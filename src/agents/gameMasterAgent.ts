@@ -1,4 +1,5 @@
 import { callLLM } from "@/services/openRouterLLM";
+import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, GameMasterResponse } from "@/types";
 import { getLLMSettings, getGMPromptSettings, getGameplaySettings } from "@/services/settingsService";
 
