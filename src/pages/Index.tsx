@@ -240,9 +240,18 @@ const Index = () => {
   }, [reset, timer]);
 
   const handleGateContinue = useCallback(() => {
+    if (sessionIdRef.current) {
+      endSession(sessionIdRef.current, {
+        game_over_reason: "completion",
+        trust_level: state.trustLevel,
+        conversation_log: conversationHistoryRef.current,
+        triggers_activated: state.triggeredIds,
+        duration_seconds: settings.TIMEOUT_SECONDS - timer.remaining,
+      }).catch(console.error);
+    }
     setPhase("game_over");
     gameOver("completion");
-  }, [setPhase, gameOver]);
+  }, [setPhase, gameOver, state.trustLevel, state.triggeredIds, timer.remaining]);
 
   switch (state.phase) {
     case "onboarding":
