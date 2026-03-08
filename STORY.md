@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-03-08 (session 4)  
+> **Last Updated**: 2026-03-08 (session 5)  
 
 ---
 
@@ -407,9 +407,43 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ---
 
+### 2026-03-08 — Protection du system prompt au sync Notion 🔹
+
+**Intent**: Empêcher la synchronisation Notion d'écraser le system prompt personnalisé de Max, qui était perdu à chaque sync.
+
+**Tool**: Lovable Cloud
+
+**Outcome**:
+- `sync-notion/index.ts` : vérifie si un `system_prompt` custom existe déjà en base avant upsert
+- Si un prompt personnalisé existe → il est préservé, le résumé Notion n'écrase plus
+- Résout le bug récurrent de perte du prompt de Max après sync
+
+**Time**: ~10min
+
+---
+
+### 2026-03-08 — Fix récupération des coûts OpenRouter 🔹
+
+**Intent**: Corriger la récupération des coûts USD qui échouait pour la plupart des appels LLM (404 ou coût à 0).
+
+**Tool**: Lovable Cloud
+
+**Outcome**:
+- `llmUsageTracker.ts` : ajout headers auth manquants, retry robuste à 15s/30s/60s (l'API OpenRouter a un délai d'indexation)
+- Bouton **"Recalculer coûts manquants"** dans l'onglet Consommation pour relancer manuellement la récupération sur les entrées `cost_fetch_failed`
+- `proxy-llm/index.ts` : amélioration du parsing des données de génération + logs détaillés
+
+**Ce que ça permet** : Avoir enfin les coûts USD réels pour chaque appel, même quand OpenRouter met du temps à indexer la génération.
+
+**Time**: ~20min
+
+---
+
 - **2026-03-08**: La persistance des réglages en localStorage seul est fragile — la double couche localStorage + DB (table admin_settings) garantit que les réglages survivent à tout contexte.
 - **2026-03-08**: Le suivi des coûts LLM doit être automatique et transparent — si l'intégrateur doit penser à logguer, il oubliera. L'intégration dans openRouterLLM.ts rend le tracking invisible pour le reste du code.
 - **2026-03-08**: Afficher le JSON brut de sync Notion était inutile pour le pilotage — un rapport visuel par table avec les métriques RAG (chunks, tokens) permet de comprendre instantanément l'état du contenu narratif.
+- **2026-03-08**: L'API OpenRouter Generation met parfois 15-60s à indexer les coûts — un mécanisme de retry progressif est indispensable pour récupérer les vrais coûts.
+- **2026-03-08**: Les environnements test et live ont des bases de données séparées — les réglages admin doivent être configurés indépendamment dans chaque environnement.
 
 *Aucun pivot majeur pour le moment — le PRD est clair et le développement suit le plan.*
 
