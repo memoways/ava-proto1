@@ -70,10 +70,18 @@ export async function getRAGContext(
   return formatRAGContext(matches);
 }
 
+// Default Notion database IDs for AVA project
+export const AVA_NOTION_DATABASES = {
+  characters: '30362322e59580bbb7b8dd49d516b341',
+  storyworld: '30362322e595806e9ef2fc62b7819980',
+  gameplay_steps: '73282ee05a414cee8307ae98ff48546d',
+  video_triggers: '478685a5b31e45b5bc534bcf905b9124',
+};
+
 /**
  * Trigger a Notion → Supabase sync (manual, for admin use).
  */
-export async function syncNotion(databases: Record<string, string>): Promise<any> {
+export async function syncNotion(databases: Record<string, string> = AVA_NOTION_DATABASES): Promise<any> {
   const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
