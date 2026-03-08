@@ -218,6 +218,9 @@ const Index = () => {
     }
   }, [isProcessing, setAudioState, addMessage, state.trustLevel, state.triggeredIds, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo]);
 
+  // Keep ref in sync
+  processUserMessageRef.current = processUserMessage;
+
   const handleMicToggle = useCallback(async () => {
     if (micActive) {
       // Stop STT
@@ -227,33 +230,10 @@ const Index = () => {
       setAudioState("idle");
       setUserSubtitle("");
     } else {
-      // Start STT
-      setMicActive(true);
-      setAudioState("user_speaking");
-      setUserSubtitle("Connexion au micro…");
-      
-      const stt = new DeepgramSTT((text, isFinal) => {
-        setUserSubtitle(text);
-        if (isFinal && text.trim()) {
-          // Stop mic and process message
-          sttRef.current?.stop();
-          sttRef.current = null;
-          setMicActive(false);
-          processUserMessage(text);
-        }
-      });
-      
-      try {
-        await stt.start();
-        sttRef.current = stt;
-      } catch (err) {
-        console.error("Failed to start STT:", err);
-        setMicActive(false);
-        setAudioState("idle");
-        setUserSubtitle("Erreur micro — vérifiez les permissions");
-      }
+      // Start STT via the auto function
+      startMicAuto();
     }
-  }, [micActive, setAudioState, processUserMessage]);
+  }, [micActive, setAudioState, startMicAuto]);
 
   const handleQuestionnaire = useCallback(() => {
     setPhase("questionnaire");
@@ -263,9 +243,11 @@ const Index = () => {
     console.log("Questionnaire submitted:", data);
     if (sessionIdRef.current) {
       saveQuestionnaire(sessionIdRef.current, data).catch(console.error);
+      // Sync to Notion
+      syncQuestionnaireToNotion(sessionIdRef.current, data, state.trustLevel, settings.TIMEOUT_SECONDS - timer.remaining, state.gameOverReason);
     }
     setPhase("thanks");
-  }, [setPhase]);
+  }, [setPhase, state.trustLevel, timer.remaining, state.gameOverReason]);
 
   const handleRestart = useCallback(() => {
     reset();
