@@ -171,6 +171,9 @@ export default function Admin() {
             <TabsTrigger value="characters">
               Personnages ({characters.length})
             </TabsTrigger>
+            <TabsTrigger value="questionnaires">
+              Questionnaires ({sessions.filter(s => s.questionnaire_responses).length})
+            </TabsTrigger>
             <TabsTrigger value="rag">RAG Test</TabsTrigger>
             <TabsTrigger value="sync">Notion Sync</TabsTrigger>
           </TabsList>
