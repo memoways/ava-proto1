@@ -20,8 +20,36 @@ interface SyncRequest {
     storyworld?: string;
     gameplay_steps?: string;
     video_triggers?: string;
-    rules?: string;
   };
+}
+
+// --- Notion property extractors ---
+
+function extractRichText(prop: any): string {
+  if (!prop?.rich_text) return '';
+  return prop.rich_text.map((t: any) => t.plain_text).join('');
+}
+
+function extractTitle(prop: any): string {
+  if (!prop?.title) return '';
+  return prop.title.map((t: any) => t.plain_text).join('');
+}
+
+function extractMultiSelect(prop: any): string[] {
+  if (!prop?.multi_select) return [];
+  return prop.multi_select.map((s: any) => s.name);
+}
+
+function extractSelect(prop: any): string | null {
+  return prop?.select?.name || null;
+}
+
+function extractNumber(prop: any): number | null {
+  return prop?.number ?? null;
+}
+
+function extractUrl(prop: any): string | null {
+  return prop?.url || null;
 }
 
 serve(async (req) => {
@@ -43,11 +71,10 @@ serve(async (req) => {
     const body: SyncRequest = await req.json();
     const results: Record<string, any> = {};
 
-    // Helper: fetch all pages from a Notion database
+    // Fetch all pages from a Notion database (handles pagination)
     async function fetchNotionDatabase(databaseId: string): Promise<NotionPage[]> {
       const pages: NotionPage[] = [];
       let cursor: string | undefined;
-
       do {
         const res = await fetch(`${NOTION_API_URL}/databases/${databaseId}/query`, {
           method: 'POST',
@@ -58,54 +85,44 @@ serve(async (req) => {
           },
           body: JSON.stringify({ start_cursor: cursor, page_size: 100 }),
         });
-
         if (!res.ok) {
           const err = await res.text();
           throw new Error(`Notion API error [${res.status}]: ${err}`);
         }
-
         const data = await res.json();
         pages.push(...data.results);
         cursor = data.has_more ? data.next_cursor : undefined;
       } while (cursor);
-
       return pages;
     }
 
-    // Helper: extract text from Notion rich text property
-    function extractRichText(prop: any): string {
-      if (!prop?.rich_text) return '';
-      return prop.rich_text.map((t: any) => t.plain_text).join('');
+    // Fetch page body content (blocks) as plain text
+    async function fetchPageContent(pageId: string): Promise<string> {
+      const blocks: string[] = [];
+      let cursor: string | undefined;
+      do {
+        const url = `${NOTION_API_URL}/blocks/${pageId}/children?page_size=100${cursor ? `&start_cursor=${cursor}` : ''}`;
+        const res = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${NOTION_API_KEY}`,
+            'Notion-Version': '2022-06-28',
+          },
+        });
+        if (!res.ok) break;
+        const data = await res.json();
+        for (const block of data.results) {
+          const richTexts = block[block.type]?.rich_text;
+          if (richTexts) {
+            const text = richTexts.map((t: any) => t.plain_text).join('');
+            if (text.trim()) blocks.push(text);
+          }
+        }
+        cursor = data.has_more ? data.next_cursor : undefined;
+      } while (cursor);
+      return blocks.join('\n');
     }
 
-    // Helper: extract title from Notion title property
-    function extractTitle(prop: any): string {
-      if (!prop?.title) return '';
-      return prop.title.map((t: any) => t.plain_text).join('');
-    }
-
-    // Helper: extract multi-select values
-    function extractMultiSelect(prop: any): string[] {
-      if (!prop?.multi_select) return [];
-      return prop.multi_select.map((s: any) => s.name);
-    }
-
-    // Helper: extract select value
-    function extractSelect(prop: any): string | null {
-      return prop?.select?.name || null;
-    }
-
-    // Helper: extract number
-    function extractNumber(prop: any): number | null {
-      return prop?.number ?? null;
-    }
-
-    // Helper: extract URL
-    function extractUrl(prop: any): string | null {
-      return prop?.url || null;
-    }
-
-    // Helper: generate embedding via OpenAI
+    // Generate embedding via OpenAI
     async function generateEmbedding(text: string): Promise<number[]> {
       const res = await fetch(`${OPENAI_API_URL}/embeddings`, {
         method: 'POST',
@@ -113,28 +130,20 @@ serve(async (req) => {
           'Authorization': `Bearer ${OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: 'text-embedding-3-small',
-          input: text,
-        }),
+        body: JSON.stringify({ model: 'text-embedding-3-small', input: text }),
       });
-
       if (!res.ok) {
         const err = await res.text();
         throw new Error(`OpenAI Embeddings error [${res.status}]: ${err}`);
       }
-
       const data = await res.json();
       return data.data[0].embedding;
     }
 
-    // Helper: upsert embedding for a record
+    // Upsert embedding for a record
     async function upsertEmbedding(sourceTable: string, sourceId: string, content: string) {
       if (!content || content.trim().length < 10) return;
-
       const embedding = await generateEmbedding(content);
-
-      // Check if embedding exists
       const { data: existing } = await supabase
         .from('embeddings')
         .select('id')
@@ -143,18 +152,18 @@ serve(async (req) => {
         .maybeSingle();
 
       if (existing) {
-        await supabase
-          .from('embeddings')
+        await supabase.from('embeddings')
           .update({ content, embedding: JSON.stringify(embedding) })
           .eq('id', existing.id);
       } else {
-        await supabase
-          .from('embeddings')
+        await supabase.from('embeddings')
           .insert({ source_table: sourceTable, source_id: sourceId, content, embedding: JSON.stringify(embedding) });
       }
     }
 
-    // SYNC CHARACTERS
+    // ========== SYNC CHARACTERS ==========
+    // Notion props: "Nom du caractère" (title), "Résumé" (text), "Genre" (select), "Rôle familial" (select), "Archétype narratif" (select)
+    // Page body contains detailed backstory, personality, system prompt
     if (body.databases.characters) {
       console.log('[sync-notion] Syncing characters...');
       const pages = await fetchNotionDatabase(body.databases.characters);
@@ -162,16 +171,21 @@ serve(async (req) => {
 
       for (const page of pages) {
         const props = page.properties;
-        const name = extractTitle(props['Name'] || props['Nom'] || props['name']);
+        const name = extractTitle(props['Nom du caractère']);
         if (!name) continue;
+
+        // Fetch page body for rich content (backstory, personality, etc.)
+        const pageContent = await fetchPageContent(page.id);
+        const resume = extractRichText(props['Résumé']);
+        const genre = extractSelect(props['Genre']);
 
         const record = {
           notion_id: page.id,
           name,
-          system_prompt: extractRichText(props['System Prompt'] || props['Prompt'] || props['system_prompt']),
-          backstory: extractRichText(props['Backstory'] || props['Histoire'] || props['backstory']),
-          personality: extractRichText(props['Personality'] || props['Personnalité'] || props['personality']),
-          branch: extractSelect(props['Branch'] || props['Branche'] || props['branch']) || 'male',
+          backstory: pageContent || resume,
+          personality: `${extractSelect(props['Archétype narratif']) || ''} - ${extractSelect(props['Type MBTI']) || ''}`.trim(),
+          system_prompt: resume,
+          branch: genre === 'Femme' ? 'female' : 'male',
           updated_at: new Date().toISOString(),
         };
 
@@ -186,15 +200,15 @@ serve(async (req) => {
           continue;
         }
 
-        // Generate embedding from combined text
-        const embeddingText = `Personnage: ${name}\n${record.backstory}\n${record.personality}\n${record.system_prompt}`;
+        const embeddingText = `Personnage: ${name}\nRésumé: ${resume}\n${pageContent}`;
         await upsertEmbedding('characters', data.id, embeddingText);
         synced++;
       }
       results.characters = { synced, total: pages.length };
     }
 
-    // SYNC STORYWORLD
+    // ========== SYNC STORYWORLD ==========
+    // Notion props: "Nom" (title), "Résumé" (text), "Type" (select), "Tags" (multi_select)
     if (body.databases.storyworld) {
       console.log('[sync-notion] Syncing storyworld...');
       const pages = await fetchNotionDatabase(body.databases.storyworld);
@@ -202,14 +216,14 @@ serve(async (req) => {
 
       for (const page of pages) {
         const props = page.properties;
-        const title = extractTitle(props['Name'] || props['Titre'] || props['Title'] || props['name']);
+        const title = extractTitle(props['Nom']);
         if (!title) continue;
 
         const record = {
           notion_id: page.id,
           title,
-          content: extractRichText(props['Content'] || props['Contenu'] || props['content'] || props['Description']),
-          category: extractSelect(props['Category'] || props['Catégorie'] || props['category']),
+          content: extractRichText(props['Résumé']),
+          category: extractSelect(props['Type']),
           updated_at: new Date().toISOString(),
         };
 
@@ -224,14 +238,16 @@ serve(async (req) => {
           continue;
         }
 
-        const embeddingText = `${title}\n${record.content}`;
+        const tags = extractMultiSelect(props['Tags']).join(', ');
+        const embeddingText = `${title}\nType: ${record.category || 'N/A'}\nTags: ${tags}\n${record.content}`;
         await upsertEmbedding('storyworld', data.id, embeddingText);
         synced++;
       }
       results.storyworld = { synced, total: pages.length };
     }
 
-    // SYNC GAMEPLAY STEPS
+    // ========== SYNC GAMEPLAY STEPS ==========
+    // Notion props: "Nom de l'étape" (title), "Type" (select), "Ordre" (number), "Condition de déclenchement" (text), "Description" (text)
     if (body.databases.gameplay_steps) {
       console.log('[sync-notion] Syncing gameplay_steps...');
       const pages = await fetchNotionDatabase(body.databases.gameplay_steps);
@@ -239,16 +255,16 @@ serve(async (req) => {
 
       for (const page of pages) {
         const props = page.properties;
-        const name = extractTitle(props['Name'] || props['Nom'] || props['name']);
+        const name = extractTitle(props["Nom de l'étape"]);
         if (!name) continue;
 
         const record = {
           notion_id: page.id,
           name,
-          type: extractSelect(props['Type'] || props['type']) || 'conversation',
-          step_order: extractNumber(props['Order'] || props['Ordre'] || props['step_order']),
-          trigger_condition: extractRichText(props['Condition'] || props['trigger_condition']),
-          description: extractRichText(props['Description'] || props['description']),
+          type: extractSelect(props['Type']) || 'conversation',
+          step_order: extractNumber(props['Ordre']),
+          trigger_condition: extractRichText(props['Condition de déclenchement']),
+          description: extractRichText(props['Description']),
           updated_at: new Date().toISOString(),
         };
 
@@ -265,7 +281,10 @@ serve(async (req) => {
       results.gameplay_steps = { synced, total: pages.length };
     }
 
-    // SYNC VIDEO TRIGGERS
+    // ========== SYNC VIDEO TRIGGERS ==========
+    // Notion props: "Titre de la vidéo" (title), "Type" (select), "Thèmes" (multi_select),
+    //   "URL Gumlet" (url), "Description" (text), "Priorité" (number),
+    //   "Style de transition" (select), "Contexte post-vidéo" (text)
     if (body.databases.video_triggers) {
       console.log('[sync-notion] Syncing video_triggers...');
       const pages = await fetchNotionDatabase(body.databases.video_triggers);
@@ -273,20 +292,19 @@ serve(async (req) => {
 
       for (const page of pages) {
         const props = page.properties;
-        const title = extractTitle(props['Name'] || props['Titre'] || props['Title'] || props['name']);
+        const title = extractTitle(props['Titre de la vidéo']);
         if (!title) continue;
 
         const record = {
           notion_id: page.id,
           title,
-          type: extractSelect(props['Type'] || props['type']) || 'mid_conversation',
-          themes: extractMultiSelect(props['Themes'] || props['Thèmes'] || props['themes']),
-          video_url: extractUrl(props['Video URL'] || props['video_url']),
-          placeholder_text: extractRichText(props['Placeholder'] || props['placeholder_text'] || props['Description']),
-          priority: extractNumber(props['Priority'] || props['Priorité'] || props['priority']) || 1,
-          transition_style: extractSelect(props['Transition'] || props['transition_style']) || 'fade_black',
-          post_video_context: extractRichText(props['Post Video Context'] || props['post_video_context'] || props['Contexte post-vidéo']),
-          duration_seconds: extractNumber(props['Duration'] || props['Durée'] || props['duration_seconds']) || 10,
+          type: extractSelect(props['Type']) || 'mid_conversation',
+          themes: extractMultiSelect(props['Thèmes']),
+          video_url: extractUrl(props['URL Gumlet']),
+          placeholder_text: extractRichText(props['Description']),
+          priority: extractNumber(props['Priorité']) || 1,
+          transition_style: extractSelect(props['Style de transition']) || 'fade_black',
+          post_video_context: extractRichText(props['Contexte post-vidéo']),
           updated_at: new Date().toISOString(),
         };
 
@@ -301,43 +319,6 @@ serve(async (req) => {
         synced++;
       }
       results.video_triggers = { synced, total: pages.length };
-    }
-
-    // SYNC RULES
-    if (body.databases.rules) {
-      console.log('[sync-notion] Syncing rules...');
-      const pages = await fetchNotionDatabase(body.databases.rules);
-      let synced = 0;
-
-      for (const page of pages) {
-        const props = page.properties;
-        const title = extractTitle(props['Name'] || props['Titre'] || props['Title'] || props['name']);
-        if (!title) continue;
-
-        const record = {
-          notion_id: page.id,
-          title,
-          content: extractRichText(props['Content'] || props['Contenu'] || props['content']),
-          category: extractSelect(props['Category'] || props['Catégorie'] || props['category']),
-          updated_at: new Date().toISOString(),
-        };
-
-        const { data, error } = await supabase
-          .from('rules')
-          .upsert(record, { onConflict: 'notion_id' })
-          .select()
-          .single();
-
-        if (error) {
-          console.error(`[sync-notion] Error upserting rule ${title}:`, error);
-          continue;
-        }
-
-        const embeddingText = `Règle: ${title}\n${record.content}`;
-        await upsertEmbedding('rules', data.id, embeddingText);
-        synced++;
-      }
-      results.rules = { synced, total: pages.length };
     }
 
     console.log('[sync-notion] Sync complete:', results);
