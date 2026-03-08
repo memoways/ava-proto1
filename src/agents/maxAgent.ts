@@ -1,5 +1,6 @@
 import { streamLLM } from "@/services/openRouterLLM";
 import { supabase } from "@/integrations/supabase/client";
+import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage } from "@/types";
 import { getLLMSettings } from "@/services/settingsService";
 
@@ -80,6 +81,7 @@ export async function callMaxAgent(
   onChunk: (text: string, done: boolean) => void
 ): Promise<string> {
   const systemPrompt = await buildMaxSystemPrompt(input.ragContext, input.postVideoContext);
+  debugLogger.log({ service: "llm", level: "info", direction: "out", label: `Max agent: ${input.conversationHistory.length} history + "${input.userMessage.slice(0, 80)}"`, payload: `System prompt: ${systemPrompt.length} chars` });
 
   const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
     { role: "system", content: systemPrompt },

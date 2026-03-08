@@ -6,6 +6,11 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import DebugPanel from "./components/DebugPanel";
+import { debugLogger } from "./services/debugLogger";
+
+// Init debug logger based on URL params
+debugLogger.init();
 
 const queryClient = new QueryClient();
 
@@ -22,6 +27,7 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
+      {debugLogger.enabled && <DebugPanel />}
     </TooltipProvider>
   </QueryClientProvider>
 );

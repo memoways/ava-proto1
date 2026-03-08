@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { debugLogger } from "./debugLogger";
 import type { Json } from "@/integrations/supabase/types";
 import type { ConversationMessage, QuestionnaireData } from "@/types";
 
@@ -17,6 +18,7 @@ export interface SessionRecord {
 
 /** Create a new session row and return its ID */
 export async function createSession(branch = "male"): Promise<string> {
+  debugLogger.log({ service: "session", level: "info", direction: "out", label: "Create session", detail: `branch=${branch}` });
   const { data, error } = await supabase
     .from("sessions")
     .insert({ branch, started_at: new Date().toISOString() })
@@ -24,9 +26,11 @@ export async function createSession(branch = "male"): Promise<string> {
     .single();
 
   if (error) {
+    debugLogger.logError("session", "Create session failed", error);
     console.error("[Session] Failed to create:", error);
     throw error;
   }
+  debugLogger.log({ service: "session", level: "success", direction: "in", label: `Session created: ${data.id}` });
   console.log("[Session] Created:", data.id);
   return data.id;
 }
@@ -115,6 +119,8 @@ export async function syncQuestionnaireToNotion(
   gameOverReason: string | null
 ): Promise<void> {
   try {
+    const startTime = Date.now();
+    const debugId = debugLogger.logFetch("notion", "Sync questionnaire → Notion", `${SUPABASE_URL}/functions/v1/sync-questionnaire`, { sessionId });
     const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-questionnaire`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -128,11 +134,14 @@ export async function syncQuestionnaireToNotion(
     });
     if (!res.ok) {
       const err = await res.text();
+      debugLogger.logResponse(debugId, "notion", "Sync questionnaire", res.status, startTime, err);
       console.error("[Notion] Questionnaire sync failed:", err);
     } else {
+      debugLogger.logResponse(debugId, "notion", "Sync questionnaire OK", res.status, startTime);
       console.log("[Notion] Questionnaire synced successfully");
     }
   } catch (err) {
+    debugLogger.logError("notion", "Questionnaire sync error", err);
     console.error("[Notion] Questionnaire sync error:", err);
   }
 }

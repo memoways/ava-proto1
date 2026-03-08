@@ -1,4 +1,5 @@
 import { getTTSSettings } from "@/services/settingsService";
+import { debugLogger } from "@/services/debugLogger";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -28,6 +29,9 @@ export async function generateSpeech(text: string, options?: TTSOptions): Promis
     ...(options?.voiceId ? { voiceId: options.voiceId } : {}),
   };
 
+  const startTime = Date.now();
+  const debugId = debugLogger.logFetch("tts", `TTS "${text.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts`, merged);
+
   const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -36,10 +40,13 @@ export async function generateSpeech(text: string, options?: TTSOptions): Promis
 
   if (!response.ok) {
     const err = await response.text();
+    debugLogger.logResponse(debugId, "tts", "TTS", response.status, startTime, err);
     throw new Error(`TTS error: ${response.status} - ${err}`);
   }
 
-  return response.blob();
+  const blob = await response.blob();
+  debugLogger.logResponse(debugId, "tts", `TTS (${(blob.size / 1024).toFixed(0)}KB)`, response.status, startTime);
+  return blob;
 }
 
 /**

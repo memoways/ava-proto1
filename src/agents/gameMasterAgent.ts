@@ -1,4 +1,5 @@
 import { callLLM } from "@/services/openRouterLLM";
+import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, GameMasterResponse } from "@/types";
 import { getLLMSettings, getGMPromptSettings, getGameplaySettings } from "@/services/settingsService";
 
@@ -41,6 +42,7 @@ export async function callGameMaster(input: GameMasterInput): Promise<GameMaster
   ];
 
   try {
+    debugLogger.log({ service: "gm", level: "info", direction: "out", label: "Game Master evaluation", payload: contextMessage.slice(0, 300) });
     const llm = getLLMSettings();
     const response = await callLLM(messages, {
       model: llm.LLM_MODEL_GM,
@@ -52,6 +54,7 @@ export async function callGameMaster(input: GameMasterInput): Promise<GameMaster
     // Parse JSON from response
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
+      debugLogger.log({ service: "gm", level: "error", direction: "in", label: "No JSON in GM response", payload: response });
       console.error("[GameMaster] No JSON found in response:", response);
       return DEFAULT_RESPONSE;
     }
@@ -68,8 +71,10 @@ export async function callGameMaster(input: GameMasterInput): Promise<GameMaster
       parsed.trigger_video_id = null;
     }
 
+    debugLogger.log({ service: "gm", level: "success", direction: "in", label: `GM → trust_delta=${parsed.trust_delta}, gate=${parsed.gate_reached}, trigger=${parsed.trigger_video_id || "none"}`, payload: JSON.stringify(parsed, null, 2) });
     return parsed;
   } catch (error) {
+    debugLogger.logError("gm", "Game Master error", error);
     console.error("[GameMaster] Error:", error);
     return DEFAULT_RESPONSE;
   }
