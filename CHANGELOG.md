@@ -4,16 +4,25 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
-## [Non publié]
+## [0.5.0] - 2026-03-08
 
 ### Ajouté
-- 
+- Micro persistant en mode continu : la connexion Deepgram reste ouverte pendant toute la conversation, le micro est mis en pause/reprise sans reconnexion
+- Méthodes `pause()` et `resume()` sur `DeepgramSTT` pour gérer le mute sans couper le WebSocket
+- Onglet **Questionnaires** dans `/admin` avec tableau récapitulatif de toutes les réponses (NPS, immersion, écoute, prix, etc.)
+- Edge Function `sync-questionnaire` — synchronise les réponses du questionnaire vers Notion (18 champs)
+- Sauvegarde de session complète (conversation log, trust level, triggers activés, durée, game over reason)
+- Édition du system prompt des personnages dans `/admin` avec sauvegarde en base
+- Durée de l'expérience augmentée à 10 minutes (600s)
 
 ### Modifié
-- 
+- `deepgramSTT.ts` : refactorisé en mode persistant (pause/resume au lieu de stop/start)
+- `Index.tsx` : le micro se relance automatiquement après chaque réponse de Max ou cinématique, sans action utilisateur
+- `Admin.tsx` : ajout onglets Questionnaires + édition system prompt fonctionnelle
+- Politiques RLS sur `characters` ouvertes pour permettre l'édition depuis le prototype (anon + authenticated)
 
 ### Corrigé
-- 
+- Sauvegarde du system prompt dans `/admin` qui ne persistait pas (problème RLS)
 
 ---
 
