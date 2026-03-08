@@ -137,3 +137,114 @@ export function resetTTSSettings(): TTSSettings {
   localStorage.removeItem(TTS_STORAGE_KEY);
   return { ...ttsDefaults };
 }
+
+// ===== Gameplay / Experience Settings =====
+
+export interface GameplaySettings {
+  TRUST_THRESHOLD: number;
+  TIMEOUT_SECONDS: number;
+  MAX_INSULT_TOLERANCE: number;
+  MIN_QUESTIONS_BEFORE_GATE: number;
+  RAG_TOP_K: number;
+  VIDEO_PLACEHOLDER_DURATION: number;
+}
+
+const GAMEPLAY_STORAGE_KEY = "ava_gameplay_settings";
+
+const gameplayDefaults: GameplaySettings = {
+  TRUST_THRESHOLD: defaultSettings.TRUST_THRESHOLD,
+  TIMEOUT_SECONDS: defaultSettings.TIMEOUT_SECONDS,
+  MAX_INSULT_TOLERANCE: defaultSettings.MAX_INSULT_TOLERANCE,
+  MIN_QUESTIONS_BEFORE_GATE: defaultSettings.MIN_QUESTIONS_BEFORE_GATE,
+  RAG_TOP_K: defaultSettings.RAG_TOP_K,
+  VIDEO_PLACEHOLDER_DURATION: defaultSettings.VIDEO_PLACEHOLDER_DURATION,
+};
+
+export function getGameplaySettings(): GameplaySettings {
+  try {
+    const stored = localStorage.getItem(GAMEPLAY_STORAGE_KEY);
+    if (stored) return { ...gameplayDefaults, ...JSON.parse(stored) };
+  } catch { /* ignore */ }
+  return { ...gameplayDefaults };
+}
+
+export function saveGameplaySettings(settings: Partial<GameplaySettings>): GameplaySettings {
+  const current = getGameplaySettings();
+  const updated = { ...current, ...settings };
+  localStorage.setItem(GAMEPLAY_STORAGE_KEY, JSON.stringify(updated));
+  return updated;
+}
+
+export function resetGameplaySettings(): GameplaySettings {
+  localStorage.removeItem(GAMEPLAY_STORAGE_KEY);
+  return { ...gameplayDefaults };
+}
+
+// ===== Game Master Prompt Settings =====
+
+export interface GameMasterPromptSettings {
+  systemPrompt: string;
+  triggers: Record<string, { themes: string[]; description: string }>;
+}
+
+const GM_PROMPT_STORAGE_KEY = "ava_gm_prompt_settings";
+
+const DEFAULT_GM_SYSTEM_PROMPT = `Tu es le Game Master d'une expérience narrative interactive "Où est Ava ?". Tu analyses chaque échange entre l'utilisateur et Max pour orchestrer l'expérience.
+
+## TON RÔLE
+- Évaluer la sincérité et l'engagement de l'utilisateur
+- Détecter si un trigger vidéo doit être activé
+- Gérer le niveau de confiance et la progression
+- Détecter les comportements inappropriés
+
+## RÈGLES
+- trust_delta: +1 si réponse sincère/engagée, 0 si neutre, -1 si évasive/désintéressée
+- Trigger vidéo si la conversation touche un thème clé (famille, enfance, secret, disparition)
+- game_over si comportement inapproprié (insultes, hors-sujet répété) ou si l'utilisateur abandonne
+- gate_reached si trust_level >= TRUST_THRESHOLD
+
+## TRIGGERS DISPONIBLES
+- "trigger_famille" : thèmes famille, parents, enfance
+- "trigger_secret" : thèmes secret, mystère, vérité cachée
+- "trigger_disparition" : thèmes disparition, absence, recherche
+
+## FORMAT DE RÉPONSE
+Tu dois TOUJOURS répondre avec un JSON valide et RIEN D'AUTRE :
+{
+  "trust_delta": 0,
+  "trigger_video_id": null,
+  "game_over": false,
+  "game_over_reason": null,
+  "gate_reached": false,
+  "moderation_flag": false,
+  "notes": "Brève analyse de l'échange"
+}`;
+
+const gmPromptDefaults: GameMasterPromptSettings = {
+  systemPrompt: DEFAULT_GM_SYSTEM_PROMPT,
+  triggers: {
+    trigger_famille: { themes: ["famille", "parents", "enfance"], description: "Flashback famille" },
+    trigger_secret: { themes: ["secret", "mystère", "vérité"], description: "Le message cryptique" },
+    trigger_disparition: { themes: ["disparition", "absence", "recherche"], description: "Le jour de la disparition" },
+  },
+};
+
+export function getGMPromptSettings(): GameMasterPromptSettings {
+  try {
+    const stored = localStorage.getItem(GM_PROMPT_STORAGE_KEY);
+    if (stored) return { ...gmPromptDefaults, ...JSON.parse(stored) };
+  } catch { /* ignore */ }
+  return { ...gmPromptDefaults };
+}
+
+export function saveGMPromptSettings(settings: Partial<GameMasterPromptSettings>): GameMasterPromptSettings {
+  const current = getGMPromptSettings();
+  const updated = { ...current, ...settings };
+  localStorage.setItem(GM_PROMPT_STORAGE_KEY, JSON.stringify(updated));
+  return updated;
+}
+
+export function resetGMPromptSettings(): GameMasterPromptSettings {
+  localStorage.removeItem(GM_PROMPT_STORAGE_KEY);
+  return { ...gmPromptDefaults };
+}
