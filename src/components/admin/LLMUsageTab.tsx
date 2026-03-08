@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { retryCostForRow } from "@/services/llmUsageTracker";
 
 interface UsageRow {
   id: string;
@@ -158,6 +159,9 @@ export default function LLMUsageTab() {
         </Select>
         <Button size="sm" variant="outline" onClick={loadData} disabled={loading}>
           {loading ? "..." : "Rafraîchir"}
+        </Button>
+        <Button size="sm" variant="outline" onClick={retryAllFailedCosts} disabled={loading}>
+          Recalculer coûts manquants
         </Button>
       </div>
 
