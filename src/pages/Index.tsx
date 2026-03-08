@@ -2,8 +2,9 @@ import { useState, useCallback, useRef } from "react";
 import { useGameState } from "@/hooks/useGameState";
 import { useTimer } from "@/hooks/useTimer";
 import { DeepgramSTT } from "@/services/deepgramSTT";
+import { processConversationTurn } from "@/services/conversationOrchestrator";
 import settings from "@/config/settings.json";
-import type { QuestionnaireData } from "@/types";
+import type { QuestionnaireData, ConversationMessage } from "@/types";
 
 import OnboardingScreen from "@/components/OnboardingScreen";
 import VideoPlaceholder from "@/components/VideoPlaceholder";
@@ -13,25 +14,28 @@ import GateScreen from "@/components/GateScreen";
 import QuestionnaireScreen from "@/components/QuestionnaireScreen";
 import ThanksScreen from "@/components/ThanksScreen";
 
-const DEMO_TRIGGERS = [
-  {
-    id: "intro",
-    title: "Cinématique d'introduction",
-    type: "intro" as const,
-    themes: [],
-    placeholder_text: "Le monde a changé. Une pandémie a tout bouleversé. Les communications sont surveillées. Et Ava… Ava a disparu sans laisser de trace.",
-    priority: 0,
-    transition_style: "fade_black",
-    post_video_context: null,
-    duration_seconds: settings.VIDEO_PLACEHOLDER_DURATION,
-  },
-];
+const INTRO_TRIGGER = {
+  id: "intro",
+  title: "Cinématique d'introduction",
+  type: "intro" as const,
+  themes: [],
+  placeholder_text: "Le monde a changé. Une pandémie a tout bouleversé. Les communications sont surveillées. Et Ava… Ava a disparu sans laisser de trace.",
+  priority: 0,
+  transition_style: "fade_black",
+  post_video_context: null,
+  duration_seconds: settings.VIDEO_PLACEHOLDER_DURATION,
+};
 
 const Index = () => {
-  const { state, setPhase, setAudioState, gameOver, reset } = useGameState();
+  const { state, setPhase, setAudioState, addMessage, updateTrust, triggerVideo, endTrigger, gameOver, reset } = useGameState();
   const [micActive, setMicActive] = useState(false);
   const [userSubtitle, setUserSubtitle] = useState("");
   const [maxSubtitle, setMaxSubtitle] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [postVideoContext, setPostVideoContext] = useState<string | null>(null);
+
+  const sttRef = useRef<DeepgramSTT | null>(null);
+  const conversationHistoryRef = useRef<ConversationMessage[]>([]);
 
   const timer = useTimer(settings.TIMEOUT_SECONDS, () => {
     gameOver("timeout");
@@ -46,7 +50,86 @@ const Index = () => {
     timer.start();
   }, [setPhase, timer]);
 
-  const sttRef = useRef<DeepgramSTT | null>(null);
+  const handleTriggerComplete = useCallback(() => {
+    endTrigger();
+  }, [endTrigger]);
+
+  // Process user message through LLM agents
+  const processUserMessage = useCallback(async (userText: string) => {
+    if (isProcessing || !userText.trim()) return;
+
+    setIsProcessing(true);
+    setAudioState("max_thinking");
+    setUserSubtitle("");
+
+    // Add user message to history
+    const userMsg: ConversationMessage = { role: "user", content: userText, timestamp: Date.now() };
+    conversationHistoryRef.current.push(userMsg);
+    addMessage(userMsg);
+
+    try {
+      // Process conversation turn (Max + Game Master)
+      const result = await processConversationTurn(
+        userText,
+        conversationHistoryRef.current.slice(0, -1), // History without current message
+        state.trustLevel,
+        state.triggeredIds,
+        settings.TIMEOUT_SECONDS - timer.remaining,
+        (chunk, done) => {
+          if (!done) {
+            setMaxSubtitle((prev) => prev + chunk);
+            setAudioState("max_speaking");
+          }
+        },
+        undefined, // RAG context (TODO: integrate later)
+        postVideoContext || undefined
+      );
+
+      // Add Max response to history
+      const maxMsg: ConversationMessage = { role: "max", content: result.maxResponse, timestamp: Date.now() };
+      conversationHistoryRef.current.push(maxMsg);
+      addMessage(maxMsg);
+
+      // Update trust
+      if (result.gameMasterResponse.trust_delta !== 0) {
+        updateTrust(result.gameMasterResponse.trust_delta);
+      }
+
+      console.log("[Game Master]", result.gameMasterResponse);
+
+      // Clear post-video context after use
+      setPostVideoContext(null);
+
+      // Handle game over
+      if (result.gameMasterResponse.game_over) {
+        gameOver(result.gameMasterResponse.game_over_reason || "moderation");
+        return;
+      }
+
+      // Handle gate reached
+      if (result.gameMasterResponse.gate_reached) {
+        setPhase("gate");
+        return;
+      }
+
+      // Handle video trigger (wait a moment then trigger)
+      if (result.trigger) {
+        setTimeout(() => {
+          setPostVideoContext(result.trigger?.post_video_context || null);
+          triggerVideo(result.trigger!);
+        }, 1500); // Wait for Max to finish "speaking"
+      }
+
+    } catch (error) {
+      console.error("Error processing conversation:", error);
+      setMaxSubtitle("Désolé, j'ai eu un problème de connexion...");
+    } finally {
+      setIsProcessing(false);
+      setAudioState("idle");
+      // Clear Max subtitle after a delay
+      setTimeout(() => setMaxSubtitle(""), 3000);
+    }
+  }, [isProcessing, setAudioState, addMessage, state.trustLevel, state.triggeredIds, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo]);
 
   const handleMicToggle = useCallback(async () => {
     if (micActive) {
@@ -64,9 +147,12 @@ const Index = () => {
       
       const stt = new DeepgramSTT((text, isFinal) => {
         setUserSubtitle(text);
-        if (isFinal) {
-          console.log("[STT Final]", text);
-          // TODO: send to LLM agents (Max + Game Master)
+        if (isFinal && text.trim()) {
+          // Stop mic and process message
+          sttRef.current?.stop();
+          sttRef.current = null;
+          setMicActive(false);
+          processUserMessage(text);
         }
       });
       
@@ -80,7 +166,7 @@ const Index = () => {
         setUserSubtitle("Erreur micro — vérifiez les permissions");
       }
     }
-  }, [micActive, setAudioState]);
+  }, [micActive, setAudioState, processUserMessage]);
 
   const handleQuestionnaire = useCallback(() => {
     setPhase("questionnaire");
@@ -97,6 +183,8 @@ const Index = () => {
     setMicActive(false);
     setUserSubtitle("");
     setMaxSubtitle("");
+    conversationHistoryRef.current = [];
+    setPostVideoContext(null);
   }, [reset, timer]);
 
   const handleGateContinue = useCallback(() => {
@@ -112,8 +200,8 @@ const Index = () => {
       return (
         <VideoPlaceholder
           title="Cinématique d'introduction"
-          description={DEMO_TRIGGERS[0].placeholder_text}
-          durationSeconds={DEMO_TRIGGERS[0].duration_seconds}
+          description={INTRO_TRIGGER.placeholder_text}
+          durationSeconds={INTRO_TRIGGER.duration_seconds}
           onComplete={handleIntroComplete}
           onSkip={handleIntroComplete}
         />
@@ -140,8 +228,8 @@ const Index = () => {
           title={state.currentTrigger?.title || "Vidéo"}
           description={state.currentTrigger?.placeholder_text || ""}
           durationSeconds={state.currentTrigger?.duration_seconds || 10}
-          onComplete={handleIntroComplete}
-          onSkip={handleIntroComplete}
+          onComplete={handleTriggerComplete}
+          onSkip={handleTriggerComplete}
         />
       );
 
