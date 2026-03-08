@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.7.1] - 2026-03-08
+
+### Corrigé
+- **Récupération des coûts OpenRouter** : ajout des headers d'authentification manquants (`apikey`, `Authorization`) dans `fetchGenerationCost`, mécanisme de retry robuste (15s → 30s → 60s) pour pallier le délai d'indexation de l'API OpenRouter
+- **Protection du system prompt au sync Notion** : `sync-notion/index.ts` vérifie maintenant si un prompt custom existe en base avant d'écraser avec les données Notion — le prompt personnalisé de Max est préservé
+- **Bouton "Recalculer coûts manquants"** dans l'onglet Consommation pour relancer la récupération des coûts sur les entrées en `cost_fetch_failed`
+
+---
+
 ## [0.7.0] - 2026-03-08
 
 ### Ajouté
