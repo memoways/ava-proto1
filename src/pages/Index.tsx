@@ -11,6 +11,7 @@ import type { QuestionnaireData, ConversationMessage } from "@/types";
 
 import OnboardingScreen from "@/components/OnboardingScreen";
 import VideoPlaceholder from "@/components/VideoPlaceholder";
+import GumletVideoPlayer from "@/components/GumletVideoPlayer";
 import ConversationScreen from "@/components/ConversationScreen";
 import GameOverScreen from "@/components/GameOverScreen";
 import GateScreen from "@/components/GateScreen";
