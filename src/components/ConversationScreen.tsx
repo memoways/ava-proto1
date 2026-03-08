@@ -13,6 +13,7 @@ interface ConversationScreenProps {
   maxSubtitle: string;
   onMicToggle: () => void;
   micActive: boolean;
+  micEverStarted: boolean;
   elapsedSeconds: number;
   onEarlyQuestionnaire?: () => void;
 }
@@ -36,6 +37,7 @@ const ConversationScreen = ({
   maxSubtitle,
   onMicToggle,
   micActive,
+  micEverStarted,
   elapsedSeconds,
   onEarlyQuestionnaire,
 }: ConversationScreenProps) => {
