@@ -46,6 +46,7 @@ export async function callGameMaster(input: GameMasterInput): Promise<GameMaster
       model: llm.LLM_MODEL_GM,
       temperature: llm.LLM_TEMPERATURE_GM,
       max_tokens: llm.LLM_MAX_TOKENS_GM,
+      feature_key: "game_master",
     });
 
     // Parse JSON from response
