@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-03-08 (session 6)  
+> **Last Updated**: 2026-03-08 (session 7)  
 
 ---
 
@@ -510,6 +510,38 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 **Ce que ça permet** : Les cinématiques sont enfin de vraies vidéos. Le mode responsive plein écran avec overlays maintient l'immersion. Le fallback vers VideoPlaceholder garantit la compatibilité avec les triggers qui n'ont pas encore de vidéo assignée.
 
 **Time**: ~25min
+
+---
+
+### 2026-03-08 — Debug Panel 🔷
+
+**Intent**: Créer un outil de diagnostic pour visualiser en temps réel tous les appels API sortants de l'application, sans impacter les performances en production.
+
+**Tool**: Lovable
+
+**Outcome**:
+- `debugLogger.ts` : service singleton activé par `?debug` dans l'URL, avec `log()`, `logFetch()`, `logResponse()`, `logError()` — chaque méthode fait un early return si désactivé (zero overhead)
+- `DebugPanel.tsx` : panneau latéral droit (w-96, fixed, z-50) avec filtres par service/niveau, entrées expansibles, copie, auto-scroll
+- Intégration dans 7 services : `openRouterLLM`, `elevenLabsTTS`, `deepgramSTT`, `ragService`, `sessionService`, `gameMasterAgent`, `maxAgent`, `conversationOrchestrator`
+- Monté conditionnellement dans `App.tsx` : `{debugLogger.enabled && <DebugPanel />}`
+
+**Ce que ça permet** : Diagnostiquer en direct les problèmes de pipeline (latence, erreurs, payloads malformés) sans ouvrir la console navigateur.
+
+**Time**: ~30min
+
+---
+
+### 2026-03-08 — Correction hint micro 🔹
+
+**Intent**: Le message "Cliquez sur le micro pour parler à Max" restait affiché même après avoir utilisé le micro.
+
+**Tool**: Lovable
+
+**Outcome**:
+- `Index.tsx` : ajout d'un state `micEverStarted` passant à true à la première activation
+- `ConversationScreen.tsx` : hint conditionné à `micEverStarted === false`
+
+**Time**: ~5min
 
 ---
 
