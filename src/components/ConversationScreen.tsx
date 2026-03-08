@@ -129,8 +129,8 @@ const ConversationScreen = ({
           )}
         </p>
 
-        {/* Mic hint */}
-        {audioState === "idle" && !micActive && (
+        {/* Mic hint — only show if mic was NEVER activated */}
+        {!micEverStarted && !micActive && (
           <p className="text-xs text-muted-foreground/60 animate-fade-in">
             Cliquez sur le micro pour parler à Max
           </p>
