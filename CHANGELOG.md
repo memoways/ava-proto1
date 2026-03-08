@@ -4,6 +4,37 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.7.0] - 2026-03-08
+
+### Ajouté
+- **LLM Cost Tracker** : module complet de suivi des coûts OpenRouter dans `/admin` → Technique → Consommation
+  - KPI cards : coût total, coût 30 jours, coût aujourd'hui, requêtes totales, tokens totaux
+  - Graphiques : coût par jour, par modèle, par feature
+  - Tableau filtrable des 100 dernières requêtes (date, feature, model, tokens, cost, status)
+  - Pipeline de collecte : chaque appel OpenRouter est loggé automatiquement avec tokens + generation_id, puis le coût USD exact est récupéré via l'API OpenRouter
+- **Persistance des réglages admin en base** : tous les réglages LLM, Voix, Gameplay et Game Master sont maintenant stockés dans la table `admin_settings` (clé/valeur JSONB) au lieu de localStorage seul
+  - Boutons **Sauvegarder** explicites dans les onglets LLM Config et Voix
+  - Hydratation automatique des réglages au chargement de la page admin
+  - Les choix de modèle, température, voix, presets survivent au rechargement et au changement de navigateur
+- **Vérification du system prompt** : relecture de contrôle en base après sauvegarde, invalidation forcée du cache mémoire
+- **Rapport de sync Notion détaillé** : après chaque synchronisation, affichage structuré par table avec :
+  - Nombre d'entrées synchronisées / total
+  - Chunks RAG créés par table
+  - Caractères et tokens estimés pour les embeddings
+  - Total d'embeddings en base
+- Table `admin_settings` créée avec RLS ouverte (prototype)
+- Table `llm_usage` créée avec index sur `created_at`, `model`, `feature_key`, `session_id`
+
+### Modifié
+- `openRouterLLM.ts` : intégration du tracking automatique (log initial + récupération coût async via generation_id)
+- `proxy-llm/index.ts` : action `get_generation_cost` ajoutée, données d'usage incluses dans le stream
+- `settingsService.ts` : refonte avec couche de persistance DB (`loadFromDB`, `saveToDB`, `hydrateAllSettings`)
+- `sync-notion/index.ts` : retourne maintenant `embedding_stats` et `total_embeddings_in_db` dans la réponse
+- `Admin.tsx` : sync Notion affiche un rapport visuel au lieu du JSON brut
+- `maxAgent.ts`, `gameMasterAgent.ts`, `conversationOrchestrator.ts` : propagation du `session_id` et `feature_key` pour le tracking
+
+---
+
 ## [0.6.0] - 2026-03-08
 
 ### Ajouté
