@@ -42,7 +42,11 @@ Valider le pipeline technique complet d'une conversation voice-to-voice avec un 
 - [x] HUD conversationnel (timer + jauge confiance + tooltips explicatifs)
 - [x] Accès questionnaire anticipé (après 4 min)
 - [x] Modal info projet (détail concept, pipeline, objectifs)
+- [x] LLM Cost Tracker (tracking automatique tokens + coûts USD par appel OpenRouter)
+- [x] Persistance des réglages admin en base (LLM, Voix, Gameplay, GM)
+- [x] Rapport de sync Notion détaillé (entrées, chunks RAG, tokens par table)
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
+- [ ] Alertes de budget LLM + fallback modèle
 
 ## 🛠️ Stack technique
 
@@ -51,6 +55,7 @@ Valider le pipeline technique complet d'une conversation voice-to-voice avec un 
 | Frontend | React + Vite + Tailwind + TypeScript (Lovable) |
 | Backend | Lovable Cloud (Supabase Postgres + pgvector) |
 | Edge Functions | proxy-llm, proxy-stt, proxy-tts, sync-notion, query-rag, sync-questionnaire |
+| Cost Tracking | OpenRouter generation API (tokens + USD per call) |
 | LLM | OpenRouter API — Multi-modèles (Qwen, Claude, Grok, Llama, Gemini) |
 | STT | Deepgram (WebSocket streaming + VAD) |
 | TTS | ElevenLabs (voix custom Max, paramètres ajustables) |
@@ -89,7 +94,7 @@ Ou directement via [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_I
 │   ├── components/         # Écrans UI (Onboarding, Conversation, GameOver, etc.)
 │   ├── config/             # settings.json (variables configurables)
 │   ├── hooks/              # useGameState, useTimer
-│   ├── services/           # deepgramSTT, elevenLabsTTS, openRouterLLM, orchestrator, ragService, settingsService
+│   ├── services/           # deepgramSTT, elevenLabsTTS, openRouterLLM, orchestrator, ragService, settingsService, llmUsageTracker, sessionService
 │   └── types/              # Types TypeScript partagés
 ├── public/assets/          # Background images
 ├── supabase/functions/     # Edge Functions (proxy-llm, proxy-stt, proxy-tts, sync-notion, query-rag, sync-questionnaire)
@@ -105,7 +110,8 @@ Ou directement via [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_I
 - Pas d'authentification — session locale
 - Vidéos en mode placeholder (écran noir + texte)
 - Sync Notion : 4 characters + 38 storyworld synchronisés, 42 embeddings générés
-- **Admin** : `/admin` pour gérer sessions, prompts, config LLM et voix
+- **Admin** : `/admin` pour gérer sessions, prompts, config LLM/voix, suivi des coûts LLM, sync Notion détaillée
+- Les réglages admin sont persistés en base (survivent au rechargement et changement de navigateur)
 
 ---
 
