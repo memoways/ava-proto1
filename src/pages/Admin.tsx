@@ -126,7 +126,7 @@ export default function Admin() {
     if (!editingChar) return;
     setSavingChar(true);
     try {
-      const { error, data } = await supabase
+      const { error } = await supabase
         .from("characters")
         .update({ system_prompt: editPrompt })
         .eq("id", editingChar.id)
@@ -135,8 +135,21 @@ export default function Admin() {
         console.error("[Admin] Save error:", error);
         toast.error("Erreur: " + error.message);
       } else {
-        console.log("[Admin] Saved prompt:", data);
-        toast.success(`System prompt de ${editingChar.name} sauvegardé ✓`);
+        // Verify the save by re-reading from DB
+        const { data: verifyData } = await supabase
+          .from("characters")
+          .select("system_prompt")
+          .eq("id", editingChar.id)
+          .single();
+        
+        if (verifyData?.system_prompt === editPrompt) {
+          console.log("[Admin] Prompt verified in DB ✓", editPrompt.length, "chars");
+          toast.success(`System prompt de ${editingChar.name} sauvegardé et vérifié ✓`);
+        } else {
+          console.warn("[Admin] Prompt verification mismatch!");
+          toast.warning("Prompt sauvegardé mais vérification incertaine — rafraîchis la page");
+        }
+        
         clearSystemPromptCache();
         setEditingChar({ ...editingChar, system_prompt: editPrompt });
         setCharacters(prev => prev.map(c => c.id === editingChar.id ? { ...c, system_prompt: editPrompt } : c));
