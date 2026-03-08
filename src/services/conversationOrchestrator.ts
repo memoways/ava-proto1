@@ -67,19 +67,22 @@ export async function processConversationTurn(
   maxResponse: string;
   gameMasterPromise: Promise<{ gameMasterResponse: GameMasterResponse; trigger: VideoTrigger | null }>;
 }> {
-  // Fetch RAG context if not provided
+  // Fetch RAG context if not provided (non-blocking — start immediately)
   let finalRagContext = ragContext;
-  if (!finalRagContext) {
+  const ragPromise = !finalRagContext ? (async () => {
     try {
       const recentMessages = conversationHistory.slice(-4).map(m => m.content).join(' ');
-      finalRagContext = await getRAGContext(userMessage, recentMessages);
-      if (finalRagContext) {
-        console.log('[RAG] Context found, injecting into prompt');
-      }
+      const ctx = await getRAGContext(userMessage, recentMessages);
+      if (ctx) console.log('[RAG] Context found, injecting into prompt');
+      return ctx;
     } catch (err) {
       console.error('[RAG] Failed to fetch context:', err);
+      return "";
     }
-  }
+  })() : Promise.resolve(finalRagContext);
+
+  // Wait for RAG (runs in parallel with any preloaded system prompt)
+  finalRagContext = await ragPromise;
 
   // Start Max streaming
   let maxFullResponse = "";

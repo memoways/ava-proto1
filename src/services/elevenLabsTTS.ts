@@ -74,11 +74,13 @@ export async function speakText(text: string, options?: TTSOptions): Promise<voi
 
 // ---- Sentence-level TTS Pipeline ----
 
+// Match sentence-ending punctuation, including mid-sentence breaks on commas for long clauses
 const SENTENCE_REGEX = /[.!?…]+[\s]+|[.!?…]+$/;
 
 /**
  * Splits text into sentences for progressive TTS.
  * Returns [completeSentences[], remainingFragment]
+ * More aggressive: splits on shorter fragments for faster first audio
  */
 export function extractSentences(text: string): [string[], string] {
   const sentences: string[] = [];
@@ -87,11 +89,11 @@ export function extractSentences(text: string): [string[], string] {
   let match: RegExpExecArray | null;
   while ((match = SENTENCE_REGEX.exec(remaining)) !== null) {
     const sentence = remaining.slice(0, match.index + match[0].length).trim();
-    if (sentence.length > 5) { // Skip tiny fragments
+    if (sentence.length > 3) { // Lower threshold for faster first TTS
       sentences.push(sentence);
     }
     remaining = remaining.slice(match.index + match[0].length);
-    SENTENCE_REGEX.lastIndex = 0; // Reset for non-global regex
+    SENTENCE_REGEX.lastIndex = 0;
   }
 
   return [sentences, remaining.trim()];
