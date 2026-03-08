@@ -501,8 +501,8 @@ export default function Admin() {
                   <div className="border rounded-lg p-3 bg-muted/30">
                     <p className="text-sm font-medium">📊 Total embeddings en base : <span className="font-bold">{syncReport.total_embeddings_in_db}</span></p>
                     {syncReport.embedding_stats && (() => {
-                      const totalChunks = Object.values(syncReport.embedding_stats).reduce((s: number, e: any) => s + e.chunks_created, 0);
-                      const totalChars = Object.values(syncReport.embedding_stats).reduce((s: number, e: any) => s + e.chars_embedded, 0);
+                      const totalChunks = Object.values(syncReport.embedding_stats as Record<string, { chunks_created: number; chars_embedded: number }>).reduce((s, e) => s + e.chunks_created, 0);
+                      const totalChars = Object.values(syncReport.embedding_stats as Record<string, { chunks_created: number; chars_embedded: number }>).reduce((s, e) => s + e.chars_embedded, 0);
                       return (
                         <p className="text-xs text-muted-foreground mt-1">
                           Cette sync : {totalChunks} chunks créés, ~{Math.ceil(totalChars / 4)} tokens OpenAI consommés pour les embeddings
