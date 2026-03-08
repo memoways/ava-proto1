@@ -63,14 +63,50 @@ const Index = () => {
     setPhase("intro_video");
   }, [setPhase]);
 
+  // Auto-start mic (used after Max responds or after a video trigger)
+  const startMicAuto = useCallback(async () => {
+    if (sttRef.current || isProcessing) return; // Already active or processing
+    setMicActive(true);
+    setAudioState("user_speaking");
+
+    const stt = new DeepgramSTT((text, isFinal) => {
+      setUserSubtitle(text);
+      if (isFinal && text.trim()) {
+        sttRef.current?.stop();
+        sttRef.current = null;
+        setMicActive(false);
+        processUserMessage(text);
+      }
+    });
+
+    try {
+      await stt.start();
+      sttRef.current = stt;
+    } catch (err) {
+      console.error("Failed to auto-start STT:", err);
+      setMicActive(false);
+      setAudioState("idle");
+    }
+  }, [isProcessing, setAudioState]);
+
+  // restartMic is called after Max finishes speaking
+  const restartMic = useCallback(() => {
+    // Small delay to avoid overlap with TTS
+    setTimeout(() => startMicAuto(), 500);
+  }, [startMicAuto]);
+
   const handleIntroComplete = useCallback(() => {
     setPhase("conversation");
     timer.start();
-  }, [setPhase, timer]);
+    // Auto-start mic when conversation begins
+    setTimeout(() => startMicAuto(), 500);
+  }, [setPhase, timer, startMicAuto]);
 
   const handleTriggerComplete = useCallback(() => {
     endTrigger();
-  }, [endTrigger]);
+    // Auto-restart mic after video trigger
+    setTimeout(() => startMicAuto(), 500);
+  }, [endTrigger, startMicAuto]);
 
   // Process user message through LLM agents
   const processUserMessage = useCallback(async (userText: string) => {
