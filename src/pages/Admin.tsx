@@ -542,7 +542,74 @@ export default function Admin() {
             </div>
           </TabsContent>
 
-          {/* ==================== SYNC ==================== */}
+          {/* ==================== QUESTIONNAIRES ==================== */}
+          <TabsContent value="questionnaires">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold">Réponses au questionnaire</h2>
+                <Button size="sm" variant="outline" onClick={loadSessions}>
+                  Rafraîchir
+                </Button>
+              </div>
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="text-left p-2 font-medium text-muted-foreground">Session</th>
+                      <th className="text-left p-2 font-medium text-muted-foreground">Date</th>
+                      <th className="text-center p-2 font-medium text-muted-foreground">Note</th>
+                      <th className="text-left p-2 font-medium text-muted-foreground">Mot</th>
+                      <th className="text-center p-2 font-medium text-muted-foreground">NPS</th>
+                      <th className="text-center p-2 font-medium text-muted-foreground">Immersion</th>
+                      <th className="text-center p-2 font-medium text-muted-foreground">Naturel</th>
+                      <th className="text-center p-2 font-medium text-muted-foreground">Écoute</th>
+                      <th className="text-left p-2 font-medium text-muted-foreground">Latence</th>
+                      <th className="text-left p-2 font-medium text-muted-foreground">Compris</th>
+                      <th className="text-center p-2 font-medium text-muted-foreground">Continuer</th>
+                      <th className="text-left p-2 font-medium text-muted-foreground">Payer</th>
+                      <th className="text-left p-2 font-medium text-muted-foreground">Prix</th>
+                      <th className="text-left p-2 font-medium text-muted-foreground">Format</th>
+                      <th className="text-center p-2 font-medium text-muted-foreground">Trust</th>
+                      <th className="text-left p-2 font-medium text-muted-foreground">Feedback</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sessions
+                      .filter((s) => s.questionnaire_responses)
+                      .map((s) => {
+                        const q = s.questionnaire_responses;
+                        return (
+                          <tr key={s.id} className="border-b hover:bg-accent/30">
+                            <td className="p-2 font-mono text-xs">{s.id.slice(0, 8)}</td>
+                            <td className="p-2 text-xs">{fmt(s.started_at)}</td>
+                            <td className="p-2 text-center">{q.experience_rating}/10</td>
+                            <td className="p-2">{q.experience_word || "—"}</td>
+                            <td className="p-2 text-center">{q.nps}/10</td>
+                            <td className="p-2 text-center">{q.immersion_story}/5</td>
+                            <td className="p-2 text-center">{q.immersion_natural}/5</td>
+                            <td className="p-2 text-center">{q.mechanic_listening}/5</td>
+                            <td className="p-2 text-xs">{q.mechanic_latency}</td>
+                            <td className="p-2 text-xs">{q.narration_understood}</td>
+                            <td className="p-2 text-center">{q.narration_continue}/5</td>
+                            <td className="p-2 text-xs">{q.value_pay}</td>
+                            <td className="p-2 text-xs">{q.value_price || "—"}</td>
+                            <td className="p-2 text-xs">{q.value_format || "—"}</td>
+                            <td className="p-2 text-center">{s.trust_level ?? 0}</td>
+                            <td className="p-2 text-xs max-w-[200px] truncate">{q.open_feedback || "—"}</td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+                {sessions.filter((s) => s.questionnaire_responses).length === 0 && (
+                  <p className="p-4 text-muted-foreground text-sm text-center">
+                    Aucune réponse au questionnaire
+                  </p>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
           <TabsContent value="sync">
             <div className="max-w-2xl">
               <h2 className="text-lg font-semibold mb-2">Sync Notion → DB</h2>
