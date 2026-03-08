@@ -1,6 +1,5 @@
 import { callLLM } from "@/services/openRouterLLM";
 import type { ConversationMessage, GameMasterResponse } from "@/types";
-import settings from "@/config/settings.json";
 import { getLLMSettings, getGMPromptSettings, getGameplaySettings } from "@/services/settingsService";
 
 // System prompt is now loaded from settings (editable in admin)
@@ -81,8 +80,9 @@ function buildContextMessage(input: GameMasterInput): string {
     .map((m) => `${m.role === "user" ? "UTILISATEUR" : "MAX"}: ${m.content}`)
     .join("\n");
 
+  const gameplay = getGameplaySettings();
   return `## ÉTAT ACTUEL
-- Trust level: ${input.currentTrustLevel}/${settings.TRUST_THRESHOLD}
+- Trust level: ${input.currentTrustLevel}/${gameplay.TRUST_THRESHOLD}
 - Triggers déjà activés: ${input.triggeredIds.length > 0 ? input.triggeredIds.join(", ") : "aucun"}
 - Temps écoulé: ${Math.floor(input.timeElapsedSeconds / 60)}min ${input.timeElapsedSeconds % 60}s
 
