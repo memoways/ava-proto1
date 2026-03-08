@@ -54,6 +54,26 @@ export default function LLMUsageTab() {
     setLoading(false);
   }
 
+  async function retryAllFailedCosts() {
+    const failed = rows.filter(r => r.status === "cost_fetch_failed" && r.generation_id);
+    if (failed.length === 0) { toast.info("Aucune entrée à recalculer"); return; }
+    setLoading(true);
+    let ok = 0;
+    for (const r of failed) {
+      const success = await retryCostForRow({
+        id: r.id,
+        generation_id: r.generation_id,
+        prompt_tokens: r.prompt_tokens,
+        completion_tokens: r.completion_tokens,
+        total_tokens: r.total_tokens,
+      });
+      if (success) ok++;
+    }
+    toast.success(`${ok}/${failed.length} coûts récupérés`);
+    await loadData();
+    setLoading(false);
+  }
+
   // Filters
   const periodStart = useMemo(() => {
     const now = new Date();
