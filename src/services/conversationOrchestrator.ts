@@ -1,6 +1,7 @@
 import { callMaxAgent, type MaxAgentInput } from "@/agents/maxAgent";
 import { callGameMaster, type GameMasterInput } from "@/agents/gameMasterAgent";
 import { getRAGContext } from "@/services/ragService";
+import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, GameMasterResponse, VideoTrigger } from "@/types";
 
 // Demo triggers for the prototype
@@ -83,6 +84,7 @@ export async function processConversationTurn(
 
   // Wait for RAG (runs in parallel with any preloaded system prompt)
   finalRagContext = await ragPromise;
+  debugLogger.log({ service: "other", level: "info", direction: "out", label: `Orchestrator: RAG done, calling Max`, detail: `History: ${conversationHistory.length} msgs, trust: ${currentTrustLevel}` });
 
   // Start Max streaming
   let maxFullResponse = "";
