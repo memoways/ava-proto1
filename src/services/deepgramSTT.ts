@@ -1,3 +1,5 @@
+import { debugLogger } from "./debugLogger";
+
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 
 interface DeepgramConfig {
@@ -7,6 +9,8 @@ interface DeepgramConfig {
 }
 
 export async function getDeepgramToken(): Promise<DeepgramConfig> {
+  const startTime = Date.now();
+  const debugId = debugLogger.logFetch("stt", "Get Deepgram token", `proxy-stt`);
   const res = await fetch(
     `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/proxy-stt`,
     {
@@ -14,7 +18,11 @@ export async function getDeepgramToken(): Promise<DeepgramConfig> {
       headers: { 'Content-Type': 'application/json' },
     }
   );
-  if (!res.ok) throw new Error(`Failed to get Deepgram token: ${res.status}`);
+  if (!res.ok) {
+    debugLogger.logResponse(debugId, "stt", "Deepgram token", res.status, startTime);
+    throw new Error(`Failed to get Deepgram token: ${res.status}`);
+  }
+  debugLogger.logResponse(debugId, "stt", "Deepgram token OK", res.status, startTime);
   return res.json();
 }
 
@@ -63,6 +71,7 @@ export class DeepgramSTT {
 
     this.ws.onopen = () => {
       console.log('[Deepgram] WebSocket connected');
+      debugLogger.log({ service: "stt", level: "success", direction: "in", label: "Deepgram WebSocket connected" });
       this.startRecording();
     };
 
@@ -101,6 +110,7 @@ export class DeepgramSTT {
     this.silenceTimer = setTimeout(() => {
       if (this.fullTranscript.trim()) {
         console.log('[Deepgram] 2s silence detected, finalizing');
+        debugLogger.log({ service: "stt", level: "info", direction: "in", label: `STT final: "${this.fullTranscript.slice(0, 100)}"` });
         const finalText = this.fullTranscript;
         this.fullTranscript = ""; // Reset for next utterance
         this.onTranscript(finalText, true);
