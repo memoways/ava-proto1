@@ -213,6 +213,9 @@ const Index = () => {
 
   const handleQuestionnaireSubmit = useCallback((data: QuestionnaireData) => {
     console.log("Questionnaire submitted:", data);
+    if (sessionIdRef.current) {
+      saveQuestionnaire(sessionIdRef.current, data).catch(console.error);
+    }
     setPhase("thanks");
   }, [setPhase]);
 
@@ -224,6 +227,7 @@ const Index = () => {
     setMaxSubtitle("");
     conversationHistoryRef.current = [];
     setPostVideoContext(null);
+    sessionIdRef.current = null;
   }, [reset, timer]);
 
   const handleGateContinue = useCallback(() => {
