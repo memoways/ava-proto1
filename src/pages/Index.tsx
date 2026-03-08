@@ -3,7 +3,7 @@ import { useGameState } from "@/hooks/useGameState";
 import { useTimer } from "@/hooks/useTimer";
 import { DeepgramSTT } from "@/services/deepgramSTT";
 import { processConversationTurn } from "@/services/conversationOrchestrator";
-import { generateSpeech, playAudioBlob } from "@/services/elevenLabsTTS";
+import { TTSQueue, extractSentences } from "@/services/elevenLabsTTS";
 import { createSession, updateSession, endSession, saveQuestionnaire, syncQuestionnaireToNotion } from "@/services/sessionService";
 import settings from "@/config/settings.json";
 import type { QuestionnaireData, ConversationMessage } from "@/types";
@@ -28,6 +28,18 @@ const INTRO_TRIGGER = {
   duration_seconds: settings.VIDEO_PLACEHOLDER_DURATION,
 };
 
+/** Performance timer helper */
+const perf = (label: string) => {
+  const start = performance.now();
+  return {
+    end: () => {
+      const ms = performance.now() - start;
+      console.log(`[Perf] ${label}: ${ms.toFixed(0)}ms`);
+      return ms;
+    },
+  };
+};
+
 const Index = () => {
   const { state, setPhase, setAudioState, addMessage, updateTrust, triggerVideo, endTrigger, gameOver, reset } = useGameState();
   const [micActive, setMicActive] = useState(false);
@@ -40,7 +52,7 @@ const Index = () => {
   const sttRef = useRef<DeepgramSTT | null>(null);
   const processUserMessageRef = useRef<(text: string) => void>(() => {});
   const conversationHistoryRef = useRef<ConversationMessage[]>([]);
-  const micStartedRef = useRef(false); // Track if mic was ever started
+  const micStartedRef = useRef(false);
 
   const timer = useTimer(settings.TIMEOUT_SECONDS, () => {
     if (sessionIdRef.current) {
@@ -65,7 +77,6 @@ const Index = () => {
     setPhase("intro_video");
   }, [setPhase]);
 
-  // Start persistent mic connection (stays open the whole conversation)
   const startMicPersistent = useCallback(async () => {
     if (sttRef.current) return;
     setMicActive(true);
@@ -90,7 +101,6 @@ const Index = () => {
     }
   }, [setAudioState]);
 
-  // Resume mic after Max finishes
   const resumeMic = useCallback(() => {
     if (sttRef.current?.isActive) {
       sttRef.current.resume();
@@ -106,19 +116,18 @@ const Index = () => {
   const handleIntroComplete = useCallback(() => {
     setPhase("conversation");
     timer.start();
-    // Don't auto-start mic — user must click the mic button first
   }, [setPhase, timer]);
 
   const handleTriggerComplete = useCallback(() => {
     endTrigger();
-    // Auto-resume mic after video trigger (no click needed)
     setTimeout(() => resumeMic(), 300);
   }, [endTrigger, resumeMic]);
 
-  // Process user message with optimized parallel pipeline
+  // ---- Optimized conversation pipeline with sentence-level TTS ----
   const processUserMessage = useCallback(async (userText: string) => {
     if (isProcessing || !userText.trim()) return;
 
+    const turnPerf = perf("Total turn");
     setIsProcessing(true);
     setAudioState("max_thinking");
     setUserSubtitle("");
@@ -128,8 +137,16 @@ const Index = () => {
     conversationHistoryRef.current.push(userMsg);
     addMessage(userMsg);
 
+    // Create TTS queue for sentence-level pipelining
+    const ttsQueue = new TTSQueue();
+    let streamedText = "";
+    let sentencesSent = 0;
+    let firstTTSTime: number | null = null;
+    const llmFirstChunkPerf = perf("LLM first chunk");
+
     try {
-      // Get Max response (streaming) + Game Master promise (runs in background)
+      const llmPerf = perf("LLM total (Max streaming)");
+
       const { maxResponse, gameMasterPromise } = await processConversationTurn(
         userText,
         conversationHistoryRef.current.slice(0, -1),
@@ -138,46 +155,66 @@ const Index = () => {
         settings.TIMEOUT_SECONDS - timer.remaining,
         (chunk, done) => {
           if (!done) {
-            setMaxSubtitle((prev) => prev + chunk);
+            if (sentencesSent === 0 && streamedText === "") {
+              llmFirstChunkPerf.end();
+            }
+            streamedText += chunk;
+            setMaxSubtitle(streamedText);
             setAudioState("max_speaking");
+
+            // Extract complete sentences and enqueue TTS immediately
+            const [sentences, remaining] = extractSentences(streamedText);
+            if (sentences.length > sentencesSent) {
+              for (let i = sentencesSent; i < sentences.length; i++) {
+                if (!firstTTSTime) {
+                  firstTTSTime = performance.now();
+                  console.log(`[Perf] First TTS enqueue: ${(firstTTSTime - (performance.now() - 10000)).toFixed(0)}ms after turn start`);
+                }
+                console.log(`[TTS-Pipeline] Enqueuing sentence #${i + 1}: "${sentences[i].slice(0, 50)}..."`);
+                ttsQueue.enqueue(sentences[i]);
+              }
+              sentencesSent = sentences.length;
+              // Keep the remaining fragment for next iteration
+              streamedText = (sentences.length > 0) 
+                ? sentences.join(" ") + (remaining ? " " + remaining : "")
+                : streamedText;
+            }
           }
         },
         undefined,
         postVideoContext || undefined
       );
 
-      // Add Max response to history immediately
+      llmPerf.end();
+
+      // Enqueue any remaining text that didn't end with punctuation
+      const [, leftover] = extractSentences(streamedText);
+      if (leftover && leftover.length > 3) {
+        console.log(`[TTS-Pipeline] Enqueuing leftover: "${leftover.slice(0, 50)}..."`);
+        ttsQueue.enqueue(leftover);
+      }
+
+      // Add Max response to history
       const maxMsg: ConversationMessage = { role: "max", content: maxResponse, timestamp: Date.now() };
       conversationHistoryRef.current.push(maxMsg);
       addMessage(maxMsg);
       setPostVideoContext(null);
 
-      // Start TTS and Game Master in PARALLEL (key latency optimization)
-      const ttsPromise = maxResponse.trim()
-        ? (async () => {
-            setAudioState("max_speaking");
-            try {
-              const audioBlob = await generateSpeech(maxResponse);
-              await playAudioBlob(audioBlob);
-            } catch (ttsError) {
-              console.error("TTS error:", ttsError);
-            }
-          })()
-        : Promise.resolve();
-
-      // Wait for both TTS playback and Game Master analysis
-      const [, gmResult] = await Promise.all([ttsPromise, gameMasterPromise]);
+      // Wait for TTS playback + Game Master in parallel
+      const gmPerf = perf("Game Master");
+      const [, gmResult] = await Promise.all([
+        ttsQueue.drain(),
+        gameMasterPromise.then(r => { gmPerf.end(); return r; }),
+      ]);
 
       const { gameMasterResponse, trigger } = gmResult;
       console.log("[Game Master]", gameMasterResponse);
 
-      // Update trust
       const newTrust = state.trustLevel + gameMasterResponse.trust_delta;
       if (gameMasterResponse.trust_delta !== 0) {
         updateTrust(gameMasterResponse.trust_delta);
       }
 
-      // Persist session state
       if (sessionIdRef.current) {
         updateSession(sessionIdRef.current, {
           trust_level: newTrust,
@@ -186,7 +223,6 @@ const Index = () => {
         }).catch(console.error);
       }
 
-      // Handle game over
       if (gameMasterResponse.game_over) {
         const reason = gameMasterResponse.game_over_reason || "moderation";
         if (sessionIdRef.current) {
@@ -202,27 +238,26 @@ const Index = () => {
         return;
       }
 
-      // Handle gate reached
       if (gameMasterResponse.gate_reached) {
         setPhase("gate");
         return;
       }
 
-      // Handle video trigger
       if (trigger) {
         setPostVideoContext(trigger.post_video_context || null);
         triggerVideo(trigger);
-        return; // Mic will auto-resume after video via handleTriggerComplete
+        return;
       }
 
     } catch (error) {
       console.error("Error processing conversation:", error);
+      ttsQueue.cancel();
       setMaxSubtitle("Désolé, j'ai eu un problème de connexion...");
     } finally {
       setIsProcessing(false);
       setAudioState("idle");
       setTimeout(() => setMaxSubtitle(""), 3000);
-      // Auto-resume mic for next turn (if mic was started)
+      turnPerf.end();
       if (micStartedRef.current) {
         setTimeout(() => resumeMic(), 300);
       }
@@ -239,7 +274,6 @@ const Index = () => {
       setUserSubtitle("");
     } else {
       if (!micStartedRef.current) {
-        // First click: start persistent connection
         startMicPersistent();
       } else {
         resumeMic();
@@ -252,7 +286,6 @@ const Index = () => {
   }, [setPhase]);
 
   const handleQuestionnaireSubmit = useCallback((data: QuestionnaireData) => {
-    console.log("Questionnaire submitted:", data);
     if (sessionIdRef.current) {
       saveQuestionnaire(sessionIdRef.current, data).catch(console.error);
       syncQuestionnaireToNotion(sessionIdRef.current, data, state.trustLevel, settings.TIMEOUT_SECONDS - timer.remaining, state.gameOverReason);
@@ -291,7 +324,6 @@ const Index = () => {
   switch (state.phase) {
     case "onboarding":
       return <OnboardingScreen onStart={handleStart} onSkip={handleStart} />;
-
     case "intro_video":
       return (
         <VideoPlaceholder
@@ -302,7 +334,6 @@ const Index = () => {
           onSkip={handleIntroComplete}
         />
       );
-
     case "conversation":
       return (
         <ConversationScreen
@@ -317,7 +348,6 @@ const Index = () => {
           micActive={micActive}
         />
       );
-
     case "video_trigger":
       return (
         <VideoPlaceholder
@@ -328,10 +358,8 @@ const Index = () => {
           onSkip={handleTriggerComplete}
         />
       );
-
     case "gate":
       return <GateScreen onContinue={handleGateContinue} />;
-
     case "game_over":
       return (
         <GameOverScreen
@@ -340,13 +368,10 @@ const Index = () => {
           onQuestionnaire={handleQuestionnaire}
         />
       );
-
     case "questionnaire":
       return <QuestionnaireScreen onSubmit={handleQuestionnaireSubmit} />;
-
     case "thanks":
       return <ThanksScreen onRestart={handleRestart} />;
-
     default:
       return null;
   }
