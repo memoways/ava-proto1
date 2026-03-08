@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.9.0] - 2026-03-08
+
+### Ajouté
+- **Player vidéo Gumlet** : intégration du player Gumlet via iframe embed (`GumletVideoPlayer.tsx`) pour jouer de vraies vidéos au lieu des placeholders texte
+  - Contrôles : play/pause + volume uniquement (configurable dans le dashboard Gumlet)
+  - Mode responsive plein écran avec overlays (HUD timer/confiance sur les vidéos mid-conversation, sans micro)
+  - Bouton "Passer →" superposé sur la vidéo
+  - Détection de fin de vidéo via `postMessage` events
+  - Fallback automatique vers `VideoPlaceholder` si aucun `video_url` n'est défini sur un trigger
+- **Vidéo d'intro** : cinématique d'introduction (`67a281cac82041cdc3714c0c`) jouée via Gumlet entre l'onboarding et la conversation
+- Champ `video_url` optionnel ajouté au type `VideoTrigger`
+
+### Ajouté (v0.8.0)
+- **Persistance des réglages de jeu** : bouton Sauvegarder dans l'onglet Mécanique de /admin, avec indicateur de modifications non enregistrées
+
+---
+
 ## [0.8.0] - 2026-03-08
 
 ### Ajouté

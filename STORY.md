@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-03-08 (session 5)  
+> **Last Updated**: 2026-03-08 (session 6)  
 
 ---
 
@@ -472,6 +472,44 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 **Ce que ça permet** : La première réplique de Max arrive significativement plus vite. Les répliques suivantes bénéficient aussi du cache system prompt et du warm-up des connexions.
 
 **Time**: ~20min
+
+---
+
+### 2026-03-08 — Persistance des réglages de jeu 🔹
+
+**Intent**: Empêcher la perte des réglages Gameplay (sliders trust threshold, timeout, etc.) au rechargement de la page admin.
+
+**Tool**: Lovable Cloud
+
+**Outcome**:
+- `GameMasterConfigTab.tsx` : bouton **Sauvegarder** dans la section Mécanique, indicateur visuel de modifications non sauvegardées
+- Chargement des valeurs depuis `admin_settings` au montage, comparaison d'état pour activer/désactiver le bouton
+
+**Time**: ~10min
+
+---
+
+### 2026-03-08 — Player vidéo Gumlet 🔷
+
+**Intent**: Remplacer les écrans placeholder texte par de vraies vidéos hébergées sur Gumlet, en commençant par la cinématique d'introduction.
+
+**Tool**: Lovable
+
+**Outcome**:
+- `GumletVideoPlayer.tsx` : composant iframe embed Gumlet plein écran responsive
+  - Extraction automatique de l'asset ID depuis différents formats d'URL Gumlet
+  - Paramètres embed : `autoplay=true`, `preload=true`
+  - Écoute des événements `postMessage` pour détecter la fin de vidéo
+  - Slot `children` pour injecter des overlays (HUD) par-dessus la vidéo
+  - Bouton "Passer →" toujours visible en overlay
+- `types/index.ts` : champ `video_url` optionnel ajouté à `VideoTrigger`
+- `Index.tsx` : 
+  - Intro video utilise `GumletVideoPlayer` avec la vidéo `67a281cac82041cdc3714c0c`
+  - Video triggers mid-conversation : si `video_url` existe → Gumlet player avec HUD (timer + confiance) sans micro ; sinon → fallback `VideoPlaceholder`
+
+**Ce que ça permet** : Les cinématiques sont enfin de vraies vidéos. Le mode responsive plein écran avec overlays maintient l'immersion. Le fallback vers VideoPlaceholder garantit la compatibilité avec les triggers qui n'ont pas encore de vidéo assignée.
+
+**Time**: ~25min
 
 ---
 
