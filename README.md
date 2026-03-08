@@ -42,7 +42,11 @@ Valider le pipeline technique complet d'une conversation voice-to-voice avec un 
 - [x] HUD conversationnel (timer + jauge confiance + tooltips explicatifs)
 - [x] Accès questionnaire anticipé (après 4 min)
 - [x] Modal info projet (détail concept, pipeline, objectifs)
+- [x] LLM Cost Tracker (tracking automatique tokens + coûts USD par appel OpenRouter)
+- [x] Persistance des réglages admin en base (LLM, Voix, Gameplay, GM)
+- [x] Rapport de sync Notion détaillé (entrées, chunks RAG, tokens par table)
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
+- [ ] Alertes de budget LLM + fallback modèle
 
 ## 🛠️ Stack technique
 
