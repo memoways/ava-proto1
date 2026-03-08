@@ -44,7 +44,13 @@ const Index = () => {
     gameOver("timeout");
   });
 
-  const handleStart = useCallback(() => {
+  const handleStart = useCallback(async () => {
+    try {
+      const id = await createSession();
+      sessionIdRef.current = id;
+    } catch (e) {
+      console.error("Failed to create session:", e);
+    }
     setPhase("intro_video");
   }, [setPhase]);
 
