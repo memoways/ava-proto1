@@ -33,7 +33,17 @@ const ConversationScreen = ({
   micActive,
 }: ConversationScreenProps) => {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-background overflow-hidden">
+    <div 
+      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden"
+      style={{
+        backgroundImage: 'url(/assets/max-bg.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
+      }}
+    >
+      {/* Background overlay */}
+      <div className="absolute inset-0 bg-black/40 pointer-events-none" />
       {/* Vignette */}
       <div className="absolute inset-0 cinema-vignette pointer-events-none z-10" />
       <div className="absolute inset-0 cinema-gradient pointer-events-none" />
