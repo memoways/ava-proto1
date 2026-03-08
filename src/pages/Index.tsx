@@ -4,6 +4,7 @@ import { useTimer } from "@/hooks/useTimer";
 import { DeepgramSTT } from "@/services/deepgramSTT";
 import { processConversationTurn } from "@/services/conversationOrchestrator";
 import { generateSpeech, playAudioBlob } from "@/services/elevenLabsTTS";
+import { createSession, updateSession, endSession, saveQuestionnaire } from "@/services/sessionService";
 import settings from "@/config/settings.json";
 import type { QuestionnaireData, ConversationMessage } from "@/types";
 
