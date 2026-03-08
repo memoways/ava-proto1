@@ -100,13 +100,21 @@ const Index = () => {
       addMessage(maxMsg);
 
       // Update trust
+      const newTrust = state.trustLevel + result.gameMasterResponse.trust_delta;
       if (result.gameMasterResponse.trust_delta !== 0) {
         updateTrust(result.gameMasterResponse.trust_delta);
       }
 
       console.log("[Game Master]", result.gameMasterResponse);
 
-      // Clear post-video context after use
+      // Persist session state
+      if (sessionIdRef.current) {
+        updateSession(sessionIdRef.current, {
+          trust_level: newTrust,
+          conversation_log: conversationHistoryRef.current,
+          triggers_activated: state.triggeredIds,
+        }).catch(console.error);
+      }
       setPostVideoContext(null);
 
       // Play Max's response with TTS
