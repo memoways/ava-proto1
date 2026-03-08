@@ -176,6 +176,8 @@ const Index = () => {
       setAudioState("idle");
       // Clear Max subtitle after a delay
       setTimeout(() => setMaxSubtitle(""), 3000);
+      // Auto-restart mic for continuous conversation
+      restartMic();
     }
   }, [isProcessing, setAudioState, addMessage, state.trustLevel, state.triggeredIds, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo]);
 
