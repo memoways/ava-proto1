@@ -41,6 +41,15 @@ const Index = () => {
   const conversationHistoryRef = useRef<ConversationMessage[]>([]);
 
   const timer = useTimer(settings.TIMEOUT_SECONDS, () => {
+    if (sessionIdRef.current) {
+      endSession(sessionIdRef.current, {
+        game_over_reason: "timeout",
+        trust_level: state.trustLevel,
+        conversation_log: conversationHistoryRef.current,
+        triggers_activated: state.triggeredIds,
+        duration_seconds: settings.TIMEOUT_SECONDS,
+      }).catch(console.error);
+    }
     gameOver("timeout");
   });
 
