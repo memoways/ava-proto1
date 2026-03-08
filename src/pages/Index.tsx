@@ -94,6 +94,7 @@ const Index = () => {
   const startMicPersistent = useCallback(async () => {
     if (sttRef.current) return;
     setMicActive(true);
+    setMicEverStarted(true);
     setAudioState("user_speaking");
     micStartedRef.current = true;
 
@@ -139,7 +140,11 @@ const Index = () => {
 
   // ---- Optimized conversation pipeline with sentence-level TTS ----
   const processUserMessage = useCallback(async (userText: string) => {
-    if (isProcessing || !userText.trim()) return;
+    console.log(`[processUserMessage] Called with: "${userText.slice(0, 50)}", isProcessing=${isProcessing}`);
+    if (isProcessing || !userText.trim()) {
+      console.log(`[processUserMessage] BLOCKED — isProcessing=${isProcessing}, empty=${!userText.trim()}`);
+      return;
+    }
 
     const turnPerf = perf("Total turn");
     setIsProcessing(true);
