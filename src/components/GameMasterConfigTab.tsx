@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import VideoTriggersEditor from "@/components/VideoTriggersEditor";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
@@ -253,33 +254,7 @@ export default function GameMasterConfigTab() {
       </section>
 
       {/* ===== TRIGGERS ===== */}
-      <section className="border rounded-lg p-4 space-y-3">
-        <div>
-          <h3 className="font-semibold text-base mb-1">🎬 Triggers vidéo</h3>
-          <p className="text-xs text-muted-foreground">
-            Le Game Master peut déclencher ces triggers quand la conversation aborde certains thèmes.
-            Les triggers ne se déclenchent qu'une fois chacun.
-          </p>
-        </div>
-        {Object.entries(gmPrompt.triggers).map(([id, trigger]) => (
-          <div key={id} className="border rounded-lg p-3 bg-muted/10">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-sm font-semibold">{id}</span>
-              <span className="text-xs text-muted-foreground">{trigger.description}</span>
-            </div>
-            <div className="flex flex-wrap gap-1 mt-2">
-              {trigger.themes.map((t) => (
-                <span key={t} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
-                  {t}
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
-        <p className="text-xs text-muted-foreground/60">
-          💡 Pour modifier les triggers, édite le prompt du Game Master ci-dessus (section TRIGGERS DISPONIBLES).
-        </p>
-      </section>
+      <VideoTriggersEditor />
 
       {/* Config Summary */}
       <section className="border rounded-lg p-4 bg-muted/20">
