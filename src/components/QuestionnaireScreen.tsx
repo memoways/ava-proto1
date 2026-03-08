@@ -19,6 +19,10 @@ const defaultData: QuestionnaireData = {
   value_price: "",
   value_format: "",
   open_feedback: "",
+  contact_name: "",
+  contact_email: "",
+  opt_in_feedback: false,
+  opt_in_updates: false,
 };
 
 const SliderField = ({ label, value, onChange, min = 1, max = 10 }: { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number }) => (
@@ -175,6 +179,55 @@ const QuestionnaireScreen = ({ onSubmit }: QuestionnaireScreenProps) => {
               value={data.open_feedback}
               onChange={(e) => update("open_feedback", e.target.value)}
             />
+          </div>
+        </section>
+
+        {/* 7. Contact */}
+        <section className="space-y-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Rester en contact</h3>
+          <p className="text-xs text-muted-foreground">Facultatif — laissez vos coordonnées si vous le souhaitez.</p>
+          <div className="space-y-1">
+            <label className="text-sm text-foreground">Prénom et nom</label>
+            <input
+              className="w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+              placeholder="Jean Dupont"
+              value={data.contact_name}
+              onChange={(e) => update("contact_name", e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm text-foreground">Email</label>
+            <input
+              type="email"
+              className="w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+              placeholder="jean@example.com"
+              value={data.contact_email}
+              onChange={(e) => update("contact_email", e.target.value)}
+            />
+          </div>
+          <div className="space-y-3 pt-1">
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={data.opt_in_feedback}
+                onChange={(e) => update("opt_in_feedback", e.target.checked)}
+                className="mt-0.5 accent-primary h-4 w-4"
+              />
+              <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                Je suis disponible pour partager plus de feedbacks sur l'expérience
+              </span>
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={data.opt_in_updates}
+                onChange={(e) => update("opt_in_updates", e.target.checked)}
+                className="mt-0.5 accent-primary h-4 w-4"
+              />
+              <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                Je souhaite être tenu·e au courant de la suite du projet
+              </span>
+            </label>
           </div>
         </section>
 

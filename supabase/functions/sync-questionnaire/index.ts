@@ -66,6 +66,20 @@ serve(async (req) => {
       "Date soumission": { date: { start: new Date().toISOString() } },
     };
 
+    // Contact fields (optional)
+    if (questionnaire.contact_name) {
+      properties["Nom contact"] = { rich_text: [{ text: { content: questionnaire.contact_name } }] };
+    }
+    if (questionnaire.contact_email) {
+      properties["Email contact"] = { email: questionnaire.contact_email };
+    }
+    if (questionnaire.opt_in_feedback) {
+      properties["Opt-in feedback"] = { checkbox: true };
+    }
+    if (questionnaire.opt_in_updates) {
+      properties["Opt-in updates"] = { checkbox: true };
+    }
+
     // Add select fields only if they have values
     if (questionnaire.mechanic_latency && LATENCY_MAP[questionnaire.mechanic_latency]) {
       properties["Latence genante"] = { select: { name: LATENCY_MAP[questionnaire.mechanic_latency] } };

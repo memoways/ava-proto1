@@ -63,6 +63,10 @@ export interface QuestionnaireData {
   value_price: string;
   value_format: string;
   open_feedback: string;
+  contact_name: string;
+  contact_email: string;
+  opt_in_feedback: boolean;
+  opt_in_updates: boolean;
 }
 
 export interface Settings {
