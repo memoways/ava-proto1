@@ -1,6 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useGameState } from "@/hooks/useGameState";
 import { useTimer } from "@/hooks/useTimer";
+import { DeepgramSTT } from "@/services/deepgramSTT";
 import settings from "@/config/settings.json";
 import type { QuestionnaireData } from "@/types";
 
@@ -45,18 +46,41 @@ const Index = () => {
     timer.start();
   }, [setPhase, timer]);
 
-  const handleMicToggle = useCallback(() => {
-    setMicActive((prev) => {
-      const next = !prev;
-      setAudioState(next ? "user_speaking" : "idle");
-      if (next) {
-        setUserSubtitle("En attente du micro…");
-      } else {
-        setUserSubtitle("");
+  const sttRef = useRef<DeepgramSTT | null>(null);
+
+  const handleMicToggle = useCallback(async () => {
+    if (micActive) {
+      // Stop STT
+      sttRef.current?.stop();
+      sttRef.current = null;
+      setMicActive(false);
+      setAudioState("idle");
+      setUserSubtitle("");
+    } else {
+      // Start STT
+      setMicActive(true);
+      setAudioState("user_speaking");
+      setUserSubtitle("Connexion au micro…");
+      
+      const stt = new DeepgramSTT((text, isFinal) => {
+        setUserSubtitle(text);
+        if (isFinal) {
+          console.log("[STT Final]", text);
+          // TODO: send to LLM agents (Max + Game Master)
+        }
+      });
+      
+      try {
+        await stt.start();
+        sttRef.current = stt;
+      } catch (err) {
+        console.error("Failed to start STT:", err);
+        setMicActive(false);
+        setAudioState("idle");
+        setUserSubtitle("Erreur micro — vérifiez les permissions");
       }
-      return next;
-    });
-  }, [setAudioState]);
+    }
+  }, [micActive, setAudioState]);
 
   const handleQuestionnaire = useCallback(() => {
     setPhase("questionnaire");
