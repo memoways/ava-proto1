@@ -156,10 +156,30 @@ export async function trackLLMCall(params: {
 
   // Async: fetch cost from OpenRouter generation API if we have a generation_id
   if (params.generation_id) {
-    // Small delay to let OpenRouter process the generation
-    setTimeout(async () => {
-      console.log(`[LLM Tracker] Fetching cost for generation: ${params.generation_id}`);
-      const costData = await fetchGenerationCost(params.generation_id!);
+    retryCostFetch(logId, params.generation_id!, params, [15000, 30000, 60000]);
+  }
+}
+
+/**
+ * Retry cost fetch with escalating delays.
+ */
+async function retryCostFetch(
+  logId: string,
+  generationId: string,
+  params: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number },
+  delays: number[]
+): Promise<void> {
+  if (delays.length === 0) {
+    console.warn(`[LLM Tracker] All retries exhausted for ${generationId}`);
+    await updateLLMUsage(logId, { status: "cost_fetch_failed" });
+    return;
+  }
+
+  const [delay, ...remaining] = delays;
+  setTimeout(async () => {
+    console.log(`[LLM Tracker] Fetching cost for ${generationId} (delay=${delay}ms, retries left=${remaining.length})`);
+    try {
+      const costData = await fetchGenerationCost(generationId);
       if (costData && costData.cost_usd > 0) {
         await updateLLMUsage(logId, {
           cost_usd: costData.cost_usd,
@@ -168,26 +188,39 @@ export async function trackLLMCall(params: {
           total_tokens: costData.total_tokens || params.total_tokens,
           status: "completed",
         });
-      } else if (costData) {
-        // Cost returned but is 0 — retry once after 10s
-        console.log(`[LLM Tracker] Cost is 0, retrying in 10s...`);
-        setTimeout(async () => {
-          const retry = await fetchGenerationCost(params.generation_id!);
-          if (retry && retry.cost_usd > 0) {
-            await updateLLMUsage(logId, {
-              cost_usd: retry.cost_usd,
-              prompt_tokens: retry.prompt_tokens || params.prompt_tokens,
-              completion_tokens: retry.completion_tokens || params.completion_tokens,
-              total_tokens: retry.total_tokens || params.total_tokens,
-              status: "completed",
-            });
-          } else {
-            await updateLLMUsage(logId, { status: "cost_zero" });
-          }
-        }, 10000);
+        console.log(`[LLM Tracker] Cost updated: $${costData.cost_usd} for ${generationId}`);
       } else {
-        await updateLLMUsage(logId, { status: "cost_fetch_failed" });
+        // Retry with next delay
+        retryCostFetch(logId, generationId, params, remaining);
       }
-    }, 5000); // 5s delay for OpenRouter to finalize
+    } catch (err) {
+      console.error(`[LLM Tracker] Cost fetch error:`, err);
+      retryCostFetch(logId, generationId, params, remaining);
+    }
+  }, delay);
+}
+
+/**
+ * Retry cost fetch for a specific row (called from admin UI).
+ */
+export async function retryCostForRow(row: {
+  id: string;
+  generation_id: string | null;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}): Promise<boolean> {
+  if (!row.generation_id) return false;
+  const costData = await fetchGenerationCost(row.generation_id);
+  if (costData && costData.cost_usd > 0) {
+    await updateLLMUsage(row.id, {
+      cost_usd: costData.cost_usd,
+      prompt_tokens: costData.prompt_tokens || row.prompt_tokens,
+      completion_tokens: costData.completion_tokens || row.completion_tokens,
+      total_tokens: costData.total_tokens || row.total_tokens,
+      status: "completed",
+    });
+    return true;
   }
+  return false;
 }

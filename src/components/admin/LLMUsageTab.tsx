@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { retryCostForRow } from "@/services/llmUsageTracker";
 
 interface UsageRow {
   id: string;
@@ -50,6 +51,26 @@ export default function LLMUsageTab() {
     } else {
       setRows((data as any[]) || []);
     }
+    setLoading(false);
+  }
+
+  async function retryAllFailedCosts() {
+    const failed = rows.filter(r => r.status === "cost_fetch_failed" && r.generation_id);
+    if (failed.length === 0) { toast.info("Aucune entrée à recalculer"); return; }
+    setLoading(true);
+    let ok = 0;
+    for (const r of failed) {
+      const success = await retryCostForRow({
+        id: r.id,
+        generation_id: r.generation_id,
+        prompt_tokens: r.prompt_tokens,
+        completion_tokens: r.completion_tokens,
+        total_tokens: r.total_tokens,
+      });
+      if (success) ok++;
+    }
+    toast.success(`${ok}/${failed.length} coûts récupérés`);
+    await loadData();
     setLoading(false);
   }
 
@@ -158,6 +179,9 @@ export default function LLMUsageTab() {
         </Select>
         <Button size="sm" variant="outline" onClick={loadData} disabled={loading}>
           {loading ? "..." : "Rafraîchir"}
+        </Button>
+        <Button size="sm" variant="outline" onClick={retryAllFailedCosts} disabled={loading}>
+          Recalculer coûts manquants
         </Button>
       </div>
 
