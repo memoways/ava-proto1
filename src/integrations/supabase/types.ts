@@ -145,36 +145,42 @@ export type Database = {
       }
       sessions: {
         Row: {
+          admin_note: string | null
           branch: string | null
           conversation_log: Json | null
           duration_seconds: number | null
           ended_at: string | null
           game_over_reason: string | null
           id: string
+          name: string | null
           questionnaire_responses: Json | null
           started_at: string | null
           triggers_activated: string[] | null
           trust_level: number | null
         }
         Insert: {
+          admin_note?: string | null
           branch?: string | null
           conversation_log?: Json | null
           duration_seconds?: number | null
           ended_at?: string | null
           game_over_reason?: string | null
           id?: string
+          name?: string | null
           questionnaire_responses?: Json | null
           started_at?: string | null
           triggers_activated?: string[] | null
           trust_level?: number | null
         }
         Update: {
+          admin_note?: string | null
           branch?: string | null
           conversation_log?: Json | null
           duration_seconds?: number | null
           ended_at?: string | null
           game_over_reason?: string | null
           id?: string
+          name?: string | null
           questionnaire_responses?: Json | null
           started_at?: string | null
           triggers_activated?: string[] | null
