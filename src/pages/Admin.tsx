@@ -429,6 +429,11 @@ export default function Admin() {
             <VoiceConfigTab />
           </TabsContent>
 
+          {/* ==================== LLM USAGE / CONSUMPTION ==================== */}
+          <TabsContent value="usage">
+            <LLMUsageTab />
+          </TabsContent>
+
           {/* ==================== NOTION SYNC ==================== */}
           <TabsContent value="sync">
             <div className="max-w-2xl">
