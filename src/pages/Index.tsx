@@ -67,7 +67,7 @@ const Index = () => {
 
   // Auto-start mic (used after Max responds or after a video trigger)
   const startMicAuto = useCallback(async () => {
-    if (sttRef.current || isProcessing) return; // Already active or processing
+    if (sttRef.current || isProcessing) return;
     setMicActive(true);
     setAudioState("user_speaking");
 
@@ -77,7 +77,7 @@ const Index = () => {
         sttRef.current?.stop();
         sttRef.current = null;
         setMicActive(false);
-        processUserMessage(text);
+        processUserMessageRef.current(text);
       }
     });
 
@@ -91,11 +91,10 @@ const Index = () => {
     }
   }, [isProcessing, setAudioState]);
 
-  // restartMic is called after Max finishes speaking
-  const restartMic = useCallback(() => {
-    // Small delay to avoid overlap with TTS
+  // Keep restartMicRef in sync
+  restartMicRef.current = () => {
     setTimeout(() => startMicAuto(), 500);
-  }, [startMicAuto]);
+  };
 
   const handleIntroComplete = useCallback(() => {
     setPhase("conversation");
