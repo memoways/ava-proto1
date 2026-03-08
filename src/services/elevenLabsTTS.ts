@@ -1,3 +1,5 @@
+import { getTTSSettings } from "@/services/settingsService";
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 interface TTSOptions {
@@ -7,20 +9,29 @@ interface TTSOptions {
   similarityBoost?: number;
   style?: number;
   speed?: number;
+  useSpeakerBoost?: boolean;
 }
 
 /**
- * Generate speech from text using ElevenLabs via proxy-tts Edge Function
- * Returns an audio blob that can be played
+ * Generate speech — merges runtime TTS settings with per-call overrides
  */
 export async function generateSpeech(text: string, options?: TTSOptions): Promise<Blob> {
+  const tts = getTTSSettings();
+  const merged = {
+    text,
+    modelId: options?.modelId ?? tts.modelId,
+    stability: options?.stability ?? tts.stability,
+    similarityBoost: options?.similarityBoost ?? tts.similarityBoost,
+    style: options?.style ?? tts.style,
+    speed: options?.speed ?? tts.speed,
+    useSpeakerBoost: options?.useSpeakerBoost ?? tts.useSpeakerBoost,
+    ...(options?.voiceId ? { voiceId: options.voiceId } : {}),
+  };
+
   const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      text,
-      ...options,
-    }),
+    body: JSON.stringify(merged),
   });
 
   if (!response.ok) {

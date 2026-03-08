@@ -13,6 +13,7 @@ interface TTSRequest {
   similarityBoost?: number;
   style?: number;
   speed?: number;
+  useSpeakerBoost?: boolean;
 }
 
 serve(async (req) => {
@@ -32,25 +33,22 @@ serve(async (req) => {
       throw new Error('Text is required');
     }
 
-    // Default voice ID (can be overridden per request)
     const voiceId = body.voiceId || Deno.env.get('ELEVENLABS_VOICE_ID') || '';
     if (!voiceId) {
       throw new Error('Voice ID is required');
     }
 
-    // Model selection - turbo for low latency streaming
     const modelId = body.modelId || 'eleven_turbo_v2_5';
 
-    // Voice settings with sensible defaults for conversational tone
     const voiceSettings = {
       stability: body.stability ?? 0.5,
       similarity_boost: body.similarityBoost ?? 0.75,
       style: body.style ?? 0.3,
-      use_speaker_boost: true,
+      use_speaker_boost: body.useSpeakerBoost ?? true,
       speed: body.speed ?? 1.0,
     };
 
-    console.log(`[proxy-tts] Generating speech for ${body.text.length} chars with voice ${voiceId}`);
+    console.log(`[proxy-tts] model=${modelId} voice=${voiceId} stability=${voiceSettings.stability} sim=${voiceSettings.similarity_boost} style=${voiceSettings.style} speed=${voiceSettings.speed} boost=${voiceSettings.use_speaker_boost} text=${body.text.length}chars`);
 
     const response = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?output_format=mp3_44100_128`,
@@ -80,7 +78,6 @@ serve(async (req) => {
       );
     }
 
-    // Stream the audio response directly
     return new Response(response.body, {
       headers: {
         ...corsHeaders,
