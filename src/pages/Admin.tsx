@@ -44,10 +44,15 @@ export default function Admin() {
   const [ragQuery, setRagQuery] = useState("");
   const [ragResults, setRagResults] = useState<any[] | null>(null);
   const [ragSearching, setRagSearching] = useState(false);
+  const [characters, setCharacters] = useState<any[]>([]);
+  const [editingChar, setEditingChar] = useState<any | null>(null);
+  const [editPrompt, setEditPrompt] = useState("");
+  const [savingChar, setSavingChar] = useState(false);
 
   useEffect(() => {
     loadSessions();
     loadEmbeddings();
+    loadCharacters();
   }, []);
 
   async function loadSessions() {
