@@ -629,6 +629,10 @@ export default function Admin() {
             <LLMConfigTab />
           </TabsContent>
 
+          {/* ==================== VOICE CONFIG ==================== */}
+          <TabsContent value="voice">
+            <VoiceConfigTab />
+
           <TabsContent value="sync">
             <div className="max-w-2xl">
               <h2 className="text-lg font-semibold mb-2">Sync Notion → DB</h2>
