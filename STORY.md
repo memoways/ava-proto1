@@ -57,6 +57,7 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 | OpenRouter (Qwen) | LLM pour Max et Game Master |
 | Deepgram | STT streaming avec VAD |
 | ElevenLabs | TTS voix custom de Max |
+| OpenAI | Embeddings text-embedding-3-small (1536 dim) |
 | Notion | Source de vérité éditoriale (contenus, personnages, règles) |
 
 ---
@@ -227,6 +228,34 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ---
 
+### 2026-03-08 — Pipeline RAG + Sync Notion 🔷
+
+**Intent**: Connecter Notion comme source de vérité éditoriale, synchroniser les données dans Supabase et enrichir les conversations de Max avec du contexte narratif pertinent via RAG.
+
+**Tool**: Lovable Cloud + Notion MCP
+
+**Outcome**: 
+- Edge Function `sync-notion` — synchronise 4 bases Notion vers Supabase :
+  - **Characters** (DB `30362322e59580bbb7b8dd49d516b341`) : `Nom du caractère`, `Résumé`, `Genre`, `Archétype narratif`, `Type MBTI` + contenu de page (backstory complet via blocks API)
+  - **Storyworld** (DB `30362322e595806e9ef2fc62b7819980`) : `Nom`, `Résumé`, `Type`, `Tags`
+  - **Gameplay** (DB `73282ee05a414cee8307ae98ff48546d`) : `Nom de l'étape`, `Type`, `Ordre`, `Condition de déclenchement`, `Description`
+  - **Vidéos** (DB `478685a5b31e45b5bc534bcf905b9124`) : `Titre de la vidéo`, `Type`, `Thèmes`, `URL Gumlet`, `Description`, `Priorité`, `Style de transition`, `Contexte post-vidéo`
+- Edge Function `query-rag` — recherche sémantique pgvector via `match_embeddings`
+- Service client `ragService.ts` avec `queryRAG()`, `getRAGContext()`, `syncNotion()`, `AVA_NOTION_DATABASES`
+- Injection RAG automatique dans `conversationOrchestrator.ts`
+- Migration SQL : contraintes UNIQUE `notion_id` + RLS policies
+
+**Test end-to-end** ✅ :
+- Sync : 4 characters + 38 storyworld synchronisés
+- 42 embeddings générés (OpenAI text-embedding-3-small)
+- Query "Qui est Max et sa relation avec Ava ?" → Max (0.55), Ava (0.52), secret familial (0.50)
+- Gameplay : base Notion vide (0 étapes)
+- Vidéos : 1 page sans titre → ignorée
+
+**Time**: ~1h
+
+---
+
 ## Pivots & Breakages
 
 *Aucun pivot majeur pour le moment — le PRD est clair et le développement suit le plan.*
@@ -243,6 +272,8 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 - **2026-03-08**: Le vibe coding avec Lovable permet de construire un prototype voice-to-voice complet en ~2 jours. La clé : un PRD détaillé qui sert de prompt initial.
 - **2026-03-08**: Les Edge Functions Supabase sont parfaites comme proxy API — zéro clé exposée côté client, déploiement automatique.
+- **2026-03-08**: Le Notion MCP permet d'inspecter directement les schémas des bases Notion et de mapper précisément les noms de propriétés français. Critique pour éviter les erreurs de mapping dans sync-notion.
+- **2026-03-08**: Le fetch du contenu de page (blocks API) pour les characters est essentiel — les propriétés Notion ne contiennent qu'un résumé, le backstory détaillé est dans le body de la page.
 
 ---
 
@@ -261,6 +292,7 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 - "Ta voix est ta seule arme" — le pitch de l'onboarding qui résume tout
 - Le moment où Max parle pour la première fois avec sa voix ElevenLabs — la magie du voice-to-voice
 - Construire un pipeline STT→LLM→TTS complet en un weekend avec du vibe coding
+- Le RAG qui retourne "Décision du grand-père (secret de Max)" quand on demande la relation Max/Ava — la narration émerge des données
 
 ---
 
@@ -268,12 +300,13 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 | Date | Description | Impact | Plan de fix |
 |------|-------------|--------|-------------|
-| 2026-03-08 | RAG pas encore connecté (query-rag Edge Function manquante) | Moyen | Prochaine session |
-| 2026-03-08 | Sauvegarde session pas implémentée (save-session Edge Function manquante) | Moyen | Prochaine session |
-| 2026-03-08 | sync-notion Edge Function manquante | Moyen | Prochaine session |
+| 2026-03-08 | Sauvegarde session pas implémentée | Moyen | Prochaine étape |
 | 2026-03-08 | Chunking TTS par phrase pas implémenté (envoie tout le texte d'un coup) | Bas | Optimisation future |
 | 2026-03-08 | Voice ID ElevenLabs vide dans settings.json | Haut | Ulrich doit fournir |
-| 2026-03-08 | Pas de test end-to-end du pipeline complet | Haut | Prochaine session |
+| 2026-03-08 | Video triggers hardcodés (DEMO_TRIGGERS) au lieu de dynamiques depuis DB | Moyen | Prochaine étape |
+| 2026-03-08 | Gameplay steps vide dans Notion (0 étapes) | Moyen | Remplir dans Notion |
+| 2026-03-08 | 1 video trigger sans titre dans Notion → ignoré au sync | Bas | Corriger dans Notion |
+| 2026-03-08 | Pas de test end-to-end du pipeline voice-to-voice complet | Haut | Prochaine session |
 
 ---
 
