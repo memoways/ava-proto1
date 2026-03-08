@@ -47,9 +47,11 @@ export interface ConversationTurnResult {
 }
 
 /**
- * Orchestrates a full conversation turn:
- * 1. Calls Max agent (streaming) and Game Master (non-streaming) in parallel
- * 2. Returns combined results
+ * Orchestrates a full conversation turn with optimized latency:
+ * 1. Fetch RAG context
+ * 2. Stream Max agent response
+ * 3. Run Game Master in parallel (doesn't block TTS)
+ * Returns Max response ASAP + a promise for Game Master results
  */
 export async function processConversationTurn(
   userMessage: string,
@@ -60,7 +62,10 @@ export async function processConversationTurn(
   onMaxChunk: (text: string, done: boolean) => void,
   ragContext?: string,
   postVideoContext?: string
-): Promise<ConversationTurnResult> {
+): Promise<{
+  maxResponse: string;
+  gameMasterPromise: Promise<{ gameMasterResponse: GameMasterResponse; trigger: VideoTrigger | null }>;
+}> {
   // Fetch RAG context if not provided
   let finalRagContext = ragContext;
   if (!finalRagContext) {
@@ -75,7 +80,8 @@ export async function processConversationTurn(
     }
   }
 
-  // Prepare inputs
+  // Start Max streaming
+  let maxFullResponse = "";
   const maxInput: MaxAgentInput = {
     conversationHistory,
     userMessage,
@@ -83,39 +89,33 @@ export async function processConversationTurn(
     postVideoContext,
   };
 
-  // Start Max streaming (we'll collect the full response)
-  let maxFullResponse = "";
-  const maxPromise = callMaxAgent(maxInput, (text, done) => {
+  await callMaxAgent(maxInput, (text, done) => {
     if (!done) {
       maxFullResponse += text;
     }
     onMaxChunk(text, done);
   });
 
-  // Wait for Max to finish so we can include his response in Game Master analysis
-  await maxPromise;
+  // Fire Game Master in background (don't await - caller can process in parallel with TTS)
+  const gameMasterPromise = (async () => {
+    const gmInput: GameMasterInput = {
+      conversationHistory,
+      userMessage,
+      maxResponse: maxFullResponse,
+      currentTrustLevel,
+      triggeredIds,
+      timeElapsedSeconds,
+    };
 
-  // Now call Game Master with the complete exchange
-  const gmInput: GameMasterInput = {
-    conversationHistory,
-    userMessage,
-    maxResponse: maxFullResponse,
-    currentTrustLevel,
-    triggeredIds,
-    timeElapsedSeconds,
-  };
+    const gameMasterResponse = await callGameMaster(gmInput);
 
-  const gameMasterResponse = await callGameMaster(gmInput);
+    let trigger: VideoTrigger | null = null;
+    if (gameMasterResponse.trigger_video_id) {
+      trigger = DEMO_TRIGGERS[gameMasterResponse.trigger_video_id] || null;
+    }
 
-  // Check for triggered video
-  let trigger: VideoTrigger | null = null;
-  if (gameMasterResponse.trigger_video_id) {
-    trigger = DEMO_TRIGGERS[gameMasterResponse.trigger_video_id] || null;
-  }
+    return { gameMasterResponse, trigger };
+  })();
 
-  return {
-    maxResponse: maxFullResponse,
-    gameMasterResponse,
-    trigger,
-  };
+  return { maxResponse: maxFullResponse, gameMasterPromise };
 }

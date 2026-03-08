@@ -36,11 +36,11 @@ const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [postVideoContext, setPostVideoContext] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
-  const restartMicRef = useRef<() => void>(() => {});
 
   const sttRef = useRef<DeepgramSTT | null>(null);
   const processUserMessageRef = useRef<(text: string) => void>(() => {});
   const conversationHistoryRef = useRef<ConversationMessage[]>([]);
+  const micStartedRef = useRef(false); // Track if mic was ever started
 
   const timer = useTimer(settings.TIMEOUT_SECONDS, () => {
     if (sessionIdRef.current) {
@@ -67,14 +67,14 @@ const Index = () => {
 
   // Start persistent mic connection (stays open the whole conversation)
   const startMicPersistent = useCallback(async () => {
-    if (sttRef.current) return; // Already running
+    if (sttRef.current) return;
     setMicActive(true);
     setAudioState("user_speaking");
+    micStartedRef.current = true;
 
     const stt = new DeepgramSTT((text, isFinal) => {
       setUserSubtitle(text);
       if (isFinal && text.trim()) {
-        // Pause mic while processing, but don't close
         stt.pause();
         processUserMessageRef.current(text);
       }
@@ -90,7 +90,7 @@ const Index = () => {
     }
   }, [setAudioState]);
 
-  // Resume mic after Max finishes (no need to reconnect)
+  // Resume mic after Max finishes
   const resumeMic = useCallback(() => {
     if (sttRef.current?.isActive) {
       sttRef.current.resume();
@@ -98,48 +98,41 @@ const Index = () => {
       setAudioState("user_speaking");
       setUserSubtitle("");
     } else {
-      // Connection lost, restart
       sttRef.current = null;
       startMicPersistent();
     }
   }, [setAudioState, startMicPersistent]);
 
-  // Keep restartMicRef in sync
-  restartMicRef.current = () => {
-    setTimeout(() => resumeMic(), 500);
-  };
-
   const handleIntroComplete = useCallback(() => {
     setPhase("conversation");
     timer.start();
-    // Start persistent mic when conversation begins
-    setTimeout(() => startMicPersistent(), 500);
-  }, [setPhase, timer, startMicPersistent]);
+    // Don't auto-start mic — user must click the mic button first
+  }, [setPhase, timer]);
 
   const handleTriggerComplete = useCallback(() => {
     endTrigger();
-    // Resume mic after video trigger
-    setTimeout(() => resumeMic(), 500);
+    // Auto-resume mic after video trigger (no click needed)
+    setTimeout(() => resumeMic(), 300);
   }, [endTrigger, resumeMic]);
 
-  // Process user message through LLM agents
+  // Process user message with optimized parallel pipeline
   const processUserMessage = useCallback(async (userText: string) => {
     if (isProcessing || !userText.trim()) return;
 
     setIsProcessing(true);
     setAudioState("max_thinking");
     setUserSubtitle("");
+    setMaxSubtitle("");
 
-    // Add user message to history
     const userMsg: ConversationMessage = { role: "user", content: userText, timestamp: Date.now() };
     conversationHistoryRef.current.push(userMsg);
     addMessage(userMsg);
 
     try {
-      // Process conversation turn (Max + Game Master)
-      const result = await processConversationTurn(
+      // Get Max response (streaming) + Game Master promise (runs in background)
+      const { maxResponse, gameMasterPromise } = await processConversationTurn(
         userText,
-        conversationHistoryRef.current.slice(0, -1), // History without current message
+        conversationHistoryRef.current.slice(0, -1),
         state.trustLevel,
         state.triggeredIds,
         settings.TIMEOUT_SECONDS - timer.remaining,
@@ -149,22 +142,40 @@ const Index = () => {
             setAudioState("max_speaking");
           }
         },
-        undefined, // RAG context (TODO: integrate later)
+        undefined,
         postVideoContext || undefined
       );
 
-      // Add Max response to history
-      const maxMsg: ConversationMessage = { role: "max", content: result.maxResponse, timestamp: Date.now() };
+      // Add Max response to history immediately
+      const maxMsg: ConversationMessage = { role: "max", content: maxResponse, timestamp: Date.now() };
       conversationHistoryRef.current.push(maxMsg);
       addMessage(maxMsg);
+      setPostVideoContext(null);
+
+      // Start TTS and Game Master in PARALLEL (key latency optimization)
+      const ttsPromise = maxResponse.trim()
+        ? (async () => {
+            setAudioState("max_speaking");
+            try {
+              const audioBlob = await generateSpeech(maxResponse);
+              await playAudioBlob(audioBlob);
+            } catch (ttsError) {
+              console.error("TTS error:", ttsError);
+            }
+          })()
+        : Promise.resolve();
+
+      // Wait for both TTS playback and Game Master analysis
+      const [, gmResult] = await Promise.all([ttsPromise, gameMasterPromise]);
+
+      const { gameMasterResponse, trigger } = gmResult;
+      console.log("[Game Master]", gameMasterResponse);
 
       // Update trust
-      const newTrust = state.trustLevel + result.gameMasterResponse.trust_delta;
-      if (result.gameMasterResponse.trust_delta !== 0) {
-        updateTrust(result.gameMasterResponse.trust_delta);
+      const newTrust = state.trustLevel + gameMasterResponse.trust_delta;
+      if (gameMasterResponse.trust_delta !== 0) {
+        updateTrust(gameMasterResponse.trust_delta);
       }
-
-      console.log("[Game Master]", result.gameMasterResponse);
 
       // Persist session state
       if (sessionIdRef.current) {
@@ -174,23 +185,10 @@ const Index = () => {
           triggers_activated: state.triggeredIds,
         }).catch(console.error);
       }
-      setPostVideoContext(null);
-
-      // Play Max's response with TTS
-      if (result.maxResponse.trim()) {
-        setAudioState("max_speaking");
-        try {
-          const audioBlob = await generateSpeech(result.maxResponse);
-          await playAudioBlob(audioBlob);
-        } catch (ttsError) {
-          console.error("TTS error:", ttsError);
-          // Continue even if TTS fails - subtitles are shown
-        }
-      }
 
       // Handle game over
-      if (result.gameMasterResponse.game_over) {
-        const reason = result.gameMasterResponse.game_over_reason || "moderation";
+      if (gameMasterResponse.game_over) {
+        const reason = gameMasterResponse.game_over_reason || "moderation";
         if (sessionIdRef.current) {
           endSession(sessionIdRef.current, {
             game_over_reason: reason,
@@ -205,17 +203,16 @@ const Index = () => {
       }
 
       // Handle gate reached
-      if (result.gameMasterResponse.gate_reached) {
+      if (gameMasterResponse.gate_reached) {
         setPhase("gate");
         return;
       }
 
-      // Handle video trigger (wait a moment then trigger)
-      if (result.trigger) {
-        setTimeout(() => {
-          setPostVideoContext(result.trigger?.post_video_context || null);
-          triggerVideo(result.trigger!);
-        }, 1500); // Wait for Max to finish speaking
+      // Handle video trigger
+      if (trigger) {
+        setPostVideoContext(trigger.post_video_context || null);
+        triggerVideo(trigger);
+        return; // Mic will auto-resume after video via handleTriggerComplete
       }
 
     } catch (error) {
@@ -224,28 +221,31 @@ const Index = () => {
     } finally {
       setIsProcessing(false);
       setAudioState("idle");
-      // Clear Max subtitle after a delay
       setTimeout(() => setMaxSubtitle(""), 3000);
-      // Auto-restart mic for continuous conversation
-      restartMicRef.current();
+      // Auto-resume mic for next turn (if mic was started)
+      if (micStartedRef.current) {
+        setTimeout(() => resumeMic(), 300);
+      }
     }
-  }, [isProcessing, setAudioState, addMessage, state.trustLevel, state.triggeredIds, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo]);
+  }, [isProcessing, setAudioState, addMessage, state.trustLevel, state.triggeredIds, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo, resumeMic]);
 
-  // Keep ref in sync
   processUserMessageRef.current = processUserMessage;
 
   const handleMicToggle = useCallback(async () => {
     if (micActive) {
-      // Pause STT (keep connection alive)
       sttRef.current?.pause();
       setMicActive(false);
       setAudioState("idle");
       setUserSubtitle("");
     } else {
-      // Resume or start
-      resumeMic();
+      if (!micStartedRef.current) {
+        // First click: start persistent connection
+        startMicPersistent();
+      } else {
+        resumeMic();
+      }
     }
-  }, [micActive, setAudioState, resumeMic]);
+  }, [micActive, setAudioState, resumeMic, startMicPersistent]);
 
   const handleQuestionnaire = useCallback(() => {
     setPhase("questionnaire");
@@ -255,13 +255,14 @@ const Index = () => {
     console.log("Questionnaire submitted:", data);
     if (sessionIdRef.current) {
       saveQuestionnaire(sessionIdRef.current, data).catch(console.error);
-      // Sync to Notion
       syncQuestionnaireToNotion(sessionIdRef.current, data, state.trustLevel, settings.TIMEOUT_SECONDS - timer.remaining, state.gameOverReason);
     }
     setPhase("thanks");
   }, [setPhase, state.trustLevel, timer.remaining, state.gameOverReason]);
 
   const handleRestart = useCallback(() => {
+    sttRef.current?.stop();
+    sttRef.current = null;
     reset();
     timer.reset();
     setMicActive(false);
@@ -270,6 +271,7 @@ const Index = () => {
     conversationHistoryRef.current = [];
     setPostVideoContext(null);
     sessionIdRef.current = null;
+    micStartedRef.current = false;
   }, [reset, timer]);
 
   const handleGateContinue = useCallback(() => {
