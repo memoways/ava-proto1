@@ -353,8 +353,61 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 **Time**: ~20min
 
 ---
+### 2026-03-08 — LLM Cost Tracker 🔷
 
-## Pivots & Breakages
+**Intent**: Suivre précisément la consommation LLM (tokens + coûts USD) pour chaque appel OpenRouter, et offrir une vue admin exploitable pour piloter les coûts de l'expérience.
+
+**Tool**: Lovable Cloud
+
+**Outcome**:
+- Table `llm_usage` avec index sur `created_at`, `model`, `feature_key`, `session_id`
+- `llmUsageTracker.ts` : pipeline de collecte automatique — log initial avec tokens, puis récupération asynchrone du coût USD via l'API OpenRouter generation detail (3s delay)
+- `proxy-llm/index.ts` : action `get_generation_cost` ajoutée, données d'usage incluses dans les réponses streaming
+- `openRouterLLM.ts` : intégration transparente — chaque appel est automatiquement loggé avec `feature_key` (chat/game_master) et `session_id`
+- Onglet **Consommation** dans `/admin` → Technique : KPI cards (coût total, 30j, aujourd'hui, requêtes, tokens), graphiques (par jour/modèle/feature), tableau filtrable des 100 dernières requêtes
+- Gestion d'erreurs : appel échoué, generation_id absent, endpoint coût indisponible
+
+**Ce que ça permet** : Comprendre ce qui coûte le plus (quel modèle, quelle feature), comparer les coûts entre modèles pour le même usage, préparer l'ajout futur d'alertes de budget et de fallback automatique vers un modèle moins cher.
+
+**Time**: ~40min
+
+---
+
+### 2026-03-08 — Persistance des réglages admin en base 🔷
+
+**Intent**: Garantir que tous les réglages faits dans /admin (modèle LLM, paramètres voix, gameplay, GM) survivent au rechargement de page et au changement de navigateur.
+
+**Tool**: Lovable Cloud
+
+**Outcome**:
+- Table `admin_settings` (clé/valeur JSONB) pour stocker durablement les configurations
+- `settingsService.ts` refactorisé : double couche localStorage (rapide) + DB (persistant), `hydrateAllSettings()` au montage admin
+- Boutons **Sauvegarder** explicites dans les onglets LLM Config et Voix
+- Vérification post-sauvegarde du system prompt (relecture DB + invalidation cache mémoire)
+
+**Ce que ça permet** : Itérer sur le fine-tuning de l'expérience sans perdre ses réglages — changer de modèle, ajuster la température, modifier les presets voix, tout est conservé entre les sessions de travail. Le system prompt de Max ne peut plus se "perdre" silencieusement.
+
+**Time**: ~25min
+
+---
+
+### 2026-03-08 — Rapport de sync Notion détaillé 🔷
+
+**Intent**: Rendre visible et compréhensible ce qui se passe lors d'une synchronisation Notion → Supabase, au lieu d'afficher un JSON brut.
+
+**Tool**: Lovable Cloud
+
+**Outcome**:
+- `sync-notion/index.ts` : tracking des stats d'embedding par table (`chunks_created`, `chars_embedded`), comptage du total d'embeddings en base après sync
+- Admin UI : affichage structuré post-sync avec cards par table (entrées synchronisées, chunks RAG créés, caractères/tokens estimés pour les embeddings, total embeddings en base)
+
+**Ce que ça permet** : Savoir exactement quel contenu narratif alimente le RAG, combien de chunks sont générés par personnage ou élément de storyworld, et combien de tokens OpenAI sont consommés pour les embeddings. Essentiel pour optimiser le contenu Notion et comprendre la qualité du RAG.
+
+**Time**: ~15min
+
+---
+
+
 
 *Aucun pivot majeur pour le moment — le PRD est clair et le développement suit le plan.*
 
