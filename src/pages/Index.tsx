@@ -35,6 +35,7 @@ const Index = () => {
   const [maxSubtitle, setMaxSubtitle] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [postVideoContext, setPostVideoContext] = useState<string | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
 
   const sttRef = useRef<DeepgramSTT | null>(null);
   const conversationHistoryRef = useRef<ConversationMessage[]>([]);
