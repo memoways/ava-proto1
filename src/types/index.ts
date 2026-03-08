@@ -20,6 +20,7 @@ export interface VideoTrigger {
   transition_style: string;
   post_video_context: string | null;
   duration_seconds: number;
+  video_url?: string | null;
 }
 
 export interface GameState {

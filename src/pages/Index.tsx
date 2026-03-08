@@ -11,11 +11,14 @@ import type { QuestionnaireData, ConversationMessage } from "@/types";
 
 import OnboardingScreen from "@/components/OnboardingScreen";
 import VideoPlaceholder from "@/components/VideoPlaceholder";
+import GumletVideoPlayer from "@/components/GumletVideoPlayer";
 import ConversationScreen from "@/components/ConversationScreen";
 import GameOverScreen from "@/components/GameOverScreen";
 import GateScreen from "@/components/GateScreen";
 import QuestionnaireScreen from "@/components/QuestionnaireScreen";
 import ThanksScreen from "@/components/ThanksScreen";
+
+const INTRO_VIDEO_URL = "https://gumlet.tv/watch/67a281cac82041cdc3714c0c/";
 
 const INTRO_TRIGGER = {
   id: "intro",
@@ -27,6 +30,7 @@ const INTRO_TRIGGER = {
   transition_style: "fade_black",
   post_video_context: null,
   duration_seconds: settings.VIDEO_PLACEHOLDER_DURATION,
+  video_url: INTRO_VIDEO_URL,
 };
 
 /** Performance timer helper */
@@ -336,10 +340,8 @@ const Index = () => {
       return <OnboardingScreen onStart={handleStart} onSkip={handleStart} />;
     case "intro_video":
       return (
-        <VideoPlaceholder
-          title="Cinématique d'introduction"
-          description={INTRO_TRIGGER.placeholder_text}
-          durationSeconds={INTRO_TRIGGER.duration_seconds}
+        <GumletVideoPlayer
+          videoUrl={INTRO_TRIGGER.video_url}
           onComplete={handleIntroComplete}
           onSkip={handleIntroComplete}
         />
@@ -360,7 +362,46 @@ const Index = () => {
           onEarlyQuestionnaire={handleQuestionnaire}
         />
       );
-    case "video_trigger":
+    case "video_trigger": {
+      const triggerVideoUrl = state.currentTrigger?.video_url;
+      if (triggerVideoUrl) {
+        return (
+          <GumletVideoPlayer
+            videoUrl={triggerVideoUrl}
+            onComplete={handleTriggerComplete}
+            onSkip={handleTriggerComplete}
+          >
+            {/* HUD overlay on trigger videos — no mic */}
+            <div className="absolute top-5 left-5 z-20">
+              <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border/20 bg-black/30 backdrop-blur-sm">
+                <span className={`font-mono text-sm tabular-nums ${timer.isWarning ? "text-timer-warning" : "text-muted-foreground/70"}`}>
+                  {timer.formatted}
+                </span>
+                <div className="w-px h-5 bg-border/20" />
+                <div className="flex items-center gap-2">
+                  <div className="w-16 h-1.5 rounded-full bg-border/20 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700 ease-out"
+                      style={{
+                        width: `${Math.min(100, (state.trustLevel / settings.TRUST_THRESHOLD) * 100)}%`,
+                        background: state.trustLevel >= settings.TRUST_THRESHOLD
+                          ? 'hsl(var(--primary))'
+                          : state.trustLevel > settings.TRUST_THRESHOLD * 0.5
+                            ? 'hsl(var(--trust))'
+                            : 'hsl(var(--muted-foreground) / 0.4)',
+                      }}
+                    />
+                  </div>
+                  <span className="font-mono text-[10px] text-muted-foreground/40">
+                    {state.trustLevel}/{settings.TRUST_THRESHOLD}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </GumletVideoPlayer>
+        );
+      }
+      // Fallback to placeholder if no video_url
       return (
         <VideoPlaceholder
           title={state.currentTrigger?.title || "Vidéo"}
@@ -370,6 +411,7 @@ const Index = () => {
           onSkip={handleTriggerComplete}
         />
       );
+    }
     case "gate":
       return <GateScreen onContinue={handleGateContinue} />;
     case "game_over":
