@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-03-08 (session 5)  
+> **Last Updated**: 2026-03-08 (session 6)  
 
 ---
 
@@ -475,12 +475,51 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ---
 
+### 2026-03-08 — Persistance des réglages de jeu 🔹
+
+**Intent**: Empêcher la perte des réglages Gameplay (sliders trust threshold, timeout, etc.) au rechargement de la page admin.
+
+**Tool**: Lovable Cloud
+
+**Outcome**:
+- `GameMasterConfigTab.tsx` : bouton **Sauvegarder** dans la section Mécanique, indicateur visuel de modifications non sauvegardées
+- Chargement des valeurs depuis `admin_settings` au montage, comparaison d'état pour activer/désactiver le bouton
+
+**Time**: ~10min
+
+---
+
+### 2026-03-08 — Player vidéo Gumlet 🔷
+
+**Intent**: Remplacer les écrans placeholder texte par de vraies vidéos hébergées sur Gumlet, en commençant par la cinématique d'introduction.
+
+**Tool**: Lovable
+
+**Outcome**:
+- `GumletVideoPlayer.tsx` : composant iframe embed Gumlet plein écran responsive
+  - Extraction automatique de l'asset ID depuis différents formats d'URL Gumlet
+  - Paramètres embed : `autoplay=true`, `preload=true`
+  - Écoute des événements `postMessage` pour détecter la fin de vidéo
+  - Slot `children` pour injecter des overlays (HUD) par-dessus la vidéo
+  - Bouton "Passer →" toujours visible en overlay
+- `types/index.ts` : champ `video_url` optionnel ajouté à `VideoTrigger`
+- `Index.tsx` : 
+  - Intro video utilise `GumletVideoPlayer` avec la vidéo `67a281cac82041cdc3714c0c`
+  - Video triggers mid-conversation : si `video_url` existe → Gumlet player avec HUD (timer + confiance) sans micro ; sinon → fallback `VideoPlaceholder`
+
+**Ce que ça permet** : Les cinématiques sont enfin de vraies vidéos. Le mode responsive plein écran avec overlays maintient l'immersion. Le fallback vers VideoPlaceholder garantit la compatibilité avec les triggers qui n'ont pas encore de vidéo assignée.
+
+**Time**: ~25min
+
+---
+
 - **2026-03-08**: La persistance des réglages en localStorage seul est fragile — la double couche localStorage + DB (table admin_settings) garantit que les réglages survivent à tout contexte.
 - **2026-03-08**: Le suivi des coûts LLM doit être automatique et transparent — si l'intégrateur doit penser à logguer, il oubliera. L'intégration dans openRouterLLM.ts rend le tracking invisible pour le reste du code.
 - **2026-03-08**: Afficher le JSON brut de sync Notion était inutile pour le pilotage — un rapport visuel par table avec les métriques RAG (chunks, tokens) permet de comprendre instantanément l'état du contenu narratif.
 - **2026-03-08**: L'API OpenRouter Generation met parfois 15-60s à indexer les coûts — un mécanisme de retry progressif est indispensable pour récupérer les vrais coûts.
 - **2026-03-08**: Les environnements test et live ont des bases de données séparées — les réglages admin doivent être configurés indépendamment dans chaque environnement.
 - **2026-03-08**: Le preload des caches et le warm-up des Edge Functions pendant les cinématiques est une stratégie clé — l'utilisateur ne remarque pas le chargement car il regarde la vidéo.
+- **2026-03-08**: L'intégration Gumlet via iframe est la plus simple et la plus fiable — pas besoin de SDK JS custom, le player est entièrement géré côté Gumlet. Le slot `children` permet d'injecter n'importe quel overlay (HUD) sans toucher au player.
 
 *Aucun pivot majeur pour le moment — le PRD est clair et le développement suit le plan.*
 
