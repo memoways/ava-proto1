@@ -61,7 +61,7 @@ serve(async (req) => {
     const { data: matches, error } = await supabase.rpc('match_embeddings', {
       query_embedding: JSON.stringify(queryEmbedding),
       match_count: body.match_count || 5,
-      match_threshold: body.match_threshold || 0.5,
+      match_threshold: body.match_threshold || 0.3,
     });
 
     if (error) {
