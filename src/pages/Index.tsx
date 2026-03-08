@@ -36,6 +36,7 @@ const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [postVideoContext, setPostVideoContext] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const restartMicRef = useRef<() => void>(() => {});
 
   const sttRef = useRef<DeepgramSTT | null>(null);
   const conversationHistoryRef = useRef<ConversationMessage[]>([]);
@@ -213,7 +214,7 @@ const Index = () => {
       // Clear Max subtitle after a delay
       setTimeout(() => setMaxSubtitle(""), 3000);
       // Auto-restart mic for continuous conversation
-      restartMic();
+      restartMicRef.current();
     }
   }, [isProcessing, setAudioState, addMessage, state.trustLevel, state.triggeredIds, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo]);
 
