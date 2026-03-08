@@ -320,6 +320,7 @@ const Index = () => {
     reset();
     timer.reset();
     setMicActive(false);
+    setMicEverStarted(false);
     setUserSubtitle("");
     setMaxSubtitle("");
     conversationHistoryRef.current = [];
