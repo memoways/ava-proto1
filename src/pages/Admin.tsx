@@ -3,8 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
+import { clearSystemPromptCache } from "@/agents/maxAgent";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
