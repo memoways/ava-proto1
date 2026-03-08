@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
 import { clearSystemPromptCache } from "@/agents/maxAgent";
+import { hydrateAllSettings } from "@/services/settingsService";
 import LLMConfigTab from "@/components/LLMConfigTab";
 import VoiceConfigTab from "@/components/VoiceConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
@@ -85,6 +86,7 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState("sessions");
 
   useEffect(() => {
+    hydrateAllSettings(); // Load all settings from DB into localStorage
     loadSessions();
     loadEmbeddings();
     loadCharacters();
