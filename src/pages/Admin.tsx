@@ -10,6 +10,8 @@ import { clearSystemPromptCache } from "@/agents/maxAgent";
 import LLMConfigTab from "@/components/LLMConfigTab";
 import VoiceConfigTab from "@/components/VoiceConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
+import SessionsTab, { type SessionRow } from "@/components/admin/SessionsTab";
+import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -50,18 +52,7 @@ const TAB_GROUPS = [
   },
 ];
 
-interface SessionRow {
-  id: string;
-  started_at: string | null;
-  ended_at: string | null;
-  trust_level: number | null;
-  game_over_reason: string | null;
-  duration_seconds: number | null;
-  branch: string | null;
-  triggers_activated: string[] | null;
-  conversation_log: any;
-  questionnaire_responses: any;
-}
+// SessionRow is imported from SessionsTab
 
 interface EmbeddingRow {
   id: string;
@@ -75,7 +66,7 @@ interface EmbeddingRow {
 export default function Admin() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [embeddings, setEmbeddings] = useState<EmbeddingRow[]>([]);
-  const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null);
+  // selectedSession moved to SessionsTab
   const [selectedEmbedding, setSelectedEmbedding] = useState<EmbeddingRow | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
@@ -254,127 +245,7 @@ export default function Admin() {
 
           {/* ==================== SESSIONS ==================== */}
           <TabsContent value="sessions">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-lg font-semibold">Sessions récentes</h2>
-                  <Button size="sm" variant="outline" onClick={loadSessions}>
-                    Rafraîchir
-                  </Button>
-                </div>
-                <ScrollArea className="h-[70vh] border rounded-lg">
-                  {sessions.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => setSelectedSession(s)}
-                      className={`w-full text-left p-3 border-b hover:bg-accent/50 transition-colors ${
-                        selectedSession?.id === s.id ? "bg-accent" : ""
-                      }`}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className="text-xs font-mono text-muted-foreground">
-                            {s.id.slice(0, 8)}
-                          </span>
-                          <p className="text-sm">{fmt(s.started_at)}</p>
-                        </div>
-                        <div className="text-right text-xs">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded-full ${
-                              s.ended_at
-                                ? "bg-green-900/40 text-green-300"
-                                : "bg-yellow-900/40 text-yellow-300"
-                            }`}
-                          >
-                            {s.ended_at ? "Terminée" : "En cours"}
-                          </span>
-                          <p className="mt-1">Trust: {s.trust_level ?? 0} | {s.duration_seconds ?? "—"}s</p>
-                        </div>
-                      </div>
-                      {s.game_over_reason && (
-                        <p className="text-xs text-red-400 mt-1">Fin: {s.game_over_reason}</p>
-                      )}
-                    </button>
-                  ))}
-                  {sessions.length === 0 && (
-                    <p className="p-4 text-muted-foreground text-sm">Aucune session</p>
-                  )}
-                </ScrollArea>
-              </div>
-
-              <div>
-                {selectedSession ? (
-                  <div className="border rounded-lg p-4">
-                    <h2 className="text-lg font-semibold mb-2">
-                      Session {selectedSession.id.slice(0, 8)}
-                    </h2>
-                    <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-                      <Stat label="Début" value={fmt(selectedSession.started_at)} />
-                      <Stat label="Fin" value={fmt(selectedSession.ended_at)} />
-                      <Stat label="Trust" value={String(selectedSession.trust_level ?? 0)} />
-                      <Stat label="Durée" value={`${selectedSession.duration_seconds ?? "—"}s`} />
-                      <Stat label="Branch" value={selectedSession.branch || "—"} />
-                      <Stat label="Raison fin" value={selectedSession.game_over_reason || "—"} />
-                    </div>
-
-                    {selectedSession.triggers_activated?.length ? (
-                      <div className="mb-3">
-                        <p className="text-xs font-semibold text-muted-foreground mb-1">Triggers activés</p>
-                        <div className="flex flex-wrap gap-1">
-                          {selectedSession.triggers_activated.map((t) => (
-                            <span key={t} className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">{t}</span>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    <div className="mb-3">
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">
-                        Conversation ({Array.isArray(selectedSession.conversation_log) ? selectedSession.conversation_log.length : 0} messages)
-                      </p>
-                      <ScrollArea className="h-60 border rounded p-2">
-                        {Array.isArray(selectedSession.conversation_log) &&
-                          selectedSession.conversation_log.map((msg: any, i: number) => (
-                            <div key={i} className={`mb-2 text-sm ${msg.role === "max" ? "text-blue-300" : "text-green-300"}`}>
-                              <span className="font-bold">{msg.role === "max" ? "Max" : "User"}:</span> {msg.content}
-                            </div>
-                          ))}
-                      </ScrollArea>
-                    </div>
-
-                    {selectedSession.questionnaire_responses && (
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground mb-1">Questionnaire</p>
-                        <div className="grid grid-cols-2 gap-2 text-sm bg-muted/30 rounded p-3">
-                          <Stat label="Note expérience" value={`${selectedSession.questionnaire_responses.experience_rating}/10`} />
-                          <Stat label="Mot" value={selectedSession.questionnaire_responses.experience_word || "—"} />
-                          <Stat label="NPS" value={`${selectedSession.questionnaire_responses.nps}/10`} />
-                          <Stat label="Immersion histoire" value={`${selectedSession.questionnaire_responses.immersion_story}/5`} />
-                          <Stat label="Immersion naturel" value={`${selectedSession.questionnaire_responses.immersion_natural}/5`} />
-                          <Stat label="Écoute Max" value={`${selectedSession.questionnaire_responses.mechanic_listening}/5`} />
-                          <Stat label="Latence gênante" value={selectedSession.questionnaire_responses.mechanic_latency || "—"} />
-                          <Stat label="Compris objectif" value={selectedSession.questionnaire_responses.narration_understood || "—"} />
-                          <Stat label="Envie continuer" value={`${selectedSession.questionnaire_responses.narration_continue}/5`} />
-                          <Stat label="Prêt à payer" value={selectedSession.questionnaire_responses.value_pay || "—"} />
-                          <Stat label="Fourchette prix" value={selectedSession.questionnaire_responses.value_price || "—"} />
-                          <Stat label="Format préféré" value={selectedSession.questionnaire_responses.value_format || "—"} />
-                        </div>
-                        {selectedSession.questionnaire_responses.open_feedback && (
-                          <div className="mt-2">
-                            <p className="text-xs text-muted-foreground">Feedback ouvert</p>
-                            <p className="text-sm italic">{selectedSession.questionnaire_responses.open_feedback}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="border rounded-lg p-8 text-center text-muted-foreground">
-                    Sélectionne une session pour voir les détails
-                  </div>
-                )}
-              </div>
-            </div>
+            <SessionsTab sessions={sessions} onRefresh={loadSessions} />
           </TabsContent>
 
           {/* ==================== EMBEDDINGS ==================== */}
@@ -538,66 +409,7 @@ export default function Admin() {
 
           {/* ==================== QUESTIONNAIRES ==================== */}
           <TabsContent value="questionnaires">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-semibold">Réponses au questionnaire</h2>
-                <Button size="sm" variant="outline" onClick={loadSessions}>Rafraîchir</Button>
-              </div>
-              <div className="overflow-x-auto border rounded-lg">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/30">
-                      <th className="text-left p-2 font-medium text-muted-foreground">Session</th>
-                      <th className="text-left p-2 font-medium text-muted-foreground">Date</th>
-                      <th className="text-center p-2 font-medium text-muted-foreground">Note</th>
-                      <th className="text-left p-2 font-medium text-muted-foreground">Mot</th>
-                      <th className="text-center p-2 font-medium text-muted-foreground">NPS</th>
-                      <th className="text-center p-2 font-medium text-muted-foreground">Immersion</th>
-                      <th className="text-center p-2 font-medium text-muted-foreground">Naturel</th>
-                      <th className="text-center p-2 font-medium text-muted-foreground">Écoute</th>
-                      <th className="text-left p-2 font-medium text-muted-foreground">Latence</th>
-                      <th className="text-left p-2 font-medium text-muted-foreground">Compris</th>
-                      <th className="text-center p-2 font-medium text-muted-foreground">Continuer</th>
-                      <th className="text-left p-2 font-medium text-muted-foreground">Payer</th>
-                      <th className="text-left p-2 font-medium text-muted-foreground">Prix</th>
-                      <th className="text-left p-2 font-medium text-muted-foreground">Format</th>
-                      <th className="text-center p-2 font-medium text-muted-foreground">Trust</th>
-                      <th className="text-left p-2 font-medium text-muted-foreground">Feedback</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sessions
-                      .filter((s) => s.questionnaire_responses)
-                      .map((s) => {
-                        const q = s.questionnaire_responses;
-                        return (
-                          <tr key={s.id} className="border-b hover:bg-accent/30">
-                            <td className="p-2 font-mono text-xs">{s.id.slice(0, 8)}</td>
-                            <td className="p-2 text-xs">{fmt(s.started_at)}</td>
-                            <td className="p-2 text-center">{q.experience_rating}/10</td>
-                            <td className="p-2">{q.experience_word || "—"}</td>
-                            <td className="p-2 text-center">{q.nps}/10</td>
-                            <td className="p-2 text-center">{q.immersion_story}/5</td>
-                            <td className="p-2 text-center">{q.immersion_natural}/5</td>
-                            <td className="p-2 text-center">{q.mechanic_listening}/5</td>
-                            <td className="p-2 text-xs">{q.mechanic_latency}</td>
-                            <td className="p-2 text-xs">{q.narration_understood}</td>
-                            <td className="p-2 text-center">{q.narration_continue}/5</td>
-                            <td className="p-2 text-xs">{q.value_pay}</td>
-                            <td className="p-2 text-xs">{q.value_price || "—"}</td>
-                            <td className="p-2 text-xs">{q.value_format || "—"}</td>
-                            <td className="p-2 text-center">{s.trust_level ?? 0}</td>
-                            <td className="p-2 text-xs max-w-[200px] truncate">{q.open_feedback || "—"}</td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
-                {sessions.filter((s) => s.questionnaire_responses).length === 0 && (
-                  <p className="p-4 text-muted-foreground text-sm text-center">Aucune réponse au questionnaire</p>
-                )}
-              </div>
-            </div>
+            <QuestionnairesTab sessions={sessions} onRefresh={loadSessions} />
           </TabsContent>
 
           {/* ==================== GAME MASTER ==================== */}
