@@ -39,6 +39,7 @@ const Index = () => {
   const restartMicRef = useRef<() => void>(() => {});
 
   const sttRef = useRef<DeepgramSTT | null>(null);
+  const processUserMessageRef = useRef<(text: string) => void>(() => {});
   const conversationHistoryRef = useRef<ConversationMessage[]>([]);
 
   const timer = useTimer(settings.TIMEOUT_SECONDS, () => {
