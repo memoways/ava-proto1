@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.8.0] - 2026-03-08
+
+### Ajouté
+- **Champs contact dans le questionnaire** : nom/prénom, email, et 2 cases à cocher (opt-in feedback, opt-in suivi du projet) — synchronisés dans la base de données et dans Notion (colonnes "Nom contact", "Email contact", "Opt-in feedback", "Opt-in updates")
+
+### Optimisé
+- **Latence première réplique** : 6 optimisations pour réduire drastiquement le temps de réponse initial de Max :
+  - Preload du system prompt pendant la cinématique d'intro
+  - Warm-up des Edge Functions (OPTIONS preflight sur proxy-llm, proxy-tts, query-rag)
+  - RAG réduit de 5 à 3 matches
+  - TTS : format `mp3_22050_32` (~4x plus léger) + `optimize_streaming_latency=4`
+  - Seuil de phrase TTS abaissé (enqueue plus tôt)
+  - RAG fetch parallélisé avec le preload du system prompt
+
+---
+
 ## [0.7.1] - 2026-03-08
 
 ### Corrigé

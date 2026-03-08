@@ -439,11 +439,48 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ---
 
+### 2026-03-08 — Champs contact dans le questionnaire 🔷
+
+**Intent**: Permettre aux testeurs de laisser leur nom et email pour être recontactés (feedback complémentaire ou suivi du projet).
+
+**Tool**: Lovable + Notion MCP
+
+**Outcome**:
+- `QuestionnaireScreen.tsx` : section "Rester en contact" avec champ nom, email, 2 checkboxes (opt-in feedback, opt-in suivi)
+- `types/index.ts` : 4 nouveaux champs dans `QuestionnaireData`
+- `sync-questionnaire/index.ts` : envoi des 4 champs vers Notion (rich_text, email, checkbox x2)
+- Notion : colonnes "Nom contact", "Email contact", "Opt-in feedback", "Opt-in updates" créées via MCP
+
+**Time**: ~15min
+
+---
+
+### 2026-03-08 — Optimisation latence première réplique 🔷
+
+**Intent**: Réduire drastiquement le délai entre la première question de l'utilisateur et la première réplique audio de Max.
+
+**Tool**: Lovable + Lovable Cloud
+
+**Outcome**:
+- **Preload system prompt** : `preloadSystemPrompt()` appelé au clic "Commencer", pendant la cinématique d'intro — le prompt est déjà en cache quand le 1er message arrive
+- **Warm-up Edge Functions** : requêtes OPTIONS fire-and-forget sur proxy-llm, proxy-tts, query-rag pendant l'intro (évite le cold start Deno)
+- **RAG allégé** : 5 → 3 matches (moins de données à chercher/transférer, embedding toujours pertinent)
+- **TTS optimisé** : `mp3_22050_32` au lieu de `mp3_44100_128` (~4x plus léger à transférer) + `optimize_streaming_latency=4` (ElevenLabs renvoie l'audio dès que possible)
+- **Sentence splitting agressif** : seuil abaissé de 5 à 3 caractères pour enqueue le TTS plus tôt
+- **Parallélisme** : RAG fetch et system prompt preload s'exécutent en parallèle
+
+**Ce que ça permet** : La première réplique de Max arrive significativement plus vite. Les répliques suivantes bénéficient aussi du cache system prompt et du warm-up des connexions.
+
+**Time**: ~20min
+
+---
+
 - **2026-03-08**: La persistance des réglages en localStorage seul est fragile — la double couche localStorage + DB (table admin_settings) garantit que les réglages survivent à tout contexte.
 - **2026-03-08**: Le suivi des coûts LLM doit être automatique et transparent — si l'intégrateur doit penser à logguer, il oubliera. L'intégration dans openRouterLLM.ts rend le tracking invisible pour le reste du code.
 - **2026-03-08**: Afficher le JSON brut de sync Notion était inutile pour le pilotage — un rapport visuel par table avec les métriques RAG (chunks, tokens) permet de comprendre instantanément l'état du contenu narratif.
 - **2026-03-08**: L'API OpenRouter Generation met parfois 15-60s à indexer les coûts — un mécanisme de retry progressif est indispensable pour récupérer les vrais coûts.
 - **2026-03-08**: Les environnements test et live ont des bases de données séparées — les réglages admin doivent être configurés indépendamment dans chaque environnement.
+- **2026-03-08**: Le preload des caches et le warm-up des Edge Functions pendant les cinématiques est une stratégie clé — l'utilisateur ne remarque pas le chargement car il regarde la vidéo.
 
 *Aucun pivot majeur pour le moment — le PRD est clair et le développement suit le plan.*
 
