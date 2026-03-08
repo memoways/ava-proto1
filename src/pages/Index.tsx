@@ -131,7 +131,17 @@ const Index = () => {
 
       // Handle game over
       if (result.gameMasterResponse.game_over) {
-        gameOver(result.gameMasterResponse.game_over_reason || "moderation");
+        const reason = result.gameMasterResponse.game_over_reason || "moderation";
+        if (sessionIdRef.current) {
+          endSession(sessionIdRef.current, {
+            game_over_reason: reason,
+            trust_level: newTrust,
+            conversation_log: conversationHistoryRef.current,
+            triggers_activated: state.triggeredIds,
+            duration_seconds: settings.TIMEOUT_SECONDS - timer.remaining,
+          }).catch(console.error);
+        }
+        gameOver(reason);
         return;
       }
 
