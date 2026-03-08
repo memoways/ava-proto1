@@ -28,9 +28,26 @@ export class DeepgramSTT {
   private silenceTimer: ReturnType<typeof setTimeout> | null = null;
   private fullTranscript = "";
   private static SILENCE_DELAY_MS = 2000;
+  private _paused = false;
 
   constructor(onTranscript: TranscriptCallback) {
     this.onTranscript = onTranscript;
+  }
+
+  get isActive() {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  /** Pause listening (mute) — keeps connection alive */
+  pause() {
+    this._paused = true;
+    if (this.silenceTimer) clearTimeout(this.silenceTimer);
+  }
+
+  /** Resume listening after pause */
+  resume() {
+    this._paused = false;
+    this.fullTranscript = "";
   }
 
   async start() {
@@ -50,6 +67,8 @@ export class DeepgramSTT {
     };
 
     this.ws.onmessage = (event) => {
+      if (this._paused) return; // Ignore transcripts while paused
+
       const data = JSON.parse(event.data);
       if (data.type === 'Results') {
         const transcript = data.channel?.alternatives?.[0]?.transcript || '';
@@ -82,7 +101,9 @@ export class DeepgramSTT {
     this.silenceTimer = setTimeout(() => {
       if (this.fullTranscript.trim()) {
         console.log('[Deepgram] 2s silence detected, finalizing');
-        this.onTranscript(this.fullTranscript, true);
+        const finalText = this.fullTranscript;
+        this.fullTranscript = ""; // Reset for next utterance
+        this.onTranscript(finalText, true);
       }
     }, DeepgramSTT.SILENCE_DELAY_MS);
   }
@@ -90,7 +111,6 @@ export class DeepgramSTT {
   private startRecording() {
     if (!this.stream || !this.ws) return;
 
-    // Use MediaRecorder to capture audio chunks
     this.mediaRecorder = new MediaRecorder(this.stream, {
       mimeType: 'audio/webm;codecs=opus',
     });
@@ -101,7 +121,7 @@ export class DeepgramSTT {
       }
     };
 
-    this.mediaRecorder.start(250); // Send chunks every 250ms
+    this.mediaRecorder.start(250);
   }
 
   stop() {
@@ -117,5 +137,6 @@ export class DeepgramSTT {
     this.mediaRecorder = null;
     this.stream = null;
     this.fullTranscript = "";
+    this._paused = false;
   }
 }
