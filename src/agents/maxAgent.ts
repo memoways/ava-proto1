@@ -1,7 +1,7 @@
 import { streamLLM } from "@/services/openRouterLLM";
 import { supabase } from "@/integrations/supabase/client";
 import type { ConversationMessage } from "@/types";
-import settings from "@/config/settings.json";
+import { getLLMSettings } from "@/services/settingsService";
 
 // Fallback minimal system prompt if DB fetch fails
 const FALLBACK_SYSTEM_PROMPT = `Tu es un personnage dans une expérience narrative interactive. Parle à la première personne, en français, de façon concise (2-3 phrases). Utilise le CONTEXTE NARRATIF ci-dessous comme source de vérité.`;
@@ -84,11 +84,12 @@ export async function callMaxAgent(
   // Add current user message
   messages.push({ role: "user", content: input.userMessage });
 
+  const llm = getLLMSettings();
   return streamLLM(messages, onChunk, {
-    model: settings.LLM_MODEL,
-    temperature: settings.LLM_TEMPERATURE,
-    max_tokens: settings.LLM_MAX_TOKENS,
-    top_p: settings.LLM_TOP_P,
+    model: llm.LLM_MODEL,
+    temperature: llm.LLM_TEMPERATURE,
+    max_tokens: llm.LLM_MAX_TOKENS,
+    top_p: llm.LLM_TOP_P,
   });
 }
 

@@ -1,6 +1,7 @@
 import { callLLM } from "@/services/openRouterLLM";
 import type { ConversationMessage, GameMasterResponse } from "@/types";
 import settings from "@/config/settings.json";
+import { getLLMSettings } from "@/services/settingsService";
 
 // System prompt for Game Master - orchestrator
 const GAME_MASTER_SYSTEM_PROMPT = `Tu es le Game Master d'une expérience narrative interactive "Où est Ava ?". Tu analyses chaque échange entre l'utilisateur et Max pour orchestrer l'expérience.
@@ -65,10 +66,11 @@ export async function callGameMaster(input: GameMasterInput): Promise<GameMaster
   ];
 
   try {
+    const llm = getLLMSettings();
     const response = await callLLM(messages, {
-      model: settings.LLM_MODEL,
-      temperature: 0.3, // Lower temperature for consistent JSON
-      max_tokens: 200,
+      model: llm.LLM_MODEL_GM,
+      temperature: llm.LLM_TEMPERATURE_GM,
+      max_tokens: llm.LLM_MAX_TOKENS_GM,
     });
 
     // Parse JSON from response
