@@ -113,6 +113,65 @@ export type Database = {
         }
         Relationships: []
       }
+      llm_usage: {
+        Row: {
+          completion_tokens: number | null
+          cost_usd: number | null
+          created_at: string
+          error_message: string | null
+          feature_key: string
+          generation_id: string | null
+          id: string
+          metadata_json: Json | null
+          model: string
+          prompt_tokens: number | null
+          request_type: string
+          session_id: string | null
+          status: string
+          total_tokens: number | null
+        }
+        Insert: {
+          completion_tokens?: number | null
+          cost_usd?: number | null
+          created_at?: string
+          error_message?: string | null
+          feature_key?: string
+          generation_id?: string | null
+          id?: string
+          metadata_json?: Json | null
+          model: string
+          prompt_tokens?: number | null
+          request_type?: string
+          session_id?: string | null
+          status?: string
+          total_tokens?: number | null
+        }
+        Update: {
+          completion_tokens?: number | null
+          cost_usd?: number | null
+          created_at?: string
+          error_message?: string | null
+          feature_key?: string
+          generation_id?: string | null
+          id?: string
+          metadata_json?: Json | null
+          model?: string
+          prompt_tokens?: number | null
+          request_type?: string
+          session_id?: string | null
+          status?: string
+          total_tokens?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "llm_usage_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rules: {
         Row: {
           category: string | null

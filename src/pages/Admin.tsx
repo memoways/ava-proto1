@@ -12,6 +12,7 @@ import VoiceConfigTab from "@/components/VoiceConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
 import SessionsTab, { type SessionRow } from "@/components/admin/SessionsTab";
 import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
+import LLMUsageTab from "@/components/admin/LLMUsageTab";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -48,6 +49,7 @@ const TAB_GROUPS = [
     tabs: [
       { id: "llm", label: "LLM Config" },
       { id: "voice", label: "Voix" },
+      { id: "usage", label: "Consommation" },
     ],
   },
 ];
@@ -425,6 +427,11 @@ export default function Admin() {
           {/* ==================== VOICE CONFIG ==================== */}
           <TabsContent value="voice">
             <VoiceConfigTab />
+          </TabsContent>
+
+          {/* ==================== LLM USAGE / CONSUMPTION ==================== */}
+          <TabsContent value="usage">
+            <LLMUsageTab />
           </TabsContent>
 
           {/* ==================== NOTION SYNC ==================== */}

@@ -58,6 +58,7 @@ export interface MaxAgentInput {
   userMessage: string;
   ragContext?: string;
   postVideoContext?: string;
+  session_id?: string;
 }
 
 /**
@@ -90,6 +91,8 @@ export async function callMaxAgent(
     temperature: llm.LLM_TEMPERATURE,
     max_tokens: llm.LLM_MAX_TOKENS,
     top_p: llm.LLM_TOP_P,
+    feature_key: "chat",
+    session_id: input.session_id,
   });
 }
 

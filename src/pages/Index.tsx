@@ -182,7 +182,8 @@ const Index = () => {
           }
         },
         undefined,
-        postVideoContext || undefined
+        postVideoContext || undefined,
+        sessionIdRef.current || undefined
       );
 
       llmPerf.end();
