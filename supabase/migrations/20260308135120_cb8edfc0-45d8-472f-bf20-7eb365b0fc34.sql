@@ -1,0 +1,1 @@
+CREATE POLICY "Service role can delete embeddings" ON public.embeddings FOR DELETE USING (true);
