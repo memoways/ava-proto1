@@ -164,6 +164,7 @@ const Index = () => {
     const llmFirstChunkPerf = perf("LLM first chunk");
 
     try {
+      console.log("[processUserMessage] Starting LLM call...");
       const llmPerf = perf("LLM total (Max streaming)");
 
       const { maxResponse, gameMasterPromise } = await processConversationTurn(
