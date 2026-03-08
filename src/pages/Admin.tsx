@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
 import { clearSystemPromptCache } from "@/agents/maxAgent";
 import LLMConfigTab from "@/components/LLMConfigTab";
+import VoiceConfigTab from "@/components/VoiceConfigTab";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -187,6 +188,7 @@ export default function Admin() {
             </TabsTrigger>
             <TabsTrigger value="rag">RAG Test</TabsTrigger>
             <TabsTrigger value="llm">LLM Config</TabsTrigger>
+            <TabsTrigger value="voice">Voix</TabsTrigger>
             <TabsTrigger value="sync">Notion Sync</TabsTrigger>
           </TabsList>
 
