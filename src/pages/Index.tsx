@@ -18,6 +18,8 @@ import GateScreen from "@/components/GateScreen";
 import QuestionnaireScreen from "@/components/QuestionnaireScreen";
 import ThanksScreen from "@/components/ThanksScreen";
 
+const INTRO_VIDEO_URL = "https://gumlet.tv/watch/67a281cac82041cdc3714c0c/";
+
 const INTRO_TRIGGER = {
   id: "intro",
   title: "Cinématique d'introduction",
@@ -28,6 +30,7 @@ const INTRO_TRIGGER = {
   transition_style: "fade_black",
   post_video_context: null,
   duration_seconds: settings.VIDEO_PLACEHOLDER_DURATION,
+  video_url: INTRO_VIDEO_URL,
 };
 
 /** Performance timer helper */
