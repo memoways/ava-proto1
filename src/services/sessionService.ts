@@ -72,7 +72,7 @@ export async function endSession(
       ended_at: new Date().toISOString(),
       game_over_reason: data.game_over_reason,
       trust_level: data.trust_level,
-      conversation_log: data.conversation_log as unknown as Record<string, unknown>[],
+      conversation_log: JSON.parse(JSON.stringify(data.conversation_log)) as Json,
       triggers_activated: data.triggers_activated,
       duration_seconds: data.duration_seconds,
     })
@@ -93,7 +93,7 @@ export async function saveQuestionnaire(
   const { error } = await supabase
     .from("sessions")
     .update({
-      questionnaire_responses: responses as unknown as Record<string, unknown>,
+      questionnaire_responses: JSON.parse(JSON.stringify(responses)) as Json,
     })
     .eq("id", sessionId);
 
