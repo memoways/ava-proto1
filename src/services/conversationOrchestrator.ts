@@ -61,7 +61,8 @@ export async function processConversationTurn(
   timeElapsedSeconds: number,
   onMaxChunk: (text: string, done: boolean) => void,
   ragContext?: string,
-  postVideoContext?: string
+  postVideoContext?: string,
+  sessionId?: string
 ): Promise<{
   maxResponse: string;
   gameMasterPromise: Promise<{ gameMasterResponse: GameMasterResponse; trigger: VideoTrigger | null }>;
@@ -87,6 +88,7 @@ export async function processConversationTurn(
     userMessage,
     ragContext: finalRagContext || undefined,
     postVideoContext,
+    session_id: sessionId,
   };
 
   await callMaxAgent(maxInput, (text, done) => {
