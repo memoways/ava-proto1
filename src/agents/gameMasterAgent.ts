@@ -57,8 +57,8 @@ export async function callGameMaster(input: GameMasterInput): Promise<GameMaster
 
     const parsed = JSON.parse(jsonMatch[0]) as GameMasterResponse;
     
-    // Validate and check gate condition
-    if (input.currentTrustLevel + (parsed.trust_delta || 0) >= settings.TRUST_THRESHOLD) {
+    const gameplay = getGameplaySettings();
+    if (input.currentTrustLevel + (parsed.trust_delta || 0) >= gameplay.TRUST_THRESHOLD) {
       parsed.gate_reached = true;
     }
 
