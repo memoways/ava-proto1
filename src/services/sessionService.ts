@@ -40,13 +40,14 @@ export async function updateSession(
     triggers_activated?: string[];
   }
 ): Promise<void> {
+  const payload: Record<string, unknown> = {};
+  if (updates.trust_level !== undefined) payload.trust_level = updates.trust_level;
+  if (updates.conversation_log) payload.conversation_log = JSON.parse(JSON.stringify(updates.conversation_log)) as Json;
+  if (updates.triggers_activated) payload.triggers_activated = updates.triggers_activated;
+
   const { error } = await supabase
     .from("sessions")
-    .update({
-      ...(updates.trust_level !== undefined && { trust_level: updates.trust_level }),
-      ...(updates.conversation_log && { conversation_log: updates.conversation_log as unknown as Record<string, unknown>[] }),
-      ...(updates.triggers_activated && { triggers_activated: updates.triggers_activated }),
-    })
+    .update(payload)
     .eq("id", sessionId);
 
   if (error) {
