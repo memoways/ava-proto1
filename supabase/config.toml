@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.proxy-llm]
 verify_jwt = false
+
+[functions.proxy-tts]
+verify_jwt = false
