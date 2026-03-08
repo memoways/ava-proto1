@@ -4,6 +4,7 @@ import { useTimer } from "@/hooks/useTimer";
 import { DeepgramSTT } from "@/services/deepgramSTT";
 import { processConversationTurn } from "@/services/conversationOrchestrator";
 import { generateSpeech, playAudioBlob } from "@/services/elevenLabsTTS";
+import { createSession, updateSession, endSession, saveQuestionnaire } from "@/services/sessionService";
 import settings from "@/config/settings.json";
 import type { QuestionnaireData, ConversationMessage } from "@/types";
 
@@ -34,15 +35,31 @@ const Index = () => {
   const [maxSubtitle, setMaxSubtitle] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [postVideoContext, setPostVideoContext] = useState<string | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
 
   const sttRef = useRef<DeepgramSTT | null>(null);
   const conversationHistoryRef = useRef<ConversationMessage[]>([]);
 
   const timer = useTimer(settings.TIMEOUT_SECONDS, () => {
+    if (sessionIdRef.current) {
+      endSession(sessionIdRef.current, {
+        game_over_reason: "timeout",
+        trust_level: state.trustLevel,
+        conversation_log: conversationHistoryRef.current,
+        triggers_activated: state.triggeredIds,
+        duration_seconds: settings.TIMEOUT_SECONDS,
+      }).catch(console.error);
+    }
     gameOver("timeout");
   });
 
-  const handleStart = useCallback(() => {
+  const handleStart = useCallback(async () => {
+    try {
+      const id = await createSession();
+      sessionIdRef.current = id;
+    } catch (e) {
+      console.error("Failed to create session:", e);
+    }
     setPhase("intro_video");
   }, [setPhase]);
 
@@ -92,13 +109,21 @@ const Index = () => {
       addMessage(maxMsg);
 
       // Update trust
+      const newTrust = state.trustLevel + result.gameMasterResponse.trust_delta;
       if (result.gameMasterResponse.trust_delta !== 0) {
         updateTrust(result.gameMasterResponse.trust_delta);
       }
 
       console.log("[Game Master]", result.gameMasterResponse);
 
-      // Clear post-video context after use
+      // Persist session state
+      if (sessionIdRef.current) {
+        updateSession(sessionIdRef.current, {
+          trust_level: newTrust,
+          conversation_log: conversationHistoryRef.current,
+          triggers_activated: state.triggeredIds,
+        }).catch(console.error);
+      }
       setPostVideoContext(null);
 
       // Play Max's response with TTS
@@ -115,7 +140,17 @@ const Index = () => {
 
       // Handle game over
       if (result.gameMasterResponse.game_over) {
-        gameOver(result.gameMasterResponse.game_over_reason || "moderation");
+        const reason = result.gameMasterResponse.game_over_reason || "moderation";
+        if (sessionIdRef.current) {
+          endSession(sessionIdRef.current, {
+            game_over_reason: reason,
+            trust_level: newTrust,
+            conversation_log: conversationHistoryRef.current,
+            triggers_activated: state.triggeredIds,
+            duration_seconds: settings.TIMEOUT_SECONDS - timer.remaining,
+          }).catch(console.error);
+        }
+        gameOver(reason);
         return;
       }
 
@@ -187,6 +222,9 @@ const Index = () => {
 
   const handleQuestionnaireSubmit = useCallback((data: QuestionnaireData) => {
     console.log("Questionnaire submitted:", data);
+    if (sessionIdRef.current) {
+      saveQuestionnaire(sessionIdRef.current, data).catch(console.error);
+    }
     setPhase("thanks");
   }, [setPhase]);
 
@@ -198,12 +236,22 @@ const Index = () => {
     setMaxSubtitle("");
     conversationHistoryRef.current = [];
     setPostVideoContext(null);
+    sessionIdRef.current = null;
   }, [reset, timer]);
 
   const handleGateContinue = useCallback(() => {
+    if (sessionIdRef.current) {
+      endSession(sessionIdRef.current, {
+        game_over_reason: "completion",
+        trust_level: state.trustLevel,
+        conversation_log: conversationHistoryRef.current,
+        triggers_activated: state.triggeredIds,
+        duration_seconds: settings.TIMEOUT_SECONDS - timer.remaining,
+      }).catch(console.error);
+    }
     setPhase("game_over");
     gameOver("completion");
-  }, [setPhase, gameOver]);
+  }, [setPhase, gameOver, state.trustLevel, state.triggeredIds, timer.remaining]);
 
   switch (state.phase) {
     case "onboarding":
