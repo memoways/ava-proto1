@@ -3,6 +3,7 @@ import { useGameState } from "@/hooks/useGameState";
 import { useTimer } from "@/hooks/useTimer";
 import { DeepgramSTT } from "@/services/deepgramSTT";
 import { processConversationTurn } from "@/services/conversationOrchestrator";
+import { generateSpeech, playAudioBlob } from "@/services/elevenLabsTTS";
 import settings from "@/config/settings.json";
 import type { QuestionnaireData, ConversationMessage } from "@/types";
 
@@ -100,6 +101,18 @@ const Index = () => {
       // Clear post-video context after use
       setPostVideoContext(null);
 
+      // Play Max's response with TTS
+      if (result.maxResponse.trim()) {
+        setAudioState("max_speaking");
+        try {
+          const audioBlob = await generateSpeech(result.maxResponse);
+          await playAudioBlob(audioBlob);
+        } catch (ttsError) {
+          console.error("TTS error:", ttsError);
+          // Continue even if TTS fails - subtitles are shown
+        }
+      }
+
       // Handle game over
       if (result.gameMasterResponse.game_over) {
         gameOver(result.gameMasterResponse.game_over_reason || "moderation");
@@ -117,7 +130,7 @@ const Index = () => {
         setTimeout(() => {
           setPostVideoContext(result.trigger?.post_video_context || null);
           triggerVideo(result.trigger!);
-        }, 1500); // Wait for Max to finish "speaking"
+        }, 1500); // Wait for Max to finish speaking
       }
 
     } catch (error) {
