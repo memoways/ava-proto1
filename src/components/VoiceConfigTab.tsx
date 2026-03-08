@@ -3,10 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { Save, RotateCcw } from "lucide-react";
 import { generateSpeech, playAudioBlob } from "@/services/elevenLabsTTS";
 import {
   getTTSSettings,
-  saveTTSSettings,
+  saveTTSSettingsLocal,
+  saveTTSSettingsToDB,
+  loadTTSSettingsFromDB,
   resetTTSSettings,
   ELEVENLABS_MODELS,
   TTS_PRESETS,
@@ -17,28 +20,46 @@ const TEST_PHRASE = "Écoute, je ne sais pas qui tu es... mais si tu sais quelqu
 
 export default function VoiceConfigTab() {
   const [settings, setSettings] = useState<TTSSettings>(getTTSSettings());
+  const [savedSettings, setSavedSettings] = useState<TTSSettings>(getTTSSettings());
   const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setSettings(getTTSSettings());
+    loadTTSSettingsFromDB().then((s) => {
+      setSettings(s);
+      setSavedSettings(s);
+    });
   }, []);
 
-  function update(patch: Partial<TTSSettings>) {
-    const updated = saveTTSSettings(patch);
-    setSettings(updated);
+  const hasChanges = JSON.stringify(settings) !== JSON.stringify(savedSettings);
+
+  function updateLocal(patch: Partial<TTSSettings>) {
+    const current = { ...settings, ...patch };
+    localStorage.setItem("ava_tts_settings", JSON.stringify(current));
+    setSettings(current);
   }
 
   function applyPreset(key: string) {
     const preset = TTS_PRESETS[key];
     if (!preset) return;
-    const updated = saveTTSSettings(preset.settings);
+    const updated = { ...settings, ...preset.settings };
+    localStorage.setItem("ava_tts_settings", JSON.stringify(updated));
     setSettings(updated);
-    toast.success(`Preset "${preset.label}" appliqué`);
+    toast.success(`Preset "${preset.label}" appliqué — sauvegarde nécessaire`);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    await saveTTSSettingsToDB(settings);
+    setSavedSettings(settings);
+    toast.success("Réglages voix sauvegardés ✓");
+    setSaving(false);
   }
 
   function handleReset() {
     const defaults = resetTTSSettings();
     setSettings(defaults);
+    setSavedSettings(defaults);
     toast.success("Réglages voix réinitialisés");
   }
 
@@ -62,18 +83,28 @@ export default function VoiceConfigTab() {
         <div>
           <h2 className="text-lg font-semibold">Réglages Voix (ElevenLabs)</h2>
           <p className="text-sm text-muted-foreground">
-            Ajuste la diction, le ton et la fluidité de Max. Changements appliqués immédiatement.
+            Ajuste la diction, le ton et la fluidité de Max. Clique "Sauvegarder" pour persister.
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleReset}>
-            Réinitialiser
+            <RotateCcw className="w-3 h-3 mr-1" /> Réinitialiser
           </Button>
           <Button size="sm" onClick={testVoice} disabled={testing}>
             {testing ? "Lecture..." : "🔊 Tester la voix"}
           </Button>
+          <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges}
+            className={hasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
+            <Save className="w-3 h-3 mr-1" /> {saving ? "..." : "Sauvegarder"}
+          </Button>
         </div>
       </div>
+
+      {hasChanges && (
+        <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg px-4 py-2 text-sm text-yellow-300">
+          ⚠️ Modifications non sauvegardées — clique "Sauvegarder" pour persister en base de données.
+        </div>
+      )}
 
       {/* Presets */}
       <section className="border rounded-lg p-4">
@@ -99,10 +130,7 @@ export default function VoiceConfigTab() {
           {ELEVENLABS_MODELS.map((m) => (
             <button
               key={m.id}
-              onClick={() => {
-                update({ modelId: m.id });
-                toast.success(`Modèle TTS → ${m.label}`);
-              }}
+              onClick={() => updateLocal({ modelId: m.id })}
               className={`text-left p-3 border rounded-lg transition-colors ${
                 settings.modelId === m.id
                   ? "bg-primary/10 border-primary"
@@ -125,116 +153,64 @@ export default function VoiceConfigTab() {
       <section className="border rounded-lg p-4 space-y-5">
         <h3 className="font-semibold text-base">🎛️ Paramètres de voix</h3>
 
-        {/* Stability */}
         <div>
           <div className="flex justify-between mb-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              Stabilité
-            </label>
+            <label className="text-sm font-medium text-muted-foreground">Stabilité</label>
             <span className="text-sm font-mono">{settings.stability.toFixed(2)}</span>
           </div>
-          <Slider
-            value={[settings.stability]}
-            onValueChange={([v]) => update({ stability: v })}
-            min={0}
-            max={1}
-            step={0.05}
-          />
+          <Slider value={[settings.stability]} onValueChange={([v]) => updateLocal({ stability: v })} min={0} max={1} step={0.05} />
           <div className="flex justify-between text-xs text-muted-foreground mt-1">
             <span>0 — Très expressif, variable</span>
             <span>1 — Monotone, constant</span>
           </div>
-          <p className="text-xs text-muted-foreground/60 mt-1">
-            💡 Pour Max : 0.40-0.55 donne un ton posé avec des variations naturelles
-          </p>
+          <p className="text-xs text-muted-foreground/60 mt-1">💡 Pour Max : 0.40-0.55 donne un ton posé avec des variations naturelles</p>
         </div>
 
-        {/* Similarity Boost */}
         <div>
           <div className="flex justify-between mb-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              Fidélité à la voix (Similarity Boost)
-            </label>
+            <label className="text-sm font-medium text-muted-foreground">Fidélité à la voix (Similarity Boost)</label>
             <span className="text-sm font-mono">{settings.similarityBoost.toFixed(2)}</span>
           </div>
-          <Slider
-            value={[settings.similarityBoost]}
-            onValueChange={([v]) => update({ similarityBoost: v })}
-            min={0}
-            max={1}
-            step={0.05}
-          />
+          <Slider value={[settings.similarityBoost]} onValueChange={([v]) => updateLocal({ similarityBoost: v })} min={0} max={1} step={0.05} />
           <div className="flex justify-between text-xs text-muted-foreground mt-1">
             <span>0 — Voix générique</span>
             <span>1 — Très fidèle au sample original</span>
           </div>
-          <p className="text-xs text-muted-foreground/60 mt-1">
-            💡 Trop haut peut causer des artefacts. 0.70-0.85 est le sweet spot
-          </p>
+          <p className="text-xs text-muted-foreground/60 mt-1">💡 Trop haut peut causer des artefacts. 0.70-0.85 est le sweet spot</p>
         </div>
 
-        {/* Style */}
         <div>
           <div className="flex justify-between mb-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              Style / Exagération
-            </label>
+            <label className="text-sm font-medium text-muted-foreground">Style / Exagération</label>
             <span className="text-sm font-mono">{settings.style.toFixed(2)}</span>
           </div>
-          <Slider
-            value={[settings.style]}
-            onValueChange={([v]) => update({ style: v })}
-            min={0}
-            max={1}
-            step={0.05}
-          />
+          <Slider value={[settings.style]} onValueChange={([v]) => updateLocal({ style: v })} min={0} max={1} step={0.05} />
           <div className="flex justify-between text-xs text-muted-foreground mt-1">
             <span>0 — Neutre, diction plate</span>
             <span>1 — Très stylisé, théâtral</span>
           </div>
-          <p className="text-xs text-muted-foreground/60 mt-1">
-            💡 Pour une diction naturelle, garder entre 0.10-0.30. Au-delà, la voix peut devenir artificielle
-          </p>
+          <p className="text-xs text-muted-foreground/60 mt-1">💡 Pour une diction naturelle, garder entre 0.10-0.30</p>
         </div>
 
-        {/* Speed */}
         <div>
           <div className="flex justify-between mb-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              Vitesse
-            </label>
+            <label className="text-sm font-medium text-muted-foreground">Vitesse</label>
             <span className="text-sm font-mono">{settings.speed.toFixed(2)}</span>
           </div>
-          <Slider
-            value={[settings.speed]}
-            onValueChange={([v]) => update({ speed: v })}
-            min={0.7}
-            max={1.2}
-            step={0.02}
-          />
+          <Slider value={[settings.speed]} onValueChange={([v]) => updateLocal({ speed: v })} min={0.7} max={1.2} step={0.02} />
           <div className="flex justify-between text-xs text-muted-foreground mt-1">
             <span>0.70 — Lent, délibéré</span>
             <span>1.20 — Rapide, pressé</span>
           </div>
-          <p className="text-xs text-muted-foreground/60 mt-1">
-            💡 0.90-0.95 améliore souvent l'articulation en français
-          </p>
+          <p className="text-xs text-muted-foreground/60 mt-1">💡 0.90-0.95 améliore souvent l'articulation en français</p>
         </div>
 
-        {/* Speaker Boost */}
         <div className="flex items-center justify-between py-2">
           <div>
-            <label className="text-sm font-medium text-muted-foreground">
-              Speaker Boost
-            </label>
-            <p className="text-xs text-muted-foreground/60">
-              Améliore la clarté et la ressemblance — peut ajouter un léger artefact
-            </p>
+            <label className="text-sm font-medium text-muted-foreground">Speaker Boost</label>
+            <p className="text-xs text-muted-foreground/60">Améliore la clarté et la ressemblance</p>
           </div>
-          <Switch
-            checked={settings.useSpeakerBoost}
-            onCheckedChange={(v) => update({ useSpeakerBoost: v })}
-          />
+          <Switch checked={settings.useSpeakerBoost} onCheckedChange={(v) => updateLocal({ useSpeakerBoost: v })} />
         </div>
       </section>
 
