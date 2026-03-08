@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+import { Info, ClipboardList } from "lucide-react";
 import type { AudioState } from "@/types";
 import SubtitleOverlay from "./SubtitleOverlay";
 
@@ -11,6 +13,8 @@ interface ConversationScreenProps {
   maxSubtitle: string;
   onMicToggle: () => void;
   micActive: boolean;
+  elapsedSeconds: number;
+  onEarlyQuestionnaire?: () => void;
 }
 
 const statusLabels: Record<AudioState, string> = {
@@ -19,6 +23,8 @@ const statusLabels: Record<AudioState, string> = {
   max_thinking: "Max réfléchit…",
   max_speaking: "Max parle…",
 };
+
+const EARLY_QUESTIONNAIRE_DELAY = 240; // 4 minutes
 
 const ConversationScreen = ({
   timerFormatted,
@@ -30,7 +36,12 @@ const ConversationScreen = ({
   maxSubtitle,
   onMicToggle,
   micActive,
+  elapsedSeconds,
+  onEarlyQuestionnaire,
 }: ConversationScreenProps) => {
+  const [showInfo, setShowInfo] = useState(false);
+  const showQuestionnaire = elapsedSeconds >= EARLY_QUESTIONNAIRE_DELAY && onEarlyQuestionnaire;
+
   return (
     <div 
       className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden"
@@ -60,6 +71,15 @@ const ConversationScreen = ({
           Confiance: {trustLevel}/{trustThreshold}
         </span>
       </div>
+
+      {/* Info button — top left under trust */}
+      <button
+        onClick={() => setShowInfo(true)}
+        className="absolute top-14 left-6 z-20 flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-black/30 text-muted-foreground/60 hover:text-foreground hover:bg-black/50 transition-all backdrop-blur-sm"
+        title="À propos du projet"
+      >
+        <Info size={14} />
+      </button>
 
       {/* Status centered */}
       <div className="relative z-10 flex flex-col items-center gap-4 mt-[40vh]">
@@ -100,8 +120,80 @@ const ConversationScreen = ({
         </button>
       </div>
 
+      {/* Early questionnaire tab — appears after 4 min */}
+      {showQuestionnaire && (
+        <button
+          onClick={onEarlyQuestionnaire}
+          className="absolute bottom-6 right-6 z-20 flex items-center gap-2 px-3 py-2 rounded-lg border border-border/30 bg-black/40 text-muted-foreground/70 hover:text-foreground hover:bg-black/60 transition-all backdrop-blur-sm text-xs animate-fade-in"
+        >
+          <ClipboardList size={14} />
+          Questionnaire
+        </button>
+      )}
+
       {/* Subtitles */}
       <SubtitleOverlay userText={userSubtitle} maxText={maxSubtitle} audioState={audioState} />
+
+      {/* Info Modal */}
+      {showInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowInfo(false)}>
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div
+            className="relative max-w-lg w-full max-h-[80vh] overflow-y-auto rounded-xl border border-border/50 bg-background/95 backdrop-blur-md p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowInfo(false)}
+              className="absolute top-3 right-3 text-muted-foreground hover:text-foreground transition-colors text-lg"
+            >
+              ✕
+            </button>
+
+            <h2 className="text-lg font-bold mb-1">À propos — "Où est Ava ?"</h2>
+            <p className="text-xs text-muted-foreground mb-4">Prototype 1 — Recherche & Développement</p>
+
+            <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+              <p>
+                <strong className="text-foreground">Concept.</strong> Vous participez à un prototype d'expérience narrative interactive. 
+                Vous êtes en appel avec <strong className="text-foreground">Max</strong>, un personnage fictif de 50 ans dont la fille, Ava, a disparu. 
+                Max cherche à comprendre ce qui s'est passé et évalue si vous êtes digne de confiance.
+              </p>
+
+              <p>
+                <strong className="text-foreground">Comment ça marche.</strong> La conversation est entièrement pilotée par intelligence artificielle : 
+                votre voix est transcrite en temps réel (Speech-to-Text), analysée par un modèle de langage qui incarne Max, 
+                puis sa réponse est synthétisée en voix (Text-to-Speech). Un "Game Master" IA invisible orchestre l'expérience : 
+                il évalue votre niveau de confiance, déclenche des cinématiques et gère la progression narrative.
+              </p>
+
+              <p>
+                <strong className="text-foreground">Objectif du prototype.</strong> Ce prototype valide le pipeline technique complet 
+                d'une conversation voice-to-voice avec un personnage IA autonome. Il teste la mécanique d'interaction, 
+                la gestion de la confiance, les triggers narratifs et le système RAG (Retrieval-Augmented Generation) 
+                qui alimente Max avec sa mémoire et son univers.
+              </p>
+
+              <p>
+                <strong className="text-foreground">Ce qu'on teste.</strong> La fluidité de la conversation, 
+                la qualité de l'immersion, la latence perçue, et si le format "parler à un personnage IA" 
+                crée une expérience engageante. Vos retours via le questionnaire sont essentiels pour itérer.
+              </p>
+
+              <p>
+                <strong className="text-foreground">Limitations connues.</strong> Les vidéos sont en mode placeholder 
+                (écran texte au lieu de vraies cinématiques). L'interface est minimaliste — le focus est sur la mécanique, 
+                pas le design final. Desktop uniquement (Chrome recommandé).
+              </p>
+
+              <div className="pt-2 border-t border-border/30">
+                <p className="text-xs text-muted-foreground/60">
+                  Projet Storygami — Prototype de recherche — Mars 2026
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -346,6 +346,8 @@ const Index = () => {
           maxSubtitle={maxSubtitle}
           onMicToggle={handleMicToggle}
           micActive={micActive}
+          elapsedSeconds={settings.TIMEOUT_SECONDS - timer.remaining}
+          onEarlyQuestionnaire={handleQuestionnaire}
         />
       );
     case "video_trigger":
