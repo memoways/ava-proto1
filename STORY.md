@@ -1,0 +1,353 @@
+# Où est Ava ? — Development Story
+
+> **Status**: 🟡 In Progress  
+> **Creator**: Ulrich Fischer / Memoways  
+> **Started**: 2026-03-07  
+> **Last Updated**: 2026-03-08  
+
+---
+
+## Genesis Block
+
+### The Friction
+
+```
+Les expériences narratives interactives restent coincées entre le jeu vidéo scripté 
+et le chatbot sans âme. Personne ne propose une vraie conversation voice-to-voice 
+avec un personnage fictif, pilotée par IA, avec une mise en scène cinématique 
+et des triggers vidéo dynamiques. Le potentiel du voice-to-voice LLM pour 
+la narration interactive est inexploré.
+```
+
+### The Conviction
+
+```
+Memoways a l'expertise narrative et audiovisuelle. Les LLMs sont enfin assez bons 
+pour tenir un personnage en français. Le pipeline STT→LLM→TTS est techniquement 
+possible avec Deepgram + OpenRouter + ElevenLabs. C'est le moment de valider 
+la mécanique complète avec un prototype fonctionnel avant d'investir dans 
+la production vidéo et le contenu éditorial complet.
+```
+
+### Initial Vision
+
+```
+Application web voice-to-voice avec Max, un développeur de 28 ans dont la sœur 
+Ava a disparu dans le contexte d'une pandémie mondiale. L'utilisateur parle 
+avec Max en visioconférence. Un Game Master IA orchestre l'expérience : 
+confiance, triggers vidéo, game over. Prototype 1 = valider le pipeline technique.
+```
+
+### Target Human
+
+```
+Joueur/spectateur curieux, 20-40 ans, francophone
+Context: Seul devant son ordinateur, casque, navigateur Chrome
+Struggle: Veut une expérience narrative immersive et interactive, pas un film passif ni un jeu à choix multiples
+Success: Se sentir "dans l'histoire", avoir eu une vraie conversation avec un personnage fictif
+How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec du texte
+```
+
+### Tools Arsenal
+
+| Tool | Role |
+|------|------|
+| Lovable | Frontend React + déploiement + vibe coding |
+| Lovable Cloud (Supabase) | Backend, BDD, Edge Functions, pgvector |
+| OpenRouter (Qwen) | LLM pour Max et Game Master |
+| Deepgram | STT streaming avec VAD |
+| ElevenLabs | TTS voix custom de Max |
+| Notion | Source de vérité éditoriale (contenus, personnages, règles) |
+
+---
+
+## Feature Chronicle
+
+### 2026-03-07 — Setup initial + Design system 🔷
+
+**Intent**: Poser les fondations du projet avec un design cinématique dark theme.
+
+**Tool**: Lovable
+
+**Outcome**: 
+- Projet React + Vite + Tailwind + TypeScript créé
+- Design tokens HSL dans index.css (background, foreground, primary, accent, trust, timer-warning, cinema-glow)
+- Animations custom (fade-in, pulse-mic, typing dots, cinema vignette/gradient)
+- Structure de fichiers alignée avec le PRD
+
+**Time**: ~30min
+
+---
+
+### 2026-03-07 — Tous les écrans UI 🔷
+
+**Intent**: Créer tous les écrans du flow utilisateur (onboarding → conversation → game over → questionnaire → thanks).
+
+**Tool**: Lovable
+
+**Outcome**: 
+- `OnboardingScreen` — contexte narratif + bouton commencer/passer
+- `VideoPlaceholder` — écran noir + texte descriptif + barre de progression + skip
+- `ConversationScreen` — portrait Max, micro toggle, sous-titres, timer, trust level, indicateur d'état audio
+- `SubtitleOverlay` — sous-titres utilisateur (gris) et Max (blanc) avec animations
+- `GameOverScreen` — raison du game over + restart + questionnaire
+- `GateScreen` — gate de confiance (Max propose Léo/Emma)
+- `QuestionnaireScreen` — formulaire complet (expérience, immersion, mécanique, narration, valeur perçue)
+- `ThanksScreen` — remerciement + restart
+
+**Time**: ~1h
+
+---
+
+### 2026-03-07 — Schema Supabase + Types 🔷
+
+**Intent**: Créer toutes les tables de la base de données conformément au PRD.
+
+**Tool**: Lovable Cloud
+
+**Outcome**: 
+- Tables : characters, storyworld, video_triggers, gameplay_steps, rules, sessions, embeddings
+- Extension pgvector activée
+- Fonction SQL `match_embeddings` pour recherche sémantique (cosine similarity)
+- Types TypeScript partagés dans `types/index.ts`
+
+**Time**: ~20min
+
+---
+
+### 2026-03-07 — State machine + Timer 🔷
+
+**Intent**: Implémenter la gestion d'état complète du jeu.
+
+**Tool**: Lovable
+
+**Outcome**: 
+- `useGameState` hook — phases (onboarding→intro_video→conversation→video_trigger→gate→game_over→questionnaire→thanks), trust level, triggered IDs, audio state, conversation log
+- `useTimer` hook — countdown 4 minutes, warning à 30s, formatted display
+- State machine dans `Index.tsx` avec switch/case sur les phases
+
+**Time**: ~30min
+
+---
+
+### 2026-03-08 — Edge Functions proxy (STT, LLM, TTS) 🔷
+
+**Intent**: Créer les proxy sécurisés pour ne jamais exposer les clés API côté client.
+
+**Tool**: Lovable Cloud
+
+**Outcome**: 
+- `proxy-stt` — retourne un token Deepgram temporaire pour connexion WebSocket client
+- `proxy-llm` — proxy streaming vers OpenRouter API, supporte tous les modèles
+- `proxy-tts` — proxy vers ElevenLabs API, retourne audio blob
+- Toutes les clés dans Supabase Secrets (OPENROUTER_API_KEY, DEEPGRAM_API_KEY, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID)
+
+**Time**: ~45min
+
+---
+
+### 2026-03-08 — Pipeline STT Deepgram 🔷
+
+**Intent**: Implémenter le speech-to-text streaming avec détection de fin de parole.
+
+**Tool**: Lovable
+
+**Outcome**: 
+- `deepgramSTT.ts` — classe DeepgramSTT avec WebSocket streaming
+- VAD (Voice Activity Detection) intégré via Deepgram
+- Double passe : interim (sous-titres temps réel) + final (input LLM)
+- Langue française configurée
+
+**Time**: ~30min
+
+---
+
+### 2026-03-08 — Agents Max + Game Master 🔷
+
+**Intent**: Implémenter les deux agents LLM qui pilotent la conversation.
+
+**Tool**: Lovable
+
+**Outcome**: 
+- `maxAgent.ts` — prompt système Max (personnalité, règles, contexte), support RAG + post-video context
+- `gameMasterAgent.ts` — prompt système Game Master, retourne JSON structuré (trust_delta, trigger_video_id, game_over, gate_reached, moderation_flag)
+- `conversationOrchestrator.ts` — coordonne Max (streaming) + Game Master (JSON), gère les triggers vidéo
+- 3 triggers démo : famille, secret, disparition
+- Modèle : qwen/qwen-2.5-72b-instruct via OpenRouter
+
+**Time**: ~45min
+
+---
+
+### 2026-03-08 — TTS ElevenLabs intégré 🔷
+
+**Intent**: Faire parler Max avec sa voix ElevenLabs après chaque réponse LLM.
+
+**Tool**: Lovable
+
+**Outcome**: 
+- `elevenLabsTTS.ts` — generateSpeech(), playAudioBlob(), speakText()
+- Intégration dans Index.tsx : après réponse Max, génère audio et le joue
+- Fallback gracieux : si TTS échoue, sous-titres toujours affichés
+- Audio state géré (max_speaking pendant lecture)
+
+**Time**: ~20min
+
+---
+
+### 2026-03-08 — Background cinématique 🔹
+
+**Intent**: Ajouter une image de fond immersive à l'écran de conversation.
+
+**Tool**: Lovable
+
+**Outcome**: 
+- Image "Max devant chalet" en background plein écran
+- Overlay noir semi-transparent (bg-black/40) pour lisibilité
+- Parallaxe (backgroundAttachment: fixed)
+- Vignette cinématique conservée
+
+**Time**: ~5min
+
+---
+
+### 2026-03-08 — Documentation projet 🔹
+
+**Intent**: Ajouter PRD, README, CHANGELOG et STORY à la codebase.
+
+**Tool**: Lovable
+
+**Outcome**: 
+- `documents/PRD_Prototype_1.md` — PRD complet
+- `README.md` — README projet Memoways
+- `CHANGELOG.md` — historique versionné
+- `STORY.md` — journal de développement
+
+**Time**: ~15min
+
+---
+
+## Pivots & Breakages
+
+*Aucun pivot majeur pour le moment — le PRD est clair et le développement suit le plan.*
+
+---
+
+## Pulse Checks
+
+*À remplir après les prochaines sessions.*
+
+---
+
+## Insights Vault
+
+- **2026-03-08**: Le vibe coding avec Lovable permet de construire un prototype voice-to-voice complet en ~2 jours. La clé : un PRD détaillé qui sert de prompt initial.
+- **2026-03-08**: Les Edge Functions Supabase sont parfaites comme proxy API — zéro clé exposée côté client, déploiement automatique.
+
+---
+
+## Artifact Links
+
+| Date | Type | Link/Location | Note |
+|------|------|---------------|------|
+| 2026-03-08 | URL | https://ava-proto1.lovable.app | App publiée |
+| 2026-03-08 | Screenshot | public/assets/max-bg.jpg | Background conversation |
+| 2026-03-08 | Doc | documents/PRD_Prototype_1.md | PRD complet |
+
+---
+
+## Narrative Seeds
+
+- "Ta voix est ta seule arme" — le pitch de l'onboarding qui résume tout
+- Le moment où Max parle pour la première fois avec sa voix ElevenLabs — la magie du voice-to-voice
+- Construire un pipeline STT→LLM→TTS complet en un weekend avec du vibe coding
+
+---
+
+## Open Windows 🪟
+
+| Date | Description | Impact | Plan de fix |
+|------|-------------|--------|-------------|
+| 2026-03-08 | RAG pas encore connecté (query-rag Edge Function manquante) | Moyen | Prochaine session |
+| 2026-03-08 | Sauvegarde session pas implémentée (save-session Edge Function manquante) | Moyen | Prochaine session |
+| 2026-03-08 | sync-notion Edge Function manquante | Moyen | Prochaine session |
+| 2026-03-08 | Chunking TTS par phrase pas implémenté (envoie tout le texte d'un coup) | Bas | Optimisation future |
+| 2026-03-08 | Voice ID ElevenLabs vide dans settings.json | Haut | Ulrich doit fournir |
+| 2026-03-08 | Pas de test end-to-end du pipeline complet | Haut | Prochaine session |
+
+---
+
+## Contrats de session (DBC)
+
+### Dernière session
+
+**Préconditions vérifiées au départ :**
+- [x] Build passait au démarrage
+- [x] Aucune branche ouverte non terminée
+- [x] STORY.md lu et contexte compris
+- [x] Open Windows revues
+
+**Postconditions au départ :**
+- [x] Build passe
+- [x] Tout commité et pushé
+- [x] STORY.md mis à jour
+- [x] Open Windows mis à jour
+
+---
+
+## AI Instructions
+
+*These instructions are for the AI assistant helping build this project:*
+
+```
+STORY.md MAINTENANCE PROTOCOL — Pragmatic Edition
+
+1. AFTER EACH FEATURE (Finish What You Start):
+   - Add entry to "Feature Chronicle" immediately
+   - 🔷 Major = new capability, significant UI change, integration, architecture shift
+   - 🔹 Minor = bug fix, tweak, small improvement, logging enhancement
+   - Verify feature is truly complete before marking done — no half-open features
+
+2. ON ERRORS/PIVOTS (Crash Early):
+   - Add entry to "Pivots & Breakages" immediately when discovered
+   - Capture technical details AND emotional context
+   - Document what was learned
+   - If a broken window is found but NOT fixed this session → add to "Open Windows"
+
+3. ON BROKEN WINDOWS (Tip 5):
+   - Any known bug, tech debt, or undocumented TODO → "Open Windows" table
+   - Never leave a broken window undocumented
+   - At session start, review Open Windows and decide: fix now or document why not
+
+4. EVERY 3-5 FEATURES:
+   - Trigger Pulse Check: Ask creator ONE question
+   - Record answer in "Pulse Checks" section
+   - Update "Last Updated" date
+
+5. ON INSIGHTS:
+   - When creator expresses a learning, add to "Insights Vault" with date
+
+6. ON ARTIFACTS:
+   - When screenshots/links are shared, add to "Artifact Links"
+
+7. AT SESSION START (DBC — préconditions):
+   - Review "Contrats de session" — update checklist
+   - Review "Open Windows" from last session
+
+8. AT SESSION END (DBC — postconditions):
+   - Update "Contrats de session" postconditions checklist
+   - Update Open Windows table
+   - Verify build passes before closing
+
+9. ALWAYS:
+   - Update "Last Updated" date at top of file after changes
+   - Preserve exact technical details in Feature Chronicle
+   - Don't sanitize failures or confusion—that's the learning gold
+   - Include Time estimate for each feature for future planning
+
+10. FORMAT:
+   - Use ISO date format [YYYY-MM-DD] consistently
+   - Include 🔷 (major) and 🔹 (minor) emojis for feature categorization
+   - Maintain markdown structure for readability
+   - Keep prose concise but specific—avoid fluff
+```
