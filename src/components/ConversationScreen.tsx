@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Info, ClipboardList } from "lucide-react";
 import type { AudioState } from "@/types";
 import SubtitleOverlay from "./SubtitleOverlay";
@@ -42,6 +42,8 @@ const ConversationScreen = ({
   const [showInfo, setShowInfo] = useState(false);
   const showQuestionnaire = elapsedSeconds >= EARLY_QUESTIONNAIRE_DELAY && onEarlyQuestionnaire;
 
+  const trustPercent = Math.min(100, (trustLevel / trustThreshold) * 100);
+
   return (
     <div 
       className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden"
@@ -58,45 +60,58 @@ const ConversationScreen = ({
       <div className="absolute inset-0 cinema-vignette pointer-events-none z-10" />
       <div className="absolute inset-0 cinema-gradient pointer-events-none" />
 
-      {/* Timer top-right */}
-      <div className="absolute top-6 right-6 z-20">
-        <span className={`font-mono text-sm ${timerWarning ? "text-timer-warning" : "text-muted-foreground"}`}>
-          {timerFormatted}
-        </span>
-      </div>
-
-      {/* Trust gauge top-left */}
-      <div className="absolute top-6 left-6 z-20 flex flex-col gap-1.5">
-        <span className="font-mono text-[10px] text-muted-foreground/50 uppercase tracking-wider">
-          Confiance de Max
-        </span>
-        <div className="flex items-center gap-2">
-          <div className="w-24 h-1.5 rounded-full bg-border/30 overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-700 ease-out"
-              style={{
-                width: `${Math.min(100, (trustLevel / trustThreshold) * 100)}%`,
-                background: trustLevel >= trustThreshold
-                  ? 'hsl(var(--primary))'
-                  : trustLevel > trustThreshold * 0.5
-                    ? 'hsl(var(--trust))'
-                    : 'hsl(var(--muted-foreground) / 0.4)',
-              }}
-            />
+      {/* HUD: Timer + Trust cartouche — top left */}
+      <div className="absolute top-5 left-5 z-20 group">
+        <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border/20 bg-black/30 backdrop-blur-sm">
+          {/* Timer */}
+          <div className="flex flex-col items-center">
+            <span className={`font-mono text-sm tabular-nums ${timerWarning ? "text-timer-warning" : "text-muted-foreground/70"}`}>
+              {timerFormatted}
+            </span>
           </div>
-          <span className="font-mono text-[10px] text-muted-foreground/40">
-            {trustLevel}/{trustThreshold}
-          </span>
+
+          {/* Separator */}
+          <div className="w-px h-5 bg-border/20" />
+
+          {/* Trust gauge */}
+          <div className="flex items-center gap-2">
+            <div className="w-16 h-1.5 rounded-full bg-border/20 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-700 ease-out"
+                style={{
+                  width: `${trustPercent}%`,
+                  background: trustLevel >= trustThreshold
+                    ? 'hsl(var(--primary))'
+                    : trustLevel > trustThreshold * 0.5
+                      ? 'hsl(var(--trust))'
+                      : 'hsl(var(--muted-foreground) / 0.4)',
+                }}
+              />
+            </div>
+            <span className="font-mono text-[10px] text-muted-foreground/40">
+              {trustLevel}/{trustThreshold}
+            </span>
+          </div>
+        </div>
+
+        {/* Hover tooltip */}
+        <div className="absolute top-full left-0 mt-2 w-72 px-3 py-2.5 rounded-lg border border-border/30 bg-black/80 backdrop-blur-md text-xs text-muted-foreground/80 leading-relaxed opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200 z-30">
+          <p className="mb-1.5">
+            <strong className="text-foreground/90">⏱ Timer</strong> — Temps restant de la session. L'expérience dure 10 minutes maximum.
+          </p>
+          <p>
+            <strong className="text-foreground/90">◆ Confiance</strong> — Niveau de confiance que Max vous accorde. Plus vos réponses sont sincères et engagées, plus la jauge monte. Atteignez le seuil pour débloquer la suite de l'histoire.
+          </p>
         </div>
       </div>
 
-      {/* Info button — top left under trust */}
+      {/* Info button — top right, more visible */}
       <button
         onClick={() => setShowInfo(true)}
-        className="absolute top-14 left-6 z-20 flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-black/30 text-muted-foreground/60 hover:text-foreground hover:bg-black/50 transition-all backdrop-blur-sm"
+        className="absolute top-5 right-5 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-border/30 bg-black/40 text-muted-foreground/70 hover:text-foreground hover:bg-black/60 hover:border-border/50 transition-all backdrop-blur-sm"
         title="À propos du projet"
       >
-        <Info size={14} />
+        <Info size={16} />
       </button>
 
       {/* Status centered */}
@@ -201,6 +216,12 @@ const ConversationScreen = ({
                 <strong className="text-foreground">Limitations connues.</strong> Les vidéos sont en mode placeholder 
                 (écran texte au lieu de vraies cinématiques). L'interface est minimaliste — le focus est sur la mécanique, 
                 pas le design final. Desktop uniquement (Chrome recommandé).
+              </p>
+
+              <p>
+                <strong className="text-foreground">Indicateurs en jeu.</strong> En haut à gauche, le timer indique le temps restant (10 min). 
+                La jauge de confiance mesure comment Max vous perçoit : réponses sincères = confiance qui monte, 
+                évasives = confiance qui stagne ou baisse. Atteignez le seuil pour débloquer la suite narrative.
               </p>
 
               <div className="pt-2 border-t border-border/30">
