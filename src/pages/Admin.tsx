@@ -632,6 +632,7 @@ export default function Admin() {
           {/* ==================== VOICE CONFIG ==================== */}
           <TabsContent value="voice">
             <VoiceConfigTab />
+          </TabsContent>
 
           <TabsContent value="sync">
             <div className="max-w-2xl">
