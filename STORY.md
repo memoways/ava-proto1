@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-03-08  
+> **Last Updated**: 2026-03-08 (session 2)  
 
 ---
 
@@ -254,6 +254,54 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 **Time**: ~1h
 
+### 2026-03-08 — Sauvegarde session + Sync questionnaire Notion 🔷
+
+**Intent**: Persister les sessions de jeu et synchroniser les réponses du questionnaire vers Notion pour analyse.
+
+**Tool**: Lovable Cloud + Notion MCP
+
+**Outcome**:
+- `sessionService.ts` : `createSession()`, `updateSession()`, `endSession()`, `saveQuestionnaire()`, `syncQuestionnaireToNotion()`
+- Edge Function `sync-questionnaire` : envoie 18 champs vers la base Notion "Questionnaire prototype 1 AVA"
+- Durée augmentée à 600s (10 min)
+- Conversation log, trust level, triggers activés, durée persistés en temps réel
+
+**Time**: ~30min
+
+---
+
+### 2026-03-08 — Dashboard admin complet 🔷
+
+**Intent**: Permettre la visualisation des sessions, des questionnaires et l'édition des system prompts depuis /admin.
+
+**Tool**: Lovable
+
+**Outcome**:
+- Onglet **Sessions** avec détail conversation + questionnaire formaté
+- Onglet **Questionnaires** : tableau récapitulatif (NPS, immersion, écoute, prix, feedback)
+- Onglet **Personnages** : édition et sauvegarde du system prompt avec cache invalidation
+- Fix RLS sur `characters` pour permettre l'update depuis le prototype
+
+**Time**: ~30min
+
+---
+
+### 2026-03-08 — Micro persistant continu 🔷
+
+**Intent**: Garder le micro ouvert en permanence pendant la conversation, sans que l'utilisateur ait à cliquer après chaque tour.
+
+**Tool**: Lovable
+
+**Outcome**:
+- `DeepgramSTT` refactorisé : ajout `pause()`, `resume()`, propriété `isActive`
+- La connexion WebSocket Deepgram reste ouverte pendant toute la session
+- Pendant que Max répond (TTS), le micro est en pause (ignore les transcripts) mais la connexion reste active
+- Après la réponse de Max, `resume()` réactive l'écoute instantanément
+- Fallback : si la connexion WebSocket est perdue, reconnexion automatique
+- Le `fullTranscript` est réinitialisé après chaque segment finalisé (2s silence)
+
+**Time**: ~15min
+
 ---
 
 ## Pivots & Breakages
@@ -274,6 +322,8 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 - **2026-03-08**: Les Edge Functions Supabase sont parfaites comme proxy API — zéro clé exposée côté client, déploiement automatique.
 - **2026-03-08**: Le Notion MCP permet d'inspecter directement les schémas des bases Notion et de mapper précisément les noms de propriétés français. Critique pour éviter les erreurs de mapping dans sync-notion.
 - **2026-03-08**: Le fetch du contenu de page (blocks API) pour les characters est essentiel — les propriétés Notion ne contiennent qu'un résumé, le backstory détaillé est dans le body de la page.
+- **2026-03-08**: Le micro persistant (pause/resume) est bien plus fluide que stop/start — évite la latence de reconnexion WebSocket et la re-demande de permission micro à chaque tour.
+- **2026-03-08**: Le system prompt de Max doit être éditable depuis /admin, pas hardcodé — permet d'itérer rapidement sur le comportement du personnage sans toucher au code.
 
 ---
 
@@ -300,9 +350,8 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 | Date | Description | Impact | Plan de fix |
 |------|-------------|--------|-------------|
-| 2026-03-08 | Sauvegarde session pas implémentée | Moyen | Prochaine étape |
+| 2026-03-08 | ~~Sauvegarde session pas implémentée~~ | ~~Moyen~~ | ✅ Fait |
 | 2026-03-08 | Chunking TTS par phrase pas implémenté (envoie tout le texte d'un coup) | Bas | Optimisation future |
-| 2026-03-08 | Voice ID ElevenLabs vide dans settings.json | Haut | Ulrich doit fournir |
 | 2026-03-08 | Video triggers hardcodés (DEMO_TRIGGERS) au lieu de dynamiques depuis DB | Moyen | Prochaine étape |
 | 2026-03-08 | Gameplay steps vide dans Notion (0 étapes) | Moyen | Remplir dans Notion |
 | 2026-03-08 | 1 video trigger sans titre dans Notion → ignoré au sync | Bas | Corriger dans Notion |

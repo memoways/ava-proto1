@@ -32,7 +32,10 @@ Valider le pipeline technique complet d'une conversation voice-to-voice avec un 
 - [x] Sync Notion → Supabase (4 bases : Characters, Storyworld, Gameplay, Vidéos)
 - [x] Embeddings OpenAI (text-embedding-3-small, 1536 dim) + pgvector
 - [x] Query RAG sémantique (match_embeddings)
-- [ ] Sauvegarde de session
+- [x] Sauvegarde de session complète
+- [x] Micro persistant continu (pause/resume sans reconnexion)
+- [x] Sync questionnaire → Notion
+- [x] Dashboard admin (sessions, questionnaires, édition system prompt)
 - [ ] Chunking TTS par phrase
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
 
@@ -42,7 +45,7 @@ Valider le pipeline technique complet d'une conversation voice-to-voice avec un 
 |-----------|-------------|
 | Frontend | React + Vite + Tailwind + TypeScript (Lovable) |
 | Backend | Lovable Cloud (Supabase Postgres + pgvector) |
-| Edge Functions | proxy-llm, proxy-stt, proxy-tts, sync-notion, query-rag |
+| Edge Functions | proxy-llm, proxy-stt, proxy-tts, sync-notion, query-rag, sync-questionnaire |
 | LLM | OpenRouter API — Qwen 2.5 72B Instruct |
 | STT | Deepgram (WebSocket streaming + VAD) |
 | TTS | ElevenLabs (voix custom Max) |
