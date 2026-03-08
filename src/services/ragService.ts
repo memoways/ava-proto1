@@ -64,7 +64,7 @@ export function formatRAGContext(matches: RAGMatch[]): string {
 export async function getRAGContext(
   userMessage: string,
   recentContext?: string,
-  matchCount = 5
+  matchCount = 3
 ): Promise<string> {
   const matches = await queryRAG(userMessage, recentContext, matchCount);
   return formatRAGContext(matches);

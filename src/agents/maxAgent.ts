@@ -23,6 +23,7 @@ Ne contredis JAMAIS ces informations. Si tu ne sais pas quelque chose, dis-le pl
 N'invente AUCUN fait qui ne figure pas dans le contexte narratif.`;
 
 let cachedSystemPrompt: string | null = null;
+let systemPromptPromise: Promise<string> | null = null;
 
 async function getCharacterSystemPrompt(name = "Max"): Promise<string> {
   if (cachedSystemPrompt) return cachedSystemPrompt;
@@ -46,6 +47,16 @@ async function getCharacterSystemPrompt(name = "Max"): Promise<string> {
     console.error("[MaxAgent] DB error:", err);
     return FALLBACK_SYSTEM_PROMPT;
   }
+}
+
+/** Preload system prompt into cache (call early, e.g. during intro video) */
+export function preloadSystemPrompt(): void {
+  if (cachedSystemPrompt || systemPromptPromise) return;
+  console.log("[MaxAgent] Preloading system prompt...");
+  systemPromptPromise = getCharacterSystemPrompt().then(p => {
+    systemPromptPromise = null;
+    return p;
+  });
 }
 
 /** Clear cached prompt (call after editing in admin) */

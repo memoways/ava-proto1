@@ -51,7 +51,7 @@ serve(async (req) => {
     console.log(`[proxy-tts] model=${modelId} voice=${voiceId} stability=${voiceSettings.stability} sim=${voiceSettings.similarity_boost} style=${voiceSettings.style} speed=${voiceSettings.speed} boost=${voiceSettings.use_speaker_boost} text=${body.text.length}chars`);
 
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?output_format=mp3_44100_128`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?output_format=mp3_22050_32&optimize_streaming_latency=4`,
       {
         method: 'POST',
         headers: {
