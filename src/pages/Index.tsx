@@ -48,6 +48,7 @@ const perf = (label: string) => {
 const Index = () => {
   const { state, setPhase, setAudioState, addMessage, updateTrust, triggerVideo, endTrigger, gameOver, reset } = useGameState();
   const [micActive, setMicActive] = useState(false);
+  const [micEverStarted, setMicEverStarted] = useState(false);
   const [userSubtitle, setUserSubtitle] = useState("");
   const [maxSubtitle, setMaxSubtitle] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -358,6 +359,7 @@ const Index = () => {
           maxSubtitle={maxSubtitle}
           onMicToggle={handleMicToggle}
           micActive={micActive}
+          micEverStarted={micEverStarted}
           elapsedSeconds={settings.TIMEOUT_SECONDS - timer.remaining}
           onEarlyQuestionnaire={handleQuestionnaire}
         />
