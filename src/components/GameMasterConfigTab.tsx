@@ -84,12 +84,28 @@ export default function GameMasterConfigTab() {
 
       {/* ===== GAMEPLAY SETTINGS ===== */}
       <section className="border rounded-lg p-4 space-y-5">
-        <div>
-          <h3 className="font-semibold text-base mb-1">⚙️ Réglages de jeu</h3>
-          <p className="text-xs text-muted-foreground">
-            Ces paramètres contrôlent la progression et les conditions de victoire/défaite.
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-base mb-1">⚙️ Réglages de jeu</h3>
+            <p className="text-xs text-muted-foreground">
+              Ces paramètres contrôlent la progression et les conditions de victoire/défaite.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleSaveGameplay}
+            disabled={saving || !hasGameplayChanges}
+            className={hasGameplayChanges ? "bg-green-600 hover:bg-green-700" : ""}
+          >
+            <Save className="w-3 h-3 mr-1" /> {saving ? "Sauvegarde..." : "Sauvegarder"}
+          </Button>
         </div>
+
+        {hasGameplayChanges && (
+          <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg px-4 py-2 text-sm text-yellow-300">
+            ⚠️ Modifications non sauvegardées — clique "Sauvegarder" pour persister en base de données.
+          </div>
+        )}
 
         {/* Trust Threshold */}
         <div>
