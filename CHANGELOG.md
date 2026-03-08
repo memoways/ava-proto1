@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.10.0] - 2026-03-08
+
+### Ajouté
+- **Debug Panel** : panneau de diagnostic latéral activé via `?debug` dans l'URL
+  - Capture tous les appels sortants (LLM, TTS, STT, RAG, Notion, Session, Game Master) avec payload, durée, status
+  - Filtrage par service et par niveau (info/success/warn/error)
+  - Entrées expansibles avec détail URL + payload tronqué (2000 chars)
+  - Copie individuelle ou globale des logs
+  - Auto-scroll avec bouton "scroll to bottom"
+  - Colorisation par service (badges) et par niveau (indicateurs)
+  - Zero impact en production : simple test booléen si `?debug` absent
+
+### Corrigé
+- **Hint micro** : le message "Cliquez sur le micro pour parler à Max" ne s'affiche plus après la première activation du micro (tracking `micEverStarted`)
+
+---
+
 ## [0.9.0] - 2026-03-08
 
 ### Ajouté
