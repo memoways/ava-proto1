@@ -25,6 +25,9 @@ export class DeepgramSTT {
   private onTranscript: TranscriptCallback;
   private mediaRecorder: MediaRecorder | null = null;
   private stream: MediaStream | null = null;
+  private silenceTimer: ReturnType<typeof setTimeout> | null = null;
+  private fullTranscript = "";
+  private static SILENCE_DELAY_MS = 2000;
 
   constructor(onTranscript: TranscriptCallback) {
     this.onTranscript = onTranscript;
@@ -37,7 +40,7 @@ export class DeepgramSTT {
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
     // Connect to Deepgram WebSocket
-    const wsUrl = `wss://api.deepgram.com/v1/listen?model=${config.model}&language=${config.language}&smart_format=true&interim_results=true&vad_events=true&endpointing=300`;
+    const wsUrl = `wss://api.deepgram.com/v1/listen?model=${config.model}&language=${config.language}&smart_format=true&interim_results=true&vad_events=true&endpointing=false`;
 
     this.ws = new WebSocket(wsUrl, ['token', config.key]);
 
@@ -52,7 +55,15 @@ export class DeepgramSTT {
         const transcript = data.channel?.alternatives?.[0]?.transcript || '';
         if (transcript) {
           const isFinal = data.is_final;
-          this.onTranscript(transcript, isFinal);
+          if (isFinal) {
+            this.fullTranscript += (this.fullTranscript ? ' ' : '') + transcript;
+          }
+          // Show interim text to user
+          const displayText = isFinal ? this.fullTranscript : this.fullTranscript + (this.fullTranscript ? ' ' : '') + transcript;
+          this.onTranscript(displayText, false);
+
+          // Reset silence timer on any speech
+          this.resetSilenceTimer();
         }
       }
     };
@@ -64,6 +75,16 @@ export class DeepgramSTT {
     this.ws.onclose = () => {
       console.log('[Deepgram] WebSocket closed');
     };
+  }
+
+  private resetSilenceTimer() {
+    if (this.silenceTimer) clearTimeout(this.silenceTimer);
+    this.silenceTimer = setTimeout(() => {
+      if (this.fullTranscript.trim()) {
+        console.log('[Deepgram] 2s silence detected, finalizing');
+        this.onTranscript(this.fullTranscript, true);
+      }
+    }, DeepgramSTT.SILENCE_DELAY_MS);
   }
 
   private startRecording() {
@@ -84,6 +105,7 @@ export class DeepgramSTT {
   }
 
   stop() {
+    if (this.silenceTimer) clearTimeout(this.silenceTimer);
     if (this.mediaRecorder?.state !== 'inactive') {
       this.mediaRecorder?.stop();
     }
@@ -94,5 +116,6 @@ export class DeepgramSTT {
     this.ws = null;
     this.mediaRecorder = null;
     this.stream = null;
+    this.fullTranscript = "";
   }
 }
