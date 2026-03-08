@@ -17,6 +17,31 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [0.4.0] - 2026-03-08
+
+### Ajouté
+- Pipeline RAG complet : Notion → Supabase → embeddings → prompt enrichi
+- Edge Function `sync-notion` — synchronise 4 bases Notion (Characters, Storyworld, Gameplay, Vidéos) vers Supabase avec génération d'embeddings OpenAI
+- Edge Function `query-rag` — recherche sémantique pgvector via `match_embeddings`
+- Service client `ragService.ts` avec `queryRAG()`, `getRAGContext()`, `syncNotion()`
+- IDs des bases Notion AVA intégrés dans `ragService.ts` (`AVA_NOTION_DATABASES`)
+- Fetch du contenu de page Notion (blocks) pour les characters (backstory complet)
+- Injection automatique du contexte RAG dans l'orchestrateur de conversation
+- Migration SQL : contraintes UNIQUE `notion_id` sur tables narratives + politiques RLS
+
+### Modifié
+- `conversationOrchestrator.ts` : intégration RAG automatique avant chaque réponse de Max
+- `supabase/config.toml` : ajout des entrées sync-notion et query-rag (verify_jwt = false)
+
+### Résultats du premier sync
+- 4 characters synchronisés (Max, Ava, Emma, +1)
+- 38 éléments storyworld synchronisés
+- 42 embeddings générés (text-embedding-3-small, 1536 dim)
+- 0 gameplay steps (base Notion vide)
+- 0/1 video triggers (page sans titre)
+
+---
+
 ## [0.3.0] - 2026-03-08
 
 ### Ajouté
@@ -56,7 +81,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Setup initial du projet React + Vite + Tailwind + TypeScript via Lovable
 - Design system dark/cinématique (index.css tokens, couleurs HSL)
 - Écran d'onboarding skippable ("Où est Ava ?")
-- Écran placeholder vidéo (écran noir + texte + barre de progression + skip)
+- Écran placeholder vidéo (écran noir + texte descriptif + barre de progression + skip)
 - Écran de conversation principal avec portrait Max, micro, sous-titres, timer, trust
 - Composant SubtitleOverlay (sous-titres utilisateur + Max)
 - Écran Game Over avec raison + boutons restart/questionnaire
