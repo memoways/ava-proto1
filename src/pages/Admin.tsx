@@ -52,18 +52,7 @@ const TAB_GROUPS = [
   },
 ];
 
-interface SessionRow {
-  id: string;
-  started_at: string | null;
-  ended_at: string | null;
-  trust_level: number | null;
-  game_over_reason: string | null;
-  duration_seconds: number | null;
-  branch: string | null;
-  triggers_activated: string[] | null;
-  conversation_log: any;
-  questionnaire_responses: any;
-}
+// SessionRow is imported from SessionsTab
 
 interface EmbeddingRow {
   id: string;
