@@ -4,7 +4,7 @@ import { useTimer } from "@/hooks/useTimer";
 import { DeepgramSTT } from "@/services/deepgramSTT";
 import { processConversationTurn } from "@/services/conversationOrchestrator";
 import { generateSpeech, playAudioBlob } from "@/services/elevenLabsTTS";
-import { createSession, updateSession, endSession, saveQuestionnaire } from "@/services/sessionService";
+import { createSession, updateSession, endSession, saveQuestionnaire, syncQuestionnaireToNotion } from "@/services/sessionService";
 import settings from "@/config/settings.json";
 import type { QuestionnaireData, ConversationMessage } from "@/types";
 
@@ -36,8 +36,10 @@ const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [postVideoContext, setPostVideoContext] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const restartMicRef = useRef<() => void>(() => {});
 
   const sttRef = useRef<DeepgramSTT | null>(null);
+  const processUserMessageRef = useRef<(text: string) => void>(() => {});
   const conversationHistoryRef = useRef<ConversationMessage[]>([]);
 
   const timer = useTimer(settings.TIMEOUT_SECONDS, () => {
@@ -63,14 +65,49 @@ const Index = () => {
     setPhase("intro_video");
   }, [setPhase]);
 
+  // Auto-start mic (used after Max responds or after a video trigger)
+  const startMicAuto = useCallback(async () => {
+    if (sttRef.current || isProcessing) return;
+    setMicActive(true);
+    setAudioState("user_speaking");
+
+    const stt = new DeepgramSTT((text, isFinal) => {
+      setUserSubtitle(text);
+      if (isFinal && text.trim()) {
+        sttRef.current?.stop();
+        sttRef.current = null;
+        setMicActive(false);
+        processUserMessageRef.current(text);
+      }
+    });
+
+    try {
+      await stt.start();
+      sttRef.current = stt;
+    } catch (err) {
+      console.error("Failed to auto-start STT:", err);
+      setMicActive(false);
+      setAudioState("idle");
+    }
+  }, [isProcessing, setAudioState]);
+
+  // Keep restartMicRef in sync
+  restartMicRef.current = () => {
+    setTimeout(() => startMicAuto(), 500);
+  };
+
   const handleIntroComplete = useCallback(() => {
     setPhase("conversation");
     timer.start();
-  }, [setPhase, timer]);
+    // Auto-start mic when conversation begins
+    setTimeout(() => startMicAuto(), 500);
+  }, [setPhase, timer, startMicAuto]);
 
   const handleTriggerComplete = useCallback(() => {
     endTrigger();
-  }, [endTrigger]);
+    // Auto-restart mic after video trigger
+    setTimeout(() => startMicAuto(), 500);
+  }, [endTrigger, startMicAuto]);
 
   // Process user message through LLM agents
   const processUserMessage = useCallback(async (userText: string) => {
@@ -176,8 +213,13 @@ const Index = () => {
       setAudioState("idle");
       // Clear Max subtitle after a delay
       setTimeout(() => setMaxSubtitle(""), 3000);
+      // Auto-restart mic for continuous conversation
+      restartMicRef.current();
     }
   }, [isProcessing, setAudioState, addMessage, state.trustLevel, state.triggeredIds, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo]);
+
+  // Keep ref in sync
+  processUserMessageRef.current = processUserMessage;
 
   const handleMicToggle = useCallback(async () => {
     if (micActive) {
@@ -188,33 +230,10 @@ const Index = () => {
       setAudioState("idle");
       setUserSubtitle("");
     } else {
-      // Start STT
-      setMicActive(true);
-      setAudioState("user_speaking");
-      setUserSubtitle("Connexion au micro…");
-      
-      const stt = new DeepgramSTT((text, isFinal) => {
-        setUserSubtitle(text);
-        if (isFinal && text.trim()) {
-          // Stop mic and process message
-          sttRef.current?.stop();
-          sttRef.current = null;
-          setMicActive(false);
-          processUserMessage(text);
-        }
-      });
-      
-      try {
-        await stt.start();
-        sttRef.current = stt;
-      } catch (err) {
-        console.error("Failed to start STT:", err);
-        setMicActive(false);
-        setAudioState("idle");
-        setUserSubtitle("Erreur micro — vérifiez les permissions");
-      }
+      // Start STT via the auto function
+      startMicAuto();
     }
-  }, [micActive, setAudioState, processUserMessage]);
+  }, [micActive, setAudioState, startMicAuto]);
 
   const handleQuestionnaire = useCallback(() => {
     setPhase("questionnaire");
@@ -224,9 +243,11 @@ const Index = () => {
     console.log("Questionnaire submitted:", data);
     if (sessionIdRef.current) {
       saveQuestionnaire(sessionIdRef.current, data).catch(console.error);
+      // Sync to Notion
+      syncQuestionnaireToNotion(sessionIdRef.current, data, state.trustLevel, settings.TIMEOUT_SECONDS - timer.remaining, state.gameOverReason);
     }
     setPhase("thanks");
-  }, [setPhase]);
+  }, [setPhase, state.trustLevel, timer.remaining, state.gameOverReason]);
 
   const handleRestart = useCallback(() => {
     reset();

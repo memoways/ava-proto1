@@ -295,9 +295,26 @@ export default function Admin() {
                         <p className="text-xs font-semibold text-muted-foreground mb-1">
                           Questionnaire
                         </p>
-                        <pre className="text-xs bg-muted/30 rounded p-2 overflow-auto max-h-40">
-                          {JSON.stringify(selectedSession.questionnaire_responses, null, 2)}
-                        </pre>
+                        <div className="grid grid-cols-2 gap-2 text-sm bg-muted/30 rounded p-3">
+                          <Stat label="Note expérience" value={`${selectedSession.questionnaire_responses.experience_rating}/10`} />
+                          <Stat label="Mot" value={selectedSession.questionnaire_responses.experience_word || "—"} />
+                          <Stat label="NPS" value={`${selectedSession.questionnaire_responses.nps}/10`} />
+                          <Stat label="Immersion histoire" value={`${selectedSession.questionnaire_responses.immersion_story}/5`} />
+                          <Stat label="Immersion naturel" value={`${selectedSession.questionnaire_responses.immersion_natural}/5`} />
+                          <Stat label="Écoute Max" value={`${selectedSession.questionnaire_responses.mechanic_listening}/5`} />
+                          <Stat label="Latence gênante" value={selectedSession.questionnaire_responses.mechanic_latency || "—"} />
+                          <Stat label="Compris objectif" value={selectedSession.questionnaire_responses.narration_understood || "—"} />
+                          <Stat label="Envie continuer" value={`${selectedSession.questionnaire_responses.narration_continue}/5`} />
+                          <Stat label="Prêt à payer" value={selectedSession.questionnaire_responses.value_pay || "—"} />
+                          <Stat label="Fourchette prix" value={selectedSession.questionnaire_responses.value_price || "—"} />
+                          <Stat label="Format préféré" value={selectedSession.questionnaire_responses.value_format || "—"} />
+                        </div>
+                        {selectedSession.questionnaire_responses.open_feedback && (
+                          <div className="mt-2">
+                            <p className="text-xs text-muted-foreground">Feedback ouvert</p>
+                            <p className="text-sm italic">{selectedSession.questionnaire_responses.open_feedback}</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
