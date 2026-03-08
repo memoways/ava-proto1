@@ -2,3 +2,6 @@ project_id = "iralfqlslqndgvexixis"
 
 [functions.proxy-stt]
 verify_jwt = false
+
+[functions.proxy-llm]
+verify_jwt = false
