@@ -1,10 +1,11 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useGameState } from "@/hooks/useGameState";
 import { useTimer } from "@/hooks/useTimer";
 import { DeepgramSTT } from "@/services/deepgramSTT";
 import { processConversationTurn } from "@/services/conversationOrchestrator";
 import { TTSQueue, extractSentences } from "@/services/elevenLabsTTS";
 import { createSession, updateSession, endSession, saveQuestionnaire, syncQuestionnaireToNotion } from "@/services/sessionService";
+import { preloadSystemPrompt } from "@/agents/maxAgent";
 import settings from "@/config/settings.json";
 import type { QuestionnaireData, ConversationMessage } from "@/types";
 
@@ -68,6 +69,14 @@ const Index = () => {
   });
 
   const handleStart = useCallback(async () => {
+    // Fire preloads in parallel with session creation
+    preloadSystemPrompt();
+    // Warm up edge functions (fire-and-forget OPTIONS preflight)
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    ["proxy-llm", "proxy-tts", "query-rag"].forEach(fn => {
+      fetch(`${supabaseUrl}/functions/v1/${fn}`, { method: "OPTIONS" }).catch(() => {});
+    });
+
     try {
       const id = await createSession();
       sessionIdRef.current = id;
