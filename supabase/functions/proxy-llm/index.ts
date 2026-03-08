@@ -40,6 +40,7 @@ serve(async (req) => {
 
     // ===== GENERATION COST LOOKUP =====
     if (body._action === "get_generation_cost" && body.generation_id) {
+      console.log(`[proxy-llm] Looking up generation cost for: ${body.generation_id}`);
       const genRes = await fetch(`${OPENROUTER_GENERATION_URL}?id=${body.generation_id}`, {
         headers: {
           'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
@@ -48,21 +49,22 @@ serve(async (req) => {
 
       if (!genRes.ok) {
         const errText = await genRes.text();
-        console.error(`OpenRouter generation lookup error [${genRes.status}]:`, errText);
+        console.error(`[proxy-llm] OpenRouter generation lookup error [${genRes.status}]:`, errText);
         return new Response(
-          JSON.stringify({ error: `Generation lookup failed: ${genRes.status}` }),
+          JSON.stringify({ error: `Generation lookup failed: ${genRes.status}`, details: errText }),
           { status: genRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       const genData = await genRes.json();
+      console.log(`[proxy-llm] Generation data:`, JSON.stringify(genData));
       const data = genData.data || genData;
       return new Response(
         JSON.stringify({
-          cost_usd: data.total_cost || data.usage?.total_cost || 0,
-          prompt_tokens: data.tokens_prompt || data.native_tokens_prompt || 0,
-          completion_tokens: data.tokens_completion || data.native_tokens_completion || 0,
-          total_tokens: (data.tokens_prompt || 0) + (data.tokens_completion || 0),
+          cost_usd: data.total_cost ?? data.usage ?? 0,
+          prompt_tokens: data.tokens_prompt ?? data.native_tokens_prompt ?? 0,
+          completion_tokens: data.tokens_completion ?? data.native_tokens_completion ?? 0,
+          total_tokens: (data.tokens_prompt ?? 0) + (data.tokens_completion ?? 0),
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
