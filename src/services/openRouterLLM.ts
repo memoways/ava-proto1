@@ -1,3 +1,5 @@
+import { trackLLMCall } from "./llmUsageTracker";
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 interface Message {
@@ -10,30 +12,49 @@ interface LLMOptions {
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
+  /** Feature key for cost tracking (e.g. 'chat', 'game_master', 'analysis') */
+  feature_key?: string;
+  /** Session ID for cost tracking */
+  session_id?: string | null;
 }
 
 type StreamCallback = (text: string, done: boolean) => void;
 
 /**
  * Streaming LLM call via proxy-llm Edge Function
+ * Tracks usage in llm_usage table automatically.
  */
 export async function streamLLM(
   messages: Message[],
   onChunk: StreamCallback,
   options?: LLMOptions
 ): Promise<string> {
+  const model = options?.model || "qwen/qwen-2.5-72b-instruct";
+  const featureKey = options?.feature_key || "chat";
+
   const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       messages,
       stream: true,
-      ...options,
+      model: options?.model,
+      temperature: options?.temperature,
+      max_tokens: options?.max_tokens,
+      top_p: options?.top_p,
     }),
   });
 
   if (!response.ok) {
     const err = await response.text();
+    // Track error
+    trackLLMCall({
+      session_id: options?.session_id,
+      feature_key: featureKey,
+      model,
+      status: "error",
+      error_message: `HTTP ${response.status}: ${err.slice(0, 200)}`,
+    });
     throw new Error(`LLM error: ${response.status} - ${err}`);
   }
 
@@ -43,6 +64,8 @@ export async function streamLLM(
   const decoder = new TextDecoder();
   let fullText = '';
   let buffer = '';
+  let usageData: any = null;
+  let generationId: string | null = null;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -50,7 +73,6 @@ export async function streamLLM(
 
     buffer += decoder.decode(value, { stream: true });
 
-    // Process SSE lines
     let newlineIndex: number;
     while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
       let line = buffer.slice(0, newlineIndex);
@@ -63,6 +85,17 @@ export async function streamLLM(
       const jsonStr = line.slice(6).trim();
       if (jsonStr === '[DONE]') {
         onChunk(fullText, true);
+        // Track usage after stream completes
+        trackLLMCall({
+          session_id: options?.session_id,
+          feature_key: featureKey,
+          model,
+          prompt_tokens: usageData?.prompt_tokens,
+          completion_tokens: usageData?.completion_tokens,
+          total_tokens: usageData?.total_tokens,
+          generation_id: generationId,
+          status: "success",
+        });
         return fullText;
       }
 
@@ -73,8 +106,15 @@ export async function streamLLM(
           fullText += content;
           onChunk(content, false);
         }
+        // Capture usage data from the stream (sent in final chunk by OpenRouter)
+        if (parsed.usage) {
+          usageData = parsed.usage;
+        }
+        // Capture generation id
+        if (parsed.id && !generationId) {
+          generationId = parsed.id;
+        }
       } catch {
-        // Partial JSON, put back and wait
         buffer = line + '\n' + buffer;
         break;
       }
@@ -82,31 +122,71 @@ export async function streamLLM(
   }
 
   onChunk(fullText, true);
+  // Track even if no [DONE] marker received
+  trackLLMCall({
+    session_id: options?.session_id,
+    feature_key: featureKey,
+    model,
+    prompt_tokens: usageData?.prompt_tokens,
+    completion_tokens: usageData?.completion_tokens,
+    total_tokens: usageData?.total_tokens,
+    generation_id: generationId,
+    status: "success",
+  });
   return fullText;
 }
 
 /**
- * Non-streaming LLM call
+ * Non-streaming LLM call with automatic usage tracking.
  */
 export async function callLLM(
   messages: Message[],
   options?: LLMOptions
 ): Promise<string> {
+  const model = options?.model || "qwen/qwen-2.5-72b-instruct";
+  const featureKey = options?.feature_key || "chat";
+
   const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       messages,
       stream: false,
-      ...options,
+      model: options?.model,
+      temperature: options?.temperature,
+      max_tokens: options?.max_tokens,
+      top_p: options?.top_p,
     }),
   });
 
   if (!response.ok) {
     const err = await response.text();
+    trackLLMCall({
+      session_id: options?.session_id,
+      feature_key: featureKey,
+      model,
+      status: "error",
+      error_message: `HTTP ${response.status}: ${err.slice(0, 200)}`,
+    });
     throw new Error(`LLM error: ${response.status} - ${err}`);
   }
 
   const data = await response.json();
-  return data.choices?.[0]?.message?.content || '';
+  const content = data.choices?.[0]?.message?.content || '';
+  const usage = data.usage;
+  const generationId = data.id || null;
+
+  // Track usage
+  trackLLMCall({
+    session_id: options?.session_id,
+    feature_key: featureKey,
+    model,
+    prompt_tokens: usage?.prompt_tokens,
+    completion_tokens: usage?.completion_tokens,
+    total_tokens: usage?.total_tokens,
+    generation_id: generationId,
+    status: "success",
+  });
+
+  return content;
 }

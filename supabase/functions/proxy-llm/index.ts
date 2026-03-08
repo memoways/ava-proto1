@@ -6,6 +6,7 @@ const corsHeaders = {
 };
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_GENERATION_URL = "https://openrouter.ai/api/v1/generation";
 
 interface Message {
   role: "system" | "user" | "assistant";
@@ -13,12 +14,15 @@ interface Message {
 }
 
 interface LLMRequest {
-  messages: Message[];
+  messages?: Message[];
   model?: string;
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
   stream?: boolean;
+  // Special action for cost lookup
+  _action?: string;
+  generation_id?: string;
 }
 
 serve(async (req) => {
@@ -34,7 +38,37 @@ serve(async (req) => {
 
     const body: LLMRequest = await req.json();
 
-    // Default values from PRD
+    // ===== GENERATION COST LOOKUP =====
+    if (body._action === "get_generation_cost" && body.generation_id) {
+      const genRes = await fetch(`${OPENROUTER_GENERATION_URL}?id=${body.generation_id}`, {
+        headers: {
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        },
+      });
+
+      if (!genRes.ok) {
+        const errText = await genRes.text();
+        console.error(`OpenRouter generation lookup error [${genRes.status}]:`, errText);
+        return new Response(
+          JSON.stringify({ error: `Generation lookup failed: ${genRes.status}` }),
+          { status: genRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const genData = await genRes.json();
+      const data = genData.data || genData;
+      return new Response(
+        JSON.stringify({
+          cost_usd: data.total_cost || data.usage?.total_cost || 0,
+          prompt_tokens: data.tokens_prompt || data.native_tokens_prompt || 0,
+          completion_tokens: data.tokens_completion || data.native_tokens_completion || 0,
+          total_tokens: (data.tokens_prompt || 0) + (data.tokens_completion || 0),
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ===== STANDARD CHAT COMPLETION =====
     const model = body.model || "qwen/qwen-2.5-72b-instruct";
     const temperature = body.temperature ?? 0.8;
     const max_tokens = body.max_tokens ?? 500;
@@ -56,6 +90,8 @@ serve(async (req) => {
         max_tokens,
         top_p,
         stream,
+        // Request usage info for tracking
+        usage: { include: true },
       }),
     });
 
