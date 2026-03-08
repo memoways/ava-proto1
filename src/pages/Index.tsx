@@ -65,18 +65,17 @@ const Index = () => {
     setPhase("intro_video");
   }, [setPhase]);
 
-  // Auto-start mic (used after Max responds or after a video trigger)
-  const startMicAuto = useCallback(async () => {
-    if (sttRef.current || isProcessing) return;
+  // Start persistent mic connection (stays open the whole conversation)
+  const startMicPersistent = useCallback(async () => {
+    if (sttRef.current) return; // Already running
     setMicActive(true);
     setAudioState("user_speaking");
 
     const stt = new DeepgramSTT((text, isFinal) => {
       setUserSubtitle(text);
       if (isFinal && text.trim()) {
-        sttRef.current?.stop();
-        sttRef.current = null;
-        setMicActive(false);
+        // Pause mic while processing, but don't close
+        stt.pause();
         processUserMessageRef.current(text);
       }
     });
@@ -85,29 +84,43 @@ const Index = () => {
       await stt.start();
       sttRef.current = stt;
     } catch (err) {
-      console.error("Failed to auto-start STT:", err);
+      console.error("Failed to start STT:", err);
       setMicActive(false);
       setAudioState("idle");
     }
-  }, [isProcessing, setAudioState]);
+  }, [setAudioState]);
+
+  // Resume mic after Max finishes (no need to reconnect)
+  const resumeMic = useCallback(() => {
+    if (sttRef.current?.isActive) {
+      sttRef.current.resume();
+      setMicActive(true);
+      setAudioState("user_speaking");
+      setUserSubtitle("");
+    } else {
+      // Connection lost, restart
+      sttRef.current = null;
+      startMicPersistent();
+    }
+  }, [setAudioState, startMicPersistent]);
 
   // Keep restartMicRef in sync
   restartMicRef.current = () => {
-    setTimeout(() => startMicAuto(), 500);
+    setTimeout(() => resumeMic(), 500);
   };
 
   const handleIntroComplete = useCallback(() => {
     setPhase("conversation");
     timer.start();
-    // Auto-start mic when conversation begins
-    setTimeout(() => startMicAuto(), 500);
-  }, [setPhase, timer, startMicAuto]);
+    // Start persistent mic when conversation begins
+    setTimeout(() => startMicPersistent(), 500);
+  }, [setPhase, timer, startMicPersistent]);
 
   const handleTriggerComplete = useCallback(() => {
     endTrigger();
-    // Auto-restart mic after video trigger
-    setTimeout(() => startMicAuto(), 500);
-  }, [endTrigger, startMicAuto]);
+    // Resume mic after video trigger
+    setTimeout(() => resumeMic(), 500);
+  }, [endTrigger, resumeMic]);
 
   // Process user message through LLM agents
   const processUserMessage = useCallback(async (userText: string) => {
@@ -223,17 +236,16 @@ const Index = () => {
 
   const handleMicToggle = useCallback(async () => {
     if (micActive) {
-      // Stop STT
-      sttRef.current?.stop();
-      sttRef.current = null;
+      // Pause STT (keep connection alive)
+      sttRef.current?.pause();
       setMicActive(false);
       setAudioState("idle");
       setUserSubtitle("");
     } else {
-      // Start STT via the auto function
-      startMicAuto();
+      // Resume or start
+      resumeMic();
     }
-  }, [micActive, setAudioState, startMicAuto]);
+  }, [micActive, setAudioState, resumeMic]);
 
   const handleQuestionnaire = useCallback(() => {
     setPhase("questionnaire");
