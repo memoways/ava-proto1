@@ -1,73 +1,96 @@
-# Welcome to your Lovable project
+# Où est Ava ? — Prototype 1
 
-## Project info
+> **Statut**: 🟡 En cours  
+> **Type**: 🧪 Prototype  
+> **Créé avec**: Lovable  
+> **Démarré**: 2026-03-07  
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## En une phrase
 
-## How can I edit this code?
+Expérience narrative interactive voice-to-voice avec Max, un personnage fictif piloté par IA, dans l'univers de "Où est Ava ?".
 
-There are several ways of editing your application.
+## 📋 Source de vérité
 
-**Use Lovable**
+- **PRD**: [`documents/PRD_Prototype_1.md`](documents/PRD_Prototype_1.md)
+- **Dernière sync**: 2026-03-08
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## 🎯 Objectif projet
 
-Changes made via Lovable will be committed automatically to this repo.
+Valider le pipeline technique complet d'une conversation voice-to-voice avec un personnage IA : STT (Deepgram) → LLM (OpenRouter/Qwen) → TTS (ElevenLabs), orchestré par un Game Master autonome qui gère la confiance, les triggers vidéo et le game over.
 
-**Use your preferred IDE**
+## ✅ Livrables
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- [x] Pipeline voice-to-voice complet (STT → LLM → TTS)
+- [x] Agent Max conversationnel (prompt système, streaming)
+- [x] Agent Game Master orchestrateur (JSON structuré)
+- [x] Système de triggers vidéo (mode placeholder)
+- [x] State machine complète (7 phases)
+- [x] UI dark theme cinématique
+- [x] Questionnaire de fin intégré
+- [ ] Pipeline RAG (Notion → Supabase → embeddings → prompt enrichi)
+- [ ] Sync Notion → Supabase
+- [ ] Sauvegarde de session
+- [ ] Chunking TTS par phrase
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🛠️ Stack technique
 
-Follow these steps:
+| Composant | Technologie |
+|-----------|-------------|
+| Frontend | React + Vite + Tailwind + TypeScript (Lovable) |
+| Backend | Lovable Cloud (Supabase Postgres + pgvector) |
+| Edge Functions | Supabase Edge Functions (Deno) — proxy-llm, proxy-stt, proxy-tts |
+| LLM | OpenRouter API — Qwen 2.5 72B Instruct |
+| STT | Deepgram (WebSocket streaming + VAD) |
+| TTS | ElevenLabs (voix custom Max) |
+| Données | Notion (source de vérité) → Supabase (miroir + embeddings) |
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+## 🚀 Démarrage rapide
+
+```bash
+# Cloner
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Installer
+npm install
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Lancer
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Ou directement via [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID).
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 🔗 Liens
 
-**Use GitHub Codespaces**
+- **URL de prod**: https://ava-proto1.lovable.app
+- **URL de preview**: https://id-preview--1265958d-b74e-40f2-917d-182fe05163fc.lovable.app
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 📁 Structure
 
-## What technologies are used for this project?
+```
+/
+├── documents/              # PRD et documentation projet
+├── src/
+│   ├── agents/             # maxAgent.ts, gameMasterAgent.ts
+│   ├── assets/             # Images (portrait Max)
+│   ├── components/         # Écrans UI (Onboarding, Conversation, GameOver, etc.)
+│   ├── config/             # settings.json (variables configurables)
+│   ├── hooks/              # useGameState, useTimer
+│   ├── services/           # deepgramSTT, elevenLabsTTS, openRouterLLM, orchestrator
+│   └── types/              # Types TypeScript partagés
+├── public/assets/          # Background images
+├── supabase/functions/     # Edge Functions (proxy-llm, proxy-stt, proxy-tts)
+├── CHANGELOG.md            # Historique versionné
+├── STORY.md                # Journal de développement
+└── README.md               # Ce fichier
+```
 
-This project is built with:
+## 📝 Notes
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- **Secrets requis** (dans Lovable Cloud) : `OPENROUTER_API_KEY`, `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`
+- Desktop only, Chrome recommandé
+- Pas d'authentification — session locale
+- Vidéos en mode placeholder (écran noir + texte)
 
-## How can I deploy this project?
+---
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+*Projet Memoways — Storygami*
