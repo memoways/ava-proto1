@@ -1,39 +1,15 @@
 import { callLLM } from "@/services/openRouterLLM";
 import type { ConversationMessage, GameMasterResponse } from "@/types";
 import settings from "@/config/settings.json";
-import { getLLMSettings } from "@/services/settingsService";
+import { getLLMSettings, getGMPromptSettings, getGameplaySettings } from "@/services/settingsService";
 
-// System prompt for Game Master - orchestrator
-const GAME_MASTER_SYSTEM_PROMPT = `Tu es le Game Master d'une expérience narrative interactive "Où est Ava ?". Tu analyses chaque échange entre l'utilisateur et Max pour orchestrer l'expérience.
-
-## TON RÔLE
-- Évaluer la sincérité et l'engagement de l'utilisateur
-- Détecter si un trigger vidéo doit être activé
-- Gérer le niveau de confiance et la progression
-- Détecter les comportements inappropriés
-
-## RÈGLES
-- trust_delta: +1 si réponse sincère/engagée, 0 si neutre, -1 si évasive/désintéressée
-- Trigger vidéo si la conversation touche un thème clé (famille, enfance, secret, disparition)
-- game_over si comportement inapproprié (insultes, hors-sujet répété) ou si l'utilisateur abandonne
-- gate_reached si trust_level >= ${settings.TRUST_THRESHOLD}
-
-## TRIGGERS DISPONIBLES
-- "trigger_famille" : thèmes famille, parents, enfance
-- "trigger_secret" : thèmes secret, mystère, vérité cachée
-- "trigger_disparition" : thèmes disparition, absence, recherche
-
-## FORMAT DE RÉPONSE
-Tu dois TOUJOURS répondre avec un JSON valide et RIEN D'AUTRE :
-{
-  "trust_delta": 0,
-  "trigger_video_id": null,
-  "game_over": false,
-  "game_over_reason": null,
-  "gate_reached": false,
-  "moderation_flag": false,
-  "notes": "Brève analyse de l'échange"
-}`;
+// System prompt is now loaded from settings (editable in admin)
+function getGameMasterSystemPrompt(): string {
+  const gmSettings = getGMPromptSettings();
+  const gameplay = getGameplaySettings();
+  // Replace TRUST_THRESHOLD placeholder
+  return gmSettings.systemPrompt.replace(/TRUST_THRESHOLD/g, String(gameplay.TRUST_THRESHOLD));
+}
 
 export interface GameMasterInput {
   conversationHistory: ConversationMessage[];
@@ -61,7 +37,7 @@ export async function callGameMaster(input: GameMasterInput): Promise<GameMaster
   const contextMessage = buildContextMessage(input);
 
   const messages: Array<{ role: "system" | "user"; content: string }> = [
-    { role: "system", content: GAME_MASTER_SYSTEM_PROMPT },
+    { role: "system", content: getGameMasterSystemPrompt() },
     { role: "user", content: contextMessage },
   ];
 
