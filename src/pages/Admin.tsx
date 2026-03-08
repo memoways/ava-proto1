@@ -72,7 +72,7 @@ export default function Admin() {
   // selectedSession moved to SessionsTab
   const [selectedEmbedding, setSelectedEmbedding] = useState<EmbeddingRow | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [syncReport, setSyncReport] = useState<any | null>(null);
   const [embFilter, setEmbFilter] = useState<string>("all");
   const [loading, setLoading] = useState(false);
   const [ragQuery, setRagQuery] = useState("");
@@ -163,7 +163,7 @@ export default function Admin() {
 
   async function triggerSync() {
     setSyncing(true);
-    setSyncResult(null);
+    setSyncReport(null);
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
         method: "POST",
@@ -172,11 +172,11 @@ export default function Admin() {
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      setSyncResult(JSON.stringify(data, null, 2));
+      setSyncReport(data);
       toast.success("Sync Notion terminé !");
       loadEmbeddings();
     } catch (err: any) {
-      setSyncResult(`Erreur: ${err.message}`);
+      setSyncReport({ error: err.message });
       toast.error("Erreur lors du sync");
     } finally {
       setSyncing(false);
@@ -451,7 +451,7 @@ export default function Admin() {
 
           {/* ==================== NOTION SYNC ==================== */}
           <TabsContent value="sync">
-            <div className="max-w-2xl">
+            <div className="max-w-3xl">
               <h2 className="text-lg font-semibold mb-2">Sync Notion → DB</h2>
               <p className="text-sm text-muted-foreground mb-4">
                 Synchronise les 4 bases Notion (Characters, Storyworld, Gameplay, Vidéos) vers la base de données et régénère les embeddings.
@@ -468,8 +468,55 @@ export default function Admin() {
               <Button onClick={triggerSync} disabled={syncing} size="lg">
                 {syncing ? "Sync en cours... (peut prendre ~60s)" : "Lancer le Sync"}
               </Button>
-              {syncResult && (
-                <pre className="mt-4 text-xs bg-muted/30 rounded p-3 overflow-auto max-h-60">{syncResult}</pre>
+
+              {syncReport && !syncReport.error && (
+                <div className="mt-6 space-y-4">
+                  <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 font-medium">
+                    ✅ Sync terminé le {new Date(syncReport.synced_at).toLocaleString("fr-FR")}
+                  </div>
+
+                  {/* Per-table results */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {syncReport.results && Object.entries(syncReport.results).map(([table, stats]: [string, any]) => {
+                      const embStats = syncReport.embedding_stats?.[table];
+                      return (
+                        <div key={table} className="border rounded-lg p-3">
+                          <h4 className="font-semibold text-sm capitalize mb-1">{table.replace(/_/g, ' ')}</h4>
+                          <div className="text-xs space-y-0.5 text-muted-foreground">
+                            <p>📄 {stats.synced}/{stats.total} entrées synchronisées</p>
+                            {embStats && (
+                              <>
+                                <p>🧩 {embStats.chunks_created} chunk{embStats.chunks_created > 1 ? 's' : ''} RAG créé{embStats.chunks_created > 1 ? 's' : ''}</p>
+                                <p>📝 {(embStats.chars_embedded / 1000).toFixed(1)}k caractères embeddings</p>
+                                <p>🪙 ~{Math.ceil(embStats.chars_embedded / 4)} tokens estimés</p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Global stats */}
+                  <div className="border rounded-lg p-3 bg-muted/30">
+                    <p className="text-sm font-medium">📊 Total embeddings en base : <span className="font-bold">{syncReport.total_embeddings_in_db}</span></p>
+                    {syncReport.embedding_stats && (() => {
+                      const totalChunks = Object.values(syncReport.embedding_stats).reduce((s: number, e: any) => s + e.chunks_created, 0);
+                      const totalChars = Object.values(syncReport.embedding_stats).reduce((s: number, e: any) => s + e.chars_embedded, 0);
+                      return (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Cette sync : {totalChunks} chunks créés, ~{Math.ceil(totalChars / 4)} tokens OpenAI consommés pour les embeddings
+                        </p>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {syncReport?.error && (
+                <pre className="mt-4 text-xs bg-destructive/10 text-destructive rounded p-3 overflow-auto max-h-60">
+                  Erreur: {syncReport.error}
+                </pre>
               )}
             </div>
           </TabsContent>
