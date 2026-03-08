@@ -70,6 +70,13 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const body: SyncRequest = await req.json();
     const results: Record<string, any> = {};
+    // Track embedding stats across all tables
+    const embeddingStats: Record<string, { chunks_created: number; chars_embedded: number }> = {};
+    function trackEmbedding(table: string, contentLength: number, chunksCount = 1) {
+      if (!embeddingStats[table]) embeddingStats[table] = { chunks_created: 0, chars_embedded: 0 };
+      embeddingStats[table].chunks_created += chunksCount;
+      embeddingStats[table].chars_embedded += contentLength;
+    }
 
     // Fetch all pages from a Notion database (handles pagination)
     async function fetchNotionDatabase(databaseId: string): Promise<NotionPage[]> {
@@ -255,12 +262,10 @@ serve(async (req) => {
         const chunks = chunkText(fullText);
 
         if (chunks.length <= 1) {
-          // Single embedding for short content
           await upsertEmbedding('characters', data.id, fullText);
+          trackEmbedding('characters', fullText.length, 1);
         } else {
-          // Multiple chunked embeddings for better retrieval
           console.log(`[sync-notion] Character "${name}": splitting into ${chunks.length} chunks`);
-          // Delete old embedding(s) for this character
           await supabase.from('embeddings')
             .delete()
             .eq('source_table', 'characters')
@@ -277,6 +282,7 @@ serve(async (req) => {
                 embedding: JSON.stringify(embedding),
               });
           }
+          trackEmbedding('characters', fullText.length, chunks.length);
         }
         synced++;
       }
@@ -316,6 +322,7 @@ serve(async (req) => {
         const tags = extractMultiSelect(props['Tags']).join(', ');
         const embeddingText = `${title}\nType: ${record.category || 'N/A'}\nTags: ${tags}\n${record.content}`;
         await upsertEmbedding('storyworld', data.id, embeddingText);
+        trackEmbedding('storyworld', embeddingText.length, 1);
         synced++;
       }
       results.storyworld = { synced, total: pages.length };
@@ -392,9 +399,20 @@ serve(async (req) => {
       results.video_triggers = { synced, total: pages.length };
     }
 
-    console.log('[sync-notion] Sync complete:', results);
+    // Count total embeddings in DB after sync
+    const { count: totalEmbeddings } = await supabase
+      .from('embeddings')
+      .select('id', { count: 'exact', head: true });
 
-    return new Response(JSON.stringify({ success: true, results }), {
+    console.log('[sync-notion] Sync complete:', results, 'embeddings:', embeddingStats);
+
+    return new Response(JSON.stringify({
+      success: true,
+      results,
+      embedding_stats: embeddingStats,
+      total_embeddings_in_db: totalEmbeddings || 0,
+      synced_at: new Date().toISOString(),
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
