@@ -6,6 +6,7 @@ import { processConversationTurn } from "@/services/conversationOrchestrator";
 import { TTSQueue, extractSentences } from "@/services/elevenLabsTTS";
 import { createSession, updateSession, endSession, saveQuestionnaire, syncQuestionnaireToNotion } from "@/services/sessionService";
 import { preloadSystemPrompt } from "@/agents/maxAgent";
+import { trackEvent, identifyUser } from "@/services/posthogService";
 import settings from "@/config/settings.json";
 import type { QuestionnaireData, ConversationMessage } from "@/types";
 
@@ -85,10 +86,13 @@ const Index = () => {
     try {
       const id = await createSession();
       sessionIdRef.current = id;
+      identifyUser(id);
+      trackEvent("game_started", { session_id: id });
     } catch (e) {
       console.error("Failed to create session:", e);
     }
     setPhase("intro_video");
+    trackEvent("phase_changed", { phase: "intro_video" });
   }, [setPhase]);
 
   const startMicPersistent = useCallback(async () => {
@@ -131,6 +135,8 @@ const Index = () => {
   const handleIntroComplete = useCallback(() => {
     setPhase("conversation");
     timer.start();
+    trackEvent("intro_video_completed");
+    trackEvent("phase_changed", { phase: "conversation" });
   }, [setPhase, timer]);
 
   const handleTriggerComplete = useCallback(() => {
@@ -246,6 +252,7 @@ const Index = () => {
 
       if (gameMasterResponse.game_over) {
         const reason = gameMasterResponse.game_over_reason || "moderation";
+        trackEvent("game_over", { reason, trust_level: newTrust, duration: settings.TIMEOUT_SECONDS - timer.remaining });
         if (sessionIdRef.current) {
           endSession(sessionIdRef.current, {
             game_over_reason: reason,
@@ -265,6 +272,7 @@ const Index = () => {
       }
 
       if (trigger) {
+        trackEvent("video_trigger_activated", { trigger_id: trigger.id, trigger_title: trigger.title });
         setPostVideoContext(trigger.post_video_context || null);
         triggerVideo(trigger);
         return;
@@ -307,6 +315,7 @@ const Index = () => {
   }, [setPhase]);
 
   const handleQuestionnaireSubmit = useCallback((data: QuestionnaireData) => {
+    trackEvent("questionnaire_submitted", { session_id: sessionIdRef.current });
     if (sessionIdRef.current) {
       saveQuestionnaire(sessionIdRef.current, data).catch(console.error);
       syncQuestionnaireToNotion(sessionIdRef.current, data, state.trustLevel, settings.TIMEOUT_SECONDS - timer.remaining, state.gameOverReason);
