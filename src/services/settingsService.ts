@@ -16,6 +16,9 @@ const STORAGE_KEY = "ava_llm_settings";
 export const OPENROUTER_MODELS = [
   { id: "qwen/qwen-2.5-72b-instruct", label: "Qwen 2.5 72B", description: "Défaut — bon rapport qualité/coût" },
   { id: "qwen/qwen-2.5-32b-instruct", label: "Qwen 2.5 32B", description: "Plus rapide, bonne qualité" },
+  { id: "x-ai/grok-3-mini-beta", label: "Grok 3 Mini", description: "Rapide, conversationnel, bon en roleplay" },
+  { id: "x-ai/grok-3-beta", label: "Grok 3", description: "Top qualité xAI, raisonnement fort" },
+  { id: "x-ai/grok-2-1212", label: "Grok 2", description: "Équilibré vitesse/qualité" },
   { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash", description: "Très rapide, gratuit" },
   { id: "google/gemini-2.5-pro-preview-06-05", label: "Gemini 2.5 Pro", description: "Top qualité, plus lent" },
   { id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4", description: "Excellent en roleplay" },
