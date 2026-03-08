@@ -9,8 +9,46 @@ import { AVA_NOTION_DATABASES } from "@/services/ragService";
 import { clearSystemPromptCache } from "@/agents/maxAgent";
 import LLMConfigTab from "@/components/LLMConfigTab";
 import VoiceConfigTab from "@/components/VoiceConfigTab";
+import GameMasterConfigTab from "@/components/GameMasterConfigTab";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
+// Tab group definitions
+const TAB_GROUPS = [
+  {
+    id: "data",
+    label: "📊 Données",
+    tabs: [
+      { id: "sessions", label: "Sessions" },
+      { id: "questionnaires", label: "Questionnaires" },
+    ],
+  },
+  {
+    id: "content",
+    label: "📚 Contenu Notion",
+    tabs: [
+      { id: "characters", label: "Personnages" },
+      { id: "embeddings", label: "Embeddings" },
+      { id: "rag", label: "RAG Test" },
+      { id: "sync", label: "Sync Notion" },
+    ],
+  },
+  {
+    id: "mechanics",
+    label: "🎮 Mécanique",
+    tabs: [
+      { id: "gamemaster", label: "Game Master" },
+    ],
+  },
+  {
+    id: "tech",
+    label: "🔧 Technique",
+    tabs: [
+      { id: "llm", label: "LLM Config" },
+      { id: "voice", label: "Voix" },
+    ],
+  },
+];
 
 interface SessionRow {
   id: string;
@@ -50,6 +88,8 @@ export default function Admin() {
   const [editingChar, setEditingChar] = useState<any | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
   const [savingChar, setSavingChar] = useState(false);
+  const [activeGroup, setActiveGroup] = useState("data");
+  const [activeTab, setActiveTab] = useState("sessions");
 
   useEffect(() => {
     loadSessions();
@@ -103,7 +143,6 @@ export default function Admin() {
         console.log("[Admin] Saved prompt:", data);
         toast.success(`System prompt de ${editingChar.name} sauvegardé ✓`);
         clearSystemPromptCache();
-        // Update local state immediately
         setEditingChar({ ...editingChar, system_prompt: editPrompt });
         setCharacters(prev => prev.map(c => c.id === editingChar.id ? { ...c, system_prompt: editPrompt } : c));
       }
@@ -164,33 +203,54 @@ export default function Admin() {
   const fmt = (d: string | null) =>
     d ? new Date(d).toLocaleString("fr-CH") : "—";
 
+  const currentGroup = TAB_GROUPS.find(g => g.id === activeGroup);
+
   return (
     <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-2xl font-bold mb-1">🔧 Admin — Où est Ava ?</h1>
-        <p className="text-muted-foreground text-sm mb-6">
-          Sessions, RAG, Embeddings, Notion Sync
+        <p className="text-muted-foreground text-sm mb-4">
+          Pilotage complet de l'expérience narrative
         </p>
 
-        <Tabs defaultValue="sessions" className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="sessions">
-              Sessions ({sessions.length})
-            </TabsTrigger>
-            <TabsTrigger value="embeddings">
-              Embeddings ({embeddings.length})
-            </TabsTrigger>
-            <TabsTrigger value="characters">
-              Personnages ({characters.length})
-            </TabsTrigger>
-            <TabsTrigger value="questionnaires">
-              Questionnaires ({sessions.filter(s => s.questionnaire_responses).length})
-            </TabsTrigger>
-            <TabsTrigger value="rag">RAG Test</TabsTrigger>
-            <TabsTrigger value="llm">LLM Config</TabsTrigger>
-            <TabsTrigger value="voice">Voix</TabsTrigger>
-            <TabsTrigger value="sync">Notion Sync</TabsTrigger>
-          </TabsList>
+        {/* ===== GROUP SELECTOR ===== */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {TAB_GROUPS.map((group) => (
+            <button
+              key={group.id}
+              onClick={() => {
+                setActiveGroup(group.id);
+                setActiveTab(group.tabs[0].id);
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                activeGroup === group.id
+                  ? "bg-primary/10 border-primary text-primary"
+                  : "bg-muted/30 border-transparent text-muted-foreground hover:bg-muted/50"
+              }`}
+            >
+              {group.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ===== TABS WITHIN GROUP ===== */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {currentGroup && currentGroup.tabs.length > 1 && (
+            <TabsList className="mb-4">
+              {currentGroup.tabs.map((tab) => {
+                let count = "";
+                if (tab.id === "sessions") count = ` (${sessions.length})`;
+                if (tab.id === "questionnaires") count = ` (${sessions.filter(s => s.questionnaire_responses).length})`;
+                if (tab.id === "characters") count = ` (${characters.length})`;
+                if (tab.id === "embeddings") count = ` (${embeddings.length})`;
+                return (
+                  <TabsTrigger key={tab.id} value={tab.id}>
+                    {tab.label}{count}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          )}
 
           {/* ==================== SESSIONS ==================== */}
           <TabsContent value="sessions">
@@ -216,9 +276,7 @@ export default function Admin() {
                           <span className="text-xs font-mono text-muted-foreground">
                             {s.id.slice(0, 8)}
                           </span>
-                          <p className="text-sm">
-                            {fmt(s.started_at)}
-                          </p>
+                          <p className="text-sm">{fmt(s.started_at)}</p>
                         </div>
                         <div className="text-right text-xs">
                           <span
@@ -230,22 +288,16 @@ export default function Admin() {
                           >
                             {s.ended_at ? "Terminée" : "En cours"}
                           </span>
-                          <p className="mt-1">
-                            Trust: {s.trust_level ?? 0} | {s.duration_seconds ?? "—"}s
-                          </p>
+                          <p className="mt-1">Trust: {s.trust_level ?? 0} | {s.duration_seconds ?? "—"}s</p>
                         </div>
                       </div>
                       {s.game_over_reason && (
-                        <p className="text-xs text-red-400 mt-1">
-                          Fin: {s.game_over_reason}
-                        </p>
+                        <p className="text-xs text-red-400 mt-1">Fin: {s.game_over_reason}</p>
                       )}
                     </button>
                   ))}
                   {sessions.length === 0 && (
-                    <p className="p-4 text-muted-foreground text-sm">
-                      Aucune session
-                    </p>
+                    <p className="p-4 text-muted-foreground text-sm">Aucune session</p>
                   )}
                 </ScrollArea>
               </div>
@@ -267,17 +319,10 @@ export default function Admin() {
 
                     {selectedSession.triggers_activated?.length ? (
                       <div className="mb-3">
-                        <p className="text-xs font-semibold text-muted-foreground mb-1">
-                          Triggers activés
-                        </p>
+                        <p className="text-xs font-semibold text-muted-foreground mb-1">Triggers activés</p>
                         <div className="flex flex-wrap gap-1">
                           {selectedSession.triggers_activated.map((t) => (
-                            <span
-                              key={t}
-                              className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded"
-                            >
-                              {t}
-                            </span>
+                            <span key={t} className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">{t}</span>
                           ))}
                         </div>
                       </div>
@@ -290,18 +335,8 @@ export default function Admin() {
                       <ScrollArea className="h-60 border rounded p-2">
                         {Array.isArray(selectedSession.conversation_log) &&
                           selectedSession.conversation_log.map((msg: any, i: number) => (
-                            <div
-                              key={i}
-                              className={`mb-2 text-sm ${
-                                msg.role === "max"
-                                  ? "text-blue-300"
-                                  : "text-green-300"
-                              }`}
-                            >
-                              <span className="font-bold">
-                                {msg.role === "max" ? "Max" : "User"}:
-                              </span>{" "}
-                              {msg.content}
+                            <div key={i} className={`mb-2 text-sm ${msg.role === "max" ? "text-blue-300" : "text-green-300"}`}>
+                              <span className="font-bold">{msg.role === "max" ? "Max" : "User"}:</span> {msg.content}
                             </div>
                           ))}
                       </ScrollArea>
@@ -309,9 +344,7 @@ export default function Admin() {
 
                     {selectedSession.questionnaire_responses && (
                       <div>
-                        <p className="text-xs font-semibold text-muted-foreground mb-1">
-                          Questionnaire
-                        </p>
+                        <p className="text-xs font-semibold text-muted-foreground mb-1">Questionnaire</p>
                         <div className="grid grid-cols-2 gap-2 text-sm bg-muted/30 rounded p-3">
                           <Stat label="Note expérience" value={`${selectedSession.questionnaire_responses.experience_rating}/10`} />
                           <Stat label="Mot" value={selectedSession.questionnaire_responses.experience_word || "—"} />
@@ -350,20 +383,11 @@ export default function Admin() {
               <div>
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <h2 className="text-lg font-semibold">Embeddings</h2>
-                  <Button
-                    size="sm"
-                    variant={embFilter === "all" ? "default" : "outline"}
-                    onClick={() => setEmbFilter("all")}
-                  >
+                  <Button size="sm" variant={embFilter === "all" ? "default" : "outline"} onClick={() => setEmbFilter("all")}>
                     Tous ({embeddings.length})
                   </Button>
                   {uniqueSources.map((s) => (
-                    <Button
-                      key={s}
-                      size="sm"
-                      variant={embFilter === s ? "default" : "outline"}
-                      onClick={() => setEmbFilter(s)}
-                    >
+                    <Button key={s} size="sm" variant={embFilter === s ? "default" : "outline"} onClick={() => setEmbFilter(s)}>
                       {s} ({embeddings.filter((e) => e.source_table === s).length})
                     </Button>
                   ))}
@@ -378,16 +402,10 @@ export default function Admin() {
                       }`}
                     >
                       <div className="flex justify-between">
-                        <span className="text-xs font-mono text-muted-foreground">
-                          {e.source_table}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {e.id.slice(0, 8)}
-                        </span>
+                        <span className="text-xs font-mono text-muted-foreground">{e.source_table}</span>
+                        <span className="text-xs text-muted-foreground">{e.id.slice(0, 8)}</span>
                       </div>
-                      <p className="text-sm mt-1 line-clamp-2">
-                        {e.content.slice(0, 120)}...
-                      </p>
+                      <p className="text-sm mt-1 line-clamp-2">{e.content.slice(0, 120)}...</p>
                     </button>
                   ))}
                 </ScrollArea>
@@ -396,9 +414,7 @@ export default function Admin() {
               <div>
                 {selectedEmbedding ? (
                   <div className="border rounded-lg p-4">
-                    <h2 className="text-lg font-semibold mb-2">
-                      Embedding Detail
-                    </h2>
+                    <h2 className="text-lg font-semibold mb-2">Embedding Detail</h2>
                     <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                       <Stat label="Source" value={selectedEmbedding.source_table} />
                       <Stat label="Source ID" value={selectedEmbedding.source_id.slice(0, 8)} />
@@ -406,9 +422,7 @@ export default function Admin() {
                       <Stat label="Longueur" value={`${selectedEmbedding.content.length} chars`} />
                     </div>
                     <ScrollArea className="h-[55vh] border rounded p-3">
-                      <pre className="text-sm whitespace-pre-wrap">
-                        {selectedEmbedding.content}
-                      </pre>
+                      <pre className="text-sm whitespace-pre-wrap">{selectedEmbedding.content}</pre>
                     </ScrollArea>
                   </div>
                 ) : (
@@ -443,18 +457,12 @@ export default function Admin() {
 
               {ragResults && (
                 <div>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    {ragResults.length} résultat(s)
-                  </p>
+                  <p className="text-sm text-muted-foreground mb-2">{ragResults.length} résultat(s)</p>
                   {ragResults.map((m: any, i: number) => (
                     <div key={m.id} className="border rounded-lg p-3 mb-3">
                       <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                        <span>
-                          #{i + 1} — {m.source_table}
-                        </span>
-                        <span>
-                          Similarité: {(m.similarity * 100).toFixed(1)}%
-                        </span>
+                        <span>#{i + 1} — {m.source_table}</span>
+                        <span>Similarité: {(m.similarity * 100).toFixed(1)}%</span>
                       </div>
                       <pre className="text-sm whitespace-pre-wrap">{m.content}</pre>
                     </div>
@@ -470,34 +478,23 @@ export default function Admin() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h2 className="text-lg font-semibold">Personnages</h2>
-                  <Button size="sm" variant="outline" onClick={loadCharacters}>
-                    Rafraîchir
-                  </Button>
+                  <Button size="sm" variant="outline" onClick={loadCharacters}>Rafraîchir</Button>
                 </div>
                 <div className="space-y-2">
                   {characters.map((c) => (
                     <button
                       key={c.id}
-                      onClick={() => {
-                        setEditingChar(c);
-                        setEditPrompt(c.system_prompt || "");
-                      }}
+                      onClick={() => { setEditingChar(c); setEditPrompt(c.system_prompt || ""); }}
                       className={`w-full text-left p-4 border rounded-lg hover:bg-accent/50 transition-colors ${
                         editingChar?.id === c.id ? "bg-accent border-primary" : ""
                       }`}
                     >
                       <div className="flex justify-between items-center">
                         <span className="font-semibold">{c.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {c.system_prompt?.length || 0} chars
-                        </span>
+                        <span className="text-xs text-muted-foreground">{c.system_prompt?.length || 0} chars</span>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {c.personality || "—"}
-                      </p>
-                      <p className="text-sm mt-1 line-clamp-2 text-muted-foreground">
-                        {c.system_prompt?.slice(0, 120) || "Aucun system prompt"}
-                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">{c.personality || "—"}</p>
+                      <p className="text-sm mt-1 line-clamp-2 text-muted-foreground">{c.system_prompt?.slice(0, 120) || "Aucun system prompt"}</p>
                     </button>
                   ))}
                 </div>
@@ -510,12 +507,9 @@ export default function Admin() {
               <div>
                 {editingChar ? (
                   <div className="border rounded-lg p-4">
-                    <h2 className="text-lg font-semibold mb-1">
-                      System Prompt — {editingChar.name}
-                    </h2>
+                    <h2 className="text-lg font-semibold mb-1">System Prompt — {editingChar.name}</h2>
                     <p className="text-xs text-muted-foreground mb-3">
-                      Ce prompt est envoyé au LLM. Les règles de jeu et le contexte RAG
-                      sont ajoutés automatiquement après.
+                      Ce prompt est envoyé au LLM. Les règles de jeu et le contexte RAG sont ajoutés automatiquement après.
                     </p>
                     <Textarea
                       value={editPrompt}
@@ -524,24 +518,10 @@ export default function Admin() {
                       placeholder="Écris le system prompt minimal pour ce personnage..."
                     />
                     <div className="flex items-center justify-between mt-3">
-                      <span className="text-xs text-muted-foreground">
-                        {editPrompt.length} caractères
-                      </span>
+                      <span className="text-xs text-muted-foreground">{editPrompt.length} caractères</span>
                       <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditPrompt(editingChar.system_prompt || "");
-                          }}
-                        >
-                          Annuler
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={saveCharacterPrompt}
-                          disabled={savingChar || editPrompt === (editingChar.system_prompt || "")}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => setEditPrompt(editingChar.system_prompt || "")}>Annuler</Button>
+                        <Button size="sm" onClick={saveCharacterPrompt} disabled={savingChar || editPrompt === (editingChar.system_prompt || "")}>
                           {savingChar ? "Sauvegarde..." : "Sauvegarder"}
                         </Button>
                       </div>
@@ -561,9 +541,7 @@ export default function Admin() {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-lg font-semibold">Réponses au questionnaire</h2>
-                <Button size="sm" variant="outline" onClick={loadSessions}>
-                  Rafraîchir
-                </Button>
+                <Button size="sm" variant="outline" onClick={loadSessions}>Rafraîchir</Button>
               </div>
               <div className="overflow-x-auto border rounded-lg">
                 <table className="w-full text-sm">
@@ -616,12 +594,15 @@ export default function Admin() {
                   </tbody>
                 </table>
                 {sessions.filter((s) => s.questionnaire_responses).length === 0 && (
-                  <p className="p-4 text-muted-foreground text-sm text-center">
-                    Aucune réponse au questionnaire
-                  </p>
+                  <p className="p-4 text-muted-foreground text-sm text-center">Aucune réponse au questionnaire</p>
                 )}
               </div>
             </div>
+          </TabsContent>
+
+          {/* ==================== GAME MASTER ==================== */}
+          <TabsContent value="gamemaster">
+            <GameMasterConfigTab />
           </TabsContent>
 
           {/* ==================== LLM CONFIG ==================== */}
@@ -634,23 +615,19 @@ export default function Admin() {
             <VoiceConfigTab />
           </TabsContent>
 
+          {/* ==================== NOTION SYNC ==================== */}
           <TabsContent value="sync">
             <div className="max-w-2xl">
               <h2 className="text-lg font-semibold mb-2">Sync Notion → DB</h2>
               <p className="text-sm text-muted-foreground mb-4">
-                Synchronise les 4 bases Notion (Characters, Storyworld, Gameplay,
-                Vidéos) vers la base de données et régénère les embeddings.
+                Synchronise les 4 bases Notion (Characters, Storyworld, Gameplay, Vidéos) vers la base de données et régénère les embeddings.
               </p>
               <div className="border rounded-lg p-4 mb-4">
-                <p className="text-xs font-mono text-muted-foreground mb-2">
-                  Databases Notion configurées :
-                </p>
+                <p className="text-xs font-mono text-muted-foreground mb-2">Databases Notion configurées :</p>
                 {Object.entries(AVA_NOTION_DATABASES).map(([k, v]) => (
                   <div key={k} className="text-sm flex justify-between py-1">
                     <span className="font-medium">{k}</span>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {v}
-                    </span>
+                    <span className="font-mono text-xs text-muted-foreground">{v}</span>
                   </div>
                 ))}
               </div>
@@ -658,9 +635,7 @@ export default function Admin() {
                 {syncing ? "Sync en cours... (peut prendre ~60s)" : "Lancer le Sync"}
               </Button>
               {syncResult && (
-                <pre className="mt-4 text-xs bg-muted/30 rounded p-3 overflow-auto max-h-60">
-                  {syncResult}
-                </pre>
+                <pre className="mt-4 text-xs bg-muted/30 rounded p-3 overflow-auto max-h-60">{syncResult}</pre>
               )}
             </div>
           </TabsContent>
