@@ -236,12 +236,27 @@ serve(async (req) => {
 
         console.log(`[sync-notion] Character "${name}": page content length = ${pageContent.length} chars`);
 
+        const { data: existingCharacter } = await supabase
+          .from('characters')
+          .select('id, system_prompt')
+          .eq('notion_id', page.id)
+          .maybeSingle();
+
+        const hasCustomPrompt = !!existingCharacter?.system_prompt?.trim();
+        const preservedSystemPrompt = hasCustomPrompt
+          ? existingCharacter!.system_prompt
+          : resume;
+
+        if (hasCustomPrompt && existingCharacter!.system_prompt !== resume) {
+          console.log(`[sync-notion] Preserving custom system_prompt for "${name}" (${existingCharacter!.system_prompt.length} chars)`);
+        }
+
         const record = {
           notion_id: page.id,
           name,
           backstory: pageContent || resume,
           personality: `${extractSelect(props['Archétype narratif']) || ''} - ${extractSelect(props['Type MBTI']) || ''}`.trim(),
-          system_prompt: resume,
+          system_prompt: preservedSystemPrompt,
           branch: genre === 'Femme' ? 'female' : 'male',
           updated_at: new Date().toISOString(),
         };
