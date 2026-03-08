@@ -1,4 +1,56 @@
 import defaultSettings from "@/config/settings.json";
+import { supabase } from "@/integrations/supabase/client";
+
+// ===== DB Persistence Layer =====
+
+/**
+ * Load a settings object from the admin_settings table.
+ * Falls back to localStorage then defaults.
+ */
+async function loadFromDB<T>(key: string, defaults: T): Promise<T> {
+  try {
+    const { data, error } = await supabase
+      .from("admin_settings" as any)
+      .select("value")
+      .eq("key", key)
+      .maybeSingle();
+    if (!error && data) {
+      const dbValue = (data as any).value as T;
+      // Also sync to localStorage for fast reads
+      localStorage.setItem(key, JSON.stringify(dbValue));
+      return { ...defaults, ...dbValue };
+    }
+  } catch (err) {
+    console.warn(`[Settings] DB load failed for ${key}:`, err);
+  }
+  // Fallback to localStorage
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored) return { ...defaults, ...JSON.parse(stored) };
+  } catch { /* ignore */ }
+  return { ...defaults };
+}
+
+/**
+ * Save a settings object to both localStorage (immediate) and DB (persistent).
+ */
+async function saveToDB<T>(key: string, value: T): Promise<void> {
+  // Immediate localStorage write
+  localStorage.setItem(key, JSON.stringify(value));
+  // Persistent DB write
+  try {
+    const { error } = await supabase
+      .from("admin_settings" as any)
+      .upsert({ key, value, updated_at: new Date().toISOString() } as any, { onConflict: "key" });
+    if (error) {
+      console.error(`[Settings] DB save failed for ${key}:`, error.message);
+    } else {
+      console.log(`[Settings] Saved ${key} to DB`);
+    }
+  } catch (err) {
+    console.error(`[Settings] DB save exception for ${key}:`, err);
+  }
+}
 
 // ===== LLM Settings =====
 
@@ -40,6 +92,7 @@ const llmDefaults: LLMSettings = {
   LLM_MAX_TOKENS_GM: 200,
 };
 
+/** Synchronous read from localStorage (fast, for use during LLM calls) */
 export function getLLMSettings(): LLMSettings {
   try {
     const stored = localStorage.getItem(LLM_STORAGE_KEY);
@@ -48,7 +101,18 @@ export function getLLMSettings(): LLMSettings {
   return { ...llmDefaults };
 }
 
-export function saveLLMSettings(settings: Partial<LLMSettings>): LLMSettings {
+/** Async load from DB (call on admin page load) */
+export async function loadLLMSettingsFromDB(): Promise<LLMSettings> {
+  return loadFromDB(LLM_STORAGE_KEY, llmDefaults);
+}
+
+/** Save to both localStorage and DB */
+export async function saveLLMSettingsToDB(settings: LLMSettings): Promise<void> {
+  await saveToDB(LLM_STORAGE_KEY, settings);
+}
+
+/** Local-only save (for slider dragging without DB write on every move) */
+export function saveLLMSettingsLocal(settings: Partial<LLMSettings>): LLMSettings {
   const current = getLLMSettings();
   const updated = { ...current, ...settings };
   localStorage.setItem(LLM_STORAGE_KEY, JSON.stringify(updated));
@@ -57,7 +121,14 @@ export function saveLLMSettings(settings: Partial<LLMSettings>): LLMSettings {
 
 export function resetLLMSettings(): LLMSettings {
   localStorage.removeItem(LLM_STORAGE_KEY);
+  // Also clear from DB
+  supabase.from("admin_settings" as any).delete().eq("key", LLM_STORAGE_KEY).then(() => {});
   return { ...llmDefaults };
+}
+
+// Keep old name for backward compatibility
+export function saveLLMSettings(settings: Partial<LLMSettings>): LLMSettings {
+  return saveLLMSettingsLocal(settings);
 }
 
 // ===== TTS / Voice Settings =====
@@ -89,7 +160,6 @@ const ttsDefaults: TTSSettings = {
   speed: 1.0,
 };
 
-// Presets for quick tuning
 export const TTS_PRESETS: Record<string, { label: string; description: string; settings: Partial<TTSSettings> }> = {
   natural_conversation: {
     label: "Conversation naturelle",
@@ -118,6 +188,7 @@ export const TTS_PRESETS: Record<string, { label: string; description: string; s
   },
 };
 
+/** Synchronous read from localStorage */
 export function getTTSSettings(): TTSSettings {
   try {
     const stored = localStorage.getItem(TTS_STORAGE_KEY);
@@ -126,7 +197,18 @@ export function getTTSSettings(): TTSSettings {
   return { ...ttsDefaults };
 }
 
-export function saveTTSSettings(settings: Partial<TTSSettings>): TTSSettings {
+/** Async load from DB */
+export async function loadTTSSettingsFromDB(): Promise<TTSSettings> {
+  return loadFromDB(TTS_STORAGE_KEY, ttsDefaults);
+}
+
+/** Save to both localStorage and DB */
+export async function saveTTSSettingsToDB(settings: TTSSettings): Promise<void> {
+  await saveToDB(TTS_STORAGE_KEY, settings);
+}
+
+/** Local-only save */
+export function saveTTSSettingsLocal(settings: Partial<TTSSettings>): TTSSettings {
   const current = getTTSSettings();
   const updated = { ...current, ...settings };
   localStorage.setItem(TTS_STORAGE_KEY, JSON.stringify(updated));
@@ -135,7 +217,13 @@ export function saveTTSSettings(settings: Partial<TTSSettings>): TTSSettings {
 
 export function resetTTSSettings(): TTSSettings {
   localStorage.removeItem(TTS_STORAGE_KEY);
+  supabase.from("admin_settings" as any).delete().eq("key", TTS_STORAGE_KEY).then(() => {});
   return { ...ttsDefaults };
+}
+
+// Keep old name for backward compatibility
+export function saveTTSSettings(settings: Partial<TTSSettings>): TTSSettings {
+  return saveTTSSettingsLocal(settings);
 }
 
 // ===== Gameplay / Experience Settings =====
@@ -168,6 +256,14 @@ export function getGameplaySettings(): GameplaySettings {
   return { ...gameplayDefaults };
 }
 
+export async function loadGameplaySettingsFromDB(): Promise<GameplaySettings> {
+  return loadFromDB(GAMEPLAY_STORAGE_KEY, gameplayDefaults);
+}
+
+export async function saveGameplaySettingsToDB(settings: GameplaySettings): Promise<void> {
+  await saveToDB(GAMEPLAY_STORAGE_KEY, settings);
+}
+
 export function saveGameplaySettings(settings: Partial<GameplaySettings>): GameplaySettings {
   const current = getGameplaySettings();
   const updated = { ...current, ...settings };
@@ -177,6 +273,7 @@ export function saveGameplaySettings(settings: Partial<GameplaySettings>): Gamep
 
 export function resetGameplaySettings(): GameplaySettings {
   localStorage.removeItem(GAMEPLAY_STORAGE_KEY);
+  supabase.from("admin_settings" as any).delete().eq("key", GAMEPLAY_STORAGE_KEY).then(() => {});
   return { ...gameplayDefaults };
 }
 
@@ -237,6 +334,14 @@ export function getGMPromptSettings(): GameMasterPromptSettings {
   return { ...gmPromptDefaults };
 }
 
+export async function loadGMPromptSettingsFromDB(): Promise<GameMasterPromptSettings> {
+  return loadFromDB(GM_PROMPT_STORAGE_KEY, gmPromptDefaults);
+}
+
+export async function saveGMPromptSettingsToDB(settings: GameMasterPromptSettings): Promise<void> {
+  await saveToDB(GM_PROMPT_STORAGE_KEY, settings);
+}
+
 export function saveGMPromptSettings(settings: Partial<GameMasterPromptSettings>): GameMasterPromptSettings {
   const current = getGMPromptSettings();
   const updated = { ...current, ...settings };
@@ -246,5 +351,18 @@ export function saveGMPromptSettings(settings: Partial<GameMasterPromptSettings>
 
 export function resetGMPromptSettings(): GameMasterPromptSettings {
   localStorage.removeItem(GM_PROMPT_STORAGE_KEY);
+  supabase.from("admin_settings" as any).delete().eq("key", GM_PROMPT_STORAGE_KEY).then(() => {});
   return { ...gmPromptDefaults };
+}
+
+// ===== Hydrate all settings from DB on app start =====
+
+export async function hydrateAllSettings(): Promise<void> {
+  await Promise.all([
+    loadLLMSettingsFromDB(),
+    loadTTSSettingsFromDB(),
+    loadGameplaySettingsFromDB(),
+    loadGMPromptSettingsFromDB(),
+  ]);
+  console.log("[Settings] All settings hydrated from DB");
 }

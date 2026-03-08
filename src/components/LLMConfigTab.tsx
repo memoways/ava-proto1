@@ -1,10 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
+import { Save, RotateCcw } from "lucide-react";
 import {
   getLLMSettings,
-  saveLLMSettings,
+  saveLLMSettingsLocal,
+  saveLLMSettingsToDB,
+  loadLLMSettingsFromDB,
   resetLLMSettings,
   OPENROUTER_MODELS,
   type LLMSettings,
@@ -12,29 +15,39 @@ import {
 
 export default function LLMConfigTab() {
   const [settings, setSettings] = useState<LLMSettings>(getLLMSettings());
+  const [savedSettings, setSavedSettings] = useState<LLMSettings>(getLLMSettings());
   const [customModel, setCustomModel] = useState("");
   const [customModelGM, setCustomModelGM] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const s = getLLMSettings();
-    setSettings(s);
-    // If current model isn't in presets, show it in custom field
-    if (!OPENROUTER_MODELS.find((m) => m.id === s.LLM_MODEL)) {
-      setCustomModel(s.LLM_MODEL);
-    }
-    if (!OPENROUTER_MODELS.find((m) => m.id === s.LLM_MODEL_GM)) {
-      setCustomModelGM(s.LLM_MODEL_GM);
-    }
+    loadLLMSettingsFromDB().then((s) => {
+      setSettings(s);
+      setSavedSettings(s);
+      if (!OPENROUTER_MODELS.find((m) => m.id === s.LLM_MODEL)) setCustomModel(s.LLM_MODEL);
+      if (!OPENROUTER_MODELS.find((m) => m.id === s.LLM_MODEL_GM)) setCustomModelGM(s.LLM_MODEL_GM);
+    });
   }, []);
 
-  function update(patch: Partial<LLMSettings>) {
-    const updated = saveLLMSettings(patch);
+  const hasChanges = JSON.stringify(settings) !== JSON.stringify(savedSettings);
+
+  function updateLocal(patch: Partial<LLMSettings>) {
+    const updated = saveLLMSettingsLocal(patch);
     setSettings(updated);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    await saveLLMSettingsToDB(settings);
+    setSavedSettings(settings);
+    toast.success("Réglages LLM sauvegardés ✓");
+    setSaving(false);
   }
 
   function handleReset() {
     const defaults = resetLLMSettings();
     setSettings(defaults);
+    setSavedSettings(defaults);
     setCustomModel("");
     setCustomModelGM("");
     toast.success("Paramètres LLM réinitialisés");
@@ -48,13 +61,25 @@ export default function LLMConfigTab() {
         <div>
           <h2 className="text-lg font-semibold">Configuration LLM</h2>
           <p className="text-sm text-muted-foreground">
-            Modèles OpenRouter, température, tokens — appliqués immédiatement à la prochaine conversation.
+            Modèles OpenRouter, température, tokens — clique "Sauvegarder" pour persister les changements.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleReset}>
-          Réinitialiser
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleReset}>
+            <RotateCcw className="w-3 h-3 mr-1" /> Réinitialiser
+          </Button>
+          <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges}
+            className={hasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
+            <Save className="w-3 h-3 mr-1" /> {saving ? "Sauvegarde..." : "Sauvegarder"}
+          </Button>
+        </div>
       </div>
+
+      {hasChanges && (
+        <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg px-4 py-2 text-sm text-yellow-300">
+          ⚠️ Modifications non sauvegardées — clique "Sauvegarder" pour persister en base de données.
+        </div>
+      )}
 
       {/* ===== MAX AGENT MODEL ===== */}
       <section className="border rounded-lg p-4 space-y-4">
@@ -67,9 +92,8 @@ export default function LLMConfigTab() {
               <button
                 key={m.id}
                 onClick={() => {
-                  update({ LLM_MODEL: m.id });
+                  updateLocal({ LLM_MODEL: m.id });
                   setCustomModel("");
-                  toast.success(`Max → ${m.label}`);
                 }}
                 className={`text-left p-3 border rounded-lg transition-colors ${
                   settings.LLM_MODEL === m.id
@@ -89,7 +113,6 @@ export default function LLMConfigTab() {
             ))}
           </div>
 
-          {/* Custom model input */}
           <div className="mt-3 flex gap-2">
             <input
               type="text"
@@ -102,31 +125,22 @@ export default function LLMConfigTab() {
               size="sm"
               variant="outline"
               disabled={!customModel.trim()}
-              onClick={() => {
-                update({ LLM_MODEL: customModel.trim() });
-                toast.success(`Max → ${customModel.trim()}`);
-              }}
+              onClick={() => updateLocal({ LLM_MODEL: customModel.trim() })}
             >
               Appliquer
             </Button>
           </div>
         </div>
 
-        {/* Temperature */}
         <div>
           <div className="flex justify-between mb-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              Température
-            </label>
+            <label className="text-sm font-medium text-muted-foreground">Température</label>
             <span className="text-sm font-mono">{settings.LLM_TEMPERATURE.toFixed(2)}</span>
           </div>
           <Slider
             value={[settings.LLM_TEMPERATURE]}
-            onValueChange={([v]) => update({ LLM_TEMPERATURE: v })}
-            min={0}
-            max={2}
-            step={0.05}
-            className="w-full"
+            onValueChange={([v]) => updateLocal({ LLM_TEMPERATURE: v })}
+            min={0} max={2} step={0.05}
           />
           <div className="flex justify-between text-xs text-muted-foreground mt-1">
             <span>0 — Déterministe</span>
@@ -134,7 +148,6 @@ export default function LLMConfigTab() {
           </div>
         </div>
 
-        {/* Max Tokens */}
         <div>
           <div className="flex justify-between mb-1">
             <label className="text-sm font-medium text-muted-foreground">Max Tokens</label>
@@ -142,11 +155,8 @@ export default function LLMConfigTab() {
           </div>
           <Slider
             value={[settings.LLM_MAX_TOKENS]}
-            onValueChange={([v]) => update({ LLM_MAX_TOKENS: v })}
-            min={50}
-            max={2000}
-            step={50}
-            className="w-full"
+            onValueChange={([v]) => updateLocal({ LLM_MAX_TOKENS: v })}
+            min={50} max={2000} step={50}
           />
           <div className="flex justify-between text-xs text-muted-foreground mt-1">
             <span>50 — Très court</span>
@@ -154,7 +164,6 @@ export default function LLMConfigTab() {
           </div>
         </div>
 
-        {/* Top P */}
         <div>
           <div className="flex justify-between mb-1">
             <label className="text-sm font-medium text-muted-foreground">Top P</label>
@@ -162,11 +171,8 @@ export default function LLMConfigTab() {
           </div>
           <Slider
             value={[settings.LLM_TOP_P]}
-            onValueChange={([v]) => update({ LLM_TOP_P: v })}
-            min={0}
-            max={1}
-            step={0.05}
-            className="w-full"
+            onValueChange={([v]) => updateLocal({ LLM_TOP_P: v })}
+            min={0} max={1} step={0.05}
           />
           <div className="flex justify-between text-xs text-muted-foreground mt-1">
             <span>0 — Restrictif</span>
@@ -189,9 +195,8 @@ export default function LLMConfigTab() {
               <button
                 key={m.id}
                 onClick={() => {
-                  update({ LLM_MODEL_GM: m.id });
+                  updateLocal({ LLM_MODEL_GM: m.id });
                   setCustomModelGM("");
-                  toast.success(`Game Master → ${m.label}`);
                 }}
                 className={`text-left p-3 border rounded-lg transition-colors ${
                   settings.LLM_MODEL_GM === m.id
@@ -222,17 +227,13 @@ export default function LLMConfigTab() {
               size="sm"
               variant="outline"
               disabled={!customModelGM.trim()}
-              onClick={() => {
-                update({ LLM_MODEL_GM: customModelGM.trim() });
-                toast.success(`Game Master → ${customModelGM.trim()}`);
-              }}
+              onClick={() => updateLocal({ LLM_MODEL_GM: customModelGM.trim() })}
             >
               Appliquer
             </Button>
           </div>
         </div>
 
-        {/* GM Temperature */}
         <div>
           <div className="flex justify-between mb-1">
             <label className="text-sm font-medium text-muted-foreground">Température</label>
@@ -240,11 +241,8 @@ export default function LLMConfigTab() {
           </div>
           <Slider
             value={[settings.LLM_TEMPERATURE_GM]}
-            onValueChange={([v]) => update({ LLM_TEMPERATURE_GM: v })}
-            min={0}
-            max={1}
-            step={0.05}
-            className="w-full"
+            onValueChange={([v]) => updateLocal({ LLM_TEMPERATURE_GM: v })}
+            min={0} max={1} step={0.05}
           />
           <div className="flex justify-between text-xs text-muted-foreground mt-1">
             <span>0 — Strict (JSON fiable)</span>
@@ -252,7 +250,6 @@ export default function LLMConfigTab() {
           </div>
         </div>
 
-        {/* GM Max Tokens */}
         <div>
           <div className="flex justify-between mb-1">
             <label className="text-sm font-medium text-muted-foreground">Max Tokens</label>
@@ -260,11 +257,8 @@ export default function LLMConfigTab() {
           </div>
           <Slider
             value={[settings.LLM_MAX_TOKENS_GM]}
-            onValueChange={([v]) => update({ LLM_MAX_TOKENS_GM: v })}
-            min={50}
-            max={500}
-            step={25}
-            className="w-full"
+            onValueChange={([v]) => updateLocal({ LLM_MAX_TOKENS_GM: v })}
+            min={50} max={500} step={25}
           />
         </div>
       </section>
