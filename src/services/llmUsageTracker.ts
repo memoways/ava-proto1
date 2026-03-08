@@ -96,18 +96,29 @@ export async function fetchGenerationCost(generationId: string): Promise<{
   total_tokens: number;
 } | null> {
   try {
+    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
     const res = await fetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_KEY,
+        "Authorization": `Bearer ${SUPABASE_KEY}`,
+      },
       body: JSON.stringify({
         _action: "get_generation_cost",
         generation_id: generationId,
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[LLM Tracker] Cost fetch failed [${res.status}]:`, errText);
+      return null;
+    }
     const data = await res.json();
+    console.log(`[LLM Tracker] Cost data for ${generationId}:`, data);
     return data;
-  } catch {
+  } catch (err) {
+    console.error("[LLM Tracker] Cost fetch exception:", err);
     return null;
   }
 }
