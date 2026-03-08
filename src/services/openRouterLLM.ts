@@ -1,4 +1,5 @@
 import { trackLLMCall } from "./llmUsageTracker";
+import { debugLogger } from "./debugLogger";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -32,6 +33,13 @@ export async function streamLLM(
   const model = options?.model || "qwen/qwen-2.5-72b-instruct";
   const featureKey = options?.feature_key || "chat";
 
+  const startTime = Date.now();
+  const debugId = debugLogger.logFetch("llm", `Stream ${model}`, `${SUPABASE_URL}/functions/v1/proxy-llm`, {
+    model, temperature: options?.temperature, max_tokens: options?.max_tokens, messages_count: messages.length,
+    first_system: messages[0]?.content?.slice(0, 100) + "…",
+    last_user: messages[messages.length - 1]?.content?.slice(0, 200),
+  });
+
   const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -47,6 +55,7 @@ export async function streamLLM(
 
   if (!response.ok) {
     const err = await response.text();
+    debugLogger.logResponse(debugId, "llm", `Stream ${model}`, response.status, startTime, err);
     // Track error
     trackLLMCall({
       session_id: options?.session_id,
@@ -57,6 +66,8 @@ export async function streamLLM(
     });
     throw new Error(`LLM error: ${response.status} - ${err}`);
   }
+
+  debugLogger.log({ service: "llm", level: "info", direction: "in", label: `Stream started (${model})`, durationMs: Date.now() - startTime });
 
   const reader = response.body?.getReader();
   if (!reader) throw new Error('No response body');
@@ -85,6 +96,7 @@ export async function streamLLM(
       const jsonStr = line.slice(6).trim();
       if (jsonStr === '[DONE]') {
         onChunk(fullText, true);
+        debugLogger.log({ service: "llm", level: "success", direction: "in", label: `Stream complete (${model})`, durationMs: Date.now() - startTime, payload: `${fullText.length} chars, ${usageData?.total_tokens || "?"} tokens` });
         // Track usage after stream completes
         trackLLMCall({
           session_id: options?.session_id,
