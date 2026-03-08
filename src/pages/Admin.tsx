@@ -471,7 +471,7 @@ export default function Admin() {
 
               {syncReport && !syncReport.error && (
                 <div className="mt-6 space-y-4">
-                  <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 font-medium">
+                  <div className="flex items-center gap-2 text-sm font-medium text-primary">
                     ✅ Sync terminé le {new Date(syncReport.synced_at).toLocaleString("fr-FR")}
                   </div>
 
