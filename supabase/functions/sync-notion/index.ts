@@ -96,8 +96,34 @@ serve(async (req) => {
       return pages;
     }
 
-    // Fetch page body content (blocks) as plain text
-    async function fetchPageContent(pageId: string): Promise<string> {
+    // Extract text from a single Notion block
+    function extractBlockText(block: any): string {
+      const type = block.type;
+      const blockData = block[type];
+      if (!blockData) return '';
+
+      // Handle rich_text based blocks
+      if (blockData.rich_text) {
+        const text = blockData.rich_text.map((t: any) => t.plain_text).join('');
+        // Add heading markers for structure
+        if (type.startsWith('heading_')) return `\n## ${text}`;
+        if (type === 'bulleted_list_item' || type === 'numbered_list_item') return `- ${text}`;
+        if (type === 'to_do') return `- [${blockData.checked ? 'x' : ' '}] ${text}`;
+        if (type === 'quote') return `> ${text}`;
+        if (type === 'callout') return `📌 ${text}`;
+        if (type === 'toggle') return `${text}`;
+        return text;
+      }
+
+      // Handle divider
+      if (type === 'divider') return '---';
+
+      return '';
+    }
+
+    // Fetch page body content RECURSIVELY (handles toggles, nested blocks, etc.)
+    async function fetchPageContent(pageId: string, depth = 0): Promise<string> {
+      if (depth > 5) return ''; // safety limit
       const blocks: string[] = [];
       let cursor: string | undefined;
       do {
@@ -111,10 +137,13 @@ serve(async (req) => {
         if (!res.ok) break;
         const data = await res.json();
         for (const block of data.results) {
-          const richTexts = block[block.type]?.rich_text;
-          if (richTexts) {
-            const text = richTexts.map((t: any) => t.plain_text).join('');
-            if (text.trim()) blocks.push(text);
+          const text = extractBlockText(block);
+          if (text.trim()) blocks.push(text);
+
+          // Recursively fetch children if block has them
+          if (block.has_children) {
+            const childContent = await fetchPageContent(block.id, depth + 1);
+            if (childContent.trim()) blocks.push(childContent);
           }
         }
         cursor = data.has_more ? data.next_cursor : undefined;
@@ -124,13 +153,15 @@ serve(async (req) => {
 
     // Generate embedding via OpenAI
     async function generateEmbedding(text: string): Promise<number[]> {
+      // Truncate to ~8000 tokens (~32000 chars) to stay within model limits
+      const truncated = text.slice(0, 32000);
       const res = await fetch(`${OPENAI_API_URL}/embeddings`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ model: 'text-embedding-3-small', input: text }),
+        body: JSON.stringify({ model: 'text-embedding-3-small', input: truncated }),
       });
       if (!res.ok) {
         const err = await res.text();
@@ -161,9 +192,26 @@ serve(async (req) => {
       }
     }
 
+    // For long character pages, split into chunks for better RAG retrieval
+    function chunkText(text: string, maxChunkSize = 1500): string[] {
+      const sections = text.split(/\n## /);
+      const chunks: string[] = [];
+      let currentChunk = '';
+
+      for (const section of sections) {
+        const sectionText = chunks.length === 0 && !text.startsWith('\n## ') ? section : `## ${section}`;
+        if (currentChunk.length + sectionText.length > maxChunkSize && currentChunk.length > 0) {
+          chunks.push(currentChunk.trim());
+          currentChunk = sectionText;
+        } else {
+          currentChunk += (currentChunk ? '\n' : '') + sectionText;
+        }
+      }
+      if (currentChunk.trim()) chunks.push(currentChunk.trim());
+      return chunks;
+    }
+
     // ========== SYNC CHARACTERS ==========
-    // Notion props: "Nom du caractère" (title), "Résumé" (text), "Genre" (select), "Rôle familial" (select), "Archétype narratif" (select)
-    // Page body contains detailed backstory, personality, system prompt
     if (body.databases.characters) {
       console.log('[sync-notion] Syncing characters...');
       const pages = await fetchNotionDatabase(body.databases.characters);
@@ -174,10 +222,12 @@ serve(async (req) => {
         const name = extractTitle(props['Nom du caractère']);
         if (!name) continue;
 
-        // Fetch page body for rich content (backstory, personality, etc.)
+        // Fetch page body RECURSIVELY for rich content
         const pageContent = await fetchPageContent(page.id);
         const resume = extractRichText(props['Résumé']);
         const genre = extractSelect(props['Genre']);
+
+        console.log(`[sync-notion] Character "${name}": page content length = ${pageContent.length} chars`);
 
         const record = {
           notion_id: page.id,
@@ -200,15 +250,40 @@ serve(async (req) => {
           continue;
         }
 
-        const embeddingText = `Personnage: ${name}\nRésumé: ${resume}\n${pageContent}`;
-        await upsertEmbedding('characters', data.id, embeddingText);
+        // Create chunked embeddings for long character pages
+        const fullText = `Personnage: ${name}\nRésumé: ${resume}\n${pageContent}`;
+        const chunks = chunkText(fullText);
+
+        if (chunks.length <= 1) {
+          // Single embedding for short content
+          await upsertEmbedding('characters', data.id, fullText);
+        } else {
+          // Multiple chunked embeddings for better retrieval
+          console.log(`[sync-notion] Character "${name}": splitting into ${chunks.length} chunks`);
+          // Delete old embedding(s) for this character
+          await supabase.from('embeddings')
+            .delete()
+            .eq('source_table', 'characters')
+            .eq('source_id', data.id);
+
+          for (let i = 0; i < chunks.length; i++) {
+            const chunkContent = `[${name} - partie ${i + 1}/${chunks.length}]\n${chunks[i]}`;
+            const embedding = await generateEmbedding(chunkContent);
+            await supabase.from('embeddings')
+              .insert({
+                source_table: 'characters',
+                source_id: data.id,
+                content: chunkContent,
+                embedding: JSON.stringify(embedding),
+              });
+          }
+        }
         synced++;
       }
       results.characters = { synced, total: pages.length };
     }
 
     // ========== SYNC STORYWORLD ==========
-    // Notion props: "Nom" (title), "Résumé" (text), "Type" (select), "Tags" (multi_select)
     if (body.databases.storyworld) {
       console.log('[sync-notion] Syncing storyworld...');
       const pages = await fetchNotionDatabase(body.databases.storyworld);
@@ -247,7 +322,6 @@ serve(async (req) => {
     }
 
     // ========== SYNC GAMEPLAY STEPS ==========
-    // Notion props: "Nom de l'étape" (title), "Type" (select), "Ordre" (number), "Condition de déclenchement" (text), "Description" (text)
     if (body.databases.gameplay_steps) {
       console.log('[sync-notion] Syncing gameplay_steps...');
       const pages = await fetchNotionDatabase(body.databases.gameplay_steps);
@@ -282,9 +356,6 @@ serve(async (req) => {
     }
 
     // ========== SYNC VIDEO TRIGGERS ==========
-    // Notion props: "Titre de la vidéo" (title), "Type" (select), "Thèmes" (multi_select),
-    //   "URL Gumlet" (url), "Description" (text), "Priorité" (number),
-    //   "Style de transition" (select), "Contexte post-vidéo" (text)
     if (body.databases.video_triggers) {
       console.log('[sync-notion] Syncing video_triggers...');
       const pages = await fetchNotionDatabase(body.databases.video_triggers);
