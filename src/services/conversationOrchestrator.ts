@@ -1,5 +1,6 @@
 import { callMaxAgent, type MaxAgentInput } from "@/agents/maxAgent";
 import { callGameMaster, type GameMasterInput } from "@/agents/gameMasterAgent";
+import { getRAGContext } from "@/services/ragService";
 import type { ConversationMessage, GameMasterResponse, VideoTrigger } from "@/types";
 
 // Demo triggers for the prototype
@@ -60,11 +61,25 @@ export async function processConversationTurn(
   ragContext?: string,
   postVideoContext?: string
 ): Promise<ConversationTurnResult> {
+  // Fetch RAG context if not provided
+  let finalRagContext = ragContext;
+  if (!finalRagContext) {
+    try {
+      const recentMessages = conversationHistory.slice(-4).map(m => m.content).join(' ');
+      finalRagContext = await getRAGContext(userMessage, recentMessages);
+      if (finalRagContext) {
+        console.log('[RAG] Context found, injecting into prompt');
+      }
+    } catch (err) {
+      console.error('[RAG] Failed to fetch context:', err);
+    }
+  }
+
   // Prepare inputs
   const maxInput: MaxAgentInput = {
     conversationHistory,
     userMessage,
-    ragContext,
+    ragContext: finalRagContext || undefined,
     postVideoContext,
   };
 
