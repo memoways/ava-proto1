@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-03-08 (session 2)  
+> **Last Updated**: 2026-03-08 (session 3)  
 
 ---
 
@@ -54,9 +54,9 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 |------|------|
 | Lovable | Frontend React + déploiement + vibe coding |
 | Lovable Cloud (Supabase) | Backend, BDD, Edge Functions, pgvector |
-| OpenRouter (Qwen) | LLM pour Max et Game Master |
+| OpenRouter (Multi-modèles) | LLM pour Max et Game Master (Qwen, Claude, Grok, Llama, Gemini) |
 | Deepgram | STT streaming avec VAD |
-| ElevenLabs | TTS voix custom de Max |
+| ElevenLabs | TTS voix custom de Max (paramètres ajustables) |
 | OpenAI | Embeddings text-embedding-3-small (1536 dim) |
 | Notion | Source de vérité éditoriale (contenus, personnages, règles) |
 
@@ -304,6 +304,56 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ---
 
+### 2026-03-08 — Config LLM dynamique + Multi-modèles 🔷
+
+**Intent**: Permettre de changer le modèle LLM de Max et du Game Master depuis l'admin, et tester différents modèles (Qwen, Claude, Grok, Llama, Gemini).
+
+**Tool**: Lovable
+
+**Outcome**:
+- `settingsService.ts` : ajout `OPENROUTER_MODELS` avec 8 modèles (Qwen 72B, Claude Sonnet 4, Claude Haiku 3.5, Llama 4 Scout, Gemini 2.5 Flash, Grok 3 Mini, Grok 3, Grok 2)
+- Onglet **LLM Config** dans `/admin` : sélection modèle Max et Game Master indépendamment, réglage température/tokens/top_p
+- Les réglages sont persistés en localStorage et appliqués au runtime
+
+**Time**: ~20min
+
+---
+
+### 2026-03-08 — Config voix ElevenLabs 🔷
+
+**Intent**: Permettre d'ajuster finement la voix de Max (diction, stabilité, vitesse) depuis l'admin pour améliorer la qualité vocale.
+
+**Tool**: Lovable
+
+**Outcome**:
+- `VoiceConfigTab.tsx` : panneau complet avec sliders (stability 0-1, similarity_boost 0-1, style 0-1, speed 0.7-1.2) + toggle speaker_boost
+- 5 presets rapides : Défaut, Claire et articulé (speed 0.92), Calme et mesuré (speed 0.85), Expressif (style 0.8), Rapide et naturel (speed 1.1)
+- Bouton **Tester la voix** : génère un sample audio avec les réglages courants
+- `elevenLabsTTS.ts` : récupère dynamiquement les voice_settings depuis settingsService
+- `proxy-tts/index.ts` : accepte et transmet les `voice_settings` complets à l'API ElevenLabs
+
+**Time**: ~25min
+
+---
+
+### 2026-03-08 — HUD conversationnel + Info modale + Questionnaire anticipé 🔷
+
+**Intent**: Améliorer l'UX de l'écran de conversation : regrouper les indicateurs, expliquer le projet, permettre l'accès au questionnaire plus tôt.
+
+**Tool**: Lovable
+
+**Outcome**:
+- **Cartouche HUD** en haut à gauche : timer + jauge de confiance regroupés dans un conteneur sobre avec séparateur vertical
+- **Tooltip hover** sur la cartouche : explication du timer (10 min) et de la mécanique de confiance (sincérité → jauge monte → déblocage narratif)
+- **Bouton info (i)** déplacé en haut à droite, plus grand et visible (h-9 w-9), ouvre une modale détaillée
+- **Modale info** : concept, pipeline technique (STT→LLM→TTS + Game Master), objectifs du prototype, limitations connues, explication des indicateurs en jeu
+- **Questionnaire anticipé** : bouton discret en bas à droite après 4 minutes (`EARLY_QUESTIONNAIRE_DELAY = 240`)
+- Jauge de confiance avec barre de progression colorée (gris → trust → primary selon le niveau)
+
+**Time**: ~20min
+
+---
+
 ## Pivots & Breakages
 
 *Aucun pivot majeur pour le moment — le PRD est clair et le développement suit le plan.*
@@ -324,6 +374,8 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 - **2026-03-08**: Le fetch du contenu de page (blocks API) pour les characters est essentiel — les propriétés Notion ne contiennent qu'un résumé, le backstory détaillé est dans le body de la page.
 - **2026-03-08**: Le micro persistant (pause/resume) est bien plus fluide que stop/start — évite la latence de reconnexion WebSocket et la re-demande de permission micro à chaque tour.
 - **2026-03-08**: Le system prompt de Max doit être éditable depuis /admin, pas hardcodé — permet d'itérer rapidement sur le comportement du personnage sans toucher au code.
+- **2026-03-08**: La diction ElevenLabs en français dépend fortement des paramètres stability et speed — le preset "Claire et articulé" (stability 0.6, speed 0.92) donne de bien meilleurs résultats que les défauts.
+- **2026-03-08**: Multi-modèles via OpenRouter est crucial pour le prototypage — pouvoir switcher entre Qwen, Claude, Grok sans changer de code permet de trouver le meilleur modèle pour le roleplay en français.
 
 ---
 
@@ -343,6 +395,7 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 - Le moment où Max parle pour la première fois avec sa voix ElevenLabs — la magie du voice-to-voice
 - Construire un pipeline STT→LLM→TTS complet en un weekend avec du vibe coding
 - Le RAG qui retourne "Décision du grand-père (secret de Max)" quand on demande la relation Max/Ava — la narration émerge des données
+- Pouvoir switcher entre Grok et Claude pour le même personnage et sentir la différence de "personnalité" — chaque LLM a son propre style de roleplay
 
 ---
 
@@ -350,12 +403,11 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 | Date | Description | Impact | Plan de fix |
 |------|-------------|--------|-------------|
-| 2026-03-08 | ~~Sauvegarde session pas implémentée~~ | ~~Moyen~~ | ✅ Fait |
-| 2026-03-08 | Chunking TTS par phrase pas implémenté (envoie tout le texte d'un coup) | Bas | Optimisation future |
 | 2026-03-08 | Video triggers hardcodés (DEMO_TRIGGERS) au lieu de dynamiques depuis DB | Moyen | Prochaine étape |
 | 2026-03-08 | Gameplay steps vide dans Notion (0 étapes) | Moyen | Remplir dans Notion |
 | 2026-03-08 | 1 video trigger sans titre dans Notion → ignoré au sync | Bas | Corriger dans Notion |
-| 2026-03-08 | Pas de test end-to-end du pipeline voice-to-voice complet | Haut | Prochaine session |
+| 2026-03-08 | Pas de test end-to-end du pipeline voice-to-voice complet avec testeurs externes | Haut | Prochaine session |
+| 2026-03-08 | Diction ElevenLabs parfois bizarre en français — nécessite fine-tuning des paramètres voix | Moyen | Tester presets dans /admin > Voix |
 
 ---
 

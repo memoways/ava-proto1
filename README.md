@@ -17,7 +17,7 @@ Expérience narrative interactive voice-to-voice avec Max, un personnage fictif 
 
 ## 🎯 Objectif projet
 
-Valider le pipeline technique complet d'une conversation voice-to-voice avec un personnage IA : STT (Deepgram) → LLM (OpenRouter/Qwen) → TTS (ElevenLabs), orchestré par un Game Master autonome qui gère la confiance, les triggers vidéo et le game over, enrichi par un pipeline RAG connecté à Notion.
+Valider le pipeline technique complet d'une conversation voice-to-voice avec un personnage IA : STT (Deepgram) → LLM (OpenRouter/multi-modèles) → TTS (ElevenLabs), orchestré par un Game Master autonome qui gère la confiance, les triggers vidéo et le game over, enrichi par un pipeline RAG connecté à Notion.
 
 ## ✅ Livrables
 
@@ -36,7 +36,12 @@ Valider le pipeline technique complet d'une conversation voice-to-voice avec un 
 - [x] Micro persistant continu (pause/resume sans reconnexion)
 - [x] Sync questionnaire → Notion
 - [x] Dashboard admin (sessions, questionnaires, édition system prompt)
-- [ ] Chunking TTS par phrase
+- [x] Pipeline TTS par phrase (sentence-level streaming)
+- [x] Config LLM dynamique (multi-modèles : Qwen, Claude, Grok, Llama, Gemini)
+- [x] Config voix ElevenLabs (stability, similarity, style, speed, presets)
+- [x] HUD conversationnel (timer + jauge confiance + tooltips explicatifs)
+- [x] Accès questionnaire anticipé (après 4 min)
+- [x] Modal info projet (détail concept, pipeline, objectifs)
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
 
 ## 🛠️ Stack technique
@@ -46,9 +51,9 @@ Valider le pipeline technique complet d'une conversation voice-to-voice avec un 
 | Frontend | React + Vite + Tailwind + TypeScript (Lovable) |
 | Backend | Lovable Cloud (Supabase Postgres + pgvector) |
 | Edge Functions | proxy-llm, proxy-stt, proxy-tts, sync-notion, query-rag, sync-questionnaire |
-| LLM | OpenRouter API — Qwen 2.5 72B Instruct |
+| LLM | OpenRouter API — Multi-modèles (Qwen, Claude, Grok, Llama, Gemini) |
 | STT | Deepgram (WebSocket streaming + VAD) |
-| TTS | ElevenLabs (voix custom Max) |
+| TTS | ElevenLabs (voix custom Max, paramètres ajustables) |
 | Embeddings | OpenAI text-embedding-3-small (1536 dim) |
 | Données | Notion (source de vérité) → Supabase (miroir + embeddings) |
 | RAG | query-rag Edge Function + match_embeddings SQL |
@@ -84,10 +89,10 @@ Ou directement via [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_I
 │   ├── components/         # Écrans UI (Onboarding, Conversation, GameOver, etc.)
 │   ├── config/             # settings.json (variables configurables)
 │   ├── hooks/              # useGameState, useTimer
-│   ├── services/           # deepgramSTT, elevenLabsTTS, openRouterLLM, orchestrator, ragService
+│   ├── services/           # deepgramSTT, elevenLabsTTS, openRouterLLM, orchestrator, ragService, settingsService
 │   └── types/              # Types TypeScript partagés
 ├── public/assets/          # Background images
-├── supabase/functions/     # Edge Functions (proxy-llm, proxy-stt, proxy-tts, sync-notion, query-rag)
+├── supabase/functions/     # Edge Functions (proxy-llm, proxy-stt, proxy-tts, sync-notion, query-rag, sync-questionnaire)
 ├── CHANGELOG.md            # Historique versionné
 ├── STORY.md                # Journal de développement
 └── README.md               # Ce fichier
@@ -100,6 +105,7 @@ Ou directement via [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_I
 - Pas d'authentification — session locale
 - Vidéos en mode placeholder (écran noir + texte)
 - Sync Notion : 4 characters + 38 storyworld synchronisés, 42 embeddings générés
+- **Admin** : `/admin` pour gérer sessions, prompts, config LLM et voix
 
 ---
 
