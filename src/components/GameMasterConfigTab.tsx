@@ -4,12 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
+import { Save, RotateCcw } from "lucide-react";
 import {
   getGMPromptSettings,
   saveGMPromptSettings,
+  saveGMPromptSettingsToDB,
+  loadGMPromptSettingsFromDB,
   resetGMPromptSettings,
   getGameplaySettings,
   saveGameplaySettings,
+  saveGameplaySettingsToDB,
+  loadGameplaySettingsFromDB,
   resetGameplaySettings,
   type GameMasterPromptSettings,
   type GameplaySettings,
@@ -18,24 +23,38 @@ import {
 export default function GameMasterConfigTab() {
   const [gmPrompt, setGmPrompt] = useState<GameMasterPromptSettings>(getGMPromptSettings());
   const [gameplay, setGameplay] = useState<GameplaySettings>(getGameplaySettings());
+  const [savedGameplay, setSavedGameplay] = useState<GameplaySettings>(getGameplaySettings());
   const [editPrompt, setEditPrompt] = useState(gmPrompt.systemPrompt);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const gm = getGMPromptSettings();
-    const gp = getGameplaySettings();
-    setGmPrompt(gm);
-    setGameplay(gp);
-    setEditPrompt(gm.systemPrompt);
+    Promise.all([loadGMPromptSettingsFromDB(), loadGameplaySettingsFromDB()]).then(([gm, gp]) => {
+      setGmPrompt(gm);
+      setGameplay(gp);
+      setSavedGameplay(gp);
+      setEditPrompt(gm.systemPrompt);
+    });
   }, []);
+
+  const hasGameplayChanges = JSON.stringify(gameplay) !== JSON.stringify(savedGameplay);
 
   function updateGameplay(patch: Partial<GameplaySettings>) {
     const updated = saveGameplaySettings(patch);
     setGameplay(updated);
   }
 
-  function savePrompt() {
+  async function handleSaveGameplay() {
+    setSaving(true);
+    await saveGameplaySettingsToDB(gameplay);
+    setSavedGameplay(gameplay);
+    toast.success("Réglages de jeu sauvegardés ✓");
+    setSaving(false);
+  }
+
+  async function savePrompt() {
     const updated = saveGMPromptSettings({ systemPrompt: editPrompt });
     setGmPrompt(updated);
+    await saveGMPromptSettingsToDB(updated);
     toast.success("Prompt Game Master sauvegardé ✓");
   }
 
@@ -44,6 +63,7 @@ export default function GameMasterConfigTab() {
     const gp = resetGameplaySettings();
     setGmPrompt(gm);
     setGameplay(gp);
+    setSavedGameplay(gp);
     setEditPrompt(gm.systemPrompt);
     toast.success("Mécanique réinitialisée aux valeurs par défaut");
   }
@@ -64,12 +84,28 @@ export default function GameMasterConfigTab() {
 
       {/* ===== GAMEPLAY SETTINGS ===== */}
       <section className="border rounded-lg p-4 space-y-5">
-        <div>
-          <h3 className="font-semibold text-base mb-1">⚙️ Réglages de jeu</h3>
-          <p className="text-xs text-muted-foreground">
-            Ces paramètres contrôlent la progression et les conditions de victoire/défaite.
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-base mb-1">⚙️ Réglages de jeu</h3>
+            <p className="text-xs text-muted-foreground">
+              Ces paramètres contrôlent la progression et les conditions de victoire/défaite.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleSaveGameplay}
+            disabled={saving || !hasGameplayChanges}
+            className={hasGameplayChanges ? "bg-green-600 hover:bg-green-700" : ""}
+          >
+            <Save className="w-3 h-3 mr-1" /> {saving ? "Sauvegarde..." : "Sauvegarder"}
+          </Button>
         </div>
+
+        {hasGameplayChanges && (
+          <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg px-4 py-2 text-sm text-yellow-300">
+            ⚠️ Modifications non sauvegardées — clique "Sauvegarder" pour persister en base de données.
+          </div>
+        )}
 
         {/* Trust Threshold */}
         <div>
