@@ -103,3 +103,36 @@ export async function saveQuestionnaire(
     console.log("[Session] Questionnaire saved");
   }
 }
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
+/** Sync questionnaire responses to Notion */
+export async function syncQuestionnaireToNotion(
+  sessionId: string,
+  questionnaire: QuestionnaireData,
+  trustLevel: number,
+  durationSeconds: number,
+  gameOverReason: string | null
+): Promise<void> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-questionnaire`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId,
+        questionnaire,
+        trustLevel,
+        durationSeconds,
+        gameOverReason,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("[Notion] Questionnaire sync failed:", err);
+    } else {
+      console.log("[Notion] Questionnaire synced successfully");
+    }
+  } catch (err) {
+    console.error("[Notion] Questionnaire sync error:", err);
+  }
+}
