@@ -10,6 +10,8 @@ import { clearSystemPromptCache } from "@/agents/maxAgent";
 import LLMConfigTab from "@/components/LLMConfigTab";
 import VoiceConfigTab from "@/components/VoiceConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
+import SessionsTab, { type SessionRow } from "@/components/admin/SessionsTab";
+import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
