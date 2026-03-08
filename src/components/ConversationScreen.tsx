@@ -13,6 +13,7 @@ interface ConversationScreenProps {
   maxSubtitle: string;
   onMicToggle: () => void;
   micActive: boolean;
+  micEverStarted: boolean;
   elapsedSeconds: number;
   onEarlyQuestionnaire?: () => void;
 }
@@ -36,6 +37,7 @@ const ConversationScreen = ({
   maxSubtitle,
   onMicToggle,
   micActive,
+  micEverStarted,
   elapsedSeconds,
   onEarlyQuestionnaire,
 }: ConversationScreenProps) => {
@@ -127,8 +129,8 @@ const ConversationScreen = ({
           )}
         </p>
 
-        {/* Mic hint */}
-        {audioState === "idle" && !micActive && (
+        {/* Mic hint — only show if mic was NEVER activated */}
+        {!micEverStarted && !micActive && (
           <p className="text-xs text-muted-foreground/60 animate-fade-in">
             Cliquez sur le micro pour parler à Max
           </p>

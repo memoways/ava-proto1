@@ -48,6 +48,7 @@ const perf = (label: string) => {
 const Index = () => {
   const { state, setPhase, setAudioState, addMessage, updateTrust, triggerVideo, endTrigger, gameOver, reset } = useGameState();
   const [micActive, setMicActive] = useState(false);
+  const [micEverStarted, setMicEverStarted] = useState(false);
   const [userSubtitle, setUserSubtitle] = useState("");
   const [maxSubtitle, setMaxSubtitle] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -93,6 +94,7 @@ const Index = () => {
   const startMicPersistent = useCallback(async () => {
     if (sttRef.current) return;
     setMicActive(true);
+    setMicEverStarted(true);
     setAudioState("user_speaking");
     micStartedRef.current = true;
 
@@ -138,7 +140,11 @@ const Index = () => {
 
   // ---- Optimized conversation pipeline with sentence-level TTS ----
   const processUserMessage = useCallback(async (userText: string) => {
-    if (isProcessing || !userText.trim()) return;
+    console.log(`[processUserMessage] Called with: "${userText.slice(0, 50)}", isProcessing=${isProcessing}`);
+    if (isProcessing || !userText.trim()) {
+      console.log(`[processUserMessage] BLOCKED — isProcessing=${isProcessing}, empty=${!userText.trim()}`);
+      return;
+    }
 
     const turnPerf = perf("Total turn");
     setIsProcessing(true);
@@ -158,6 +164,7 @@ const Index = () => {
     const llmFirstChunkPerf = perf("LLM first chunk");
 
     try {
+      console.log("[processUserMessage] Starting LLM call...");
       const llmPerf = perf("LLM total (Max streaming)");
 
       const { maxResponse, gameMasterPromise } = await processConversationTurn(
@@ -313,6 +320,7 @@ const Index = () => {
     reset();
     timer.reset();
     setMicActive(false);
+    setMicEverStarted(false);
     setUserSubtitle("");
     setMaxSubtitle("");
     conversationHistoryRef.current = [];
@@ -358,6 +366,7 @@ const Index = () => {
           maxSubtitle={maxSubtitle}
           onMicToggle={handleMicToggle}
           micActive={micActive}
+          micEverStarted={micEverStarted}
           elapsedSeconds={settings.TIMEOUT_SECONDS - timer.remaining}
           onEarlyQuestionnaire={handleQuestionnaire}
         />
