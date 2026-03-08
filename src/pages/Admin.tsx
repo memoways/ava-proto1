@@ -88,16 +88,26 @@ export default function Admin() {
   async function saveCharacterPrompt() {
     if (!editingChar) return;
     setSavingChar(true);
-    const { error } = await supabase
-      .from("characters")
-      .update({ system_prompt: editPrompt })
-      .eq("id", editingChar.id);
-    if (error) {
-      toast.error("Erreur: " + error.message);
-    } else {
-      toast.success(`System prompt de ${editingChar.name} sauvegardé`);
-      clearSystemPromptCache();
-      loadCharacters();
+    try {
+      const { error, data } = await supabase
+        .from("characters")
+        .update({ system_prompt: editPrompt })
+        .eq("id", editingChar.id)
+        .select();
+      if (error) {
+        console.error("[Admin] Save error:", error);
+        toast.error("Erreur: " + error.message);
+      } else {
+        console.log("[Admin] Saved prompt:", data);
+        toast.success(`System prompt de ${editingChar.name} sauvegardé ✓`);
+        clearSystemPromptCache();
+        // Update local state immediately
+        setEditingChar({ ...editingChar, system_prompt: editPrompt });
+        setCharacters(prev => prev.map(c => c.id === editingChar.id ? { ...c, system_prompt: editPrompt } : c));
+      }
+    } catch (err) {
+      console.error("[Admin] Save exception:", err);
+      toast.error("Erreur inattendue lors de la sauvegarde");
     }
     setSavingChar(false);
   }
