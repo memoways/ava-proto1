@@ -65,11 +65,29 @@ const ConversationScreen = ({
         </span>
       </div>
 
-      {/* Trust top-left */}
-      <div className="absolute top-6 left-6 z-20">
-        <span className="font-mono text-xs text-trust">
-          Confiance: {trustLevel}/{trustThreshold}
+      {/* Trust gauge top-left */}
+      <div className="absolute top-6 left-6 z-20 flex flex-col gap-1.5">
+        <span className="font-mono text-[10px] text-muted-foreground/50 uppercase tracking-wider">
+          Confiance de Max
         </span>
+        <div className="flex items-center gap-2">
+          <div className="w-24 h-1.5 rounded-full bg-border/30 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-700 ease-out"
+              style={{
+                width: `${Math.min(100, (trustLevel / trustThreshold) * 100)}%`,
+                background: trustLevel >= trustThreshold
+                  ? 'hsl(var(--primary))'
+                  : trustLevel > trustThreshold * 0.5
+                    ? 'hsl(var(--trust))'
+                    : 'hsl(var(--muted-foreground) / 0.4)',
+              }}
+            />
+          </div>
+          <span className="font-mono text-[10px] text-muted-foreground/40">
+            {trustLevel}/{trustThreshold}
+          </span>
+        </div>
       </div>
 
       {/* Info button — top left under trust */}
