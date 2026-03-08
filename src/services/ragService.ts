@@ -16,7 +16,7 @@ export async function queryRAG(
   userMessage: string,
   recentContext?: string,
   matchCount = 5,
-  matchThreshold = 0.5
+  matchThreshold = 0.3
 ): Promise<RAGMatch[]> {
   const query = recentContext
     ? `${userMessage}\n\nContexte récent: ${recentContext}`
