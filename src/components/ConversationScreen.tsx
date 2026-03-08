@@ -1,4 +1,3 @@
-import maxPortrait from "@/assets/max-portrait.jpg";
 import type { AudioState } from "@/types";
 import SubtitleOverlay from "./SubtitleOverlay";
 
@@ -62,23 +61,8 @@ const ConversationScreen = ({
         </span>
       </div>
 
-      {/* Max portrait */}
-      <div className="relative z-10 flex flex-col items-center gap-6">
-        <div className="relative">
-          <div className="h-56 w-56 rounded-full overflow-hidden border-2 border-border shadow-2xl shadow-primary/5">
-            <img
-              src={maxPortrait}
-              alt="Max"
-              className="h-full w-full object-cover"
-            />
-          </div>
-          {/* Audio state ring */}
-          {audioState === "max_speaking" && (
-            <div className="absolute inset-0 rounded-full border-2 border-primary/40 animate-pulse" />
-          )}
-        </div>
-
-        {/* Status */}
+      {/* Status centered */}
+      <div className="relative z-10 flex flex-col items-center gap-4 mt-[40vh]">
         <p className="text-sm font-mono text-muted-foreground animate-fade-in">
           {statusLabels[audioState]}
           {audioState === "max_thinking" && (
@@ -89,6 +73,13 @@ const ConversationScreen = ({
             </span>
           )}
         </p>
+
+        {/* Mic hint */}
+        {audioState === "idle" && !micActive && (
+          <p className="text-xs text-muted-foreground/60 animate-fade-in">
+            Cliquez sur le micro pour parler à Max
+          </p>
+        )}
       </div>
 
       {/* Mic button */}
