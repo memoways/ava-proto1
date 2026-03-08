@@ -3,8 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
+import { clearSystemPromptCache } from "@/agents/maxAgent";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -42,10 +44,15 @@ export default function Admin() {
   const [ragQuery, setRagQuery] = useState("");
   const [ragResults, setRagResults] = useState<any[] | null>(null);
   const [ragSearching, setRagSearching] = useState(false);
+  const [characters, setCharacters] = useState<any[]>([]);
+  const [editingChar, setEditingChar] = useState<any | null>(null);
+  const [editPrompt, setEditPrompt] = useState("");
+  const [savingChar, setSavingChar] = useState(false);
 
   useEffect(() => {
     loadSessions();
     loadEmbeddings();
+    loadCharacters();
   }, []);
 
   async function loadSessions() {
@@ -68,6 +75,31 @@ export default function Admin() {
     setEmbeddings(
       (data || []).map((e: any) => ({ ...e, has_embedding: true }))
     );
+  }
+
+  async function loadCharacters() {
+    const { data } = await supabase
+      .from("characters")
+      .select("id, name, personality, system_prompt")
+      .order("name");
+    setCharacters(data || []);
+  }
+
+  async function saveCharacterPrompt() {
+    if (!editingChar) return;
+    setSavingChar(true);
+    const { error } = await supabase
+      .from("characters")
+      .update({ system_prompt: editPrompt })
+      .eq("id", editingChar.id);
+    if (error) {
+      toast.error("Erreur: " + error.message);
+    } else {
+      toast.success(`System prompt de ${editingChar.name} sauvegardé`);
+      clearSystemPromptCache();
+      loadCharacters();
+    }
+    setSavingChar(false);
   }
 
   async function triggerSync() {
@@ -135,6 +167,9 @@ export default function Admin() {
             </TabsTrigger>
             <TabsTrigger value="embeddings">
               Embeddings ({embeddings.length})
+            </TabsTrigger>
+            <TabsTrigger value="characters">
+              Personnages ({characters.length})
             </TabsTrigger>
             <TabsTrigger value="rag">RAG Test</TabsTrigger>
             <TabsTrigger value="sync">Notion Sync</TabsTrigger>
@@ -392,6 +427,98 @@ export default function Admin() {
                   ))}
                 </div>
               )}
+            </div>
+          </TabsContent>
+
+          {/* ==================== CHARACTERS ==================== */}
+          <TabsContent value="characters">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-lg font-semibold">Personnages</h2>
+                  <Button size="sm" variant="outline" onClick={loadCharacters}>
+                    Rafraîchir
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {characters.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        setEditingChar(c);
+                        setEditPrompt(c.system_prompt || "");
+                      }}
+                      className={`w-full text-left p-4 border rounded-lg hover:bg-accent/50 transition-colors ${
+                        editingChar?.id === c.id ? "bg-accent border-primary" : ""
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold">{c.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {c.system_prompt?.length || 0} chars
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {c.personality || "—"}
+                      </p>
+                      <p className="text-sm mt-1 line-clamp-2 text-muted-foreground">
+                        {c.system_prompt?.slice(0, 120) || "Aucun system prompt"}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-4">
+                  💡 Le system prompt doit être minimal : rôle, comportement, règles de jeu.
+                  Le reste (mémoire, backstory, storyworld) provient du RAG automatiquement.
+                </p>
+              </div>
+
+              <div>
+                {editingChar ? (
+                  <div className="border rounded-lg p-4">
+                    <h2 className="text-lg font-semibold mb-1">
+                      System Prompt — {editingChar.name}
+                    </h2>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Ce prompt est envoyé au LLM. Les règles de jeu et le contexte RAG
+                      sont ajoutés automatiquement après.
+                    </p>
+                    <Textarea
+                      value={editPrompt}
+                      onChange={(e) => setEditPrompt(e.target.value)}
+                      className="min-h-[50vh] font-mono text-sm"
+                      placeholder="Écris le system prompt minimal pour ce personnage..."
+                    />
+                    <div className="flex items-center justify-between mt-3">
+                      <span className="text-xs text-muted-foreground">
+                        {editPrompt.length} caractères
+                      </span>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditPrompt(editingChar.system_prompt || "");
+                          }}
+                        >
+                          Annuler
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={saveCharacterPrompt}
+                          disabled={savingChar || editPrompt === (editingChar.system_prompt || "")}
+                        >
+                          {savingChar ? "Sauvegarde..." : "Sauvegarder"}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border rounded-lg p-8 text-center text-muted-foreground">
+                    Sélectionne un personnage pour éditer son system prompt
+                  </div>
+                )}
+              </div>
             </div>
           </TabsContent>
 
