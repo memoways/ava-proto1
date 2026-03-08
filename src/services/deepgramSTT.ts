@@ -27,7 +27,7 @@ export class DeepgramSTT {
   private stream: MediaStream | null = null;
   private silenceTimer: ReturnType<typeof setTimeout> | null = null;
   private fullTranscript = "";
-  private static SILENCE_DELAY_MS = 2000;
+  private static SILENCE_DELAY_MS = 1500;
   private _paused = false;
 
   constructor(onTranscript: TranscriptCallback) {
