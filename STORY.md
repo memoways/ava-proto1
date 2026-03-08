@@ -407,7 +407,9 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ---
 
-
+- **2026-03-08**: La persistance des réglages en localStorage seul est fragile — la double couche localStorage + DB (table admin_settings) garantit que les réglages survivent à tout contexte.
+- **2026-03-08**: Le suivi des coûts LLM doit être automatique et transparent — si l'intégrateur doit penser à logguer, il oubliera. L'intégration dans openRouterLLM.ts rend le tracking invisible pour le reste du code.
+- **2026-03-08**: Afficher le JSON brut de sync Notion était inutile pour le pilotage — un rapport visuel par table avec les métriques RAG (chunks, tokens) permet de comprendre instantanément l'état du contenu narratif.
 
 *Aucun pivot majeur pour le moment — le PRD est clair et le développement suit le plan.*
 
