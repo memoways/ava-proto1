@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.12.0] - 2026-03-12
+
+### Corrigé
+- **Closure stale `isProcessing`** : remplacement du state React par un `useRef` pour le guard anti-double-processing, éliminant les blocages silencieux des tours de conversation suivants
+- **Sync Notion "Failed to fetch"** : refactoring de la sync pour traiter les bases table par table avec timeout 120s par appel, au lieu d'un seul appel global qui dépassait le timeout des Edge Functions
+
+### Ajouté
+- **PostHog Analytics** : intégration complète du tracking utilisateur avec session recording
+  - Événements trackés : `game_started`, `phase_changed`, `intro_video_completed`, `video_trigger_activated`, `game_over`, `questionnaire_submitted`
+  - Identification des sessions pour le suivi longitudinal
+  - Autocapture et session replay activés
+
+---
+
 ## [0.10.0] - 2026-03-08
 
 ### Ajouté
