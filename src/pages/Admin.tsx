@@ -164,23 +164,46 @@ export default function Admin() {
   async function triggerSync() {
     setSyncing(true);
     setSyncReport(null);
-    try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ databases: AVA_NOTION_DATABASES }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      setSyncReport(data);
-      toast.success("Sync Notion terminé !");
-      loadEmbeddings();
-    } catch (err: any) {
-      setSyncReport({ error: err.message });
-      toast.error("Erreur lors du sync");
-    } finally {
-      setSyncing(false);
+    const tableKeys = Object.keys(AVA_NOTION_DATABASES) as (keyof typeof AVA_NOTION_DATABASES)[];
+    const combinedResults: Record<string, any> = {};
+    const combinedEmbeddingStats: Record<string, any> = {};
+    let lastTotalEmbeddings = 0;
+    let hadError = false;
+
+    for (const key of tableKeys) {
+      try {
+        toast.info(`Sync ${key}...`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000);
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ databases: { [key]: AVA_NOTION_DATABASES[key] } }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        if (data.results) Object.assign(combinedResults, data.results);
+        if (data.embedding_stats) Object.assign(combinedEmbeddingStats, data.embedding_stats);
+        if (data.total_embeddings_in_db) lastTotalEmbeddings = data.total_embeddings_in_db;
+      } catch (err: any) {
+        hadError = true;
+        combinedResults[key] = { error: err.name === 'AbortError' ? 'Timeout (>120s)' : err.message };
+        toast.error(`Erreur sync ${key}: ${err.name === 'AbortError' ? 'Timeout' : err.message}`);
+      }
     }
+
+    setSyncReport({
+      success: !hadError,
+      results: combinedResults,
+      embedding_stats: combinedEmbeddingStats,
+      total_embeddings_in_db: lastTotalEmbeddings,
+      synced_at: new Date().toISOString(),
+    });
+    if (!hadError) toast.success("Sync Notion terminé !");
+    loadEmbeddings();
+    setSyncing(false);
   }
 
   async function testRAG() {
