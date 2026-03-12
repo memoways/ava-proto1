@@ -147,13 +147,14 @@ const Index = () => {
 
   // ---- Optimized conversation pipeline with sentence-level TTS ----
   const processUserMessage = useCallback(async (userText: string) => {
-    console.log(`[processUserMessage] Called with: "${userText.slice(0, 50)}", isProcessing=${isProcessing}`);
-    if (isProcessing || !userText.trim()) {
-      console.log(`[processUserMessage] BLOCKED — isProcessing=${isProcessing}, empty=${!userText.trim()}`);
+    console.log(`[processUserMessage] Called with: "${userText.slice(0, 50)}", isProcessingRef=${isProcessingRef.current}`);
+    if (isProcessingRef.current || !userText.trim()) {
+      console.log(`[processUserMessage] BLOCKED — isProcessing=${isProcessingRef.current}, empty=${!userText.trim()}`);
       return;
     }
 
     const turnPerf = perf("Total turn");
+    isProcessingRef.current = true;
     setIsProcessing(true);
     setAudioState("max_thinking");
     setUserSubtitle("");
