@@ -53,6 +53,7 @@ const Index = () => {
   const [userSubtitle, setUserSubtitle] = useState("");
   const [maxSubtitle, setMaxSubtitle] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const isProcessingRef = useRef(false);
   const [postVideoContext, setPostVideoContext] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
 
@@ -146,13 +147,14 @@ const Index = () => {
 
   // ---- Optimized conversation pipeline with sentence-level TTS ----
   const processUserMessage = useCallback(async (userText: string) => {
-    console.log(`[processUserMessage] Called with: "${userText.slice(0, 50)}", isProcessing=${isProcessing}`);
-    if (isProcessing || !userText.trim()) {
-      console.log(`[processUserMessage] BLOCKED — isProcessing=${isProcessing}, empty=${!userText.trim()}`);
+    console.log(`[processUserMessage] Called with: "${userText.slice(0, 50)}", isProcessingRef=${isProcessingRef.current}`);
+    if (isProcessingRef.current || !userText.trim()) {
+      console.log(`[processUserMessage] BLOCKED — isProcessing=${isProcessingRef.current}, empty=${!userText.trim()}`);
       return;
     }
 
     const turnPerf = perf("Total turn");
+    isProcessingRef.current = true;
     setIsProcessing(true);
     setAudioState("max_thinking");
     setUserSubtitle("");
@@ -283,6 +285,7 @@ const Index = () => {
       ttsQueue.cancel();
       setMaxSubtitle("Désolé, j'ai eu un problème de connexion...");
     } finally {
+      isProcessingRef.current = false;
       setIsProcessing(false);
       setAudioState("idle");
       setTimeout(() => setMaxSubtitle(""), 3000);
@@ -291,7 +294,7 @@ const Index = () => {
         setTimeout(() => resumeMic(), 300);
       }
     }
-  }, [isProcessing, setAudioState, addMessage, state.trustLevel, state.triggeredIds, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo, resumeMic]);
+  }, [setAudioState, addMessage, state.trustLevel, state.triggeredIds, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo, resumeMic]);
 
   processUserMessageRef.current = processUserMessage;
 
