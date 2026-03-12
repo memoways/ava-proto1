@@ -545,6 +545,60 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ---
 
+### 2026-03-12 — Intégration PostHog Analytics 🔷
+
+**Intent**: Comprendre les usages des utilisateurs à travers l'application avec du tracking d'événements et du session recording.
+
+**Tool**: Lovable
+
+**Outcome**:
+- `posthogService.ts` : service centralisé d'analytics (init, trackEvent, identifyUser) avec PostHog EU (`eu.i.posthog.com`)
+- `main.tsx` : initialisation PostHog au lancement de l'app
+- `Index.tsx` : tracking des étapes clés du tunnel — `game_started`, `phase_changed`, `intro_video_completed`, `video_trigger_activated`, `game_over`, `questionnaire_submitted`
+- Session recording et autocapture activés par défaut
+
+**Ce que ça permet** : Visualiser le parcours utilisateur complet, identifier les points d'abandon, mesurer les durées de session et les raisons de game over.
+
+**Time**: ~15min
+
+---
+
+### 2026-03-12 — Fix sync Notion "Failed to fetch" 🔹
+
+**Intent**: La sync Notion échouait avec "Failed to fetch" car toutes les tables étaient traitées en un seul appel, dépassant le timeout de 60s des Edge Functions.
+
+**Tool**: Lovable
+
+**Outcome**:
+- `Admin.tsx` : refactoring de `triggerSync` pour itérer table par table avec `AbortController` (timeout 120s par appel)
+- Toast de feedback en temps réel par table (succès/échec individuel)
+- Résumé final avec compteur de tables synchronisées vs échouées
+
+**Ce que ça permet** : La sync Notion fonctionne même avec des bases volumineuses, et l'utilisateur voit la progression en temps réel.
+
+**Time**: ~10min
+
+---
+
+### 2026-03-12 — Fix closure stale `isProcessing` 🔹
+
+**Intent**: Après le premier échange, Max "réfléchit" mais ne répond plus — les tours suivants étaient silencieusement bloqués par un guard `isProcessing` capturé dans une closure stale.
+
+**Tool**: Lovable
+
+**Outcome**:
+- `Index.tsx` : ajout de `isProcessingRef` (useRef) en parallèle du state `isProcessing`
+  - Le ref est lu/écrit immédiatement (pas de batching React)
+  - Le state est conservé pour le rendu UI si nécessaire
+  - Le guard dans `processUserMessage` utilise `isProcessingRef.current` au lieu du state
+- Suppression de `isProcessing` des dépendances du `useCallback`
+
+**Pourquoi ça cassait** : `isProcessing` est un state React utilisé dans un `useCallback`. Quand il passe à `true`, le callback est recréé avec cette valeur en closure. Même après le `setIsProcessing(false)` du `finally`, le re-render + mise à jour du ref pouvait arriver trop tard si le STT renvoyait un transcript entre-temps.
+
+**Time**: ~10min
+
+---
+
 - **2026-03-08**: La persistance des réglages en localStorage seul est fragile — la double couche localStorage + DB (table admin_settings) garantit que les réglages survivent à tout contexte.
 - **2026-03-08**: Le suivi des coûts LLM doit être automatique et transparent — si l'intégrateur doit penser à logguer, il oubliera. L'intégration dans openRouterLLM.ts rend le tracking invisible pour le reste du code.
 - **2026-03-08**: Afficher le JSON brut de sync Notion était inutile pour le pilotage — un rapport visuel par table avec les métriques RAG (chunks, tokens) permet de comprendre instantanément l'état du contenu narratif.
