@@ -53,6 +53,7 @@ const Index = () => {
   const [userSubtitle, setUserSubtitle] = useState("");
   const [maxSubtitle, setMaxSubtitle] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const isProcessingRef = useRef(false);
   const [postVideoContext, setPostVideoContext] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
 
