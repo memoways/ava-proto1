@@ -285,6 +285,7 @@ const Index = () => {
       ttsQueue.cancel();
       setMaxSubtitle("Désolé, j'ai eu un problème de connexion...");
     } finally {
+      isProcessingRef.current = false;
       setIsProcessing(false);
       setAudioState("idle");
       setTimeout(() => setMaxSubtitle(""), 3000);
@@ -293,7 +294,7 @@ const Index = () => {
         setTimeout(() => resumeMic(), 300);
       }
     }
-  }, [isProcessing, setAudioState, addMessage, state.trustLevel, state.triggeredIds, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo, resumeMic]);
+  }, [setAudioState, addMessage, state.trustLevel, state.triggeredIds, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo, resumeMic]);
 
   processUserMessageRef.current = processUserMessage;
 
