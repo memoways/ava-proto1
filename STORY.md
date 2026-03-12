@@ -607,6 +607,10 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 - **2026-03-08**: Le preload des caches et le warm-up des Edge Functions pendant les cinématiques est une stratégie clé — l'utilisateur ne remarque pas le chargement car il regarde la vidéo.
 - **2026-03-08**: L'intégration Gumlet via iframe est la plus simple et la plus fiable — pas besoin de SDK JS custom, le player est entièrement géré côté Gumlet. Le slot `children` permet d'injecter n'importe quel overlay (HUD) sans toucher au player.
 
+- **2026-03-12**: Les closures stales sur des states React dans des `useCallback` sont un piège classique — pour tout guard critique (comme `isProcessing`), utiliser un ref en plus du state pour garantir une lecture synchrone.
+- **2026-03-12**: PostHog en mode EU (`eu.i.posthog.com`) avec session recording permet de comprendre les parcours utilisateurs sans infrastructure analytics custom.
+- **2026-03-12**: Découper les opérations longues (sync multi-tables) en appels individuels avec feedback progressif est toujours préférable à un appel monolithique qui risque de timeout.
+
 *Aucun pivot majeur pour le moment — le PRD est clair et le développement suit le plan.*
 
 ---
