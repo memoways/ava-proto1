@@ -186,6 +186,7 @@ export default function Admin() {
         const data = await res.json();
         if (data.results) Object.assign(combinedResults, data.results);
         if (data.embedding_stats) Object.assign(combinedEmbeddingStats, data.embedding_stats);
+        if (data.embedding_diff) Object.assign(combinedResults, { [`${key}_diff`]: data.embedding_diff[key] });
         if (data.total_embeddings_in_db) lastTotalEmbeddings = data.total_embeddings_in_db;
       } catch (err: any) {
         hadError = true;
