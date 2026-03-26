@@ -160,8 +160,8 @@ serve(async (req) => {
 
     // Generate embedding via OpenAI
     async function generateEmbedding(text: string): Promise<number[]> {
-      // Truncate to ~8000 tokens (~32000 chars) to stay within model limits
-      const truncated = text.slice(0, 32000);
+      // Truncate to ~6000 tokens (~18000 chars) to safely stay within 8192 token limit
+      const truncated = text.slice(0, 18000);
       const res = await fetch(`${OPENAI_API_URL}/embeddings`, {
         method: 'POST',
         headers: {
@@ -207,7 +207,27 @@ serve(async (req) => {
 
       for (const section of sections) {
         const sectionText = chunks.length === 0 && !text.startsWith('\n## ') ? section : `## ${section}`;
-        if (currentChunk.length + sectionText.length > maxChunkSize && currentChunk.length > 0) {
+        
+        // If a single section exceeds maxChunkSize, split it by paragraphs
+        if (sectionText.length > maxChunkSize) {
+          if (currentChunk.trim()) {
+            chunks.push(currentChunk.trim());
+            currentChunk = '';
+          }
+          const paragraphs = sectionText.split(/\n\n|\n(?=-\s)/);
+          let subChunk = '';
+          for (const para of paragraphs) {
+            if (subChunk.length + para.length > maxChunkSize && subChunk.length > 0) {
+              chunks.push(subChunk.trim());
+              subChunk = para;
+            } else {
+              subChunk += (subChunk ? '\n' : '') + para;
+            }
+          }
+          if (subChunk.trim()) {
+            currentChunk = subChunk;
+          }
+        } else if (currentChunk.length + sectionText.length > maxChunkSize && currentChunk.length > 0) {
           chunks.push(currentChunk.trim());
           currentChunk = sectionText;
         } else {
