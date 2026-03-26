@@ -70,6 +70,19 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const body: SyncRequest = await req.json();
     const results: Record<string, any> = {};
+
+    // Snapshot embedding counts BEFORE sync
+    const tablesToTrack = ['characters', 'storyworld', 'gameplay_steps', 'video_triggers'];
+    const beforeCounts: Record<string, number> = {};
+    for (const table of tablesToTrack) {
+      const { count } = await supabase
+        .from('embeddings')
+        .select('id', { count: 'exact', head: true })
+        .eq('source_table', table);
+      beforeCounts[table] = count || 0;
+    }
+    console.log('[sync-notion] Embeddings BEFORE sync:', beforeCounts);
+
     // Track embedding stats across all tables
     const embeddingStats: Record<string, { chunks_created: number; chars_embedded: number }> = {};
     function trackEmbedding(table: string, contentLength: number, chunksCount = 1) {
