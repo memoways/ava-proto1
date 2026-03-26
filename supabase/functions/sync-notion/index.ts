@@ -217,7 +217,25 @@ serve(async (req) => {
           const paragraphs = sectionText.split(/\n\n|\n(?=-\s)/);
           let subChunk = '';
           for (const para of paragraphs) {
-            if (subChunk.length + para.length > maxChunkSize && subChunk.length > 0) {
+            // If a single paragraph is still too large, force-split by sentence or fixed size
+            if (para.length > maxChunkSize) {
+              if (subChunk.trim()) {
+                chunks.push(subChunk.trim());
+                subChunk = '';
+              }
+              // Split by sentences (period/exclamation/question followed by space)
+              const sentences = para.split(/(?<=[.!?])\s+/);
+              let sentenceChunk = '';
+              for (const sentence of sentences) {
+                if (sentenceChunk.length + sentence.length > maxChunkSize && sentenceChunk.length > 0) {
+                  chunks.push(sentenceChunk.trim());
+                  sentenceChunk = sentence;
+                } else {
+                  sentenceChunk += (sentenceChunk ? ' ' : '') + sentence;
+                }
+              }
+              if (sentenceChunk.trim()) subChunk = sentenceChunk;
+            } else if (subChunk.length + para.length > maxChunkSize && subChunk.length > 0) {
               chunks.push(subChunk.trim());
               subChunk = para;
             } else {
