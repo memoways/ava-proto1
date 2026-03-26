@@ -155,7 +155,7 @@ serve(async (req) => {
         }
         cursor = data.has_more ? data.next_cursor : undefined;
       } while (cursor);
-      return blocks.join('\n');
+      return blocks.join('\n\n');
     }
 
     // Generate embedding via OpenAI
