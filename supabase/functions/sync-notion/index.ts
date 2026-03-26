@@ -70,6 +70,19 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const body: SyncRequest = await req.json();
     const results: Record<string, any> = {};
+
+    // Snapshot embedding counts BEFORE sync
+    const tablesToTrack = ['characters', 'storyworld', 'gameplay_steps', 'video_triggers'];
+    const beforeCounts: Record<string, number> = {};
+    for (const table of tablesToTrack) {
+      const { count } = await supabase
+        .from('embeddings')
+        .select('id', { count: 'exact', head: true })
+        .eq('source_table', table);
+      beforeCounts[table] = count || 0;
+    }
+    console.log('[sync-notion] Embeddings BEFORE sync:', beforeCounts);
+
     // Track embedding stats across all tables
     const embeddingStats: Record<string, { chunks_created: number; chars_embedded: number }> = {};
     function trackEmbedding(table: string, contentLength: number, chunksCount = 1) {
@@ -155,7 +168,7 @@ serve(async (req) => {
         }
         cursor = data.has_more ? data.next_cursor : undefined;
       } while (cursor);
-      return blocks.join('\n');
+      return blocks.join('\n\n');
     }
 
     // Generate embedding via OpenAI
@@ -217,7 +230,25 @@ serve(async (req) => {
           const paragraphs = sectionText.split(/\n\n|\n(?=-\s)/);
           let subChunk = '';
           for (const para of paragraphs) {
-            if (subChunk.length + para.length > maxChunkSize && subChunk.length > 0) {
+            // If a single paragraph is still too large, force-split by sentence or fixed size
+            if (para.length > maxChunkSize) {
+              if (subChunk.trim()) {
+                chunks.push(subChunk.trim());
+                subChunk = '';
+              }
+              // Split by sentences (period/exclamation/question followed by space)
+              const sentences = para.split(/(?<=[.!?])\s+/);
+              let sentenceChunk = '';
+              for (const sentence of sentences) {
+                if (sentenceChunk.length + sentence.length > maxChunkSize && sentenceChunk.length > 0) {
+                  chunks.push(sentenceChunk.trim());
+                  sentenceChunk = sentence;
+                } else {
+                  sentenceChunk += (sentenceChunk ? ' ' : '') + sentence;
+                }
+              }
+              if (sentenceChunk.trim()) subChunk = sentenceChunk;
+            } else if (subChunk.length + para.length > maxChunkSize && subChunk.length > 0) {
               chunks.push(subChunk.trim());
               subChunk = para;
             } else {
@@ -434,17 +465,38 @@ serve(async (req) => {
       results.video_triggers = { synced, total: pages.length };
     }
 
-    // Count total embeddings in DB after sync
+    // Snapshot embedding counts AFTER sync
+    const afterCounts: Record<string, number> = {};
+    for (const table of tablesToTrack) {
+      const { count } = await supabase
+        .from('embeddings')
+        .select('id', { count: 'exact', head: true })
+        .eq('source_table', table);
+      afterCounts[table] = count || 0;
+    }
     const { count: totalEmbeddings } = await supabase
       .from('embeddings')
       .select('id', { count: 'exact', head: true });
 
-    console.log('[sync-notion] Sync complete:', results, 'embeddings:', embeddingStats);
+    // Build diff report
+    const embeddingDiff: Record<string, { before: number; after: number; delta: number }> = {};
+    for (const table of tablesToTrack) {
+      embeddingDiff[table] = {
+        before: beforeCounts[table],
+        after: afterCounts[table],
+        delta: afterCounts[table] - beforeCounts[table],
+      };
+    }
+
+    console.log('[sync-notion] Sync complete:', results);
+    console.log('[sync-notion] Embeddings diff:', JSON.stringify(embeddingDiff));
+    console.log('[sync-notion] Embedding generation stats:', embeddingStats);
 
     return new Response(JSON.stringify({
       success: true,
       results,
       embedding_stats: embeddingStats,
+      embedding_diff: embeddingDiff,
       total_embeddings_in_db: totalEmbeddings || 0,
       synced_at: new Date().toISOString(),
     }), {
