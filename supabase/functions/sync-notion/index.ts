@@ -465,17 +465,38 @@ serve(async (req) => {
       results.video_triggers = { synced, total: pages.length };
     }
 
-    // Count total embeddings in DB after sync
+    // Snapshot embedding counts AFTER sync
+    const afterCounts: Record<string, number> = {};
+    for (const table of tablesToTrack) {
+      const { count } = await supabase
+        .from('embeddings')
+        .select('id', { count: 'exact', head: true })
+        .eq('source_table', table);
+      afterCounts[table] = count || 0;
+    }
     const { count: totalEmbeddings } = await supabase
       .from('embeddings')
       .select('id', { count: 'exact', head: true });
 
-    console.log('[sync-notion] Sync complete:', results, 'embeddings:', embeddingStats);
+    // Build diff report
+    const embeddingDiff: Record<string, { before: number; after: number; delta: number }> = {};
+    for (const table of tablesToTrack) {
+      embeddingDiff[table] = {
+        before: beforeCounts[table],
+        after: afterCounts[table],
+        delta: afterCounts[table] - beforeCounts[table],
+      };
+    }
+
+    console.log('[sync-notion] Sync complete:', results);
+    console.log('[sync-notion] Embeddings diff:', JSON.stringify(embeddingDiff));
+    console.log('[sync-notion] Embedding generation stats:', embeddingStats);
 
     return new Response(JSON.stringify({
       success: true,
       results,
       embedding_stats: embeddingStats,
+      embedding_diff: embeddingDiff,
       total_embeddings_in_db: totalEmbeddings || 0,
       synced_at: new Date().toISOString(),
     }), {
