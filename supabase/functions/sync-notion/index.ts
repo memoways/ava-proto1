@@ -207,7 +207,27 @@ serve(async (req) => {
 
       for (const section of sections) {
         const sectionText = chunks.length === 0 && !text.startsWith('\n## ') ? section : `## ${section}`;
-        if (currentChunk.length + sectionText.length > maxChunkSize && currentChunk.length > 0) {
+        
+        // If a single section exceeds maxChunkSize, split it by paragraphs
+        if (sectionText.length > maxChunkSize) {
+          if (currentChunk.trim()) {
+            chunks.push(currentChunk.trim());
+            currentChunk = '';
+          }
+          const paragraphs = sectionText.split(/\n\n|\n(?=-\s)/);
+          let subChunk = '';
+          for (const para of paragraphs) {
+            if (subChunk.length + para.length > maxChunkSize && subChunk.length > 0) {
+              chunks.push(subChunk.trim());
+              subChunk = para;
+            } else {
+              subChunk += (subChunk ? '\n' : '') + para;
+            }
+          }
+          if (subChunk.trim()) {
+            currentChunk = subChunk;
+          }
+        } else if (currentChunk.length + sectionText.length > maxChunkSize && currentChunk.length > 0) {
           chunks.push(currentChunk.trim());
           currentChunk = sectionText;
         } else {
