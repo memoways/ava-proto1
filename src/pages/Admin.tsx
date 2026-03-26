@@ -501,18 +501,27 @@ export default function Admin() {
 
                   {/* Per-table results */}
                   <div className="grid grid-cols-2 gap-3">
-                    {syncReport.results && Object.entries(syncReport.results).map(([table, stats]: [string, any]) => {
+                    {syncReport.results && Object.entries(syncReport.results).filter(([k]) => !k.endsWith('_diff')).map(([table, stats]: [string, any]) => {
                       const embStats = syncReport.embedding_stats?.[table];
+                      const diff = syncReport.results?.[`${table}_diff`];
                       return (
                         <div key={table} className="border rounded-lg p-3">
                           <h4 className="font-semibold text-sm capitalize mb-1">{table.replace(/_/g, ' ')}</h4>
                           <div className="text-xs space-y-0.5 text-muted-foreground">
-                            <p>📄 {stats.synced}/{stats.total} entrées synchronisées</p>
+                            {stats.error ? (
+                              <p className="text-destructive">❌ {stats.error}</p>
+                            ) : (
+                              <p>📄 {stats.synced}/{stats.total} entrées synchronisées</p>
+                            )}
+                            {diff && (
+                              <p className={diff.delta > 0 ? 'text-green-400' : diff.delta < 0 ? 'text-red-400' : ''}>
+                                🔢 Embeddings: {diff.before} → {diff.after} ({diff.delta > 0 ? '+' : ''}{diff.delta})
+                              </p>
+                            )}
                             {embStats && (
                               <>
                                 <p>🧩 {embStats.chunks_created} chunk{embStats.chunks_created > 1 ? 's' : ''} RAG créé{embStats.chunks_created > 1 ? 's' : ''}</p>
                                 <p>📝 {(embStats.chars_embedded / 1000).toFixed(1)}k caractères embeddings</p>
-                                <p>🪙 ~{Math.ceil(embStats.chars_embedded / 4)} tokens estimés</p>
                               </>
                             )}
                           </div>
