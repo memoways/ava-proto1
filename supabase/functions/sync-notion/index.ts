@@ -160,8 +160,8 @@ serve(async (req) => {
 
     // Generate embedding via OpenAI
     async function generateEmbedding(text: string): Promise<number[]> {
-      // Truncate to ~8000 tokens (~32000 chars) to stay within model limits
-      const truncated = text.slice(0, 32000);
+      // Truncate to ~6000 tokens (~18000 chars) to safely stay within 8192 token limit
+      const truncated = text.slice(0, 18000);
       const res = await fetch(`${OPENAI_API_URL}/embeddings`, {
         method: 'POST',
         headers: {
