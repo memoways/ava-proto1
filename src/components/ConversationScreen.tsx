@@ -51,9 +51,12 @@ const ConversationScreen = ({
   onPTTPress,
   onPTTRelease,
   micStream,
+  sessionDurationSeconds,
 }: ConversationScreenProps) => {
   const [showInfo, setShowInfo] = useState(false);
-  const showQuestionnaire = elapsedSeconds >= EARLY_QUESTIONNAIRE_DELAY && onEarlyQuestionnaire;
+  // Early questionnaire appears at 50% of the session (min 60s)
+  const earlyQuestionnaireDelay = Math.max(60, Math.floor((sessionDurationSeconds ?? 600) * 0.5));
+  const showQuestionnaire = elapsedSeconds >= earlyQuestionnaireDelay && onEarlyQuestionnaire;
   const isPTT = voiceModality === "push_to_talk";
 
   const { buttonHandlers } = usePushToTalk({
