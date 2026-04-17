@@ -11,6 +11,7 @@ import settings from "@/config/settings.json";
 import type { QuestionnaireData, ConversationMessage } from "@/types";
 
 import ABChoiceScreen from "@/components/ABChoiceScreen";
+import OnboardingScreen from "@/components/OnboardingScreen";
 import OnboardingAScreen from "@/components/OnboardingAScreen";
 import OnboardingBScreen from "@/components/OnboardingBScreen";
 import CharacterSelectScreen from "@/components/CharacterSelectScreen";
