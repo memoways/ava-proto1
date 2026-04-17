@@ -51,6 +51,7 @@ const ConversationScreen = ({
   voiceModality,
   onPTTPress,
   onPTTRelease,
+  micStream,
 }: ConversationScreenProps) => {
   const [showInfo, setShowInfo] = useState(false);
   const showQuestionnaire = elapsedSeconds >= EARLY_QUESTIONNAIRE_DELAY && onEarlyQuestionnaire;
@@ -61,6 +62,9 @@ const ConversationScreen = ({
     onPress: () => onPTTPress?.(),
     onRelease: () => onPTTRelease?.(),
   });
+
+  // Audio level for waveform visualization (active only while mic is live)
+  const audioLevel = useAudioLevel(micStream ?? null, micActive);
 
   const trustPercent = Math.min(100, (trustLevel / trustThreshold) * 100);
 
