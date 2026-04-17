@@ -13,6 +13,8 @@ import type { QuestionnaireData, ConversationMessage } from "@/types";
 import ABChoiceScreen from "@/components/ABChoiceScreen";
 import OnboardingAScreen from "@/components/OnboardingAScreen";
 import OnboardingBScreen from "@/components/OnboardingBScreen";
+import CharacterSelectScreen from "@/components/CharacterSelectScreen";
+import RingingScreen from "@/components/RingingScreen";
 import VideoPlaceholder from "@/components/VideoPlaceholder";
 import GumletVideoPlayer from "@/components/GumletVideoPlayer";
 import ConversationScreen from "@/components/ConversationScreen";
@@ -49,7 +51,7 @@ const perf = (label: string) => {
 };
 
 const Index = () => {
-  const { state, setPhase, setAudioState, addMessage, updateTrust, triggerVideo, endTrigger, gameOver, setVariant, setVoiceModality, reset } = useGameState();
+  const { state, setPhase, setAudioState, addMessage, updateTrust, triggerVideo, endTrigger, gameOver, setVariant, setVoiceModality, setCharacter, reset } = useGameState();
   const [micActive, setMicActive] = useState(false);
   const [micEverStarted, setMicEverStarted] = useState(false);
   const [userSubtitle, setUserSubtitle] = useState("");
@@ -114,9 +116,43 @@ const Index = () => {
   }, [setPhase, setVariant, setVoiceModality]);
 
   const handleOnboardingComplete = useCallback(() => {
+    setPhase("character_select");
+    trackEvent("phase_changed", { phase: "character_select" });
+  }, [setPhase]);
+
+  const handleCharacterSelect = useCallback((character: "max" | "emma" | "leo" | "ava") => {
+    setCharacter(character);
+    if (sessionIdRef.current) {
+      updateSession(sessionIdRef.current, { personnage_appele: character }).catch(console.error);
+    }
+    trackEvent("character_selected", { character });
+    setPhase("ringing");
+    trackEvent("phase_changed", { phase: "ringing" });
+  }, [setPhase, setCharacter]);
+
+  const handleRingingAnswer = useCallback(() => {
     setPhase("intro_video");
     trackEvent("phase_changed", { phase: "intro_video" });
   }, [setPhase]);
+
+  const handleHangUp = useCallback(() => {
+    sttRef.current?.stop();
+    sttRef.current = null;
+    micStartedRef.current = false;
+    setMicActive(false);
+    const reason = "hang_up";
+    trackEvent("game_over", { reason, trust_level: state.trustLevel });
+    if (sessionIdRef.current) {
+      endSession(sessionIdRef.current, {
+        game_over_reason: reason,
+        trust_level: state.trustLevel,
+        conversation_log: conversationHistoryRef.current,
+        triggers_activated: state.triggeredIds,
+        duration_seconds: settings.TIMEOUT_SECONDS - timer.remaining,
+      }).catch(console.error);
+    }
+    gameOver(reason);
+  }, [gameOver, state.trustLevel, state.triggeredIds, timer.remaining]);
 
   const startMicPersistent = useCallback(async () => {
     if (sttRef.current) return;
@@ -384,6 +420,16 @@ const Index = () => {
       return <OnboardingAScreen onContinue={handleOnboardingComplete} />;
     case "onboarding_b":
       return <OnboardingBScreen onContinue={handleOnboardingComplete} />;
+    case "character_select":
+      return <CharacterSelectScreen onSelect={handleCharacterSelect} />;
+    case "ringing":
+      return (
+        <RingingScreen
+          characterName={state.character.charAt(0).toUpperCase() + state.character.slice(1)}
+          onAnswer={handleRingingAnswer}
+          onHangUp={handleHangUp}
+        />
+      );
     case "intro_video":
       return (
         <GumletVideoPlayer
@@ -407,6 +453,7 @@ const Index = () => {
           micEverStarted={micEverStarted}
           elapsedSeconds={settings.TIMEOUT_SECONDS - timer.remaining}
           onEarlyQuestionnaire={handleQuestionnaire}
+          onHangUp={handleHangUp}
         />
       );
     case "video_trigger": {
