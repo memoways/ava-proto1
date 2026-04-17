@@ -376,13 +376,13 @@ const Index = () => {
   }, [setPhase]);
 
   const handleQuestionnaireSubmit = useCallback((data: QuestionnaireData) => {
-    trackEvent("questionnaire_submitted", { session_id: sessionIdRef.current });
+    trackEvent("questionnaire_submitted", { session_id: sessionIdRef.current, variant: state.variant, voice_modality: state.voiceModality });
     if (sessionIdRef.current) {
       saveQuestionnaire(sessionIdRef.current, data).catch(console.error);
-      syncQuestionnaireToNotion(sessionIdRef.current, data, state.trustLevel, settings.TIMEOUT_SECONDS - timer.remaining, state.gameOverReason);
+      syncQuestionnaireToNotion(sessionIdRef.current, data, state.trustLevel, settings.TIMEOUT_SECONDS - timer.remaining, state.gameOverReason, state.variant, state.voiceModality);
     }
     setPhase("thanks");
-  }, [setPhase, state.trustLevel, timer.remaining, state.gameOverReason]);
+  }, [setPhase, state.trustLevel, timer.remaining, state.gameOverReason, state.variant, state.voiceModality]);
 
   const handleRestart = useCallback(() => {
     sttRef.current?.stop();
@@ -517,7 +517,7 @@ const Index = () => {
         />
       );
     case "questionnaire":
-      return <QuestionnaireScreen onSubmit={handleQuestionnaireSubmit} />;
+      return <QuestionnaireScreen onSubmit={handleQuestionnaireSubmit} variant={state.variant} voiceModality={state.voiceModality} />;
     case "thanks":
       return <ThanksScreen onRestart={handleRestart} />;
     default:
