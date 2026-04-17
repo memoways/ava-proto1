@@ -8,6 +8,7 @@ import { createSession, updateSession, endSession, saveQuestionnaire, syncQuesti
 import { preloadSystemPrompt } from "@/agents/maxAgent";
 import { trackEvent, identifyUser } from "@/services/posthogService";
 import settings from "@/config/settings.json";
+import { getGameplaySettings } from "@/services/settingsService";
 import type { QuestionnaireData, ConversationMessage } from "@/types";
 
 import ABChoiceScreen from "@/components/ABChoiceScreen";
