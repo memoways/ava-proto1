@@ -78,14 +78,14 @@ const Index = () => {
   const conversationHistoryRef = useRef<ConversationMessage[]>([]);
   const micStartedRef = useRef(false);
 
-  const timer = useTimer(settings.TIMEOUT_SECONDS, () => {
+  const timer = useTimer(sessionDuration, () => {
     if (sessionIdRef.current) {
       endSession(sessionIdRef.current, {
         game_over_reason: "timeout",
         trust_level: state.trustLevel,
         conversation_log: conversationHistoryRef.current,
         triggers_activated: state.triggeredIds,
-        duration_seconds: settings.TIMEOUT_SECONDS,
+        duration_seconds: sessionDuration,
       }).catch(console.error);
     }
     gameOver("timeout");
@@ -162,7 +162,7 @@ const Index = () => {
         trust_level: state.trustLevel,
         conversation_log: conversationHistoryRef.current,
         triggers_activated: state.triggeredIds,
-        duration_seconds: settings.TIMEOUT_SECONDS - timer.remaining,
+        duration_seconds: sessionDuration - timer.remaining,
       }).catch(console.error);
     }
     gameOver(reason);
@@ -255,7 +255,7 @@ const Index = () => {
         conversationHistoryRef.current.slice(0, -1),
         state.trustLevel,
         state.triggeredIds,
-        settings.TIMEOUT_SECONDS - timer.remaining,
+        sessionDuration - timer.remaining,
         (chunk, done) => {
           if (!done) {
             if (sentencesSent === 0 && streamedText === "") {
@@ -329,14 +329,14 @@ const Index = () => {
 
       if (gameMasterResponse.game_over) {
         const reason = gameMasterResponse.game_over_reason || "moderation";
-        trackEvent("game_over", { reason, trust_level: newTrust, duration: settings.TIMEOUT_SECONDS - timer.remaining });
+        trackEvent("game_over", { reason, trust_level: newTrust, duration: sessionDuration - timer.remaining });
         if (sessionIdRef.current) {
           endSession(sessionIdRef.current, {
             game_over_reason: reason,
             trust_level: newTrust,
             conversation_log: conversationHistoryRef.current,
             triggers_activated: state.triggeredIds,
-            duration_seconds: settings.TIMEOUT_SECONDS - timer.remaining,
+            duration_seconds: sessionDuration - timer.remaining,
           }).catch(console.error);
         }
         gameOver(reason);
@@ -414,7 +414,7 @@ const Index = () => {
     trackEvent("questionnaire_submitted", { session_id: sessionIdRef.current, variant: state.variant, voice_modality: state.voiceModality });
     if (sessionIdRef.current) {
       saveQuestionnaire(sessionIdRef.current, data).catch(console.error);
-      syncQuestionnaireToNotion(sessionIdRef.current, data, state.trustLevel, settings.TIMEOUT_SECONDS - timer.remaining, state.gameOverReason, state.variant, state.voiceModality);
+      syncQuestionnaireToNotion(sessionIdRef.current, data, state.trustLevel, sessionDuration - timer.remaining, state.gameOverReason, state.variant, state.voiceModality);
     }
     setPhase("thanks");
   }, [setPhase, state.trustLevel, timer.remaining, state.gameOverReason, state.variant, state.voiceModality]);
@@ -442,7 +442,7 @@ const Index = () => {
         trust_level: state.trustLevel,
         conversation_log: conversationHistoryRef.current,
         triggers_activated: state.triggeredIds,
-        duration_seconds: settings.TIMEOUT_SECONDS - timer.remaining,
+        duration_seconds: sessionDuration - timer.remaining,
       }).catch(console.error);
     }
     setPhase("game_over");
@@ -493,14 +493,14 @@ const Index = () => {
           timerFormatted={timer.formatted}
           timerWarning={timer.isWarning}
           trustLevel={state.trustLevel}
-          trustThreshold={settings.TRUST_THRESHOLD}
+          trustThreshold={trustThreshold}
           audioState={state.audioState}
           userSubtitle={userSubtitle}
           maxSubtitle={maxSubtitle}
           onMicToggle={handleMicToggle}
           micActive={micActive}
           micEverStarted={micEverStarted}
-          elapsedSeconds={settings.TIMEOUT_SECONDS - timer.remaining}
+          elapsedSeconds={sessionDuration - timer.remaining}
           onEarlyQuestionnaire={handleQuestionnaire}
           onHangUp={handleHangUp}
           voiceModality={state.voiceModality}
@@ -530,17 +530,17 @@ const Index = () => {
                     <div
                       className="h-full rounded-full transition-all duration-700 ease-out"
                       style={{
-                        width: `${Math.min(100, (state.trustLevel / settings.TRUST_THRESHOLD) * 100)}%`,
-                        background: state.trustLevel >= settings.TRUST_THRESHOLD
+                        width: `${Math.min(100, (state.trustLevel / trustThreshold) * 100)}%`,
+                        background: state.trustLevel >= trustThreshold
                           ? 'hsl(var(--primary))'
-                          : state.trustLevel > settings.TRUST_THRESHOLD * 0.5
+                          : state.trustLevel > trustThreshold * 0.5
                             ? 'hsl(var(--trust))'
                             : 'hsl(var(--muted-foreground) / 0.4)',
                       }}
                     />
                   </div>
                   <span className="font-mono text-[10px] text-muted-foreground/40">
-                    {state.trustLevel}/{settings.TRUST_THRESHOLD}
+                    {state.trustLevel}/{trustThreshold}
                   </span>
                 </div>
               </div>
