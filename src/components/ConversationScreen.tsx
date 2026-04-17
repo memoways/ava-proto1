@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Info, ClipboardList, PhoneOff } from "lucide-react";
-import type { AudioState } from "@/types";
+import { Info, ClipboardList, PhoneOff, Mic } from "lucide-react";
+import type { AudioState, VoiceModality } from "@/types";
 import SubtitleOverlay from "./SubtitleOverlay";
+import { usePushToTalk } from "@/hooks/usePushToTalk";
 
 interface ConversationScreenProps {
   timerFormatted: string;
@@ -17,6 +18,9 @@ interface ConversationScreenProps {
   elapsedSeconds: number;
   onEarlyQuestionnaire?: () => void;
   onHangUp?: () => void;
+  voiceModality?: VoiceModality | null;
+  onPTTPress?: () => void;
+  onPTTRelease?: () => void;
 }
 
 const statusLabels: Record<AudioState, string> = {
