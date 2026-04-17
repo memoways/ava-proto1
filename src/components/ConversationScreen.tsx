@@ -46,9 +46,19 @@ const ConversationScreen = ({
   elapsedSeconds,
   onEarlyQuestionnaire,
   onHangUp,
+  voiceModality,
+  onPTTPress,
+  onPTTRelease,
 }: ConversationScreenProps) => {
   const [showInfo, setShowInfo] = useState(false);
   const showQuestionnaire = elapsedSeconds >= EARLY_QUESTIONNAIRE_DELAY && onEarlyQuestionnaire;
+  const isPTT = voiceModality === "push_to_talk";
+
+  const { buttonHandlers } = usePushToTalk({
+    enabled: isPTT && !!onPTTPress && !!onPTTRelease,
+    onPress: () => onPTTPress?.(),
+    onRelease: () => onPTTRelease?.(),
+  });
 
   const trustPercent = Math.min(100, (trustLevel / trustThreshold) * 100);
 
