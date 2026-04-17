@@ -133,9 +133,10 @@ const Index = () => {
   }, [setPhase, setCharacter]);
 
   const handleRingingAnswer = useCallback(() => {
-    setPhase("intro_video");
-    trackEvent("phase_changed", { phase: "intro_video" });
-  }, [setPhase]);
+    setPhase("conversation");
+    timer.start();
+    trackEvent("phase_changed", { phase: "conversation" });
+  }, [setPhase, timer]);
 
   const handleHangUp = useCallback(() => {
     sttRef.current?.stop();
