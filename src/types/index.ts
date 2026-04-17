@@ -61,9 +61,32 @@ export interface GameMasterResponse {
 }
 
 export interface QuestionnaireData {
+  // 1 — Global
   experience_rating: number;
   experience_word: string;
   nps: number;
+  // 2 — Game Master (onboarding & cadrage)
+  gm_clarity: number;             // 1-5 — clarté du cadrage
+  gm_role_understood: "oui" | "non" | "partiellement";
+  gm_immersion_intro: number;     // 1-5
+  // 3A — Variante A (co-création)
+  a_cocreation_engaged?: number;  // 1-5
+  a_cocreation_natural?: number;  // 1-5
+  a_cocreation_freeform?: string;
+  // 3B — Variante B (narrateur omniscient)
+  b_narrator_immersive?: number;  // 1-5
+  b_narrator_freeform?: string;
+  // 4 — Voix & modalité
+  voice_naturalness: number;      // 1-5 voix Max
+  voice_gm_naturalness: number;   // 1-5 voix GM
+  voice_modality_comfort: number; // 1-5 confort modalité reçue
+  // sous-bloc PTT (uniquement si push_to_talk)
+  ptt_button_clear?: number;      // 1-5
+  ptt_release_issues?: "aucun" | "parfois" | "souvent";
+  // 5 — Latence détail
+  latency_perceived: "fluide" | "acceptable" | "genante";
+  latency_moments?: string;
+  // 6 — Immersion / mécanique (legacy)
   immersion_story: number;
   immersion_natural: number;
   mechanic_listening: number;
@@ -74,6 +97,7 @@ export interface QuestionnaireData {
   value_price: string;
   value_format: string;
   open_feedback: string;
+  // 7 — Contact
   contact_name: string;
   contact_email: string;
   opt_in_feedback: boolean;
