@@ -173,10 +173,12 @@ const Index = () => {
     try {
       await stt.start();
       sttRef.current = stt;
+      setMicStream(stt.getStream());
     } catch (err) {
       console.error("Failed to start STT:", err);
       setMicActive(false);
       setAudioState("idle");
+      setMicStream(null);
     }
   }, [setAudioState]);
 
