@@ -64,6 +64,15 @@ const Index = () => {
   const [micStream, setMicStream] = useState<MediaStream | null>(null);
   const sessionIdRef = useRef<string | null>(null);
 
+  // Dynamic gameplay settings (read once at mount, includes admin overrides)
+  const [gameplaySettings, setGameplaySettings] = useState(() => getGameplaySettings());
+  useEffect(() => {
+    // Re-read on mount in case admin updated values
+    setGameplaySettings(getGameplaySettings());
+  }, []);
+  const sessionDuration = gameplaySettings.TIMEOUT_SECONDS;
+  const trustThreshold = gameplaySettings.TRUST_THRESHOLD;
+
   const sttRef = useRef<DeepgramSTT | null>(null);
   const processUserMessageRef = useRef<(text: string) => void>(() => {});
   const conversationHistoryRef = useRef<ConversationMessage[]>([]);
