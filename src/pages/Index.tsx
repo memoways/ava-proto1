@@ -139,6 +139,7 @@ const Index = () => {
   const handleHangUp = useCallback(() => {
     sttRef.current?.stop();
     sttRef.current = null;
+    setMicStream(null);
     micStartedRef.current = false;
     setMicActive(false);
     const reason = "hang_up";
@@ -410,6 +411,7 @@ const Index = () => {
   const handleRestart = useCallback(() => {
     sttRef.current?.stop();
     sttRef.current = null;
+    setMicStream(null);
     reset();
     timer.reset();
     setMicActive(false);
