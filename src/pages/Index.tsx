@@ -59,6 +59,7 @@ const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const isProcessingRef = useRef(false);
   const [postVideoContext, setPostVideoContext] = useState<string | null>(null);
+  const [micStream, setMicStream] = useState<MediaStream | null>(null);
   const sessionIdRef = useRef<string | null>(null);
 
   const sttRef = useRef<DeepgramSTT | null>(null);
