@@ -51,7 +51,7 @@ serve(async (req) => {
 
     // Metadata
     set("Session ID", textProp(sessionId));
-    set("Variante", variant ? { select: { name: variant } } : null);
+    set("Variante onboarding", variant ? { select: { name: variant } } : null);
     set("Modalite voix", voiceModality ? { select: { name: voiceModality } } : null);
     set("Trust final", numProp(trustLevel));
     set("Duree secondes", numProp(durationSeconds));
