@@ -371,6 +371,24 @@ const Index = () => {
     }
   }, [micActive, setAudioState, resumeMic, startMicPersistent]);
 
+  // ---- Push-to-talk handlers ----
+  const handlePTTPress = useCallback(async () => {
+    if (isProcessingRef.current) return;
+    if (!micStartedRef.current) {
+      await startMicPersistent();
+    } else {
+      resumeMic();
+    }
+  }, [startMicPersistent, resumeMic]);
+
+  const handlePTTRelease = useCallback(() => {
+    if (!sttRef.current) return;
+    sttRef.current.flush(); // triggers final transcript → processUserMessage
+    sttRef.current.pause();
+    setMicActive(false);
+    setAudioState("idle");
+  }, [setAudioState]);
+
   const handleQuestionnaire = useCallback(() => {
     setPhase("questionnaire");
   }, [setPhase]);
