@@ -58,6 +58,17 @@ export class DeepgramSTT {
     this.fullTranscript = "";
   }
 
+  /** Force-finalize current transcript (used by push-to-talk on release) */
+  flush() {
+    if (this.silenceTimer) clearTimeout(this.silenceTimer);
+    const finalText = this.fullTranscript.trim();
+    this.fullTranscript = "";
+    if (finalText) {
+      debugLogger.log({ service: "stt", level: "info", direction: "in", label: `STT flush (PTT): "${finalText.slice(0, 100)}"` });
+      this.onTranscript(finalText, true);
+    }
+  }
+
   async start() {
     const config = await getDeepgramToken();
 

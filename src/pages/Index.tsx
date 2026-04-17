@@ -200,8 +200,10 @@ const Index = () => {
 
   const handleTriggerComplete = useCallback(() => {
     endTrigger();
-    setTimeout(() => resumeMic(), 300);
-  }, [endTrigger, resumeMic]);
+    if (state.voiceModality !== "push_to_talk") {
+      setTimeout(() => resumeMic(), 300);
+    }
+  }, [endTrigger, resumeMic, state.voiceModality]);
 
   // ---- Optimized conversation pipeline with sentence-level TTS ----
   const processUserMessage = useCallback(async (userText: string) => {
@@ -348,11 +350,11 @@ const Index = () => {
       setAudioState("idle");
       setTimeout(() => setMaxSubtitle(""), 3000);
       turnPerf.end();
-      if (micStartedRef.current) {
+      if (micStartedRef.current && state.voiceModality !== "push_to_talk") {
         setTimeout(() => resumeMic(), 300);
       }
     }
-  }, [setAudioState, addMessage, state.trustLevel, state.triggeredIds, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo, resumeMic]);
+  }, [setAudioState, addMessage, state.trustLevel, state.triggeredIds, state.voiceModality, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo, resumeMic]);
 
   processUserMessageRef.current = processUserMessage;
 
@@ -370,6 +372,24 @@ const Index = () => {
       }
     }
   }, [micActive, setAudioState, resumeMic, startMicPersistent]);
+
+  // ---- Push-to-talk handlers ----
+  const handlePTTPress = useCallback(async () => {
+    if (isProcessingRef.current) return;
+    if (!micStartedRef.current) {
+      await startMicPersistent();
+    } else {
+      resumeMic();
+    }
+  }, [startMicPersistent, resumeMic]);
+
+  const handlePTTRelease = useCallback(() => {
+    if (!sttRef.current) return;
+    sttRef.current.flush(); // triggers final transcript → processUserMessage
+    sttRef.current.pause();
+    setMicActive(false);
+    setAudioState("idle");
+  }, [setAudioState]);
 
   const handleQuestionnaire = useCallback(() => {
     setPhase("questionnaire");
@@ -454,6 +474,9 @@ const Index = () => {
           elapsedSeconds={settings.TIMEOUT_SECONDS - timer.remaining}
           onEarlyQuestionnaire={handleQuestionnaire}
           onHangUp={handleHangUp}
+          voiceModality={state.voiceModality}
+          onPTTPress={handlePTTPress}
+          onPTTRelease={handlePTTRelease}
         />
       );
     case "video_trigger": {

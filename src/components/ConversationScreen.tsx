@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Info, ClipboardList, PhoneOff } from "lucide-react";
-import type { AudioState } from "@/types";
+import { Info, ClipboardList, PhoneOff, Mic } from "lucide-react";
+import type { AudioState, VoiceModality } from "@/types";
 import SubtitleOverlay from "./SubtitleOverlay";
+import { usePushToTalk } from "@/hooks/usePushToTalk";
 
 interface ConversationScreenProps {
   timerFormatted: string;
@@ -17,6 +18,9 @@ interface ConversationScreenProps {
   elapsedSeconds: number;
   onEarlyQuestionnaire?: () => void;
   onHangUp?: () => void;
+  voiceModality?: VoiceModality | null;
+  onPTTPress?: () => void;
+  onPTTRelease?: () => void;
 }
 
 const statusLabels: Record<AudioState, string> = {
@@ -42,9 +46,19 @@ const ConversationScreen = ({
   elapsedSeconds,
   onEarlyQuestionnaire,
   onHangUp,
+  voiceModality,
+  onPTTPress,
+  onPTTRelease,
 }: ConversationScreenProps) => {
   const [showInfo, setShowInfo] = useState(false);
   const showQuestionnaire = elapsedSeconds >= EARLY_QUESTIONNAIRE_DELAY && onEarlyQuestionnaire;
+  const isPTT = voiceModality === "push_to_talk";
+
+  const { buttonHandlers } = usePushToTalk({
+    enabled: isPTT && !!onPTTPress && !!onPTTRelease,
+    onPress: () => onPTTPress?.(),
+    onRelease: () => onPTTRelease?.(),
+  });
 
   const trustPercent = Math.min(100, (trustLevel / trustThreshold) * 100);
 
@@ -134,27 +148,39 @@ const ConversationScreen = ({
         {/* Mic hint — only show if mic was NEVER activated */}
         {!micEverStarted && !micActive && (
           <p className="text-xs text-muted-foreground/60 animate-fade-in">
-            Cliquez sur le micro pour parler à Max
+            {isPTT
+              ? "Maintiens le bouton (ou la barre Espace) pour parler"
+              : "Cliquez sur le micro pour parler à Max"}
           </p>
         )}
       </div>
 
-      {/* Mic + Hang Up — bottom center */}
+      {/* Mic / PTT + Hang Up — bottom center */}
       <div className="absolute bottom-32 z-20 flex items-center gap-6">
-        <button
-          onClick={onMicToggle}
-          className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${
-            micActive
-              ? "border-primary bg-primary/10 text-primary animate-pulse-mic"
-              : "border-border bg-secondary text-muted-foreground hover:border-primary/50"
-          }`}
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" x2="12" y1="19" y2="22" />
-          </svg>
-        </button>
+        {isPTT ? (
+          <button
+            {...buttonHandlers}
+            className={`flex h-20 w-20 items-center justify-center rounded-full border-2 select-none transition-all touch-none ${
+              micActive
+                ? "border-primary bg-primary/20 text-primary scale-110 animate-pulse-mic"
+                : "border-border bg-secondary text-muted-foreground hover:border-primary/50 active:scale-95"
+            }`}
+            title="Maintenir pour parler (Espace)"
+          >
+            <Mic size={28} />
+          </button>
+        ) : (
+          <button
+            onClick={onMicToggle}
+            className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${
+              micActive
+                ? "border-primary bg-primary/10 text-primary animate-pulse-mic"
+                : "border-border bg-secondary text-muted-foreground hover:border-primary/50"
+            }`}
+          >
+            <Mic size={24} />
+          </button>
+        )}
         {onHangUp && (
           <button
             onClick={onHangUp}
