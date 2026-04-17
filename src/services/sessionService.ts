@@ -132,7 +132,9 @@ export async function syncQuestionnaireToNotion(
   questionnaire: QuestionnaireData,
   trustLevel: number,
   durationSeconds: number,
-  gameOverReason: string | null
+  gameOverReason: string | null,
+  variant?: string | null,
+  voiceModality?: string | null,
 ): Promise<void> {
   try {
     const startTime = Date.now();
@@ -146,6 +148,8 @@ export async function syncQuestionnaireToNotion(
         trustLevel,
         durationSeconds,
         gameOverReason,
+        variant,
+        voiceModality,
       }),
     });
     if (!res.ok) {
