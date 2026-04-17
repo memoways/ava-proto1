@@ -378,8 +378,12 @@ const Index = () => {
   }, [setPhase, gameOver, state.trustLevel, state.triggeredIds, timer.remaining]);
 
   switch (state.phase) {
-    case "onboarding":
-      return <OnboardingScreen onStart={handleStart} onSkip={handleStart} />;
+    case "ab_choice":
+      return <ABChoiceScreen onChoose={handleABChoice} />;
+    case "onboarding_a":
+      return <OnboardingAScreen onContinue={handleOnboardingComplete} />;
+    case "onboarding_b":
+      return <OnboardingBScreen onContinue={handleOnboardingComplete} />;
     case "intro_video":
       return (
         <GumletVideoPlayer
