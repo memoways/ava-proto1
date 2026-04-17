@@ -200,8 +200,10 @@ const Index = () => {
 
   const handleTriggerComplete = useCallback(() => {
     endTrigger();
-    setTimeout(() => resumeMic(), 300);
-  }, [endTrigger, resumeMic]);
+    if (state.voiceModality !== "push_to_talk") {
+      setTimeout(() => resumeMic(), 300);
+    }
+  }, [endTrigger, resumeMic, state.voiceModality]);
 
   // ---- Optimized conversation pipeline with sentence-level TTS ----
   const processUserMessage = useCallback(async (userText: string) => {
@@ -352,7 +354,7 @@ const Index = () => {
         setTimeout(() => resumeMic(), 300);
       }
     }
-  }, [setAudioState, addMessage, state.trustLevel, state.triggeredIds, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo, resumeMic]);
+  }, [setAudioState, addMessage, state.trustLevel, state.triggeredIds, state.voiceModality, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo, resumeMic]);
 
   processUserMessageRef.current = processUserMessage;
 
@@ -472,6 +474,9 @@ const Index = () => {
           elapsedSeconds={settings.TIMEOUT_SECONDS - timer.remaining}
           onEarlyQuestionnaire={handleQuestionnaire}
           onHangUp={handleHangUp}
+          voiceModality={state.voiceModality}
+          onPTTPress={handlePTTPress}
+          onPTTRelease={handlePTTRelease}
         />
       );
     case "video_trigger": {
