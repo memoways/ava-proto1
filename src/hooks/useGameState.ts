@@ -1,8 +1,16 @@
 import { useState, useCallback } from "react";
-import type { GameState, GamePhase, AudioState, ConversationMessage, VideoTrigger } from "@/types";
+import type {
+  GameState,
+  GamePhase,
+  AudioState,
+  ConversationMessage,
+  VideoTrigger,
+  OnboardingVariant,
+  VoiceModality,
+} from "@/types";
 
 const initialState: GameState = {
-  phase: "onboarding",
+  phase: "ab_choice",
   trustLevel: 0,
   triggeredIds: [],
   questionCount: 0,
@@ -10,6 +18,9 @@ const initialState: GameState = {
   conversationLog: [],
   gameOverReason: null,
   currentTrigger: null,
+  variant: null,
+  voiceModality: null,
+  character: "max",
 };
 
 export function useGameState() {
@@ -52,6 +63,18 @@ export function useGameState() {
     setState((s) => ({ ...s, phase: "game_over", gameOverReason: reason }));
   }, []);
 
+  const setVariant = useCallback((variant: OnboardingVariant) => {
+    setState((s) => ({ ...s, variant }));
+  }, []);
+
+  const setVoiceModality = useCallback((modality: VoiceModality) => {
+    setState((s) => ({ ...s, voiceModality: modality }));
+  }, []);
+
+  const setCharacter = useCallback((character: string) => {
+    setState((s) => ({ ...s, character }));
+  }, []);
+
   const reset = useCallback(() => {
     setState(initialState);
   }, []);
@@ -65,6 +88,9 @@ export function useGameState() {
     triggerVideo,
     endTrigger,
     gameOver,
+    setVariant,
+    setVoiceModality,
+    setCharacter,
     reset,
   };
 }

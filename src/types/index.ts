@@ -1,12 +1,19 @@
 export type GamePhase =
-  | "onboarding"
+  | "ab_choice"
+  | "onboarding_a"
+  | "onboarding_b"
   | "intro_video"
+  | "character_select"
+  | "ringing"
   | "conversation"
   | "video_trigger"
   | "gate"
   | "game_over"
   | "questionnaire"
   | "thanks";
+
+export type OnboardingVariant = "A" | "B";
+export type VoiceModality = "micro_ouvert" | "push_to_talk";
 
 export type AudioState = "idle" | "user_speaking" | "max_thinking" | "max_speaking";
 
@@ -32,6 +39,9 @@ export interface GameState {
   conversationLog: ConversationMessage[];
   gameOverReason: string | null;
   currentTrigger: VideoTrigger | null;
+  variant: OnboardingVariant | null;
+  voiceModality: VoiceModality | null;
+  character: string;
 }
 
 export interface ConversationMessage {
