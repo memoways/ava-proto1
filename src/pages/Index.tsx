@@ -348,7 +348,7 @@ const Index = () => {
       setAudioState("idle");
       setTimeout(() => setMaxSubtitle(""), 3000);
       turnPerf.end();
-      if (micStartedRef.current) {
+      if (micStartedRef.current && state.voiceModality !== "push_to_talk") {
         setTimeout(() => resumeMic(), 300);
       }
     }
