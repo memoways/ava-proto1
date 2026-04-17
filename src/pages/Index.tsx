@@ -10,7 +10,9 @@ import { trackEvent, identifyUser } from "@/services/posthogService";
 import settings from "@/config/settings.json";
 import type { QuestionnaireData, ConversationMessage } from "@/types";
 
-import OnboardingScreen from "@/components/OnboardingScreen";
+import ABChoiceScreen from "@/components/ABChoiceScreen";
+import OnboardingAScreen from "@/components/OnboardingAScreen";
+import OnboardingBScreen from "@/components/OnboardingBScreen";
 import VideoPlaceholder from "@/components/VideoPlaceholder";
 import GumletVideoPlayer from "@/components/GumletVideoPlayer";
 import ConversationScreen from "@/components/ConversationScreen";
@@ -47,7 +49,7 @@ const perf = (label: string) => {
 };
 
 const Index = () => {
-  const { state, setPhase, setAudioState, addMessage, updateTrust, triggerVideo, endTrigger, gameOver, reset } = useGameState();
+  const { state, setPhase, setAudioState, addMessage, updateTrust, triggerVideo, endTrigger, gameOver, setVariant, setVoiceModality, reset } = useGameState();
   const [micActive, setMicActive] = useState(false);
   const [micEverStarted, setMicEverStarted] = useState(false);
   const [userSubtitle, setUserSubtitle] = useState("");
@@ -75,10 +77,14 @@ const Index = () => {
     gameOver("timeout");
   });
 
-  const handleStart = useCallback(async () => {
+  const handleABChoice = useCallback(async (variant: "A" | "B") => {
+    // Assign voice modality randomly (50/50)
+    const modality: "micro_ouvert" | "push_to_talk" = Math.random() < 0.5 ? "micro_ouvert" : "push_to_talk";
+    setVariant(variant);
+    setVoiceModality(modality);
+
     // Fire preloads in parallel with session creation
     preloadSystemPrompt();
-    // Warm up edge functions (fire-and-forget OPTIONS preflight)
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     ["proxy-llm", "proxy-tts", "query-rag"].forEach(fn => {
       fetch(`${supabaseUrl}/functions/v1/${fn}`, { method: "OPTIONS" }).catch(() => {});
@@ -88,10 +94,26 @@ const Index = () => {
       const id = await createSession();
       sessionIdRef.current = id;
       identifyUser(id);
-      trackEvent("game_started", { session_id: id });
+      trackEvent("game_started", { session_id: id, variant, voice_modality: modality });
+      trackEvent("ab_choice_made", { variant });
+      trackEvent("voice_modality_assigned", { modality });
+      // Persist variant + modality in session
+      updateSession(id, {
+        variante_onboarding: variant,
+        modalite_voix: modality,
+        personnage_appele: "max",
+      }).catch(console.error);
     } catch (e) {
       console.error("Failed to create session:", e);
     }
+
+    // Route to the correct onboarding placeholder
+    const nextPhase = variant === "A" ? "onboarding_a" : "onboarding_b";
+    setPhase(nextPhase);
+    trackEvent("phase_changed", { phase: nextPhase });
+  }, [setPhase, setVariant, setVoiceModality]);
+
+  const handleOnboardingComplete = useCallback(() => {
     setPhase("intro_video");
     trackEvent("phase_changed", { phase: "intro_video" });
   }, [setPhase]);
@@ -356,8 +378,12 @@ const Index = () => {
   }, [setPhase, gameOver, state.trustLevel, state.triggeredIds, timer.remaining]);
 
   switch (state.phase) {
-    case "onboarding":
-      return <OnboardingScreen onStart={handleStart} onSkip={handleStart} />;
+    case "ab_choice":
+      return <ABChoiceScreen onChoose={handleABChoice} />;
+    case "onboarding_a":
+      return <OnboardingAScreen onContinue={handleOnboardingComplete} />;
+    case "onboarding_b":
+      return <OnboardingBScreen onContinue={handleOnboardingComplete} />;
     case "intro_video":
       return (
         <GumletVideoPlayer
