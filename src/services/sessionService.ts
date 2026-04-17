@@ -42,12 +42,28 @@ export async function updateSession(
     trust_level?: number;
     conversation_log?: ConversationMessage[];
     triggers_activated?: string[];
+    variante_onboarding?: "A" | "B";
+    modalite_voix?: "micro_ouvert" | "push_to_talk";
+    personnage_appele?: string;
+    narrative_end?: boolean;
   }
 ): Promise<void> {
-  const payload: Record<string, unknown> = {};
+  const payload: {
+    trust_level?: number;
+    conversation_log?: Json;
+    triggers_activated?: string[];
+    variante_onboarding?: string;
+    modalite_voix?: string;
+    personnage_appele?: string;
+    narrative_end?: boolean;
+  } = {};
   if (updates.trust_level !== undefined) payload.trust_level = updates.trust_level;
   if (updates.conversation_log) payload.conversation_log = JSON.parse(JSON.stringify(updates.conversation_log)) as Json;
   if (updates.triggers_activated) payload.triggers_activated = updates.triggers_activated;
+  if (updates.variante_onboarding) payload.variante_onboarding = updates.variante_onboarding;
+  if (updates.modalite_voix) payload.modalite_voix = updates.modalite_voix;
+  if (updates.personnage_appele) payload.personnage_appele = updates.personnage_appele;
+  if (updates.narrative_end !== undefined) payload.narrative_end = updates.narrative_end;
 
   const { error } = await supabase
     .from("sessions")

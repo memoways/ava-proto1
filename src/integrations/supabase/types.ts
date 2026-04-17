@@ -229,11 +229,16 @@ export type Database = {
           ended_at: string | null
           game_over_reason: string | null
           id: string
+          modalite_voix: string | null
           name: string | null
+          narrative_end: boolean | null
+          personnage_appele: string | null
+          player_role: Json | null
           questionnaire_responses: Json | null
           started_at: string | null
           triggers_activated: string[] | null
           trust_level: number | null
+          variante_onboarding: string | null
         }
         Insert: {
           admin_note?: string | null
@@ -243,11 +248,16 @@ export type Database = {
           ended_at?: string | null
           game_over_reason?: string | null
           id?: string
+          modalite_voix?: string | null
           name?: string | null
+          narrative_end?: boolean | null
+          personnage_appele?: string | null
+          player_role?: Json | null
           questionnaire_responses?: Json | null
           started_at?: string | null
           triggers_activated?: string[] | null
           trust_level?: number | null
+          variante_onboarding?: string | null
         }
         Update: {
           admin_note?: string | null
@@ -257,11 +267,16 @@ export type Database = {
           ended_at?: string | null
           game_over_reason?: string | null
           id?: string
+          modalite_voix?: string | null
           name?: string | null
+          narrative_end?: boolean | null
+          personnage_appele?: string | null
+          player_role?: Json | null
           questionnaire_responses?: Json | null
           started_at?: string | null
           triggers_activated?: string[] | null
           trust_level?: number | null
+          variante_onboarding?: string | null
         }
         Relationships: []
       }
