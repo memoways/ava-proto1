@@ -46,6 +46,11 @@ export class DeepgramSTT {
     return this.ws?.readyState === WebSocket.OPEN;
   }
 
+  /** Expose the underlying microphone stream (for audio-level visualization) */
+  getStream(): MediaStream | null {
+    return this.stream;
+  }
+
   /** Pause listening (mute) — keeps connection alive */
   pause() {
     this._paused = true;

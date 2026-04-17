@@ -59,6 +59,7 @@ const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const isProcessingRef = useRef(false);
   const [postVideoContext, setPostVideoContext] = useState<string | null>(null);
+  const [micStream, setMicStream] = useState<MediaStream | null>(null);
   const sessionIdRef = useRef<string | null>(null);
 
   const sttRef = useRef<DeepgramSTT | null>(null);
@@ -138,6 +139,7 @@ const Index = () => {
   const handleHangUp = useCallback(() => {
     sttRef.current?.stop();
     sttRef.current = null;
+    setMicStream(null);
     micStartedRef.current = false;
     setMicActive(false);
     const reason = "hang_up";
@@ -172,10 +174,12 @@ const Index = () => {
     try {
       await stt.start();
       sttRef.current = stt;
+      setMicStream(stt.getStream());
     } catch (err) {
       console.error("Failed to start STT:", err);
       setMicActive(false);
       setAudioState("idle");
+      setMicStream(null);
     }
   }, [setAudioState]);
 
@@ -407,6 +411,7 @@ const Index = () => {
   const handleRestart = useCallback(() => {
     sttRef.current?.stop();
     sttRef.current = null;
+    setMicStream(null);
     reset();
     timer.reset();
     setMicActive(false);
@@ -477,6 +482,7 @@ const Index = () => {
           voiceModality={state.voiceModality}
           onPTTPress={handlePTTPress}
           onPTTRelease={handlePTTRelease}
+          micStream={micStream}
         />
       );
     case "video_trigger": {

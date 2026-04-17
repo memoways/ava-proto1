@@ -3,6 +3,7 @@ import { Info, ClipboardList, PhoneOff, Mic } from "lucide-react";
 import type { AudioState, VoiceModality } from "@/types";
 import SubtitleOverlay from "./SubtitleOverlay";
 import { usePushToTalk } from "@/hooks/usePushToTalk";
+import { useAudioLevel } from "@/hooks/useAudioLevel";
 
 interface ConversationScreenProps {
   timerFormatted: string;
@@ -21,6 +22,7 @@ interface ConversationScreenProps {
   voiceModality?: VoiceModality | null;
   onPTTPress?: () => void;
   onPTTRelease?: () => void;
+  micStream?: MediaStream | null;
 }
 
 const statusLabels: Record<AudioState, string> = {
@@ -49,6 +51,7 @@ const ConversationScreen = ({
   voiceModality,
   onPTTPress,
   onPTTRelease,
+  micStream,
 }: ConversationScreenProps) => {
   const [showInfo, setShowInfo] = useState(false);
   const showQuestionnaire = elapsedSeconds >= EARLY_QUESTIONNAIRE_DELAY && onEarlyQuestionnaire;
@@ -59,6 +62,9 @@ const ConversationScreen = ({
     onPress: () => onPTTPress?.(),
     onRelease: () => onPTTRelease?.(),
   });
+
+  // Audio level for waveform visualization (active only while mic is live)
+  const audioLevel = useAudioLevel(micStream ?? null, micActive);
 
   const trustPercent = Math.min(100, (trustLevel / trustThreshold) * 100);
 
@@ -158,28 +164,69 @@ const ConversationScreen = ({
       {/* Mic / PTT + Hang Up — bottom center */}
       <div className="absolute bottom-32 z-20 flex items-center gap-6">
         {isPTT ? (
-          <button
-            {...buttonHandlers}
-            className={`flex h-20 w-20 items-center justify-center rounded-full border-2 select-none transition-all touch-none ${
-              micActive
-                ? "border-primary bg-primary/20 text-primary scale-110 animate-pulse-mic"
-                : "border-border bg-secondary text-muted-foreground hover:border-primary/50 active:scale-95"
-            }`}
-            title="Maintenir pour parler (Espace)"
-          >
-            <Mic size={28} />
-          </button>
+          <div className="relative flex items-center justify-center">
+            {micActive && (
+              <>
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute rounded-full bg-primary/20 transition-[transform,opacity] duration-100 ease-out"
+                  style={{
+                    width: 80,
+                    height: 80,
+                    transform: `scale(${1 + audioLevel * 0.9})`,
+                    opacity: 0.25 + audioLevel * 0.5,
+                  }}
+                />
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute rounded-full border-2 border-primary/40 transition-[transform,opacity] duration-150 ease-out"
+                  style={{
+                    width: 80,
+                    height: 80,
+                    transform: `scale(${1 + audioLevel * 1.6})`,
+                    opacity: 0.15 + audioLevel * 0.4,
+                  }}
+                />
+              </>
+            )}
+            <button
+              {...buttonHandlers}
+              className={`relative z-10 flex h-20 w-20 items-center justify-center rounded-full border-2 select-none transition-all touch-none ${
+                micActive
+                  ? "border-primary bg-primary/20 text-primary"
+                  : "border-border bg-secondary text-muted-foreground hover:border-primary/50 active:scale-95"
+              }`}
+              style={micActive ? { transform: `scale(${1.05 + audioLevel * 0.15})` } : undefined}
+              title="Maintenir pour parler (Espace)"
+            >
+              <Mic size={28} />
+            </button>
+          </div>
         ) : (
-          <button
-            onClick={onMicToggle}
-            className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${
-              micActive
-                ? "border-primary bg-primary/10 text-primary animate-pulse-mic"
-                : "border-border bg-secondary text-muted-foreground hover:border-primary/50"
-            }`}
-          >
-            <Mic size={24} />
-          </button>
+          <div className="relative flex items-center justify-center">
+            {micActive && (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute rounded-full bg-primary/20 transition-[transform,opacity] duration-100 ease-out"
+                style={{
+                  width: 64,
+                  height: 64,
+                  transform: `scale(${1 + audioLevel * 0.8})`,
+                  opacity: 0.25 + audioLevel * 0.5,
+                }}
+              />
+            )}
+            <button
+              onClick={onMicToggle}
+              className={`relative z-10 flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${
+                micActive
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-secondary text-muted-foreground hover:border-primary/50"
+              }`}
+            >
+              <Mic size={24} />
+            </button>
+          </div>
         )}
         {onHangUp && (
           <button
