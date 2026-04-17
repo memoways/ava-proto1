@@ -4,6 +4,48 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.13.0] - 2026-04-17 — Phase 1 PRD : A/B onboarding, PTT, sélection personnage, questionnaire enrichi
+
+### Ajouté
+- **Flow A/B testing onboarding** : nouvel écran `ABChoiceScreen` à l'entrée de l'app
+  - Variante **A — Co-création** : le joueur définit lui-même son rôle/intention dans l'enquête (`OnboardingAScreen`)
+  - Variante **B — Narrateur omniscient** : cadrage classique imposé par le Game Master (`OnboardingBScreen`)
+  - Variante stockée dans la session (`variante_onboarding`) et trackée PostHog (`ab_choice_made`)
+- **Sélection de personnage** : nouvel écran `CharacterSelectScreen` après l'onboarding
+  - Choix entre Max / Emma / Léo / Ava (Max actif, autres en *coming soon*)
+  - Personnage persisté dans `sessions.personnage_appele` + event `character_selected`
+- **Écran d'appel entrant** : nouveau `RingingScreen` avec sonnerie animée, boutons Répondre / Raccrocher
+- **Push-to-Talk (PTT)** : modalité voix assignée aléatoirement 50/50 par session
+  - Nouveau hook `usePushToTalk` : binding global barre Espace + pointer events (mouse/touch) avec pointer capture et release sur blur
+  - Nouvelle méthode `DeepgramSTT.flush()` qui force la finalisation du transcript courant au relâchement du bouton
+  - Bouton PTT dédié dans `ConversationScreen` activé selon `voiceModality`
+  - Auto-reprise du micro désactivée en mode PTT après réponse de Max ou cinématique
+  - Modalité stockée dans `sessions.modalite_voix` + events `voice_modality_assigned`
+- **Indicateur audio temps réel** : nouveau hook `useAudioLevel` (Web Audio API, RMS lissé)
+  - Halos concentriques animés autour du bouton micro/PTT, réagissant au volume capté
+  - `DeepgramSTT.getStream()` exposé pour permettre la visualisation
+- **Bouton "Raccrocher"** présent dans `RingingScreen` et `ConversationScreen` (déclenche game over `hang_up`)
+- **Bouton "Questionnaire"** apparaît après 4 minutes en bas à droite (sortie anticipée)
+- **Questionnaire enrichi paginé** (~50 champs sur 8 blocs) :
+  - Bloc 1 — Global (NPS, rating, mot-clé)
+  - Bloc 2 — Game Master / onboarding (clarté, rôle compris, immersion)
+  - Bloc 3A/3B — Variante reçue (co-création vs narrateur, freeform)
+  - Bloc 4 — Voix & modalité (naturalité Max/GM, confort modalité, sous-bloc PTT conditionnel)
+  - Bloc 5 — Latence détaillée (perçue + moments)
+  - Bloc 6 — Immersion / mécanique (legacy)
+  - Bloc 7 — Valeur perçue (paiement, prix, format)
+  - Bloc 8 — Contact (opt-in feedback / updates)
+  - Barre de progression + navigation Précédent/Suivant + logique conditionnelle (variant + modality)
+- **Sync Notion étendu** : 15 nouvelles colonnes créées dans la base Questionnaire (GM clarte, A cocreation engage, B narrateur immersif, PTT relachement, Latence percue, etc.) avec mapping `SELECT_MAPS` côté Edge Function
+
+### Modifié
+- **Routing global** : nouveau `GamePhase` étendu (`ab_choice`, `onboarding_a`, `onboarding_b`, `character_select`, `ringing`, …)
+- **`useGameState`** : ajout de `variant`, `voiceModality`, `character` + setters dédiés
+- **`Index.tsx`** : remplacement de l'OnboardingScreen unique par le flow A/B + sélection perso + ringing
+- **`syncQuestionnaireToNotion`** : signature étendue avec `variant` et `voiceModality`
+
+---
+
 ## [0.12.0] - 2026-03-12
 
 ### Corrigé
