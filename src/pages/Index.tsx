@@ -517,7 +517,7 @@ const Index = () => {
         />
       );
     case "questionnaire":
-      return <QuestionnaireScreen onSubmit={handleQuestionnaireSubmit} />;
+      return <QuestionnaireScreen onSubmit={handleQuestionnaireSubmit} variant={state.variant} voiceModality={state.voiceModality} />;
     case "thanks":
       return <ThanksScreen onRestart={handleRestart} />;
     default:
