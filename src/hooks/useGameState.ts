@@ -10,7 +10,7 @@ import type {
 } from "@/types";
 
 const initialState: GameState = {
-  phase: "ab_choice",
+  phase: "welcome",
   trustLevel: 0,
   triggeredIds: [],
   questionCount: 0,

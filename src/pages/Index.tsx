@@ -11,6 +11,7 @@ import settings from "@/config/settings.json";
 import type { QuestionnaireData, ConversationMessage } from "@/types";
 
 import ABChoiceScreen from "@/components/ABChoiceScreen";
+import OnboardingScreen from "@/components/OnboardingScreen";
 import OnboardingAScreen from "@/components/OnboardingAScreen";
 import OnboardingBScreen from "@/components/OnboardingBScreen";
 import CharacterSelectScreen from "@/components/CharacterSelectScreen";
@@ -439,6 +440,19 @@ const Index = () => {
   }, [setPhase, gameOver, state.trustLevel, state.triggeredIds, timer.remaining]);
 
   switch (state.phase) {
+    case "welcome":
+      return (
+        <OnboardingScreen
+          onStart={() => {
+            setPhase("ab_choice");
+            trackEvent("phase_changed", { phase: "ab_choice" });
+          }}
+          onSkip={() => {
+            setPhase("ab_choice");
+            trackEvent("phase_changed", { phase: "ab_choice" });
+          }}
+        />
+      );
     case "ab_choice":
       return <ABChoiceScreen onChoose={handleABChoice} />;
     case "onboarding_a":

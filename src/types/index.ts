@@ -1,4 +1,5 @@
 export type GamePhase =
+  | "welcome"
   | "ab_choice"
   | "onboarding_a"
   | "onboarding_b"
