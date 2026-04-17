@@ -507,6 +507,7 @@ const Index = () => {
           onPTTPress={handlePTTPress}
           onPTTRelease={handlePTTRelease}
           micStream={micStream}
+          sessionDurationSeconds={sessionDuration}
         />
       );
     case "video_trigger": {
