@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-03-12 (session 8)  
+> **Last Updated**: 2026-04-17 (session 9 — Phase 1 PRD)  
 
 ---
 
@@ -63,6 +63,31 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-04-17 — Phase 1 PRD : A/B onboarding + PTT + questionnaire enrichi 🔷
+
+**Intent**: Implémenter la Phase 1 du PRD : valider en parallèle deux variantes d'onboarding (co-création vs narrateur omniscient) et deux modalités vocales (micro ouvert vs push-to-talk), avec sélection de personnage, et collecter des retours quali/quanti riches via un questionnaire en 8 blocs.
+
+**Tool**: Lovable
+
+**Outcome (5 commits)**:
+
+1. **Refactor data model** — Extension de `GamePhase` (ajout `ab_choice`, `onboarding_a/b`, `character_select`, `ringing`), ajout dans `useGameState` des champs `variant: "A"|"B"`, `voiceModality: "micro_ouvert"|"push_to_talk"`, `character`. Persistance dans `sessions` (colonnes `variante_onboarding`, `modalite_voix`, `personnage_appele`).
+2. **`ABChoiceScreen` + nouveau routing** — Écran d'entrée présentant les 2 variantes ; à la sélection, assignation aléatoire 50/50 de la modalité voix, création de session, tracking PostHog (`ab_choice_made`, `voice_modality_assigned`), routing vers `OnboardingAScreen` ou `OnboardingBScreen` (textes différenciés selon le cadrage testé).
+3. **`CharacterSelectScreen` + `RingingScreen` + boutons Hang Up** — Écran de sélection de personnage (Max actif, Emma/Léo/Ava en coming soon), écran d'appel entrant avec sonnerie animée et bouton Répondre/Raccrocher, bouton "Raccrocher" (PhoneOff) ajouté aussi dans `ConversationScreen` (game over `hang_up`).
+4. **Questionnaire enrichi + sync Notion** — `QuestionnaireData` étendu à ~50 champs sur 8 blocs (Global, GM, Variante A/B, Voix & modalité, Latence, Immersion legacy, Valeur, Contact). `QuestionnaireScreen` réécrit en formulaire paginé avec barre de progression et logique conditionnelle (affichage des blocs A/B et PTT selon le contexte de la session). Edge Function `sync-questionnaire` mise à jour avec mapping `SELECT_MAPS`. **15 colonnes créées dans la base Notion** (GM clarte, A cocreation engage, B narrateur immersif, PTT relachement, Latence percue, etc.) via l'API Notion.
+5. **Push-to-Talk** — Nouveau hook `usePushToTalk` (binding global barre Espace + pointer events avec pointer capture, ignore les inputs/textareas, release sur blur). Nouvelle méthode `DeepgramSTT.flush()` qui force la finalisation du transcript en cours sur relâchement (au lieu d'attendre le silence de 1.5s). Bouton PTT dédié dans `ConversationScreen` (taille 80px vs 64px en micro ouvert). Auto-reprise du micro **désactivée** en mode PTT après une réponse de Max ou une cinématique vidéo.
+
+**Bonus** — Indicateur audio temps réel : nouveau hook `useAudioLevel` (Web Audio API, AnalyserNode, RMS lissé avec low-pass filter) ; deux halos concentriques animés autour du bouton micro/PTT réagissent au volume capté. `DeepgramSTT.getStream()` ajouté pour exposer le `MediaStream` au composant.
+
+**Difficultés rencontrées**:
+- Mapping Notion : 15 colonnes manquantes dans la base Questionnaire ont dû être créées via DDL (`ADD COLUMN`) avant que la sync ne fonctionne sur les nouveaux champs.
+- Closure dans le pipeline conversationnel : il fallait ajouter `state.voiceModality` aux dépendances du `useCallback` de `processUserMessage` pour que la condition d'auto-reprise du micro voie bien la valeur courante.
+- PTT vs silence detection : `pause()` seul ne suffisait pas (il *jette* le buffer). Une nouvelle méthode `flush()` était nécessaire pour émettre `(text, isFinal=true)` sur relâchement.
+
+**Time**: ~3h (5 commits + audit Notion + visualizer audio)
+
+---
 
 ### 2026-03-07 — Setup initial + Design system 🔷
 
