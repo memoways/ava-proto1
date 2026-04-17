@@ -482,6 +482,7 @@ const Index = () => {
           voiceModality={state.voiceModality}
           onPTTPress={handlePTTPress}
           onPTTRelease={handlePTTRelease}
+          micStream={micStream}
         />
       );
     case "video_trigger": {
