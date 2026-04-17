@@ -198,11 +198,10 @@ const Index = () => {
   }, [setAudioState, startMicPersistent]);
 
   const handleIntroComplete = useCallback(() => {
-    setPhase("conversation");
-    timer.start();
+    setPhase("ab_choice");
     trackEvent("intro_video_completed");
-    trackEvent("phase_changed", { phase: "conversation" });
-  }, [setPhase, timer]);
+    trackEvent("phase_changed", { phase: "ab_choice" });
+  }, [setPhase]);
 
   const handleTriggerComplete = useCallback(() => {
     endTrigger();
