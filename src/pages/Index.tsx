@@ -439,6 +439,19 @@ const Index = () => {
   }, [setPhase, gameOver, state.trustLevel, state.triggeredIds, timer.remaining]);
 
   switch (state.phase) {
+    case "welcome":
+      return (
+        <OnboardingScreen
+          onStart={() => {
+            setPhase("ab_choice");
+            trackEvent("phase_changed", { phase: "ab_choice" });
+          }}
+          onSkip={() => {
+            setPhase("ab_choice");
+            trackEvent("phase_changed", { phase: "ab_choice" });
+          }}
+        />
+      );
     case "ab_choice":
       return <ABChoiceScreen onChoose={handleABChoice} />;
     case "onboarding_a":
