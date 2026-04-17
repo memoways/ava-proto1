@@ -133,9 +133,10 @@ const Index = () => {
   }, [setPhase, setCharacter]);
 
   const handleRingingAnswer = useCallback(() => {
-    setPhase("intro_video");
-    trackEvent("phase_changed", { phase: "intro_video" });
-  }, [setPhase]);
+    setPhase("conversation");
+    timer.start();
+    trackEvent("phase_changed", { phase: "conversation" });
+  }, [setPhase, timer]);
 
   const handleHangUp = useCallback(() => {
     sttRef.current?.stop();
@@ -197,11 +198,10 @@ const Index = () => {
   }, [setAudioState, startMicPersistent]);
 
   const handleIntroComplete = useCallback(() => {
-    setPhase("conversation");
-    timer.start();
+    setPhase("ab_choice");
     trackEvent("intro_video_completed");
-    trackEvent("phase_changed", { phase: "conversation" });
-  }, [setPhase, timer]);
+    trackEvent("phase_changed", { phase: "ab_choice" });
+  }, [setPhase]);
 
   const handleTriggerComplete = useCallback(() => {
     endTrigger();
@@ -444,12 +444,12 @@ const Index = () => {
       return (
         <OnboardingScreen
           onStart={() => {
-            setPhase("ab_choice");
-            trackEvent("phase_changed", { phase: "ab_choice" });
+            setPhase("intro_video");
+            trackEvent("phase_changed", { phase: "intro_video" });
           }}
           onSkip={() => {
-            setPhase("ab_choice");
-            trackEvent("phase_changed", { phase: "ab_choice" });
+            setPhase("intro_video");
+            trackEvent("phase_changed", { phase: "intro_video" });
           }}
         />
       );
