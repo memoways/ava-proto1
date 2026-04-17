@@ -3,6 +3,7 @@ import { Info, ClipboardList, PhoneOff, Mic } from "lucide-react";
 import type { AudioState, VoiceModality } from "@/types";
 import SubtitleOverlay from "./SubtitleOverlay";
 import { usePushToTalk } from "@/hooks/usePushToTalk";
+import { useAudioLevel } from "@/hooks/useAudioLevel";
 
 interface ConversationScreenProps {
   timerFormatted: string;
@@ -21,6 +22,7 @@ interface ConversationScreenProps {
   voiceModality?: VoiceModality | null;
   onPTTPress?: () => void;
   onPTTRelease?: () => void;
+  micStream?: MediaStream | null;
 }
 
 const statusLabels: Record<AudioState, string> = {
