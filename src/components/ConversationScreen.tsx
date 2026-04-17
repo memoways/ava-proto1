@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Info, ClipboardList } from "lucide-react";
+import { Info, ClipboardList, PhoneOff } from "lucide-react";
 import type { AudioState } from "@/types";
 import SubtitleOverlay from "./SubtitleOverlay";
 
@@ -16,6 +16,7 @@ interface ConversationScreenProps {
   micEverStarted: boolean;
   elapsedSeconds: number;
   onEarlyQuestionnaire?: () => void;
+  onHangUp?: () => void;
 }
 
 const statusLabels: Record<AudioState, string> = {
@@ -40,6 +41,7 @@ const ConversationScreen = ({
   micEverStarted,
   elapsedSeconds,
   onEarlyQuestionnaire,
+  onHangUp,
 }: ConversationScreenProps) => {
   const [showInfo, setShowInfo] = useState(false);
   const showQuestionnaire = elapsedSeconds >= EARLY_QUESTIONNAIRE_DELAY && onEarlyQuestionnaire;

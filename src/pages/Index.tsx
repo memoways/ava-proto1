@@ -420,6 +420,16 @@ const Index = () => {
       return <OnboardingAScreen onContinue={handleOnboardingComplete} />;
     case "onboarding_b":
       return <OnboardingBScreen onContinue={handleOnboardingComplete} />;
+    case "character_select":
+      return <CharacterSelectScreen onSelect={handleCharacterSelect} />;
+    case "ringing":
+      return (
+        <RingingScreen
+          characterName={state.character.charAt(0).toUpperCase() + state.character.slice(1)}
+          onAnswer={handleRingingAnswer}
+          onHangUp={handleHangUp}
+        />
+      );
     case "intro_video":
       return (
         <GumletVideoPlayer
@@ -443,6 +453,7 @@ const Index = () => {
           micEverStarted={micEverStarted}
           elapsedSeconds={settings.TIMEOUT_SECONDS - timer.remaining}
           onEarlyQuestionnaire={handleQuestionnaire}
+          onHangUp={handleHangUp}
         />
       );
     case "video_trigger": {
