@@ -139,8 +139,8 @@ const ConversationScreen = ({
         )}
       </div>
 
-      {/* Mic button */}
-      <div className="absolute bottom-32 z-20">
+      {/* Mic + Hang Up — bottom center */}
+      <div className="absolute bottom-32 z-20 flex items-center gap-6">
         <button
           onClick={onMicToggle}
           className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${
@@ -155,6 +155,15 @@ const ConversationScreen = ({
             <line x1="12" x2="12" y1="19" y2="22" />
           </svg>
         </button>
+        {onHangUp && (
+          <button
+            onClick={onHangUp}
+            className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all"
+            title="Raccrocher"
+          >
+            <PhoneOff size={18} />
+          </button>
+        )}
       </div>
 
       {/* Early questionnaire tab — appears after 4 min */}
