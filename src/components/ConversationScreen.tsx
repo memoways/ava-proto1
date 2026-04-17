@@ -23,6 +23,7 @@ interface ConversationScreenProps {
   onPTTPress?: () => void;
   onPTTRelease?: () => void;
   micStream?: MediaStream | null;
+  sessionDurationSeconds?: number;
 }
 
 const statusLabels: Record<AudioState, string> = {
@@ -31,8 +32,6 @@ const statusLabels: Record<AudioState, string> = {
   max_thinking: "Max réfléchit…",
   max_speaking: "Max parle…",
 };
-
-const EARLY_QUESTIONNAIRE_DELAY = 240; // 4 minutes
 
 const ConversationScreen = ({
   timerFormatted,
