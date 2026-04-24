@@ -245,7 +245,7 @@ const Index = () => {
       console.log("[processUserMessage] Starting LLM call...");
       const llmPerf = perf("LLM total (Max streaming)");
 
-      const { maxResponse, validation, gameMasterPromise } = await processConversationTurn(
+      const { maxResponse, validation, timings, gameMasterPromise } = await processConversationTurn(
         userText,
         conversationHistoryRef.current.slice(0, -1),
         state.trustLevel,
@@ -266,6 +266,7 @@ const Index = () => {
       setMaxSubtitle(maxResponse);
       setAudioState("max_speaking");
 
+      const ttsStart = performance.now();
       const ttsQueue = new TTSQueue();
       const [sentences, leftover] = extractSentences(maxResponse);
       for (const sentence of sentences) {
@@ -275,21 +276,38 @@ const Index = () => {
         ttsQueue.enqueue(leftover);
       }
 
-      // Add Max response to history (with validation trace for metrics persistence)
-      const maxMsg: ConversationMessage = { role: "max", content: maxResponse, timestamp: Date.now(), validation };
-      conversationHistoryRef.current.push(maxMsg);
-      addMessage(maxMsg);
-      setPostVideoContext(null);
-
       // Wait for TTS playback + Game Master in parallel
       const gmPerf = perf("Game Master");
       const [, gmResult] = await Promise.all([
         ttsQueue.drain(),
         gameMasterPromise.then(r => { gmPerf.end(); return r; }),
       ]);
+      const tts_ms = Math.round(performance.now() - ttsStart);
+
+      // Build full pipeline timings + identify the bottleneck (>2s rule)
+      const fullTimings = {
+        ...timings,
+        tts_ms,
+        gm_post_ms: gmResult.gm_post_ms,
+        total_ms: Math.round(performance.now() - turnPerf["__startMark" as never] || 0) || timings.total_ms,
+      };
+      const blocker = pickBlocker(fullTimings);
+      fullTimings.blocker = blocker;
+
+      // Add Max response to history (with validation + pipeline trace for admin observability)
+      const maxMsg: ConversationMessage = {
+        role: "max",
+        content: maxResponse,
+        timestamp: Date.now(),
+        validation,
+        pipeline: fullTimings,
+      };
+      conversationHistoryRef.current.push(maxMsg);
+      addMessage(maxMsg);
+      setPostVideoContext(null);
 
       const { gameMasterResponse, trigger } = gmResult;
-      console.log("[Game Master]", gameMasterResponse);
+      console.log("[Game Master]", gameMasterResponse, "[Pipeline timings]", fullTimings);
 
       const newTrust = state.trustLevel + gameMasterResponse.trust_delta;
       if (gameMasterResponse.trust_delta !== 0) {
