@@ -12,8 +12,47 @@ import {
   type AntiHallucinationValidatorSettings,
 } from "@/services/settingsService";
 
+function splitLines(value: string): string[] {
+  return value.split("\n").map((line) => line.trim()).filter(Boolean);
+}
+
 function countLines(value: string) {
-  return value.split("\n").map((line) => line.trim()).filter(Boolean).length;
+  return splitLines(value).length;
+}
+
+function mergeUnique(...lists: Array<string[] | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const list of lists) {
+    if (!list) continue;
+    for (const item of list) {
+      const key = item.trim();
+      if (!key) continue;
+      const dedupKey = key.toLowerCase();
+      if (seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+      out.push(key);
+    }
+  }
+  return out;
+}
+
+type PipelineSnapshot = {
+  updatedAt?: string;
+  preTurnBrief?: {
+    allowed_knowledge?: string[];
+    forbidden_topics?: string[];
+    blocked_assertions?: string[];
+  };
+};
+
+function readLastTrace(): PipelineSnapshot | null {
+  try {
+    const raw = localStorage.getItem("ava_pipeline_last_trace");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
 
 export default function AntiHallucinationValidatorTab() {
@@ -33,6 +72,30 @@ export default function AntiHallucinationValidatorTab() {
     facts: countLines(settings.authorizedFacts),
     rules: countLines(settings.blockedAssertionRules),
   }), [settings]);
+
+  const [trace, setTrace] = useState<PipelineSnapshot | null>(() => readLastTrace());
+
+  function refreshTrace() {
+    setTrace(readLastTrace());
+  }
+
+  const merged = useMemo(() => {
+    const globalFacts = splitLines(settings.authorizedFacts);
+    const globalRules = splitLines(settings.blockedAssertionRules);
+    const turnAllowed = trace?.preTurnBrief?.allowed_knowledge ?? [];
+    const turnForbidden = trace?.preTurnBrief?.forbidden_topics ?? [];
+    const turnBlocked = trace?.preTurnBrief?.blocked_assertions ?? [];
+    return {
+      globalFacts,
+      globalRules,
+      turnAllowed,
+      turnForbidden,
+      turnBlocked,
+      mergedFacts: mergeUnique(globalFacts, turnAllowed),
+      mergedBlocked: mergeUnique(globalRules, turnBlocked),
+      mergedForbidden: mergeUnique(turnForbidden),
+    };
+  }, [settings, trace]);
 
   function updateField(key: keyof AntiHallucinationValidatorSettings, value: string) {
     const updated = saveAntiHallucinationValidatorSettings({ [key]: value });
