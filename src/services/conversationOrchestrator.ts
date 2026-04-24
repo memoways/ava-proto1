@@ -54,6 +54,7 @@ const MAX_VALIDATION_RETRIES = 1;
 interface ValidatedMaxResponse {
   response: string;
   validation: ConversationValidationTrace;
+  timings: { max_ms: number; validator_ms: number };
 }
 
 /**
