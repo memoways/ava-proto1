@@ -4,6 +4,37 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.14.0] - 2026-04-24 — Contrôle éditorial de Max, simulation et robustesse OpenRouter
+
+### Ajouté
+- **Contrôle structuré du prompt de Max** : nouveau système de pilotage séparant la persona, les objectifs, l'historique injecté et les garde-fous d'affirmation
+  - Nouvel onglet admin `MaxPromptControlTab`
+  - Paramètres persistés via `settingsService` pour cadrer ce que Max sait, ce qu'il peut dire et ce qu'il doit refuser d'affirmer
+- **Écran de test de conformité** : nouvel onglet `MaxPromptTestTab` pour simuler une réponse de Max à partir d'un exemple de contexte RAG
+  - Visualisation du contexte injecté
+  - Vérification explicite du respect des contraintes d'interdiction d'affirmation
+  - Retour lisible pour l'équipe éditoriale avant test en conversation réelle
+- **Pipeline conversationnel visible dans l'admin** : nouvel onglet `PipelineTraceTab`
+  - Affiche l'entrée utilisateur, le contexte RAG, le brief pré-tour du GM et la trace du dernier tour
+  - Première matérialisation de la Phase 1 du plan d'implémentation Max/GM
+- **Pré-turn planner GM** : introduction d'un brief structuré `GameMasterTurnBrief` généré avant la réponse de Max
+  - Champs de direction éditoriale : `response_mode`, `openness_level`, `reveal_budget`, `style_instructions`
+  - Prompt dédié éditable depuis l'admin via `preTurnPlannerPrompt`
+
+### Modifié
+- **Orchestrateur de conversation** : `processConversationTurn()` suit maintenant une logique en deux temps
+  - préparation du tour par le Game Master
+  - génération de Max sous contraintes
+  - post-analyse légère pour la progression narrative
+- **Agent Max** : prise en compte du nouveau contrat de contrôle éditorial (persona + contexte + contraintes du tour)
+- **Services RAG et settings** : alignés pour exposer et persister les nouvelles briques de contrôle, de simulation et de traçabilité
+
+### Corrigé
+- **Lookup OpenRouter non bloquant** : correction du crash provoqué par les réponses 404/5xx lors de la récupération différée des coûts de génération
+  - `proxy-llm` renvoie désormais une réponse structurée non fatale pour `get_generation_cost` quand la génération n'est pas encore disponible
+  - `llmUsageTracker` traite ces cas comme "coût indisponible pour l'instant" au lieu de faire échouer le runtime
+  - Élimine le blank screen lié au message `Generation lookup failed: 404`
+
 ## [0.13.0] - 2026-04-17 — Phase 1 PRD : A/B onboarding, PTT, sélection personnage, questionnaire enrichi
 
 ### Ajouté
