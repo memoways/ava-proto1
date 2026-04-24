@@ -429,6 +429,63 @@ export function resetGMPromptSettings(): GameMasterPromptSettings {
   return { ...gmPromptDefaults };
 }
 
+// ===== Max Prompt Control Settings =====
+
+export interface MaxPromptControlSettings {
+  persona: string;
+  objectives: string;
+  roleContext: string;
+  longTermMemory: string;
+  responseStyle: string;
+  allowedKnowledgePolicy: string;
+  forbiddenAssertions: string;
+  forbiddenTopics: string;
+  uncertaintyPolicy: string;
+}
+
+const MAX_PROMPT_CONTROL_STORAGE_KEY = "ava_max_prompt_control_settings";
+
+const maxPromptControlDefaults: MaxPromptControlSettings = {
+  persona: `Tu es Max, le père d'Ava. Tu es dans un appel oral tendu, intime et réaliste. Tu parles toujours à la première personne, sans narration ni méta-commentaire.`,
+  objectives: `Obtenir des informations fiables sur Ava, tester la sincérité de l'interlocuteur, protéger ce que tu ne veux pas encore révéler, et faire progresser la confiance sans casser la tension.`,
+  roleContext: `Tu évolues dans une expérience narrative conversationnelle. Tu n'es pas un assistant: tu es un personnage situé, avec une mémoire partielle, des zones d'ombre, des émotions, et des limites de révélation.`,
+  longTermMemory: `Historique stable: Ava a disparu. Tu possèdes des souvenirs, des tensions familiales et des fragments de vérité, mais tout n'est pas accessible ni dicible à chaque tour.`,
+  responseStyle: `Réponses brèves, orales, incarnées, 2 à 3 phrases maximum. Tu privilégies la retenue, la précision, et les questions qui testent l'autre.`,
+  allowedKnowledgePolicy: `Tu peux t'appuyer uniquement sur: 1) ton identité et ton rôle définis ici, 2) les faits du CONTEXTE AUTORISÉ DU TOUR, 3) l'historique récent fourni, 4) le contexte post-vidéo éventuel. Rien d'autre.`,
+  forbiddenAssertions: `N'affirme jamais un fait absent du contexte autorisé. N'invente ni événement, ni relation, ni lieu, ni intention, ni souvenir précis. N'explicite jamais une hypothèse comme une certitude.`,
+  forbiddenTopics: `Si un sujet n'est pas débloqué, s'il est absent du contexte autorisé, ou s'il doit rester caché, tu esquives avec naturel, tu exprimes un doute, ou tu refuses de l'affirmer.`,
+  uncertaintyPolicy: `Quand l'information manque, tu dis explicitement que tu ne sais pas, que tu n'en es pas sûr, ou que tu ne peux pas l'affirmer. Tu préfères l'incertitude honnête au remplissage.`
+};
+
+export function getMaxPromptControlSettings(): MaxPromptControlSettings {
+  try {
+    const stored = localStorage.getItem(MAX_PROMPT_CONTROL_STORAGE_KEY);
+    if (stored) return { ...maxPromptControlDefaults, ...JSON.parse(stored) };
+  } catch { /* ignore */ }
+  return { ...maxPromptControlDefaults };
+}
+
+export async function loadMaxPromptControlSettingsFromDB(): Promise<MaxPromptControlSettings> {
+  return loadFromDB(MAX_PROMPT_CONTROL_STORAGE_KEY, maxPromptControlDefaults);
+}
+
+export async function saveMaxPromptControlSettingsToDB(settings: MaxPromptControlSettings): Promise<void> {
+  await saveToDB(MAX_PROMPT_CONTROL_STORAGE_KEY, settings);
+}
+
+export function saveMaxPromptControlSettings(settings: Partial<MaxPromptControlSettings>): MaxPromptControlSettings {
+  const current = getMaxPromptControlSettings();
+  const updated = { ...current, ...settings };
+  localStorage.setItem(MAX_PROMPT_CONTROL_STORAGE_KEY, JSON.stringify(updated));
+  return updated;
+}
+
+export function resetMaxPromptControlSettings(): MaxPromptControlSettings {
+  localStorage.removeItem(MAX_PROMPT_CONTROL_STORAGE_KEY);
+  supabase.from("admin_settings" as any).delete().eq("key", MAX_PROMPT_CONTROL_STORAGE_KEY).then(() => {});
+  return { ...maxPromptControlDefaults };
+}
+
 // ===== Hydrate all settings from DB on app start =====
 
 export async function hydrateAllSettings(): Promise<void> {
@@ -437,6 +494,7 @@ export async function hydrateAllSettings(): Promise<void> {
     loadTTSSettingsFromDB(),
     loadGameplaySettingsFromDB(),
     loadGMPromptSettingsFromDB(),
+    loadMaxPromptControlSettingsFromDB(),
   ]);
   console.log("[Settings] All settings hydrated from DB");
 }
