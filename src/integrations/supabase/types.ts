@@ -190,6 +190,45 @@ export type Database = {
           },
         ]
       }
+      openrouter_cost_error_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          error_type: string
+          generation_id: string | null
+          id: string
+          metadata_json: Json
+          occurred_at: string
+          session_id: string | null
+          source: string
+          status_code: number | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          error_type: string
+          generation_id?: string | null
+          id?: string
+          metadata_json?: Json
+          occurred_at?: string
+          session_id?: string | null
+          source?: string
+          status_code?: number | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          error_type?: string
+          generation_id?: string | null
+          id?: string
+          metadata_json?: Json
+          occurred_at?: string
+          session_id?: string | null
+          source?: string
+          status_code?: number | null
+        }
+        Relationships: []
+      }
       rules: {
         Row: {
           category: string | null

@@ -13,6 +13,19 @@
 import { supabase } from "@/integrations/supabase/client";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const COST_ERROR_LOG_STORAGE_KEY = "ava_openrouter_cost_error_logs";
+const COST_FETCH_TIMEOUT_MS = 10000;
+
+export interface CostErrorLogEntry {
+  session_id?: string | null;
+  generation_id?: string | null;
+  error_type: "not_found" | "timeout" | "server_error" | "network_error" | "http_error" | "unknown";
+  status_code?: number | null;
+  error_message?: string | null;
+  source?: string;
+  metadata_json?: Record<string, unknown>;
+  occurred_at?: string;
+}
 
 export interface UsageLogEntry {
   session_id?: string | null;
@@ -27,6 +40,60 @@ export interface UsageLogEntry {
   status?: string;
   metadata_json?: Record<string, unknown>;
   error_message?: string | null;
+}
+
+function saveCostErrorLocally(entry: CostErrorLogEntry) {
+  try {
+    const existing = localStorage.getItem(COST_ERROR_LOG_STORAGE_KEY);
+    const parsed = existing ? JSON.parse(existing) : [];
+    const next = [
+      {
+        ...entry,
+        occurred_at: entry.occurred_at || new Date().toISOString(),
+      },
+      ...((Array.isArray(parsed) ? parsed : []) as CostErrorLogEntry[]),
+    ].slice(0, 100);
+    localStorage.setItem(COST_ERROR_LOG_STORAGE_KEY, JSON.stringify(next));
+  } catch (err) {
+    console.warn("[LLM Tracker] Local cost error log failed:", err);
+  }
+}
+
+export async function logCostFetchError(entry: CostErrorLogEntry): Promise<void> {
+  const occurredAt = entry.occurred_at || new Date().toISOString();
+  const normalizedEntry = {
+    session_id: entry.session_id || null,
+    generation_id: entry.generation_id || null,
+    error_type: entry.error_type,
+    status_code: entry.status_code ?? null,
+    error_message: entry.error_message || null,
+    source: entry.source || "cost_fetch",
+    metadata_json: entry.metadata_json || {},
+    occurred_at: occurredAt,
+  };
+
+  saveCostErrorLocally(normalizedEntry);
+
+  try {
+    const { error } = await supabase
+      .from("openrouter_cost_error_logs" as any)
+      .insert(normalizedEntry as any);
+
+    if (error) {
+      console.error("[LLM Tracker] Cost error DB insert failed:", error.message);
+    }
+  } catch (err) {
+    console.error("[LLM Tracker] Cost error DB insert exception:", err);
+  }
+}
+
+function getCostErrorType(status?: number, err?: unknown): CostErrorLogEntry["error_type"] {
+  if (status === 404) return "not_found";
+  if (status && status >= 500) return "server_error";
+  if (err instanceof DOMException && err.name === "AbortError") return "timeout";
+  if (err instanceof TypeError) return "network_error";
+  if (status) return "http_error";
+  return "unknown";
 }
 
 /**
@@ -89,7 +156,10 @@ export async function updateLLMUsage(
  * Fetch the cost for a generation from OpenRouter's generation API.
  * This is called via the edge function proxy to keep the API key server-side.
  */
-export async function fetchGenerationCost(generationId: string): Promise<{
+export async function fetchGenerationCost(
+  generationId: string,
+  context?: { session_id?: string | null; source?: string; metadata_json?: Record<string, unknown> }
+): Promise<{
   cost_usd: number;
   prompt_tokens: number;
   completion_tokens: number;
@@ -97,6 +167,8 @@ export async function fetchGenerationCost(generationId: string): Promise<{
 } | null> {
   try {
     const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), COST_FETCH_TIMEOUT_MS);
     const res = await fetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
       method: "POST",
       headers: {
@@ -104,13 +176,27 @@ export async function fetchGenerationCost(generationId: string): Promise<{
         "apikey": SUPABASE_KEY,
         "Authorization": `Bearer ${SUPABASE_KEY}`,
       },
+      signal: controller.signal,
       body: JSON.stringify({
         _action: "get_generation_cost",
         generation_id: generationId,
       }),
     });
+    clearTimeout(timeoutId);
     if (!res.ok) {
       const errText = await res.text();
+      await logCostFetchError({
+        session_id: context?.session_id,
+        generation_id: generationId,
+        error_type: getCostErrorType(res.status),
+        status_code: res.status,
+        error_message: errText.slice(0, 500),
+        source: context?.source || "cost_fetch",
+        metadata_json: {
+          ...(context?.metadata_json || {}),
+          stage: "fetch_generation_cost",
+        },
+      });
       // OpenRouter may return 404 while generation accounting is still propagating.
       // This is non-blocking for gameplay; retryCostFetch will try again later.
       if (res.status === 404) {
@@ -124,6 +210,17 @@ export async function fetchGenerationCost(generationId: string): Promise<{
     console.log(`[LLM Tracker] Cost data for ${generationId}:`, data);
     return data;
   } catch (err) {
+    await logCostFetchError({
+      session_id: context?.session_id,
+      generation_id: generationId,
+      error_type: getCostErrorType(undefined, err),
+      error_message: err instanceof Error ? err.message.slice(0, 500) : String(err).slice(0, 500),
+      source: context?.source || "cost_fetch",
+      metadata_json: {
+        ...(context?.metadata_json || {}),
+        stage: "fetch_generation_cost",
+      },
+    });
     console.error("[LLM Tracker] Cost fetch exception:", err);
     return null;
   }
@@ -172,7 +269,7 @@ export async function trackLLMCall(params: {
 async function retryCostFetch(
   logId: string,
   generationId: string,
-  params: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number },
+  params: { session_id?: string | null; prompt_tokens?: number; completion_tokens?: number; total_tokens?: number },
   delays: number[]
 ): Promise<void> {
   if (delays.length === 0) {
@@ -185,7 +282,13 @@ async function retryCostFetch(
   setTimeout(async () => {
     console.log(`[LLM Tracker] Fetching cost for ${generationId} (delay=${delay}ms, retries left=${remaining.length})`);
     try {
-      const costData = await fetchGenerationCost(generationId);
+      const costData = await fetchGenerationCost(generationId, {
+        session_id: params.session_id,
+        source: "cost_fetch_retry",
+        metadata_json: {
+          retries_remaining: remaining.length,
+        },
+      });
       if (costData && costData.cost_usd > 0) {
         await updateLLMUsage(logId, {
           cost_usd: costData.cost_usd,
@@ -200,6 +303,16 @@ async function retryCostFetch(
         retryCostFetch(logId, generationId, params, remaining);
       }
     } catch (err) {
+      await logCostFetchError({
+        session_id: params.session_id,
+        generation_id: generationId,
+        error_type: getCostErrorType(undefined, err),
+        error_message: err instanceof Error ? err.message.slice(0, 500) : String(err).slice(0, 500),
+        metadata_json: {
+          stage: "retry_cost_fetch",
+          retries_remaining: remaining.length,
+        },
+      });
       console.error(`[LLM Tracker] Cost fetch error:`, err);
       retryCostFetch(logId, generationId, params, remaining);
     }
@@ -211,13 +324,17 @@ async function retryCostFetch(
  */
 export async function retryCostForRow(row: {
   id: string;
+  session_id?: string | null;
   generation_id: string | null;
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
 }): Promise<boolean> {
   if (!row.generation_id) return false;
-  const costData = await fetchGenerationCost(row.generation_id);
+  const costData = await fetchGenerationCost(row.generation_id, {
+    session_id: row.session_id,
+    source: "cost_fetch_admin_retry",
+  });
   if (costData && costData.cost_usd > 0) {
     await updateLLMUsage(row.id, {
       cost_usd: costData.cost_usd,
