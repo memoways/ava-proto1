@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-04-24 (session 11 — validateur anti-hallucination, métriques et finitions du plan Max/GM)  
+> **Last Updated**: 2026-04-24 (session 12 — perf pipeline parallélisé, panneau "Latence & blocage", admin protégé par mot de passe)  
 
 ---
 
@@ -63,6 +63,25 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-04-24 — Performance pipeline + panneau latence + admin protégé 🔷
+
+**Intent**: Suite à un test live où Max ne répondait qu'une seule fois puis restait silencieux, identifier la cause de la latence/du blocage, refondre le pipeline pour qu'il soit non-bloquant, donner à l'équipe un outil de diagnostic permanent, et empêcher que n'importe qui avec l'URL `/admin` puisse casser des choses.
+
+**Tool**: Lovable + Lovable Cloud
+
+**Outcome**:
+1. **Diagnostic** — chaque tour enchaînait 3 appels LLM séquentiels (GM pre-turn → Max → Validateur) avant que le TTS ne puisse démarrer, soit 5 à 15s de latence. En plus, un JSON malformé du validateur ou un faux négatif déclenchait des régénérations inutiles voire un blocage silencieux.
+2. **Parallélisation** — `conversationOrchestrator.ts` exécute désormais `planGameMasterTurn` (GM pre-turn) et `simulateMaxResponse` (Max) en parallèle via `Promise.all`. Max consomme directement le contexte RAG initial ; le brief GM sert à la validation post-génération. Économie typique : 2-5s par tour.
+3. **Validateur fail-open** — `VALIDATION_TIMEOUT_MS = 4000` : au-delà, la réponse est libérée avec une trace `fail-open sur timeout`. Côté `maxAgent.ts`, si le LLM validateur renvoie un JSON malformé ou erreur, l'agent retourne `compliant: true` au lieu de bloquer. Les bypass restent visibles dans `HallucinationMetricsTab` pour audit éditorial.
+4. **Panneau admin "Latence & blocage"** (`LatencyBlockingTab`) — instrumentation complète : nouveau type `ConversationPipelineTimings` (rag_ms, gm_pre_ms, max_ms, validator_ms, tts_ms, gm_post_ms, total_ms) attaché à chaque message Max et persisté dans `conversation_log`. Le panneau affiche : (a) moyenne et max par étape sur 50 sessions, (b) timeline tour par tour, (c) **dernier point de blocage** identifié via `pickBlocker` selon des seuils (RAG > 1.5s, Max > 3s, validateur > 2s, TTS > 4s).
+5. **Accès `/admin` protégé** — `AdminAuthGate` ajoute un écran de login devant le dashboard. Identifiants : `game-master` / `jesuisdieu`, persistance via `sessionStorage`. Bouton "Déconnexion" en haut à droite. Sécurité légère assumée : objectif anti-curieux, pas anti-attaquant.
+
+**Ce que ça change** : le pipeline conversationnel passe de séquentiel-bloquant à parallèle-résilient. L'équipe a maintenant un outil de diagnostic permanent pour identifier où le temps part et où ça se bloque, plutôt que de deviner à chaque incident. Le `/admin` n'est plus une porte ouverte sur l'URL publique.
+
+**Time**: ~3h
+
+---
 
 ### 2026-04-24 — Validateur anti-hallucination + métriques + finitions plan Max/GM 🔷
 
