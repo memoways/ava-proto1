@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-04-17 (session 9 — Phase 1 PRD)  
+> **Last Updated**: 2026-04-24 (session 10 — contrôle éditorial Max / GM)  
 
 ---
 
@@ -63,6 +63,42 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-04-24 — Contrôle éditorial de Max + simulation admin + trace pipeline 🔷
+
+**Intent**: Suivre le plan d'implémentation Max/GM pour mieux contrôler ce que Max sait, ce qu'il peut affirmer, et rendre ce contrôle testable par l'équipe éditoriale depuis `/admin`.
+
+**Tool**: Lovable
+
+**Outcome**:
+1. **Système de prompt structuré pour Max** — `maxAgent.ts`, `settingsService.ts` et `types/index.ts` ont été étendus pour séparer les briques de contrôle : persona, objectifs, historique/contextes injectés, et consignes négatives sur ce que Max ne doit pas affirmer sans source.
+2. **Onglet admin `MaxPromptControlTab`** — panneau dédié pour éditer et persister ces nouvelles couches de prompt, afin de piloter finement le comportement narratif sans modifier le code.
+3. **Onglet admin `MaxPromptTestTab`** — écran de test permettant de simuler une réponse de Max à partir d'un exemple de contexte RAG et d'afficher explicitement si les contraintes d'interdiction d'affirmation semblent respectées.
+4. **Trace pipeline `PipelineTraceTab`** — visualisation du dernier tour avec entrée utilisateur, contexte RAG, brief pré-tour du Game Master et artefacts de pilotage, première matérialisation concrète de la "Phase 1 — rendre visible la mécanique" du plan.
+5. **Pré-turn planner Game Master** — `gameMasterAgent.ts` et `conversationOrchestrator.ts` ont été refactorés pour introduire un objet `GameMasterTurnBrief` avant la génération de Max (`response_mode`, `openness_level`, `reveal_budget`, `style_instructions`), conformément à la phase 2 du plan.
+
+**Ce que ça change** : le Game Master n'est plus seulement un arbitre post-réponse ; il commence à devenir un directeur éditorial de tour. Le contrôle est encore incomplet, mais l'architecture a basculé vers un modèle GM pre-turn → Max contraint → GM post-turn.
+
+**Time**: ~2h
+
+---
+
+### 2026-04-24 — Fix robustesse OpenRouter generation lookup 🔹
+
+**Intent**: Corriger le crash runtime provoqué par les réponses `404 Generation not found` de l'API OpenRouter lors de la récupération différée des coûts, qui faisait tomber l'app sur un blank screen.
+
+**Tool**: Lovable Cloud
+
+**Outcome**:
+- `proxy-llm/index.ts` : l'action `get_generation_cost` renvoie désormais une réponse structurée non bloquante quand la génération n'est pas encore indexée (`available: false`, `retryable`, `error_type`) au lieu de propager une erreur fatale.
+- `llmUsageTracker.ts` : le client interprète ces cas comme un coût temporairement indisponible et poursuit le flux sans casser le runtime.
+- Validation faite en simulant un `generation_id` introuvable : plus de 404 fatal remonté au frontend, donc plus d'écran blanc lié à ce scénario.
+
+**Pourquoi c'était subtil** : OpenRouter peut accepter une génération puis ne pas la rendre consultable immédiatement côté lookup. Traiter ce délai d'indexation comme une erreur fatale cassait une fonctionnalité non critique (la collecte de coût) et contaminait toute l'expérience.
+
+**Time**: ~30min
+
+---
 
 ### 2026-04-17 — Phase 1 PRD : A/B onboarding + PTT + questionnaire enrichi 🔷
 
@@ -635,6 +671,9 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 - **2026-03-12**: Les closures stales sur des states React dans des `useCallback` sont un piège classique — pour tout guard critique (comme `isProcessing`), utiliser un ref en plus du state pour garantir une lecture synchrone.
 - **2026-03-12**: PostHog en mode EU (`eu.i.posthog.com`) avec session recording permet de comprendre les parcours utilisateurs sans infrastructure analytics custom.
 - **2026-03-12**: Découper les opérations longues (sync multi-tables) en appels individuels avec feedback progressif est toujours préférable à un appel monolithique qui risque de timeout.
+- **2026-04-24**: Pour contrôler un personnage IA, il faut séparer identité, connaissances autorisées, objectifs de tour et interdictions d'affirmation — un seul prompt monolithique donne trop de latitude au modèle.
+- **2026-04-24**: Une vue de trace admin devient essentielle dès qu'on introduit plusieurs couches de pilotage (RAG, brief GM, contraintes Max) — sinon il devient impossible d'expliquer pourquoi Max a répondu d'une certaine manière.
+- **2026-04-24**: Une erreur de lookup de coût OpenRouter ne doit jamais avoir d'impact UX sur la conversation — la télémétrie doit être dégradée gracieusement, jamais critique-path.
 
 *Aucun pivot majeur pour le moment — le PRD est clair et le développement suit le plan.*
 
@@ -688,6 +727,8 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 | 2026-03-08 | 1 video trigger sans titre dans Notion → ignoré au sync | Bas | Corriger dans Notion |
 | 2026-03-08 | Pas de test end-to-end du pipeline voice-to-voice complet avec testeurs externes | Haut | Prochaine session |
 | 2026-03-08 | Diction ElevenLabs parfois bizarre en français — nécessite fine-tuning des paramètres voix | Moyen | Tester presets dans /admin > Voix |
+| 2026-04-24 | Validation anti-hallucination pré-TTS pas encore intégrée au runtime | Haut | Ajouter validateur + régénération automatique |
+| 2026-04-24 | Bible factuelle / sujets verrouillés non encore modélisés explicitement | Haut | Implémenter la Phase 3 du plan Max / GM |
 
 ---
 
