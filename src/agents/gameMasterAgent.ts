@@ -107,6 +107,13 @@ export async function callGameMaster(input: GameMasterInput): Promise<GameMaster
   }
 }
 
+/**
+ * Timeout dur sur le GM pre-turn : si le LLM dépasse cette durée,
+ * on retourne immédiatement le brief par défaut pour ne pas bloquer
+ * la réponse de Max et le TTS (cf. panneau admin "Latence & blocage").
+ */
+const GM_PRETURN_TIMEOUT_MS = 4000;
+
 export async function planGameMasterTurn(input: GameMasterPreTurnInput): Promise<GameMasterTurnBrief> {
   const contextMessage = buildPreTurnContextMessage(input);
   const messages: Array<{ role: "system" | "user"; content: string }> = [
@@ -114,37 +121,52 @@ export async function planGameMasterTurn(input: GameMasterPreTurnInput): Promise
     { role: "user", content: contextMessage },
   ];
 
-  try {
-    debugLogger.log({ service: "gm", level: "info", direction: "out", label: "Game Master pre-turn planning", payload: contextMessage.slice(0, 300) });
-    const llm = getLLMSettings();
-    const response = await callLLM(messages, {
-      model: llm.LLM_MODEL_GM,
-      temperature: 0.2,
-      max_tokens: 400,
-      feature_key: "game_master_pre_turn",
-    });
+  const fallbackBrief = (reason: string): GameMasterTurnBrief => ({
+    ...DEFAULT_TURN_BRIEF,
+    allowed_knowledge: input.knowledgeContext?.allowedFacts || [],
+    forbidden_topics: input.knowledgeContext?.forbiddenTopics || [],
+    blocked_assertions: input.knowledgeContext?.blockedAssertions || [],
+    notes: `Brief par défaut (${reason})`,
+  });
 
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return DEFAULT_TURN_BRIEF;
+  const llmCall = (async (): Promise<GameMasterTurnBrief> => {
+    try {
+      debugLogger.log({ service: "gm", level: "info", direction: "out", label: "Game Master pre-turn planning", payload: contextMessage.slice(0, 300) });
+      const llm = getLLMSettings();
+      const response = await callLLM(messages, {
+        model: llm.LLM_MODEL_GM,
+        temperature: 0.2,
+        max_tokens: llm.LLM_MAX_TOKENS_GM ?? 180,
+        feature_key: "game_master_pre_turn",
+      });
 
-    const parsed = JSON.parse(jsonMatch[0]) as Partial<GameMasterTurnBrief>;
-    return {
-      ...DEFAULT_TURN_BRIEF,
-      ...parsed,
-      allowed_knowledge: parsed.allowed_knowledge || input.knowledgeContext?.allowedFacts || [],
-      forbidden_topics: parsed.forbidden_topics || input.knowledgeContext?.forbiddenTopics || [],
-      blocked_assertions: parsed.blocked_assertions || input.knowledgeContext?.blockedAssertions || [],
-      style_instructions: parsed.style_instructions?.length ? parsed.style_instructions : DEFAULT_TURN_BRIEF.style_instructions,
-    };
-  } catch (error) {
-    debugLogger.logError("gm", "Game Master pre-turn error", error);
-    return {
-      ...DEFAULT_TURN_BRIEF,
-      allowed_knowledge: input.knowledgeContext?.allowedFacts || [],
-      forbidden_topics: input.knowledgeContext?.forbiddenTopics || [],
-      blocked_assertions: input.knowledgeContext?.blockedAssertions || [],
-    };
-  }
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return fallbackBrief("réponse LLM sans JSON");
+
+      const parsed = JSON.parse(jsonMatch[0]) as Partial<GameMasterTurnBrief>;
+      return {
+        ...DEFAULT_TURN_BRIEF,
+        ...parsed,
+        allowed_knowledge: parsed.allowed_knowledge || input.knowledgeContext?.allowedFacts || [],
+        forbidden_topics: parsed.forbidden_topics || input.knowledgeContext?.forbiddenTopics || [],
+        blocked_assertions: parsed.blocked_assertions || input.knowledgeContext?.blockedAssertions || [],
+        style_instructions: parsed.style_instructions?.length ? parsed.style_instructions : DEFAULT_TURN_BRIEF.style_instructions,
+      };
+    } catch (error) {
+      debugLogger.logError("gm", "Game Master pre-turn error", error);
+      return fallbackBrief("erreur LLM");
+    }
+  })();
+
+  // Race contre un timeout : si le LLM est trop lent, on continue avec un brief par défaut.
+  const timeoutPromise = new Promise<GameMasterTurnBrief>((resolve) =>
+    setTimeout(() => {
+      console.warn(`[GameMaster] pre-turn timeout après ${GM_PRETURN_TIMEOUT_MS}ms — fail-soft vers brief par défaut`);
+      resolve(fallbackBrief(`timeout ${GM_PRETURN_TIMEOUT_MS}ms`));
+    }, GM_PRETURN_TIMEOUT_MS),
+  );
+
+  return Promise.race([llmCall, timeoutPromise]);
 }
 
 function buildContextMessage(input: GameMasterInput): string {
