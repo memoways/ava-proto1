@@ -84,12 +84,16 @@ export const OPENROUTER_MODELS = [
 
 const llmDefaults: LLMSettings = {
   LLM_MODEL: defaultSettings.LLM_MODEL,
-  LLM_MODEL_GM: defaultSettings.LLM_MODEL,
+  // Le GM ne fait QUE du JSON structuré déterministe (brief de tour, évaluation post-turn).
+  // Un modèle "flash/lite" est ~5-10x plus rapide qu'un 72B pour la même qualité sur cette tâche
+  // → réduit drastiquement la latence du GM pre-turn (vue dans le panneau Latence & blocage).
+  LLM_MODEL_GM: "google/gemini-2.0-flash-001",
   LLM_TEMPERATURE: defaultSettings.LLM_TEMPERATURE,
   LLM_MAX_TOKENS: defaultSettings.LLM_MAX_TOKENS,
   LLM_TOP_P: defaultSettings.LLM_TOP_P,
   LLM_TEMPERATURE_GM: 0.3,
-  LLM_MAX_TOKENS_GM: 200,
+  // Le brief JSON fait ~150 tokens utiles ; 180 = marge confortable, plus de gaspillage de génération.
+  LLM_MAX_TOKENS_GM: 180,
 };
 
 const DEPRECATED_OPENROUTER_MODELS: Record<string, string> = {
