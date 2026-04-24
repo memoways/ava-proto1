@@ -316,7 +316,10 @@ const Index = () => {
         gm_post_ms: gmResult.gm_post_ms,
         total_ms: (timings.total_ms ?? 0) + tts_ms,
         blocker: pickBlocker({
-          ...timings,
+          rag_ms: timings.rag_ms,
+          gm_pre_ms: timings.gm_pre_ms,
+          max_ms: timings.max_ms,
+          validator_ms: timings.validator_ms,
           tts_ms,
           gm_post_ms: gmResult.gm_post_ms,
         }),
