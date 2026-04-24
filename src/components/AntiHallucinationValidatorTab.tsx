@@ -12,8 +12,47 @@ import {
   type AntiHallucinationValidatorSettings,
 } from "@/services/settingsService";
 
+function splitLines(value: string): string[] {
+  return value.split("\n").map((line) => line.trim()).filter(Boolean);
+}
+
 function countLines(value: string) {
-  return value.split("\n").map((line) => line.trim()).filter(Boolean).length;
+  return splitLines(value).length;
+}
+
+function mergeUnique(...lists: Array<string[] | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const list of lists) {
+    if (!list) continue;
+    for (const item of list) {
+      const key = item.trim();
+      if (!key) continue;
+      const dedupKey = key.toLowerCase();
+      if (seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+      out.push(key);
+    }
+  }
+  return out;
+}
+
+type PipelineSnapshot = {
+  updatedAt?: string;
+  preTurnBrief?: {
+    allowed_knowledge?: string[];
+    forbidden_topics?: string[];
+    blocked_assertions?: string[];
+  };
+};
+
+function readLastTrace(): PipelineSnapshot | null {
+  try {
+    const raw = localStorage.getItem("ava_pipeline_last_trace");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
 
 export default function AntiHallucinationValidatorTab() {
@@ -33,6 +72,30 @@ export default function AntiHallucinationValidatorTab() {
     facts: countLines(settings.authorizedFacts),
     rules: countLines(settings.blockedAssertionRules),
   }), [settings]);
+
+  const [trace, setTrace] = useState<PipelineSnapshot | null>(() => readLastTrace());
+
+  function refreshTrace() {
+    setTrace(readLastTrace());
+  }
+
+  const merged = useMemo(() => {
+    const globalFacts = splitLines(settings.authorizedFacts);
+    const globalRules = splitLines(settings.blockedAssertionRules);
+    const turnAllowed = trace?.preTurnBrief?.allowed_knowledge ?? [];
+    const turnForbidden = trace?.preTurnBrief?.forbidden_topics ?? [];
+    const turnBlocked = trace?.preTurnBrief?.blocked_assertions ?? [];
+    return {
+      globalFacts,
+      globalRules,
+      turnAllowed,
+      turnForbidden,
+      turnBlocked,
+      mergedFacts: mergeUnique(globalFacts, turnAllowed),
+      mergedBlocked: mergeUnique(globalRules, turnBlocked),
+      mergedForbidden: mergeUnique(turnForbidden),
+    };
+  }, [settings, trace]);
 
   function updateField(key: keyof AntiHallucinationValidatorSettings, value: string) {
     const updated = saveAntiHallucinationValidatorSettings({ [key]: value });
@@ -115,6 +178,124 @@ export default function AntiHallucinationValidatorTab() {
           />
         </div>
       </section>
+
+      <section className="space-y-4 rounded-lg border p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-base font-semibold">🔬 Aperçu de la fusion validateur</h3>
+            <p className="text-sm text-muted-foreground">
+              Visualise comment les listes globales se combinent avec le brief pré-tour du Game Master, juste avant la validation et le TTS.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={refreshTrace}>
+            Rafraîchir
+          </Button>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          {trace?.updatedAt
+            ? `Dernier tour observé : ${new Date(trace.updatedAt).toLocaleString("fr-FR")}`
+            : "Aucune trace de tour disponible — joue une conversation pour alimenter cet aperçu."}
+        </p>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <PreviewColumn
+            title="Faits autorisés (fusion)"
+            globalLabel="globaux"
+            globalItems={merged.globalFacts}
+            turnLabel="brief du tour"
+            turnItems={merged.turnAllowed}
+            mergedItems={merged.mergedFacts}
+            mergedTone="positive"
+          />
+          <PreviewColumn
+            title="Assertions bloquées (fusion)"
+            globalLabel="règles globales"
+            globalItems={merged.globalRules}
+            turnLabel="brief du tour"
+            turnItems={merged.turnBlocked}
+            mergedItems={merged.mergedBlocked}
+            mergedTone="negative"
+          />
+          <PreviewColumn
+            title="Sujets interdits (tour)"
+            globalLabel="—"
+            globalItems={[]}
+            turnLabel="brief du tour"
+            turnItems={merged.turnForbidden}
+            mergedItems={merged.mergedForbidden}
+            mergedTone="negative"
+          />
+        </div>
+
+        <div className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
+          Règle de fusion : les entrées globales et celles du tour sont concaténées puis dédupliquées (insensible à la casse). Cette liste fusionnée est exactement ce que le validateur reçoit avant d’autoriser la synthèse vocale.
+        </div>
+      </section>
+    </div>
+  );
+}
+function PreviewColumn({
+  title,
+  globalLabel,
+  globalItems,
+  turnLabel,
+  turnItems,
+  mergedItems,
+  mergedTone,
+}: {
+  title: string;
+  globalLabel: string;
+  globalItems: string[];
+  turnLabel: string;
+  turnItems: string[];
+  mergedItems: string[];
+  mergedTone: "positive" | "negative";
+}) {
+  const mergedClass =
+    mergedTone === "positive"
+      ? "border-emerald-700/40 bg-emerald-900/20"
+      : "border-red-700/40 bg-red-900/20";
+
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <p className="text-sm font-semibold">{title}</p>
+      <MiniList label={globalLabel} items={globalItems} />
+      <MiniList label={turnLabel} items={turnItems} />
+      <div className={`rounded-md border p-2 ${mergedClass}`}>
+        <p className="text-xs uppercase text-muted-foreground">
+          Fusion envoyée au validateur ({mergedItems.length})
+        </p>
+        {mergedItems.length === 0 ? (
+          <p className="text-xs italic text-muted-foreground">— aucune entrée —</p>
+        ) : (
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-xs">
+            {mergedItems.map((item, idx) => (
+              <li key={`merged-${idx}`}>{item}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MiniList({ label, items }: { label: string; items: string[] }) {
+  return (
+    <div className="rounded-md border bg-muted/10 p-2">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label} ({items.length})</p>
+      {items.length === 0 ? (
+        <p className="text-xs italic text-muted-foreground">—</p>
+      ) : (
+        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs">
+          {items.slice(0, 6).map((item, idx) => (
+            <li key={`${label}-${idx}`}>{item}</li>
+          ))}
+          {items.length > 6 && (
+            <li className="italic text-muted-foreground">+{items.length - 6} de plus…</li>
+          )}
+        </ul>
+      )}
     </div>
   );
 }
