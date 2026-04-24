@@ -275,8 +275,8 @@ const Index = () => {
         ttsQueue.enqueue(leftover);
       }
 
-      // Add Max response to history
-      const maxMsg: ConversationMessage = { role: "max", content: maxResponse, timestamp: Date.now() };
+      // Add Max response to history (with validation trace for metrics persistence)
+      const maxMsg: ConversationMessage = { role: "max", content: maxResponse, timestamp: Date.now(), validation };
       conversationHistoryRef.current.push(maxMsg);
       addMessage(maxMsg);
       setPostVideoContext(null);
