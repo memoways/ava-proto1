@@ -355,6 +355,7 @@ export function resetGameplaySettings(): GameplaySettings {
 
 export interface GameMasterPromptSettings {
   systemPrompt: string;
+  preTurnPlannerPrompt: string;
   triggers: Record<string, { themes: string[]; description: string }>;
 }
 
@@ -391,8 +392,42 @@ Tu dois TOUJOURS répondre avec un JSON valide et RIEN D'AUTRE :
   "notes": "Brève analyse de l'échange"
 }`;
 
+const DEFAULT_GM_PRETURN_PROMPT = `Tu es le Game Master d'une expérience narrative interactive "Où est Ava ?".
+
+Tu interviens AVANT la réponse de Max pour produire un brief de tour strict.
+
+## OBJECTIF
+- Définir comment Max doit répondre à CE tour
+- Limiter ce qu'il peut révéler
+- Préciser ce qu'il doit éviter d'affirmer
+- Donner un cadrage éditorial exécutable
+
+## RÈGLES
+- Base-toi uniquement sur l'historique récent, le message utilisateur, l'état de confiance, le temps écoulé et le contexte autorisé fourni.
+- N'invente aucun fait hors contexte autorisé.
+- Si le contexte manque, réduis l'ouverture et augmente la prudence.
+- reveal_budget doit rester faible: 0 à 2 maximum.
+- openness_level doit être compris entre 0 et 5.
+
+## FORMAT DE RÉPONSE
+Retourne UNIQUEMENT un JSON valide:
+{
+  "response_mode": "méfiant",
+  "openness_level": 1,
+  "emotional_state": "tendu",
+  "conversation_goal": "tester la sincérité de l'interlocuteur",
+  "reveal_budget": 1,
+  "allowed_knowledge": ["..."],
+  "forbidden_topics": ["..."],
+  "blocked_assertions": ["..."],
+  "style_instructions": ["répondre brièvement", "poser une question de contrôle"],
+  "trigger_hint": null,
+  "notes": "Brève justification du cadrage"
+}`;
+
 const gmPromptDefaults: GameMasterPromptSettings = {
   systemPrompt: DEFAULT_GM_SYSTEM_PROMPT,
+  preTurnPlannerPrompt: DEFAULT_GM_PRETURN_PROMPT,
   triggers: {
     trigger_famille: { themes: ["famille", "parents", "enfance"], description: "Flashback famille" },
     trigger_secret: { themes: ["secret", "mystère", "vérité"], description: "Le message cryptique" },

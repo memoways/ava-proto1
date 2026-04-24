@@ -13,6 +13,7 @@ import VoiceConfigTab from "@/components/VoiceConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
 import MaxPromptControlTab from "@/components/MaxPromptControlTab";
 import MaxPromptTestTab from "@/components/MaxPromptTestTab";
+import PipelineTraceTab from "@/components/PipelineTraceTab";
 import SessionsTab, { type SessionRow } from "@/components/admin/SessionsTab";
 import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
 import LLMUsageTab from "@/components/admin/LLMUsageTab";
@@ -46,6 +47,7 @@ const TAB_GROUPS = [
       { id: "gamemaster", label: "Game Master" },
       { id: "max-prompt", label: "Max Prompt" },
       { id: "max-test", label: "Test Max" },
+        { id: "pipeline", label: "Pipeline" },
     ],
   },
   {
@@ -469,6 +471,10 @@ export default function Admin() {
 
           <TabsContent value="max-test">
             <MaxPromptTestTab />
+          </TabsContent>
+
+          <TabsContent value="pipeline">
+            <PipelineTraceTab />
           </TabsContent>
 
           {/* ==================== LLM CONFIG ==================== */}
