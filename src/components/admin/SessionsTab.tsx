@@ -308,6 +308,17 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
                                           </pre>
                                         </div>
                                       )}
+                                      {FALLBACK_TARGET_TAB[fb.kind] && (
+                                        <div className="pt-1.5 border-t border-border">
+                                          <Link
+                                            to={`/admin?tab=${FALLBACK_TARGET_TAB[fb.kind].tab}`}
+                                            className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
+                                          >
+                                            <ExternalLink className="h-3 w-3" />
+                                            {FALLBACK_TARGET_TAB[fb.kind].label}
+                                          </Link>
+                                        </div>
+                                      )}
                                     </div>
                                   </TooltipContent>
                                 </Tooltip>
