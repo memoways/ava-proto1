@@ -27,7 +27,9 @@ function extractTraces(log: any): ConversationValidationTrace[] {
   if (!Array.isArray(log)) return [];
   const traces: ConversationValidationTrace[] = [];
   for (const entry of log) {
-    if (entry && typeof entry === "object" && entry.validation && typeof entry.validation === "object") {
+    if (!entry || typeof entry !== "object") continue;
+    if (entry.role && entry.role !== "max") continue;
+    if (entry.validation && typeof entry.validation === "object") {
       traces.push(entry.validation as ConversationValidationTrace);
     }
   }
