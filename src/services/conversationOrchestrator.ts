@@ -76,11 +76,15 @@ export async function processConversationTurn(
   maxResponse: string;
   preTurnBrief: GameMasterTurnBrief;
   validation: ConversationValidationTrace;
-  gameMasterPromise: Promise<{ gameMasterResponse: GameMasterResponse; trigger: VideoTrigger | null }>;
+  /** Per-step latency timings captured by the orchestrator (rag/gm_pre/max/validator). */
+  timings: ConversationPipelineTimings;
+  gameMasterPromise: Promise<{ gameMasterResponse: GameMasterResponse; trigger: VideoTrigger | null; gm_post_ms: number }>;
 }> {
+  const t0 = performance.now();
   // Fetch RAG context if not provided (non-blocking — start immediately)
   let finalRagContext = ragContext;
   const gameplay = getGameplaySettings();
+  const ragStart = performance.now();
   const ragPromise = !finalRagContext ? (async () => {
     try {
       const recentMessages = conversationHistory.slice(-4).map(m => m.content).join(' ');
@@ -96,11 +100,12 @@ export async function processConversationTurn(
 
   // Wait for RAG (runs in parallel with any preloaded system prompt)
   const ragResult = await ragPromise;
+  const rag_ms = Math.round(performance.now() - ragStart);
   finalRagContext = ragResult.ctx;
-  debugLogger.log({ service: "other", level: "info", direction: "out", label: `Orchestrator: RAG done, calling Max+GM in parallel`, detail: `History: ${conversationHistory.length} msgs, trust: ${currentTrustLevel}` });
+  debugLogger.log({ service: "other", level: "info", direction: "out", label: `Orchestrator: RAG done (${rag_ms}ms), calling Max+GM in parallel`, detail: `History: ${conversationHistory.length} msgs, trust: ${currentTrustLevel}` });
 
   // Lance le GM pre-turn ET la réponse Max EN PARALLÈLE.
-  // Max utilise le knowledge issu du RAG ; le pre-turn affine mais ne bloque plus la latence vocale.
+  const gmPreStart = performance.now();
   const preTurnPromise = planGameMasterTurn({
     conversationHistory,
     userMessage,
@@ -123,7 +128,7 @@ export async function processConversationTurn(
       trigger_hint: null,
       notes: "fallback (GM pre-turn error)",
     };
-  });
+  }).then((brief) => ({ brief, gm_pre_ms: Math.round(performance.now() - gmPreStart) }));
 
   const maxInput: MaxAgentInput = {
     conversationHistory,
@@ -134,21 +139,29 @@ export async function processConversationTurn(
     knowledgeContext: ragResult.knowledgeContext,
   };
 
-  const [validatedTurn, preTurnBrief] = await Promise.all([
-    generateValidatedMaxResponse(maxInput),
-    preTurnPromise,
-  ]);
+  const validatedPromise = generateValidatedMaxResponse(maxInput);
+  const [validatedTurn, preTurnResult] = await Promise.all([validatedPromise, preTurnPromise]);
+
+  const timings: ConversationPipelineTimings = {
+    rag_ms,
+    gm_pre_ms: preTurnResult.gm_pre_ms,
+    max_ms: validatedTurn.timings.max_ms,
+    validator_ms: validatedTurn.timings.validator_ms,
+    total_ms: Math.round(performance.now() - t0),
+  };
+
   persistPipelineTrace({
     updatedAt: new Date().toISOString(),
     userMessage,
     ragContext: finalRagContext || "",
-    preTurnBrief,
+    preTurnBrief: preTurnResult.brief,
     finalResponse: validatedTurn.response,
     validation: validatedTurn.validation,
   });
 
-  // Fire Game Master in background (don't await - caller can process in parallel with TTS)
+  // Fire Game Master post-turn in background
   const gameMasterPromise = (async () => {
+    const gmPostStart = performance.now();
     const gmInput: GameMasterInput = {
       conversationHistory,
       userMessage,
@@ -165,13 +178,14 @@ export async function processConversationTurn(
       trigger = DEMO_TRIGGERS[gameMasterResponse.trigger_video_id] || null;
     }
 
-    return { gameMasterResponse, trigger };
+    return { gameMasterResponse, trigger, gm_post_ms: Math.round(performance.now() - gmPostStart) };
   })();
 
   return {
     maxResponse: validatedTurn.response,
-    preTurnBrief,
+    preTurnBrief: preTurnResult.brief,
     validation: validatedTurn.validation,
+    timings,
     gameMasterPromise,
   };
 }
