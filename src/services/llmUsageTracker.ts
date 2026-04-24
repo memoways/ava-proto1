@@ -111,7 +111,13 @@ export async function fetchGenerationCost(generationId: string): Promise<{
     });
     if (!res.ok) {
       const errText = await res.text();
-      console.error(`[LLM Tracker] Cost fetch failed [${res.status}]:`, errText);
+      // OpenRouter may return 404 while generation accounting is still propagating.
+      // This is non-blocking for gameplay; retryCostFetch will try again later.
+      if (res.status === 404) {
+        console.warn(`[LLM Tracker] Cost not available yet for ${generationId} [404], retrying later.`);
+        return null;
+      }
+      console.warn(`[LLM Tracker] Cost fetch unavailable [${res.status}]:`, errText);
       return null;
     }
     const data = await res.json();
@@ -170,7 +176,7 @@ async function retryCostFetch(
   delays: number[]
 ): Promise<void> {
   if (delays.length === 0) {
-    console.warn(`[LLM Tracker] All retries exhausted for ${generationId}`);
+    console.warn(`[LLM Tracker] Cost unavailable after all retries for ${generationId}`);
     await updateLLMUsage(logId, { status: "cost_fetch_failed" });
     return;
   }
