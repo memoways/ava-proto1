@@ -2,7 +2,7 @@ import { callLLM, streamLLM } from "@/services/openRouterLLM";
 import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, MaxConstraintCheckResult, MaxTurnKnowledgeContext } from "@/types";
-import { getLLMSettings, getMaxPromptControlSettings } from "@/services/settingsService";
+import { getAntiHallucinationValidatorSettings, getLLMSettings, getMaxPromptControlSettings } from "@/services/settingsService";
 
 // Fallback minimal system prompt if DB fetch fails
 const FALLBACK_SYSTEM_PROMPT = `Tu es un personnage dans une expérience narrative interactive. Parle à la première personne, en français, de façon concise (2-3 phrases). Utilise le CONTEXTE NARRATIF ci-dessous comme source de vérité.`;
@@ -141,6 +141,7 @@ export async function validateMaxResponseConstraints(input: {
 }): Promise<MaxConstraintCheckResult> {
   const llm = getLLMSettings();
   const control = getMaxPromptControlSettings();
+  const validatorSettings = getAntiHallucinationValidatorSettings();
   const validatorPrompt = `Tu es un validateur éditorial strict. Tu dois vérifier si la réponse de Max respecte les contraintes suivantes.
 
 ## RÈGLES À FAIRE RESPECTER
@@ -154,6 +155,12 @@ ${control.forbiddenAssertions}
 
 ## SUJETS INTERDITS
 ${control.forbiddenTopics}
+
+## BASE GLOBALE DES FAITS AUTORISÉS
+${validatorSettings.authorizedFacts}
+
+## RÈGLES GLOBALES D'ASSERTIONS BLOQUÉES
+${validatorSettings.blockedAssertionRules}
 
 ## CONTEXTE AUTORISÉ
 ${formatKnowledgeList("FAITS AUTORISÉS", input.knowledgeContext?.allowedFacts)}
