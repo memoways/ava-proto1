@@ -16,6 +16,7 @@ import MaxPromptTestTab from "@/components/MaxPromptTestTab";
 import PipelineTraceTab from "@/components/PipelineTraceTab";
 import AntiHallucinationValidatorTab from "@/components/AntiHallucinationValidatorTab";
 import HallucinationMetricsTab from "@/components/HallucinationMetricsTab";
+import LatencyBlockingTab from "@/components/LatencyBlockingTab";
 import SessionsTab, { type SessionRow } from "@/components/admin/SessionsTab";
 import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
 import LLMUsageTab from "@/components/admin/LLMUsageTab";
@@ -50,6 +51,7 @@ const TAB_GROUPS = [
       { id: "max-prompt", label: "Max Prompt" },
       { id: "validator", label: "Validateur" },
       { id: "metrics", label: "Métriques hallu." },
+      { id: "latency", label: "Latence & blocage" },
       { id: "max-test", label: "Test Max" },
         { id: "pipeline", label: "Pipeline" },
     ],
@@ -479,6 +481,10 @@ export default function Admin() {
 
           <TabsContent value="metrics">
             <HallucinationMetricsTab />
+          </TabsContent>
+
+          <TabsContent value="latency">
+            <LatencyBlockingTab />
           </TabsContent>
 
           <TabsContent value="max-test">

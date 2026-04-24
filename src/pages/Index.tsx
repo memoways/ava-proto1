@@ -52,6 +52,31 @@ const perf = (label: string) => {
   };
 };
 
+/**
+ * Identify the slowest pipeline step that exceeds the warning threshold.
+ * Returns the step name (e.g. "max", "validator", "tts") or null if all OK.
+ */
+const STEP_THRESHOLDS_MS: Record<string, number> = {
+  rag_ms: 1500,
+  gm_pre_ms: 2500,
+  max_ms: 3000,
+  validator_ms: 2000,
+  tts_ms: 4000,
+  gm_post_ms: 3000,
+};
+function pickBlocker(t: Record<string, number | undefined>): string | null {
+  let worst: { step: string; ratio: number } | null = null;
+  for (const [step, threshold] of Object.entries(STEP_THRESHOLDS_MS)) {
+    const v = t[step];
+    if (typeof v !== "number" || v <= 0) continue;
+    const ratio = v / threshold;
+    if (ratio >= 1 && (!worst || ratio > worst.ratio)) {
+      worst = { step: step.replace("_ms", ""), ratio };
+    }
+  }
+  return worst?.step ?? null;
+}
+
 const Index = () => {
   const { state, setPhase, setAudioState, addMessage, updateTrust, triggerVideo, endTrigger, gameOver, setVariant, setVoiceModality, setCharacter, reset } = useGameState();
   const [micActive, setMicActive] = useState(false);
@@ -245,7 +270,7 @@ const Index = () => {
       console.log("[processUserMessage] Starting LLM call...");
       const llmPerf = perf("LLM total (Max streaming)");
 
-      const { maxResponse, validation, gameMasterPromise } = await processConversationTurn(
+      const { maxResponse, validation, timings, gameMasterPromise } = await processConversationTurn(
         userText,
         conversationHistoryRef.current.slice(0, -1),
         state.trustLevel,
@@ -266,6 +291,7 @@ const Index = () => {
       setMaxSubtitle(maxResponse);
       setAudioState("max_speaking");
 
+      const ttsStart = performance.now();
       const ttsQueue = new TTSQueue();
       const [sentences, leftover] = extractSentences(maxResponse);
       for (const sentence of sentences) {
@@ -275,21 +301,44 @@ const Index = () => {
         ttsQueue.enqueue(leftover);
       }
 
-      // Add Max response to history (with validation trace for metrics persistence)
-      const maxMsg: ConversationMessage = { role: "max", content: maxResponse, timestamp: Date.now(), validation };
-      conversationHistoryRef.current.push(maxMsg);
-      addMessage(maxMsg);
-      setPostVideoContext(null);
-
       // Wait for TTS playback + Game Master in parallel
       const gmPerf = perf("Game Master");
       const [, gmResult] = await Promise.all([
         ttsQueue.drain(),
         gameMasterPromise.then(r => { gmPerf.end(); return r; }),
       ]);
+      const tts_ms = Math.round(performance.now() - ttsStart);
+
+      // Build full pipeline timings + identify the bottleneck
+      const fullTimings = {
+        ...timings,
+        tts_ms,
+        gm_post_ms: gmResult.gm_post_ms,
+        total_ms: (timings.total_ms ?? 0) + tts_ms,
+        blocker: pickBlocker({
+          rag_ms: timings.rag_ms,
+          gm_pre_ms: timings.gm_pre_ms,
+          max_ms: timings.max_ms,
+          validator_ms: timings.validator_ms,
+          tts_ms,
+          gm_post_ms: gmResult.gm_post_ms,
+        }),
+      };
+
+      // Add Max response to history (with validation + pipeline trace for admin observability)
+      const maxMsg: ConversationMessage = {
+        role: "max",
+        content: maxResponse,
+        timestamp: Date.now(),
+        validation,
+        pipeline: fullTimings,
+      };
+      conversationHistoryRef.current.push(maxMsg);
+      addMessage(maxMsg);
+      setPostVideoContext(null);
 
       const { gameMasterResponse, trigger } = gmResult;
-      console.log("[Game Master]", gameMasterResponse);
+      console.log("[Game Master]", gameMasterResponse, "[Pipeline timings]", fullTimings);
 
       const newTrust = state.trustLevel + gameMasterResponse.trust_delta;
       if (gameMasterResponse.trust_delta !== 0) {
