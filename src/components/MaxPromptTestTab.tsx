@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { simulateMaxResponse, validateMaxResponseConstraints } from "@/agents/maxAgent";
 import type { MaxTurnKnowledgeContext } from "@/types";
-import { getMaxPromptControlSettings } from "@/services/settingsService";
+import { getAntiHallucinationValidatorSettings, getMaxPromptControlSettings } from "@/services/settingsService";
 import { toast } from "sonner";
 
 const DEFAULT_USER_MESSAGE = "Est-ce qu’Ava t’avait parlé de partir avant sa disparition ?";
@@ -36,10 +36,11 @@ function extractKnowledgeContext(ragContext: string, forbiddenTopicsText: string
 
 export default function MaxPromptTestTab() {
   const control = getMaxPromptControlSettings();
+  const validatorSettings = getAntiHallucinationValidatorSettings();
   const [userMessage, setUserMessage] = useState(DEFAULT_USER_MESSAGE);
   const [ragContext, setRagContext] = useState(DEFAULT_RAG_CONTEXT);
   const [forbiddenTopics, setForbiddenTopics] = useState(control.forbiddenTopics);
-  const [blockedAssertions, setBlockedAssertions] = useState(control.forbiddenAssertions);
+  const [blockedAssertions, setBlockedAssertions] = useState(`${control.forbiddenAssertions}\n${validatorSettings.blockedAssertionRules}`.trim());
   const [response, setResponse] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [validation, setValidation] = useState<{
@@ -147,6 +148,7 @@ export default function MaxPromptTestTab() {
           <div className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground">
             <p><strong className="text-foreground">Faits autorisés détectés :</strong> {knowledgeContext.allowedFacts?.length || 0}</p>
             <p><strong className="text-foreground">Hypothèses détectées :</strong> {knowledgeContext.hypotheses?.length || 0}</p>
+            <p><strong className="text-foreground">Règles globales du validateur :</strong> {validatorSettings.blockedAssertionRules.split("\n").map((line) => line.trim()).filter(Boolean).length}</p>
           </div>
 
           <div className="space-y-2">
