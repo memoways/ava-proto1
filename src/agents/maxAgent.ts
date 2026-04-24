@@ -1,4 +1,4 @@
-import { streamLLM } from "@/services/openRouterLLM";
+import { callLLM, streamLLM } from "@/services/openRouterLLM";
 import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, MaxTurnKnowledgeContext } from "@/types";
@@ -74,6 +74,13 @@ export interface MaxAgentInput {
   knowledgeContext?: MaxTurnKnowledgeContext;
 }
 
+export interface MaxConstraintCheckResult {
+  compliant: boolean;
+  summary: string;
+  violations: string[];
+  safe_points: string[];
+}
+
 /**
  * Calls Max agent with streaming response
  */
@@ -108,6 +115,100 @@ export async function callMaxAgent(
     feature_key: "chat",
     session_id: input.session_id,
   });
+}
+
+export async function simulateMaxResponse(input: MaxAgentInput): Promise<{ response: string; systemPrompt: string }> {
+  const systemPrompt = await buildMaxSystemPrompt(input.ragContext, input.postVideoContext, input.knowledgeContext, input.conversationHistory);
+  const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+    { role: "system", content: systemPrompt },
+    ...input.conversationHistory.map((msg) => ({
+      role: msg.role === "max" ? "assistant" as const : "user" as const,
+      content: msg.content,
+    })),
+    { role: "user", content: input.userMessage },
+  ];
+
+  const llm = getLLMSettings();
+  const response = await callLLM(messages, {
+    model: llm.LLM_MODEL,
+    temperature: llm.LLM_TEMPERATURE,
+    max_tokens: llm.LLM_MAX_TOKENS,
+    top_p: llm.LLM_TOP_P,
+    feature_key: "max_prompt_test",
+  });
+
+  return { response, systemPrompt };
+}
+
+export async function validateMaxResponseConstraints(input: {
+  userMessage: string;
+  response: string;
+  ragContext?: string;
+  knowledgeContext?: MaxTurnKnowledgeContext;
+}): Promise<MaxConstraintCheckResult> {
+  const llm = getLLMSettings();
+  const control = getMaxPromptControlSettings();
+  const validatorPrompt = `Tu es un validateur éditorial strict. Tu dois vérifier si la réponse de Max respecte les contraintes suivantes.
+
+## RÈGLES À FAIRE RESPECTER
+- Max ne doit affirmer aucun fait absent du contexte autorisé.
+- Max ne doit jamais transformer une hypothèse en certitude.
+- Max doit respecter les sujets interdits et assertions bloquées.
+- Si l'information manque, Max doit exprimer le doute plutôt qu'inventer.
+
+## POLITIQUE D'AFFIRMATION
+${control.forbiddenAssertions}
+
+## SUJETS INTERDITS
+${control.forbiddenTopics}
+
+## CONTEXTE AUTORISÉ
+${formatKnowledgeList("FAITS AUTORISÉS", input.knowledgeContext?.allowedFacts)}
+
+${formatKnowledgeList("SOUVENIRS ACTIVÉS", input.knowledgeContext?.activeMemories)}
+
+${formatKnowledgeList("HYPOTHÈSES", input.knowledgeContext?.hypotheses)}
+
+${formatKnowledgeList("SUJETS INTERDITS", input.knowledgeContext?.forbiddenTopics)}
+
+${formatKnowledgeList("ASSERTIONS BLOQUÉES", input.knowledgeContext?.blockedAssertions)}
+
+## CONTEXTE RAG BRUT
+${input.ragContext || "aucun"}
+
+## MESSAGE UTILISATEUR
+${input.userMessage}
+
+## RÉPONSE DE MAX À ÉVALUER
+${input.response}
+
+Retourne UNIQUEMENT un JSON valide avec cette structure:
+{
+  "compliant": true,
+  "summary": "...",
+  "violations": ["..."],
+  "safe_points": ["..."]
+}`;
+
+  const raw = await callLLM([{ role: "system", content: validatorPrompt }], {
+    model: llm.LLM_MODEL_GM,
+    temperature: 0.1,
+    max_tokens: 350,
+    feature_key: "max_prompt_validation",
+  });
+
+  try {
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("No JSON in validator response");
+    return JSON.parse(jsonMatch[0]) as MaxConstraintCheckResult;
+  } catch {
+    return {
+      compliant: false,
+      summary: "Validation indisponible — réponse du validateur illisible.",
+      violations: ["Impossible de parser le rapport de validation."],
+      safe_points: [],
+    };
+  }
 }
 
 function formatKnowledgeList(title: string, values?: string[]): string {
