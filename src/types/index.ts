@@ -59,6 +59,20 @@ export interface MaxTurnKnowledgeContext {
   blockedAssertions?: string[];
 }
 
+export interface GameMasterTurnBrief {
+  response_mode: string;
+  openness_level: number;
+  emotional_state: string;
+  conversation_goal: string;
+  reveal_budget: number;
+  allowed_knowledge: string[];
+  forbidden_topics: string[];
+  blocked_assertions: string[];
+  style_instructions: string[];
+  trigger_hint: string | null;
+  notes: string;
+}
+
 export interface GameMasterResponse {
   trust_delta: number;
   trigger_video_id: string | null;
