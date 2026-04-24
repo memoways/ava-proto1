@@ -51,6 +51,20 @@ export interface ConversationMessage {
   timestamp: number;
   /** Anti-hallucination validation trace, only present on Max messages that went through the validator. */
   validation?: ConversationValidationTrace;
+  /** Per-step latency timings (ms) and last blocker, only on Max messages. */
+  pipeline?: ConversationPipelineTimings;
+}
+
+export interface ConversationPipelineTimings {
+  rag_ms?: number;
+  gm_pre_ms?: number;
+  max_ms?: number;
+  validator_ms?: number;
+  tts_ms?: number;
+  gm_post_ms?: number;
+  total_ms?: number;
+  /** Step name flagged as the bottleneck/blocker for this turn, or null if all steps OK. */
+  blocker?: string | null;
 }
 
 export interface MaxTurnKnowledgeContext {
