@@ -249,13 +249,35 @@ function buildAttemptInput(input: MaxAgentInput, reports: ConversationValidation
   };
 }
 
+const VALIDATION_TIMEOUT_MS = 4000;
+
 async function validateAttempt(input: MaxAgentInput, response: string): Promise<MaxConstraintCheckResult> {
-  return validateMaxResponseConstraints({
-    userMessage: input.userMessage,
-    response,
-    ragContext: input.ragContext,
-    knowledgeContext: input.knowledgeContext,
-  });
+  // Fail-open avec timeout : si le validateur ne répond pas vite ou échoue,
+  // on laisse passer la réponse pour ne pas bloquer le pipeline vocal.
+  return Promise.race<MaxConstraintCheckResult>([
+    validateMaxResponseConstraints({
+      userMessage: input.userMessage,
+      response,
+      ragContext: input.ragContext,
+      knowledgeContext: input.knowledgeContext,
+    }).catch((err) => {
+      console.warn("[Validator] erreur — fail-open:", err);
+      return {
+        compliant: true,
+        summary: "Validation indisponible (erreur) — réponse diffusée par défaut.",
+        violations: [],
+        safe_points: ["fail-open sur erreur"],
+      };
+    }),
+    new Promise<MaxConstraintCheckResult>((resolve) =>
+      setTimeout(() => resolve({
+        compliant: true,
+        summary: `Validation expirée après ${VALIDATION_TIMEOUT_MS}ms — réponse diffusée par défaut.`,
+        violations: [],
+        safe_points: ["fail-open sur timeout"],
+      }), VALIDATION_TIMEOUT_MS),
+    ),
+  ]);
 }
 
 function persistPipelineTrace(trace: ConversationPipelineTrace) {
