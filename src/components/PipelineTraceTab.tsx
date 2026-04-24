@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import PipelineSchema from "@/components/PipelineSchema";
 
 type PipelineSnapshot = {
   updatedAt?: string;
@@ -58,6 +59,8 @@ export default function PipelineTraceTab() {
           Cette vue suit le plan en montrant le brief pré-tour du Game Master avant la réponse de Max.
         </p>
       </div>
+
+      <PipelineSchema />
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
         <Card>

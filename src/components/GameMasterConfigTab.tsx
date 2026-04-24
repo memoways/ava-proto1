@@ -3,8 +3,10 @@ import VideoTriggersEditor from "@/components/VideoTriggersEditor";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Save, RotateCcw } from "lucide-react";
+import { SPEECH_MODES } from "@/services/speechModes";
 import {
   getGMPromptSettings,
   saveGMPromptSettings,
@@ -84,6 +86,30 @@ export default function GameMasterConfigTab() {
           Tout réinitialiser
         </Button>
       </div>
+
+      {/* ===== SPEECH MODES CATALOG ===== */}
+      <section className="border rounded-lg p-4 space-y-3">
+        <div>
+          <h3 className="font-semibold text-base mb-1">🎭 Catalogue des modes de parole</h3>
+          <p className="text-xs text-muted-foreground">
+            Le Game Master sélectionne un de ces modes dans le champ <code>response_mode</code> du brief de tour. Max l'exécute via les indices de style.
+          </p>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2">
+          {SPEECH_MODES.map((mode) => (
+            <div key={mode.id} className="rounded border p-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold text-sm">{mode.label}</p>
+                <Badge variant="outline" className="font-mono text-[10px]">{mode.id}</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">{mode.description}</p>
+              <ul className="list-disc pl-4 text-xs">
+                {mode.styleHints.map((hint) => <li key={hint}>{hint}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* ===== GAMEPLAY SETTINGS ===== */}
       <section className="border rounded-lg p-4 space-y-5">
