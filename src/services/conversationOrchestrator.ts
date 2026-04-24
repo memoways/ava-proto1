@@ -1,8 +1,8 @@
-import { callMaxAgent, type MaxAgentInput } from "@/agents/maxAgent";
+import { simulateMaxResponse, validateMaxResponseConstraints, type MaxAgentInput } from "@/agents/maxAgent";
 import { callGameMaster, planGameMasterTurn, type GameMasterInput } from "@/agents/gameMasterAgent";
 import { buildKnowledgeContextFromRAG, formatRAGContext, queryRAG } from "@/services/ragService";
 import { debugLogger } from "@/services/debugLogger";
-import type { ConversationMessage, GameMasterResponse, GameMasterTurnBrief, VideoTrigger } from "@/types";
+import type { ConversationMessage, ConversationPipelineTrace, ConversationValidationTrace, GameMasterResponse, GameMasterTurnBrief, MaxConstraintCheckResult, VideoTrigger } from "@/types";
 import { getGameplaySettings } from "@/services/settingsService";
 
 // Demo triggers for the prototype
@@ -48,11 +48,12 @@ export interface ConversationTurnResult {
   trigger: VideoTrigger | null;
 }
 
-export interface ConversationPipelineTrace {
-  userMessage: string;
-  ragContext: string;
-  preTurnBrief: GameMasterTurnBrief;
-  maxSystemPromptPreview: string;
+const PIPELINE_TRACE_KEY = "ava_pipeline_last_trace";
+const MAX_VALIDATION_RETRIES = 1;
+
+interface ValidatedMaxResponse {
+  response: string;
+  validation: ConversationValidationTrace;
 }
 
 /**
@@ -68,13 +69,13 @@ export async function processConversationTurn(
   currentTrustLevel: number,
   triggeredIds: string[],
   timeElapsedSeconds: number,
-  onMaxChunk: (text: string, done: boolean) => void,
   ragContext?: string,
   postVideoContext?: string,
   sessionId?: string
 ): Promise<{
   maxResponse: string;
   preTurnBrief: GameMasterTurnBrief;
+  validation: ConversationValidationTrace;
   gameMasterPromise: Promise<{ gameMasterResponse: GameMasterResponse; trigger: VideoTrigger | null }>;
 }> {
   // Fetch RAG context if not provided (non-blocking — start immediately)
@@ -107,19 +108,6 @@ export async function processConversationTurn(
     knowledgeContext: ragResult.knowledgeContext,
   });
 
-  try {
-    localStorage.setItem("ava_pipeline_last_trace", JSON.stringify({
-      updatedAt: new Date().toISOString(),
-      userMessage,
-      ragContext: finalRagContext || "",
-      preTurnBrief,
-    }));
-  } catch {
-    // ignore trace persistence issues
-  }
-
-  // Start Max streaming
-  let maxFullResponse = "";
   const maxInput: MaxAgentInput = {
     conversationHistory,
     userMessage,
@@ -134,11 +122,14 @@ export async function processConversationTurn(
     },
   };
 
-  await callMaxAgent(maxInput, (text, done) => {
-    if (!done) {
-      maxFullResponse += text;
-    }
-    onMaxChunk(text, done);
+  const validatedTurn = await generateValidatedMaxResponse(maxInput);
+  persistPipelineTrace({
+    updatedAt: new Date().toISOString(),
+    userMessage,
+    ragContext: finalRagContext || "",
+    preTurnBrief,
+    finalResponse: validatedTurn.response,
+    validation: validatedTurn.validation,
   });
 
   // Fire Game Master in background (don't await - caller can process in parallel with TTS)
@@ -146,7 +137,7 @@ export async function processConversationTurn(
     const gmInput: GameMasterInput = {
       conversationHistory,
       userMessage,
-      maxResponse: maxFullResponse,
+      maxResponse: validatedTurn.response,
       currentTrustLevel,
       triggeredIds,
       timeElapsedSeconds,
@@ -162,5 +153,100 @@ export async function processConversationTurn(
     return { gameMasterResponse, trigger };
   })();
 
-  return { maxResponse: maxFullResponse, preTurnBrief, gameMasterPromise };
+  return {
+    maxResponse: validatedTurn.response,
+    preTurnBrief,
+    validation: validatedTurn.validation,
+    gameMasterPromise,
+  };
+}
+
+async function generateValidatedMaxResponse(input: MaxAgentInput): Promise<ValidatedMaxResponse> {
+  const reports: ConversationValidationTrace["reports"] = [];
+
+  for (let attempt = 1; attempt <= MAX_VALIDATION_RETRIES + 1; attempt++) {
+    const attemptInput = buildAttemptInput(input, reports);
+    const { response } = await simulateMaxResponse(attemptInput);
+    const validation = await validateAttempt(attemptInput, response);
+
+    reports.push({
+      attempt,
+      response,
+      compliant: validation.compliant,
+      summary: validation.summary,
+      violations: validation.violations,
+      safe_points: validation.safe_points,
+    });
+
+    if (validation.compliant) {
+      return {
+        response,
+        validation: {
+          attempts: attempt,
+          regenerated: attempt > 1,
+          finalStatus: "passed",
+          reports,
+        },
+      };
+    }
+  }
+
+  const lastReport = reports[reports.length - 1];
+  const fallbackResponse = "Je ne peux pas l'affirmer avec certitude à partir de ce que je sais. Je préfère rester prudent pour l'instant.";
+
+  return {
+    response: fallbackResponse,
+    validation: {
+      attempts: reports.length,
+      regenerated: reports.length > 1,
+      finalStatus: "fallback",
+      reports: [
+        ...reports,
+        {
+          attempt: reports.length + 1,
+          response: fallbackResponse,
+          compliant: true,
+          summary: `Fallback de sécurité après validation échouée${lastReport ? ` (${lastReport.summary})` : ""}.`,
+          violations: [],
+          safe_points: ["Réponse remplacée par un message de prudence avant TTS."],
+        },
+      ],
+    },
+  };
+}
+
+function buildAttemptInput(input: MaxAgentInput, reports: ConversationValidationTrace["reports"]): MaxAgentInput {
+  if (!reports.length) return input;
+
+  const lastReport = reports[reports.length - 1];
+  const regenerationInstruction = [
+    "[RÉGÉNÉRATION SÉCURISÉE]",
+    "Ta réponse précédente a été rejetée avant diffusion vocale.",
+    `Violations détectées: ${lastReport.violations.join(" | ") || lastReport.summary}`,
+    "Réécris une réponse plus prudente.",
+    "N'affirme aucun fait absent des faits autorisés.",
+    "Si l'information manque, exprime explicitement le doute ou les limites de ce que tu sais.",
+  ].join("\n");
+
+  return {
+    ...input,
+    userMessage: `${input.userMessage}\n\n${regenerationInstruction}`,
+  };
+}
+
+async function validateAttempt(input: MaxAgentInput, response: string): Promise<MaxConstraintCheckResult> {
+  return validateMaxResponseConstraints({
+    userMessage: input.userMessage,
+    response,
+    ragContext: input.ragContext,
+    knowledgeContext: input.knowledgeContext,
+  });
+}
+
+function persistPipelineTrace(trace: ConversationPipelineTrace) {
+  try {
+    localStorage.setItem(PIPELINE_TRACE_KEY, JSON.stringify(trace));
+  } catch {
+    // ignore trace persistence issues
+  }
 }

@@ -1,7 +1,7 @@
 import { callLLM, streamLLM } from "@/services/openRouterLLM";
 import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "@/services/debugLogger";
-import type { ConversationMessage, MaxTurnKnowledgeContext } from "@/types";
+import type { ConversationMessage, MaxConstraintCheckResult, MaxTurnKnowledgeContext } from "@/types";
 import { getLLMSettings, getMaxPromptControlSettings } from "@/services/settingsService";
 
 // Fallback minimal system prompt if DB fetch fails
@@ -72,13 +72,6 @@ export interface MaxAgentInput {
   postVideoContext?: string;
   session_id?: string;
   knowledgeContext?: MaxTurnKnowledgeContext;
-}
-
-export interface MaxConstraintCheckResult {
-  compliant: boolean;
-  summary: string;
-  violations: string[];
-  safe_points: string[];
 }
 
 /**

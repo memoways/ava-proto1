@@ -7,6 +7,7 @@ type PipelineSnapshot = {
   updatedAt?: string;
   userMessage?: string;
   ragContext?: string;
+  finalResponse?: string;
   preTurnBrief?: {
     response_mode?: string;
     openness_level?: number;
@@ -19,6 +20,19 @@ type PipelineSnapshot = {
     style_instructions?: string[];
     trigger_hint?: string | null;
     notes?: string;
+  };
+  validation?: {
+    attempts?: number;
+    regenerated?: boolean;
+    finalStatus?: "passed" | "fallback";
+    reports?: Array<{
+      attempt?: number;
+      response?: string;
+      compliant?: boolean;
+      summary?: string;
+      violations?: string[];
+      safe_points?: string[];
+    }>;
   };
 };
 
@@ -56,7 +70,7 @@ export default function PipelineTraceTab() {
             <PipelineStep title="2. RAG" status="done" description="Contexte narratif structuré en faits, souvenirs, hypothèses." />
             <PipelineStep title="3. GM pre-turn planner" status="done" description="Brief de tour généré avant Max avec mode, ouverture, budget de révélation et interdits." />
             <PipelineStep title="4. Réponse de Max sous contraintes" status="done" description="Le brief pilote désormais les facts/interdits injectés au tour." />
-            <PipelineStep title="5. Validation pré-TTS" status="todo" description="Le validateur existe en test admin, pas encore branché dans le runtime réel." />
+            <PipelineStep title="5. Validation pré-TTS" status="done" description="Chaque réponse est validée avant TTS, avec régénération automatique puis fallback prudent si nécessaire." />
             <PipelineStep title="6. GM post-turn scorer" status="done" description="Scoring trust / trigger / fin de partie toujours actif après réponse." />
           </CardContent>
         </Card>
@@ -91,6 +105,28 @@ export default function PipelineTraceTab() {
               <List title="Sujets interdits" items={trace?.preTurnBrief?.forbidden_topics} />
               <List title="Assertions bloquées" items={trace?.preTurnBrief?.blocked_assertions} />
               <List title="Instructions de style" items={trace?.preTurnBrief?.style_instructions} />
+            </section>
+            <Separator />
+            <section className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">validation: {trace?.validation?.finalStatus || "—"}</Badge>
+                <Badge variant="outline">tentatives: {trace?.validation?.attempts ?? "—"}</Badge>
+                <Badge variant="outline">régénération: {trace?.validation?.regenerated ? "oui" : "non"}</Badge>
+              </div>
+              <p><strong>Réponse finale:</strong></p>
+              <div className="rounded-md border bg-muted/20 p-3 whitespace-pre-wrap">{trace?.finalResponse || "—"}</div>
+              {(trace?.validation?.reports || []).map((report, index) => (
+                <div key={`report-${index}`} className="rounded-md border p-3 space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline">essai {report.attempt ?? index + 1}</Badge>
+                    <Badge variant={report.compliant ? "secondary" : "destructive"}>{report.compliant ? "conforme" : "bloqué"}</Badge>
+                  </div>
+                  <p><strong>Résumé:</strong> {report.summary || "—"}</p>
+                  <div className="rounded-md border bg-muted/20 p-3 whitespace-pre-wrap">{report.response || "—"}</div>
+                  <List title="Violations" items={report.violations} />
+                  <List title="Points sûrs" items={report.safe_points} />
+                </div>
+              ))}
             </section>
           </CardContent>
         </Card>

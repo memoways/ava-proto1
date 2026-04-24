@@ -59,6 +59,13 @@ export interface MaxTurnKnowledgeContext {
   blockedAssertions?: string[];
 }
 
+export interface MaxConstraintCheckResult {
+  compliant: boolean;
+  summary: string;
+  violations: string[];
+  safe_points: string[];
+}
+
 export interface GameMasterTurnBrief {
   response_mode: string;
   openness_level: number;
@@ -81,6 +88,29 @@ export interface GameMasterResponse {
   gate_reached: boolean;
   moderation_flag: boolean;
   notes: string;
+}
+
+export interface ConversationValidationTrace {
+  attempts: number;
+  regenerated: boolean;
+  finalStatus: "passed" | "fallback";
+  reports: Array<{
+    attempt: number;
+    response: string;
+    compliant: boolean;
+    summary: string;
+    violations: string[];
+    safe_points: string[];
+  }>;
+}
+
+export interface ConversationPipelineTrace {
+  updatedAt?: string;
+  userMessage?: string;
+  ragContext?: string;
+  preTurnBrief?: GameMasterTurnBrief;
+  finalResponse?: string;
+  validation?: ConversationValidationTrace;
 }
 
 export interface QuestionnaireData {
