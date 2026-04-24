@@ -394,6 +394,10 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
               </div>
             ) : null}
 
+            {Array.isArray(selected.conversation_log) && selected.conversation_log.length > 0 && (
+              <GmFallbackChart log={selected.conversation_log} />
+            )}
+
             <div className="mb-3">
               <p className="text-xs font-semibold text-muted-foreground mb-1">
                 Conversation ({Array.isArray(selected.conversation_log) ? selected.conversation_log.length : 0} messages)
