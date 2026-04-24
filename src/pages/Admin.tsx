@@ -14,6 +14,7 @@ import GameMasterConfigTab from "@/components/GameMasterConfigTab";
 import MaxPromptControlTab from "@/components/MaxPromptControlTab";
 import MaxPromptTestTab from "@/components/MaxPromptTestTab";
 import PipelineTraceTab from "@/components/PipelineTraceTab";
+import AntiHallucinationValidatorTab from "@/components/AntiHallucinationValidatorTab";
 import SessionsTab, { type SessionRow } from "@/components/admin/SessionsTab";
 import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
 import LLMUsageTab from "@/components/admin/LLMUsageTab";
@@ -46,6 +47,7 @@ const TAB_GROUPS = [
     tabs: [
       { id: "gamemaster", label: "Game Master" },
       { id: "max-prompt", label: "Max Prompt" },
+      { id: "validator", label: "Validateur" },
       { id: "max-test", label: "Test Max" },
         { id: "pipeline", label: "Pipeline" },
     ],
@@ -467,6 +469,10 @@ export default function Admin() {
           {/* ==================== MAX PROMPT CONTROL ==================== */}
           <TabsContent value="max-prompt">
             <MaxPromptControlTab />
+          </TabsContent>
+
+          <TabsContent value="validator">
+            <AntiHallucinationValidatorTab />
           </TabsContent>
 
           <TabsContent value="max-test">
