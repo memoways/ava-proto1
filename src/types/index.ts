@@ -49,6 +49,8 @@ export interface ConversationMessage {
   role: "user" | "max";
   content: string;
   timestamp: number;
+  /** Anti-hallucination validation trace, only present on Max messages that went through the validator. */
+  validation?: ConversationValidationTrace;
 }
 
 export interface MaxTurnKnowledgeContext {
