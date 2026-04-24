@@ -10,6 +10,9 @@ import {
   loadLLMSettingsFromDB,
   resetLLMSettings,
   OPENROUTER_MODELS,
+  getLastLLMValidationIssues,
+  getLLMValidationErrorMessage,
+  isSupportedOpenRouterModel,
   type LLMSettings,
 } from "@/services/settingsService";
 
@@ -22,10 +25,12 @@ export default function LLMConfigTab() {
 
   useEffect(() => {
     loadLLMSettingsFromDB().then((s) => {
+      const validationIssues = getLastLLMValidationIssues();
       setSettings(s);
       setSavedSettings(s);
-      if (!OPENROUTER_MODELS.find((m) => m.id === s.LLM_MODEL)) setCustomModel(s.LLM_MODEL);
-      if (!OPENROUTER_MODELS.find((m) => m.id === s.LLM_MODEL_GM)) setCustomModelGM(s.LLM_MODEL_GM);
+      if (validationIssues.length) {
+        toast.error(getLLMValidationErrorMessage(validationIssues));
+      }
     });
   }, []);
 
@@ -116,7 +121,7 @@ export default function LLMConfigTab() {
           <div className="mt-3 flex gap-2">
             <input
               type="text"
-              value={customModel || (!isPresetModel(settings.LLM_MODEL) ? settings.LLM_MODEL : "")}
+              value={customModel}
               onChange={(e) => setCustomModel(e.target.value)}
               placeholder="Modèle custom OpenRouter (ex: deepseek/deepseek-r1)"
               className="flex-1 bg-muted/30 border rounded px-3 py-2 text-sm font-mono"
@@ -125,7 +130,15 @@ export default function LLMConfigTab() {
               size="sm"
               variant="outline"
               disabled={!customModel.trim()}
-              onClick={() => updateLocal({ LLM_MODEL: customModel.trim() })}
+              onClick={() => {
+                const modelId = customModel.trim();
+                if (!isSupportedOpenRouterModel(modelId)) {
+                  toast.error(`Modèle OpenRouter non supporté : ${modelId}`);
+                  return;
+                }
+                updateLocal({ LLM_MODEL: modelId });
+                setCustomModel("");
+              }}
             >
               Appliquer
             </Button>
@@ -218,7 +231,7 @@ export default function LLMConfigTab() {
           <div className="mt-3 flex gap-2">
             <input
               type="text"
-              value={customModelGM || (!isPresetModel(settings.LLM_MODEL_GM) ? settings.LLM_MODEL_GM : "")}
+              value={customModelGM}
               onChange={(e) => setCustomModelGM(e.target.value)}
               placeholder="Modèle custom pour le Game Master"
               className="flex-1 bg-muted/30 border rounded px-3 py-2 text-sm font-mono"
@@ -227,7 +240,15 @@ export default function LLMConfigTab() {
               size="sm"
               variant="outline"
               disabled={!customModelGM.trim()}
-              onClick={() => updateLocal({ LLM_MODEL_GM: customModelGM.trim() })}
+              onClick={() => {
+                const modelId = customModelGM.trim();
+                if (!isSupportedOpenRouterModel(modelId)) {
+                  toast.error(`Modèle OpenRouter non supporté : ${modelId}`);
+                  return;
+                }
+                updateLocal({ LLM_MODEL_GM: modelId });
+                setCustomModelGM("");
+              }}
             >
               Appliquer
             </Button>
