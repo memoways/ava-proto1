@@ -19,7 +19,7 @@ describe("PipelineSchema", () => {
     render(<PipelineSchema />);
     expect(screen.getByText(/Glossaire/i)).toBeInTheDocument();
     expect(screen.getByText(/GM \(Game Master\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/RAG/)).toBeInTheDocument();
-    expect(screen.getByText(/Validateur/)).toBeInTheDocument();
+    expect(screen.getByText(/Brief de tour/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Validateur/i).length).toBeGreaterThan(0);
   });
 });

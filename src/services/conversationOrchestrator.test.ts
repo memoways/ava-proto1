@@ -6,16 +6,18 @@ vi.mock("@/services/openRouterLLM", () => ({
   streamLLM: vi.fn(),
 }));
 
+const emptyKnowledge = {
+  allowedFacts: [],
+  activeMemories: [],
+  hypotheses: [],
+  forbiddenTopics: [],
+  blockedAssertions: [],
+};
+
 vi.mock("@/services/ragService", () => ({
   queryRAG: vi.fn().mockResolvedValue([]),
   formatRAGContext: vi.fn().mockReturnValue(""),
-  buildKnowledgeContextFromRAG: vi.fn().mockReturnValue({
-    allowedFacts: [],
-    activeMemories: [],
-    hypotheses: [],
-    forbiddenTopics: [],
-    blockedAssertions: [],
-  }),
+  buildKnowledgeContextFromRAG: vi.fn(() => ({ ...emptyKnowledge })),
 }));
 
 vi.mock("@/services/debugLogger", () => ({
