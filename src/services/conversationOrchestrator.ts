@@ -116,6 +116,7 @@ export async function processConversationTurn(
     knowledgeContext: ragResult.knowledgeContext,
   }).catch((err) => {
     console.warn("[Orchestrator] GM pre-turn failed, using empty brief:", err);
+    const message = err instanceof Error ? err.message : String(err);
     return {
       response_mode: "ferme_mefiant" as const,
       openness_level: 1,
@@ -128,6 +129,10 @@ export async function processConversationTurn(
       style_instructions: [],
       trigger_hint: null,
       notes: "fallback (GM pre-turn error)",
+      fallback: {
+        kind: "orchestrator_error" as const,
+        reason: `orchestrator: ${message.slice(0, 140)}`,
+      },
     };
   }).then((brief) => ({ brief, gm_pre_ms: Math.round(performance.now() - gmPreStart) }));
 
