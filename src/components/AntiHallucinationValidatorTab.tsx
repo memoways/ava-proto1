@@ -178,6 +178,60 @@ export default function AntiHallucinationValidatorTab() {
           />
         </div>
       </section>
+
+      <section className="space-y-4 rounded-lg border p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-base font-semibold">🔬 Aperçu de la fusion validateur</h3>
+            <p className="text-sm text-muted-foreground">
+              Visualise comment les listes globales se combinent avec le brief pré-tour du Game Master, juste avant la validation et le TTS.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={refreshTrace}>
+            Rafraîchir
+          </Button>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          {trace?.updatedAt
+            ? `Dernier tour observé : ${new Date(trace.updatedAt).toLocaleString("fr-FR")}`
+            : "Aucune trace de tour disponible — joue une conversation pour alimenter cet aperçu."}
+        </p>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <PreviewColumn
+            title="Faits autorisés (fusion)"
+            globalLabel="globaux"
+            globalItems={merged.globalFacts}
+            turnLabel="brief du tour"
+            turnItems={merged.turnAllowed}
+            mergedItems={merged.mergedFacts}
+            mergedTone="positive"
+          />
+          <PreviewColumn
+            title="Assertions bloquées (fusion)"
+            globalLabel="règles globales"
+            globalItems={merged.globalRules}
+            turnLabel="brief du tour"
+            turnItems={merged.turnBlocked}
+            mergedItems={merged.mergedBlocked}
+            mergedTone="negative"
+          />
+          <PreviewColumn
+            title="Sujets interdits (tour)"
+            globalLabel="—"
+            globalItems={[]}
+            turnLabel="brief du tour"
+            turnItems={merged.turnForbidden}
+            mergedItems={merged.mergedForbidden}
+            mergedTone="negative"
+          />
+        </div>
+
+        <div className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
+          Règle de fusion : les entrées globales et celles du tour sont concaténées puis dédupliquées (insensible à la casse). Cette liste fusionnée est exactement ce que le validateur reçoit avant d’autoriser la synthèse vocale.
+        </div>
+      </section>
     </div>
   );
 }
