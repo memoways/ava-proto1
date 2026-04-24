@@ -1,6 +1,6 @@
 import { callMaxAgent, type MaxAgentInput } from "@/agents/maxAgent";
 import { callGameMaster, type GameMasterInput } from "@/agents/gameMasterAgent";
-import { buildKnowledgeContextFromRAG, getRAGContext, queryRAG } from "@/services/ragService";
+import { buildKnowledgeContextFromRAG, formatRAGContext, queryRAG } from "@/services/ragService";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, GameMasterResponse, VideoTrigger } from "@/types";
 import { getGameplaySettings } from "@/services/settingsService";
@@ -76,7 +76,7 @@ export async function processConversationTurn(
     try {
       const recentMessages = conversationHistory.slice(-4).map(m => m.content).join(' ');
       const matches = await queryRAG(userMessage, recentMessages, gameplay.RAG_TOP_K);
-      const ctx = matches.length ? matches.map((m, i) => `[${i + 1}] (${m.source_table}, score: ${m.similarity.toFixed(2)})\n${m.content}`).join('\n\n') : "";
+      const ctx = formatRAGContext(matches);
       if (ctx) console.log('[RAG] Context found, injecting into prompt');
       return { ctx, knowledgeContext: buildKnowledgeContextFromRAG(matches) };
     } catch (err) {
