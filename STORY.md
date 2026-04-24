@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-04-24 (session 10 — contrôle éditorial Max / GM)  
+> **Last Updated**: 2026-04-24 (session 11 — validateur anti-hallucination, métriques et finitions du plan Max/GM)  
 
 ---
 
@@ -63,6 +63,29 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-04-24 — Validateur anti-hallucination + métriques + finitions plan Max/GM 🔷
+
+**Intent**: Boucler les phases 4 et 5 du plan Max/GM : empêcher Max d'affirmer des faits non autorisés, donner à l'équipe éditoriale une vue lisible de ce qui est réellement transmis au validateur, et mesurer le comportement réel du système sur les sessions passées.
+
+**Tool**: Lovable + Lovable Cloud
+
+**Outcome**:
+1. **Validateur anti-hallucination pré-TTS** — `conversationOrchestrator` exécute désormais une étape de validation entre la génération de Max et le TTS, qui compare la réponse aux faits autorisés globaux + au contexte autorisé du tour. Logique en deux temps : **retry** d'abord, **fallback** ensuite si le retry échoue toujours.
+2. **Aperçu admin de la fusion** — nouvel onglet `AntiHallucinationValidatorTab` qui montre comment le validateur combine faits globaux et contexte du tour avant l'appel. Composants `PreviewColumn` et `MiniList` rendent la fusion lisible côté éditorial. Test `AntiHallucinationValidatorTab.test.tsx` qui échoue si l'un des deux composants disparaît.
+3. **Persistance de la trace de validation par message** — `ConversationMessage` reçoit un champ optionnel `validation: ConversationValidationTrace`. La page `Index` attache la trace renvoyée par l'orchestrateur au message Max avant push dans l'historique et mise à jour de `conversation_log`. Pas de migration : le champ étant `jsonb`, le stockage est transparent.
+4. **Métriques admin** — nouvel onglet `HallucinationMetricsTab` qui calcule les taux de régénération et de fallback sur les 50 dernières sessions à partir des traces persistées. Première mesure réelle du comportement du validateur en prod.
+5. **Catalogue formel des modes de parole** — `src/services/speechModes.ts` définit 6 styles éditoriaux (`ferme_mefiant`, `fragile`, `revelateur_partiel`, etc.) exposés dans `GameMasterConfigTab`. Aligne `response_mode` du brief GM sur un vocabulaire stable.
+6. **Schéma visuel du pipeline** — `PipelineSchema` intégré à l'onglet Pipeline : séquence en 8 étapes (User → STT → RAG → GM pre-turn → Max → Validateur → TTS → GM post-turn) avec glossaire interactif.
+7. **Tests automatisés** — `conversationOrchestrator.test.ts` (retry puis fallback), `speechModes.test.ts`, `PipelineSchema.test.tsx`. 9/9 verts.
+
+**Ce que ça change** : le pipeline Max/GM passe d'un système "fais confiance au LLM" à un système "vérifie puis publie", avec mesure réelle du taux d'invention. Le contrôle éditorial est maintenant outillé de bout en bout (config → simulation → validation → métriques).
+
+**Reporté** : la politique de vérité à 4 niveaux (certain / probable / inconnu / interdit) — elle demande un refactor structurel de `MaxTurnKnowledgeContext` et du prompt du validateur, traité dans une session dédiée.
+
+**Time**: ~3h
+
+---
 
 ### 2026-04-24 — Contrôle éditorial de Max + simulation admin + trace pipeline 🔷
 
@@ -727,8 +750,10 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 | 2026-03-08 | 1 video trigger sans titre dans Notion → ignoré au sync | Bas | Corriger dans Notion |
 | 2026-03-08 | Pas de test end-to-end du pipeline voice-to-voice complet avec testeurs externes | Haut | Prochaine session |
 | 2026-03-08 | Diction ElevenLabs parfois bizarre en français — nécessite fine-tuning des paramètres voix | Moyen | Tester presets dans /admin > Voix |
-| 2026-04-24 | Validation anti-hallucination pré-TTS pas encore intégrée au runtime | Haut | Ajouter validateur + régénération automatique |
-| 2026-04-24 | Bible factuelle / sujets verrouillés non encore modélisés explicitement | Haut | Implémenter la Phase 3 du plan Max / GM |
+| 2026-04-24 | ~~Validation anti-hallucination pré-TTS pas encore intégrée au runtime~~ ✅ Résolu en session 11 (retry + fallback + métriques) | — | Fait |
+| 2026-04-24 | Bible factuelle / sujets verrouillés non encore modélisés explicitement | Haut | Phase 3 étendue : politique de vérité à 4 niveaux |
+| 2026-04-24 | Politique de vérité à 4 niveaux (certain/probable/inconnu/interdit) reportée | Moyen | Refactor `MaxTurnKnowledgeContext` + prompt validateur |
+| 2026-04-24 | Bible factuelle pas encore éditable depuis l'admin | Moyen | UI dédiée pour les faits autorisés globaux |
 
 ---
 

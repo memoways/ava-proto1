@@ -4,6 +4,35 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.15.0] - 2026-04-24 — Validateur anti-hallucination, métriques et finitions du plan Max/GM
+
+### Ajouté
+- **Validateur anti-hallucination pré-TTS** : avant la synthèse vocale, la réponse de Max est validée contre les faits autorisés globaux + le contexte autorisé du tour
+  - Logique de **retry** puis **fallback** quand une hallucination est détectée
+  - Onglet admin `AntiHallucinationValidatorTab` avec aperçu de la fusion (faits globaux + contexte du tour) avant validation et TTS
+  - Colonnes "Preview" et "MiniList" dans l'aperçu pour visualiser ce qui est réellement transmis au validateur
+- **Persistance de la trace de validation par message** : chaque message de Max stocke sa `ConversationValidationTrace` dans `conversation_log` (jsonb)
+  - Nouveau champ optionnel `validation` sur `ConversationMessage`
+  - L'orchestrateur attache la trace renvoyée par le validateur au message Max avant push dans l'historique
+- **Onglet admin `HallucinationMetricsTab`** : taux de régénération et de fallback agrégés sur les 50 dernières sessions à partir des traces persistées
+- **Catalogue formel de modes de parole** (`src/services/speechModes.ts`) : 6 styles éditoriaux (`ferme_mefiant`, `fragile`, `revelateur_partiel`, etc.) exposés dans `GameMasterConfigTab`
+- **Schéma visuel du pipeline** (`PipelineSchema`) intégré à l'onglet Pipeline : séquence en 8 étapes (User → STT → RAG → GM pre-turn → Max → Validateur → TTS → GM post-turn) avec glossaire interactif
+- **Tests automatisés** :
+  - `conversationOrchestrator.test.ts` : vérifie la logique "retry puis fallback" quand le validateur détecte une hallucination
+  - `speechModes.test.ts` : valide le catalogue de modes
+  - `PipelineSchema.test.tsx` : vérifie le rendu du schéma pipeline
+  - `AntiHallucinationValidatorTab.test.tsx` : garantit la présence des composants `PreviewColumn` et `MiniList`
+
+### Modifié
+- **Orchestrateur de conversation** : intègre l'étape de validation entre la génération Max et le TTS, avec stratégie retry/fallback
+- **Page `Index`** : la boucle conversationnelle attache la trace de validation au message Max avant la mise à jour de la session
+- **`PipelineTraceTab`** : enrichi du schéma pipeline et du glossaire des étapes
+- **`Admin.tsx`** : nouvel onglet "Métriques hallucinations" et raccordement du catalogue de modes au config GM
+
+### Notes
+- Aucune migration de schéma : `conversation_log` étant `jsonb`, la trace de validation y est stockée sans changement de structure
+- La politique de vérité à 4 niveaux (certain / probable / inconnu / interdit) reste à implémenter — elle nécessite un refactor structurel de `MaxTurnKnowledgeContext` et du prompt LLM du validateur
+
 ## [0.14.0] - 2026-04-24 — Contrôle éditorial de Max, simulation et robustesse OpenRouter
 
 ### Ajouté
