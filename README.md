@@ -5,6 +5,8 @@
 > **Créé avec**: Lovable  
 > **Démarré**: 2026-03-07  
 
+> **Mise à jour récente**: le pipeline Max ↔ Game Master entre dans une phase de contrôle éditorial fin, avec simulation admin, traçabilité du brief de tour et robustesse renforcée sur les retours différés OpenRouter.
+
 ## En une phrase
 
 Expérience narrative interactive voice-to-voice avec Max, un personnage fictif piloté par IA, dans l'univers de "Où est Ava ?".
@@ -18,6 +20,8 @@ Expérience narrative interactive voice-to-voice avec Max, un personnage fictif 
 ## 🎯 Objectif projet
 
 Valider le pipeline technique complet d'une conversation voice-to-voice avec un personnage IA : STT (Deepgram) → LLM (OpenRouter/multi-modèles) → TTS (ElevenLabs), orchestré par un Game Master autonome qui gère la confiance, les triggers vidéo et le game over, enrichi par un pipeline RAG connecté à Notion.
+
+Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mieux séparer l'identité de Max, les connaissances autorisées, les contraintes de révélation et la supervision éditoriale du Game Master.
 
 ## ✅ Livrables
 
@@ -46,7 +50,14 @@ Valider le pipeline technique complet d'une conversation voice-to-voice avec un 
 - [x] Persistance des réglages admin en base (LLM, Voix, Gameplay, GM)
 - [x] Rapport de sync Notion détaillé (entrées, chunks RAG, tokens par table)
 - [x] Player vidéo Gumlet (iframe embed responsive plein écran)
+- [x] Contrôle éditorial structuré de Max (persona, objectifs, historique, interdictions d'affirmation)
+- [x] Simulateur admin de réponse Max avec contexte RAG de test
+- [x] Vue admin de trace pipeline conversationnelle (input, RAG, brief GM, décision)
+- [x] Pré-turn planner Game Master avant génération de Max
+- [x] Robustesse du tracking de coûts OpenRouter en cas de génération introuvable temporairement
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
+- [ ] Validation anti-hallucination pré-TTS avec régénération automatique
+- [ ] Bible factuelle éditable et gestion explicite des sujets verrouillés/déverrouillés
 - [ ] Alertes de budget LLM + fallback modèle
 
 ## 🛠️ Stack technique
@@ -64,6 +75,22 @@ Valider le pipeline technique complet d'une conversation voice-to-voice avec un 
 | Embeddings | OpenAI text-embedding-3-small (1536 dim) |
 | Données | Notion (source de vérité) → Supabase (miroir + embeddings) |
 | RAG | query-rag Edge Function + match_embeddings SQL |
+
+## 🧭 Avancement du plan Max / GM
+
+Le plan initial visait 5 phases pour réduire les inventions de Max et rendre son comportement éditorialement pilotable.
+
+### Déjà implémenté
+- **Phase 1 — Visibilité** : vue admin `PipelineTraceTab` pour inspecter le pipeline conversationnel réel.
+- **Phase 2 — Contrat GM → Max** : brief pré-tour structuré généré par le Game Master avant l'appel à Max.
+- **Phase 3 — Première couche de contrôle de connaissance** : système de prompt structuré côté Max avec persona, objectifs, historique/contextes et contraintes d'affirmation.
+- **Phase 5 — Outils éditoriaux partiels** : écran de simulation admin (`MaxPromptTestTab`) et panneau de réglage (`MaxPromptControlTab`).
+
+### Reste à développer
+- **Validation pré-TTS** : refuser ou régénérer une réponse si elle affirme un fait non autorisé.
+- **Bible factuelle éditable** : distinguer explicitement faits certains, hypothèses, inconnus et sujets interdits.
+- **Gestion d'unlocked/locked subjects** : pilotage fin des sujets révélables selon l'état narratif.
+- **Trace complète de simulation multi-agent** : inclure validation, régénérations et score post-tour dans un seul déroulé lisible.
 
 ## 🚀 Démarrage rapide
 
@@ -113,7 +140,9 @@ Ou directement via [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_I
 - Vidéos servies via Gumlet (intro fonctionnelle, triggers en cours de configuration)
 - Sync Notion : 4 characters + 38 storyworld synchronisés, 42 embeddings générés
 - **Admin** : `/admin` pour gérer sessions, prompts, config LLM/voix, suivi des coûts LLM, sync Notion détaillée
+- **Admin** : `/admin` inclut désormais des onglets de contrôle du prompt de Max, de test éditorial et de trace pipeline Max/GM
 - Les réglages admin sont persistés en base (survivent au rechargement et changement de navigateur)
+- Le tracking de coûts OpenRouter est tolérant aux délais d'indexation et aux `generation_id` temporairement introuvables
 
 ---
 
