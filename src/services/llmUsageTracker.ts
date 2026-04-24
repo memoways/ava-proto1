@@ -160,6 +160,7 @@ export async function fetchGenerationCost(
   generationId: string,
   context?: { session_id?: string | null; source?: string; metadata_json?: Record<string, unknown> }
 ): Promise<{
+  available?: boolean;
   cost_usd: number;
   prompt_tokens: number;
   completion_tokens: number;
@@ -183,8 +184,16 @@ export async function fetchGenerationCost(
       }),
     });
     clearTimeout(timeoutId);
+    const rawText = await res.text();
+    let payload: any = null;
+    try {
+      payload = rawText ? JSON.parse(rawText) : null;
+    } catch {
+      payload = null;
+    }
+
     if (!res.ok) {
-      const errText = await res.text();
+      const errText = rawText;
       await logCostFetchError({
         session_id: context?.session_id,
         generation_id: generationId,
@@ -206,7 +215,32 @@ export async function fetchGenerationCost(
       console.warn(`[LLM Tracker] Cost fetch unavailable [${res.status}]:`, errText);
       return null;
     }
-    const data = await res.json();
+
+    if (payload?.available === false) {
+      await logCostFetchError({
+        session_id: context?.session_id,
+        generation_id: generationId,
+        error_type: payload?.error_type || getCostErrorType(payload?.status_code),
+        status_code: payload?.status_code ?? null,
+        error_message: String(payload?.details || payload?.error || "Generation cost unavailable").slice(0, 500),
+        source: context?.source || "cost_fetch",
+        metadata_json: {
+          ...(context?.metadata_json || {}),
+          stage: "fetch_generation_cost",
+          retryable: payload?.retryable ?? false,
+        },
+      });
+
+      if (payload?.status_code === 404) {
+        console.warn(`[LLM Tracker] Cost not available yet for ${generationId} [404], retrying later.`);
+        return null;
+      }
+
+      console.warn(`[LLM Tracker] Generation cost unavailable:`, payload);
+      return null;
+    }
+
+    const data = payload;
     console.log(`[LLM Tracker] Cost data for ${generationId}:`, data);
     return data;
   } catch (err) {
