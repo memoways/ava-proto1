@@ -45,11 +45,14 @@ describe("AntiHallucinationValidatorTab", () => {
     // PreviewColumn merged footer label (proves PreviewColumn rendered)
     expect(screen.getAllByText(/Fusion envoyée au validateur/i).length).toBeGreaterThanOrEqual(3);
 
-    // MiniList items from global + turn (proves MiniList rendered)
-    expect(screen.getByText("Fait global A")).toBeInTheDocument();
-    expect(screen.getByText("Fait du tour X")).toBeInTheDocument();
-    expect(screen.getByText("Règle globale 1")).toBeInTheDocument();
-    expect(screen.getByText("Assertion bloquée Z")).toBeInTheDocument();
-    expect(screen.getByText("Sujet interdit Y")).toBeInTheDocument();
+    // MiniList items from global + turn (proves MiniList rendered, items also appear in merged list)
+    expect(screen.getAllByText("Fait global A").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Fait du tour X").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Règle globale 1").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Assertion bloquée Z").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Sujet interdit Y").length).toBeGreaterThanOrEqual(1);
+
+    // MiniList label format "(N)" (proves MiniList helper rendered)
+    expect(screen.getAllByText(/\(\d+\)/).length).toBeGreaterThan(0);
   });
 });
