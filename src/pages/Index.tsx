@@ -332,6 +332,7 @@ const Index = () => {
         timestamp: Date.now(),
         validation,
         pipeline: fullTimings,
+        gmFallback: preTurnBrief?.fallback ?? null,
       };
       conversationHistoryRef.current.push(maxMsg);
       addMessage(maxMsg);
