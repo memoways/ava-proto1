@@ -237,34 +237,83 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
                 Conversation ({Array.isArray(selected.conversation_log) ? selected.conversation_log.length : 0} messages)
               </p>
               <ScrollArea className="h-60 border rounded p-2">
-                {Array.isArray(selected.conversation_log) &&
-                  selected.conversation_log.map((msg: any, i: number) => {
-                    const fb = msg.gmFallback;
-                    const blocker = msg.pipeline?.blocker;
-                    return (
-                      <div key={i} className={`mb-2 text-sm ${msg.role === "max" ? "text-blue-300" : "text-green-300"}`}>
-                        <span className="font-bold">{msg.role === "max" ? "Max" : "User"}:</span> {msg.content}
-                        {msg.role === "max" && (fb || blocker) && (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {fb && (
-                              <span
-                                className="text-[10px] uppercase tracking-wide bg-destructive/20 text-destructive border border-destructive/40 px-1.5 py-0.5 rounded"
-                                title={fb.reason}
-                              >
-                                GM fallback · {fb.kind}
-                                {typeof fb.elapsed_ms === "number" ? ` · ${fb.elapsed_ms}ms` : ""}
-                              </span>
-                            )}
-                            {blocker && (
-                              <span className="text-[10px] uppercase tracking-wide bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded">
-                                blocker · {blocker}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                <TooltipProvider delayDuration={150}>
+                  {Array.isArray(selected.conversation_log) &&
+                    selected.conversation_log.map((msg: any, i: number) => {
+                      const fb = msg.gmFallback;
+                      const blocker = msg.pipeline?.blocker;
+                      return (
+                        <div key={i} className={`mb-2 text-sm ${msg.role === "max" ? "text-blue-300" : "text-green-300"}`}>
+                          <span className="font-bold">{msg.role === "max" ? "Max" : "User"}:</span> {msg.content}
+                          {msg.role === "max" && (fb || blocker) && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {fb && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="cursor-help text-[10px] uppercase tracking-wide bg-destructive/20 text-destructive border border-destructive/40 px-1.5 py-0.5 rounded">
+                                      GM fallback · {fb.kind}
+                                      {typeof fb.elapsed_ms === "number" ? ` · ${fb.elapsed_ms}ms` : ""}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent
+                                    side="bottom"
+                                    align="start"
+                                    className="max-w-[420px] p-0 bg-popover text-popover-foreground border"
+                                  >
+                                    <div className="p-2.5 space-y-1.5 text-xs">
+                                      <div className="flex items-center justify-between gap-3 border-b border-border pb-1.5">
+                                        <span className="font-semibold uppercase tracking-wide text-destructive">
+                                          GM fallback · {fb.kind}
+                                        </span>
+                                        {typeof fb.elapsed_ms === "number" && (
+                                          <span className="font-mono text-[10px] text-muted-foreground">
+                                            {fb.elapsed_ms} ms
+                                            {typeof fb.timeout_ms === "number"
+                                              ? ` / ${fb.timeout_ms} ms seuil`
+                                              : ""}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="grid grid-cols-[80px_1fr] gap-x-2 gap-y-1">
+                                        <span className="text-muted-foreground">Raison</span>
+                                        <span className="break-words">{fb.reason || "—"}</span>
+
+                                        <span className="text-muted-foreground">Modèle</span>
+                                        <span className="font-mono break-all">{fb.model || "—"}</span>
+
+                                        <span className="text-muted-foreground">Timeout</span>
+                                        <span className="font-mono">
+                                          {typeof fb.timeout_ms === "number" ? `${fb.timeout_ms} ms` : "—"}
+                                        </span>
+
+                                        <span className="text-muted-foreground">Écoulé</span>
+                                        <span className="font-mono">
+                                          {typeof fb.elapsed_ms === "number" ? `${fb.elapsed_ms} ms` : "—"}
+                                        </span>
+                                      </div>
+                                      {fb.error_excerpt && (
+                                        <div className="pt-1.5 border-t border-border">
+                                          <p className="text-muted-foreground mb-1">Extrait erreur (200 c.)</p>
+                                          <pre className="whitespace-pre-wrap break-words font-mono text-[10px] bg-muted/40 rounded p-1.5 max-h-32 overflow-auto">
+{fb.error_excerpt}
+                                          </pre>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                              {blocker && (
+                                <span className="text-[10px] uppercase tracking-wide bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded">
+                                  blocker · {blocker}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </TooltipProvider>
               </ScrollArea>
             </div>
 
