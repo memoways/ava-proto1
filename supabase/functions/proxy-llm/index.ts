@@ -25,6 +25,13 @@ interface LLMRequest {
   generation_id?: string;
 }
 
+function getLookupErrorType(status: number) {
+  if (status === 404) return "not_found";
+  if (status === 408) return "timeout";
+  if (status >= 500) return "server_error";
+  return "http_error";
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -51,8 +58,15 @@ serve(async (req) => {
         const errText = await genRes.text();
         console.error(`[proxy-llm] OpenRouter generation lookup error [${genRes.status}]:`, errText);
         return new Response(
-          JSON.stringify({ error: `Generation lookup failed: ${genRes.status}`, details: errText }),
-          { status: genRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({
+            available: false,
+            retryable: genRes.status === 404 || genRes.status === 408 || genRes.status >= 500,
+            error: `Generation lookup failed: ${genRes.status}`,
+            error_type: getLookupErrorType(genRes.status),
+            status_code: genRes.status,
+            details: errText,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -61,6 +75,7 @@ serve(async (req) => {
       const data = genData.data || genData;
       return new Response(
         JSON.stringify({
+          available: true,
           cost_usd: data.total_cost ?? data.usage ?? 0,
           prompt_tokens: data.tokens_prompt ?? data.native_tokens_prompt ?? 0,
           completion_tokens: data.tokens_completion ?? data.native_tokens_completion ?? 0,
