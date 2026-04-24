@@ -235,3 +235,67 @@ export default function AntiHallucinationValidatorTab() {
     </div>
   );
 }
+function PreviewColumn({
+  title,
+  globalLabel,
+  globalItems,
+  turnLabel,
+  turnItems,
+  mergedItems,
+  mergedTone,
+}: {
+  title: string;
+  globalLabel: string;
+  globalItems: string[];
+  turnLabel: string;
+  turnItems: string[];
+  mergedItems: string[];
+  mergedTone: "positive" | "negative";
+}) {
+  const mergedClass =
+    mergedTone === "positive"
+      ? "border-emerald-700/40 bg-emerald-900/20"
+      : "border-red-700/40 bg-red-900/20";
+
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <p className="text-sm font-semibold">{title}</p>
+      <MiniList label={globalLabel} items={globalItems} />
+      <MiniList label={turnLabel} items={turnItems} />
+      <div className={`rounded-md border p-2 ${mergedClass}`}>
+        <p className="text-xs uppercase text-muted-foreground">
+          Fusion envoyée au validateur ({mergedItems.length})
+        </p>
+        {mergedItems.length === 0 ? (
+          <p className="text-xs italic text-muted-foreground">— aucune entrée —</p>
+        ) : (
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-xs">
+            {mergedItems.map((item, idx) => (
+              <li key={`merged-${idx}`}>{item}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MiniList({ label, items }: { label: string; items: string[] }) {
+  return (
+    <div className="rounded-md border bg-muted/10 p-2">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label} ({items.length})</p>
+      {items.length === 0 ? (
+        <p className="text-xs italic text-muted-foreground">—</p>
+      ) : (
+        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs">
+          {items.slice(0, 6).map((item, idx) => (
+            <li key={`${label}-${idx}`}>{item}</li>
+          ))}
+          {items.length > 6 && (
+            <li className="italic text-muted-foreground">+{items.length - 6} de plus…</li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
