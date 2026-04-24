@@ -6,13 +6,9 @@ describe("PipelineSchema", () => {
   it("rend les 8 étapes du pipeline conversationnel", () => {
     render(<PipelineSchema />);
     expect(screen.getByText(/Schéma du pipeline conversationnel/i)).toBeInTheDocument();
-    expect(screen.getByText(/STT/)).toBeInTheDocument();
-    expect(screen.getAllByText(/RAG/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/GM pré-tour/)).toBeInTheDocument();
-    expect(screen.getByText(/Max Agent/)).toBeInTheDocument();
-    expect(screen.getByText(/Validateur anti-hallucination/)).toBeInTheDocument();
-    expect(screen.getByText(/TTS/)).toBeInTheDocument();
-    expect(screen.getByText(/GM post-tour/)).toBeInTheDocument();
+    for (const label of [/STT/, /RAG/, /GM pré-tour/, /Max Agent/, /Validateur anti-hallucination/, /TTS/, /GM post-tour/]) {
+      expect(screen.getAllByText(label).length).toBeGreaterThanOrEqual(1);
+    }
   });
 
   it("rend le glossaire des rôles GM/Max/RAG", () => {
