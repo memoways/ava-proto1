@@ -483,6 +483,10 @@ export default function Admin() {
             <HallucinationMetricsTab />
           </TabsContent>
 
+          <TabsContent value="latency">
+            <LatencyBlockingTab />
+          </TabsContent>
+
           <TabsContent value="max-test">
             <MaxPromptTestTab />
           </TabsContent>
