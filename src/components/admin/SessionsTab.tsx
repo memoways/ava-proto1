@@ -43,6 +43,159 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+interface FallbackPoint {
+  index: number;        // index du message Max dans le log
+  turnLabel: string;    // ex "T3"
+  elapsed_ms: number;
+  timeout_ms: number;
+  kind: string;
+  exceeded: boolean;
+}
+
+/** Mini bar chart SVG : elapsed_ms vs timeout_ms sur les N derniers fallbacks GM. */
+function GmFallbackChart({ log }: { log: any[] }) {
+  // Construire la liste des fallbacks (uniquement messages Max avec gmFallback)
+  let turnCount = 0;
+  const points: FallbackPoint[] = [];
+  for (let i = 0; i < log.length; i++) {
+    const m = log[i];
+    if (m?.role !== "max") continue;
+    turnCount += 1;
+    const fb = m.gmFallback;
+    if (!fb || typeof fb.elapsed_ms !== "number") continue;
+    const timeout_ms = typeof fb.timeout_ms === "number" ? fb.timeout_ms : 4000;
+    points.push({
+      index: i,
+      turnLabel: `T${turnCount}`,
+      elapsed_ms: fb.elapsed_ms,
+      timeout_ms,
+      kind: fb.kind || "?",
+      exceeded: fb.elapsed_ms >= timeout_ms,
+    });
+  }
+
+  if (points.length === 0) {
+    return (
+      <div className="mb-3 border rounded p-3 bg-muted/20 text-xs text-muted-foreground">
+        Aucun fallback GM sur cette session.
+      </div>
+    );
+  }
+
+  const recent = points.slice(-20); // les 20 derniers
+  const maxTimeout = Math.max(...recent.map((p) => p.timeout_ms));
+  const maxValue = Math.max(maxTimeout, ...recent.map((p) => p.elapsed_ms));
+  const yMax = Math.ceil((maxValue * 1.1) / 500) * 500 || 500; // arrondi 500ms
+
+  const W = 480;
+  const H = 140;
+  const padL = 32;
+  const padR = 8;
+  const padT = 8;
+  const padB = 22;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const slot = innerW / recent.length;
+  const barW = Math.max(4, slot * 0.55);
+
+  const yFor = (v: number) => padT + innerH - (v / yMax) * innerH;
+  const exceededCount = recent.filter((p) => p.exceeded).length;
+
+  // Ligne timeout (on prend le max — quasi tjrs constant) tracée en repère
+  const timeoutY = yFor(maxTimeout);
+
+  return (
+    <div className="mb-3 border rounded p-3 bg-muted/20">
+      <div className="flex items-baseline justify-between mb-2">
+        <p className="text-xs font-semibold text-muted-foreground">
+          Fallbacks GM — elapsed vs timeout ({recent.length} dernier{recent.length > 1 ? "s" : ""})
+        </p>
+        <p className="text-[10px] text-muted-foreground">
+          <span className="text-destructive font-medium">{exceededCount}</span> dépassement{exceededCount > 1 ? "s" : ""} ·
+          seuil {maxTimeout} ms
+        </p>
+      </div>
+      <TooltipProvider delayDuration={100}>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          className="w-full h-auto"
+          role="img"
+          aria-label="Graphique elapsed_ms vs timeout_ms des derniers fallbacks GM"
+        >
+          {/* Axe Y simplifié : 3 graduations */}
+          {[0, 0.5, 1].map((r) => {
+            const v = Math.round(yMax * r);
+            const y = yFor(v);
+            return (
+              <g key={r}>
+                <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="hsl(var(--border))" strokeDasharray="2 3" strokeWidth={0.5} />
+                <text x={padL - 4} y={y + 3} textAnchor="end" fontSize="9" fill="hsl(var(--muted-foreground))">
+                  {v}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Ligne seuil timeout */}
+          <line
+            x1={padL}
+            y1={timeoutY}
+            x2={W - padR}
+            y2={timeoutY}
+            stroke="hsl(var(--destructive))"
+            strokeWidth={1}
+            strokeDasharray="4 3"
+            opacity={0.7}
+          />
+          <text x={W - padR} y={timeoutY - 3} textAnchor="end" fontSize="9" fill="hsl(var(--destructive))">
+            timeout
+          </text>
+
+          {/* Barres elapsed_ms */}
+          {recent.map((p, idx) => {
+            const x = padL + idx * slot + (slot - barW) / 2;
+            const y = yFor(p.elapsed_ms);
+            const h = padT + innerH - y;
+            const fill = p.exceeded
+              ? "hsl(var(--destructive))"
+              : p.kind === "no_json"
+                ? "hsl(var(--primary))"
+                : "hsl(var(--muted-foreground))";
+            return (
+              <Tooltip key={idx}>
+                <TooltipTrigger asChild>
+                  <g className="cursor-help">
+                    <rect x={x} y={y} width={barW} height={Math.max(1, h)} fill={fill} opacity={0.85} rx={1} />
+                    {/* zone hover plus large */}
+                    <rect x={padL + idx * slot} y={padT} width={slot} height={innerH} fill="transparent" />
+                  </g>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  <div className="font-semibold">{p.turnLabel} · {p.kind}</div>
+                  <div>elapsed: <span className="font-mono">{p.elapsed_ms} ms</span></div>
+                  <div>timeout: <span className="font-mono">{p.timeout_ms} ms</span></div>
+                  {p.exceeded && <div className="text-destructive font-medium">⚠ dépassement</div>}
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
+
+          {/* Labels X (1 sur 2 si trop dense) */}
+          {recent.map((p, idx) => {
+            if (recent.length > 10 && idx % 2 !== 0) return null;
+            const x = padL + idx * slot + slot / 2;
+            return (
+              <text key={`xl-${idx}`} x={x} y={H - 6} textAnchor="middle" fontSize="9" fill="hsl(var(--muted-foreground))">
+                {p.turnLabel}
+              </text>
+            );
+          })}
+        </svg>
+      </TooltipProvider>
+    </div>
+  );
+}
+
 interface Props {
   sessions: SessionRow[];
   onRefresh: () => void;
@@ -240,6 +393,10 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
                 </div>
               </div>
             ) : null}
+
+            {Array.isArray(selected.conversation_log) && selected.conversation_log.length > 0 && (
+              <GmFallbackChart log={selected.conversation_log} />
+            )}
 
             <div className="mb-3">
               <p className="text-xs font-semibold text-muted-foreground mb-1">
