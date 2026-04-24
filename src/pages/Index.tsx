@@ -270,7 +270,7 @@ const Index = () => {
       console.log("[processUserMessage] Starting LLM call...");
       const llmPerf = perf("LLM total (Max streaming)");
 
-      const { maxResponse, validation, timings, gameMasterPromise } = await processConversationTurn(
+      const { maxResponse, validation, timings, gameMasterPromise, preTurnBrief } = await processConversationTurn(
         userText,
         conversationHistoryRef.current.slice(0, -1),
         state.trustLevel,
@@ -332,6 +332,7 @@ const Index = () => {
         timestamp: Date.now(),
         validation,
         pipeline: fullTimings,
+        gmFallback: preTurnBrief?.fallback ?? null,
       };
       conversationHistoryRef.current.push(maxMsg);
       addMessage(maxMsg);

@@ -53,6 +53,8 @@ export interface ConversationMessage {
   validation?: ConversationValidationTrace;
   /** Per-step latency timings (ms) and last blocker, only on Max messages. */
   pipeline?: ConversationPipelineTimings;
+  /** Si le Game Master pre-turn est tombé en fallback, on garde la raison pour debug. */
+  gmFallback?: GameMasterFallbackInfo | null;
 }
 
 export interface ConversationPipelineTimings {
@@ -82,6 +84,19 @@ export interface MaxConstraintCheckResult {
   safe_points: string[];
 }
 
+export type GameMasterFallbackKind =
+  | "timeout"
+  | "no_json"
+  | "llm_error"
+  | "orchestrator_error";
+
+export interface GameMasterFallbackInfo {
+  kind: GameMasterFallbackKind;
+  reason: string;
+  /** ms écoulés avant fallback (utile pour timeout) */
+  elapsed_ms?: number;
+}
+
 export interface GameMasterTurnBrief {
   response_mode: string;
   openness_level: number;
@@ -94,6 +109,8 @@ export interface GameMasterTurnBrief {
   style_instructions: string[];
   trigger_hint: string | null;
   notes: string;
+  /** Présent uniquement si le brief vient d'un fail-soft (timeout, parsing JSON, erreur LLM…) */
+  fallback?: GameMasterFallbackInfo | null;
 }
 
 export interface GameMasterResponse {

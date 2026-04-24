@@ -121,12 +121,21 @@ export async function planGameMasterTurn(input: GameMasterPreTurnInput): Promise
     { role: "user", content: contextMessage },
   ];
 
-  const fallbackBrief = (reason: string): GameMasterTurnBrief => ({
+  const startedAt = performance.now();
+  const fallbackBrief = (
+    kind: "timeout" | "no_json" | "llm_error",
+    reason: string,
+  ): GameMasterTurnBrief => ({
     ...DEFAULT_TURN_BRIEF,
     allowed_knowledge: input.knowledgeContext?.allowedFacts || [],
     forbidden_topics: input.knowledgeContext?.forbiddenTopics || [],
     blocked_assertions: input.knowledgeContext?.blockedAssertions || [],
     notes: `Brief par défaut (${reason})`,
+    fallback: {
+      kind,
+      reason,
+      elapsed_ms: Math.round(performance.now() - startedAt),
+    },
   });
 
   const llmCall = (async (): Promise<GameMasterTurnBrief> => {
@@ -141,7 +150,7 @@ export async function planGameMasterTurn(input: GameMasterPreTurnInput): Promise
       });
 
       const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return fallbackBrief("réponse LLM sans JSON");
+      if (!jsonMatch) return fallbackBrief("no_json", "réponse LLM sans JSON");
 
       const parsed = JSON.parse(jsonMatch[0]) as Partial<GameMasterTurnBrief>;
       return {
@@ -151,10 +160,12 @@ export async function planGameMasterTurn(input: GameMasterPreTurnInput): Promise
         forbidden_topics: parsed.forbidden_topics || input.knowledgeContext?.forbiddenTopics || [],
         blocked_assertions: parsed.blocked_assertions || input.knowledgeContext?.blockedAssertions || [],
         style_instructions: parsed.style_instructions?.length ? parsed.style_instructions : DEFAULT_TURN_BRIEF.style_instructions,
+        fallback: null,
       };
     } catch (error) {
       debugLogger.logError("gm", "Game Master pre-turn error", error);
-      return fallbackBrief("erreur LLM");
+      const message = error instanceof Error ? error.message : String(error);
+      return fallbackBrief("llm_error", `erreur LLM: ${message.slice(0, 140)}`);
     }
   })();
 
@@ -162,7 +173,7 @@ export async function planGameMasterTurn(input: GameMasterPreTurnInput): Promise
   const timeoutPromise = new Promise<GameMasterTurnBrief>((resolve) =>
     setTimeout(() => {
       console.warn(`[GameMaster] pre-turn timeout après ${GM_PRETURN_TIMEOUT_MS}ms — fail-soft vers brief par défaut`);
-      resolve(fallbackBrief(`timeout ${GM_PRETURN_TIMEOUT_MS}ms`));
+      resolve(fallbackBrief("timeout", `timeout ${GM_PRETURN_TIMEOUT_MS}ms`));
     }, GM_PRETURN_TIMEOUT_MS),
   );
 
