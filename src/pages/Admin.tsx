@@ -477,6 +477,10 @@ export default function Admin() {
             <AntiHallucinationValidatorTab />
           </TabsContent>
 
+          <TabsContent value="metrics">
+            <HallucinationMetricsTab />
+          </TabsContent>
+
           <TabsContent value="max-test">
             <MaxPromptTestTab />
           </TabsContent>
