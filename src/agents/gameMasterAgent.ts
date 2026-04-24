@@ -121,10 +121,16 @@ export async function planGameMasterTurn(input: GameMasterPreTurnInput): Promise
     { role: "user", content: contextMessage },
   ];
 
+  // Capture le modèle dès maintenant : si l'utilisateur change la config en cours de tour,
+  // on garde la valeur réellement utilisée pour ce fallback.
+  const llmAtStart = getLLMSettings();
+  const modelAtStart = llmAtStart.LLM_MODEL_GM;
   const startedAt = performance.now();
+
   const fallbackBrief = (
     kind: "timeout" | "no_json" | "llm_error",
     reason: string,
+    extra?: { error_excerpt?: string },
   ): GameMasterTurnBrief => ({
     ...DEFAULT_TURN_BRIEF,
     allowed_knowledge: input.knowledgeContext?.allowedFacts || [],
@@ -135,22 +141,28 @@ export async function planGameMasterTurn(input: GameMasterPreTurnInput): Promise
       kind,
       reason,
       elapsed_ms: Math.round(performance.now() - startedAt),
+      timeout_ms: GM_PRETURN_TIMEOUT_MS,
+      model: modelAtStart,
+      ...(extra?.error_excerpt ? { error_excerpt: extra.error_excerpt } : {}),
     },
   });
 
   const llmCall = (async (): Promise<GameMasterTurnBrief> => {
     try {
       debugLogger.log({ service: "gm", level: "info", direction: "out", label: "Game Master pre-turn planning", payload: contextMessage.slice(0, 300) });
-      const llm = getLLMSettings();
       const response = await callLLM(messages, {
-        model: llm.LLM_MODEL_GM,
+        model: modelAtStart,
         temperature: 0.2,
-        max_tokens: llm.LLM_MAX_TOKENS_GM ?? 180,
+        max_tokens: llmAtStart.LLM_MAX_TOKENS_GM ?? 180,
         feature_key: "game_master_pre_turn",
       });
 
       const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return fallbackBrief("no_json", "réponse LLM sans JSON");
+      if (!jsonMatch) {
+        return fallbackBrief("no_json", "réponse LLM sans JSON", {
+          error_excerpt: response.slice(0, 200),
+        });
+      }
 
       const parsed = JSON.parse(jsonMatch[0]) as Partial<GameMasterTurnBrief>;
       return {
@@ -165,7 +177,9 @@ export async function planGameMasterTurn(input: GameMasterPreTurnInput): Promise
     } catch (error) {
       debugLogger.logError("gm", "Game Master pre-turn error", error);
       const message = error instanceof Error ? error.message : String(error);
-      return fallbackBrief("llm_error", `erreur LLM: ${message.slice(0, 140)}`);
+      return fallbackBrief("llm_error", `erreur LLM: ${message.slice(0, 140)}`, {
+        error_excerpt: message.slice(0, 200),
+      });
     }
   })();
 

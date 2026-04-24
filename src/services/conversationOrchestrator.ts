@@ -3,7 +3,7 @@ import { callGameMaster, planGameMasterTurn, type GameMasterInput } from "@/agen
 import { buildKnowledgeContextFromRAG, formatRAGContext, queryRAG } from "@/services/ragService";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, ConversationPipelineTimings, ConversationPipelineTrace, ConversationValidationTrace, GameMasterResponse, GameMasterTurnBrief, MaxConstraintCheckResult, VideoTrigger } from "@/types";
-import { getGameplaySettings } from "@/services/settingsService";
+import { getGameplaySettings, getLLMSettings } from "@/services/settingsService";
 
 // Demo triggers for the prototype
 const DEMO_TRIGGERS: Record<string, VideoTrigger> = {
@@ -117,6 +117,9 @@ export async function processConversationTurn(
   }).catch((err) => {
     console.warn("[Orchestrator] GM pre-turn failed, using empty brief:", err);
     const message = err instanceof Error ? err.message : String(err);
+    const elapsed_ms = Math.round(performance.now() - gmPreStart);
+    let modelAtError: string | undefined;
+    try { modelAtError = getLLMSettings().LLM_MODEL_GM; } catch { /* ignore */ }
     return {
       response_mode: "ferme_mefiant" as const,
       openness_level: 1,
@@ -132,6 +135,9 @@ export async function processConversationTurn(
       fallback: {
         kind: "orchestrator_error" as const,
         reason: `orchestrator: ${message.slice(0, 140)}`,
+        elapsed_ms,
+        model: modelAtError,
+        error_excerpt: message.slice(0, 200),
       },
     };
   }).then((brief) => ({ brief, gm_pre_ms: Math.round(performance.now() - gmPreStart) }));
