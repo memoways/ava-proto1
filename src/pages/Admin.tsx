@@ -16,6 +16,7 @@ import MaxPromptTestTab from "@/components/MaxPromptTestTab";
 import PipelineTraceTab from "@/components/PipelineTraceTab";
 import AntiHallucinationValidatorTab from "@/components/AntiHallucinationValidatorTab";
 import HallucinationMetricsTab from "@/components/HallucinationMetricsTab";
+import LatencyBlockingTab from "@/components/LatencyBlockingTab";
 import SessionsTab, { type SessionRow } from "@/components/admin/SessionsTab";
 import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
 import LLMUsageTab from "@/components/admin/LLMUsageTab";
