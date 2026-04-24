@@ -5,7 +5,7 @@
 > **Créé avec**: Lovable  
 > **Démarré**: 2026-03-07  
 
-> **Mise à jour récente**: le validateur anti-hallucination pré-TTS est en place (retry + fallback), avec persistance des traces de validation par message, métriques admin sur les 50 dernières sessions, schéma visuel du pipeline et catalogue formel des modes de parole de Max.
+> **Mise à jour récente**: pipeline conversationnel parallélisé (GM pre-turn + Max en `Promise.all`), validateur anti-hallucination en mode fail-open avec timeout 4s, nouveau panneau admin "Latence & blocage" (timings par étape + dernier point de blocage par session) et accès `/admin` protégé par mot de passe (`game-master` / `jesuisdieu`).
 
 ## En une phrase
 
