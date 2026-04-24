@@ -64,7 +64,7 @@ const STEP_THRESHOLDS_MS: Record<string, number> = {
   tts_ms: 4000,
   gm_post_ms: 3000,
 };
-function pickBlocker(t: Partial<Record<string, number>>): string | null {
+function pickBlocker(t: Record<string, number | undefined>): string | null {
   let worst: { step: string; ratio: number } | null = null;
   for (const [step, threshold] of Object.entries(STEP_THRESHOLDS_MS)) {
     const v = t[step];
