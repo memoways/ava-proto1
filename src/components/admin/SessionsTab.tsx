@@ -237,11 +237,33 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
               </p>
               <ScrollArea className="h-60 border rounded p-2">
                 {Array.isArray(selected.conversation_log) &&
-                  selected.conversation_log.map((msg: any, i: number) => (
-                    <div key={i} className={`mb-2 text-sm ${msg.role === "max" ? "text-blue-300" : "text-green-300"}`}>
-                      <span className="font-bold">{msg.role === "max" ? "Max" : "User"}:</span> {msg.content}
-                    </div>
-                  ))}
+                  selected.conversation_log.map((msg: any, i: number) => {
+                    const fb = msg.gmFallback;
+                    const blocker = msg.pipeline?.blocker;
+                    return (
+                      <div key={i} className={`mb-2 text-sm ${msg.role === "max" ? "text-blue-300" : "text-green-300"}`}>
+                        <span className="font-bold">{msg.role === "max" ? "Max" : "User"}:</span> {msg.content}
+                        {msg.role === "max" && (fb || blocker) && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {fb && (
+                              <span
+                                className="text-[10px] uppercase tracking-wide bg-destructive/20 text-destructive border border-destructive/40 px-1.5 py-0.5 rounded"
+                                title={fb.reason}
+                              >
+                                GM fallback · {fb.kind}
+                                {typeof fb.elapsed_ms === "number" ? ` · ${fb.elapsed_ms}ms` : ""}
+                              </span>
+                            )}
+                            {blocker && (
+                              <span className="text-[10px] uppercase tracking-wide bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded">
+                                blocker · {blocker}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
               </ScrollArea>
             </div>
 
