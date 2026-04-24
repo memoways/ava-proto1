@@ -5,7 +5,7 @@
 > **Créé avec**: Lovable  
 > **Démarré**: 2026-03-07  
 
-> **Mise à jour récente**: le pipeline Max ↔ Game Master entre dans une phase de contrôle éditorial fin, avec simulation admin, traçabilité du brief de tour et robustesse renforcée sur les retours différés OpenRouter.
+> **Mise à jour récente**: le validateur anti-hallucination pré-TTS est en place (retry + fallback), avec persistance des traces de validation par message, métriques admin sur les 50 dernières sessions, schéma visuel du pipeline et catalogue formel des modes de parole de Max.
 
 ## En une phrase
 
@@ -55,8 +55,15 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] Vue admin de trace pipeline conversationnelle (input, RAG, brief GM, décision)
 - [x] Pré-turn planner Game Master avant génération de Max
 - [x] Robustesse du tracking de coûts OpenRouter en cas de génération introuvable temporairement
+- [x] Validation anti-hallucination pré-TTS avec retry + fallback automatique
+- [x] Aperçu admin de la fusion faits globaux + contexte autorisé du tour avant validation
+- [x] Persistance des traces de validation par message dans `conversation_log`
+- [x] Métriques admin de hallucinations (taux régénération + fallback sur 50 dernières sessions)
+- [x] Catalogue formel des modes de parole de Max (6 styles éditoriaux)
+- [x] Schéma visuel du pipeline conversationnel (8 étapes + glossaire)
+- [x] Tests automatisés orchestrateur + validateur + composants admin
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
-- [ ] Validation anti-hallucination pré-TTS avec régénération automatique
+- [ ] Politique de vérité à 4 niveaux (certain / probable / inconnu / interdit)
 - [ ] Bible factuelle éditable et gestion explicite des sujets verrouillés/déverrouillés
 - [ ] Alertes de budget LLM + fallback modèle
 
@@ -81,16 +88,16 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 Le plan initial visait 5 phases pour réduire les inventions de Max et rendre son comportement éditorialement pilotable.
 
 ### Déjà implémenté
-- **Phase 1 — Visibilité** : vue admin `PipelineTraceTab` pour inspecter le pipeline conversationnel réel.
-- **Phase 2 — Contrat GM → Max** : brief pré-tour structuré généré par le Game Master avant l'appel à Max.
-- **Phase 3 — Première couche de contrôle de connaissance** : système de prompt structuré côté Max avec persona, objectifs, historique/contextes et contraintes d'affirmation.
-- **Phase 5 — Outils éditoriaux partiels** : écran de simulation admin (`MaxPromptTestTab`) et panneau de réglage (`MaxPromptControlTab`).
+- **Phase 1 — Visibilité** : `PipelineTraceTab` + schéma visuel `PipelineSchema` (8 étapes) avec glossaire.
+- **Phase 2 — Contrat GM → Max** : brief pré-tour structuré généré par le Game Master avant l'appel à Max + catalogue formel de 6 modes de parole.
+- **Phase 3 — Contrôle de connaissance** : prompt structuré Max (persona, objectifs, contextes, interdictions).
+- **Phase 4 — Validation pré-TTS** : validateur anti-hallucination avec retry + fallback, aperçu admin de la fusion faits globaux + contexte autorisé du tour, et persistance des traces par message dans `conversation_log`.
+- **Phase 5 — Outils éditoriaux** : `MaxPromptControlTab`, `MaxPromptTestTab`, `AntiHallucinationValidatorTab`, `HallucinationMetricsTab` (taux régénération/fallback sur 50 sessions).
 
 ### Reste à développer
-- **Validation pré-TTS** : refuser ou régénérer une réponse si elle affirme un fait non autorisé.
-- **Bible factuelle éditable** : distinguer explicitement faits certains, hypothèses, inconnus et sujets interdits.
+- **Politique de vérité à 4 niveaux** (certain / probable / inconnu / interdit) — refactor structurel de `MaxTurnKnowledgeContext` et du prompt validateur.
+- **Bible factuelle éditable** : interface admin pour gérer les faits autorisés globaux.
 - **Gestion d'unlocked/locked subjects** : pilotage fin des sujets révélables selon l'état narratif.
-- **Trace complète de simulation multi-agent** : inclure validation, régénérations et score post-tour dans un seul déroulé lisible.
 
 ## 🚀 Démarrage rapide
 
