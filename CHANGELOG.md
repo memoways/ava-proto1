@@ -4,6 +4,40 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.16.0] - 2026-04-24 — Performance pipeline, panneau latence et accès admin protégé
+
+### Ajouté
+- **Panneau admin "Latence & blocage"** (`LatencyBlockingTab`) : visualisation du temps passé à chaque étape du pipeline conversationnel
+  - Vue globale : moyenne et max par étape (RAG, GM pre-turn, Max, validateur, TTS, GM post-turn) sur les 50 dernières sessions
+  - Vue détail par session : timeline tour par tour avec identification du **dernier point de blocage** (étape la plus lente au-dessus du seuil)
+  - Seuils de détection : RAG > 1.5s, GM > 1.5s, Max > 3s, validateur > 2s, TTS > 4s
+- **Instrumentation des timings du pipeline** :
+  - Nouveau type `ConversationPipelineTimings` (rag_ms, gm_pre_ms, max_ms, validator_ms, tts_ms, gm_post_ms, total_ms)
+  - Nouveau champ `pipeline` sur `ConversationMessage`, persisté dans `conversation_log`
+  - L'orchestrateur mesure RAG / GM pre-turn / boucle Max+validateur (retries inclus)
+  - `Index.tsx` mesure le TTS et calcule le total du tour
+  - Utilitaire `pickBlocker` qui flagge l'étape la plus lente dépassant les seuils
+- **Protection mot de passe pour `/admin`** :
+  - Nouveau composant `AdminAuthGate` avec écran de login (utilisateur `game-master`, mot de passe `jesuisdieu`)
+  - Persistance via `sessionStorage` (clé `admin_auth_ok`) — survit au rechargement de l'onglet
+  - Bouton "Déconnexion" en haut à droite du dashboard admin
+  - Sécurité légère : objectif = éviter les accès accidentels via URL connue, pas une protection forte
+
+### Modifié
+- **Orchestrateur de conversation** : parallélisation `planGameMasterTurn` (GM pre-turn) et `simulateMaxResponse` (Max) via `Promise.all` pour réduire la latence
+  - Max consomme désormais le contexte RAG initial (rapide) et la validation post-génération s'appuie sur le brief GM
+  - Économie typique : ~2-5s par tour selon le modèle LLM
+- **Validateur anti-hallucination — fail-open** :
+  - Timeout dur `VALIDATION_TIMEOUT_MS = 4000` : si la validation dépasse 4s, la réponse est libérée avec une trace `fail-open sur timeout`
+  - Si le LLM validateur renvoie un JSON malformé ou erreur, l'agent retourne `compliant: true` au lieu de bloquer
+  - Les bypass restent visibles dans `HallucinationMetricsTab` pour audit
+- **`App.tsx`** : route `/admin` désormais wrappée dans `<AdminAuthGate>`
+- **`Admin.tsx`** : ajout de l'onglet "Latence & blocage"
+
+### Notes
+- Le `pipeline` étant stocké dans `conversation_log` (jsonb), aucune migration DB nécessaire
+- Le mot de passe est en clair dans le code — protection volontairement faible (anti-curieux, pas anti-attaquant)
+
 ## [0.15.0] - 2026-04-24 — Validateur anti-hallucination, métriques et finitions du plan Max/GM
 
 ### Ajouté
