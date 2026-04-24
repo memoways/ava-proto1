@@ -52,6 +52,31 @@ const perf = (label: string) => {
   };
 };
 
+/**
+ * Identify the slowest pipeline step that exceeds the warning threshold.
+ * Returns the step name (e.g. "max", "validator", "tts") or null if all OK.
+ */
+const STEP_THRESHOLDS_MS: Record<string, number> = {
+  rag_ms: 1500,
+  gm_pre_ms: 2500,
+  max_ms: 3000,
+  validator_ms: 2000,
+  tts_ms: 4000,
+  gm_post_ms: 3000,
+};
+function pickBlocker(t: Partial<Record<string, number>>): string | null {
+  let worst: { step: string; ratio: number } | null = null;
+  for (const [step, threshold] of Object.entries(STEP_THRESHOLDS_MS)) {
+    const v = t[step];
+    if (typeof v !== "number" || v <= 0) continue;
+    const ratio = v / threshold;
+    if (ratio >= 1 && (!worst || ratio > worst.ratio)) {
+      worst = { step: step.replace("_ms", ""), ratio };
+    }
+  }
+  return worst?.step ?? null;
+}
+
 const Index = () => {
   const { state, setPhase, setAudioState, addMessage, updateTrust, triggerVideo, endTrigger, gameOver, setVariant, setVoiceModality, setCharacter, reset } = useGameState();
   const [micActive, setMicActive] = useState(false);
