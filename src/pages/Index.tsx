@@ -239,62 +239,39 @@ const Index = () => {
     conversationHistoryRef.current.push(userMsg);
     addMessage(userMsg);
 
-    // Create TTS queue for sentence-level pipelining
-    const ttsQueue = new TTSQueue();
-    let streamedText = "";
-    let sentencesSent = 0;
-    let firstTTSTime: number | null = null;
     const llmFirstChunkPerf = perf("LLM first chunk");
 
     try {
       console.log("[processUserMessage] Starting LLM call...");
       const llmPerf = perf("LLM total (Max streaming)");
 
-      const { maxResponse, gameMasterPromise } = await processConversationTurn(
+      const { maxResponse, validation, gameMasterPromise } = await processConversationTurn(
         userText,
         conversationHistoryRef.current.slice(0, -1),
         state.trustLevel,
         state.triggeredIds,
         sessionDuration - timer.remaining,
-        (chunk, done) => {
-          if (!done) {
-            if (sentencesSent === 0 && streamedText === "") {
-              llmFirstChunkPerf.end();
-            }
-            streamedText += chunk;
-            setMaxSubtitle(streamedText);
-            setAudioState("max_speaking");
-
-            // Extract complete sentences and enqueue TTS immediately
-            const [sentences, remaining] = extractSentences(streamedText);
-            if (sentences.length > sentencesSent) {
-              for (let i = sentencesSent; i < sentences.length; i++) {
-                if (!firstTTSTime) {
-                  firstTTSTime = performance.now();
-                  console.log(`[Perf] First TTS enqueue: ${(firstTTSTime - (performance.now() - 10000)).toFixed(0)}ms after turn start`);
-                }
-                console.log(`[TTS-Pipeline] Enqueuing sentence #${i + 1}: "${sentences[i].slice(0, 50)}..."`);
-                ttsQueue.enqueue(sentences[i]);
-              }
-              sentencesSent = sentences.length;
-              // Keep the remaining fragment for next iteration
-              streamedText = (sentences.length > 0) 
-                ? sentences.join(" ") + (remaining ? " " + remaining : "")
-                : streamedText;
-            }
-          }
-        },
         undefined,
         postVideoContext || undefined,
         sessionIdRef.current || undefined
       );
 
       llmPerf.end();
+      llmFirstChunkPerf.end();
 
-      // Enqueue any remaining text that didn't end with punctuation
-      const [, leftover] = extractSentences(streamedText);
+      if (validation.regenerated) {
+        console.warn("[Validator] Réponse régénérée avant TTS", validation);
+      }
+
+      setMaxSubtitle(maxResponse);
+      setAudioState("max_speaking");
+
+      const ttsQueue = new TTSQueue();
+      const [sentences, leftover] = extractSentences(maxResponse);
+      for (const sentence of sentences) {
+        ttsQueue.enqueue(sentence);
+      }
       if (leftover && leftover.length > 3) {
-        console.log(`[TTS-Pipeline] Enqueuing leftover: "${leftover.slice(0, 50)}..."`);
         ttsQueue.enqueue(leftover);
       }
 
@@ -357,7 +334,6 @@ const Index = () => {
 
     } catch (error) {
       console.error("Error processing conversation:", error);
-      ttsQueue.cancel();
       setMaxSubtitle("Désolé, j'ai eu un problème de connexion...");
     } finally {
       isProcessingRef.current = false;
