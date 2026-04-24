@@ -53,6 +53,8 @@ export interface ConversationMessage {
   validation?: ConversationValidationTrace;
   /** Per-step latency timings (ms) and last blocker, only on Max messages. */
   pipeline?: ConversationPipelineTimings;
+  /** Si le Game Master pre-turn est tombé en fallback, on garde la raison pour debug. */
+  gmFallback?: GameMasterFallbackInfo | null;
 }
 
 export interface ConversationPipelineTimings {
