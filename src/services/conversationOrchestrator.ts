@@ -3,7 +3,7 @@ import { callGameMaster, planGameMasterTurn, type GameMasterInput } from "@/agen
 import { buildKnowledgeContextFromRAG, formatRAGContext, queryRAG } from "@/services/ragService";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, ConversationPipelineTimings, ConversationPipelineTrace, ConversationValidationTrace, GameMasterResponse, GameMasterTurnBrief, MaxConstraintCheckResult, VideoTrigger } from "@/types";
-import { getGameplaySettings } from "@/services/settingsService";
+import { getGameplaySettings, getLLMSettings } from "@/services/settingsService";
 
 // Demo triggers for the prototype
 const DEMO_TRIGGERS: Record<string, VideoTrigger> = {
