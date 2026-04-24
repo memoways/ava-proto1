@@ -1,8 +1,8 @@
 import { callMaxAgent, type MaxAgentInput } from "@/agents/maxAgent";
-import { callGameMaster, type GameMasterInput } from "@/agents/gameMasterAgent";
+import { callGameMaster, planGameMasterTurn, type GameMasterInput } from "@/agents/gameMasterAgent";
 import { buildKnowledgeContextFromRAG, formatRAGContext, queryRAG } from "@/services/ragService";
 import { debugLogger } from "@/services/debugLogger";
-import type { ConversationMessage, GameMasterResponse, VideoTrigger } from "@/types";
+import type { ConversationMessage, GameMasterResponse, GameMasterTurnBrief, VideoTrigger } from "@/types";
 import { getGameplaySettings } from "@/services/settingsService";
 
 // Demo triggers for the prototype
@@ -48,6 +48,13 @@ export interface ConversationTurnResult {
   trigger: VideoTrigger | null;
 }
 
+export interface ConversationPipelineTrace {
+  userMessage: string;
+  ragContext: string;
+  preTurnBrief: GameMasterTurnBrief;
+  maxSystemPromptPreview: string;
+}
+
 /**
  * Orchestrates a full conversation turn with optimized latency:
  * 1. Fetch RAG context
@@ -67,6 +74,7 @@ export async function processConversationTurn(
   sessionId?: string
 ): Promise<{
   maxResponse: string;
+  preTurnBrief: GameMasterTurnBrief;
   gameMasterPromise: Promise<{ gameMasterResponse: GameMasterResponse; trigger: VideoTrigger | null }>;
 }> {
   // Fetch RAG context if not provided (non-blocking — start immediately)
@@ -90,6 +98,15 @@ export async function processConversationTurn(
   finalRagContext = ragResult.ctx;
   debugLogger.log({ service: "other", level: "info", direction: "out", label: `Orchestrator: RAG done, calling Max`, detail: `History: ${conversationHistory.length} msgs, trust: ${currentTrustLevel}` });
 
+  const preTurnBrief = await planGameMasterTurn({
+    conversationHistory,
+    userMessage,
+    currentTrustLevel,
+    triggeredIds,
+    timeElapsedSeconds,
+    knowledgeContext: ragResult.knowledgeContext,
+  });
+
   // Start Max streaming
   let maxFullResponse = "";
   const maxInput: MaxAgentInput = {
@@ -98,7 +115,12 @@ export async function processConversationTurn(
     ragContext: finalRagContext || undefined,
     postVideoContext,
     session_id: sessionId,
-    knowledgeContext: ragResult.knowledgeContext,
+    knowledgeContext: {
+      ...ragResult.knowledgeContext,
+      allowedFacts: preTurnBrief.allowed_knowledge.length ? preTurnBrief.allowed_knowledge : ragResult.knowledgeContext.allowedFacts,
+      forbiddenTopics: preTurnBrief.forbidden_topics.length ? preTurnBrief.forbidden_topics : ragResult.knowledgeContext.forbiddenTopics,
+      blockedAssertions: preTurnBrief.blocked_assertions.length ? preTurnBrief.blocked_assertions : ragResult.knowledgeContext.blockedAssertions,
+    },
   };
 
   await callMaxAgent(maxInput, (text, done) => {
@@ -129,5 +151,5 @@ export async function processConversationTurn(
     return { gameMasterResponse, trigger };
   })();
 
-  return { maxResponse: maxFullResponse, gameMasterPromise };
+  return { maxResponse: maxFullResponse, preTurnBrief, gameMasterPromise };
 }
