@@ -25,6 +25,7 @@ export default function GameMasterConfigTab() {
   const [gameplay, setGameplay] = useState<GameplaySettings>(getGameplaySettings());
   const [savedGameplay, setSavedGameplay] = useState<GameplaySettings>(getGameplaySettings());
   const [editPrompt, setEditPrompt] = useState(gmPrompt.systemPrompt);
+  const [editPreTurnPrompt, setEditPreTurnPrompt] = useState(gmPrompt.preTurnPlannerPrompt);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -33,6 +34,7 @@ export default function GameMasterConfigTab() {
       setGameplay(gp);
       setSavedGameplay(gp);
       setEditPrompt(gm.systemPrompt);
+      setEditPreTurnPrompt(gm.preTurnPlannerPrompt);
     });
   }, []);
 
@@ -52,7 +54,7 @@ export default function GameMasterConfigTab() {
   }
 
   async function savePrompt() {
-    const updated = saveGMPromptSettings({ systemPrompt: editPrompt });
+    const updated = saveGMPromptSettings({ systemPrompt: editPrompt, preTurnPlannerPrompt: editPreTurnPrompt });
     setGmPrompt(updated);
     await saveGMPromptSettingsToDB(updated);
     toast.success("Prompt Game Master sauvegardé ✓");
@@ -65,6 +67,7 @@ export default function GameMasterConfigTab() {
     setGameplay(gp);
     setSavedGameplay(gp);
     setEditPrompt(gm.systemPrompt);
+    setEditPreTurnPrompt(gm.preTurnPlannerPrompt);
     toast.success("Mécanique réinitialisée aux valeurs par défaut");
   }
 
@@ -268,13 +271,28 @@ export default function GameMasterConfigTab() {
           className="min-h-[40vh] font-mono text-sm"
           placeholder="System prompt du Game Master..."
         />
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground">Pré-turn planner du Game Master</p>
+          <p className="text-xs text-muted-foreground">
+            Nouveau: ce prompt prépare le tour avant Max et génère le brief de réponse utilisé par le pipeline.
+          </p>
+          <Textarea
+            value={editPreTurnPrompt}
+            onChange={(e) => setEditPreTurnPrompt(e.target.value)}
+            className="min-h-[28vh] font-mono text-sm"
+            placeholder="Prompt de planification pré-tour..."
+          />
+        </div>
         <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">{editPrompt.length} caractères</span>
+          <span className="text-xs text-muted-foreground">{editPrompt.length + editPreTurnPrompt.length} caractères cumulés</span>
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setEditPrompt(gmPrompt.systemPrompt)}
+              onClick={() => {
+                setEditPrompt(gmPrompt.systemPrompt);
+                setEditPreTurnPrompt(gmPrompt.preTurnPlannerPrompt);
+              }}
             >
               Annuler
             </Button>
