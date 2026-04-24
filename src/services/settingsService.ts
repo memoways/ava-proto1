@@ -521,6 +521,55 @@ export function resetMaxPromptControlSettings(): MaxPromptControlSettings {
   return { ...maxPromptControlDefaults };
 }
 
+// ===== Anti-hallucination Validator Settings =====
+
+export interface AntiHallucinationValidatorSettings {
+  authorizedFacts: string;
+  blockedAssertionRules: string;
+}
+
+const ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY = "ava_anti_hallucination_validator_settings";
+
+const antiHallucinationValidatorDefaults: AntiHallucinationValidatorSettings = {
+  authorizedFacts: `Max est le père d'Ava.
+Ava a disparu.
+Max ne dispose que d'informations partielles.
+Max doit s'en tenir strictement au contexte autorisé du tour et aux faits validés ci-dessous.`,
+  blockedAssertionRules: `Bloquer toute affirmation factuelle absente des faits autorisés du tour ou de cette base globale.
+Bloquer toute transformation d'une hypothèse, possibilité ou soupçon en certitude.
+Bloquer toute invention de lieu, date, relation, intention, preuve, diagnostic ou souvenir précis non sourcé.
+Bloquer toute formulation qui laisse entendre que Max sait plus que ce que le contexte autorisé permet.`
+};
+
+export function getAntiHallucinationValidatorSettings(): AntiHallucinationValidatorSettings {
+  try {
+    const stored = localStorage.getItem(ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY);
+    if (stored) return { ...antiHallucinationValidatorDefaults, ...JSON.parse(stored) };
+  } catch { /* ignore */ }
+  return { ...antiHallucinationValidatorDefaults };
+}
+
+export async function loadAntiHallucinationValidatorSettingsFromDB(): Promise<AntiHallucinationValidatorSettings> {
+  return loadFromDB(ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY, antiHallucinationValidatorDefaults);
+}
+
+export async function saveAntiHallucinationValidatorSettingsToDB(settings: AntiHallucinationValidatorSettings): Promise<void> {
+  await saveToDB(ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY, settings);
+}
+
+export function saveAntiHallucinationValidatorSettings(settings: Partial<AntiHallucinationValidatorSettings>): AntiHallucinationValidatorSettings {
+  const current = getAntiHallucinationValidatorSettings();
+  const updated = { ...current, ...settings };
+  localStorage.setItem(ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY, JSON.stringify(updated));
+  return updated;
+}
+
+export function resetAntiHallucinationValidatorSettings(): AntiHallucinationValidatorSettings {
+  localStorage.removeItem(ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY);
+  supabase.from("admin_settings" as any).delete().eq("key", ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY).then(() => {});
+  return { ...antiHallucinationValidatorDefaults };
+}
+
 // ===== Hydrate all settings from DB on app start =====
 
 export async function hydrateAllSettings(): Promise<void> {
@@ -530,6 +579,7 @@ export async function hydrateAllSettings(): Promise<void> {
     loadGameplaySettingsFromDB(),
     loadGMPromptSettingsFromDB(),
     loadMaxPromptControlSettingsFromDB(),
+    loadAntiHallucinationValidatorSettingsFromDB(),
   ]);
   console.log("[Settings] All settings hydrated from DB");
 }
