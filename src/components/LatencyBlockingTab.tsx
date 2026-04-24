@@ -30,7 +30,9 @@ interface SessionAggregate {
   turns: TurnTiming[];
 }
 
-const STEP_LABELS: Array<{ key: keyof ConversationPipelineTimings; label: string; color: string }> = [
+type NumericTimingKey = "rag_ms" | "gm_pre_ms" | "max_ms" | "validator_ms" | "tts_ms" | "gm_post_ms" | "total_ms";
+
+const STEP_LABELS: Array<{ key: NumericTimingKey; label: string; color: string }> = [
   { key: "rag_ms", label: "RAG", color: "bg-sky-500" },
   { key: "gm_pre_ms", label: "GM pre-turn", color: "bg-violet-500" },
   { key: "max_ms", label: "Max LLM", color: "bg-emerald-500" },
