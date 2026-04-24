@@ -156,7 +156,10 @@ export async function updateLLMUsage(
  * Fetch the cost for a generation from OpenRouter's generation API.
  * This is called via the edge function proxy to keep the API key server-side.
  */
-export async function fetchGenerationCost(generationId: string): Promise<{
+export async function fetchGenerationCost(
+  generationId: string,
+  context?: { session_id?: string | null; source?: string; metadata_json?: Record<string, unknown> }
+): Promise<{
   cost_usd: number;
   prompt_tokens: number;
   completion_tokens: number;
@@ -183,11 +186,14 @@ export async function fetchGenerationCost(generationId: string): Promise<{
     if (!res.ok) {
       const errText = await res.text();
       await logCostFetchError({
+        session_id: context?.session_id,
         generation_id: generationId,
         error_type: getCostErrorType(res.status),
         status_code: res.status,
         error_message: errText.slice(0, 500),
+        source: context?.source || "cost_fetch",
         metadata_json: {
+          ...(context?.metadata_json || {}),
           stage: "fetch_generation_cost",
         },
       });
@@ -205,10 +211,13 @@ export async function fetchGenerationCost(generationId: string): Promise<{
     return data;
   } catch (err) {
     await logCostFetchError({
+      session_id: context?.session_id,
       generation_id: generationId,
       error_type: getCostErrorType(undefined, err),
       error_message: err instanceof Error ? err.message.slice(0, 500) : String(err).slice(0, 500),
+      source: context?.source || "cost_fetch",
       metadata_json: {
+        ...(context?.metadata_json || {}),
         stage: "fetch_generation_cost",
       },
     });
@@ -273,7 +282,13 @@ async function retryCostFetch(
   setTimeout(async () => {
     console.log(`[LLM Tracker] Fetching cost for ${generationId} (delay=${delay}ms, retries left=${remaining.length})`);
     try {
-      const costData = await fetchGenerationCost(generationId);
+      const costData = await fetchGenerationCost(generationId, {
+        session_id: params.session_id,
+        source: "cost_fetch_retry",
+        metadata_json: {
+          retries_remaining: remaining.length,
+        },
+      });
       if (costData && costData.cost_usd > 0) {
         await updateLLMUsage(logId, {
           cost_usd: costData.cost_usd,
@@ -316,7 +331,10 @@ export async function retryCostForRow(row: {
   total_tokens: number;
 }): Promise<boolean> {
   if (!row.generation_id) return false;
-  const costData = await fetchGenerationCost(row.generation_id);
+  const costData = await fetchGenerationCost(row.generation_id, {
+    session_id: row.session_id,
+    source: "cost_fetch_admin_retry",
+  });
   if (costData && costData.cost_usd > 0) {
     await updateLLMUsage(row.id, {
       cost_usd: costData.cost_usd,
