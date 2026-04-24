@@ -11,10 +11,19 @@ interface TTSOptions {
   style?: number;
   speed?: number;
   useSpeakerBoost?: boolean;
+  /** Texte de la phrase précédente (request stitching → prosodie continue) */
+  previousText?: string;
+  /** Texte de la phrase suivante (request stitching → prosodie continue) */
+  nextText?: string;
+  /** Format audio override (défaut: HD côté serveur) */
+  outputFormat?: string;
+  /** 0 = qualité max, 4 = latence min */
+  optimizeStreamingLatency?: number;
 }
 
 /**
- * Generate speech — merges runtime TTS settings with per-call overrides
+ * Generate speech — merges runtime TTS settings with per-call overrides.
+ * Supports request stitching (previousText/nextText) for natural prosody between sentences.
  */
 export async function generateSpeech(text: string, options?: TTSOptions): Promise<Blob> {
   const tts = getTTSSettings();
@@ -27,6 +36,12 @@ export async function generateSpeech(text: string, options?: TTSOptions): Promis
     speed: options?.speed ?? tts.speed,
     useSpeakerBoost: options?.useSpeakerBoost ?? tts.useSpeakerBoost,
     ...(options?.voiceId ? { voiceId: options.voiceId } : {}),
+    ...(options?.previousText ? { previousText: options.previousText } : {}),
+    ...(options?.nextText ? { nextText: options.nextText } : {}),
+    ...(options?.outputFormat ? { outputFormat: options.outputFormat } : {}),
+    ...(typeof options?.optimizeStreamingLatency === "number"
+      ? { optimizeStreamingLatency: options.optimizeStreamingLatency }
+      : {}),
   };
 
   const startTime = Date.now();
@@ -56,17 +71,17 @@ export function playAudioBlob(blob: Blob): Promise<void> {
   return new Promise((resolve, reject) => {
     const audioUrl = URL.createObjectURL(blob);
     const audio = new Audio(audioUrl);
-    
+
     audio.onended = () => {
       URL.revokeObjectURL(audioUrl);
       resolve();
     };
-    
+
     audio.onerror = (e) => {
       URL.revokeObjectURL(audioUrl);
       reject(new Error(`Audio playback failed: ${e}`));
     };
-    
+
     audio.play().catch(reject);
   });
 }
@@ -81,53 +96,117 @@ export async function speakText(text: string, options?: TTSOptions): Promise<voi
 
 // ---- Sentence-level TTS Pipeline ----
 
-// Match sentence-ending punctuation, including mid-sentence breaks on commas for long clauses
-const SENTENCE_REGEX = /[.!?…]+[\s]+|[.!?…]+$/;
+/**
+ * Découpe le texte en phrases pour le TTS progressif.
+ *
+ * Améliorations vs version précédente :
+ * - Ignore les abréviations courantes (M., Mme., Dr., etc., cf., M., …) qui faisaient des coupures parasites
+ * - Ignore les nombres décimaux (3.14, 1.5)
+ * - Ne coupe pas sur "..." ou "…" interne (suspension), seulement en fin
+ * - Seuil minimum relevé à ~25 chars : les fragments plus courts sont gardés en buffer
+ *   pour être fusionnés avec la suite (meilleure prosodie ElevenLabs).
+ */
+const MIN_SENTENCE_LEN = 25;
+const ABBREVIATIONS = new Set([
+  "m", "mme", "mlle", "dr", "pr", "me", "st", "ste",
+  "etc", "cf", "p", "pp", "vs", "ex", "no", "n°",
+]);
+
+function isAbbreviationBreak(text: string, dotIndex: number): boolean {
+  // remonte jusqu'au dernier espace/début pour récupérer le mot
+  let start = dotIndex - 1;
+  while (start >= 0 && /[A-Za-zÀ-ÿ]/.test(text[start])) start--;
+  const word = text.slice(start + 1, dotIndex).toLowerCase();
+  if (!word) return false;
+  if (ABBREVIATIONS.has(word)) return true;
+  // initiale isolée: "J. Dupont"
+  if (word.length === 1 && /[A-Za-zÀ-ÿ]/.test(word)) return true;
+  return false;
+}
+
+function isNumericDot(text: string, dotIndex: number): boolean {
+  const prev = text[dotIndex - 1];
+  const next = text[dotIndex + 1];
+  return /\d/.test(prev || "") && /\d/.test(next || "");
+}
 
 /**
  * Splits text into sentences for progressive TTS.
- * Returns [completeSentences[], remainingFragment]
- * More aggressive: splits on shorter fragments for faster first audio
+ * Returns [completeSentences[], remainingFragment].
+ *
+ * Stratégie de buffering : si une phrase complète fait moins de MIN_SENTENCE_LEN chars,
+ * elle est gardée et fusionnée avec la suivante avant d'être renvoyée.
  */
 export function extractSentences(text: string): [string[], string] {
   const sentences: string[] = [];
-  let remaining = text;
+  let buffer = "";
+  let cursor = 0;
 
-  let match: RegExpExecArray | null;
-  while ((match = SENTENCE_REGEX.exec(remaining)) !== null) {
-    const sentence = remaining.slice(0, match.index + match[0].length).trim();
-    if (sentence.length > 3) { // Lower threshold for faster first TTS
-      sentences.push(sentence);
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const isEnd = ch === "." || ch === "!" || ch === "?";
+    if (!isEnd) continue;
+
+    // gérer "...", "…" comme une seule fin
+    let endIdx = i;
+    while (endIdx + 1 < text.length && (text[endIdx + 1] === "." || text[endIdx + 1] === "…")) endIdx++;
+
+    // exclure abréviations / décimaux (uniquement pour le point simple)
+    if (ch === "." && endIdx === i) {
+      if (isAbbreviationBreak(text, i)) continue;
+      if (isNumericDot(text, i)) continue;
     }
-    remaining = remaining.slice(match.index + match[0].length);
-    SENTENCE_REGEX.lastIndex = 0;
+
+    // exiger un espace/fin après pour confirmer la frontière
+    const after = text[endIdx + 1];
+    if (after && !/\s/.test(after)) continue;
+
+    const segment = text.slice(cursor, endIdx + 1).trim();
+    cursor = endIdx + 1;
+    if (!segment) continue;
+
+    buffer = buffer ? `${buffer} ${segment}` : segment;
+    if (buffer.length >= MIN_SENTENCE_LEN) {
+      sentences.push(buffer);
+      buffer = "";
+    }
+    // sinon: on garde en buffer, on fusionnera avec la phrase suivante
   }
 
-  return [sentences, remaining.trim()];
+  const remaining = (buffer ? `${buffer} ${text.slice(cursor)}` : text.slice(cursor)).trim();
+  return [sentences, remaining];
 }
 
 /**
  * TTS Audio Queue — generates and plays sentences sequentially,
  * allowing new sentences to be enqueued while earlier ones play.
+ *
+ * Tient à jour un contexte de stitching (phrase précédente + phrase suivante)
+ * pour donner à ElevenLabs la prosodie continue entre les segments.
  */
 export class TTSQueue {
   private queue: Promise<void> = Promise.resolve();
   private _cancelled = false;
   private generationCount = 0;
   private playbackCount = 0;
+  /** Dernière phrase envoyée — passée comme `previous_text` au prochain appel */
+  private lastSentText = "";
+  /** Phrases en attente, pour calculer `next_text` du segment courant */
+  private pending: Array<{ text: string; options?: TTSOptions; resolveBlob: (b: Blob) => void; rejectBlob: (e: any) => void }> = [];
 
   /** Enqueue a sentence for TTS generation + playback */
   enqueue(text: string, options?: TTSOptions): void {
     if (this._cancelled || !text.trim()) return;
-    
-    // Start generating immediately (don't wait for queue)
-    const genStart = performance.now();
-    const blobPromise = generateSpeech(text, options).then(blob => {
-      const genTime = performance.now() - genStart;
-      this.generationCount++;
-      console.log(`[TTS-Queue] Generated sentence #${this.generationCount} in ${genTime.toFixed(0)}ms (${text.slice(0, 40)}...)`);
-      return blob;
+
+    let resolveBlob!: (b: Blob) => void;
+    let rejectBlob!: (e: any) => void;
+    const blobPromise = new Promise<Blob>((resolve, reject) => {
+      resolveBlob = resolve;
+      rejectBlob = reject;
     });
+
+    this.pending.push({ text, options, resolveBlob, rejectBlob });
+    this.flushPending();
 
     // Chain playback sequentially
     this.queue = this.queue.then(async () => {
@@ -143,6 +222,45 @@ export class TTSQueue {
         console.error("[TTS-Queue] Error:", err);
       }
     });
+  }
+
+  /**
+   * Démarre la génération de la première entrée pending dès qu'on a sa next_text
+   * (= dès qu'une 2e entrée est arrivée, OU on accepte de partir sans next_text).
+   * Pour rester réactif, on lance dès qu'on a au moins 1 entrée.
+   */
+  private flushPending(): void {
+    while (this.pending.length > 0) {
+      const head = this.pending[0];
+      const next = this.pending[1];
+      // On lance head dès maintenant, en utilisant next.text comme next_text si dispo
+      const nextText = next?.text;
+      this.pending.shift();
+      this.startGeneration(head, nextText);
+    }
+  }
+
+  private startGeneration(
+    entry: { text: string; options?: TTSOptions; resolveBlob: (b: Blob) => void; rejectBlob: (e: any) => void },
+    nextText?: string,
+  ): void {
+    const previousText = this.lastSentText || undefined;
+    this.lastSentText = entry.text;
+
+    const genStart = performance.now();
+    generateSpeech(entry.text, {
+      ...entry.options,
+      previousText,
+      nextText,
+    })
+      .then((blob) => {
+        const genTime = performance.now() - genStart;
+        this.generationCount++;
+        const stitchTag = `${previousText ? "P" : "-"}${nextText ? "N" : "-"}`;
+        console.log(`[TTS-Queue] Generated #${this.generationCount} in ${genTime.toFixed(0)}ms stitch=${stitchTag} (${entry.text.slice(0, 40)}...)`);
+        entry.resolveBlob(blob);
+      })
+      .catch(entry.rejectBlob);
   }
 
   /** Wait for all queued audio to finish playing */

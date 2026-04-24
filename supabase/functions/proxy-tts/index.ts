@@ -14,6 +14,12 @@ interface TTSRequest {
   style?: number;
   speed?: number;
   useSpeakerBoost?: boolean;
+  // Request stitching — prosodic context for natural inter-sentence flow
+  previousText?: string;
+  nextText?: string;
+  // Output format / latency tuning (overridable per call)
+  outputFormat?: string;
+  optimizeStreamingLatency?: number;
 }
 
 serve(async (req) => {
@@ -48,10 +54,19 @@ serve(async (req) => {
       speed: body.speed ?? 1.0,
     };
 
-    console.log(`[proxy-tts] model=${modelId} voice=${voiceId} stability=${voiceSettings.stability} sim=${voiceSettings.similarity_boost} style=${voiceSettings.style} speed=${voiceSettings.speed} boost=${voiceSettings.use_speaker_boost} text=${body.text.length}chars`);
+    // Defaults: HD audio + moderate streaming latency for natural prosody
+    const outputFormat = body.outputFormat || 'mp3_44100_128';
+    const optimizeLatency = body.optimizeStreamingLatency ?? 2;
+
+    const stitching = {
+      ...(body.previousText && body.previousText.trim() ? { previous_text: body.previousText.slice(-500) } : {}),
+      ...(body.nextText && body.nextText.trim() ? { next_text: body.nextText.slice(0, 500) } : {}),
+    };
+
+    console.log(`[proxy-tts] model=${modelId} voice=${voiceId} stab=${voiceSettings.stability} sim=${voiceSettings.similarity_boost} style=${voiceSettings.style} speed=${voiceSettings.speed} fmt=${outputFormat} lat=${optimizeLatency} stitch=${Object.keys(stitching).join('+') || 'none'} text=${body.text.length}chars`);
 
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?output_format=mp3_22050_32&optimize_streaming_latency=4`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?output_format=${outputFormat}&optimize_streaming_latency=${optimizeLatency}`,
       {
         method: 'POST',
         headers: {
@@ -62,6 +77,7 @@ serve(async (req) => {
           text: body.text,
           model_id: modelId,
           voice_settings: voiceSettings,
+          ...stitching,
         }),
       }
     );
