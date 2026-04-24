@@ -1,8 +1,8 @@
 import { streamLLM } from "@/services/openRouterLLM";
 import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "@/services/debugLogger";
-import type { ConversationMessage } from "@/types";
-import { getLLMSettings } from "@/services/settingsService";
+import type { ConversationMessage, MaxTurnKnowledgeContext } from "@/types";
+import { getLLMSettings, getMaxPromptControlSettings } from "@/services/settingsService";
 
 // Fallback minimal system prompt if DB fetch fails
 const FALLBACK_SYSTEM_PROMPT = `Tu es un personnage dans une expérience narrative interactive. Parle à la première personne, en français, de façon concise (2-3 phrases). Utilise le CONTEXTE NARRATIF ci-dessous comme source de vérité.`;
@@ -71,6 +71,7 @@ export interface MaxAgentInput {
   ragContext?: string;
   postVideoContext?: string;
   session_id?: string;
+  knowledgeContext?: MaxTurnKnowledgeContext;
 }
 
 /**
@@ -80,7 +81,7 @@ export async function callMaxAgent(
   input: MaxAgentInput,
   onChunk: (text: string, done: boolean) => void
 ): Promise<string> {
-  const systemPrompt = await buildMaxSystemPrompt(input.ragContext, input.postVideoContext);
+  const systemPrompt = await buildMaxSystemPrompt(input.ragContext, input.postVideoContext, input.knowledgeContext, input.conversationHistory);
   debugLogger.log({ service: "llm", level: "info", direction: "out", label: `Max agent: ${input.conversationHistory.length} history + "${input.userMessage.slice(0, 80)}"`, payload: `System prompt: ${systemPrompt.length} chars` });
 
   const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
@@ -109,9 +110,29 @@ export async function callMaxAgent(
   });
 }
 
-async function buildMaxSystemPrompt(ragContext?: string, postVideoContext?: string): Promise<string> {
+function formatKnowledgeList(title: string, values?: string[]): string {
+  if (!values?.length) return `${title}\n- aucun`;
+  return `${title}\n${values.map((value) => `- ${value}`).join("\n")}`;
+}
+
+function formatRecentHistory(history: ConversationMessage[]): string {
+  if (!history.length) return "- aucun historique récent";
+  return history.slice(-6).map((msg) => `- ${msg.role === "user" ? "UTILISATEUR" : "MAX"}: ${msg.content}`).join("\n");
+}
+
+async function buildMaxSystemPrompt(
+  ragContext?: string,
+  postVideoContext?: string,
+  knowledgeContext?: MaxTurnKnowledgeContext,
+  conversationHistory: ConversationMessage[] = []
+): Promise<string> {
   const characterPrompt = await getCharacterSystemPrompt("Max");
-  let prompt = characterPrompt + "\n" + GAMEPLAY_RULES;
+  const control = getMaxPromptControlSettings();
+  let prompt = `${characterPrompt}\n${GAMEPLAY_RULES}\n\n## PERSONA STABLE\n${control.persona}\n\n## OBJECTIFS\n${control.objectives}\n\n## RÔLE ET CONTEXTE\n${control.roleContext}\n\n## HISTORIQUE STABLE\n${control.longTermMemory}\n\n## STYLE DE RÉPONSE\n${control.responseStyle}\n\n## POLITIQUE DE SAVOIR AUTORISÉ\n${control.allowedKnowledgePolicy}\n\n## INTERDITS D'AFFIRMATION\n${control.forbiddenAssertions}\n\n## SUJETS SENSIBLES / INTERDITS\n${control.forbiddenTopics}\n\n## POLITIQUE D'INCERTITUDE\n${control.uncertaintyPolicy}`;
+
+  prompt += `\n\n## HISTORIQUE RÉCENT DU TOUR\n${formatRecentHistory(conversationHistory)}`;
+
+  prompt += `\n\n## CONTEXTE AUTORISÉ DU TOUR\n${formatKnowledgeList("### FAITS AUTORISÉS", knowledgeContext?.allowedFacts)}\n\n${formatKnowledgeList("### SOUVENIRS ACTIVÉS", knowledgeContext?.activeMemories)}\n\n${formatKnowledgeList("### HYPOTHÈSES (à ne jamais affirmer comme vraies)", knowledgeContext?.hypotheses)}\n\n${formatKnowledgeList("### SUJETS INTERDITS", knowledgeContext?.forbiddenTopics)}\n\n${formatKnowledgeList("### ASSERTIONS BLOQUÉES", knowledgeContext?.blockedAssertions)}`;
 
   if (ragContext) {
     prompt += `\n\n## CONTEXTE NARRATIF (SOURCE DE VÉRITÉ — utilise ces informations)\n${ragContext}`;

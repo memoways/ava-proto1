@@ -1,8 +1,9 @@
 import { callMaxAgent, type MaxAgentInput } from "@/agents/maxAgent";
 import { callGameMaster, type GameMasterInput } from "@/agents/gameMasterAgent";
-import { getRAGContext } from "@/services/ragService";
+import { buildKnowledgeContextFromRAG, formatRAGContext, queryRAG } from "@/services/ragService";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, GameMasterResponse, VideoTrigger } from "@/types";
+import { getGameplaySettings } from "@/services/settingsService";
 
 // Demo triggers for the prototype
 const DEMO_TRIGGERS: Record<string, VideoTrigger> = {
@@ -70,20 +71,23 @@ export async function processConversationTurn(
 }> {
   // Fetch RAG context if not provided (non-blocking — start immediately)
   let finalRagContext = ragContext;
+  const gameplay = getGameplaySettings();
   const ragPromise = !finalRagContext ? (async () => {
     try {
       const recentMessages = conversationHistory.slice(-4).map(m => m.content).join(' ');
-      const ctx = await getRAGContext(userMessage, recentMessages);
+      const matches = await queryRAG(userMessage, recentMessages, gameplay.RAG_TOP_K);
+      const ctx = formatRAGContext(matches);
       if (ctx) console.log('[RAG] Context found, injecting into prompt');
-      return ctx;
+      return { ctx, knowledgeContext: buildKnowledgeContextFromRAG(matches) };
     } catch (err) {
       console.error('[RAG] Failed to fetch context:', err);
-      return "";
+      return { ctx: "", knowledgeContext: buildKnowledgeContextFromRAG([]) };
     }
-  })() : Promise.resolve(finalRagContext);
+  })() : Promise.resolve({ ctx: finalRagContext, knowledgeContext: buildKnowledgeContextFromRAG([]) });
 
   // Wait for RAG (runs in parallel with any preloaded system prompt)
-  finalRagContext = await ragPromise;
+  const ragResult = await ragPromise;
+  finalRagContext = ragResult.ctx;
   debugLogger.log({ service: "other", level: "info", direction: "out", label: `Orchestrator: RAG done, calling Max`, detail: `History: ${conversationHistory.length} msgs, trust: ${currentTrustLevel}` });
 
   // Start Max streaming
@@ -94,6 +98,7 @@ export async function processConversationTurn(
     ragContext: finalRagContext || undefined,
     postVideoContext,
     session_id: sessionId,
+    knowledgeContext: ragResult.knowledgeContext,
   };
 
   await callMaxAgent(maxInput, (text, done) => {

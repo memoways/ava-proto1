@@ -51,6 +51,14 @@ export interface ConversationMessage {
   timestamp: number;
 }
 
+export interface MaxTurnKnowledgeContext {
+  allowedFacts?: string[];
+  activeMemories?: string[];
+  hypotheses?: string[];
+  forbiddenTopics?: string[];
+  blockedAssertions?: string[];
+}
+
 export interface GameMasterResponse {
   trust_delta: number;
   trigger_video_id: string | null;

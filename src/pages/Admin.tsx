@@ -11,6 +11,7 @@ import { hydrateAllSettings } from "@/services/settingsService";
 import LLMConfigTab from "@/components/LLMConfigTab";
 import VoiceConfigTab from "@/components/VoiceConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
+import MaxPromptControlTab from "@/components/MaxPromptControlTab";
 import SessionsTab, { type SessionRow } from "@/components/admin/SessionsTab";
 import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
 import LLMUsageTab from "@/components/admin/LLMUsageTab";
@@ -42,6 +43,7 @@ const TAB_GROUPS = [
     label: "🎮 Mécanique",
     tabs: [
       { id: "gamemaster", label: "Game Master" },
+      { id: "max-prompt", label: "Max Prompt" },
     ],
   },
   {
@@ -456,6 +458,11 @@ export default function Admin() {
           {/* ==================== GAME MASTER ==================== */}
           <TabsContent value="gamemaster">
             <GameMasterConfigTab />
+          </TabsContent>
+
+          {/* ==================== MAX PROMPT CONTROL ==================== */}
+          <TabsContent value="max-prompt">
+            <MaxPromptControlTab />
           </TabsContent>
 
           {/* ==================== LLM CONFIG ==================== */}

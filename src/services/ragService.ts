@@ -1,4 +1,5 @@
 import { debugLogger } from "./debugLogger";
+import type { MaxTurnKnowledgeContext } from "@/types";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -77,6 +78,40 @@ export async function getRAGContext(
 ): Promise<string> {
   const matches = await queryRAG(userMessage, recentContext, matchCount);
   return formatRAGContext(matches);
+}
+
+export function buildKnowledgeContextFromRAG(matches: RAGMatch[]): MaxTurnKnowledgeContext {
+  if (!matches.length) {
+    return {
+      allowedFacts: [],
+      activeMemories: [],
+      hypotheses: [],
+      forbiddenTopics: [],
+      blockedAssertions: [],
+    };
+  }
+
+  const sorted = [...matches].sort((a, b) => b.similarity - a.similarity);
+  const allowedFacts = sorted.slice(0, 3).map((match, index) => `[F${index + 1}] ${match.content}`);
+  const activeMemories = sorted.slice(0, 2).map((match, index) => `[M${index + 1}] ${match.content}`);
+  const hypotheses = sorted
+    .filter((match) => match.similarity < 0.55)
+    .slice(0, 2)
+    .map((match, index) => `[H${index + 1}] Piste partielle seulement: ${match.content}`);
+
+  return {
+    allowedFacts,
+    activeMemories,
+    hypotheses,
+    forbiddenTopics: [
+      "Toute information absente des faits autorisés du tour",
+      "Toute révélation non encore débloquée par la progression narrative",
+    ],
+    blockedAssertions: [
+      "Ne jamais transformer une hypothèse en souvenir certain",
+      "Ne jamais inventer de détail concret (date, lieu, action, intention) absent des faits autorisés",
+    ],
+  };
 }
 
 // Default Notion database IDs for AVA project
