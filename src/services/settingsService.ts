@@ -96,11 +96,61 @@ const DEPRECATED_OPENROUTER_MODELS: Record<string, string> = {
   "qwen/qwen-2.5-32b-instruct": "qwen/qwen-2.5-72b-instruct",
 };
 
+export type LLMModelField = "LLM_MODEL" | "LLM_MODEL_GM";
+
+export interface LLMValidationIssue {
+  field: LLMModelField;
+  rejectedModel: string;
+  fallbackModel: string;
+  reason: "deprecated" | "unsupported";
+}
+
+const SUPPORTED_OPENROUTER_MODEL_IDS = new Set(OPENROUTER_MODELS.map((model) => model.id));
+const FALLBACK_OPENROUTER_MODEL = OPENROUTER_MODELS[0].id;
+let lastLLMValidationIssues: LLMValidationIssue[] = [];
+
+function validateOpenRouterModel(field: LLMModelField, modelId: string): { modelId: string; issue?: LLMValidationIssue } {
+  const deprecatedFallback = DEPRECATED_OPENROUTER_MODELS[modelId];
+  if (deprecatedFallback) {
+    return {
+      modelId: deprecatedFallback,
+      issue: { field, rejectedModel: modelId, fallbackModel: deprecatedFallback, reason: "deprecated" },
+    };
+  }
+
+  if (!SUPPORTED_OPENROUTER_MODEL_IDS.has(modelId)) {
+    return {
+      modelId: FALLBACK_OPENROUTER_MODEL,
+      issue: { field, rejectedModel: modelId || "(vide)", fallbackModel: FALLBACK_OPENROUTER_MODEL, reason: "unsupported" },
+    };
+  }
+
+  return { modelId };
+}
+
+export function getLastLLMValidationIssues(): LLMValidationIssue[] {
+  return lastLLMValidationIssues;
+}
+
+export function isSupportedOpenRouterModel(modelId: string): boolean {
+  return SUPPORTED_OPENROUTER_MODEL_IDS.has(modelId);
+}
+
+export function getLLMValidationErrorMessage(issues: LLMValidationIssue[]): string {
+  if (!issues.length) return "";
+  const rejectedModels = issues.map((issue) => issue.rejectedModel).join(", ");
+  return `Modèle OpenRouter non supporté refusé : ${rejectedModels}. Retour automatique sur ${FALLBACK_OPENROUTER_MODEL}.`;
+}
+
 function normalizeLLMSettings(settings: LLMSettings): LLMSettings {
+  const maxModel = validateOpenRouterModel("LLM_MODEL", settings.LLM_MODEL);
+  const gmModel = validateOpenRouterModel("LLM_MODEL_GM", settings.LLM_MODEL_GM);
+  lastLLMValidationIssues = [maxModel.issue, gmModel.issue].filter(Boolean) as LLMValidationIssue[];
+
   return {
     ...settings,
-    LLM_MODEL: DEPRECATED_OPENROUTER_MODELS[settings.LLM_MODEL] ?? settings.LLM_MODEL,
-    LLM_MODEL_GM: DEPRECATED_OPENROUTER_MODELS[settings.LLM_MODEL_GM] ?? settings.LLM_MODEL_GM,
+    LLM_MODEL: maxModel.modelId,
+    LLM_MODEL_GM: gmModel.modelId,
   };
 }
 
@@ -132,7 +182,7 @@ export async function loadLLMSettingsFromDB(): Promise<LLMSettings> {
 
 /** Save to both localStorage and DB */
 export async function saveLLMSettingsToDB(settings: LLMSettings): Promise<void> {
-  await saveToDB(LLM_STORAGE_KEY, settings);
+  await saveToDB(LLM_STORAGE_KEY, normalizeLLMSettings(settings));
 }
 
 /** Local-only save (for slider dragging without DB write on every move) */
