@@ -107,6 +107,17 @@ export async function processConversationTurn(
     knowledgeContext: ragResult.knowledgeContext,
   });
 
+  try {
+    localStorage.setItem("ava_pipeline_last_trace", JSON.stringify({
+      updatedAt: new Date().toISOString(),
+      userMessage,
+      ragContext: finalRagContext || "",
+      preTurnBrief,
+    }));
+  } catch {
+    // ignore trace persistence issues
+  }
+
   // Start Max streaming
   let maxFullResponse = "";
   const maxInput: MaxAgentInput = {
