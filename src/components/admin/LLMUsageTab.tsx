@@ -23,6 +23,18 @@ interface UsageRow {
   error_message: string | null;
 }
 
+interface CostErrorRow {
+  id: string;
+  occurred_at: string;
+  session_id: string | null;
+  generation_id: string | null;
+  error_type: string;
+  status_code: number | null;
+  error_message: string | null;
+  source: string;
+  metadata_json: any;
+}
+
 const COLORS = ["hsl(var(--primary))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))", "#6366f1", "#f59e0b", "#10b981"];
 
 const fmtCost = (v: number) => `$${v.toFixed(6)}`;
@@ -31,6 +43,7 @@ const fmtDate = (d: string) => new Date(d).toLocaleString("fr-CH");
 
 export default function LLMUsageTab() {
   const [rows, setRows] = useState<UsageRow[]>([]);
+  const [costErrors, setCostErrors] = useState<CostErrorRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [filterModel, setFilterModel] = useState("all");
   const [filterFeature, setFilterFeature] = useState("all");
@@ -41,15 +54,27 @@ export default function LLMUsageTab() {
 
   async function loadData() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("llm_usage" as any)
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(1000);
+    const [{ data, error }, { data: errorData, error: costErrorLoadError }] = await Promise.all([
+      supabase
+        .from("llm_usage" as any)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      supabase
+        .from("openrouter_cost_error_logs" as any)
+        .select("*")
+        .order("occurred_at", { ascending: false })
+        .limit(500),
+    ]);
     if (error) {
-      toast.error("Erreur chargement: " + error.message);
+      toast.error("Erreur chargement consommation: " + error.message);
     } else {
       setRows((data as any[]) || []);
+    }
+    if (costErrorLoadError) {
+      toast.error("Erreur chargement journal coûts: " + costErrorLoadError.message);
+    } else {
+      setCostErrors((errorData as any[]) || []);
     }
     setLoading(false);
   }
@@ -62,6 +87,7 @@ export default function LLMUsageTab() {
     for (const r of failed) {
       const success = await retryCostForRow({
         id: r.id,
+        session_id: r.session_id,
         generation_id: r.generation_id,
         prompt_tokens: r.prompt_tokens,
         completion_tokens: r.completion_tokens,
@@ -96,6 +122,17 @@ export default function LLMUsageTab() {
   const uniqueModels = [...new Set(rows.map(r => r.model))];
   const uniqueFeatures = [...new Set(rows.map(r => r.feature_key))];
   const uniqueStatuses = [...new Set(rows.map(r => r.status))];
+  const errorCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    costErrors.forEach((row) => {
+      counts[row.error_type] = (counts[row.error_type] || 0) + 1;
+    });
+    return counts;
+  }, [costErrors]);
+  const errorsToday = useMemo(() => costErrors.filter((row) => new Date(row.occurred_at) >= todayStart).length, [costErrors]);
+  const uniqueErrorTypes = Object.entries(errorCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([type, count]) => ({ type, count }));
 
   // KPIs
   const totalCost = filtered.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
@@ -143,6 +180,13 @@ export default function LLMUsageTab() {
         <KPICard label="Coût 30 jours" value={fmtCost(cost30d)} />
         <KPICard label="Requêtes" value={String(totalRequests)} />
         <KPICard label="Tokens total" value={fmtTokens(totalTokensSum)} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <KPICard label="Erreurs coût total" value={String(costErrors.length)} />
+        <KPICard label="Erreurs aujourd'hui" value={String(errorsToday)} />
+        <KPICard label="404 coût" value={String(errorCounts.not_found || 0)} />
+        <KPICard label="Timeouts / 5xx" value={String((errorCounts.timeout || 0) + (errorCounts.server_error || 0))} />
       </div>
 
       {/* Filters */}
@@ -283,6 +327,55 @@ export default function LLMUsageTab() {
         {filtered.length > 100 && (
           <p className="p-2 text-xs text-muted-foreground text-center">Affichage limité aux 100 dernières entrées</p>
         )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)] gap-4">
+        <div className="border rounded-lg p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground">Erreurs de coût par type</h3>
+          {uniqueErrorTypes.length > 0 ? uniqueErrorTypes.map(({ type, count }) => (
+            <div key={type} className="flex items-center justify-between text-sm">
+              <span className="capitalize">{type.replaceAll("_", " ")}</span>
+              <span className="font-mono text-xs px-2 py-1 rounded bg-muted/50">{count}</span>
+            </div>
+          )) : (
+            <p className="text-sm text-muted-foreground">Aucune erreur de coût journalisée.</p>
+          )}
+        </div>
+
+        <div className="overflow-x-auto border rounded-lg">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/30">
+                <th className="text-left p-2 font-medium text-muted-foreground">Timestamp</th>
+                <th className="text-left p-2 font-medium text-muted-foreground">Type</th>
+                <th className="text-left p-2 font-medium text-muted-foreground">Source</th>
+                <th className="text-left p-2 font-medium text-muted-foreground">Generation ID</th>
+                <th className="text-left p-2 font-medium text-muted-foreground">HTTP</th>
+                <th className="text-left p-2 font-medium text-muted-foreground">Message</th>
+              </tr>
+            </thead>
+            <tbody>
+              {costErrors.slice(0, 100).map((row) => (
+                <tr key={row.id} className="border-b hover:bg-accent/30 align-top">
+                  <td className="p-2 text-xs whitespace-nowrap">{fmtDate(row.occurred_at)}</td>
+                  <td className="p-2 text-xs">
+                    <span className="px-2 py-0.5 rounded bg-primary/10 text-primary">{row.error_type}</span>
+                  </td>
+                  <td className="p-2 text-xs">{row.source}</td>
+                  <td className="p-2 text-xs font-mono max-w-[220px] truncate">{row.generation_id || "—"}</td>
+                  <td className="p-2 text-xs font-mono">{row.status_code ?? "—"}</td>
+                  <td className="p-2 text-xs text-muted-foreground max-w-[420px] truncate">{row.error_message || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {costErrors.length === 0 && (
+            <p className="p-4 text-muted-foreground text-sm text-center">Aucune erreur de coût</p>
+          )}
+          {costErrors.length > 100 && (
+            <p className="p-2 text-xs text-muted-foreground text-center">Affichage limité aux 100 dernières erreurs</p>
+          )}
+        </div>
       </div>
     </div>
   );
