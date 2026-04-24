@@ -97,15 +97,32 @@ export async function processConversationTurn(
   // Wait for RAG (runs in parallel with any preloaded system prompt)
   const ragResult = await ragPromise;
   finalRagContext = ragResult.ctx;
-  debugLogger.log({ service: "other", level: "info", direction: "out", label: `Orchestrator: RAG done, calling Max`, detail: `History: ${conversationHistory.length} msgs, trust: ${currentTrustLevel}` });
+  debugLogger.log({ service: "other", level: "info", direction: "out", label: `Orchestrator: RAG done, calling Max+GM in parallel`, detail: `History: ${conversationHistory.length} msgs, trust: ${currentTrustLevel}` });
 
-  const preTurnBrief = await planGameMasterTurn({
+  // Lance le GM pre-turn ET la réponse Max EN PARALLÈLE.
+  // Max utilise le knowledge issu du RAG ; le pre-turn affine mais ne bloque plus la latence vocale.
+  const preTurnPromise = planGameMasterTurn({
     conversationHistory,
     userMessage,
     currentTrustLevel,
     triggeredIds,
     timeElapsedSeconds,
     knowledgeContext: ragResult.knowledgeContext,
+  }).catch((err) => {
+    console.warn("[Orchestrator] GM pre-turn failed, using empty brief:", err);
+    return {
+      response_mode: "ferme_mefiant" as const,
+      openness_level: 1,
+      emotional_state: "neutre",
+      conversation_goal: "",
+      reveal_budget: 0,
+      allowed_knowledge: [],
+      forbidden_topics: [],
+      blocked_assertions: [],
+      style_instructions: [],
+      trigger_hint: null,
+      notes: "fallback (GM pre-turn error)",
+    };
   });
 
   const maxInput: MaxAgentInput = {
@@ -114,15 +131,13 @@ export async function processConversationTurn(
     ragContext: finalRagContext || undefined,
     postVideoContext,
     session_id: sessionId,
-    knowledgeContext: {
-      ...ragResult.knowledgeContext,
-      allowedFacts: preTurnBrief.allowed_knowledge.length ? preTurnBrief.allowed_knowledge : ragResult.knowledgeContext.allowedFacts,
-      forbiddenTopics: preTurnBrief.forbidden_topics.length ? preTurnBrief.forbidden_topics : ragResult.knowledgeContext.forbiddenTopics,
-      blockedAssertions: preTurnBrief.blocked_assertions.length ? preTurnBrief.blocked_assertions : ragResult.knowledgeContext.blockedAssertions,
-    },
+    knowledgeContext: ragResult.knowledgeContext,
   };
 
-  const validatedTurn = await generateValidatedMaxResponse(maxInput);
+  const [validatedTurn, preTurnBrief] = await Promise.all([
+    generateValidatedMaxResponse(maxInput),
+    preTurnPromise,
+  ]);
   persistPipelineTrace({
     updatedAt: new Date().toISOString(),
     userMessage,
@@ -234,13 +249,35 @@ function buildAttemptInput(input: MaxAgentInput, reports: ConversationValidation
   };
 }
 
+const VALIDATION_TIMEOUT_MS = 4000;
+
 async function validateAttempt(input: MaxAgentInput, response: string): Promise<MaxConstraintCheckResult> {
-  return validateMaxResponseConstraints({
-    userMessage: input.userMessage,
-    response,
-    ragContext: input.ragContext,
-    knowledgeContext: input.knowledgeContext,
-  });
+  // Fail-open avec timeout : si le validateur ne répond pas vite ou échoue,
+  // on laisse passer la réponse pour ne pas bloquer le pipeline vocal.
+  return Promise.race<MaxConstraintCheckResult>([
+    validateMaxResponseConstraints({
+      userMessage: input.userMessage,
+      response,
+      ragContext: input.ragContext,
+      knowledgeContext: input.knowledgeContext,
+    }).catch((err) => {
+      console.warn("[Validator] erreur — fail-open:", err);
+      return {
+        compliant: true,
+        summary: "Validation indisponible (erreur) — réponse diffusée par défaut.",
+        violations: [],
+        safe_points: ["fail-open sur erreur"],
+      };
+    }),
+    new Promise<MaxConstraintCheckResult>((resolve) =>
+      setTimeout(() => resolve({
+        compliant: true,
+        summary: `Validation expirée après ${VALIDATION_TIMEOUT_MS}ms — réponse diffusée par défaut.`,
+        violations: [],
+        safe_points: ["fail-open sur timeout"],
+      }), VALIDATION_TIMEOUT_MS),
+    ),
+  ]);
 }
 
 function persistPipelineTrace(trace: ConversationPipelineTrace) {

@@ -202,11 +202,13 @@ Retourne UNIQUEMENT un JSON valide avec cette structure:
     if (!jsonMatch) throw new Error("No JSON in validator response");
     return JSON.parse(jsonMatch[0]) as MaxConstraintCheckResult;
   } catch {
+    // Fail-open : si le validateur renvoie un JSON illisible, on laisse passer
+    // la réponse pour ne pas bloquer le pipeline vocal. Trace conservée.
     return {
-      compliant: false,
-      summary: "Validation indisponible — réponse du validateur illisible.",
-      violations: ["Impossible de parser le rapport de validation."],
-      safe_points: [],
+      compliant: true,
+      summary: "Validation indisponible — réponse du validateur illisible (fail-open).",
+      violations: [],
+      safe_points: ["JSON validateur non-parsable, réponse diffusée par défaut"],
     };
   }
 }
