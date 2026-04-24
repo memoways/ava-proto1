@@ -95,6 +95,12 @@ export interface GameMasterFallbackInfo {
   reason: string;
   /** ms écoulés avant fallback (utile pour timeout) */
   elapsed_ms?: number;
+  /** Seuil de timeout configuré au moment du fallback (ms) */
+  timeout_ms?: number;
+  /** Modèle LLM utilisé pour le pre-turn quand le fallback s'est déclenché */
+  model?: string;
+  /** Extrait du message d'erreur brut (200 premiers caractères) — utile pour llm_error / orchestrator_error */
+  error_excerpt?: string;
 }
 
 export interface GameMasterTurnBrief {
