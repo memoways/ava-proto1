@@ -7,7 +7,7 @@ describe("PipelineSchema", () => {
     render(<PipelineSchema />);
     expect(screen.getByText(/Schéma du pipeline conversationnel/i)).toBeInTheDocument();
     expect(screen.getByText(/STT/)).toBeInTheDocument();
-    expect(screen.getByText(/RAG/)).toBeInTheDocument();
+    expect(screen.getAllByText(/RAG/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/GM pré-tour/)).toBeInTheDocument();
     expect(screen.getByText(/Max Agent/)).toBeInTheDocument();
     expect(screen.getByText(/Validateur anti-hallucination/)).toBeInTheDocument();
