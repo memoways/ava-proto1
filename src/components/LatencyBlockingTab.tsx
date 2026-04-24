@@ -123,7 +123,7 @@ export default function LatencyBlockingTab() {
       .order("started_at", { ascending: false })
       .limit(50);
     if (error) console.error(error);
-    setSessions((data as SessionRow[]) || []);
+    setSessions(((data as unknown) as SessionRow[]) || []);
     setLoading(false);
   }
 
