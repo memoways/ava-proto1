@@ -51,6 +51,7 @@ const TAB_GROUPS = [
       { id: "max-prompt", label: "Max Prompt" },
       { id: "validator", label: "Validateur" },
       { id: "metrics", label: "Métriques hallu." },
+      { id: "latency", label: "Latence & blocage" },
       { id: "max-test", label: "Test Max" },
         { id: "pipeline", label: "Pipeline" },
     ],
