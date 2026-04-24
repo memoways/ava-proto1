@@ -40,7 +40,7 @@ import { processConversationTurn } from "@/services/conversationOrchestrator";
 
 describe("conversationOrchestrator — anti-hallucination", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    (callLLM as any).mockReset();
     localStorage.clear();
   });
   afterEach(() => vi.restoreAllMocks());
