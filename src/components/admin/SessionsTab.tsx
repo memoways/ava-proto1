@@ -6,7 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Trash2, Pencil, MessageSquare, Check, X } from "lucide-react";
+import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
+
+/** Onglet admin où corriger la cause racine selon le type de fallback GM. */
+const FALLBACK_TARGET_TAB: Record<string, { tab: string; label: string }> = {
+  timeout: { tab: "llm", label: "Ouvrir LLM Config (modèle / max_tokens GM)" },
+  llm_error: { tab: "llm", label: "Ouvrir LLM Config (modèle GM)" },
+  orchestrator_error: { tab: "llm", label: "Ouvrir LLM Config (modèle GM)" },
+  no_json: { tab: "gamemaster", label: "Ouvrir prompt Game Master (forcer JSON)" },
+};
 
 export interface SessionRow {
   id: string;
@@ -297,6 +306,17 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
                                           <pre className="whitespace-pre-wrap break-words font-mono text-[10px] bg-muted/40 rounded p-1.5 max-h-32 overflow-auto">
 {fb.error_excerpt}
                                           </pre>
+                                        </div>
+                                      )}
+                                      {FALLBACK_TARGET_TAB[fb.kind] && (
+                                        <div className="pt-1.5 border-t border-border">
+                                          <Link
+                                            to={`/admin?tab=${FALLBACK_TARGET_TAB[fb.kind].tab}`}
+                                            className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
+                                          >
+                                            <ExternalLink className="h-3 w-3" />
+                                            {FALLBACK_TARGET_TAB[fb.kind].label}
+                                          </Link>
                                         </div>
                                       )}
                                     </div>

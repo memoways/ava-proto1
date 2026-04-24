@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -96,6 +97,30 @@ export default function Admin() {
   const [savingChar, setSavingChar] = useState(false);
   const [activeGroup, setActiveGroup] = useState("data");
   const [activeTab, setActiveTab] = useState("sessions");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Lire ?tab=... au montage et lors d'un changement d'URL (ex: lien depuis le tooltip GM fallback)
+  useEffect(() => {
+    const requested = searchParams.get("tab");
+    if (!requested) return;
+    for (const group of TAB_GROUPS) {
+      const found = group.tabs.find((t) => t.id === requested);
+      if (found) {
+        setActiveGroup(group.id);
+        setActiveTab(requested);
+        return;
+      }
+    }
+  }, [searchParams]);
+
+  // Quand l'utilisateur change d'onglet manuellement, refléter dans l'URL (sans push history)
+  useEffect(() => {
+    if (searchParams.get("tab") !== activeTab) {
+      const next = new URLSearchParams(searchParams);
+      next.set("tab", activeTab);
+      setSearchParams(next, { replace: true });
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     hydrateAllSettings(); // Load all settings from DB into localStorage
