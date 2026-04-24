@@ -284,15 +284,18 @@ const Index = () => {
       ]);
       const tts_ms = Math.round(performance.now() - ttsStart);
 
-      // Build full pipeline timings + identify the bottleneck (>2s rule)
+      // Build full pipeline timings + identify the bottleneck
       const fullTimings = {
         ...timings,
         tts_ms,
         gm_post_ms: gmResult.gm_post_ms,
-        total_ms: Math.round(performance.now() - turnPerf["__startMark" as never] || 0) || timings.total_ms,
+        total_ms: (timings.total_ms ?? 0) + tts_ms,
+        blocker: pickBlocker({
+          ...timings,
+          tts_ms,
+          gm_post_ms: gmResult.gm_post_ms,
+        }),
       };
-      const blocker = pickBlocker(fullTimings);
-      fullTimings.blocker = blocker;
 
       // Add Max response to history (with validation + pipeline trace for admin observability)
       const maxMsg: ConversationMessage = {
