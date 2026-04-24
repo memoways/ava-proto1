@@ -193,11 +193,17 @@ export async function processConversationTurn(
 
 async function generateValidatedMaxResponse(input: MaxAgentInput): Promise<ValidatedMaxResponse> {
   const reports: ConversationValidationTrace["reports"] = [];
+  let max_ms = 0;
+  let validator_ms = 0;
 
   for (let attempt = 1; attempt <= MAX_VALIDATION_RETRIES + 1; attempt++) {
     const attemptInput = buildAttemptInput(input, reports);
+    const maxStart = performance.now();
     const { response } = await simulateMaxResponse(attemptInput);
+    max_ms += performance.now() - maxStart;
+    const valStart = performance.now();
     const validation = await validateAttempt(attemptInput, response);
+    validator_ms += performance.now() - valStart;
 
     reports.push({
       attempt,
@@ -217,6 +223,7 @@ async function generateValidatedMaxResponse(input: MaxAgentInput): Promise<Valid
           finalStatus: "passed",
           reports,
         },
+        timings: { max_ms: Math.round(max_ms), validator_ms: Math.round(validator_ms) },
       };
     }
   }
@@ -242,6 +249,7 @@ async function generateValidatedMaxResponse(input: MaxAgentInput): Promise<Valid
         },
       ],
     },
+    timings: { max_ms: Math.round(max_ms), validator_ms: Math.round(validator_ms) },
   };
 }
 
