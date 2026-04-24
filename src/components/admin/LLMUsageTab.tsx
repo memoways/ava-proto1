@@ -122,6 +122,7 @@ export default function LLMUsageTab() {
   const uniqueModels = [...new Set(rows.map(r => r.model))];
   const uniqueFeatures = [...new Set(rows.map(r => r.feature_key))];
   const uniqueStatuses = [...new Set(rows.map(r => r.status))];
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   const errorCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     costErrors.forEach((row) => {
@@ -136,7 +137,6 @@ export default function LLMUsageTab() {
 
   // KPIs
   const totalCost = filtered.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   const costToday = rows.filter(r => new Date(r.created_at) >= todayStart).reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
   const cost30d = rows.filter(r => new Date(r.created_at) >= new Date(Date.now() - 30 * 86400000)).reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
   const totalRequests = filtered.length;
@@ -334,7 +334,7 @@ export default function LLMUsageTab() {
           <h3 className="text-sm font-semibold text-muted-foreground">Erreurs de coût par type</h3>
           {uniqueErrorTypes.length > 0 ? uniqueErrorTypes.map(({ type, count }) => (
             <div key={type} className="flex items-center justify-between text-sm">
-              <span className="capitalize">{type.replaceAll("_", " ")}</span>
+              <span className="capitalize">{type.split("_").join(" ")}</span>
               <span className="font-mono text-xs px-2 py-1 rounded bg-muted/50">{count}</span>
             </div>
           )) : (
