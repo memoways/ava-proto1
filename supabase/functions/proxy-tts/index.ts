@@ -14,6 +14,12 @@ interface TTSRequest {
   style?: number;
   speed?: number;
   useSpeakerBoost?: boolean;
+  // Request stitching — prosodic context for natural inter-sentence flow
+  previousText?: string;
+  nextText?: string;
+  // Output format / latency tuning (overridable per call)
+  outputFormat?: string;
+  optimizeStreamingLatency?: number;
 }
 
 serve(async (req) => {
