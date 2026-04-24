@@ -68,7 +68,7 @@ const LLM_STORAGE_KEY = "ava_llm_settings";
 
 export const OPENROUTER_MODELS = [
   { id: "qwen/qwen-2.5-72b-instruct", label: "Qwen 2.5 72B", description: "Défaut — bon rapport qualité/coût" },
-  { id: "qwen/qwen-2.5-32b-instruct", label: "Qwen 2.5 32B", description: "Plus rapide, bonne qualité" },
+  { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "Rapide, fiable, bonne qualité" },
   { id: "x-ai/grok-3-mini-beta", label: "Grok 3 Mini", description: "Rapide, conversationnel, bon en roleplay" },
   { id: "x-ai/grok-3-beta", label: "Grok 3", description: "Top qualité xAI, raisonnement fort" },
   { id: "x-ai/grok-2-1212", label: "Grok 2", description: "Équilibré vitesse/qualité" },
@@ -92,18 +92,42 @@ const llmDefaults: LLMSettings = {
   LLM_MAX_TOKENS_GM: 200,
 };
 
+const DEPRECATED_OPENROUTER_MODELS: Record<string, string> = {
+  "qwen/qwen-2.5-32b-instruct": "qwen/qwen-2.5-72b-instruct",
+};
+
+function normalizeLLMSettings(settings: LLMSettings): LLMSettings {
+  return {
+    ...settings,
+    LLM_MODEL: DEPRECATED_OPENROUTER_MODELS[settings.LLM_MODEL] ?? settings.LLM_MODEL,
+    LLM_MODEL_GM: DEPRECATED_OPENROUTER_MODELS[settings.LLM_MODEL_GM] ?? settings.LLM_MODEL_GM,
+  };
+}
+
 /** Synchronous read from localStorage (fast, for use during LLM calls) */
 export function getLLMSettings(): LLMSettings {
   try {
     const stored = localStorage.getItem(LLM_STORAGE_KEY);
-    if (stored) return { ...llmDefaults, ...JSON.parse(stored) };
+    if (stored) {
+      const merged = { ...llmDefaults, ...JSON.parse(stored) };
+      const normalized = normalizeLLMSettings(merged);
+      if (JSON.stringify(merged) !== JSON.stringify(normalized)) {
+        localStorage.setItem(LLM_STORAGE_KEY, JSON.stringify(normalized));
+      }
+      return normalized;
+    }
   } catch { /* ignore */ }
   return { ...llmDefaults };
 }
 
 /** Async load from DB (call on admin page load) */
 export async function loadLLMSettingsFromDB(): Promise<LLMSettings> {
-  return loadFromDB(LLM_STORAGE_KEY, llmDefaults);
+  const loaded = await loadFromDB(LLM_STORAGE_KEY, llmDefaults);
+  const normalized = normalizeLLMSettings(loaded);
+  if (JSON.stringify(loaded) !== JSON.stringify(normalized)) {
+    await saveToDB(LLM_STORAGE_KEY, normalized);
+  }
+  return normalized;
 }
 
 /** Save to both localStorage and DB */
@@ -114,7 +138,7 @@ export async function saveLLMSettingsToDB(settings: LLMSettings): Promise<void> 
 /** Local-only save (for slider dragging without DB write on every move) */
 export function saveLLMSettingsLocal(settings: Partial<LLMSettings>): LLMSettings {
   const current = getLLMSettings();
-  const updated = { ...current, ...settings };
+  const updated = normalizeLLMSettings({ ...current, ...settings });
   localStorage.setItem(LLM_STORAGE_KEY, JSON.stringify(updated));
   return updated;
 }
