@@ -47,6 +47,194 @@ function fmtMs(v?: number): string {
   return `${(v / 1000).toFixed(2)} s`;
 }
 
+const STEP_HEX: Record<NumericTimingKey, string> = {
+  rag_ms: "#0ea5e9",       // sky-500
+  gm_pre_ms: "#8b5cf6",    // violet-500
+  max_ms: "#10b981",       // emerald-500
+  validator_ms: "#f59e0b", // amber-500
+  tts_ms: "#f43f5e",       // rose-500
+  gm_post_ms: "#d946ef",   // fuchsia-500
+  total_ms: "#6366f1",
+};
+
+const TARGET_MS = 2000;
+
+interface StackedRowProps {
+  label: string;
+  values: ConversationPipelineTimings;
+  scaleMax: number;
+  target?: number;
+}
+
+function StackedRow({ label, values, scaleMax, target }: StackedRowProps) {
+  const total = STEP_LABELS.reduce((acc, { key }) => acc + (values[key] ?? 0), 0);
+  const denom = Math.max(scaleMax, total, 1);
+  const targetPct = target ? Math.min(100, (target / denom) * 100) : null;
+  const overTarget = target ? total > target : false;
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-1">
+        <span className="text-xs text-muted-foreground">{label}</span>
+        <span className={`text-xs font-mono font-semibold ${overTarget ? "text-destructive" : "text-foreground"}`}>
+          {fmtMs(total)}
+        </span>
+      </div>
+      <div className="relative h-6 w-full bg-muted/40 rounded overflow-hidden">
+        <div className="absolute inset-0 flex">
+          {STEP_LABELS.map(({ key, label: stepLabel }) => {
+            const v = values[key] ?? 0;
+            if (v <= 0) return null;
+            const pct = (v / denom) * 100;
+            return (
+              <div
+                key={key}
+                className="h-full flex items-center justify-center text-[10px] text-white/95 font-medium overflow-hidden"
+                style={{ width: `${pct}%`, backgroundColor: STEP_HEX[key] }}
+                title={`${stepLabel}: ${fmtMs(v)}`}
+              >
+                {pct > 8 ? stepLabel : ""}
+              </div>
+            );
+          })}
+        </div>
+        {targetPct !== null && (
+          <>
+            <div
+              className="absolute top-0 bottom-0 w-px bg-destructive"
+              style={{ left: `${targetPct}%` }}
+            />
+            <div
+              className="absolute -top-0.5 w-2 h-2 rounded-full bg-destructive -translate-x-1/2"
+              style={{ left: `${targetPct}%` }}
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LatencyVisualization({
+  avg,
+  max,
+  turns,
+}: {
+  avg: ConversationPipelineTimings;
+  max: ConversationPipelineTimings;
+  turns: TurnTiming[];
+}) {
+  const bestTurn = turns.reduce<TurnTiming | null>((best, t) => {
+    if (typeof t.total_ms !== "number") return best;
+    if (!best || (best.total_ms ?? Infinity) > t.total_ms) return t;
+    return best;
+  }, null);
+  const bestTotal = bestTurn?.total_ms ?? 0;
+  const avgTotal = avg.total_ms ?? 0;
+  const maxTotal = max.total_ms ?? 0;
+  const scaleMax = Math.max(maxTotal, avgTotal, bestTotal, TARGET_MS) * 1.05;
+
+  const onTarget = avgTotal > 0 && avgTotal <= TARGET_MS;
+
+  return (
+    <div className="border rounded-lg p-4 bg-card">
+      <div className="flex items-start justify-between mb-4 gap-4 flex-wrap">
+        <div>
+          <h3 className="text-sm font-semibold">Latence estimée &amp; répartition</h3>
+          <p className="text-xs text-muted-foreground">
+            Vue relative et absolue des étapes du pipeline. Cible : &lt; {TARGET_MS / 1000}s end-to-end.
+          </p>
+        </div>
+        <div className="flex items-center gap-5 text-xs">
+          <div>
+            <div className="text-muted-foreground">Best case</div>
+            <div className="font-mono font-bold text-base text-emerald-500">{fmtMs(bestTotal)}</div>
+          </div>
+          <div>
+            <div className="text-muted-foreground">Moyen</div>
+            <div className="font-mono font-bold text-base">{fmtMs(avgTotal)}</div>
+          </div>
+          <div>
+            <div className="text-muted-foreground">Pire</div>
+            <div className="font-mono font-bold text-base text-destructive">{fmtMs(maxTotal)}</div>
+          </div>
+          <div
+            className={`px-2 py-1 rounded text-xs font-medium ${
+              onTarget
+                ? "bg-emerald-500/15 text-emerald-500"
+                : "bg-destructive/15 text-destructive"
+            }`}
+          >
+            {onTarget ? `✓ Cible <${TARGET_MS / 1000}s` : `✗ Au-dessus de ${TARGET_MS / 1000}s`}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {bestTurn && <StackedRow label="Best case" values={bestTurn} scaleMax={scaleMax} target={TARGET_MS} />}
+        <StackedRow label="Moyen" values={avg} scaleMax={scaleMax} target={TARGET_MS} />
+        <StackedRow label="Pire" values={max} scaleMax={scaleMax} target={TARGET_MS} />
+      </div>
+
+      {/* Legend */}
+      <div className="mt-4 pt-3 border-t flex flex-wrap gap-x-4 gap-y-2 text-xs">
+        {STEP_LABELS.map(({ key, label }) => (
+          <div key={key} className="flex items-center gap-1.5">
+            <span
+              className="inline-block w-3 h-3 rounded-sm"
+              style={{ backgroundColor: STEP_HEX[key] }}
+            />
+            <span className="text-muted-foreground">{label} :</span>
+            <span className="font-mono">{fmtMs(avg[key])}</span>
+          </div>
+        ))}
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-px bg-destructive" />
+          <span className="text-destructive">cible {TARGET_MS / 1000}s</span>
+        </div>
+      </div>
+
+      {/* Cost breakdown (relative share of average pipeline) */}
+      {avgTotal > 0 && (
+        <div className="mt-4">
+          <div className="text-xs text-muted-foreground mb-1">Répartition relative (moyenne)</div>
+          <div className="flex h-3 w-full rounded overflow-hidden">
+            {STEP_LABELS.map(({ key, label }) => {
+              const v = avg[key] ?? 0;
+              if (v <= 0) return null;
+              const pct = (v / avgTotal) * 100;
+              return (
+                <div
+                  key={key}
+                  style={{ width: `${pct}%`, backgroundColor: STEP_HEX[key] }}
+                  title={`${label}: ${pct.toFixed(0)}%`}
+                />
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-[11px]">
+            {STEP_LABELS.map(({ key, label }) => {
+              const v = avg[key] ?? 0;
+              if (v <= 0) return null;
+              const pct = (v / avgTotal) * 100;
+              return (
+                <span key={key} className="flex items-center gap-1">
+                  <span
+                    className="inline-block w-2 h-2 rounded-sm"
+                    style={{ backgroundColor: STEP_HEX[key] }}
+                  />
+                  <span className="text-muted-foreground">{label} :</span>
+                  <span className="font-mono">{pct.toFixed(0)}%</span>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function aggregate(session: SessionRow): SessionAggregate {
   const log = Array.isArray(session.conversation_log) ? session.conversation_log : [];
   const turns: TurnTiming[] = [];
