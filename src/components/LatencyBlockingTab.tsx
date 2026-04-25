@@ -824,7 +824,7 @@ export default function LatencyBlockingTab() {
                   />
                   <button
                     type="button"
-                    onClick={() => setFocusId(a.session.id)}
+                    onClick={() => handleFocus(a.session.id)}
                     className="flex-1 text-left"
                   >
                     <div className="flex justify-between items-center mb-1">
