@@ -64,7 +64,29 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-04-25 — Visualisation comparative des latences réelles, par session et par tour 🔷
+
+**Intent**: Le panneau "Latence & blocage" donnait des moyennes globales mais ne permettait pas de comprendre **ce qui s'est vraiment passé** dans une session donnée. L'équipe avait besoin de voir, sur une même échelle, comment chaque session se compare, où elle dépasse la cible 2 s, et tour par tour quelle étape coûte combien — sans estimations ni scénarios fictifs.
+
+**Tool**: Lovable + Lovable Cloud
+
+**Outcome**:
+1. **Une barre par session, données 100 % réelles** — `LatencyVisualization` a été refondue pour afficher exclusivement la moyenne réelle des tours de chaque session sélectionnée. Les anciennes variantes "best case / moyen / pire" ont été supprimées : elles induisaient en erreur en mélangeant données mesurées et extrapolations.
+2. **Sélection multi-sessions + filtres** — checkboxes dans la liste, boutons "Tout / Aucune", et trois filtres complémentaires (période 24h/7j/30j/personnalisée, nombre minimum de tours Max, présence ou absence de blocage). Le compteur `Sessions (n / total)` et la sync automatique (les sélections invalidées par un filtre sont retirées) gardent la comparaison cohérente.
+3. **Marqueur de cible 2 s commun** — toutes les barres (session + tours) partagent le même `scaleMax`, recalculé pour intégrer la plus longue moyenne, le plus haut max de dispersion et la cible. Le trait rouge des 2 s est donc positionné de manière cohérente partout, ce qui rend les dépassements immédiatement lisibles.
+4. **Indicateur de dispersion** — bracket min–max sur la barre + badge `[min – max] · σ` dans l'en-tête de chaque session, calculé à partir du `total_ms` réel de chaque tour (écart-type d'échantillon, n-1). Une session avec une moyenne basse mais un max très haut (ex : un tour bloqué par TTS) saute aux yeux.
+5. **Détail par tour dépliable** — chaque session a un chevron ▸ qui révèle, en dessous de la barre de moyenne, **une barre par tour individuel** (`Tour #N`), avec mention du blocker si le tour en a un. Les tours sont peints sur la même échelle que la session, donc la cible 2 s reste alignée.
+6. **Auto-dépliage au focus** — cliquer sur une session dans la liste de gauche la coche automatiquement (si nécessaire), la place en focus et déplie ses barres de tours dans la comparaison. Plus besoin d'un double-clic mental "je sélectionne puis je déplie" : un seul geste révèle tout.
+7. **Bonus diagnostic GM** — un mini-graphique `elapsed_ms` vs `timeout_ms` a été ajouté dans `SessionsTab` pour visualiser de combien les derniers fallbacks Game Master ont dépassé leur seuil.
+
+**Ce que ça change** : on passe d'un dashboard statistique (moyennes agrégées) à un **outil d'enquête** où chaque session est inspectable. L'équipe peut isoler 3 sessions "lentes" depuis hier, les afficher côte à côte, ouvrir celle qui paraît la pire et voir directement quel tour exactement dépasse la cible et sur quelle étape. C'est le passage du "il y a un problème de latence" au "le tour 4 de la session abc12345 a un TTS à 5,2 s".
+
+**Time**: ~2h30 sur plusieurs itérations rapprochées (refonte → comparaison → filtres → données réelles uniquement → dispersion → barres par tour → auto-dépliage).
+
+---
+
 ### 2026-04-24 — Performance pipeline + panneau latence + admin protégé 🔷
+
 
 **Intent**: Suite à un test live où Max ne répondait qu'une seule fois puis restait silencieux, identifier la cause de la latence/du blocage, refondre le pipeline pour qu'il soit non-bloquant, donner à l'équipe un outil de diagnostic permanent, et empêcher que n'importe qui avec l'URL `/admin` puisse casser des choses.
 
