@@ -718,18 +718,18 @@ export default function LatencyBlockingTab() {
             {comparison ? (
               <LatencyVisualization
                 avg={comparison.avg}
-                max={comparison.max}
-                turns={comparison.turns}
                 showRelative={showRelative}
-                perSessionRows={
-                  selectedAggregates.length > 1
-                    ? selectedAggregates.map((a) => ({
-                        id: a.session.id,
-                        label: `${a.session.id.slice(0, 8)} · ${a.turnCount} tour(s)`,
-                        avg: a.avg,
-                      }))
-                    : undefined
-                }
+                perSessionRows={selectedAggregates.map((a) => ({
+                  id: a.session.id,
+                  label: a.session.id.slice(0, 8),
+                  sublabel: `${a.turnCount} tour(s)${
+                    a.session.started_at
+                      ? " · " + new Date(a.session.started_at).toLocaleDateString("fr-CH")
+                      : ""
+                  }`,
+                  avg: a.avg,
+                  turnCount: a.turnCount,
+                }))}
               />
             ) : (
               <p className="text-sm text-muted-foreground py-8 text-center">
