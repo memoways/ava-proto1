@@ -426,45 +426,7 @@ export default function LatencyBlockingTab() {
   function selectNone() {
     setSelectedIds(new Set());
   }
-
-
-  // Global stats across last 50 sessions
-  const global = useMemo(() => {
-    const allTurns = aggregates.flatMap((a) => a.turns);
-    if (!allTurns.length) return null;
-    const sums: Record<string, { sum: number; count: number; max: number }> = {};
-    let blockers = 0;
-    const blockerCounter: Record<string, number> = {};
-    for (const t of allTurns) {
-      for (const { key } of STEP_LABELS) {
-        const v = t[key];
-        if (typeof v === "number") {
-          sums[key] ??= { sum: 0, count: 0, max: 0 };
-          sums[key].sum += v;
-          sums[key].count++;
-          sums[key].max = Math.max(sums[key].max, v);
-        }
-      }
-      if (typeof t.total_ms === "number") {
-        sums["total_ms"] ??= { sum: 0, count: 0, max: 0 };
-        sums["total_ms"].sum += t.total_ms;
-        sums["total_ms"].count++;
-        sums["total_ms"].max = Math.max(sums["total_ms"].max, t.total_ms);
-      }
-      if (t.blocker) {
-        blockers++;
-        blockerCounter[t.blocker] = (blockerCounter[t.blocker] ?? 0) + 1;
-      }
-    }
-    return {
-      turnCount: allTurns.length,
-      sums,
-      blockers,
-      blockerRate: blockers / allTurns.length,
-      topBlocker: Object.entries(blockerCounter).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null,
-      blockerCounter,
-    };
-  }, [aggregates]);
+  const allSelected = aggregates.length > 0 && selectedIds.size === aggregates.length;
 
   return (
     <div className="space-y-4">
@@ -472,7 +434,7 @@ export default function LatencyBlockingTab() {
         <div>
           <h2 className="text-lg font-semibold">Latence & blocage</h2>
           <p className="text-xs text-muted-foreground">
-            Temps par étape (RAG, GM pre-turn, Max, validateur, TTS, GM post-turn) et dernier point de blocage par session.
+            Sélectionne une ou plusieurs sessions pour comparer leurs latences cumulatives.
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={load} disabled={loading}>
@@ -480,145 +442,174 @@ export default function LatencyBlockingTab() {
         </Button>
       </div>
 
-      {/* Global stats */}
-      {global && (
-        <div className="border rounded-lg p-4 bg-muted/20">
-          <h3 className="text-sm font-semibold mb-3">
-            Vue globale — {aggregates.length} session(s) instrumentée(s), {global.turnCount} tour(s) Max
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-            {[...STEP_LABELS, { key: "total_ms" as const, label: "Total", color: "bg-primary" }].map(({ key, label, color }) => {
-              const s = global.sums[key];
-              if (!s) return (
-                <div key={key} className="text-xs">
-                  <div className="text-muted-foreground">{label}</div>
-                  <div className="font-mono">—</div>
-                </div>
-              );
-              return (
-                <div key={key} className="text-xs">
-                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <span className={`inline-block w-2 h-2 rounded-full ${color}`} />
-                    {label}
-                  </div>
-                  <div className="font-mono font-semibold">{fmtMs(s.sum / s.count)}</div>
-                  <div className="text-muted-foreground text-[10px]">max {fmtMs(s.max)}</div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-3 pt-3 border-t flex flex-wrap items-center gap-3 text-xs">
-            <span className="text-muted-foreground">Tours bloqués (au moins 1 étape au-dessus du seuil)&nbsp;:</span>
-            <Badge variant={global.blockerRate > 0.3 ? "destructive" : "secondary"}>
-              {global.blockers} / {global.turnCount} ({(global.blockerRate * 100).toFixed(0)}%)
-            </Badge>
-            {global.topBlocker && (
-              <span className="text-muted-foreground">
-                Étape la plus bloquante&nbsp;: <strong className="text-foreground">{global.topBlocker}</strong>
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Visual latency breakdown — global */}
-      {global && (() => {
-        const avg: ConversationPipelineTimings = {};
-        const max: ConversationPipelineTimings = {};
-        for (const k of Object.keys(global.sums)) {
-          (avg as Record<string, number>)[k as NumericTimingKey] = global.sums[k].sum / global.sums[k].count;
-          (max as Record<string, number>)[k as NumericTimingKey] = global.sums[k].max;
-        }
-        const allTurns = aggregates.flatMap((a) => a.turns);
-        return <LatencyVisualization avg={avg} max={max} turns={allTurns} />;
-      })()}
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Session list */}
-        <div className="border rounded-lg">
-          <div className="p-3 border-b text-sm font-semibold">Sessions ({aggregates.length})</div>
+        {/* Sessions list with checkboxes */}
+        <div className="border rounded-lg flex flex-col">
+          <div className="p-3 border-b">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold">Sessions ({aggregates.length})</span>
+              <Badge variant={selectedIds.size > 0 ? "default" : "secondary"} className="text-[10px]">
+                {selectedIds.size} sélectionnée(s)
+              </Badge>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs flex-1"
+                onClick={selectAll}
+                disabled={allSelected}
+              >
+                Tout
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs flex-1"
+                onClick={selectNone}
+                disabled={selectedIds.size === 0}
+              >
+                Aucune
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2">
+              ☐ Coche pour comparer · clique le nom pour voir le détail
+            </p>
+          </div>
           <ScrollArea className="h-[60vh]">
             {aggregates.length === 0 && (
               <p className="p-4 text-xs text-muted-foreground">
                 Aucune session avec timings instrumentés. Joue une partie pour générer des données.
               </p>
             )}
-            {aggregates.map((a) => (
-              <button
-                key={a.session.id}
-                onClick={() => setSelectedId(a.session.id)}
-                className={`w-full text-left p-3 border-b text-xs hover:bg-accent/50 transition-colors ${
-                  selected?.session.id === a.session.id ? "bg-accent" : ""
-                }`}
-              >
-                <div className="flex justify-between items-center mb-1">
-                  <span className="font-mono">{a.session.id.slice(0, 8)}</span>
-                  <span className="text-muted-foreground">{a.turnCount} tour(s)</span>
+            {aggregates.map((a) => {
+              const isSelected = selectedIds.has(a.session.id);
+              const isFocused = focusId === a.session.id;
+              return (
+                <div
+                  key={a.session.id}
+                  className={`flex items-start gap-2 p-3 border-b text-xs transition-colors ${
+                    isFocused ? "bg-accent" : "hover:bg-accent/40"
+                  }`}
+                >
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => toggleId(a.session.id)}
+                    className="mt-0.5"
+                    aria-label={`Comparer la session ${a.session.id.slice(0, 8)}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setFocusId(a.session.id)}
+                    className="flex-1 text-left"
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-mono">{a.session.id.slice(0, 8)}</span>
+                      <span className="text-muted-foreground">{a.turnCount} tour(s)</span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      {a.session.started_at ? new Date(a.session.started_at).toLocaleString("fr-CH") : "—"}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span>
+                        Total moy. <strong className="text-foreground font-mono">{fmtMs(a.avg.total_ms)}</strong>
+                      </span>
+                      {a.blockerCount > 0 && (
+                        <Badge variant="destructive" className="text-[10px] py-0 px-1.5">
+                          {a.blockerCount} bloc.
+                        </Badge>
+                      )}
+                    </div>
+                    {a.lastBlocker?.step && (
+                      <div className="mt-1 text-amber-500">
+                        Dernier blocage&nbsp;: <strong>{a.lastBlocker.step}</strong> (tour #{a.lastBlocker.turnIndex})
+                      </div>
+                    )}
+                  </button>
                 </div>
-                <div className="text-muted-foreground">
-                  {a.session.started_at ? new Date(a.session.started_at).toLocaleString("fr-CH") : "—"}
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <span>Total moy. <strong className="text-foreground font-mono">{fmtMs(a.avg.total_ms)}</strong></span>
-                  {a.blockerCount > 0 && (
-                    <Badge variant="destructive" className="text-[10px] py-0 px-1.5">
-                      {a.blockerCount} bloc.
-                    </Badge>
-                  )}
-                </div>
-                {a.lastBlocker?.step && (
-                  <div className="mt-1 text-amber-500">
-                    Dernier blocage&nbsp;: <strong>{a.lastBlocker.step}</strong> (tour #{a.lastBlocker.turnIndex})
-                  </div>
-                )}
-              </button>
-            ))}
+              );
+            })}
           </ScrollArea>
         </div>
 
-        {/* Detail */}
-        <div className="lg:col-span-2 border rounded-lg p-4">
-          {!selected ? (
-            <p className="text-sm text-muted-foreground">Sélectionne une session.</p>
-          ) : (
-            <>
+        {/* Right column: comparison + (optional) focused detail */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Comparison panel */}
+          <div className="border rounded-lg p-4">
+            <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+              <div>
+                <h3 className="text-sm font-semibold">
+                  Comparaison ({comparison?.sessionCount ?? 0} session{(comparison?.sessionCount ?? 0) > 1 ? "s" : ""})
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {comparison
+                    ? `Agrégé sur ${comparison.turnCount} tour(s) Max.`
+                    : "Coche au moins une session dans la liste."}
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                <Checkbox
+                  checked={showRelative}
+                  onCheckedChange={(v) => setShowRelative(Boolean(v))}
+                />
+                <span>Afficher la répartition relative (moyenne)</span>
+              </label>
+            </div>
+
+            {comparison ? (
+              <LatencyVisualization
+                avg={comparison.avg}
+                max={comparison.max}
+                turns={comparison.turns}
+                showRelative={showRelative}
+                perSessionRows={
+                  selectedAggregates.length > 1
+                    ? selectedAggregates.map((a) => ({
+                        id: a.session.id,
+                        label: `${a.session.id.slice(0, 8)} · ${a.turnCount} tour(s)`,
+                        avg: a.avg,
+                      }))
+                    : undefined
+                }
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                Aucune donnée à comparer. Coche des sessions dans la liste à gauche.
+              </p>
+            )}
+          </div>
+
+          {/* Focused session detail */}
+          {focused && (
+            <div className="border rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="text-sm font-semibold font-mono">{selected.session.id}</h3>
+                  <h3 className="text-sm font-semibold font-mono">{focused.session.id}</h3>
                   <p className="text-xs text-muted-foreground">
-                    {selected.turnCount} tour(s) Max • Game over&nbsp;: {selected.session.game_over_reason || "—"}
+                    {focused.turnCount} tour(s) Max • Game over&nbsp;: {focused.session.game_over_reason || "—"}
                   </p>
                 </div>
-                {selected.lastBlocker?.step ? (
-                  <Badge variant="destructive">Dernier point de blocage : {selected.lastBlocker.step}</Badge>
-                ) : (
-                  <Badge variant="secondary">Aucun blocage détecté</Badge>
-                )}
-              </div>
-
-              {/* Per-step averages */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                {[...STEP_LABELS, { key: "total_ms" as const, label: "Total", color: "bg-primary" }].map(({ key, label, color }) => (
-                  <div key={key} className="border rounded p-2">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <span className={`inline-block w-2 h-2 rounded-full ${color}`} />
-                      {label}
-                    </div>
-                    <div className="font-mono text-sm font-semibold">{fmtMs(selected.avg[key])}</div>
-                    <div className="text-[10px] text-muted-foreground">max {fmtMs(selected.max[key])}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Visual breakdown for selected session */}
-              <div className="mb-4">
-                <LatencyVisualization avg={selected.avg} max={selected.max} turns={selected.turns} />
+                <div className="flex items-center gap-2">
+                  {focused.lastBlocker?.step ? (
+                    <Badge variant="destructive">Blocage : {focused.lastBlocker.step}</Badge>
+                  ) : (
+                    <Badge variant="secondary">Aucun blocage</Badge>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs"
+                    onClick={() => setFocusId(null)}
+                  >
+                    Fermer
+                  </Button>
+                </div>
               </div>
 
               {/* Per-turn breakdown */}
               <div>
                 <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">
-                  Détail par tour ({selected.turns.length})
+                  Détail par tour ({focused.turns.length})
                 </h4>
                 <ScrollArea className="h-[40vh] border rounded">
                   <table className="w-full text-xs">
@@ -633,7 +624,7 @@ export default function LatencyBlockingTab() {
                       </tr>
                     </thead>
                     <tbody>
-                      {selected.turns.map((t) => (
+                      {focused.turns.map((t) => (
                         <tr key={t.index} className="border-t">
                           <td className="p-2 font-mono">{t.index}</td>
                           {STEP_LABELS.map(({ key }) => (
@@ -653,7 +644,7 @@ export default function LatencyBlockingTab() {
                   </table>
                 </ScrollArea>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
