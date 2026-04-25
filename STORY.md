@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-04-24 (session 12 — perf pipeline parallélisé, panneau "Latence & blocage", admin protégé par mot de passe)  
+> **Last Updated**: 2026-04-25 (session 13 — visualisation cumulative des latences par session et par tour, comparaison multi-sessions, filtres et auto-dépliage)  
 
 ---
 
