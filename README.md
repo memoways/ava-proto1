@@ -66,6 +66,11 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] Validateur anti-hallucination en mode fail-open (timeout 4s + résilience aux JSON malformés)
 - [x] Panneau admin "Latence & blocage" : timings par étape (RAG/GM/Max/validateur/TTS) + détection du point de blocage
 - [x] Accès `/admin` protégé par mot de passe (anti-accès accidentel)
+- [x] Visualisation comparative multi-sessions des latences réelles (barres empilées par session)
+- [x] Détail par tour dépliable depuis chaque barre de session, avec marqueur de cible 2 s commun
+- [x] Indicateur de dispersion par session (bracket min–max + écart-type σ sur le total des tours)
+- [x] Filtres sessions (période, nombre min de tours, présence de blocage) + auto-dépliage au focus
+- [x] Mini-graphique GM fallback (`elapsed_ms` vs `timeout_ms`) dans l'onglet Sessions
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
 - [ ] Politique de vérité à 4 niveaux (certain / probable / inconnu / interdit)
 - [ ] Bible factuelle éditable et gestion explicite des sujets verrouillés/déverrouillés
