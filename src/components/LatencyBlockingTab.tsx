@@ -4,6 +4,14 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { ConversationMessage, ConversationPipelineTimings } from "@/types";
 
 interface SessionRow {
@@ -372,12 +380,23 @@ function aggregateMany(aggs: SessionAggregate[]): ComparisonAggregate | null {
   };
 }
 
+type PeriodPreset = "all" | "24h" | "7d" | "30d" | "custom";
+type BlockerFilter = "all" | "with" | "without";
+
 export default function LatencyBlockingTab() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [focusId, setFocusId] = useState<string | null>(null);
   const [showRelative, setShowRelative] = useState(false);
+
+  // Filters
+  const [period, setPeriod] = useState<PeriodPreset>("all");
+  const [customFrom, setCustomFrom] = useState<string>(""); // yyyy-mm-dd
+  const [customTo, setCustomTo] = useState<string>("");
+  const [minTurns, setMinTurns] = useState<number>(0);
+  const [blockerFilter, setBlockerFilter] = useState<BlockerFilter>("all");
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -397,16 +416,55 @@ export default function LatencyBlockingTab() {
 
   const aggregates = useMemo(() => sessions.map(aggregate).filter((a) => a.turnCount > 0), [sessions]);
 
+  // Apply filters
+  const filteredAggregates = useMemo(() => {
+    const now = Date.now();
+    let fromTs: number | null = null;
+    let toTs: number | null = null;
+    if (period === "24h") fromTs = now - 24 * 3600 * 1000;
+    else if (period === "7d") fromTs = now - 7 * 24 * 3600 * 1000;
+    else if (period === "30d") fromTs = now - 30 * 24 * 3600 * 1000;
+    else if (period === "custom") {
+      if (customFrom) fromTs = new Date(customFrom + "T00:00:00").getTime();
+      if (customTo) toTs = new Date(customTo + "T23:59:59").getTime();
+    }
+    return aggregates.filter((a) => {
+      if (a.turnCount < minTurns) return false;
+      if (blockerFilter === "with" && a.blockerCount === 0) return false;
+      if (blockerFilter === "without" && a.blockerCount > 0) return false;
+      const ts = a.session.started_at ? new Date(a.session.started_at).getTime() : null;
+      if (fromTs !== null && (ts === null || ts < fromTs)) return false;
+      if (toTs !== null && (ts === null || ts > toTs)) return false;
+      return true;
+    });
+  }, [aggregates, period, customFrom, customTo, minTurns, blockerFilter]);
+
   // Initialize selection: select all sessions on first load
   useEffect(() => {
-    if (aggregates.length > 0 && selectedIds.size === 0) {
+    if (!hasInitialized && aggregates.length > 0) {
       setSelectedIds(new Set(aggregates.map((a) => a.session.id)));
+      setHasInitialized(true);
     }
-  }, [aggregates, selectedIds.size]);
+  }, [aggregates, hasInitialized]);
+
+  // Drop selected ids that no longer pass the filter so the comparison matches what's visible
+  useEffect(() => {
+    if (!hasInitialized) return;
+    const visibleIds = new Set(filteredAggregates.map((a) => a.session.id));
+    setSelectedIds((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (visibleIds.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [filteredAggregates, hasInitialized]);
 
   const selectedAggregates = useMemo(
-    () => aggregates.filter((a) => selectedIds.has(a.session.id)),
-    [aggregates, selectedIds],
+    () => filteredAggregates.filter((a) => selectedIds.has(a.session.id)),
+    [filteredAggregates, selectedIds],
   );
 
   const comparison = useMemo(() => aggregateMany(selectedAggregates), [selectedAggregates]);
@@ -421,12 +479,23 @@ export default function LatencyBlockingTab() {
     });
   }
   function selectAll() {
-    setSelectedIds(new Set(aggregates.map((a) => a.session.id)));
+    setSelectedIds(new Set(filteredAggregates.map((a) => a.session.id)));
   }
   function selectNone() {
     setSelectedIds(new Set());
   }
-  const allSelected = aggregates.length > 0 && selectedIds.size === aggregates.length;
+  function resetFilters() {
+    setPeriod("all");
+    setCustomFrom("");
+    setCustomTo("");
+    setMinTurns(0);
+    setBlockerFilter("all");
+  }
+  const allSelected =
+    filteredAggregates.length > 0 && selectedIds.size === filteredAggregates.length;
+  const filtersActive =
+    period !== "all" || minTurns > 0 || blockerFilter !== "all" || !!customFrom || !!customTo;
+  const hiddenCount = aggregates.length - filteredAggregates.length;
 
   return (
     <div className="space-y-4">
@@ -445,20 +514,116 @@ export default function LatencyBlockingTab() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Sessions list with checkboxes */}
         <div className="border rounded-lg flex flex-col">
-          <div className="p-3 border-b">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold">Sessions ({aggregates.length})</span>
+          <div className="p-3 border-b space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold">
+                Sessions ({filteredAggregates.length}
+                {hiddenCount > 0 && (
+                  <span className="text-muted-foreground font-normal"> / {aggregates.length}</span>
+                )}
+                )
+              </span>
               <Badge variant={selectedIds.size > 0 ? "default" : "secondary"} className="text-[10px]">
                 {selectedIds.size} sélectionnée(s)
               </Badge>
             </div>
-            <div className="flex gap-2">
+
+            {/* Filters */}
+            <div className="space-y-2 pt-1">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                    Période
+                  </label>
+                  <Select value={period} onValueChange={(v) => setPeriod(v as PeriodPreset)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes</SelectItem>
+                      <SelectItem value="24h">Dernières 24h</SelectItem>
+                      <SelectItem value="7d">7 derniers jours</SelectItem>
+                      <SelectItem value="30d">30 derniers jours</SelectItem>
+                      <SelectItem value="custom">Personnalisée…</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                    Blocage
+                  </label>
+                  <Select
+                    value={blockerFilter}
+                    onValueChange={(v) => setBlockerFilter(v as BlockerFilter)}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes</SelectItem>
+                      <SelectItem value="with">Avec blocage</SelectItem>
+                      <SelectItem value="without">Sans blocage</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {period === "custom" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Du</label>
+                    <Input
+                      type="date"
+                      value={customFrom}
+                      onChange={(e) => setCustomFrom(e.target.value)}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Au</label>
+                    <Input
+                      type="date"
+                      value={customTo}
+                      onChange={(e) => setCustomTo(e.target.value)}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                  Min. tours Max
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={minTurns || ""}
+                  placeholder="0"
+                  onChange={(e) => setMinTurns(Math.max(0, Number(e.target.value) || 0))}
+                  className="h-8 text-xs"
+                />
+              </div>
+
+              {filtersActive && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-full text-xs"
+                  onClick={resetFilters}
+                >
+                  Réinitialiser les filtres
+                </Button>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-1">
               <Button
                 size="sm"
                 variant="ghost"
                 className="h-7 text-xs flex-1"
                 onClick={selectAll}
-                disabled={allSelected}
+                disabled={allSelected || filteredAggregates.length === 0}
               >
                 Tout
               </Button>
@@ -472,7 +637,7 @@ export default function LatencyBlockingTab() {
                 Aucune
               </Button>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-2">
+            <p className="text-[10px] text-muted-foreground">
               ☐ Coche pour comparer · clique le nom pour voir le détail
             </p>
           </div>
@@ -482,7 +647,12 @@ export default function LatencyBlockingTab() {
                 Aucune session avec timings instrumentés. Joue une partie pour générer des données.
               </p>
             )}
-            {aggregates.map((a) => {
+            {aggregates.length > 0 && filteredAggregates.length === 0 && (
+              <p className="p-4 text-xs text-muted-foreground">
+                Aucune session ne correspond aux filtres.
+              </p>
+            )}
+            {filteredAggregates.map((a) => {
               const isSelected = selectedIds.has(a.session.id);
               const isFocused = focusId === a.session.id;
               return (
