@@ -120,10 +120,14 @@ function LatencyVisualization({
   avg,
   max,
   turns,
+  showRelative = true,
+  perSessionRows,
 }: {
   avg: ConversationPipelineTimings;
   max: ConversationPipelineTimings;
   turns: TurnTiming[];
+  showRelative?: boolean;
+  perSessionRows?: Array<{ id: string; label: string; avg: ConversationPipelineTimings }>;
 }) {
   const bestTurn = turns.reduce<TurnTiming | null>((best, t) => {
     if (typeof t.total_ms !== "number") return best;
