@@ -211,6 +211,7 @@ function LatencyVisualization({
     sublabel?: string;
     avg: ConversationPipelineTimings;
     turnCount: number;
+    dispersion?: DispersionStats | null;
   }>;
 }) {
   const avgTotal = avg.total_ms ?? 0;
