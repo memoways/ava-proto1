@@ -5,7 +5,7 @@
 > **Créé avec**: Lovable  
 > **Démarré**: 2026-03-07  
 
-> **Mise à jour récente**: pipeline conversationnel parallélisé (GM pre-turn + Max en `Promise.all`), validateur anti-hallucination en mode fail-open avec timeout 4s, nouveau panneau admin "Latence & blocage" (timings par étape + dernier point de blocage par session) et accès `/admin` protégé par mot de passe (`game-master` / `jesuisdieu`).
+> **Mise à jour récente**: panneau "Latence & blocage" enrichi — visualisation cumulative des vraies latences par session **et par tour** (barres dépliables avec marqueur de cible 2 s, dispersion min/max + σ), comparaison multi-sessions sur une échelle commune, filtres (période / nombre de tours / présence de blocage) et auto-dépliage au clic sur une session. Mini-graphique des fallbacks GM (`elapsed_ms` vs `timeout_ms`) ajouté dans l'onglet Sessions.
 
 ## En une phrase
 
@@ -66,6 +66,11 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] Validateur anti-hallucination en mode fail-open (timeout 4s + résilience aux JSON malformés)
 - [x] Panneau admin "Latence & blocage" : timings par étape (RAG/GM/Max/validateur/TTS) + détection du point de blocage
 - [x] Accès `/admin` protégé par mot de passe (anti-accès accidentel)
+- [x] Visualisation comparative multi-sessions des latences réelles (barres empilées par session)
+- [x] Détail par tour dépliable depuis chaque barre de session, avec marqueur de cible 2 s commun
+- [x] Indicateur de dispersion par session (bracket min–max + écart-type σ sur le total des tours)
+- [x] Filtres sessions (période, nombre min de tours, présence de blocage) + auto-dépliage au focus
+- [x] Mini-graphique GM fallback (`elapsed_ms` vs `timeout_ms`) dans l'onglet Sessions
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
 - [ ] Politique de vérité à 4 niveaux (certain / probable / inconnu / interdit)
 - [ ] Bible factuelle éditable et gestion explicite des sujets verrouillés/déverrouillés
