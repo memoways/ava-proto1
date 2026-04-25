@@ -68,26 +68,68 @@ const STEP_HEX: Record<NumericTimingKey, string> = {
 
 const TARGET_MS = 2000;
 
+interface DispersionStats {
+  /** Number of samples (turns) used. */
+  n: number;
+  min: number;
+  max: number;
+  stddev: number;
+}
+
+function computeDispersion(samples: number[]): DispersionStats | null {
+  const xs = samples.filter((v) => Number.isFinite(v));
+  if (xs.length === 0) return null;
+  const min = Math.min(...xs);
+  const max = Math.max(...xs);
+  if (xs.length < 2) return { n: xs.length, min, max, stddev: 0 };
+  const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+  // Sample standard deviation (n-1)
+  const variance = xs.reduce((a, b) => a + (b - mean) ** 2, 0) / (xs.length - 1);
+  return { n: xs.length, min, max, stddev: Math.sqrt(variance) };
+}
+
 interface StackedRowProps {
   label: string;
   values: ConversationPipelineTimings;
   scaleMax: number;
   target?: number;
+  /** Per-turn dispersion of the total latency, displayed as min–max bracket and σ badge. */
+  dispersion?: DispersionStats | null;
 }
 
-function StackedRow({ label, values, scaleMax, target }: StackedRowProps) {
+function StackedRow({ label, values, scaleMax, target, dispersion }: StackedRowProps) {
   const total = STEP_LABELS.reduce((acc, { key }) => acc + (values[key] ?? 0), 0);
-  const denom = Math.max(scaleMax, total, 1);
+  const denom = Math.max(scaleMax, total, dispersion?.max ?? 0, 1);
   const targetPct = target ? Math.min(100, (target / denom) * 100) : null;
   const overTarget = target ? total > target : false;
 
+  const showRange = !!dispersion && dispersion.n >= 2 && dispersion.max > dispersion.min;
+  const minPct = showRange ? (dispersion!.min / denom) * 100 : 0;
+  const maxPct = showRange ? Math.min(100, (dispersion!.max / denom) * 100) : 0;
+
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-1">
+      <div className="flex items-baseline justify-between mb-1 gap-2 flex-wrap">
         <span className="text-xs text-muted-foreground">{label}</span>
-        <span className={`text-xs font-mono font-semibold ${overTarget ? "text-destructive" : "text-foreground"}`}>
-          {fmtMs(total)}
-        </span>
+        <div className="flex items-baseline gap-2">
+          {dispersion && dispersion.n >= 2 && (
+            <span
+              className="text-[10px] font-mono text-muted-foreground"
+              title={`${dispersion.n} tour(s) — min ${fmtMs(dispersion.min)} · max ${fmtMs(
+                dispersion.max,
+              )} · σ ${fmtMs(dispersion.stddev)}`}
+            >
+              [{fmtMs(dispersion.min)} – {fmtMs(dispersion.max)}] · σ {fmtMs(dispersion.stddev)}
+            </span>
+          )}
+          <span
+            className={`text-xs font-mono font-semibold ${
+              overTarget ? "text-destructive" : "text-foreground"
+            }`}
+          >
+            {fmtMs(total)}
+          </span>
+        </div>
       </div>
       <div className="relative h-6 w-full bg-muted/40 rounded overflow-hidden">
         <div className="absolute inset-0 flex">
@@ -107,6 +149,36 @@ function StackedRow({ label, values, scaleMax, target }: StackedRowProps) {
             );
           })}
         </div>
+
+        {/* Min–max range bracket overlay */}
+        {showRange && (
+          <div
+            className="pointer-events-none absolute left-0 right-0 bottom-0 h-1.5"
+            title={`Plage min–max sur ${dispersion!.n} tour(s) : ${fmtMs(
+              dispersion!.min,
+            )} – ${fmtMs(dispersion!.max)}`}
+          >
+            {/* Range line */}
+            <div
+              className="absolute top-1/2 -translate-y-1/2 h-px bg-foreground/80"
+              style={{
+                left: `${minPct}%`,
+                width: `${Math.max(0, maxPct - minPct)}%`,
+              }}
+            />
+            {/* Min tick */}
+            <div
+              className="absolute top-0 bottom-0 w-px bg-foreground/80"
+              style={{ left: `${minPct}%` }}
+            />
+            {/* Max tick */}
+            <div
+              className="absolute top-0 bottom-0 w-px bg-foreground/80"
+              style={{ left: `${maxPct}%` }}
+            />
+          </div>
+        )}
+
         {targetPct !== null && (
           <>
             <div
@@ -139,13 +211,15 @@ function LatencyVisualization({
     sublabel?: string;
     avg: ConversationPipelineTimings;
     turnCount: number;
+    dispersion?: DispersionStats | null;
   }>;
 }) {
   const avgTotal = avg.total_ms ?? 0;
-  const perSessionMax = perSessionRows.reduce(
-    (m, r) => Math.max(m, r.avg.total_ms ?? 0),
-    0,
-  );
+  const perSessionMax = perSessionRows.reduce((m, r) => {
+    const t = r.avg.total_ms ?? 0;
+    const dispMax = r.dispersion?.max ?? 0;
+    return Math.max(m, t, dispMax);
+  }, 0);
   const scaleMax = Math.max(perSessionMax, avgTotal, TARGET_MS) * 1.05;
   const onTarget = avgTotal > 0 && avgTotal <= TARGET_MS;
   const isAggregate = perSessionRows.length > 1;
@@ -195,6 +269,7 @@ function LatencyVisualization({
             values={row.avg}
             scaleMax={scaleMax}
             target={TARGET_MS}
+            dispersion={row.dispersion}
           />
         ))}
       </div>
@@ -729,6 +804,11 @@ export default function LatencyBlockingTab() {
                   }`,
                   avg: a.avg,
                   turnCount: a.turnCount,
+                  dispersion: computeDispersion(
+                    a.turns
+                      .map((t) => t.total_ms)
+                      .filter((v): v is number => typeof v === "number"),
+                  ),
                 }))}
               />
             ) : (
