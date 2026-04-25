@@ -514,20 +514,116 @@ export default function LatencyBlockingTab() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Sessions list with checkboxes */}
         <div className="border rounded-lg flex flex-col">
-          <div className="p-3 border-b">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold">Sessions ({aggregates.length})</span>
+          <div className="p-3 border-b space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold">
+                Sessions ({filteredAggregates.length}
+                {hiddenCount > 0 && (
+                  <span className="text-muted-foreground font-normal"> / {aggregates.length}</span>
+                )}
+                )
+              </span>
               <Badge variant={selectedIds.size > 0 ? "default" : "secondary"} className="text-[10px]">
                 {selectedIds.size} sélectionnée(s)
               </Badge>
             </div>
-            <div className="flex gap-2">
+
+            {/* Filters */}
+            <div className="space-y-2 pt-1">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                    Période
+                  </label>
+                  <Select value={period} onValueChange={(v) => setPeriod(v as PeriodPreset)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes</SelectItem>
+                      <SelectItem value="24h">Dernières 24h</SelectItem>
+                      <SelectItem value="7d">7 derniers jours</SelectItem>
+                      <SelectItem value="30d">30 derniers jours</SelectItem>
+                      <SelectItem value="custom">Personnalisée…</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                    Blocage
+                  </label>
+                  <Select
+                    value={blockerFilter}
+                    onValueChange={(v) => setBlockerFilter(v as BlockerFilter)}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes</SelectItem>
+                      <SelectItem value="with">Avec blocage</SelectItem>
+                      <SelectItem value="without">Sans blocage</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {period === "custom" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Du</label>
+                    <Input
+                      type="date"
+                      value={customFrom}
+                      onChange={(e) => setCustomFrom(e.target.value)}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Au</label>
+                    <Input
+                      type="date"
+                      value={customTo}
+                      onChange={(e) => setCustomTo(e.target.value)}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                  Min. tours Max
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={minTurns || ""}
+                  placeholder="0"
+                  onChange={(e) => setMinTurns(Math.max(0, Number(e.target.value) || 0))}
+                  className="h-8 text-xs"
+                />
+              </div>
+
+              {filtersActive && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-full text-xs"
+                  onClick={resetFilters}
+                >
+                  Réinitialiser les filtres
+                </Button>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-1">
               <Button
                 size="sm"
                 variant="ghost"
                 className="h-7 text-xs flex-1"
                 onClick={selectAll}
-                disabled={allSelected}
+                disabled={allSelected || filteredAggregates.length === 0}
               >
                 Tout
               </Button>
@@ -541,7 +637,7 @@ export default function LatencyBlockingTab() {
                 Aucune
               </Button>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-2">
+            <p className="text-[10px] text-muted-foreground">
               ☐ Coche pour comparer · clique le nom pour voir le détail
             </p>
           </div>
@@ -551,7 +647,12 @@ export default function LatencyBlockingTab() {
                 Aucune session avec timings instrumentés. Joue une partie pour générer des données.
               </p>
             )}
-            {aggregates.map((a) => {
+            {aggregates.length > 0 && filteredAggregates.length === 0 && (
+              <p className="p-4 text-xs text-muted-foreground">
+                Aucune session ne correspond aux filtres.
+              </p>
+            )}
+            {filteredAggregates.map((a) => {
               const isSelected = selectedIds.has(a.session.id);
               const isFocused = focusId === a.session.id;
               return (
