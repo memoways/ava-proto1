@@ -504,6 +504,11 @@ export default function LatencyBlockingTab() {
                 ))}
               </div>
 
+              {/* Visual breakdown for selected session */}
+              <div className="mb-4">
+                <LatencyVisualization avg={selected.avg} max={selected.max} turns={selected.turns} />
+              </div>
+
               {/* Per-turn breakdown */}
               <div>
                 <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">
