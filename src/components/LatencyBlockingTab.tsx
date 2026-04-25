@@ -201,6 +201,8 @@ function LatencyVisualization({
   avg,
   showRelative = true,
   perSessionRows,
+  expandedIds,
+  onToggleExpanded,
 }: {
   /** Moyenne agrégée sur les sessions affichées (vraies données). */
   avg: ConversationPipelineTimings;
@@ -215,15 +217,11 @@ function LatencyVisualization({
     dispersion?: DispersionStats | null;
     turns?: TurnTiming[];
   }>;
+  expandedIds: Set<string>;
+  onToggleExpanded: (id: string) => void;
 }) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const toggleExpanded = (id: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const expanded = expandedIds;
+  const toggleExpanded = onToggleExpanded;
 
   const avgTotal = avg.total_ms ?? 0;
   const perSessionMax = perSessionRows.reduce((m, r) => {
@@ -518,6 +516,33 @@ export default function LatencyBlockingTab() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [focusId, setFocusId] = useState<string | null>(null);
   const [showRelative, setShowRelative] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  function handleFocus(id: string) {
+    setFocusId(id);
+    // Coche la session si pas encore sélectionnée et déplie ses tours dans la comparaison
+    setSelectedIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    setExpandedIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   // Filters
   const [period, setPeriod] = useState<PeriodPreset>("all");
@@ -799,7 +824,7 @@ export default function LatencyBlockingTab() {
                   />
                   <button
                     type="button"
-                    onClick={() => setFocusId(a.session.id)}
+                    onClick={() => handleFocus(a.session.id)}
                     className="flex-1 text-left"
                   >
                     <div className="flex justify-between items-center mb-1">
@@ -859,6 +884,8 @@ export default function LatencyBlockingTab() {
               <LatencyVisualization
                 avg={comparison.avg}
                 showRelative={showRelative}
+                expandedIds={expandedIds}
+                onToggleExpanded={toggleExpanded}
                 perSessionRows={selectedAggregates.map((a) => ({
                   id: a.session.id,
                   label: a.session.id.slice(0, 8),
