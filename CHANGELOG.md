@@ -4,6 +4,32 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.17.0] - 2026-04-25 — Visualisation comparative des latences réelles par session et par tour
+
+### Ajouté
+- **Comparaison visuelle multi-sessions dans "Latence & blocage"** :
+  - Une barre empilée **par session sélectionnée** (RAG / GM pre-turn / Max / Validateur / TTS / GM post-turn) sur une échelle commune
+  - **Barres dépliables par tour** : chaque session peut être ouverte via un chevron pour afficher une barre par tour individuel (`Tour #N`), avec le blocker du tour s'il y en a un
+  - **Marqueur de cible 2 s** positionné de manière cohérente sur toutes les barres (session + tours)
+  - **Indicateur de dispersion** par session : bracket min–max sur la barre + badge `[min – max] · σ` dans l'en-tête (écart-type sur le total des tours)
+  - **Auto-dépliage** : cliquer sur une session dans la liste la coche, la focalise et déplie automatiquement ses barres de tours
+  - **Répartition relative (moyenne)** activable via toggle, calculée sur les sessions cochées uniquement
+- **Filtres de session** dans le panneau de gauche :
+  - Période (Toutes / 24h / 7 jours / 30 jours / personnalisée avec dates)
+  - Nombre minimum de tours Max
+  - Filtre blocage (Toutes / Avec blocage / Sans blocage)
+  - Bouton "Réinitialiser les filtres" + compteur `Sessions (n / total)`
+- **Sélection multi-sessions** via cases à cocher + boutons "Tout" / "Aucune" (limités aux sessions visibles après filtres)
+- **Mini-graphique GM fallback** (`SessionsTab`) : comparaison `elapsed_ms` vs `timeout_ms` sur les derniers fallbacks Game Master pour visualiser les dépassements
+
+### Modifié
+- `LatencyVisualization` refactorée : présente exclusivement les **données réelles** des sessions (plus d'estimations best/moyen/pire). Une seule barre par session, autant de lignes que de sessions cochées.
+- `scaleMax` recalculé dynamiquement pour intégrer la plus longue valeur (moyenne session, max de dispersion, max d'un tour individuel ou cible 2 s).
+- État `expandedIds` remonté au composant parent pour permettre l'auto-dépliage depuis la liste de sessions.
+
+### Notes
+- Aucune migration DB. Toutes les données viennent du `pipeline.*_ms` déjà persisté dans `conversation_log`.
+
 ## [0.16.0] - 2026-04-24 — Performance pipeline, panneau latence et accès admin protégé
 
 ### Ajouté
