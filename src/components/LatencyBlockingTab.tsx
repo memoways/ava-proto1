@@ -415,6 +415,18 @@ export default function LatencyBlockingTab() {
         </div>
       )}
 
+      {/* Visual latency breakdown — global */}
+      {global && (() => {
+        const avg: ConversationPipelineTimings = {};
+        const max: ConversationPipelineTimings = {};
+        for (const k of Object.keys(global.sums)) {
+          (avg as Record<string, number>)[k as NumericTimingKey] = global.sums[k].sum / global.sums[k].count;
+          (max as Record<string, number>)[k as NumericTimingKey] = global.sums[k].max;
+        }
+        const allTurns = aggregates.flatMap((a) => a.turns);
+        return <LatencyVisualization avg={avg} max={max} turns={allTurns} />;
+      })()}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Session list */}
         <div className="border rounded-lg">
