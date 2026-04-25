@@ -126,51 +126,49 @@ function StackedRow({ label, values, scaleMax, target }: StackedRowProps) {
 
 function LatencyVisualization({
   avg,
-  max,
-  turns,
   showRelative = true,
   perSessionRows,
 }: {
+  /** Moyenne agrégée sur les sessions affichées (vraies données). */
   avg: ConversationPipelineTimings;
-  max: ConversationPipelineTimings;
-  turns: TurnTiming[];
   showRelative?: boolean;
-  perSessionRows?: Array<{ id: string; label: string; avg: ConversationPipelineTimings }>;
+  /** Une ligne par session sélectionnée — moyenne réelle des tours de la session. */
+  perSessionRows: Array<{
+    id: string;
+    label: string;
+    sublabel?: string;
+    avg: ConversationPipelineTimings;
+    turnCount: number;
+  }>;
 }) {
-  const bestTurn = turns.reduce<TurnTiming | null>((best, t) => {
-    if (typeof t.total_ms !== "number") return best;
-    if (!best || (best.total_ms ?? Infinity) > t.total_ms) return t;
-    return best;
-  }, null);
-  const bestTotal = bestTurn?.total_ms ?? 0;
   const avgTotal = avg.total_ms ?? 0;
-  const maxTotal = max.total_ms ?? 0;
-  const scaleMax = Math.max(maxTotal, avgTotal, bestTotal, TARGET_MS) * 1.05;
-
+  const perSessionMax = perSessionRows.reduce(
+    (m, r) => Math.max(m, r.avg.total_ms ?? 0),
+    0,
+  );
+  const scaleMax = Math.max(perSessionMax, avgTotal, TARGET_MS) * 1.05;
   const onTarget = avgTotal > 0 && avgTotal <= TARGET_MS;
+  const isAggregate = perSessionRows.length > 1;
 
   return (
     <div className="border rounded-lg p-4 bg-card">
       <div className="flex items-start justify-between mb-4 gap-4 flex-wrap">
         <div>
-          <h3 className="text-sm font-semibold">Latence estimée &amp; répartition</h3>
+          <h3 className="text-sm font-semibold">Latence réelle &amp; répartition</h3>
           <p className="text-xs text-muted-foreground">
-            Vue relative et absolue des étapes du pipeline. Cible : &lt; {TARGET_MS / 1000}s end-to-end.
+            {isAggregate
+              ? "Moyenne réelle par session, mesurée à partir de la conversation."
+              : "Moyenne réelle des tours de la session."}{" "}
+            Cible : &lt; {TARGET_MS / 1000}s end-to-end.
           </p>
         </div>
         <div className="flex items-center gap-5 text-xs">
-          <div>
-            <div className="text-muted-foreground">Best case</div>
-            <div className="font-mono font-bold text-base text-emerald-500">{fmtMs(bestTotal)}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">Moyen</div>
-            <div className="font-mono font-bold text-base">{fmtMs(avgTotal)}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">Pire</div>
-            <div className="font-mono font-bold text-base text-destructive">{fmtMs(maxTotal)}</div>
-          </div>
+          {isAggregate && (
+            <div>
+              <div className="text-muted-foreground">Moyenne globale</div>
+              <div className="font-mono font-bold text-base">{fmtMs(avgTotal)}</div>
+            </div>
+          )}
           <div
             className={`px-2 py-1 rounded text-xs font-medium ${
               onTarget
@@ -183,31 +181,23 @@ function LatencyVisualization({
         </div>
       </div>
 
-      <div className="space-y-3">
-        {bestTurn && <StackedRow label="Best case" values={bestTurn} scaleMax={scaleMax} target={TARGET_MS} />}
-        <StackedRow label="Moyen" values={avg} scaleMax={scaleMax} target={TARGET_MS} />
-        <StackedRow label="Pire" values={max} scaleMax={scaleMax} target={TARGET_MS} />
+      {/* Une barre par session — données réelles uniquement */}
+      <div className="space-y-2">
+        {perSessionRows.length === 0 && (
+          <p className="text-sm text-muted-foreground py-4 text-center">
+            Aucune session à afficher.
+          </p>
+        )}
+        {perSessionRows.map((row) => (
+          <StackedRow
+            key={row.id}
+            label={row.sublabel ? `${row.label} · ${row.sublabel}` : row.label}
+            values={row.avg}
+            scaleMax={scaleMax}
+            target={TARGET_MS}
+          />
+        ))}
       </div>
-
-      {/* Per-session comparison rows */}
-      {perSessionRows && perSessionRows.length > 0 && (
-        <div className="mt-5 pt-4 border-t">
-          <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
-            Comparaison par session ({perSessionRows.length})
-          </div>
-          <div className="space-y-2">
-            {perSessionRows.map((row) => (
-              <StackedRow
-                key={row.id}
-                label={row.label}
-                values={row.avg}
-                scaleMax={scaleMax}
-                target={TARGET_MS}
-              />
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Legend */}
       <div className="mt-4 pt-3 border-t flex flex-wrap gap-x-4 gap-y-2 text-xs">
@@ -217,8 +207,7 @@ function LatencyVisualization({
               className="inline-block w-3 h-3 rounded-sm"
               style={{ backgroundColor: STEP_HEX[key] }}
             />
-            <span className="text-muted-foreground">{label} :</span>
-            <span className="font-mono">{fmtMs(avg[key])}</span>
+            <span className="text-muted-foreground">{label}</span>
           </div>
         ))}
         <div className="flex items-center gap-1.5">
@@ -729,18 +718,18 @@ export default function LatencyBlockingTab() {
             {comparison ? (
               <LatencyVisualization
                 avg={comparison.avg}
-                max={comparison.max}
-                turns={comparison.turns}
                 showRelative={showRelative}
-                perSessionRows={
-                  selectedAggregates.length > 1
-                    ? selectedAggregates.map((a) => ({
-                        id: a.session.id,
-                        label: `${a.session.id.slice(0, 8)} · ${a.turnCount} tour(s)`,
-                        avg: a.avg,
-                      }))
-                    : undefined
-                }
+                perSessionRows={selectedAggregates.map((a) => ({
+                  id: a.session.id,
+                  label: a.session.id.slice(0, 8),
+                  sublabel: `${a.turnCount} tour(s)${
+                    a.session.started_at
+                      ? " · " + new Date(a.session.started_at).toLocaleDateString("fr-CH")
+                      : ""
+                  }`,
+                  avg: a.avg,
+                  turnCount: a.turnCount,
+                }))}
               />
             ) : (
               <p className="text-sm text-muted-foreground py-8 text-center">
