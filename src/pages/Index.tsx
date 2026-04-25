@@ -3,7 +3,7 @@ import { useGameState } from "@/hooks/useGameState";
 import { useTimer } from "@/hooks/useTimer";
 import { DeepgramSTT } from "@/services/deepgramSTT";
 import { processConversationTurn } from "@/services/conversationOrchestrator";
-import { TTSQueue, extractSentences } from "@/services/elevenLabsTTS";
+import { TTSQueue, chunkTextForTTS } from "@/services/elevenLabsTTS";
 import { createSession, updateSession, endSession, saveQuestionnaire, syncQuestionnaireToNotion } from "@/services/sessionService";
 import { preloadSystemPrompt } from "@/agents/maxAgent";
 import { trackEvent, identifyUser } from "@/services/posthogService";
@@ -293,12 +293,9 @@ const Index = () => {
 
       const ttsStart = performance.now();
       const ttsQueue = new TTSQueue();
-      const [sentences, leftover] = extractSentences(maxResponse);
-      for (const sentence of sentences) {
-        ttsQueue.enqueue(sentence);
-      }
-      if (leftover && leftover.length > 3) {
-        ttsQueue.enqueue(leftover);
+      const ttsChunks = chunkTextForTTS(maxResponse);
+      for (const chunk of ttsChunks) {
+        ttsQueue.enqueue(chunk);
       }
 
       // Wait for TTS playback + Game Master in parallel

@@ -7,7 +7,6 @@ import { Save, RotateCcw } from "lucide-react";
 import { generateSpeech, playAudioBlob } from "@/services/elevenLabsTTS";
 import {
   getTTSSettings,
-  saveTTSSettingsLocal,
   saveTTSSettingsToDB,
   loadTTSSettingsFromDB,
   resetTTSSettings,
@@ -17,6 +16,7 @@ import {
 } from "@/services/settingsService";
 
 const TEST_PHRASE = "Écoute, je ne sais pas qui tu es... mais si tu sais quelque chose sur Ava, il faut me le dire maintenant. Je n'ai plus beaucoup de temps.";
+const NORMALIZATION_OPTIONS: Array<TTSSettings["applyTextNormalization"]> = ["on", "auto", "off"];
 
 export default function VoiceConfigTab() {
   const [settings, setSettings] = useState<TTSSettings>(getTTSSettings());
@@ -153,6 +153,33 @@ export default function VoiceConfigTab() {
       <section className="border rounded-lg p-4 space-y-5">
         <h3 className="font-semibold text-base">🎛️ Paramètres de voix</h3>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="space-y-1">
+            <span className="text-sm font-medium text-muted-foreground">Langue forcée</span>
+            <input
+              value={settings.languageCode}
+              onChange={(e) => updateLocal({ languageCode: e.target.value.trim().toLowerCase() || "fr" })}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              placeholder="fr"
+            />
+            <span className="block text-xs text-muted-foreground/60">Forcer "fr" aide ElevenLabs à stabiliser la prononciation française.</span>
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-sm font-medium text-muted-foreground">Normalisation du texte</span>
+            <select
+              value={settings.applyTextNormalization}
+              onChange={(e) => updateLocal({ applyTextNormalization: e.target.value as TTSSettings["applyTextNormalization"] })}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            >
+              {NORMALIZATION_OPTIONS.map((value) => (
+                <option key={value} value={value}>{value}</option>
+              ))}
+            </select>
+            <span className="block text-xs text-muted-foreground/60">"on" limite les mauvaises lectures de nombres, sigles et ponctuation.</span>
+          </label>
+        </div>
+
         <div>
           <div className="flex justify-between mb-1">
             <label className="text-sm font-medium text-muted-foreground">Stabilité</label>
@@ -203,6 +230,53 @@ export default function VoiceConfigTab() {
             <span>1.20 — Rapide, pressé</span>
           </div>
           <p className="text-xs text-muted-foreground/60 mt-1">💡 0.90-0.95 améliore souvent l'articulation en français</p>
+        </div>
+
+        <div>
+          <div className="flex justify-between mb-1">
+            <label className="text-sm font-medium text-muted-foreground">Optimisation latence ElevenLabs</label>
+            <span className="text-sm font-mono">{settings.optimizeStreamingLatency}</span>
+          </div>
+          <Slider
+            value={[settings.optimizeStreamingLatency]}
+            onValueChange={([v]) => updateLocal({ optimizeStreamingLatency: Math.round(v) })}
+            min={0}
+            max={4}
+            step={1}
+          />
+          <div className="flex justify-between text-xs text-muted-foreground mt-1">
+            <span>0 — Qualité max</span>
+            <span>4 — Latence min</span>
+          </div>
+          <p className="text-xs text-muted-foreground/60 mt-1">💡 0 est recommandé pour corriger la diction. 4 peut désactiver une partie de la normalisation et dégrader la prononciation.</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="space-y-1">
+            <span className="text-sm font-medium text-muted-foreground">Format audio</span>
+            <select
+              value={settings.outputFormat}
+              onChange={(e) => updateLocal({ outputFormat: e.target.value })}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            >
+              <option value="mp3_44100_128">MP3 44.1 kHz 128 kbps</option>
+              <option value="mp3_44100_192">MP3 44.1 kHz 192 kbps</option>
+              <option value="mp3_44100_96">MP3 44.1 kHz 96 kbps</option>
+              <option value="mp3_22050_32">MP3 22.05 kHz 32 kbps</option>
+            </select>
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-sm font-medium text-muted-foreground">Seed cohérence</span>
+            <input
+              type="number"
+              min={0}
+              max={4294967295}
+              value={settings.seed}
+              onChange={(e) => updateLocal({ seed: Math.max(0, Math.min(4294967295, Number(e.target.value) || 0)) })}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            />
+          </label>
         </div>
 
         <div className="flex items-center justify-between py-2">

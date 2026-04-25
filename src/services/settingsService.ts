@@ -218,51 +218,78 @@ export interface TTSSettings {
   style: number;
   useSpeakerBoost: boolean;
   speed: number;
+  outputFormat: string;
+  optimizeStreamingLatency: number;
+  languageCode: string;
+  applyTextNormalization: "auto" | "on" | "off";
+  seed: number;
 }
 
 const TTS_STORAGE_KEY = "ava_tts_settings";
 
 export const ELEVENLABS_MODELS = [
+  { id: "eleven_multilingual_v2", label: "Multilingual v2", description: "Meilleure diction et continuité — recommandé pour Max" },
   { id: "eleven_turbo_v2_5", label: "Turbo v2.5", description: "Basse latence, bonne qualité — recommandé pour le temps réel" },
-  { id: "eleven_multilingual_v2", label: "Multilingual v2", description: "Meilleure qualité, 29 langues — plus lent" },
+  { id: "eleven_v3", label: "Eleven v3", description: "Très expressif — à tester selon disponibilité du compte" },
   { id: "eleven_turbo_v2", label: "Turbo v2", description: "Rapide, qualité correcte" },
   { id: "eleven_flash_v2_5", label: "Flash v2.5", description: "Ultra rapide, latence minimale" },
 ];
 
 const ttsDefaults: TTSSettings = {
-  modelId: "eleven_turbo_v2_5",
-  stability: 0.50,
-  similarityBoost: 0.75,
-  style: 0.30,
+  modelId: "eleven_multilingual_v2",
+  stability: 0.58,
+  similarityBoost: 0.82,
+  style: 0.14,
   useSpeakerBoost: true,
-  speed: 1.0,
+  speed: 0.94,
+  outputFormat: "mp3_44100_128",
+  optimizeStreamingLatency: 0,
+  languageCode: "fr",
+  applyTextNormalization: "on",
+  seed: 19051976,
 };
 
 export const TTS_PRESETS: Record<string, { label: string; description: string; settings: Partial<TTSSettings> }> = {
+  max_diction: {
+    label: "Max diction FR",
+    description: "Priorité prononciation, continuité et cohérence",
+    settings: {
+      modelId: "eleven_multilingual_v2",
+      stability: 0.58,
+      similarityBoost: 0.82,
+      style: 0.14,
+      speed: 0.94,
+      useSpeakerBoost: true,
+      optimizeStreamingLatency: 0,
+      languageCode: "fr",
+      applyTextNormalization: "on",
+      seed: 19051976,
+    },
+  },
   natural_conversation: {
     label: "Conversation naturelle",
     description: "Ton posé et naturel, idéal pour Max",
-    settings: { stability: 0.45, similarityBoost: 0.70, style: 0.20, speed: 0.95 },
+    settings: { stability: 0.50, similarityBoost: 0.78, style: 0.18, speed: 0.95, optimizeStreamingLatency: 0, applyTextNormalization: "on" },
   },
   expressive: {
     label: "Expressif",
     description: "Plus d'émotion et de variation",
-    settings: { stability: 0.30, similarityBoost: 0.80, style: 0.50, speed: 1.0 },
+    settings: { stability: 0.38, similarityBoost: 0.80, style: 0.38, speed: 1.0, optimizeStreamingLatency: 0, applyTextNormalization: "on" },
   },
   calm_measured: {
     label: "Calme et mesuré",
     description: "Stable, grave, peu de variation — père inquiet",
-    settings: { stability: 0.65, similarityBoost: 0.80, style: 0.15, speed: 0.90 },
+    settings: { stability: 0.66, similarityBoost: 0.84, style: 0.12, speed: 0.90, optimizeStreamingLatency: 0, applyTextNormalization: "on" },
   },
   clear_articulate: {
-    label: "Claire et articulé",
+    label: "Clair et articulé",
     description: "Diction nette, speaker boost — meilleure compréhension",
-    settings: { stability: 0.55, similarityBoost: 0.85, style: 0.10, speed: 0.92, useSpeakerBoost: true },
+    settings: { stability: 0.60, similarityBoost: 0.86, style: 0.08, speed: 0.90, useSpeakerBoost: true, optimizeStreamingLatency: 0, applyTextNormalization: "on" },
   },
   fast_urgent: {
     label: "Rapide et urgent",
     description: "Sous stress, phrases pressées",
-    settings: { stability: 0.35, similarityBoost: 0.75, style: 0.40, speed: 1.10 },
+    settings: { modelId: "eleven_turbo_v2_5", stability: 0.38, similarityBoost: 0.76, style: 0.32, speed: 1.06, optimizeStreamingLatency: 1, applyTextNormalization: "on" },
   },
 };
 

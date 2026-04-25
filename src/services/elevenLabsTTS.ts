@@ -11,14 +11,15 @@ interface TTSOptions {
   style?: number;
   speed?: number;
   useSpeakerBoost?: boolean;
+  outputFormat?: string;
+  optimizeStreamingLatency?: number;
+  languageCode?: string;
+  applyTextNormalization?: "auto" | "on" | "off";
+  seed?: number;
   /** Texte de la phrase précédente (request stitching → prosodie continue) */
   previousText?: string;
   /** Texte de la phrase suivante (request stitching → prosodie continue) */
   nextText?: string;
-  /** Format audio override (défaut: HD côté serveur) */
-  outputFormat?: string;
-  /** 0 = qualité max, 4 = latence min */
-  optimizeStreamingLatency?: number;
 }
 
 /**
@@ -27,25 +28,27 @@ interface TTSOptions {
  */
 export async function generateSpeech(text: string, options?: TTSOptions): Promise<Blob> {
   const tts = getTTSSettings();
+  const preparedText = prepareTextForTTS(text);
   const merged = {
-    text,
+    text: preparedText,
     modelId: options?.modelId ?? tts.modelId,
     stability: options?.stability ?? tts.stability,
     similarityBoost: options?.similarityBoost ?? tts.similarityBoost,
     style: options?.style ?? tts.style,
     speed: options?.speed ?? tts.speed,
     useSpeakerBoost: options?.useSpeakerBoost ?? tts.useSpeakerBoost,
+    outputFormat: options?.outputFormat ?? tts.outputFormat,
+    optimizeStreamingLatency: options?.optimizeStreamingLatency ?? tts.optimizeStreamingLatency,
+    languageCode: options?.languageCode ?? tts.languageCode,
+    applyTextNormalization: options?.applyTextNormalization ?? tts.applyTextNormalization,
+    seed: options?.seed ?? tts.seed,
     ...(options?.voiceId ? { voiceId: options.voiceId } : {}),
-    ...(options?.previousText ? { previousText: options.previousText } : {}),
-    ...(options?.nextText ? { nextText: options.nextText } : {}),
-    ...(options?.outputFormat ? { outputFormat: options.outputFormat } : {}),
-    ...(typeof options?.optimizeStreamingLatency === "number"
-      ? { optimizeStreamingLatency: options.optimizeStreamingLatency }
-      : {}),
+    ...(options?.previousText ? { previousText: prepareTextForTTS(options.previousText) } : {}),
+    ...(options?.nextText ? { nextText: prepareTextForTTS(options.nextText) } : {}),
   };
 
   const startTime = Date.now();
-  const debugId = debugLogger.logFetch("tts", `TTS "${text.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts`, merged);
+  const debugId = debugLogger.logFetch("tts", `TTS "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts`, merged);
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-tts`, {
     method: 'POST',
@@ -92,6 +95,36 @@ export function playAudioBlob(blob: Blob): Promise<void> {
 export async function speakText(text: string, options?: TTSOptions): Promise<void> {
   const blob = await generateSpeech(text, options);
   await playAudioBlob(blob);
+}
+
+/**
+ * Normalise le texte pour ElevenLabs sans ajouter d'instructions qui seraient lues à voix haute.
+ * Le but est d'éviter les artefacts fréquents: markdown, ellipses multiples, symboles UI,
+ * parenthèses de narration et fragments trop abrupts pour la prosodie française.
+ */
+export function prepareTextForTTS(text: string): string {
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/[_`#>]/g, "")
+    .replace(/\[(?:il|elle|max)\s+[^\]]+\]/gi, "")
+    .replace(/\((?:il|elle|max)\s+[^)]+\)/gi, "")
+    .replace(/\bA\.V\.A\.\b/g, "Ava")
+    .replace(/\bIA\b/g, "I A")
+    .replace(/\bRAG\b/g, "rague")
+    .replace(/\bSTT\b/g, "S T T")
+    .replace(/\bTTS\b/g, "T T S")
+    .replace(/\bGM\b/g, "game master")
+    .replace(/…/g, "...")
+    .replace(/\.{4,}/g, "...")
+    .replace(/[◆•]/g, ",")
+    .replace(/\s+([,;:.!?])/g, "$1")
+    .replace(/([,;:.!?])(?=\S)/g, "$1 ")
+    .replace(/\. \. \./g, "...")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
 }
 
 // ---- Sentence-level TTS Pipeline ----
@@ -177,6 +210,48 @@ export function extractSentences(text: string): [string[], string] {
   return [sentences, remaining];
 }
 
+const SINGLE_REQUEST_MAX_CHARS = 700;
+const CHUNK_TARGET_CHARS = 420;
+
+/**
+ * Prépare des segments TTS assez longs pour conserver la diction et la continuité.
+ * Pour les réponses courtes de Max (cas normal), on garde tout en une seule génération.
+ */
+export function chunkTextForTTS(text: string): string[] {
+  const prepared = prepareTextForTTS(text);
+  if (!prepared) return [];
+  if (prepared.length <= SINGLE_REQUEST_MAX_CHARS) return [prepared];
+
+  const [sentences, leftover] = extractSentences(prepared);
+  const parts = leftover && leftover.length > 3 ? [...sentences, leftover] : sentences;
+  const chunks: string[] = [];
+  let current = "";
+
+  for (const part of parts) {
+    if (!current) {
+      current = part;
+      continue;
+    }
+
+    if ((current + " " + part).length <= CHUNK_TARGET_CHARS) {
+      current += " " + part;
+    } else {
+      chunks.push(current);
+      current = part;
+    }
+  }
+
+  if (current) chunks.push(current);
+  return chunks;
+}
+
+interface PendingEntry {
+  text: string;
+  options?: TTSOptions;
+  resolveBlob: (b: Blob) => void;
+  rejectBlob: (e: unknown) => void;
+}
+
 /**
  * TTS Audio Queue — generates and plays sentences sequentially,
  * allowing new sentences to be enqueued while earlier ones play.
@@ -192,21 +267,22 @@ export class TTSQueue {
   /** Dernière phrase envoyée — passée comme `previous_text` au prochain appel */
   private lastSentText = "";
   /** Phrases en attente, pour calculer `next_text` du segment courant */
-  private pending: Array<{ text: string; options?: TTSOptions; resolveBlob: (b: Blob) => void; rejectBlob: (e: any) => void }> = [];
+  private pending: PendingEntry[] = [];
+  private flushScheduled = false;
 
   /** Enqueue a sentence for TTS generation + playback */
   enqueue(text: string, options?: TTSOptions): void {
     if (this._cancelled || !text.trim()) return;
 
     let resolveBlob!: (b: Blob) => void;
-    let rejectBlob!: (e: any) => void;
+    let rejectBlob!: (e: unknown) => void;
     const blobPromise = new Promise<Blob>((resolve, reject) => {
       resolveBlob = resolve;
       rejectBlob = reject;
     });
 
-    this.pending.push({ text, options, resolveBlob, rejectBlob });
-    this.flushPending();
+    this.pending.push({ text: prepareTextForTTS(text), options, resolveBlob, rejectBlob });
+    this.scheduleFlush();
 
     // Chain playback sequentially
     this.queue = this.queue.then(async () => {
@@ -225,10 +301,18 @@ export class TTSQueue {
   }
 
   /**
-   * Démarre la génération de la première entrée pending dès qu'on a sa next_text
-   * (= dès qu'une 2e entrée est arrivée, OU on accepte de partir sans next_text).
-   * Pour rester réactif, on lance dès qu'on a au moins 1 entrée.
+   * Attend une micro-tâche avant de flusher: les enqueues synchrones du même tour
+   * ont ainsi le temps d'arriver, ce qui rend `next_text` réellement disponible.
    */
+  private scheduleFlush(): void {
+    if (this.flushScheduled) return;
+    this.flushScheduled = true;
+    queueMicrotask(() => {
+      this.flushScheduled = false;
+      this.flushPending();
+    });
+  }
+
   private flushPending(): void {
     while (this.pending.length > 0) {
       const head = this.pending[0];
@@ -241,7 +325,7 @@ export class TTSQueue {
   }
 
   private startGeneration(
-    entry: { text: string; options?: TTSOptions; resolveBlob: (b: Blob) => void; rejectBlob: (e: any) => void },
+    entry: PendingEntry,
     nextText?: string,
   ): void {
     const previousText = this.lastSentText || undefined;

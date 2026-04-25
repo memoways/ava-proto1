@@ -14,6 +14,9 @@ interface TTSRequest {
   style?: number;
   speed?: number;
   useSpeakerBoost?: boolean;
+  languageCode?: string;
+  applyTextNormalization?: "auto" | "on" | "off";
+  seed?: number;
   // Request stitching — prosodic context for natural inter-sentence flow
   previousText?: string;
   nextText?: string;
@@ -44,7 +47,7 @@ serve(async (req) => {
       throw new Error('Voice ID is required');
     }
 
-    const modelId = body.modelId || 'eleven_turbo_v2_5';
+    const modelId = body.modelId || 'eleven_multilingual_v2';
 
     const voiceSettings = {
       stability: body.stability ?? 0.5,
@@ -54,16 +57,18 @@ serve(async (req) => {
       speed: body.speed ?? 1.0,
     };
 
-    // Defaults: HD audio + moderate streaming latency for natural prosody
+    // Defaults: prioritize diction and prosody. Latency optimizations can degrade quality.
     const outputFormat = body.outputFormat || 'mp3_44100_128';
-    const optimizeLatency = body.optimizeStreamingLatency ?? 2;
+    const optimizeLatency = body.optimizeStreamingLatency ?? 0;
+    const languageCode = body.languageCode || 'fr';
+    const applyTextNormalization = body.applyTextNormalization || 'on';
 
     const stitching = {
       ...(body.previousText && body.previousText.trim() ? { previous_text: body.previousText.slice(-500) } : {}),
       ...(body.nextText && body.nextText.trim() ? { next_text: body.nextText.slice(0, 500) } : {}),
     };
 
-    console.log(`[proxy-tts] model=${modelId} voice=${voiceId} stab=${voiceSettings.stability} sim=${voiceSettings.similarity_boost} style=${voiceSettings.style} speed=${voiceSettings.speed} fmt=${outputFormat} lat=${optimizeLatency} stitch=${Object.keys(stitching).join('+') || 'none'} text=${body.text.length}chars`);
+    console.log(`[proxy-tts] model=${modelId} voice=${voiceId} lang=${languageCode} norm=${applyTextNormalization} stab=${voiceSettings.stability} sim=${voiceSettings.similarity_boost} style=${voiceSettings.style} speed=${voiceSettings.speed} fmt=${outputFormat} lat=${optimizeLatency} seed=${body.seed ?? "none"} stitch=${Object.keys(stitching).join('+') || 'none'} text=${body.text.length}chars`);
 
     const response = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?output_format=${outputFormat}&optimize_streaming_latency=${optimizeLatency}`,
@@ -76,7 +81,10 @@ serve(async (req) => {
         body: JSON.stringify({
           text: body.text,
           model_id: modelId,
+          language_code: languageCode,
+          apply_text_normalization: applyTextNormalization,
           voice_settings: voiceSettings,
+          ...(typeof body.seed === "number" ? { seed: body.seed } : {}),
           ...stitching,
         }),
       }
@@ -98,6 +106,7 @@ serve(async (req) => {
       headers: {
         ...corsHeaders,
         'Content-Type': 'audio/mpeg',
+        ...(response.headers.get('request-id') ? { 'X-ElevenLabs-Request-Id': response.headers.get('request-id')! } : {}),
         'Transfer-Encoding': 'chunked',
       },
     });
