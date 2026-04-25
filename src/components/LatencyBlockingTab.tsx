@@ -201,6 +201,8 @@ function LatencyVisualization({
   avg,
   showRelative = true,
   perSessionRows,
+  expandedIds,
+  onToggleExpanded,
 }: {
   /** Moyenne agrégée sur les sessions affichées (vraies données). */
   avg: ConversationPipelineTimings;
@@ -215,15 +217,11 @@ function LatencyVisualization({
     dispersion?: DispersionStats | null;
     turns?: TurnTiming[];
   }>;
+  expandedIds: Set<string>;
+  onToggleExpanded: (id: string) => void;
 }) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const toggleExpanded = (id: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const expanded = expandedIds;
+  const toggleExpanded = onToggleExpanded;
 
   const avgTotal = avg.total_ms ?? 0;
   const perSessionMax = perSessionRows.reduce((m, r) => {
