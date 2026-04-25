@@ -269,6 +269,7 @@ function LatencyVisualization({
             values={row.avg}
             scaleMax={scaleMax}
             target={TARGET_MS}
+            dispersion={row.dispersion}
           />
         ))}
       </div>
