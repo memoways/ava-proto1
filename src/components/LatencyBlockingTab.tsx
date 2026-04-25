@@ -874,6 +874,7 @@ export default function LatencyBlockingTab() {
                       .map((t) => t.total_ms)
                       .filter((v): v is number => typeof v === "number"),
                   ),
+                  turns: a.turns,
                 }))}
               />
             ) : (
