@@ -884,6 +884,8 @@ export default function LatencyBlockingTab() {
               <LatencyVisualization
                 avg={comparison.avg}
                 showRelative={showRelative}
+                expandedIds={expandedIds}
+                onToggleExpanded={toggleExpanded}
                 perSessionRows={selectedAggregates.map((a) => ({
                   id: a.session.id,
                   label: a.session.id.slice(0, 8),
