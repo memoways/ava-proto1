@@ -804,6 +804,11 @@ export default function LatencyBlockingTab() {
                   }`,
                   avg: a.avg,
                   turnCount: a.turnCount,
+                  dispersion: computeDispersion(
+                    a.turns
+                      .map((t) => t.total_ms)
+                      .filter((v): v is number => typeof v === "number"),
+                  ),
                 }))}
               />
             ) : (
