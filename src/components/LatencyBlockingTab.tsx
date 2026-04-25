@@ -215,10 +215,11 @@ function LatencyVisualization({
   }>;
 }) {
   const avgTotal = avg.total_ms ?? 0;
-  const perSessionMax = perSessionRows.reduce(
-    (m, r) => Math.max(m, r.avg.total_ms ?? 0),
-    0,
-  );
+  const perSessionMax = perSessionRows.reduce((m, r) => {
+    const t = r.avg.total_ms ?? 0;
+    const dispMax = r.dispersion?.max ?? 0;
+    return Math.max(m, t, dispMax);
+  }, 0);
   const scaleMax = Math.max(perSessionMax, avgTotal, TARGET_MS) * 1.05;
   const onTarget = avgTotal > 0 && avgTotal <= TARGET_MS;
   const isAggregate = perSessionRows.length > 1;
