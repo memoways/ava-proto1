@@ -220,7 +220,7 @@ function LatencyVisualization({
       </div>
 
       {/* Cost breakdown (relative share of average pipeline) */}
-      {avgTotal > 0 && (
+      {showRelative && avgTotal > 0 && (
         <div className="mt-4">
           <div className="text-xs text-muted-foreground mb-1">Répartition relative (moyenne)</div>
           <div className="flex h-3 w-full rounded overflow-hidden">
