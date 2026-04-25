@@ -5,7 +5,7 @@
 > **Créé avec**: Lovable  
 > **Démarré**: 2026-03-07  
 
-> **Mise à jour récente**: pipeline conversationnel parallélisé (GM pre-turn + Max en `Promise.all`), validateur anti-hallucination en mode fail-open avec timeout 4s, nouveau panneau admin "Latence & blocage" (timings par étape + dernier point de blocage par session) et accès `/admin` protégé par mot de passe (`game-master` / `jesuisdieu`).
+> **Mise à jour récente**: panneau "Latence & blocage" enrichi — visualisation cumulative des vraies latences par session **et par tour** (barres dépliables avec marqueur de cible 2 s, dispersion min/max + σ), comparaison multi-sessions sur une échelle commune, filtres (période / nombre de tours / présence de blocage) et auto-dépliage au clic sur une session. Mini-graphique des fallbacks GM (`elapsed_ms` vs `timeout_ms`) ajouté dans l'onglet Sessions.
 
 ## En une phrase
 
