@@ -299,10 +299,61 @@ function aggregate(session: SessionRow): SessionAggregate {
   };
 }
 
+interface ComparisonAggregate {
+  turnCount: number;
+  sessionCount: number;
+  avg: ConversationPipelineTimings;
+  max: ConversationPipelineTimings;
+  turns: TurnTiming[];
+  blockerCount: number;
+  topBlocker: string | null;
+}
+
+function aggregateMany(aggs: SessionAggregate[]): ComparisonAggregate | null {
+  const allTurns = aggs.flatMap((a) => a.turns);
+  if (!allTurns.length) return null;
+  const sums: Record<string, { sum: number; count: number; max: number }> = {};
+  let blockers = 0;
+  const blockerCounter: Record<string, number> = {};
+  const allKeys: NumericTimingKey[] = [...STEP_LABELS.map((s) => s.key), "total_ms"];
+  for (const t of allTurns) {
+    for (const key of allKeys) {
+      const v = t[key];
+      if (typeof v === "number") {
+        sums[key] ??= { sum: 0, count: 0, max: 0 };
+        sums[key].sum += v;
+        sums[key].count++;
+        sums[key].max = Math.max(sums[key].max, v);
+      }
+    }
+    if (t.blocker) {
+      blockers++;
+      blockerCounter[t.blocker] = (blockerCounter[t.blocker] ?? 0) + 1;
+    }
+  }
+  const avg: ConversationPipelineTimings = {};
+  const max: ConversationPipelineTimings = {};
+  for (const k of Object.keys(sums)) {
+    (avg as Record<string, number>)[k] = sums[k].sum / sums[k].count;
+    (max as Record<string, number>)[k] = sums[k].max;
+  }
+  return {
+    turnCount: allTurns.length,
+    sessionCount: aggs.length,
+    avg,
+    max,
+    turns: allTurns,
+    blockerCount: blockers,
+    topBlocker: Object.entries(blockerCounter).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null,
+  };
+}
+
 export default function LatencyBlockingTab() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const [showRelative, setShowRelative] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -321,7 +372,37 @@ export default function LatencyBlockingTab() {
   }, []);
 
   const aggregates = useMemo(() => sessions.map(aggregate).filter((a) => a.turnCount > 0), [sessions]);
-  const selected = aggregates.find((a) => a.session.id === selectedId) ?? aggregates[0] ?? null;
+
+  // Initialize selection: select all sessions on first load
+  useEffect(() => {
+    if (aggregates.length > 0 && selectedIds.size === 0) {
+      setSelectedIds(new Set(aggregates.map((a) => a.session.id)));
+    }
+  }, [aggregates, selectedIds.size]);
+
+  const selectedAggregates = useMemo(
+    () => aggregates.filter((a) => selectedIds.has(a.session.id)),
+    [aggregates, selectedIds],
+  );
+
+  const comparison = useMemo(() => aggregateMany(selectedAggregates), [selectedAggregates]);
+  const focused = aggregates.find((a) => a.session.id === focusId) ?? null;
+
+  function toggleId(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function selectAll() {
+    setSelectedIds(new Set(aggregates.map((a) => a.session.id)));
+  }
+  function selectNone() {
+    setSelectedIds(new Set());
+  }
+
 
   // Global stats across last 50 sessions
   const global = useMemo(() => {
