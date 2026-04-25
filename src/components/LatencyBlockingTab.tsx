@@ -213,13 +213,27 @@ function LatencyVisualization({
     avg: ConversationPipelineTimings;
     turnCount: number;
     dispersion?: DispersionStats | null;
+    turns?: TurnTiming[];
   }>;
 }) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
   const avgTotal = avg.total_ms ?? 0;
   const perSessionMax = perSessionRows.reduce((m, r) => {
     const t = r.avg.total_ms ?? 0;
     const dispMax = r.dispersion?.max ?? 0;
-    return Math.max(m, t, dispMax);
+    const turnsMax = (r.turns ?? []).reduce(
+      (mm, tt) => Math.max(mm, tt.total_ms ?? 0),
+      0,
+    );
+    return Math.max(m, t, dispMax, turnsMax);
   }, 0);
   const scaleMax = Math.max(perSessionMax, avgTotal, TARGET_MS) * 1.05;
   const onTarget = avgTotal > 0 && avgTotal <= TARGET_MS;
@@ -234,7 +248,7 @@ function LatencyVisualization({
             {isAggregate
               ? "Moyenne réelle par session, mesurée à partir de la conversation."
               : "Moyenne réelle des tours de la session."}{" "}
-            Cible : &lt; {TARGET_MS / 1000}s end-to-end.
+            Cible : &lt; {TARGET_MS / 1000}s end-to-end. Clique sur ▸ pour voir le détail par tour.
           </p>
         </div>
         <div className="flex items-center gap-5 text-xs">
@@ -257,22 +271,72 @@ function LatencyVisualization({
       </div>
 
       {/* Une barre par session — données réelles uniquement */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {perSessionRows.length === 0 && (
           <p className="text-sm text-muted-foreground py-4 text-center">
             Aucune session à afficher.
           </p>
         )}
-        {perSessionRows.map((row) => (
-          <StackedRow
-            key={row.id}
-            label={row.sublabel ? `${row.label} · ${row.sublabel}` : row.label}
-            values={row.avg}
-            scaleMax={scaleMax}
-            target={TARGET_MS}
-            dispersion={row.dispersion}
-          />
-        ))}
+        {perSessionRows.map((row) => {
+          const isOpen = expanded.has(row.id);
+          const turns = row.turns ?? [];
+          const canExpand = turns.length > 0;
+          return (
+            <div key={row.id} className="space-y-1.5">
+              <div className="flex items-start gap-1.5">
+                {canExpand ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(row.id)}
+                    className="mt-3 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                    aria-label={isOpen ? "Masquer les tours" : "Afficher les tours"}
+                    aria-expanded={isOpen}
+                  >
+                    {isOpen ? (
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                ) : (
+                  <span className="mt-3 w-3.5 shrink-0 inline-block" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <StackedRow
+                    label={row.sublabel ? `${row.label} · ${row.sublabel}` : row.label}
+                    values={row.avg}
+                    scaleMax={scaleMax}
+                    target={TARGET_MS}
+                    dispersion={row.dispersion}
+                  />
+                </div>
+              </div>
+              {isOpen && canExpand && (
+                <div className="pl-5 space-y-1.5 border-l-2 border-border/60 ml-1.5">
+                  {turns.map((t) => {
+                    const stepValues: ConversationPipelineTimings = {
+                      rag_ms: t.rag_ms,
+                      gm_pre_ms: t.gm_pre_ms,
+                      max_ms: t.max_ms,
+                      validator_ms: t.validator_ms,
+                      tts_ms: t.tts_ms,
+                      gm_post_ms: t.gm_post_ms,
+                    };
+                    return (
+                      <StackedRow
+                        key={t.index}
+                        label={`Tour #${t.index}${t.blocker ? ` · blocker: ${t.blocker}` : ""}`}
+                        values={stepValues}
+                        scaleMax={scaleMax}
+                        target={TARGET_MS}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Legend */}
