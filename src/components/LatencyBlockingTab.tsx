@@ -181,6 +181,26 @@ function LatencyVisualization({
         <StackedRow label="Pire" values={max} scaleMax={scaleMax} target={TARGET_MS} />
       </div>
 
+      {/* Per-session comparison rows */}
+      {perSessionRows && perSessionRows.length > 0 && (
+        <div className="mt-5 pt-4 border-t">
+          <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+            Comparaison par session ({perSessionRows.length})
+          </div>
+          <div className="space-y-2">
+            {perSessionRows.map((row) => (
+              <StackedRow
+                key={row.id}
+                label={row.label}
+                values={row.avg}
+                scaleMax={scaleMax}
+                target={TARGET_MS}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Legend */}
       <div className="mt-4 pt-3 border-t flex flex-wrap gap-x-4 gap-y-2 text-xs">
         {STEP_LABELS.map(({ key, label }) => (
