@@ -257,9 +257,28 @@ interface StackedRowProps {
   target?: number;
   /** Per-turn dispersion of the total latency, displayed as min–max bracket and σ badge. */
   dispersion?: DispersionStats | null;
+  /** Baselines (médiane/p95/moyenne) calculées sur tous les tours visibles, pour
+   *  qualifier chaque segment dans le tooltip. */
+  baselines?: StepBaselines;
+  /** Indique si la ligne est une moyenne agrégée (vs un tour individuel). */
+  rowKind?: "session-avg" | "turn" | "global-avg";
 }
 
-function StackedRow({ label, values, scaleMax, target, dispersion }: StackedRowProps) {
+function severityClasses(sev: StepDiagnostic["severity"]): string {
+  if (sev === "critical") return "bg-destructive/15 text-destructive border-destructive/40";
+  if (sev === "high") return "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/40";
+  return "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/40";
+}
+
+function StackedRow({
+  label,
+  values,
+  scaleMax,
+  target,
+  dispersion,
+  baselines,
+  rowKind = "turn",
+}: StackedRowProps) {
   const total = STEP_LABELS.reduce((acc, { key }) => acc + (values[key] ?? 0), 0);
   const denom = Math.max(scaleMax, total, dispersion?.max ?? 0, 1);
   const targetPct = target ? Math.min(100, (target / denom) * 100) : null;
@@ -299,15 +318,70 @@ function StackedRow({ label, values, scaleMax, target, dispersion }: StackedRowP
             const v = values[key] ?? 0;
             if (v <= 0) return null;
             const pct = (v / denom) * 100;
+            const diag = analyzeStep(key, v, total, baselines?.[key]);
             return (
-              <div
-                key={key}
-                className="h-full flex items-center justify-center text-[10px] text-white/95 font-medium overflow-hidden"
-                style={{ width: `${pct}%`, backgroundColor: STEP_HEX[key] }}
-                title={`${stepLabel}: ${fmtMs(v)}`}
-              >
-                {pct > 8 ? stepLabel : ""}
-              </div>
+              <Tooltip key={key} delayDuration={120}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="h-full flex items-center justify-center text-[10px] text-white/95 font-medium overflow-hidden cursor-help focus:outline-none focus:ring-1 focus:ring-foreground/40"
+                    style={{ width: `${pct}%`, backgroundColor: STEP_HEX[key] }}
+                    aria-label={`${stepLabel}: ${fmtMs(v)} — ${diag.severityLabel}`}
+                  >
+                    {pct > 8 ? stepLabel : ""}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[340px] p-0 overflow-hidden">
+                  <div className="space-y-2 p-3 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="inline-block w-2.5 h-2.5 rounded-sm"
+                          style={{ backgroundColor: STEP_HEX[key] }}
+                        />
+                        <span className="font-semibold text-sm">{stepLabel}</span>
+                      </div>
+                      <span className="font-mono font-semibold">{fmtMs(v)}</span>
+                    </div>
+
+                    <div
+                      className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium ${severityClasses(
+                        diag.severity,
+                      )}`}
+                    >
+                      {diag.severityLabel}
+                    </div>
+
+                    <div className="space-y-1 text-muted-foreground">
+                      {diag.shareOfTotalPct !== null && (
+                        <div>
+                          <span className="text-foreground font-medium">
+                            {diag.shareOfTotalPct.toFixed(0)}%
+                          </span>{" "}
+                          de la latence{" "}
+                          {rowKind === "turn" ? "du tour" : "moyenne de la session"} ({fmtMs(total)})
+                        </div>
+                      )}
+                      <div>{diag.comparison}</div>
+                      <div>{diag.distribution}</div>
+                    </div>
+
+                    {diag.severity !== "ok" && diag.hypotheses.length > 0 && (
+                      <div className="border-t pt-2">
+                        <div className="flex items-center gap-1 mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                          <Info className="h-3 w-3" />
+                          <span>Pistes pour réduire</span>
+                        </div>
+                        <ul className="list-disc pl-4 space-y-0.5 text-foreground/90">
+                          {diag.hypotheses.map((h, i) => (
+                            <li key={i}>{h}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             );
           })}
         </div>
