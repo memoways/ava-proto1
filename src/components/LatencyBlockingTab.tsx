@@ -548,6 +548,8 @@ function LatencyVisualization({
                     scaleMax={scaleMax}
                     target={TARGET_MS}
                     dispersion={row.dispersion}
+                    baselines={baselines}
+                    rowKind="session-avg"
                   />
                 </div>
               </div>
