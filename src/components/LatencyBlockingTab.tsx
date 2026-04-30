@@ -490,6 +490,9 @@ function LatencyVisualization({
               : "Moyenne réelle des tours de la session."}{" "}
             Cible : &lt; {TARGET_MS / 1000}s end-to-end. Clique sur ▸ pour voir le détail par tour.
           </p>
+          <p className="mt-1 text-[11px] text-muted-foreground/80 flex items-center gap-1">
+            <Info className="h-3 w-3" /> Survole un segment coloré pour voir son diagnostic et des pistes d'optimisation.
+          </p>
         </div>
         <div className="flex items-center gap-5 text-xs">
           {isAggregate && (
