@@ -70,6 +70,166 @@ const STEP_HEX: Record<NumericTimingKey, string> = {
 
 const TARGET_MS = 2000;
 
+// ============================================================================
+// Analyse factuelle des causes de latence par étape
+// ----------------------------------------------------------------------------
+// Tout est calculé en pur JS sur des données déjà chargées (conversation_log
+// déjà persistée en base). Aucune requête réseau supplémentaire — donc zéro
+// impact sur la latence vécue par l'utilisateur en jeu. Le calcul est mémoïsé
+// dans le composant parent.
+// ============================================================================
+
+/** Budget cible (ms) attendu par étape pour tenir une latence end-to-end < 2s.
+ *  Ces valeurs sont des hypothèses de référence (pas d'estimation des durées
+ *  réelles) — elles servent uniquement à qualifier un segment comme "ok",
+ *  "élevé" ou "critique" par rapport à un objectif raisonnable. */
+const STEP_BUDGET_MS: Record<NumericTimingKey, number> = {
+  rag_ms: 250,
+  gm_pre_ms: 400,
+  max_ms: 800,
+  validator_ms: 300,
+  tts_ms: 600,
+  gm_post_ms: 200,
+  total_ms: TARGET_MS,
+};
+
+/** Hypothèses d'optimisation factuelles, par étape. Affichées en tooltip
+ *  pour orienter le diagnostic — ce ne sont pas des promesses de gain. */
+const STEP_HYPOTHESES: Record<NumericTimingKey, string[]> = {
+  rag_ms: [
+    "Réduire RAG_TOP_K (moins de chunks à vectoriser)",
+    "Cache local des embeddings de la dernière question",
+    "Filtrer côté SQL avant le match vectoriel",
+  ],
+  gm_pre_ms: [
+    "Basculer sur un modèle GM plus rapide (ex. gemini-2.5-flash-lite)",
+    "Réduire la taille du brief JSON demandé au planner",
+    "Lancer le pre-turn en parallèle du début du STT final",
+  ],
+  max_ms: [
+    "Activer le streaming token-par-token côté Max LLM",
+    "Modèle plus rapide pour Max si la persona le permet",
+    "Raccourcir le system prompt et le contexte injecté",
+  ],
+  validator_ms: [
+    "Modèle validateur plus léger (nano/flash-lite)",
+    "Skipper le validateur si le brief n'a aucune assertion bloquée",
+    "Validation déclenchée seulement quand triggers/trust changent",
+  ],
+  tts_ms: [
+    "Streaming ElevenLabs (déjà actif ?) — vérifier le first-byte",
+    "Voice ID plus rapide ou modèle TTS turbo",
+    "Pré-charger l'intro TTS pendant la phase ringing",
+  ],
+  gm_post_ms: [
+    "Post-turn en background (n'attend pas avant le tour suivant)",
+    "Modèle scorer ultra-rapide (réponse JSON très courte)",
+    "Skipper le scoring quand trust n'a pas pu bouger",
+  ],
+  total_ms: [
+    "Paralléliser les étapes indépendantes (TTS pendant validateur)",
+    "Identifier l'étape bloqueuse récurrente sur la session",
+  ],
+};
+
+interface StepBaseline {
+  /** Nombre d'observations (tours) pour cette étape sur le dataset visible. */
+  n: number;
+  mean: number;
+  median: number;
+  p95: number;
+  max: number;
+}
+
+type StepBaselines = Partial<Record<NumericTimingKey, StepBaseline>>;
+
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  if (sorted.length === 1) return sorted[0];
+  const idx = (sorted.length - 1) * p;
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
+function computeBaselines(allTurns: TurnTiming[]): StepBaselines {
+  const out: StepBaselines = {};
+  const allKeys: NumericTimingKey[] = [...STEP_LABELS.map((s) => s.key), "total_ms"];
+  for (const key of allKeys) {
+    const xs = allTurns
+      .map((t) => t[key])
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v))
+      .sort((a, b) => a - b);
+    if (xs.length === 0) continue;
+    const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+    out[key] = {
+      n: xs.length,
+      mean,
+      median: percentile(xs, 0.5),
+      p95: percentile(xs, 0.95),
+      max: xs[xs.length - 1],
+    };
+  }
+  return out;
+}
+
+interface StepDiagnostic {
+  /** "ok" | "élevé" | "critique" — sévérité par rapport au budget cible. */
+  severity: "ok" | "high" | "critical";
+  severityLabel: string;
+  /** Texte court résumant la situation (ex. "1.4× la médiane du dataset"). */
+  comparison: string;
+  /** Position approximative dans la distribution (ex. "≥ p95"). */
+  distribution: string;
+  /** Hypothèses d'optimisation pertinentes. */
+  hypotheses: string[];
+  /** Part dans le total du tour (en %). */
+  shareOfTotalPct: number | null;
+}
+
+function analyzeStep(
+  key: NumericTimingKey,
+  value: number,
+  totalForRow: number,
+  baseline: StepBaseline | undefined,
+): StepDiagnostic {
+  const budget = STEP_BUDGET_MS[key];
+  let severity: StepDiagnostic["severity"] = "ok";
+  if (value > budget * 2) severity = "critical";
+  else if (value > budget) severity = "high";
+
+  const severityLabel =
+    severity === "critical"
+      ? `Critique (> 2× budget cible ${fmtMs(budget)})`
+      : severity === "high"
+        ? `Élevé (> budget cible ${fmtMs(budget)})`
+        : `Dans le budget cible (${fmtMs(budget)})`;
+
+  let comparison = "Pas assez d'historique pour comparer.";
+  let distribution = "—";
+  if (baseline && baseline.n >= 2) {
+    const ratio = baseline.median > 0 ? value / baseline.median : 0;
+    if (ratio > 0) {
+      comparison = `${ratio.toFixed(2)}× la médiane (${fmtMs(baseline.median)}) sur ${baseline.n} tour(s)`;
+    }
+    if (value >= baseline.p95) distribution = `≥ p95 (${fmtMs(baseline.p95)}) — parmi les pires 5 %`;
+    else if (value >= baseline.mean) distribution = `> moyenne (${fmtMs(baseline.mean)})`;
+    else distribution = `≤ moyenne (${fmtMs(baseline.mean)})`;
+  }
+
+  const shareOfTotalPct = totalForRow > 0 ? (value / totalForRow) * 100 : null;
+
+  return {
+    severity,
+    severityLabel,
+    comparison,
+    distribution,
+    hypotheses: STEP_HYPOTHESES[key] ?? [],
+    shareOfTotalPct,
+  };
+}
+
 interface DispersionStats {
   /** Number of samples (turns) used. */
   n: number;
