@@ -571,6 +571,8 @@ function LatencyVisualization({
                         values={stepValues}
                         scaleMax={scaleMax}
                         target={TARGET_MS}
+                        baselines={baselines}
+                        rowKind="turn"
                       />
                     );
                   })}
