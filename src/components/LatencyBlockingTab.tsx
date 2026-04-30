@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ConversationMessage, ConversationPipelineTimings } from "@/types";
 
 interface SessionRow {
@@ -69,6 +70,166 @@ const STEP_HEX: Record<NumericTimingKey, string> = {
 
 const TARGET_MS = 2000;
 
+// ============================================================================
+// Analyse factuelle des causes de latence par étape
+// ----------------------------------------------------------------------------
+// Tout est calculé en pur JS sur des données déjà chargées (conversation_log
+// déjà persistée en base). Aucune requête réseau supplémentaire — donc zéro
+// impact sur la latence vécue par l'utilisateur en jeu. Le calcul est mémoïsé
+// dans le composant parent.
+// ============================================================================
+
+/** Budget cible (ms) attendu par étape pour tenir une latence end-to-end < 2s.
+ *  Ces valeurs sont des hypothèses de référence (pas d'estimation des durées
+ *  réelles) — elles servent uniquement à qualifier un segment comme "ok",
+ *  "élevé" ou "critique" par rapport à un objectif raisonnable. */
+const STEP_BUDGET_MS: Record<NumericTimingKey, number> = {
+  rag_ms: 250,
+  gm_pre_ms: 400,
+  max_ms: 800,
+  validator_ms: 300,
+  tts_ms: 600,
+  gm_post_ms: 200,
+  total_ms: TARGET_MS,
+};
+
+/** Hypothèses d'optimisation factuelles, par étape. Affichées en tooltip
+ *  pour orienter le diagnostic — ce ne sont pas des promesses de gain. */
+const STEP_HYPOTHESES: Record<NumericTimingKey, string[]> = {
+  rag_ms: [
+    "Réduire RAG_TOP_K (moins de chunks à vectoriser)",
+    "Cache local des embeddings de la dernière question",
+    "Filtrer côté SQL avant le match vectoriel",
+  ],
+  gm_pre_ms: [
+    "Basculer sur un modèle GM plus rapide (ex. gemini-2.5-flash-lite)",
+    "Réduire la taille du brief JSON demandé au planner",
+    "Lancer le pre-turn en parallèle du début du STT final",
+  ],
+  max_ms: [
+    "Activer le streaming token-par-token côté Max LLM",
+    "Modèle plus rapide pour Max si la persona le permet",
+    "Raccourcir le system prompt et le contexte injecté",
+  ],
+  validator_ms: [
+    "Modèle validateur plus léger (nano/flash-lite)",
+    "Skipper le validateur si le brief n'a aucune assertion bloquée",
+    "Validation déclenchée seulement quand triggers/trust changent",
+  ],
+  tts_ms: [
+    "Streaming ElevenLabs (déjà actif ?) — vérifier le first-byte",
+    "Voice ID plus rapide ou modèle TTS turbo",
+    "Pré-charger l'intro TTS pendant la phase ringing",
+  ],
+  gm_post_ms: [
+    "Post-turn en background (n'attend pas avant le tour suivant)",
+    "Modèle scorer ultra-rapide (réponse JSON très courte)",
+    "Skipper le scoring quand trust n'a pas pu bouger",
+  ],
+  total_ms: [
+    "Paralléliser les étapes indépendantes (TTS pendant validateur)",
+    "Identifier l'étape bloqueuse récurrente sur la session",
+  ],
+};
+
+interface StepBaseline {
+  /** Nombre d'observations (tours) pour cette étape sur le dataset visible. */
+  n: number;
+  mean: number;
+  median: number;
+  p95: number;
+  max: number;
+}
+
+type StepBaselines = Partial<Record<NumericTimingKey, StepBaseline>>;
+
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  if (sorted.length === 1) return sorted[0];
+  const idx = (sorted.length - 1) * p;
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
+function computeBaselines(allTurns: TurnTiming[]): StepBaselines {
+  const out: StepBaselines = {};
+  const allKeys: NumericTimingKey[] = [...STEP_LABELS.map((s) => s.key), "total_ms"];
+  for (const key of allKeys) {
+    const xs = allTurns
+      .map((t) => t[key])
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v))
+      .sort((a, b) => a - b);
+    if (xs.length === 0) continue;
+    const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+    out[key] = {
+      n: xs.length,
+      mean,
+      median: percentile(xs, 0.5),
+      p95: percentile(xs, 0.95),
+      max: xs[xs.length - 1],
+    };
+  }
+  return out;
+}
+
+interface StepDiagnostic {
+  /** "ok" | "élevé" | "critique" — sévérité par rapport au budget cible. */
+  severity: "ok" | "high" | "critical";
+  severityLabel: string;
+  /** Texte court résumant la situation (ex. "1.4× la médiane du dataset"). */
+  comparison: string;
+  /** Position approximative dans la distribution (ex. "≥ p95"). */
+  distribution: string;
+  /** Hypothèses d'optimisation pertinentes. */
+  hypotheses: string[];
+  /** Part dans le total du tour (en %). */
+  shareOfTotalPct: number | null;
+}
+
+function analyzeStep(
+  key: NumericTimingKey,
+  value: number,
+  totalForRow: number,
+  baseline: StepBaseline | undefined,
+): StepDiagnostic {
+  const budget = STEP_BUDGET_MS[key];
+  let severity: StepDiagnostic["severity"] = "ok";
+  if (value > budget * 2) severity = "critical";
+  else if (value > budget) severity = "high";
+
+  const severityLabel =
+    severity === "critical"
+      ? `Critique (> 2× budget cible ${fmtMs(budget)})`
+      : severity === "high"
+        ? `Élevé (> budget cible ${fmtMs(budget)})`
+        : `Dans le budget cible (${fmtMs(budget)})`;
+
+  let comparison = "Pas assez d'historique pour comparer.";
+  let distribution = "—";
+  if (baseline && baseline.n >= 2) {
+    const ratio = baseline.median > 0 ? value / baseline.median : 0;
+    if (ratio > 0) {
+      comparison = `${ratio.toFixed(2)}× la médiane (${fmtMs(baseline.median)}) sur ${baseline.n} tour(s)`;
+    }
+    if (value >= baseline.p95) distribution = `≥ p95 (${fmtMs(baseline.p95)}) — parmi les pires 5 %`;
+    else if (value >= baseline.mean) distribution = `> moyenne (${fmtMs(baseline.mean)})`;
+    else distribution = `≤ moyenne (${fmtMs(baseline.mean)})`;
+  }
+
+  const shareOfTotalPct = totalForRow > 0 ? (value / totalForRow) * 100 : null;
+
+  return {
+    severity,
+    severityLabel,
+    comparison,
+    distribution,
+    hypotheses: STEP_HYPOTHESES[key] ?? [],
+    shareOfTotalPct,
+  };
+}
+
 interface DispersionStats {
   /** Number of samples (turns) used. */
   n: number;
@@ -96,9 +257,28 @@ interface StackedRowProps {
   target?: number;
   /** Per-turn dispersion of the total latency, displayed as min–max bracket and σ badge. */
   dispersion?: DispersionStats | null;
+  /** Baselines (médiane/p95/moyenne) calculées sur tous les tours visibles, pour
+   *  qualifier chaque segment dans le tooltip. */
+  baselines?: StepBaselines;
+  /** Indique si la ligne est une moyenne agrégée (vs un tour individuel). */
+  rowKind?: "session-avg" | "turn" | "global-avg";
 }
 
-function StackedRow({ label, values, scaleMax, target, dispersion }: StackedRowProps) {
+function severityClasses(sev: StepDiagnostic["severity"]): string {
+  if (sev === "critical") return "bg-destructive/15 text-destructive border-destructive/40";
+  if (sev === "high") return "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/40";
+  return "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/40";
+}
+
+function StackedRow({
+  label,
+  values,
+  scaleMax,
+  target,
+  dispersion,
+  baselines,
+  rowKind = "turn",
+}: StackedRowProps) {
   const total = STEP_LABELS.reduce((acc, { key }) => acc + (values[key] ?? 0), 0);
   const denom = Math.max(scaleMax, total, dispersion?.max ?? 0, 1);
   const targetPct = target ? Math.min(100, (target / denom) * 100) : null;
@@ -138,15 +318,70 @@ function StackedRow({ label, values, scaleMax, target, dispersion }: StackedRowP
             const v = values[key] ?? 0;
             if (v <= 0) return null;
             const pct = (v / denom) * 100;
+            const diag = analyzeStep(key, v, total, baselines?.[key]);
             return (
-              <div
-                key={key}
-                className="h-full flex items-center justify-center text-[10px] text-white/95 font-medium overflow-hidden"
-                style={{ width: `${pct}%`, backgroundColor: STEP_HEX[key] }}
-                title={`${stepLabel}: ${fmtMs(v)}`}
-              >
-                {pct > 8 ? stepLabel : ""}
-              </div>
+              <Tooltip key={key} delayDuration={120}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="h-full flex items-center justify-center text-[10px] text-white/95 font-medium overflow-hidden cursor-help focus:outline-none focus:ring-1 focus:ring-foreground/40"
+                    style={{ width: `${pct}%`, backgroundColor: STEP_HEX[key] }}
+                    aria-label={`${stepLabel}: ${fmtMs(v)} — ${diag.severityLabel}`}
+                  >
+                    {pct > 8 ? stepLabel : ""}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[340px] p-0 overflow-hidden">
+                  <div className="space-y-2 p-3 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="inline-block w-2.5 h-2.5 rounded-sm"
+                          style={{ backgroundColor: STEP_HEX[key] }}
+                        />
+                        <span className="font-semibold text-sm">{stepLabel}</span>
+                      </div>
+                      <span className="font-mono font-semibold">{fmtMs(v)}</span>
+                    </div>
+
+                    <div
+                      className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium ${severityClasses(
+                        diag.severity,
+                      )}`}
+                    >
+                      {diag.severityLabel}
+                    </div>
+
+                    <div className="space-y-1 text-muted-foreground">
+                      {diag.shareOfTotalPct !== null && (
+                        <div>
+                          <span className="text-foreground font-medium">
+                            {diag.shareOfTotalPct.toFixed(0)}%
+                          </span>{" "}
+                          de la latence{" "}
+                          {rowKind === "turn" ? "du tour" : "moyenne de la session"} ({fmtMs(total)})
+                        </div>
+                      )}
+                      <div>{diag.comparison}</div>
+                      <div>{diag.distribution}</div>
+                    </div>
+
+                    {diag.severity !== "ok" && diag.hypotheses.length > 0 && (
+                      <div className="border-t pt-2">
+                        <div className="flex items-center gap-1 mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                          <Info className="h-3 w-3" />
+                          <span>Pistes pour réduire</span>
+                        </div>
+                        <ul className="list-disc pl-4 space-y-0.5 text-foreground/90">
+                          {diag.hypotheses.map((h, i) => (
+                            <li key={i}>{h}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             );
           })}
         </div>
@@ -237,6 +472,13 @@ function LatencyVisualization({
   const onTarget = avgTotal > 0 && avgTotal <= TARGET_MS;
   const isAggregate = perSessionRows.length > 1;
 
+  // Baselines (médiane / p95 / moyenne par étape) calculées une fois sur tous
+  // les tours visibles. Mémoïsé pour éviter tout recalcul au hover.
+  const baselines = useMemo<StepBaselines>(() => {
+    const allTurns = perSessionRows.flatMap((r) => r.turns ?? []);
+    return computeBaselines(allTurns);
+  }, [perSessionRows]);
+
   return (
     <div className="border rounded-lg p-4 bg-card">
       <div className="flex items-start justify-between mb-4 gap-4 flex-wrap">
@@ -247,6 +489,9 @@ function LatencyVisualization({
               ? "Moyenne réelle par session, mesurée à partir de la conversation."
               : "Moyenne réelle des tours de la session."}{" "}
             Cible : &lt; {TARGET_MS / 1000}s end-to-end. Clique sur ▸ pour voir le détail par tour.
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground/80 flex items-center gap-1">
+            <Info className="h-3 w-3" /> Survole un segment coloré pour voir son diagnostic et des pistes d'optimisation.
           </p>
         </div>
         <div className="flex items-center gap-5 text-xs">
@@ -306,6 +551,8 @@ function LatencyVisualization({
                     scaleMax={scaleMax}
                     target={TARGET_MS}
                     dispersion={row.dispersion}
+                    baselines={baselines}
+                    rowKind="session-avg"
                   />
                 </div>
               </div>
@@ -327,6 +574,8 @@ function LatencyVisualization({
                         values={stepValues}
                         scaleMax={scaleMax}
                         target={TARGET_MS}
+                        baselines={baselines}
+                        rowKind="turn"
                       />
                     );
                   })}
