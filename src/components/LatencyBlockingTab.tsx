@@ -472,6 +472,13 @@ function LatencyVisualization({
   const onTarget = avgTotal > 0 && avgTotal <= TARGET_MS;
   const isAggregate = perSessionRows.length > 1;
 
+  // Baselines (médiane / p95 / moyenne par étape) calculées une fois sur tous
+  // les tours visibles. Mémoïsé pour éviter tout recalcul au hover.
+  const baselines = useMemo<StepBaselines>(() => {
+    const allTurns = perSessionRows.flatMap((r) => r.turns ?? []);
+    return computeBaselines(allTurns);
+  }, [perSessionRows]);
+
   return (
     <div className="border rounded-lg p-4 bg-card">
       <div className="flex items-start justify-between mb-4 gap-4 flex-wrap">
