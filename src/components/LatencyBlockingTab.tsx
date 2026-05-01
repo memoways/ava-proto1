@@ -680,7 +680,143 @@ function LatencyVisualization({
           </div>
         </div>
       )}
+
+      <SegmentDetailSheet
+        selection={selected}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null);
+        }}
+      />
     </div>
+  );
+}
+
+function SegmentDetailSheet({
+  selection,
+  onOpenChange,
+}: {
+  selection: SegmentSelection | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const open = selection !== null;
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+        {selection && (
+          <>
+            <SheetHeader>
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-block w-3 h-3 rounded-sm"
+                  style={{ backgroundColor: selection.stepColor }}
+                  aria-hidden
+                />
+                <SheetTitle className="text-base">
+                  {selection.stepLabel} · {fmtMs(selection.value)}
+                </SheetTitle>
+              </div>
+              <SheetDescription className="text-xs">
+                {selection.rowKind === "turn" ? "Tour individuel" : "Moyenne de la session"} —{" "}
+                <span className="font-medium text-foreground/80">{selection.rowLabel}</span>
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="mt-5 space-y-5 text-sm">
+              {/* Sévérité */}
+              <div
+                className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs font-medium ${severityClasses(
+                  selection.diagnostic.severity,
+                )}`}
+              >
+                {selection.diagnostic.severityLabel}
+              </div>
+
+              {/* Chiffres clés */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Part du tour
+                  </div>
+                  <div className="font-mono font-semibold text-base">
+                    {selection.diagnostic.shareOfTotalPct !== null
+                      ? `${selection.diagnostic.shareOfTotalPct.toFixed(0)} %`
+                      : "—"}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    sur {fmtMs(selection.total)} total
+                  </div>
+                </div>
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Budget cible
+                  </div>
+                  <div className="font-mono font-semibold text-base">
+                    {fmtMs(STEP_BUDGET_MS[selection.stepKey])}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    pour tenir &lt; {TARGET_MS / 1000}s end-to-end
+                  </div>
+                </div>
+              </div>
+
+              {/* Distribution / comparaison */}
+              <div className="space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Comparaison dataset
+                </div>
+                <div className="rounded-md border p-3 space-y-1.5 text-xs">
+                  <div>
+                    <span className="text-muted-foreground">vs médiane : </span>
+                    <span className="text-foreground">{selection.diagnostic.comparison}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">distribution : </span>
+                    <span className="text-foreground">{selection.diagnostic.distribution}</span>
+                  </div>
+                  {selection.baseline && selection.baseline.n >= 2 && (
+                    <div className="grid grid-cols-4 gap-2 pt-2 border-t mt-2 text-[11px]">
+                      <div>
+                        <div className="text-muted-foreground">n</div>
+                        <div className="font-mono">{selection.baseline.n}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">moy</div>
+                        <div className="font-mono">{fmtMs(selection.baseline.mean)}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">méd</div>
+                        <div className="font-mono">{fmtMs(selection.baseline.median)}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">p95</div>
+                        <div className="font-mono">{fmtMs(selection.baseline.p95)}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Hypothèses d'optimisation */}
+              {selection.diagnostic.hypotheses.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <Info className="h-3 w-3" /> Pistes pour réduire cette latence
+                  </div>
+                  <ul className="list-disc pl-5 space-y-1 text-sm text-foreground/90">
+                    {selection.diagnostic.hypotheses.map((h, i) => (
+                      <li key={i}>{h}</li>
+                    ))}
+                  </ul>
+                  <p className="text-[11px] text-muted-foreground">
+                    Hypothèses indicatives — à valider par mesure A/B sur une nouvelle session.
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }
 
