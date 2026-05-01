@@ -283,6 +283,8 @@ interface StackedRowProps {
   rowKind?: "session-avg" | "turn" | "global-avg";
   /** Callback déclenché au clic sur un segment — ouvre le panneau latéral détaillé. */
   onSelectSegment?: (sel: SegmentSelection) => void;
+  /** Sévérité minimale pour mettre en avant les segments ; les autres sont atténués. */
+  minSeverity?: "all" | "high" | "critical";
 }
 
 function severityClasses(sev: StepDiagnostic["severity"]): string {
@@ -300,7 +302,9 @@ function StackedRow({
   baselines,
   rowKind = "turn",
   onSelectSegment,
+  minSeverity = "all",
 }: StackedRowProps) {
+  const sevThreshold = minSeverity === "all" ? 0 : minSeverity === "high" ? 1 : 2;
   const total = STEP_LABELS.reduce((acc, { key }) => acc + (values[key] ?? 0), 0);
   const denom = Math.max(scaleMax, total, dispersion?.max ?? 0, 1);
   const targetPct = target ? Math.min(100, (target / denom) * 100) : null;
@@ -341,6 +345,7 @@ function StackedRow({
             if (v <= 0) return null;
             const pct = (v / denom) * 100;
             const diag = analyzeStep(key, v, total, baselines?.[key]);
+            const dimmed = SEVERITY_RANK[diag.severity] < sevThreshold;
             return (
               <Tooltip key={key} delayDuration={120}>
                 <TooltipTrigger asChild>
@@ -359,7 +364,9 @@ function StackedRow({
                         baseline: baselines?.[key],
                       })
                     }
-                    className="h-full flex items-center justify-center text-[10px] text-white/95 font-medium overflow-hidden cursor-pointer focus:outline-none focus:ring-1 focus:ring-foreground/40 hover:brightness-110 transition"
+                    className={`h-full flex items-center justify-center text-[10px] text-white/95 font-medium overflow-hidden cursor-pointer focus:outline-none focus:ring-1 focus:ring-foreground/40 hover:brightness-110 transition ${
+                      dimmed ? "opacity-25 grayscale" : ""
+                    }`}
                     style={{ width: `${pct}%`, backgroundColor: STEP_HEX[key] }}
                     aria-label={`${stepLabel}: ${fmtMs(v)} — ${diag.severityLabel}. Cliquer pour le détail.`}
                   >
@@ -473,6 +480,7 @@ function LatencyVisualization({
   perSessionRows,
   expandedIds,
   onToggleExpanded,
+  minSeverity = "all",
 }: {
   /** Moyenne agrégée sur les sessions affichées (vraies données). */
   avg: ConversationPipelineTimings;
@@ -489,6 +497,7 @@ function LatencyVisualization({
   }>;
   expandedIds: Set<string>;
   onToggleExpanded: (id: string) => void;
+  minSeverity?: "all" | "high" | "critical";
 }) {
   const expanded = expandedIds;
   const toggleExpanded = onToggleExpanded;
@@ -592,6 +601,7 @@ function LatencyVisualization({
                     baselines={baselines}
                     rowKind="session-avg"
                     onSelectSegment={setSelected}
+                    minSeverity={minSeverity}
                   />
                 </div>
               </div>
@@ -616,6 +626,7 @@ function LatencyVisualization({
                         baselines={baselines}
                         rowKind="turn"
                         onSelectSegment={setSelected}
+                        minSeverity={minSeverity}
                       />
                     );
                   })}
@@ -934,6 +945,13 @@ function aggregateMany(aggs: SessionAggregate[]): ComparisonAggregate | null {
 
 type PeriodPreset = "all" | "24h" | "7d" | "30d" | "custom";
 type BlockerFilter = "all" | "with" | "without";
+type SeverityFilter = "all" | "high" | "critical";
+
+const SEVERITY_RANK: Record<StepDiagnostic["severity"], number> = {
+  ok: 0,
+  high: 1,
+  critical: 2,
+};
 
 export default function LatencyBlockingTab() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
@@ -942,6 +960,7 @@ export default function LatencyBlockingTab() {
   const [focusId, setFocusId] = useState<string | null>(null);
   const [showRelative, setShowRelative] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [minSeverity, setMinSeverity] = useState<SeverityFilter>("all");
 
   function handleFocus(id: string) {
     setFocusId(id);
@@ -1296,19 +1315,40 @@ export default function LatencyBlockingTab() {
                     : "Coche au moins une session dans la liste."}
                 </p>
               </div>
-              <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
-                <Checkbox
-                  checked={showRelative}
-                  onCheckedChange={(v) => setShowRelative(Boolean(v))}
-                />
-                <span>Afficher la répartition relative (moyenne)</span>
-              </label>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Sévérité min.
+                  </label>
+                  <Select
+                    value={minSeverity}
+                    onValueChange={(v) => setMinSeverity(v as SeverityFilter)}
+                  >
+                    <SelectTrigger className="h-8 text-xs w-[160px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes</SelectItem>
+                      <SelectItem value="high">Élevée et plus</SelectItem>
+                      <SelectItem value="critical">Critique uniquement</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                  <Checkbox
+                    checked={showRelative}
+                    onCheckedChange={(v) => setShowRelative(Boolean(v))}
+                  />
+                  <span>Répartition relative</span>
+                </label>
+              </div>
             </div>
 
             {comparison ? (
               <LatencyVisualization
                 avg={comparison.avg}
                 showRelative={showRelative}
+                minSeverity={minSeverity}
                 expandedIds={expandedIds}
                 onToggleExpanded={toggleExpanded}
                 perSessionRows={selectedAggregates.map((a) => ({
