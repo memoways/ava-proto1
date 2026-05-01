@@ -283,6 +283,8 @@ interface StackedRowProps {
   rowKind?: "session-avg" | "turn" | "global-avg";
   /** Callback déclenché au clic sur un segment — ouvre le panneau latéral détaillé. */
   onSelectSegment?: (sel: SegmentSelection) => void;
+  /** Sévérité minimale pour mettre en avant les segments ; les autres sont atténués. */
+  minSeverity?: "all" | "high" | "critical";
 }
 
 function severityClasses(sev: StepDiagnostic["severity"]): string {
