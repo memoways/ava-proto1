@@ -591,6 +591,7 @@ function LatencyVisualization({
                     dispersion={row.dispersion}
                     baselines={baselines}
                     rowKind="session-avg"
+                    onSelectSegment={setSelected}
                   />
                 </div>
               </div>
