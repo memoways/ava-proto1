@@ -345,6 +345,7 @@ function StackedRow({
             if (v <= 0) return null;
             const pct = (v / denom) * 100;
             const diag = analyzeStep(key, v, total, baselines?.[key]);
+            const dimmed = SEVERITY_RANK[diag.severity] < sevThreshold;
             return (
               <Tooltip key={key} delayDuration={120}>
                 <TooltipTrigger asChild>
