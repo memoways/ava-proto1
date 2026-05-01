@@ -299,6 +299,7 @@ function StackedRow({
   dispersion,
   baselines,
   rowKind = "turn",
+  onSelectSegment,
 }: StackedRowProps) {
   const total = STEP_LABELS.reduce((acc, { key }) => acc + (values[key] ?? 0), 0);
   const denom = Math.max(scaleMax, total, dispersion?.max ?? 0, 1);
