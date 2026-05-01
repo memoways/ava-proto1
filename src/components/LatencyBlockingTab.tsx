@@ -934,6 +934,13 @@ function aggregateMany(aggs: SessionAggregate[]): ComparisonAggregate | null {
 
 type PeriodPreset = "all" | "24h" | "7d" | "30d" | "custom";
 type BlockerFilter = "all" | "with" | "without";
+type SeverityFilter = "all" | "high" | "critical";
+
+const SEVERITY_RANK: Record<StepDiagnostic["severity"], number> = {
+  ok: 0,
+  high: 1,
+  critical: 2,
+};
 
 export default function LatencyBlockingTab() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
