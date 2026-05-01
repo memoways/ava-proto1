@@ -601,6 +601,7 @@ function LatencyVisualization({
                     baselines={baselines}
                     rowKind="session-avg"
                     onSelectSegment={setSelected}
+                    minSeverity={minSeverity}
                   />
                 </div>
               </div>
