@@ -1315,19 +1315,40 @@ export default function LatencyBlockingTab() {
                     : "Coche au moins une session dans la liste."}
                 </p>
               </div>
-              <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
-                <Checkbox
-                  checked={showRelative}
-                  onCheckedChange={(v) => setShowRelative(Boolean(v))}
-                />
-                <span>Afficher la répartition relative (moyenne)</span>
-              </label>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Sévérité min.
+                  </label>
+                  <Select
+                    value={minSeverity}
+                    onValueChange={(v) => setMinSeverity(v as SeverityFilter)}
+                  >
+                    <SelectTrigger className="h-8 text-xs w-[160px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes</SelectItem>
+                      <SelectItem value="high">Élevée et plus</SelectItem>
+                      <SelectItem value="critical">Critique uniquement</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                  <Checkbox
+                    checked={showRelative}
+                    onCheckedChange={(v) => setShowRelative(Boolean(v))}
+                  />
+                  <span>Répartition relative</span>
+                </label>
+              </div>
             </div>
 
             {comparison ? (
               <LatencyVisualization
                 avg={comparison.avg}
                 showRelative={showRelative}
+                minSeverity={minSeverity}
                 expandedIds={expandedIds}
                 onToggleExpanded={toggleExpanded}
                 perSessionRows={selectedAggregates.map((a) => ({
