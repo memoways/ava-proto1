@@ -514,6 +514,9 @@ function LatencyVisualization({
     return computeBaselines(allTurns);
   }, [perSessionRows]);
 
+  // Sélection courante pour le panneau latéral détaillé (clic sur un segment).
+  const [selected, setSelected] = useState<SegmentSelection | null>(null);
+
   return (
     <div className="border rounded-lg p-4 bg-card">
       <div className="flex items-start justify-between mb-4 gap-4 flex-wrap">
