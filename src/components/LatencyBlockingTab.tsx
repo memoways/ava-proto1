@@ -626,6 +626,7 @@ function LatencyVisualization({
                         baselines={baselines}
                         rowKind="turn"
                         onSelectSegment={setSelected}
+                        minSeverity={minSeverity}
                       />
                     );
                   })}
