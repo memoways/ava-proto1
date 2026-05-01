@@ -480,6 +480,7 @@ function LatencyVisualization({
   perSessionRows,
   expandedIds,
   onToggleExpanded,
+  minSeverity = "all",
 }: {
   /** Moyenne agrégée sur les sessions affichées (vraies données). */
   avg: ConversationPipelineTimings;
@@ -496,6 +497,7 @@ function LatencyVisualization({
   }>;
   expandedIds: Set<string>;
   onToggleExpanded: (id: string) => void;
+  minSeverity?: "all" | "high" | "critical";
 }) {
   const expanded = expandedIds;
   const toggleExpanded = onToggleExpanded;
