@@ -529,7 +529,7 @@ function LatencyVisualization({
             Cible : &lt; {TARGET_MS / 1000}s end-to-end. Clique sur ▸ pour voir le détail par tour.
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground/80 flex items-center gap-1">
-            <Info className="h-3 w-3" /> Survole un segment coloré pour voir son diagnostic et des pistes d'optimisation.
+            <Info className="h-3 w-3" /> Survole un segment pour un aperçu, clique dessus pour ouvrir le panneau d'analyse détaillée.
           </p>
         </div>
         <div className="flex items-center gap-5 text-xs">
