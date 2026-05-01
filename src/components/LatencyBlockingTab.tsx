@@ -364,7 +364,9 @@ function StackedRow({
                         baseline: baselines?.[key],
                       })
                     }
-                    className="h-full flex items-center justify-center text-[10px] text-white/95 font-medium overflow-hidden cursor-pointer focus:outline-none focus:ring-1 focus:ring-foreground/40 hover:brightness-110 transition"
+                    className={`h-full flex items-center justify-center text-[10px] text-white/95 font-medium overflow-hidden cursor-pointer focus:outline-none focus:ring-1 focus:ring-foreground/40 hover:brightness-110 transition ${
+                      dimmed ? "opacity-25 grayscale" : ""
+                    }`}
                     style={{ width: `${pct}%`, backgroundColor: STEP_HEX[key] }}
                     aria-label={`${stepLabel}: ${fmtMs(v)} — ${diag.severityLabel}. Cliquer pour le détail.`}
                   >
