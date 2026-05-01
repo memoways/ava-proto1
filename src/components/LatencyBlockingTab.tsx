@@ -960,6 +960,7 @@ export default function LatencyBlockingTab() {
   const [focusId, setFocusId] = useState<string | null>(null);
   const [showRelative, setShowRelative] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [minSeverity, setMinSeverity] = useState<SeverityFilter>("all");
 
   function handleFocus(id: string) {
     setFocusId(id);
