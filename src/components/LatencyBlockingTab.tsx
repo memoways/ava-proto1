@@ -302,7 +302,9 @@ function StackedRow({
   baselines,
   rowKind = "turn",
   onSelectSegment,
+  minSeverity = "all",
 }: StackedRowProps) {
+  const sevThreshold = minSeverity === "all" ? 0 : minSeverity === "high" ? 1 : 2;
   const total = STEP_LABELS.reduce((acc, { key }) => acc + (values[key] ?? 0), 0);
   const denom = Math.max(scaleMax, total, dispersion?.max ?? 0, 1);
   const targetPct = target ? Math.min(100, (target / denom) * 100) : null;
