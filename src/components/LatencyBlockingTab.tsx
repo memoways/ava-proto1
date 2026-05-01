@@ -257,6 +257,18 @@ function computeDispersion(samples: number[]): DispersionStats | null {
   return { n: xs.length, min, max, stddev: Math.sqrt(variance) };
 }
 
+export interface SegmentSelection {
+  rowLabel: string;
+  rowKind: "session-avg" | "turn" | "global-avg";
+  stepKey: NumericTimingKey;
+  stepLabel: string;
+  stepColor: string;
+  value: number;
+  total: number;
+  diagnostic: StepDiagnostic;
+  baseline: StepBaseline | undefined;
+}
+
 interface StackedRowProps {
   label: string;
   values: ConversationPipelineTimings;
@@ -269,6 +281,8 @@ interface StackedRowProps {
   baselines?: StepBaselines;
   /** Indique si la ligne est une moyenne agrégée (vs un tour individuel). */
   rowKind?: "session-avg" | "turn" | "global-avg";
+  /** Callback déclenché au clic sur un segment — ouvre le panneau latéral détaillé. */
+  onSelectSegment?: (sel: SegmentSelection) => void;
 }
 
 function severityClasses(sev: StepDiagnostic["severity"]): string {
