@@ -346,9 +346,22 @@ function StackedRow({
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    className="h-full flex items-center justify-center text-[10px] text-white/95 font-medium overflow-hidden cursor-help focus:outline-none focus:ring-1 focus:ring-foreground/40"
+                    onClick={() =>
+                      onSelectSegment?.({
+                        rowLabel: label,
+                        rowKind,
+                        stepKey: key,
+                        stepLabel,
+                        stepColor: STEP_HEX[key],
+                        value: v,
+                        total,
+                        diagnostic: diag,
+                        baseline: baselines?.[key],
+                      })
+                    }
+                    className="h-full flex items-center justify-center text-[10px] text-white/95 font-medium overflow-hidden cursor-pointer focus:outline-none focus:ring-1 focus:ring-foreground/40 hover:brightness-110 transition"
                     style={{ width: `${pct}%`, backgroundColor: STEP_HEX[key] }}
-                    aria-label={`${stepLabel}: ${fmtMs(v)} — ${diag.severityLabel}`}
+                    aria-label={`${stepLabel}: ${fmtMs(v)} — ${diag.severityLabel}. Cliquer pour le détail.`}
                   >
                     {pct > 8 ? stepLabel : ""}
                   </button>
