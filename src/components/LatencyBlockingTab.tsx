@@ -615,6 +615,7 @@ function LatencyVisualization({
                         target={TARGET_MS}
                         baselines={baselines}
                         rowKind="turn"
+                        onSelectSegment={setSelected}
                       />
                     );
                   })}
