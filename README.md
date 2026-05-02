@@ -5,7 +5,7 @@
 > **Créé avec**: Lovable  
 > **Démarré**: 2026-03-07  
 
-> **Mise à jour récente**: panneau "Latence & blocage" enrichi — visualisation cumulative des vraies latences par session **et par tour** (barres dépliables avec marqueur de cible 2 s, dispersion min/max + σ), comparaison multi-sessions sur une échelle commune, filtres (période / nombre de tours / présence de blocage) et auto-dépliage au clic sur une session. Mini-graphique des fallbacks GM (`elapsed_ms` vs `timeout_ms`) ajouté dans l'onglet Sessions.
+> **Mise à jour récente**: diagnostic factuel des latences dans "Latence & blocage" — au **survol** d'un segment, tooltip enrichi (sévérité ok/élevée/critique vs budget cible, ratio vs médiane, drapeau p95, hypothèses d'optimisation) ; au **clic**, panneau latéral détaillé (`SegmentDetailSheet`) avec métriques, benchmarking dataset et pistes techniques ; **filtre "Sévérité min."** (Toutes / Élevée et plus / Critique uniquement) qui atténue visuellement les segments sous le seuil. Analyse 100 % asynchrone côté client, zéro latence ajoutée au pipeline. Nouveau guide `documents/guide_game_master_contenus_et_tests.md` pour piloter les prompts, variables et choix de gameplay du Game Master.
 
 ## En une phrase
 
@@ -71,6 +71,10 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] Indicateur de dispersion par session (bracket min–max + écart-type σ sur le total des tours)
 - [x] Filtres sessions (période, nombre min de tours, présence de blocage) + auto-dépliage au focus
 - [x] Mini-graphique GM fallback (`elapsed_ms` vs `timeout_ms`) dans l'onglet Sessions
+- [x] Diagnostic factuel des latences au survol des segments (budget cible, ratio vs médiane, p95, hypothèses d'optimisation)
+- [x] Panneau latéral détaillé (`SegmentDetailSheet`) au clic sur un segment de latence
+- [x] Filtre "Sévérité min." dans la vue latence (atténuation visuelle des segments sous le seuil)
+- [x] Guide Game Master (`documents/guide_game_master_contenus_et_tests.md`) — prompts, variables, hypothèses, variantes à tester
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
 - [ ] Politique de vérité à 4 niveaux (certain / probable / inconnu / interdit)
 - [ ] Bible factuelle éditable et gestion explicite des sujets verrouillés/déverrouillés

@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-04-25 (session 13 — visualisation cumulative des latences par session et par tour, comparaison multi-sessions, filtres et auto-dépliage)  
+> **Last Updated**: 2026-05-02 (session 14 — diagnostic factuel des latences au survol/clic, filtre de sévérité, guide Game Master)  
 
 ---
 
@@ -63,6 +63,26 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-05-02 — Diagnostic factuel des latences (survol + panneau latéral + filtre sévérité) + guide Game Master 🔷
+
+**Intent**: Le panneau "Latence & blocage" montrait *quelles* sessions et *quels* tours étaient lents, mais pas *pourquoi*. L'équipe avait besoin d'un diagnostic factuel directement attaché aux segments des barres, sans rajouter de latence au pipeline conversationnel. En parallèle, structurer un guide pour rédiger les prompts et choix de gameplay du Game Master à partir du contexte projet Notion.
+
+**Tool**: Lovable
+
+**Outcome**:
+1. **Budgets cibles + hypothèses par étape** — `STEP_BUDGET_MS` (RAG 250 ms, GM pre 400 ms, Max LLM 800 ms, TTS 600 ms, validateur 500 ms, GM post 400 ms) et `STEP_HYPOTHESES` (pistes d'optimisation : streaming token-per-token, switch modèle, cache RAG, voice presets plus rapides, etc.) donnent un référentiel commun.
+2. **Analyse asynchrone côté client** — `computeBaselines` (`useMemo`) calcule moyenne, médiane et **p95** sur l'ensemble des segments visibles. `analyzeStep` produit ensuite, pour chaque segment : une sévérité (`ok` / `high` / `critical`) selon le budget, un ratio vs médiane (ex. "1.4× la médiane"), et un drapeau "outlier ≥ p95". Tout est dérivé de `pipeline.*_ms` déjà persisté — **aucune latence ajoutée** au tour de jeu.
+3. **Tooltips riches au survol** — `StackedRow` utilise désormais `Tooltip` (Radix) au lieu d'un simple `title`. Au survol, on voit la sévérité, le diagnostic comparatif et les hypothèses applicables.
+4. **Panneau latéral au clic** — `SegmentDetailSheet` (Shadcn `Sheet`) ouvre un audit structuré : contexte tour/session, métriques (durée mesurée vs **budget cible**, **part du tour** en %), benchmarking dataset (médiane / p95 / moyenne), et liste d'hypothèses techniques. Les segments sont transformés en boutons accessibles (`aria-label`), la sélection est lift-up via `SegmentSelection` à `LatencyVisualization`.
+5. **Filtre de sévérité minimum** — type `SeverityFilter` (`all` / `high` / `critical`) + `SEVERITY_RANK`, dropdown "Sévérité min." (Toutes / Élevée et plus / Critique uniquement). Les segments sous le seuil sont atténués (opacité 25 % + grayscale) mais restent cliquables, ce qui permet d'isoler visuellement les problèmes sans perdre le contexte.
+6. **Guide Game Master** — `documents/guide_game_master_contenus_et_tests.md` : tutoriel pour rédiger l'ensemble des prompts, variables et choix de gameplay du GM à partir du contexte projet Notion, avec hypothèses de design, variantes techniques et UX à tester, et paramètres-clés à arbitrer.
+
+**Ce que ça change** : on passe d'un tableau de bord descriptif ("le tour 4 a un TTS à 5,2 s") à un **outil de root-cause analysis** ("ce TTS est à 5,2 s soit 8.6× le budget de 600 ms et au-delà du p95 du dataset — pistes : preset voix plus rapide, streaming sentence-level"). Et l'équipe éditoriale dispose enfin d'un guide structuré pour remplir les paramètres du Game Master au lieu d'improviser.
+
+**Time**: ~2h sur plusieurs itérations (hover analysis → side panel → severity filter → guide GM).
+
+---
 
 ### 2026-04-25 — Visualisation comparative des latences réelles, par session et par tour 🔷
 
