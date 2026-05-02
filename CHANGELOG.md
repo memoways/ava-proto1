@@ -4,6 +4,35 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.18.0] - 2026-05-02 — Diagnostic latence enrichi + guide Game Master
+
+### Ajouté
+- **Analyse factuelle des latences au survol des segments** (`LatencyBlockingTab`) :
+  - `STEP_BUDGET_MS` : cibles de référence par étape (RAG 250 ms, GM pre 400 ms, Max LLM 800 ms, TTS 600 ms, validateur 500 ms, GM post 400 ms)
+  - `STEP_HYPOTHESES` : pistes d'optimisation actionnables par étape (streaming token-per-token, switch modèle, cache RAG, etc.)
+  - `computeBaselines` (`useMemo`) : calcule moyenne, médiane et **p95** sur l'ensemble des sessions visibles pour donner un contexte comparatif
+  - `analyzeStep` : produit une sévérité (`ok` / `high` / `critical`) basée sur le budget, un ratio vs médiane et un drapeau "outlier ≥ p95"
+  - Tooltip Radix UI riche par segment avec badge de sévérité + diagnostic + hypothèses
+- **Panneau latéral détaillé au clic sur un segment** (`SegmentDetailSheet` via Shadcn `Sheet`) :
+  - Contexte tour/session, badge sévérité
+  - Métriques : durée mesurée vs **budget cible**, **part du tour** en %
+  - Benchmarking sur le dataset visible : médiane, p95, moyenne
+  - Liste d'hypothèses techniques pour réduire la latence sur ce step précis
+  - Sélection partagée via `SegmentSelection`, segments transformés en boutons accessibles (`aria-label`)
+- **Filtre de sévérité minimum** dans le bandeau de comparaison :
+  - Type `SeverityFilter` (`all` / `high` / `critical`) + `SEVERITY_RANK`
+  - Dropdown "Sévérité min." avec options "Toutes", "Élevée et plus", "Critique uniquement"
+  - Les segments sous le seuil sont visuellement atténués (opacité 25 % + grayscale) tout en restant cliquables
+- **Guide Game Master** : nouveau document `documents/guide_game_master_contenus_et_tests.md` — tutoriel complet pour rédiger les prompts, variables et choix de gameplay du GM, avec hypothèses, variantes à tester (technique + UX) et paramètres-clés à arbitrer
+
+### Modifié
+- `LatencyBlockingTab` : `StackedRow` reçoit `onSelectSegment`, calcul `dimmed` selon le filtre actif, segments rendus comme `<button>` interactifs
+- État de sélection de segment remonté à `LatencyVisualization`
+- Calculs d'analyse 100 % côté client sur des données déjà chargées : aucune latence ajoutée au pipeline conversationnel
+
+### Notes
+- Aucune migration DB ni appel réseau supplémentaire pour l'analyse de latence (purement dérivé de `pipeline.*_ms` déjà persisté)
+
 ## [0.17.0] - 2026-04-25 — Visualisation comparative des latences réelles par session et par tour
 
 ### Ajouté
