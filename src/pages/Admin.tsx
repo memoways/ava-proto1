@@ -433,7 +433,18 @@ export default function Admin() {
                 </Button>
               </div>
 
-              {ragResults && (
+              {ragError && (
+                <div className="border border-destructive/50 bg-destructive/10 rounded-lg p-3 mb-4">
+                  <p className="text-sm font-semibold text-destructive mb-1">⚠️ Recherche RAG impossible</p>
+                  <pre className="text-xs whitespace-pre-wrap text-destructive/90 font-mono">{ragError}</pre>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Astuce : si le quota OpenAI est épuisé, recharge ton compte sur platform.openai.com,
+                    ou demande de migrer les embeddings vers Lovable AI Gateway (gratuit).
+                  </p>
+                </div>
+              )}
+
+              {ragResults && !ragError && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">{ragResults.length} résultat(s)</p>
                   {ragResults.map((m: any, i: number) => (
