@@ -91,6 +91,7 @@ export default function Admin() {
   const [ragQuery, setRagQuery] = useState("");
   const [ragResults, setRagResults] = useState<any[] | null>(null);
   const [ragSearching, setRagSearching] = useState(false);
+  const [ragError, setRagError] = useState<string | null>(null);
   const [characters, setCharacters] = useState<any[]>([]);
   const [editingChar, setEditingChar] = useState<any | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
@@ -247,16 +248,44 @@ export default function Admin() {
   async function testRAG() {
     if (!ragQuery.trim()) return;
     setRagSearching(true);
+    setRagResults(null);
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: ragQuery, match_count: 10, match_threshold: 0.2 }),
       });
-      const data = await res.json();
+      const raw = await res.text();
+      let data: any = {};
+      try { data = JSON.parse(raw); } catch { /* non-JSON response */ }
+
+      if (!res.ok || data.error) {
+        const rawMsg = typeof data.error === "string" ? data.error : (raw || `HTTP ${res.status}`);
+        let friendly = rawMsg;
+        if (/insufficient_quota|exceeded your current quota/i.test(rawMsg)) {
+          friendly = "Quota OpenAI épuisé (embeddings). Recharge ton compte OpenAI ou bascule les embeddings sur un autre fournisseur.";
+        } else if (/OPENAI_API_KEY/i.test(rawMsg)) {
+          friendly = "Clé OPENAI_API_KEY manquante côté edge function.";
+        } else if (/429/.test(rawMsg)) {
+          friendly = "Rate-limit OpenAI (429). Réessaie dans quelques secondes.";
+        } else if (/401|403|invalid_api_key/i.test(rawMsg)) {
+          friendly = "Clé OpenAI invalide ou non autorisée.";
+        }
+        toast.error(`RAG indisponible : ${friendly}`);
+        setRagResults([]);
+        // Stocker le détail brut pour affichage
+        (window as any).__lastRagError = rawMsg;
+        setRagError(friendly + (rawMsg && rawMsg !== friendly ? `\n\nDétail technique :\n${rawMsg}` : ""));
+        return;
+      }
+
+      setRagError(null);
       setRagResults(data.matches || []);
-    } catch {
-      toast.error("Erreur RAG");
+    } catch (e: any) {
+      const msg = e?.message || "Erreur réseau";
+      toast.error(`Erreur RAG : ${msg}`);
+      setRagError(msg);
+      setRagResults([]);
     } finally {
       setRagSearching(false);
     }
@@ -404,7 +433,18 @@ export default function Admin() {
                 </Button>
               </div>
 
-              {ragResults && (
+              {ragError && (
+                <div className="border border-destructive/50 bg-destructive/10 rounded-lg p-3 mb-4">
+                  <p className="text-sm font-semibold text-destructive mb-1">⚠️ Recherche RAG impossible</p>
+                  <pre className="text-xs whitespace-pre-wrap text-destructive/90 font-mono">{ragError}</pre>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Astuce : si le quota OpenAI est épuisé, recharge ton compte sur platform.openai.com,
+                    ou demande de migrer les embeddings vers Lovable AI Gateway (gratuit).
+                  </p>
+                </div>
+              )}
+
+              {ragResults && !ragError && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">{ragResults.length} résultat(s)</p>
                   {ragResults.map((m: any, i: number) => (
