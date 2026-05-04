@@ -247,16 +247,44 @@ export default function Admin() {
   async function testRAG() {
     if (!ragQuery.trim()) return;
     setRagSearching(true);
+    setRagResults(null);
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: ragQuery, match_count: 10, match_threshold: 0.2 }),
       });
-      const data = await res.json();
+      const raw = await res.text();
+      let data: any = {};
+      try { data = JSON.parse(raw); } catch { /* non-JSON response */ }
+
+      if (!res.ok || data.error) {
+        const rawMsg = typeof data.error === "string" ? data.error : (raw || `HTTP ${res.status}`);
+        let friendly = rawMsg;
+        if (/insufficient_quota|exceeded your current quota/i.test(rawMsg)) {
+          friendly = "Quota OpenAI épuisé (embeddings). Recharge ton compte OpenAI ou bascule les embeddings sur un autre fournisseur.";
+        } else if (/OPENAI_API_KEY/i.test(rawMsg)) {
+          friendly = "Clé OPENAI_API_KEY manquante côté edge function.";
+        } else if (/429/.test(rawMsg)) {
+          friendly = "Rate-limit OpenAI (429). Réessaie dans quelques secondes.";
+        } else if (/401|403|invalid_api_key/i.test(rawMsg)) {
+          friendly = "Clé OpenAI invalide ou non autorisée.";
+        }
+        toast.error(`RAG indisponible : ${friendly}`);
+        setRagResults([]);
+        // Stocker le détail brut pour affichage
+        (window as any).__lastRagError = rawMsg;
+        setRagError(friendly + (rawMsg && rawMsg !== friendly ? `\n\nDétail technique :\n${rawMsg}` : ""));
+        return;
+      }
+
+      setRagError(null);
       setRagResults(data.matches || []);
-    } catch {
-      toast.error("Erreur RAG");
+    } catch (e: any) {
+      const msg = e?.message || "Erreur réseau";
+      toast.error(`Erreur RAG : ${msg}`);
+      setRagError(msg);
+      setRagResults([]);
     } finally {
       setRagSearching(false);
     }
