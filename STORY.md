@@ -84,6 +84,37 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ---
 
+### 2026-05-08 — Banc d'essai complet « Test de réponse Max » : inspection du pipeline conversationnel étape par étape 🔷
+
+**Intent**: L'onglet `MaxPromptTestTab` existant permettait de simuler une réponse de Max à partir d'un contexte RAG statique, mais ne montrait pas *ce qui se passait réellement* dans les coulisses. L'équipe éditoriale avait besoin d'un outil qui, à partir d'une simple phrase utilisateur, rejoue un tour complet en exposant chaque brique du pipeline : quels chunks RAG remontent, comment ils sont transformés en contexte injecté, quel brief le GM pré-tour génère, quel prompt système final est envoyé à Max, et comment le validateur juge la conformité — le tout avec des métriques de tokens et de latence pour chaque étape.
+
+**Tool**: Lovable
+
+**Outcome**:
+1. **Instrumentation détaillée des appels LLM** — variantes additives sans régression sur le pipeline temps réel :
+   - `openRouterLLM.ts` : `callLLMWithUsage()` retourne désormais `{ content, usage, generationId, model, latencyMs }`.
+   - `ragService.ts` : `queryRAGDetailed()` expose les `RAGMatch` bruts et la latence réelle de l'edge function.
+   - `maxAgent.ts` : `simulateMaxResponse()` retourne `{ response, systemPrompt, usage, latencyMs, model }` ; `validateMaxResponseDetailed()` retourne `{ result, usage, latencyMs, model, validatorPrompt }`.
+   - `gameMasterAgent.ts` : `planGameMasterTurnDetailed()` retourne `{ brief, usage, latencyMs, model, systemPrompt, userPrompt }` (sans timeout dur, pour mesurer la latence réelle en test).
+2. **Nouveau service `maxTestPipeline.ts`** — orchestrateur UI-only qui exécute séquentiellement les 5 étapes (RAG → Knowledge build → GM Pre-turn → Max response → Validator) avec `onUpdate` incrémental pour rendu temps réel. Gestion des skips (`skipRAG`, `skipGM`, `skipValidator`) et parseur d'historique libre (`parseHistory`) pour simuler des conversations complexes.
+3. **Refonte UI complète de `MaxPromptTestTab.tsx`** :
+   - **Inputs enrichis** : sélecteur de personnage dynamique (depuis la table `characters`), phrase utilisateur libre, historique simulé parsé (`USER: ... / MAX: ...`), paramètres avancés repliés (`RAG_TOP_K`, `RAG_THRESHOLD`, `currentTrustLevel`, `triggeredIds`, `timeElapsedSeconds`).
+   - **Chronologie verticale** — 5 étapes visuelles avec statuts animés (`pending` → `running` → `ok/error/skipped`), durée ms, modèle, tokens in/out/total. Totaux cumulés (latence + tokens) en pied de page.
+   - **Détails RAG dépliables** — tableau des matches avec `source_table`, `source_id`, extrait, badge de similarité coloré, et message d'erreur explicite (ex. quota OpenAI embeddings épuisé).
+   - **Contexte injecté décomposé** — 4 blocs : `allowed_facts`, `active_memories`, `hypotheses`, `forbidden_topics` / `blocked_assertions`, permettant d'auditer exactement ce qui nourrit le prompt.
+   - **Brief GM pré-tour** — JSON formaté du `GameMasterTurnBrief` avec badge fallback éventuel (timeout / no_json / llm_error).
+   - **Prompt système final** — texte intégral du `systemPrompt` envoyé à Max, avec compteur de caractères et estimation tokens (`estimateTokens`).
+   - **Réponse Max + diagnostic validateur** — texte généré, badge conformité (vert/rouge/orange), liste `violations` et `safe_points`, tokens par agent, bouton « Régénérer avec prudence ».
+   - **Export JSON** — téléchargement du trace complet (inputs, résultats, prompts bruts, usages) pour analyse externe.
+   - **Presets rapides** — 3-4 scénarios pré-écrits pour tester des configurations typiques en un clic.
+4. **Document de plan** : `docs/plan_max_test_inspector.md` — spécification complète du flux, des modifications backend et de la refonte UI, rédigé avant l'implémentation pour aligner l'équipe.
+
+**Ce que ça change** : on passe d'un simulateur de réponse isolée à un **banc d'essai d'intégration** où chaque paramètre éditorial (personnage, RAG, contexte, brief GM, prompt, validateur) est testable et inspectable individuellement. L'équipe peut désormais fine-tuner le RAG (threshold, top_k), le contexte injecté, le brief GM et le prompt système avec un retour immédiat sur les tokens et la latence. C'est le passage du "devine et espère" au "change une variable, mesure l'impact".
+
+**Time**: ~2h30 (plan → instrumentation backend → orchestrateur → refonte UI → presets + export).
+
+---
+
 ### 2026-04-25 — Visualisation comparative des latences réelles, par session et par tour 🔷
 
 **Intent**: Le panneau "Latence & blocage" donnait des moyennes globales mais ne permettait pas de comprendre **ce qui s'est vraiment passé** dans une session donnée. L'équipe avait besoin de voir, sur une même échelle, comment chaque session se compare, où elle dépasse la cible 2 s, et tour par tour quelle étape coûte combien — sans estimations ni scénarios fictifs.
