@@ -5,7 +5,7 @@
 > **Créé avec**: Lovable  
 > **Démarré**: 2026-03-07  
 
-> **Mise à jour récente**: diagnostic factuel des latences dans "Latence & blocage" — au **survol** d'un segment, tooltip enrichi (sévérité ok/élevée/critique vs budget cible, ratio vs médiane, drapeau p95, hypothèses d'optimisation) ; au **clic**, panneau latéral détaillé (`SegmentDetailSheet`) avec métriques, benchmarking dataset et pistes techniques ; **filtre "Sévérité min."** (Toutes / Élevée et plus / Critique uniquement) qui atténue visuellement les segments sous le seuil. Analyse 100 % asynchrone côté client, zéro latence ajoutée au pipeline. Nouveau guide `documents/guide_game_master_contenus_et_tests.md` pour piloter les prompts, variables et choix de gameplay du Game Master.
+> **Mise à jour récente**: banc d'essai complet « Test de réponse Max » — refonte de l'onglet en **outil d'inspection du pipeline conversationnel** étape par étape (RAG → Knowledge → GM pré-tour → Max → Validateur). À partir d'une simple phrase utilisateur, l'équipe éditoriale peut visualiser : la requête RAG brute (matches + similarités), le contexte injecté décomposé (`allowed_facts`, `active_memories`, `hypotheses`, `blocked_assertions`), le brief GM pré-tour JSON, le prompt système final envoyé à Max, la réponse générée, et le diagnostic de conformité détaillé du validateur (violations, safe points, tokens). Chronologie verticale avec latences et tokens par étape, export JSON du trace complet, presets rapides. Aucune régression sur le pipeline temps réel : les fonctions `*Detailed` coexistent avec les appels prod. Document de plan : `docs/plan_max_test_inspector.md`.
 
 ## En une phrase
 
