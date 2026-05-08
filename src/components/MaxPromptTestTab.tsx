@@ -1,202 +1,374 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { simulateMaxResponse, validateMaxResponseConstraints } from "@/agents/maxAgent";
-import type { MaxTurnKnowledgeContext } from "@/types";
-import { getAntiHallucinationValidatorSettings, getMaxPromptControlSettings } from "@/services/settingsService";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  emptyStepStates,
+  estimateTokens,
+  parseHistory,
+  runMaxTestPipeline,
+  totalLatencyMs,
+  totalTokens,
+  type MaxTestStepStates,
+  type StepKey,
+  type StepStatus,
+} from "@/services/maxTestPipeline";
 import { toast } from "sonner";
 
-const DEFAULT_USER_MESSAGE = "Est-ce qu’Ava t’avait parlé de partir avant sa disparition ?";
-const DEFAULT_RAG_CONTEXT = `[1] (storyworld, score: 0.88)
-Ava a disparu il y a plusieurs jours. Max possède seulement des indices fragmentaires et refuse d'affirmer ce qu'il ne sait pas.
+const PRESETS = [
+  { id: "ava_disp", label: "Question sur Ava (in-scope)", text: "Est-ce qu'Ava t'avait parlé de partir avant sa disparition ?" },
+  { id: "off_topic", label: "Hors-périmètre", text: "Quelle est la météo demain à Paris ?" },
+  { id: "trap", label: "Piège à hallucination", text: "Donne-moi la date exacte et l'adresse où Ava a été vue pour la dernière fois." },
+  { id: "intim", label: "Sujet sensible", text: "Tu penses qu'Ava est encore en vie ?" },
+];
 
-[2] (characters, score: 0.81)
-Max est méfiant, protecteur, et teste la sincérité de son interlocuteur avant de révéler quoi que ce soit.
+const STEP_LABELS: Record<StepKey, string> = {
+  rag: "1. RAG query",
+  knowledge: "2. Knowledge build",
+  gmPre: "3. GM pré-tour",
+  max: "4. Réponse Max",
+  validator: "5. Validateur conformité",
+};
 
-[3] (storyworld, score: 0.54)
-Il existe des tensions familiales autour d'Ava, mais aucun élément ne confirme qu'elle préparait une fuite.`;
-
-function extractKnowledgeContext(ragContext: string, forbiddenTopicsText: string, blockedAssertionsText: string): MaxTurnKnowledgeContext {
-  const chunks = ragContext
-    .split(/\n\s*\n/)
-    .map((chunk) => chunk.trim())
-    .filter(Boolean);
-
-  const facts = chunks.map((chunk) => chunk.replace(/^\[[^\]]+\]\s*/gm, "").trim());
-
-  return {
-    allowedFacts: facts,
-    activeMemories: facts.slice(0, 2),
-    hypotheses: facts.filter((fact) => /aucun|aucune|partiel|fragment|hypoth/i.test(fact)).slice(0, 2),
-    forbiddenTopics: forbiddenTopicsText.split("\n").map((line) => line.trim()).filter(Boolean),
-    blockedAssertions: blockedAssertionsText.split("\n").map((line) => line.trim()).filter(Boolean),
+function StatusBadge({ status }: { status: StepStatus["status"] }) {
+  const map: Record<StepStatus["status"], { label: string; cls: string }> = {
+    pending: { label: "En attente", cls: "bg-muted text-muted-foreground" },
+    running: { label: "En cours…", cls: "bg-primary/20 text-primary animate-pulse" },
+    ok: { label: "OK", cls: "bg-emerald-500/20 text-emerald-300" },
+    error: { label: "Erreur", cls: "bg-destructive/20 text-destructive" },
+    skipped: { label: "Ignoré", cls: "bg-muted text-muted-foreground" },
   };
+  const v = map[status];
+  return <span className={`rounded px-2 py-0.5 text-xs font-medium ${v.cls}`}>{v.label}</span>;
+}
+
+function fmtMs(n?: number) {
+  if (n === undefined) return "—";
+  return `${n} ms`;
+}
+
+function fmtTokens(p?: number, c?: number, t?: number) {
+  if (!p && !c && !t) return "—";
+  return `in ${p ?? "?"} / out ${c ?? "?"} / total ${t ?? "?"}`;
 }
 
 export default function MaxPromptTestTab() {
-  const control = getMaxPromptControlSettings();
-  const validatorSettings = getAntiHallucinationValidatorSettings();
-  const [userMessage, setUserMessage] = useState(DEFAULT_USER_MESSAGE);
-  const [ragContext, setRagContext] = useState(DEFAULT_RAG_CONTEXT);
-  const [forbiddenTopics, setForbiddenTopics] = useState(control.forbiddenTopics);
-  const [blockedAssertions, setBlockedAssertions] = useState(`${control.forbiddenAssertions}\n${validatorSettings.blockedAssertionRules}`.trim());
-  const [response, setResponse] = useState("");
-  const [systemPrompt, setSystemPrompt] = useState("");
-  const [validation, setValidation] = useState<{
-    compliant: boolean;
-    summary: string;
-    violations: string[];
-    safe_points: string[];
-  } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [characters, setCharacters] = useState<Array<{ name: string }>>([]);
+  const [characterName, setCharacterName] = useState("Max");
+  const [userMessage, setUserMessage] = useState(PRESETS[0].text);
+  const [historyText, setHistoryText] = useState("");
+  const [topK, setTopK] = useState(5);
+  const [threshold, setThreshold] = useState(0.3);
+  const [trustLevel, setTrustLevel] = useState(0);
+  const [running, setRunning] = useState(false);
+  const [states, setStates] = useState<MaxTestStepStates>(emptyStepStates());
 
-  const knowledgeContext = useMemo(
-    () => extractKnowledgeContext(ragContext, forbiddenTopics, blockedAssertions),
-    [ragContext, forbiddenTopics, blockedAssertions],
-  );
+  useEffect(() => {
+    supabase.from("characters").select("name").order("name").then(({ data }) => {
+      if (data) setCharacters(data as Array<{ name: string }>);
+    });
+  }, []);
 
-  async function handleRunSimulation() {
-    setLoading(true);
-    setValidation(null);
+  const conversationHistory = useMemo(() => parseHistory(historyText), [historyText]);
 
+  async function handleRun(opts?: { skipRAG?: boolean; skipGM?: boolean; skipValidator?: boolean }) {
+    if (running) return;
+    if (!userMessage.trim()) {
+      toast.error("Saisis un message utilisateur");
+      return;
+    }
+    setRunning(true);
+    setStates(emptyStepStates());
     try {
-      const simulation = await simulateMaxResponse({
-        conversationHistory: [],
-        userMessage,
-        ragContext,
-        knowledgeContext,
-      });
-
-      setResponse(simulation.response);
-      setSystemPrompt(simulation.systemPrompt);
-
-      const check = await validateMaxResponseConstraints({
-        userMessage,
-        response: simulation.response,
-        ragContext,
-        knowledgeContext,
-      });
-
-      setValidation(check);
-      toast.success("Simulation Max terminée ✓");
-    } catch (error) {
-      console.error("[MaxPromptTest] Simulation failed", error);
-      toast.error("Erreur lors de la simulation Max");
+      const final = await runMaxTestPipeline(
+        {
+          characterName,
+          userMessage,
+          conversationHistory,
+          ragTopK: topK,
+          ragThreshold: threshold,
+          currentTrustLevel: trustLevel,
+          triggeredIds: [],
+          timeElapsedSeconds: 0,
+          ...opts,
+        },
+        (s) => setStates({ ...s }),
+      );
+      setStates(final);
+      toast.success("Simulation terminée");
+    } catch (err) {
+      console.error("[MaxPromptTest] pipeline failed", err);
+      toast.error("Pipeline échoué — voir console");
     } finally {
-      setLoading(false);
+      setRunning(false);
     }
   }
 
+  function exportTrace() {
+    const blob = new Blob([JSON.stringify({ input: { characterName, userMessage, historyText, topK, threshold, trustLevel }, states }, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `max-test-trace-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const total_ms = totalLatencyMs(states);
+  const total_tok = totalTokens(states);
+
   return (
-    <div className="max-w-6xl space-y-6">
+    <div className="max-w-7xl space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">🧪 Test de réponse Max</h2>
+        <h2 className="text-lg font-semibold">🧪 Banc d'essai Max — pipeline complet</h2>
         <p className="text-sm text-muted-foreground">
-          Simulez une réponse de Max à partir d’un exemple de contexte RAG, puis vérifiez automatiquement si les interdictions d’affirmation sont respectées.
+          Rejoue un tour complet (RAG → contexte → GM pré-tour → Max → validateur) à partir d'une simple phrase utilisateur.
+          Inspecte chaque étape : prompt injecté, tokens, latences, fallback éventuel.
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="space-y-4 rounded-lg border p-4">
-          <div className="space-y-2">
-            <Label htmlFor="max-test-user-message">Message utilisateur</Label>
-            <Textarea
-              id="max-test-user-message"
-              value={userMessage}
-              onChange={(event) => setUserMessage(event.target.value)}
-              className="min-h-[90px]"
-            />
-          </div>
+      {/* Inputs */}
+      <section className="grid gap-4 rounded-lg border p-4 lg:grid-cols-3">
+        <div className="space-y-2">
+          <Label>Personnage</Label>
+          <Select value={characterName} onValueChange={setCharacterName}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {characters.map((c) => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}
+              {!characters.length && <SelectItem value="Max">Max</SelectItem>}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Preset rapide</Label>
+          <Select onValueChange={(id) => { const p = PRESETS.find((x) => x.id === id); if (p) setUserMessage(p.text); }}>
+            <SelectTrigger><SelectValue placeholder="Choisir un cas type…" /></SelectTrigger>
+            <SelectContent>{PRESETS.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Trust level</Label>
+          <Input type="number" value={trustLevel} onChange={(e) => setTrustLevel(Number(e.target.value))} />
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="max-test-rag-context">Contexte RAG d’exemple</Label>
-            <Textarea
-              id="max-test-rag-context"
-              value={ragContext}
-              onChange={(event) => setRagContext(event.target.value)}
-              className="min-h-[280px] font-mono text-sm"
-            />
-          </div>
+        <div className="space-y-2 lg:col-span-3">
+          <Label>Message utilisateur</Label>
+          <Textarea value={userMessage} onChange={(e) => setUserMessage(e.target.value)} className="min-h-[80px]" />
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="max-test-forbidden-topics">Sujets interdits testés</Label>
-            <Textarea
-              id="max-test-forbidden-topics"
-              value={forbiddenTopics}
-              onChange={(event) => setForbiddenTopics(event.target.value)}
-              className="min-h-[120px] font-mono text-sm"
-            />
-          </div>
+        <div className="space-y-2 lg:col-span-3">
+          <Label>Historique simulé (optionnel — format <code>USER: …</code> / <code>MAX: …</code>)</Label>
+          <Textarea value={historyText} onChange={(e) => setHistoryText(e.target.value)} className="min-h-[100px] font-mono text-xs" placeholder={"USER: bonjour\nMAX: salut, qui es-tu ?"} />
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="max-test-blocked-assertions">Affirmations interdites testées</Label>
-            <Textarea
-              id="max-test-blocked-assertions"
-              value={blockedAssertions}
-              onChange={(event) => setBlockedAssertions(event.target.value)}
-              className="min-h-[120px] font-mono text-sm"
-            />
-          </div>
-
-          <Button onClick={handleRunSimulation} disabled={loading || !userMessage.trim() || !ragContext.trim()}>
-            {loading ? "Simulation..." : "Lancer le test"}
+        <div className="space-y-2">
+          <Label>RAG top_k</Label>
+          <Input type="number" value={topK} onChange={(e) => setTopK(Number(e.target.value))} />
+        </div>
+        <div className="space-y-2">
+          <Label>RAG threshold</Label>
+          <Input type="number" step="0.05" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} />
+        </div>
+        <div className="flex items-end gap-2">
+          <Button onClick={() => handleRun()} disabled={running}>
+            {running ? "Simulation…" : "Lancer la simulation complète"}
           </Button>
-        </section>
+          <Button variant="outline" onClick={() => handleRun({ skipRAG: true, skipGM: true })} disabled={running}>
+            Max seul
+          </Button>
+        </div>
+      </section>
 
-        <section className="space-y-4 rounded-lg border p-4">
-          <div className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground">
-            <p><strong className="text-foreground">Faits autorisés détectés :</strong> {knowledgeContext.allowedFacts?.length || 0}</p>
-            <p><strong className="text-foreground">Hypothèses détectées :</strong> {knowledgeContext.hypotheses?.length || 0}</p>
-            <p><strong className="text-foreground">Règles globales du validateur :</strong> {validatorSettings.blockedAssertionRules.split("\n").map((line) => line.trim()).filter(Boolean).length}</p>
+      {/* Pipeline chronology */}
+      <section className="rounded-lg border p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-semibold">Chronologie du pipeline</h3>
+          <div className="text-sm text-muted-foreground">
+            Total : <strong>{total_ms} ms</strong> · ≈ <strong>{total_tok || "—"}</strong> tokens
+            <Button size="sm" variant="ghost" className="ml-3" onClick={exportTrace}>Export JSON</Button>
           </div>
+        </div>
+        <div className="space-y-2">
+          {(Object.keys(STEP_LABELS) as StepKey[]).map((key) => {
+            const s = states[key];
+            const meta: string[] = [];
+            if (key === "rag" && s.status === "ok") {
+              const matches = (s as any).matches?.length ?? 0;
+              meta.push(`${matches} matches`);
+            }
+            if (key === "gmPre" && s.status === "ok") {
+              const d = (s as any).detail;
+              if (d?.model) meta.push(d.model);
+              if (d?.usage) meta.push(fmtTokens(d.usage.prompt_tokens, d.usage.completion_tokens, d.usage.total_tokens));
+              if (d?.brief?.fallback) meta.push(`fallback: ${d.brief.fallback.kind}`);
+            }
+            if (key === "max" && s.status === "ok") {
+              const d = (s as any).detail;
+              if (d?.model) meta.push(d.model);
+              if (d?.usage) meta.push(fmtTokens(d.usage.prompt_tokens, d.usage.completion_tokens, d.usage.total_tokens));
+            }
+            if (key === "validator" && s.status === "ok") {
+              const d = (s as any).detail;
+              if (d?.model) meta.push(d.model);
+              if (d?.usage) meta.push(fmtTokens(d.usage.prompt_tokens, d.usage.completion_tokens, d.usage.total_tokens));
+              if (d?.result) meta.push(d.result.compliant ? "conforme" : "NON conforme");
+            }
+            return (
+              <div key={key} className="grid grid-cols-12 items-center gap-2 rounded border bg-muted/10 px-3 py-2 text-sm">
+                <div className="col-span-4 font-medium">{STEP_LABELS[key]}</div>
+                <div className="col-span-2"><StatusBadge status={s.status} /></div>
+                <div className="col-span-2 text-right tabular-nums">{fmtMs(s.durationMs)}</div>
+                <div className="col-span-4 truncate text-xs text-muted-foreground">{s.error ? `❌ ${s.error}` : meta.join(" · ")}</div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
-          <div className="space-y-2">
-            <Label>Réponse simulée de Max</Label>
-            <div className="min-h-[120px] rounded-lg border bg-muted/20 p-4 text-sm whitespace-pre-wrap">
-              {response || "La réponse simulée apparaîtra ici."}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Diagnostic de conformité</Label>
-            <div className={`rounded-lg border p-4 text-sm ${validation ? (validation.compliant ? "bg-primary/10" : "bg-destructive/10") : "bg-muted/20"}`}>
-              {validation ? (
-                <div className="space-y-3">
-                  <p>
-                    <strong>{validation.compliant ? "Conforme" : "Non conforme"}</strong> — {validation.summary}
-                  </p>
-
-                  {!!validation.safe_points.length && (
-                    <div>
-                      <p className="mb-1 font-medium">Points respectés</p>
-                      <ul className="list-disc space-y-1 pl-5">
-                        {validation.safe_points.map((point, index) => <li key={`safe-${index}`}>{point}</li>)}
-                      </ul>
+      {/* Inspection accordions */}
+      <Accordion type="multiple" defaultValue={["max", "validator"]} className="space-y-2">
+        <AccordionItem value="rag" className="rounded-lg border px-4">
+          <AccordionTrigger>RAG matches ({states.rag.matches?.length ?? 0})</AccordionTrigger>
+          <AccordionContent>
+            {states.rag.error && <div className="mb-2 rounded bg-destructive/10 p-2 text-xs text-destructive">{states.rag.error}</div>}
+            {!states.rag.matches?.length ? (
+              <p className="text-sm text-muted-foreground">Aucun match.</p>
+            ) : (
+              <div className="space-y-2">
+                {states.rag.matches.map((m, i) => (
+                  <div key={m.id} className="rounded border bg-muted/20 p-3 text-xs">
+                    <div className="mb-1 flex items-center justify-between">
+                      <Badge variant="outline">[{i + 1}] {m.source_table}</Badge>
+                      <span className="tabular-nums">similarity: {m.similarity.toFixed(3)}</span>
                     </div>
-                  )}
+                    <p className="whitespace-pre-wrap">{m.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </AccordionContent>
+        </AccordionItem>
 
-                  {!!validation.violations.length && (
-                    <div>
-                      <p className="mb-1 font-medium">Violations détectées</p>
-                      <ul className="list-disc space-y-1 pl-5">
-                        {validation.violations.map((violation, index) => <li key={`violation-${index}`}>{violation}</li>)}
-                      </ul>
-                    </div>
-                  )}
+        <AccordionItem value="knowledge" className="rounded-lg border px-4">
+          <AccordionTrigger>Contexte injecté (knowledge)</AccordionTrigger>
+          <AccordionContent>
+            {!states.knowledge.context ? (
+              <p className="text-sm text-muted-foreground">Pas de contexte construit.</p>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2 text-xs">
+                {(["allowedFacts", "activeMemories", "hypotheses", "forbiddenTopics", "blockedAssertions"] as const).map((k) => (
+                  <div key={k} className="rounded border bg-muted/20 p-3">
+                    <p className="mb-1 font-medium text-foreground">{k} ({states.knowledge.context?.[k]?.length || 0})</p>
+                    <ul className="list-disc space-y-1 pl-4">
+                      {(states.knowledge.context?.[k] || []).map((v, i) => <li key={i} className="break-words">{v}</li>)}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="gmPre" className="rounded-lg border px-4">
+          <AccordionTrigger>Brief Game Master pré-tour</AccordionTrigger>
+          <AccordionContent>
+            {!states.gmPre.detail ? (
+              <p className="text-sm text-muted-foreground">Pas exécuté.</p>
+            ) : (
+              <div className="space-y-3 text-xs">
+                {states.gmPre.detail.brief.fallback && (
+                  <div className="rounded bg-destructive/10 p-2 text-destructive">
+                    Fallback: <strong>{states.gmPre.detail.brief.fallback.kind}</strong> — {states.gmPre.detail.brief.fallback.reason}
+                  </div>
+                )}
+                <pre className="overflow-auto rounded border bg-muted/20 p-3">{JSON.stringify(states.gmPre.detail.brief, null, 2)}</pre>
+                <details>
+                  <summary className="cursor-pointer text-muted-foreground">Voir prompts envoyés au GM</summary>
+                  <div className="mt-2 space-y-2">
+                    <Label>System</Label>
+                    <Textarea readOnly value={states.gmPre.detail.systemPrompt} className="min-h-[120px] font-mono text-xs" />
+                    <Label>User</Label>
+                    <Textarea readOnly value={states.gmPre.detail.userPrompt} className="min-h-[120px] font-mono text-xs" />
+                  </div>
+                </details>
+              </div>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="max" className="rounded-lg border px-4">
+          <AccordionTrigger>Prompt système final + réponse Max</AccordionTrigger>
+          <AccordionContent>
+            {!states.max.detail ? (
+              <p className="text-sm text-muted-foreground">Pas exécuté.</p>
+            ) : (
+              <div className="space-y-3">
+                <div className="rounded border bg-muted/20 p-3 text-sm whitespace-pre-wrap">
+                  {states.max.detail.response}
                 </div>
-              ) : (
-                "Le rapport de conformité apparaîtra ici après simulation."
-              )}
-            </div>
-          </div>
+                <div className="text-xs text-muted-foreground">
+                  Modèle : <strong>{states.max.detail.model}</strong> ·
+                  Tokens : {fmtTokens(states.max.detail.usage?.prompt_tokens, states.max.detail.usage?.completion_tokens, states.max.detail.usage?.total_tokens)} ·
+                  Latence : {states.max.detail.latencyMs} ms
+                </div>
+                <details>
+                  <summary className="cursor-pointer text-xs text-muted-foreground">
+                    Voir prompt système complet ({states.max.detail.systemPrompt.length} chars · ≈ {estimateTokens(states.max.detail.systemPrompt)} tokens)
+                  </summary>
+                  <Textarea readOnly value={states.max.detail.systemPrompt} className="mt-2 min-h-[300px] font-mono text-xs" />
+                </details>
+              </div>
+            )}
+          </AccordionContent>
+        </AccordionItem>
 
-          <div className="space-y-2">
-            <Label>Prompt effectif envoyé à Max</Label>
-            <Textarea value={systemPrompt} readOnly className="min-h-[260px] font-mono text-xs" />
-          </div>
-        </section>
-      </div>
+        <AccordionItem value="validator" className="rounded-lg border px-4">
+          <AccordionTrigger>Diagnostic validateur</AccordionTrigger>
+          <AccordionContent>
+            {!states.validator.detail ? (
+              <p className="text-sm text-muted-foreground">Pas exécuté.</p>
+            ) : (
+              <div className="space-y-3 text-sm">
+                <div className={`rounded border p-3 ${states.validator.detail.result.compliant ? "bg-emerald-500/10" : "bg-destructive/10"}`}>
+                  <p className="font-medium">{states.validator.detail.result.compliant ? "✅ Conforme" : "❌ Non conforme"} — {states.validator.detail.result.summary}</p>
+                </div>
+                {!!states.validator.detail.result.violations.length && (
+                  <div>
+                    <p className="mb-1 font-medium">Violations</p>
+                    <ul className="list-disc space-y-1 pl-5 text-xs">
+                      {states.validator.detail.result.violations.map((v, i) => <li key={i}>{v}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {!!states.validator.detail.result.safe_points.length && (
+                  <div>
+                    <p className="mb-1 font-medium">Points respectés</p>
+                    <ul className="list-disc space-y-1 pl-5 text-xs">
+                      {states.validator.detail.result.safe_points.map((v, i) => <li key={i}>{v}</li>)}
+                    </ul>
+                  </div>
+                )}
+                <div className="text-xs text-muted-foreground">
+                  Modèle : <strong>{states.validator.detail.model}</strong> ·
+                  Tokens : {fmtTokens(states.validator.detail.usage?.prompt_tokens, states.validator.detail.usage?.completion_tokens, states.validator.detail.usage?.total_tokens)} ·
+                  Latence : {states.validator.detail.latencyMs} ms
+                </div>
+                <details>
+                  <summary className="cursor-pointer text-xs text-muted-foreground">Voir prompt validateur</summary>
+                  <Textarea readOnly value={states.validator.detail.validatorPrompt || ""} className="mt-2 min-h-[200px] font-mono text-xs" />
+                </details>
+              </div>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 }

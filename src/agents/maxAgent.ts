@@ -1,4 +1,4 @@
-import { callLLM, streamLLM } from "@/services/openRouterLLM";
+import { callLLM, callLLMWithUsage, streamLLM, type LLMUsage } from "@/services/openRouterLLM";
 import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, MaxConstraintCheckResult, MaxTurnKnowledgeContext } from "@/types";
@@ -23,11 +23,11 @@ Ces informations sont LA SOURCE DE VÉRITÉ ABSOLUE. Tu DOIS les utiliser pour r
 Ne contredis JAMAIS ces informations. Si tu ne sais pas quelque chose, dis-le plutôt que d'inventer.
 N'invente AUCUN fait qui ne figure pas dans le contexte narratif.`;
 
-let cachedSystemPrompt: string | null = null;
+const cachedSystemPrompts: Record<string, string> = {};
 let systemPromptPromise: Promise<string> | null = null;
 
 async function getCharacterSystemPrompt(name = "Max"): Promise<string> {
-  if (cachedSystemPrompt) return cachedSystemPrompt;
+  if (cachedSystemPrompts[name]) return cachedSystemPrompts[name];
 
   try {
     const { data, error } = await supabase
@@ -37,11 +37,11 @@ async function getCharacterSystemPrompt(name = "Max"): Promise<string> {
       .maybeSingle();
 
     if (error || !data?.system_prompt) {
-      console.warn("[MaxAgent] Could not fetch system_prompt from DB, using fallback");
+      console.warn(`[MaxAgent] Could not fetch system_prompt for ${name}, using fallback`);
       return FALLBACK_SYSTEM_PROMPT;
     }
 
-    cachedSystemPrompt = data.system_prompt;
+    cachedSystemPrompts[data.name] = data.system_prompt;
     console.log(`[MaxAgent] Loaded system_prompt for ${data.name} (${data.system_prompt.length} chars)`);
     return data.system_prompt;
   } catch (err) {
@@ -52,7 +52,7 @@ async function getCharacterSystemPrompt(name = "Max"): Promise<string> {
 
 /** Preload system prompt into cache (call early, e.g. during intro video) */
 export function preloadSystemPrompt(): void {
-  if (cachedSystemPrompt || systemPromptPromise) return;
+  if (cachedSystemPrompts["Max"] || systemPromptPromise) return;
   console.log("[MaxAgent] Preloading system prompt...");
   systemPromptPromise = getCharacterSystemPrompt().then(p => {
     systemPromptPromise = null;
@@ -62,7 +62,7 @@ export function preloadSystemPrompt(): void {
 
 /** Clear cached prompt (call after editing in admin) */
 export function clearSystemPromptCache() {
-  cachedSystemPrompt = null;
+  for (const k of Object.keys(cachedSystemPrompts)) delete cachedSystemPrompts[k];
 }
 
 export interface MaxAgentInput {
@@ -110,8 +110,27 @@ export async function callMaxAgent(
   });
 }
 
-export async function simulateMaxResponse(input: MaxAgentInput): Promise<{ response: string; systemPrompt: string }> {
-  const systemPrompt = await buildMaxSystemPrompt(input.ragContext, input.postVideoContext, input.knowledgeContext, input.conversationHistory);
+export interface SimulateMaxResult {
+  response: string;
+  systemPrompt: string;
+  usage?: LLMUsage | null;
+  latencyMs?: number;
+  model?: string;
+  characterName?: string;
+}
+
+export async function simulateMaxResponse(
+  input: MaxAgentInput,
+  opts?: { characterName?: string; featureKey?: string },
+): Promise<SimulateMaxResult> {
+  const characterName = opts?.characterName || "Max";
+  const systemPrompt = await buildMaxSystemPrompt(
+    input.ragContext,
+    input.postVideoContext,
+    input.knowledgeContext,
+    input.conversationHistory,
+    characterName,
+  );
   const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
     { role: "system", content: systemPrompt },
     ...input.conversationHistory.map((msg) => ({
@@ -122,27 +141,33 @@ export async function simulateMaxResponse(input: MaxAgentInput): Promise<{ respo
   ];
 
   const llm = getLLMSettings();
-  const response = await callLLM(messages, {
+  const result = await callLLMWithUsage(messages, {
     model: llm.LLM_MODEL,
     temperature: llm.LLM_TEMPERATURE,
     max_tokens: llm.LLM_MAX_TOKENS,
     top_p: llm.LLM_TOP_P,
-    feature_key: "max_prompt_test",
+    feature_key: opts?.featureKey || "max_prompt_test",
   });
 
-  return { response, systemPrompt };
+  return {
+    response: result.content,
+    systemPrompt,
+    usage: result.usage,
+    latencyMs: result.latencyMs,
+    model: result.model,
+    characterName,
+  };
 }
 
-export async function validateMaxResponseConstraints(input: {
+function buildValidatorPrompt(input: {
   userMessage: string;
   response: string;
   ragContext?: string;
   knowledgeContext?: MaxTurnKnowledgeContext;
-}): Promise<MaxConstraintCheckResult> {
-  const llm = getLLMSettings();
+}): string {
   const control = getMaxPromptControlSettings();
   const validatorSettings = getAntiHallucinationValidatorSettings();
-  const validatorPrompt = `Tu es un validateur éditorial strict. Tu dois vérifier si la réponse de Max respecte les contraintes suivantes.
+  return `Tu es un validateur éditorial strict. Tu dois vérifier si la réponse de Max respecte les contraintes suivantes.
 
 ## RÈGLES À FAIRE RESPECTER
 - Max ne doit affirmer aucun fait absent du contexte autorisé.
@@ -189,28 +214,54 @@ Retourne UNIQUEMENT un JSON valide avec cette structure:
   "violations": ["..."],
   "safe_points": ["..."]
 }`;
+}
 
-  const raw = await callLLM([{ role: "system", content: validatorPrompt }], {
+export interface ValidateMaxDetailed {
+  result: MaxConstraintCheckResult;
+  usage?: LLMUsage | null;
+  latencyMs?: number;
+  model?: string;
+  validatorPrompt?: string;
+}
+
+export async function validateMaxResponseDetailed(input: {
+  userMessage: string;
+  response: string;
+  ragContext?: string;
+  knowledgeContext?: MaxTurnKnowledgeContext;
+}): Promise<ValidateMaxDetailed> {
+  const llm = getLLMSettings();
+  const validatorPrompt = buildValidatorPrompt(input);
+  const callRes = await callLLMWithUsage([{ role: "system", content: validatorPrompt }], {
     model: llm.LLM_MODEL_GM,
     temperature: 0.1,
     max_tokens: 350,
     feature_key: "max_prompt_validation",
   });
-
+  let result: MaxConstraintCheckResult;
   try {
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON in validator response");
-    return JSON.parse(jsonMatch[0]) as MaxConstraintCheckResult;
+    const jsonMatch = callRes.content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("no json");
+    result = JSON.parse(jsonMatch[0]) as MaxConstraintCheckResult;
   } catch {
-    // Fail-open : si le validateur renvoie un JSON illisible, on laisse passer
-    // la réponse pour ne pas bloquer le pipeline vocal. Trace conservée.
-    return {
+    result = {
       compliant: true,
-      summary: "Validation indisponible — réponse du validateur illisible (fail-open).",
+      summary: "Validation indisponible — JSON validateur illisible (fail-open).",
       violations: [],
       safe_points: ["JSON validateur non-parsable, réponse diffusée par défaut"],
     };
   }
+  return { result, usage: callRes.usage, latencyMs: callRes.latencyMs, model: callRes.model, validatorPrompt };
+}
+
+export async function validateMaxResponseConstraints(input: {
+  userMessage: string;
+  response: string;
+  ragContext?: string;
+  knowledgeContext?: MaxTurnKnowledgeContext;
+}): Promise<MaxConstraintCheckResult> {
+  const detailed = await validateMaxResponseDetailed(input);
+  return detailed.result;
 }
 
 function formatKnowledgeList(title: string, values?: string[]): string {
@@ -227,9 +278,10 @@ async function buildMaxSystemPrompt(
   ragContext?: string,
   postVideoContext?: string,
   knowledgeContext?: MaxTurnKnowledgeContext,
-  conversationHistory: ConversationMessage[] = []
+  conversationHistory: ConversationMessage[] = [],
+  characterName: string = "Max",
 ): Promise<string> {
-  const characterPrompt = await getCharacterSystemPrompt("Max");
+  const characterPrompt = await getCharacterSystemPrompt(characterName);
   const control = getMaxPromptControlSettings();
   let prompt = `${characterPrompt}\n${GAMEPLAY_RULES}\n\n## PERSONA STABLE\n${control.persona}\n\n## OBJECTIFS\n${control.objectives}\n\n## RÔLE ET CONTEXTE\n${control.roleContext}\n\n## HISTORIQUE STABLE\n${control.longTermMemory}\n\n## STYLE DE RÉPONSE\n${control.responseStyle}\n\n## POLITIQUE DE SAVOIR AUTORISÉ\n${control.allowedKnowledgePolicy}\n\n## INTERDITS D'AFFIRMATION\n${control.forbiddenAssertions}\n\n## SUJETS SENSIBLES / INTERDITS\n${control.forbiddenTopics}\n\n## POLITIQUE D'INCERTITUDE\n${control.uncertaintyPolicy}`;
 

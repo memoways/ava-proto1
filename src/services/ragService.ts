@@ -57,6 +57,43 @@ export async function queryRAG(
   }
 }
 
+export interface RAGQueryDetailed {
+  matches: RAGMatch[];
+  latencyMs: number;
+  error?: string;
+}
+
+/** Detailed RAG query for diagnostics: returns latency + error if any. */
+export async function queryRAGDetailed(
+  userMessage: string,
+  recentContext?: string,
+  matchCount = 5,
+  matchThreshold = 0.3,
+): Promise<RAGQueryDetailed> {
+  const startedAt = performance.now();
+  const query = recentContext ? `${userMessage}\n\nContexte récent: ${recentContext}` : userMessage;
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, match_count: matchCount, match_threshold: matchThreshold }),
+    });
+    const latencyMs = Math.round(performance.now() - startedAt);
+    if (!response.ok) {
+      const err = await response.text();
+      return { matches: [], latencyMs, error: `HTTP ${response.status}: ${err.slice(0, 300)}` };
+    }
+    const data = await response.json();
+    return { matches: data.matches || [], latencyMs };
+  } catch (err) {
+    return {
+      matches: [],
+      latencyMs: Math.round(performance.now() - startedAt),
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 /**
  * Format RAG matches into a context string for injection into the LLM prompt.
  */

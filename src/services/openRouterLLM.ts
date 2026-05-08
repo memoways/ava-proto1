@@ -148,15 +148,31 @@ export async function streamLLM(
   return fullText;
 }
 
+export interface LLMUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+}
+
+export interface LLMCallResult {
+  content: string;
+  usage: LLMUsage | null;
+  generationId: string | null;
+  model: string;
+  latencyMs: number;
+}
+
 /**
- * Non-streaming LLM call with automatic usage tracking.
+ * Non-streaming LLM call returning both content and usage/latency metadata.
+ * Use this in test/diagnostic UIs that need to display tokens.
  */
-export async function callLLM(
+export async function callLLMWithUsage(
   messages: Message[],
   options?: LLMOptions
-): Promise<string> {
+): Promise<LLMCallResult> {
   const model = options?.model || "qwen/qwen-2.5-72b-instruct";
   const featureKey = options?.feature_key || "chat";
+  const startedAt = performance.now();
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
     method: 'POST',
@@ -185,10 +201,9 @@ export async function callLLM(
 
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content || '';
-  const usage = data.usage;
+  const usage = data.usage || null;
   const generationId = data.id || null;
 
-  // Track usage
   trackLLMCall({
     session_id: options?.session_id,
     feature_key: featureKey,
@@ -200,5 +215,22 @@ export async function callLLM(
     status: "success",
   });
 
-  return content;
+  return {
+    content,
+    usage,
+    generationId,
+    model,
+    latencyMs: Math.round(performance.now() - startedAt),
+  };
+}
+
+/**
+ * Non-streaming LLM call with automatic usage tracking.
+ */
+export async function callLLM(
+  messages: Message[],
+  options?: LLMOptions
+): Promise<string> {
+  const result = await callLLMWithUsage(messages, options);
+  return result.content;
 }
