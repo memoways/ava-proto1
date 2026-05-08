@@ -1,4 +1,4 @@
-import { callLLM } from "@/services/openRouterLLM";
+import { callLLM, callLLMWithUsage, type LLMUsage } from "@/services/openRouterLLM";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, GameMasterResponse, GameMasterTurnBrief, MaxTurnKnowledgeContext } from "@/types";
 import { getLLMSettings, getGMPromptSettings, getGameplaySettings } from "@/services/settingsService";
@@ -192,6 +192,88 @@ export async function planGameMasterTurn(input: GameMasterPreTurnInput): Promise
   );
 
   return Promise.race([llmCall, timeoutPromise]);
+}
+
+export interface PlanGameMasterDetailed {
+  brief: GameMasterTurnBrief;
+  usage?: LLMUsage | null;
+  latencyMs: number;
+  model: string;
+  systemPrompt: string;
+  userPrompt: string;
+  rawResponse?: string;
+  error?: string;
+}
+
+/** Detailed pre-turn planner for diagnostics: no hard timeout, returns tokens + raw prompts. */
+export async function planGameMasterTurnDetailed(input: GameMasterPreTurnInput): Promise<PlanGameMasterDetailed> {
+  const systemPrompt = getGameMasterPreTurnPrompt();
+  const userPrompt = buildPreTurnContextMessage(input);
+  const llm = getLLMSettings();
+  const startedAt = performance.now();
+  try {
+    const callRes = await callLLMWithUsage(
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      {
+        model: llm.LLM_MODEL_GM,
+        temperature: 0.2,
+        max_tokens: llm.LLM_MAX_TOKENS_GM ?? 180,
+        feature_key: "max_prompt_test_gm_pre",
+      },
+    );
+    const jsonMatch = callRes.content.match(/\{[\s\S]*\}/);
+    let brief: GameMasterTurnBrief;
+    if (!jsonMatch) {
+      brief = {
+        ...DEFAULT_TURN_BRIEF,
+        allowed_knowledge: input.knowledgeContext?.allowedFacts || [],
+        forbidden_topics: input.knowledgeContext?.forbiddenTopics || [],
+        blocked_assertions: input.knowledgeContext?.blockedAssertions || [],
+        notes: "Brief par défaut (réponse LLM sans JSON)",
+        fallback: { kind: "no_json", reason: "réponse LLM sans JSON", elapsed_ms: callRes.latencyMs, model: callRes.model },
+      };
+    } else {
+      const parsed = JSON.parse(jsonMatch[0]) as Partial<GameMasterTurnBrief>;
+      brief = {
+        ...DEFAULT_TURN_BRIEF,
+        ...parsed,
+        allowed_knowledge: parsed.allowed_knowledge || input.knowledgeContext?.allowedFacts || [],
+        forbidden_topics: parsed.forbidden_topics || input.knowledgeContext?.forbiddenTopics || [],
+        blocked_assertions: parsed.blocked_assertions || input.knowledgeContext?.blockedAssertions || [],
+        style_instructions: parsed.style_instructions?.length ? parsed.style_instructions : DEFAULT_TURN_BRIEF.style_instructions,
+        fallback: null,
+      };
+    }
+    return {
+      brief,
+      usage: callRes.usage,
+      latencyMs: callRes.latencyMs,
+      model: callRes.model,
+      systemPrompt,
+      userPrompt,
+      rawResponse: callRes.content,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      brief: {
+        ...DEFAULT_TURN_BRIEF,
+        allowed_knowledge: input.knowledgeContext?.allowedFacts || [],
+        forbidden_topics: input.knowledgeContext?.forbiddenTopics || [],
+        blocked_assertions: input.knowledgeContext?.blockedAssertions || [],
+        notes: `Brief par défaut (erreur LLM: ${message.slice(0, 100)})`,
+        fallback: { kind: "llm_error", reason: message.slice(0, 200), elapsed_ms: Math.round(performance.now() - startedAt), model: llm.LLM_MODEL_GM, error_excerpt: message.slice(0, 200) },
+      },
+      latencyMs: Math.round(performance.now() - startedAt),
+      model: llm.LLM_MODEL_GM,
+      systemPrompt,
+      userPrompt,
+      error: message,
+    };
+  }
 }
 
 function buildContextMessage(input: GameMasterInput): string {
