@@ -23,11 +23,11 @@ Ces informations sont LA SOURCE DE VÉRITÉ ABSOLUE. Tu DOIS les utiliser pour r
 Ne contredis JAMAIS ces informations. Si tu ne sais pas quelque chose, dis-le plutôt que d'inventer.
 N'invente AUCUN fait qui ne figure pas dans le contexte narratif.`;
 
-let cachedSystemPrompt: string | null = null;
+const cachedSystemPrompts: Record<string, string> = {};
 let systemPromptPromise: Promise<string> | null = null;
 
 async function getCharacterSystemPrompt(name = "Max"): Promise<string> {
-  if (cachedSystemPrompt) return cachedSystemPrompt;
+  if (cachedSystemPrompts[name]) return cachedSystemPrompts[name];
 
   try {
     const { data, error } = await supabase
@@ -37,11 +37,11 @@ async function getCharacterSystemPrompt(name = "Max"): Promise<string> {
       .maybeSingle();
 
     if (error || !data?.system_prompt) {
-      console.warn("[MaxAgent] Could not fetch system_prompt from DB, using fallback");
+      console.warn(`[MaxAgent] Could not fetch system_prompt for ${name}, using fallback`);
       return FALLBACK_SYSTEM_PROMPT;
     }
 
-    cachedSystemPrompt = data.system_prompt;
+    cachedSystemPrompts[data.name] = data.system_prompt;
     console.log(`[MaxAgent] Loaded system_prompt for ${data.name} (${data.system_prompt.length} chars)`);
     return data.system_prompt;
   } catch (err) {
@@ -52,7 +52,7 @@ async function getCharacterSystemPrompt(name = "Max"): Promise<string> {
 
 /** Preload system prompt into cache (call early, e.g. during intro video) */
 export function preloadSystemPrompt(): void {
-  if (cachedSystemPrompt || systemPromptPromise) return;
+  if (cachedSystemPrompts["Max"] || systemPromptPromise) return;
   console.log("[MaxAgent] Preloading system prompt...");
   systemPromptPromise = getCharacterSystemPrompt().then(p => {
     systemPromptPromise = null;
@@ -62,7 +62,7 @@ export function preloadSystemPrompt(): void {
 
 /** Clear cached prompt (call after editing in admin) */
 export function clearSystemPromptCache() {
-  cachedSystemPrompt = null;
+  for (const k of Object.keys(cachedSystemPrompts)) delete cachedSystemPrompts[k];
 }
 
 export interface MaxAgentInput {
