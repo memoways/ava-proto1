@@ -4,6 +4,35 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.19.0] - 2026-05-08 — Banc d'essai complet « Test de réponse Max »
+
+### Ajouté
+- **Banc d'essai d'inspection du pipeline Max** — refonte complète de l'onglet `MaxPromptTestTab` en outil de fine-tuning éditorial qui rejoue un tour réel étape par étape :
+  - **Inputs enrichis** : sélecteur de personnage (depuis la table `characters`), phrase utilisateur libre, historique simulé parsé (`USER: ... / MAX: ...`), paramètres avancés repliés (`RAG_TOP_K`, `RAG_THRESHOLD`, `currentTrustLevel`, `triggeredIds`, `timeElapsedSeconds`)
+  - **Chronologie verticale du pipeline** — 5 étapes visuelles avec statut (`pending` → `running` → `ok/error/skipped`), durée en ms, modèle utilisé, tokens in/out/total : (1) RAG query, (2) Knowledge build, (3) GM pré-tour, (4) Max response, (5) Validateur. Totaux cumulés (latence + tokens) affichés en pied de chronologie.
+  - **Détails RAG dépliables** — tableau des `RAGMatch` bruts avec `source_table`, `source_id`, extrait textuel et badge de similarité (couleur selon le score), plus message d'erreur explicite si le quota OpenAI embeddings est épuisé.
+  - **Contexte injecté décomposé** — quatre blocs visuels : `allowed_facts`, `active_memories`, `hypotheses`, `forbidden_topics` / `blocked_assertions`, permettant d'auditer exactement ce qui est chargé dans le prompt.
+  - **Brief GM pré-tour** — JSON formaté du `GameMasterTurnBrief` (`response_mode`, `openness_level`, `reveal_budget`, `style_instructions`, `trust_change`, `video_trigger_id`) avec badge fallback éventuel (timeout / no_json / llm_error).
+  - **Prompt système final** — vue texte intégral du `systemPrompt` réellement envoyé à Max, avec compteur de caractères et estimation de tokens (`estimateTokens`).
+  - **Réponse Max + diagnostic validateur** — texte généré, badge de conformité (vert/rouge/orange), liste explicite des `violations` et `safe_points`, tokens Max vs tokens validateur, bouton « Régénérer avec prudence ».
+  - **Export JSON** — téléchargement du trace complet (inputs, résultats de chaque étape, prompts bruts, usages) pour analyse externe ou tickets.
+  - **Presets rapides** — 3-4 scénarios pré-écrits accessibles en un clic pour tester des configurations typiques.
+- **Instrumentation détaillée des appels LLM** (variantes additives, zéro régression sur le pipeline temps réel) :
+  - `openRouterLLM.ts` : `callLLMWithUsage()` retourne `{ content, usage, generationId, model, latencyMs }`
+  - `ragService.ts` : `queryRAGDetailed()` expose les matches bruts et la latence réelle de l'edge function
+  - `maxAgent.ts` : `simulateMaxResponse()` retourne `{ response, systemPrompt, usage, latencyMs, model }` ; `validateMaxResponseDetailed()` retourne `{ result, usage, latencyMs, model, validatorPrompt }`
+  - `gameMasterAgent.ts` : `planGameMasterTurnDetailed()` retourne `{ brief, usage, latencyMs, model, systemPrompt, userPrompt }` (sans timeout dur, pour mesurer la latence réelle en test)
+- **Nouveau service `maxTestPipeline.ts`** — orchestrateur de test UI-only qui exécute séquentiellement les 5 étapes (RAG → Knowledge → GM Pre → Max → Validator) avec mise à jour incrémentale de l'état (`onUpdate`) pour rendu temps réel. Gestion du `skipRAG`, `skipGM`, `skipValidator`. Parseur d'historique libre (`parseHistory`).
+- **Document de plan** : `docs/plan_max_test_inspector.md` — spécification complète du flux de simulation, des modifications backend et de la refonte UI.
+
+### Modifié
+- `MaxPromptTestTab.tsx` : refonte intégrale du simple simulateur de réponse en banc d'essai pipeline complet (voir Ajouté).
+- `Admin.tsx` : raccordement du nouvel onglet avec le selecteur de personnage dynamique.
+
+### Notes
+- Aucune migration DB, aucune nouvelle edge function. Toutes les variantes détaillées (`*Detailed`) coexistent avec les fonctions prod existantes sans modifier `conversationOrchestrator.ts`.
+- Le tracking des coûts LLM fonctionne pour les appels de test via la `feature_key` dédiée `max_prompt_test_full`.
+
 ## [0.18.0] - 2026-05-02 — Diagnostic latence enrichi + guide Game Master
 
 ### Ajouté
