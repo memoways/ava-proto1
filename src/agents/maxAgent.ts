@@ -159,70 +159,15 @@ export async function simulateMaxResponse(
   };
 }
 
-export interface ValidateMaxDetailed {
-  result: MaxConstraintCheckResult;
-  usage?: LLMUsage | null;
-  latencyMs?: number;
-  model?: string;
-  validatorPrompt?: string;
-}
-
-export async function validateMaxResponseDetailed(input: {
+function buildValidatorPrompt(input: {
   userMessage: string;
   response: string;
   ragContext?: string;
   knowledgeContext?: MaxTurnKnowledgeContext;
-}): Promise<ValidateMaxDetailed> {
-  const llm = getLLMSettings();
-  const validatorPrompt = buildValidatorPrompt(input);
-  const callRes = await callLLMWithUsage([{ role: "system", content: validatorPrompt }], {
-    model: llm.LLM_MODEL_GM,
-    temperature: 0.1,
-    max_tokens: 350,
-    feature_key: "max_prompt_validation",
-  });
-  let result: MaxConstraintCheckResult;
-  try {
-    const jsonMatch = callRes.content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("no json");
-    result = JSON.parse(jsonMatch[0]) as MaxConstraintCheckResult;
-  } catch {
-    result = {
-      compliant: true,
-      summary: "Validation indisponible — JSON validateur illisible (fail-open).",
-      violations: [],
-      safe_points: ["JSON validateur non-parsable, réponse diffusée par défaut"],
-    };
-  }
-  return { result, usage: callRes.usage, latencyMs: callRes.latencyMs, model: callRes.model, validatorPrompt };
-}
-
-function buildValidatorPrompt(input: { userMessage: string; response: string; ragContext?: string; knowledgeContext?: MaxTurnKnowledgeContext }): string {
+}): string {
   const control = getMaxPromptControlSettings();
   const validatorSettings = getAntiHallucinationValidatorSettings();
-  return _legacyValidatorPromptBuilder(input, control, validatorSettings);
-}
-
-export async function validateMaxResponseConstraints(input: {
-  userMessage: string;
-  response: string;
-  ragContext?: string;
-  knowledgeContext?: MaxTurnKnowledgeContext;
-}): Promise<MaxConstraintCheckResult> {
-  const detailed = await validateMaxResponseDetailed(input);
-  return detailed.result;
-}
-
-async function _legacyValidatorEntry(input: {
-  userMessage: string;
-  response: string;
-  ragContext?: string;
-  knowledgeContext?: MaxTurnKnowledgeContext;
-}): Promise<MaxConstraintCheckResult> {
-  const llm = getLLMSettings();
-  const control = getMaxPromptControlSettings();
-  const validatorSettings = getAntiHallucinationValidatorSettings();
-  const validatorPrompt = `Tu es un validateur éditorial strict. Tu dois vérifier si la réponse de Max respecte les contraintes suivantes.
+  return `Tu es un validateur éditorial strict. Tu dois vérifier si la réponse de Max respecte les contraintes suivantes.
 
 ## RÈGLES À FAIRE RESPECTER
 - Max ne doit affirmer aucun fait absent du contexte autorisé.
@@ -269,28 +214,54 @@ Retourne UNIQUEMENT un JSON valide avec cette structure:
   "violations": ["..."],
   "safe_points": ["..."]
 }`;
+}
 
-  const raw = await callLLM([{ role: "system", content: validatorPrompt }], {
+export interface ValidateMaxDetailed {
+  result: MaxConstraintCheckResult;
+  usage?: LLMUsage | null;
+  latencyMs?: number;
+  model?: string;
+  validatorPrompt?: string;
+}
+
+export async function validateMaxResponseDetailed(input: {
+  userMessage: string;
+  response: string;
+  ragContext?: string;
+  knowledgeContext?: MaxTurnKnowledgeContext;
+}): Promise<ValidateMaxDetailed> {
+  const llm = getLLMSettings();
+  const validatorPrompt = buildValidatorPrompt(input);
+  const callRes = await callLLMWithUsage([{ role: "system", content: validatorPrompt }], {
     model: llm.LLM_MODEL_GM,
     temperature: 0.1,
     max_tokens: 350,
     feature_key: "max_prompt_validation",
   });
-
+  let result: MaxConstraintCheckResult;
   try {
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON in validator response");
-    return JSON.parse(jsonMatch[0]) as MaxConstraintCheckResult;
+    const jsonMatch = callRes.content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("no json");
+    result = JSON.parse(jsonMatch[0]) as MaxConstraintCheckResult;
   } catch {
-    // Fail-open : si le validateur renvoie un JSON illisible, on laisse passer
-    // la réponse pour ne pas bloquer le pipeline vocal. Trace conservée.
-    return {
+    result = {
       compliant: true,
-      summary: "Validation indisponible — réponse du validateur illisible (fail-open).",
+      summary: "Validation indisponible — JSON validateur illisible (fail-open).",
       violations: [],
       safe_points: ["JSON validateur non-parsable, réponse diffusée par défaut"],
     };
   }
+  return { result, usage: callRes.usage, latencyMs: callRes.latencyMs, model: callRes.model, validatorPrompt };
+}
+
+export async function validateMaxResponseConstraints(input: {
+  userMessage: string;
+  response: string;
+  ragContext?: string;
+  knowledgeContext?: MaxTurnKnowledgeContext;
+}): Promise<MaxConstraintCheckResult> {
+  const detailed = await validateMaxResponseDetailed(input);
+  return detailed.result;
 }
 
 function formatKnowledgeList(title: string, values?: string[]): string {
@@ -307,9 +278,10 @@ async function buildMaxSystemPrompt(
   ragContext?: string,
   postVideoContext?: string,
   knowledgeContext?: MaxTurnKnowledgeContext,
-  conversationHistory: ConversationMessage[] = []
+  conversationHistory: ConversationMessage[] = [],
+  characterName: string = "Max",
 ): Promise<string> {
-  const characterPrompt = await getCharacterSystemPrompt("Max");
+  const characterPrompt = await getCharacterSystemPrompt(characterName);
   const control = getMaxPromptControlSettings();
   let prompt = `${characterPrompt}\n${GAMEPLAY_RULES}\n\n## PERSONA STABLE\n${control.persona}\n\n## OBJECTIFS\n${control.objectives}\n\n## RÔLE ET CONTEXTE\n${control.roleContext}\n\n## HISTORIQUE STABLE\n${control.longTermMemory}\n\n## STYLE DE RÉPONSE\n${control.responseStyle}\n\n## POLITIQUE DE SAVOIR AUTORISÉ\n${control.allowedKnowledgePolicy}\n\n## INTERDITS D'AFFIRMATION\n${control.forbiddenAssertions}\n\n## SUJETS SENSIBLES / INTERDITS\n${control.forbiddenTopics}\n\n## POLITIQUE D'INCERTITUDE\n${control.uncertaintyPolicy}`;
 
