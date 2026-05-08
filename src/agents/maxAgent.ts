@@ -1,4 +1,4 @@
-import { callLLM, streamLLM } from "@/services/openRouterLLM";
+import { callLLM, callLLMWithUsage, streamLLM, type LLMUsage } from "@/services/openRouterLLM";
 import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, MaxConstraintCheckResult, MaxTurnKnowledgeContext } from "@/types";
@@ -110,8 +110,27 @@ export async function callMaxAgent(
   });
 }
 
-export async function simulateMaxResponse(input: MaxAgentInput): Promise<{ response: string; systemPrompt: string }> {
-  const systemPrompt = await buildMaxSystemPrompt(input.ragContext, input.postVideoContext, input.knowledgeContext, input.conversationHistory);
+export interface SimulateMaxResult {
+  response: string;
+  systemPrompt: string;
+  usage?: LLMUsage | null;
+  latencyMs?: number;
+  model?: string;
+  characterName?: string;
+}
+
+export async function simulateMaxResponse(
+  input: MaxAgentInput,
+  opts?: { characterName?: string; featureKey?: string },
+): Promise<SimulateMaxResult> {
+  const characterName = opts?.characterName || "Max";
+  const systemPrompt = await buildMaxSystemPrompt(
+    input.ragContext,
+    input.postVideoContext,
+    input.knowledgeContext,
+    input.conversationHistory,
+    characterName,
+  );
   const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
     { role: "system", content: systemPrompt },
     ...input.conversationHistory.map((msg) => ({
@@ -122,18 +141,79 @@ export async function simulateMaxResponse(input: MaxAgentInput): Promise<{ respo
   ];
 
   const llm = getLLMSettings();
-  const response = await callLLM(messages, {
+  const result = await callLLMWithUsage(messages, {
     model: llm.LLM_MODEL,
     temperature: llm.LLM_TEMPERATURE,
     max_tokens: llm.LLM_MAX_TOKENS,
     top_p: llm.LLM_TOP_P,
-    feature_key: "max_prompt_test",
+    feature_key: opts?.featureKey || "max_prompt_test",
   });
 
-  return { response, systemPrompt };
+  return {
+    response: result.content,
+    systemPrompt,
+    usage: result.usage,
+    latencyMs: result.latencyMs,
+    model: result.model,
+    characterName,
+  };
+}
+
+export interface ValidateMaxDetailed {
+  result: MaxConstraintCheckResult;
+  usage?: LLMUsage | null;
+  latencyMs?: number;
+  model?: string;
+  validatorPrompt?: string;
+}
+
+export async function validateMaxResponseDetailed(input: {
+  userMessage: string;
+  response: string;
+  ragContext?: string;
+  knowledgeContext?: MaxTurnKnowledgeContext;
+}): Promise<ValidateMaxDetailed> {
+  const llm = getLLMSettings();
+  const validatorPrompt = buildValidatorPrompt(input);
+  const callRes = await callLLMWithUsage([{ role: "system", content: validatorPrompt }], {
+    model: llm.LLM_MODEL_GM,
+    temperature: 0.1,
+    max_tokens: 350,
+    feature_key: "max_prompt_validation",
+  });
+  let result: MaxConstraintCheckResult;
+  try {
+    const jsonMatch = callRes.content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("no json");
+    result = JSON.parse(jsonMatch[0]) as MaxConstraintCheckResult;
+  } catch {
+    result = {
+      compliant: true,
+      summary: "Validation indisponible — JSON validateur illisible (fail-open).",
+      violations: [],
+      safe_points: ["JSON validateur non-parsable, réponse diffusée par défaut"],
+    };
+  }
+  return { result, usage: callRes.usage, latencyMs: callRes.latencyMs, model: callRes.model, validatorPrompt };
+}
+
+function buildValidatorPrompt(input: { userMessage: string; response: string; ragContext?: string; knowledgeContext?: MaxTurnKnowledgeContext }): string {
+  const control = getMaxPromptControlSettings();
+  const validatorSettings = getAntiHallucinationValidatorSettings();
+  return _legacyValidatorPromptBuilder(input, control, validatorSettings);
 }
 
 export async function validateMaxResponseConstraints(input: {
+  userMessage: string;
+  response: string;
+  ragContext?: string;
+  knowledgeContext?: MaxTurnKnowledgeContext;
+}): Promise<MaxConstraintCheckResult> {
+  const detailed = await validateMaxResponseDetailed(input);
+  return detailed.result;
+}
+
+async function _legacyValidatorEntry(input: {
   userMessage: string;
   response: string;
   ragContext?: string;
