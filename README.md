@@ -75,6 +75,7 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] Panneau latéral détaillé (`SegmentDetailSheet`) au clic sur un segment de latence
 - [x] Filtre "Sévérité min." dans la vue latence (atténuation visuelle des segments sous le seuil)
 - [x] Guide Game Master (`documents/guide_game_master_contenus_et_tests.md`) — prompts, variables, hypothèses, variantes à tester
+- [x] Banc d'essai complet d'inspection du pipeline Max (RAG → Knowledge → GM Pre → Max → Validator) avec chronologie, tokens, latences, contexte injecté décomposé, brief GM JSON, prompt système final, diagnostic validateur, export JSON et presets rapides
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
 - [ ] Politique de vérité à 4 niveaux (certain / probable / inconnu / interdit)
 - [ ] Bible factuelle éditable et gestion explicite des sujets verrouillés/déverrouillés

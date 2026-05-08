@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-02 (session 14 — diagnostic factuel des latences au survol/clic, filtre de sévérité, guide Game Master)  
+> **Last Updated**: 2026-05-08 (session 15 — banc d'essai complet « Test de réponse Max » : inspection pipeline RAG → Knowledge → GM pré-tour → Max → Validator, chronologie verticale avec tokens et latences, export JSON)  
 
 ---
 
