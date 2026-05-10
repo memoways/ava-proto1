@@ -1,6 +1,7 @@
 import { simulateMaxResponse, validateMaxResponseConstraints, type MaxAgentInput } from "@/agents/maxAgent";
 import { callGameMaster, planGameMasterTurn, type GameMasterInput } from "@/agents/gameMasterAgent";
-import { buildKnowledgeContextFromRAG, formatRAGContext, queryRAG } from "@/services/ragService";
+import { buildKnowledgeContextFromRAG, formatRAGContext, queryRAG, rewriteRAGQuery } from "@/services/ragService";
+import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, ConversationPipelineTimings, ConversationPipelineTrace, ConversationValidationTrace, GameMasterResponse, GameMasterTurnBrief, MaxConstraintCheckResult, VideoTrigger } from "@/types";
 import { getGameplaySettings, getLLMSettings } from "@/services/settingsService";
