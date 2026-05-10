@@ -5,7 +5,9 @@
 > **Créé avec**: Lovable  
 > **Démarré**: 2026-03-07  
 
-> **Mise à jour récente**: banc d'essai complet « Test de réponse Max » — refonte de l'onglet en **outil d'inspection du pipeline conversationnel** étape par étape (RAG → Knowledge → GM pré-tour → Max → Validateur). À partir d'une simple phrase utilisateur, l'équipe éditoriale peut visualiser : la requête RAG brute (matches + similarités), le contexte injecté décomposé (`allowed_facts`, `active_memories`, `hypotheses`, `blocked_assertions`), le brief GM pré-tour JSON, le prompt système final envoyé à Max, la réponse générée, et le diagnostic de conformité détaillé du validateur (violations, safe points, tokens). Chronologie verticale avec latences et tokens par étape, export JSON du trace complet, presets rapides. Aucune régression sur le pipeline temps réel : les fonctions `*Detailed` coexistent avec les appels prod. Document de plan : `docs/plan_max_test_inspector.md`.
+> **Mise à jour récente (2026-05-10) — RAG v2 (Voyage AI + reranker + query rewriting + mémoire de session)** : ajout des embeddings **Voyage AI `voyage-3` (1024 dim)** en double-stack avec OpenAI, reranker **`rerank-2.5`** appliqué après retrieval (champs `retrieval_similarity` + `rerank_score`), filtrage strict par `character_id` (chunks scopés vs partagés), passage des indexes pgvector en **HNSW** pour fiabilité sur petits datasets. Nouvelles edge functions `rewrite-query` (reformulation de la question utilisateur en requête autonome avant RAG) et `summarize-session` (résumé compressé tous les N tours, injecté dans le prompt Max sous « SOUVENIRS DE LA SESSION »). Le banc d'essai `MaxPromptTestTab` affiche désormais l'étape « Query rewrite », le provider d'embedding par requête, et par chunk : `character_id`, `rerank_score`, similarité de retrieval brute. Détails complets dans `CHANGELOG.md` et `STORY.md`.
+
+> **Mise à jour précédente**: banc d'essai complet « Test de réponse Max » — refonte de l'onglet en **outil d'inspection du pipeline conversationnel** étape par étape (RAG → Knowledge → GM pré-tour → Max → Validateur). Document de plan : `docs/plan_max_test_inspector.md`.
 
 ## En une phrase
 
