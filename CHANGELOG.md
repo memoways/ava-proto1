@@ -4,7 +4,46 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.20.0] - 2026-05-10 — RAG v2 : Voyage AI + query rewriting + mémoire de session compressée
+
+### Ajouté
+- **Embeddings Voyage AI (`voyage-3`, 1024 dim)** en parallèle d'OpenAI :
+  - Nouvelle colonne `embedding_v vector(1024)` sur `embeddings` + `embedding_provider` (`openai` / `voyage`)
+  - Re-sync complète des 4 bases Notion avec génération double-provider à la demande
+  - Edge function `query-rag` enrichie : sélection du provider (`provider`) + override `retrieve_k`
+- **Reranker Voyage `rerank-2.5`** appliqué après retrieval vectoriel :
+  - Champs `retrieval_similarity` (cosinus brut) et `rerank_score` (score Voyage) exposés sur chaque `RAGMatch`
+  - Toggle `RAG_RERANK_ENABLED` dans `settings.json`
+- **Filtrage strict par personnage** : `character_id` propagé sur les chunks RAG ; les chunks scopés sont filtrés par personnage actif, les chunks partagés (`storyworld`, `rules`) restent visibles à tous.
+- **Index HNSW** (`m=16, ef_construction=64`) sur `embedding` et `embedding_v` en remplacement des `ivfflat` — corrige le scoring quasi-nul observé sur petits datasets.
+- **Query rewriting LLM** — nouvelle edge function `rewrite-query` (gemini-3-flash-preview) qui transforme « et toi ? » en requête autonome avant appel RAG. Gating via `RAG_QUERY_REWRITE_ENABLED`. Intégré dans `conversationOrchestrator` et exposé dans `MaxPromptTestTab`.
+- **Mémoire de session compressée** :
+  - Nouvelle table `session_summaries` (session_id, summary, last_turn)
+  - Edge function `summarize-session` (gemini-3-flash-preview) : résumé en bullet points (Faits, Sujets, Promesses) déclenché tous les `RAG_SUMMARY_EVERY_N_TURNS` (4) tours en fire-and-forget
+  - Service `sessionMemoryService.ts` (fetch + déclenchement asynchrone)
+  - Injection automatique dans le prompt système Max sous `## SOUVENIRS DE LA SESSION`
+- **Banc d'essai Max enrichi** :
+  - Nouvelle étape « 0. Query rewrite » dans la chronologie (original → réécrite)
+  - Badge `embedding_provider` (+ `rerank` si actif) sur l'accordéon RAG
+  - Par chunk : badge `character_id` (ou `shared`), `rerank_score` Voyage, `retrieval_similarity` brute, score final
+
+### Modifié
+- `ragService.ts` : `RAGMatch` étendu (`retrieval_similarity`, `rerank_score`, `character_id`) ; `RAGQueryOptions` (provider, rerank, retrieveK, characterId, rewrittenQuery) ; nouvelle helper `rewriteRAGQuery()`.
+- `maxAgent.ts` : `MaxAgentInput` accepte `sessionSummary` ; `buildMaxSystemPrompt` injecte le bloc « SOUVENIRS » avant l'historique récent.
+- `conversationOrchestrator.ts` : pipeline étendu — rewrite optionnel → RAG (avec query réécrite) → summary fetch parallèle → résumé background tous les N tours.
+- `supabase/config.toml` : déclaration des nouvelles edge functions `rewrite-query` et `summarize-session`.
+
+### Migrations
+- `20260510115532_*` — ajout `embedding_v`, `embedding_provider`, `character_id` + RPC `match_embeddings_v`
+- `20260510121928_*` — remplacement des indexes `ivfflat` par HNSW
+
+### Notes
+- Aucun secret supplémentaire visible côté front (clés Voyage stockées en backend uniquement).
+- Les anciennes fonctions et les chunks OpenAI restent fonctionnels en fallback transparent.
+- **Bug majeur résolu en cours de route** : retrieval Voyage retournait quasi rien à cause d'un index `ivfflat lists=100` sur ~226 vecteurs (scoring quasi-aléatoire). Fix : passage en HNSW.
+
 ## [0.19.0] - 2026-05-08 — Banc d'essai complet « Test de réponse Max »
+
 
 ### Ajouté
 - **Banc d'essai d'inspection du pipeline Max** — refonte complète de l'onglet `MaxPromptTestTab` en outil de fine-tuning éditorial qui rejoue un tour réel étape par étape :
