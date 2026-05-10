@@ -200,9 +200,16 @@ export default function MaxPromptTestTab() {
           {(Object.keys(STEP_LABELS) as StepKey[]).map((key) => {
             const s = states[key];
             const meta: string[] = [];
+            if (key === "rewrite" && s.status === "ok") {
+              const rw = (s as any).rewritten;
+              meta.push(rw ? `→ "${String(rw).slice(0, 80)}"` : "(inchangée)");
+            }
             if (key === "rag" && s.status === "ok") {
               const matches = (s as any).matches?.length ?? 0;
+              const prov = (s as any).embeddingProvider;
+              const rer = (s as any).rerankUsed;
               meta.push(`${matches} matches`);
+              if (prov) meta.push(`provider: ${prov}${rer ? "+rerank" : ""}`);
             }
             if (key === "gmPre" && s.status === "ok") {
               const d = (s as any).detail;
