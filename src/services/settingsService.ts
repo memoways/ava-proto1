@@ -339,6 +339,11 @@ export interface GameplaySettings {
   MAX_INSULT_TOLERANCE: number;
   MIN_QUESTIONS_BEFORE_GATE: number;
   RAG_TOP_K: number;
+  RAG_RETRIEVE_K: number;
+  RAG_RERANK_ENABLED: boolean;
+  RAG_QUERY_REWRITE_ENABLED: boolean;
+  RAG_EMBEDDING_PROVIDER: "voyage" | "openai";
+  RAG_SUMMARY_EVERY_N_TURNS: number;
   VIDEO_PLACEHOLDER_DURATION: number;
 }
 
@@ -350,6 +355,11 @@ const gameplayDefaults: GameplaySettings = {
   MAX_INSULT_TOLERANCE: defaultSettings.MAX_INSULT_TOLERANCE,
   MIN_QUESTIONS_BEFORE_GATE: defaultSettings.MIN_QUESTIONS_BEFORE_GATE,
   RAG_TOP_K: defaultSettings.RAG_TOP_K,
+  RAG_RETRIEVE_K: (defaultSettings as any).RAG_RETRIEVE_K ?? 15,
+  RAG_RERANK_ENABLED: (defaultSettings as any).RAG_RERANK_ENABLED ?? true,
+  RAG_QUERY_REWRITE_ENABLED: (defaultSettings as any).RAG_QUERY_REWRITE_ENABLED ?? true,
+  RAG_EMBEDDING_PROVIDER: ((defaultSettings as any).RAG_EMBEDDING_PROVIDER as "voyage" | "openai") ?? "voyage",
+  RAG_SUMMARY_EVERY_N_TURNS: (defaultSettings as any).RAG_SUMMARY_EVERY_N_TURNS ?? 4,
   VIDEO_PLACEHOLDER_DURATION: defaultSettings.VIDEO_PLACEHOLDER_DURATION,
 };
 
