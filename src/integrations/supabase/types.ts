@@ -70,30 +70,47 @@ export type Database = {
       }
       embeddings: {
         Row: {
+          character_id: string | null
           content: string
           created_at: string | null
           embedding: string | null
+          embedding_provider: string
+          embedding_v: string | null
           id: string
           source_id: string
           source_table: string
         }
         Insert: {
+          character_id?: string | null
           content: string
           created_at?: string | null
           embedding?: string | null
+          embedding_provider?: string
+          embedding_v?: string | null
           id?: string
           source_id: string
           source_table: string
         }
         Update: {
+          character_id?: string | null
           content?: string
           created_at?: string | null
           embedding?: string | null
+          embedding_provider?: string
+          embedding_v?: string | null
           id?: string
           source_id?: string
           source_table?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "embeddings_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       gameplay_steps: {
         Row: {
@@ -259,6 +276,33 @@ export type Database = {
         }
         Relationships: []
       }
+      session_summaries: {
+        Row: {
+          created_at: string
+          id: string
+          last_turn: number
+          session_id: string
+          summary: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_turn?: number
+          session_id: string
+          summary?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_turn?: number
+          session_id?: string
+          summary?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sessions: {
         Row: {
           admin_note: string | null
@@ -420,6 +464,38 @@ export type Database = {
           query_embedding: string
         }
         Returns: {
+          content: string
+          id: string
+          similarity: number
+          source_id: string
+          source_table: string
+        }[]
+      }
+      match_embeddings_scoped: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          p_character_id?: string
+          query_embedding: string
+        }
+        Returns: {
+          character_id: string
+          content: string
+          id: string
+          similarity: number
+          source_id: string
+          source_table: string
+        }[]
+      }
+      match_embeddings_voyage: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          p_character_id?: string
+          query_embedding: string
+        }
+        Returns: {
+          character_id: string
           content: string
           id: string
           similarity: number
