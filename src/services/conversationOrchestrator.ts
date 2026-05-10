@@ -223,6 +223,22 @@ export async function processConversationTurn(
     return { gameMasterResponse, trigger, gm_post_ms: Math.round(performance.now() - gmPostStart) };
   })();
 
+  // Background: refresh compressed session summary every N user turns.
+  if (sessionId && gameplay.RAG_SUMMARY_EVERY_N_TURNS > 0) {
+    const userTurns = conversationHistory.filter((m) => m.role === "user").length + 1; // +1 = current turn
+    const lastSummarizedTurn = summaryRecord?.last_turn ?? 0;
+    const dueForSummary = userTurns - lastSummarizedTurn >= gameplay.RAG_SUMMARY_EVERY_N_TURNS;
+    if (dueForSummary) {
+      const fullHistory: ConversationMessage[] = [
+        ...conversationHistory,
+        { role: "user", content: userMessage, timestamp: Date.now() },
+        { role: "max", content: validatedTurn.response, timestamp: Date.now() },
+      ];
+      // Fire and forget — never block the turn.
+      summarizeSessionAsync(sessionId, fullHistory, userTurns).catch(() => {});
+    }
+  }
+
   return {
     maxResponse: validatedTurn.response,
     preTurnBrief: preTurnResult.brief,
