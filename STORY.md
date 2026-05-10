@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-08 (session 15 — banc d'essai complet « Test de réponse Max » : inspection pipeline RAG → Knowledge → GM pré-tour → Max → Validator, chronologie verticale avec tokens et latences, export JSON)  
+> **Last Updated**: 2026-05-10 (session 16 — RAG v2 : Voyage AI `voyage-3` + reranker `rerank-2.5`, filtrage strict par personnage, indexes HNSW, query rewriting et mémoire de session compressée injectée dans le prompt Max)  
 
 ---
 
