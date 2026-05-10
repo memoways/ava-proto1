@@ -78,6 +78,12 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] Filtre "Sévérité min." dans la vue latence (atténuation visuelle des segments sous le seuil)
 - [x] Guide Game Master (`documents/guide_game_master_contenus_et_tests.md`) — prompts, variables, hypothèses, variantes à tester
 - [x] Banc d'essai complet d'inspection du pipeline Max (RAG → Knowledge → GM Pre → Max → Validator) avec chronologie, tokens, latences, contexte injecté décomposé, brief GM JSON, prompt système final, diagnostic validateur, export JSON et presets rapides
+- [x] Embeddings Voyage AI `voyage-3` (1024 dim) en double-stack avec OpenAI + reranker `rerank-2.5` appliqué après retrieval
+- [x] Filtrage strict par personnage (`character_id`) sur les chunks RAG (chunks scopés vs partagés)
+- [x] Indexes pgvector HNSW (m=16) — fix scoring quasi-nul sur petits datasets vs ivfflat
+- [x] Query rewriting LLM (`rewrite-query` edge function) — reformulation autonome avant RAG
+- [x] Mémoire de session compressée (`summarize-session` + table `session_summaries`) injectée dans le prompt Max
+- [x] Affichage banc d'essai : étape Query rewrite, badge provider d'embedding, par chunk `character_id`/`rerank_score`/retrieval brut
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
 - [ ] Politique de vérité à 4 niveaux (certain / probable / inconnu / interdit)
 - [ ] Bible factuelle éditable et gestion explicite des sujets verrouillés/déverrouillés
