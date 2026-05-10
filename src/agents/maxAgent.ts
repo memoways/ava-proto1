@@ -283,10 +283,15 @@ async function buildMaxSystemPrompt(
   knowledgeContext?: MaxTurnKnowledgeContext,
   conversationHistory: ConversationMessage[] = [],
   characterName: string = "Max",
+  sessionSummary?: string,
 ): Promise<string> {
   const characterPrompt = await getCharacterSystemPrompt(characterName);
   const control = getMaxPromptControlSettings();
   let prompt = `${characterPrompt}\n${GAMEPLAY_RULES}\n\n## PERSONA STABLE\n${control.persona}\n\n## OBJECTIFS\n${control.objectives}\n\n## RÔLE ET CONTEXTE\n${control.roleContext}\n\n## HISTORIQUE STABLE\n${control.longTermMemory}\n\n## STYLE DE RÉPONSE\n${control.responseStyle}\n\n## POLITIQUE DE SAVOIR AUTORISÉ\n${control.allowedKnowledgePolicy}\n\n## INTERDITS D'AFFIRMATION\n${control.forbiddenAssertions}\n\n## SUJETS SENSIBLES / INTERDITS\n${control.forbiddenTopics}\n\n## POLITIQUE D'INCERTITUDE\n${control.uncertaintyPolicy}`;
+
+  if (sessionSummary && sessionSummary.trim()) {
+    prompt += `\n\n## SOUVENIRS DE LA SESSION (résumé compressé des tours précédents)\n${sessionSummary.trim()}`;
+  }
 
   prompt += `\n\n## HISTORIQUE RÉCENT DU TOUR\n${formatRecentHistory(conversationHistory)}`;
 
