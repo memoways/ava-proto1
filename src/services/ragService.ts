@@ -9,6 +9,47 @@ export interface RAGMatch {
   source_id: string;
   content: string;
   similarity: number;
+  /** Cosine similarity from the vector retrieval (kept for traceability when rerank reorders). */
+  retrieval_similarity?: number;
+  /** Score returned by Voyage rerank-2.5 if reranking was applied. */
+  rerank_score?: number;
+  /** Owning character (null for shared sources like storyworld). */
+  character_id?: string | null;
+}
+
+export interface RAGQueryOptions {
+  recentContext?: string;
+  matchCount?: number;
+  matchThreshold?: number;
+  /** Restrict character-scoped chunks to this character. Shared chunks (NULL) always remain visible. */
+  characterId?: string | null;
+  /** Embedding+rerank provider override; falls back to backend default. */
+  provider?: "voyage" | "openai";
+  /** Disable rerank explicitly. */
+  rerank?: boolean;
+  /** Override retrieve_k (top fetched before rerank). */
+  retrieveK?: number;
+  /** Pre-rewritten search query — when provided, used as-is instead of userMessage+context. */
+  rewrittenQuery?: string;
+}
+
+async function callQueryRag(payload: Record<string, unknown>): Promise<{ matches: RAGMatch[]; embedding_provider?: string; rerank_used?: boolean; latency_ms?: number; error?: string; status?: number }> {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    return { matches: [], error: `HTTP ${response.status}: ${err.slice(0, 300)}`, status: response.status };
+  }
+  const data = await response.json();
+  return {
+    matches: data.matches || [],
+    embedding_provider: data.embedding_provider,
+    rerank_used: data.rerank_used,
+    latency_ms: data.latency_ms,
+  };
 }
 
 /**
@@ -19,40 +60,32 @@ export async function queryRAG(
   userMessage: string,
   recentContext?: string,
   matchCount = 5,
-  matchThreshold = 0.3
+  matchThreshold = 0.3,
+  options: Omit<RAGQueryOptions, "recentContext" | "matchCount" | "matchThreshold"> = {},
 ): Promise<RAGMatch[]> {
-  const query = recentContext
-    ? `${userMessage}\n\nContexte récent: ${recentContext}`
-    : userMessage;
+  const startTime = Date.now();
+  const debugId = debugLogger.logFetch("rag", `RAG query (top ${matchCount}${options.characterId ? `, char=${options.characterId.slice(0, 8)}` : ""})`, `${SUPABASE_URL}/functions/v1/query-rag`, { user_message: userMessage.slice(0, 200) });
 
   try {
-    const startTime = Date.now();
-    const debugId = debugLogger.logFetch("rag", `RAG query (${matchCount} matches)`, `${SUPABASE_URL}/functions/v1/query-rag`, { query: query.slice(0, 200) });
-
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query,
-        match_count: matchCount,
-        match_threshold: matchThreshold,
-      }),
+    const res = await callQueryRag({
+      query: options.rewrittenQuery || userMessage,
+      user_message: userMessage,
+      recent_context: recentContext,
+      match_count: matchCount,
+      match_threshold: matchThreshold,
+      character_id: options.characterId ?? null,
+      provider: options.provider,
+      rerank: options.rerank,
+      retrieve_k: options.retrieveK,
     });
-
-    if (!response.ok) {
-      const err = await response.text();
-      debugLogger.logResponse(debugId, "rag", "RAG query", response.status, startTime, err);
-      console.error(`[RAG] Error: ${response.status} - ${err}`);
+    if (res.error) {
+      debugLogger.logResponse(debugId, "rag", "RAG query", res.status || 500, startTime, res.error);
       return [];
     }
-
-    const data = await response.json();
-    const matches = data.matches || [];
-    debugLogger.logResponse(debugId, "rag", `RAG → ${matches.length} matches`, response.status, startTime, matches.map((m: any) => `${m.source_table}: ${m.content.slice(0, 80)}… (${m.similarity.toFixed(2)})`).join("\n"));
-    return matches;
+    debugLogger.logResponse(debugId, "rag", `RAG → ${res.matches.length} matches (${res.embedding_provider}${res.rerank_used ? "+rerank" : ""})`, 200, startTime, res.matches.map((m) => `${m.source_table}: ${m.content.slice(0, 80)}… (sim ${m.similarity.toFixed(2)})`).join("\n"));
+    return res.matches;
   } catch (error) {
     debugLogger.logError("rag", "RAG query failed", error);
-    console.error('[RAG] Failed to query:', error);
     return [];
   }
 }
@@ -60,31 +93,39 @@ export async function queryRAG(
 export interface RAGQueryDetailed {
   matches: RAGMatch[];
   latencyMs: number;
+  embeddingProvider?: string;
+  rerankUsed?: boolean;
   error?: string;
 }
 
-/** Detailed RAG query for diagnostics: returns latency + error if any. */
+/** Detailed RAG query for diagnostics: returns latency + provider + error if any. */
 export async function queryRAGDetailed(
   userMessage: string,
   recentContext?: string,
   matchCount = 5,
   matchThreshold = 0.3,
+  options: Omit<RAGQueryOptions, "recentContext" | "matchCount" | "matchThreshold"> = {},
 ): Promise<RAGQueryDetailed> {
   const startedAt = performance.now();
-  const query = recentContext ? `${userMessage}\n\nContexte récent: ${recentContext}` : userMessage;
   try {
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, match_count: matchCount, match_threshold: matchThreshold }),
+    const res = await callQueryRag({
+      query: options.rewrittenQuery || userMessage,
+      user_message: userMessage,
+      recent_context: recentContext,
+      match_count: matchCount,
+      match_threshold: matchThreshold,
+      character_id: options.characterId ?? null,
+      provider: options.provider,
+      rerank: options.rerank,
+      retrieve_k: options.retrieveK,
     });
-    const latencyMs = Math.round(performance.now() - startedAt);
-    if (!response.ok) {
-      const err = await response.text();
-      return { matches: [], latencyMs, error: `HTTP ${response.status}: ${err.slice(0, 300)}` };
-    }
-    const data = await response.json();
-    return { matches: data.matches || [], latencyMs };
+    return {
+      matches: res.matches,
+      latencyMs: Math.round(performance.now() - startedAt),
+      embeddingProvider: res.embedding_provider,
+      rerankUsed: res.rerank_used,
+      error: res.error,
+    };
   } catch (err) {
     return {
       matches: [],
@@ -98,22 +139,20 @@ export async function queryRAGDetailed(
  * Format RAG matches into a context string for injection into the LLM prompt.
  */
 export function formatRAGContext(matches: RAGMatch[]): string {
-  if (!matches.length) return '';
-
+  if (!matches.length) return "";
   return matches
     .map((m, i) => `[${i + 1}] (${m.source_table}, score: ${m.similarity.toFixed(2)})\n${m.content}`)
-    .join('\n\n');
+    .join("\n\n");
 }
 
-/**
- * Convenience: query RAG and return formatted context string.
- */
+/** Convenience: query RAG and return formatted context string. */
 export async function getRAGContext(
   userMessage: string,
   recentContext?: string,
-  matchCount = 3
+  matchCount = 3,
+  options: Omit<RAGQueryOptions, "recentContext" | "matchCount" | "matchThreshold"> = {},
 ): Promise<string> {
-  const matches = await queryRAG(userMessage, recentContext, matchCount);
+  const matches = await queryRAG(userMessage, recentContext, matchCount, undefined, options);
   return formatRAGContext(matches);
 }
 
@@ -181,4 +220,21 @@ export async function syncNotion(databases: Record<string, string> = AVA_NOTION_
   const data = await response.json();
   debugLogger.logResponse(debugId, "notion", "Sync Notion complete", response.status, startTime, JSON.stringify(data).slice(0, 500));
   return data;
+}
+
+/** Lightweight LLM-based query rewriter — turns "et toi ?" into a self-contained search query. */
+export async function rewriteRAGQuery(userMessage: string, recentContext?: string, characterName?: string): Promise<string | null> {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/rewrite-query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_message: userMessage, recent_context: recentContext, character_name: characterName }),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const q = (data?.query || "").toString().trim();
+    return q.length > 0 ? q : null;
+  } catch {
+    return null;
+  }
 }

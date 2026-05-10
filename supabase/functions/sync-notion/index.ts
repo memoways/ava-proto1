@@ -8,6 +8,7 @@ const corsHeaders = {
 
 const NOTION_API_URL = "https://api.notion.com/v1";
 const OPENAI_API_URL = "https://api.openai.com/v1";
+const VOYAGE_API_URL = "https://api.voyageai.com/v1";
 
 interface NotionPage {
   id: string;
@@ -62,7 +63,10 @@ serve(async (req) => {
     if (!NOTION_API_KEY) throw new Error('NOTION_API_KEY is not configured');
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not configured');
+    const VOYAGE_API_KEY = Deno.env.get('VOYAGE_API_KEY');
+    if (!OPENAI_API_KEY && !VOYAGE_API_KEY) throw new Error('No embedding provider configured (OPENAI_API_KEY or VOYAGE_API_KEY)');
+    const useVoyage = !!VOYAGE_API_KEY;
+    console.log(`[sync-notion] Embedding provider: ${useVoyage ? 'voyage-3 (1024d)' : 'openai-3-small (1536d)'}`);
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -171,30 +175,51 @@ serve(async (req) => {
       return blocks.join('\n\n');
     }
 
-    // Generate embedding via OpenAI
-    async function generateEmbedding(text: string): Promise<number[]> {
-      // Truncate to ~6000 tokens (~18000 chars) to safely stay within 8192 token limit
-      const truncated = text.slice(0, 18000);
-      const res = await fetch(`${OPENAI_API_URL}/embeddings`, {
+    // Generate embedding via Voyage (preferred) or OpenAI fallback. Returns { vector, provider, dim }.
+    async function generateEmbedding(text: string, inputType: "document" | "query" = "document"): Promise<{ vector: number[]; provider: 'voyage' | 'openai'; dim: number }> {
+      const truncated = text.slice(0, 18000); // ~6k tokens safety
+      if (useVoyage) {
+        const r = await fetch(`${VOYAGE_API_URL}/embeddings`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${VOYAGE_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'voyage-3', input: [truncated], input_type: inputType, output_dimension: 1024 }),
+        });
+        if (!r.ok) {
+          const err = await r.text();
+          throw new Error(`Voyage embeddings error [${r.status}]: ${err}`);
+        }
+        const d = await r.json();
+        return { vector: d.data[0].embedding, provider: 'voyage', dim: 1024 };
+      }
+      const r = await fetch(`${OPENAI_API_URL}/embeddings`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: 'text-embedding-3-small', input: truncated }),
       });
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(`OpenAI Embeddings error [${res.status}]: ${err}`);
+      if (!r.ok) {
+        const err = await r.text();
+        throw new Error(`OpenAI Embeddings error [${r.status}]: ${err}`);
       }
-      const data = await res.json();
-      return data.data[0].embedding;
+      const d = await r.json();
+      return { vector: d.data[0].embedding, provider: 'openai', dim: 1536 };
     }
 
-    // Upsert embedding for a record
-    async function upsertEmbedding(sourceTable: string, sourceId: string, content: string) {
+    // Build the row payload depending on provider (writes to embedding or embedding_v).
+    function buildEmbeddingPayload(emb: { vector: number[]; provider: 'voyage' | 'openai' }, characterId: string | null) {
+      const base: Record<string, unknown> = {
+        embedding_provider: emb.provider,
+        character_id: characterId,
+      };
+      if (emb.provider === 'voyage') base.embedding_v = JSON.stringify(emb.vector);
+      else base.embedding = JSON.stringify(emb.vector);
+      return base;
+    }
+
+    // Upsert embedding for a record (single chunk).
+    async function upsertEmbedding(sourceTable: string, sourceId: string, content: string, characterId: string | null = null) {
       if (!content || content.trim().length < 10) return;
-      const embedding = await generateEmbedding(content);
+      const emb = await generateEmbedding(content);
+      const payload = buildEmbeddingPayload(emb, characterId);
       const { data: existing } = await supabase
         .from('embeddings')
         .select('id')
@@ -203,17 +228,15 @@ serve(async (req) => {
         .maybeSingle();
 
       if (existing) {
-        await supabase.from('embeddings')
-          .update({ content, embedding: JSON.stringify(embedding) })
-          .eq('id', existing.id);
+        await supabase.from('embeddings').update({ content, ...payload }).eq('id', existing.id);
       } else {
-        await supabase.from('embeddings')
-          .insert({ source_table: sourceTable, source_id: sourceId, content, embedding: JSON.stringify(embedding) });
+        await supabase.from('embeddings').insert({ source_table: sourceTable, source_id: sourceId, content, ...payload });
       }
     }
 
-    // For long character pages, split into chunks for better RAG retrieval
-    function chunkText(text: string, maxChunkSize = 1500): string[] {
+    // For long character pages, split into chunks for better RAG retrieval.
+    // Now uses 1000 chars max + 150-char overlap between consecutive chunks.
+    function chunkText(text: string, maxChunkSize = 1000, overlap = 150): string[] {
       const sections = text.split(/\n## /);
       const chunks: string[] = [];
       let currentChunk = '';
@@ -266,6 +289,16 @@ serve(async (req) => {
         }
       }
       if (currentChunk.trim()) chunks.push(currentChunk.trim());
+      // Add an overlap window from the previous chunk's tail to the next chunk's head
+      // → mitigates hard cuts when retrieving short chunks.
+      if (overlap > 0 && chunks.length > 1) {
+        const overlapped: string[] = [chunks[0]];
+        for (let i = 1; i < chunks.length; i++) {
+          const prevTail = chunks[i - 1].slice(-overlap);
+          overlapped.push(`…${prevTail}\n\n${chunks[i]}`);
+        }
+        return overlapped;
+      }
       return chunks;
     }
 
@@ -323,13 +356,17 @@ serve(async (req) => {
           continue;
         }
 
-        // Create chunked embeddings for long character pages
-        const fullText = `Personnage: ${name}\nRésumé: ${resume}\n${pageContent}`;
+        // Create chunked embeddings for long character pages.
+        // Each chunk is prefixed with a structured header so the embedding model captures the parent context.
+        const archetype = extractSelect(props['Archétype narratif']) || '';
+        const headerPrefix = `Personnage: ${name}${archetype ? ` | Archétype: ${archetype}` : ''}`;
+        const fullText = `${headerPrefix}\nRésumé: ${resume}\n${pageContent}`;
         const chunks = chunkText(fullText);
 
         if (chunks.length <= 1) {
-          await upsertEmbedding('characters', data.id, fullText);
-          trackEmbedding('characters', fullText.length, 1);
+          const single = `${headerPrefix}\n${fullText}`.slice(0, 18000);
+          await upsertEmbedding('characters', data.id, single, data.id);
+          trackEmbedding('characters', single.length, 1);
         } else {
           console.log(`[sync-notion] Character "${name}": splitting into ${chunks.length} chunks`);
           await supabase.from('embeddings')
@@ -338,15 +375,15 @@ serve(async (req) => {
             .eq('source_id', data.id);
 
           for (let i = 0; i < chunks.length; i++) {
-            const chunkContent = `[${name} - partie ${i + 1}/${chunks.length}]\n${chunks[i]}`;
-            const embedding = await generateEmbedding(chunkContent);
-            await supabase.from('embeddings')
-              .insert({
-                source_table: 'characters',
-                source_id: data.id,
-                content: chunkContent,
-                embedding: JSON.stringify(embedding),
-              });
+            const chunkContent = `${headerPrefix} | Partie ${i + 1}/${chunks.length}\n${chunks[i]}`;
+            const emb = await generateEmbedding(chunkContent);
+            const payload = buildEmbeddingPayload(emb, data.id);
+            await supabase.from('embeddings').insert({
+              source_table: 'characters',
+              source_id: data.id,
+              content: chunkContent,
+              ...payload,
+            });
           }
           trackEmbedding('characters', fullText.length, chunks.length);
         }
@@ -386,8 +423,8 @@ serve(async (req) => {
         }
 
         const tags = extractMultiSelect(props['Tags']).join(', ');
-        const embeddingText = `${title}\nType: ${record.category || 'N/A'}\nTags: ${tags}\n${record.content}`;
-        await upsertEmbedding('storyworld', data.id, embeddingText);
+        const embeddingText = `Sujet: ${title} | Catégorie: ${record.category || 'N/A'}${tags ? ` | Tags: ${tags}` : ''}\n${record.content}`;
+        await upsertEmbedding('storyworld', data.id, embeddingText, null);
         trackEmbedding('storyworld', embeddingText.length, 1);
         synced++;
       }
