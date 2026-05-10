@@ -164,7 +164,7 @@ Ou directement via [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_I
 
 ## 📝 Notes
 
-- **Secrets requis** (dans Lovable Cloud) : `OPENROUTER_API_KEY`, `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, `OPENAI_API_KEY`, `NOTION_API_KEY`
+- **Secrets requis** (dans Lovable Cloud) : `OPENROUTER_API_KEY`, `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, `OPENAI_API_KEY`, `NOTION_API_KEY`, **`VOYAGE_API_KEY`**
 - Desktop only, Chrome recommandé
 - Pas d'authentification — session locale
 - Vidéos servies via Gumlet (intro fonctionnelle, triggers en cours de configuration)
