@@ -5,7 +5,9 @@
 > **Créé avec**: Lovable  
 > **Démarré**: 2026-03-07  
 
-> **Mise à jour récente**: banc d'essai complet « Test de réponse Max » — refonte de l'onglet en **outil d'inspection du pipeline conversationnel** étape par étape (RAG → Knowledge → GM pré-tour → Max → Validateur). À partir d'une simple phrase utilisateur, l'équipe éditoriale peut visualiser : la requête RAG brute (matches + similarités), le contexte injecté décomposé (`allowed_facts`, `active_memories`, `hypotheses`, `blocked_assertions`), le brief GM pré-tour JSON, le prompt système final envoyé à Max, la réponse générée, et le diagnostic de conformité détaillé du validateur (violations, safe points, tokens). Chronologie verticale avec latences et tokens par étape, export JSON du trace complet, presets rapides. Aucune régression sur le pipeline temps réel : les fonctions `*Detailed` coexistent avec les appels prod. Document de plan : `docs/plan_max_test_inspector.md`.
+> **Mise à jour récente (2026-05-10) — RAG v2 (Voyage AI + reranker + query rewriting + mémoire de session)** : ajout des embeddings **Voyage AI `voyage-3` (1024 dim)** en double-stack avec OpenAI, reranker **`rerank-2.5`** appliqué après retrieval (champs `retrieval_similarity` + `rerank_score`), filtrage strict par `character_id` (chunks scopés vs partagés), passage des indexes pgvector en **HNSW** pour fiabilité sur petits datasets. Nouvelles edge functions `rewrite-query` (reformulation de la question utilisateur en requête autonome avant RAG) et `summarize-session` (résumé compressé tous les N tours, injecté dans le prompt Max sous « SOUVENIRS DE LA SESSION »). Le banc d'essai `MaxPromptTestTab` affiche désormais l'étape « Query rewrite », le provider d'embedding par requête, et par chunk : `character_id`, `rerank_score`, similarité de retrieval brute. Détails complets dans `CHANGELOG.md` et `STORY.md`.
+
+> **Mise à jour précédente**: banc d'essai complet « Test de réponse Max » — refonte de l'onglet en **outil d'inspection du pipeline conversationnel** étape par étape (RAG → Knowledge → GM pré-tour → Max → Validateur). Document de plan : `docs/plan_max_test_inspector.md`.
 
 ## En une phrase
 
@@ -76,6 +78,12 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] Filtre "Sévérité min." dans la vue latence (atténuation visuelle des segments sous le seuil)
 - [x] Guide Game Master (`documents/guide_game_master_contenus_et_tests.md`) — prompts, variables, hypothèses, variantes à tester
 - [x] Banc d'essai complet d'inspection du pipeline Max (RAG → Knowledge → GM Pre → Max → Validator) avec chronologie, tokens, latences, contexte injecté décomposé, brief GM JSON, prompt système final, diagnostic validateur, export JSON et presets rapides
+- [x] Embeddings Voyage AI `voyage-3` (1024 dim) en double-stack avec OpenAI + reranker `rerank-2.5` appliqué après retrieval
+- [x] Filtrage strict par personnage (`character_id`) sur les chunks RAG (chunks scopés vs partagés)
+- [x] Indexes pgvector HNSW (m=16) — fix scoring quasi-nul sur petits datasets vs ivfflat
+- [x] Query rewriting LLM (`rewrite-query` edge function) — reformulation autonome avant RAG
+- [x] Mémoire de session compressée (`summarize-session` + table `session_summaries`) injectée dans le prompt Max
+- [x] Affichage banc d'essai : étape Query rewrite, badge provider d'embedding, par chunk `character_id`/`rerank_score`/retrieval brut
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
 - [ ] Politique de vérité à 4 niveaux (certain / probable / inconnu / interdit)
 - [ ] Bible factuelle éditable et gestion explicite des sujets verrouillés/déverrouillés
@@ -87,15 +95,16 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 |-----------|-------------|
 | Frontend | React + Vite + Tailwind + TypeScript (Lovable) |
 | Backend | Lovable Cloud (Supabase Postgres + pgvector) |
-| Edge Functions | proxy-llm, proxy-stt, proxy-tts, sync-notion, query-rag, sync-questionnaire |
+| Edge Functions | proxy-llm, proxy-stt, proxy-tts, sync-notion, query-rag, sync-questionnaire, **rewrite-query**, **summarize-session** |
 | Video | Gumlet (hébergement + embed player) |
 | Cost Tracking | OpenRouter generation API (tokens + USD per call) |
-| LLM | OpenRouter API — Multi-modèles (Qwen, Claude, Grok, Llama, Gemini) |
+| LLM | OpenRouter API — Multi-modèles (Qwen, Claude, Grok, Llama, Gemini, GPT-5) |
 | STT | Deepgram (WebSocket streaming + VAD) |
 | TTS | ElevenLabs (voix custom Max, paramètres ajustables) |
-| Embeddings | OpenAI text-embedding-3-small (1536 dim) |
-| Données | Notion (source de vérité) → Supabase (miroir + embeddings) |
-| RAG | query-rag Edge Function + match_embeddings SQL |
+| Embeddings | **Voyage AI `voyage-3` (1024 dim, défaut)** + OpenAI text-embedding-3-small (1536 dim, fallback) |
+| Reranker | **Voyage `rerank-2.5`** (toggle via `RAG_RERANK_ENABLED`) |
+| Données | Notion (source de vérité) → Supabase (miroir + embeddings double-stack) |
+| RAG | query-rag Edge Function + pgvector HNSW + filtrage `character_id` + query rewrite + session summary |
 
 ## 🧭 Avancement du plan Max / GM
 
@@ -155,7 +164,7 @@ Ou directement via [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_I
 
 ## 📝 Notes
 
-- **Secrets requis** (dans Lovable Cloud) : `OPENROUTER_API_KEY`, `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, `OPENAI_API_KEY`, `NOTION_API_KEY`
+- **Secrets requis** (dans Lovable Cloud) : `OPENROUTER_API_KEY`, `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, `OPENAI_API_KEY`, `NOTION_API_KEY`, **`VOYAGE_API_KEY`**
 - Desktop only, Chrome recommandé
 - Pas d'authentification — session locale
 - Vidéos servies via Gumlet (intro fonctionnelle, triggers en cours de configuration)

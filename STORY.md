@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-08 (session 15 — banc d'essai complet « Test de réponse Max » : inspection pipeline RAG → Knowledge → GM pré-tour → Max → Validator, chronologie verticale avec tokens et latences, export JSON)  
+> **Last Updated**: 2026-05-10 (session 16 — RAG v2 : Voyage AI `voyage-3` + reranker `rerank-2.5`, filtrage strict par personnage, indexes HNSW, query rewriting et mémoire de session compressée injectée dans le prompt Max)  
 
 ---
 
@@ -63,6 +63,31 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-05-10 — RAG v2 : Voyage AI + reranker + query rewriting + mémoire de session compressée 🔷
+
+**Intent**: Le RAG v1 reposait uniquement sur OpenAI `text-embedding-3-small` (1536 dim) avec scoring par cosinus brut, sans filtrage par personnage et sans reformulation de requête. Conséquences observées : (1) chunks d'autres personnages remontaient dans le contexte de Max, (2) les questions implicites (« et toi ? », « pourquoi ? ») produisaient des matches faibles car la requête manquait de contexte, (3) la mémoire au-delà de quelques tours se perdait dans le prompt système. Cible : un pipeline RAG capable de tenir une conversation de 10 minutes en restant éditorialement précis.
+
+**Tool**: Lovable
+
+**Outcome**:
+1. **Embeddings Voyage AI `voyage-3` (1024 dim)** en double-stack avec OpenAI — nouvelle colonne `embedding_v vector(1024)` + `embedding_provider`. Re-sync complète des 4 bases Notion. RPC `match_embeddings_v` dédiée. Le provider est sélectionnable par requête.
+2. **Reranker Voyage `rerank-2.5`** appliqué après le retrieval vectoriel — chaque `RAGMatch` expose désormais `retrieval_similarity` (cosinus brut) et `rerank_score` (Voyage). Toggle `RAG_RERANK_ENABLED` dans `settings.json`. Effet observé en test : un chunk pertinent passe de 0.47 (cosinus) à 0.81 (rerank) et remonte en tête.
+3. **Filtrage strict par `character_id`** — colonne ajoutée sur `embeddings`, propagée via `query-rag`. Les chunks scopés sont filtrés par personnage actif, les chunks partagés (`storyworld`, `rules`) restent visibles à tous. Plus de fuites de persona.
+4. **Indexes HNSW (`m=16, ef_construction=64`)** en remplacement des `ivfflat lists=100` — ces derniers, sur ~226 vecteurs, créaient des sous-listes de ~2 vecteurs et avec `probes=1` par défaut le retrieval Voyage retournait quasi rien (et le système retombait silencieusement sur OpenAI). Bug majeur identifié et corrigé en cours de chantier.
+5. **Query rewriting LLM** — edge function `rewrite-query` (gemini-3-flash-preview) qui transforme « et toi ? » en requête autonome basée sur les 4 derniers tours, avant l'appel RAG. Gating via `RAG_QUERY_REWRITE_ENABLED`. Intégré dans `conversationOrchestrator` et exposé en étape « 0 » dans le banc d'essai.
+6. **Mémoire de session compressée** — table `session_summaries` (1 ligne par session) + edge function `summarize-session` (gemini-3-flash-preview) qui produit un résumé bullet-points (Faits / Sujets / Promesses) tous les `RAG_SUMMARY_EVERY_N_TURNS` (4) tours en fire-and-forget. Service `sessionMemoryService.ts`. Injection automatique dans le prompt Max sous `## SOUVENIRS DE LA SESSION`, fetch en parallèle du RAG pour ne pas alourdir la latence.
+7. **Banc d'essai Max enrichi** :
+   - Étape « 0. Query rewrite » dans la chronologie (original → réécrite, ou « inchangée »)
+   - Badge `embedding_provider` (+ `rerank` si actif) sur l'accordéon RAG
+   - Par chunk : badge `character_id` (ou `shared`), `rerank_score` Voyage, similarité de retrieval brute, score final
+8. **Configuration** — `supabase/config.toml` mis à jour pour les 2 nouvelles edge functions, secret `VOYAGE_API_KEY` ajouté côté backend.
+
+**Ce que ça change** : le RAG passe d'un retrieval cosinus naïf et global à un **pipeline éditorialement scopé et auto-réflexif** — la requête est reformulée si elle est trop pauvre, les chunks sont filtrés par personnage, le scoring est affiné par un reranker dédié, et la conversation entière conserve une mémoire compressée injectée dans le prompt. Le banc d'essai expose chaque étape pour permettre le fine-tuning éditorial sans devinette. Effet attendu : diminution mesurable des hallucinations « hors-périmètre » et meilleure cohérence sur des sessions longues.
+
+**Time**: ~4h sur plusieurs itérations (plan → migration double-stack → re-sync → debug HNSW → rewrite + summarize → UI banc d'essai).
+
+---
 
 ### 2026-05-02 — Diagnostic factuel des latences (survol + panneau latéral + filtre sévérité) + guide Game Master 🔷
 
