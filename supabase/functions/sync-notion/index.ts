@@ -289,6 +289,16 @@ serve(async (req) => {
         }
       }
       if (currentChunk.trim()) chunks.push(currentChunk.trim());
+      // Add an overlap window from the previous chunk's tail to the next chunk's head
+      // → mitigates hard cuts when retrieving short chunks.
+      if (overlap > 0 && chunks.length > 1) {
+        const overlapped: string[] = [chunks[0]];
+        for (let i = 1; i < chunks.length; i++) {
+          const prevTail = chunks[i - 1].slice(-overlap);
+          overlapped.push(`…${prevTail}\n\n${chunks[i]}`);
+        }
+        return overlapped;
+      }
       return chunks;
     }
 
@@ -346,13 +356,17 @@ serve(async (req) => {
           continue;
         }
 
-        // Create chunked embeddings for long character pages
-        const fullText = `Personnage: ${name}\nRésumé: ${resume}\n${pageContent}`;
+        // Create chunked embeddings for long character pages.
+        // Each chunk is prefixed with a structured header so the embedding model captures the parent context.
+        const archetype = extractSelect(props['Archétype narratif']) || '';
+        const headerPrefix = `Personnage: ${name}${archetype ? ` | Archétype: ${archetype}` : ''}`;
+        const fullText = `${headerPrefix}\nRésumé: ${resume}\n${pageContent}`;
         const chunks = chunkText(fullText);
 
         if (chunks.length <= 1) {
-          await upsertEmbedding('characters', data.id, fullText);
-          trackEmbedding('characters', fullText.length, 1);
+          const single = `${headerPrefix}\n${fullText}`.slice(0, 18000);
+          await upsertEmbedding('characters', data.id, single, data.id);
+          trackEmbedding('characters', single.length, 1);
         } else {
           console.log(`[sync-notion] Character "${name}": splitting into ${chunks.length} chunks`);
           await supabase.from('embeddings')
@@ -361,15 +375,15 @@ serve(async (req) => {
             .eq('source_id', data.id);
 
           for (let i = 0; i < chunks.length; i++) {
-            const chunkContent = `[${name} - partie ${i + 1}/${chunks.length}]\n${chunks[i]}`;
-            const embedding = await generateEmbedding(chunkContent);
-            await supabase.from('embeddings')
-              .insert({
-                source_table: 'characters',
-                source_id: data.id,
-                content: chunkContent,
-                embedding: JSON.stringify(embedding),
-              });
+            const chunkContent = `${headerPrefix} | Partie ${i + 1}/${chunks.length}\n${chunks[i]}`;
+            const emb = await generateEmbedding(chunkContent);
+            const payload = buildEmbeddingPayload(emb, data.id);
+            await supabase.from('embeddings').insert({
+              source_table: 'characters',
+              source_id: data.id,
+              content: chunkContent,
+              ...payload,
+            });
           }
           trackEmbedding('characters', fullText.length, chunks.length);
         }
