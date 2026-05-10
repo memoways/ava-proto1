@@ -1,4 +1,4 @@
-import { queryRAGDetailed, formatRAGContext, buildKnowledgeContextFromRAG, type RAGMatch } from "./ragService";
+import { queryRAGDetailed, formatRAGContext, buildKnowledgeContextFromRAG, rewriteRAGQuery, type RAGMatch } from "./ragService";
 import { planGameMasterTurnDetailed, type PlanGameMasterDetailed } from "@/agents/gameMasterAgent";
 import { simulateMaxResponse, validateMaxResponseDetailed, type SimulateMaxResult, type ValidateMaxDetailed } from "@/agents/maxAgent";
 import type { ConversationMessage, MaxTurnKnowledgeContext } from "@/types";
@@ -12,7 +12,8 @@ export interface StepStatus {
 }
 
 export interface MaxTestStepStates {
-  rag: StepStatus & { matches?: RAGMatch[]; threshold?: number; topK?: number };
+  rewrite: StepStatus & { original?: string; rewritten?: string | null };
+  rag: StepStatus & { matches?: RAGMatch[]; threshold?: number; topK?: number; embeddingProvider?: string; rerankUsed?: boolean };
   knowledge: StepStatus & { context?: MaxTurnKnowledgeContext };
   gmPre: StepStatus & { detail?: PlanGameMasterDetailed };
   max: StepStatus & { detail?: SimulateMaxResult };
@@ -37,6 +38,7 @@ export type StepKey = keyof MaxTestStepStates;
 
 export function emptyStepStates(): MaxTestStepStates {
   return {
+    rewrite: { status: "pending" },
     rag: { status: "pending" },
     knowledge: { status: "pending" },
     gmPre: { status: "pending" },
@@ -78,22 +80,52 @@ export async function runMaxTestPipeline(
   const threshold = input.ragThreshold ?? 0.3;
   const recentText = input.conversationHistory.slice(-4).map((m) => m.content).join(" ");
 
-  // 1. RAG
-  let ragContext = "";
-  let knowledgeContext: MaxTurnKnowledgeContext = {};
+  // 0. Query rewrite (optional, before RAG)
+  let rewrittenQuery: string | null = null;
   if (input.skipRAG) {
+    states.rewrite = { status: "skipped" };
     states.rag = { status: "skipped" };
     states.knowledge = { status: "skipped" };
   } else {
+    const tR = performance.now();
+    states.rewrite = { status: "running", startedAt: tR, original: input.userMessage };
+    onUpdate({ ...states });
+    try {
+      rewrittenQuery = await rewriteRAGQuery(input.userMessage, recentText, input.characterName);
+      states.rewrite = {
+        status: "ok",
+        durationMs: Math.round(performance.now() - tR),
+        original: input.userMessage,
+        rewritten: rewrittenQuery,
+      };
+    } catch (err) {
+      states.rewrite = {
+        status: "error",
+        durationMs: Math.round(performance.now() - tR),
+        original: input.userMessage,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+    onUpdate({ ...states });
+  }
+
+  // 1. RAG
+  let ragContext = "";
+  let knowledgeContext: MaxTurnKnowledgeContext = {};
+  if (!input.skipRAG) {
     states.rag = { status: "running", startedAt: performance.now(), topK, threshold };
     onUpdate({ ...states });
-    const ragRes = await queryRAGDetailed(input.userMessage, recentText, topK, threshold);
+    const ragRes = await queryRAGDetailed(input.userMessage, recentText, topK, threshold, {
+      rewrittenQuery: rewrittenQuery || undefined,
+    });
     states.rag = {
       status: ragRes.error ? "error" : "ok",
       durationMs: ragRes.latencyMs,
       matches: ragRes.matches,
       threshold,
       topK,
+      embeddingProvider: ragRes.embeddingProvider,
+      rerankUsed: ragRes.rerankUsed,
       error: ragRes.error,
     };
     onUpdate({ ...states });

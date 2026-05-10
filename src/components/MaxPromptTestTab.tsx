@@ -28,6 +28,7 @@ const PRESETS = [
 ];
 
 const STEP_LABELS: Record<StepKey, string> = {
+  rewrite: "0. Query rewrite",
   rag: "1. RAG query",
   knowledge: "2. Knowledge build",
   gmPre: "3. GM pré-tour",
@@ -199,9 +200,16 @@ export default function MaxPromptTestTab() {
           {(Object.keys(STEP_LABELS) as StepKey[]).map((key) => {
             const s = states[key];
             const meta: string[] = [];
+            if (key === "rewrite" && s.status === "ok") {
+              const rw = (s as any).rewritten;
+              meta.push(rw ? `→ "${String(rw).slice(0, 80)}"` : "(inchangée)");
+            }
             if (key === "rag" && s.status === "ok") {
               const matches = (s as any).matches?.length ?? 0;
+              const prov = (s as any).embeddingProvider;
+              const rer = (s as any).rerankUsed;
               meta.push(`${matches} matches`);
+              if (prov) meta.push(`provider: ${prov}${rer ? "+rerank" : ""}`);
             }
             if (key === "gmPre" && s.status === "ok") {
               const d = (s as any).detail;
@@ -233,9 +241,41 @@ export default function MaxPromptTestTab() {
       </section>
 
       {/* Inspection accordions */}
-      <Accordion type="multiple" defaultValue={["max", "validator"]} className="space-y-2">
+      <Accordion type="multiple" defaultValue={["rewrite", "rag", "max", "validator"]} className="space-y-2">
+        <AccordionItem value="rewrite" className="rounded-lg border px-4">
+          <AccordionTrigger>Query rewrite</AccordionTrigger>
+          <AccordionContent>
+            {states.rewrite.status === "skipped" ? (
+              <p className="text-sm text-muted-foreground">Étape ignorée.</p>
+            ) : states.rewrite.status === "pending" ? (
+              <p className="text-sm text-muted-foreground">Pas exécuté.</p>
+            ) : (
+              <div className="space-y-2 text-xs">
+                <div className="rounded border bg-muted/20 p-2">
+                  <p className="mb-1 font-medium text-muted-foreground">Original</p>
+                  <p className="whitespace-pre-wrap">{states.rewrite.original}</p>
+                </div>
+                <div className="rounded border bg-primary/5 p-2">
+                  <p className="mb-1 font-medium text-muted-foreground">Réécrite (envoyée au RAG)</p>
+                  <p className="whitespace-pre-wrap">
+                    {states.rewrite.rewritten ? states.rewrite.rewritten : <em className="text-muted-foreground">aucune réécriture — message original utilisé</em>}
+                  </p>
+                </div>
+                {states.rewrite.error && <div className="rounded bg-destructive/10 p-2 text-destructive">{states.rewrite.error}</div>}
+              </div>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+
         <AccordionItem value="rag" className="rounded-lg border px-4">
-          <AccordionTrigger>RAG matches ({states.rag.matches?.length ?? 0})</AccordionTrigger>
+          <AccordionTrigger>
+            RAG matches ({states.rag.matches?.length ?? 0})
+            {states.rag.embeddingProvider && (
+              <Badge variant="secondary" className="ml-2 text-[10px]">
+                {states.rag.embeddingProvider}{states.rag.rerankUsed ? " + rerank" : ""}
+              </Badge>
+            )}
+          </AccordionTrigger>
           <AccordionContent>
             {states.rag.error && <div className="mb-2 rounded bg-destructive/10 p-2 text-xs text-destructive">{states.rag.error}</div>}
             {!states.rag.matches?.length ? (
@@ -244,9 +284,22 @@ export default function MaxPromptTestTab() {
               <div className="space-y-2">
                 {states.rag.matches.map((m, i) => (
                   <div key={m.id} className="rounded border bg-muted/20 p-3 text-xs">
-                    <div className="mb-1 flex items-center justify-between">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
                       <Badge variant="outline">[{i + 1}] {m.source_table}</Badge>
-                      <span className="tabular-nums">similarity: {m.similarity.toFixed(3)}</span>
+                      {m.character_id ? (
+                        <Badge variant="secondary" className="text-[10px]">char: {m.character_id.slice(0, 8)}</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px]">shared</Badge>
+                      )}
+                      <span className="ml-auto flex gap-3 tabular-nums text-muted-foreground">
+                        {typeof m.rerank_score === "number" && (
+                          <span title="Voyage rerank-2.5 score">rerank: <strong className="text-foreground">{m.rerank_score.toFixed(3)}</strong></span>
+                        )}
+                        {typeof m.retrieval_similarity === "number" && (
+                          <span title="Cosine retrieval similarity">retrieval: {m.retrieval_similarity.toFixed(3)}</span>
+                        )}
+                        <span>final: {m.similarity.toFixed(3)}</span>
+                      </span>
                     </div>
                     <p className="whitespace-pre-wrap">{m.content}</p>
                   </div>
