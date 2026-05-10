@@ -178,6 +178,7 @@ export async function processConversationTurn(
     postVideoContext,
     session_id: sessionId,
     knowledgeContext: ragResult.knowledgeContext,
+    sessionSummary,
   };
 
   const validatedPromise = generateValidatedMaxResponse(maxInput);
