@@ -87,6 +87,7 @@ export default function MaxPromptTestTab() {
   const [topK, setTopK] = useState(5);
   const [threshold, setThreshold] = useState(0.3);
   const [trustLevel, setTrustLevel] = useState(0);
+  const [sessionSummary, setSessionSummary] = useState("");
   const [running, setRunning] = useState(false);
   const [states, setStates] = useState<MaxTestStepStates>(emptyStepStates());
 
