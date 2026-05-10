@@ -423,8 +423,8 @@ serve(async (req) => {
         }
 
         const tags = extractMultiSelect(props['Tags']).join(', ');
-        const embeddingText = `${title}\nType: ${record.category || 'N/A'}\nTags: ${tags}\n${record.content}`;
-        await upsertEmbedding('storyworld', data.id, embeddingText);
+        const embeddingText = `Sujet: ${title} | Catégorie: ${record.category || 'N/A'}${tags ? ` | Tags: ${tags}` : ''}\n${record.content}`;
+        await upsertEmbedding('storyworld', data.id, embeddingText, null);
         trackEmbedding('storyworld', embeddingText.length, 1);
         synced++;
       }
