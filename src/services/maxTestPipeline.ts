@@ -38,6 +38,7 @@ export type StepKey = keyof MaxTestStepStates;
 
 export function emptyStepStates(): MaxTestStepStates {
   return {
+    rewrite: { status: "pending" },
     rag: { status: "pending" },
     knowledge: { status: "pending" },
     gmPre: { status: "pending" },
