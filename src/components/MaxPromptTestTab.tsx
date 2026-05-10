@@ -28,6 +28,7 @@ const PRESETS = [
 ];
 
 const STEP_LABELS: Record<StepKey, string> = {
+  rewrite: "0. Query rewrite",
   rag: "1. RAG query",
   knowledge: "2. Knowledge build",
   gmPre: "3. GM pré-tour",
