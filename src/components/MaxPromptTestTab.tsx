@@ -27,6 +27,27 @@ const PRESETS = [
   { id: "intim", label: "Sujet sensible", text: "Tu penses qu'Ava est encore en vie ?" },
 ];
 
+/**
+ * Scénario complet « banc d'essai RAG v2 » :
+ * - historique multi-tours qui déclenche l'injection de mémoire de session
+ * - dernier message volontairement ambigu pour exercer le query rewrite
+ * - le RAG appliquera rerank + provider configurés dans les toggles courants
+ */
+const FULL_BENCH_SCENARIO = {
+  history: [
+    "USER: Salut Max, tu peux me parler d'Ava ?",
+    "MAX: Ava… c'est ma sœur. Elle a disparu il y a quelques semaines.",
+    "USER: Vous étiez proches ?",
+    "MAX: Très. On se voyait presque tous les jours avant qu'elle déménage.",
+    "USER: Elle t'avait parlé de quelque chose d'inhabituel récemment ?",
+    "MAX: Elle bossait sur un truc qu'elle voulait pas trop expliquer. Un projet, peut-être.",
+  ].join("\n"),
+  message: "Et ce truc-là, justement, t'en sais plus ?",
+  sessionSummary:
+    "Max a confié que sa sœur Ava a disparu récemment. Ils étaient très proches. Avant sa disparition, Ava travaillait sur un projet qu'elle ne souhaitait pas détailler.",
+};
+
+
 const STEP_LABELS: Record<StepKey, string> = {
   rewrite: "0. Query rewrite",
   rag: "1. RAG query",
