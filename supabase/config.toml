@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.query-rag]
 verify_jwt = false
+
+[functions.rewrite-query]
+verify_jwt = false
+
+[functions.summarize-session]
+verify_jwt = false
