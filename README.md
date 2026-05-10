@@ -137,6 +137,41 @@ npm run dev
 
 Ou directement via [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID).
 
+## 🧪 Protocole de test RAG v2 (banc d'essai Max)
+
+Prérequis : secret `VOYAGE_API_KEY` configuré dans Lovable Cloud, et données Notion synchronisées (`sync-notion` → `embedding_v` rempli).
+
+### 1. Activer les toggles (`src/config/settings.json`)
+
+```json
+{
+  "RAG_EMBEDDING_PROVIDER": "voyage",
+  "RAG_RERANK_ENABLED": true,
+  "RAG_QUERY_REWRITE_ENABLED": true,
+  "RAG_TOP_K": 5,
+  "RAG_RETRIEVE_K": 15
+}
+```
+
+### 2. Lancer le banc d'essai
+
+Aller sur `/admin` → onglet **Test de réponse Max**.
+
+### 3. Points de contrôle attendus
+
+| Étape | Contrôle | Détail |
+|---|---|---|
+| **0. Query rewrite** | Message ambigu (ex. *"Et toi ?"*) | Vérifier que la requête est réécrite en phrase autonome dans l'accordéon |
+| **1. RAG** | Provider badge | Doit afficher **voyage** (pas openai) |
+| **1. RAG** | `rerankUsed` | Badge présent si `RAG_RERANK_ENABLED=true` |
+| **1. RAG** | Par chunk | Vérifier `character_id` (scopé ou "shared"), `retrieval_similarity` (cosine brute), `rerank_score` (Voyage rerank-2.5) |
+| **4. Max** | Réponse | Doit s'appuyer sur les chunks rerankés, pas inventer hors contexte |
+| **5. Mémoire session** | Historique de 4+ tours | Après 4 tours utilisateur, un résumé est généré et réinjecté dans le prompt (visible dans le contexte final de Max sous *SOUVENIRS DE LA SESSION*) |
+
+### 4. Test rapide d'ambiguïté
+
+Saisir un historique avec un message ambigu (antécédent manquant) et vérifier que le pipeline affiche la requête réécrite avant le RAG. Sans rewrite, le RAG retourne des chunks incohérents ; avec rewrite, les chunks doivent revenir cohérents avec le sujet rétabli.
+
 ## 🔗 Liens
 
 - **URL de prod**: https://ava-proto1.lovable.app
