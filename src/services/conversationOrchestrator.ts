@@ -1,6 +1,7 @@
 import { simulateMaxResponse, validateMaxResponseConstraints, type MaxAgentInput } from "@/agents/maxAgent";
 import { callGameMaster, planGameMasterTurn, type GameMasterInput } from "@/agents/gameMasterAgent";
-import { buildKnowledgeContextFromRAG, formatRAGContext, queryRAG } from "@/services/ragService";
+import { buildKnowledgeContextFromRAG, formatRAGContext, queryRAG, rewriteRAGQuery } from "@/services/ragService";
+import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, ConversationPipelineTimings, ConversationPipelineTrace, ConversationValidationTrace, GameMasterResponse, GameMasterTurnBrief, MaxConstraintCheckResult, VideoTrigger } from "@/types";
 import { getGameplaySettings, getLLMSettings } from "@/services/settingsService";
@@ -85,11 +86,35 @@ export async function processConversationTurn(
   // Fetch RAG context if not provided (non-blocking — start immediately)
   let finalRagContext = ragContext;
   const gameplay = getGameplaySettings();
+
+  // Kick off session summary fetch in parallel — does not block RAG.
+  const summaryPromise = sessionId ? fetchSessionSummary(sessionId) : Promise.resolve(null);
+
   const ragStart = performance.now();
   const ragPromise = !finalRagContext ? (async () => {
     try {
       const recentMessages = conversationHistory.slice(-4).map(m => m.content).join(' ');
-      const matches = await queryRAG(userMessage, recentMessages, gameplay.RAG_TOP_K);
+
+      // Optional query rewriting (toggle: RAG_QUERY_REWRITE_ENABLED).
+      let rewrittenQuery: string | undefined;
+      if (gameplay.RAG_QUERY_REWRITE_ENABLED) {
+        try {
+          const r = await rewriteRAGQuery(userMessage, recentMessages);
+          if (r && r !== userMessage) {
+            rewrittenQuery = r;
+            console.log('[RAG] Rewritten query:', r);
+          }
+        } catch (rwErr) {
+          console.warn('[RAG] rewrite failed (fallback to raw):', rwErr);
+        }
+      }
+
+      const matches = await queryRAG(userMessage, recentMessages, gameplay.RAG_TOP_K, undefined, {
+        rewrittenQuery,
+        rerank: gameplay.RAG_RERANK_ENABLED,
+        retrieveK: gameplay.RAG_RETRIEVE_K,
+        provider: gameplay.RAG_EMBEDDING_PROVIDER,
+      });
       const ctx = formatRAGContext(matches);
       if (ctx) console.log('[RAG] Context found, injecting into prompt');
       return { ctx, knowledgeContext: buildKnowledgeContextFromRAG(matches) };
@@ -104,6 +129,10 @@ export async function processConversationTurn(
   const rag_ms = Math.round(performance.now() - ragStart);
   finalRagContext = ragResult.ctx;
   debugLogger.log({ service: "other", level: "info", direction: "out", label: `Orchestrator: RAG done (${rag_ms}ms), calling Max+GM in parallel`, detail: `History: ${conversationHistory.length} msgs, trust: ${currentTrustLevel}` });
+
+  // Resolve the session summary (small fetch, usually finished by now).
+  const summaryRecord = await summaryPromise;
+  const sessionSummary = summaryRecord?.summary;
 
   // Lance le GM pre-turn ET la réponse Max EN PARALLÈLE.
   const gmPreStart = performance.now();
@@ -149,6 +178,7 @@ export async function processConversationTurn(
     postVideoContext,
     session_id: sessionId,
     knowledgeContext: ragResult.knowledgeContext,
+    sessionSummary,
   };
 
   const validatedPromise = generateValidatedMaxResponse(maxInput);
@@ -192,6 +222,22 @@ export async function processConversationTurn(
 
     return { gameMasterResponse, trigger, gm_post_ms: Math.round(performance.now() - gmPostStart) };
   })();
+
+  // Background: refresh compressed session summary every N user turns.
+  if (sessionId && gameplay.RAG_SUMMARY_EVERY_N_TURNS > 0) {
+    const userTurns = conversationHistory.filter((m) => m.role === "user").length + 1; // +1 = current turn
+    const lastSummarizedTurn = summaryRecord?.last_turn ?? 0;
+    const dueForSummary = userTurns - lastSummarizedTurn >= gameplay.RAG_SUMMARY_EVERY_N_TURNS;
+    if (dueForSummary) {
+      const fullHistory: ConversationMessage[] = [
+        ...conversationHistory,
+        { role: "user", content: userMessage, timestamp: Date.now() },
+        { role: "max", content: validatedTurn.response, timestamp: Date.now() },
+      ];
+      // Fire and forget — never block the turn.
+      summarizeSessionAsync(sessionId, fullHistory, userTurns).catch(() => {});
+    }
+  }
 
   return {
     maxResponse: validatedTurn.response,
