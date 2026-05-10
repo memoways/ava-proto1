@@ -1,4 +1,4 @@
-import { queryRAGDetailed, formatRAGContext, buildKnowledgeContextFromRAG, type RAGMatch } from "./ragService";
+import { queryRAGDetailed, formatRAGContext, buildKnowledgeContextFromRAG, rewriteRAGQuery, type RAGMatch } from "./ragService";
 import { planGameMasterTurnDetailed, type PlanGameMasterDetailed } from "@/agents/gameMasterAgent";
 import { simulateMaxResponse, validateMaxResponseDetailed, type SimulateMaxResult, type ValidateMaxDetailed } from "@/agents/maxAgent";
 import type { ConversationMessage, MaxTurnKnowledgeContext } from "@/types";
