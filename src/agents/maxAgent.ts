@@ -72,6 +72,8 @@ export interface MaxAgentInput {
   postVideoContext?: string;
   session_id?: string;
   knowledgeContext?: MaxTurnKnowledgeContext;
+  /** Compressed bullet-point summary of earlier turns of the same session. */
+  sessionSummary?: string;
 }
 
 /**
