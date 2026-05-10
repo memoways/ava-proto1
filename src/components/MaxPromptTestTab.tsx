@@ -99,9 +99,10 @@ export default function MaxPromptTestTab() {
 
   const conversationHistory = useMemo(() => parseHistory(historyText), [historyText]);
 
-  async function handleRun(opts?: { skipRAG?: boolean; skipGM?: boolean; skipValidator?: boolean }) {
+  async function handleRun(opts?: { skipRAG?: boolean; skipGM?: boolean; skipValidator?: boolean; overrideHistory?: ReturnType<typeof parseHistory>; overrideMessage?: string; overrideSummary?: string }) {
     if (running) return;
-    if (!userMessage.trim()) {
+    const msg = opts?.overrideMessage ?? userMessage;
+    if (!msg.trim()) {
       toast.error("Saisis un message utilisateur");
       return;
     }
@@ -111,14 +112,17 @@ export default function MaxPromptTestTab() {
       const final = await runMaxTestPipeline(
         {
           characterName,
-          userMessage,
-          conversationHistory,
+          userMessage: msg,
+          conversationHistory: opts?.overrideHistory ?? conversationHistory,
           ragTopK: topK,
           ragThreshold: threshold,
           currentTrustLevel: trustLevel,
           triggeredIds: [],
           timeElapsedSeconds: 0,
-          ...opts,
+          sessionSummary: (opts?.overrideSummary ?? sessionSummary) || undefined,
+          skipRAG: opts?.skipRAG,
+          skipGM: opts?.skipGM,
+          skipValidator: opts?.skipValidator,
         },
         (s) => setStates({ ...s }),
       );
@@ -130,6 +134,18 @@ export default function MaxPromptTestTab() {
     } finally {
       setRunning(false);
     }
+  }
+
+  async function handleRunFullBench() {
+    setHistoryText(FULL_BENCH_SCENARIO.history);
+    setUserMessage(FULL_BENCH_SCENARIO.message);
+    setSessionSummary(FULL_BENCH_SCENARIO.sessionSummary);
+    toast.info("Banc complet : rewrite + rerank + mémoire de session");
+    await handleRun({
+      overrideHistory: parseHistory(FULL_BENCH_SCENARIO.history),
+      overrideMessage: FULL_BENCH_SCENARIO.message,
+      overrideSummary: FULL_BENCH_SCENARIO.sessionSummary,
+    });
   }
 
   function exportTrace() {
