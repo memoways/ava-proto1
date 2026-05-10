@@ -32,6 +32,7 @@ export interface MaxTestPipelineInput {
   skipRAG?: boolean;
   skipGM?: boolean;
   skipValidator?: boolean;
+  sessionSummary?: string;
 }
 
 export type StepKey = keyof MaxTestStepStates;
