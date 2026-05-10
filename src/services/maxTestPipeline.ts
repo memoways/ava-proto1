@@ -32,6 +32,7 @@ export interface MaxTestPipelineInput {
   skipRAG?: boolean;
   skipGM?: boolean;
   skipValidator?: boolean;
+  sessionSummary?: string;
 }
 
 export type StepKey = keyof MaxTestStepStates;
@@ -173,6 +174,7 @@ export async function runMaxTestPipeline(
         userMessage: input.userMessage,
         ragContext: ragContext || undefined,
         knowledgeContext,
+        sessionSummary: input.sessionSummary,
       },
       { characterName: input.characterName, featureKey: "max_prompt_test_full" },
     );

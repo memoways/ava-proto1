@@ -27,6 +27,27 @@ const PRESETS = [
   { id: "intim", label: "Sujet sensible", text: "Tu penses qu'Ava est encore en vie ?" },
 ];
 
+/**
+ * Scénario complet « banc d'essai RAG v2 » :
+ * - historique multi-tours qui déclenche l'injection de mémoire de session
+ * - dernier message volontairement ambigu pour exercer le query rewrite
+ * - le RAG appliquera rerank + provider configurés dans les toggles courants
+ */
+const FULL_BENCH_SCENARIO = {
+  history: [
+    "USER: Salut Max, tu peux me parler d'Ava ?",
+    "MAX: Ava… c'est ma sœur. Elle a disparu il y a quelques semaines.",
+    "USER: Vous étiez proches ?",
+    "MAX: Très. On se voyait presque tous les jours avant qu'elle déménage.",
+    "USER: Elle t'avait parlé de quelque chose d'inhabituel récemment ?",
+    "MAX: Elle bossait sur un truc qu'elle voulait pas trop expliquer. Un projet, peut-être.",
+  ].join("\n"),
+  message: "Et ce truc-là, justement, t'en sais plus ?",
+  sessionSummary:
+    "Max a confié que sa sœur Ava a disparu récemment. Ils étaient très proches. Avant sa disparition, Ava travaillait sur un projet qu'elle ne souhaitait pas détailler.",
+};
+
+
 const STEP_LABELS: Record<StepKey, string> = {
   rewrite: "0. Query rewrite",
   rag: "1. RAG query",
@@ -66,6 +87,7 @@ export default function MaxPromptTestTab() {
   const [topK, setTopK] = useState(5);
   const [threshold, setThreshold] = useState(0.3);
   const [trustLevel, setTrustLevel] = useState(0);
+  const [sessionSummary, setSessionSummary] = useState("");
   const [running, setRunning] = useState(false);
   const [states, setStates] = useState<MaxTestStepStates>(emptyStepStates());
 
@@ -77,9 +99,10 @@ export default function MaxPromptTestTab() {
 
   const conversationHistory = useMemo(() => parseHistory(historyText), [historyText]);
 
-  async function handleRun(opts?: { skipRAG?: boolean; skipGM?: boolean; skipValidator?: boolean }) {
+  async function handleRun(opts?: { skipRAG?: boolean; skipGM?: boolean; skipValidator?: boolean; overrideHistory?: ReturnType<typeof parseHistory>; overrideMessage?: string; overrideSummary?: string }) {
     if (running) return;
-    if (!userMessage.trim()) {
+    const msg = opts?.overrideMessage ?? userMessage;
+    if (!msg.trim()) {
       toast.error("Saisis un message utilisateur");
       return;
     }
@@ -89,14 +112,17 @@ export default function MaxPromptTestTab() {
       const final = await runMaxTestPipeline(
         {
           characterName,
-          userMessage,
-          conversationHistory,
+          userMessage: msg,
+          conversationHistory: opts?.overrideHistory ?? conversationHistory,
           ragTopK: topK,
           ragThreshold: threshold,
           currentTrustLevel: trustLevel,
           triggeredIds: [],
           timeElapsedSeconds: 0,
-          ...opts,
+          sessionSummary: (opts?.overrideSummary ?? sessionSummary) || undefined,
+          skipRAG: opts?.skipRAG,
+          skipGM: opts?.skipGM,
+          skipValidator: opts?.skipValidator,
         },
         (s) => setStates({ ...s }),
       );
@@ -108,6 +134,18 @@ export default function MaxPromptTestTab() {
     } finally {
       setRunning(false);
     }
+  }
+
+  async function handleRunFullBench() {
+    setHistoryText(FULL_BENCH_SCENARIO.history);
+    setUserMessage(FULL_BENCH_SCENARIO.message);
+    setSessionSummary(FULL_BENCH_SCENARIO.sessionSummary);
+    toast.info("Banc complet : rewrite + rerank + mémoire de session");
+    await handleRun({
+      overrideHistory: parseHistory(FULL_BENCH_SCENARIO.history),
+      overrideMessage: FULL_BENCH_SCENARIO.message,
+      overrideSummary: FULL_BENCH_SCENARIO.sessionSummary,
+    });
   }
 
   function exportTrace() {
@@ -169,6 +207,16 @@ export default function MaxPromptTestTab() {
           <Textarea value={historyText} onChange={(e) => setHistoryText(e.target.value)} className="min-h-[100px] font-mono text-xs" placeholder={"USER: bonjour\nMAX: salut, qui es-tu ?"} />
         </div>
 
+        <div className="space-y-2 lg:col-span-3">
+          <Label>Mémoire de session injectée (optionnel — résumé compressé des tours précédents)</Label>
+          <Textarea
+            value={sessionSummary}
+            onChange={(e) => setSessionSummary(e.target.value)}
+            className="min-h-[70px] font-mono text-xs"
+            placeholder="Laisser vide pour ne pas injecter de mémoire de session."
+          />
+        </div>
+
         <div className="space-y-2">
           <Label>RAG top_k</Label>
           <Input type="number" value={topK} onChange={(e) => setTopK(Number(e.target.value))} />
@@ -177,9 +225,12 @@ export default function MaxPromptTestTab() {
           <Label>RAG threshold</Label>
           <Input type="number" step="0.05" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} />
         </div>
-        <div className="flex items-end gap-2">
+        <div className="flex flex-wrap items-end gap-2">
           <Button onClick={() => handleRun()} disabled={running}>
             {running ? "Simulation…" : "Lancer la simulation complète"}
+          </Button>
+          <Button variant="secondary" onClick={handleRunFullBench} disabled={running} title="Charge un scénario multi-tours ambigu et exécute rewrite + rerank + mémoire de session avec les toggles courants.">
+            🧪 Lancer le banc (rewrite + rerank + mémoire)
           </Button>
           <Button variant="outline" onClick={() => handleRun({ skipRAG: true, skipGM: true })} disabled={running}>
             Max seul
