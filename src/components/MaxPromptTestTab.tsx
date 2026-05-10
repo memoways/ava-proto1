@@ -207,6 +207,16 @@ export default function MaxPromptTestTab() {
           <Textarea value={historyText} onChange={(e) => setHistoryText(e.target.value)} className="min-h-[100px] font-mono text-xs" placeholder={"USER: bonjour\nMAX: salut, qui es-tu ?"} />
         </div>
 
+        <div className="space-y-2 lg:col-span-3">
+          <Label>Mémoire de session injectée (optionnel — résumé compressé des tours précédents)</Label>
+          <Textarea
+            value={sessionSummary}
+            onChange={(e) => setSessionSummary(e.target.value)}
+            className="min-h-[70px] font-mono text-xs"
+            placeholder="Laisser vide pour ne pas injecter de mémoire de session."
+          />
+        </div>
+
         <div className="space-y-2">
           <Label>RAG top_k</Label>
           <Input type="number" value={topK} onChange={(e) => setTopK(Number(e.target.value))} />
@@ -215,9 +225,12 @@ export default function MaxPromptTestTab() {
           <Label>RAG threshold</Label>
           <Input type="number" step="0.05" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} />
         </div>
-        <div className="flex items-end gap-2">
+        <div className="flex flex-wrap items-end gap-2">
           <Button onClick={() => handleRun()} disabled={running}>
             {running ? "Simulation…" : "Lancer la simulation complète"}
+          </Button>
+          <Button variant="secondary" onClick={handleRunFullBench} disabled={running} title="Charge un scénario multi-tours ambigu et exécute rewrite + rerank + mémoire de session avec les toggles courants.">
+            🧪 Lancer le banc (rewrite + rerank + mémoire)
           </Button>
           <Button variant="outline" onClick={() => handleRun({ skipRAG: true, skipGM: true })} disabled={running}>
             Max seul
