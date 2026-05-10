@@ -12,7 +12,8 @@ export interface StepStatus {
 }
 
 export interface MaxTestStepStates {
-  rag: StepStatus & { matches?: RAGMatch[]; threshold?: number; topK?: number };
+  rewrite: StepStatus & { original?: string; rewritten?: string | null };
+  rag: StepStatus & { matches?: RAGMatch[]; threshold?: number; topK?: number; embeddingProvider?: string; rerankUsed?: boolean };
   knowledge: StepStatus & { context?: MaxTurnKnowledgeContext };
   gmPre: StepStatus & { detail?: PlanGameMasterDetailed };
   max: StepStatus & { detail?: SimulateMaxResult };
