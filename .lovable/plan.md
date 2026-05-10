@@ -1,246 +1,146 @@
-## Objectif
-Produire un livrable clair sur la mécanique actuelle entre le Game Master et Max, puis proposer une évolution pour mieux contrôler ce que Max sait, dit, et la manière dont il le dit.
 
-## Schéma de la mécanique actuelle
-```text
-Utilisateur parle
-   |
-   v
-STT (transcription voix -> texte)
-   |
-   v
-processConversationTurn()
-   |
-   +--> RAG: recherche de contexte narratif pertinent
-   |
-   +--> Max Agent
-   |      - system prompt personnage (DB / characters.system_prompt)
-   |      - règles de gameplay fixes
-   |      - contexte RAG injecté
-   |      - post_video_context éventuel
-   |      => génère la réponse de Max
-   |
-   +--> TTS: lecture audio de la réponse
-   |
-   +--> Game Master Agent (après la réponse de Max)
-          - lit historique récent
-          - lit message user + réponse de Max
-          - lit trust actuel + temps écoulé + triggers déjà joués
-          => retourne JSON:
-             trust_delta
-             trigger_video_id
-             game_over
-             gate_reached
-             moderation_flag
-             notes
+# Optimisation RAG / mémoire / cohérence persona
 
-Ensuite l'application:
-- met à jour trust_level
-- déclenche une vidéo éventuelle
-- passe au gate si gate_reached = true
-- termine la session si game_over = true
-- sinon reprend la conversation
-```
+Objectif : tirer le maximum du pipeline existant (Notion → pgvector → Max) sans le refondre. On reste sur Supabase + pgvector. On ajoute Voyage AI (embeddings + reranker), un filtrage strict par personnage, et une mémoire intra-session compressée. Pas de Mem0/Letta/Qdrant/GraphRAG dans cette itération.
 
-## Explication simple de la mécanique actuelle
-1. Max parle avant que le Game Master ne tranche.
-2. Le Game Master n’écrit pas la réponse de Max: il la juge après coup.
-3. Le contrôle réel de Max aujourd’hui vient surtout de 4 blocs:
-   - le prompt personnage de Max
-   - les règles fixes ajoutées au prompt
-   - le contexte RAG récupéré
-   - le contexte post-vidéo
-4. Le Game Master agit surtout comme arbitre de progression:
-   - confiance
-   - vidéos
-   - fin de partie
-   - ouverture de gate
+---
 
-## Réponses aux questions / constats clés
-### 1) Comment le Game Master interagit-il avec l’expérience utilisateur ?
-Il orchestre la progression, mais pas finement le contenu de parole de Max. En pratique, le joueur perçoit Max comme agent principal, et le Game Master comme logique invisible de scoring / gating.
+## Diagnostic actuel (rappel)
 
-### 2) Pourquoi Max invente-t-il vite ?
-Parce qu’il n’existe pas encore de garde-fou fort entre “ce que Max sait” et “ce qu’il peut dire”. Aujourd’hui:
-- le prompt dit d’utiliser le contexte narratif comme vérité,
-- mais Max peut encore combler les trous par inférence,
-- le Game Master ne bloque pas la réponse avant envoi,
-- il n’y a pas de validation factuelle systématique avant lecture TTS.
+- Embeddings : OpenAI `text-embedding-3-small` (1536 dim)
+- Chunking : sections par `## `, max 1500 chars, sans overlap, sans contexte parent injecté
+- Retrieval : `match_embeddings` global (pas de filtre source/personnage), `top_k=5`, seuil `0.3`
+- Knowledge context : tranchage figé (top3 facts / top2 memories / `<0.55` = hypothèses), aucune trace du personnage actif
+- Mémoire intra-session : aucune — uniquement les 6 derniers tours bruts envoyés au LLM
+- Pas de reranking, pas de query rewriting, pas de hybrid search
 
-### 3) Où est la limite principale de l’architecture actuelle ?
-Le contrôle arrive trop tard. Le GM intervient après la génération de Max. Donc il peut sanctionner ou déclencher, mais pas empêcher une hallucination déjà produite.
+Résultat observé : chunks d'autres personnages qui remontent, hypothèses arbitraires basées sur un seuil dur, RAG souvent "à côté" quand l'utilisateur parle vaguement.
 
-### 4) Entre custom prompt et texte de contexte, que faut-il privilégier ?
-Il faut séparer clairement 4 couches, au lieu de tout mettre dans un seul prompt:
-- Identité stable de Max
-- Règles comportementales de parole
-- Connaissances autorisées du tour
-- Intentions / état émotionnel du moment
+---
 
-C’est cette séparation qui donnera du contrôle éditorial.
+## Plan en 5 chantiers (ordonnés par ratio impact / effort)
 
-## 3 exemples simulés
-### Exemple 1 — Bonne interaction, contrôle faible
-- User: “Est-ce qu’Ava t’avait parlé de fuir avant sa disparition ?”
-- RAG remonte un souvenir partiel sur Ava et une tension familiale.
-- Max répond: “Oui, je sentais qu’elle voulait partir depuis un moment. Elle avait même préparé des affaires.”
-- Problème: la seconde phrase peut être inventée si elle n’est pas explicitement dans le contexte.
-- GM ensuite met trust +1 et ne voit pas forcément le problème.
+### Chantier 1 — Filtrage strict par personnage (impact immédiat, 0 coût)
 
-Conclusion: même quand la mécanique de jeu marche, la vérité narrative peut dériver.
+**Pourquoi** : aujourd'hui quand on parle à Ava, des chunks "characters/Max" peuvent gagner le top-K et polluer le contexte.
 
-### Exemple 2 — Interaction émotionnelle, contrôle de ton insuffisant
-- User: “Tu ne me fais pas confiance, mais tu m’appelles quand même.”
-- Max devrait répondre de façon brève, tendue, défensive.
-- Aujourd’hui il peut produire une réponse trop explicative, trop littéraire, ou trop ouverte émotionnellement.
-- GM peut juger la sincérité du joueur, mais ne cadre pas le style exact de Max.
+**Quoi** :
+1. Migration : nouvelle colonne `embeddings.character_id uuid NULL` + index. Pour les chunks issus de `source_table='characters'`, on remplit avec l'id du personnage. Pour `storyworld` / `gameplay_steps` / `video_triggers`, on laisse `NULL` (= partagé).
+2. Migration : nouvelle fonction `match_embeddings_scoped(query_embedding, match_count, match_threshold, p_character_id uuid)` qui ne retourne que les chunks où `character_id IS NULL OR character_id = p_character_id`.
+3. `sync-notion` : remplir `character_id` lors de l'insertion des chunks `characters`.
+4. `query-rag` (edge function) : accepter un nouveau body field `character_id` et appeler la nouvelle RPC.
+5. Côté front : `queryRAG` / `queryRAGDetailed` reçoivent `characterId` ; `conversationOrchestrator` et `maxTestPipeline` le passent à partir du personnage actif (Admin → sélection ; en jeu → personnage de la session).
 
-Conclusion: il manque un “style controller” par état émotionnel et par phase narrative.
+### Chantier 2 — Voyage AI : embeddings + reranker (qualité retrieval)
 
-### Exemple 3 — Trigger narratif correct mais timing éditorial faible
-- User évoque l’enfance / la famille.
-- Max répond longuement sur son passé.
-- Ensuite GM déclenche `trigger_famille`.
-- Dramaturgiquement, on voudrait parfois l’inverse: d’abord rétention, puis micro-révélation, puis trigger vidéo.
+**Pourquoi** : voyage-3 surpasse OpenAI 3-small sur BEIR, et le reranker `rerank-2.5` permet de récupérer top 15-20 puis reclasser en top 5 ultra-pertinents — exactement ce qui manque aujourd'hui.
 
-Conclusion: le GM devrait décider du mode de réponse attendu avant génération: retenue, révélation partielle, esquive, confrontation, aveu.
+**Quoi** :
+1. Ajout du secret `VOYAGE_API_KEY` (action utilisateur via `add_secret`).
+2. Migration : nouvelle colonne `embeddings.embedding_v voyage(1024)` ou plus simplement `embedding_v vector(1024)` + index ivfflat dédié, en gardant l'ancienne colonne pendant la transition. Rebuild des embeddings au prochain sync. Nouvelle RPC `match_embeddings_v` qui interroge cette colonne. *Alternative plus simple : on remplace l'ancienne colonne après recalcul complet — choix à valider en début d'implémentation selon volume.*
+3. `sync-notion` : appel Voyage `voyage-3` (input_type=`document`) à la place d'OpenAI pour générer les embeddings.
+4. `query-rag` : appel Voyage `voyage-3` (input_type=`query`), récupère `match_count` élargi (15), puis appelle `voyage-rerank-2.5` avec les contenus pour reclasser, garde top N (= `RAG_TOP_K` actuel, défaut 5).
+5. Réglage : `RAG_TOP_K` reste à 5 ; on ajoute deux paramètres dans `settings.json` : `RAG_RETRIEVE_K=15` et `RAG_RERANK_ENABLED=true` (pour pouvoir débrancher).
+6. Surface admin : on expose ces deux nouveaux réglages dans l'onglet RAG existant + le score de rerank (différent de la similarité cosinus) est affiché dans le test "Max Response Test".
 
-## Pistes de solution recommandées
-### A. Faire passer le Game Master avant Max sur chaque tour important
-Le GM ne doit plus seulement scorer après coup. Il doit produire un “brief de tour” pour Max, par exemple:
-- intention de la réponse
-- niveau d’ouverture
-- niveau émotionnel
-- informations autorisées
-- informations interdites
-- objectif conversationnel
-- éventuel trigger à préparer
+### Chantier 3 — Chunking enrichi avec contexte parent (Anthropic-style contextual chunks, sans le coût LLM)
 
-### B. Séparer le contrôle de Max en 4 blocs
-1. Persona durable
-   - qui il est
-   - comment il parle
-   - ce qu’il veut globalement
-2. Bible factuelle
-   - ce qu’il sait comme vérité
-   - ce qu’il ignore
-   - ce qu’il croit sans certitude
-3. État dynamique du tour
-   - confiance actuelle
-   - pression temporelle
-   - émotion dominante
-   - phase de relation avec le joueur
-4. Directive de réponse du tour
-   - répondre brièvement
-   - éviter tel sujet
-   - poser une question
-   - révéler 1 seul fait max
+**Pourquoi** : aujourd'hui un chunk "## Enfance" perd la référence "Personnage Ava" sauf si le titre est dans le chunk. Voyage embeddings gèrent mieux ce contexte si on le préfixe.
 
-### C. Introduire une politique de vérité stricte
-Chaque fait devrait être classé:
-- certain
-- probable
-- inconnu
-- interdit à révéler maintenant
+**Quoi** : modifier `chunkText` dans `sync-notion` :
+1. Préfixer chaque chunk par un header structuré : `Personnage: <nom> | Section: <h2> | Type: <archétype>` (ou pour storyworld : `Sujet: <titre> | Catégorie: <type>`).
+2. Ajouter un overlap de 150 chars entre chunks consécutifs (paragraphe de fin recopié au chunk suivant) pour éviter les coupures sèches.
+3. Réduire `maxChunkSize` à 1000 (Voyage est meilleur sur des chunks plus courts et le rerank compensera).
 
-Max ne doit jamais transformer “probable” en “certain”.
+Pas de contextualisation LLM (trop coûteux/lent à l'ingestion), mais on capture 80% du gain.
 
-### D. Mettre en place des modes de parole éditoriaux
-Exemples:
-- fermé / méfiant
-- testeur
-- fragile
-- accusateur
-- confiant
-- révélateur partiel
+### Chantier 4 — Query rewriting léger (mémoire intra-session activée)
 
-Le GM choisit le mode, Max exécute.
+**Pourquoi** : aujourd'hui on envoie au RAG le message brut + 6 derniers messages concaténés. Quand l'utilisateur dit "et toi, ça t'est arrivé ?", la requête vectorielle est inutile. Un mini-LLM peut reformuler.
 
-### E. Ajouter un validateur de réponse avant TTS
-Avant lecture audio:
-- vérifier si la réponse contient des faits absents du contexte autorisé
-- vérifier longueur / ton / interdits
-- si échec: régénération avec consigne corrective
+**Quoi** :
+1. Avant le RAG, appel rapide `gemini-3-flash-preview` (déjà dispo via Lovable AI) avec un prompt court : "Reformule la dernière question de l'utilisateur en une requête de recherche autonome en français, en réutilisant les références implicites de l'historique. Réponds uniquement par la requête."
+2. Cette requête reformulée alimente Voyage embeddings + rerank. Le message brut reste celui envoyé à Max.
+3. Toggle dans settings : `RAG_QUERY_REWRITE_ENABLED=true` (débrayable).
+4. Surface dans Max Response Test : nouvelle ligne "Requête réécrite" entre l'input et l'étape RAG.
 
-## Plan proposé
-### Phase 1 — Documenter et rendre visible la mécanique
-- Ajouter dans l’admin une vue “pipeline conversationnel” avec:
-  - entrée user
-  - contexte RAG injecté
-  - prompt effectif de Max
-  - sortie GM
-  - décision finale
-- Ajouter un schéma lisible et un mini glossaire des rôles GM / Max / RAG / TTS / trust.
+### Chantier 5 — Mémoire intra-session compressée (cohérence sur 10 min)
 
-### Phase 2 — Repenser le contrat entre GM et Max
-- Faire produire au GM un objet structuré de “direction de tour” avant appel à Max.
-- Remplacer le simple post-analyse par une orchestration en 2 temps:
-  1. GM prépare le tour
-  2. Max répond sous contraintes
-  3. GM post-analyse légère pour trust / trigger / fin
+**Pourquoi** : sur un tour 8/10, Max ne "voit" pas ce qui s'est dit au tour 1. Pas besoin de Mem0 pour 10 min, on peut faire un résumé glissant.
 
-### Phase 3 — Cadrer la connaissance de Max
-- Structurer le contexte injecté en sections:
-  - faits certains
-  - souvenirs activés
-  - hypothèses
-  - sujets interdits / non débloqués
-- Réduire la liberté du prompt libre personnage en le transformant en gabarit plus normé.
+**Quoi** :
+1. Nouvelle table `session_summaries (session_id uuid, summary text, last_turn int, updated_at)`.
+2. Tous les 4 tours, edge function `summarize-session` (gemini-3-flash-preview) génère un résumé bullet-point (faits saillants sur l'utilisateur, sujets déjà abordés, promesses faites par Max).
+3. Ce résumé est injecté dans le system prompt de Max sous une nouvelle section `## SOUVENIRS DE LA SESSION` — alimente aussi `knowledgeContext.activeMemories`.
+4. Reset à la fin de session (déjà géré par `session_id`).
 
-### Phase 4 — Ajouter des garde-fous anti-hallucination
-- Validation pré-TTS de la réponse.
-- Régénération si:
-  - fait non sourcé
-  - ton interdit
-  - longueur excessive
-  - révélation trop rapide
+---
 
-### Phase 5 — Outiller l’équipe éditoriale
-- Dans l’admin, séparer:
-  - prompt identitaire de Max
-  - règles de style
-  - connaissance autorisée
-  - règles de révélation
-  - profils de tour / modes émotionnels
-- Permettre de tester un tour simulé depuis l’admin avec trace complète.
+## Inspecteur Max Test — extensions
+
+Le bench existant (`MaxPromptTestTab` + `maxTestPipeline`) gagne 4 lignes :
+- "Requête réécrite" (chantier 4)
+- "Embedding model" + "Rerank model" + scores rerank par chunk (chantier 2)
+- Badge `character_id` filtré sur chaque match (chantier 1)
+- Bloc "Résumé de session injecté" (chantier 5, si simulé)
+
+Aucune logique métier à dupliquer : on enrichit juste les types `RAGMatch` et `RAGQueryDetailed`.
+
+---
 
 ## Détails techniques
-### Ce que le code montre aujourd’hui
-- Le GM lit les 6 derniers messages, le trust, les triggers et le temps écoulé.
-- Max reçoit un prompt personnage + règles fixes + RAG + post_video_context.
-- Le GM est appelé après la génération complète de Max.
-- Le `gate_reached` est surtout déterminé par le GM, avec un complément de vérification sur le seuil de trust.
-- Le contrôle “MIN_QUESTIONS_BEFORE_GATE” et “MAX_INSULT_TOLERANCE” dépend aujourd’hui surtout du prompt, pas d’une vraie logique stricte dans le pipeline montré.
 
-### Refactor cible recommandé
+### Nouveaux secrets
+- `VOYAGE_API_KEY` (à ajouter)
+
+### Migrations DB
+1. `ALTER TABLE embeddings ADD COLUMN character_id uuid NULL REFERENCES characters(id) ON DELETE CASCADE;` + index
+2. `ALTER TABLE embeddings ADD COLUMN embedding_v vector(1024) NULL;` + index ivfflat
+3. Nouvelle RPC `match_embeddings_scoped_v(query_embedding vector(1024), match_count int, match_threshold float, p_character_id uuid)`
+4. Nouvelle table `session_summaries`
+
+### Nouveaux paramètres `settings.json`
+- `RAG_RETRIEVE_K: 15`
+- `RAG_RERANK_ENABLED: true`
+- `RAG_QUERY_REWRITE_ENABLED: true`
+- `RAG_EMBEDDING_PROVIDER: "voyage"` (`"openai"` reste possible en fallback)
+- `RAG_SUMMARY_EVERY_N_TURNS: 4`
+
+### Edge functions touchées
+- `sync-notion` (chunking enrichi + Voyage embeddings + character_id)
+- `query-rag` (filtrage personnage + Voyage embed query + rerank)
+- nouvelle `summarize-session`
+- (optionnel) nouvelle `rewrite-query` ou inliné dans `conversationOrchestrator` via Lovable AI Gateway
+
+### Front / services
+- `ragService.queryRAG(userMessage, recentContext, topK, threshold, characterId)` — signature étendue
+- `conversationOrchestrator` : passe le `characterId` actif + appelle `rewrite-query` avant `queryRAG` + injecte le summary courant
+- `maxTestPipeline` : ajoute étape "rewrite" + champs rerank dans la trace
+- `Admin RAG tab` : nouveaux toggles et affichage du provider d'embedding
+
+---
+
+## Roadmap d'exécution suggérée
+
 ```text
-Tour utilisateur
-  -> GM pre-turn planner
-     -> response_mode
-     -> allowed_knowledge
-     -> forbidden_topics
-     -> trust_policy
-     -> reveal_budget
-  -> Max responder
-  -> response validator
-  -> TTS
-  -> GM post-turn scorer
-  -> state update
+Sprint 1 (rapide, gros gain visible)
+  └ Chantier 1 : filtrage strict par personnage
+  └ Chantier 3 : chunking enrichi (préfixes + overlap)
+  → Re-sync Notion complet
+
+Sprint 2 (qualité retrieval)
+  └ Chantier 2 : Voyage embeddings + rerank
+  → Re-sync Notion complet sur la colonne v
+
+Sprint 3 (intelligence du tour)
+  └ Chantier 4 : query rewriting
+  └ Chantier 5 : mémoire intra-session compressée
 ```
 
-### Livrables d’implémentation
-- Un schéma UI ou document dans l’admin
-- Une nouvelle structure de prompt pour Max
-- Un nouveau format JSON de consignes GM -> Max
-- Un validateur de réponse
-- Un écran ou panneau de simulation de tours
+Chaque chantier est isolé par un toggle, donc on peut désactiver indépendamment en cas de régression.
 
-## Priorité recommandée
-1. Schématiser et tracer le pipeline actuel
-2. Introduire le GM pre-turn planner
-3. Structurer la connaissance autorisée
-4. Ajouter le validateur anti-hallucination
-5. Outiller l’admin pour tests éditoriaux
+---
 
-## Résultat attendu
-Après cette évolution, Max ne sera plus seulement “bien prompté”. Il sera piloté par une couche de direction éditoriale et narrative beaucoup plus contrôlée, ce qui réduira fortement les inventions, améliorera la cohérence, et donnera une vraie maîtrise sur ce qu’il dit, quand il le dit, comment il le dit, et ce qu’il sait.
+## Hors scope volontaire
+
+ID-RAG/PersonaRAG/Mem0/Zep/LoRA/RAFT/GraphRAG : intéressants mais disproportionnés pour un proto de session 10 min — à reconsidérer si l'app évolue vers du multi-session persistant par utilisateur.
