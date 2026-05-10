@@ -8,6 +8,7 @@ const corsHeaders = {
 
 const NOTION_API_URL = "https://api.notion.com/v1";
 const OPENAI_API_URL = "https://api.openai.com/v1";
+const VOYAGE_API_URL = "https://api.voyageai.com/v1";
 
 interface NotionPage {
   id: string;
@@ -62,7 +63,10 @@ serve(async (req) => {
     if (!NOTION_API_KEY) throw new Error('NOTION_API_KEY is not configured');
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not configured');
+    const VOYAGE_API_KEY = Deno.env.get('VOYAGE_API_KEY');
+    if (!OPENAI_API_KEY && !VOYAGE_API_KEY) throw new Error('No embedding provider configured (OPENAI_API_KEY or VOYAGE_API_KEY)');
+    const useVoyage = !!VOYAGE_API_KEY;
+    console.log(`[sync-notion] Embedding provider: ${useVoyage ? 'voyage-3 (1024d)' : 'openai-3-small (1536d)'}`);
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
