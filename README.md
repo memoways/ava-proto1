@@ -95,15 +95,16 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 |-----------|-------------|
 | Frontend | React + Vite + Tailwind + TypeScript (Lovable) |
 | Backend | Lovable Cloud (Supabase Postgres + pgvector) |
-| Edge Functions | proxy-llm, proxy-stt, proxy-tts, sync-notion, query-rag, sync-questionnaire |
+| Edge Functions | proxy-llm, proxy-stt, proxy-tts, sync-notion, query-rag, sync-questionnaire, **rewrite-query**, **summarize-session** |
 | Video | Gumlet (hébergement + embed player) |
 | Cost Tracking | OpenRouter generation API (tokens + USD per call) |
-| LLM | OpenRouter API — Multi-modèles (Qwen, Claude, Grok, Llama, Gemini) |
+| LLM | OpenRouter API — Multi-modèles (Qwen, Claude, Grok, Llama, Gemini, GPT-5) |
 | STT | Deepgram (WebSocket streaming + VAD) |
 | TTS | ElevenLabs (voix custom Max, paramètres ajustables) |
-| Embeddings | OpenAI text-embedding-3-small (1536 dim) |
-| Données | Notion (source de vérité) → Supabase (miroir + embeddings) |
-| RAG | query-rag Edge Function + match_embeddings SQL |
+| Embeddings | **Voyage AI `voyage-3` (1024 dim, défaut)** + OpenAI text-embedding-3-small (1536 dim, fallback) |
+| Reranker | **Voyage `rerank-2.5`** (toggle via `RAG_RERANK_ENABLED`) |
+| Données | Notion (source de vérité) → Supabase (miroir + embeddings double-stack) |
+| RAG | query-rag Edge Function + pgvector HNSW + filtrage `character_id` + query rewrite + session summary |
 
 ## 🧭 Avancement du plan Max / GM
 
