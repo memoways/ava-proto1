@@ -86,11 +86,35 @@ export async function processConversationTurn(
   // Fetch RAG context if not provided (non-blocking — start immediately)
   let finalRagContext = ragContext;
   const gameplay = getGameplaySettings();
+
+  // Kick off session summary fetch in parallel — does not block RAG.
+  const summaryPromise = sessionId ? fetchSessionSummary(sessionId) : Promise.resolve(null);
+
   const ragStart = performance.now();
   const ragPromise = !finalRagContext ? (async () => {
     try {
       const recentMessages = conversationHistory.slice(-4).map(m => m.content).join(' ');
-      const matches = await queryRAG(userMessage, recentMessages, gameplay.RAG_TOP_K);
+
+      // Optional query rewriting (toggle: RAG_QUERY_REWRITE_ENABLED).
+      let rewrittenQuery: string | undefined;
+      if (gameplay.RAG_QUERY_REWRITE_ENABLED) {
+        try {
+          const r = await rewriteRAGQuery(userMessage, recentMessages);
+          if (r && r !== userMessage) {
+            rewrittenQuery = r;
+            console.log('[RAG] Rewritten query:', r);
+          }
+        } catch (rwErr) {
+          console.warn('[RAG] rewrite failed (fallback to raw):', rwErr);
+        }
+      }
+
+      const matches = await queryRAG(userMessage, recentMessages, gameplay.RAG_TOP_K, undefined, {
+        rewrittenQuery,
+        rerank: gameplay.RAG_RERANK_ENABLED,
+        retrieveK: gameplay.RAG_RETRIEVE_K,
+        provider: gameplay.RAG_EMBEDDING_PROVIDER,
+      });
       const ctx = formatRAGContext(matches);
       if (ctx) console.log('[RAG] Context found, injecting into prompt');
       return { ctx, knowledgeContext: buildKnowledgeContextFromRAG(matches) };
@@ -105,6 +129,10 @@ export async function processConversationTurn(
   const rag_ms = Math.round(performance.now() - ragStart);
   finalRagContext = ragResult.ctx;
   debugLogger.log({ service: "other", level: "info", direction: "out", label: `Orchestrator: RAG done (${rag_ms}ms), calling Max+GM in parallel`, detail: `History: ${conversationHistory.length} msgs, trust: ${currentTrustLevel}` });
+
+  // Resolve the session summary (small fetch, usually finished by now).
+  const summaryRecord = await summaryPromise;
+  const sessionSummary = summaryRecord?.summary;
 
   // Lance le GM pre-turn ET la réponse Max EN PARALLÈLE.
   const gmPreStart = performance.now();
