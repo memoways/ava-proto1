@@ -187,16 +187,10 @@ export default function Admin() {
         // Verify the save by re-reading from DB
         const { data: verifyData } = await supabase
           .from("characters")
-          .select("system_prompt")
-          .eq("id", editingChar.id)
-          .single();
-        
-        // Verify the save by re-reading from DB
-        const { data: verifyData } = await supabase
-          .from("characters")
           .select("system_prompt, updated_at")
           .eq("id", editingChar.id)
           .single();
+
 
         if (verifyData?.system_prompt === editPrompt) {
           console.log("[Admin] Prompt verified in DB ✓", editPrompt.length, "chars");
