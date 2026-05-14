@@ -4,6 +4,27 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.20.1] - 2026-05-14 — Banc d'essai « Lancer le banc » + traçabilité du system prompt Max
+
+### Ajouté
+- **Bouton 🧪 « Lancer le banc »** dans `MaxPromptTestTab` : pré-remplit un scénario complet (historique multi-tours ambigu sur la disparition d'Ava + résumé de session compressé) et déclenche `handleRun` avec query rewrite + rerank + mémoire de session injectée. Permet de valider en un clic les trois leviers RAG v2.
+- **Champ `sessionSummary`** (textarea) dans les inputs du banc d'essai pour injecter manuellement une mémoire de session arbitraire.
+- **Affichage de la requête réécrite** dans la chronologie du banc (étape « 0. Query rewrite » : original → réécrite + flag `rewritten`).
+- **Colonne `rerank_score` Voyage et badge `embedding_provider` par chunk** dans l'accordéon RAG du banc d'essai (en plus de `retrieval_similarity` brute et du score final).
+- **Badge de traçabilité du system prompt** dans le panneau d'édition Admin (`/admin?tab=characters`) : affiche `🆔 character.id`, `🕒 updated_at` UTC, `# hash FNV-1a 32-bit` du prompt chargé en DB, et `✎ #hash` de l'édition courante (passe en ambre si différent du DB). Permet de vérifier visuellement que le prompt provient bien de la ligne DB attendue.
+- **Vérification post-save** : après `update`, re-lecture de `system_prompt` + `updated_at` depuis la DB, comparaison stricte avec la valeur envoyée, propagation du nouveau `updated_at` à l'état local.
+- **Mini-protocole de test** ajouté au `README` pour rejouer query rewrite + rerank + mémoire de session avec les toggles à activer.
+
+### Modifié
+- `maxAgent.ts` : `MaxAgentInput.sessionSummary` propagé aussi par `simulateMaxResponse` (pas seulement par `callMaxAgent`).
+- `Admin.tsx` : query `characters` enrichie de `updated_at` ; helper `promptHash()` (FNV-1a 32-bit) ajouté pour fingerprint visuel.
+
+### Vérifié (audit centralisation system prompt Max)
+- **Write** : `Admin.tsx` → `update({ system_prompt }) on characters` + `clearSystemPromptCache()`.
+- **Read** : `maxAgent.ts:getCharacterSystemPrompt()` lit `select system_prompt from characters where name = ?` (cache mémoire + preload). Utilisé par `callMaxAgent` (live) **et** `simulateMaxResponse` (banc d'essai) — donc les éditions admin sont propagées partout.
+- **Protection sync Notion** : `sync-notion/index.ts:325` préserve `existingCharacter.system_prompt` à chaque upsert. Conforme à la règle « Never overwrite local system prompts via Notion sync ».
+- **Limite connue** : le cache `cachedSystemPrompts` est par onglet/process. Une édition dans un onglet n'invalide pas un autre onglet déjà chargé tant qu'il n'est pas rechargé. Cross-tab invalidation (Supabase Realtime sur `characters` ou `BroadcastChannel`) à envisager si besoin.
+
 ## [0.20.0] - 2026-05-10 — RAG v2 : Voyage AI + query rewriting + mémoire de session compressée
 
 ### Ajouté

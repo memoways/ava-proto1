@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-10 (session 16 — RAG v2 : Voyage AI `voyage-3` + reranker `rerank-2.5`, filtrage strict par personnage, indexes HNSW, query rewriting et mémoire de session compressée injectée dans le prompt Max)  
+> **Last Updated**: 2026-05-14 (session 17 — Banc d'essai « Lancer le banc » avec scénario complet RAG v2 + traçabilité visuelle du system prompt Max dans l'Admin (id, updated_at, hash FNV-1a) + audit centralisation DB)  
 
 ---
 
@@ -237,6 +237,33 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 **Pourquoi c'était subtil** : OpenRouter peut accepter une génération puis ne pas la rendre consultable immédiatement côté lookup. Traiter ce délai d'indexation comme une erreur fatale cassait une fonctionnalité non critique (la collecte de coût) et contaminait toute l'expérience.
 
 **Time**: ~30min
+
+---
+
+### 2026-05-14 — Banc d'essai « Lancer le banc » + traçabilité du system prompt Max 🔷
+
+**Intent**: Pouvoir valider en un clic les trois leviers RAG v2 (query rewrite + rerank + mémoire de session) sur un scénario calibré, et vérifier visuellement que le system prompt Max édité dans l'admin provient bien de la ligne DB attendue (et non d'un cache obsolète ou d'un fallback).
+
+**Tool**: Lovable
+
+**Outcome**:
+
+1. **Bouton 🧪 « Lancer le banc »** dans `MaxPromptTestTab` — pré-remplit historique multi-tours ambigu sur la disparition d'Ava + résumé de session compressé (`FULL_BENCH_SCENARIO`), puis déclenche `handleRun` avec query rewrite ON, rerank ON, et `sessionSummary` injecté. Nouveau champ textarea `sessionSummary` exposé dans les inputs pour scénarios manuels.
+2. **Affichage de la requête réécrite** dans la chronologie du banc (étape « 0. Query rewrite » : original → réécrite + flag `rewritten`).
+3. **Colonne `rerank_score` Voyage et badge `embedding_provider`** ajoutés par chunk dans l'accordéon RAG (en plus du score final et de `retrieval_similarity`).
+4. **Audit complet du flux system prompt** — vérifié que :
+   - Admin écrit dans `characters.system_prompt` via `update({ system_prompt })` puis appelle `clearSystemPromptCache()`.
+   - `maxAgent.ts:getCharacterSystemPrompt()` lit toujours depuis `characters` filtré par `name`, avec cache mémoire et preload pendant l'intro vidéo.
+   - Le même `simulateMaxResponse` du banc d'essai utilise le même `buildMaxSystemPrompt` que `callMaxAgent` live → édition admin propagée partout.
+   - `sync-notion` préserve `existingCharacter.system_prompt` à chaque upsert (règle « Never overwrite local system prompts via Notion sync » respectée).
+5. **Badge de traçabilité dans l'Admin** (`/admin?tab=characters`) — nouveau badge dashed dans le header du panneau d'édition affichant `🆔 character.id`, `🕒 updated_at` UTC, `# hash FNV-1a 32-bit` du prompt chargé en DB, et `✎ #hash` de l'édition courante (passe en ambre si différent du DB). Permet de capter visuellement un cache obsolète ou une divergence DB↔UI.
+6. **Vérification post-save** — après `update`, re-lecture stricte de `system_prompt` + `updated_at` depuis la DB et comparaison à la valeur envoyée. Le nouveau `updated_at` est propagé à `editingChar` et à la liste.
+
+**Difficultés rencontrées**:
+- Le cache `cachedSystemPrompts` est par onglet/process : `clearSystemPromptCache()` n'invalide que l'onglet qui sauvegarde. Documenté comme limite connue (cross-tab invalidation via Realtime ou `BroadcastChannel` à envisager si plusieurs éditeurs simultanés).
+- `simulateMaxResponse` n'acceptait pas `sessionSummary` au départ — il fallait le propager dans `MaxAgentInput` côté simulation pour que le banc reflète exactement le runtime live.
+
+**Time**: ~1h30 (banc + badge + audit + docs)
 
 ---
 
