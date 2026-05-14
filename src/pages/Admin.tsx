@@ -155,9 +155,20 @@ export default function Admin() {
   async function loadCharacters() {
     const { data } = await supabase
       .from("characters")
-      .select("id, name, personality, system_prompt")
+      .select("id, name, personality, system_prompt, updated_at")
       .order("name");
     setCharacters(data || []);
+  }
+
+  // Short stable hash (FNV-1a 32-bit) for visual fingerprint of a string
+  function promptHash(text: string | null | undefined): string {
+    if (!text) return "00000000";
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return h.toString(16).padStart(8, "0");
   }
 
   async function saveCharacterPrompt() {
