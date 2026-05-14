@@ -191,6 +191,13 @@ export default function Admin() {
           .eq("id", editingChar.id)
           .single();
         
+        // Verify the save by re-reading from DB
+        const { data: verifyData } = await supabase
+          .from("characters")
+          .select("system_prompt, updated_at")
+          .eq("id", editingChar.id)
+          .single();
+
         if (verifyData?.system_prompt === editPrompt) {
           console.log("[Admin] Prompt verified in DB ✓", editPrompt.length, "chars");
           toast.success(`System prompt de ${editingChar.name} sauvegardé et vérifié ✓`);
@@ -198,10 +205,11 @@ export default function Admin() {
           console.warn("[Admin] Prompt verification mismatch!");
           toast.warning("Prompt sauvegardé mais vérification incertaine — rafraîchis la page");
         }
-        
+
         clearSystemPromptCache();
-        setEditingChar({ ...editingChar, system_prompt: editPrompt });
-        setCharacters(prev => prev.map(c => c.id === editingChar.id ? { ...c, system_prompt: editPrompt } : c));
+        const newUpdatedAt = verifyData?.updated_at || new Date().toISOString();
+        setEditingChar({ ...editingChar, system_prompt: editPrompt, updated_at: newUpdatedAt });
+        setCharacters(prev => prev.map(c => c.id === editingChar.id ? { ...c, system_prompt: editPrompt, updated_at: newUpdatedAt } : c));
       }
     } catch (err) {
       console.error("[Admin] Save exception:", err);
