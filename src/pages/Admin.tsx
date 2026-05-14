@@ -155,9 +155,20 @@ export default function Admin() {
   async function loadCharacters() {
     const { data } = await supabase
       .from("characters")
-      .select("id, name, personality, system_prompt")
+      .select("id, name, personality, system_prompt, updated_at")
       .order("name");
     setCharacters(data || []);
+  }
+
+  // Short stable hash (FNV-1a 32-bit) for visual fingerprint of a string
+  function promptHash(text: string | null | undefined): string {
+    if (!text) return "00000000";
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return h.toString(16).padStart(8, "0");
   }
 
   async function saveCharacterPrompt() {
@@ -176,10 +187,11 @@ export default function Admin() {
         // Verify the save by re-reading from DB
         const { data: verifyData } = await supabase
           .from("characters")
-          .select("system_prompt")
+          .select("system_prompt, updated_at")
           .eq("id", editingChar.id)
           .single();
-        
+
+
         if (verifyData?.system_prompt === editPrompt) {
           console.log("[Admin] Prompt verified in DB ✓", editPrompt.length, "chars");
           toast.success(`System prompt de ${editingChar.name} sauvegardé et vérifié ✓`);
@@ -187,10 +199,11 @@ export default function Admin() {
           console.warn("[Admin] Prompt verification mismatch!");
           toast.warning("Prompt sauvegardé mais vérification incertaine — rafraîchis la page");
         }
-        
+
         clearSystemPromptCache();
-        setEditingChar({ ...editingChar, system_prompt: editPrompt });
-        setCharacters(prev => prev.map(c => c.id === editingChar.id ? { ...c, system_prompt: editPrompt } : c));
+        const newUpdatedAt = verifyData?.updated_at || new Date().toISOString();
+        setEditingChar({ ...editingChar, system_prompt: editPrompt, updated_at: newUpdatedAt });
+        setCharacters(prev => prev.map(c => c.id === editingChar.id ? { ...c, system_prompt: editPrompt, updated_at: newUpdatedAt } : c));
       }
     } catch (err) {
       console.error("[Admin] Save exception:", err);
@@ -497,9 +510,30 @@ export default function Admin() {
                 {editingChar ? (
                   <div className="border rounded-lg p-4">
                     <h2 className="text-lg font-semibold mb-1">System Prompt — {editingChar.name}</h2>
-                    <p className="text-xs text-muted-foreground mb-3">
+                    <p className="text-xs text-muted-foreground mb-2">
                       Ce prompt est envoyé au LLM. Les règles de jeu et le contexte RAG sont ajoutés automatiquement après.
                     </p>
+                    <div className="mb-3 flex flex-wrap gap-2 rounded-md border border-dashed border-border/60 bg-muted/30 px-2 py-1.5 font-mono text-[11px] text-muted-foreground">
+                      <span title="UUID de la ligne characters en base">
+                        🆔 <span className="text-foreground">{editingChar.id}</span>
+                      </span>
+                      <span className="opacity-50">·</span>
+                      <span title="characters.updated_at en base">
+                        🕒 <span className="text-foreground">{editingChar.updated_at ? new Date(editingChar.updated_at).toISOString().replace("T", " ").slice(0, 19) + " UTC" : "—"}</span>
+                      </span>
+                      <span className="opacity-50">·</span>
+                      <span title="Hash FNV-1a 32-bit du system_prompt chargé depuis la DB">
+                        # <span className="text-foreground">{promptHash(editingChar.system_prompt)}</span>
+                      </span>
+                      {editPrompt !== (editingChar.system_prompt || "") && (
+                        <>
+                          <span className="opacity-50">·</span>
+                          <span className="text-amber-400" title="Hash de la valeur en cours d'édition (non sauvegardée)">
+                            ✎ #<span>{promptHash(editPrompt)}</span>
+                          </span>
+                        </>
+                      )}
+                    </div>
                     <Textarea
                       value={editPrompt}
                       onChange={(e) => setEditPrompt(e.target.value)}
