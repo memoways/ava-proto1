@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-10 (session 16 — RAG v2 : Voyage AI `voyage-3` + reranker `rerank-2.5`, filtrage strict par personnage, indexes HNSW, query rewriting et mémoire de session compressée injectée dans le prompt Max)  
+> **Last Updated**: 2026-05-14 (session 17 — Banc d'essai « Lancer le banc » avec scénario complet RAG v2 + traçabilité visuelle du system prompt Max dans l'Admin (id, updated_at, hash FNV-1a) + audit centralisation DB)  
 
 ---
 
