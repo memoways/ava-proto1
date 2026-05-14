@@ -510,9 +510,30 @@ export default function Admin() {
                 {editingChar ? (
                   <div className="border rounded-lg p-4">
                     <h2 className="text-lg font-semibold mb-1">System Prompt — {editingChar.name}</h2>
-                    <p className="text-xs text-muted-foreground mb-3">
+                    <p className="text-xs text-muted-foreground mb-2">
                       Ce prompt est envoyé au LLM. Les règles de jeu et le contexte RAG sont ajoutés automatiquement après.
                     </p>
+                    <div className="mb-3 flex flex-wrap gap-2 rounded-md border border-dashed border-border/60 bg-muted/30 px-2 py-1.5 font-mono text-[11px] text-muted-foreground">
+                      <span title="UUID de la ligne characters en base">
+                        🆔 <span className="text-foreground">{editingChar.id}</span>
+                      </span>
+                      <span className="opacity-50">·</span>
+                      <span title="characters.updated_at en base">
+                        🕒 <span className="text-foreground">{editingChar.updated_at ? new Date(editingChar.updated_at).toISOString().replace("T", " ").slice(0, 19) + " UTC" : "—"}</span>
+                      </span>
+                      <span className="opacity-50">·</span>
+                      <span title="Hash FNV-1a 32-bit du system_prompt chargé depuis la DB">
+                        # <span className="text-foreground">{promptHash(editingChar.system_prompt)}</span>
+                      </span>
+                      {editPrompt !== (editingChar.system_prompt || "") && (
+                        <>
+                          <span className="opacity-50">·</span>
+                          <span className="text-amber-400" title="Hash de la valeur en cours d'édition (non sauvegardée)">
+                            ✎ #<span>{promptHash(editPrompt)}</span>
+                          </span>
+                        </>
+                      )}
+                    </div>
                     <Textarea
                       value={editPrompt}
                       onChange={(e) => setEditPrompt(e.target.value)}
