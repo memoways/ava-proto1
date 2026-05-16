@@ -9,6 +9,12 @@ verify_jwt = false
 [functions.proxy-tts]
 verify_jwt = false
 
+[functions.proxy-tts-inworld]
+verify_jwt = false
+
+[functions.proxy-tts-hume]
+verify_jwt = false
+
 [functions.sync-notion]
 verify_jwt = false
 
