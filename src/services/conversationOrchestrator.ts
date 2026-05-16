@@ -92,7 +92,7 @@ export async function processConversationTurn(
     user_message_len: userMessage.length,
     max_model: llmSettings.LLM_MODEL,
     gm_model: llmSettings.LLM_MODEL_GM,
-    validator_model: llmSettings.LLM_MODEL_VALIDATOR,
+    validator_model: llmSettings.LLM_MODEL_GM,
     turn_index: conversationHistory.filter((m) => m.role === "user").length + 1,
   });
   // Fetch RAG context if not provided (non-blocking — start immediately)
