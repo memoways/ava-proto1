@@ -24,8 +24,11 @@ export const inworldProvider: TTSProvider = {
       text: preparedText,
       voiceId,
       modelId: s.modelId,
+      deliveryMode: s.deliveryMode,
+      language: s.language,
+      speakingRate: s.speakingRate,
       temperature: s.temperature,
-      languageCode: s.languageCode,
+      stream: true,
     };
 
     const startTime = Date.now();

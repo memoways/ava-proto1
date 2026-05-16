@@ -9,23 +9,29 @@ import { supabase } from "@/integrations/supabase/client";
 
 export interface InworldSettings {
   voiceId: string;
-  modelId: "inworld-tts-1" | "inworld-tts-1-max";
+  modelId: "inworld-tts-2" | "inworld-tts-1" | "inworld-tts-1-max";
+  deliveryMode: "STABLE" | "BALANCED" | "CREATIVE";
+  language: string; // BCP-47 or "AUTO" (tts-2 only)
+  speakingRate: number;
+  /** Legacy models only (tts-1*) */
   temperature: number;
-  languageCode: string;
 }
 
 export const INWORLD_MODELS = [
-  { id: "inworld-tts-1", label: "Inworld TTS 1", description: "Rapide, bonne qualité, basse latence" },
-  { id: "inworld-tts-1-max", label: "Inworld TTS 1 Max", description: "Qualité max, plus lent" },
+  { id: "inworld-tts-2", label: "Inworld TTS 2", description: "Dernier modèle — delivery_mode + language AUTO" },
+  { id: "inworld-tts-1", label: "Inworld TTS 1 (legacy)", description: "Modèle legacy, supporte temperature" },
+  { id: "inworld-tts-1-max", label: "Inworld TTS 1 Max (legacy)", description: "Qualité max legacy" },
 ];
 
 const INWORLD_KEY = "ava_tts_settings_inworld";
 
 const inworldDefaults: InworldSettings = {
-  voiceId: "Hades", // French-capable Inworld preset
-  modelId: "inworld-tts-1",
+  voiceId: "Alain",
+  modelId: "inworld-tts-2",
+  deliveryMode: "BALANCED",
+  language: "AUTO",
+  speakingRate: 1,
   temperature: 0.7,
-  languageCode: "fr",
 };
 
 export function getInworldSettings(): InworldSettings {
