@@ -172,8 +172,8 @@ export default function VoiceUsageTab() {
       </div>
       <p className="text-[11px] text-muted-foreground -mt-3">
         Coûts estimés à partir du nombre de caractères synthétisés et des tarifs publics indicatifs
-        (ElevenLabs ${COST_PER_1K_CHARS_USD.elevenlabs}/1k · Hume ${COST_PER_1K_CHARS_USD.hume}/1k ·
-        Inworld ${COST_PER_1K_CHARS_USD.inworld}/1k). Total période (tous appels) : {fmtUsd(totalCostUsd)}.
+        (ElevenLabs {fmtUsd(COST_PER_1K_CHARS_USD.elevenlabs)}/1k · Hume {fmtUsd(COST_PER_1K_CHARS_USD.hume)}/1k ·
+        Inworld {fmtUsd(COST_PER_1K_CHARS_USD.inworld)}/1k). Total période (tous appels) : {fmtUsd(totalCostUsd)}.
       </p>
 
       {/* Alerte taux d'erreur */}
