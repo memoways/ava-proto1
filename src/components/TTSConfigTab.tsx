@@ -301,19 +301,38 @@ export default function TTSConfigTab() {
             <span className="font-medium text-muted-foreground">Voice ID</span>
             <input value={iwSettings.voiceId}
               onChange={(e) => updateIw({ voiceId: e.target.value })}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="Hades, Ashley, ..." />
-            <span className="block text-xs text-muted-foreground/60">Ex: Hades, Ashley, Olivia, Pixie... (voir docs Inworld)</span>
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="Alain, Hades, Ashley, ..." />
+            <span className="block text-xs text-muted-foreground/60">Ex: Alain (FR), Hades, Ashley, Olivia... (voir docs Inworld)</span>
           </label>
 
           <label className="space-y-1 text-sm">
-            <span className="font-medium text-muted-foreground">Langue</span>
-            <input value={iwSettings.languageCode}
-              onChange={(e) => updateIw({ languageCode: e.target.value.trim().toLowerCase() || "fr" })}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="fr" />
+            <span className="font-medium text-muted-foreground">Langue (BCP-47 ou AUTO)</span>
+            <input value={iwSettings.language}
+              onChange={(e) => updateIw({ language: e.target.value.trim() || "AUTO" })}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="AUTO, fr-FR, en-US..." />
+            <span className="block text-xs text-muted-foreground/60">tts-2 uniquement. Legacy : ignoré.</span>
           </label>
         </div>
 
-        <SliderRow label="Temperature" value={iwSettings.temperature} min={0} max={2} step={0.05}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <p className="text-xs font-medium mb-2">Delivery mode (tts-2)</p>
+            <div className="flex gap-2">
+              {(["STABLE", "BALANCED", "CREATIVE"] as const).map((m) => (
+                <button key={m} onClick={() => updateIw({ deliveryMode: m })}
+                  className={`flex-1 px-2 py-1.5 border rounded text-xs ${
+                    iwSettings.deliveryMode === m ? "bg-primary/10 border-primary" : "hover:bg-accent/50"
+                  }`}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+          <SliderRow label="Speaking rate" value={iwSettings.speakingRate} min={0.5} max={2} step={0.05}
+            onChange={(v) => updateIw({ speakingRate: v })} />
+        </div>
+
+        <SliderRow label="Temperature (legacy tts-1 uniquement)" value={iwSettings.temperature} min={0} max={2} step={0.05}
           onChange={(v) => updateIw({ temperature: v })} />
       </section>
 

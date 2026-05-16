@@ -1,5 +1,8 @@
-// Inworld TTS proxy — POST /tts/v1/voice, returns binary MP3 to the client.
-// Docs: https://docs.inworld.ai (TTS REST API)
+// Inworld TTS proxy — streams audio from POST /tts/v1/voice:stream and pipes
+// concatenated MP3 frames back to the client (audio/mpeg). Falls back to the
+// non-streaming /tts/v1/voice endpoint if streaming is unavailable.
+//
+// Docs: https://docs.inworld.ai/tts/tts.md
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { decode as base64Decode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
@@ -13,7 +16,10 @@ interface ReqBody {
   voiceId?: string;
   modelId?: string;
   temperature?: number;
-  languageCode?: string;
+  deliveryMode?: "STABLE" | "BALANCED" | "CREATIVE";
+  language?: string;
+  speakingRate?: number;
+  stream?: boolean;
 }
 
 serve(async (req) => {
@@ -26,41 +32,118 @@ serve(async (req) => {
     const body: ReqBody = await req.json();
     if (!body.text?.trim()) throw new Error("Text is required");
 
-    const voiceId = body.voiceId || "Hades";
-    const modelId = body.modelId || "inworld-tts-1";
+    const voiceId = body.voiceId || "Alain";
+    const modelId = body.modelId || "inworld-tts-2";
+    const deliveryMode = body.deliveryMode || "BALANCED";
+    const language = body.language || "AUTO";
+    const speakingRate = typeof body.speakingRate === "number" ? body.speakingRate : 1;
+    const wantStream = body.stream !== false; // default true
+    const isLegacyModel = /^inworld-tts-1/.test(modelId);
 
-    const payload = {
+    // Inworld accepts the API key directly via Basic auth.
+    // The key the user provided is already base64 — do NOT re-encode.
+    const auth = `Basic ${apiKey}`;
+
+    console.log(
+      `[proxy-tts-inworld] model=${modelId} voice=${voiceId} lang=${language} mode=${deliveryMode} stream=${wantStream} text=${body.text.length}chars`,
+    );
+
+    if (wantStream) {
+      // ---- Streaming endpoint (snake_case payload) ----
+      const streamPayload: Record<string, unknown> = {
+        text: body.text,
+        voice_id: voiceId,
+        model_id: modelId,
+        audio_config: { audio_encoding: "MP3", speaking_rate: speakingRate },
+      };
+      if (isLegacyModel) {
+        if (typeof body.temperature === "number") streamPayload.temperature = body.temperature;
+      } else {
+        streamPayload.delivery_mode = deliveryMode;
+        streamPayload.language = language;
+      }
+
+      const response = await fetch("https://api.inworld.ai/tts/v1/voice:stream", {
+        method: "POST",
+        headers: { Authorization: auth, "Content-Type": "application/json" },
+        body: JSON.stringify(streamPayload),
+      });
+
+      if (!response.ok || !response.body) {
+        const errorText = await response.text();
+        console.error(`[proxy-tts-inworld] stream error [${response.status}]:`, errorText.slice(0, 500));
+        return new Response(
+          JSON.stringify({ error: `Inworld error: ${response.status}`, details: errorText }),
+          { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      // Pipe NDJSON → decoded MP3 bytes as a streamed response.
+      const decoder = new TextDecoder();
+      const reader = response.body.getReader();
+      let buffer = "";
+
+      const audioStream = new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              if (buffer.trim()) {
+                tryEmitLine(buffer, controller);
+              }
+              controller.close();
+              return;
+            }
+            buffer += decoder.decode(value, { stream: true });
+            let nlIdx;
+            while ((nlIdx = buffer.indexOf("\n")) >= 0) {
+              const line = buffer.slice(0, nlIdx).trim();
+              buffer = buffer.slice(nlIdx + 1);
+              if (line) tryEmitLine(line, controller);
+            }
+            // Return control to consumer between network reads.
+            return;
+          }
+        },
+        cancel(reason) {
+          try { reader.cancel(reason); } catch { /* ignore */ }
+        },
+      });
+
+      return new Response(audioStream, {
+        headers: { ...corsHeaders, "Content-Type": "audio/mpeg", "Cache-Control": "no-store" },
+      });
+    }
+
+    // ---- Non-streaming fallback ----
+    const payload: Record<string, unknown> = {
       text: body.text,
       voiceId,
       modelId,
-      ...(typeof body.temperature === "number" ? { temperature: body.temperature } : {}),
-      audioConfig: { audioEncoding: "MP3", sampleRateHertz: 44100 },
+      audioConfig: { audioEncoding: "MP3", speakingRate },
     };
-
-    console.log(`[proxy-tts-inworld] model=${modelId} voice=${voiceId} lang=${body.languageCode || "fr"} text=${body.text.length}chars`);
-
-    // Inworld accepts the API key directly via Basic auth (base64 of "<key>")
-    const auth = `Basic ${btoa(apiKey)}`;
+    if (isLegacyModel) {
+      if (typeof body.temperature === "number") payload.temperature = body.temperature;
+    } else {
+      payload.deliveryMode = deliveryMode;
+      payload.language = language;
+    }
 
     const response = await fetch("https://api.inworld.ai/tts/v1/voice", {
       method: "POST",
-      headers: {
-        "Authorization": auth,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: auth, "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[proxy-tts-inworld] Inworld error [${response.status}]:`, errorText);
+      console.error(`[proxy-tts-inworld] error [${response.status}]:`, errorText.slice(0, 500));
       return new Response(
         JSON.stringify({ error: `Inworld error: ${response.status}`, details: errorText }),
         { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // Inworld returns { audioContent: "<base64-mp3>" }
     const data = await response.json();
     const b64 = data.audioContent || data.audio_content || data.audio;
     if (!b64) {
@@ -84,3 +167,20 @@ serve(async (req) => {
     });
   }
 });
+
+function tryEmitLine(line: string, controller: ReadableStreamDefaultController<Uint8Array>) {
+  try {
+    const obj = JSON.parse(line);
+    const b64 =
+      obj?.result?.audioContent ||
+      obj?.result?.audio_content ||
+      obj?.audioContent ||
+      obj?.audio_content;
+    if (b64) controller.enqueue(base64Decode(b64));
+    else if (obj?.error) {
+      console.error("[proxy-tts-inworld] stream chunk error:", JSON.stringify(obj.error).slice(0, 300));
+    }
+  } catch (err) {
+    console.warn("[proxy-tts-inworld] bad NDJSON line:", line.slice(0, 120), err);
+  }
+}
