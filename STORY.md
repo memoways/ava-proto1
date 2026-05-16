@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-16 (session 18 — Refonte TTS multi-providers (ElevenLabs / Inworld / Hume) avec sélection d'un provider actif global depuis l'Admin, intégration de la voix « Alain » via Inworld `inworld-tts-2` en streaming, et dashboard unifié « Consommation Voix » (compteurs + codes HTTP + latences p50/p95 par provider))  
+> **Last Updated**: 2026-05-16 (session 19 — Fix lecture audio Inworld lors du test (passage `stream:false` côté provider pour un MP3 monolithique décodable par le navigateur) + ajout des **coûts $ estimés** dans le dashboard « Consommation Voix » : KPI globaux (caractères TTS, coût succès), section coût par carte provider et 3 colonnes supplémentaires dans le tableau comparatif (Chars, Coût succès, Coût total) sur base des tarifs publics indicatifs par 1k caractères)  
 
 ---
 
