@@ -109,6 +109,11 @@ export default function VoiceUsageTab() {
       });
       const firstByteVals = provRows.map((r) => r.t_tts_first_byte_ms).filter((v): v is number => v != null);
       const totalVals = provRows.map((r) => r.t_tts_total_ms).filter((v): v is number => v != null);
+      const charsTotal = provRows.reduce((sum, r) => sum + (r.tts_text_len || 0), 0);
+      const charsSuccess = success.reduce((sum, r) => sum + (r.tts_text_len || 0), 0);
+      const rate = COST_PER_1K_CHARS_USD[p.id as TTSProviderId] ?? 0;
+      const costTotalUsd = (charsTotal / 1000) * rate;
+      const costSuccessUsd = (charsSuccess / 1000) * rate;
       const lastError = errors[0];
       return {
         id: p.id as TTSProviderId,
@@ -123,6 +128,11 @@ export default function VoiceUsageTab() {
         fbP95: percentile(firstByteVals, 95),
         totalP50: percentile(totalVals, 50),
         totalP95: percentile(totalVals, 95),
+        charsTotal,
+        charsSuccess,
+        costTotalUsd,
+        costSuccessUsd,
+        ratePer1k: rate,
         lastError: lastError
           ? {
               when: lastError.created_at,
@@ -137,6 +147,9 @@ export default function VoiceUsageTab() {
   const totalReqs = filtered.length;
   const totalErrors = filtered.filter((r) => (r.metadata_json?.error_type ?? "ok") !== "ok").length;
   const globalErrorRate = totalReqs ? (totalErrors / totalReqs) * 100 : 0;
+  const totalCostUsd = providerStats.reduce((s, p) => s + p.costTotalUsd, 0);
+  const totalCostSuccessUsd = providerStats.reduce((s, p) => s + p.costSuccessUsd, 0);
+  const totalChars = providerStats.reduce((s, p) => s + p.charsTotal, 0);
 
   const recentErrors = filtered
     .filter((r) => (r.metadata_json?.error_type ?? "ok") !== "ok")
