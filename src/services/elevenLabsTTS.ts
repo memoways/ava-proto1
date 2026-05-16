@@ -284,6 +284,20 @@ export class TTSQueue {
   /** Phrases en attente, pour calculer `next_text` du segment courant */
   private pending: PendingEntry[] = [];
   private flushScheduled = false;
+  /** Callback déclenché à la première erreur de génération/lecture audio (quota, réseau, etc.) */
+  private onError?: (err: Error) => void;
+  private errorReported = false;
+
+  constructor(opts?: { onError?: (err: Error) => void }) {
+    this.onError = opts?.onError;
+  }
+
+  private reportError(err: unknown) {
+    if (this.errorReported) return;
+    this.errorReported = true;
+    const e = err instanceof Error ? err : new Error(String(err));
+    try { this.onError?.(e); } catch { /* ignore */ }
+  }
 
   /** Enqueue a sentence for TTS generation + playback */
   enqueue(text: string, options?: TTSOptions): void {
@@ -311,6 +325,7 @@ export class TTSQueue {
         console.log(`[TTS-Queue] Played sentence #${this.playbackCount} in ${(performance.now() - playStart).toFixed(0)}ms`);
       } catch (err) {
         console.error("[TTS-Queue] Error:", err);
+        this.reportError(err);
       }
     });
   }
