@@ -16,6 +16,22 @@ import { toast } from "sonner";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
 import type { TTSProviderId } from "@/services/tts/types";
 
+/**
+ * Coût estimé par 1000 caractères TTS (USD).
+ * Tarifs publics de référence — à ajuster selon le plan réel souscrit.
+ *  - ElevenLabs : ~$0.30/1k chars (plan Creator pay-as-you-go)
+ *  - Hume Octave : ~$0.20/1k chars
+ *  - Inworld : $5 / 1M chars = $0.005/1k chars
+ */
+const COST_PER_1K_CHARS_USD: Record<TTSProviderId, number> = {
+  elevenlabs: 0.30,
+  hume: 0.20,
+  inworld: 0.005,
+};
+
+const fmtUsd = (v: number) =>
+  v >= 1 ? `$${v.toFixed(2)}` : v >= 0.01 ? `$${v.toFixed(3)}` : `$${v.toFixed(4)}`;
+
 interface AudioRow {
   id: string;
   created_at: string;
