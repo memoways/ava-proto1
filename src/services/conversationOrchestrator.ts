@@ -84,6 +84,17 @@ export async function processConversationTurn(
   gameMasterPromise: Promise<{ gameMasterResponse: GameMasterResponse; trigger: VideoTrigger | null; gm_post_ms: number }>;
 }> {
   const t0 = performance.now();
+  const llmSettings = (() => { try { return getLLMSettings(); } catch { return {} as ReturnType<typeof getLLMSettings>; } })();
+  const turnTimer = createTurnTimer({
+    session_id: sessionId,
+    character: "max",
+    voice_modality: "voice",
+    user_message_len: userMessage.length,
+    max_model: llmSettings.LLM_MODEL,
+    gm_model: llmSettings.LLM_MODEL_GM,
+    validator_model: llmSettings.LLM_MODEL_VALIDATOR,
+    turn_index: conversationHistory.filter((m) => m.role === "user").length + 1,
+  });
   // Fetch RAG context if not provided (non-blocking — start immediately)
   let finalRagContext = ragContext;
   const gameplay = getGameplaySettings();
