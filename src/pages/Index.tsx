@@ -293,32 +293,50 @@ const Index = () => {
         console.warn("[Validator] Réponse régénérée avant TTS", validation);
       }
 
-      setMaxSubtitle(maxResponse);
+      setMaxSubtitle(ttsDisabledRef.current && ttsDisabledReason
+        ? `${maxResponse}\n\n${ttsDisabledReason}`
+        : maxResponse);
       setAudioState("max_speaking");
 
       const ttsStart = performance.now();
       let ttsError: Error | null = null;
-      const ttsQueue = new TTSQueue({
-        onError: (err) => {
-          ttsError = err;
-          const msg = err.message || "";
-          const friendly = /quota_exceeded|quota of|credits remaining/i.test(msg)
-            ? "⚠️ Voix indisponible (quota TTS épuisé)"
-            : "⚠️ Voix indisponible (erreur TTS)";
-          console.error("[TTS] surfaced error:", msg);
-          setMaxSubtitle(`${maxResponse}\n\n${friendly}`);
-          trackEvent("tts_error", { message: msg.slice(0, 300), turn_chars: maxResponse.length });
-        },
-      });
-      const ttsChunks = chunkTextForTTS(maxResponse);
-      for (const chunk of ttsChunks) {
-        ttsQueue.enqueue(chunk);
+      let ttsQueue: TTSQueue | null = null;
+
+      if (!ttsDisabledRef.current) {
+        ttsQueue = new TTSQueue({
+          onError: (err) => {
+            ttsError = err;
+            const msg = err.message || "";
+            const isQuota = /quota_exceeded|quota of|credits remaining/i.test(msg);
+            const friendly = isQuota
+              ? "⚠️ Voix indisponible (quota TTS épuisé) — mode texte activé pour la suite."
+              : "⚠️ Voix indisponible (erreur TTS) — mode texte activé pour la suite.";
+            console.error("[TTS] surfaced error → disabling voice for session:", msg);
+            // Fallback: désactive la voix pour les tours suivants + annule la queue courante
+            ttsDisabledRef.current = true;
+            setTtsDisabledReason(friendly);
+            try { ttsQueue?.cancel(); } catch { /* ignore */ }
+            setMaxSubtitle(`${maxResponse}\n\n${friendly}`);
+            trackEvent("tts_error", {
+              message: msg.slice(0, 300),
+              turn_chars: maxResponse.length,
+              quota_exceeded: isQuota,
+              voice_disabled: true,
+            });
+          },
+        });
+        const ttsChunks = chunkTextForTTS(maxResponse);
+        for (const chunk of ttsChunks) {
+          ttsQueue.enqueue(chunk);
+        }
+      } else {
+        console.log("[TTS] voix désactivée pour la session — skip TTS, affichage texte seul");
       }
 
       // Wait for TTS playback + Game Master in parallel
       const gmPerf = perf("Game Master");
       const [, gmResult] = await Promise.all([
-        ttsQueue.drain(),
+        ttsQueue ? ttsQueue.drain() : Promise.resolve(),
         gameMasterPromise.then(r => { gmPerf.end(); return r; }),
       ]);
       const tts_ms = Math.round(performance.now() - ttsStart);
