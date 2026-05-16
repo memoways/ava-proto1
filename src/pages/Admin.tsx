@@ -10,7 +10,7 @@ import { AVA_NOTION_DATABASES } from "@/services/ragService";
 import { clearSystemPromptCache } from "@/agents/maxAgent";
 import { hydrateAllSettings } from "@/services/settingsService";
 import LLMConfigTab from "@/components/LLMConfigTab";
-import VoiceConfigTab from "@/components/VoiceConfigTab";
+import TTSConfigTab from "@/components/TTSConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
 import MaxPromptControlTab from "@/components/MaxPromptControlTab";
 import MaxPromptTestTab from "@/components/MaxPromptTestTab";
@@ -64,8 +64,8 @@ const TAB_GROUPS = [
     label: "🔧 Technique",
     tabs: [
       { id: "llm", label: "LLM Config" },
-      { id: "voice", label: "Voix" },
-      { id: "usage", label: "Consommation" },
+      { id: "voice", label: "TTS Config" },
+      { id: "usage", label: "Consommation LLM" },
     ],
   },
 ];
@@ -604,9 +604,9 @@ export default function Admin() {
             <LLMConfigTab />
           </TabsContent>
 
-          {/* ==================== VOICE CONFIG ==================== */}
+          {/* ==================== TTS CONFIG ==================== */}
           <TabsContent value="voice">
-            <VoiceConfigTab />
+            <TTSConfigTab />
           </TabsContent>
 
           {/* ==================== LLM USAGE / CONSUMPTION ==================== */}
