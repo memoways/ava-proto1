@@ -4,6 +4,37 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.21.0] - 2026-05-16 — TTS multi-providers (ElevenLabs / Inworld / Hume) + voix Alain (Inworld) + monitoring « Consommation Voix »
+
+### Ajouté
+- **Façade TTS multi-providers** (`src/services/tts/`) : nouvelle architecture découplée avec `types.ts` (interface `TTSProvider`), `registry.ts` (mapping `elevenlabs` / `inworld` / `hume`), `index.ts` (entrée unique `generateSpeech` / `speakText` + télémétrie de latence uniforme), `queue.ts` (file séquentielle provider-agnostique), `textPrep.ts` + `textChunking.ts` (logique partagée de nettoyage markdown et segmentation prosodique).
+- **3 providers TTS** implémentés sous `src/services/tts/providers/` :
+  - `elevenlabs.ts` — branché sur le proxy existant (voix custom Max).
+  - `inworld.ts` — voix **« Alain »** via `inworld-tts-2`, streaming HTTP NDJSON, paramètres `deliveryMode` (STABLE / BALANCED / CREATIVE), `language`, `speakingRate`.
+  - `hume.ts` — Hume AI Octave via nouveau proxy edge function.
+- **Edge functions proxy** : `supabase/functions/proxy-tts-inworld` (endpoint `/voice:stream`, parsing NDJSON, pipe MP3 directement au client) et `supabase/functions/proxy-tts-hume`. `verify_jwt = false` ajouté dans `supabase/config.toml`.
+- **Sélecteur de provider actif global** dans Admin → **TTS Config** (`src/components/TTSConfigTab.tsx`) : un seul provider actif à la fois, persisté en DB + LocalStorage via `src/services/tts/providerSettings.ts` (clés `ava_tts_active_provider`, `ava_tts_settings_<provider>`). Panneau de réglages par provider + bouton **🔊 Tester** par provider.
+- **Dashboard monitoring unifié** « Consommation Voix » (`src/components/admin/VoiceUsageTab.tsx`) — agrégation depuis `audio_latencies.metadata_json` :
+  - Compteurs requêtes + taux de succès par provider
+  - Latences **p50 / p95** (first-byte et total) par provider
+  - Distribution des **codes HTTP** (200, 401, 429, 5xx…)
+  - Liste des **erreurs récentes** (avec `error_type` + `error_message` complets)
+  - Vue comparative côte-à-côte des providers actifs
+- **Secrets** : ajout de `INWORLD_API_KEY` et `HUME_API_KEY` côté backend.
+- **Renommage onglet** : « Consommation » → **« Consommation LLM »** pour distinguer du nouveau « Consommation Voix ».
+
+### Modifié
+- `src/services/elevenLabsTTS.ts` : converti en **shim de compatibilité** vers la nouvelle façade — aucun import existant cassé.
+- `src/pages/Admin.tsx` : nouvel onglet **TTS Config** (remplace `VoiceConfigTab`), nouvel onglet **Consommation Voix** sous la section Technical.
+- Proxy Inworld : correction d'un **401** dû à un double encodage base64 de `INWORLD_API_KEY`.
+
+### Supprimé
+- `src/components/VoiceConfigTab.tsx` — remplacé par `TTSConfigTab` multi-providers.
+
+### Notes
+- Le pipeline real-time reste sur ElevenLabs par défaut ; bascule vers Inworld (Alain) ou Hume se fait sans redéploiement via Admin → TTS Config.
+- Le monitoring se peuple automatiquement (pas de migration DB requise — `metadata_json` était déjà persisté).
+
 ## [0.20.1] - 2026-05-14 — Banc d'essai « Lancer le banc » + traçabilité du system prompt Max
 
 ### Ajouté

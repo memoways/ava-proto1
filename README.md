@@ -5,7 +5,9 @@
 > **Créé avec**: Lovable  
 > **Démarré**: 2026-03-07  
 
-> **Mise à jour récente (2026-05-10) — RAG v2 (Voyage AI + reranker + query rewriting + mémoire de session)** : ajout des embeddings **Voyage AI `voyage-3` (1024 dim)** en double-stack avec OpenAI, reranker **`rerank-2.5`** appliqué après retrieval (champs `retrieval_similarity` + `rerank_score`), filtrage strict par `character_id` (chunks scopés vs partagés), passage des indexes pgvector en **HNSW** pour fiabilité sur petits datasets. Nouvelles edge functions `rewrite-query` (reformulation de la question utilisateur en requête autonome avant RAG) et `summarize-session` (résumé compressé tous les N tours, injecté dans le prompt Max sous « SOUVENIRS DE LA SESSION »). Le banc d'essai `MaxPromptTestTab` affiche désormais l'étape « Query rewrite », le provider d'embedding par requête, et par chunk : `character_id`, `rerank_score`, similarité de retrieval brute. Détails complets dans `CHANGELOG.md` et `STORY.md`.
+> **Mise à jour récente (2026-05-16) — TTS multi-providers + voix Alain (Inworld) + monitoring « Consommation Voix »** : refonte du TTS en **façade découplée** (`src/services/tts/`) avec 3 providers branchés — **ElevenLabs**, **Inworld `inworld-tts-2`** (voix « Alain » en streaming NDJSON, deliveryMode STABLE/BALANCED/CREATIVE) et **Hume AI Octave**. Sélection d'un seul provider actif **global** depuis Admin → **TTS Config**, sans redéploiement, avec bouton 🔊 Tester par provider. Nouveau dashboard **« Consommation Voix »** : compteurs, taux de succès, latences **p50/p95** (first-byte + total), distribution des **codes HTTP** et erreurs récentes par provider. Secrets `INWORLD_API_KEY` et `HUME_API_KEY` ajoutés. Détails dans `CHANGELOG.md` et `STORY.md`.
+
+> **Mise à jour précédente (2026-05-10) — RAG v2 (Voyage AI + reranker + query rewriting + mémoire de session)** : embeddings **Voyage AI `voyage-3` (1024 dim)** en double-stack avec OpenAI, reranker **`rerank-2.5`**, filtrage strict par `character_id`, indexes pgvector **HNSW**, edge functions `rewrite-query` et `summarize-session`.
 
 > **Mise à jour précédente**: banc d'essai complet « Test de réponse Max » — refonte de l'onglet en **outil d'inspection du pipeline conversationnel** étape par étape (RAG → Knowledge → GM pré-tour → Max → Validateur). Document de plan : `docs/plan_max_test_inspector.md`.
 
@@ -84,6 +86,8 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] Query rewriting LLM (`rewrite-query` edge function) — reformulation autonome avant RAG
 - [x] Mémoire de session compressée (`summarize-session` + table `session_summaries`) injectée dans le prompt Max
 - [x] Affichage banc d'essai : étape Query rewrite, badge provider d'embedding, par chunk `character_id`/`rerank_score`/retrieval brut
+- [x] **TTS multi-providers** : façade `src/services/tts/` + providers ElevenLabs / Inworld (`inworld-tts-2`, voix « Alain », streaming NDJSON) / Hume AI Octave, sélection d'un provider actif global depuis Admin → TTS Config
+- [x] **Dashboard « Consommation Voix »** : compteurs, taux de succès, latences p50/p95 (first-byte + total), codes HTTP et erreurs récentes par provider
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
 - [ ] Politique de vérité à 4 niveaux (certain / probable / inconnu / interdit)
 - [ ] Bible factuelle éditable et gestion explicite des sujets verrouillés/déverrouillés
@@ -95,12 +99,12 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 |-----------|-------------|
 | Frontend | React + Vite + Tailwind + TypeScript (Lovable) |
 | Backend | Lovable Cloud (Supabase Postgres + pgvector) |
-| Edge Functions | proxy-llm, proxy-stt, proxy-tts, sync-notion, query-rag, sync-questionnaire, **rewrite-query**, **summarize-session** |
+| Edge Functions | proxy-llm, proxy-stt, proxy-tts, **proxy-tts-inworld**, **proxy-tts-hume**, sync-notion, query-rag, sync-questionnaire, rewrite-query, summarize-session |
 | Video | Gumlet (hébergement + embed player) |
 | Cost Tracking | OpenRouter generation API (tokens + USD per call) |
 | LLM | OpenRouter API — Multi-modèles (Qwen, Claude, Grok, Llama, Gemini, GPT-5) |
 | STT | Deepgram (WebSocket streaming + VAD) |
-| TTS | ElevenLabs (voix custom Max, paramètres ajustables) |
+| TTS | **Multi-providers** via façade `src/services/tts/` — ElevenLabs (voix custom Max), **Inworld `inworld-tts-2`** (voix « Alain », streaming NDJSON), **Hume AI Octave**. Provider actif sélectionné dans Admin → TTS Config. |
 | Embeddings | **Voyage AI `voyage-3` (1024 dim, défaut)** + OpenAI text-embedding-3-small (1536 dim, fallback) |
 | Reranker | **Voyage `rerank-2.5`** (toggle via `RAG_RERANK_ENABLED`) |
 | Données | Notion (source de vérité) → Supabase (miroir + embeddings double-stack) |

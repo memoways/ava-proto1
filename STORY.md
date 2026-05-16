@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-14 (session 17 — Banc d'essai « Lancer le banc » avec scénario complet RAG v2 + traçabilité visuelle du system prompt Max dans l'Admin (id, updated_at, hash FNV-1a) + audit centralisation DB)  
+> **Last Updated**: 2026-05-16 (session 18 — Refonte TTS multi-providers (ElevenLabs / Inworld / Hume) avec sélection d'un provider actif global depuis l'Admin, intégration de la voix « Alain » via Inworld `inworld-tts-2` en streaming, et dashboard unifié « Consommation Voix » (compteurs + codes HTTP + latences p50/p95 par provider))  
 
 ---
 
@@ -63,6 +63,26 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-05-16 — TTS multi-providers (ElevenLabs / Inworld / Hume) + voix Alain + monitoring « Consommation Voix » 🔷
+
+**Intent**: Le TTS reposait sur un seul provider (ElevenLabs) câblé en dur dans `elevenLabsTTS.ts`, ce qui empêchait de tester d'autres voix (notamment **« Alain »** sur Inworld en attendant le clone vocal de Max) et de comparer empiriquement coût / latence / qualité. En parallèle, aucun monitoring dédié ne permettait de voir les taux d'erreur HTTP ou les percentiles de latence par provider — les incidents (ex. 401 Inworld dû à un double encodage base64) étaient invisibles tant qu'on ne lisait pas les logs Edge Functions.
+
+**Tool**: Lovable
+
+**Outcome**:
+1. **Façade TTS unifiée** (`src/services/tts/`) — interface `TTSProvider` + `registry` qui mappe les IDs (`elevenlabs` / `inworld` / `hume`) vers leurs implémentations. Le code applicatif appelle `generateSpeech()` / `speakText()` sans connaître le provider. Logique partagée extraite : nettoyage markdown (`textPrep`), segmentation prosodique (`textChunking`), file séquentielle (`queue`), télémétrie de latence uniforme.
+2. **3 providers branchés** : ElevenLabs (existant), **Inworld `inworld-tts-2`** (voix Alain, streaming HTTP NDJSON décodé en MP3 piped client-side, paramètres `deliveryMode` STABLE/BALANCED/CREATIVE + `language` + `speakingRate`), **Hume AI Octave**. Edge functions proxy dédiées (`proxy-tts-inworld`, `proxy-tts-hume`) avec `verify_jwt = false`. Secrets `INWORLD_API_KEY` et `HUME_API_KEY` ajoutés.
+3. **Sélecteur global dans l'Admin** (`TTSConfigTab`) — un seul provider actif à la fois, persisté DB + LocalStorage (`ava_tts_active_provider`, `ava_tts_settings_<provider>`). Panneau de réglages par provider + bouton **🔊 Tester** par provider pour A/B en un clic, sans redéploiement.
+4. **Dashboard « Consommation Voix »** (`VoiceUsageTab`) — agrégation depuis `audio_latencies.metadata_json` (aucune migration DB requise) : compteurs requêtes, taux de succès, latences **p50 / p95** (first-byte + total) par provider, distribution des **codes HTTP** (200/401/429/5xx…), liste des **erreurs récentes** avec `error_type` + `error_message` complets, et vue comparative côte-à-côte.
+5. **Compatibilité préservée** : `elevenLabsTTS.ts` converti en shim vers la nouvelle façade — zéro régression sur le pipeline temps réel. Ancien `VoiceConfigTab` supprimé, onglet « Consommation » renommé **« Consommation LLM »** pour cohabiter avec « Consommation Voix ».
+6. **Bug fix Inworld 401** — diagnostiqué via le proxy : la clé était re-encodée en base64 alors qu'elle l'est déjà côté Inworld. Corrigé en envoyant le header `Authorization: Basic <key>` brut.
+
+**Ce que ça change** : le TTS devient un **point de bascule éditorial** plutôt qu'un câblage figé — l'équipe peut comparer ElevenLabs, Inworld (Alain) et Hume sur le même contenu sans toucher au code, et le monitoring rend visibles les pannes silencieuses (429 = quota, 401 = clé invalide, p95 qui dérive). Prépare le terrain pour le clone vocal de Max (qui sera un 4ᵉ provider ou une voix custom dans ElevenLabs).
+
+**Time**: ~3h (façade → providers → proxy Inworld streaming → debug 401 → dashboard monitoring → cleanup VoiceConfigTab).
+
+---
 
 ### 2026-05-10 — RAG v2 : Voyage AI + reranker + query rewriting + mémoire de session compressée 🔷
 
