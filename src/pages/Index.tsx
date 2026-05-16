@@ -292,7 +292,19 @@ const Index = () => {
       setAudioState("max_speaking");
 
       const ttsStart = performance.now();
-      const ttsQueue = new TTSQueue();
+      let ttsError: Error | null = null;
+      const ttsQueue = new TTSQueue({
+        onError: (err) => {
+          ttsError = err;
+          const msg = err.message || "";
+          const friendly = /quota_exceeded|quota of|credits remaining/i.test(msg)
+            ? "⚠️ Voix indisponible (quota TTS épuisé)"
+            : "⚠️ Voix indisponible (erreur TTS)";
+          console.error("[TTS] surfaced error:", msg);
+          setMaxSubtitle(`${maxResponse}\n\n${friendly}`);
+          trackEvent("tts_error", { message: msg.slice(0, 300), turn_chars: maxResponse.length });
+        },
+      });
       const ttsChunks = chunkTextForTTS(maxResponse);
       for (const chunk of ttsChunks) {
         ttsQueue.enqueue(chunk);
