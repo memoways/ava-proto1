@@ -604,9 +604,9 @@ export default function Admin() {
             <LLMConfigTab />
           </TabsContent>
 
-          {/* ==================== VOICE CONFIG ==================== */}
+          {/* ==================== TTS CONFIG ==================== */}
           <TabsContent value="voice">
-            <VoiceConfigTab />
+            <TTSConfigTab />
           </TabsContent>
 
           {/* ==================== LLM USAGE / CONSUMPTION ==================== */}
