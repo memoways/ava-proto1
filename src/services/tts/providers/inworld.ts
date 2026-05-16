@@ -28,7 +28,7 @@ export const inworldProvider: TTSProvider = {
       language: s.language,
       speakingRate: s.speakingRate,
       temperature: s.temperature,
-      stream: true,
+      stream: false,
     };
 
     const startTime = Date.now();
