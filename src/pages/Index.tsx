@@ -102,6 +102,11 @@ const Index = () => {
   const processUserMessageRef = useRef<(text: string) => void>(() => {});
   const conversationHistoryRef = useRef<ConversationMessage[]>([]);
   const micStartedRef = useRef(false);
+  /** Quand TTS échoue de façon persistante (ex: quota ElevenLabs épuisé), on désactive la voix
+   *  pour le reste de la session: les tours suivants n'appellent plus le proxy TTS et l'UI
+   *  affiche uniquement le texte de Max. Évite blocages et confusion utilisateur. */
+  const ttsDisabledRef = useRef(false);
+  const [ttsDisabledReason, setTtsDisabledReason] = useState<string | null>(null);
 
   const timer = useTimer(sessionDuration, () => {
     if (sessionIdRef.current) {
