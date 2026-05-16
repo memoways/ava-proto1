@@ -313,6 +313,9 @@ export default function VoiceUsageTab() {
               <th className="text-right p-2 font-medium text-muted-foreground">FB p95</th>
               <th className="text-right p-2 font-medium text-muted-foreground">Tot. p50</th>
               <th className="text-right p-2 font-medium text-muted-foreground">Tot. p95</th>
+              <th className="text-right p-2 font-medium text-muted-foreground">Chars</th>
+              <th className="text-right p-2 font-medium text-muted-foreground">Coût (succès)</th>
+              <th className="text-right p-2 font-medium text-muted-foreground">Coût total</th>
             </tr>
           </thead>
           <tbody>
@@ -327,6 +330,9 @@ export default function VoiceUsageTab() {
                 <td className="p-2 text-right font-mono">{fmtMs(s.fbP95)}</td>
                 <td className="p-2 text-right font-mono">{fmtMs(s.totalP50)}</td>
                 <td className="p-2 text-right font-mono">{fmtMs(s.totalP95)}</td>
+                <td className="p-2 text-right font-mono">{s.charsTotal.toLocaleString("fr-CH")}</td>
+                <td className="p-2 text-right font-mono text-amber-400">{fmtUsd(s.costSuccessUsd)}</td>
+                <td className="p-2 text-right font-mono">{fmtUsd(s.costTotalUsd)}</td>
               </tr>
             ))}
           </tbody>
