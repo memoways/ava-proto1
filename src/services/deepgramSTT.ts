@@ -109,6 +109,9 @@ export class DeepgramSTT {
           const displayText = isFinal ? this.fullTranscript : this.fullTranscript + (this.fullTranscript ? ' ' : '') + transcript;
           this.onTranscript(displayText, false);
 
+          // Track last speech timestamp for STT latency telemetry
+          this.lastSpeechAt = performance.now();
+
           // Reset silence timer on any speech
           this.resetSilenceTimer();
         }
