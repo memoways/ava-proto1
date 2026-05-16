@@ -1,146 +1,157 @@
 
-# Optimisation RAG / mémoire / cohérence persona
+# Plan — TTS multi-providers + monitoring Consommation Voix
 
-Objectif : tirer le maximum du pipeline existant (Notion → pgvector → Max) sans le refondre. On reste sur Supabase + pgvector. On ajoute Voyage AI (embeddings + reranker), un filtrage strict par personnage, et une mémoire intra-session compressée. Pas de Mem0/Letta/Qdrant/GraphRAG dans cette itération.
-
----
-
-## Diagnostic actuel (rappel)
-
-- Embeddings : OpenAI `text-embedding-3-small` (1536 dim)
-- Chunking : sections par `## `, max 1500 chars, sans overlap, sans contexte parent injecté
-- Retrieval : `match_embeddings` global (pas de filtre source/personnage), `top_k=5`, seuil `0.3`
-- Knowledge context : tranchage figé (top3 facts / top2 memories / `<0.55` = hypothèses), aucune trace du personnage actif
-- Mémoire intra-session : aucune — uniquement les 6 derniers tours bruts envoyés au LLM
-- Pas de reranking, pas de query rewriting, pas de hybrid search
-
-Résultat observé : chunks d'autres personnages qui remontent, hypothèses arbitraires basées sur un seuil dur, RAG souvent "à côté" quand l'utilisateur parle vaguement.
+Livré en 2 phases distinctes pour minimiser le risque de régression. Phase 1 ne touche pas au monitoring existant ; Phase 2 ne touche pas au pipeline audio.
 
 ---
 
-## Plan en 5 chantiers (ordonnés par ratio impact / effort)
+## Phase 1 — Refonte TTS multi-providers
 
-### Chantier 1 — Filtrage strict par personnage (impact immédiat, 0 coût)
+### Objectif
+Remplacer l'appel direct "ElevenLabs only" par une abstraction `TTSProvider` permettant de choisir l'un des 4 services depuis l'admin, sans changer le comportement runtime côté `Index.tsx` / `TTSQueue`.
 
-**Pourquoi** : aujourd'hui quand on parle à Ava, des chunks "characters/Max" peuvent gagner le top-K et polluer le contexte.
+### Providers cibles
+1. **ElevenLabs** (existant, conservé tel quel)
+2. **Inworld TTS** — API REST, modèles `inworld-tts-1` / `inworld-tts-1-max`
+3. **StepAudio** (Step-Audio / StepFun) — API REST, voix FR
+4. **Hume AI Octave** — API REST, voix expressives
 
-**Quoi** :
-1. Migration : nouvelle colonne `embeddings.character_id uuid NULL` + index. Pour les chunks issus de `source_table='characters'`, on remplit avec l'id du personnage. Pour `storyworld` / `gameplay_steps` / `video_triggers`, on laisse `NULL` (= partagé).
-2. Migration : nouvelle fonction `match_embeddings_scoped(query_embedding, match_count, match_threshold, p_character_id uuid)` qui ne retourne que les chunks où `character_id IS NULL OR character_id = p_character_id`.
-3. `sync-notion` : remplir `character_id` lors de l'insertion des chunks `characters`.
-4. `query-rag` (edge function) : accepter un nouveau body field `character_id` et appeler la nouvelle RPC.
-5. Côté front : `queryRAG` / `queryRAGDetailed` reçoivent `characterId` ; `conversationOrchestrator` et `maxTestPipeline` le passent à partir du personnage actif (Admin → sélection ; en jeu → personnage de la session).
+Une 5e (Cartesia, Deepgram Aura, OpenAI TTS) pourra être ajoutée sans refactor — l'archi est ouverte.
 
-### Chantier 2 — Voyage AI : embeddings + reranker (qualité retrieval)
+### Architecture
 
-**Pourquoi** : voyage-3 surpasse OpenAI 3-small sur BEIR, et le reranker `rerank-2.5` permet de récupérer top 15-20 puis reclasser en top 5 ultra-pertinents — exactement ce qui manque aujourd'hui.
+```text
+src/services/tts/
+  index.ts                  ← façade publique : generateSpeech(), TTSQueue
+  types.ts                  ← TTSProvider interface, TTSRequest, TTSResponse
+  registry.ts               ← map { elevenlabs, inworld, stepaudio, hume } → provider
+  providers/
+    elevenlabs.ts           ← wrap existant (appelle proxy-tts)
+    inworld.ts              ← appelle proxy-tts-inworld
+    stepaudio.ts            ← appelle proxy-tts-stepaudio
+    hume.ts                 ← appelle proxy-tts-hume
 
-**Quoi** :
-1. Ajout du secret `VOYAGE_API_KEY` (action utilisateur via `add_secret`).
-2. Migration : nouvelle colonne `embeddings.embedding_v voyage(1024)` ou plus simplement `embedding_v vector(1024)` + index ivfflat dédié, en gardant l'ancienne colonne pendant la transition. Rebuild des embeddings au prochain sync. Nouvelle RPC `match_embeddings_v` qui interroge cette colonne. *Alternative plus simple : on remplace l'ancienne colonne après recalcul complet — choix à valider en début d'implémentation selon volume.*
-3. `sync-notion` : appel Voyage `voyage-3` (input_type=`document`) à la place d'OpenAI pour générer les embeddings.
-4. `query-rag` : appel Voyage `voyage-3` (input_type=`query`), récupère `match_count` élargi (15), puis appelle `voyage-rerank-2.5` avec les contenus pour reclasser, garde top N (= `RAG_TOP_K` actuel, défaut 5).
-5. Réglage : `RAG_TOP_K` reste à 5 ; on ajoute deux paramètres dans `settings.json` : `RAG_RETRIEVE_K=15` et `RAG_RERANK_ENABLED=true` (pour pouvoir débrancher).
-6. Surface admin : on expose ces deux nouveaux réglages dans l'onglet RAG existant + le score de rerank (différent de la similarité cosinus) est affiché dans le test "Max Response Test".
+supabase/functions/
+  proxy-tts/                ← inchangé (ElevenLabs)
+  proxy-tts-inworld/        ← nouveau
+  proxy-tts-stepaudio/      ← nouveau
+  proxy-tts-hume/           ← nouveau
+```
 
-### Chantier 3 — Chunking enrichi avec contexte parent (Anthropic-style contextual chunks, sans le coût LLM)
+Chaque provider expose la même signature :
+```ts
+interface TTSProvider {
+  id: "elevenlabs" | "inworld" | "stepaudio" | "hume";
+  label: string;
+  generate(text: string, opts: CommonTTSOptions): Promise<{ blob: Blob; meta: ProviderMeta }>;
+  defaultSettings(): ProviderSettings;
+  settingsSchema: SettingsField[];  // pour rendu auto dans TTS Config
+}
+```
 
-**Pourquoi** : aujourd'hui un chunk "## Enfance" perd la référence "Personnage Ava" sauf si le titre est dans le chunk. Voyage embeddings gèrent mieux ce contexte si on le préfixe.
+### Sélection du provider actif
 
-**Quoi** : modifier `chunkText` dans `sync-notion` :
-1. Préfixer chaque chunk par un header structuré : `Personnage: <nom> | Section: <h2> | Type: <archétype>` (ou pour storyworld : `Sujet: <titre> | Catégorie: <type>`).
-2. Ajouter un overlap de 150 chars entre chunks consécutifs (paragraphe de fin recopié au chunk suivant) pour éviter les coupures sèches.
-3. Réduire `maxChunkSize` à 1000 (Voyage est meilleur sur des chunks plus courts et le rerank compensera).
+- Nouvelle clé dans `admin_settings` : `tts_active_provider` (default `"elevenlabs"`).
+- Chargée au boot via `settingsService` et exposée par `getActiveTTSProvider()`.
+- `generateSpeech(text, opts)` (façade) délègue à `registry[active].generate(...)`.
+- **Aucun changement** dans `Index.tsx` ni `TTSQueue` : ils continuent à appeler `generateSpeech()` comme aujourd'hui.
 
-Pas de contextualisation LLM (trop coûteux/lent à l'ingestion), mais on capture 80% du gain.
+### Refonte de l'onglet "Voix" → "TTS Config"
 
-### Chantier 4 — Query rewriting léger (mémoire intra-session activée)
+`src/components/VoiceConfigTab.tsx` devient `TTSConfigTab.tsx`, structuré comme `LLMConfigTab` :
 
-**Pourquoi** : aujourd'hui on envoie au RAG le message brut + 6 derniers messages concaténés. Quand l'utilisateur dit "et toi, ça t'est arrivé ?", la requête vectorielle est inutile. Un mini-LLM peut reformuler.
+1. **Sélecteur de provider actif** (radio + descriptif + bouton "Définir comme actif")
+2. **Section par provider** (accordéon), avec :
+   - Réglages spécifiques (voix, modèle, stabilité, vitesse, format audio…) générés depuis `settingsSchema`
+   - Bouton "🔊 Tester ce provider" (utilise le provider de la section, pas le provider actif)
+   - Statut secret : `ELEVENLABS_API_KEY` configurée ✓ / `INWORLD_API_KEY` manquante ⚠️
+3. **Section comparaison rapide** : un même texte joué successivement par chaque provider (utile pour A/B).
 
-**Quoi** :
-1. Avant le RAG, appel rapide `gemini-3-flash-preview` (déjà dispo via Lovable AI) avec un prompt court : "Reformule la dernière question de l'utilisateur en une requête de recherche autonome en français, en réutilisant les références implicites de l'historique. Réponds uniquement par la requête."
-2. Cette requête reformulée alimente Voyage embeddings + rerank. Le message brut reste celui envoyé à Max.
-3. Toggle dans settings : `RAG_QUERY_REWRITE_ENABLED=true` (débrayable).
-4. Surface dans Max Response Test : nouvelle ligne "Requête réécrite" entre l'input et l'étape RAG.
+Persistance : une clé par provider dans `admin_settings` (`tts_settings_elevenlabs`, `tts_settings_inworld`, …).
 
-### Chantier 5 — Mémoire intra-session compressée (cohérence sur 10 min)
+### Secrets requis
 
-**Pourquoi** : sur un tour 8/10, Max ne "voit" pas ce qui s'est dit au tour 1. Pas besoin de Mem0 pour 10 min, on peut faire un résumé glissant.
+À ajouter via `secrets--add_secret` au début de la phase :
+- `INWORLD_API_KEY`
+- `STEPAUDIO_API_KEY`
+- `HUME_API_KEY`
 
-**Quoi** :
-1. Nouvelle table `session_summaries (session_id uuid, summary text, last_turn int, updated_at)`.
-2. Tous les 4 tours, edge function `summarize-session` (gemini-3-flash-preview) génère un résumé bullet-point (faits saillants sur l'utilisateur, sujets déjà abordés, promesses faites par Max).
-3. Ce résumé est injecté dans le system prompt de Max sous une nouvelle section `## SOUVENIRS DE LA SESSION` — alimente aussi `knowledgeContext.activeMemories`.
-4. Reset à la fin de session (déjà géré par `session_id`).
+(Note : je demanderai à l'utilisateur les clés au moment de démarrer la phase, pas maintenant.)
+
+### Garde-fous régression
+- ElevenLabs reste branché à `proxy-tts` existant, signature inchangée, défaut actif.
+- La façade `generateSpeech` garde la même signature publique → `Index.tsx`, `TTSQueue`, tests existants restent verts.
+- Renommer "Voix" → "TTS Config" dans `Admin.tsx` (1 ligne), garder `tab=voice` pour ne pas casser les liens.
+- Tests unitaires nouveaux : registry mapping + selection.
 
 ---
 
-## Inspecteur Max Test — extensions
+## Phase 2 — Panel "Consommation Voix"
 
-Le bench existant (`MaxPromptTestTab` + `maxTestPipeline`) gagne 4 lignes :
-- "Requête réécrite" (chantier 4)
-- "Embedding model" + "Rerank model" + scores rerank par chunk (chantier 2)
-- Badge `character_id` filtré sur chaque match (chantier 1)
-- Bloc "Résumé de session injecté" (chantier 5, si simulé)
+### Objectif
+Ajouter un onglet à côté de "Consommation" (renommé "Consommation LLM"), monitoring multi-providers basé sur la table existante `audio_latencies` enrichie.
 
-Aucune logique métier à dupliquer : on enrichit juste les types `RAGMatch` et `RAGQueryDetailed`.
+### Renommages dans `Admin.tsx`
+- `usage` → label "Consommation LLM" (id inchangé)
+- Nouveau tab `voice-usage` → label "Consommation Voix"
+
+### Enrichissement données
+
+Migration `audio_latencies` :
+- Ajout colonnes : `provider text`, `status_code int`, `error_type text` (`ok` / `quota` / `auth` / `network` / `server` / `client`), `error_message text`.
+- Backfill : `provider = 'elevenlabs'` pour les lignes existantes.
+
+Côté providers (Phase 1 déjà en place) : chaque `provider.generate()` retourne `meta` qui est passé à `recordAudioLatency()` — donc Phase 2 n'a qu'à lire ces champs.
+
+### Composant `VoiceUsageTab.tsx`
+
+Sur une fenêtre temporelle sélectionnable (24h / 7j / total) :
+
+- **Cartes par provider** (ElevenLabs, Inworld, StepAudio, Hume) :
+  - Requêtes totales / succès / erreurs (+ % succès)
+  - Répartition codes HTTP : 200 / 401 / 429 / 5xx (mini bar chart)
+  - Latence first-byte p50 / p95
+  - Latence totale p50 / p95
+  - Dernière erreur (timestamp + message tronqué)
+- **Bandeau d'alerte** si taux d'erreur > 10% sur 24h
+- **Tableau comparatif** côte-à-côte (1 ligne par provider, colonnes : req, succès, p50, p95, erreurs)
+
+Requêtes : `supabase.from('audio_latencies').select(...)` agrégé côté client (volumes modestes), filtrage par fenêtre temporelle.
+
+### Garde-fous régression
+- Lecture seule. Aucun impact sur le pipeline voix.
+- La phase 1 garantit que `provider`, `status_code`, `error_type` sont déjà alimentés avant que ce panel ne soit livré.
 
 ---
 
 ## Détails techniques
 
-### Nouveaux secrets
-- `VOYAGE_API_KEY` (à ajouter)
+### Question quotas/coûts (hors scope monitoring de base, prévu extensible)
+Aucun appel `/v1/usage` ou équivalent provider dans Phase 2 — le coût et le quota restant ne seront pas affichés (peuvent être ajoutés en Phase 3 si besoin, sans toucher au schéma).
 
-### Migrations DB
-1. `ALTER TABLE embeddings ADD COLUMN character_id uuid NULL REFERENCES characters(id) ON DELETE CASCADE;` + index
-2. `ALTER TABLE embeddings ADD COLUMN embedding_v vector(1024) NULL;` + index ivfflat
-3. Nouvelle RPC `match_embeddings_scoped_v(query_embedding vector(1024), match_count int, match_threshold float, p_character_id uuid)`
-4. Nouvelle table `session_summaries`
+### PostHog
+Les events `audio_latency` envoyés depuis `latencyTelemetry.ts` reçoivent automatiquement les nouveaux champs (`provider`, `status_code`, `error_type`) → exploitables aussi côté PostHog Insights sans travail supplémentaire.
 
-### Nouveaux paramètres `settings.json`
-- `RAG_RETRIEVE_K: 15`
-- `RAG_RERANK_ENABLED: true`
-- `RAG_QUERY_REWRITE_ENABLED: true`
-- `RAG_EMBEDDING_PROVIDER: "voyage"` (`"openai"` reste possible en fallback)
-- `RAG_SUMMARY_EVERY_N_TURNS: 4`
+### Fichiers touchés (estimation)
 
-### Edge functions touchées
-- `sync-notion` (chunking enrichi + Voyage embeddings + character_id)
-- `query-rag` (filtrage personnage + Voyage embed query + rerank)
-- nouvelle `summarize-session`
-- (optionnel) nouvelle `rewrite-query` ou inliné dans `conversationOrchestrator` via Lovable AI Gateway
+Phase 1 (~10 fichiers) :
+- nouveaux : `src/services/tts/{index,types,registry}.ts`, `src/services/tts/providers/{elevenlabs,inworld,stepaudio,hume}.ts`, `src/components/TTSConfigTab.tsx`, 3 edge functions
+- modifiés : `src/pages/Admin.tsx` (label + import), `src/services/settingsService.ts` (clés par provider), `src/pages/Index.tsx` (aucun changement attendu — import via façade)
+- supprimé/déprécié : `src/components/VoiceConfigTab.tsx` (logique migrée)
 
-### Front / services
-- `ragService.queryRAG(userMessage, recentContext, topK, threshold, characterId)` — signature étendue
-- `conversationOrchestrator` : passe le `characterId` actif + appelle `rewrite-query` avant `queryRAG` + injecte le summary courant
-- `maxTestPipeline` : ajoute étape "rewrite" + champs rerank dans la trace
-- `Admin RAG tab` : nouveaux toggles et affichage du provider d'embedding
+Phase 2 (~4 fichiers) :
+- nouveaux : `src/components/admin/VoiceUsageTab.tsx`, 1 migration SQL
+- modifiés : `src/pages/Admin.tsx` (rename + nouvel onglet), `src/services/latencyTelemetry.ts` (4 nouveaux champs)
+
+### Risques identifiés
+- **Inworld / StepAudio / Hume** : APIs moins documentées qu'ElevenLabs ; je vérifierai les endpoints + formats au moment de coder chaque proxy et signalerai tout blocage.
+- **Latence ajoutée** : nulle — la façade est un simple lookup de map ; `Index.tsx` ne change pas.
+- **Régression ElevenLabs** : couverte par les tests unitaires existants (`elevenLabsTTS.test.ts`) qui resteront verts car le provider ElevenLabs reste un wrapper 1:1 du code actuel.
 
 ---
 
-## Roadmap d'exécution suggérée
-
-```text
-Sprint 1 (rapide, gros gain visible)
-  └ Chantier 1 : filtrage strict par personnage
-  └ Chantier 3 : chunking enrichi (préfixes + overlap)
-  → Re-sync Notion complet
-
-Sprint 2 (qualité retrieval)
-  └ Chantier 2 : Voyage embeddings + rerank
-  → Re-sync Notion complet sur la colonne v
-
-Sprint 3 (intelligence du tour)
-  └ Chantier 4 : query rewriting
-  └ Chantier 5 : mémoire intra-session compressée
-```
-
-Chaque chantier est isolé par un toggle, donc on peut désactiver indépendamment en cas de régression.
-
----
-
-## Hors scope volontaire
-
-ID-RAG/PersonaRAG/Mem0/Zep/LoRA/RAFT/GraphRAG : intéressants mais disproportionnés pour un proto de session 10 min — à reconsidérer si l'app évolue vers du multi-session persistant par utilisateur.
+## Validation à chaque phase
+1. Build + tests verts
+2. Test manuel du provider actif en jeu (ElevenLabs par défaut → comportement identique)
+3. Test du bouton "Tester ce provider" pour chaque provider configuré
+4. Phase 2 : vérifier que le panel se peuple correctement après quelques tours de jeu
