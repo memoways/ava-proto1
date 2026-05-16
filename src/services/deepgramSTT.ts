@@ -1,4 +1,5 @@
 import { debugLogger } from "./debugLogger";
+import { recordAudioLatency } from "./latencyTelemetry";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 
