@@ -22,6 +22,7 @@ import LatencyTelemetryTab from "@/components/LatencyTelemetryTab";
 import SessionsTab, { type SessionRow } from "@/components/admin/SessionsTab";
 import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
 import LLMUsageTab from "@/components/admin/LLMUsageTab";
+import VoiceUsageTab from "@/components/admin/VoiceUsageTab";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -66,6 +67,7 @@ const TAB_GROUPS = [
       { id: "llm", label: "LLM Config" },
       { id: "voice", label: "TTS Config" },
       { id: "usage", label: "Consommation LLM" },
+      { id: "voice-usage", label: "Consommation Voix" },
     ],
   },
 ];
@@ -612,6 +614,11 @@ export default function Admin() {
           {/* ==================== LLM USAGE / CONSUMPTION ==================== */}
           <TabsContent value="usage">
             <LLMUsageTab />
+          </TabsContent>
+
+          {/* ==================== VOICE USAGE ==================== */}
+          <TabsContent value="voice-usage">
+            <VoiceUsageTab />
           </TabsContent>
 
           {/* ==================== NOTION SYNC ==================== */}
