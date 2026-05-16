@@ -104,12 +104,14 @@ export async function processConversationTurn(
 
   const ragStart = performance.now();
   const ragPromise = !finalRagContext ? (async () => {
+    const subTimings = { rewrite_ms: 0, query_ms: 0, knowledge_build_ms: 0, matches_count: 0, top_similarity: 0 };
     try {
       const recentMessages = conversationHistory.slice(-4).map(m => m.content).join(' ');
 
       // Optional query rewriting (toggle: RAG_QUERY_REWRITE_ENABLED).
       let rewrittenQuery: string | undefined;
       if (gameplay.RAG_QUERY_REWRITE_ENABLED) {
+        const rwStart = performance.now();
         try {
           const r = await rewriteRAGQuery(userMessage, recentMessages);
           if (r && r !== userMessage) {
@@ -119,22 +121,32 @@ export async function processConversationTurn(
         } catch (rwErr) {
           console.warn('[RAG] rewrite failed (fallback to raw):', rwErr);
         }
+        subTimings.rewrite_ms = Math.round(performance.now() - rwStart);
       }
 
+      const qStart = performance.now();
       const matches = await queryRAG(userMessage, recentMessages, gameplay.RAG_TOP_K, undefined, {
         rewrittenQuery,
         rerank: gameplay.RAG_RERANK_ENABLED,
         retrieveK: gameplay.RAG_RETRIEVE_K,
         provider: gameplay.RAG_EMBEDDING_PROVIDER,
       });
+      subTimings.query_ms = Math.round(performance.now() - qStart);
+      subTimings.matches_count = matches.length;
+      subTimings.top_similarity = matches[0]?.similarity ?? matches[0]?.retrieval_similarity ?? 0;
+
+      const kbStart = performance.now();
       const ctx = formatRAGContext(matches);
+      const knowledgeContext = buildKnowledgeContextFromRAG(matches);
+      subTimings.knowledge_build_ms = Math.round(performance.now() - kbStart);
+
       if (ctx) console.log('[RAG] Context found, injecting into prompt');
-      return { ctx, knowledgeContext: buildKnowledgeContextFromRAG(matches) };
+      return { ctx, knowledgeContext, subTimings };
     } catch (err) {
       console.error('[RAG] Failed to fetch context:', err);
-      return { ctx: "", knowledgeContext: buildKnowledgeContextFromRAG([]) };
+      return { ctx: "", knowledgeContext: buildKnowledgeContextFromRAG([]), subTimings };
     }
-  })() : Promise.resolve({ ctx: finalRagContext, knowledgeContext: buildKnowledgeContextFromRAG([]) });
+  })() : Promise.resolve({ ctx: finalRagContext, knowledgeContext: buildKnowledgeContextFromRAG([]), subTimings: { rewrite_ms: 0, query_ms: 0, knowledge_build_ms: 0, matches_count: 0, top_similarity: 0 } });
 
   // Wait for RAG (runs in parallel with any preloaded system prompt)
   const ragResult = await ragPromise;
