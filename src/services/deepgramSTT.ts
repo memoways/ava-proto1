@@ -134,6 +134,14 @@ export class DeepgramSTT {
         console.log('[Deepgram] 2s silence detected, finalizing');
         debugLogger.log({ service: "stt", level: "info", direction: "in", label: `STT final: "${this.fullTranscript.slice(0, 100)}"` });
         const finalText = this.fullTranscript;
+        // Latence STT = délai depuis le dernier mot reçu, moins la fenêtre de silence imposée.
+        const tElapsed = performance.now() - this.lastSpeechAt;
+        recordAudioLatency({
+          direction: "in",
+          t_stt_ms: Math.max(0, Math.round(tElapsed - DeepgramSTT.SILENCE_DELAY_MS)),
+          stt_text_len: finalText.length,
+          metadata: { silence_window_ms: DeepgramSTT.SILENCE_DELAY_MS, trigger: "silence" },
+        });
         this.fullTranscript = ""; // Reset for next utterance
         this.onTranscript(finalText, true);
       }
