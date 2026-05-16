@@ -16,6 +16,22 @@ import { toast } from "sonner";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
 import type { TTSProviderId } from "@/services/tts/types";
 
+/**
+ * Coût estimé par 1000 caractères TTS (USD).
+ * Tarifs publics de référence — à ajuster selon le plan réel souscrit.
+ *  - ElevenLabs : ~$0.30/1k chars (plan Creator pay-as-you-go)
+ *  - Hume Octave : ~$0.20/1k chars
+ *  - Inworld : $5 / 1M chars = $0.005/1k chars
+ */
+const COST_PER_1K_CHARS_USD: Record<TTSProviderId, number> = {
+  elevenlabs: 0.30,
+  hume: 0.20,
+  inworld: 0.005,
+};
+
+const fmtUsd = (v: number) =>
+  v >= 1 ? `$${v.toFixed(2)}` : v >= 0.01 ? `$${v.toFixed(3)}` : `$${v.toFixed(4)}`;
+
 interface AudioRow {
   id: string;
   created_at: string;
@@ -93,6 +109,11 @@ export default function VoiceUsageTab() {
       });
       const firstByteVals = provRows.map((r) => r.t_tts_first_byte_ms).filter((v): v is number => v != null);
       const totalVals = provRows.map((r) => r.t_tts_total_ms).filter((v): v is number => v != null);
+      const charsTotal = provRows.reduce((sum, r) => sum + (r.tts_text_len || 0), 0);
+      const charsSuccess = success.reduce((sum, r) => sum + (r.tts_text_len || 0), 0);
+      const rate = COST_PER_1K_CHARS_USD[p.id as TTSProviderId] ?? 0;
+      const costTotalUsd = (charsTotal / 1000) * rate;
+      const costSuccessUsd = (charsSuccess / 1000) * rate;
       const lastError = errors[0];
       return {
         id: p.id as TTSProviderId,
@@ -107,6 +128,11 @@ export default function VoiceUsageTab() {
         fbP95: percentile(firstByteVals, 95),
         totalP50: percentile(totalVals, 50),
         totalP95: percentile(totalVals, 95),
+        charsTotal,
+        charsSuccess,
+        costTotalUsd,
+        costSuccessUsd,
+        ratePer1k: rate,
         lastError: lastError
           ? {
               when: lastError.created_at,
@@ -121,6 +147,9 @@ export default function VoiceUsageTab() {
   const totalReqs = filtered.length;
   const totalErrors = filtered.filter((r) => (r.metadata_json?.error_type ?? "ok") !== "ok").length;
   const globalErrorRate = totalReqs ? (totalErrors / totalReqs) * 100 : 0;
+  const totalCostUsd = providerStats.reduce((s, p) => s + p.costTotalUsd, 0);
+  const totalCostSuccessUsd = providerStats.reduce((s, p) => s + p.costSuccessUsd, 0);
+  const totalChars = providerStats.reduce((s, p) => s + p.charsTotal, 0);
 
   const recentErrors = filtered
     .filter((r) => (r.metadata_json?.error_type ?? "ok") !== "ok")
@@ -129,7 +158,7 @@ export default function VoiceUsageTab() {
   return (
     <div className="space-y-6">
       {/* Header KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <KPI label="Requêtes (période)" value={String(totalReqs)} />
         <KPI label="Erreurs" value={String(totalErrors)} tone={totalErrors > 0 ? "warn" : "ok"} />
         <KPI
@@ -138,7 +167,14 @@ export default function VoiceUsageTab() {
           tone={globalErrorRate > 10 ? "err" : globalErrorRate > 2 ? "warn" : "ok"}
         />
         <KPI label="Providers actifs" value={String(providerStats.filter((p) => p.total > 0).length)} />
+        <KPI label="Caractères TTS" value={totalChars.toLocaleString("fr-CH")} />
+        <KPI label="Coût estimé (succès)" value={fmtUsd(totalCostSuccessUsd)} tone="warn" />
       </div>
+      <p className="text-[11px] text-muted-foreground -mt-3">
+        Coûts estimés à partir du nombre de caractères synthétisés et des tarifs publics indicatifs
+        (ElevenLabs {fmtUsd(COST_PER_1K_CHARS_USD.elevenlabs)}/1k · Hume {fmtUsd(COST_PER_1K_CHARS_USD.hume)}/1k ·
+        Inworld {fmtUsd(COST_PER_1K_CHARS_USD.inworld)}/1k). Total période (tous appels) : {fmtUsd(totalCostUsd)}.
+      </p>
 
       {/* Alerte taux d'erreur */}
       {globalErrorRate > 10 && totalReqs >= 10 && (
@@ -200,6 +236,19 @@ export default function VoiceUsageTab() {
                   </div>
                 </div>
 
+                <div className="space-y-1 border-t border-border/40 pt-2">
+                  <p className="text-xs text-muted-foreground">Coût estimé ({s.ratePer1k}$/1k chars)</p>
+                  <div className="flex justify-between text-sm font-mono">
+                    <span title="Caractères TTS (succès)">{s.charsSuccess.toLocaleString("fr-CH")} chars</span>
+                    <span className="text-amber-400 font-semibold">{fmtUsd(s.costSuccessUsd)}</span>
+                  </div>
+                  {s.errors > 0 && s.costTotalUsd > s.costSuccessUsd && (
+                    <div className="flex justify-between text-[11px] text-muted-foreground">
+                      <span>incl. erreurs</span>
+                      <span>{fmtUsd(s.costTotalUsd)}</span>
+                    </div>
+                  )}
+                </div>
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">Codes HTTP</p>
                   <div className="flex flex-wrap gap-1">
@@ -264,6 +313,9 @@ export default function VoiceUsageTab() {
               <th className="text-right p-2 font-medium text-muted-foreground">FB p95</th>
               <th className="text-right p-2 font-medium text-muted-foreground">Tot. p50</th>
               <th className="text-right p-2 font-medium text-muted-foreground">Tot. p95</th>
+              <th className="text-right p-2 font-medium text-muted-foreground">Chars</th>
+              <th className="text-right p-2 font-medium text-muted-foreground">Coût (succès)</th>
+              <th className="text-right p-2 font-medium text-muted-foreground">Coût total</th>
             </tr>
           </thead>
           <tbody>
@@ -278,6 +330,9 @@ export default function VoiceUsageTab() {
                 <td className="p-2 text-right font-mono">{fmtMs(s.fbP95)}</td>
                 <td className="p-2 text-right font-mono">{fmtMs(s.totalP50)}</td>
                 <td className="p-2 text-right font-mono">{fmtMs(s.totalP95)}</td>
+                <td className="p-2 text-right font-mono">{s.charsTotal.toLocaleString("fr-CH")}</td>
+                <td className="p-2 text-right font-mono text-amber-400">{fmtUsd(s.costSuccessUsd)}</td>
+                <td className="p-2 text-right font-mono">{fmtUsd(s.costTotalUsd)}</td>
               </tr>
             ))}
           </tbody>
