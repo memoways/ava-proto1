@@ -325,6 +325,7 @@ export class TTSQueue {
         console.log(`[TTS-Queue] Played sentence #${this.playbackCount} in ${(performance.now() - playStart).toFixed(0)}ms`);
       } catch (err) {
         console.error("[TTS-Queue] Error:", err);
+        this.reportError(err);
       }
     });
   }
