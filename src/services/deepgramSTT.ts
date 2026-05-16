@@ -36,6 +36,8 @@ export class DeepgramSTT {
   private stream: MediaStream | null = null;
   private silenceTimer: ReturnType<typeof setTimeout> | null = null;
   private fullTranscript = "";
+  /** Timestamp (performance.now()) du dernier mot reçu — sert à mesurer la latence STT après silence. */
+  private lastSpeechAt = 0;
   private static SILENCE_DELAY_MS = 1500;
   private _paused = false;
 
