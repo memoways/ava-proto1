@@ -5,6 +5,7 @@ import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMe
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, ConversationPipelineTimings, ConversationPipelineTrace, ConversationValidationTrace, GameMasterResponse, GameMasterTurnBrief, MaxConstraintCheckResult, VideoTrigger } from "@/types";
 import { getGameplaySettings, getLLMSettings } from "@/services/settingsService";
+import { createTurnTimer } from "@/services/latencyTelemetry";
 
 // Demo triggers for the prototype
 const DEMO_TRIGGERS: Record<string, VideoTrigger> = {
