@@ -216,6 +216,26 @@ export async function processConversationTurn(
     total_ms: Math.round(performance.now() - t0),
   };
 
+  // Emit telemetry (fire-and-forget) — never blocks the turn return.
+  turnTimer.emit({
+    t_rag_rewrite_ms: ragResult.subTimings.rewrite_ms,
+    t_rag_query_ms: ragResult.subTimings.query_ms,
+    t_rag_total_ms: rag_ms,
+    t_knowledge_build_ms: ragResult.subTimings.knowledge_build_ms,
+    t_gm_pre_ms: preTurnResult.gm_pre_ms,
+    t_max_llm_ms: validatedTurn.timings.max_ms,
+    t_validator_ms: validatedTurn.timings.validator_ms,
+    t_turn_total_ms: timings.total_ms,
+    rag_matches_count: ragResult.subTimings.matches_count,
+    rag_top_similarity: ragResult.subTimings.top_similarity,
+    max_response_len: validatedTurn.response.length,
+    had_fallback: validatedTurn.validation.finalStatus === "fallback",
+    metadata: {
+      attempts: validatedTurn.validation.attempts,
+      gm_pre_fallback: preTurnResult.brief.fallback?.kind ?? null,
+    },
+  });
+
   persistPipelineTrace({
     updatedAt: new Date().toISOString(),
     userMessage,
@@ -244,7 +264,13 @@ export async function processConversationTurn(
       trigger = DEMO_TRIGGERS[gameMasterResponse.trigger_video_id] || null;
     }
 
-    return { gameMasterResponse, trigger, gm_post_ms: Math.round(performance.now() - gmPostStart) };
+    const gm_post_ms = Math.round(performance.now() - gmPostStart);
+    // Post-turn telemetry (separate small event for gm_post measure)
+    try {
+      const { trackEvent } = await import("@/services/posthogService");
+      trackEvent("turn_latency_post", { session_id: sessionId, t_gm_post_ms: gm_post_ms });
+    } catch { /* ignore */ }
+    return { gameMasterResponse, trigger, gm_post_ms };
   })();
 
   // Background: refresh compressed session summary every N user turns.
