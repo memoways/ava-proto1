@@ -491,6 +491,8 @@ const Index = () => {
     setPostVideoContext(null);
     sessionIdRef.current = null;
     micStartedRef.current = false;
+    ttsDisabledRef.current = false;
+    setTtsDisabledReason(null);
   }, [reset, timer]);
 
   const handleGateContinue = useCallback(() => {
