@@ -64,8 +64,8 @@ const TAB_GROUPS = [
     label: "🔧 Technique",
     tabs: [
       { id: "llm", label: "LLM Config" },
-      { id: "voice", label: "Voix" },
-      { id: "usage", label: "Consommation" },
+      { id: "voice", label: "TTS Config" },
+      { id: "usage", label: "Consommation LLM" },
     ],
   },
 ];
