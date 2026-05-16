@@ -587,6 +587,9 @@ export default function Admin() {
           <TabsContent value="latency">
             <LatencyBlockingTab />
           </TabsContent>
+          <TabsContent value="latency-telemetry">
+            <LatencyTelemetryTab />
+          </TabsContent>
 
           <TabsContent value="max-test">
             <MaxPromptTestTab />
