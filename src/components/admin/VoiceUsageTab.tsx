@@ -236,6 +236,19 @@ export default function VoiceUsageTab() {
                   </div>
                 </div>
 
+                <div className="space-y-1 border-t border-border/40 pt-2">
+                  <p className="text-xs text-muted-foreground">Coût estimé ({s.ratePer1k}$/1k chars)</p>
+                  <div className="flex justify-between text-sm font-mono">
+                    <span title="Caractères TTS (succès)">{s.charsSuccess.toLocaleString("fr-CH")} chars</span>
+                    <span className="text-amber-400 font-semibold">{fmtUsd(s.costSuccessUsd)}</span>
+                  </div>
+                  {s.errors > 0 && s.costTotalUsd > s.costSuccessUsd && (
+                    <div className="flex justify-between text-[11px] text-muted-foreground">
+                      <span>incl. erreurs</span>
+                      <span>{fmtUsd(s.costTotalUsd)}</span>
+                    </div>
+                  )}
+                </div>
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">Codes HTTP</p>
                   <div className="flex flex-wrap gap-1">
