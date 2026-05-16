@@ -158,7 +158,7 @@ export default function VoiceUsageTab() {
   return (
     <div className="space-y-6">
       {/* Header KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <KPI label="Requêtes (période)" value={String(totalReqs)} />
         <KPI label="Erreurs" value={String(totalErrors)} tone={totalErrors > 0 ? "warn" : "ok"} />
         <KPI
@@ -167,7 +167,14 @@ export default function VoiceUsageTab() {
           tone={globalErrorRate > 10 ? "err" : globalErrorRate > 2 ? "warn" : "ok"}
         />
         <KPI label="Providers actifs" value={String(providerStats.filter((p) => p.total > 0).length)} />
+        <KPI label="Caractères TTS" value={totalChars.toLocaleString("fr-CH")} />
+        <KPI label="Coût estimé (succès)" value={fmtUsd(totalCostSuccessUsd)} tone="warn" />
       </div>
+      <p className="text-[11px] text-muted-foreground -mt-3">
+        Coûts estimés à partir du nombre de caractères synthétisés et des tarifs publics indicatifs
+        (ElevenLabs ${COST_PER_1K_CHARS_USD.elevenlabs}/1k · Hume ${COST_PER_1K_CHARS_USD.hume}/1k ·
+        Inworld ${COST_PER_1K_CHARS_USD.inworld}/1k). Total période (tous appels) : {fmtUsd(totalCostUsd)}.
+      </p>
 
       {/* Alerte taux d'erreur */}
       {globalErrorRate > 10 && totalReqs >= 10 && (
