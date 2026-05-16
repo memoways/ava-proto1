@@ -1,5 +1,6 @@
 import { getTTSSettings } from "@/services/settingsService";
 import { debugLogger } from "@/services/debugLogger";
+import { recordAudioLatency } from "@/services/latencyTelemetry";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -48,6 +49,7 @@ export async function generateSpeech(text: string, options?: TTSOptions): Promis
   };
 
   const startTime = Date.now();
+  const tRequest = performance.now();
   const debugId = debugLogger.logFetch("tts", `TTS "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts`, merged);
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-tts`, {
@@ -55,6 +57,7 @@ export async function generateSpeech(text: string, options?: TTSOptions): Promis
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(merged),
   });
+  const tFirstByte = performance.now();
 
   if (!response.ok) {
     const err = await response.text();
@@ -63,7 +66,19 @@ export async function generateSpeech(text: string, options?: TTSOptions): Promis
   }
 
   const blob = await response.blob();
+  const tEnd = performance.now();
   debugLogger.logResponse(debugId, "tts", `TTS (${(blob.size / 1024).toFixed(0)}KB)`, response.status, startTime);
+  recordAudioLatency({
+    direction: "out",
+    t_tts_first_byte_ms: Math.round(tFirstByte - tRequest),
+    t_tts_total_ms: Math.round(tEnd - tRequest),
+    tts_text_len: preparedText.length,
+    metadata: {
+      model: merged.modelId,
+      stitched_previous: !!options?.previousText,
+      stitched_next: !!options?.nextText,
+    },
+  });
   return blob;
 }
 

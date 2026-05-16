@@ -32,6 +32,51 @@ export type Database = {
         }
         Relationships: []
       }
+      audio_latencies: {
+        Row: {
+          created_at: string
+          direction: string
+          id: string
+          metadata_json: Json | null
+          session_id: string | null
+          stt_text_len: number | null
+          t_audio_playback_ms: number | null
+          t_stt_ms: number | null
+          t_tts_first_byte_ms: number | null
+          t_tts_total_ms: number | null
+          tts_text_len: number | null
+          turn_index: number | null
+        }
+        Insert: {
+          created_at?: string
+          direction: string
+          id?: string
+          metadata_json?: Json | null
+          session_id?: string | null
+          stt_text_len?: number | null
+          t_audio_playback_ms?: number | null
+          t_stt_ms?: number | null
+          t_tts_first_byte_ms?: number | null
+          t_tts_total_ms?: number | null
+          tts_text_len?: number | null
+          turn_index?: number | null
+        }
+        Update: {
+          created_at?: string
+          direction?: string
+          id?: string
+          metadata_json?: Json | null
+          session_id?: string | null
+          stt_text_len?: number | null
+          t_audio_playback_ms?: number | null
+          t_stt_ms?: number | null
+          t_tts_first_byte_ms?: number | null
+          t_tts_total_ms?: number | null
+          tts_text_len?: number | null
+          turn_index?: number | null
+        }
+        Relationships: []
+      }
       characters: {
         Row: {
           backstory: string | null
@@ -390,6 +435,93 @@ export type Database = {
           notion_id?: string | null
           title?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      turn_latencies: {
+        Row: {
+          character: string | null
+          created_at: string
+          gm_model: string | null
+          had_fallback: boolean | null
+          id: string
+          max_model: string | null
+          max_response_len: number | null
+          metadata_json: Json | null
+          rag_matches_count: number | null
+          rag_top_similarity: number | null
+          session_id: string | null
+          t_gm_post_ms: number | null
+          t_gm_pre_ms: number | null
+          t_knowledge_build_ms: number | null
+          t_max_first_token_ms: number | null
+          t_max_llm_ms: number | null
+          t_rag_query_ms: number | null
+          t_rag_rewrite_ms: number | null
+          t_rag_total_ms: number | null
+          t_turn_total_ms: number | null
+          t_validator_ms: number | null
+          turn_index: number | null
+          usage_total_tokens: number | null
+          user_message_len: number | null
+          validator_model: string | null
+          voice_modality: string | null
+        }
+        Insert: {
+          character?: string | null
+          created_at?: string
+          gm_model?: string | null
+          had_fallback?: boolean | null
+          id?: string
+          max_model?: string | null
+          max_response_len?: number | null
+          metadata_json?: Json | null
+          rag_matches_count?: number | null
+          rag_top_similarity?: number | null
+          session_id?: string | null
+          t_gm_post_ms?: number | null
+          t_gm_pre_ms?: number | null
+          t_knowledge_build_ms?: number | null
+          t_max_first_token_ms?: number | null
+          t_max_llm_ms?: number | null
+          t_rag_query_ms?: number | null
+          t_rag_rewrite_ms?: number | null
+          t_rag_total_ms?: number | null
+          t_turn_total_ms?: number | null
+          t_validator_ms?: number | null
+          turn_index?: number | null
+          usage_total_tokens?: number | null
+          user_message_len?: number | null
+          validator_model?: string | null
+          voice_modality?: string | null
+        }
+        Update: {
+          character?: string | null
+          created_at?: string
+          gm_model?: string | null
+          had_fallback?: boolean | null
+          id?: string
+          max_model?: string | null
+          max_response_len?: number | null
+          metadata_json?: Json | null
+          rag_matches_count?: number | null
+          rag_top_similarity?: number | null
+          session_id?: string | null
+          t_gm_post_ms?: number | null
+          t_gm_pre_ms?: number | null
+          t_knowledge_build_ms?: number | null
+          t_max_first_token_ms?: number | null
+          t_max_llm_ms?: number | null
+          t_rag_query_ms?: number | null
+          t_rag_rewrite_ms?: number | null
+          t_rag_total_ms?: number | null
+          t_turn_total_ms?: number | null
+          t_validator_ms?: number | null
+          turn_index?: number | null
+          usage_total_tokens?: number | null
+          user_message_len?: number | null
+          validator_model?: string | null
+          voice_modality?: string | null
         }
         Relationships: []
       }

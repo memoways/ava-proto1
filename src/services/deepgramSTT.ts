@@ -1,4 +1,5 @@
 import { debugLogger } from "./debugLogger";
+import { recordAudioLatency } from "./latencyTelemetry";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 
@@ -35,6 +36,8 @@ export class DeepgramSTT {
   private stream: MediaStream | null = null;
   private silenceTimer: ReturnType<typeof setTimeout> | null = null;
   private fullTranscript = "";
+  /** Timestamp (performance.now()) du dernier mot reçu — sert à mesurer la latence STT après silence. */
+  private lastSpeechAt = 0;
   private static SILENCE_DELAY_MS = 1500;
   private _paused = false;
 
@@ -106,6 +109,9 @@ export class DeepgramSTT {
           const displayText = isFinal ? this.fullTranscript : this.fullTranscript + (this.fullTranscript ? ' ' : '') + transcript;
           this.onTranscript(displayText, false);
 
+          // Track last speech timestamp for STT latency telemetry
+          this.lastSpeechAt = performance.now();
+
           // Reset silence timer on any speech
           this.resetSilenceTimer();
         }
@@ -128,6 +134,14 @@ export class DeepgramSTT {
         console.log('[Deepgram] 2s silence detected, finalizing');
         debugLogger.log({ service: "stt", level: "info", direction: "in", label: `STT final: "${this.fullTranscript.slice(0, 100)}"` });
         const finalText = this.fullTranscript;
+        // Latence STT = délai depuis le dernier mot reçu, moins la fenêtre de silence imposée.
+        const tElapsed = performance.now() - this.lastSpeechAt;
+        recordAudioLatency({
+          direction: "in",
+          t_stt_ms: Math.max(0, Math.round(tElapsed - DeepgramSTT.SILENCE_DELAY_MS)),
+          stt_text_len: finalText.length,
+          metadata: { silence_window_ms: DeepgramSTT.SILENCE_DELAY_MS, trigger: "silence" },
+        });
         this.fullTranscript = ""; // Reset for next utterance
         this.onTranscript(finalText, true);
       }

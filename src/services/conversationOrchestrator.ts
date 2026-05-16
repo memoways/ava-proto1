@@ -5,6 +5,7 @@ import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMe
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, ConversationPipelineTimings, ConversationPipelineTrace, ConversationValidationTrace, GameMasterResponse, GameMasterTurnBrief, MaxConstraintCheckResult, VideoTrigger } from "@/types";
 import { getGameplaySettings, getLLMSettings } from "@/services/settingsService";
+import { createTurnTimer } from "@/services/latencyTelemetry";
 
 // Demo triggers for the prototype
 const DEMO_TRIGGERS: Record<string, VideoTrigger> = {
@@ -83,6 +84,17 @@ export async function processConversationTurn(
   gameMasterPromise: Promise<{ gameMasterResponse: GameMasterResponse; trigger: VideoTrigger | null; gm_post_ms: number }>;
 }> {
   const t0 = performance.now();
+  const llmSettings = (() => { try { return getLLMSettings(); } catch { return {} as ReturnType<typeof getLLMSettings>; } })();
+  const turnTimer = createTurnTimer({
+    session_id: sessionId,
+    character: "max",
+    voice_modality: "voice",
+    user_message_len: userMessage.length,
+    max_model: llmSettings.LLM_MODEL,
+    gm_model: llmSettings.LLM_MODEL_GM,
+    validator_model: llmSettings.LLM_MODEL_GM,
+    turn_index: conversationHistory.filter((m) => m.role === "user").length + 1,
+  });
   // Fetch RAG context if not provided (non-blocking — start immediately)
   let finalRagContext = ragContext;
   const gameplay = getGameplaySettings();
@@ -92,12 +104,14 @@ export async function processConversationTurn(
 
   const ragStart = performance.now();
   const ragPromise = !finalRagContext ? (async () => {
+    const subTimings = { rewrite_ms: 0, query_ms: 0, knowledge_build_ms: 0, matches_count: 0, top_similarity: 0 };
     try {
       const recentMessages = conversationHistory.slice(-4).map(m => m.content).join(' ');
 
       // Optional query rewriting (toggle: RAG_QUERY_REWRITE_ENABLED).
       let rewrittenQuery: string | undefined;
       if (gameplay.RAG_QUERY_REWRITE_ENABLED) {
+        const rwStart = performance.now();
         try {
           const r = await rewriteRAGQuery(userMessage, recentMessages);
           if (r && r !== userMessage) {
@@ -107,22 +121,32 @@ export async function processConversationTurn(
         } catch (rwErr) {
           console.warn('[RAG] rewrite failed (fallback to raw):', rwErr);
         }
+        subTimings.rewrite_ms = Math.round(performance.now() - rwStart);
       }
 
+      const qStart = performance.now();
       const matches = await queryRAG(userMessage, recentMessages, gameplay.RAG_TOP_K, undefined, {
         rewrittenQuery,
         rerank: gameplay.RAG_RERANK_ENABLED,
         retrieveK: gameplay.RAG_RETRIEVE_K,
         provider: gameplay.RAG_EMBEDDING_PROVIDER,
       });
+      subTimings.query_ms = Math.round(performance.now() - qStart);
+      subTimings.matches_count = matches.length;
+      subTimings.top_similarity = matches[0]?.similarity ?? matches[0]?.retrieval_similarity ?? 0;
+
+      const kbStart = performance.now();
       const ctx = formatRAGContext(matches);
+      const knowledgeContext = buildKnowledgeContextFromRAG(matches);
+      subTimings.knowledge_build_ms = Math.round(performance.now() - kbStart);
+
       if (ctx) console.log('[RAG] Context found, injecting into prompt');
-      return { ctx, knowledgeContext: buildKnowledgeContextFromRAG(matches) };
+      return { ctx, knowledgeContext, subTimings };
     } catch (err) {
       console.error('[RAG] Failed to fetch context:', err);
-      return { ctx: "", knowledgeContext: buildKnowledgeContextFromRAG([]) };
+      return { ctx: "", knowledgeContext: buildKnowledgeContextFromRAG([]), subTimings };
     }
-  })() : Promise.resolve({ ctx: finalRagContext, knowledgeContext: buildKnowledgeContextFromRAG([]) });
+  })() : Promise.resolve({ ctx: finalRagContext, knowledgeContext: buildKnowledgeContextFromRAG([]), subTimings: { rewrite_ms: 0, query_ms: 0, knowledge_build_ms: 0, matches_count: 0, top_similarity: 0 } });
 
   // Wait for RAG (runs in parallel with any preloaded system prompt)
   const ragResult = await ragPromise;
@@ -192,6 +216,26 @@ export async function processConversationTurn(
     total_ms: Math.round(performance.now() - t0),
   };
 
+  // Emit telemetry (fire-and-forget) — never blocks the turn return.
+  turnTimer.emit({
+    t_rag_rewrite_ms: ragResult.subTimings.rewrite_ms,
+    t_rag_query_ms: ragResult.subTimings.query_ms,
+    t_rag_total_ms: rag_ms,
+    t_knowledge_build_ms: ragResult.subTimings.knowledge_build_ms,
+    t_gm_pre_ms: preTurnResult.gm_pre_ms,
+    t_max_llm_ms: validatedTurn.timings.max_ms,
+    t_validator_ms: validatedTurn.timings.validator_ms,
+    t_turn_total_ms: timings.total_ms,
+    rag_matches_count: ragResult.subTimings.matches_count,
+    rag_top_similarity: ragResult.subTimings.top_similarity,
+    max_response_len: validatedTurn.response.length,
+    had_fallback: validatedTurn.validation.finalStatus === "fallback",
+    metadata: {
+      attempts: validatedTurn.validation.attempts,
+      gm_pre_fallback: preTurnResult.brief.fallback?.kind ?? null,
+    },
+  });
+
   persistPipelineTrace({
     updatedAt: new Date().toISOString(),
     userMessage,
@@ -220,7 +264,13 @@ export async function processConversationTurn(
       trigger = DEMO_TRIGGERS[gameMasterResponse.trigger_video_id] || null;
     }
 
-    return { gameMasterResponse, trigger, gm_post_ms: Math.round(performance.now() - gmPostStart) };
+    const gm_post_ms = Math.round(performance.now() - gmPostStart);
+    // Post-turn telemetry (separate small event for gm_post measure)
+    try {
+      const { trackEvent } = await import("@/services/posthogService");
+      trackEvent("turn_latency_post", { session_id: sessionId, t_gm_post_ms: gm_post_ms });
+    } catch { /* ignore */ }
+    return { gameMasterResponse, trigger, gm_post_ms };
   })();
 
   // Background: refresh compressed session summary every N user turns.
