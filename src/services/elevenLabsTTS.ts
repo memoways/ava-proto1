@@ -1,5 +1,6 @@
 import { getTTSSettings } from "@/services/settingsService";
 import { debugLogger } from "@/services/debugLogger";
+import { recordAudioLatency } from "@/services/latencyTelemetry";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
