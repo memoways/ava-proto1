@@ -4,6 +4,19 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.21.1] - 2026-05-16 — Fix audio Inworld + coûts $ dans « Consommation Voix »
+
+### Corrigé
+- **Inworld TTS — pas de son lors du test** : le bouton « Tester » d'Inworld retournait bien un MP3 mais celui-ci n'était pas joué par le `<audio>` (frames MP3 concaténées via NDJSON difficiles à décoder). Passage à `stream: false` côté provider (`src/services/tts/providers/inworld.ts`) pour récupérer un MP3 monolithique fiable côté navigateur. Le proxy edge function conserve le mode streaming activé pour de futurs usages temps réel.
+
+### Ajouté
+- **Coûts $ estimés dans « Consommation Voix »** (`src/components/admin/VoiceUsageTab.tsx`) :
+  - Constantes tarifaires publiques par provider (`ElevenLabs $0.30/1k chars`, `Hume $0.20/1k chars`, `Inworld $0.005/1k chars`).
+  - 2 nouvelles KPI cards en tête de page : **Caractères TTS** (total période) et **Coût estimé (succès)**.
+  - Section coût par carte provider : caractères synthétisés + coût succès (en ambre), plus coût total incluant erreurs si différent.
+  - 3 nouvelles colonnes dans le tableau comparatif : **Chars**, **Coût (succès)**, **Coût total**.
+  - Note de bas de page rappelant les tarifs indicatifs utilisés.
+
 ## [0.21.0] - 2026-05-16 — TTS multi-providers (ElevenLabs / Inworld / Hume) + voix Alain (Inworld) + monitoring « Consommation Voix »
 
 ### Ajouté
