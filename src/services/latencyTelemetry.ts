@@ -88,7 +88,10 @@ export function createTurnTimer(initial?: Partial<TurnLatencyRecord>) {
       }
       safe(() => trackEvent("turn_latency", record as unknown as Record<string, unknown>));
       safe(() => {
-        void supabase.from("turn_latencies" as never).insert(record as never).then(({ error }) => {
+        // DB column is `metadata_json` — rename before insert to avoid schema cache errors.
+        const { metadata, ...rest } = record;
+        const row = { ...rest, metadata_json: metadata ?? {} };
+        void supabase.from("turn_latencies" as never).insert(row as never).then(({ error }) => {
           if (error) console.warn("[latencyTelemetry] insert turn_latencies", error.message);
         });
       });
@@ -104,7 +107,9 @@ export function recordAudioLatency(record: AudioLatencyRecord) {
   if (!enabled) return;
   safe(() => trackEvent("audio_latency", record as unknown as Record<string, unknown>));
   safe(() => {
-    void supabase.from("audio_latencies" as never).insert(record as never).then(({ error }) => {
+    const { metadata, ...rest } = record;
+    const row = { ...rest, metadata_json: metadata ?? {} };
+    void supabase.from("audio_latencies" as never).insert(row as never).then(({ error }) => {
       if (error) console.warn("[latencyTelemetry] insert audio_latencies", error.message);
     });
   });
