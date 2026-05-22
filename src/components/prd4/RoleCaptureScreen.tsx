@@ -1,7 +1,7 @@
 /** PRD4 — Écran 4 : Création libre du personnage utilisateur (PTT + Deepgram, Phase 2) */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, Loader2 } from "lucide-react";
+import { Mic, MicOff, Loader2 } from "lucide-react";
 import { DeepgramSTT } from "@/services/deepgramSTT";
 import { usePushToTalk } from "@/hooks/usePushToTalk";
 import { cn } from "@/lib/utils";
@@ -91,6 +91,7 @@ const RoleCaptureScreen = ({ onSubmit, onPTTError, submitting = false }: Props) 
     enabled: !submitting,
     onPress: handlePress,
     onRelease: handleRelease,
+    mode: "toggle",
   });
 
   // Cleanup
@@ -151,24 +152,26 @@ const RoleCaptureScreen = ({ onSubmit, onPTTError, submitting = false }: Props) 
                 "relative flex h-24 w-24 items-center justify-center rounded-full border-2 transition-all select-none",
                 "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background",
                 recording
-                  ? "border-primary bg-primary/20 scale-110 shadow-[0_0_40px_-5px_hsl(var(--primary)/0.6)]"
-                  : "border-border bg-card hover:border-primary/60",
+                  ? "border-destructive bg-destructive/20 scale-110 shadow-[0_0_40px_-5px_hsl(var(--destructive)/0.6)]"
+                  : "border-primary/60 bg-card hover:border-primary",
                 submitting && "opacity-50 cursor-not-allowed",
               )}
-              aria-label="Maintiens pour parler"
+              aria-label={recording ? "Cliquer pour arrêter et envoyer" : "Cliquer pour parler"}
             >
               {starting ? (
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              ) : recording ? (
+                <MicOff className="h-8 w-8 text-destructive" />
               ) : (
-                <Mic className={cn("h-8 w-8", recording ? "text-primary" : "text-foreground/70")} />
+                <Mic className="h-8 w-8 text-foreground/80" />
               )}
             </button>
           </div>
 
           <p className="text-center text-xs text-muted-foreground">
             {recording
-              ? "🔴 Parle… relâche pour valider ce segment."
-              : "Maintiens le micro (ou la barre d'espace) pour parler. Tu peux faire plusieurs prises."}
+              ? "🔴 Enregistrement… clique à nouveau (ou Espace) pour arrêter et valider ce segment."
+              : "Clique sur le micro (ou la barre d'espace) pour parler. Clique à nouveau pour arrêter. Tu peux faire plusieurs prises."}
           </p>
 
           <div
