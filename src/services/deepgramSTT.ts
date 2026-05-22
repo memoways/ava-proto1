@@ -32,7 +32,7 @@ export async function getDeepgramToken(): Promise<DeepgramConfig> {
 }
 
 type TranscriptCallback = (text: string, isFinal: boolean) => void;
-type STTErrorCallback = (error: Error, context?: Record<string, unknown>) => void;
+type STTErrorCallback = (error: Error, context?: Record<string, unknown> | import("./browserCapabilities").BrowserDiagnostics) => void;
 type STTTelemetryContext = { session_id?: string | null; turn_id?: string | null; turn_index?: number | null };
 
 export interface STTFinalTelemetry {
