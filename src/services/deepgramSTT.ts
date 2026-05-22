@@ -193,6 +193,7 @@ export class DeepgramSTT {
   }
 
   private resetSilenceTimer() {
+    if (this.manualMode) return;
     if (this.silenceTimer) clearTimeout(this.silenceTimer);
     this.silenceTimer = setTimeout(() => {
       if (this.fullTranscript.trim()) {
