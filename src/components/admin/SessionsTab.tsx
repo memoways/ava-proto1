@@ -30,6 +30,10 @@ export interface SessionRow {
   questionnaire_responses: any;
   name: string | null;
   admin_note: string | null;
+  player_role?: any;
+  gm_post_turn_log?: any;
+  personnage_appele?: string | null;
+  modalite_voix?: string | null;
 }
 
 const fmt = (d: string | null) => d ? new Date(d).toLocaleString("fr-CH") : "—";
