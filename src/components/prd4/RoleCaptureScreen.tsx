@@ -60,6 +60,7 @@ const RoleCaptureScreen = ({ onSubmit, onPTTError, submitting = false }: Props) 
       const stt = new DeepgramSTT(handleTranscript, { onError: handleSTTError });
       sttRef.current = stt;
       await stt.start();
+      stt.setManualMode(true); // toggle-to-talk : on attend le clic Stop pour envoyer
       // Démarre en pause — l'utilisateur active via PTT.
       stt.pause();
       return stt;

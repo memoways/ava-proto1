@@ -58,6 +58,17 @@ export class DeepgramSTT {
   private getTelemetryContext?: () => STTTelemetryContext;
   private selectedMimeType = "";
   private lastFinalTelemetry: STTFinalTelemetry | null = null;
+  private manualMode = false;
+
+  /** Disable automatic silence-based finalization. Caller must invoke `flush()` to end an utterance. */
+  setManualMode(manual: boolean) {
+    this.manualMode = manual;
+    if (manual && this.silenceTimer) {
+      clearTimeout(this.silenceTimer);
+      this.silenceTimer = null;
+    }
+  }
+
 
   constructor(onTranscript: TranscriptCallback, opts?: { onError?: STTErrorCallback; getTelemetryContext?: () => STTTelemetryContext }) {
     this.onTranscript = onTranscript;
@@ -182,6 +193,7 @@ export class DeepgramSTT {
   }
 
   private resetSilenceTimer() {
+    if (this.manualMode) return;
     if (this.silenceTimer) clearTimeout(this.silenceTimer);
     this.silenceTimer = setTimeout(() => {
       if (this.fullTranscript.trim()) {
