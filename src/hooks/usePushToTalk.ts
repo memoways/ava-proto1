@@ -1,9 +1,10 @@
 import { useEffect, useRef, useCallback } from "react";
 
 /**
- * Push-to-talk hook.
- * - Hold (mouse down / touch start / Space key) → calls onPress (start listening)
- * - Release (mouse up / touch end / Space release) → calls onRelease (finalize)
+ * Push-to-talk / Toggle-to-talk hook.
+ *
+ * mode: "hold" (default) — press = onPress, release = onRelease (mouse/touch/space hold).
+ * mode: "toggle" — single click or space tap toggles between onPress / onRelease.
  *
  * Spacebar binding is global; ignored when typing in input/textarea.
  */
@@ -11,8 +12,9 @@ export function usePushToTalk(opts: {
   enabled: boolean;
   onPress: () => void;
   onRelease: () => void;
+  mode?: "hold" | "toggle";
 }) {
-  const { enabled, onPress, onRelease } = opts;
+  const { enabled, onPress, onRelease, mode = "hold" } = opts;
   const holdingRef = useRef(false);
 
   const press = useCallback(() => {
@@ -26,6 +28,17 @@ export function usePushToTalk(opts: {
     holdingRef.current = false;
     onRelease();
   }, [enabled, onRelease]);
+
+  const toggle = useCallback(() => {
+    if (!enabled) return;
+    if (holdingRef.current) {
+      holdingRef.current = false;
+      onRelease();
+    } else {
+      holdingRef.current = true;
+      onPress();
+    }
+  }, [enabled, onPress, onRelease]);
 
   // Global Space key binding
   useEffect(() => {
@@ -41,19 +54,22 @@ export function usePushToTalk(opts: {
       if (e.code !== "Space" || e.repeat) return;
       if (isTypingTarget(e.target)) return;
       e.preventDefault();
-      press();
+      if (mode === "toggle") toggle();
+      else press();
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code !== "Space") return;
       if (isTypingTarget(e.target)) return;
       e.preventDefault();
-      release();
+      if (mode === "hold") release();
     };
 
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
-    // Safety: if window loses focus while holding, release
-    const onBlur = () => release();
+    // Safety: if window loses focus while holding (hold mode only), release
+    const onBlur = () => {
+      if (mode === "hold") release();
+    };
     window.addEventListener("blur", onBlur);
 
     return () => {
@@ -61,26 +77,34 @@ export function usePushToTalk(opts: {
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
     };
-  }, [enabled, press, release]);
+  }, [enabled, mode, press, release, toggle]);
 
-  // Pointer handlers to attach to the PTT button
-  const buttonHandlers = {
-    onPointerDown: (e: React.PointerEvent) => {
-      e.preventDefault();
-      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-      press();
-    },
-    onPointerUp: (e: React.PointerEvent) => {
-      e.preventDefault();
-      release();
-    },
-    onPointerCancel: () => release(),
-    onPointerLeave: (e: React.PointerEvent) => {
-      // Only release if pointer is no longer down
-      if (e.buttons === 0) release();
-    },
-    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
-  };
+  // Handlers to attach to the PTT button
+  const buttonHandlers =
+    mode === "toggle"
+      ? {
+          onClick: (e: React.MouseEvent) => {
+            e.preventDefault();
+            toggle();
+          },
+          onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+        }
+      : {
+          onPointerDown: (e: React.PointerEvent) => {
+            e.preventDefault();
+            (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+            press();
+          },
+          onPointerUp: (e: React.PointerEvent) => {
+            e.preventDefault();
+            release();
+          },
+          onPointerCancel: () => release(),
+          onPointerLeave: (e: React.PointerEvent) => {
+            if (e.buttons === 0) release();
+          },
+          onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+        };
 
   return { buttonHandlers, isHolding: holdingRef };
 }
