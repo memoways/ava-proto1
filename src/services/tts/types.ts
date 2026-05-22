@@ -22,6 +22,10 @@ export interface TTSGenerateContext {
   nextText?: string;
   /** Optional voice override (provider-specific id) */
   voiceId?: string;
+  /** Observability context propagated to PostHog/Supabase telemetry. */
+  session_id?: string | null;
+  turn_id?: string | null;
+  turn_index?: number | null;
 }
 
 export interface TTSGenerateResult {

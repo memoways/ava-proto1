@@ -18,6 +18,12 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   - `audioPlayback.test.ts` — classification des erreurs de lecture.
   - `tts/queue.test.ts` — statut de drain joué / échoué.
 - **Preset TTS basse latence** `realtime_conversation` dans `settingsService.ts` : `eleven_turbo_v2_5`, MP3 64 kbps, `optimizeStreamingLatency=1`, vitesse 1.02.
+- **Observabilité voix unifiée PostHog + Supabase** :
+  - nouveau service `src/services/voiceTelemetry.ts`;
+  - événements PostHog `voice_turn_completed` et `voice_error`;
+  - corrélation `turn_id` sur STT, TTS, queue TTS, GM post et erreurs orchestrateur;
+  - nouvelles tables internes `voice_turn_events` et `voice_error_events`;
+  - audit dédié `docs/posthog_latency_observability_audit.md`.
 
 ### Modifié
 - **Optimisation latence du hot path Max** :
@@ -42,7 +48,9 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   - audio unlock déclenché au moment de répondre, d'activer le micro ou de presser le push-to-talk;
   - erreurs STT affichées en sous-titre et trackées via `stt_error`;
   - GM post-turn protégé par timeout 6 s et fallback neutre (`trust_delta: 0`, pas de trigger/game over);
-  - résultat de queue TTS tracké via `tts_queue_result` si non joué.
+  - résultat de queue TTS tracké via `tts_queue_result` si non joué;
+  - émission en fin de tour de `voice_turn_completed` avec temps réponse prête, voix prête, end-to-end, navigateur, modèle Max, provider TTS, segments joués/échoués et bloqueur dominant.
+- **Back-office latence** : l'onglet `Latences (PostHog)` lit désormais aussi `voice_turn_events` / `voice_error_events` pour afficher les p50/p95 agrégés et les erreurs voix récentes.
 - **Timeouts réseau** :
   - OpenRouter `streamLLM()` et `callLLMWithUsage()` protégés par `AbortController` 18 s.
   - Providers TTS ElevenLabs, Hume et Inworld protégés par timeout fetch 12 s + timeout `response.blob()` 12 s.
@@ -54,6 +62,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - ESLint ciblé sur les fichiers modifiés : OK.
 - Validation navigateur locale via Browser plugin : `http://127.0.0.1:8080/` charge correctement, écran d'accueil rendu, interaction `Commencer` → vidéo/skip → choix A/B OK, sans overlay Vite ni erreur applicative. Warnings observés : uniquement les warnings React Router v7 existants.
 - Après la capture de latence montrant `LLM total (Max streaming): 15911ms`, seconde passe appliquée pour retirer Qwen 72B du live, supprimer le GM pré-tour LLM du hot path et réduire le volume de prompt/RAG.
+- Ajout de tests unitaires `voiceTelemetry.test.ts` pour le calcul de bloqueur, le payload agrégé et la double émission PostHog/Supabase.
 
 ### Notes
 - Le fallback WebAudio PCM complet pour Safari n'est pas encore implémenté ; cette version réduit fortement le risque en évitant le forçage WebM/Opus, en ajoutant un fallback navigateur par défaut et en rendant les erreurs observables/récupérables.

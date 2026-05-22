@@ -5,6 +5,8 @@ Ce document décrit **ce que l'application envoie à PostHog** (événements, pr
 Projet PostHog : **EU Cloud** (`https://eu.i.posthog.com`)
 Clé publique (publishable) intégrée dans `src/services/posthogService.ts` : `phc_x9m2Hn…sPyZr`
 
+Voir aussi : `docs/posthog_latency_observability_audit.md` pour l'audit critique du schéma actuel, les lacunes de corrélation `session_id` / `turn_id`, et le dashboard cible "Ava Proto1 — Latence voix Max".
+
 ---
 
 ## 1. Mécanique de collecte côté app
@@ -43,6 +45,10 @@ Cela signifie : tout ce qui apparaît dans l'onglet admin **Latences** et **Cons
 | `turn_latency` | `latencyTelemetry.ts` → `createTurnTimer().emit()` | `session_id`, `turn_index`, `character`, `voice_modality`, `user_message_len`, `max_response_len`, `t_rag_rewrite_ms`, `t_rag_query_ms`, `t_rag_total_ms`, `t_knowledge_build_ms`, `t_gm_pre_ms`, `t_max_llm_ms`, `t_max_first_token_ms`, `t_validator_ms`, `t_gm_post_ms`, `t_turn_total_ms`, `rag_matches_count`, `rag_top_similarity`, `max_model`, `gm_model`, `validator_model`, `usage_total_tokens`, `had_fallback` |
 | `turn_latency_post` | `conversationOrchestrator.ts` | `session_id`, `t_gm_post_ms` (mesure asynchrone post-réponse) |
 | `audio_latency` | `recordAudioLatency()` | `direction` (`in`=STT / `out`=TTS), `t_stt_ms`, `t_tts_first_byte_ms`, `t_tts_total_ms`, `stt_text_len`, `tts_text_len`, `metadata.provider` (`elevenlabs`/`hume`/`inworld`), `metadata.model`, `metadata.status_code`, `metadata.error_type` (`ok`/`quota`/`auth`/`network`/`server`/`client`/`unknown`), `metadata.stitched_previous`, `metadata.stitched_next` |
+| `voice_turn_completed` | `voiceTelemetry.ts` | Événement agrégé fin de tour : `turn_id`, `session_id`, `turn_index`, `t_turn_response_ready_ms`, `t_turn_voice_ready_ms`, `t_turn_end_to_end_ms`, `blocker_step`, `blocker_reason`, `severity`, `browser_family`, `voice_modality`, `max_model`, `tts_provider`, segments TTS |
+| `voice_error` | `voiceTelemetry.ts` | Erreur unifiée : `component`, `provider`, `error_type`, `error_message`, `recoverable`, `fallback_used`, `browser_family`, `turn_id` |
+
+Les événements `voice_turn_completed` et `voice_error` sont aussi persistés en Supabase dans `voice_turn_events` et `voice_error_events`, afin que l'admin interne et PostHog s'appuient sur le même schéma.
 
 ### 2.2 Événements de jeu / funnel
 
@@ -140,6 +146,23 @@ Crée un nouveau **Dashboard** "Ava Proto1 — Pipeline" et ajoute :
 **G. Fallbacks LLM**
 - Event : `turn_latency`, filtre `had_fallback = true`
 - Math : `total count`, interval = jour
+
+**H. Vue voix agrégée end-to-end**
+- Event : `voice_turn_completed`
+- Math : `p50` et `p95` sur `t_turn_response_ready_ms`, `t_turn_voice_ready_ms`, `t_turn_end_to_end_ms`
+- Breakdown : `browser_family`, puis dupliquer avec `voice_modality`, `max_model`, `tts_provider`
+
+**I. Top blockers**
+- Event : `voice_turn_completed`
+- Math : `total count`
+- Filtre : `severity != ok`
+- Breakdown : `blocker_step`
+
+**J. Erreurs voix transverses**
+- Event : `voice_error`
+- Math : `total count`
+- Breakdown : `component`
+- Dupliquer avec breakdown `error_type` et `provider`
 
 ### 3.5 Funnel de jeu
 

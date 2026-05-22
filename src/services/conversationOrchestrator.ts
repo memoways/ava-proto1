@@ -98,7 +98,8 @@ export async function processConversationTurn(
   timeElapsedSeconds: number,
   ragContext?: string,
   postVideoContext?: string,
-  sessionId?: string
+  sessionId?: string,
+  turnId?: string
 ): Promise<{
   maxResponse: string;
   preTurnBrief: GameMasterTurnBrief;
@@ -234,6 +235,7 @@ export async function processConversationTurn(
     max_response_len: validatedTurn.response.length,
     had_fallback: validatedTurn.validation.finalStatus === "fallback",
     metadata: {
+      turn_id: turnId ?? null,
       attempts: validatedTurn.validation.attempts,
       gm_pre_fallback: preTurnResult.brief.fallback?.kind ?? null,
     },
@@ -271,7 +273,7 @@ export async function processConversationTurn(
     // Post-turn telemetry (separate small event for gm_post measure)
     try {
       const { trackEvent } = await import("@/services/posthogService");
-      trackEvent("turn_latency_post", { session_id: sessionId, t_gm_post_ms: gm_post_ms });
+      trackEvent("turn_latency_post", { session_id: sessionId, turn_id: turnId ?? null, t_gm_post_ms: gm_post_ms });
     } catch { /* ignore */ }
     return { gameMasterResponse, trigger, gm_post_ms };
   })();

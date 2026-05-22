@@ -11,7 +11,7 @@
 import { getActiveProvider, getProviderById } from "@/services/tts/registry";
 import type { TTSGenerateContext, TTSProviderId } from "@/services/tts/types";
 import { recordAudioLatency } from "@/services/latencyTelemetry";
-import { playAudioBlobRobust } from "@/services/audioPlayback";
+import { playAudioBlobRobust, type PlaybackResult } from "@/services/audioPlayback";
 
 export { prepareTextForTTS } from "@/services/tts/textPrep";
 export { chunkTextForTTS, extractSentences } from "@/services/tts/textChunking";
@@ -40,11 +40,14 @@ export async function generateSpeech(text: string, opts?: TTSOptions): Promise<B
   try {
     const { blob, meta } = await provider.generate(text, opts);
     recordAudioLatency({
+      session_id: opts?.session_id ?? undefined,
+      turn_index: opts?.turn_index ?? undefined,
       direction: "out",
       t_tts_first_byte_ms: meta.firstByteMs,
       t_tts_total_ms: meta.totalMs,
       tts_text_len: text.length,
       metadata: {
+        turn_id: opts?.turn_id ?? null,
         provider: meta.provider,
         model: meta.model,
         status_code: meta.statusCode ?? 200,
@@ -59,10 +62,13 @@ export async function generateSpeech(text: string, opts?: TTSOptions): Promise<B
     const message = err instanceof Error ? err.message : String(err);
     const statusCode = (err as { statusCode?: number })?.statusCode;
     recordAudioLatency({
+      session_id: opts?.session_id ?? undefined,
+      turn_index: opts?.turn_index ?? undefined,
       direction: "out",
       t_tts_total_ms: totalMs,
       tts_text_len: text.length,
       metadata: {
+        turn_id: opts?.turn_id ?? null,
         provider: provider.id,
         status_code: statusCode ?? 0,
         error_type: classifyError(statusCode, message),
@@ -74,9 +80,9 @@ export async function generateSpeech(text: string, opts?: TTSOptions): Promise<B
 }
 
 /** Play an audio Blob through an <audio> element. */
-export function playAudioBlob(blob: Blob): Promise<void> {
+export function playAudioBlob(blob: Blob): Promise<PlaybackResult> {
   return playAudioBlobRobust(blob).then((result) => {
-    if (result.status === "played") return;
+    if (result.status === "played") return result;
     const error = result.error || new Error("Audio playback failed");
     (error as Error & { playbackErrorType?: string }).playbackErrorType = result.errorInfo?.type;
     throw error;

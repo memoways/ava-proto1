@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-22 (session 20 — Audit profond du pipeline vocal Max puis durcissement multi-navigateurs et optimisation latence live : sélection MIME STT à l'exécution, timeouts critiques STT/LLM/TTS/GM, audio unlock, lecture TTS robuste, statuts de queue TTS, preset « Conversation temps réel », fenêtre de silence STT à 900 ms, modèle Max live basculé sur Gemini Flash, GM pré-tour LLM retiré du hot path et contexte RAG compacté)  
+> **Last Updated**: 2026-05-22 (session 20 — Audit profond du pipeline vocal Max puis durcissement multi-navigateurs, optimisation latence live et observabilité PostHog : sélection MIME STT, timeouts critiques, audio unlock, lecture TTS robuste, statuts de queue TTS, preset « Conversation temps réel », fenêtre STT à 900 ms, Gemini Flash par défaut, GM pré-tour LLM retiré du hot path, contexte RAG compacté, événements `voice_turn_completed` / `voice_error` et stockage interne `voice_turn_events` / `voice_error_events`)  
 
 ---
 
@@ -64,7 +64,7 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
-### 2026-05-22 — Robustesse voix multi-navigateurs + optimisation latence live 🔷
+### 2026-05-22 — Robustesse voix multi-navigateurs + optimisation latence live + observabilité 🔷
 
 **Intent**: Les sessions vocales récentes montraient des pannes difficiles à diagnostiquer : Safari et Firefox ne démarraient pas toujours le STT, Brave/Chrome perdaient parfois le TTS, et certains tours restaient bloqués sans reprise claire. L'audit a montré que le pipeline était fonctionnel mais trop optimiste pour le web réel : `MediaRecorder` forçait `audio/webm;codecs=opus`, la lecture audio dépendait d'un `audio.play()` tardif soumis aux politiques autoplay, plusieurs opérations réseau n'avaient pas de timeout dur, et la queue TTS ne distinguait pas explicitement succès, erreur, annulation ou skip.
 
@@ -78,6 +78,7 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 5. **Anti-blocage pipeline** — `Index.tsx` déclenche l'audio unlock au moment de répondre, d'activer le micro ou de presser le PTT. Le GM post-turn est protégé par timeout 6 s et fallback neutre. Les erreurs STT affichent un sous-titre utilisateur et remontent via `stt_error`.
 6. **Timeouts réseau critiques** — `openRouterLLM.ts` ajoute `AbortController` 18 s sur les appels LLM. Les providers TTS ElevenLabs, Hume et Inworld ont maintenant un timeout fetch 12 s et un timeout `response.blob()` 12 s.
 7. **Mode conversation rapide** — preset `realtime_conversation` : ElevenLabs Turbo v2.5, MP3 64 kbps, `optimizeStreamingLatency=1`, vitesse 1.02. Objectif : permettre des tests voice-to-voice plus nerveux sans sacrifier le preset qualité existant.
+8. **Observabilité PostHog + admin** — ajout d'une corrélation `turn_id`, d'un événement agrégé `voice_turn_completed` et d'une erreur unifiée `voice_error`. Les mêmes données sont stockées en interne dans `voice_turn_events` / `voice_error_events`, et l'onglet admin des latences affiche les p50/p95 end-to-end ainsi que les erreurs voix récentes.
 8. **Hot path Max allégé** — après une capture montrant `LLM total (Max streaming): 15911ms`, le live abandonne `qwen/qwen-2.5-72b-instruct` comme modèle par défaut au profit de `google/gemini-2.0-flash-001`, plafonne les réponses à 220 tokens, force une réponse orale 1-2 phrases, réduit le RAG (`top_k=3`, `retrieve_k=8`) et compacte les extraits injectés.
 9. **GM pré-tour LLM retiré du chemin temps réel** — le pre-turn timeoutait à 4 s et son brief n'était pas injecté dans Max. Le live utilise désormais un brief local instantané pour la trace ; le planner LLM reste disponible dans le banc d'essai.
 10. **Tests de robustesse** — nouveaux tests unitaires pour les timeouts, la sélection MIME, la classification audio et les statuts de queue TTS.

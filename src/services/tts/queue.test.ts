@@ -21,7 +21,14 @@ describe("TTSQueue drain status", () => {
     queue.enqueue("Bonjour.");
     const result = await queue.drain();
 
-    expect(result).toEqual({ status: "played", playedSegments: 1, failedSegments: 0 });
+    expect(result).toEqual({
+      status: "played",
+      playedSegments: 1,
+      failedSegments: 0,
+      generatedSegments: 1,
+      playbackStartMs: 0,
+      playbackTotalMs: 0,
+    });
   });
 
   it("reports failure instead of hiding playback errors", async () => {
