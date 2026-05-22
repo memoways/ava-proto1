@@ -109,54 +109,69 @@ function buildPRD4Props(payload: any) {
   const props: Record<string, any> = {};
   const set = (k: string, v: any) => { if (v != null) props[k] = v; };
 
+  // Méta
   props["Nom"] = { title: [{ text: { content: `PRD4 ${sessionId?.slice(0, 8) || "session"}` } }] };
   set("Session ID", textProp(sessionId));
-  set("Modalite voix", { select: { name: "push_to_talk" } });
   set("Date soumission", { date: { start: t.submitted_at || new Date().toISOString() } });
-  set("Duree secondes", numProp(t.duration_seconds));
 
-  // PRD4 spécifique
+  // Questionnaire utilisateur — noms Notion exacts (avec accents)
   set("PRD4 A vu le film", a.q1_film_seen ? { select: { name: a.q1_film_seen === "oui" ? "Oui" : "Non" } } : null);
   set("PRD4 Teaser vu", { checkbox: !!t.teaser_seen });
   set("PRD4 Teaser skippé", { checkbox: !!t.teaser_skipped });
   set("PRD4 Teaser utile score", numProp(a.q2_teaser_helpful));
-  set("PRD4 Role creation clarte", numProp(a.q3_role_clarity));
-  set("PRD4 Role summary justesse", numProp(a.q4_role_summary_accuracy));
-  set("PRD4 PTT clarte", numProp(a.q5_ptt_clarity));
-  set("PRD4 PTT frustration", numProp(t.ptt_errors));
-  set("PRD4 Max reconnait role", numProp(a.q6_max_used_role));
-  set("PRD4 Max credible personnage", numProp(a.q7_max_credible));
+  set("PRD4 Rôle création clarté", numProp(a.q3_role_clarity));
+  set("PRD4 Résumé personnage justesse", numProp(a.q4_role_summary_accuracy));
+  set("PRD4 PTT clarté", numProp(a.q5_ptt_clarity));
+  set("PRD4 PTT frustration", numProp(a.q5b_ptt_frustration));
+  set("PRD4 Max reconnaît rôle", numProp(a.q6_max_used_role));
+  set("PRD4 Max crédible personnage", numProp(a.q7_max_credible));
   set("PRD4 Envie autres personnages", numProp(a.q8_want_other_characters));
   set(
-    "PRD4 Personnage souhaite prochain",
+    "PRD4 Personnage souhaité prochain",
     a.q8b_next_character_wanted
       ? { select: { name: PRD4_CHARACTER_MAP[a.q8b_next_character_wanted] || a.q8b_next_character_wanted } }
       : null,
   );
   set(
-    "PRD4 Duree ressentie",
+    "PRD4 Durée ressentie",
     a.q9_duration_feeling
       ? { select: { name: PRD4_DURATION_MAP[a.q9_duration_feeling] || a.q9_duration_feeling } }
       : null,
   );
   set("PRD4 Rupture immersion", textProp(a.q10_open_feedback));
 
-  if (t.role_profile) {
-    set("PRD4 Role JSON", textProp(JSON.stringify(t.role_profile)));
+  // Email + opt-ins (canaux PRD4 uniquement, plus d'anciens champs A/B)
+  if (a.contact_email) props["PRD4 Email contact"] = { email: a.contact_email };
+  props["PRD4 Être tenu au courant"] = { checkbox: !!a.opt_in_updates };
+  props["PRD4 Contact feedback détaillé"] = { checkbox: !!a.opt_in_feedback };
+
+  // Données techniques automatiques
+  if (t.role_profile) set("PRD4 Rôle JSON", textProp(JSON.stringify(t.role_profile)));
+  if (t.active_character) {
+    const charName = PRD4_CHARACTER_MAP[t.active_character] || t.active_character;
+    // Personnage actif n'utilise pas "Max encore" — c'est Max
+    const cleanName = t.active_character === "max" ? "Max" : charName;
+    set("PRD4 Personnage actif", { select: { name: cleanName } });
   }
+  set("PRD4 Durée réelle secondes", numProp(t.duration_seconds));
   set("PRD4 Nb tours", numProp(t.turn_count));
   set("PRD4 Latence moyenne ms", numProp(t.avg_latency_ms));
   set("PRD4 Latence max ms", numProp(t.max_latency_ms));
   set("PRD4 Erreurs PTT", numProp(t.ptt_errors));
+  set("PRD4 Durée parole utilisateur s", numProp(t.user_speech_seconds));
+  set("PRD4 Durée parole Max s", numProp(t.max_speech_seconds));
+  set("PRD4 Transcript disponible", { checkbox: !!t.transcript_available });
 
-  if (a.contact_email) props["PRD4 Email contact"] = { email: a.contact_email };
-  if (a.opt_in_updates) props["PRD4 Être tenu au courant"] = { checkbox: true };
-  if (a.opt_in_feedback) props["PRD4 Contact feedback détaillé"] = { checkbox: true };
-
-  // Aussi écrire l'email dans le champ générique pour homogénéité
-  if (a.contact_email) props["Email contact"] = { email: a.contact_email };
-  if (a.opt_in_updates) props["Opt-in updates"] = { checkbox: true };
-  if (a.opt_in_feedback) props["Opt-in feedback"] = { checkbox: true };
+  // Champs optionnels (latence perçue / moments / fin / etc.) si jamais ajoutés côté app
+  if (a.latency_perceived) {
+    const lp = SELECT_MAPS.latency_perceived[a.latency_perceived] || a.latency_perceived;
+    set("PRD4 Latence perçue", { select: { name: lp } });
+  }
+  set("PRD4 Latence moments", textProp(a.latency_moments));
+  set("PRD4 Raison fin", textProp(payload.gameOverReason));
+  set("PRD4 Moment marquant", textProp(a.moment_marquant));
+  set("PRD4 Feedback libre", textProp(a.feedback_libre));
+  set("PRD4 Commentaire PTT", textProp(a.ptt_comment));
 
   return props;
 }
