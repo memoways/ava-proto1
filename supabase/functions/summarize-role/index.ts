@@ -91,7 +91,7 @@ serve(async (req) => {
         Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
         "HTTP-Referer": "https://ava-prototype.lovable.app",
-        "X-Title": "AVA PRD4 — summarize-role",
+        "X-Title": "AVA PRD4 summarize-role",
       },
       body: JSON.stringify({
         model,
