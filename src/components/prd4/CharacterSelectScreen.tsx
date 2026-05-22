@@ -2,10 +2,10 @@
 import { useState } from "react";
 import { Lock } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import maxImg from "@/assets/characters/max.svg";
-import emmaImg from "@/assets/characters/emma.svg";
-import avaImg from "@/assets/characters/ava.svg";
-import leoImg from "@/assets/characters/leo.svg";
+import maxImg from "@/assets/characters/max.jpg";
+import emmaImg from "@/assets/characters/emma.jpg";
+import avaImg from "@/assets/characters/ava.jpg";
+import leoImg from "@/assets/characters/leo.jpg";
 
 type CharId = "max" | "emma" | "ava" | "leo";
 

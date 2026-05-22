@@ -1,7 +1,7 @@
 /** PRD4 — Écran 7 : Appel Max (sonnerie + animation visio) */
 import { useEffect, useState } from "react";
 import { Phone } from "lucide-react";
-import maxImg from "@/assets/characters/max.svg";
+import maxImg from "@/assets/characters/max.jpg";
 
 interface Props {
   onAnswered: () => void;
@@ -69,8 +69,8 @@ const CallingMaxScreen = ({ onAnswered }: Props) => {
         </div>
 
         <p className="mx-auto max-w-md text-xs text-muted-foreground/80">
-          Quand ce sera à toi de parler, maintiens le bouton micro appuyé
-          (ou la barre&nbsp;Espace).
+          Quand ce sera à toi de parler, clique sur le bouton micro
+          (ou appuie sur la barre&nbsp;Espace). Clique à nouveau pour envoyer.
         </p>
       </div>
     </div>
