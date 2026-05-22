@@ -1,16 +1,17 @@
 /**
  * IndexPRD4 — Nouveau parcours (mai 2026).
  *
- * Phase 1 : flow complet cliquable, sans STT/LLM/TTS. La conversation est
- * stubbée pour vérifier l'enchaînement des écrans. Les Phases 2+ branchent
- * la création de rôle (LLM), Max contextualisé et le GM post-turn.
+ * Phase 2 : création de rôle réelle via PTT + Deepgram + edge function
+ * `summarize-role` (LLM). La conversation Max reste stubbée (Phase 3).
  *
  * L'ancien Index reste accessible sur /legacy.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useExperienceState } from "@/hooks/useExperienceState";
-import type { AudioState, FilmAnswer, UserRoleProfile } from "@/types";
+import type { AudioState, FilmAnswer } from "@/types";
 import { trackEvent } from "@/services/posthogService";
+import { summarizeRole } from "@/services/roleProfileService";
+import { toast } from "@/hooks/use-toast";
 
 import WelcomeScreen from "@/components/prd4/WelcomeScreen";
 import FilmQuestionScreen from "@/components/prd4/FilmQuestionScreen";
@@ -22,22 +23,6 @@ import CallingMaxScreen from "@/components/prd4/CallingMaxScreen";
 import ConversationScreen from "@/components/prd4/ConversationScreen";
 import EndSessionScreen from "@/components/prd4/EndSessionScreen";
 
-/** Phase 1 : fabrique un profil-stub à partir du texte saisi. */
-function stubRoleProfile(rawInput: string): UserRoleProfile {
-  return {
-    raw_input: rawInput,
-    summary_for_user: `Tu te présentes comme : « ${rawInput.slice(0, 200)}${rawInput.length > 200 ? "…" : ""} ». (Phase 1 — résumé LLM branché en Phase 2.)`,
-    summary_for_max: rawInput,
-    relationship_to_family: "inconnu",
-    age: "inconnu",
-    gender: "inconnu",
-    proximity_level: "inconnu",
-    intent: "inconnu",
-    created_by_system: true,
-    created_at: new Date().toISOString(),
-  };
-}
-
 const IndexPRD4 = () => {
   const {
     state,
@@ -47,12 +32,14 @@ const IndexPRD4 = () => {
     setRoleProfile,
     setAudioState,
     addMessage,
+    incrementPttError,
     endExperience,
     reset,
   } = useExperienceState();
 
   const [userSubtitle, setUserSubtitle] = useState("");
   const [maxSubtitle, setMaxSubtitle] = useState("");
+  const [summarizing, setSummarizing] = useState(false);
   const stubTurnRef = useRef(0);
 
   // PostHog : phase tracking
@@ -83,15 +70,44 @@ const IndexPRD4 = () => {
     setPhase("role_capture");
   }, [markTeaserSeen, setPhase]);
 
-  // ---- Role capture → résumé (stub Phase 1) ---------------------------------
+  // ---- Role capture → résumé LLM (Phase 2) ----------------------------------
   const handleRoleSubmit = useCallback(
-    (rawInput: string) => {
-      const profile = stubRoleProfile(rawInput);
-      setRoleProfile(profile);
-      trackEvent("prd4_role_created", { length: rawInput.length, stub: true });
-      setPhase("role_summary");
+    async (rawInput: string) => {
+      setSummarizing(true);
+      const t0 = performance.now();
+      try {
+        const { profile, model, latency_ms } = await summarizeRole(rawInput);
+        setRoleProfile(profile);
+        trackEvent("prd4_role_created", {
+          length: rawInput.length,
+          model,
+          latency_ms,
+          relationship: profile.relationship_to_family,
+        });
+        setPhase("role_summary");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[IndexPRD4] summarizeRole failed:", msg);
+        trackEvent("prd4_role_failed", { length: rawInput.length, error: msg.slice(0, 200) });
+        toast({
+          title: "Impossible d'analyser ta présentation",
+          description: "Réessaie dans un instant.",
+          variant: "destructive",
+        });
+      } finally {
+        setSummarizing(false);
+        console.log(`[IndexPRD4] role summarize total ${Math.round(performance.now() - t0)}ms`);
+      }
     },
     [setRoleProfile, setPhase],
+  );
+
+  const handleRolePTTError = useCallback(
+    (err: Error) => {
+      incrementPttError();
+      trackEvent("prd4_ptt_error", { phase: "role_capture", message: err.message });
+    },
+    [incrementPttError],
   );
 
   // ---- Role summary ---------------------------------------------------------
@@ -162,7 +178,13 @@ const IndexPRD4 = () => {
     case "teaser":
       return <TeaserScreen onContinue={handleTeaserContinue} onSkip={handleTeaserSkip} />;
     case "role_capture":
-      return <RoleCaptureScreen onSubmit={handleRoleSubmit} />;
+      return (
+        <RoleCaptureScreen
+          onSubmit={handleRoleSubmit}
+          onPTTError={handleRolePTTError}
+          submitting={summarizing}
+        />
+      );
     case "role_summary":
       return state.userRoleProfile ? (
         <RoleSummaryScreen
