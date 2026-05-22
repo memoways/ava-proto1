@@ -85,7 +85,7 @@ export async function callMaxAgent(
   input: MaxAgentInput,
   onChunk: (text: string, done: boolean) => void
 ): Promise<string> {
-  const systemPrompt = await buildMaxSystemPrompt(input.ragContext, input.postVideoContext, input.knowledgeContext, input.conversationHistory, "Max", input.sessionSummary);
+  const systemPrompt = await buildMaxSystemPrompt(input.ragContext, input.postVideoContext, input.knowledgeContext, input.conversationHistory, "Max", input.sessionSummary, input.userRoleSummary);
   debugLogger.log({ service: "llm", level: "info", direction: "out", label: `Max agent: ${input.conversationHistory.length} history + "${input.userMessage.slice(0, 80)}"`, payload: `System prompt: ${systemPrompt.length} chars` });
 
   const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
