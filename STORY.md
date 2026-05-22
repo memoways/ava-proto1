@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-22 (session 20 — Audit profond du pipeline vocal Max puis durcissement multi-navigateurs, optimisation latence live et observabilité PostHog : sélection MIME STT, timeouts critiques, audio unlock, lecture TTS robuste, statuts de queue TTS, preset « Conversation temps réel », fenêtre STT à 900 ms, Gemini Flash par défaut, GM pré-tour LLM retiré du hot path, contexte RAG compacté, événements `voice_turn_completed` / `voice_error` et stockage interne `voice_turn_events` / `voice_error_events`)  
+> **Last Updated**: 2026-05-22 (session 21 — PRD4 livré en 6 phases : nouveau parcours unique post-film, capture de rôle joueur en push-to-talk + résumé LLM, Max contextualisé par le rôle, 4 personnages avec Emma/Ava/Léo grisés, GM pré-tour retiré et GM post-turn async, nouveau questionnaire 10 questions, mapping Notion avec accents exacts, suppression des écrans A/B et de la route `/legacy`, back-office enrichi d'une section rôle utilisateur et d'une timeline GM post-turn)
 
 ---
 
