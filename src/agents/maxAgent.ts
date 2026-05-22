@@ -74,6 +74,8 @@ export interface MaxAgentInput {
   knowledgeContext?: MaxTurnKnowledgeContext;
   /** Compressed bullet-point summary of earlier turns of the same session. */
   sessionSummary?: string;
+  /** PRD4 — résumé du rôle inventé par le joueur, injecté à chaque tour. */
+  userRoleSummary?: string;
 }
 
 /**
