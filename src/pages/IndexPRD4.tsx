@@ -302,6 +302,7 @@ const IndexPRD4 = () => {
       },
     );
     await stt.start();
+    stt.setManualMode(true); // toggle-to-talk: pas de silence auto-finalize
     stt.pause(); // démarre muet
     sttRef.current = stt;
     return stt;
