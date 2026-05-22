@@ -441,22 +441,17 @@ const IndexPRD4 = () => {
       return <EndSessionScreen onContinue={handleEndContinue} />;
     case "questionnaire":
       return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
-          <div className="max-w-md space-y-4">
-            <h2 className="font-serif text-2xl text-foreground">Questionnaire</h2>
-            <p className="text-sm text-muted-foreground">Phase 5 — le nouveau questionnaire PRD4 sera branché ici.</p>
-            <button
-              onClick={() => { reset(); setUserSubtitle(""); setMaxSubtitle(""); sessionIdRef.current = null; conversationRef.current = []; endedRef.current = false; }}
-              className="text-sm text-primary underline"
-            >
-              Recommencer le flow
-            </button>
-          </div>
-        </div>
+        <QuestionnaireScreenPRD4
+          teaserSeen={state.teaserSeen}
+          onSubmit={handleQuestionnaireSubmit}
+          submitting={submittingQuestionnaire}
+        />
       );
     case "thanks":
+      return <ThanksScreen onRestart={handleRestart} />;
     default:
       return null;
+
   }
 };
 
