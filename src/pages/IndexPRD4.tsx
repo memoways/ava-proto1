@@ -61,6 +61,10 @@ const IndexPRD4 = () => {
   const endedRef = useRef(false);
   const userRoleRef = useRef(state.userRoleProfile);
   userRoleRef.current = state.userRoleProfile;
+  const turnLatenciesRef = useRef<number[]>([]);
+  const sessionDurationRef = useRef<number>(0);
+  const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
+
 
   // Timer 5 minutes — démarré quand on entre en conversation, fin auto à 0.
   const handleTimeout = useCallback(() => {
