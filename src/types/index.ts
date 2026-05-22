@@ -282,3 +282,46 @@ export interface PRD4PostTurnEvaluation {
   created_at?: string;
 }
 
+// ============================================================================
+// PRD4 §14 — Nouveau questionnaire (mai 2026)
+// ============================================================================
+
+export interface QuestionnairePRD4Answers {
+  q1_film_seen: "oui" | "non";
+  q2_teaser_helpful: number | null; // 1-5, null si teaser non vu
+  q3_role_clarity: number;
+  q4_role_summary_accuracy: number;
+  q5_ptt_clarity: number;
+  q6_max_used_role: number;
+  q7_max_credible: number;
+  q8_want_other_characters: number;
+  q8b_next_character_wanted: "emma" | "ava" | "leo" | "max" | "aucun";
+  q9_duration_feeling: "trop_court" | "juste" | "trop_long";
+  q10_open_feedback: string;
+  contact_email: string;
+  opt_in_updates: boolean;
+  opt_in_feedback: boolean;
+}
+
+export interface QuestionnairePRD4Technical {
+  session_id: string | null;
+  submitted_at: string;
+  duration_seconds: number;
+  teaser_seen: boolean;
+  teaser_skipped: boolean;
+  role_profile: UserRoleProfile | null;
+  active_character: string;
+  turn_count: number;
+  avg_latency_ms: number | null;
+  max_latency_ms: number | null;
+  ptt_errors: number;
+  transcript_available: boolean;
+}
+
+export interface QuestionnairePRD4Data {
+  version: "prd4";
+  answers: QuestionnairePRD4Answers;
+  technical: QuestionnairePRD4Technical;
+}
+
+

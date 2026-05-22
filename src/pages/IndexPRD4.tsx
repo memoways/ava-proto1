@@ -26,8 +26,13 @@ import CharacterSelectScreen from "@/components/prd4/CharacterSelectScreen";
 import CallingMaxScreen from "@/components/prd4/CallingMaxScreen";
 import ConversationScreen from "@/components/prd4/ConversationScreen";
 import EndSessionScreen from "@/components/prd4/EndSessionScreen";
+import QuestionnaireScreenPRD4 from "@/components/prd4/QuestionnaireScreenPRD4";
+import ThanksScreen from "@/components/ThanksScreen";
+import { savePRD4Questionnaire, syncPRD4QuestionnaireToNotion } from "@/services/prd4Questionnaire";
+import type { QuestionnairePRD4Answers, QuestionnairePRD4Data } from "@/types";
 
 const SESSION_DURATION_S = 5 * 60; // PRD4 §11 : ~5 min cible.
+
 
 const IndexPRD4 = () => {
   const {
@@ -56,6 +61,10 @@ const IndexPRD4 = () => {
   const endedRef = useRef(false);
   const userRoleRef = useRef(state.userRoleProfile);
   userRoleRef.current = state.userRoleProfile;
+  const turnLatenciesRef = useRef<number[]>([]);
+  const sessionDurationRef = useRef<number>(0);
+  const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
+
 
   // Timer 5 minutes — démarré quand on entre en conversation, fin auto à 0.
   const handleTimeout = useCallback(() => {
@@ -86,6 +95,7 @@ const IndexPRD4 = () => {
       cleanupAudio();
       const sid = sessionIdRef.current;
       const duration = SESSION_DURATION_S - (timerRef.current?.remaining ?? SESSION_DURATION_S);
+      sessionDurationRef.current = duration;
       if (sid) {
         await endPRD4Session(sid, reason, conversationRef.current, duration).catch((e) =>
           console.warn("[PRD4] endSession failed:", e),
@@ -96,6 +106,7 @@ const IndexPRD4 = () => {
     },
     [cleanupAudio, endExperience],
   );
+
 
   // ---- Welcome / Film / Teaser ----------------------------------------------
   const handleStart = useCallback(() => setPhase("film_question"), [setPhase]);
@@ -149,6 +160,9 @@ const IndexPRD4 = () => {
     setPhase("conversation_max");
     endedRef.current = false;
     conversationRef.current = [];
+    turnLatenciesRef.current = [];
+    sessionDurationRef.current = 0;
+
 
     // Crée la session DB
     try {
@@ -252,6 +266,10 @@ const IndexPRD4 = () => {
           ...result.timings,
           rag_matches: result.ragMatches,
         });
+        if (typeof result.timings?.total_ms === "number") {
+          turnLatenciesRef.current.push(result.timings.total_ms);
+        }
+
       } catch (err) {
         console.error("[PRD4] turn failed:", err);
         toast({ title: "Erreur dans la conversation", description: "Réessaie.", variant: "destructive" });
@@ -320,6 +338,65 @@ const IndexPRD4 = () => {
   // ---- End / Questionnaire --------------------------------------------------
   const handleEndContinue = useCallback(() => setPhase("questionnaire"), [setPhase]);
 
+  const handleQuestionnaireSubmit = useCallback(
+    async (answers: QuestionnairePRD4Answers) => {
+      setSubmittingQuestionnaire(true);
+      const latencies = turnLatenciesRef.current;
+      const avg = latencies.length ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : null;
+      const max = latencies.length ? Math.max(...latencies) : null;
+      const data: QuestionnairePRD4Data = {
+        version: "prd4",
+        answers,
+        technical: {
+          session_id: sessionIdRef.current,
+          submitted_at: new Date().toISOString(),
+          duration_seconds: sessionDurationRef.current,
+          teaser_seen: state.teaserSeen,
+          teaser_skipped: state.teaserSkipped,
+          role_profile: state.userRoleProfile,
+          active_character: state.selectedCharacter,
+          turn_count: conversationRef.current.filter((m) => m.role === "user").length,
+          avg_latency_ms: avg,
+          max_latency_ms: max,
+          ptt_errors: state.pttErrors,
+          transcript_available: conversationRef.current.length > 0,
+        },
+      };
+      try {
+        if (sessionIdRef.current) {
+          await savePRD4Questionnaire(sessionIdRef.current, data);
+          void syncPRD4QuestionnaireToNotion(sessionIdRef.current, data);
+        }
+        trackEvent("prd4_questionnaire_submitted", {
+          session_id: sessionIdRef.current,
+          turn_count: data.technical.turn_count,
+          duration_s: data.technical.duration_seconds,
+          ptt_errors: data.technical.ptt_errors,
+          q1_film_seen: answers.q1_film_seen,
+          q9_duration_feeling: answers.q9_duration_feeling,
+        });
+      } catch (err) {
+        console.warn("[PRD4] questionnaire submit failed:", err);
+      } finally {
+        setSubmittingQuestionnaire(false);
+        setPhase("thanks");
+      }
+    },
+    [setPhase, state.pttErrors, state.selectedCharacter, state.teaserSeen, state.teaserSkipped, state.userRoleProfile],
+  );
+
+  const handleRestart = useCallback(() => {
+    reset();
+    setUserSubtitle("");
+    setMaxSubtitle("");
+    sessionIdRef.current = null;
+    conversationRef.current = [];
+    turnLatenciesRef.current = [];
+    sessionDurationRef.current = 0;
+    endedRef.current = false;
+  }, [reset]);
+
+
   // ---- Render ---------------------------------------------------------------
   switch (state.phase) {
     case "welcome":
@@ -364,22 +441,17 @@ const IndexPRD4 = () => {
       return <EndSessionScreen onContinue={handleEndContinue} />;
     case "questionnaire":
       return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
-          <div className="max-w-md space-y-4">
-            <h2 className="font-serif text-2xl text-foreground">Questionnaire</h2>
-            <p className="text-sm text-muted-foreground">Phase 5 — le nouveau questionnaire PRD4 sera branché ici.</p>
-            <button
-              onClick={() => { reset(); setUserSubtitle(""); setMaxSubtitle(""); sessionIdRef.current = null; conversationRef.current = []; endedRef.current = false; }}
-              className="text-sm text-primary underline"
-            >
-              Recommencer le flow
-            </button>
-          </div>
-        </div>
+        <QuestionnaireScreenPRD4
+          teaserSeen={state.teaserSeen}
+          onSubmit={handleQuestionnaireSubmit}
+          submitting={submittingQuestionnaire}
+        />
       );
     case "thanks":
+      return <ThanksScreen onRestart={handleRestart} />;
     default:
       return null;
+
   }
 };
 
