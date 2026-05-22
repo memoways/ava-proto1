@@ -13,6 +13,61 @@ export type GamePhase =
   | "questionnaire"
   | "thanks";
 
+// ============================================================================
+// PRD4 — Nouveau parcours (mai 2026)
+// La machine à états ExperiencePhase coexiste avec GamePhase le temps de la
+// migration. Voir docs/plan_prd4_implementation.md
+// ============================================================================
+
+export type ExperiencePhase =
+  | "welcome"
+  | "film_question"
+  | "teaser"
+  | "role_capture"
+  | "role_summary"
+  | "character_select"
+  | "calling_max"
+  | "conversation_max"
+  | "end_session"
+  | "questionnaire"
+  | "thanks";
+
+export type ProximityLevel =
+  | "proche"
+  | "connu"
+  | "institutionnel"
+  | "inconnu"
+  | "menaçant";
+
+export interface UserRoleProfile {
+  raw_input: string;
+  summary_for_user: string;
+  summary_for_max: string;
+  relationship_to_family: string;
+  age: string;
+  gender: string;
+  proximity_level: ProximityLevel;
+  intent: string;
+  created_by_system: boolean;
+  created_at: string;
+}
+
+export type FilmAnswer = "vu" | "pas_vu" | "rappel";
+
+export interface ExperienceState {
+  phase: ExperiencePhase;
+  hasSeenFilm: FilmAnswer | null;
+  teaserSeen: boolean;
+  teaserSkipped: boolean;
+  userRoleProfile: UserRoleProfile | null;
+  selectedCharacter: "max" | "emma" | "ava" | "leo";
+  conversationLog: ConversationMessage[];
+  turnCount: number;
+  pttErrors: number;
+  audioState: AudioState;
+  endReason: string | null;
+}
+
 export type OnboardingVariant = "A" | "B";
 export type VoiceModality = "micro_ouvert" | "push_to_talk";
 
