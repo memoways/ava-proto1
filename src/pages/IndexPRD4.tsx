@@ -266,6 +266,10 @@ const IndexPRD4 = () => {
           ...result.timings,
           rag_matches: result.ragMatches,
         });
+        if (typeof result.timings?.total_ms === "number") {
+          turnLatenciesRef.current.push(result.timings.total_ms);
+        }
+
       } catch (err) {
         console.error("[PRD4] turn failed:", err);
         toast({ title: "Erreur dans la conversation", description: "Réessaie.", variant: "destructive" });
