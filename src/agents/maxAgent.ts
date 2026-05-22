@@ -135,6 +135,7 @@ export async function simulateMaxResponse(
     input.conversationHistory,
     characterName,
     input.sessionSummary,
+    input.userRoleSummary,
   );
   const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
     { role: "system", content: systemPrompt },
