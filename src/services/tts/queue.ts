@@ -21,11 +21,13 @@ export class TTSQueue {
   private _cancelled = false;
   private generationCount = 0;
   private playbackCount = 0;
+  private failedCount = 0;
   private lastSentText = "";
   private pending: PendingEntry[] = [];
   private flushScheduled = false;
   private onError?: (err: Error) => void;
   private errorReported = false;
+  private lastError?: Error;
 
   constructor(opts?: { onError?: (err: Error) => void }) {
     this.onError = opts?.onError;
@@ -62,6 +64,8 @@ export class TTSQueue {
         console.log(`[TTS-Queue] Played sentence #${this.playbackCount} in ${(performance.now() - playStart).toFixed(0)}ms`);
       } catch (err) {
         console.error("[TTS-Queue] Error:", err);
+        this.failedCount++;
+        this.lastError = err instanceof Error ? err : new Error(String(err));
         this.reportError(err);
       }
     });
@@ -87,6 +91,10 @@ export class TTSQueue {
   }
 
   private startGeneration(entry: PendingEntry, nextText?: string): void {
+    if (this._cancelled) {
+      entry.rejectBlob(new Error("TTS queue cancelled"));
+      return;
+    }
     const previousText = this.lastSentText || undefined;
     this.lastSentText = entry.text;
 
@@ -106,12 +114,28 @@ export class TTSQueue {
       .catch(entry.rejectBlob);
   }
 
-  async drain(): Promise<void> {
+  async drain(): Promise<{ status: "played" | "failed" | "cancelled" | "skipped"; playedSegments: number; failedSegments: number; error?: Error }> {
     await this.queue;
+    if (this._cancelled) {
+      return { status: "cancelled", playedSegments: this.playbackCount, failedSegments: this.failedCount, error: this.lastError };
+    }
+    if (this.failedCount > 0) {
+      return { status: "failed", playedSegments: this.playbackCount, failedSegments: this.failedCount, error: this.lastError };
+    }
+    if (this.playbackCount === 0) {
+      return { status: "skipped", playedSegments: 0, failedSegments: 0 };
+    }
+    return { status: "played", playedSegments: this.playbackCount, failedSegments: 0 };
   }
 
   cancel(): void {
     this._cancelled = true;
+    const error = new Error("TTS queue cancelled");
+    this.lastError = error;
+    while (this.pending.length > 0) {
+      const entry = this.pending.shift();
+      entry?.rejectBlob(error);
+    }
   }
 
   get cancelled(): boolean {

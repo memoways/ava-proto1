@@ -4,6 +4,52 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.22.0] - 2026-05-22 — Robustesse voix multi-navigateurs + garde-fous anti-blocage
+
+### Ajouté
+- **Audit technique complet du pipeline vocal Max** : nouveau document `docs/audit_voice_conversation_max.md` couvrant STT, orchestration conversationnelle, TTS, lecture audio navigateur, causes probables Safari/Firefox/Brave/Chrome, budgets de latence et plan d'amélioration priorisé.
+- **Utilitaires de robustesse transverses** :
+  - `src/services/asyncUtils.ts` : `TimeoutError`, `withTimeout()` et `createTimeoutSignal()` pour limiter les opérations critiques.
+  - `src/services/browserCapabilities.ts` : sélection MIME `MediaRecorder` par feature detection et diagnostic navigateur.
+  - `src/services/audioPlayback.ts` : audio unlock via `AudioContext`, lecture blob avec timeout, classification `NotAllowedError` / `NotSupportedError` / `AbortError` / réseau.
+- **Tests ciblés** :
+  - `asyncUtils.test.ts` — timeouts labelisés.
+  - `browserCapabilities.test.ts` — sélection MIME STT.
+  - `audioPlayback.test.ts` — classification des erreurs de lecture.
+  - `tts/queue.test.ts` — statut de drain joué / échoué.
+- **Preset TTS basse latence** `realtime_conversation` dans `settingsService.ts` : `eleven_turbo_v2_5`, MP3 64 kbps, `optimizeStreamingLatency=1`, vitesse 1.02.
+
+### Modifié
+- **STT Deepgram durci** (`src/services/deepgramSTT.ts`) :
+  - suppression du forçage systématique `audio/webm;codecs=opus`;
+  - sélection dynamique parmi `audio/webm;codecs=opus`, `audio/webm`, `audio/ogg;codecs=opus`, `audio/mp4`, puis fallback navigateur par défaut;
+  - timeout token Deepgram (5 s), permission micro (10 s) et ouverture WebSocket (8 s);
+  - callback `onError` avec contexte navigateur/MIME pour remonter les erreurs dans l'UI et PostHog;
+  - fenêtre de silence réduite de 1500 ms à 900 ms pour améliorer la latence perçue.
+- **Lecture TTS plus robuste** :
+  - `playAudioBlob()` passe par `playAudioBlobRobust()` et enrichit les erreurs avec `playbackErrorType`.
+  - `TTSQueue.drain()` retourne désormais `{ status, playedSegments, failedSegments, error }` au lieu d'un `void`, ce qui permet de distinguer succès, échec, annulation et skip.
+  - `TTSQueue.cancel()` rejette explicitement les segments pending.
+- **Pipeline conversationnel** (`src/pages/Index.tsx`) :
+  - audio unlock déclenché au moment de répondre, d'activer le micro ou de presser le push-to-talk;
+  - erreurs STT affichées en sous-titre et trackées via `stt_error`;
+  - GM post-turn protégé par timeout 6 s et fallback neutre (`trust_delta: 0`, pas de trigger/game over);
+  - résultat de queue TTS tracké via `tts_queue_result` si non joué.
+- **Timeouts réseau** :
+  - OpenRouter `streamLLM()` et `callLLMWithUsage()` protégés par `AbortController` 18 s.
+  - Providers TTS ElevenLabs, Hume et Inworld protégés par timeout fetch 12 s + timeout `response.blob()` 12 s.
+
+### Vérifié
+- `npm test` : 20 tests passants.
+- `npx tsc --noEmit` : OK.
+- `npm run build` : OK.
+- ESLint ciblé sur les fichiers modifiés : OK.
+- Validation navigateur locale via Browser plugin : `http://127.0.0.1:8080/` charge correctement, écran d'accueil rendu, interaction `Commencer` → vidéo/skip → choix A/B OK, sans overlay Vite ni erreur applicative. Warnings observés : uniquement les warnings React Router v7 existants.
+
+### Notes
+- Le fallback WebAudio PCM complet pour Safari n'est pas encore implémenté ; cette version réduit fortement le risque en évitant le forçage WebM/Opus, en ajoutant un fallback navigateur par défaut et en rendant les erreurs observables/récupérables.
+- Le vrai streaming audio bas niveau via MediaSource/WebAudio chunks reste une étape ultérieure. Le proxy ElevenLabs stream toujours, mais la lecture front reste blob-based avec timeouts.
+
 ## [0.21.1] - 2026-05-16 — Fix audio Inworld + coûts $ dans « Consommation Voix »
 
 ### Corrigé

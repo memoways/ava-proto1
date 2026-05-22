@@ -7,6 +7,8 @@ import { TTSQueue, chunkTextForTTS } from "@/services/elevenLabsTTS";
 import { createSession, updateSession, endSession, saveQuestionnaire, syncQuestionnaireToNotion } from "@/services/sessionService";
 import { preloadSystemPrompt } from "@/agents/maxAgent";
 import { trackEvent, identifyUser } from "@/services/posthogService";
+import { unlockAudioPlayback } from "@/services/audioPlayback";
+import { withTimeout } from "@/services/asyncUtils";
 import settings from "@/config/settings.json";
 import { getGameplaySettings } from "@/services/settingsService";
 import type { QuestionnaireData, ConversationMessage } from "@/types";
@@ -173,6 +175,9 @@ const Index = () => {
   }, [setPhase, setCharacter]);
 
   const handleRingingAnswer = useCallback(() => {
+    unlockAudioPlayback()
+      .then((ok) => trackEvent("audio_unlock_result", { ok, trigger: "ringing_answer" }))
+      .catch((err) => trackEvent("audio_unlock_result", { ok: false, trigger: "ringing_answer", error: err instanceof Error ? err.message : String(err) }));
     setPhase("conversation");
     timer.start();
     trackEvent("phase_changed", { phase: "conversation" });
@@ -196,7 +201,7 @@ const Index = () => {
       }).catch(console.error);
     }
     gameOver(reason);
-  }, [gameOver, state.trustLevel, state.triggeredIds, timer.remaining]);
+  }, [gameOver, state.trustLevel, state.triggeredIds, timer.remaining, sessionDuration]);
 
   const startMicPersistent = useCallback(async () => {
     if (sttRef.current) return;
@@ -205,13 +210,27 @@ const Index = () => {
     setAudioState("user_speaking");
     micStartedRef.current = true;
 
-    const stt = new DeepgramSTT((text, isFinal) => {
-      setUserSubtitle(text);
-      if (isFinal && text.trim()) {
-        stt.pause();
-        processUserMessageRef.current(text);
-      }
-    });
+    const stt = new DeepgramSTT(
+      (text, isFinal) => {
+        setUserSubtitle(text);
+        if (isFinal && text.trim()) {
+          stt.pause();
+          processUserMessageRef.current(text);
+        }
+      },
+      {
+        onError: (error, context) => {
+          console.error("[STT] error:", error, context);
+          setMicActive(false);
+          setAudioState("idle");
+          setUserSubtitle("Micro indisponible. Réessaie dans ce navigateur ou passe en push-to-talk.");
+          trackEvent("stt_error", {
+            message: error.message.slice(0, 300),
+            ...(context || {}),
+          });
+        },
+      },
+    );
 
     try {
       await stt.start();
@@ -222,6 +241,7 @@ const Index = () => {
       setMicActive(false);
       setAudioState("idle");
       setMicStream(null);
+      setUserSubtitle("Micro indisponible. Vérifie l'autorisation du navigateur puis réessaie.");
     }
   }, [setAudioState]);
 
@@ -335,10 +355,40 @@ const Index = () => {
 
       // Wait for TTS playback + Game Master in parallel
       const gmPerf = perf("Game Master");
-      const [, gmResult] = await Promise.all([
-        ttsQueue ? ttsQueue.drain() : Promise.resolve(),
-        gameMasterPromise.then(r => { gmPerf.end(); return r; }),
+      const [ttsResult, gmResult] = await Promise.all([
+        ttsQueue ? ttsQueue.drain() : Promise.resolve({ status: "skipped" as const, playedSegments: 0, failedSegments: 0 }),
+        withTimeout(
+          "gm_post_turn",
+          gameMasterPromise.then(r => { gmPerf.end(); return r; }),
+          6000,
+        ).catch((err) => {
+          gmPerf.end();
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn("[Game Master] post-turn fallback:", err);
+          trackEvent("gm_post_fallback", { message: message.slice(0, 300) });
+          return {
+            gameMasterResponse: {
+              trust_delta: 0,
+              trigger_video_id: null,
+              game_over: false,
+              game_over_reason: null,
+              gate_reached: false,
+              moderation_flag: false,
+              notes: "fallback gm_post_turn timeout/error",
+            },
+            trigger: null,
+            gm_post_ms: 6000,
+          };
+        }),
       ]);
+      if (ttsResult && ttsResult.status !== "played" && ttsResult.status !== "skipped") {
+        trackEvent("tts_queue_result", {
+          status: ttsResult.status,
+          played_segments: ttsResult.playedSegments,
+          failed_segments: ttsResult.failedSegments,
+          error: ttsResult.error?.message?.slice(0, 300),
+        });
+      }
       const tts_ms = Math.round(performance.now() - ttsStart);
 
       // Build full pipeline timings + identify the bottleneck
@@ -427,7 +477,7 @@ const Index = () => {
         setTimeout(() => resumeMic(), 300);
       }
     }
-  }, [setAudioState, addMessage, state.trustLevel, state.triggeredIds, state.voiceModality, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo, resumeMic]);
+  }, [setAudioState, addMessage, state.trustLevel, state.triggeredIds, state.voiceModality, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo, resumeMic, sessionDuration, ttsDisabledReason]);
 
   processUserMessageRef.current = processUserMessage;
 
@@ -438,6 +488,9 @@ const Index = () => {
       setAudioState("idle");
       setUserSubtitle("");
     } else {
+      unlockAudioPlayback()
+        .then((ok) => trackEvent("audio_unlock_result", { ok, trigger: "mic_toggle" }))
+        .catch((err) => trackEvent("audio_unlock_result", { ok: false, trigger: "mic_toggle", error: err instanceof Error ? err.message : String(err) }));
       if (!micStartedRef.current) {
         startMicPersistent();
       } else {
@@ -449,6 +502,9 @@ const Index = () => {
   // ---- Push-to-talk handlers ----
   const handlePTTPress = useCallback(async () => {
     if (isProcessingRef.current) return;
+    unlockAudioPlayback()
+      .then((ok) => trackEvent("audio_unlock_result", { ok, trigger: "ptt_press" }))
+      .catch((err) => trackEvent("audio_unlock_result", { ok: false, trigger: "ptt_press", error: err instanceof Error ? err.message : String(err) }));
     if (!micStartedRef.current) {
       await startMicPersistent();
     } else {
@@ -475,7 +531,7 @@ const Index = () => {
       syncQuestionnaireToNotion(sessionIdRef.current, data, state.trustLevel, sessionDuration - timer.remaining, state.gameOverReason, state.variant, state.voiceModality);
     }
     setPhase("thanks");
-  }, [setPhase, state.trustLevel, timer.remaining, state.gameOverReason, state.variant, state.voiceModality]);
+  }, [setPhase, state.trustLevel, timer.remaining, state.gameOverReason, state.variant, state.voiceModality, sessionDuration]);
 
   const handleRestart = useCallback(() => {
     sttRef.current?.stop();
@@ -507,7 +563,7 @@ const Index = () => {
     }
     setPhase("game_over");
     gameOver("completion");
-  }, [setPhase, gameOver, state.trustLevel, state.triggeredIds, timer.remaining]);
+  }, [setPhase, gameOver, state.trustLevel, state.triggeredIds, timer.remaining, sessionDuration]);
 
   switch (state.phase) {
     case "welcome":

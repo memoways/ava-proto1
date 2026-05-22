@@ -291,6 +291,11 @@ export const TTS_PRESETS: Record<string, { label: string; description: string; s
     description: "Sous stress, phrases pressées",
     settings: { modelId: "eleven_turbo_v2_5", stability: 0.38, similarityBoost: 0.76, style: 0.32, speed: 1.06, optimizeStreamingLatency: 1, applyTextNormalization: "on" },
   },
+  realtime_conversation: {
+    label: "Conversation temps réel",
+    description: "Priorité à la latence faible pour tests voice-to-voice",
+    settings: { modelId: "eleven_turbo_v2_5", stability: 0.46, similarityBoost: 0.78, style: 0.16, speed: 1.02, outputFormat: "mp3_44100_64", optimizeStreamingLatency: 1, applyTextNormalization: "on" },
+  },
 };
 
 /** Synchronous read from localStorage */

@@ -1,5 +1,7 @@
 import { debugLogger } from "./debugLogger";
 import { recordAudioLatency } from "./latencyTelemetry";
+import { createTimeoutSignal, withTimeout } from "./asyncUtils";
+import { getBrowserDiagnostics, selectMediaRecorderMimeType } from "./browserCapabilities";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 
@@ -12,13 +14,15 @@ interface DeepgramConfig {
 export async function getDeepgramToken(): Promise<DeepgramConfig> {
   const startTime = Date.now();
   const debugId = debugLogger.logFetch("stt", "Get Deepgram token", `proxy-stt`);
+  const timeout = createTimeoutSignal(5000);
   const res = await fetch(
     `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/proxy-stt`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: timeout.signal,
     }
-  );
+  ).finally(timeout.cancel);
   if (!res.ok) {
     debugLogger.logResponse(debugId, "stt", "Deepgram token", res.status, startTime);
     throw new Error(`Failed to get Deepgram token: ${res.status}`);
@@ -28,6 +32,7 @@ export async function getDeepgramToken(): Promise<DeepgramConfig> {
 }
 
 type TranscriptCallback = (text: string, isFinal: boolean) => void;
+type STTErrorCallback = (error: Error, context?: Record<string, unknown>) => void;
 
 export class DeepgramSTT {
   private ws: WebSocket | null = null;
@@ -38,11 +43,14 @@ export class DeepgramSTT {
   private fullTranscript = "";
   /** Timestamp (performance.now()) du dernier mot reçu — sert à mesurer la latence STT après silence. */
   private lastSpeechAt = 0;
-  private static SILENCE_DELAY_MS = 1500;
+  private static SILENCE_DELAY_MS = 900;
   private _paused = false;
+  private onError?: STTErrorCallback;
+  private selectedMimeType = "";
 
-  constructor(onTranscript: TranscriptCallback) {
+  constructor(onTranscript: TranscriptCallback, opts?: { onError?: STTErrorCallback }) {
     this.onTranscript = onTranscript;
+    this.onError = opts?.onError;
   }
 
   get isActive() {
@@ -81,17 +89,44 @@ export class DeepgramSTT {
     const config = await getDeepgramToken();
 
     // Get microphone
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    this.stream = await withTimeout(
+      "microphone_permission",
+      navigator.mediaDevices.getUserMedia({ audio: true }),
+      10000,
+    );
 
     // Connect to Deepgram WebSocket
     const wsUrl = `wss://api.deepgram.com/v1/listen?model=${config.model}&language=${config.language}&smart_format=true&interim_results=true&vad_events=true&endpointing=false`;
 
     this.ws = new WebSocket(wsUrl, ['token', config.key]);
+    const openTimeout = setTimeout(() => {
+      if (this.ws?.readyState !== WebSocket.OPEN) {
+        const error = new Error("Deepgram WebSocket open timeout");
+        debugLogger.log({ service: "stt", level: "error", direction: "in", label: error.message });
+        this.onError?.(error, getBrowserDiagnostics(this.selectedMimeType));
+        try { this.ws?.close(); } catch { /* ignore */ }
+      }
+    }, 8000);
 
     this.ws.onopen = () => {
+      clearTimeout(openTimeout);
       console.log('[Deepgram] WebSocket connected');
       debugLogger.log({ service: "stt", level: "success", direction: "in", label: "Deepgram WebSocket connected" });
-      this.startRecording();
+      try {
+        this.startRecording();
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        debugLogger.log({
+          service: "stt",
+          level: "error",
+          direction: "in",
+          label: "MediaRecorder start failed",
+          detail: error.message,
+          payload: JSON.stringify(getBrowserDiagnostics(this.selectedMimeType)),
+        });
+        this.onError?.(error, getBrowserDiagnostics(this.selectedMimeType));
+        this.stop();
+      }
     };
 
     this.ws.onmessage = (event) => {
@@ -120,9 +155,11 @@ export class DeepgramSTT {
 
     this.ws.onerror = (err) => {
       console.error('[Deepgram] WebSocket error:', err);
+      this.onError?.(new Error("Deepgram WebSocket error"), getBrowserDiagnostics(this.selectedMimeType));
     };
 
     this.ws.onclose = () => {
+      clearTimeout(openTimeout);
       console.log('[Deepgram] WebSocket closed');
     };
   }
@@ -151,9 +188,17 @@ export class DeepgramSTT {
   private startRecording() {
     if (!this.stream || !this.ws) return;
 
-    this.mediaRecorder = new MediaRecorder(this.stream, {
-      mimeType: 'audio/webm;codecs=opus',
+    this.selectedMimeType = selectMediaRecorderMimeType();
+    const options = this.selectedMimeType ? { mimeType: this.selectedMimeType } : undefined;
+    debugLogger.log({
+      service: "stt",
+      level: "info",
+      direction: "in",
+      label: `MediaRecorder selected ${this.selectedMimeType || "browser-default"}`,
+      payload: JSON.stringify(getBrowserDiagnostics(this.selectedMimeType)),
     });
+
+    this.mediaRecorder = new MediaRecorder(this.stream, options);
 
     this.mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0 && this.ws?.readyState === WebSocket.OPEN) {

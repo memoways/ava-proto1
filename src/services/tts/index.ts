@@ -11,6 +11,7 @@
 import { getActiveProvider, getProviderById } from "@/services/tts/registry";
 import type { TTSGenerateContext, TTSProviderId } from "@/services/tts/types";
 import { recordAudioLatency } from "@/services/latencyTelemetry";
+import { playAudioBlobRobust } from "@/services/audioPlayback";
 
 export { prepareTextForTTS } from "@/services/tts/textPrep";
 export { chunkTextForTTS, extractSentences } from "@/services/tts/textChunking";
@@ -74,12 +75,11 @@ export async function generateSpeech(text: string, opts?: TTSOptions): Promise<B
 
 /** Play an audio Blob through an <audio> element. */
 export function playAudioBlob(blob: Blob): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const audioUrl = URL.createObjectURL(blob);
-    const audio = new Audio(audioUrl);
-    audio.onended = () => { URL.revokeObjectURL(audioUrl); resolve(); };
-    audio.onerror = (e) => { URL.revokeObjectURL(audioUrl); reject(new Error(`Audio playback failed: ${e}`)); };
-    audio.play().catch(reject);
+  return playAudioBlobRobust(blob).then((result) => {
+    if (result.status === "played") return;
+    const error = result.error || new Error("Audio playback failed");
+    (error as Error & { playbackErrorType?: string }).playbackErrorType = result.errorInfo?.type;
+    throw error;
   });
 }
 

@@ -1,5 +1,6 @@
 import { trackLLMCall } from "./llmUsageTracker";
 import { debugLogger } from "./debugLogger";
+import { createTimeoutSignal } from "./asyncUtils";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -20,6 +21,11 @@ interface LLMOptions {
 }
 
 type StreamCallback = (text: string, done: boolean) => void;
+type LLMUsagePayload = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+};
 
 /**
  * Streaming LLM call via proxy-llm Edge Function
@@ -40,6 +46,7 @@ export async function streamLLM(
     last_user: messages[messages.length - 1]?.content?.slice(0, 200),
   });
 
+  const timeout = createTimeoutSignal(18000);
   const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -51,7 +58,8 @@ export async function streamLLM(
       max_tokens: options?.max_tokens,
       top_p: options?.top_p,
     }),
-  });
+    signal: timeout.signal,
+  }).finally(timeout.cancel);
 
   if (!response.ok) {
     const err = await response.text();
@@ -75,7 +83,7 @@ export async function streamLLM(
   const decoder = new TextDecoder();
   let fullText = '';
   let buffer = '';
-  let usageData: any = null;
+  let usageData: LLMUsagePayload | null = null;
   let generationId: string | null = null;
 
   while (true) {
@@ -174,6 +182,7 @@ export async function callLLMWithUsage(
   const featureKey = options?.feature_key || "chat";
   const startedAt = performance.now();
 
+  const timeout = createTimeoutSignal(18000);
   const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -185,7 +194,8 @@ export async function callLLMWithUsage(
       max_tokens: options?.max_tokens,
       top_p: options?.top_p,
     }),
-  });
+    signal: timeout.signal,
+  }).finally(timeout.cancel);
 
   if (!response.ok) {
     const err = await response.text();

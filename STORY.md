@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-16 (session 19 — Fix lecture audio Inworld lors du test (passage `stream:false` côté provider pour un MP3 monolithique décodable par le navigateur) + ajout des **coûts $ estimés** dans le dashboard « Consommation Voix » : KPI globaux (caractères TTS, coût succès), section coût par carte provider et 3 colonnes supplémentaires dans le tableau comparatif (Chars, Coût succès, Coût total) sur base des tarifs publics indicatifs par 1k caractères)  
+> **Last Updated**: 2026-05-22 (session 20 — Audit profond du pipeline vocal Max puis durcissement multi-navigateurs : sélection MIME STT à l'exécution au lieu de forcer WebM/Opus, timeouts critiques STT/LLM/TTS/GM, audio unlock sur geste utilisateur, lecture TTS robuste avec classification des erreurs, statuts explicites de queue TTS, preset « Conversation temps réel » et fenêtre de silence STT réduite à 900 ms)  
 
 ---
 
@@ -63,6 +63,35 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-05-22 — Robustesse voix multi-navigateurs + garde-fous anti-blocage 🔷
+
+**Intent**: Les sessions vocales récentes montraient des pannes difficiles à diagnostiquer : Safari et Firefox ne démarraient pas toujours le STT, Brave/Chrome perdaient parfois le TTS, et certains tours restaient bloqués sans reprise claire. L'audit a montré que le pipeline était fonctionnel mais trop optimiste pour le web réel : `MediaRecorder` forçait `audio/webm;codecs=opus`, la lecture audio dépendait d'un `audio.play()` tardif soumis aux politiques autoplay, plusieurs opérations réseau n'avaient pas de timeout dur, et la queue TTS ne distinguait pas explicitement succès, erreur, annulation ou skip.
+
+**Tool**: Codex
+
+**Outcome**:
+1. **Audit documenté** — `docs/audit_voice_conversation_max.md` formalise le diagnostic : compatibilité STT navigateur, streaming TTS non exploité côté blob, risques autoplay, blocages via `Promise.all`, timeouts manquants, objectifs p50/p95 et plan de correction par phases.
+2. **STT Deepgram durci** — `deepgramSTT.ts` ne force plus WebM/Opus. Il choisit le premier MIME supporté (`audio/webm;codecs=opus`, `audio/webm`, `audio/ogg;codecs=opus`, `audio/mp4`) ou laisse le navigateur décider si aucun candidat ne passe. Ajout de timeouts token (5 s), micro (10 s), WebSocket open (8 s), callback `onError` avec contexte navigateur/MIME, et réduction de la fenêtre de silence de 1500 ms à 900 ms.
+3. **Audio unlock + lecture robuste** — nouveau `audioPlayback.ts` : `AudioContext` réveillé sur geste utilisateur, lecture blob encapsulée avec timeout, classification des erreurs (`not_allowed`, `not_supported`, `aborted`, `network`, `unknown`). `playAudioBlob()` passe par ce service et enrichit les erreurs avec `playbackErrorType`.
+4. **Queue TTS observable** — `TTSQueue.drain()` retourne maintenant un statut (`played`, `failed`, `cancelled`, `skipped`) + compteurs de segments. Les erreurs ne sont plus seulement loggées : le pipeline peut les tracker via `tts_queue_result` et reprendre proprement.
+5. **Anti-blocage pipeline** — `Index.tsx` déclenche l'audio unlock au moment de répondre, d'activer le micro ou de presser le PTT. Le GM post-turn est protégé par timeout 6 s et fallback neutre. Les erreurs STT affichent un sous-titre utilisateur et remontent via `stt_error`.
+6. **Timeouts réseau critiques** — `openRouterLLM.ts` ajoute `AbortController` 18 s sur les appels LLM. Les providers TTS ElevenLabs, Hume et Inworld ont maintenant un timeout fetch 12 s et un timeout `response.blob()` 12 s.
+7. **Mode conversation rapide** — preset `realtime_conversation` : ElevenLabs Turbo v2.5, MP3 64 kbps, `optimizeStreamingLatency=1`, vitesse 1.02. Objectif : permettre des tests voice-to-voice plus nerveux sans sacrifier le preset qualité existant.
+8. **Tests de robustesse** — nouveaux tests unitaires pour les timeouts, la sélection MIME, la classification audio et les statuts de queue TTS.
+
+**Ce que ça change** : le pipeline voix passe d'un prototype orienté "happy path Chrome" à un runtime beaucoup plus défensif. Les erreurs navigateur deviennent observables, les opérations critiques ont des limites temporelles, l'audio est préparé sur geste utilisateur, et un tour ne dépend plus d'un GM post-turn ou d'une lecture TTS qui pourrait attendre indéfiniment. Cette version ne prétend pas résoudre tout Safari (le fallback PCM WebAudio complet reste à faire), mais elle élimine les causes les plus probables de casse immédiate et rend les prochaines pannes mesurables.
+
+**Validation**:
+- `npm test` : 20 tests passants.
+- `npx tsc --noEmit` : OK.
+- `npm run build` : OK.
+- ESLint ciblé sur les fichiers modifiés : OK.
+- Browser local : accueil → `Commencer` → vidéo/skip → choix A/B, sans overlay ni erreur applicative.
+
+**Time**: ~3h (audit → plan docs → TDD utilitaires → intégration STT/TTS/pipeline → tests/build → QA navigateur locale).
+
+---
 
 ### 2026-05-16 — TTS multi-providers (ElevenLabs / Inworld / Hume) + voix Alain + monitoring « Consommation Voix » 🔷
 

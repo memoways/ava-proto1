@@ -7,6 +7,7 @@ import type { TTSProvider, TTSGenerateContext, TTSGenerateResult } from "@/servi
 import { getInworldSettings } from "@/services/tts/providerSettings";
 import { debugLogger } from "@/services/debugLogger";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
+import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -34,23 +35,25 @@ export const inworldProvider: TTSProvider = {
     const startTime = Date.now();
     const tRequest = performance.now();
     const debugId = debugLogger.logFetch("tts", `TTS-IW "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts-inworld`, body);
+    const timeout = createTimeoutSignal(12000);
 
     const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-tts-inworld`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    });
+      signal: timeout.signal,
+    }).finally(timeout.cancel);
     const tFirstByte = performance.now();
 
     if (!response.ok) {
       const err = await response.text();
       debugLogger.logResponse(debugId, "tts", "TTS-IW", response.status, startTime, err);
       const error = new Error(`Inworld TTS error: ${response.status} - ${err}`);
-      (error as any).statusCode = response.status;
+      (error as Error & { statusCode?: number }).statusCode = response.status;
       throw error;
     }
 
-    const blob = await response.blob();
+    const blob = await withTimeout("tts_inworld_blob", response.blob(), 12000);
     const tEnd = performance.now();
     debugLogger.logResponse(debugId, "tts", `TTS-IW (${(blob.size / 1024).toFixed(0)}KB)`, response.status, startTime);
 
