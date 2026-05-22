@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-22 (session 20 — Audit profond du pipeline vocal Max puis durcissement multi-navigateurs : sélection MIME STT à l'exécution au lieu de forcer WebM/Opus, timeouts critiques STT/LLM/TTS/GM, audio unlock sur geste utilisateur, lecture TTS robuste avec classification des erreurs, statuts explicites de queue TTS, preset « Conversation temps réel » et fenêtre de silence STT réduite à 900 ms)  
+> **Last Updated**: 2026-05-22 (session 20 — Audit profond du pipeline vocal Max puis durcissement multi-navigateurs et optimisation latence live : sélection MIME STT à l'exécution, timeouts critiques STT/LLM/TTS/GM, audio unlock, lecture TTS robuste, statuts de queue TTS, preset « Conversation temps réel », fenêtre de silence STT à 900 ms, modèle Max live basculé sur Gemini Flash, GM pré-tour LLM retiré du hot path et contexte RAG compacté)  
 
 ---
 
@@ -64,7 +64,7 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
-### 2026-05-22 — Robustesse voix multi-navigateurs + garde-fous anti-blocage 🔷
+### 2026-05-22 — Robustesse voix multi-navigateurs + optimisation latence live 🔷
 
 **Intent**: Les sessions vocales récentes montraient des pannes difficiles à diagnostiquer : Safari et Firefox ne démarraient pas toujours le STT, Brave/Chrome perdaient parfois le TTS, et certains tours restaient bloqués sans reprise claire. L'audit a montré que le pipeline était fonctionnel mais trop optimiste pour le web réel : `MediaRecorder` forçait `audio/webm;codecs=opus`, la lecture audio dépendait d'un `audio.play()` tardif soumis aux politiques autoplay, plusieurs opérations réseau n'avaient pas de timeout dur, et la queue TTS ne distinguait pas explicitement succès, erreur, annulation ou skip.
 
@@ -78,9 +78,11 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 5. **Anti-blocage pipeline** — `Index.tsx` déclenche l'audio unlock au moment de répondre, d'activer le micro ou de presser le PTT. Le GM post-turn est protégé par timeout 6 s et fallback neutre. Les erreurs STT affichent un sous-titre utilisateur et remontent via `stt_error`.
 6. **Timeouts réseau critiques** — `openRouterLLM.ts` ajoute `AbortController` 18 s sur les appels LLM. Les providers TTS ElevenLabs, Hume et Inworld ont maintenant un timeout fetch 12 s et un timeout `response.blob()` 12 s.
 7. **Mode conversation rapide** — preset `realtime_conversation` : ElevenLabs Turbo v2.5, MP3 64 kbps, `optimizeStreamingLatency=1`, vitesse 1.02. Objectif : permettre des tests voice-to-voice plus nerveux sans sacrifier le preset qualité existant.
-8. **Tests de robustesse** — nouveaux tests unitaires pour les timeouts, la sélection MIME, la classification audio et les statuts de queue TTS.
+8. **Hot path Max allégé** — après une capture montrant `LLM total (Max streaming): 15911ms`, le live abandonne `qwen/qwen-2.5-72b-instruct` comme modèle par défaut au profit de `google/gemini-2.0-flash-001`, plafonne les réponses à 220 tokens, force une réponse orale 1-2 phrases, réduit le RAG (`top_k=3`, `retrieve_k=8`) et compacte les extraits injectés.
+9. **GM pré-tour LLM retiré du chemin temps réel** — le pre-turn timeoutait à 4 s et son brief n'était pas injecté dans Max. Le live utilise désormais un brief local instantané pour la trace ; le planner LLM reste disponible dans le banc d'essai.
+10. **Tests de robustesse** — nouveaux tests unitaires pour les timeouts, la sélection MIME, la classification audio et les statuts de queue TTS.
 
-**Ce que ça change** : le pipeline voix passe d'un prototype orienté "happy path Chrome" à un runtime beaucoup plus défensif. Les erreurs navigateur deviennent observables, les opérations critiques ont des limites temporelles, l'audio est préparé sur geste utilisateur, et un tour ne dépend plus d'un GM post-turn ou d'une lecture TTS qui pourrait attendre indéfiniment. Cette version ne prétend pas résoudre tout Safari (le fallback PCM WebAudio complet reste à faire), mais elle élimine les causes les plus probables de casse immédiate et rend les prochaines pannes mesurables.
+**Ce que ça change** : le pipeline voix passe d'un prototype orienté "happy path Chrome" à un runtime beaucoup plus défensif et plus nerveux. Les erreurs navigateur deviennent observables, les opérations critiques ont des limites temporelles, l'audio est préparé sur geste utilisateur, et le tour live ne dépend plus d'un GM pré-tour LLM ni d'un modèle 72B trop lent. Cette version ne prétend pas résoudre tout Safari (le fallback PCM WebAudio complet reste à faire), mais elle élimine les causes les plus probables de casse immédiate et attaque le principal goulet visible : la génération Max à ~16 s.
 
 **Validation**:
 - `npm test` : 20 tests passants.

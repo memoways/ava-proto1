@@ -1,9 +1,9 @@
 import { simulateMaxResponse, validateMaxResponseConstraints, type MaxAgentInput } from "@/agents/maxAgent";
-import { callGameMaster, planGameMasterTurn, type GameMasterInput } from "@/agents/gameMasterAgent";
+import { callGameMaster, type GameMasterInput } from "@/agents/gameMasterAgent";
 import { buildKnowledgeContextFromRAG, formatRAGContext, queryRAG, rewriteRAGQuery } from "@/services/ragService";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { debugLogger } from "@/services/debugLogger";
-import type { ConversationMessage, ConversationPipelineTimings, ConversationPipelineTrace, ConversationValidationTrace, GameMasterResponse, GameMasterTurnBrief, MaxConstraintCheckResult, VideoTrigger } from "@/types";
+import type { ConversationMessage, ConversationPipelineTimings, ConversationPipelineTrace, ConversationValidationTrace, GameMasterResponse, GameMasterTurnBrief, MaxConstraintCheckResult, MaxTurnKnowledgeContext, VideoTrigger } from "@/types";
 import { getGameplaySettings, getLLMSettings } from "@/services/settingsService";
 import { createTurnTimer } from "@/services/latencyTelemetry";
 
@@ -57,6 +57,30 @@ interface ValidatedMaxResponse {
   response: string;
   validation: ConversationValidationTrace;
   timings: { max_ms: number; validator_ms: number };
+}
+
+function buildFastPreTurnBrief(input: {
+  knowledgeContext?: MaxTurnKnowledgeContext;
+} & Pick<GameMasterInput, "conversationHistory" | "userMessage" | "currentTrustLevel" | "triggeredIds" | "timeElapsedSeconds">): GameMasterTurnBrief {
+  return {
+    response_mode: "méfiant",
+    openness_level: input.currentTrustLevel >= 6 ? 2 : 1,
+    emotional_state: "tendu",
+    conversation_goal: "répondre brièvement et relancer l'interlocuteur",
+    reveal_budget: input.currentTrustLevel >= 6 ? 1 : 0,
+    allowed_knowledge: input.knowledgeContext?.allowedFacts?.slice(0, 3) || [],
+    forbidden_topics: input.knowledgeContext?.forbiddenTopics?.slice(0, 3) || [],
+    blocked_assertions: input.knowledgeContext?.blockedAssertions?.slice(0, 3) || [],
+    style_instructions: ["réponse orale courte", "2 phrases maximum", "poser une question simple"],
+    trigger_hint: null,
+    notes: "Brief local instantané (GM pré-tour LLM désactivé sur le hot path live)",
+    fallback: {
+      kind: "orchestrator_error",
+      reason: "gm_pre_turn_llm_skipped_for_latency",
+      elapsed_ms: 0,
+      timeout_ms: 0,
+    },
+  };
 }
 
 /**
@@ -158,42 +182,21 @@ export async function processConversationTurn(
   const summaryRecord = await summaryPromise;
   const sessionSummary = summaryRecord?.summary;
 
-  // Lance le GM pre-turn ET la réponse Max EN PARALLÈLE.
+  // Le GM pre-turn LLM a été retiré du hot path live : il timeoutait souvent à 4s
+  // et son brief n'était pas injecté dans Max. On garde un brief local instantané
+  // pour la trace, et le banc d'essai conserve le planner LLM détaillé.
   const gmPreStart = performance.now();
-  const preTurnPromise = planGameMasterTurn({
-    conversationHistory,
-    userMessage,
-    currentTrustLevel,
-    triggeredIds,
-    timeElapsedSeconds,
-    knowledgeContext: ragResult.knowledgeContext,
-  }).catch((err) => {
-    console.warn("[Orchestrator] GM pre-turn failed, using empty brief:", err);
-    const message = err instanceof Error ? err.message : String(err);
-    const elapsed_ms = Math.round(performance.now() - gmPreStart);
-    let modelAtError: string | undefined;
-    try { modelAtError = getLLMSettings().LLM_MODEL_GM; } catch { /* ignore */ }
-    return {
-      response_mode: "ferme_mefiant" as const,
-      openness_level: 1,
-      emotional_state: "neutre",
-      conversation_goal: "",
-      reveal_budget: 0,
-      allowed_knowledge: [],
-      forbidden_topics: [],
-      blocked_assertions: [],
-      style_instructions: [],
-      trigger_hint: null,
-      notes: "fallback (GM pre-turn error)",
-      fallback: {
-        kind: "orchestrator_error" as const,
-        reason: `orchestrator: ${message.slice(0, 140)}`,
-        elapsed_ms,
-        model: modelAtError,
-        error_excerpt: message.slice(0, 200),
-      },
-    };
-  }).then((brief) => ({ brief, gm_pre_ms: Math.round(performance.now() - gmPreStart) }));
+  const preTurnResult = {
+    brief: buildFastPreTurnBrief({
+      conversationHistory,
+      userMessage,
+      currentTrustLevel,
+      triggeredIds,
+      timeElapsedSeconds,
+      knowledgeContext: ragResult.knowledgeContext,
+    }),
+    gm_pre_ms: Math.round(performance.now() - gmPreStart),
+  };
 
   const maxInput: MaxAgentInput = {
     conversationHistory,
@@ -206,7 +209,7 @@ export async function processConversationTurn(
   };
 
   const validatedPromise = generateValidatedMaxResponse(maxInput);
-  const [validatedTurn, preTurnResult] = await Promise.all([validatedPromise, preTurnPromise]);
+  const validatedTurn = await validatedPromise;
 
   const timings: ConversationPipelineTimings = {
     rag_ms,

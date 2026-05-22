@@ -5,7 +5,7 @@
 > **Créé avec**: Lovable  
 > **Démarré**: 2026-03-07  
 
-> **Mise à jour récente (2026-05-22) — Robustesse voix multi-navigateurs + garde-fous anti-blocage** : audit détaillé du pipeline vocal Max (`docs/audit_voice_conversation_max.md`) puis durcissement du runtime voix : sélection MIME STT au lieu de forcer WebM/Opus, timeouts sur token STT / micro / WebSocket / LLM / TTS / GM post-turn, audio unlock sur geste utilisateur, lecture TTS robuste avec classification d'erreur, statut explicite de `TTSQueue.drain()`, preset **Conversation temps réel**, et fenêtre de silence STT réduite à 900 ms.
+> **Mise à jour récente (2026-05-22) — Robustesse voix multi-navigateurs + optimisation latence live** : audit détaillé du pipeline vocal Max (`docs/audit_voice_conversation_max.md`) puis durcissement du runtime voix : sélection MIME STT au lieu de forcer WebM/Opus, timeouts critiques, audio unlock, lecture TTS robuste, statut explicite de `TTSQueue.drain()`, preset **Conversation temps réel**, silence STT réduit à 900 ms. Deuxième passe latence : modèle Max live basculé sur **Gemini 2.0 Flash**, réponses limitées à 220 tokens / 1-2 phrases, RAG live réduit et compacté, suppression du GM pré-tour LLM du hot path.
 
 > **Mise à jour précédente (2026-05-16) — TTS multi-providers + voix Alain (Inworld) + monitoring « Consommation Voix »** : refonte du TTS en **façade découplée** (`src/services/tts/`) avec 3 providers branchés — **ElevenLabs**, **Inworld `inworld-tts-2`** (voix « Alain » en streaming NDJSON, deliveryMode STABLE/BALANCED/CREATIVE) et **Hume AI Octave**. Sélection d'un seul provider actif **global** depuis Admin → **TTS Config**, sans redéploiement, avec bouton 🔊 Tester par provider. Nouveau dashboard **« Consommation Voix »** : compteurs, taux de succès, latences **p50/p95** (first-byte + total), distribution des **codes HTTP** et erreurs récentes par provider. Secrets `INWORLD_API_KEY` et `HUME_API_KEY` ajoutés. Détails dans `CHANGELOG.md` et `STORY.md`.
 
@@ -92,6 +92,7 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] **Dashboard « Consommation Voix »** : compteurs, taux de succès, latences p50/p95 (first-byte + total), codes HTTP et erreurs récentes par provider
 - [x] **Robustesse voix multi-navigateurs** : sélection MIME STT à l'exécution, timeouts critiques, audio unlock, erreurs TTS/STT trackées et état conversationnel récupérable
 - [x] **Preset voix basse latence** : réglage `realtime_conversation` pour tests voice-to-voice rapides (`eleven_turbo_v2_5`, MP3 64 kbps, `optimizeStreamingLatency=1`)
+- [x] **Optimisation latence live Max** : modèle live rapide par défaut, contexte RAG compacté, GM pré-tour LLM retiré du chemin temps réel, réponses orales bornées à 1-2 phrases
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
 - [ ] Politique de vérité à 4 niveaux (certain / probable / inconnu / interdit)
 - [ ] Bible factuelle éditable et gestion explicite des sujets verrouillés/déverrouillés
@@ -106,7 +107,7 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 | Edge Functions | proxy-llm, proxy-stt, proxy-tts, **proxy-tts-inworld**, **proxy-tts-hume**, sync-notion, query-rag, sync-questionnaire, rewrite-query, summarize-session |
 | Video | Gumlet (hébergement + embed player) |
 | Cost Tracking | OpenRouter generation API (tokens + USD per call) |
-| LLM | OpenRouter API — Multi-modèles (Qwen, Claude, Grok, Llama, Gemini, GPT-5) |
+| LLM | OpenRouter API — Multi-modèles. Chemin live optimisé sur **Gemini 2.0 Flash** par défaut ; modèles plus lourds réservés aux tests/qualité depuis l'admin. |
 | STT | Deepgram (WebSocket streaming + VAD) avec sélection MIME `MediaRecorder` à l'exécution et timeouts token/micro/WebSocket |
 | TTS | **Multi-providers** via façade `src/services/tts/` — ElevenLabs (voix custom Max), **Inworld `inworld-tts-2`** (voix « Alain », streaming NDJSON), **Hume AI Octave**. Provider actif sélectionné dans Admin → TTS Config. Lecture audio robuste avec audio unlock et classification des erreurs navigateur. |
 | Embeddings | **Voyage AI `voyage-3` (1024 dim, défaut)** + OpenAI text-embedding-3-small (1536 dim, fallback) |

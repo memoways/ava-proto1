@@ -20,6 +20,14 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - **Preset TTS basse latence** `realtime_conversation` dans `settingsService.ts` : `eleven_turbo_v2_5`, MP3 64 kbps, `optimizeStreamingLatency=1`, vitesse 1.02.
 
 ### Modifié
+- **Optimisation latence du hot path Max** :
+  - modèle Max live par défaut basculé de `qwen/qwen-2.5-72b-instruct` vers `google/gemini-2.0-flash-001`;
+  - normalisation des anciens réglages locaux lents (`qwen 72B`, `llama 70B`, `gemini pro`) vers Gemini Flash pour le chemin live;
+  - `LLM_MAX_TOKENS` plafonné à 220 et `top_p` plafonné à 0.9;
+  - règle prompt Max resserrée : réponse orale temps réel en 1-2 phrases / 45 mots maximum;
+  - RAG live réduit de `top_k=5 / retrieve_k=15` à `top_k=3 / retrieve_k=8`;
+  - contexte RAG et `MaxTurnKnowledgeContext` compactés par extrait pour éviter de doubler des centaines de tokens.
+- **GM pré-tour retiré du hot path live** : l'appel LLM `planGameMasterTurn()` timeoutait à 4 s et son brief n'était pas injecté dans la génération Max. Le chemin live utilise désormais un brief local instantané pour la trace pipeline ; le planner LLM détaillé reste disponible dans le banc d'essai admin.
 - **STT Deepgram durci** (`src/services/deepgramSTT.ts`) :
   - suppression du forçage systématique `audio/webm;codecs=opus`;
   - sélection dynamique parmi `audio/webm;codecs=opus`, `audio/webm`, `audio/ogg;codecs=opus`, `audio/mp4`, puis fallback navigateur par défaut;
@@ -45,6 +53,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - `npm run build` : OK.
 - ESLint ciblé sur les fichiers modifiés : OK.
 - Validation navigateur locale via Browser plugin : `http://127.0.0.1:8080/` charge correctement, écran d'accueil rendu, interaction `Commencer` → vidéo/skip → choix A/B OK, sans overlay Vite ni erreur applicative. Warnings observés : uniquement les warnings React Router v7 existants.
+- Après la capture de latence montrant `LLM total (Max streaming): 15911ms`, seconde passe appliquée pour retirer Qwen 72B du live, supprimer le GM pré-tour LLM du hot path et réduire le volume de prompt/RAG.
 
 ### Notes
 - Le fallback WebAudio PCM complet pour Safari n'est pas encore implémenté ; cette version réduit fortement le risque en évitant le forçage WebM/Opus, en ajoutant un fallback navigateur par défaut et en rendant les erreurs observables/récupérables.

@@ -135,13 +135,23 @@ export async function queryRAGDetailed(
   }
 }
 
+const MAX_RAG_CONTEXT_CHARS = 420;
+const MAX_KNOWLEDGE_ITEM_CHARS = 300;
+
+function compactText(text: string, maxChars: number): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= maxChars) return clean;
+  return `${clean.slice(0, maxChars - 1).trim()}…`;
+}
+
 /**
  * Format RAG matches into a context string for injection into the LLM prompt.
  */
 export function formatRAGContext(matches: RAGMatch[]): string {
   if (!matches.length) return "";
   return matches
-    .map((m, i) => `[${i + 1}] (${m.source_table}, score: ${m.similarity.toFixed(2)})\n${m.content}`)
+    .slice(0, 3)
+    .map((m, i) => `[${i + 1}] (${m.source_table}, score: ${m.similarity.toFixed(2)})\n${compactText(m.content, MAX_RAG_CONTEXT_CHARS)}`)
     .join("\n\n");
 }
 
@@ -168,12 +178,12 @@ export function buildKnowledgeContextFromRAG(matches: RAGMatch[]): MaxTurnKnowle
   }
 
   const sorted = [...matches].sort((a, b) => b.similarity - a.similarity);
-  const allowedFacts = sorted.slice(0, 3).map((match, index) => `[F${index + 1}] ${match.content}`);
-  const activeMemories = sorted.slice(0, 2).map((match, index) => `[M${index + 1}] ${match.content}`);
+  const allowedFacts = sorted.slice(0, 3).map((match, index) => `[F${index + 1}] ${compactText(match.content, MAX_KNOWLEDGE_ITEM_CHARS)}`);
+  const activeMemories = sorted.slice(0, 2).map((match, index) => `[M${index + 1}] ${compactText(match.content, MAX_KNOWLEDGE_ITEM_CHARS)}`);
   const hypotheses = sorted
     .filter((match) => match.similarity < 0.55)
     .slice(0, 2)
-    .map((match, index) => `[H${index + 1}] Piste partielle seulement: ${match.content}`);
+    .map((match, index) => `[H${index + 1}] Piste partielle seulement: ${compactText(match.content, MAX_KNOWLEDGE_ITEM_CHARS)}`);
 
   return {
     allowedFacts,

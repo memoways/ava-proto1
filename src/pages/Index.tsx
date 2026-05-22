@@ -289,11 +289,11 @@ const Index = () => {
     conversationHistoryRef.current.push(userMsg);
     addMessage(userMsg);
 
-    const llmFirstChunkPerf = perf("LLM first chunk");
+    const llmReadyPerf = perf("Max response ready");
 
     try {
       console.log("[processUserMessage] Starting LLM call...");
-      const llmPerf = perf("LLM total (Max streaming)");
+      const llmPerf = perf("LLM total (Max response)");
 
       const { maxResponse, validation, timings, gameMasterPromise, preTurnBrief } = await processConversationTurn(
         userText,
@@ -307,7 +307,7 @@ const Index = () => {
       );
 
       llmPerf.end();
-      llmFirstChunkPerf.end();
+      llmReadyPerf.end();
 
       if (validation.regenerated) {
         console.warn("[Validator] Réponse régénérée avant TTS", validation);

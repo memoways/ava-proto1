@@ -67,16 +67,16 @@ export interface LLMSettings {
 const LLM_STORAGE_KEY = "ava_llm_settings";
 
 export const OPENROUTER_MODELS = [
-  { id: "qwen/qwen-2.5-72b-instruct", label: "Qwen 2.5 72B", description: "Défaut — bon rapport qualité/coût" },
+  { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash", description: "Défaut live — très rapide, fiable" },
   { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "Rapide, fiable, bonne qualité" },
+  { id: "openai/gpt-4o-mini", label: "GPT-4o Mini", description: "Très rapide, économique" },
   { id: "x-ai/grok-3-mini-beta", label: "Grok 3 Mini", description: "Rapide, conversationnel, bon en roleplay" },
+  { id: "qwen/qwen-2.5-72b-instruct", label: "Qwen 2.5 72B", description: "Qualité correcte mais trop lent pour le live voice-to-voice" },
   { id: "x-ai/grok-3-beta", label: "Grok 3", description: "Top qualité xAI, raisonnement fort" },
   { id: "x-ai/grok-2-1212", label: "Grok 2", description: "Équilibré vitesse/qualité" },
-  { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash", description: "Très rapide, gratuit" },
   { id: "google/gemini-2.5-pro-preview-06-05", label: "Gemini 2.5 Pro", description: "Top qualité, plus lent" },
   { id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4", description: "Excellent en roleplay" },
   { id: "openai/gpt-4o", label: "GPT-4o", description: "Polyvalent, rapide" },
-  { id: "openai/gpt-4o-mini", label: "GPT-4o Mini", description: "Très rapide, économique" },
   { id: "meta-llama/llama-3.1-70b-instruct", label: "Llama 3.1 70B", description: "Open source, performant" },
   { id: "meta-llama/llama-3.1-8b-instruct", label: "Llama 3.1 8B", description: "Ultra rapide, léger" },
   { id: "mistralai/mistral-large", label: "Mistral Large", description: "Bon en français" },
@@ -89,7 +89,7 @@ const llmDefaults: LLMSettings = {
   // → réduit drastiquement la latence du GM pre-turn (vue dans le panneau Latence & blocage).
   LLM_MODEL_GM: "google/gemini-2.0-flash-001",
   LLM_TEMPERATURE: defaultSettings.LLM_TEMPERATURE,
-  LLM_MAX_TOKENS: defaultSettings.LLM_MAX_TOKENS,
+  LLM_MAX_TOKENS: Math.min(defaultSettings.LLM_MAX_TOKENS, 220),
   LLM_TOP_P: defaultSettings.LLM_TOP_P,
   LLM_TEMPERATURE_GM: 0.3,
   // Le brief JSON fait ~150 tokens utiles ; 180 = marge confortable, plus de gaspillage de génération.
@@ -98,6 +98,12 @@ const llmDefaults: LLMSettings = {
 
 const DEPRECATED_OPENROUTER_MODELS: Record<string, string> = {
   "qwen/qwen-2.5-32b-instruct": "qwen/qwen-2.5-72b-instruct",
+};
+
+const SLOW_LIVE_MODEL_FALLBACKS: Record<string, string> = {
+  "qwen/qwen-2.5-72b-instruct": "google/gemini-2.0-flash-001",
+  "meta-llama/llama-3.1-70b-instruct": "google/gemini-2.0-flash-001",
+  "google/gemini-2.5-pro-preview-06-05": "google/gemini-2.0-flash-001",
 };
 
 export type LLMModelField = "LLM_MODEL" | "LLM_MODEL_GM";
@@ -150,11 +156,14 @@ function normalizeLLMSettings(settings: LLMSettings): LLMSettings {
   const maxModel = validateOpenRouterModel("LLM_MODEL", settings.LLM_MODEL);
   const gmModel = validateOpenRouterModel("LLM_MODEL_GM", settings.LLM_MODEL_GM);
   lastLLMValidationIssues = [maxModel.issue, gmModel.issue].filter(Boolean) as LLMValidationIssue[];
+  const realtimeModel = SLOW_LIVE_MODEL_FALLBACKS[maxModel.modelId] || maxModel.modelId;
 
   return {
     ...settings,
-    LLM_MODEL: maxModel.modelId,
+    LLM_MODEL: realtimeModel,
     LLM_MODEL_GM: gmModel.modelId,
+    LLM_MAX_TOKENS: Math.min(settings.LLM_MAX_TOKENS || llmDefaults.LLM_MAX_TOKENS, 220),
+    LLM_TOP_P: Math.min(settings.LLM_TOP_P || llmDefaults.LLM_TOP_P, 0.9),
   };
 }
 

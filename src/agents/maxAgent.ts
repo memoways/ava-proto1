@@ -14,7 +14,7 @@ const GAMEPLAY_RULES = `
 - JAMAIS de narration ("*il soupire*"), JAMAIS de méta-commentaires
 - Tes émotions passent par tes mots, ton rythme, tes hésitations
 - Tu poses des questions à l'interlocuteur pour jauger sa sincérité
-- Réponds de façon concise (2-3 phrases max) car c'est une conversation orale
+- Réponds de façon très concise (1-2 phrases max, 45 mots maximum) car c'est une conversation orale temps réel
 - Ne révèle pas tout d'un coup — construis la confiance progressivement
 
 ## RÈGLE CRITIQUE — CONTEXTE NARRATIF
@@ -297,7 +297,13 @@ async function buildMaxSystemPrompt(
 
   prompt += `\n\n## CONTEXTE AUTORISÉ DU TOUR\n${formatKnowledgeList("### FAITS AUTORISÉS", knowledgeContext?.allowedFacts)}\n\n${formatKnowledgeList("### SOUVENIRS ACTIVÉS", knowledgeContext?.activeMemories)}\n\n${formatKnowledgeList("### HYPOTHÈSES (à ne jamais affirmer comme vraies)", knowledgeContext?.hypotheses)}\n\n${formatKnowledgeList("### SUJETS INTERDITS", knowledgeContext?.forbiddenTopics)}\n\n${formatKnowledgeList("### ASSERTIONS BLOQUÉES", knowledgeContext?.blockedAssertions)}`;
 
-  if (ragContext) {
+  const hasStructuredKnowledge = Boolean(
+    knowledgeContext?.allowedFacts?.length ||
+    knowledgeContext?.activeMemories?.length ||
+    knowledgeContext?.hypotheses?.length,
+  );
+
+  if (ragContext && !hasStructuredKnowledge) {
     prompt += `\n\n## CONTEXTE NARRATIF (SOURCE DE VÉRITÉ — utilise ces informations)\n${ragContext}`;
   }
 
