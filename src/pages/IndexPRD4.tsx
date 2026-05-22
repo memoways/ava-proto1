@@ -338,6 +338,65 @@ const IndexPRD4 = () => {
   // ---- End / Questionnaire --------------------------------------------------
   const handleEndContinue = useCallback(() => setPhase("questionnaire"), [setPhase]);
 
+  const handleQuestionnaireSubmit = useCallback(
+    async (answers: QuestionnairePRD4Answers) => {
+      setSubmittingQuestionnaire(true);
+      const latencies = turnLatenciesRef.current;
+      const avg = latencies.length ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : null;
+      const max = latencies.length ? Math.max(...latencies) : null;
+      const data: QuestionnairePRD4Data = {
+        version: "prd4",
+        answers,
+        technical: {
+          session_id: sessionIdRef.current,
+          submitted_at: new Date().toISOString(),
+          duration_seconds: sessionDurationRef.current,
+          teaser_seen: state.teaserSeen,
+          teaser_skipped: state.teaserSkipped,
+          role_profile: state.userRoleProfile,
+          active_character: state.selectedCharacter,
+          turn_count: conversationRef.current.filter((m) => m.role === "user").length,
+          avg_latency_ms: avg,
+          max_latency_ms: max,
+          ptt_errors: state.pttErrors,
+          transcript_available: conversationRef.current.length > 0,
+        },
+      };
+      try {
+        if (sessionIdRef.current) {
+          await savePRD4Questionnaire(sessionIdRef.current, data);
+          void syncPRD4QuestionnaireToNotion(sessionIdRef.current, data);
+        }
+        trackEvent("prd4_questionnaire_submitted", {
+          session_id: sessionIdRef.current,
+          turn_count: data.technical.turn_count,
+          duration_s: data.technical.duration_seconds,
+          ptt_errors: data.technical.ptt_errors,
+          q1_film_seen: answers.q1_film_seen,
+          q9_duration_feeling: answers.q9_duration_feeling,
+        });
+      } catch (err) {
+        console.warn("[PRD4] questionnaire submit failed:", err);
+      } finally {
+        setSubmittingQuestionnaire(false);
+        setPhase("thanks");
+      }
+    },
+    [setPhase, state.pttErrors, state.selectedCharacter, state.teaserSeen, state.teaserSkipped, state.userRoleProfile],
+  );
+
+  const handleRestart = useCallback(() => {
+    reset();
+    setUserSubtitle("");
+    setMaxSubtitle("");
+    sessionIdRef.current = null;
+    conversationRef.current = [];
+    turnLatenciesRef.current = [];
+    sessionDurationRef.current = 0;
+    endedRef.current = false;
+  }, [reset]);
+
+
   // ---- Render ---------------------------------------------------------------
   switch (state.phase) {
     case "welcome":
