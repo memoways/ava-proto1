@@ -1,0 +1,1 @@
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS gm_post_turn_log jsonb NOT NULL DEFAULT '[]'::jsonb;

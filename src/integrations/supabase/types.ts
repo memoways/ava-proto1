@@ -356,6 +356,7 @@ export type Database = {
           duration_seconds: number | null
           ended_at: string | null
           game_over_reason: string | null
+          gm_post_turn_log: Json
           id: string
           modalite_voix: string | null
           name: string | null
@@ -375,6 +376,7 @@ export type Database = {
           duration_seconds?: number | null
           ended_at?: string | null
           game_over_reason?: string | null
+          gm_post_turn_log?: Json
           id?: string
           modalite_voix?: string | null
           name?: string | null
@@ -394,6 +396,7 @@ export type Database = {
           duration_seconds?: number | null
           ended_at?: string | null
           game_over_reason?: string | null
+          gm_post_turn_log?: Json
           id?: string
           modalite_voix?: string | null
           name?: string | null
