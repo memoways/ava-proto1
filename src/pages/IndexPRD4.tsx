@@ -178,7 +178,13 @@ const IndexPRD4 = () => {
     case "teaser":
       return <TeaserScreen onContinue={handleTeaserContinue} onSkip={handleTeaserSkip} />;
     case "role_capture":
-      return <RoleCaptureScreen onSubmit={handleRoleSubmit} />;
+      return (
+        <RoleCaptureScreen
+          onSubmit={handleRoleSubmit}
+          onPTTError={handleRolePTTError}
+          submitting={summarizing}
+        />
+      );
     case "role_summary":
       return state.userRoleProfile ? (
         <RoleSummaryScreen
