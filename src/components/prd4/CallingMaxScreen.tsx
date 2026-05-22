@@ -1,7 +1,7 @@
 /** PRD4 — Écran 7 : Appel Max (sonnerie + animation visio) */
 import { useEffect, useState } from "react";
 import { Phone } from "lucide-react";
-import maxImg from "@/assets/characters/max.svg";
+import maxImg from "@/assets/characters/max.jpg";
 
 interface Props {
   onAnswered: () => void;
