@@ -287,10 +287,15 @@ async function buildMaxSystemPrompt(
   conversationHistory: ConversationMessage[] = [],
   characterName: string = "Max",
   sessionSummary?: string,
+  userRoleSummary?: string,
 ): Promise<string> {
   const characterPrompt = await getCharacterSystemPrompt(characterName);
   const control = getMaxPromptControlSettings();
   let prompt = `${characterPrompt}\n${GAMEPLAY_RULES}\n\n## PERSONA STABLE\n${control.persona}\n\n## OBJECTIFS\n${control.objectives}\n\n## RÔLE ET CONTEXTE\n${control.roleContext}\n\n## HISTORIQUE STABLE\n${control.longTermMemory}\n\n## STYLE DE RÉPONSE\n${control.responseStyle}\n\n## POLITIQUE DE SAVOIR AUTORISÉ\n${control.allowedKnowledgePolicy}\n\n## INTERDITS D'AFFIRMATION\n${control.forbiddenAssertions}\n\n## SUJETS SENSIBLES / INTERDITS\n${control.forbiddenTopics}\n\n## POLITIQUE D'INCERTITUDE\n${control.uncertaintyPolicy}`;
+
+  if (userRoleSummary && userRoleSummary.trim()) {
+    prompt += `\n\n## INTERLOCUTEUR (qui t'appelle)\n${userRoleSummary.trim()}\n\nUtilise ces éléments pour personnaliser tes réponses : adresse-toi à cette personne en cohérence avec qui elle dit être, sans jamais contredire sa présentation. Tu peux questionner sa sincérité si quelque chose te paraît étrange, mais reste poli.`;
+  }
 
   if (sessionSummary && sessionSummary.trim()) {
     prompt += `\n\n## SOUVENIRS DE LA SESSION (résumé compressé des tours précédents)\n${sessionSummary.trim()}`;
