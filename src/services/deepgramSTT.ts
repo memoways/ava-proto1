@@ -33,6 +33,15 @@ export async function getDeepgramToken(): Promise<DeepgramConfig> {
 
 type TranscriptCallback = (text: string, isFinal: boolean) => void;
 type STTErrorCallback = (error: Error, context?: Record<string, unknown>) => void;
+type STTTelemetryContext = { session_id?: string | null; turn_id?: string | null; turn_index?: number | null };
+
+export interface STTFinalTelemetry {
+  t_stt_ms: number;
+  stt_text_len: number;
+  trigger: "silence" | "ptt_flush";
+  selectedMimeType: string;
+  turn_id?: string | null;
+}
 
 export class DeepgramSTT {
   private ws: WebSocket | null = null;
@@ -46,11 +55,14 @@ export class DeepgramSTT {
   private static SILENCE_DELAY_MS = 900;
   private _paused = false;
   private onError?: STTErrorCallback;
+  private getTelemetryContext?: () => STTTelemetryContext;
   private selectedMimeType = "";
+  private lastFinalTelemetry: STTFinalTelemetry | null = null;
 
-  constructor(onTranscript: TranscriptCallback, opts?: { onError?: STTErrorCallback }) {
+  constructor(onTranscript: TranscriptCallback, opts?: { onError?: STTErrorCallback; getTelemetryContext?: () => STTTelemetryContext }) {
     this.onTranscript = onTranscript;
     this.onError = opts?.onError;
+    this.getTelemetryContext = opts?.getTelemetryContext;
   }
 
   get isActive() {
@@ -60,6 +72,10 @@ export class DeepgramSTT {
   /** Expose the underlying microphone stream (for audio-level visualization) */
   getStream(): MediaStream | null {
     return this.stream;
+  }
+
+  getLastFinalTelemetry(): STTFinalTelemetry | null {
+    return this.lastFinalTelemetry;
   }
 
   /** Pause listening (mute) — keeps connection alive */
@@ -81,6 +97,7 @@ export class DeepgramSTT {
     this.fullTranscript = "";
     if (finalText) {
       debugLogger.log({ service: "stt", level: "info", direction: "in", label: `STT flush (PTT): "${finalText.slice(0, 100)}"` });
+      this.recordFinalTelemetry(finalText, "ptt_flush");
       this.onTranscript(finalText, true);
     }
   }
@@ -171,18 +188,39 @@ export class DeepgramSTT {
         console.log('[Deepgram] 2s silence detected, finalizing');
         debugLogger.log({ service: "stt", level: "info", direction: "in", label: `STT final: "${this.fullTranscript.slice(0, 100)}"` });
         const finalText = this.fullTranscript;
-        // Latence STT = délai depuis le dernier mot reçu, moins la fenêtre de silence imposée.
-        const tElapsed = performance.now() - this.lastSpeechAt;
-        recordAudioLatency({
-          direction: "in",
-          t_stt_ms: Math.max(0, Math.round(tElapsed - DeepgramSTT.SILENCE_DELAY_MS)),
-          stt_text_len: finalText.length,
-          metadata: { silence_window_ms: DeepgramSTT.SILENCE_DELAY_MS, trigger: "silence" },
-        });
+        this.recordFinalTelemetry(finalText, "silence");
         this.fullTranscript = ""; // Reset for next utterance
         this.onTranscript(finalText, true);
       }
     }, DeepgramSTT.SILENCE_DELAY_MS);
+  }
+
+  private recordFinalTelemetry(finalText: string, trigger: "silence" | "ptt_flush") {
+    const context = this.getTelemetryContext?.() ?? {};
+    const elapsedSinceSpeech = this.lastSpeechAt > 0 ? performance.now() - this.lastSpeechAt : 0;
+    const t_stt_ms = trigger === "silence"
+      ? Math.max(0, Math.round(elapsedSinceSpeech - DeepgramSTT.SILENCE_DELAY_MS))
+      : Math.max(0, Math.round(elapsedSinceSpeech));
+    this.lastFinalTelemetry = {
+      t_stt_ms,
+      stt_text_len: finalText.length,
+      trigger,
+      selectedMimeType: this.selectedMimeType,
+      turn_id: context.turn_id,
+    };
+    recordAudioLatency({
+      session_id: context.session_id ?? undefined,
+      turn_index: context.turn_index ?? undefined,
+      direction: "in",
+      t_stt_ms,
+      stt_text_len: finalText.length,
+      metadata: {
+        turn_id: context.turn_id ?? null,
+        silence_window_ms: DeepgramSTT.SILENCE_DELAY_MS,
+        trigger,
+        selected_mime_type: this.selectedMimeType,
+      },
+    });
   }
 
   private startRecording() {

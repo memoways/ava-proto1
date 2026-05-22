@@ -10,6 +10,8 @@ export interface PlaybackErrorInfo {
 
 export interface PlaybackResult {
   status: "played" | "failed";
+  playbackStartMs?: number;
+  playbackTotalMs?: number;
   error?: Error;
   errorInfo?: PlaybackErrorInfo;
 }
@@ -55,19 +57,25 @@ export function isAudioPlaybackUnlocked(): boolean {
 export async function playAudioBlobRobust(blob: Blob, timeoutMs = 20000): Promise<PlaybackResult> {
   const audioUrl = URL.createObjectURL(blob);
   const audio = new Audio(audioUrl);
+  const t0 = performance.now();
+  let playbackStartMs: number | undefined;
 
   try {
     await withTimeout("audio_playback", new Promise<void>((resolve, reject) => {
       audio.onended = () => resolve();
       audio.onerror = () => reject(new Error("Audio playback failed"));
-      audio.play().catch(reject);
+      audio.play()
+        .then(() => {
+          playbackStartMs = Math.round(performance.now() - t0);
+        })
+        .catch(reject);
     }), timeoutMs, () => {
       try { audio.pause(); } catch { /* ignore */ }
     });
-    return { status: "played" };
+    return { status: "played", playbackStartMs, playbackTotalMs: Math.round(performance.now() - t0) };
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
-    return { status: "failed", error, errorInfo: classifyPlaybackError(err) };
+    return { status: "failed", playbackStartMs, playbackTotalMs: Math.round(performance.now() - t0), error, errorInfo: classifyPlaybackError(err) };
   } finally {
     URL.revokeObjectURL(audioUrl);
   }

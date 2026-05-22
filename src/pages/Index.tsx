@@ -7,10 +7,18 @@ import { TTSQueue, chunkTextForTTS } from "@/services/elevenLabsTTS";
 import { createSession, updateSession, endSession, saveQuestionnaire, syncQuestionnaireToNotion } from "@/services/sessionService";
 import { preloadSystemPrompt } from "@/agents/maxAgent";
 import { trackEvent, identifyUser } from "@/services/posthogService";
-import { unlockAudioPlayback } from "@/services/audioPlayback";
+import { isAudioPlaybackUnlocked, unlockAudioPlayback } from "@/services/audioPlayback";
 import { withTimeout } from "@/services/asyncUtils";
+import { getBrowserDiagnostics } from "@/services/browserCapabilities";
+import { getActiveProvider } from "@/services/tts/registry";
+import {
+  buildVoiceTurnCompletedPayload,
+  createVoiceTurnId,
+  recordVoiceError,
+  recordVoiceTurnCompleted,
+} from "@/services/voiceTelemetry";
 import settings from "@/config/settings.json";
-import { getGameplaySettings } from "@/services/settingsService";
+import { getGameplaySettings, getLLMSettings } from "@/services/settingsService";
 import type { QuestionnaireData, ConversationMessage } from "@/types";
 
 import ABChoiceScreen from "@/components/ABChoiceScreen";
@@ -219,6 +227,14 @@ const Index = () => {
         }
       },
       {
+        getTelemetryContext: () => {
+          const turnIndex = conversationHistoryRef.current.filter((m) => m.role === "user").length + 1;
+          return {
+            session_id: sessionIdRef.current,
+            turn_index: turnIndex,
+            turn_id: createVoiceTurnId(sessionIdRef.current, turnIndex),
+          };
+        },
         onError: (error, context) => {
           console.error("[STT] error:", error, context);
           setMicActive(false);
@@ -227,6 +243,15 @@ const Index = () => {
           trackEvent("stt_error", {
             message: error.message.slice(0, 300),
             ...(context || {}),
+          });
+          recordVoiceError({
+            session_id: sessionIdRef.current,
+            component: "stt",
+            error_type: "stt_runtime_error",
+            error_message: error.message,
+            recoverable: true,
+            fallback_used: "user_retry",
+            browser: context,
           });
         },
       },
@@ -242,6 +267,15 @@ const Index = () => {
       setAudioState("idle");
       setMicStream(null);
       setUserSubtitle("Micro indisponible. Vérifie l'autorisation du navigateur puis réessaie.");
+      recordVoiceError({
+        session_id: sessionIdRef.current,
+        component: "stt",
+        error_type: "stt_start_failed",
+        error_message: err instanceof Error ? err.message : String(err),
+        recoverable: true,
+        fallback_used: "user_retry",
+        browser: getBrowserDiagnostics(),
+      });
     }
   }, [setAudioState]);
 
@@ -279,6 +313,16 @@ const Index = () => {
     }
 
     const turnPerf = perf("Total turn");
+    const turnStart = performance.now();
+    const turnIndex = conversationHistoryRef.current.filter((m) => m.role === "user").length + 1;
+    const turnId = createVoiceTurnId(sessionIdRef.current, turnIndex);
+    const sttTelemetry = sttRef.current?.getLastFinalTelemetry();
+    const ttsProvider = (() => {
+      try { return getActiveProvider(); } catch { return null; }
+    })();
+    const llmSettings = (() => {
+      try { return getLLMSettings(); } catch { return null; }
+    })();
     isProcessingRef.current = true;
     setIsProcessing(true);
     setAudioState("max_thinking");
@@ -303,7 +347,8 @@ const Index = () => {
         sessionDuration - timer.remaining,
         undefined,
         postVideoContext || undefined,
-        sessionIdRef.current || undefined
+        sessionIdRef.current || undefined,
+        turnId
       );
 
       llmPerf.end();
@@ -338,16 +383,35 @@ const Index = () => {
             try { ttsQueue?.cancel(); } catch { /* ignore */ }
             setMaxSubtitle(`${maxResponse}\n\n${friendly}`);
             trackEvent("tts_error", {
+              session_id: sessionIdRef.current,
+              turn_id: turnId,
+              turn_index: turnIndex,
               message: msg.slice(0, 300),
               turn_chars: maxResponse.length,
               quota_exceeded: isQuota,
               voice_disabled: true,
             });
+            recordVoiceError({
+              session_id: sessionIdRef.current,
+              turn_id: turnId,
+              turn_index: turnIndex,
+              component: "tts",
+              provider: ttsProvider?.id,
+              error_type: isQuota ? "quota" : "tts_error",
+              error_message: msg,
+              recoverable: true,
+              fallback_used: "text_only",
+              browser: getBrowserDiagnostics(sttTelemetry?.selectedMimeType || ""),
+            });
           },
         });
         const ttsChunks = chunkTextForTTS(maxResponse);
         for (const chunk of ttsChunks) {
-          ttsQueue.enqueue(chunk);
+          ttsQueue.enqueue(chunk, {
+            session_id: sessionIdRef.current,
+            turn_id: turnId,
+            turn_index: turnIndex,
+          });
         }
       } else {
         console.log("[TTS] voix désactivée pour la session — skip TTS, affichage texte seul");
@@ -356,7 +420,7 @@ const Index = () => {
       // Wait for TTS playback + Game Master in parallel
       const gmPerf = perf("Game Master");
       const [ttsResult, gmResult] = await Promise.all([
-        ttsQueue ? ttsQueue.drain() : Promise.resolve({ status: "skipped" as const, playedSegments: 0, failedSegments: 0 }),
+        ttsQueue ? ttsQueue.drain() : Promise.resolve({ status: "skipped" as const, playedSegments: 0, failedSegments: 0, generatedSegments: 0, playbackStartMs: 0, playbackTotalMs: 0 }),
         withTimeout(
           "gm_post_turn",
           gameMasterPromise.then(r => { gmPerf.end(); return r; }),
@@ -365,7 +429,18 @@ const Index = () => {
           gmPerf.end();
           const message = err instanceof Error ? err.message : String(err);
           console.warn("[Game Master] post-turn fallback:", err);
-          trackEvent("gm_post_fallback", { message: message.slice(0, 300) });
+          trackEvent("gm_post_fallback", { session_id: sessionIdRef.current, turn_id: turnId, turn_index: turnIndex, message: message.slice(0, 300) });
+          recordVoiceError({
+            session_id: sessionIdRef.current,
+            turn_id: turnId,
+            turn_index: turnIndex,
+            component: "gm",
+            error_type: "gm_post_fallback",
+            error_message: message,
+            recoverable: true,
+            fallback_used: "neutral_gm_post",
+            browser: getBrowserDiagnostics(sttTelemetry?.selectedMimeType || ""),
+          });
           return {
             gameMasterResponse: {
               trust_delta: 0,
@@ -383,10 +458,25 @@ const Index = () => {
       ]);
       if (ttsResult && ttsResult.status !== "played" && ttsResult.status !== "skipped") {
         trackEvent("tts_queue_result", {
+          session_id: sessionIdRef.current,
+          turn_id: turnId,
+          turn_index: turnIndex,
           status: ttsResult.status,
           played_segments: ttsResult.playedSegments,
           failed_segments: ttsResult.failedSegments,
           error: ttsResult.error?.message?.slice(0, 300),
+        });
+        recordVoiceError({
+          session_id: sessionIdRef.current,
+          turn_id: turnId,
+          turn_index: turnIndex,
+          component: "audio_playback",
+          provider: ttsProvider?.id,
+          error_type: ttsResult.status,
+          error_message: ttsResult.error?.message,
+          recoverable: true,
+          fallback_used: ttsDisabledRef.current ? "text_only" : "continue",
+          browser: getBrowserDiagnostics(sttTelemetry?.selectedMimeType || ""),
         });
       }
       const tts_ms = Math.round(performance.now() - ttsStart);
@@ -406,6 +496,48 @@ const Index = () => {
           gm_post_ms: gmResult.gm_post_ms,
         }),
       };
+
+      const voiceTurnPayload = buildVoiceTurnCompletedPayload({
+        session_id: sessionIdRef.current,
+        turn_id: turnId,
+        turn_index: turnIndex,
+        character: "max",
+        variant: state.variant,
+        voice_modality: state.voiceModality,
+        user_message_len: userText.length,
+        max_response_len: maxResponse.length,
+        timings: {
+          t_stt_total_ms: sttTelemetry?.t_stt_ms,
+          t_rag_total_ms: timings.rag_ms,
+          t_gm_pre_ms: timings.gm_pre_ms,
+          t_max_llm_ms: timings.max_ms,
+          t_validator_ms: timings.validator_ms,
+          t_tts_total_ms: tts_ms,
+          t_audio_playback_start_ms: ttsResult.playbackStartMs,
+          t_audio_playback_total_ms: ttsResult.playbackTotalMs,
+          t_gm_post_ms: gmResult.gm_post_ms,
+          t_turn_response_ready_ms: timings.total_ms,
+          t_turn_end_to_end_ms: Math.round(performance.now() - turnStart),
+        },
+        models: {
+          max_model: llmSettings?.LLM_MODEL,
+          gm_model: llmSettings?.LLM_MODEL_GM,
+          validator_model: llmSettings?.LLM_MODEL_GM,
+        },
+        tts: {
+          provider: ttsProvider?.id,
+          segments_count: ttsResult.generatedSegments,
+          segments_played: ttsResult.playedSegments,
+          segments_failed: ttsResult.failedSegments,
+        },
+        browser: getBrowserDiagnostics(sttTelemetry?.selectedMimeType || ""),
+        audio_unlocked: isAudioPlaybackUnlocked(),
+        stt_trigger: sttTelemetry?.trigger || "unknown",
+        had_fallback: validation.finalStatus === "fallback" || !!preTurnBrief?.fallback,
+        had_error: !!ttsError || ttsResult.status === "failed" || ttsResult.status === "cancelled",
+        error_type: ttsError?.message?.slice(0, 120) ?? null,
+      });
+      recordVoiceTurnCompleted(voiceTurnPayload);
 
       // Add Max response to history (with validation + pipeline trace for admin observability)
       const maxMsg: ConversationMessage = {
@@ -467,6 +599,17 @@ const Index = () => {
     } catch (error) {
       console.error("Error processing conversation:", error);
       setMaxSubtitle("Désolé, j'ai eu un problème de connexion...");
+      recordVoiceError({
+        session_id: sessionIdRef.current,
+        turn_id: turnId,
+        turn_index: turnIndex,
+        component: "orchestrator",
+        error_type: "turn_failed",
+        error_message: error instanceof Error ? error.message : String(error),
+        recoverable: true,
+        fallback_used: "connection_error_subtitle",
+        browser: getBrowserDiagnostics(sttTelemetry?.selectedMimeType || ""),
+      });
     } finally {
       isProcessingRef.current = false;
       setIsProcessing(false);
@@ -477,7 +620,7 @@ const Index = () => {
         setTimeout(() => resumeMic(), 300);
       }
     }
-  }, [setAudioState, addMessage, state.trustLevel, state.triggeredIds, state.voiceModality, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo, resumeMic, sessionDuration, ttsDisabledReason]);
+  }, [setAudioState, addMessage, state.trustLevel, state.triggeredIds, state.voiceModality, state.variant, timer.remaining, postVideoContext, updateTrust, gameOver, setPhase, triggerVideo, resumeMic, sessionDuration, ttsDisabledReason]);
 
   processUserMessageRef.current = processUserMessage;
 

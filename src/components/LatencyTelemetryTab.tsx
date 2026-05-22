@@ -37,6 +37,38 @@ interface AudioRow {
   tts_text_len: number | null;
 }
 
+interface VoiceTurnEventRow {
+  id: string;
+  created_at: string;
+  session_id: string | null;
+  turn_id: string;
+  turn_index: number | null;
+  severity: string | null;
+  blocker_step: string | null;
+  metadata_json: {
+    t_turn_response_ready_ms?: number;
+    t_turn_voice_ready_ms?: number;
+    t_turn_end_to_end_ms?: number;
+    browser_family?: string;
+    voice_modality?: string;
+    tts_provider?: string;
+    max_model?: string;
+  } | null;
+}
+
+interface VoiceErrorEventRow {
+  id: string;
+  created_at: string;
+  session_id: string | null;
+  turn_id: string | null;
+  component: string;
+  provider: string | null;
+  error_type: string;
+  error_message: string | null;
+  recoverable: boolean | null;
+  fallback_used: string | null;
+}
+
 const SEGMENTS: Array<{ key: keyof TurnRow; label: string; color: string }> = [
   { key: "t_rag_rewrite_ms", label: "Query rewrite", color: "bg-indigo-500" },
   { key: "t_rag_query_ms", label: "RAG query", color: "bg-blue-500" },
@@ -62,12 +94,14 @@ function percentile(values: number[], p: number): number {
 export default function LatencyTelemetryTab() {
   const [turns, setTurns] = useState<TurnRow[]>([]);
   const [audios, setAudios] = useState<AudioRow[]>([]);
+  const [voiceTurns, setVoiceTurns] = useState<VoiceTurnEventRow[]>([]);
+  const [voiceErrors, setVoiceErrors] = useState<VoiceErrorEventRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
-    const [t, a] = await Promise.all([
+    const [t, a, vt, ve] = await Promise.all([
       supabase
         .from("turn_latencies" as never)
         .select("*")
@@ -78,9 +112,21 @@ export default function LatencyTelemetryTab() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(200),
+      supabase
+        .from("voice_turn_events" as never)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100),
+      supabase
+        .from("voice_error_events" as never)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100),
     ]);
     if (t.data) setTurns(t.data as unknown as TurnRow[]);
     if (a.data) setAudios(a.data as unknown as AudioRow[]);
+    if (vt.data) setVoiceTurns(vt.data as unknown as VoiceTurnEventRow[]);
+    if (ve.data) setVoiceErrors(ve.data as unknown as VoiceErrorEventRow[]);
     setLoading(false);
   };
 
@@ -111,6 +157,27 @@ export default function LatencyTelemetryTab() {
   }, [audios]);
 
   const maxTotal = Math.max(1, ...turns.map((t) => t.t_turn_total_ms ?? 0));
+  const voiceStats = useMemo(() => {
+    const responseReady = voiceTurns.map((t) => t.metadata_json?.t_turn_response_ready_ms ?? 0).filter((v) => v > 0);
+    const voiceReady = voiceTurns.map((t) => t.metadata_json?.t_turn_voice_ready_ms ?? 0).filter((v) => v > 0);
+    const endToEnd = voiceTurns.map((t) => t.metadata_json?.t_turn_end_to_end_ms ?? 0).filter((v) => v > 0);
+    const blockers = voiceTurns.reduce<Record<string, number>>((acc, t) => {
+      const key = t.blocker_step || "unknown";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    return {
+      count: voiceTurns.length,
+      responseP50: percentile(responseReady, 50),
+      responseP95: percentile(responseReady, 95),
+      voiceP50: percentile(voiceReady, 50),
+      voiceP95: percentile(voiceReady, 95),
+      endP50: percentile(endToEnd, 50),
+      endP95: percentile(endToEnd, 95),
+      topBlocker: Object.entries(blockers).sort((a, b) => b[1] - a[1])[0]?.[0] || "—",
+      critical: voiceTurns.filter((t) => t.severity === "critical" || t.severity === "failed").length,
+    };
+  }, [voiceTurns]);
 
   return (
     <div className="space-y-4">
@@ -139,6 +206,39 @@ export default function LatencyTelemetryTab() {
           <div className="text-muted-foreground">TTS total</div>
           <div className="font-mono">méd {fmt(audioStats.tts_total_median)} · p95 {fmt(audioStats.tts_total_p95)}</div>
         </div>
+      </div>
+
+      <div className="border rounded p-3 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="text-sm font-semibold">Observabilité voix unifiée</h3>
+            <p className="text-xs text-muted-foreground">
+              {voiceStats.count} tour(s) · blocker principal {voiceStats.topBlocker} · {voiceStats.critical} critique(s)/échec(s)
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-[11px]">
+            <MiniMetric label="Réponse prête" value={`p50 ${fmt(voiceStats.responseP50)} · p95 ${fmt(voiceStats.responseP95)}`} />
+            <MiniMetric label="Voix prête" value={`p50 ${fmt(voiceStats.voiceP50)} · p95 ${fmt(voiceStats.voiceP95)}`} />
+            <MiniMetric label="End-to-end" value={`p50 ${fmt(voiceStats.endP50)} · p95 ${fmt(voiceStats.endP95)}`} />
+          </div>
+        </div>
+
+        {voiceErrors.length > 0 && (
+          <div className="space-y-1">
+            <div className="text-xs font-medium">Erreurs voix récentes</div>
+            <div className="grid gap-1">
+              {voiceErrors.slice(0, 5).map((e) => (
+                <div key={e.id} className="flex items-center gap-2 text-[11px] border rounded px-2 py-1">
+                  <Badge variant="destructive">{e.component}</Badge>
+                  <span className="font-mono">{e.error_type}</span>
+                  {e.provider ? <span className="text-muted-foreground">{e.provider}</span> : null}
+                  {e.fallback_used ? <span className="text-muted-foreground">fallback {e.fallback_used}</span> : null}
+                  <span className="truncate text-muted-foreground">{e.error_message || "—"}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-3 text-xs flex-wrap">
@@ -229,6 +329,15 @@ export default function LatencyTelemetryTab() {
         en fire-and-forget. Tu peux y construire des Insights : médiane/p95 par jour, breakdown par modèle, funnel
         STT → tour → TTS.
       </p>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded border p-2 min-w-[150px]">
+      <div className="text-muted-foreground">{label}</div>
+      <div className="font-mono">{value}</div>
     </div>
   );
 }

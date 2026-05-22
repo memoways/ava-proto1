@@ -22,6 +22,8 @@ export class TTSQueue {
   private generationCount = 0;
   private playbackCount = 0;
   private failedCount = 0;
+  private playbackStartMsTotal = 0;
+  private playbackTotalMs = 0;
   private lastSentText = "";
   private pending: PendingEntry[] = [];
   private flushScheduled = false;
@@ -59,7 +61,9 @@ export class TTSQueue {
         const blob = await blobPromise;
         if (this._cancelled) return;
         const playStart = performance.now();
-        await playAudioBlob(blob);
+        const result = await playAudioBlob(blob);
+        this.playbackStartMsTotal += result?.playbackStartMs ?? 0;
+        this.playbackTotalMs += result?.playbackTotalMs ?? Math.round(performance.now() - playStart);
         this.playbackCount++;
         console.log(`[TTS-Queue] Played sentence #${this.playbackCount} in ${(performance.now() - playStart).toFixed(0)}ms`);
       } catch (err) {
@@ -114,18 +118,26 @@ export class TTSQueue {
       .catch(entry.rejectBlob);
   }
 
-  async drain(): Promise<{ status: "played" | "failed" | "cancelled" | "skipped"; playedSegments: number; failedSegments: number; error?: Error }> {
+  async drain(): Promise<{
+    status: "played" | "failed" | "cancelled" | "skipped";
+    playedSegments: number;
+    failedSegments: number;
+    generatedSegments: number;
+    playbackStartMs: number;
+    playbackTotalMs: number;
+    error?: Error;
+  }> {
     await this.queue;
     if (this._cancelled) {
-      return { status: "cancelled", playedSegments: this.playbackCount, failedSegments: this.failedCount, error: this.lastError };
+      return { status: "cancelled", playedSegments: this.playbackCount, failedSegments: this.failedCount, generatedSegments: this.generationCount, playbackStartMs: this.playbackStartMsTotal, playbackTotalMs: this.playbackTotalMs, error: this.lastError };
     }
     if (this.failedCount > 0) {
-      return { status: "failed", playedSegments: this.playbackCount, failedSegments: this.failedCount, error: this.lastError };
+      return { status: "failed", playedSegments: this.playbackCount, failedSegments: this.failedCount, generatedSegments: this.generationCount, playbackStartMs: this.playbackStartMsTotal, playbackTotalMs: this.playbackTotalMs, error: this.lastError };
     }
     if (this.playbackCount === 0) {
-      return { status: "skipped", playedSegments: 0, failedSegments: 0 };
+      return { status: "skipped", playedSegments: 0, failedSegments: 0, generatedSegments: this.generationCount, playbackStartMs: 0, playbackTotalMs: 0 };
     }
-    return { status: "played", playedSegments: this.playbackCount, failedSegments: 0 };
+    return { status: "played", playedSegments: this.playbackCount, failedSegments: 0, generatedSegments: this.generationCount, playbackStartMs: this.playbackStartMsTotal, playbackTotalMs: this.playbackTotalMs };
   }
 
   cancel(): void {
