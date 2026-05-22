@@ -262,3 +262,23 @@ export interface Settings {
   VIDEO_PLACEHOLDER_DURATION: number;
   DEEPGRAM_LANGUAGE: string;
 }
+
+/** PRD4 — évaluation post-tour produite par le Game Master après chaque réponse de Max. */
+export interface PRD4PostTurnEvaluation {
+  engagement_delta: number;
+  confusion_detected: boolean;
+  role_usage_quality: "low" | "medium" | "high" | "unknown";
+  topics_covered: string[];
+  transition_recommended: boolean;
+  cinematic_hint: string | null;
+  next_turn_guidance: string;
+  end_recommended: boolean;
+  moderation_flag: boolean;
+  notes: string;
+  /** Renseignés côté client après l'appel LLM. */
+  turn_index?: number;
+  latency_ms?: number;
+  model?: string;
+  created_at?: string;
+}
+
