@@ -95,6 +95,7 @@ const IndexPRD4 = () => {
       cleanupAudio();
       const sid = sessionIdRef.current;
       const duration = SESSION_DURATION_S - (timerRef.current?.remaining ?? SESSION_DURATION_S);
+      sessionDurationRef.current = duration;
       if (sid) {
         await endPRD4Session(sid, reason, conversationRef.current, duration).catch((e) =>
           console.warn("[PRD4] endSession failed:", e),
@@ -105,6 +106,7 @@ const IndexPRD4 = () => {
     },
     [cleanupAudio, endExperience],
   );
+
 
   // ---- Welcome / Film / Teaser ----------------------------------------------
   const handleStart = useCallback(() => setPhase("film_question"), [setPhase]);
