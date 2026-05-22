@@ -1,10 +1,17 @@
-/** PRD4 — Écran 4 : Création libre du personnage utilisateur (PTT — stub Phase 1) */
-import { useState } from "react";
+/** PRD4 — Écran 4 : Création libre du personnage utilisateur (PTT + Deepgram, Phase 2) */
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Mic } from "lucide-react";
+import { Mic, Loader2 } from "lucide-react";
+import { DeepgramSTT } from "@/services/deepgramSTT";
+import { usePushToTalk } from "@/hooks/usePushToTalk";
+import { cn } from "@/lib/utils";
 
 interface Props {
   onSubmit: (rawInput: string) => void;
+  /** Phase 2 : indique au parent qu'une erreur PTT s'est produite (compteur télémétrie). */
+  onPTTError?: (err: Error) => void;
+  /** True pendant que le parent appelle summarize-role (désactive le bouton). */
+  submitting?: boolean;
 }
 
 const EXAMPLES = [
@@ -13,10 +20,89 @@ const EXAMPLES = [
   "Tu pourrais être un voisin qui connaît la famille de loin.",
 ];
 
-const RoleCaptureScreen = ({ onSubmit }: Props) => {
-  // Phase 1 : stub — pas de STT réel. Saisie texte pour valider le flow.
-  // Phase 2 : remplace par PTT + Deepgram.
-  const [text, setText] = useState("");
+const MIN_CHARS = 20;
+
+const RoleCaptureScreen = ({ onSubmit, onPTTError, submitting = false }: Props) => {
+  const [transcript, setTranscript] = useState("");
+  const [interim, setInterim] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const sttRef = useRef<DeepgramSTT | null>(null);
+
+  // Reçoit les transcripts (interim + final) depuis Deepgram.
+  const handleTranscript = useCallback((text: string, isFinal: boolean) => {
+    if (isFinal) {
+      setTranscript((prev) => (prev ? `${prev} ${text}` : text).trim());
+      setInterim("");
+    } else {
+      setInterim(text);
+    }
+  }, []);
+
+  const handleSTTError = useCallback(
+    (err: Error) => {
+      console.error("[RoleCapture] STT error:", err);
+      setError(err.message || "Erreur micro");
+      setRecording(false);
+      setStarting(false);
+      onPTTError?.(err);
+    },
+    [onPTTError],
+  );
+
+  // Démarre une session STT au premier press, la garde en vie jusqu'au démontage.
+  const ensureSTT = useCallback(async () => {
+    if (sttRef.current?.isActive) return sttRef.current;
+    setStarting(true);
+    setError(null);
+    try {
+      const stt = new DeepgramSTT(handleTranscript, { onError: handleSTTError });
+      sttRef.current = stt;
+      await stt.start();
+      // Démarre en pause — l'utilisateur active via PTT.
+      stt.pause();
+      return stt;
+    } finally {
+      setStarting(false);
+    }
+  }, [handleTranscript, handleSTTError]);
+
+  const handlePress = useCallback(async () => {
+    setError(null);
+    try {
+      const stt = await ensureSTT();
+      stt?.resume();
+      setRecording(true);
+    } catch (err) {
+      handleSTTError(err instanceof Error ? err : new Error(String(err)));
+    }
+  }, [ensureSTT, handleSTTError]);
+
+  const handleRelease = useCallback(() => {
+    const stt = sttRef.current;
+    if (!stt) return;
+    stt.flush();
+    stt.pause();
+    setRecording(false);
+  }, []);
+
+  const { buttonHandlers } = usePushToTalk({
+    enabled: !submitting,
+    onPress: handlePress,
+    onRelease: handleRelease,
+  });
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      sttRef.current?.stop();
+      sttRef.current = null;
+    };
+  }, []);
+
+  const displayText = (transcript + (interim ? ` ${interim}` : "")).trim();
+  const canSubmit = transcript.trim().length >= MIN_CHARS && !recording && !submitting;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10">
@@ -46,9 +132,7 @@ const RoleCaptureScreen = ({ onSubmit }: Props) => {
         </div>
 
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">
-            Quelques exemples
-          </p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">Quelques exemples</p>
           <ul className="space-y-1 text-sm italic text-muted-foreground/90">
             {EXAMPLES.map((e, i) => (
               <li key={i}>— {e}</li>
@@ -56,30 +140,88 @@ const RoleCaptureScreen = ({ onSubmit }: Props) => {
           </ul>
         </div>
 
-        {/* Phase 1 : stub textarea. Remplacé par PTT en Phase 2. */}
-        <div className="space-y-3 rounded-md border border-dashed border-border bg-muted/20 p-4">
-          <p className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Mic className="h-3.5 w-3.5" /> Phase 2 — push-to-talk. Pour
-            l'instant, écris ta présentation.
+        {/* PTT + transcript live */}
+        <div className="space-y-4 rounded-md border border-border bg-muted/20 p-5">
+          <div className="flex items-center justify-center">
+            <button
+              type="button"
+              {...buttonHandlers}
+              disabled={submitting}
+              className={cn(
+                "relative flex h-24 w-24 items-center justify-center rounded-full border-2 transition-all select-none",
+                "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background",
+                recording
+                  ? "border-primary bg-primary/20 scale-110 shadow-[0_0_40px_-5px_hsl(var(--primary)/0.6)]"
+                  : "border-border bg-card hover:border-primary/60",
+                submitting && "opacity-50 cursor-not-allowed",
+              )}
+              aria-label="Maintiens pour parler"
+            >
+              {starting ? (
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              ) : (
+                <Mic className={cn("h-8 w-8", recording ? "text-primary" : "text-foreground/70")} />
+              )}
+            </button>
+          </div>
+
+          <p className="text-center text-xs text-muted-foreground">
+            {recording
+              ? "🔴 Parle… relâche pour valider ce segment."
+              : "Maintiens le micro (ou la barre d'espace) pour parler. Tu peux faire plusieurs prises."}
           </p>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Je suis…"
-            rows={5}
-            className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
-          />
+
+          <div
+            className={cn(
+              "min-h-[6rem] rounded-md border border-input bg-background px-3 py-2 text-sm whitespace-pre-wrap",
+              displayText ? "text-foreground" : "text-muted-foreground/60 italic",
+            )}
+            aria-live="polite"
+          >
+            {displayText || "Ton texte apparaîtra ici au fur et à mesure…"}
+            {interim && <span className="text-muted-foreground">{" "}</span>}
+          </div>
+
+          {transcript && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setTranscript("");
+                  setInterim("");
+                }}
+                className="text-xs text-muted-foreground underline hover:text-foreground"
+              >
+                Effacer et recommencer
+              </button>
+            </div>
+          )}
+
+          {error && (
+            <p className="text-center text-xs text-destructive">⚠️ {error}</p>
+          )}
         </div>
 
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center gap-2">
           <Button
             size="lg"
-            disabled={text.trim().length < 10}
-            onClick={() => onSubmit(text.trim())}
+            disabled={!canSubmit}
+            onClick={() => onSubmit(transcript.trim())}
             className="min-w-[220px] bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            Valider mon personnage
+            {submitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyse en cours…
+              </>
+            ) : (
+              "Valider mon personnage"
+            )}
           </Button>
+          {!canSubmit && !submitting && transcript.trim().length < MIN_CHARS && (
+            <p className="text-xs text-muted-foreground">
+              Parle un peu plus pour que Max puisse te situer.
+            </p>
+          )}
         </div>
       </div>
     </div>
