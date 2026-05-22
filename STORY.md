@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-22 (session 20 — Audit profond du pipeline vocal Max puis durcissement multi-navigateurs, optimisation latence live et observabilité PostHog : sélection MIME STT, timeouts critiques, audio unlock, lecture TTS robuste, statuts de queue TTS, preset « Conversation temps réel », fenêtre STT à 900 ms, Gemini Flash par défaut, GM pré-tour LLM retiré du hot path, contexte RAG compacté, événements `voice_turn_completed` / `voice_error` et stockage interne `voice_turn_events` / `voice_error_events`)  
+> **Last Updated**: 2026-05-22 (session 21 — PRD4 livré en 6 phases : nouveau parcours unique post-film, capture de rôle joueur en push-to-talk + résumé LLM, Max contextualisé par le rôle, 4 personnages avec Emma/Ava/Léo grisés, GM pré-tour retiré et GM post-turn async, nouveau questionnaire 10 questions, mapping Notion avec accents exacts, suppression des écrans A/B et de la route `/legacy`, back-office enrichi d'une section rôle utilisateur et d'une timeline GM post-turn)
 
 ---
 
@@ -63,6 +63,36 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-05-22 — PRD4 : nouveau parcours post-film + rôle utilisateur + Max contextualisé (6 phases) 🔷
+
+**Intent**: Le PRD4 redéfinit complètement l'expérience joueur. L'onboarding A/B (variantes co-création vs narrateur omniscient) ne servait plus le scénario produit. Le nouveau parcours pose une seule mise en situation : *« Tu viens de voir le film *Où est Ava ?*. Tu veux appeler quelqu'un de la famille. Choisis ton rôle, choisis ton interlocuteur. »* Cela suppose un rôle joueur libre (capturé à la voix puis résumé par un LLM), un Max conscient de qui l'appelle, 4 personnages affichés dont 3 grisés (Emma, Ava, Léo) pour signaler le périmètre du prototype, un push-to-talk avec sous-titres, et un questionnaire entièrement nouveau aligné sur les apprentissages voulus côté éditorial.
+
+**Tool**: Lovable (6 phases enchaînées dans la même session)
+
+**Outcome**:
+1. **Phase 1 — State machine + écrans statiques** : nouveau type `ExperiencePhase` (11 états) coexistant avec `GamePhase` historique le temps de la bascule, hook `useExperienceState`, 9 écrans PRD4 (`Welcome`, `FilmQuestion`, `Teaser`, `RoleCapture`, `RoleSummary`, `CharacterSelect`, `CallingMax`, `Conversation`, `EndSession`, `QuestionnaireScreenPRD4`), 4 SVG placeholders personnages. Le flow complet est cliquable sans STT/LLM/TTS.
+2. **Phase 2 — Création de rôle PTT + résumé LLM** : push-to-talk sur `role_capture` (réutilise `usePushToTalk` + Deepgram), edge function `summarize-role` (Gemini 2.5 Flash via OpenRouter) qui retourne un `UserRoleProfile` JSON structuré (`raw_input`, `summary_for_user`, `summary_for_max`, `relationship_to_family`, `age`, `gender`, `proximity_level`, `intent`), service `roleProfileService.ts`, fallback robuste (rôle par défaut si LLM échoue), persistance dans `sessions.player_role` (colonne existante).
+3. **Phase 3 — Max contextualisé + GM post-turn async** : injection du résumé rôle + champs structurés en tête du system prompt de Max (`maxAgent.ts`), nouvel agent `gameMasterPRD4.ts` qui produit une évaluation post-tour structurée (`engagement_delta`, `confusion_detected`, `role_usage_quality`, `topics_covered`, `transition_recommended`, `cinematic_hint`, `next_turn_guidance`, `end_recommended`, `moderation_flag`), orchestrateur `prd4Orchestrator.ts` qui appelle Max **sans GM pré-tour** et déclenche le post-turn en `void` (non bloquant), migration `sessions.gm_post_turn_log jsonb not null default '[]'`, timer 3-5 min ou `end_recommended` → `end_session`.
+4. **Phase 4 — Personnages grisés + appel Max** : grille 2×2 avec Max coloré et Emma/Ava/Léo grisés + cadenas + dialog *« Bientôt disponible »*. Écran `CallingMaxScreen` qui joue 2-3 sonneries (~3 s) puis bascule automatiquement vers `conversation_max`.
+5. **Phase 5 — Nouveau questionnaire PRD4** : `QuestionnaireScreenPRD4.tsx` (10 questions PRD §14.2 — film vu, teaser utile, clarté création rôle, justesse résumé, clarté PTT, Max reconnaît rôle, Max crédible, envie autres personnages, prochain personnage souhaité, durée ressentie, feedback ouvert + email + 2 opt-ins). Types `QuestionnairePRD4Answers/Technical/Data`. Données techniques calculées automatiquement (`duration_seconds`, `turn_count`, `avg_latency_ms`, `max_latency_ms`, `ptt_errors`, `role_profile`, `teaser_seen/skipped`, `transcript_available`). Stockage `questionnaire_responses` au format `{ version: "prd4", answers, technical }`.
+6. **Phase 6 — Back-office + nettoyage** : `SessionsTab` enrichi avec une section *« Rôle utilisateur »* (résumés joueur/Max + JSON repliable) et une timeline `gm_post_turn_log` compacte (badges engagement, role usage quality, confusion, end, modération, latence ms, sujets couverts, next_turn_guidance). Suppression définitive des écrans A/B (`OnboardingAScreen/BScreen`, `ABChoiceScreen`, `OnboardingScreen`, `GateScreen`) et de `pages/Index.tsx`. La route `/` pointe désormais directement sur `IndexPRD4` ; `/legacy` retirée.
+7. **Sync Notion PRD4 fiabilisée** : `sync-questionnaire` détecte `version: "prd4"` et écrit dans les propriétés Notion **exactes (avec accents)** de la base *Questionnaire AVA* — `PRD4 Rôle création clarté`, `PRD4 Résumé personnage justesse`, `PRD4 Max reconnaît rôle`, `PRD4 Personnage souhaité prochain`, `PRD4 Durée ressentie`, `PRD4 Rôle JSON`, `PRD4 Être tenu au courant`, `PRD4 Contact feedback détaillé`, etc. Ajout d'un `fetchDatabaseProperties()` qui lit le schéma Notion et filtre côté serveur les propriétés absentes (log `skipped_props`) pour éviter toute erreur 400 si la base évolue.
+8. **Events PostHog PRD4** : `role_created`, `character_locked_clicked`, `ptt_error`, `session_ended`.
+
+**Ce que ça change** : le prototype passe d'une expérience A/B « démo techno » à un parcours produit cohérent avec le scénario *« j'ai vu le film, j'appelle quelqu'un »*. Max devient sensible à qui parle (un proche, un journaliste, un policier, un inconnu menaçant…), ce qui rend les sessions immédiatement plus narratives. Le retrait du GM pré-tour du hot path consolide le travail de latence de la session 20. Les 3 personnages grisés cadrent les attentes du joueur sans casser l'illusion. Côté éditorial, les feedbacks remontent enfin sur les bonnes dimensions (clarté du rôle, crédibilité de Max sous l'angle du rôle, envie de continuer avec un autre personnage), et le mapping Notion respecte la nomenclature accentuée de la base.
+
+**Validation**:
+- `npx tsc --noEmit` : OK.
+- `npm run build` : OK.
+- Browser local : flow complet jouable `/` → film question → teaser → role capture (PTT + résumé) → role summary → character select (Max actif, autres grisés cliquables avec dialog) → calling Max → conversation → end → questionnaire → thanks.
+- `/admin` → onglet Sessions : sélection d'une session PRD4 affiche bien le rôle joueur et la timeline GM post-turn.
+
+**Time**: ~4h (plan d'implémentation détaillé puis 6 phases enchaînées + correctifs mapping Notion).
+
+---
+
+
 
 ### 2026-05-22 — Robustesse voix multi-navigateurs + optimisation latence live + observabilité 🔷
 

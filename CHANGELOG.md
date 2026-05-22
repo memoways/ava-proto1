@@ -4,14 +4,34 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
-## [0.23.0] - 2026-05-22 — PRD4 phase 6 : back-office + nettoyage
+## [0.23.0] - 2026-05-22 — PRD4 : nouveau parcours post-film + rôle utilisateur + Max contextualisé
+
+Refonte structurante (PRD4 §1–14, plan `docs/plan_prd4_implementation.md`) livrée en 6 phases dans la même journée. Remplacement de l'onboarding A/B par un parcours unique post-film, injection d'un rôle joueur libre dans Max, affichage des 4 protagonistes (Max actif, Emma/Ava/Léo grisés), bascule push-to-talk + sous-titres, suppression du GM pré-tour du chemin critique, GM post-turn async, questionnaire entièrement nouveau avec mapping Notion accentué.
 
 ### Ajouté
-- **SessionsTab admin (PRD4)** : nouvelle section « Rôle utilisateur » affichant `summary_for_user`, `summary_for_max` et JSON complet du `player_role`.
-- **Timeline GM post-turn** : chaque évaluation `gm_post_turn_log` (engagement_delta, role_usage_quality, confusion, end_recommended, latency_ms, next_turn_guidance, topics_covered) est rendue de façon compacte dans le détail session.
+- **Phase 1 — State machine + écrans** : nouveau type `ExperiencePhase` (`welcome → film_question → teaser → role_capture → role_summary → character_select → calling_max → conversation_max → end_session → questionnaire → thanks`), hook `useExperienceState`, 9 écrans PRD4 (`WelcomeScreen`, `FilmQuestionScreen`, `TeaserScreen`, `RoleCaptureScreen`, `RoleSummaryScreen`, `CharacterSelectScreen`, `CallingMaxScreen`, `ConversationScreen`, `EndSessionScreen`, `QuestionnaireScreenPRD4`), 4 SVG placeholders personnages (`max`, `emma`, `ava`, `leo`).
+- **Phase 2 — Création de rôle (PTT + résumé LLM)** : capture push-to-talk sur `role_capture`, edge function `summarize-role` (Gemini 2.5 Flash via OpenRouter) produisant un `UserRoleProfile` JSON (`raw_input`, `summary_for_user`, `summary_for_max`, `relationship_to_family`, `age`, `gender`, `proximity_level`, `intent`), service `roleProfileService.ts`, fallback robuste si LLM échoue, persistance dans `sessions.player_role`.
+- **Phase 3 — Max contextualisé + GM post-turn async** : injection de `summary_for_max` + champs structurés en tête du system prompt Max (`maxAgent.ts`), nouvel agent `gameMasterPRD4.ts` produisant une évaluation post-tour structurée (`engagement_delta`, `confusion_detected`, `role_usage_quality`, `topics_covered`, `transition_recommended`, `cinematic_hint`, `next_turn_guidance`, `end_recommended`, `moderation_flag`), orchestrateur `prd4Orchestrator.ts` qui appelle Max sans GM pré-tour et déclenche le post-turn en `void`, persistance append-only dans `sessions.gm_post_turn_log` (jsonb), timer 3–5 min + `end_recommended` → `end_session`.
+- **Phase 4 — Personnages grisés + appel Max** : grille 2×2 avec Max coloré et Emma/Ava/Léo grisés + cadenas + dialog « indisponible », écran `CallingMaxScreen` (2-3 sonneries ~3 s puis transition auto vers `conversation_max`).
+- **Phase 5 — Nouveau questionnaire PRD4** : `QuestionnaireScreenPRD4.tsx` (10 questions PRD §14.2 + email + opt-ins updates/feedback), types `QuestionnairePRD4Answers` / `QuestionnairePRD4Technical` / `QuestionnairePRD4Data`, service `prd4Questionnaire.ts`, calcul automatique des métriques techniques (`duration_seconds`, `turn_count`, `avg_latency_ms`, `max_latency_ms`, `ptt_errors`, `role_profile`, `teaser_seen`, `teaser_skipped`, `transcript_available`), stockage dans `questionnaire_responses` au format `{ version: "prd4", answers, technical }`.
+- **Phase 6 — Back-office PRD4** : `SessionsTab` admin enrichi avec une section « Rôle utilisateur » (résumés + JSON repliable) et une timeline `gm_post_turn_log` compacte (badges engagement, role usage quality, confusion, end, modération, latence, sujets, next_turn_guidance).
+- **Sync Notion questionnaire PRD4** : `sync-questionnaire` détecte `version: "prd4"` et écrit dans les propriétés Notion exactes (avec accents) de la base *Questionnaire AVA* — `PRD4 A vu le film`, `PRD4 Teaser vu/skippé/utile score`, `PRD4 Rôle création clarté`, `PRD4 Résumé personnage justesse`, `PRD4 PTT clarté/frustration`, `PRD4 Max reconnaît rôle`, `PRD4 Max crédible personnage`, `PRD4 Envie autres personnages`, `PRD4 Personnage souhaité prochain`, `PRD4 Durée ressentie`, `PRD4 Rupture immersion`, `PRD4 Rôle JSON`, `PRD4 Personnage actif`, `PRD4 Durée réelle secondes`, `PRD4 Nb tours`, `PRD4 Latence moyenne/max ms`, `PRD4 Erreurs PTT`, `PRD4 Email contact`, `PRD4 Être tenu au courant`, `PRD4 Contact feedback détaillé`, etc. Filtrage automatique des propriétés absentes via `fetchDatabaseProperties()` (log `skipped_props` dans la réponse) pour éviter toute erreur Notion 400 si la base évolue.
+- **Migration** : `sessions.gm_post_turn_log jsonb not null default '[]'`.
+- **Events PostHog PRD4** : `role_created`, `character_locked_clicked`, `ptt_error`, `session_ended`.
+
+### Modifié
+- Route racine `/` désormais montée sur le parcours PRD4 (`IndexPRD4`). L'admin `/admin` est inchangé.
+- `maxAgent.ts` accepte un `UserRoleProfile` en entrée et le préfixe au system prompt avant la persona.
+- `conversationOrchestrator.ts` : suppression du GM pré-tour du chemin critique, GM post-turn déclenché en `void` (non bloquant), JSON conforme PRD §10.3.
 
 ### Supprimé
-- Écrans legacy A/B et route `/legacy` : `OnboardingAScreen`, `OnboardingBScreen`, `ABChoiceScreen`, `OnboardingScreen`, `GateScreen`, `pages/Index.tsx`. La racine `/` pointe désormais directement sur le parcours PRD4 (`IndexPRD4`).
+- Écrans legacy A/B et route `/legacy` : `OnboardingAScreen`, `OnboardingBScreen`, `ABChoiceScreen`, `OnboardingScreen`, `GateScreen`, `pages/Index.tsx`.
+- Côté Notion PRD4, plus aucune écriture vers les anciens champs A/B (`Variante onboarding`, `Modalite voix`, `Duree secondes`, `Email contact`, `Opt-in updates`, `Opt-in feedback`) — uniquement vers les propriétés `PRD4 *` exactes.
+
+### Notes de déploiement
+- Les colonnes `PRD4 *` doivent exister dans la base Notion *Questionnaire AVA* (déjà créées côté éditorial). Toute propriété absente est silencieusement ignorée et listée dans `skipped_props`.
+- Pipeline STT/TTS/RAG/cost-tracking inchangé : aucun impact attendu sur la latence hors le bénéfice de la suppression du GM pré-tour.
+- Hors scope (volontairement reporté) : vraie vidéo teaser, images finales personnages, activation Emma/Ava/Léo, cinématiques, mémoire inter-personnages, split GM.
 
 ## [0.22.0] - 2026-05-22 — Robustesse voix multi-navigateurs + garde-fous anti-blocage
 
