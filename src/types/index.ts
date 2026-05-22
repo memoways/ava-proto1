@@ -46,7 +46,7 @@ export interface UserRoleProfile {
   relationship_to_family: string;
   age: string;
   gender: string;
-  proximity_level: ProximityLevel;
+  proximity_level: string;
   intent: string;
   created_by_system: boolean;
   created_at: string;
