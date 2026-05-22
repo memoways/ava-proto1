@@ -161,6 +161,21 @@ function buildPRD4Props(payload: any) {
   return props;
 }
 
+async function fetchDatabaseProperties(): Promise<Set<string>> {
+  const res = await fetch(`https://api.notion.com/v1/databases/${NOTION_DATABASE_ID}`, {
+    headers: {
+      "Authorization": `Bearer ${NOTION_API_KEY}`,
+      "Notion-Version": "2022-06-28",
+    },
+  });
+  if (!res.ok) {
+    console.warn("[Notion] Could not fetch DB schema, sending all props:", await res.text());
+    return new Set();
+  }
+  const data = await res.json();
+  return new Set(Object.keys(data.properties || {}));
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -169,7 +184,20 @@ serve(async (req) => {
   try {
     const payload = await req.json();
     const version = payload?.questionnaire?.version;
-    const props = version === "prd4" ? buildPRD4Props(payload) : buildLegacyProps(payload);
+    const allProps = version === "prd4" ? buildPRD4Props(payload) : buildLegacyProps(payload);
+
+    // Filtre : ne garde que les propriétés qui existent dans la base Notion.
+    const existing = await fetchDatabaseProperties();
+    let props = allProps;
+    let skipped: string[] = [];
+    if (existing.size > 0) {
+      props = {};
+      for (const [k, v] of Object.entries(allProps)) {
+        if (existing.has(k)) props[k] = v;
+        else skipped.push(k);
+      }
+      if (skipped.length) console.warn("[Notion] Skipped missing props:", skipped);
+    }
 
     const res = await fetch("https://api.notion.com/v1/pages", {
       method: "POST",
@@ -184,7 +212,7 @@ serve(async (req) => {
     if (!res.ok) {
       const err = await res.text();
       console.error("[Notion] Failed to create page:", err);
-      return new Response(JSON.stringify({ error: err }), {
+      return new Response(JSON.stringify({ error: err, skipped_props: skipped }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -192,9 +220,10 @@ serve(async (req) => {
 
     const data = await res.json();
     console.log(`[Notion] Questionnaire synced (version=${version || "legacy"}):`, data.id);
-    return new Response(JSON.stringify({ success: true, notionPageId: data.id, version: version || "legacy" }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ success: true, notionPageId: data.id, version: version || "legacy", skipped_props: skipped }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (error) {
     console.error("[Notion] Error:", error);
     return new Response(JSON.stringify({ error: String(error) }), {
@@ -203,3 +232,4 @@ serve(async (req) => {
     });
   }
 });
+
