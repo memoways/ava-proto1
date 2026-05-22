@@ -30,6 +30,10 @@ export interface SessionRow {
   questionnaire_responses: any;
   name: string | null;
   admin_note: string | null;
+  player_role?: any;
+  gm_post_turn_log?: any;
+  personnage_appele?: string | null;
+  modalite_voix?: string | null;
 }
 
 const fmt = (d: string | null) => d ? new Date(d).toLocaleString("fr-CH") : "—";
@@ -393,6 +397,93 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
                 </div>
               </div>
             ) : null}
+
+            {/* PRD4 — Rôle utilisateur */}
+            {selected.player_role && typeof selected.player_role === "object" && (
+              <div className="mb-3 border rounded p-3 bg-muted/20">
+                <p className="text-xs font-semibold text-muted-foreground mb-2">
+                  Rôle utilisateur (PRD4)
+                </p>
+                {selected.player_role.summary_for_user && (
+                  <p className="text-sm mb-1">
+                    <span className="text-muted-foreground">Pour le joueur : </span>
+                    {selected.player_role.summary_for_user}
+                  </p>
+                )}
+                {selected.player_role.summary_for_max && (
+                  <p className="text-sm mb-2 italic">
+                    <span className="text-muted-foreground not-italic">Pour Max : </span>
+                    {selected.player_role.summary_for_max}
+                  </p>
+                )}
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                    JSON complet
+                  </summary>
+                  <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-[10px] bg-background/40 rounded p-2 max-h-48 overflow-auto">
+{JSON.stringify(selected.player_role, null, 2)}
+                  </pre>
+                </details>
+              </div>
+            )}
+
+            {/* PRD4 — Timeline GM post-turn */}
+            {Array.isArray(selected.gm_post_turn_log) && selected.gm_post_turn_log.length > 0 && (
+              <div className="mb-3 border rounded p-3 bg-muted/20">
+                <p className="text-xs font-semibold text-muted-foreground mb-2">
+                  Game Master post-turn ({selected.gm_post_turn_log.length} évaluations)
+                </p>
+                <ScrollArea className="h-48">
+                  <div className="space-y-1.5">
+                    {selected.gm_post_turn_log.map((evalEntry: any, i: number) => (
+                      <div
+                        key={i}
+                        className="text-[11px] border-l-2 border-primary/40 pl-2 py-1"
+                      >
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-muted-foreground">
+                            T{evalEntry.turn_index ?? i + 1}
+                          </span>
+                          <span className={evalEntry.engagement_delta >= 0 ? "text-green-400" : "text-red-400"}>
+                            engagement {evalEntry.engagement_delta >= 0 ? "+" : ""}
+                            {evalEntry.engagement_delta ?? 0}
+                          </span>
+                          {evalEntry.role_usage_quality && (
+                            <span className="bg-muted/60 px-1.5 rounded text-[10px]">
+                              rôle: {evalEntry.role_usage_quality}
+                            </span>
+                          )}
+                          {evalEntry.confusion_detected && (
+                            <span className="text-amber-400">⚠ confusion</span>
+                          )}
+                          {evalEntry.end_recommended && (
+                            <span className="text-red-400 font-semibold">END</span>
+                          )}
+                          {evalEntry.moderation_flag && (
+                            <span className="text-red-400 font-semibold">MOD</span>
+                          )}
+                          {typeof evalEntry.latency_ms === "number" && (
+                            <span className="font-mono text-muted-foreground">
+                              {evalEntry.latency_ms}ms
+                            </span>
+                          )}
+                        </div>
+                        {evalEntry.next_turn_guidance && (
+                          <p className="text-muted-foreground mt-0.5 italic">
+                            → {evalEntry.next_turn_guidance}
+                          </p>
+                        )}
+                        {Array.isArray(evalEntry.topics_covered) && evalEntry.topics_covered.length > 0 && (
+                          <p className="text-muted-foreground/70 mt-0.5">
+                            sujets: {evalEntry.topics_covered.join(", ")}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
 
             {Array.isArray(selected.conversation_log) && selected.conversation_log.length > 0 && (
               <GmFallbackChart log={selected.conversation_log} />

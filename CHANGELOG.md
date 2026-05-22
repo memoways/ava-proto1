@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.23.0] - 2026-05-22 — PRD4 phase 6 : back-office + nettoyage
+
+### Ajouté
+- **SessionsTab admin (PRD4)** : nouvelle section « Rôle utilisateur » affichant `summary_for_user`, `summary_for_max` et JSON complet du `player_role`.
+- **Timeline GM post-turn** : chaque évaluation `gm_post_turn_log` (engagement_delta, role_usage_quality, confusion, end_recommended, latency_ms, next_turn_guidance, topics_covered) est rendue de façon compacte dans le détail session.
+
+### Supprimé
+- Écrans legacy A/B et route `/legacy` : `OnboardingAScreen`, `OnboardingBScreen`, `ABChoiceScreen`, `OnboardingScreen`, `GateScreen`, `pages/Index.tsx`. La racine `/` pointe désormais directement sur le parcours PRD4 (`IndexPRD4`).
+
 ## [0.22.0] - 2026-05-22 — Robustesse voix multi-navigateurs + garde-fous anti-blocage
 
 ### Ajouté
