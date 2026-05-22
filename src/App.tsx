@@ -23,7 +23,6 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<IndexPRD4 />} />
-          <Route path="/legacy" element={<Index />} />
           <Route path="/admin" element={<AdminAuthGate><Admin /></AdminAuthGate>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
