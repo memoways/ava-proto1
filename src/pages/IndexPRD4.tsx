@@ -160,6 +160,9 @@ const IndexPRD4 = () => {
     setPhase("conversation_max");
     endedRef.current = false;
     conversationRef.current = [];
+    turnLatenciesRef.current = [];
+    sessionDurationRef.current = 0;
+
 
     // Crée la session DB
     try {
