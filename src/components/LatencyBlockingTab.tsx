@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Info } from "lucide-react";
+import { ChevronDown, ChevronRight, Info, MessageSquare } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,10 +26,15 @@ import type { ConversationMessage, ConversationPipelineTimings } from "@/types";
 
 interface SessionRow {
   id: string;
+  name: string | null;
   started_at: string | null;
   ended_at: string | null;
   conversation_log: ConversationMessage[] | null;
   game_over_reason: string | null;
+}
+
+function sessionLabel(s: SessionRow): string {
+  return s.name?.trim() || s.id.slice(0, 8);
 }
 
 interface TurnTiming extends ConversationPipelineTimings {
