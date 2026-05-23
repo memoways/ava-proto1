@@ -81,12 +81,38 @@ describe("voiceTelemetry", () => {
       turn_id: "session-1:1",
       turn_index: 1,
       character: "max",
-      timings: { t_turn_end_to_end_ms: 1200 },
+      timings: { t_stt_total_ms: 120, t_max_llm_ms: 800, t_tts_total_ms: 280, t_turn_end_to_end_ms: 1200 },
+      models: { max_model: "openai/gpt-4o-mini" },
+      stt: { provider: "Deepgram", model: "nova-2", mode: "realtime" },
+      tts: { provider: "inworld", model: "inworld-tts-2" },
     });
 
     recordVoiceTurnCompleted(payload);
 
     expect(mocks.trackEventMock).toHaveBeenCalledWith("voice_turn_completed", payload);
+    expect(mocks.trackEventMock).toHaveBeenCalledWith("ava_turn_latency_summary", expect.objectContaining({
+      session_id: "session-1",
+      turn_index: 1,
+      correlation_id: "session-1:1",
+      total_latency_ms: 1200,
+      segment_count: 3,
+      stt_provider: "Deepgram",
+      stt_model: "nova-2",
+      llm_provider: "OpenRouter",
+      llm_model: "openai/gpt-4o-mini",
+      tts_provider: "inworld",
+      tts_model: "inworld-tts-2",
+    }));
+    expect(mocks.trackEventMock).toHaveBeenCalledWith("ava_latency_segment", expect.objectContaining({
+      session_id: "session-1",
+      turn_index: 1,
+      correlation_id: "session-1:1",
+      segment_key: "max_ms",
+      segment_label: "Max LLM",
+      duration_ms: 800,
+      provider: "OpenRouter",
+      model: "openai/gpt-4o-mini",
+    }));
     expect(mocks.fromMock).toHaveBeenCalledWith("voice_turn_events");
     expect(mocks.insertMock).toHaveBeenCalledWith(expect.objectContaining({
       session_id: "session-1",

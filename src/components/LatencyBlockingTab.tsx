@@ -1,6 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Info, MessageSquare } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ReferenceLine,
+  XAxis,
+  YAxis,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,6 +34,15 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import type { ConversationMessage, ConversationPipelineTimings } from "@/types";
+import {
+  buildLatencySegmentsFromPipeline,
+  computeSegmentServiceEvolution,
+  computeSegmentServiceStats,
+  type LatencySegmentKey,
+  type LatencyServiceInfo,
+  type SegmentServiceEvolutionPoint,
+  type SegmentServiceStats,
+} from "@/services/latencySegments";
 
 interface SessionRow {
   id: string;
@@ -39,6 +59,7 @@ function sessionLabel(s: SessionRow): string {
 
 interface TurnTiming extends ConversationPipelineTimings {
   index: number;
+  sessionId: string;
   timestamp: number;
   preview: string;
 }
@@ -54,9 +75,10 @@ interface SessionAggregate {
   turns: TurnTiming[];
 }
 
-type NumericTimingKey = "rag_ms" | "gm_pre_ms" | "max_ms" | "validator_ms" | "tts_ms" | "gm_post_ms" | "total_ms";
+type NumericTimingKey = "stt_ms" | "rag_ms" | "gm_pre_ms" | "max_ms" | "validator_ms" | "tts_ms" | "gm_post_ms" | "total_ms";
 
 const STEP_LABELS: Array<{ key: NumericTimingKey; label: string; color: string }> = [
+  { key: "stt_ms", label: "STT", color: "bg-slate-500" },
   { key: "rag_ms", label: "RAG", color: "bg-sky-500" },
   { key: "gm_pre_ms", label: "GM pre-turn", color: "bg-violet-500" },
   { key: "max_ms", label: "Max LLM", color: "bg-emerald-500" },
@@ -72,6 +94,7 @@ function fmtMs(v?: number): string {
 }
 
 const STEP_HEX: Record<NumericTimingKey, string> = {
+  stt_ms: "#64748b",       // slate-500
   rag_ms: "#0ea5e9",       // sky-500
   gm_pre_ms: "#8b5cf6",    // violet-500
   max_ms: "#10b981",       // emerald-500
@@ -97,6 +120,7 @@ const TARGET_MS = 2000;
  *  réelles) — elles servent uniquement à qualifier un segment comme "ok",
  *  "élevé" ou "critique" par rapport à un objectif raisonnable. */
 const STEP_BUDGET_MS: Record<NumericTimingKey, number> = {
+  stt_ms: 900,
   rag_ms: 250,
   gm_pre_ms: 400,
   max_ms: 800,
@@ -109,6 +133,11 @@ const STEP_BUDGET_MS: Record<NumericTimingKey, number> = {
 /** Hypothèses d'optimisation factuelles, par étape. Affichées en tooltip
  *  pour orienter le diagnostic — ce ne sont pas des promesses de gain. */
 const STEP_HYPOTHESES: Record<NumericTimingKey, string[]> = {
+  stt_ms: [
+    "Comparer Deepgram par navigateur et mime MediaRecorder",
+    "Vérifier le délai de silence avant finalisation",
+    "Mesurer séparément PTT flush et silence automatique",
+  ],
   rag_ms: [
     "Réduire RAG_TOP_K (moins de chunks à vectoriser)",
     "Cache local des embeddings de la dernière question",
@@ -273,6 +302,7 @@ export interface SegmentSelection {
   total: number;
   diagnostic: StepDiagnostic;
   baseline: StepBaseline | undefined;
+  service?: LatencyServiceInfo;
 }
 
 interface StackedRowProps {
@@ -351,6 +381,7 @@ function StackedRow({
             if (v <= 0) return null;
             const pct = (v / denom) * 100;
             const diag = analyzeStep(key, v, total, baselines?.[key]);
+            const service = values.segmentServices?.[key];
             const dimmed = SEVERITY_RANK[diag.severity] < sevThreshold;
             return (
               <Tooltip key={key} delayDuration={120}>
@@ -368,6 +399,7 @@ function StackedRow({
                         total,
                         diagnostic: diag,
                         baseline: baselines?.[key],
+                        service,
                       })
                     }
                     className={`h-full flex items-center justify-center text-[10px] text-white/95 font-medium overflow-hidden cursor-pointer focus:outline-none focus:ring-1 focus:ring-foreground/40 hover:brightness-110 transition ${
@@ -401,6 +433,21 @@ function StackedRow({
                     </div>
 
                     <div className="space-y-1 text-muted-foreground">
+                      {service && (
+                        <>
+                          <div>
+                            Service: <span className="text-foreground font-medium">{service.serviceProvider || service.serviceName || "Unknown"}</span>
+                          </div>
+                          <div>
+                            Model: <span className="text-foreground font-medium">{service.model || "Unknown"}</span>
+                          </div>
+                          {service.mode && (
+                            <div>
+                              Mode: <span className="text-foreground font-medium">{service.mode}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
                       {diag.shareOfTotalPct !== null && (
                         <div>
                           <span className="text-foreground font-medium">
@@ -615,12 +662,14 @@ function LatencyVisualization({
                 <div className="pl-5 space-y-1.5 border-l-2 border-border/60 ml-1.5">
                   {turns.map((t) => {
                     const stepValues: ConversationPipelineTimings = {
+                      stt_ms: t.stt_ms,
                       rag_ms: t.rag_ms,
                       gm_pre_ms: t.gm_pre_ms,
                       max_ms: t.max_ms,
                       validator_ms: t.validator_ms,
                       tts_ms: t.tts_ms,
                       gm_post_ms: t.gm_post_ms,
+                      segmentServices: t.segmentServices,
                     };
                     return (
                       <StackedRow
@@ -708,6 +757,361 @@ function LatencyVisualization({
   );
 }
 
+function ServiceComparisonPanel({
+  stats,
+  metric,
+  onMetricChange,
+}: {
+  stats: SegmentServiceStats[];
+  metric: MetricMode;
+  onMetricChange: (metric: MetricMode) => void;
+}) {
+  const sorted = [...stats].sort((a, b) => (b[metric] ?? 0) - (a[metric] ?? 0));
+  const topOutliers = sorted.flatMap((s) =>
+    s.outliers.map((o) => ({
+      ...o,
+      segmentLabel: s.segmentLabel,
+      serviceProvider: s.serviceProvider,
+      model: s.model,
+    })),
+  ).sort((a, b) => b.durationMs - a.durationMs).slice(0, 5);
+
+  return (
+    <div className="border rounded-lg p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h3 className="text-sm font-semibold">Comparaison par segment et service</h3>
+          <p className="text-xs text-muted-foreground">
+            Groupé par segment existant puis provider/model. P50 est la métrique principale par défaut.
+          </p>
+        </div>
+        <Select value={metric} onValueChange={(v) => onMetricChange(v as MetricMode)}>
+          <SelectTrigger className="h-8 text-xs w-[110px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="p50">P50</SelectItem>
+            <SelectItem value="p95">P95</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {sorted.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-4 text-center">
+          Aucun segment enrichi à comparer dans la sélection.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="text-left p-2 font-medium text-muted-foreground">Segment</th>
+                <th className="text-left p-2 font-medium text-muted-foreground">Service</th>
+                <th className="text-left p-2 font-medium text-muted-foreground">Model</th>
+                <th className="text-right p-2 font-medium text-muted-foreground">Tours</th>
+                <th className="text-right p-2 font-medium text-muted-foreground">{metric.toUpperCase()}</th>
+                <th className="text-right p-2 font-medium text-muted-foreground">Moy</th>
+                <th className="text-right p-2 font-medium text-muted-foreground">Max</th>
+                <th className="text-right p-2 font-medium text-muted-foreground">Blocages</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((s) => (
+                <tr key={`${s.segmentKey}-${s.serviceProvider}-${s.model}-${s.mode}`} className="border-t">
+                  <td className="p-2 font-medium">{s.segmentLabel}</td>
+                  <td className="p-2 font-mono">{s.serviceProvider}</td>
+                  <td className="p-2 font-mono max-w-[220px] truncate" title={s.model}>{s.model}</td>
+                  <td className="p-2 text-right font-mono">{s.count}</td>
+                  <td className="p-2 text-right font-mono font-semibold">{fmtMs(s[metric])}</td>
+                  <td className="p-2 text-right font-mono">{fmtMs(s.avg)}</td>
+                  <td className="p-2 text-right font-mono">{fmtMs(s.max)}</td>
+                  <td className="p-2 text-right font-mono">
+                    {s.blockageCount} · {(s.blockageRate * 100).toFixed(0)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {topOutliers.length > 0 && (
+        <div className="border-t pt-3">
+          <div className="text-xs font-semibold mb-2">Cas extrêmes</div>
+          <div className="grid gap-1">
+            {topOutliers.map((o, i) => (
+              <div key={`${o.key}-${o.context?.sessionId}-${o.context?.turnIndex}-${i}`} className="flex items-center gap-2 text-[11px] border rounded px-2 py-1">
+                <Badge variant={o.aboveP95 ? "destructive" : "secondary"} className="text-[10px]">
+                  {o.aboveP95 ? "> P95" : "top 5"}
+                </Badge>
+                <span className="font-medium">{o.segmentLabel}</span>
+                <span className="font-mono">{fmtMs(o.durationMs)}</span>
+                <span className="text-muted-foreground truncate">
+                  {o.serviceProvider} · {o.model} · tour #{o.context?.turnIndex ?? "?"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function seconds(ms: number): number {
+  return Number((ms / 1000).toFixed(2));
+}
+
+function buildEvolutionChartData(points: SegmentServiceEvolutionPoint[], serviceKeys: string[]) {
+  const bySession = new Map<string, Record<string, string | number | null>>();
+  for (const point of points) {
+    const sessionKey = point.sessionId;
+    if (!bySession.has(sessionKey)) {
+      bySession.set(sessionKey, {
+        sessionId: point.sessionId,
+        sessionLabel: point.sessionLabel,
+        sessionStartedAt: point.sessionStartedAt,
+      });
+    }
+    const row = bySession.get(sessionKey)!;
+    row[`${point.serviceKey}__min`] = seconds(point.minMs);
+    row[`${point.serviceKey}__median`] = seconds(point.medianMs);
+    row[`${point.serviceKey}__max`] = seconds(point.maxMs);
+  }
+  return [...bySession.values()].sort((a, b) => {
+    const at = typeof a.sessionStartedAt === "string" ? new Date(a.sessionStartedAt).getTime() : 0;
+    const bt = typeof b.sessionStartedAt === "string" ? new Date(b.sessionStartedAt).getTime() : 0;
+    return at - bt || String(a.sessionLabel).localeCompare(String(b.sessionLabel));
+  }).map((row, index) => {
+    row.sessionNumber = `#${index + 1}`;
+    for (const serviceKey of serviceKeys) {
+      row[`${serviceKey}__min`] ??= null;
+      row[`${serviceKey}__median`] ??= null;
+      row[`${serviceKey}__max`] ??= null;
+    }
+    return row;
+  });
+}
+
+function SegmentEvolutionChart({
+  segment,
+  points,
+  selectedService,
+  onServiceChange,
+  highlightedSessionId,
+  onHighlightSession,
+}: {
+  segment: { key: SegmentEvolutionKey; label: string; color: string };
+  points: SegmentServiceEvolutionPoint[];
+  selectedService: string;
+  onServiceChange: (value: string) => void;
+  highlightedSessionId: string | null;
+  onHighlightSession: (sessionId: string) => void;
+}) {
+  const segmentPoints = points.filter((p) => p.segmentKey === segment.key);
+  const serviceOptions = [...new Map(segmentPoints.map((p) => [p.serviceKey, p.serviceLabel])).entries()];
+  const visibleServiceKeys = selectedService === "all" ? serviceOptions.map(([key]) => key) : [selectedService].filter(Boolean);
+  const visiblePoints = segmentPoints.filter((p) => visibleServiceKeys.includes(p.serviceKey));
+  const chartData = buildEvolutionChartData(visiblePoints, visibleServiceKeys);
+
+  const detailRows = visiblePoints;
+  const colorByService = new Map(serviceOptions.map(([key], index) => [key, SERVICE_COLORS[index % SERVICE_COLORS.length]]));
+  const sessionNumberById = new Map(chartData.map((row) => [String(row.sessionId), String(row.sessionNumber)]));
+  const highlightedX = highlightedSessionId ? sessionNumberById.get(highlightedSessionId) : undefined;
+
+  return (
+    <div className="rounded-md border p-3 space-y-3">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: segment.color }} />
+          <div>
+            <h4 className="text-sm font-semibold">{segment.label}</h4>
+            <p className="text-[11px] text-muted-foreground">
+              Axe vertical en secondes · min / médiane / max par session. Clique une ligne du tableau pour la repérer.
+            </p>
+          </div>
+        </div>
+        <Select value={selectedService} onValueChange={onServiceChange}>
+          <SelectTrigger className="h-8 text-xs w-[230px]">
+            <SelectValue placeholder="Service" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les services superposés</SelectItem>
+            {serviceOptions.map(([key, label]) => (
+              <SelectItem key={key} value={key}>{label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {chartData.length === 0 ? (
+        <p className="text-xs text-muted-foreground py-8 text-center">
+          Aucune donnée {segment.label} enrichie dans les sessions sélectionnées.
+        </p>
+      ) : (
+        <div className="h-[260px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 8, right: 18, left: 0, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis
+                dataKey="sessionNumber"
+                tick={{ fontSize: 11 }}
+                interval={0}
+                minTickGap={8}
+              />
+              <YAxis
+                tick={{ fontSize: 11 }}
+                tickFormatter={(v: number) => v.toFixed(2)}
+                label={{ value: "secondes", angle: -90, position: "insideLeft", style: { fontSize: 11 } }}
+              />
+              <RechartsTooltip
+                formatter={(value: number | string, name: string) => [
+                  typeof value === "number" ? `${value.toFixed(2)} s` : value,
+                  name,
+                ]}
+                labelFormatter={(label) => `Session ${label}`}
+              />
+              {highlightedX && (
+                <ReferenceLine
+                  x={highlightedX}
+                  stroke="hsl(var(--foreground))"
+                  strokeDasharray="4 3"
+                  label={{ value: highlightedX, position: "top", fontSize: 11, fill: "hsl(var(--foreground))" }}
+                />
+              )}
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              {visibleServiceKeys.map((serviceKey) => {
+                const label = serviceOptions.find(([key]) => key === serviceKey)?.[1] || "Unknown";
+                const color = colorByService.get(serviceKey) || segment.color;
+                return (
+                  <Fragment key={serviceKey}>
+                    <Line
+                      key={`${serviceKey}-min`}
+                      type="monotone"
+                      dataKey={`${serviceKey}__min`}
+                      name={`${label} · min`}
+                      stroke={color}
+                      strokeDasharray="3 3"
+                      strokeWidth={1.5}
+                      dot={false}
+                      connectNulls
+                    />
+                    <Line
+                      key={`${serviceKey}-median`}
+                      type="monotone"
+                      dataKey={`${serviceKey}__median`}
+                      name={`${label} · médiane`}
+                      stroke={color}
+                      strokeWidth={2.5}
+                      dot={{ r: 2 }}
+                      connectNulls
+                    />
+                    <Line
+                      key={`${serviceKey}-max`}
+                      type="monotone"
+                      dataKey={`${serviceKey}__max`}
+                      name={`${label} · max`}
+                      stroke={color}
+                      strokeDasharray="5 2"
+                      strokeWidth={1.5}
+                      dot={false}
+                      connectNulls
+                    />
+                  </Fragment>
+                );
+              })}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {detailRows.length > 0 && (
+        <div className="overflow-x-auto border-t pt-2">
+          <table className="w-full text-[11px]">
+            <thead className="text-muted-foreground">
+              <tr>
+                <th className="text-left py-1 pr-2 font-medium">Session</th>
+                <th className="text-left py-1 pr-2 font-medium">Service</th>
+                <th className="text-right py-1 px-2 font-medium">Min</th>
+                <th className="text-right py-1 px-2 font-medium">Médiane</th>
+                <th className="text-right py-1 px-2 font-medium">Max</th>
+                <th className="text-right py-1 pl-2 font-medium">Tours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {detailRows.map((row) => {
+                const sessionNumber = sessionNumberById.get(row.sessionId) || "#?";
+                const isHighlighted = highlightedSessionId === row.sessionId;
+                return (
+                <tr
+                  key={`${row.segmentKey}-${row.serviceKey}-${row.sessionId}`}
+                  className={`border-t cursor-pointer hover:bg-accent/40 ${isHighlighted ? "bg-accent" : ""}`}
+                  onClick={() => onHighlightSession(row.sessionId)}
+                >
+                  <td className="py-1 pr-2">
+                    <span className="font-mono font-semibold">{sessionNumber}</span>{" "}
+                    <span className="text-muted-foreground">{row.sessionLabel}</span>
+                  </td>
+                  <td className="py-1 pr-2 font-mono max-w-[220px] truncate" title={row.serviceLabel}>{row.serviceLabel}</td>
+                  <td className="py-1 px-2 text-right font-mono">{seconds(row.minMs).toFixed(2)} s</td>
+                  <td className="py-1 px-2 text-right font-mono font-semibold">{seconds(row.medianMs).toFixed(2)} s</td>
+                  <td className="py-1 px-2 text-right font-mono">{seconds(row.maxMs).toFixed(2)} s</td>
+                  <td className="py-1 pl-2 text-right font-mono">{row.count}</td>
+                </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LatencyEvolutionPanel({
+  points,
+  serviceFilters,
+  onServiceFilterChange,
+  highlightedSessionId,
+  onHighlightSession,
+}: {
+  points: SegmentServiceEvolutionPoint[];
+  serviceFilters: Record<SegmentEvolutionKey, string>;
+  onServiceFilterChange: (segment: SegmentEvolutionKey, value: string) => void;
+  highlightedSessionId: string | null;
+  onHighlightSession: (sessionId: string) => void;
+}) {
+  const hasUnknown = points.some((p) => p.serviceProvider === "Unknown" || p.model === "Unknown");
+  return (
+    <div className="border rounded-lg p-4 space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold">Évolution temporelle par service</h3>
+        <p className="text-xs text-muted-foreground">
+          Compare STT, Max LLM et TTS dans le temps. Les services peuvent être superposés ou inspectés indépendamment.
+        </p>
+        {hasUnknown && (
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Unknown = session historique sans métadonnées provider/model dans <code>pipeline.segmentServices</code>. Les nouveaux tours instrumentés les renseignent.
+          </p>
+        )}
+      </div>
+      <div className="grid gap-4">
+        {EVOLUTION_SEGMENTS.map((segment) => (
+          <SegmentEvolutionChart
+            key={segment.key}
+            segment={segment}
+            points={points}
+            selectedService={serviceFilters[segment.key] || "all"}
+            onServiceChange={(value) => onServiceFilterChange(segment.key, value)}
+            highlightedSessionId={highlightedSessionId}
+            onHighlightSession={onHighlightSession}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SegmentDetailSheet({
   selection,
   onOpenChange,
@@ -775,6 +1179,31 @@ function SegmentDetailSheet({
                   </div>
                 </div>
               </div>
+
+              {/* Distribution / comparaison */}
+              {selection.service && (
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Service
+                  </div>
+                  <div className="rounded-md border p-3 grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <div className="text-muted-foreground">Provider</div>
+                      <div className="font-mono break-all">{selection.service.serviceProvider || selection.service.serviceName || "Unknown"}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Model</div>
+                      <div className="font-mono break-all">{selection.service.model || "Unknown"}</div>
+                    </div>
+                    {selection.service.mode && (
+                      <div>
+                        <div className="text-muted-foreground">Mode</div>
+                        <div className="font-mono break-all">{selection.service.mode}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Distribution / comparaison */}
               <div className="space-y-2">
@@ -845,6 +1274,7 @@ function aggregate(session: SessionRow): SessionAggregate {
     turns.push({
       ...msg.pipeline,
       index: i,
+      sessionId: session.id,
       timestamp: msg.timestamp,
       preview: msg.content.slice(0, 80),
     });
@@ -952,6 +1382,26 @@ function aggregateMany(aggs: SessionAggregate[]): ComparisonAggregate | null {
 type PeriodPreset = "all" | "24h" | "7d" | "30d" | "custom";
 type BlockerFilter = "all" | "with" | "without";
 type SeverityFilter = "all" | "high" | "critical";
+type MetricMode = "p50" | "p95";
+type SegmentEvolutionKey = "stt_ms" | "max_ms" | "tts_ms";
+
+const EVOLUTION_SEGMENTS: Array<{ key: SegmentEvolutionKey; label: string; color: string }> = [
+  { key: "stt_ms", label: "STT", color: STEP_HEX.stt_ms },
+  { key: "max_ms", label: "Max LLM", color: STEP_HEX.max_ms },
+  { key: "tts_ms", label: "TTS", color: STEP_HEX.tts_ms },
+];
+
+const SERVICE_COLORS = [
+  "#2563eb",
+  "#dc2626",
+  "#16a34a",
+  "#9333ea",
+  "#ea580c",
+  "#0891b2",
+  "#be123c",
+  "#4f46e5",
+];
+const DEFAULT_SELECTED_SESSION_COUNT = 8;
 
 const SEVERITY_RANK: Record<StepDiagnostic["severity"], number> = {
   ok: 0,
@@ -967,6 +1417,13 @@ export default function LatencyBlockingTab() {
   const [showRelative, setShowRelative] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [minSeverity, setMinSeverity] = useState<SeverityFilter>("all");
+  const [serviceMetric, setServiceMetric] = useState<MetricMode>("p50");
+  const [evolutionServiceFilters, setEvolutionServiceFilters] = useState<Record<SegmentEvolutionKey, string>>({
+    stt_ms: "all",
+    max_ms: "all",
+    tts_ms: "all",
+  });
+  const [highlightedEvolutionSessionId, setHighlightedEvolutionSessionId] = useState<string | null>(null);
 
   function handleFocus(id: string) {
     setFocusId(id);
@@ -1067,13 +1524,15 @@ export default function LatencyBlockingTab() {
     });
   }, [aggregates, period, customFrom, customTo, minTurns, blockerFilter]);
 
-  // Initialize selection: select all sessions on first load
+  // Initialize selection: keep charts readable by selecting only the latest sessions.
   useEffect(() => {
-    if (!hasInitialized && aggregates.length > 0) {
-      setSelectedIds(new Set(aggregates.map((a) => a.session.id)));
+    if (!hasInitialized && filteredAggregates.length > 0) {
+      const defaultIds = filteredAggregates.slice(0, DEFAULT_SELECTED_SESSION_COUNT).map((a) => a.session.id);
+      setSelectedIds(new Set(defaultIds));
+      setHighlightedEvolutionSessionId(defaultIds[0] ?? null);
       setHasInitialized(true);
     }
-  }, [aggregates, hasInitialized]);
+  }, [filteredAggregates, hasInitialized]);
 
   // Drop selected ids that no longer pass the filter so the comparison matches what's visible
   useEffect(() => {
@@ -1086,9 +1545,12 @@ export default function LatencyBlockingTab() {
         if (visibleIds.has(id)) next.add(id);
         else changed = true;
       }
+      if (changed && highlightedEvolutionSessionId && !visibleIds.has(highlightedEvolutionSessionId)) {
+        setHighlightedEvolutionSessionId(next.values().next().value ?? null);
+      }
       return changed ? next : prev;
     });
-  }, [filteredAggregates, hasInitialized]);
+  }, [filteredAggregates, hasInitialized, highlightedEvolutionSessionId]);
 
   const selectedAggregates = useMemo(
     () => filteredAggregates.filter((a) => selectedIds.has(a.session.id)),
@@ -1096,21 +1558,56 @@ export default function LatencyBlockingTab() {
   );
 
   const comparison = useMemo(() => aggregateMany(selectedAggregates), [selectedAggregates]);
+  const selectedLatencySegments = useMemo(() => {
+    return selectedAggregates.flatMap((a) =>
+      a.turns.flatMap((turn) =>
+        buildLatencySegmentsFromPipeline({
+          sessionId: turn.sessionId,
+          sessionLabel: sessionLabel(a.session),
+          sessionStartedAt: a.session.started_at,
+          turnIndex: turn.index,
+          pipeline: turn,
+          services: turn.segmentServices as Partial<Record<LatencySegmentKey, LatencyServiceInfo>> | undefined,
+        }),
+      ),
+    );
+  }, [selectedAggregates]);
+  const serviceStats = useMemo(() => {
+    const segments = selectedLatencySegments;
+    return computeSegmentServiceStats(segments).filter((s) =>
+      s.segmentKey === "stt_ms" || s.segmentKey === "max_ms" || s.segmentKey === "tts_ms" || s.segmentKey === "rag_ms",
+    );
+  }, [selectedLatencySegments]);
+  const evolutionPoints = useMemo(
+    () => computeSegmentServiceEvolution(selectedLatencySegments).filter((p) =>
+      p.segmentKey === "stt_ms" || p.segmentKey === "max_ms" || p.segmentKey === "tts_ms",
+    ),
+    [selectedLatencySegments],
+  );
   const focused = aggregates.find((a) => a.session.id === focusId) ?? null;
+
+  function setEvolutionFilter(segment: SegmentEvolutionKey, value: string) {
+    setEvolutionServiceFilters((prev) => ({ ...prev, [segment]: value }));
+  }
 
   function toggleId(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      if (next.has(id)) setHighlightedEvolutionSessionId(id);
+      else if (highlightedEvolutionSessionId === id) setHighlightedEvolutionSessionId(next.values().next().value ?? null);
       return next;
     });
   }
   function selectAll() {
-    setSelectedIds(new Set(filteredAggregates.map((a) => a.session.id)));
+    const ids = filteredAggregates.map((a) => a.session.id);
+    setSelectedIds(new Set(ids));
+    setHighlightedEvolutionSessionId(ids[0] ?? null);
   }
   function selectNone() {
     setSelectedIds(new Set());
+    setHighlightedEvolutionSessionId(null);
   }
   function resetFilters() {
     setPeriod("all");
@@ -1131,7 +1628,7 @@ export default function LatencyBlockingTab() {
         <div>
           <h2 className="text-lg font-semibold">Latence & blocage</h2>
           <p className="text-xs text-muted-foreground">
-            Sélectionne une ou plusieurs sessions pour comparer leurs latences cumulatives.
+            Sélectionne une ou plusieurs sessions pour comparer leurs latences cumulatives. Par défaut: les {DEFAULT_SELECTED_SESSION_COUNT} plus récentes.
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={load} disabled={loading}>
@@ -1382,30 +1879,48 @@ export default function LatencyBlockingTab() {
             </div>
 
             {comparison ? (
-              <LatencyVisualization
-                avg={comparison.avg}
-                showRelative={showRelative}
-                minSeverity={minSeverity}
-                expandedIds={expandedIds}
-                onToggleExpanded={toggleExpanded}
-                perSessionRows={selectedAggregates.map((a) => ({
-                  id: a.session.id,
-                  label: sessionLabel(a.session),
-                  sublabel: `${a.turnCount} tour(s)${
-                    a.session.started_at
-                      ? " · " + new Date(a.session.started_at).toLocaleDateString("fr-CH")
-                      : ""
-                  }${a.session.name ? " · " + a.session.id.slice(0, 8) : ""}`,
-                  avg: a.avg,
-                  turnCount: a.turnCount,
-                  dispersion: computeDispersion(
-                    a.turns
-                      .map((t) => t.total_ms)
-                      .filter((v): v is number => typeof v === "number"),
-                  ),
-                  turns: a.turns,
-                }))}
-              />
+              <>
+                <LatencyVisualization
+                  avg={comparison.avg}
+                  showRelative={showRelative}
+                  minSeverity={minSeverity}
+                  expandedIds={expandedIds}
+                  onToggleExpanded={toggleExpanded}
+                  perSessionRows={selectedAggregates.map((a) => ({
+                    id: a.session.id,
+                    label: sessionLabel(a.session),
+                    sublabel: `${a.turnCount} tour(s)${
+                      a.session.started_at
+                        ? " · " + new Date(a.session.started_at).toLocaleDateString("fr-CH")
+                        : ""
+                    }${a.session.name ? " · " + a.session.id.slice(0, 8) : ""}`,
+                    avg: a.avg,
+                    turnCount: a.turnCount,
+                    dispersion: computeDispersion(
+                      a.turns
+                        .map((t) => t.total_ms)
+                        .filter((v): v is number => typeof v === "number"),
+                    ),
+                    turns: a.turns,
+                  }))}
+                />
+                <div className="mt-4">
+                  <ServiceComparisonPanel
+                    stats={serviceStats}
+                    metric={serviceMetric}
+                    onMetricChange={setServiceMetric}
+                  />
+                </div>
+                <div className="mt-4">
+                  <LatencyEvolutionPanel
+                    points={evolutionPoints}
+                    serviceFilters={evolutionServiceFilters}
+                    onServiceFilterChange={setEvolutionFilter}
+                    highlightedSessionId={highlightedEvolutionSessionId}
+                    onHighlightSession={setHighlightedEvolutionSessionId}
+                  />
+                </div>
+              </>
             ) : (
               <p className="text-sm text-muted-foreground py-8 text-center">
                 Aucune donnée à comparer. Coche des sessions dans la liste à gauche.
@@ -1501,7 +2016,7 @@ export default function LatencyBlockingTab() {
                   </SheetHeader>
                   <div className="mt-4 space-y-2">
                     {Array.isArray(focused.session.conversation_log) &&
-                      focused.session.conversation_log.map((msg: any, i: number) => (
+                      focused.session.conversation_log.map((msg: ConversationMessage, i: number) => (
                         <div
                           key={i}
                           className={`text-sm rounded p-2 ${

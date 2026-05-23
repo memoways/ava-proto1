@@ -113,6 +113,7 @@ export interface ConversationMessage {
 }
 
 export interface ConversationPipelineTimings {
+  stt_ms?: number;
   rag_ms?: number;
   gm_pre_ms?: number;
   max_ms?: number;
@@ -122,6 +123,14 @@ export interface ConversationPipelineTimings {
   total_ms?: number;
   /** Step name flagged as the bottleneck/blocker for this turn, or null if all steps OK. */
   blocker?: string | null;
+  /** Optional non-sensitive service metadata per latency segment. */
+  segmentServices?: Record<string, {
+    serviceProvider?: string;
+    serviceName?: string;
+    model?: string;
+    mode?: string;
+    endpointType?: string;
+  }>;
 }
 
 export interface MaxTurnKnowledgeContext {
@@ -323,5 +332,3 @@ export interface QuestionnairePRD4Data {
   answers: QuestionnairePRD4Answers;
   technical: QuestionnairePRD4Technical;
 }
-
-

@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-22 (session 21 — PRD4 livré en 6 phases : nouveau parcours unique post-film, capture de rôle joueur en push-to-talk + résumé LLM, Max contextualisé par le rôle, 4 personnages avec Emma/Ava/Léo grisés, GM pré-tour retiré et GM post-turn async, nouveau questionnaire 10 questions, mapping Notion avec accents exacts, suppression des écrans A/B et de la route `/legacy`, back-office enrichi d'une section rôle utilisateur et d'une timeline GM post-turn)
+> **Last Updated**: 2026-05-23 (session 22 — observabilité latence enrichie par service : segments rétro-compatibles avec provider/service/model/mode, PostHog aligné sur les mêmes segments, comparaison P50/P95 par segment et service, cas extrêmes, tooltips enrichis, visualisations temporelles STT/Max LLM/TTS par session avec filtre service, superposition et sélection des 8 dernières sessions par défaut)
 
 ---
 
@@ -63,6 +63,36 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-05-23 — Observabilité latence par service + évolution temporelle STT/Max LLM/TTS 🔷
+
+**Intent**: Le panneau **Latence & blocage** savait déjà montrer *quel segment* ralentissait un tour, mais pas *quel service exact* était derrière ce segment. Pour comparer Deepgram, OpenRouter, ElevenLabs, Inworld ou Hume dans le temps, il fallait enrichir les segments sans renommer les labels existants, sans casser les anciennes sessions, sans modifier le flow conversationnel AVA, et sans envoyer de contenus sensibles à PostHog. La demande UI s'est ensuite précisée : pour **STT**, **LLM** et **TTS**, afficher l'évolution par session avec min / médiane / max, filtrer par service, superposer les services, afficher seulement les 8 dernières sessions par défaut, remplacer les noms longs sur l'axe X par des numéros, et permettre de cliquer une session dans la liste pour la retrouver sur la courbe.
+
+**Tool**: Codex
+
+**Outcome**:
+1. **Segments enrichis sans rupture** — nouveau module `src/services/latencySegments.ts` qui centralise la structure des segments et ajoute des champs optionnels (`serviceProvider`, `serviceName`, `model`, `mode`, `endpointType`, `context`). Les labels visibles restent les mêmes (`RAG`, `GM pre-turn`, `Max LLM`, `Validateur`, `TTS`, `GM post-turn`). Les anciennes sessions continuent de s'afficher ; les données manquantes tombent sur `Unknown`.
+2. **Métadonnées service/model dans le runtime** — le STT Deepgram remonte maintenant `Deepgram / nova-2 / realtime`. Le TTS reprend le provider actif connu par le pipeline multi-provider (`ElevenLabs`, `Inworld`, `Hume`, sinon `Unknown`). Le LLM Max réutilise le modèle OpenRouter connu quand il est disponible. GM, Validateur et RAG restent défensifs : provider/model si le runtime les expose, `Unknown` sinon.
+3. **PostHog structuré comme l'admin** — deux événements sont envoyés via l'initialisation existante, en no-op silencieux si PostHog n'est pas disponible : `ava_turn_latency_summary` pour le résumé de tour et `ava_latency_segment` pour chaque segment. Les payloads ne contiennent que des métadonnées non sensibles (`session_id`, `turn_index`, `correlation_id`, durées, provider/model/mode, blocage, scénario/avatar/langue) et jamais le texte complet utilisateur, la réponse complète de Max, les prompts ou des secrets.
+4. **Comparaison par segment et service** — dans **Latence & blocage**, nouvelle section qui regroupe par segment existant puis par service/model avec nombre de tours, P50, P95, moyenne, max, nombre de blocages et taux de blocage. P50 reste le mode par défaut, avec switch P95 pour inspecter les queues de distribution.
+5. **Cas extrêmes exploitables** — chaque groupe expose le top 5 des durées les plus longues et marque les valeurs supérieures au P95, ce qui permet de distinguer une dérive générale d'un seul tour pathologique.
+6. **Visualisation temporelle STT/Max LLM/TTS** — trois graphes dédiés affichent les latences en secondes avec 2 décimales, par session, avec courbes min / médiane / max. Les sessions sont numérotées (`#1`, `#2`, etc.) pour éviter les labels illisibles sur l'axe horizontal. La liste sous chaque graphe garde les noms de sessions et permet de cliquer une ligne pour montrer la session correspondante sur la visualisation.
+7. **Filtre service + superposition** — chaque graphe peut afficher un service isolé pour le détail ou superposer tous les services pour comparer leur évolution dans le temps. Par défaut, seules les 8 dernières sessions disponibles sont sélectionnées afin de garder une lecture immédiate.
+8. **Tooltips plus utiles** — les segments existants affichent maintenant, quand disponible, le label, la durée, le provider/service, le modèle, le mode, le tour/session et le blocage éventuel. Les champs absents ne cassent pas l'UI.
+9. **Réponse au `Unknown`** — les sessions historiques n'avaient pas encore de `pipeline.segmentServices`, donc leur provider/model ne peut pas être reconstruit avec certitude. L'admin le dit explicitement ; les nouveaux tours instrumentés rempliront progressivement ces informations.
+
+**Ce que ça change** : l'admin ne sert plus seulement à repérer *où* la latence se produit, mais aussi *avec quel service* et *comment cette latence évolue dans le temps*. On peut regarder STT, Max LLM et TTS séparément, comparer les providers entre eux, isoler une session récente, lire les outliers, puis revenir au détail tour par tour sans perdre les vues existantes. C'est le passage d'une analyse de segments à une analyse de services.
+
+**Validation**:
+- `npx tsc --noEmit` : OK.
+- `npm test` : 29 tests passants.
+- `npm run build` : OK.
+- ESLint ciblé sur les fichiers modifiés : OK.
+- Browser local : `http://127.0.0.1:8080/admin?tab=latency` affiche les nouvelles sections, limite la sélection par défaut aux dernières sessions disponibles, numérote l'axe horizontal et met en évidence une session cliquée dans la liste.
+
+**Time**: ~3h (inspection des sources de latence/PostHog → enrichissement rétro-compatible → tests statistiques → UI comparaison service → visualisations temporelles → QA navigateur → documentation).
+
+---
 
 ### 2026-05-22 — PRD4 : nouveau parcours post-film + rôle utilisateur + Max contextualisé (6 phases) 🔷
 
