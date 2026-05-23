@@ -293,6 +293,14 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
               )}
               {/* Action buttons on hover */}
               <div className="absolute right-2 top-2 hidden group-hover:flex gap-1">
+                <Link
+                  to={`/admin?tab=latency&session=${s.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="p-1 rounded bg-muted/80 hover:bg-muted text-muted-foreground"
+                  title="Voir latences & blocages"
+                >
+                  <Activity className="w-3 h-3" />
+                </Link>
                 <button
                   onClick={(e) => { e.stopPropagation(); setEditingName(s.id); setNameInput(s.name || ""); }}
                   className="p-1 rounded bg-muted/80 hover:bg-muted text-muted-foreground"
