@@ -4,6 +4,45 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.24.0] - 2026-05-23 — Observabilité latence par service + évolution temporelle STT/LLM/TTS
+
+Objectif de départ : enrichir l'onglet admin **Latence & blocage** sans casser l'existant, conserver les labels visibles (`RAG`, `GM pre-turn`, `Max LLM`, `Validateur`, `TTS`, `GM post-turn`, etc.), réutiliser les providers/models déjà connus quand ils existent, rester rétro-compatible si les anciennes sessions ne contiennent pas ces métadonnées, et aligner PostHog sur les mêmes segments sans envoyer de contenu sensible.
+
+Demande complémentaire UI : dans `/admin?tab=latency`, ajouter pour **STT**, **LLM** et **TTS** une lecture temporelle des latences par session, en secondes avec 2 décimales, montrant min / médiane / max, filtrable par service, superposable entre services, lisible dans le temps, avec seulement les 8 dernières sessions affichées par défaut et des sessions numérotées sur l'axe horizontal.
+
+### Ajouté
+- **Enrichissement rétro-compatible des segments de latence** : nouveau module `src/services/latencySegments.ts` qui centralise la construction et l'enrichissement des segments avec champs optionnels `serviceProvider`, `serviceName`, `model`, `mode`, `endpointType` et `context`. Les anciennes données restent valides ; les valeurs manquantes tombent sur `Unknown` ou restent vides.
+- **Métadonnées service/model dans le runtime voix** :
+  - STT Deepgram remonte désormais `serviceProvider: "Deepgram"`, `model: "nova-2"`, `mode: "realtime"` et la langue quand disponible.
+  - TTS remonte le provider actif (`ElevenLabs`, `Inworld`, `Hume` ou `Unknown`) et les métadonnées déjà disponibles dans le pipeline.
+  - Max LLM / Avatar LLM réutilise le modèle OpenRouter déjà connu dans le pipeline quand il est présent.
+  - Les segments GM, Validateur et RAG restent défensifs : provider/model si disponible, sinon `Unknown`.
+- **PostHog aligné sur les segments admin** via l'initialisation existante et en no-op silencieux si PostHog n'est pas disponible :
+  - `ava_turn_latency_summary` : résumé par tour (`session_id`, `turn_index`, `correlation_id`, `total_latency_ms`, `blocked`, `blockage_reason`, `segment_count`, providers/models STT/LLM/TTS).
+  - `ava_latency_segment` : détail par segment (`segment_key`, `segment_label`, `duration_ms`, provider, service, model, mode, contexte non sensible).
+- **Comparaison par segment et service** dans l'onglet **Latence & blocage** : regroupement par segment existant puis par provider/service/model, nombre de tours, P50, P95, moyenne, max, nombre et taux de blocages.
+- **Switch P50 / P95** : P50 reste la métrique principale par défaut, avec bascule P95 pour inspecter les queues de latence.
+- **Cas extrêmes** : top 5 des durées les plus longues par groupe et badge visuel pour les valeurs supérieures au P95.
+- **Évolution temporelle par service** : trois visualisations dédiées **STT**, **Max LLM** et **TTS** avec axe vertical en secondes (2 décimales), axe horizontal numéroté par session, courbes min / médiane / max, filtre par service, mode superposition tous services, et détail indépendant par service.
+- **Sélection de sessions plus lisible** : par défaut seules les 8 dernières sessions disponibles sont affichées ; les graphes n'affichent plus les noms longs des sessions, seulement `#1`, `#2`, etc. La liste sous chaque graphe permet de cliquer une session pour la localiser visuellement sur la courbe.
+- **Tooltips enrichis** sur les segments existants : label inchangé, durée, provider/service, model, mode, tour/session et blocage éventuel, sans crash si les champs sont absents.
+
+### Modifié
+- `ConversationPipelineTimings` accepte maintenant des champs optionnels additionnels (`stt_ms`, `segmentServices`) sans modifier les contrats existants.
+- `voiceTelemetry.ts` publie les nouveaux événements PostHog en plus du stockage interne existant, en filtrant les propriétés aux métadonnées non sensibles : pas de texte utilisateur complet, pas de réponse avatar complète, pas de prompt, pas de secret.
+- L'admin explique explicitement pourquoi des services peuvent apparaître en `Unknown` : les sessions historiques ne contenaient pas encore `pipeline.segmentServices`; les nouveaux tours instrumentés renseignent ces champs progressivement.
+
+### Vérifié
+- `npx tsc --noEmit` : OK.
+- `npm test` : 29 tests passants.
+- `npm run build` : OK (warning de taille de chunk Vite existant uniquement).
+- ESLint ciblé sur les fichiers modifiés : OK.
+- Validation navigateur locale sur `http://127.0.0.1:8080/admin?tab=latency` : onglet rendu, 8 dernières sessions au maximum sélectionnées par défaut, graphes STT/Max LLM/TTS visibles, axe horizontal numéroté, clic sur une session de la liste reflété dans la visualisation.
+
+### Notes
+- Les anciennes sessions restent majoritairement en `Unknown` car elles n'ont pas été enregistrées avec les métadonnées `segmentServices`. C'est attendu et non bloquant.
+- Le lint global du projet contient encore des erreurs préexistantes hors scope ; le lint ciblé des fichiers modifiés passe.
+
 ## [0.23.0] - 2026-05-22 — PRD4 : nouveau parcours post-film + rôle utilisateur + Max contextualisé
 
 Refonte structurante (PRD4 §1–14, plan `docs/plan_prd4_implementation.md`) livrée en 6 phases dans la même journée. Remplacement de l'onboarding A/B par un parcours unique post-film, injection d'un rôle joueur libre dans Max, affichage des 4 protagonistes (Max actif, Emma/Ava/Léo grisés), bascule push-to-talk + sous-titres, suppression du GM pré-tour du chemin critique, GM post-turn async, questionnaire entièrement nouveau avec mapping Notion accentué.

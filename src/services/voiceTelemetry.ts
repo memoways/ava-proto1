@@ -51,6 +51,11 @@ export interface VoiceTurnCompletedInput {
     gm_model?: string;
     validator_model?: string;
   };
+  stt?: {
+    provider?: string;
+    model?: string;
+    mode?: string;
+  };
   rag?: {
     matches_count?: number;
     top_similarity?: number;
@@ -78,6 +83,9 @@ export type VoiceTurnCompletedPayload = VoiceTurnCompletedInput &
     media_recorder_mime: string;
     tts_provider?: string;
     tts_model?: string;
+    stt_provider?: string;
+    stt_model?: string;
+    stt_mode?: string;
     tts_segments_count?: number;
     tts_segments_played?: number;
     tts_segments_failed?: number;
@@ -228,6 +236,9 @@ export function buildVoiceTurnCompletedPayload(input: VoiceTurnCompletedInput): 
     media_recorder_mime: input.browser?.selectedMimeType || "",
     tts_provider: input.tts?.provider,
     tts_model: input.tts?.model,
+    stt_provider: input.stt?.provider,
+    stt_model: input.stt?.model,
+    stt_mode: input.stt?.mode,
     tts_segments_count: input.tts?.segments_count,
     tts_segments_played: input.tts?.segments_played,
     tts_segments_failed: input.tts?.segments_failed,
@@ -244,6 +255,7 @@ export function buildVoiceTurnCompletedPayload(input: VoiceTurnCompletedInput): 
 
 export function recordVoiceTurnCompleted(payload: VoiceTurnCompletedPayload): void {
   safe(() => trackEvent("voice_turn_completed", payload as unknown as Record<string, unknown>));
+  safe(() => recordAvaLatencyEvents(payload));
   safe(() => {
     void supabase
       .from("voice_turn_events" as never)
@@ -260,6 +272,112 @@ export function recordVoiceTurnCompleted(payload: VoiceTurnCompletedPayload): vo
         if (error) console.warn("[voiceTelemetry] insert voice_turn_events", error.message);
       });
   });
+}
+
+function recordAvaLatencyEvents(payload: VoiceTurnCompletedPayload): void {
+  const blocked = payload.severity === "slow" || payload.severity === "critical" || payload.severity === "failed";
+  const blockageReason = blocked ? payload.blocker_step || payload.blocker_reason : null;
+  const segments = [
+    {
+      key: "stt_ms",
+      label: "STT",
+      duration: payload.t_stt_total_ms,
+      provider: payload.stt_provider || payload.stt?.provider || "Deepgram",
+      serviceName: "deepgram",
+      model: payload.stt_model || payload.stt?.model || "nova-2",
+      mode: payload.stt_mode || payload.stt?.mode || "realtime",
+    },
+    {
+      key: "rag_ms",
+      label: "RAG",
+      duration: payload.t_rag_total_ms,
+      provider: "Unknown",
+      serviceName: "rag",
+      model: "Unknown",
+      mode: "",
+    },
+    {
+      key: "gm_pre_ms",
+      label: "GM pre-turn",
+      duration: payload.t_gm_pre_ms,
+      provider: "OpenRouter",
+      serviceName: "openrouter",
+      model: payload.gm_model || "Unknown",
+      mode: "",
+    },
+    {
+      key: "max_ms",
+      label: "Max LLM",
+      duration: payload.t_max_llm_ms,
+      provider: "OpenRouter",
+      serviceName: "openrouter",
+      model: payload.max_model || "Unknown",
+      mode: "",
+    },
+    {
+      key: "validator_ms",
+      label: "Validateur",
+      duration: payload.t_validator_ms,
+      provider: "OpenRouter",
+      serviceName: "openrouter",
+      model: payload.validator_model || payload.gm_model || "Unknown",
+      mode: "",
+    },
+    {
+      key: "tts_ms",
+      label: "TTS",
+      duration: payload.t_tts_total_ms,
+      provider: payload.tts_provider || "Unknown",
+      serviceName: payload.tts_provider || "Unknown",
+      model: payload.tts_model || "Unknown",
+      mode: "realtime",
+    },
+    {
+      key: "gm_post_ms",
+      label: "GM post-turn",
+      duration: payload.t_gm_post_ms,
+      provider: "OpenRouter",
+      serviceName: "openrouter",
+      model: payload.gm_model || "Unknown",
+      mode: "",
+    },
+  ].filter((segment) => typeof segment.duration === "number" && Number.isFinite(segment.duration) && segment.duration > 0);
+
+  trackEvent("ava_turn_latency_summary", {
+    session_id: payload.session_id ?? null,
+    turn_index: payload.turn_index,
+    correlation_id: payload.turn_id,
+    total_latency_ms: payload.t_turn_end_to_end_ms ?? payload.t_turn_voice_ready_ms ?? payload.t_turn_response_ready_ms ?? null,
+    blocked,
+    blockage_reason: blockageReason,
+    segment_count: segments.length,
+    stt_provider: payload.stt_provider || payload.stt?.provider || "Deepgram",
+    stt_model: payload.stt_model || payload.stt?.model || "nova-2",
+    llm_provider: "OpenRouter",
+    llm_model: payload.max_model || "Unknown",
+    tts_provider: payload.tts_provider || "Unknown",
+    tts_model: payload.tts_model || "Unknown",
+  });
+
+  for (const segment of segments) {
+    trackEvent("ava_latency_segment", {
+      session_id: payload.session_id ?? null,
+      turn_index: payload.turn_index,
+      correlation_id: payload.turn_id,
+      segment_key: segment.key,
+      segment_label: segment.label,
+      duration_ms: segment.duration,
+      provider: segment.provider,
+      service_name: segment.serviceName,
+      model: segment.model,
+      mode: segment.mode,
+      blocked: blocked && payload.blocker_step === segment.key.replace("_ms", "").replace("max", "max_llm").replace("tts", "tts_generation"),
+      blockage_reason: blockageReason,
+      scenario_id: payload.variant ?? null,
+      avatar_id: payload.character,
+      language: null,
+    });
+  }
 }
 
 export function recordVoiceError(record: VoiceErrorRecord): void {

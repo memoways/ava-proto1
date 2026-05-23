@@ -14,6 +14,13 @@ import { processPRD4Turn } from "@/services/prd4Orchestrator";
 import { createPRD4Session, endPRD4Session, updatePRD4Conversation } from "@/services/prd4Session";
 import { DeepgramSTT } from "@/services/deepgramSTT";
 import { TTSQueue, chunkTextForTTS } from "@/services/elevenLabsTTS";
+import { getGameplaySettings, getLLMSettings, getTTSSettings } from "@/services/settingsService";
+import { getActiveProviderId, getHumeSettings, getInworldSettings } from "@/services/tts/providerSettings";
+import {
+  buildVoiceTurnCompletedPayload,
+  createVoiceTurnId,
+  recordVoiceTurnCompleted,
+} from "@/services/voiceTelemetry";
 import { useTimer } from "@/hooks/useTimer";
 import { toast } from "@/hooks/use-toast";
 
@@ -32,6 +39,37 @@ import { savePRD4Questionnaire, syncPRD4QuestionnaireToNotion } from "@/services
 import type { QuestionnairePRD4Answers, QuestionnairePRD4Data } from "@/types";
 
 const SESSION_DURATION_S = 5 * 60; // PRD4 §11 : ~5 min cible.
+
+function currentTTSServiceInfo() {
+  try {
+    const provider = getActiveProviderId();
+    if (provider === "inworld") {
+      const s = getInworldSettings();
+      return { serviceProvider: "Inworld", serviceName: "inworld", model: s.modelId, mode: s.deliveryMode };
+    }
+    if (provider === "hume") {
+      const s = getHumeSettings();
+      return { serviceProvider: "Hume", serviceName: "hume", model: "octave", mode: s.format };
+    }
+    return { serviceProvider: "ElevenLabs", serviceName: "elevenlabs", model: getTTSSettings().modelId, mode: "streaming" };
+  } catch {
+    return { serviceProvider: "Unknown", serviceName: "Unknown", model: "Unknown", mode: "realtime" };
+  }
+}
+
+function currentLLMServiceInfo(model?: string) {
+  return { serviceProvider: "OpenRouter", serviceName: "openrouter", model: model || "Unknown", endpointType: "llm" };
+}
+
+function currentRAGServiceInfo() {
+  try {
+    const gameplay = getGameplaySettings();
+    const provider = gameplay.RAG_EMBEDDING_PROVIDER || "Unknown";
+    return { serviceProvider: provider === "voyage" ? "Voyage" : provider === "openai" ? "OpenAI" : "Unknown", serviceName: provider, model: "Unknown", endpointType: "rag" };
+  } catch {
+    return { serviceProvider: "Unknown", serviceName: "Unknown", model: "Unknown", endpointType: "rag" };
+  }
+}
 
 
 const IndexPRD4 = () => {
@@ -215,7 +253,12 @@ const IndexPRD4 = () => {
       conversationRef.current = [...conversationRef.current, userMsg];
       addMessage(userMsg);
 
+      const turnIndex = conversationRef.current.filter((m) => m.role === "user").length;
+      const turnId = createVoiceTurnId(sessionIdRef.current, turnIndex);
       const elapsed = SESSION_DURATION_S - (timerRef.current?.remaining ?? SESSION_DURATION_S);
+      const llmSettings = (() => { try { return getLLMSettings(); } catch { return null; } })();
+      const ttsService = currentTTSServiceInfo();
+      const ragService = currentRAGServiceInfo();
 
       try {
         const result = await processPRD4Turn({
@@ -239,6 +282,10 @@ const IndexPRD4 = () => {
             max_ms: result.timings.max_ms,
             total_ms: result.timings.total_ms,
             blocker,
+            segmentServices: {
+              rag_ms: ragService,
+              max_ms: currentLLMServiceInfo(llmSettings?.LLM_MODEL),
+            },
           },
         };
         conversationRef.current = [...conversationRef.current, maxMsg];
@@ -250,17 +297,72 @@ const IndexPRD4 = () => {
         const queue = new TTSQueue({ onError: (e) => console.warn("[TTS] turn error:", e.message) });
         ttsQueueRef.current = queue;
         for (const chunk of chunkTextForTTS(result.maxResponse)) {
-          queue.enqueue(chunk, { session_id: sessionIdRef.current ?? undefined });
+          queue.enqueue(chunk, { session_id: sessionIdRef.current ?? undefined, turn_id: turnId, turn_index: turnIndex });
         }
-        await queue.drain();
+        const ttsResult = await queue.drain();
         const tts_ms = Math.round(performance.now() - ttsStart);
         if (maxMsg.pipeline) {
           maxMsg.pipeline.tts_ms = tts_ms;
           maxMsg.pipeline.total_ms = (maxMsg.pipeline.total_ms ?? 0) + tts_ms;
+          maxMsg.pipeline.segmentServices = {
+            ...(maxMsg.pipeline.segmentServices || {}),
+            tts_ms: ttsService,
+          };
           if (tts_ms > (maxMsg.pipeline.max_ms ?? 0) && tts_ms > (maxMsg.pipeline.rag_ms ?? 0)) {
             maxMsg.pipeline.blocker = "tts_ms";
           }
         }
+
+        const sttTelemetry = sttRef.current?.getLastFinalTelemetry();
+        if (maxMsg.pipeline && typeof sttTelemetry?.t_stt_ms === "number") {
+          maxMsg.pipeline.stt_ms = sttTelemetry.t_stt_ms;
+          maxMsg.pipeline.segmentServices = {
+            ...(maxMsg.pipeline.segmentServices || {}),
+            stt_ms: {
+              serviceProvider: "Deepgram",
+              serviceName: "deepgram",
+              model: sttTelemetry.model || "nova-2",
+              mode: "realtime",
+            },
+          };
+        }
+        recordVoiceTurnCompleted(buildVoiceTurnCompletedPayload({
+          session_id: sessionIdRef.current,
+          turn_id: turnId,
+          turn_index: turnIndex,
+          character: "max",
+          voice_modality: "push_to_talk",
+          user_message_len: userText.length,
+          max_response_len: result.maxResponse.length,
+          timings: {
+            t_stt_total_ms: sttTelemetry?.t_stt_ms,
+            t_rag_total_ms: result.timings.rag_ms,
+            t_max_llm_ms: result.timings.max_ms,
+            t_tts_total_ms: tts_ms,
+            t_audio_playback_total_ms: ttsResult.playbackTotalMs,
+            t_turn_response_ready_ms: result.timings.total_ms,
+            t_turn_voice_ready_ms: (result.timings.total_ms ?? 0) + tts_ms,
+          },
+          models: {
+            max_model: llmSettings?.LLM_MODEL,
+            gm_model: llmSettings?.LLM_MODEL_GM,
+          },
+          rag: { matches_count: result.ragMatches },
+          tts: {
+            provider: ttsService.serviceName,
+            model: ttsService.model,
+            segments_count: ttsResult.generatedSegments,
+            segments_played: ttsResult.playedSegments,
+            segments_failed: ttsResult.failedSegments,
+          },
+          stt: {
+            provider: "Deepgram",
+            model: sttTelemetry?.model || "nova-2",
+            mode: "realtime",
+          },
+          had_error: ttsResult.status === "failed",
+          error_type: ttsResult.status === "failed" ? "tts" : null,
+        }));
 
         // Persist conversation (best effort, fire-and-forget)
         if (sessionIdRef.current) {
@@ -319,6 +421,14 @@ const IndexPRD4 = () => {
           incrementPttError();
           trackEvent("prd4_ptt_error", { phase: "conversation", message: err.message });
           setUserSubtitle("Micro indisponible — réessaie.");
+        },
+        getTelemetryContext: () => {
+          const turnIndex = conversationRef.current.filter((m) => m.role === "user").length + 1;
+          return {
+            session_id: sessionIdRef.current,
+            turn_index: turnIndex,
+            turn_id: createVoiceTurnId(sessionIdRef.current, turnIndex),
+          };
         },
       },
     );

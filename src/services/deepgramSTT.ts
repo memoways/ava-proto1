@@ -41,6 +41,9 @@ export interface STTFinalTelemetry {
   trigger: "silence" | "ptt_flush";
   selectedMimeType: string;
   turn_id?: string | null;
+  provider?: string;
+  model?: string;
+  language?: string;
 }
 
 export class DeepgramSTT {
@@ -59,6 +62,7 @@ export class DeepgramSTT {
   private selectedMimeType = "";
   private lastFinalTelemetry: STTFinalTelemetry | null = null;
   private manualMode = false;
+  private config: DeepgramConfig | null = null;
 
   /** Disable automatic silence-based finalization. Caller must invoke `flush()` to end an utterance. */
   setManualMode(manual: boolean) {
@@ -115,6 +119,7 @@ export class DeepgramSTT {
 
   async start() {
     const config = await getDeepgramToken();
+    this.config = config;
 
     // Get microphone
     this.stream = await withTimeout(
@@ -219,6 +224,9 @@ export class DeepgramSTT {
       trigger,
       selectedMimeType: this.selectedMimeType,
       turn_id: context.turn_id,
+      provider: "Deepgram",
+      model: this.config?.model || "nova-2",
+      language: this.config?.language || "fr",
     };
     recordAudioLatency({
       session_id: context.session_id ?? undefined,
@@ -228,6 +236,10 @@ export class DeepgramSTT {
       stt_text_len: finalText.length,
       metadata: {
         turn_id: context.turn_id ?? null,
+        provider: "Deepgram",
+        model: this.config?.model || "nova-2",
+        mode: "realtime",
+        language: this.config?.language || "fr",
         silence_window_ms: DeepgramSTT.SILENCE_DELAY_MS,
         trigger,
         selected_mime_type: this.selectedMimeType,
