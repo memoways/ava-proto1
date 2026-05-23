@@ -227,7 +227,20 @@ const IndexPRD4 = () => {
           characterName: "Max",
         });
 
-        const maxMsg: ConversationMessage = { role: "max", content: result.maxResponse, timestamp: Date.now() };
+        const ttsStart = performance.now();
+        const blocker =
+          (result.timings.max_ms ?? 0) >= (result.timings.rag_ms ?? 0) ? "max_ms" : "rag_ms";
+        const maxMsg: ConversationMessage = {
+          role: "max",
+          content: result.maxResponse,
+          timestamp: Date.now(),
+          pipeline: {
+            rag_ms: result.timings.rag_ms,
+            max_ms: result.timings.max_ms,
+            total_ms: result.timings.total_ms,
+            blocker,
+          },
+        };
         conversationRef.current = [...conversationRef.current, maxMsg];
         addMessage(maxMsg);
         setMaxSubtitle(result.maxResponse);
@@ -240,6 +253,14 @@ const IndexPRD4 = () => {
           queue.enqueue(chunk, { session_id: sessionIdRef.current ?? undefined });
         }
         await queue.drain();
+        const tts_ms = Math.round(performance.now() - ttsStart);
+        if (maxMsg.pipeline) {
+          maxMsg.pipeline.tts_ms = tts_ms;
+          maxMsg.pipeline.total_ms = (maxMsg.pipeline.total_ms ?? 0) + tts_ms;
+          if (tts_ms > (maxMsg.pipeline.max_ms ?? 0) && tts_ms > (maxMsg.pipeline.rag_ms ?? 0)) {
+            maxMsg.pipeline.blocker = "tts_ms";
+          }
+        }
 
         // Persist conversation (best effort, fire-and-forget)
         if (sessionIdRef.current) {
