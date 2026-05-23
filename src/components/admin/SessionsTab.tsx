@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink } from "lucide-react";
+import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity } from "lucide-react";
 import { Link } from "react-router-dom";
 
 /** Onglet admin où corriger la cause racine selon le type de fallback GM. */
@@ -293,6 +293,14 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
               )}
               {/* Action buttons on hover */}
               <div className="absolute right-2 top-2 hidden group-hover:flex gap-1">
+                <Link
+                  to={`/admin?tab=latency&session=${s.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="p-1 rounded bg-muted/80 hover:bg-muted text-muted-foreground"
+                  title="Voir latences & blocages"
+                >
+                  <Activity className="w-3 h-3" />
+                </Link>
                 <button
                   onClick={(e) => { e.stopPropagation(); setEditingName(s.id); setNameInput(s.name || ""); }}
                   className="p-1 rounded bg-muted/80 hover:bg-muted text-muted-foreground"
@@ -360,18 +368,25 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
       <div>
         {selected ? (
           <div className="border rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
               <h2 className="text-lg font-semibold">
                 {selected.name || `Session ${selected.id.slice(0, 8)}`}
               </h2>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={() => deleteSession(selected.id)}
-                disabled={deleting === selected.id}
-              >
-                <Trash2 className="w-3 h-3 mr-1" /> Supprimer
-              </Button>
+              <div className="flex items-center gap-2">
+                <Link to={`/admin?tab=latency&session=${selected.id}`}>
+                  <Button size="sm" variant="outline">
+                    <Activity className="w-3 h-3 mr-1" /> Voir latences
+                  </Button>
+                </Link>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => deleteSession(selected.id)}
+                  disabled={deleting === selected.id}
+                >
+                  <Trash2 className="w-3 h-3 mr-1" /> Supprimer
+                </Button>
+              </div>
             </div>
 
             {selected.admin_note && (
