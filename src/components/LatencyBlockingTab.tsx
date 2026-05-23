@@ -1006,7 +1006,7 @@ export default function LatencyBlockingTab() {
     setLoading(true);
     const { data, error } = await supabase
       .from("sessions")
-      .select("id, started_at, ended_at, conversation_log, game_over_reason")
+      .select("id, name, started_at, ended_at, conversation_log, game_over_reason")
       .order("started_at", { ascending: false })
       .limit(50);
     if (error) console.error(error);
@@ -1017,6 +1017,30 @@ export default function LatencyBlockingTab() {
   useEffect(() => {
     load();
   }, []);
+
+  // Sync focus from URL ?session=<id> (deep link from Sessions tab)
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const sid = searchParams.get("session");
+    if (!sid) return;
+    if (!sessions.some((s) => s.id === sid)) return;
+    setFocusId(sid);
+    setSelectedIds((prev) => {
+      if (prev.has(sid)) return prev;
+      const next = new Set(prev);
+      next.add(sid);
+      return next;
+    });
+    setExpandedIds((prev) => {
+      if (prev.has(sid)) return prev;
+      const next = new Set(prev);
+      next.add(sid);
+      return next;
+    });
+  }, [searchParams, sessions]);
+
+  const [conversationOpen, setConversationOpen] = useState(false);
+
 
   const aggregates = useMemo(() => sessions.map(aggregate).filter((a) => a.turnCount > 0), [sessions]);
 
