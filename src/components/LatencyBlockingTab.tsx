@@ -1416,19 +1416,29 @@ export default function LatencyBlockingTab() {
           {/* Focused session detail */}
           {focused && (
             <div className="border rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
                 <div>
-                  <h3 className="text-sm font-semibold font-mono">{focused.session.id}</h3>
+                  <h3 className="text-sm font-semibold">{sessionLabel(focused.session)}</h3>
+                  <p className="text-[10px] font-mono text-muted-foreground/70">{focused.session.id}</p>
                   <p className="text-xs text-muted-foreground">
                     {focused.turnCount} tour(s) Max • Game over&nbsp;: {focused.session.game_over_reason || "—"}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {focused.lastBlocker?.step ? (
                     <Badge variant="destructive">Blocage : {focused.lastBlocker.step}</Badge>
                   ) : (
                     <Badge variant="secondary">Aucun blocage</Badge>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={() => setConversationOpen(true)}
+                    disabled={!Array.isArray(focused.session.conversation_log) || focused.session.conversation_log.length === 0}
+                  >
+                    <MessageSquare className="h-3 w-3 mr-1" /> Voir la conversation
+                  </Button>
                   <Button
                     size="sm"
                     variant="ghost"
@@ -1478,6 +1488,45 @@ export default function LatencyBlockingTab() {
                   </table>
                 </ScrollArea>
               </div>
+
+              <Sheet open={conversationOpen} onOpenChange={setConversationOpen}>
+                <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+                  <SheetHeader>
+                    <SheetTitle className="text-base">
+                      Conversation — {sessionLabel(focused.session)}
+                    </SheetTitle>
+                    <SheetDescription className="text-xs font-mono">
+                      {focused.session.id}
+                    </SheetDescription>
+                  </SheetHeader>
+                  <div className="mt-4 space-y-2">
+                    {Array.isArray(focused.session.conversation_log) &&
+                      focused.session.conversation_log.map((msg: any, i: number) => (
+                        <div
+                          key={i}
+                          className={`text-sm rounded p-2 ${
+                            msg.role === "max"
+                              ? "bg-blue-500/10 border border-blue-500/20"
+                              : "bg-emerald-500/10 border border-emerald-500/20"
+                          }`}
+                        >
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-2">
+                            <span className="font-semibold">{msg.role === "max" ? "Max" : "Utilisateur"}</span>
+                            {msg.pipeline?.total_ms != null && (
+                              <span className="font-mono">{fmtMs(msg.pipeline.total_ms)}</span>
+                            )}
+                            {msg.pipeline?.blocker && (
+                              <Badge variant="destructive" className="text-[10px] py-0 px-1.5">
+                                blocker: {msg.pipeline.blocker}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                        </div>
+                      ))}
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           )}
         </div>
