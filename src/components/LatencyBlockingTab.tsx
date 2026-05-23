@@ -1390,12 +1390,12 @@ export default function LatencyBlockingTab() {
                 onToggleExpanded={toggleExpanded}
                 perSessionRows={selectedAggregates.map((a) => ({
                   id: a.session.id,
-                  label: a.session.id.slice(0, 8),
+                  label: sessionLabel(a.session),
                   sublabel: `${a.turnCount} tour(s)${
                     a.session.started_at
                       ? " · " + new Date(a.session.started_at).toLocaleDateString("fr-CH")
                       : ""
-                  }`,
+                  }${a.session.name ? " · " + a.session.id.slice(0, 8) : ""}`,
                   avg: a.avg,
                   turnCount: a.turnCount,
                   dispersion: computeDispersion(
