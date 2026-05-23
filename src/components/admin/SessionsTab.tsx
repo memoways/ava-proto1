@@ -360,18 +360,25 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
       <div>
         {selected ? (
           <div className="border rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
               <h2 className="text-lg font-semibold">
                 {selected.name || `Session ${selected.id.slice(0, 8)}`}
               </h2>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={() => deleteSession(selected.id)}
-                disabled={deleting === selected.id}
-              >
-                <Trash2 className="w-3 h-3 mr-1" /> Supprimer
-              </Button>
+              <div className="flex items-center gap-2">
+                <Link to={`/admin?tab=latency&session=${selected.id}`}>
+                  <Button size="sm" variant="outline">
+                    <Activity className="w-3 h-3 mr-1" /> Voir latences
+                  </Button>
+                </Link>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => deleteSession(selected.id)}
+                  disabled={deleting === selected.id}
+                >
+                  <Trash2 className="w-3 h-3 mr-1" /> Supprimer
+                </Button>
+              </div>
             </div>
 
             {selected.admin_note && (
