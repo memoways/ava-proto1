@@ -253,6 +253,14 @@ const IndexPRD4 = () => {
           queue.enqueue(chunk, { session_id: sessionIdRef.current ?? undefined });
         }
         await queue.drain();
+        const tts_ms = Math.round(performance.now() - ttsStart);
+        if (maxMsg.pipeline) {
+          maxMsg.pipeline.tts_ms = tts_ms;
+          maxMsg.pipeline.total_ms = (maxMsg.pipeline.total_ms ?? 0) + tts_ms;
+          if (tts_ms > (maxMsg.pipeline.max_ms ?? 0) && tts_ms > (maxMsg.pipeline.rag_ms ?? 0)) {
+            maxMsg.pipeline.blocker = "tts_ms";
+          }
+        }
 
         // Persist conversation (best effort, fire-and-forget)
         if (sessionIdRef.current) {
