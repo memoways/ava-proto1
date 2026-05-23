@@ -1301,10 +1301,17 @@ export default function LatencyBlockingTab() {
                     onClick={() => handleFocus(a.session.id)}
                     className="flex-1 text-left"
                   >
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-mono">{a.session.id.slice(0, 8)}</span>
-                      <span className="text-muted-foreground">{a.turnCount} tour(s)</span>
+                    <div className="flex justify-between items-center mb-1 gap-2">
+                      <span className="font-semibold truncate" title={a.session.id}>
+                        {sessionLabel(a.session)}
+                      </span>
+                      <span className="text-muted-foreground shrink-0">{a.turnCount} tour(s)</span>
                     </div>
+                    {a.session.name && (
+                      <div className="font-mono text-[10px] text-muted-foreground/70">
+                        {a.session.id.slice(0, 8)}
+                      </div>
+                    )}
                     <div className="text-muted-foreground">
                       {a.session.started_at ? new Date(a.session.started_at).toLocaleString("fr-CH") : "—"}
                     </div>
