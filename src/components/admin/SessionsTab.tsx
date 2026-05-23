@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink } from "lucide-react";
+import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity } from "lucide-react";
 import { Link } from "react-router-dom";
 
 /** Onglet admin où corriger la cause racine selon le type de fallback GM. */
