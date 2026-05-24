@@ -35,7 +35,7 @@ export class GamilabSTT implements STTSession {
   private fullTranscript = "";
   private startedAt = 0;
   private firstPartialAt = 0;
-  private lastFinalTelemetry: unknown = null;
+  private lastFinalTelemetry: import("../types").STTFinalTelemetryBase | null = null;
 
   constructor(onTranscript: TranscriptCallback, opts?: STTCreateOptions) {
     this.onTranscript = onTranscript;
@@ -51,7 +51,7 @@ export class GamilabSTT implements STTSession {
     return null;
   }
 
-  getLastFinalTelemetry(): unknown {
+  getLastFinalTelemetry(): import("../types").STTFinalTelemetryBase | null {
     return this.lastFinalTelemetry;
   }
 

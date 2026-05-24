@@ -30,6 +30,17 @@ export interface STTSettings {
   activeProvider: STTProviderId;
 }
 
+export interface STTFinalTelemetryBase {
+  t_stt_ms: number;
+  stt_text_len: number;
+  trigger: string;
+  provider?: string;
+  model?: string;
+  language?: string;
+  selectedMimeType?: string;
+  turn_id?: string | null;
+}
+
 export interface STTSession {
   readonly isActive: boolean;
   start(): Promise<void>;
@@ -39,7 +50,7 @@ export interface STTSession {
   flush(): void;
   setManualMode(manual: boolean): void;
   getStream?(): MediaStream | null;
-  getLastFinalTelemetry?(): unknown;
+  getLastFinalTelemetry?(): STTFinalTelemetryBase | null;
 }
 
 export interface STTCreateOptions {

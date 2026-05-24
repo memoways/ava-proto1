@@ -20,18 +20,18 @@ export const STT_PROVIDER_LIST: STTProviderDefinition[] = [
   {
     id: "openai_whisper",
     label: "OpenAI Whisper",
-    description: "Transcription externe de référence qualité, préparée en mode minimal.",
+    description: "Transcription batch via /v1/audio/transcriptions (whisper-1). Pas de partiels, qualité de référence.",
     mode: "batch",
     expectedSecrets: ["OPENAI_API_KEY"],
-    implemented: false,
+    implemented: true,
   },
   {
     id: "assemblyai",
     label: "AssemblyAI",
-    description: "Alternative commerciale STT, préparée en mode minimal.",
-    mode: "hybrid",
+    description: "Universal Streaming v3 — WebSocket realtime PCM 16kHz avec turn detection.",
+    mode: "streaming",
     expectedSecrets: ["ASSEMBLYAI_API_KEY"],
-    implemented: false,
+    implemented: true,
   },
 ];
 

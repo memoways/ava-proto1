@@ -67,13 +67,13 @@ export async function getSTTProviderRuntimeStatuses(): Promise<Record<STTProvide
     },
     openai_whisper: {
       provider: "openai_whisper",
-      status: config.configured.openai_whisper ? "disabled" : "missing_config",
-      message: config.configured.openai_whisper ? "Préparé, activation runtime à finaliser" : "Secret OPENAI_API_KEY requis",
+      status: config.configured.openai_whisper ? "ready" : "missing_config",
+      message: config.configured.openai_whisper ? "Prêt via proxy-stt-whisper (batch, whisper-1)" : "Secret OPENAI_API_KEY requis",
     },
     assemblyai: {
       provider: "assemblyai",
-      status: config.configured.assemblyai ? "disabled" : "missing_config",
-      message: config.configured.assemblyai ? "Préparé, activation runtime à finaliser" : "Secret ASSEMBLYAI_API_KEY requis",
+      status: config.configured.assemblyai ? "ready" : "missing_config",
+      message: config.configured.assemblyai ? "Prêt via proxy-stt-assemblyai (Universal Streaming v3)" : "Secret ASSEMBLYAI_API_KEY requis",
     },
   };
 }
