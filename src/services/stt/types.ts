@@ -39,7 +39,7 @@ export interface STTSession {
   flush(): void;
   setManualMode(manual: boolean): void;
   getStream?(): MediaStream | null;
-  getLastFinalTelemetry?(): unknown;
+  getLastFinalTelemetry?(): import("@/services/deepgramSTT").STTFinalTelemetry | null | unknown;
 }
 
 export interface STTCreateOptions {
