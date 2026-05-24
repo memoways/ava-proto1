@@ -118,6 +118,7 @@ export interface ConversationPipelineTimings {
   gm_pre_ms?: number;
   max_ms?: number;
   validator_ms?: number;
+  /** TTS latency until audio playback starts. Playback duration is tracked separately in voice telemetry. */
   tts_ms?: number;
   gm_post_ms?: number;
   total_ms?: number;

@@ -16,6 +16,11 @@ interface PendingEntry {
   rejectBlob: (e: unknown) => void;
 }
 
+interface TTSQueueOptions {
+  onError?: (err: Error) => void;
+  onFirstPlaybackStart?: (latencyMs: number) => void;
+}
+
 export class TTSQueue {
   private queue: Promise<void> = Promise.resolve();
   private _cancelled = false;
@@ -24,15 +29,20 @@ export class TTSQueue {
   private failedCount = 0;
   private playbackStartMsTotal = 0;
   private playbackTotalMs = 0;
+  private firstEnqueuedAt: number | null = null;
+  private firstPlaybackStartMs: number | null = null;
+  private generationWallMs = 0;
   private lastSentText = "";
   private pending: PendingEntry[] = [];
   private flushScheduled = false;
   private onError?: (err: Error) => void;
+  private onFirstPlaybackStart?: (latencyMs: number) => void;
   private errorReported = false;
   private lastError?: Error;
 
-  constructor(opts?: { onError?: (err: Error) => void }) {
+  constructor(opts?: TTSQueueOptions) {
     this.onError = opts?.onError;
+    this.onFirstPlaybackStart = opts?.onFirstPlaybackStart;
   }
 
   private reportError(err: unknown) {
@@ -44,6 +54,7 @@ export class TTSQueue {
 
   enqueue(text: string, options?: TTSOptions): void {
     if (this._cancelled || !text.trim()) return;
+    this.firstEnqueuedAt ??= performance.now();
 
     let resolveBlob!: (b: Blob) => void;
     let rejectBlob!: (e: unknown) => void;
@@ -61,7 +72,11 @@ export class TTSQueue {
         const blob = await blobPromise;
         if (this._cancelled) return;
         const playStart = performance.now();
-        const result = await playAudioBlob(blob);
+        const result = await playAudioBlob(blob, () => {
+          if (this.firstPlaybackStartMs !== null || this.firstEnqueuedAt === null) return;
+          this.firstPlaybackStartMs = Math.max(0, Math.round(performance.now() - this.firstEnqueuedAt));
+          this.onFirstPlaybackStart?.(this.firstPlaybackStartMs);
+        });
         this.playbackStartMsTotal += result?.playbackStartMs ?? 0;
         this.playbackTotalMs += result?.playbackTotalMs ?? Math.round(performance.now() - playStart);
         this.playbackCount++;
@@ -110,6 +125,7 @@ export class TTSQueue {
     })
       .then((blob) => {
         const genTime = performance.now() - genStart;
+        this.generationWallMs = Math.max(this.generationWallMs, Math.round(performance.now() - (this.firstEnqueuedAt ?? genStart)));
         this.generationCount++;
         const stitchTag = `${previousText ? "P" : "-"}${nextText ? "N" : "-"}`;
         console.log(`[TTS-Queue] Generated #${this.generationCount} in ${genTime.toFixed(0)}ms stitch=${stitchTag} (${entry.text.slice(0, 40)}...)`);
@@ -125,19 +141,22 @@ export class TTSQueue {
     generatedSegments: number;
     playbackStartMs: number;
     playbackTotalMs: number;
+    firstPlaybackStartMs: number;
+    generationWallMs: number;
     error?: Error;
   }> {
     await this.queue;
+    const firstPlaybackStartMs = this.firstPlaybackStartMs ?? 0;
     if (this._cancelled) {
-      return { status: "cancelled", playedSegments: this.playbackCount, failedSegments: this.failedCount, generatedSegments: this.generationCount, playbackStartMs: this.playbackStartMsTotal, playbackTotalMs: this.playbackTotalMs, error: this.lastError };
+      return { status: "cancelled", playedSegments: this.playbackCount, failedSegments: this.failedCount, generatedSegments: this.generationCount, playbackStartMs: this.playbackStartMsTotal, playbackTotalMs: this.playbackTotalMs, firstPlaybackStartMs, generationWallMs: this.generationWallMs, error: this.lastError };
     }
     if (this.failedCount > 0) {
-      return { status: "failed", playedSegments: this.playbackCount, failedSegments: this.failedCount, generatedSegments: this.generationCount, playbackStartMs: this.playbackStartMsTotal, playbackTotalMs: this.playbackTotalMs, error: this.lastError };
+      return { status: "failed", playedSegments: this.playbackCount, failedSegments: this.failedCount, generatedSegments: this.generationCount, playbackStartMs: this.playbackStartMsTotal, playbackTotalMs: this.playbackTotalMs, firstPlaybackStartMs, generationWallMs: this.generationWallMs, error: this.lastError };
     }
     if (this.playbackCount === 0) {
-      return { status: "skipped", playedSegments: 0, failedSegments: 0, generatedSegments: this.generationCount, playbackStartMs: 0, playbackTotalMs: 0 };
+      return { status: "skipped", playedSegments: 0, failedSegments: 0, generatedSegments: this.generationCount, playbackStartMs: 0, playbackTotalMs: 0, firstPlaybackStartMs, generationWallMs: this.generationWallMs };
     }
-    return { status: "played", playedSegments: this.playbackCount, failedSegments: 0, generatedSegments: this.generationCount, playbackStartMs: this.playbackStartMsTotal, playbackTotalMs: this.playbackTotalMs };
+    return { status: "played", playedSegments: this.playbackCount, failedSegments: 0, generatedSegments: this.generationCount, playbackStartMs: this.playbackStartMsTotal, playbackTotalMs: this.playbackTotalMs, firstPlaybackStartMs, generationWallMs: this.generationWallMs };
   }
 
   cancel(): void {

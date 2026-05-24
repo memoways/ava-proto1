@@ -161,7 +161,7 @@ const STEP_HYPOTHESES: Record<NumericTimingKey, string[]> = {
     "Validation déclenchée seulement quand triggers/trust changent",
   ],
   tts_ms: [
-    "Streaming ElevenLabs (déjà actif ?) — vérifier le first-byte",
+    "Vérifier le délai texte → premier son audible",
     "Voice ID plus rapide ou modèle TTS turbo",
     "Pré-charger l'intro TTS pendant la phase ringing",
   ],
@@ -592,9 +592,9 @@ function LatencyVisualization({
           <h3 className="text-sm font-semibold">Latence réelle &amp; répartition</h3>
           <p className="text-xs text-muted-foreground">
             {isAggregate
-              ? "Moyenne réelle par session, mesurée à partir de la conversation."
-              : "Moyenne réelle des tours de la session."}{" "}
-            Cible : &lt; {TARGET_MS / 1000}s end-to-end. Clique sur ▸ pour voir le détail par tour.
+              ? "Moyenne réelle par session, mesurée à partir des latences de service."
+              : "Moyenne réelle des latences de service de la session."}{" "}
+            La durée de parole utilisateur et la durée de lecture audio TTS sont exclues. Clique sur ▸ pour voir le détail par tour.
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground/80 flex items-center gap-1">
             <Info className="h-3 w-3" /> Survole un segment pour un aperçu, clique dessus pour ouvrir le panneau d'analyse détaillée.
@@ -1638,7 +1638,7 @@ export default function LatencyBlockingTab() {
         <div>
           <h2 className="text-lg font-semibold">Latence & blocage</h2>
           <p className="text-xs text-muted-foreground">
-            Sélectionne une ou plusieurs sessions pour comparer leurs latences cumulatives. Par défaut: les {DEFAULT_SELECTED_SESSION_COUNT} plus récentes.
+            Sélectionne une ou plusieurs sessions pour comparer uniquement les latences de service. Par défaut: les {DEFAULT_SELECTED_SESSION_COUNT} plus récentes.
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={load} disabled={loading}>

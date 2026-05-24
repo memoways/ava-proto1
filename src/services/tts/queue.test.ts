@@ -15,7 +15,10 @@ describe("TTSQueue drain status", () => {
 
   it("reports played segments when generation and playback succeed", async () => {
     vi.mocked(generateSpeech).mockResolvedValue(new Blob(["audio"], { type: "audio/mpeg" }));
-    vi.mocked(playAudioBlob).mockResolvedValue(undefined);
+    vi.mocked(playAudioBlob).mockImplementation(async (_blob, onPlaybackStart) => {
+      onPlaybackStart?.(0);
+      return { status: "played", playbackStartMs: 0, playbackTotalMs: 0 };
+    });
     const queue = new TTSQueue();
 
     queue.enqueue("Bonjour.");
@@ -28,6 +31,8 @@ describe("TTSQueue drain status", () => {
       generatedSegments: 1,
       playbackStartMs: 0,
       playbackTotalMs: 0,
+      firstPlaybackStartMs: expect.any(Number),
+      generationWallMs: expect.any(Number),
     });
   });
 

@@ -54,7 +54,11 @@ export function isAudioPlaybackUnlocked(): boolean {
   return unlocked || audioContext?.state === "running";
 }
 
-export async function playAudioBlobRobust(blob: Blob, timeoutMs = 20000): Promise<PlaybackResult> {
+export async function playAudioBlobRobust(
+  blob: Blob,
+  timeoutMs = 20000,
+  onPlaybackStart?: (playbackStartMs: number) => void,
+): Promise<PlaybackResult> {
   const audioUrl = URL.createObjectURL(blob);
   const audio = new Audio(audioUrl);
   const t0 = performance.now();
@@ -67,6 +71,7 @@ export async function playAudioBlobRobust(blob: Blob, timeoutMs = 20000): Promis
       audio.play()
         .then(() => {
           playbackStartMs = Math.round(performance.now() - t0);
+          onPlaybackStart?.(playbackStartMs);
         })
         .catch(reject);
     }), timeoutMs, () => {

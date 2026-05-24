@@ -80,8 +80,11 @@ export async function generateSpeech(text: string, opts?: TTSOptions): Promise<B
 }
 
 /** Play an audio Blob through an <audio> element. */
-export function playAudioBlob(blob: Blob): Promise<PlaybackResult> {
-  return playAudioBlobRobust(blob).then((result) => {
+export function playAudioBlob(
+  blob: Blob,
+  onPlaybackStart?: (playbackStartMs: number) => void,
+): Promise<PlaybackResult> {
+  return playAudioBlobRobust(blob, undefined, onPlaybackStart).then((result) => {
     if (result.status === "played") return result;
     const error = result.error || new Error("Audio playback failed");
     (error as Error & { playbackErrorType?: string }).playbackErrorType = result.errorInfo?.type;

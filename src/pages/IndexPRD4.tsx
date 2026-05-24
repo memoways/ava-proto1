@@ -325,7 +325,15 @@ const IndexPRD4 = () => {
         setAudioState("max_speaking");
 
         // TTS streaming
-        const queue = new TTSQueue({ onError: (e) => console.warn("[TTS] turn error:", e.message) });
+        let ttsLatencySegmentDone = false;
+        const queue = new TTSQueue({
+          onError: (e) => console.warn("[TTS] turn error:", e.message),
+          onFirstPlaybackStart: () => {
+            if (ttsLatencySegmentDone) return;
+            ttsLatencySegmentDone = true;
+            endLatencySegment(ttsLatencySegmentId);
+          },
+        });
         ttsQueueRef.current = queue;
         const ttsLatencySegmentId = latencyOverlayEnabled
           ? startLatencySegment({ segment: "TTS", service: latencyServiceLabel(ttsService) })
@@ -334,9 +342,9 @@ const IndexPRD4 = () => {
           queue.enqueue(chunk, { session_id: sessionIdRef.current ?? undefined, turn_id: turnId, turn_index: turnIndex });
         }
         const ttsResult = await queue.drain().finally(() => {
-          endLatencySegment(ttsLatencySegmentId);
+          if (!ttsLatencySegmentDone) endLatencySegment(ttsLatencySegmentId);
         });
-        const tts_ms = Math.round(performance.now() - ttsStart);
+        const tts_ms = ttsResult.firstPlaybackStartMs || ttsResult.generationWallMs || Math.round(performance.now() - ttsStart);
         if (maxMsg.pipeline) {
           maxMsg.pipeline.tts_ms = tts_ms;
           maxMsg.pipeline.total_ms = (maxMsg.pipeline.total_ms ?? 0) + tts_ms;
