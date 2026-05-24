@@ -1,5 +1,6 @@
 import type { LatencySegmentKey, LatencyServiceInfo } from "@/services/latencySegments";
 import { getGameplaySettings, getLLMSettings, getTTSSettings } from "@/services/settingsService";
+import { getSTTProvider, getSTTProviderDefinition } from "@/services/stt";
 import { getActiveProviderId, getHumeSettings, getInworldSettings } from "@/services/tts/providerSettings";
 
 export function getConfiguredTTSServiceInfo(): LatencyServiceInfo {
@@ -31,6 +32,21 @@ export function getConfiguredTTSServiceInfo(): LatencyServiceInfo {
     };
   } catch {
     return { serviceProvider: "Unknown", serviceName: "Unknown", model: "Unknown", mode: "realtime" };
+  }
+}
+
+export function getConfiguredSTTServiceInfo(): LatencyServiceInfo {
+  try {
+    const providerId = getSTTProvider();
+    const provider = getSTTProviderDefinition(providerId);
+    return {
+      serviceProvider: provider.label,
+      serviceName: provider.id,
+      model: provider.id === "deepgram" ? "nova-2" : provider.id,
+      mode: provider.mode,
+    };
+  } catch {
+    return { serviceProvider: "Deepgram", serviceName: "deepgram", model: "nova-2", mode: "streaming" };
   }
 }
 

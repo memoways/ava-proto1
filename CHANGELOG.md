@@ -4,6 +4,55 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.25.0] - 2026-05-24 — Sélecteur STT input multi-providers pour Lovable
+
+Objectif de départ : préparer dans le repo l'ajout d'un sélecteur global de provider STT pour l'input vocal, conformément au PRD *Ajout sélection SST en input*, en gardant Deepgram fonctionnel par défaut, en ajoutant Gamilab comme provider prioritaire via Browser SDK, et en préparant OpenAI Whisper / AssemblyAI sans hardcoder de secrets ni casser le pipeline PRD4.
+
+### Ajouté
+- **Onglet admin `STT Config`** (`src/components/STTConfigTab.tsx`) dans la section Technique, à côté de `LLM Config`, `TTS Config`, `Consommation LLM` et `Consommation Voix`.
+- **Catalogue STT multi-providers** (`src/services/stt/registry.ts`) avec les 4 providers demandés :
+  - `deepgram` — baseline stable, streaming WebSocket basse latence, provider par défaut.
+  - `gamilab` — provider stratégique, préparé pour ASR/STT live via Browser SDK.
+  - `openai_whisper` — provider commercial préparé en mode minimal.
+  - `assemblyai` — provider commercial préparé en mode minimal.
+- **Configuration globale STT persistée** (`src/services/stt/settings.ts`) sous la clé `ava_stt_settings`, avec lecture locale rapide, hydratation Supabase `admin_settings`, cache runtime et fallback défensif sur `deepgram` si la valeur est absente ou invalide.
+- **Façade STT runtime** (`src/services/stt/index.ts`) qui expose `createConfiguredSTT()` et isole le choix du provider actif sans refondre le pipeline vocal.
+- **Provider Gamilab préparé** (`src/services/stt/providers/gamilabSTT.ts`) :
+  - résolution du SDK via `window.gami` ou `window.Gamilab`;
+  - flow `connect → use_portal → create_thread → start_recording`;
+  - mapping `text_current` vers transcript partiel;
+  - mapping `text_history` / `silence` / `flush` vers transcript final;
+  - télémétrie STT minimale (`provider: "Gamilab"`, mode realtime, longueur transcript, latence approximative);
+  - aucune utilisation de `struct_current` ni d'extraction structurée.
+- **Edge function de statut de configuration** (`supabase/functions/proxy-stt-config`) qui renvoie uniquement les flags `configured` et le `gamilabPortalId`, jamais les clés API.
+- **Tests unitaires STT** :
+  - `settings.test.ts` vérifie le défaut Deepgram, la normalisation des providers inconnus et la sauvegarde locale.
+  - `registry.test.ts` vérifie la présence des 4 providers PRD et le fallback Deepgram.
+
+### Modifié
+- `src/pages/Admin.tsx` intègre le nouvel onglet `STT Config`.
+- `src/pages/IndexPRD4.tsx` n'instancie plus `DeepgramSTT` directement : le flux conversation Max passe par `createConfiguredSTT()`, avec pré-hydratation des settings et labels de latence basés sur le provider STT configuré.
+- `src/components/prd4/RoleCaptureScreen.tsx` utilise aussi `createConfiguredSTT()` pour la capture du rôle joueur, afin que le même provider global s'applique à tout l'input vocal PRD4.
+- `src/services/latencyServiceMetadata.ts` expose `getConfiguredSTTServiceInfo()` pour afficher le provider STT sélectionné dans l'overlay / instrumentation latence.
+
+### Sécurité / Lovable
+- Aucun secret n'est hardcodé dans le repo.
+- Les secrets attendus côté Lovable / Supabase sont documentés dans l'admin : `DEEPGRAM_API_KEY`, `GAMILAB_PORTAL_ID`, `GAMILAB_API_KEY`, `OPENAI_API_KEY`, `ASSEMBLYAI_API_KEY`.
+- Les clés locales éventuelles ne sont pas transportées automatiquement vers Lovable : elles doivent être renseignées côté Lovable/Supabase secrets au déploiement.
+- Si Gamilab n'est pas configuré ou si le SDK browser est absent, le runtime retombe sur Deepgram au lieu de bloquer la conversation.
+- OpenAI Whisper et AssemblyAI sont visibles/préparés, mais restent en fallback Deepgram tant que leur intégration runtime n'est pas finalisée.
+
+### Vérifié
+- `npx tsc --noEmit` : OK.
+- `npm test` : 41 tests passants.
+- `npm run build` : OK (warnings existants : Browserslist obsolète et chunk Vite > 500 kB).
+- Vérification navigateur locale tentée sur `/admin?tab=stt` : l'écran login admin s'affiche sans erreur console ; le backend Playwright s'est bloqué après authentification, donc la validation visuelle complète de l'onglet devra être refaite dans Lovable ou navigateur local humain.
+
+### Notes
+- Deepgram reste le chemin stable et le provider par défaut. Le comportement interne de `DeepgramSTT` n'a pas été réécrit.
+- La vraie activation Gamilab dépend encore du chargement du Browser SDK et des secrets Lovable/Supabase.
+- Cette version prépare le socle MVP demandé ; le benchmark WER/latence/prix reste hors scope.
+
 ## [0.24.0] - 2026-05-23 — Observabilité latence par service + évolution temporelle STT/LLM/TTS
 
 Objectif de départ : enrichir l'onglet admin **Latence & blocage** sans casser l'existant, conserver les labels visibles (`RAG`, `GM pre-turn`, `Max LLM`, `Validateur`, `TTS`, `GM post-turn`, etc.), réutiliser les providers/models déjà connus quand ils existent, rester rétro-compatible si les anciennes sessions ne contiennent pas ces métadonnées, et aligner PostHog sur les mêmes segments sans envoyer de contenu sensible.

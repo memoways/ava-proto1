@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-23 (session 22 — observabilité latence enrichie par service : segments rétro-compatibles avec provider/service/model/mode, PostHog aligné sur les mêmes segments, comparaison P50/P95 par segment et service, cas extrêmes, tooltips enrichis, visualisations temporelles STT/Max LLM/TTS par session avec filtre service, superposition et sélection des 8 dernières sessions par défaut)
+> **Last Updated**: 2026-05-24 (session 23 — sélecteur STT input multi-providers pour Lovable : onglet Admin `STT Config`, config globale persistée `ava_stt_settings`, façade `src/services/stt`, Deepgram fallback par défaut, Gamilab préparé via Browser SDK, Whisper/AssemblyAI préparés, edge function de statut sans exposition de secrets)
 
 ---
 
@@ -55,7 +55,8 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 | Lovable | Frontend React + déploiement + vibe coding |
 | Lovable Cloud (Supabase) | Backend, BDD, Edge Functions, pgvector |
 | OpenRouter (Multi-modèles) | LLM pour Max et Game Master (Qwen, Claude, Grok, Llama, Gemini) |
-| Deepgram | STT streaming avec VAD |
+| Deepgram | STT streaming avec VAD, provider input par défaut |
+| Gamilab | Provider STT/ASR live stratégique, préparé via Browser SDK |
 | ElevenLabs | TTS voix custom de Max (paramètres ajustables) |
 | OpenAI | Embeddings text-embedding-3-small (1536 dim) |
 | Notion | Source de vérité éditoriale (contenus, personnages, règles) |
@@ -63,6 +64,35 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-05-24 — Sélecteur STT input multi-providers pour Lovable 🔷
+
+**Intent**: Le TTS avait déjà une architecture multi-provider pilotable depuis l'admin, mais l'input vocal restait centré sur Deepgram. Le PRD *Ajout sélection SST en input* demande de créer l'équivalent côté STT : un provider global, modifiable sans redéploiement, avec Deepgram conservé comme baseline stable, Gamilab ajouté en priorité via Browser SDK, et OpenAI Whisper / AssemblyAI préparés comme alternatives commerciales. La contrainte importante : préparer le code ici pour un déploiement Lovable, sans hardcoder de clés, sans réécrire le pipeline vocal et sans casser le PRD4.
+
+**Tool**: Codex
+
+**Outcome**:
+1. **Onglet Admin `STT Config`** — ajout d'un nouvel onglet dans la section Technique, aux côtés de `LLM Config`, `TTS Config`, `Consommation LLM` et `Consommation Voix`. L'écran liste Deepgram, Gamilab, OpenAI Whisper et AssemblyAI, affiche le provider actif, le statut de configuration, les secrets attendus et permet d'activer/sauvegarder le choix global.
+2. **Settings globaux persistés** — `src/services/stt/settings.ts` introduit `ava_stt_settings`, avec défaut `deepgram`, normalisation des valeurs inconnues, sauvegarde locale immédiate, hydratation depuis `admin_settings`, cache runtime et reset défensif. Si rien n'est configuré, Deepgram reste toujours la réponse.
+3. **Façade STT minimale** — `src/services/stt/index.ts` expose `createConfiguredSTT()`. Le code applicatif ne choisit plus directement `DeepgramSTT`; il demande une session STT configurée. Cette façade garde l'abstraction volontairement petite pour respecter le PRD : pas de refonte complète, pas de benchmark, pas de nouveau pipeline lourd.
+4. **Deepgram préservé** — `DeepgramSTT` reste intact et sert de fallback. Le flux conversation Max (`IndexPRD4`) et la capture du rôle joueur (`RoleCaptureScreen`) passent maintenant par la façade, mais le comportement Deepgram existant reste le chemin stable.
+5. **Gamilab préparé** — `src/services/stt/providers/gamilabSTT.ts` résout le Browser SDK via `window.gami` ou `window.Gamilab`, exécute le flow `connect → use_portal → create_thread → start_recording`, mappe `text_current` vers le transcript partiel et `text_history` / `silence` / `flush` vers le transcript final. `struct_current` et l'extraction structurée restent hors scope.
+6. **Secrets Lovable/Supabase clarifiés** — ajout de `supabase/functions/proxy-stt-config`, qui renvoie seulement des booléens de configuration et `gamilabPortalId`, jamais les clés API. Les secrets attendus au déploiement sont `DEEPGRAM_API_KEY`, `GAMILAB_PORTAL_ID`, `GAMILAB_API_KEY`, `OPENAI_API_KEY`, `ASSEMBLYAI_API_KEY`. Les clés locales du repo ne sont pas censées être transportées automatiquement dans Lovable.
+7. **Whisper / AssemblyAI préparés sans risque** — ils apparaissent dans l'admin avec leurs statuts et secrets attendus. Tant que leur intégration runtime n'est pas finalisée, le système ne plante pas : il retombe sur Deepgram.
+8. **Observabilité minimale** — `getConfiguredSTTServiceInfo()` permet de labelliser le segment STT avec le provider sélectionné dans les outils de latence. Gamilab émet une télémétrie STT minimale non sensible : provider, mode, longueur du transcript, latence approximative.
+9. **Tests de garde-fous** — tests unitaires sur la config et le registry STT : défaut Deepgram, fallback provider inconnu, persistance locale, présence des quatre providers PRD.
+
+**Ce que ça change** : l'input vocal devient un point de configuration produit, comme le TTS. L'équipe peut préparer une bascule vers Gamilab en production Lovable sans sacrifier Deepgram comme filet de sécurité. Les providers futurs sont visibles dans l'admin, les secrets attendus sont explicites, et le pipeline PRD4 continue de fonctionner même si un provider est sélectionné sans être prêt.
+
+**Validation**:
+- `npx tsc --noEmit` : OK.
+- `npm test` : 41 tests passants.
+- `npm run build` : OK.
+- Browser local : tentative sur `/admin?tab=stt`; le login admin s'affiche sans erreur console, mais le backend Playwright s'est bloqué après authentification. À revérifier visuellement dans Lovable ou navigateur local humain après déploiement des secrets.
+
+**Time**: ~2h30 (lecture PRD → réponse architecture/secrets Lovable → TDD settings/registry → façade STT → Gamilab Browser SDK wrapper → admin config → branchement PRD4 → tests/build → documentation).
+
+---
 
 ### 2026-05-23 — Observabilité latence par service + évolution temporelle STT/Max LLM/TTS 🔷
 

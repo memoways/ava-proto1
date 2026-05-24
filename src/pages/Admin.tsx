@@ -11,6 +11,7 @@ import { clearSystemPromptCache } from "@/agents/maxAgent";
 import { hydrateAllSettings } from "@/services/settingsService";
 import LLMConfigTab from "@/components/LLMConfigTab";
 import TTSConfigTab from "@/components/TTSConfigTab";
+import STTConfigTab from "@/components/STTConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
 import MaxPromptControlTab from "@/components/MaxPromptControlTab";
 import MaxPromptTestTab from "@/components/MaxPromptTestTab";
@@ -66,6 +67,7 @@ const TAB_GROUPS = [
     tabs: [
       { id: "llm", label: "LLM Config" },
       { id: "voice", label: "TTS Config" },
+      { id: "stt", label: "STT Config" },
       { id: "usage", label: "Consommation LLM" },
       { id: "voice-usage", label: "Consommation Voix" },
     ],
@@ -609,6 +611,11 @@ export default function Admin() {
           {/* ==================== TTS CONFIG ==================== */}
           <TabsContent value="voice">
             <TTSConfigTab />
+          </TabsContent>
+
+          {/* ==================== STT CONFIG ==================== */}
+          <TabsContent value="stt">
+            <STTConfigTab />
           </TabsContent>
 
           {/* ==================== LLM USAGE / CONSUMPTION ==================== */}

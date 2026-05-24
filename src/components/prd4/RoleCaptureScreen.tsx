@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, MicOff, Loader2 } from "lucide-react";
-import { DeepgramSTT } from "@/services/deepgramSTT";
+import { createConfiguredSTT, loadSTTSettingsFromDB, type STTSession } from "@/services/stt";
 import { usePushToTalk } from "@/hooks/usePushToTalk";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +28,7 @@ const RoleCaptureScreen = ({ onSubmit, onPTTError, submitting = false }: Props) 
   const [recording, setRecording] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const sttRef = useRef<DeepgramSTT | null>(null);
+  const sttRef = useRef<STTSession | null>(null);
 
   // Reçoit les transcripts (interim + final) depuis Deepgram.
   const handleTranscript = useCallback((text: string, isFinal: boolean) => {
@@ -52,12 +52,16 @@ const RoleCaptureScreen = ({ onSubmit, onPTTError, submitting = false }: Props) 
   );
 
   // Démarre une session STT au premier press, la garde en vie jusqu'au démontage.
+  useEffect(() => {
+    void loadSTTSettingsFromDB();
+  }, []);
+
   const ensureSTT = useCallback(async () => {
     if (sttRef.current?.isActive) return sttRef.current;
     setStarting(true);
     setError(null);
     try {
-      const stt = new DeepgramSTT(handleTranscript, { onError: handleSTTError });
+      const stt = await createConfiguredSTT(handleTranscript, { onError: handleSTTError });
       sttRef.current = stt;
       await stt.start();
       stt.setManualMode(true); // toggle-to-talk : on attend le clic Stop pour envoyer

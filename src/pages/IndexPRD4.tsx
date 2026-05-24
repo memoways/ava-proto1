@@ -12,7 +12,7 @@ import { trackEvent } from "@/services/posthogService";
 import { summarizeRole } from "@/services/roleProfileService";
 import { processPRD4Turn } from "@/services/prd4Orchestrator";
 import { createPRD4Session, endPRD4Session, updatePRD4Conversation } from "@/services/prd4Session";
-import { DeepgramSTT } from "@/services/deepgramSTT";
+import { createConfiguredSTT, loadSTTSettingsFromDB, type STTSession } from "@/services/stt";
 import { TTSQueue, chunkTextForTTS } from "@/services/elevenLabsTTS";
 import { getLLMSettings } from "@/services/settingsService";
 import {
@@ -31,6 +31,7 @@ import {
 import {
   getConfiguredLLMServiceInfo,
   getConfiguredRAGServiceInfo,
+  getConfiguredSTTServiceInfo,
   getConfiguredTTSServiceInfo,
   latencyServiceLabel,
 } from "@/services/latencyServiceMetadata";
@@ -79,7 +80,7 @@ const IndexPRD4 = () => {
   } = useLatencyInstrumentation(latencyOverlayEnabled);
 
   // Refs pour pipeline conversation
-  const sttRef = useRef<DeepgramSTT | null>(null);
+  const sttRef = useRef<STTSession | null>(null);
   const ttsQueueRef = useRef<TTSQueue | null>(null);
   const sttLatencySegmentRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -109,6 +110,10 @@ const IndexPRD4 = () => {
   useEffect(() => {
     trackEvent("prd4_phase_changed", { phase: state.phase });
   }, [state.phase]);
+
+  useEffect(() => {
+    void loadSTTSettingsFromDB();
+  }, []);
 
   // ---- Helpers conversation -------------------------------------------------
   const cleanupAudio = useCallback(() => {
@@ -455,7 +460,7 @@ const IndexPRD4 = () => {
 
   const createSTT = useCallback(async () => {
     teardownSTT();
-    const stt = new DeepgramSTT(
+    const stt = await createConfiguredSTT(
       (text, isFinal) => {
         setUserSubtitle(text);
         if (isFinal && text.trim()) {
@@ -505,7 +510,7 @@ const IndexPRD4 = () => {
       }
       endLatencySegment(sttLatencySegmentRef.current);
       sttLatencySegmentRef.current = latencyOverlayEnabled
-        ? startLatencySegment({ segment: "STT", service: "Deepgram" })
+        ? startLatencySegment({ segment: "STT", service: latencyServiceLabel(getConfiguredSTTServiceInfo()) })
         : null;
       setAudioState("user_speaking");
       setUserSubtitle("");
