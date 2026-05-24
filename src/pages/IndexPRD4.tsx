@@ -661,7 +661,7 @@ const IndexPRD4 = () => {
             onPTTRelease={handlePTTRelease}
             onHangUp={handleHangUp}
           />
-          <LatencyOverlay enabled={latencyOverlayEnabled} segments={latencySegments} />
+          <LatencyOverlay enabled={latencyOverlayEnabled} segments={latencySegments} currentTurn={latencyCurrentTurn} />
         </>
       );
     case "end_session":
