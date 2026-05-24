@@ -5,14 +5,16 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 
 export interface STTRuntimeConfig {
   gamilabPortalId: string | null;
+  gamilabPortalToken: string | null;
   configured: Record<STTProviderId, boolean>;
 }
 
 const DEFAULT_RUNTIME_CONFIG: STTRuntimeConfig = {
   gamilabPortalId: import.meta.env.VITE_GAMILAB_PORTAL_ID || null,
+  gamilabPortalToken: null,
   configured: {
     deepgram: true,
-    gamilab: Boolean(import.meta.env.VITE_GAMILAB_PORTAL_ID),
+    gamilab: false,
     openai_whisper: false,
     assemblyai: false,
   },
@@ -33,6 +35,7 @@ export async function getSTTRuntimeConfig(): Promise<STTRuntimeConfig> {
     const data = await res.json();
     cachedConfig = {
       gamilabPortalId: data.gamilabPortalId || DEFAULT_RUNTIME_CONFIG.gamilabPortalId,
+      gamilabPortalToken: data.gamilabPortalToken || null,
       configured: {
         deepgram: Boolean(data.configured?.deepgram ?? DEFAULT_RUNTIME_CONFIG.configured.deepgram),
         gamilab: Boolean(data.configured?.gamilab ?? DEFAULT_RUNTIME_CONFIG.configured.gamilab),

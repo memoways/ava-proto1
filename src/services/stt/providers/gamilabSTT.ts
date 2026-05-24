@@ -3,30 +3,57 @@ import { recordAudioLatency } from "@/services/latencyTelemetry";
 import { getSTTRuntimeConfig } from "../runtimeConfig";
 import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types";
 
-type GamilabClient = {
-  connect: (options?: Record<string, unknown>) => Promise<void> | void;
-  use_portal: (portalId: string) => Promise<void> | void;
-  create_thread: () => Promise<void> | void;
-  start_recording: () => Promise<void> | void;
-  stop_recording?: () => Promise<void> | void;
-  pause_recording?: () => Promise<void> | void;
-  resume_recording?: () => Promise<void> | void;
-  on?: (event: string, callback: (payload: any) => void) => void;
-  off?: (event: string, callback: (payload: any) => void) => void;
-  disconnect?: () => Promise<void> | void;
+type GamilabSingleton = {
+  connect: (host?: string) => Promise<void>;
+  disconnect?: () => Promise<void>;
+  use_portal: (portalIdOrOpts: number | string | { portal_id: number; token?: string }, token?: string) => Promise<void>;
+  create_thread: () => Promise<{ thread_id: string; token: string }>;
+  start_recording: () => Promise<void>;
+  pause_recording?: () => Promise<void>;
+  resume_recording?: () => Promise<void>;
+  stop_recording?: () => Promise<void>;
+  on: (event: string, cb: (payload: any) => void) => unknown;
+  off: (ref: unknown) => void;
 };
-
-type GamilabFactory = new (options?: Record<string, unknown>) => GamilabClient;
 
 declare global {
   interface Window {
-    Gamilab?: GamilabFactory;
-    gami?: GamilabClient;
+    __gami_singleton__?: GamilabSingleton;
   }
 }
 
+/**
+ * Wait for the SDK to initialise. The SDK fires `gami:init` repeatedly until
+ * `evt.detail.Gami()` is called; we cache the singleton on `window`.
+ */
+function getGamiSingleton(timeoutMs = 5000): Promise<GamilabSingleton> {
+  if (window.__gami_singleton__) return Promise.resolve(window.__gami_singleton__);
+  return new Promise((resolve, reject) => {
+    const handler = (evt: Event) => {
+      const detail = (evt as CustomEvent).detail;
+      if (detail?.Gami) {
+        const gami = detail.Gami() as GamilabSingleton;
+        window.__gami_singleton__ = gami;
+        window.removeEventListener("gami:init", handler);
+        resolve(gami);
+      }
+    };
+    window.addEventListener("gami:init", handler);
+    setTimeout(() => {
+      window.removeEventListener("gami:init", handler);
+      reject(new Error("Gamilab SDK never fired gami:init (script https://gamilab.ch/js/sdk.js not loaded?)"));
+    }, timeoutMs);
+  });
+}
+
+/**
+ * Gamilab STT (transcription only, no extraction).
+ * Uses connect → use_portal(id, token) → create_thread → start_recording.
+ * Listens to text_current (live), text_history (final) and silence events.
+ */
 export class GamilabSTT implements STTSession {
-  private client: GamilabClient | null = null;
+  private gami: GamilabSingleton | null = null;
+  private listeners: unknown[] = [];
   private onTranscript: TranscriptCallback;
   private onError?: STTCreateOptions["onError"];
   private getTelemetryContext?: STTCreateOptions["getTelemetryContext"];
@@ -56,44 +83,45 @@ export class GamilabSTT implements STTSession {
   }
 
   setManualMode(_manual: boolean) {
-    // Gamilab controls finalization through text_history/silence events.
+    /* Gamilab manages turn finalization via silence/text_history events */
   }
 
   async start() {
     const config = await getSTTRuntimeConfig();
     const portalId = config.gamilabPortalId;
+    const portalToken = config.gamilabPortalToken;
     if (!portalId) {
-      throw new Error("Gamilab portal_id manquant. Configure GAMILAB_PORTAL_ID côté Lovable/Supabase.");
+      throw new Error("Gamilab portal_id manquant (GAMILAB_PORTAL_ID).");
+    }
+    if (!portalToken) {
+      throw new Error("Gamilab portal token manquant (GAMILAB_API_KEY).");
     }
 
-    const client = this.resolveClient();
-    if (!client) {
-      throw new Error("SDK Gamilab introuvable côté navigateur. Charge le Browser SDK avant d'activer ce provider.");
-    }
-
-    this.client = client;
+    const gami = await getGamiSingleton();
+    this.gami = gami;
     this.startedAt = performance.now();
-    this.bindEvents(client);
+    this.bindEvents(gami);
 
-    await client.connect();
-    await client.use_portal(portalId);
-    await client.create_thread();
-    await client.start_recording();
+    await gami.connect();
+    // portal_id is numeric, token is the JWT-like string from Gamilab
+    await gami.use_portal({ portal_id: Number(portalId), token: portalToken });
+    await gami.create_thread();
+    await gami.start_recording();
+
     this._active = true;
     this._paused = false;
-
-    debugLogger.log({ service: "stt", level: "success", direction: "in", label: "Gamilab STT connected" });
+    debugLogger.log({ service: "stt", level: "success", direction: "in", label: `Gamilab STT recording (portal ${portalId})` });
   }
 
   pause() {
     this._paused = true;
-    void this.client?.pause_recording?.();
+    void this.gami?.pause_recording?.();
   }
 
   resume() {
     this._paused = false;
     this.fullTranscript = "";
-    void this.client?.resume_recording?.();
+    void this.gami?.resume_recording?.();
   }
 
   flush() {
@@ -105,43 +133,50 @@ export class GamilabSTT implements STTSession {
   async stop() {
     this._active = false;
     this._paused = false;
-    try { await this.client?.stop_recording?.(); } catch { /* ignore */ }
-    try { await this.client?.disconnect?.(); } catch { /* ignore */ }
-    this.client = null;
+    try { await this.gami?.stop_recording?.(); } catch { /* ignore */ }
+    try { await this.gami?.pause_recording?.(); } catch { /* ignore */ }
+    // unsubscribe listeners
+    if (this.gami) {
+      for (const ref of this.listeners) {
+        try { this.gami.off(ref); } catch { /* ignore */ }
+      }
+    }
+    this.listeners = [];
+    // Do NOT disconnect — keep singleton hot for the next turn
+    this.gami = null;
     this.fullTranscript = "";
   }
 
-  private resolveClient(): GamilabClient | null {
-    if (window.gami) return window.gami;
-    if (window.Gamilab) return new window.Gamilab();
-    return null;
-  }
+  private bindEvents(gami: GamilabSingleton) {
+    this.listeners.push(
+      gami.on("text_current", (payload: any) => {
+        if (this._paused) return;
+        const text = this.extractText(payload);
+        if (!text) return;
+        if (!this.firstPartialAt) this.firstPartialAt = performance.now();
+        this.onTranscript(text, false);
+      }),
+    );
 
-  private bindEvents(client: GamilabClient) {
-    client.on?.("text_current", (payload) => {
-      if (this._paused) return;
-      const text = this.extractText(payload);
-      if (!text) return;
-      if (!this.firstPartialAt) this.firstPartialAt = performance.now();
-      this.onTranscript(text, false);
-    });
+    this.listeners.push(
+      gami.on("text_history", (payload: any) => {
+        if (this._paused) return;
+        const text = this.extractText(payload);
+        if (!text) return;
+        this.fullTranscript = text;
+      }),
+    );
 
-    client.on?.("text_history", (payload) => {
-      if (this._paused) return;
-      const text = this.extractText(payload);
-      if (!text) return;
-      this.fullTranscript = text;
-      this.emitFinal(text, "text_history");
-    });
-
-    client.on?.("silence", () => {
-      if (!this._paused) this.flush();
-    });
-
-    client.on?.("error", (payload) => {
-      const error = payload instanceof Error ? payload : new Error(String(payload?.message || payload || "Gamilab STT error"));
-      this.onError?.(error, { provider: "gamilab" });
-    });
+    this.listeners.push(
+      gami.on("silence", (isSilence: boolean) => {
+        if (!isSilence || this._paused) return;
+        const finalText = this.fullTranscript.trim();
+        if (finalText) {
+          this.fullTranscript = "";
+          this.emitFinal(finalText, "silence");
+        }
+      }),
+    );
   }
 
   private extractText(payload: any): string {
@@ -152,7 +187,7 @@ export class GamilabSTT implements STTSession {
     return "";
   }
 
-  private emitFinal(finalText: string, trigger: "ptt_flush" | "text_history") {
+  private emitFinal(finalText: string, trigger: "ptt_flush" | "silence") {
     const context = this.getTelemetryContext?.() ?? {};
     const now = performance.now();
     const t_stt_ms = Math.max(0, Math.round(now - (this.firstPartialAt || this.startedAt || now)));
@@ -179,6 +214,7 @@ export class GamilabSTT implements STTSession {
         trigger,
       },
     });
+    this.firstPartialAt = 0;
     this.onTranscript(finalText, true);
   }
 }
