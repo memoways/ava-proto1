@@ -17,13 +17,13 @@ describe("LatencyOverlay", () => {
   });
 
   it("renders nothing when disabled", () => {
-    render(<LatencyOverlay enabled={false} segments={[activeSegment()]} nowMs={3_000} />);
+    render(<LatencyOverlay enabled={false} segments={[activeSegment()]} currentTurn={1} nowMs={3_000} />);
 
     expect(screen.queryByTestId("latency-overlay")).not.toBeInTheDocument();
   });
 
   it("renders an active segment with a live counter", () => {
-    render(<LatencyOverlay enabled segments={[activeSegment()]} nowMs={3_000} />);
+    render(<LatencyOverlay enabled segments={[activeSegment()]} currentTurn={1} nowMs={3_000} />);
 
     expect(screen.getByTestId("latency-overlay")).toBeInTheDocument();
     expect(screen.getByText("STT")).toBeInTheDocument();
