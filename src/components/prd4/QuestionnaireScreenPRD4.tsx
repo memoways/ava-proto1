@@ -7,8 +7,10 @@ import type { QuestionnairePRD4Answers } from "@/types";
 interface Props {
   teaserSeen: boolean;
   onSubmit: (answers: QuestionnairePRD4Answers) => void;
+  onSkip?: () => void;
   submitting?: boolean;
 }
+
 
 const defaultAnswers: QuestionnairePRD4Answers = {
   q1_film_seen: "non",
