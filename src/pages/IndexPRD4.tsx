@@ -428,6 +428,10 @@ const IndexPRD4 = () => {
         console.error("[PRD4] turn failed:", err);
         toast({ title: "Erreur dans la conversation", description: "Réessaie.", variant: "destructive" });
       } finally {
+        if (processingWatchdogRef.current) {
+          window.clearTimeout(processingWatchdogRef.current);
+          processingWatchdogRef.current = null;
+        }
         isProcessingRef.current = false;
         setAudioState("idle");
       }
