@@ -114,6 +114,8 @@ export interface ConversationMessage {
 
 export interface ConversationPipelineTimings {
   stt_ms?: number;
+  /** Explicit STT service finalization latency. Old Gamilab `stt_ms` values may include user speaking time. */
+  stt_service_ms?: number;
   rag_ms?: number;
   gm_pre_ms?: number;
   max_ms?: number;

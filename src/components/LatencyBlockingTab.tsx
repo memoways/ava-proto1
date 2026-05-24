@@ -38,6 +38,7 @@ import {
   buildLatencySegmentsFromPipeline,
   computeSegmentServiceEvolution,
   computeSegmentServiceStats,
+  hasLegacyAmbiguousGamilabSttLatency,
   getPipelineServiceLatency,
   hasLegacyAmbiguousTtsLatency,
   resolveLatencyServiceInfo,
@@ -599,6 +600,9 @@ function LatencyVisualization({
   const legacyAmbiguousTtsCount = perSessionRows
     .flatMap((r) => r.turns ?? [])
     .filter(hasLegacyAmbiguousTtsLatency).length;
+  const legacyAmbiguousGamilabSttCount = perSessionRows
+    .flatMap((r) => r.turns ?? [])
+    .filter(hasLegacyAmbiguousGamilabSttLatency).length;
   const availability = useMemo(() => {
     const turns = perSessionRows.flatMap((r) => r.turns ?? []);
     return STEP_LABELS.map(({ key, label }) => ({
@@ -636,6 +640,11 @@ function LatencyVisualization({
           {legacyAmbiguousTtsCount > 0 && (
             <p className="mt-1 text-[11px] text-amber-500">
               {legacyAmbiguousTtsCount} ancienne(s) mesure(s) TTS exclue(s) : elles mélangent génération et lecture audio.
+            </p>
+          )}
+          {legacyAmbiguousGamilabSttCount > 0 && (
+            <p className="mt-1 text-[11px] text-amber-500">
+              {legacyAmbiguousGamilabSttCount} ancienne(s) mesure(s) STT Gamilab exclue(s) : elles mélangent transcription et durée de parole.
             </p>
           )}
           {availability.length > 0 && (
@@ -718,6 +727,7 @@ function LatencyVisualization({
                   {turns.map((t) => {
                     const stepValues: ConversationPipelineTimings = {
                       stt_ms: t.stt_ms,
+                      stt_service_ms: t.stt_service_ms,
                       rag_ms: t.rag_ms,
                       gm_pre_ms: t.gm_pre_ms,
                       max_ms: t.max_ms,

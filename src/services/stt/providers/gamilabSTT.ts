@@ -62,6 +62,7 @@ export class GamilabSTT implements STTSession {
   private fullTranscript = "";
   private startedAt = 0;
   private firstPartialAt = 0;
+  private lastTextAt = 0;
   private lastFinalTelemetry: import("../types").STTFinalTelemetryBase | null = null;
 
   constructor(onTranscript: TranscriptCallback, opts?: STTCreateOptions) {
@@ -159,6 +160,7 @@ export class GamilabSTT implements STTSession {
         const text = this.extractText(payload);
         if (!text) return;
         if (!this.firstPartialAt) this.firstPartialAt = performance.now();
+        this.lastTextAt = performance.now();
         this.onTranscript(text, false);
       }),
     );
@@ -168,6 +170,7 @@ export class GamilabSTT implements STTSession {
         if (this._paused) return;
         const text = this.extractText(payload);
         if (!text) return;
+        this.lastTextAt = performance.now();
         this.fullTranscript = text;
       }),
     );
@@ -195,7 +198,7 @@ export class GamilabSTT implements STTSession {
   private emitFinal(finalText: string, trigger: "ptt_flush" | "silence") {
     const context = this.getTelemetryContext?.() ?? {};
     const now = performance.now();
-    const t_stt_ms = Math.max(0, Math.round(now - (this.firstPartialAt || this.startedAt || now)));
+    const t_stt_ms = Math.max(0, Math.round(now - (this.lastTextAt || this.firstPartialAt || this.startedAt || now)));
     this.lastFinalTelemetry = {
       t_stt_ms,
       stt_text_len: finalText.length,
@@ -220,6 +223,7 @@ export class GamilabSTT implements STTSession {
       },
     });
     this.firstPartialAt = 0;
+    this.lastTextAt = 0;
     this.onTranscript(finalText, true);
   }
 }

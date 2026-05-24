@@ -84,6 +84,7 @@ export const LATENCY_SEGMENT_LABELS: Record<LatencySegmentKey, string> = {
 };
 
 const PIPELINE_KEYS: LatencySegmentKey[] = [
+  "stt_ms",
   "rag_ms",
   "gm_pre_ms",
   "max_ms",
@@ -96,13 +97,27 @@ export function getPipelineServiceLatency(
   pipeline: ConversationPipelineTimings,
   key: LatencySegmentKey,
 ): number | undefined {
-  const value = key === "tts_ms" ? pipeline.tts_first_playback_ms : pipeline[key];
+  if (key === "stt_ms" && hasLegacyAmbiguousGamilabSttLatency(pipeline)) return undefined;
+  const value = key === "stt_ms"
+    ? (pipeline.stt_service_ms ?? pipeline.stt_ms)
+    : key === "tts_ms"
+      ? pipeline.tts_first_playback_ms
+      : pipeline[key];
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
   return value;
 }
 
 export function hasLegacyAmbiguousTtsLatency(pipeline: ConversationPipelineTimings): boolean {
   return typeof pipeline.tts_ms === "number" && typeof pipeline.tts_first_playback_ms !== "number";
+}
+
+export function hasLegacyAmbiguousGamilabSttLatency(pipeline: ConversationPipelineTimings): boolean {
+  const sttService = pipeline.segmentServices?.stt_ms;
+  const provider = `${sttService?.serviceProvider ?? ""} ${sttService?.serviceName ?? ""}`;
+  const model = sttService?.model ?? "";
+  return typeof pipeline.stt_ms === "number"
+    && typeof pipeline.stt_service_ms !== "number"
+    && (/gamilab/i.test(provider) || /gamilab/i.test(model));
 }
 
 export function percentile(values: number[], p: number): number {
@@ -145,7 +160,7 @@ export function buildLatencySegmentsFromPipeline(input: {
     const durationMs = getPipelineServiceLatency(input.pipeline, key);
     if (durationMs == null) return [];
     const blocked = input.pipeline.blocker === key;
-    const service = resolveLatencyServiceInfo(input.defaultServices?.[key], input.services?.[key]);
+    const service = normalizeLatencyServiceInfo(key, resolveLatencyServiceInfo(input.defaultServices?.[key], input.services?.[key]));
     return [{
       key,
       label: LATENCY_SEGMENT_LABELS[key],
@@ -162,6 +177,40 @@ export function buildLatencySegmentsFromPipeline(input: {
       },
     }];
   });
+}
+
+function normalizeLatencyServiceInfo(
+  key: LatencySegmentKey,
+  service: LatencyServiceInfo,
+): LatencyServiceInfo {
+  if (key !== "stt_ms") return service;
+  const model = service.model || "";
+  if (/gamilab/i.test(model)) {
+    return {
+      ...service,
+      serviceProvider: "Gamilab",
+      serviceName: "gamilab",
+      model: service.model || "gamilab-browser-sdk",
+      mode: service.mode || "realtime",
+    };
+  }
+  if (/assembly/i.test(model)) {
+    return {
+      ...service,
+      serviceProvider: "AssemblyAI",
+      serviceName: "assemblyai",
+      mode: service.mode || "realtime",
+    };
+  }
+  if (/whisper/i.test(model)) {
+    return {
+      ...service,
+      serviceProvider: "OpenAI Whisper",
+      serviceName: "openai_whisper",
+      mode: service.mode || "batch",
+    };
+  }
+  return service;
 }
 
 export function resolveLatencyServiceInfo(

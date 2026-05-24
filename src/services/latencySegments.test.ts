@@ -60,6 +60,70 @@ describe("latencySegments", () => {
     ]);
   });
 
+  it("builds STT segments and infers Gamilab from metadata", () => {
+    const [segment] = buildLatencySegmentsFromPipeline({
+      sessionId: "s-gami",
+      turnIndex: 1,
+      pipeline: {
+        stt_ms: 420,
+        stt_service_ms: 420,
+        segmentServices: {
+          stt_ms: {
+            serviceProvider: "Deepgram",
+            serviceName: "deepgram",
+            model: "gamilab-browser-sdk",
+            mode: "realtime",
+          },
+        },
+      },
+      services: {
+        stt_ms: {
+          serviceProvider: "Deepgram",
+          serviceName: "deepgram",
+          model: "gamilab-browser-sdk",
+          mode: "realtime",
+        },
+      },
+    });
+
+    expect(segment).toMatchObject({
+      key: "stt_ms",
+      label: "STT",
+      durationMs: 420,
+      serviceProvider: "Gamilab",
+      serviceName: "gamilab",
+      model: "gamilab-browser-sdk",
+    });
+  });
+
+  it("excludes legacy Gamilab STT durations that include speaking time", () => {
+    const segments = buildLatencySegmentsFromPipeline({
+      sessionId: "s-gami",
+      turnIndex: 1,
+      pipeline: {
+        stt_ms: 12_000,
+        segmentServices: {
+          stt_ms: {
+            serviceProvider: "Deepgram",
+            serviceName: "deepgram",
+            model: "gamilab-browser-sdk",
+            mode: "realtime",
+          },
+        },
+      },
+      services: {
+        stt_ms: {
+          serviceProvider: "Deepgram",
+          serviceName: "deepgram",
+          model: "gamilab-browser-sdk",
+          mode: "realtime",
+        },
+      },
+    });
+
+    expect(segments).toEqual([]);
+  });
+
   it("fills Unknown fields from configured defaults without replacing explicit known fields", () => {
     const [segment] = buildLatencySegmentsFromPipeline({
       pipeline: {

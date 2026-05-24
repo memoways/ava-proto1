@@ -362,6 +362,7 @@ const IndexPRD4 = () => {
         if (maxMsg.pipeline && typeof sttTelemetry?.t_stt_ms === "number") {
           const sttProvider = sttTelemetry.provider || "Unknown";
           maxMsg.pipeline.stt_ms = sttTelemetry.t_stt_ms;
+          maxMsg.pipeline.stt_service_ms = sttTelemetry.t_stt_ms;
           maxMsg.pipeline.segmentServices = {
             ...(maxMsg.pipeline.segmentServices || {}),
             stt_ms: {
