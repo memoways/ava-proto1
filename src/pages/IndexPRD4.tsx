@@ -576,8 +576,10 @@ const IndexPRD4 = () => {
         <QuestionnaireScreenPRD4
           teaserSeen={state.teaserSeen}
           onSubmit={handleQuestionnaireSubmit}
+          onSkip={handleRestart}
           submitting={submittingQuestionnaire}
         />
+
       );
     case "thanks":
       return <ThanksScreen onRestart={handleRestart} />;
