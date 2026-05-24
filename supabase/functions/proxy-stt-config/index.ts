@@ -11,13 +11,15 @@ serve(async (req) => {
   }
 
   const gamilabPortalId = Deno.env.get("GAMILAB_PORTAL_ID") || null;
+  const gamilabPortalToken = Deno.env.get("GAMILAB_API_KEY") || null;
 
   return new Response(
     JSON.stringify({
       gamilabPortalId,
+      gamilabPortalToken,
       configured: {
         deepgram: Boolean(Deno.env.get("DEEPGRAM_API_KEY")),
-        gamilab: Boolean(gamilabPortalId && Deno.env.get("GAMILAB_API_KEY")),
+        gamilab: Boolean(gamilabPortalId && gamilabPortalToken),
         openai_whisper: Boolean(Deno.env.get("OPENAI_API_KEY")),
         assemblyai: Boolean(Deno.env.get("ASSEMBLYAI_API_KEY")),
       },
