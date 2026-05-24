@@ -71,6 +71,8 @@ const IndexPRD4 = () => {
   const latencyOverlayEnabled = useLatencyOverlayEnabled();
   const {
     segments: latencySegments,
+    currentTurn: latencyCurrentTurn,
+    startTurn: startLatencyTurn,
     startSegment: startLatencySegment,
     endSegment: endLatencySegment,
     addCompletedSegment: addCompletedLatencySegment,
@@ -83,6 +85,7 @@ const IndexPRD4 = () => {
   const sessionIdRef = useRef<string | null>(null);
   const conversationRef = useRef<ConversationMessage[]>([]);
   const isProcessingRef = useRef(false);
+  const processingWatchdogRef = useRef<number | null>(null);
   const endedRef = useRef(false);
   const userRoleRef = useRef(state.userRoleProfile);
   userRoleRef.current = state.userRoleProfile;
