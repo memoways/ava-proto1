@@ -236,6 +236,14 @@ const IndexPRD4 = () => {
     async (userText: string) => {
       if (isProcessingRef.current || !userText.trim() || endedRef.current) return;
       isProcessingRef.current = true;
+      // Watchdog : si le tour ne se termine pas en 60s, on libère le verrou pour ne pas bloquer l'UX
+      if (processingWatchdogRef.current) window.clearTimeout(processingWatchdogRef.current);
+      processingWatchdogRef.current = window.setTimeout(() => {
+        console.warn("[PRD4] turn watchdog fired — releasing processing lock");
+        isProcessingRef.current = false;
+        setAudioState("idle");
+        toast({ title: "Le tour a pris trop de temps", description: "Tu peux reparler.", variant: "destructive" });
+      }, 60_000);
       setAudioState("max_thinking");
       setUserSubtitle(userText);
 
