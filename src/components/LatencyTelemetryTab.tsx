@@ -35,6 +35,12 @@ interface AudioRow {
   t_tts_total_ms: number | null;
   stt_text_len: number | null;
   tts_text_len: number | null;
+  metadata_json: {
+    provider?: string;
+    model?: string;
+    mode?: string;
+    trigger?: string;
+  } | null;
 }
 
 interface VoiceTurnEventRow {
@@ -91,6 +97,14 @@ function percentile(values: number[], p: number): number {
   return sorted[idx];
 }
 
+function serviceTurnTotal(t: TurnRow): number {
+  return SEGMENTS.reduce((sum, s) => sum + (((t[s.key] as number | null) ?? 0) || 0), 0);
+}
+
+function providerLabel(row: AudioRow, fallback: string): string {
+  return row.metadata_json?.provider || fallback;
+}
+
 export default function LatencyTelemetryTab() {
   const [turns, setTurns] = useState<TurnRow[]>([]);
   const [audios, setAudios] = useState<AudioRow[]>([]);
@@ -133,7 +147,7 @@ export default function LatencyTelemetryTab() {
   useEffect(() => { load(); }, []);
 
   const stats = useMemo(() => {
-    const totals = turns.map((t) => t.t_turn_total_ms ?? 0).filter((v) => v > 0);
+    const totals = turns.map(serviceTurnTotal).filter((v) => v > 0);
     return {
       count: turns.length,
       median: percentile(totals, 50),
@@ -146,6 +160,20 @@ export default function LatencyTelemetryTab() {
     const stt = audios.filter((a) => a.direction === "in").map((a) => a.t_stt_ms ?? 0).filter((v) => v > 0);
     const ttsFirstByte = audios.filter((a) => a.direction === "out").map((a) => a.t_tts_first_byte_ms ?? 0).filter((v) => v > 0);
     const ttsTotal = audios.filter((a) => a.direction === "out").map((a) => a.t_tts_total_ms ?? 0).filter((v) => v > 0);
+    const sttByProvider = [...audios
+      .filter((a) => a.direction === "in" && (a.t_stt_ms ?? 0) > 0)
+      .reduce((map, row) => {
+        const provider = providerLabel(row, "Unknown");
+        map.set(provider, [...(map.get(provider) ?? []), row.t_stt_ms!]);
+        return map;
+      }, new Map<string, number[]>())]
+      .map(([provider, values]) => ({
+        provider,
+        count: values.length,
+        median: percentile(values, 50),
+        p95: percentile(values, 95),
+      }))
+      .sort((a, b) => a.provider.localeCompare(b.provider));
     return {
       stt_median: percentile(stt, 50),
       stt_p95: percentile(stt, 95),
@@ -153,14 +181,12 @@ export default function LatencyTelemetryTab() {
       tts_fb_p95: percentile(ttsFirstByte, 95),
       tts_total_median: percentile(ttsTotal, 50),
       tts_total_p95: percentile(ttsTotal, 95),
+      sttByProvider,
     };
   }, [audios]);
 
-  const maxTotal = Math.max(1, ...turns.map((t) => t.t_turn_total_ms ?? 0));
+  const maxTotal = Math.max(1, ...turns.map(serviceTurnTotal));
   const voiceStats = useMemo(() => {
-    const responseReady = voiceTurns.map((t) => t.metadata_json?.t_turn_response_ready_ms ?? 0).filter((v) => v > 0);
-    const voiceReady = voiceTurns.map((t) => t.metadata_json?.t_turn_voice_ready_ms ?? 0).filter((v) => v > 0);
-    const endToEnd = voiceTurns.map((t) => t.metadata_json?.t_turn_end_to_end_ms ?? 0).filter((v) => v > 0);
     const blockers = voiceTurns.reduce<Record<string, number>>((acc, t) => {
       const key = t.blocker_step || "unknown";
       acc[key] = (acc[key] || 0) + 1;
@@ -168,12 +194,6 @@ export default function LatencyTelemetryTab() {
     }, {});
     return {
       count: voiceTurns.length,
-      responseP50: percentile(responseReady, 50),
-      responseP95: percentile(responseReady, 95),
-      voiceP50: percentile(voiceReady, 50),
-      voiceP95: percentile(voiceReady, 95),
-      endP50: percentile(endToEnd, 50),
-      endP95: percentile(endToEnd, 95),
       topBlocker: Object.entries(blockers).sort((a, b) => b[1] - a[1])[0]?.[0] || "—",
       critical: voiceTurns.filter((t) => t.severity === "critical" || t.severity === "failed").length,
     };
@@ -185,7 +205,7 @@ export default function LatencyTelemetryTab() {
         <div>
           <h2 className="text-lg font-semibold">Latences pipeline</h2>
           <p className="text-xs text-muted-foreground">
-            {stats.count} tours · médiane {fmt(stats.median)} · p95 {fmt(stats.p95)} · {stats.fallbacks} fallback(s)
+            {stats.count} tours · latence service médiane {fmt(stats.median)} · p95 {fmt(stats.p95)} · {stats.fallbacks} fallback(s)
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={load} disabled={loading}>
@@ -195,15 +215,24 @@ export default function LatencyTelemetryTab() {
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
         <div className="rounded border p-2">
-          <div className="text-muted-foreground">STT (Deepgram, après silence)</div>
+          <div className="text-muted-foreground">STT service</div>
           <div className="font-mono">méd {fmt(audioStats.stt_median)} · p95 {fmt(audioStats.stt_p95)}</div>
+          <div className="mt-1 space-y-0.5">
+            {audioStats.sttByProvider.length === 0 ? (
+              <div className="text-[11px] text-muted-foreground">Provider non disponible</div>
+            ) : audioStats.sttByProvider.map((row) => (
+              <div key={row.provider} className="text-[11px] text-muted-foreground">
+                {row.provider}: <span className="font-mono">{row.count} · méd {fmt(row.median)}</span>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="rounded border p-2">
           <div className="text-muted-foreground">TTS premier octet</div>
           <div className="font-mono">méd {fmt(audioStats.tts_fb_median)} · p95 {fmt(audioStats.tts_fb_p95)}</div>
         </div>
         <div className="rounded border p-2">
-          <div className="text-muted-foreground">TTS total</div>
+          <div className="text-muted-foreground">TTS génération totale</div>
           <div className="font-mono">méd {fmt(audioStats.tts_total_median)} · p95 {fmt(audioStats.tts_total_p95)}</div>
         </div>
       </div>
@@ -213,14 +242,10 @@ export default function LatencyTelemetryTab() {
           <div>
             <h3 className="text-sm font-semibold">Observabilité voix unifiée</h3>
             <p className="text-xs text-muted-foreground">
-              {voiceStats.count} tour(s) · blocker principal {voiceStats.topBlocker} · {voiceStats.critical} critique(s)/échec(s)
+              {voiceStats.count} tour(s) · blocker service principal {voiceStats.topBlocker} · {voiceStats.critical} critique(s)/échec(s)
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-[11px]">
-            <MiniMetric label="Réponse prête" value={`p50 ${fmt(voiceStats.responseP50)} · p95 ${fmt(voiceStats.responseP95)}`} />
-            <MiniMetric label="Voix prête" value={`p50 ${fmt(voiceStats.voiceP50)} · p95 ${fmt(voiceStats.voiceP95)}`} />
-            <MiniMetric label="End-to-end" value={`p50 ${fmt(voiceStats.endP50)} · p95 ${fmt(voiceStats.endP95)}`} />
-          </div>
+          <MiniMetric label="Source" value="latences service uniquement" />
         </div>
 
         {voiceErrors.length > 0 && (
@@ -253,7 +278,7 @@ export default function LatencyTelemetryTab() {
       <ScrollArea className="h-[520px] border rounded">
         <div className="p-2 space-y-1">
           {turns.map((t) => {
-            const total = t.t_turn_total_ms ?? 0;
+            const total = serviceTurnTotal(t);
             const widthPct = (total / maxTotal) * 100;
             const segments = SEGMENTS.map((s) => ({ ...s, value: (t[s.key] as number) ?? 0 }));
             const sum = segments.reduce((acc, s) => acc + s.value, 0) || 1;
@@ -302,7 +327,7 @@ export default function LatencyTelemetryTab() {
                       </div>
                     ))}
                     <div className="flex justify-between col-span-full pt-1 border-t">
-                      <span className="text-muted-foreground">Total</span>
+                      <span className="text-muted-foreground">Latence services</span>
                       <span>{fmt(total)}</span>
                     </div>
                     {t.max_model && (

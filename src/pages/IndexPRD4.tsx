@@ -347,6 +347,7 @@ const IndexPRD4 = () => {
         const tts_ms = ttsResult.firstPlaybackStartMs || ttsResult.generationWallMs || Math.round(performance.now() - ttsStart);
         if (maxMsg.pipeline) {
           maxMsg.pipeline.tts_ms = tts_ms;
+          maxMsg.pipeline.tts_first_playback_ms = tts_ms;
           maxMsg.pipeline.total_ms = (maxMsg.pipeline.total_ms ?? 0) + tts_ms;
           maxMsg.pipeline.segmentServices = {
             ...(maxMsg.pipeline.segmentServices || {}),
@@ -359,13 +360,14 @@ const IndexPRD4 = () => {
 
         const sttTelemetry = sttRef.current?.getLastFinalTelemetry();
         if (maxMsg.pipeline && typeof sttTelemetry?.t_stt_ms === "number") {
+          const sttProvider = sttTelemetry.provider || "Unknown";
           maxMsg.pipeline.stt_ms = sttTelemetry.t_stt_ms;
           maxMsg.pipeline.segmentServices = {
             ...(maxMsg.pipeline.segmentServices || {}),
             stt_ms: {
-              serviceProvider: "Deepgram",
-              serviceName: "deepgram",
-              model: sttTelemetry.model || "nova-2",
+              serviceProvider: sttProvider,
+              serviceName: sttProvider.toLowerCase().replace(/\s+/g, "_"),
+              model: sttTelemetry.model || "Unknown",
               mode: "realtime",
             },
           };
@@ -400,8 +402,8 @@ const IndexPRD4 = () => {
             segments_failed: ttsResult.failedSegments,
           },
           stt: {
-            provider: "Deepgram",
-            model: sttTelemetry?.model || "nova-2",
+            provider: sttTelemetry?.provider,
+            model: sttTelemetry?.model,
             mode: "realtime",
           },
           had_error: ttsResult.status === "failed",

@@ -38,6 +38,8 @@ import {
   buildLatencySegmentsFromPipeline,
   computeSegmentServiceEvolution,
   computeSegmentServiceStats,
+  getPipelineServiceLatency,
+  hasLegacyAmbiguousTtsLatency,
   resolveLatencyServiceInfo,
   type LatencySegmentKey,
   type LatencyServiceInfo,
@@ -93,6 +95,26 @@ function fmtMs(v?: number): string {
   if (v == null || !Number.isFinite(v)) return "—";
   if (v < 1000) return `${Math.round(v)} ms`;
   return `${(v / 1000).toFixed(2)} s`;
+}
+
+function serviceLatency(values: ConversationPipelineTimings, key: NumericTimingKey): number | undefined {
+  return getPipelineServiceLatency(values, key as LatencySegmentKey);
+}
+
+function serviceLatencyTotal(values: ConversationPipelineTimings): number {
+  return STEP_LABELS.reduce((acc, { key }) => acc + (serviceLatency(values, key) ?? 0), 0);
+}
+
+function serviceBlocker(values: ConversationPipelineTimings): string | null {
+  const persisted = values.blocker as NumericTimingKey | undefined;
+  if (persisted && (serviceLatency(values, persisted) ?? 0) > 0) return persisted;
+  let worst: { key: NumericTimingKey; value: number } | null = null;
+  for (const { key } of STEP_LABELS) {
+    const value = serviceLatency(values, key) ?? 0;
+    if (value <= 0) continue;
+    if (!worst || value > worst.value) worst = { key, value };
+  }
+  return worst?.key ?? null;
 }
 
 const STEP_HEX: Record<NumericTimingKey, string> = {
@@ -202,7 +224,7 @@ function computeBaselines(allTurns: TurnTiming[]): StepBaselines {
   const allKeys: NumericTimingKey[] = [...STEP_LABELS.map((s) => s.key), "total_ms"];
   for (const key of allKeys) {
     const xs = allTurns
-      .map((t) => t[key])
+      .map((t) => key === "total_ms" ? serviceLatencyTotal(t) : serviceLatency(t, key))
       .filter((v): v is number => typeof v === "number" && Number.isFinite(v))
       .sort((a, b) => a - b);
     if (xs.length === 0) continue;
@@ -346,7 +368,7 @@ function StackedRow({
   defaultServices,
 }: StackedRowProps) {
   const sevThreshold = minSeverity === "all" ? 0 : minSeverity === "high" ? 1 : 2;
-  const total = STEP_LABELS.reduce((acc, { key }) => acc + (values[key] ?? 0), 0);
+  const total = serviceLatencyTotal(values);
   const denom = Math.max(scaleMax, total, dispersion?.max ?? 0, 1);
   const targetPct = target ? Math.min(100, (target / denom) * 100) : null;
   const overTarget = target ? total > target : false;
@@ -382,7 +404,7 @@ function StackedRow({
       <div className="relative h-6 w-full bg-muted/40 rounded overflow-hidden">
         <div className="absolute inset-0 flex">
           {STEP_LABELS.map(({ key, label: stepLabel }) => {
-            const v = values[key] ?? 0;
+            const v = serviceLatency(values, key) ?? 0;
             if (v <= 0) return null;
             const pct = (v / denom) * 100;
             const diag = analyzeStep(key, v, total, baselines?.[key]);
@@ -561,12 +583,12 @@ function LatencyVisualization({
   const expanded = expandedIds;
   const toggleExpanded = onToggleExpanded;
 
-  const avgTotal = avg.total_ms ?? 0;
+  const avgTotal = serviceLatencyTotal(avg);
   const perSessionMax = perSessionRows.reduce((m, r) => {
-    const t = r.avg.total_ms ?? 0;
+    const t = serviceLatencyTotal(r.avg);
     const dispMax = r.dispersion?.max ?? 0;
     const turnsMax = (r.turns ?? []).reduce(
-      (mm, tt) => Math.max(mm, tt.total_ms ?? 0),
+      (mm, tt) => Math.max(mm, serviceLatencyTotal(tt)),
       0,
     );
     return Math.max(m, t, dispMax, turnsMax);
@@ -574,6 +596,18 @@ function LatencyVisualization({
   const scaleMax = Math.max(perSessionMax, avgTotal, TARGET_MS) * 1.05;
   const onTarget = avgTotal > 0 && avgTotal <= TARGET_MS;
   const isAggregate = perSessionRows.length > 1;
+  const legacyAmbiguousTtsCount = perSessionRows
+    .flatMap((r) => r.turns ?? [])
+    .filter(hasLegacyAmbiguousTtsLatency).length;
+  const availability = useMemo(() => {
+    const turns = perSessionRows.flatMap((r) => r.turns ?? []);
+    return STEP_LABELS.map(({ key, label }) => ({
+      key,
+      label,
+      count: turns.filter((t) => (serviceLatency(t, key) ?? 0) > 0).length,
+      total: turns.length,
+    }));
+  }, [perSessionRows]);
 
   // Baselines (médiane / p95 / moyenne par étape) calculées une fois sur tous
   // les tours visibles. Mémoïsé pour éviter tout recalcul au hover.
@@ -599,6 +633,20 @@ function LatencyVisualization({
           <p className="mt-1 text-[11px] text-muted-foreground/80 flex items-center gap-1">
             <Info className="h-3 w-3" /> Survole un segment pour un aperçu, clique dessus pour ouvrir le panneau d'analyse détaillée.
           </p>
+          {legacyAmbiguousTtsCount > 0 && (
+            <p className="mt-1 text-[11px] text-amber-500">
+              {legacyAmbiguousTtsCount} ancienne(s) mesure(s) TTS exclue(s) : elles mélangent génération et lecture audio.
+            </p>
+          )}
+          {availability.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
+              {availability.map((item) => (
+                <Badge key={item.key} variant={item.count > 0 ? "secondary" : "outline"} className="font-normal">
+                  {item.label}: {item.count}/{item.total || 0}
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-5 text-xs">
           {isAggregate && (
@@ -675,13 +723,15 @@ function LatencyVisualization({
                       max_ms: t.max_ms,
                       validator_ms: t.validator_ms,
                       tts_ms: t.tts_ms,
+                      tts_first_playback_ms: t.tts_first_playback_ms,
                       gm_post_ms: t.gm_post_ms,
                       segmentServices: t.segmentServices,
                     };
+                    const blocker = serviceBlocker(stepValues);
                     return (
                       <StackedRow
                         key={t.index}
-                        label={`Tour #${t.index}${t.blocker ? ` · blocker: ${t.blocker}` : ""}`}
+                        label={`Tour #${t.index}${blocker ? ` · blocker: ${blocker}` : ""}`}
                         values={stepValues}
                         scaleMax={scaleMax}
                         target={TARGET_MS}
@@ -723,7 +773,7 @@ function LatencyVisualization({
           <div className="text-xs text-muted-foreground mb-1">Répartition relative (moyenne)</div>
           <div className="flex h-3 w-full rounded overflow-hidden">
             {STEP_LABELS.map(({ key, label }) => {
-              const v = avg[key] ?? 0;
+              const v = serviceLatency(avg, key) ?? 0;
               if (v <= 0) return null;
               const pct = (v / avgTotal) * 100;
               return (
@@ -737,7 +787,7 @@ function LatencyVisualization({
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-[11px]">
             {STEP_LABELS.map(({ key, label }) => {
-              const v = avg[key] ?? 0;
+              const v = serviceLatency(avg, key) ?? 0;
               if (v <= 0) return null;
               const pct = (v / avgTotal) * 100;
               return (
@@ -1297,23 +1347,24 @@ function aggregate(session: SessionRow): SessionAggregate {
 
   for (const t of turns) {
     for (const { key } of STEP_LABELS) {
-      const v = t[key];
-      if (typeof v === "number") {
+      const v = serviceLatency(t, key);
+      if (typeof v === "number" && v > 0) {
         sums[key] = (sums[key] ?? 0) + v;
         counts[key] = (counts[key] ?? 0) + 1;
         maxes[key] = Math.max(maxes[key] ?? 0, v);
       }
     }
-    const tot = t.total_ms;
-    if (typeof tot === "number") {
+    const tot = serviceLatencyTotal(t);
+    if (tot > 0) {
       sums["total_ms"] = (sums["total_ms"] ?? 0) + tot;
       counts["total_ms"] = (counts["total_ms"] ?? 0) + 1;
       maxes["total_ms"] = Math.max(maxes["total_ms"] ?? 0, tot);
     }
-    if (t.blocker) {
+    const blocker = serviceBlocker(t);
+    if (blocker) {
       blockerCount++;
-      blockerCounter[t.blocker] = (blockerCounter[t.blocker] ?? 0) + 1;
-      lastBlocker = { step: t.blocker, turnIndex: t.index, preview: t.preview };
+      blockerCounter[blocker] = (blockerCounter[blocker] ?? 0) + 1;
+      lastBlocker = { step: blocker, turnIndex: t.index, preview: t.preview };
     }
   }
 
@@ -1357,17 +1408,18 @@ function aggregateMany(aggs: SessionAggregate[]): ComparisonAggregate | null {
   const allKeys: NumericTimingKey[] = [...STEP_LABELS.map((s) => s.key), "total_ms"];
   for (const t of allTurns) {
     for (const key of allKeys) {
-      const v = t[key];
-      if (typeof v === "number") {
+      const v = key === "total_ms" ? serviceLatencyTotal(t) : serviceLatency(t, key);
+      if (typeof v === "number" && v > 0) {
         sums[key] ??= { sum: 0, count: 0, max: 0 };
         sums[key].sum += v;
         sums[key].count++;
         sums[key].max = Math.max(sums[key].max, v);
       }
     }
-    if (t.blocker) {
+    const blocker = serviceBlocker(t);
+    if (blocker) {
       blockers++;
-      blockerCounter[t.blocker] = (blockerCounter[t.blocker] ?? 0) + 1;
+      blockerCounter[blocker] = (blockerCounter[blocker] ?? 0) + 1;
     }
   }
   const avg: ConversationPipelineTimings = {};
@@ -1824,7 +1876,7 @@ export default function LatencyBlockingTab() {
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <span>
-                        Total moy. <strong className="text-foreground font-mono">{fmtMs(a.avg.total_ms)}</strong>
+                        Latence moy. <strong className="text-foreground font-mono">{fmtMs(serviceLatencyTotal(a.avg))}</strong>
                       </span>
                       {a.blockerCount > 0 && (
                         <Badge variant="destructive" className="text-[10px] py-0 px-1.5">
@@ -1908,8 +1960,8 @@ export default function LatencyBlockingTab() {
                     turnCount: a.turnCount,
                     dispersion: computeDispersion(
                       a.turns
-                        .map((t) => t.total_ms)
-                        .filter((v): v is number => typeof v === "number"),
+                        .map(serviceLatencyTotal)
+                        .filter((v) => v > 0),
                     ),
                     turns: a.turns,
                   }))}
@@ -1988,27 +2040,32 @@ export default function LatencyBlockingTab() {
                         {STEP_LABELS.map(({ key, label }) => (
                           <th key={key} className="p-2 text-right">{label}</th>
                         ))}
-                        <th className="p-2 text-right">Total</th>
+                        <th className="p-2 text-right">Latence</th>
                         <th className="p-2 text-left">Blocker</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {focused.turns.map((t) => (
-                        <tr key={t.index} className="border-t">
-                          <td className="p-2 font-mono">{t.index}</td>
-                          {STEP_LABELS.map(({ key }) => (
-                            <td key={key} className="p-2 text-right font-mono">{fmtMs(t[key])}</td>
-                          ))}
-                          <td className="p-2 text-right font-mono font-semibold">{fmtMs(t.total_ms)}</td>
-                          <td className="p-2">
-                            {t.blocker ? (
-                              <Badge variant="destructive" className="text-[10px] py-0 px-1.5">{t.blocker}</Badge>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                      {focused.turns.map((t) => {
+                        const blocker = serviceBlocker(t);
+                        return (
+                          <tr key={t.index} className="border-t">
+                            <td className="p-2 font-mono">{t.index}</td>
+                            {STEP_LABELS.map(({ key }) => (
+                              <td key={key} className="p-2 text-right font-mono">
+                                {fmtMs(serviceLatency(t, key))}
+                              </td>
+                            ))}
+                            <td className="p-2 text-right font-mono font-semibold">{fmtMs(serviceLatencyTotal(t))}</td>
+                            <td className="p-2">
+                              {blocker ? (
+                                <Badge variant="destructive" className="text-[10px] py-0 px-1.5">{blocker}</Badge>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </ScrollArea>
@@ -2037,12 +2094,12 @@ export default function LatencyBlockingTab() {
                         >
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-2">
                             <span className="font-semibold">{msg.role === "max" ? "Max" : "Utilisateur"}</span>
-                            {msg.pipeline?.total_ms != null && (
-                              <span className="font-mono">{fmtMs(msg.pipeline.total_ms)}</span>
+                            {msg.pipeline && serviceLatencyTotal(msg.pipeline) > 0 && (
+                              <span className="font-mono">latence {fmtMs(serviceLatencyTotal(msg.pipeline))}</span>
                             )}
-                            {msg.pipeline?.blocker && (
+                            {msg.pipeline && serviceBlocker(msg.pipeline) && (
                               <Badge variant="destructive" className="text-[10px] py-0 px-1.5">
-                                blocker: {msg.pipeline.blocker}
+                                blocker: {serviceBlocker(msg.pipeline)}
                               </Badge>
                             )}
                           </div>

@@ -120,6 +120,8 @@ export interface ConversationPipelineTimings {
   validator_ms?: number;
   /** TTS latency until audio playback starts. Playback duration is tracked separately in voice telemetry. */
   tts_ms?: number;
+  /** Explicit TTS service latency for new sessions. Old `tts_ms` values may include full audio playback. */
+  tts_first_playback_ms?: number;
   gm_post_ms?: number;
   total_ms?: number;
   /** Step name flagged as the bottleneck/blocker for this turn, or null if all steps OK. */

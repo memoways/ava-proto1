@@ -71,8 +71,8 @@ describe("voiceTelemetry", () => {
     expect(payload.t_turn_voice_ready_ms).toBe(1850);
     expect(payload.t_turn_end_to_end_ms).toBe(4300);
     expect(payload.browser_family).toBe("Chromium");
-    expect(payload.blocker_step).toBe("audio_playback");
-    expect(payload.severity).toBe("slow");
+    expect(payload.blocker_step).toBe("unknown");
+    expect(payload.severity).toBe("ok");
   });
 
   it("sends completed voice turns to PostHog and internal storage", () => {

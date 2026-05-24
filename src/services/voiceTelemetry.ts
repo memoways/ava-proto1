@@ -138,6 +138,11 @@ function firstNumber(...values: Array<number | undefined>): number | undefined {
   return values.find((v): v is number => typeof v === "number" && Number.isFinite(v));
 }
 
+function serviceNameFromProvider(provider?: string | null): string {
+  if (!provider) return "unknown";
+  return provider.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "unknown";
+}
+
 export function createVoiceTurnId(sessionId: string | null | undefined, turnIndex: number): string {
   const prefix = sessionId || "local";
   return `${prefix}:${turnIndex}`;
@@ -166,7 +171,6 @@ export function pickVoiceTurnBlocker(timings: VoiceTurnTimings, hadError = false
     { step: "max_llm", value: timings.t_max_llm_ms },
     { step: "validator", value: timings.t_validator_ms },
     { step: "tts_generation", value: timings.t_tts_total_ms },
-    { step: "audio_playback", value: timings.t_audio_playback_total_ms },
     { step: "gm_post", value: timings.t_gm_post_ms },
   ];
 
@@ -282,9 +286,9 @@ function recordAvaLatencyEvents(payload: VoiceTurnCompletedPayload): void {
       key: "stt_ms",
       label: "STT",
       duration: payload.t_stt_total_ms,
-      provider: payload.stt_provider || payload.stt?.provider || "Deepgram",
-      serviceName: "deepgram",
-      model: payload.stt_model || payload.stt?.model || "nova-2",
+      provider: payload.stt_provider || payload.stt?.provider || "Unknown",
+      serviceName: serviceNameFromProvider(payload.stt_provider || payload.stt?.provider),
+      model: payload.stt_model || payload.stt?.model || "Unknown",
       mode: payload.stt_mode || payload.stt?.mode || "realtime",
     },
     {
@@ -347,12 +351,12 @@ function recordAvaLatencyEvents(payload: VoiceTurnCompletedPayload): void {
     session_id: payload.session_id ?? null,
     turn_index: payload.turn_index,
     correlation_id: payload.turn_id,
-    total_latency_ms: payload.t_turn_end_to_end_ms ?? payload.t_turn_voice_ready_ms ?? payload.t_turn_response_ready_ms ?? null,
+    total_latency_ms: payload.t_turn_voice_ready_ms ?? payload.t_turn_response_ready_ms ?? null,
     blocked,
     blockage_reason: blockageReason,
     segment_count: segments.length,
-    stt_provider: payload.stt_provider || payload.stt?.provider || "Deepgram",
-    stt_model: payload.stt_model || payload.stt?.model || "nova-2",
+    stt_provider: payload.stt_provider || payload.stt?.provider || "Unknown",
+    stt_model: payload.stt_model || payload.stt?.model || "Unknown",
     llm_provider: "OpenRouter",
     llm_model: payload.max_model || "Unknown",
     tts_provider: payload.tts_provider || "Unknown",

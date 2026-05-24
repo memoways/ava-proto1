@@ -17,7 +17,7 @@ describe("latencySegments", () => {
     const [segment] = buildLatencySegmentsFromPipeline({
       sessionId: "s1",
       turnIndex: 1,
-      pipeline: { tts_ms: 7750 },
+      pipeline: { tts_ms: 7750, tts_first_playback_ms: 7750 },
     });
 
     expect(segment).toMatchObject({
@@ -37,7 +37,7 @@ describe("latencySegments", () => {
     const segments = buildLatencySegmentsFromPipeline({
       sessionId: "s1",
       turnIndex: 1,
-      pipeline: { max_ms: 1200, tts_ms: 800 },
+      pipeline: { max_ms: 1200, tts_ms: 800, tts_first_playback_ms: 800 },
       defaultServices: {
         max_ms: { serviceProvider: "OpenRouter", serviceName: "openrouter", model: "google/gemini-2.0-flash-001" },
         tts_ms: { serviceProvider: "ElevenLabs", serviceName: "elevenlabs", model: "eleven_multilingual_v2" },

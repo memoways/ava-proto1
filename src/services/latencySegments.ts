@@ -92,6 +92,19 @@ const PIPELINE_KEYS: LatencySegmentKey[] = [
   "gm_post_ms",
 ];
 
+export function getPipelineServiceLatency(
+  pipeline: ConversationPipelineTimings,
+  key: LatencySegmentKey,
+): number | undefined {
+  const value = key === "tts_ms" ? pipeline.tts_first_playback_ms : pipeline[key];
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
+  return value;
+}
+
+export function hasLegacyAmbiguousTtsLatency(pipeline: ConversationPipelineTimings): boolean {
+  return typeof pipeline.tts_ms === "number" && typeof pipeline.tts_first_playback_ms !== "number";
+}
+
 export function percentile(values: number[], p: number): number {
   const xs = values.filter(Number.isFinite).sort((a, b) => a - b);
   if (xs.length === 0) return 0;
@@ -129,8 +142,8 @@ export function buildLatencySegmentsFromPipeline(input: {
   };
 
   return PIPELINE_KEYS.flatMap((key) => {
-    const durationMs = input.pipeline[key];
-    if (typeof durationMs !== "number" || !Number.isFinite(durationMs) || durationMs <= 0) return [];
+    const durationMs = getPipelineServiceLatency(input.pipeline, key);
+    if (durationMs == null) return [];
     const blocked = input.pipeline.blocker === key;
     const service = resolveLatencyServiceInfo(input.defaultServices?.[key], input.services?.[key]);
     return [{
