@@ -78,7 +78,7 @@ const Radio = <T extends string>({
   </div>
 );
 
-const QuestionnaireScreenPRD4 = ({ teaserSeen, onSubmit, submitting }: Props) => {
+const QuestionnaireScreenPRD4 = ({ teaserSeen, onSubmit, onSkip, submitting }: Props) => {
   const [a, setA] = useState<QuestionnairePRD4Answers>({
     ...defaultAnswers,
     q2_teaser_helpful: teaserSeen ? 3 : null,
