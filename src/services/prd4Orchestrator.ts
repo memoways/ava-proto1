@@ -25,6 +25,7 @@ export interface PRD4TurnInput {
   timeElapsedSeconds: number;
   /** Personnage appelé (PRD4 : "max" toujours, autres grisés). */
   characterName?: string;
+  onLatencySegment?: (event: PRD4LatencySegmentEvent) => void;
 }
 
 export interface PRD4TurnResult {
@@ -39,6 +40,10 @@ export interface PRD4TurnResult {
   postTurnPromise: Promise<PRD4PostTurnEvaluation>;
 }
 
+export type PRD4LatencySegmentEvent =
+  | { type: "start"; segment: "RAG" | "LLM" | "GM"; service: string }
+  | { type: "end"; segment: "RAG" | "LLM" | "GM"; service: string; durationMs: number };
+
 export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnResult> {
   const t0 = performance.now();
   const gameplay = (() => {
@@ -47,6 +52,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
 
   // --- RAG (best-effort, non-bloquant en cas d'erreur) -----------------------
   const ragStart = performance.now();
+  input.onLatencySegment?.({ type: "start", segment: "RAG", service: "RAG" });
   let ragContext = "";
   let knowledgeContext = buildKnowledgeContextFromRAG([]);
   let matchesCount = 0;
@@ -70,9 +76,11 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     console.warn("[PRD4 orchestrator] RAG failed (non-fatal):", err);
   }
   const rag_ms = Math.round(performance.now() - ragStart);
+  input.onLatencySegment?.({ type: "end", segment: "RAG", service: "RAG", durationMs: rag_ms });
 
   // --- Max --------------------------------------------------------------------
   const maxStart = performance.now();
+  input.onLatencySegment?.({ type: "start", segment: "LLM", service: "Max LLM" });
   const maxInput: MaxAgentInput = {
     conversationHistory: input.conversationHistory,
     userMessage: input.userMessage,
@@ -81,23 +89,43 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     knowledgeContext,
     userRoleSummary: input.userRole?.summary_for_max,
   };
-  const { response: maxResponse } = await simulateMaxResponse(maxInput, {
-    characterName: input.characterName || "Max",
-    featureKey: "prd4_chat",
-  });
-  const max_ms = Math.round(performance.now() - maxStart);
+  let maxResponse = "";
+  let max_ms = 0;
+  try {
+    const { response } = await simulateMaxResponse(maxInput, {
+      characterName: input.characterName || "Max",
+      featureKey: "prd4_chat",
+    });
+    maxResponse = response;
+  } finally {
+    max_ms = Math.round(performance.now() - maxStart);
+    input.onLatencySegment?.({ type: "end", segment: "LLM", service: "Max LLM", durationMs: max_ms });
+  }
 
   // --- GM post-turn (void) ---------------------------------------------------
   const turnIndex = input.conversationHistory.filter((m) => m.role === "user").length + 1;
-  const postTurnPromise = evaluatePostTurnPRD4({
-    sessionId: input.sessionId,
-    conversationHistory: input.conversationHistory,
-    userMessage: input.userMessage,
-    maxResponse,
-    userRole: input.userRole,
-    turnIndex,
-    timeElapsedSeconds: input.timeElapsedSeconds,
-  });
+  const postTurnPromise = (async () => {
+    const gmStart = performance.now();
+    input.onLatencySegment?.({ type: "start", segment: "GM", service: "GM post-turn" });
+    try {
+      return await evaluatePostTurnPRD4({
+        sessionId: input.sessionId,
+        conversationHistory: input.conversationHistory,
+        userMessage: input.userMessage,
+        maxResponse,
+        userRole: input.userRole,
+        turnIndex,
+        timeElapsedSeconds: input.timeElapsedSeconds,
+      });
+    } finally {
+      input.onLatencySegment?.({
+        type: "end",
+        segment: "GM",
+        service: "GM post-turn",
+        durationMs: Math.round(performance.now() - gmStart),
+      });
+    }
+  })();
 
   return {
     maxResponse,

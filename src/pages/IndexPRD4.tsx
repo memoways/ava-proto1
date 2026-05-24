@@ -23,6 +23,12 @@ import {
 } from "@/services/voiceTelemetry";
 import { useTimer } from "@/hooks/useTimer";
 import { toast } from "@/hooks/use-toast";
+import LatencyOverlay from "@/components/LatencyOverlay";
+import {
+  useLatencyInstrumentation,
+  useLatencyOverlayEnabled,
+  type LatencySegmentEvent,
+} from "@/hooks/useLatencyOverlay";
 
 import WelcomeScreen from "@/components/prd4/WelcomeScreen";
 import FilmQuestionScreen from "@/components/prd4/FilmQuestionScreen";
@@ -71,6 +77,11 @@ function currentRAGServiceInfo() {
   }
 }
 
+function serviceLabel(service: { serviceProvider?: string; model?: string }) {
+  return [service.serviceProvider, service.model && service.model !== "Unknown" ? service.model : null]
+    .filter(Boolean)
+    .join(" · ") || "Unknown";
+}
 
 const IndexPRD4 = () => {
   const {
@@ -89,10 +100,18 @@ const IndexPRD4 = () => {
   const [userSubtitle, setUserSubtitle] = useState("");
   const [maxSubtitle, setMaxSubtitle] = useState("");
   const [summarizing, setSummarizing] = useState(false);
+  const latencyOverlayEnabled = useLatencyOverlayEnabled();
+  const {
+    segments: latencySegments,
+    startSegment: startLatencySegment,
+    endSegment: endLatencySegment,
+    addCompletedSegment: addCompletedLatencySegment,
+  } = useLatencyInstrumentation(latencyOverlayEnabled);
 
   // Refs pour pipeline conversation
   const sttRef = useRef<DeepgramSTT | null>(null);
   const ttsQueueRef = useRef<TTSQueue | null>(null);
+  const sttLatencySegmentRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const conversationRef = useRef<ConversationMessage[]>([]);
   const isProcessingRef = useRef(false);
@@ -259,6 +278,33 @@ const IndexPRD4 = () => {
       const llmSettings = (() => { try { return getLLMSettings(); } catch { return null; } })();
       const ttsService = currentTTSServiceInfo();
       const ragService = currentRAGServiceInfo();
+      const latencySegmentIds: Record<string, string | null> = {};
+      const serviceLabelForLatency = (segment: string) => {
+        if (segment === "RAG") return serviceLabel(ragService);
+        if (segment === "LLM") return serviceLabel(currentLLMServiceInfo(llmSettings?.LLM_MODEL));
+        if (segment === "GM") return serviceLabel(currentLLMServiceInfo(llmSettings?.LLM_MODEL_GM));
+        return segment;
+      };
+      const handleLatencySegment = latencyOverlayEnabled
+        ? (event: { type: "start" | "end"; segment: "RAG" | "LLM" | "GM"; service: string; durationMs?: number }) => {
+            const key = `${event.segment}:${event.service}`;
+            const segment: LatencySegmentEvent = {
+              segment: event.segment,
+              service: serviceLabelForLatency(event.segment),
+            };
+            if (event.type === "start") {
+              latencySegmentIds[key] = startLatencySegment(segment);
+              return;
+            }
+            const activeId = latencySegmentIds[key];
+            if (activeId) {
+              endLatencySegment(activeId);
+              latencySegmentIds[key] = null;
+            } else if (typeof event.durationMs === "number") {
+              addCompletedLatencySegment(segment, event.durationMs);
+            }
+          }
+        : undefined;
 
       try {
         const result = await processPRD4Turn({
@@ -268,6 +314,7 @@ const IndexPRD4 = () => {
           userRole: userRoleRef.current,
           timeElapsedSeconds: elapsed,
           characterName: "Max",
+          onLatencySegment: handleLatencySegment,
         });
 
         const ttsStart = performance.now();
@@ -296,10 +343,15 @@ const IndexPRD4 = () => {
         // TTS streaming
         const queue = new TTSQueue({ onError: (e) => console.warn("[TTS] turn error:", e.message) });
         ttsQueueRef.current = queue;
+        const ttsLatencySegmentId = latencyOverlayEnabled
+          ? startLatencySegment({ segment: "TTS", service: serviceLabel(ttsService) })
+          : null;
         for (const chunk of chunkTextForTTS(result.maxResponse)) {
           queue.enqueue(chunk, { session_id: sessionIdRef.current ?? undefined, turn_id: turnId, turn_index: turnIndex });
         }
-        const ttsResult = await queue.drain();
+        const ttsResult = await queue.drain().finally(() => {
+          endLatencySegment(ttsLatencySegmentId);
+        });
         const tts_ms = Math.round(performance.now() - ttsStart);
         if (maxMsg.pipeline) {
           maxMsg.pipeline.tts_ms = tts_ms;
@@ -401,7 +453,15 @@ const IndexPRD4 = () => {
         setAudioState("idle");
       }
     },
-    [addMessage, finalizeAndEnd, setAudioState],
+    [
+      addCompletedLatencySegment,
+      addMessage,
+      endLatencySegment,
+      finalizeAndEnd,
+      latencyOverlayEnabled,
+      setAudioState,
+      startLatencySegment,
+    ],
   );
 
   // ---- PTT handlers : démarre/reprend STT, finalise au release -------------
@@ -411,6 +471,8 @@ const IndexPRD4 = () => {
       (text, isFinal) => {
         setUserSubtitle(text);
         if (isFinal && text.trim()) {
+          endLatencySegment(sttLatencySegmentRef.current);
+          sttLatencySegmentRef.current = null;
           stt.pause();
           void processTurn(text);
         }
@@ -437,26 +499,36 @@ const IndexPRD4 = () => {
     stt.pause(); // démarre muet
     sttRef.current = stt;
     return stt;
-  }, [incrementPttError, processTurn]);
+  }, [endLatencySegment, incrementPttError, processTurn]);
 
   const handlePTTPress = useCallback(async () => {
     if (isProcessingRef.current || endedRef.current) return;
     try {
+      endLatencySegment(sttLatencySegmentRef.current);
+      sttLatencySegmentRef.current = latencyOverlayEnabled
+        ? startLatencySegment({ segment: "STT", service: "Deepgram" })
+        : null;
       const stt = await ensureSTT();
       stt?.resume();
       setAudioState("user_speaking");
       setUserSubtitle("");
     } catch (err) {
       console.warn("[PRD4] PTT start failed:", err);
+      endLatencySegment(sttLatencySegmentRef.current);
+      sttLatencySegmentRef.current = null;
       incrementPttError();
     }
-  }, [ensureSTT, incrementPttError, setAudioState]);
+  }, [endLatencySegment, ensureSTT, incrementPttError, latencyOverlayEnabled, setAudioState, startLatencySegment]);
 
   const handlePTTRelease = useCallback(() => {
     const stt = sttRef.current;
     if (!stt) return;
     stt.flush(); // déclenche le isFinal → processTurn
-  }, []);
+    window.setTimeout(() => {
+      endLatencySegment(sttLatencySegmentRef.current);
+      sttLatencySegmentRef.current = null;
+    }, 1500);
+  }, [endLatencySegment]);
 
   const handleHangUp = useCallback(() => {
     if (endedRef.current) return;
@@ -559,15 +631,18 @@ const IndexPRD4 = () => {
       return <CallingMaxScreen onAnswered={handleAnswered} />;
     case "conversation_max":
       return (
-        <ConversationScreen
-          audioState={state.audioState}
-          userSubtitle={userSubtitle}
-          maxSubtitle={maxSubtitle}
-          conversationLog={state.conversationLog}
-          onPTTPress={handlePTTPress}
-          onPTTRelease={handlePTTRelease}
-          onHangUp={handleHangUp}
-        />
+        <>
+          <ConversationScreen
+            audioState={state.audioState}
+            userSubtitle={userSubtitle}
+            maxSubtitle={maxSubtitle}
+            conversationLog={state.conversationLog}
+            onPTTPress={handlePTTPress}
+            onPTTRelease={handlePTTRelease}
+            onHangUp={handleHangUp}
+          />
+          <LatencyOverlay enabled={latencyOverlayEnabled} segments={latencySegments} />
+        </>
       );
     case "end_session":
       return <EndSessionScreen onContinue={handleEndContinue} />;
