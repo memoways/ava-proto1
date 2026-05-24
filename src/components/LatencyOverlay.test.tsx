@@ -40,9 +40,10 @@ describe("LatencyOverlay", () => {
       startedAt: 1_000,
       endedAt: 3_000,
       durationMs: 2_000,
+      turnIndex: 1,
     };
 
-    render(<LatencyOverlay enabled segments={[segment]} nowMs={30_000} />);
+    render(<LatencyOverlay enabled segments={[segment]} currentTurn={1} nowMs={30_000} />);
 
     expect(screen.getByText("TTS")).toBeInTheDocument();
     expect(screen.getByText("ElevenLabs")).toBeInTheDocument();
@@ -57,5 +58,6 @@ function activeSegment(): LatencySegment {
     service: "Deepgram",
     status: "active",
     startedAt: 0,
+    turnIndex: 1,
   };
 }
