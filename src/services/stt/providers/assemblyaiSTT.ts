@@ -24,7 +24,7 @@ export class AssemblyAISTT implements STTSession {
   private fullTranscript = "";
   private startedAt = 0;
   private firstPartialAt = 0;
-  private lastFinalTelemetry: unknown = null;
+  private lastFinalTelemetry: import("../types").STTFinalTelemetryBase | null = null;
 
   constructor(onTranscript: TranscriptCallback, opts?: STTCreateOptions) {
     this.onTranscript = onTranscript;

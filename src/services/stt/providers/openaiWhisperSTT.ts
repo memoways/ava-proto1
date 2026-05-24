@@ -22,7 +22,7 @@ export class OpenAIWhisperSTT implements STTSession {
   private _active = false;
   private _paused = false;
   private startedAt = 0;
-  private lastFinalTelemetry: unknown = null;
+  private lastFinalTelemetry: import("../types").STTFinalTelemetryBase | null = null;
 
   constructor(onTranscript: TranscriptCallback, opts?: STTCreateOptions) {
     this.onTranscript = onTranscript;
