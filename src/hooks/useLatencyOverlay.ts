@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 export type LatencySegmentStatus = "active" | "done";
 
@@ -39,11 +39,14 @@ export function useLatencyOverlayEnabled() {
 export function useLatencyInstrumentation(enabled: boolean) {
   const [segments, setSegments] = useState<LatencySegment[]>([]);
   const [currentTurn, setCurrentTurn] = useState<number>(0);
+  // Ref tenue à jour de manière synchrone pour que startSegment puisse l'utiliser
+  // sans attendre un re-render après startTurn.
+  const currentTurnRef = useRef<number>(0);
 
-  /** Démarre un nouveau tour : efface les segments précédents et affiche le nouvel en-tête. */
   const startTurn = useCallback(
     (turnIndex: number) => {
       if (!enabled) return;
+      currentTurnRef.current = turnIndex;
       setCurrentTurn(turnIndex);
       setSegments([]);
     },
@@ -55,6 +58,7 @@ export function useLatencyInstrumentation(enabled: boolean) {
       if (!enabled) return null;
       const now = performance.now();
       const id = `${segment.toLowerCase()}-${Math.round(now)}-${Math.random().toString(36).slice(2, 7)}`;
+      const turnIndex = currentTurnRef.current;
       setSegments((current) => [
         ...current,
         {
@@ -63,12 +67,12 @@ export function useLatencyInstrumentation(enabled: boolean) {
           service,
           status: "active",
           startedAt: now,
-          turnIndex: currentTurn,
+          turnIndex,
         },
       ]);
       return id;
     },
-    [enabled, currentTurn],
+    [enabled],
   );
 
   const endSegment = useCallback(
@@ -96,6 +100,7 @@ export function useLatencyInstrumentation(enabled: boolean) {
       const duration = Math.max(0, Math.round(durationMs));
       const now = performance.now();
       const id = `${segment.toLowerCase()}-${Math.round(now)}-${Math.random().toString(36).slice(2, 7)}`;
+      const turnIndex = currentTurnRef.current;
       setSegments((current) => [
         ...current,
         {
@@ -106,12 +111,12 @@ export function useLatencyInstrumentation(enabled: boolean) {
           startedAt: now - duration,
           endedAt: now,
           durationMs: duration,
-          turnIndex: currentTurn,
+          turnIndex,
         },
       ]);
       return id;
     },
-    [enabled, currentTurn],
+    [enabled],
   );
 
   return {
@@ -123,3 +128,4 @@ export function useLatencyInstrumentation(enabled: boolean) {
     addCompletedSegment,
   };
 }
+
