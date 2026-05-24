@@ -557,6 +557,7 @@ function LatencyVisualization({
   onToggleExpanded: (id: string) => void;
   minSeverity?: "all" | "high" | "critical";
 }) {
+  const configuredLatencyServices = useMemo(() => getConfiguredLatencyServices(), []);
   const expanded = expandedIds;
   const toggleExpanded = onToggleExpanded;
 

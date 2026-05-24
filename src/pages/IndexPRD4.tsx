@@ -71,6 +71,8 @@ const IndexPRD4 = () => {
   const latencyOverlayEnabled = useLatencyOverlayEnabled();
   const {
     segments: latencySegments,
+    currentTurn: latencyCurrentTurn,
+    startTurn: startLatencyTurn,
     startSegment: startLatencySegment,
     endSegment: endLatencySegment,
     addCompletedSegment: addCompletedLatencySegment,
@@ -83,6 +85,7 @@ const IndexPRD4 = () => {
   const sessionIdRef = useRef<string | null>(null);
   const conversationRef = useRef<ConversationMessage[]>([]);
   const isProcessingRef = useRef(false);
+  const processingWatchdogRef = useRef<number | null>(null);
   const endedRef = useRef(false);
   const userRoleRef = useRef(state.userRoleProfile);
   userRoleRef.current = state.userRoleProfile;
@@ -233,6 +236,14 @@ const IndexPRD4 = () => {
     async (userText: string) => {
       if (isProcessingRef.current || !userText.trim() || endedRef.current) return;
       isProcessingRef.current = true;
+      // Watchdog : si le tour ne se termine pas en 60s, on libère le verrou pour ne pas bloquer l'UX
+      if (processingWatchdogRef.current) window.clearTimeout(processingWatchdogRef.current);
+      processingWatchdogRef.current = window.setTimeout(() => {
+        console.warn("[PRD4] turn watchdog fired — releasing processing lock");
+        isProcessingRef.current = false;
+        setAudioState("idle");
+        toast({ title: "Le tour a pris trop de temps", description: "Tu peux reparler.", variant: "destructive" });
+      }, 60_000);
       setAudioState("max_thinking");
       setUserSubtitle(userText);
 
@@ -417,6 +428,10 @@ const IndexPRD4 = () => {
         console.error("[PRD4] turn failed:", err);
         toast({ title: "Erreur dans la conversation", description: "Réessaie.", variant: "destructive" });
       } finally {
+        if (processingWatchdogRef.current) {
+          window.clearTimeout(processingWatchdogRef.current);
+          processingWatchdogRef.current = null;
+        }
         isProcessingRef.current = false;
         setAudioState("idle");
       }
@@ -433,8 +448,13 @@ const IndexPRD4 = () => {
   );
 
   // ---- PTT handlers : démarre/reprend STT, finalise au release -------------
-  const ensureSTT = useCallback(async () => {
-    if (sttRef.current?.isActive) return sttRef.current;
+  const teardownSTT = useCallback(() => {
+    try { sttRef.current?.stop(); } catch { /* ignore */ }
+    sttRef.current = null;
+  }, []);
+
+  const createSTT = useCallback(async () => {
+    teardownSTT();
     const stt = new DeepgramSTT(
       (text, isFinal) => {
         setUserSubtitle(text);
@@ -451,6 +471,13 @@ const IndexPRD4 = () => {
           incrementPttError();
           trackEvent("prd4_ptt_error", { phase: "conversation", message: err.message });
           setUserSubtitle("Micro indisponible — réessaie.");
+          // Force reset: drop the dead STT so the next click recreates a fresh one
+          teardownSTT();
+          if (sttLatencySegmentRef.current) {
+            endLatencySegment(sttLatencySegmentRef.current);
+            sttLatencySegmentRef.current = null;
+          }
+          setAudioState("idle");
         },
         getTelemetryContext: () => {
           const turnIndex = conversationRef.current.filter((m) => m.role === "user").length + 1;
@@ -464,39 +491,64 @@ const IndexPRD4 = () => {
     );
     await stt.start();
     stt.setManualMode(true); // toggle-to-talk: pas de silence auto-finalize
-    stt.pause(); // démarre muet
     sttRef.current = stt;
     return stt;
-  }, [endLatencySegment, incrementPttError, processTurn]);
+  }, [endLatencySegment, incrementPttError, processTurn, setAudioState, teardownSTT]);
 
   const handlePTTPress = useCallback(async () => {
     if (isProcessingRef.current || endedRef.current) return;
     try {
+      // Always start a fresh STT per turn for robustness (avoid stale WS, paused state, etc.)
+      const nextTurn = conversationRef.current.filter((m) => m.role === "user").length + 1;
+      if (latencyOverlayEnabled) {
+        startLatencyTurn(nextTurn);
+      }
       endLatencySegment(sttLatencySegmentRef.current);
       sttLatencySegmentRef.current = latencyOverlayEnabled
         ? startLatencySegment({ segment: "STT", service: "Deepgram" })
         : null;
-      const stt = await ensureSTT();
-      stt?.resume();
       setAudioState("user_speaking");
       setUserSubtitle("");
+      await createSTT();
     } catch (err) {
       console.warn("[PRD4] PTT start failed:", err);
       endLatencySegment(sttLatencySegmentRef.current);
       sttLatencySegmentRef.current = null;
+      teardownSTT();
       incrementPttError();
+      setAudioState("idle");
+      toast({ title: "Micro indisponible", description: "Réessaie dans un instant.", variant: "destructive" });
     }
-  }, [endLatencySegment, ensureSTT, incrementPttError, latencyOverlayEnabled, setAudioState, startLatencySegment]);
+  }, [
+    createSTT,
+    endLatencySegment,
+    incrementPttError,
+    latencyOverlayEnabled,
+    setAudioState,
+    startLatencySegment,
+    startLatencyTurn,
+    teardownSTT,
+  ]);
 
   const handlePTTRelease = useCallback(() => {
     const stt = sttRef.current;
-    if (!stt) return;
-    stt.flush(); // déclenche le isFinal → processTurn
+    if (!stt) {
+      // Nothing recording — just normalize state
+      setAudioState("idle");
+      return;
+    }
+    stt.flush(); // déclenche le isFinal → processTurn si du texte a été capté
+    // Si rien n'a été capté, on remet l'état au repos pour permettre une nouvelle tentative
     window.setTimeout(() => {
       endLatencySegment(sttLatencySegmentRef.current);
       sttLatencySegmentRef.current = null;
-    }, 1500);
-  }, [endLatencySegment]);
+      if (!isProcessingRef.current) {
+        setAudioState("idle");
+        setUserSubtitle("");
+        teardownSTT();
+      }
+    }, 600);
+  }, [endLatencySegment, setAudioState, teardownSTT]);
 
   const handleHangUp = useCallback(() => {
     if (endedRef.current) return;
@@ -609,7 +661,7 @@ const IndexPRD4 = () => {
             onPTTRelease={handlePTTRelease}
             onHangUp={handleHangUp}
           />
-          <LatencyOverlay enabled={latencyOverlayEnabled} segments={latencySegments} />
+          <LatencyOverlay enabled={latencyOverlayEnabled} segments={latencySegments} currentTurn={latencyCurrentTurn} />
         </>
       );
     case "end_session":

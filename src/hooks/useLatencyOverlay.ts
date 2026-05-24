@@ -10,6 +10,7 @@ export interface LatencySegment {
   startedAt: number;
   endedAt?: number;
   durationMs?: number;
+  turnIndex: number;
 }
 
 export interface LatencySegmentEvent {
@@ -37,6 +38,17 @@ export function useLatencyOverlayEnabled() {
 
 export function useLatencyInstrumentation(enabled: boolean) {
   const [segments, setSegments] = useState<LatencySegment[]>([]);
+  const [currentTurn, setCurrentTurn] = useState<number>(0);
+
+  /** Démarre un nouveau tour : efface les segments précédents et affiche le nouvel en-tête. */
+  const startTurn = useCallback(
+    (turnIndex: number) => {
+      if (!enabled) return;
+      setCurrentTurn(turnIndex);
+      setSegments([]);
+    },
+    [enabled],
+  );
 
   const startSegment = useCallback(
     ({ segment, service }: LatencySegmentEvent) => {
@@ -51,11 +63,12 @@ export function useLatencyInstrumentation(enabled: boolean) {
           service,
           status: "active",
           startedAt: now,
+          turnIndex: currentTurn,
         },
-      ].slice(-10));
+      ]);
       return id;
     },
-    [enabled],
+    [enabled, currentTurn],
   );
 
   const endSegment = useCallback(
@@ -93,15 +106,18 @@ export function useLatencyInstrumentation(enabled: boolean) {
           startedAt: now - duration,
           endedAt: now,
           durationMs: duration,
+          turnIndex: currentTurn,
         },
-      ].slice(-10));
+      ]);
       return id;
     },
-    [enabled],
+    [enabled, currentTurn],
   );
 
   return {
     segments,
+    currentTurn,
+    startTurn,
     startSegment,
     endSegment,
     addCompletedSegment,

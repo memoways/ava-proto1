@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 interface LatencyOverlayProps {
   enabled: boolean;
   segments: LatencySegment[];
+  currentTurn?: number;
   nowMs?: number;
 }
 
@@ -18,7 +19,9 @@ const SEGMENT_STYLES: Record<string, string> = {
   Validator: "border-violet-300/40 bg-violet-500/20 text-violet-50",
 };
 
-export default function LatencyOverlay({ enabled, segments, nowMs }: LatencyOverlayProps) {
+const ORDER: Record<string, number> = { STT: 0, ASR: 0, RAG: 1, LLM: 2, TTS: 3, Validator: 4, GM: 5 };
+
+export default function LatencyOverlay({ enabled, segments, currentTurn, nowMs }: LatencyOverlayProps) {
   const hasActiveSegment = segments.some((segment) => segment.status === "active");
   const [tick, setTick] = useState(() => performance.now());
 
@@ -29,17 +32,27 @@ export default function LatencyOverlay({ enabled, segments, nowMs }: LatencyOver
   }, [enabled, hasActiveSegment, nowMs]);
 
   const renderNow = nowMs ?? tick;
-  const visibleSegments = useMemo(() => segments.slice(-8), [segments]);
 
-  if (!enabled || visibleSegments.length === 0) return null;
+  // Garde uniquement les segments du tour courant, et trie par ordre canonique
+  const turnSegments = useMemo(() => {
+    if (currentTurn == null) return segments;
+    return segments
+      .filter((s) => s.turnIndex === currentTurn)
+      .sort((a, b) => (ORDER[a.segment] ?? 99) - (ORDER[b.segment] ?? 99) || a.startedAt - b.startedAt);
+  }, [segments, currentTurn]);
+
+  if (!enabled || (currentTurn ?? 0) <= 0) return null;
 
   return (
     <div
       data-testid="latency-overlay"
-      className="pointer-events-none fixed bottom-[6.75rem] left-3 z-40 flex max-h-[4.25rem] max-w-[calc(100vw-1.5rem)] flex-wrap items-start gap-1.5 overflow-hidden md:bottom-4 md:left-4 md:max-w-[28rem]"
+      className="pointer-events-none fixed bottom-4 left-4 z-40 flex max-w-[20rem] flex-col gap-1.5"
       aria-hidden
     >
-      {visibleSegments.map((segment) => {
+      <div className="self-start rounded-md border border-primary/50 bg-primary/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-primary-foreground shadow-lg backdrop-blur-md">
+        Tour {currentTurn}
+      </div>
+      {turnSegments.map((segment) => {
         const durationMs = segment.status === "active"
           ? renderNow - segment.startedAt
           : segment.durationMs ?? ((segment.endedAt ?? renderNow) - segment.startedAt);
@@ -49,11 +62,12 @@ export default function LatencyOverlay({ enabled, segments, nowMs }: LatencyOver
             className={cn(
               "flex min-w-0 items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] leading-none shadow-lg shadow-black/20 backdrop-blur-md",
               SEGMENT_STYLES[segment.segment] ?? "border-border/40 bg-background/60 text-foreground",
+              segment.status === "active" && "animate-pulse",
             )}
           >
             <span className="font-semibold uppercase tracking-wide">{segment.segment}</span>
             <span className="max-w-[8rem] truncate text-white/72">{segment.service}</span>
-            <span className="font-mono tabular-nums text-white">{formatLatencyDuration(durationMs)}</span>
+            <span className="ml-auto font-mono tabular-nums text-white">{formatLatencyDuration(durationMs)}</span>
           </div>
         );
       })}
