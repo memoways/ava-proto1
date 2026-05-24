@@ -103,8 +103,13 @@ export class GamilabSTT implements STTSession {
     this.bindEvents(gami);
 
     await gami.connect();
-    // portal_id is numeric, token is the JWT-like string from Gamilab
-    await gami.use_portal({ portal_id: Number(portalId), token: portalToken });
+    // Try positional signature first (portal_id, token), then fall back to object form.
+    try {
+      await gami.use_portal(Number(portalId), portalToken);
+    } catch (errPos) {
+      debugLogger.log({ service: "stt", level: "warn", direction: "in", label: `Gamilab use_portal(positional) failed: ${(errPos as Error).message}, retrying with object` });
+      await gami.use_portal({ portal_id: Number(portalId), token: portalToken });
+    }
     await gami.create_thread();
     await gami.start_recording();
 
