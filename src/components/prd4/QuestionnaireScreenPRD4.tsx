@@ -213,14 +213,27 @@ const QuestionnaireScreenPRD4 = ({ teaserSeen, onSubmit, onSkip, submitting }: P
           </label>
         </section>
 
-        <button
-          type="button"
-          onClick={() => onSubmit(a)}
-          disabled={submitting}
-          className="w-full rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
-          {submitting ? "Envoi…" : "Envoyer mon feedback"}
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => onSubmit(a)}
+            disabled={submitting}
+            className="w-full rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {submitting ? "Envoi…" : "Envoyer mon feedback"}
+          </button>
+          {onSkip && (
+            <button
+              type="button"
+              onClick={onSkip}
+              disabled={submitting}
+              className="w-full rounded-md border border-border bg-transparent px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 sm:w-auto sm:px-6"
+            >
+              Passer
+            </button>
+          )}
+        </div>
+
       </div>
     </div>
   );
