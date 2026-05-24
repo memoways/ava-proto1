@@ -115,6 +115,7 @@ export function buildLatencySegmentsFromPipeline(input: {
   language?: string | null;
   pipeline: ConversationPipelineTimings;
   services?: Partial<Record<LatencySegmentKey, LatencyServiceInfo>>;
+  defaultServices?: Partial<Record<LatencySegmentKey, LatencyServiceInfo>>;
 }): LatencySegment[] {
   const contextBase: LatencySegmentContext = {
     sessionId: input.sessionId,
@@ -131,7 +132,7 @@ export function buildLatencySegmentsFromPipeline(input: {
     const durationMs = input.pipeline[key];
     if (typeof durationMs !== "number" || !Number.isFinite(durationMs) || durationMs <= 0) return [];
     const blocked = input.pipeline.blocker === key;
-    const service = input.services?.[key] ?? {};
+    const service = resolveLatencyServiceInfo(input.defaultServices?.[key], input.services?.[key]);
     return [{
       key,
       label: LATENCY_SEGMENT_LABELS[key],
@@ -148,6 +149,25 @@ export function buildLatencySegmentsFromPipeline(input: {
       },
     }];
   });
+}
+
+export function resolveLatencyServiceInfo(
+  fallback: LatencyServiceInfo | undefined,
+  explicit: LatencyServiceInfo | undefined,
+): LatencyServiceInfo {
+  return {
+    serviceProvider: preferKnown(explicit?.serviceProvider, fallback?.serviceProvider),
+    serviceName: preferKnown(explicit?.serviceName, fallback?.serviceName),
+    model: preferKnown(explicit?.model, fallback?.model),
+    mode: preferKnown(explicit?.mode, fallback?.mode),
+    endpointType: preferKnown(explicit?.endpointType, fallback?.endpointType),
+  };
+}
+
+function preferKnown(primary?: string, fallback?: string) {
+  if (primary && primary !== "Unknown") return primary;
+  if (fallback && fallback !== "Unknown") return fallback;
+  return primary || fallback;
 }
 
 export function computeSegmentServiceStats(segments: LatencySegment[]): SegmentServiceStats[] {

@@ -33,6 +33,56 @@ describe("latencySegments", () => {
     });
   });
 
+  it("uses configured default services when per-turn metadata is missing", () => {
+    const segments = buildLatencySegmentsFromPipeline({
+      sessionId: "s1",
+      turnIndex: 1,
+      pipeline: { max_ms: 1200, tts_ms: 800 },
+      defaultServices: {
+        max_ms: { serviceProvider: "OpenRouter", serviceName: "openrouter", model: "google/gemini-2.0-flash-001" },
+        tts_ms: { serviceProvider: "ElevenLabs", serviceName: "elevenlabs", model: "eleven_multilingual_v2" },
+      },
+    });
+
+    expect(segments).toEqual([
+      expect.objectContaining({
+        key: "max_ms",
+        serviceProvider: "OpenRouter",
+        serviceName: "openrouter",
+        model: "google/gemini-2.0-flash-001",
+      }),
+      expect.objectContaining({
+        key: "tts_ms",
+        serviceProvider: "ElevenLabs",
+        serviceName: "elevenlabs",
+        model: "eleven_multilingual_v2",
+      }),
+    ]);
+  });
+
+  it("fills Unknown fields from configured defaults without replacing explicit known fields", () => {
+    const [segment] = buildLatencySegmentsFromPipeline({
+      pipeline: {
+        max_ms: 1200,
+        segmentServices: {
+          max_ms: { serviceProvider: "OpenRouter", serviceName: "openrouter", model: "Unknown" },
+        },
+      },
+      services: {
+        max_ms: { serviceProvider: "OpenRouter", serviceName: "openrouter", model: "Unknown" },
+      },
+      defaultServices: {
+        max_ms: { serviceProvider: "OpenRouter", serviceName: "openrouter", model: "google/gemini-2.0-flash-001" },
+      },
+    });
+
+    expect(segment).toMatchObject({
+      serviceProvider: "OpenRouter",
+      serviceName: "openrouter",
+      model: "google/gemini-2.0-flash-001",
+    });
+  });
+
   it("groups stats by segment, provider, service and model", () => {
     const stats = computeSegmentServiceStats([
       {

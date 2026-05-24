@@ -14,8 +14,7 @@ import { processPRD4Turn } from "@/services/prd4Orchestrator";
 import { createPRD4Session, endPRD4Session, updatePRD4Conversation } from "@/services/prd4Session";
 import { DeepgramSTT } from "@/services/deepgramSTT";
 import { TTSQueue, chunkTextForTTS } from "@/services/elevenLabsTTS";
-import { getGameplaySettings, getLLMSettings, getTTSSettings } from "@/services/settingsService";
-import { getActiveProviderId, getHumeSettings, getInworldSettings } from "@/services/tts/providerSettings";
+import { getLLMSettings } from "@/services/settingsService";
 import {
   buildVoiceTurnCompletedPayload,
   createVoiceTurnId,
@@ -29,6 +28,12 @@ import {
   useLatencyOverlayEnabled,
   type LatencySegmentEvent,
 } from "@/hooks/useLatencyOverlay";
+import {
+  getConfiguredLLMServiceInfo,
+  getConfiguredRAGServiceInfo,
+  getConfiguredTTSServiceInfo,
+  latencyServiceLabel,
+} from "@/services/latencyServiceMetadata";
 
 import WelcomeScreen from "@/components/prd4/WelcomeScreen";
 import FilmQuestionScreen from "@/components/prd4/FilmQuestionScreen";
@@ -45,43 +50,6 @@ import { savePRD4Questionnaire, syncPRD4QuestionnaireToNotion } from "@/services
 import type { QuestionnairePRD4Answers, QuestionnairePRD4Data } from "@/types";
 
 const SESSION_DURATION_S = 5 * 60; // PRD4 §11 : ~5 min cible.
-
-function currentTTSServiceInfo() {
-  try {
-    const provider = getActiveProviderId();
-    if (provider === "inworld") {
-      const s = getInworldSettings();
-      return { serviceProvider: "Inworld", serviceName: "inworld", model: s.modelId, mode: s.deliveryMode };
-    }
-    if (provider === "hume") {
-      const s = getHumeSettings();
-      return { serviceProvider: "Hume", serviceName: "hume", model: "octave", mode: s.format };
-    }
-    return { serviceProvider: "ElevenLabs", serviceName: "elevenlabs", model: getTTSSettings().modelId, mode: "streaming" };
-  } catch {
-    return { serviceProvider: "Unknown", serviceName: "Unknown", model: "Unknown", mode: "realtime" };
-  }
-}
-
-function currentLLMServiceInfo(model?: string) {
-  return { serviceProvider: "OpenRouter", serviceName: "openrouter", model: model || "Unknown", endpointType: "llm" };
-}
-
-function currentRAGServiceInfo() {
-  try {
-    const gameplay = getGameplaySettings();
-    const provider = gameplay.RAG_EMBEDDING_PROVIDER || "Unknown";
-    return { serviceProvider: provider === "voyage" ? "Voyage" : provider === "openai" ? "OpenAI" : "Unknown", serviceName: provider, model: "Unknown", endpointType: "rag" };
-  } catch {
-    return { serviceProvider: "Unknown", serviceName: "Unknown", model: "Unknown", endpointType: "rag" };
-  }
-}
-
-function serviceLabel(service: { serviceProvider?: string; model?: string }) {
-  return [service.serviceProvider, service.model && service.model !== "Unknown" ? service.model : null]
-    .filter(Boolean)
-    .join(" · ") || "Unknown";
-}
 
 const IndexPRD4 = () => {
   const {
@@ -276,13 +244,13 @@ const IndexPRD4 = () => {
       const turnId = createVoiceTurnId(sessionIdRef.current, turnIndex);
       const elapsed = SESSION_DURATION_S - (timerRef.current?.remaining ?? SESSION_DURATION_S);
       const llmSettings = (() => { try { return getLLMSettings(); } catch { return null; } })();
-      const ttsService = currentTTSServiceInfo();
-      const ragService = currentRAGServiceInfo();
+      const ttsService = getConfiguredTTSServiceInfo();
+      const ragService = getConfiguredRAGServiceInfo();
       const latencySegmentIds: Record<string, string | null> = {};
       const serviceLabelForLatency = (segment: string) => {
-        if (segment === "RAG") return serviceLabel(ragService);
-        if (segment === "LLM") return serviceLabel(currentLLMServiceInfo(llmSettings?.LLM_MODEL));
-        if (segment === "GM") return serviceLabel(currentLLMServiceInfo(llmSettings?.LLM_MODEL_GM));
+        if (segment === "RAG") return latencyServiceLabel(ragService);
+        if (segment === "LLM") return latencyServiceLabel(getConfiguredLLMServiceInfo(llmSettings?.LLM_MODEL));
+        if (segment === "GM") return latencyServiceLabel(getConfiguredLLMServiceInfo(llmSettings?.LLM_MODEL_GM));
         return segment;
       };
       const handleLatencySegment = latencyOverlayEnabled
@@ -331,7 +299,7 @@ const IndexPRD4 = () => {
             blocker,
             segmentServices: {
               rag_ms: ragService,
-              max_ms: currentLLMServiceInfo(llmSettings?.LLM_MODEL),
+              max_ms: getConfiguredLLMServiceInfo(llmSettings?.LLM_MODEL),
             },
           },
         };
@@ -344,7 +312,7 @@ const IndexPRD4 = () => {
         const queue = new TTSQueue({ onError: (e) => console.warn("[TTS] turn error:", e.message) });
         ttsQueueRef.current = queue;
         const ttsLatencySegmentId = latencyOverlayEnabled
-          ? startLatencySegment({ segment: "TTS", service: serviceLabel(ttsService) })
+          ? startLatencySegment({ segment: "TTS", service: latencyServiceLabel(ttsService) })
           : null;
         for (const chunk of chunkTextForTTS(result.maxResponse)) {
           queue.enqueue(chunk, { session_id: sessionIdRef.current ?? undefined, turn_id: turnId, turn_index: turnIndex });
@@ -401,7 +369,7 @@ const IndexPRD4 = () => {
           },
           rag: { matches_count: result.ragMatches },
           tts: {
-            provider: ttsService.serviceName,
+            provider: ttsService.serviceProvider,
             model: ttsService.model,
             segments_count: ttsResult.generatedSegments,
             segments_played: ttsResult.playedSegments,

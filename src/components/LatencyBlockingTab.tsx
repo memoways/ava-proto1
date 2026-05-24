@@ -38,11 +38,13 @@ import {
   buildLatencySegmentsFromPipeline,
   computeSegmentServiceEvolution,
   computeSegmentServiceStats,
+  resolveLatencyServiceInfo,
   type LatencySegmentKey,
   type LatencyServiceInfo,
   type SegmentServiceEvolutionPoint,
   type SegmentServiceStats,
 } from "@/services/latencySegments";
+import { getConfiguredLatencyServices } from "@/services/latencyServiceMetadata";
 
 interface SessionRow {
   id: string;
@@ -321,6 +323,8 @@ interface StackedRowProps {
   onSelectSegment?: (sel: SegmentSelection) => void;
   /** Sévérité minimale pour mettre en avant les segments ; les autres sont atténués. */
   minSeverity?: "all" | "high" | "critical";
+  /** Services configurés actuellement, utilisés si les tours historiques n'ont pas de metadata. */
+  defaultServices?: Partial<Record<LatencySegmentKey, LatencyServiceInfo>>;
 }
 
 function severityClasses(sev: StepDiagnostic["severity"]): string {
@@ -339,6 +343,7 @@ function StackedRow({
   rowKind = "turn",
   onSelectSegment,
   minSeverity = "all",
+  defaultServices,
 }: StackedRowProps) {
   const sevThreshold = minSeverity === "all" ? 0 : minSeverity === "high" ? 1 : 2;
   const total = STEP_LABELS.reduce((acc, { key }) => acc + (values[key] ?? 0), 0);
@@ -381,7 +386,7 @@ function StackedRow({
             if (v <= 0) return null;
             const pct = (v / denom) * 100;
             const diag = analyzeStep(key, v, total, baselines?.[key]);
-            const service = values.segmentServices?.[key];
+            const service = resolveLatencyServiceInfo(defaultServices?.[key], values.segmentServices?.[key]);
             const dimmed = SEVERITY_RANK[diag.severity] < sevThreshold;
             return (
               <Tooltip key={key} delayDuration={120}>
@@ -655,6 +660,7 @@ function LatencyVisualization({
                     rowKind="session-avg"
                     onSelectSegment={setSelected}
                     minSeverity={minSeverity}
+                    defaultServices={configuredLatencyServices}
                   />
                 </div>
               </div>
@@ -682,6 +688,7 @@ function LatencyVisualization({
                         rowKind="turn"
                         onSelectSegment={setSelected}
                         minSeverity={minSeverity}
+                        defaultServices={configuredLatencyServices}
                       />
                     );
                   })}
@@ -1498,6 +1505,7 @@ export default function LatencyBlockingTab() {
 
   const [conversationOpen, setConversationOpen] = useState(false);
 
+  const configuredLatencyServices = useMemo(() => getConfiguredLatencyServices(), []);
 
   const aggregates = useMemo(() => sessions.map(aggregate).filter((a) => a.turnCount > 0), [sessions]);
 
@@ -1568,10 +1576,11 @@ export default function LatencyBlockingTab() {
           turnIndex: turn.index,
           pipeline: turn,
           services: turn.segmentServices as Partial<Record<LatencySegmentKey, LatencyServiceInfo>> | undefined,
+          defaultServices: configuredLatencyServices,
         }),
       ),
     );
-  }, [selectedAggregates]);
+  }, [configuredLatencyServices, selectedAggregates]);
   const serviceStats = useMemo(() => {
     const segments = selectedLatencySegments;
     return computeSegmentServiceStats(segments).filter((s) =>
