@@ -146,8 +146,8 @@ const IndexPRD4 = () => {
   const handleFilmAnswer = useCallback(
     (a: FilmAnswer) => {
       setFilmAnswer(a);
-      // "vu" et "rappel" → vidéo teaser ; "pas_vu" → role_capture direct
-      setPhase(a === "pas_vu" ? "role_capture" : "teaser");
+      // "pas_vu" et "rappel" → vidéo teaser ; "vu" → role_capture direct
+      setPhase(a === "vu" ? "role_capture" : "teaser");
     },
     [setFilmAnswer, setPhase],
   );
