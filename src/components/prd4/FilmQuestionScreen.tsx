@@ -36,7 +36,7 @@ const FilmQuestionScreen = ({ onAnswer }: Props) => (
           variant="outline"
           size="lg"
           onClick={() => onAnswer("rappel")}
-          className="min-w-[260px]"
+          className="w-full whitespace-normal text-center leading-tight px-6 sm:w-auto sm:min-w-[320px]"
         >
           Il y a longtemps / j'ai besoin d'un rappel
         </Button>
