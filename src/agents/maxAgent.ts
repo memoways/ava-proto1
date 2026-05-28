@@ -125,7 +125,7 @@ export interface SimulateMaxResult {
 
 export async function simulateMaxResponse(
   input: MaxAgentInput,
-  opts?: { characterName?: string; featureKey?: string },
+  opts?: { characterName?: string; featureKey?: string; timeoutMs?: number },
 ): Promise<SimulateMaxResult> {
   const characterName = opts?.characterName || "Max";
   const systemPrompt = await buildMaxSystemPrompt(
@@ -152,6 +152,7 @@ export async function simulateMaxResponse(
     temperature: llm.LLM_TEMPERATURE,
     max_tokens: llm.LLM_MAX_TOKENS,
     top_p: llm.LLM_TOP_P,
+    timeoutMs: opts?.timeoutMs,
     feature_key: opts?.featureKey || "max_prompt_test",
   });
 

@@ -44,6 +44,10 @@ export type PRD4LatencySegmentEvent =
   | { type: "start"; segment: "RAG" | "LLM" | "GM"; service: string }
   | { type: "end"; segment: "RAG" | "LLM" | "GM"; service: string; durationMs: number };
 
+const MAX_TURN_TIMEOUT_MS = 10000;
+const MAX_FALLBACK_RESPONSE =
+  "Je vous entends, mais la ligne accroche. Répétez juste l'essentiel, s'il vous plaît.";
+
 export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnResult> {
   const t0 = performance.now();
   const gameplay = (() => {
@@ -95,8 +99,12 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     const { response } = await simulateMaxResponse(maxInput, {
       characterName: input.characterName || "Max",
       featureKey: "prd4_chat",
+      timeoutMs: MAX_TURN_TIMEOUT_MS,
     });
     maxResponse = response;
+  } catch (err) {
+    console.warn("[PRD4 orchestrator] Max LLM failed (fallback response):", err);
+    maxResponse = MAX_FALLBACK_RESPONSE;
   } finally {
     max_ms = Math.round(performance.now() - maxStart);
     input.onLatencySegment?.({ type: "end", segment: "LLM", service: "Max LLM", durationMs: max_ms });

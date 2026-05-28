@@ -33,6 +33,8 @@ const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
   notes: "Évaluation par défaut (LLM indisponible).",
 };
 
+const GM_POST_TURN_TIMEOUT_MS = 6000;
+
 const SYSTEM_PROMPT = `Tu es le Game Master d'une expérience narrative en temps réel de ~5 minutes entre un joueur et Max (père d'Ava). Après chaque échange (1 message utilisateur + 1 réponse de Max), tu produis une évaluation structurée en JSON STRICT — aucun texte hors JSON.
 
 Tu retournes EXACTEMENT cet objet :
@@ -111,6 +113,7 @@ export async function evaluatePostTurnPRD4(
         model: llm.LLM_MODEL_GM,
         temperature: 0.2,
         max_tokens: llm.LLM_MAX_TOKENS_GM ?? 250,
+        timeoutMs: GM_POST_TURN_TIMEOUT_MS,
         feature_key: "prd4_gm_post_turn",
         session_id: input.sessionId ?? undefined,
       },

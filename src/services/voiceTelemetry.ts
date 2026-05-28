@@ -126,6 +126,13 @@ const STEP_BUDGET_MS: Record<VoiceBlockerStep, number> = {
   unknown: Number.POSITIVE_INFINITY,
 };
 
+let voiceTurnEventsUnavailable = false;
+let voiceErrorEventsUnavailable = false;
+
+function isMissingTelemetryTable(errorMessage?: string): boolean {
+  return /Could not find the table|schema cache|relation .* does not exist/i.test(errorMessage || "");
+}
+
 function safe(fn: () => void) {
   try {
     fn();
@@ -261,6 +268,7 @@ export function recordVoiceTurnCompleted(payload: VoiceTurnCompletedPayload): vo
   safe(() => trackEvent("voice_turn_completed", payload as unknown as Record<string, unknown>));
   safe(() => recordAvaLatencyEvents(payload));
   safe(() => {
+    if (voiceTurnEventsUnavailable) return;
     void supabase
       .from("voice_turn_events" as never)
       .insert({
@@ -273,7 +281,13 @@ export function recordVoiceTurnCompleted(payload: VoiceTurnCompletedPayload): vo
         metadata_json: payload,
       } as never)
       .then(({ error }) => {
-        if (error) console.warn("[voiceTelemetry] insert voice_turn_events", error.message);
+        if (!error) return;
+        if (isMissingTelemetryTable(error.message)) {
+          voiceTurnEventsUnavailable = true;
+          console.warn("[voiceTelemetry] voice_turn_events table unavailable; disabling internal inserts for this session");
+          return;
+        }
+        console.warn("[voiceTelemetry] insert voice_turn_events", error.message);
       });
   });
 }
@@ -396,6 +410,7 @@ export function recordVoiceError(record: VoiceErrorRecord): void {
 
   safe(() => trackEvent("voice_error", payload as Record<string, unknown>));
   safe(() => {
+    if (voiceErrorEventsUnavailable) return;
     void supabase
       .from("voice_error_events" as never)
       .insert({
@@ -411,7 +426,13 @@ export function recordVoiceError(record: VoiceErrorRecord): void {
         metadata_json: payload,
       } as never)
       .then(({ error }) => {
-        if (error) console.warn("[voiceTelemetry] insert voice_error_events", error.message);
+        if (!error) return;
+        if (isMissingTelemetryTable(error.message)) {
+          voiceErrorEventsUnavailable = true;
+          console.warn("[voiceTelemetry] voice_error_events table unavailable; disabling internal inserts for this session");
+          return;
+        }
+        console.warn("[voiceTelemetry] insert voice_error_events", error.message);
       });
   });
 }

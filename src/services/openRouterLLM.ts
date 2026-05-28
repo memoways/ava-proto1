@@ -1,6 +1,6 @@
 import { trackLLMCall } from "./llmUsageTracker";
 import { debugLogger } from "./debugLogger";
-import { createTimeoutSignal } from "./asyncUtils";
+import { TimeoutError, withTimeout } from "./asyncUtils";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -14,6 +14,8 @@ interface LLMOptions {
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
+  /** Hard client-side timeout. Keeps the conversation reactive even if the proxy/provider stalls. */
+  timeoutMs?: number;
   /** Feature key for cost tracking (e.g. 'chat', 'game_master', 'analysis') */
   feature_key?: string;
   /** Session ID for cost tracking */
@@ -27,6 +29,35 @@ type LLMUsagePayload = {
   total_tokens?: number;
 };
 
+const DEFAULT_LLM_TIMEOUT_MS = 18000;
+
+function normalizeTimeoutError(err: unknown, label: string, timeoutMs: number): Error {
+  if (err instanceof TimeoutError) return err;
+  if (err instanceof DOMException && err.name === "AbortError") {
+    return new TimeoutError(label, timeoutMs);
+  }
+  if (err instanceof Error && err.name === "AbortError") {
+    return new TimeoutError(label, timeoutMs);
+  }
+  return err instanceof Error ? err : new Error(String(err));
+}
+
+async function fetchProxyLLM(body: Record<string, unknown>, timeoutMs: number, label: string): Promise<Response> {
+  const controller = new AbortController();
+  const fetchPromise = fetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: controller.signal,
+  });
+
+  try {
+    return await withTimeout(label, fetchPromise, timeoutMs, () => controller.abort());
+  } catch (err) {
+    throw normalizeTimeoutError(err, label, timeoutMs);
+  }
+}
+
 /**
  * Streaming LLM call via proxy-llm Edge Function
  * Tracks usage in llm_usage table automatically.
@@ -38,6 +69,7 @@ export async function streamLLM(
 ): Promise<string> {
   const model = options?.model || "qwen/qwen-2.5-72b-instruct";
   const featureKey = options?.feature_key || "chat";
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS;
 
   const startTime = Date.now();
   const debugId = debugLogger.logFetch("llm", `Stream ${model}`, `${SUPABASE_URL}/functions/v1/proxy-llm`, {
@@ -46,20 +78,32 @@ export async function streamLLM(
     last_user: messages[messages.length - 1]?.content?.slice(0, 200),
   });
 
-  const timeout = createTimeoutSignal(18000);
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messages,
-      stream: true,
-      model: options?.model,
-      temperature: options?.temperature,
-      max_tokens: options?.max_tokens,
-      top_p: options?.top_p,
-    }),
-    signal: timeout.signal,
-  }).finally(timeout.cancel);
+  let response: Response;
+  try {
+    response = await fetchProxyLLM(
+      {
+        messages,
+        stream: true,
+        model: options?.model,
+        temperature: options?.temperature,
+        max_tokens: options?.max_tokens,
+        top_p: options?.top_p,
+        timeout_ms: timeoutMs,
+      },
+      timeoutMs,
+      `LLM stream ${model}`,
+    );
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    trackLLMCall({
+      session_id: options?.session_id,
+      feature_key: featureKey,
+      model,
+      status: "error",
+      error_message: errorMessage.slice(0, 200),
+    });
+    throw err;
+  }
 
   if (!response.ok) {
     const err = await response.text();
@@ -87,7 +131,12 @@ export async function streamLLM(
   let generationId: string | null = null;
 
   while (true) {
-    const { done, value } = await reader.read();
+    const { done, value } = await withTimeout(
+      `LLM stream read ${model}`,
+      reader.read(),
+      timeoutMs,
+      () => reader.cancel().catch(() => {}),
+    );
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });
@@ -181,21 +230,34 @@ export async function callLLMWithUsage(
   const model = options?.model || "qwen/qwen-2.5-72b-instruct";
   const featureKey = options?.feature_key || "chat";
   const startedAt = performance.now();
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS;
 
-  const timeout = createTimeoutSignal(18000);
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messages,
-      stream: false,
-      model: options?.model,
-      temperature: options?.temperature,
-      max_tokens: options?.max_tokens,
-      top_p: options?.top_p,
-    }),
-    signal: timeout.signal,
-  }).finally(timeout.cancel);
+  let response: Response;
+  try {
+    response = await fetchProxyLLM(
+      {
+        messages,
+        stream: false,
+        model: options?.model,
+        temperature: options?.temperature,
+        max_tokens: options?.max_tokens,
+        top_p: options?.top_p,
+        timeout_ms: timeoutMs,
+      },
+      timeoutMs,
+      `LLM request ${model}`,
+    );
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    trackLLMCall({
+      session_id: options?.session_id,
+      feature_key: featureKey,
+      model,
+      status: "error",
+      error_message: errorMessage.slice(0, 200),
+    });
+    throw err;
+  }
 
   if (!response.ok) {
     const err = await response.text();

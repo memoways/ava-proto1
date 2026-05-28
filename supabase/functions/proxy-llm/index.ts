@@ -20,6 +20,7 @@ interface LLMRequest {
   max_tokens?: number;
   top_p?: number;
   stream?: boolean;
+  timeout_ms?: number;
   // Special action for cost lookup
   _action?: string;
   generation_id?: string;
@@ -30,6 +31,22 @@ function getLookupErrorType(status: number) {
   if (status === 408) return "timeout";
   if (status >= 500) return "server_error";
   return "http_error";
+}
+
+function clampTimeoutMs(value: unknown, fallback: number): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(1000, Math.min(25000, Math.round(parsed)));
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 serve(async (req) => {
@@ -91,8 +108,9 @@ serve(async (req) => {
     const max_tokens = body.max_tokens ?? 500;
     const top_p = body.top_p ?? 0.95;
     const stream = body.stream ?? true;
+    const timeoutMs = clampTimeoutMs(body.timeout_ms, stream ? 18000 : 15000);
 
-    const response = await fetch(OPENROUTER_URL, {
+    const response = await fetchWithTimeout(OPENROUTER_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
@@ -110,6 +128,14 @@ serve(async (req) => {
         // Request usage info for tracking
         usage: { include: true },
       }),
+    }, timeoutMs).catch((error) => {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return new Response(
+          JSON.stringify({ error: `OpenRouter timeout after ${timeoutMs}ms` }),
+          { status: 504, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      throw error;
     });
 
     if (!response.ok) {
