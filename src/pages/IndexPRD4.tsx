@@ -144,7 +144,11 @@ const IndexPRD4 = () => {
   // ---- Welcome / Film / Teaser ----------------------------------------------
   const handleStart = useCallback(() => setPhase("film_question"), [setPhase]);
   const handleFilmAnswer = useCallback(
-    (a: FilmAnswer) => { setFilmAnswer(a); setPhase(a === "vu" ? "role_capture" : "teaser"); },
+    (a: FilmAnswer) => {
+      setFilmAnswer(a);
+      // "vu" et "rappel" → vidéo teaser ; "pas_vu" → role_capture direct
+      setPhase(a === "pas_vu" ? "role_capture" : "teaser");
+    },
     [setFilmAnswer, setPhase],
   );
   const handleTeaserContinue = useCallback(() => { markTeaserSeen(false); setPhase("role_capture"); }, [markTeaserSeen, setPhase]);
