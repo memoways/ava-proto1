@@ -16,6 +16,13 @@ interface GumletVideoPlayerProps {
 const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVideoPlayerProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  const isGumletEndedMessage = useCallback((data: unknown) => {
+    if (!data || typeof data !== "object") return false;
+
+    const message = data as { type?: string; event?: string };
+    return message.type === "gumlet" && message.event === "ended";
+  }, []);
+
   // Extract asset ID from various Gumlet URL formats
   const getEmbedUrl = useCallback((url: string) => {
     // Already an embed URL
@@ -35,17 +42,15 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
   // Listen for Gumlet player events via postMessage
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Gumlet sends events when video ends
-      if (event.data && typeof event.data === "object") {
-        if (event.data.type === "gumlet" && event.data.event === "ended") {
-          onComplete();
-        }
+      if (isGumletEndedMessage(event.data)) {
+        onComplete();
+        return;
       }
-      // Also handle string-based messages
+
       if (typeof event.data === "string") {
         try {
           const parsed = JSON.parse(event.data);
-          if (parsed.event === "ended" || parsed.type === "ended") {
+          if (isGumletEndedMessage(parsed)) {
             onComplete();
           }
         } catch {
@@ -56,7 +61,7 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [onComplete]);
+  }, [isGumletEndedMessage, onComplete]);
 
   const embedUrl = getEmbedUrl(videoUrl);
 
