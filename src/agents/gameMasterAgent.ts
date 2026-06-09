@@ -2,6 +2,8 @@ import { callLLM, callLLMWithUsage, type LLMUsage } from "@/services/openRouterL
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, GameMasterResponse, GameMasterTurnBrief, MaxTurnKnowledgeContext } from "@/types";
 import { getLLMSettings, getGMPromptSettings, getGameplaySettings } from "@/services/settingsService";
+import { loadCharacterPromptByName } from "@/services/characterPromptService";
+import { queryRAG } from "@/services/ragService";
 
 // System prompt is now loaded from settings (editable in admin)
 function getGameMasterSystemPrompt(): string {
@@ -13,6 +15,30 @@ function getGameMasterSystemPrompt(): string {
 
 function getGameMasterPreTurnPrompt(): string {
   return getGMPromptSettings().preTurnPlannerPrompt;
+}
+
+async function getCharacterContextBlock(characterName?: string): Promise<{ system: string; characterId: string | null }> {
+  if (!characterName) return { system: "", characterId: null };
+  const prompt = await loadCharacterPromptByName(characterName);
+  if (!prompt) return { system: "", characterId: null };
+  let block = "";
+  if (prompt.situation_summary?.trim()) {
+    block = `\n\n## SITUATION ACTUELLE DU PERSONNAGE (${characterName})\n${prompt.situation_summary.trim()}`;
+  }
+  return { system: block, characterId: prompt.character_id };
+}
+
+async function getCharacterRagExtracts(characterId: string | null, userMessage: string, recentContext?: string): Promise<string> {
+  if (!characterId) return "";
+  try {
+    const matches = await queryRAG(userMessage, recentContext, 2, 0.2, { characterId });
+    if (!matches.length) return "";
+    return `\n\n## EXTRAITS NARRATIFS PERTINENTS (RAG, scopé personnage)\n${matches
+      .map((m, i) => `[${i + 1}] ${m.content.slice(0, 400)}`)
+      .join("\n\n")}`;
+  } catch {
+    return "";
+  }
 }
 
 export interface GameMasterInput {
