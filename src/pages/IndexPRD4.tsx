@@ -473,7 +473,7 @@ const IndexPRD4 = () => {
     sttRef.current = null;
   }, []);
 
-  const createSTT = useCallback(async () => {
+  const createSTT = useCallback(async (initialStream?: Promise<MediaStream>) => {
     teardownSTT();
     const stt = await createConfiguredSTT(
       (text, isFinal) => {
@@ -507,6 +507,7 @@ const IndexPRD4 = () => {
             turn_id: createVoiceTurnId(sessionIdRef.current, turnIndex),
           };
         },
+        initialStream,
       },
     );
     await stt.start();
@@ -517,7 +518,9 @@ const IndexPRD4 = () => {
 
   const handlePTTPress = useCallback(async () => {
     if (isProcessingRef.current || endedRef.current) return;
+    let initialStream: Promise<MediaStream> | undefined;
     try {
+      initialStream = navigator.mediaDevices?.getUserMedia({ audio: true });
       // Always start a fresh STT per turn for robustness (avoid stale WS, paused state, etc.)
       const nextTurn = conversationRef.current.filter((m) => m.role === "user").length + 1;
       if (latencyOverlayEnabled) {
@@ -529,7 +532,7 @@ const IndexPRD4 = () => {
         : null;
       setAudioState("mic_starting");
       setUserSubtitle("");
-      await createSTT();
+      await createSTT(initialStream);
       setAudioState("user_speaking");
     } catch (err) {
       console.warn("[PRD4] PTT start failed:", err);
