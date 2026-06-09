@@ -64,6 +64,7 @@ export function preloadSystemPrompt(): void {
 /** Clear cached prompt (call after editing in admin) */
 export function clearSystemPromptCache() {
   for (const k of Object.keys(cachedSystemPrompts)) delete cachedSystemPrompts[k];
+  clearCharacterPromptCache();
 }
 
 export interface MaxAgentInput {
