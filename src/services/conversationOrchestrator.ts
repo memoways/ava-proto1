@@ -260,6 +260,7 @@ export async function processConversationTurn(
       currentTrustLevel,
       triggeredIds,
       timeElapsedSeconds,
+      characterName: "Max",
     };
 
     const gameMasterResponse = await callGameMaster(gmInput);
