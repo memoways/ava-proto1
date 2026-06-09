@@ -31,9 +31,20 @@ export default function CharacterEditorTab() {
 
   async function refreshList() {
     const entries = await listCharactersWithPrompts();
-    setList(entries);
-    if (!activeId && entries.length > 0) {
-      const max = entries.find((e) => e.name === "Max") || entries[0];
+    // Filter out non-character entries and sort Max first, then alphabetical
+    const cleaned = entries
+      .filter((e) => e.name.trim().toLowerCase() !== "identité & présentation"
+        && e.name.trim().toLowerCase() !== "identite & presentation")
+      .sort((a, b) => {
+        const aMax = a.name.toLowerCase().startsWith("max");
+        const bMax = b.name.toLowerCase().startsWith("max");
+        if (aMax && !bMax) return -1;
+        if (!aMax && bMax) return 1;
+        return a.name.localeCompare(b.name);
+      });
+    setList(cleaned);
+    if (!activeId && cleaned.length > 0) {
+      const max = cleaned.find((e) => e.name.toLowerCase().startsWith("max")) || cleaned[0];
       setActiveId(max.character_id);
     }
   }

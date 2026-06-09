@@ -292,6 +292,11 @@ serve(async (req) => {
       const props = page.properties;
       const name = extractTitle(props['Nom du caractère']);
       if (!name) continue;
+      // Skip non-character entries (Notion section headers)
+      if (name.trim().toLowerCase() === 'identité & présentation' || name.trim().toLowerCase() === 'identite & presentation') {
+        console.log(`[sync-notion] Skipping non-character entry: "${name}"`);
+        continue;
+      }
 
       const pageContent = await fetchPageContent(page.id);
       const resume = extractRichText(props['Résumé']);
