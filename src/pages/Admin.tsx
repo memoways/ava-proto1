@@ -13,7 +13,7 @@ import LLMConfigTab from "@/components/LLMConfigTab";
 import TTSConfigTab from "@/components/TTSConfigTab";
 import STTConfigTab from "@/components/STTConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
-import MaxPromptControlTab from "@/components/MaxPromptControlTab";
+import CharacterEditorTab from "@/components/CharacterEditorTab";
 import MaxPromptTestTab from "@/components/MaxPromptTestTab";
 import PipelineTraceTab from "@/components/PipelineTraceTab";
 import AntiHallucinationValidatorTab from "@/components/AntiHallucinationValidatorTab";
@@ -41,10 +41,16 @@ const TAB_GROUPS = [
     id: "content",
     label: "📚 Contenu Notion",
     tabs: [
-      { id: "characters", label: "Personnages" },
+      { id: "sync", label: "Sync Notion" },
       { id: "embeddings", label: "Embeddings" },
       { id: "rag", label: "RAG Test" },
-      { id: "sync", label: "Sync Notion" },
+    ],
+  },
+  {
+    id: "characters",
+    label: "🎭 Personnages",
+    tabs: [
+      { id: "character-editor", label: "Éditeur personnage" },
     ],
   },
   {
@@ -52,13 +58,12 @@ const TAB_GROUPS = [
     label: "🎮 Mécanique",
     tabs: [
       { id: "gamemaster", label: "Game Master" },
-      { id: "max-prompt", label: "Max Prompt" },
       { id: "validator", label: "Validateur" },
       { id: "metrics", label: "Métriques hallu." },
       { id: "latency", label: "Latence & blocage" },
       { id: "latency-telemetry", label: "Latences (PostHog)" },
       { id: "max-test", label: "Test Max" },
-        { id: "pipeline", label: "Pipeline" },
+      { id: "pipeline", label: "Pipeline" },
     ],
   },
   {
@@ -218,49 +223,34 @@ export default function Admin() {
     setSavingChar(false);
   }
 
-  async function triggerSync() {
+  async function triggerSync(opts: { wipeAll?: boolean } = {}) {
     setSyncing(true);
     setSyncReport(null);
-    const tableKeys = Object.keys(AVA_NOTION_DATABASES) as (keyof typeof AVA_NOTION_DATABASES)[];
-    const combinedResults: Record<string, any> = {};
-    const combinedEmbeddingStats: Record<string, any> = {};
-    let lastTotalEmbeddings = 0;
-    let hadError = false;
-
-    for (const key of tableKeys) {
-      try {
-        toast.info(`Sync ${key}...`);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 120000);
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ databases: { [key]: AVA_NOTION_DATABASES[key] } }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        if (data.results) Object.assign(combinedResults, data.results);
-        if (data.embedding_stats) Object.assign(combinedEmbeddingStats, data.embedding_stats);
-        if (data.embedding_diff) Object.assign(combinedResults, { [`${key}_diff`]: data.embedding_diff[key] });
-        if (data.total_embeddings_in_db) lastTotalEmbeddings = data.total_embeddings_in_db;
-      } catch (err: any) {
-        hadError = true;
-        combinedResults[key] = { error: err.name === 'AbortError' ? 'Timeout (>120s)' : err.message };
-        toast.error(`Erreur sync ${key}: ${err.name === 'AbortError' ? 'Timeout' : err.message}`);
-      }
+    try {
+      toast.info(opts.wipeAll ? "Wipe & rebuild RAG…" : "Sync Notion…");
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 180000);
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          databases: { characters: AVA_NOTION_DATABASES.characters },
+          wipe_all: !!opts.wipeAll,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setSyncReport({ ...data, synced_at: new Date().toISOString() });
+      clearSystemPromptCache();
+      toast.success(`Sync OK : ${data.characters_synced} personnage(s), ${data.total_embeddings_in_db} embeddings total`);
+      loadEmbeddings();
+    } catch (err: any) {
+      const msg = err.name === "AbortError" ? "Timeout (>180s)" : err.message;
+      setSyncReport({ error: msg });
+      toast.error(`Erreur sync : ${msg}`);
     }
-
-    setSyncReport({
-      success: !hadError,
-      results: combinedResults,
-      embedding_stats: combinedEmbeddingStats,
-      total_embeddings_in_db: lastTotalEmbeddings,
-      synced_at: new Date().toISOString(),
-    });
-    if (!hadError) toast.success("Sync Notion terminé !");
-    loadEmbeddings();
     setSyncing(false);
   }
 
@@ -480,89 +470,9 @@ export default function Admin() {
             </div>
           </TabsContent>
 
-          {/* ==================== CHARACTERS ==================== */}
-          <TabsContent value="characters">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-lg font-semibold">Personnages</h2>
-                  <Button size="sm" variant="outline" onClick={loadCharacters}>Rafraîchir</Button>
-                </div>
-                <div className="space-y-2">
-                  {characters.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => { setEditingChar(c); setEditPrompt(c.system_prompt || ""); }}
-                      className={`w-full text-left p-4 border rounded-lg hover:bg-accent/50 transition-colors ${
-                        editingChar?.id === c.id ? "bg-accent border-primary" : ""
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="font-semibold">{c.name}</span>
-                        <span className="text-xs text-muted-foreground">{c.system_prompt?.length || 0} chars</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">{c.personality || "—"}</p>
-                      <p className="text-sm mt-1 line-clamp-2 text-muted-foreground">{c.system_prompt?.slice(0, 120) || "Aucun system prompt"}</p>
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground mt-4">
-                  💡 Le system prompt doit être minimal : rôle, comportement, règles de jeu.
-                  Le reste (mémoire, backstory, storyworld) provient du RAG automatiquement.
-                </p>
-              </div>
-
-              <div>
-                {editingChar ? (
-                  <div className="border rounded-lg p-4">
-                    <h2 className="text-lg font-semibold mb-1">System Prompt — {editingChar.name}</h2>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Ce prompt est envoyé au LLM. Les règles de jeu et le contexte RAG sont ajoutés automatiquement après.
-                    </p>
-                    <div className="mb-3 flex flex-wrap gap-2 rounded-md border border-dashed border-border/60 bg-muted/30 px-2 py-1.5 font-mono text-[11px] text-muted-foreground">
-                      <span title="UUID de la ligne characters en base">
-                        🆔 <span className="text-foreground">{editingChar.id}</span>
-                      </span>
-                      <span className="opacity-50">·</span>
-                      <span title="characters.updated_at en base">
-                        🕒 <span className="text-foreground">{editingChar.updated_at ? new Date(editingChar.updated_at).toISOString().replace("T", " ").slice(0, 19) + " UTC" : "—"}</span>
-                      </span>
-                      <span className="opacity-50">·</span>
-                      <span title="Hash FNV-1a 32-bit du system_prompt chargé depuis la DB">
-                        # <span className="text-foreground">{promptHash(editingChar.system_prompt)}</span>
-                      </span>
-                      {editPrompt !== (editingChar.system_prompt || "") && (
-                        <>
-                          <span className="opacity-50">·</span>
-                          <span className="text-amber-400" title="Hash de la valeur en cours d'édition (non sauvegardée)">
-                            ✎ #<span>{promptHash(editPrompt)}</span>
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    <Textarea
-                      value={editPrompt}
-                      onChange={(e) => setEditPrompt(e.target.value)}
-                      className="min-h-[50vh] font-mono text-sm"
-                      placeholder="Écris le system prompt minimal pour ce personnage..."
-                    />
-                    <div className="flex items-center justify-between mt-3">
-                      <span className="text-xs text-muted-foreground">{editPrompt.length} caractères</span>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setEditPrompt(editingChar.system_prompt || "")}>Annuler</Button>
-                        <Button size="sm" onClick={saveCharacterPrompt} disabled={savingChar || editPrompt === (editingChar.system_prompt || "")}>
-                          {savingChar ? "Sauvegarde..." : "Sauvegarder"}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="border rounded-lg p-8 text-center text-muted-foreground">
-                    Sélectionne un personnage pour éditer son system prompt
-                  </div>
-                )}
-              </div>
-            </div>
+          {/* ==================== CHARACTER EDITOR ==================== */}
+          <TabsContent value="character-editor">
+            <CharacterEditorTab />
           </TabsContent>
 
           {/* ==================== QUESTIONNAIRES ==================== */}
@@ -575,10 +485,6 @@ export default function Admin() {
             <GameMasterConfigTab />
           </TabsContent>
 
-          {/* ==================== MAX PROMPT CONTROL ==================== */}
-          <TabsContent value="max-prompt">
-            <MaxPromptControlTab />
-          </TabsContent>
 
           <TabsContent value="validator">
             <AntiHallucinationValidatorTab />
@@ -633,70 +539,57 @@ export default function Admin() {
             <div className="max-w-3xl">
               <h2 className="text-lg font-semibold mb-2">Sync Notion → DB</h2>
               <p className="text-sm text-muted-foreground mb-4">
-                Synchronise les 4 bases Notion (Characters, Storyworld, Gameplay, Vidéos) vers la base de données et régénère les embeddings.
+                Synchronise la base <strong>Caractères AVA</strong> (seule source) : champs éditoriaux,
+                résumé situation actuelle et embeddings RAG (corps de page uniquement, scoping strict par personnage).
               </p>
               <div className="border rounded-lg p-4 mb-4">
-                <p className="text-xs font-mono text-muted-foreground mb-2">Databases Notion configurées :</p>
-                {Object.entries(AVA_NOTION_DATABASES).map(([k, v]) => (
-                  <div key={k} className="text-sm flex justify-between py-1">
-                    <span className="font-medium">{k}</span>
-                    <span className="font-mono text-xs text-muted-foreground">{v}</span>
-                  </div>
-                ))}
+                <p className="text-xs font-mono text-muted-foreground mb-2">Database Notion configurée :</p>
+                <div className="text-sm flex justify-between py-1">
+                  <span className="font-medium">characters</span>
+                  <span className="font-mono text-xs text-muted-foreground">{AVA_NOTION_DATABASES.characters}</span>
+                </div>
               </div>
-              <Button onClick={triggerSync} disabled={syncing} size="lg">
-                {syncing ? "Sync en cours... (peut prendre ~60s)" : "Lancer le Sync"}
-              </Button>
+              <div className="flex gap-3 flex-wrap">
+                <Button onClick={() => triggerSync()} disabled={syncing} size="lg">
+                  {syncing ? "Sync en cours…" : "Sync incrémental"}
+                </Button>
+                <Button onClick={() => triggerSync({ wipeAll: true })} disabled={syncing} size="lg" variant="destructive">
+                  {syncing ? "Sync en cours…" : "⚠️ Wipe & rebuild RAG"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                « Wipe & rebuild » supprime tous les embeddings puis reconstruit depuis zéro.
+                À utiliser après un changement majeur dans Notion ou un changement de provider d'embeddings.
+              </p>
 
               {syncReport && !syncReport.error && (
                 <div className="mt-6 space-y-4">
                   <div className="flex items-center gap-2 text-sm font-medium text-primary">
                     ✅ Sync terminé le {new Date(syncReport.synced_at).toLocaleString("fr-FR")}
+                    {syncReport.wiped_all && <span className="text-xs text-yellow-400">(wipe global)</span>}
                   </div>
 
-                  {/* Per-table results */}
-                  <div className="grid grid-cols-2 gap-3">
-                    {syncReport.results && Object.entries(syncReport.results).filter(([k]) => !k.endsWith('_diff')).map(([table, stats]: [string, any]) => {
-                      const embStats = syncReport.embedding_stats?.[table];
-                      const diff = syncReport.results?.[`${table}_diff`];
-                      return (
-                        <div key={table} className="border rounded-lg p-3">
-                          <h4 className="font-semibold text-sm capitalize mb-1">{table.replace(/_/g, ' ')}</h4>
-                          <div className="text-xs space-y-0.5 text-muted-foreground">
-                            {stats.error ? (
-                              <p className="text-destructive">❌ {stats.error}</p>
-                            ) : (
-                              <p>📄 {stats.synced}/{stats.total} entrées synchronisées</p>
-                            )}
-                            {diff && (
-                              <p className={diff.delta > 0 ? 'text-green-400' : diff.delta < 0 ? 'text-red-400' : ''}>
-                                🔢 Embeddings: {diff.before} → {diff.after} ({diff.delta > 0 ? '+' : ''}{diff.delta})
-                              </p>
-                            )}
-                            {embStats && (
-                              <>
-                                <p>🧩 {embStats.chunks_created} chunk{embStats.chunks_created > 1 ? 's' : ''} RAG créé{embStats.chunks_created > 1 ? 's' : ''}</p>
-                                <p>📝 {(embStats.chars_embedded / 1000).toFixed(1)}k caractères embeddings</p>
-                              </>
-                            )}
-                          </div>
+                  <div className="space-y-2">
+                    {(syncReport.per_character || []).map((c: any) => (
+                      <div key={c.id} className="border rounded-lg p-3">
+                        <h4 className="font-semibold text-sm mb-1">🎭 {c.name}</h4>
+                        <div className="grid grid-cols-2 gap-x-4 text-xs text-muted-foreground">
+                          <p>📄 Page : {c.page_chars} chars</p>
+                          <p>🧩 RAG : {c.chunks_created} chunks</p>
+                          <p>✏️ Champs : {c.prompt_fields_filled}/7 remplis</p>
+                          <p>📝 Résumé : {c.summary_chars} chars</p>
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
 
-                  {/* Global stats */}
                   <div className="border rounded-lg p-3 bg-muted/30">
-                    <p className="text-sm font-medium">📊 Total embeddings en base : <span className="font-bold">{syncReport.total_embeddings_in_db}</span></p>
-                    {syncReport.embedding_stats && (() => {
-                      const totalChunks = Object.values(syncReport.embedding_stats as Record<string, { chunks_created: number; chars_embedded: number }>).reduce((s, e) => s + e.chunks_created, 0);
-                      const totalChars = Object.values(syncReport.embedding_stats as Record<string, { chunks_created: number; chars_embedded: number }>).reduce((s, e) => s + e.chars_embedded, 0);
-                      return (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Cette sync : {totalChunks} chunks créés, ~{Math.ceil(totalChars / 4)} tokens OpenAI consommés pour les embeddings
-                        </p>
-                      );
-                    })()}
+                    <p className="text-sm font-medium">
+                      📊 Total embeddings en base : <span className="font-bold">{syncReport.total_embeddings_in_db}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Latence sync : {syncReport.latency_ms}ms · {syncReport.characters_synced} personnage(s) traité(s)
+                    </p>
                   </div>
                 </div>
               )}
@@ -708,6 +601,7 @@ export default function Admin() {
               )}
             </div>
           </TabsContent>
+
         </Tabs>
       </div>
     </div>

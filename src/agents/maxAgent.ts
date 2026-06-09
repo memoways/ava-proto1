@@ -2,7 +2,8 @@ import { callLLM, callLLMWithUsage, streamLLM, type LLMUsage } from "@/services/
 import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, MaxConstraintCheckResult, MaxTurnKnowledgeContext } from "@/types";
-import { getAntiHallucinationValidatorSettings, getLLMSettings, getMaxPromptControlSettings } from "@/services/settingsService";
+import { getAntiHallucinationValidatorSettings, getLLMSettings } from "@/services/settingsService";
+import { buildCharacterPromptSections, loadCharacterPromptByName, clearCharacterPromptCache } from "@/services/characterPromptService";
 
 // Fallback minimal system prompt if DB fetch fails
 const FALLBACK_SYSTEM_PROMPT = `Tu es un personnage dans une expérience narrative interactive. Parle à la première personne, en français, de façon concise (2-3 phrases). Utilise le CONTEXTE NARRATIF ci-dessous comme source de vérité.`;
@@ -63,6 +64,7 @@ export function preloadSystemPrompt(): void {
 /** Clear cached prompt (call after editing in admin) */
 export function clearSystemPromptCache() {
   for (const k of Object.keys(cachedSystemPrompts)) delete cachedSystemPrompts[k];
+  clearCharacterPromptCache();
 }
 
 export interface MaxAgentInput {
@@ -172,7 +174,6 @@ function buildValidatorPrompt(input: {
   ragContext?: string;
   knowledgeContext?: MaxTurnKnowledgeContext;
 }): string {
-  const control = getMaxPromptControlSettings();
   const validatorSettings = getAntiHallucinationValidatorSettings();
   return `Tu es un validateur éditorial strict. Tu dois vérifier si la réponse de Max respecte les contraintes suivantes.
 
@@ -182,12 +183,6 @@ function buildValidatorPrompt(input: {
 - Max doit respecter les sujets interdits et assertions bloquées.
 - Si l'information manque, Max doit exprimer le doute plutôt qu'inventer.
 
-## POLITIQUE D'AFFIRMATION
-${control.forbiddenAssertions}
-
-## SUJETS INTERDITS
-${control.forbiddenTopics}
-
 ## BASE GLOBALE DES FAITS AUTORISÉS
 ${validatorSettings.authorizedFacts}
 
@@ -196,6 +191,7 @@ ${validatorSettings.blockedAssertionRules}
 
 ## CONTEXTE AUTORISÉ
 ${formatKnowledgeList("FAITS AUTORISÉS", input.knowledgeContext?.allowedFacts)}
+
 
 ${formatKnowledgeList("SOUVENIRS ACTIVÉS", input.knowledgeContext?.activeMemories)}
 
@@ -291,8 +287,12 @@ async function buildMaxSystemPrompt(
   userRoleSummary?: string,
 ): Promise<string> {
   const characterPrompt = await getCharacterSystemPrompt(characterName);
-  const control = getMaxPromptControlSettings();
-  let prompt = `${characterPrompt}\n${GAMEPLAY_RULES}\n\n## PERSONA STABLE\n${control.persona}\n\n## OBJECTIFS\n${control.objectives}\n\n## RÔLE ET CONTEXTE\n${control.roleContext}\n\n## HISTORIQUE STABLE\n${control.longTermMemory}\n\n## STYLE DE RÉPONSE\n${control.responseStyle}\n\n## POLITIQUE DE SAVOIR AUTORISÉ\n${control.allowedKnowledgePolicy}\n\n## INTERDITS D'AFFIRMATION\n${control.forbiddenAssertions}\n\n## SUJETS SENSIBLES / INTERDITS\n${control.forbiddenTopics}\n\n## POLITIQUE D'INCERTITUDE\n${control.uncertaintyPolicy}`;
+  const characterFields = await loadCharacterPromptByName(characterName);
+  const fieldsSections = buildCharacterPromptSections(characterFields);
+  let prompt = `${characterPrompt}\n${GAMEPLAY_RULES}`;
+  if (fieldsSections) {
+    prompt += `\n\n${fieldsSections}`;
+  }
 
   if (userRoleSummary && userRoleSummary.trim()) {
     prompt += `\n\n## INTERLOCUTEUR (qui t'appelle)\n${userRoleSummary.trim()}\n\nUtilise ces éléments pour personnaliser tes réponses : adresse-toi à cette personne en cohérence avec qui elle dit être, sans jamais contredire sa présentation. Tu peux questionner sa sincérité si quelque chose te paraît étrange, mais reste poli.`;

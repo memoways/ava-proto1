@@ -2,6 +2,8 @@ import { callLLM, callLLMWithUsage, type LLMUsage } from "@/services/openRouterL
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, GameMasterResponse, GameMasterTurnBrief, MaxTurnKnowledgeContext } from "@/types";
 import { getLLMSettings, getGMPromptSettings, getGameplaySettings } from "@/services/settingsService";
+import { loadCharacterPromptByName } from "@/services/characterPromptService";
+import { queryRAG } from "@/services/ragService";
 
 // System prompt is now loaded from settings (editable in admin)
 function getGameMasterSystemPrompt(): string {
@@ -15,6 +17,30 @@ function getGameMasterPreTurnPrompt(): string {
   return getGMPromptSettings().preTurnPlannerPrompt;
 }
 
+async function getCharacterContextBlock(characterName?: string): Promise<{ system: string; characterId: string | null }> {
+  if (!characterName) return { system: "", characterId: null };
+  const prompt = await loadCharacterPromptByName(characterName);
+  if (!prompt) return { system: "", characterId: null };
+  let block = "";
+  if (prompt.situation_summary?.trim()) {
+    block = `\n\n## SITUATION ACTUELLE DU PERSONNAGE (${characterName})\n${prompt.situation_summary.trim()}`;
+  }
+  return { system: block, characterId: prompt.character_id };
+}
+
+async function getCharacterRagExtracts(characterId: string | null, userMessage: string, recentContext?: string): Promise<string> {
+  if (!characterId) return "";
+  try {
+    const matches = await queryRAG(userMessage, recentContext, 2, 0.2, { characterId });
+    if (!matches.length) return "";
+    return `\n\n## EXTRAITS NARRATIFS PERTINENTS (RAG, scopé personnage)\n${matches
+      .map((m, i) => `[${i + 1}] ${m.content.slice(0, 400)}`)
+      .join("\n\n")}`;
+  } catch {
+    return "";
+  }
+}
+
 export interface GameMasterInput {
   conversationHistory: ConversationMessage[];
   userMessage: string;
@@ -22,6 +48,8 @@ export interface GameMasterInput {
   currentTrustLevel: number;
   triggeredIds: string[];
   timeElapsedSeconds: number;
+  /** Active character name (Max / Ava / …). Enables injection of situation_summary + scoped RAG. */
+  characterName?: string;
 }
 
 export interface GameMasterPreTurnInput {
@@ -31,6 +59,8 @@ export interface GameMasterPreTurnInput {
   triggeredIds: string[];
   timeElapsedSeconds: number;
   knowledgeContext?: MaxTurnKnowledgeContext;
+  /** Active character name (Max / Ava / …). */
+  characterName?: string;
 }
 
 const DEFAULT_TURN_BRIEF: GameMasterTurnBrief = {
@@ -62,10 +92,12 @@ const DEFAULT_RESPONSE: GameMasterResponse = {
  */
 export async function callGameMaster(input: GameMasterInput): Promise<GameMasterResponse> {
   const contextMessage = buildContextMessage(input);
+  const { system: charBlock, characterId } = await getCharacterContextBlock(input.characterName);
+  const ragExtracts = await getCharacterRagExtracts(characterId, input.userMessage, contextMessage.slice(0, 600));
 
   const messages: Array<{ role: "system" | "user"; content: string }> = [
-    { role: "system", content: getGameMasterSystemPrompt() },
-    { role: "user", content: contextMessage },
+    { role: "system", content: getGameMasterSystemPrompt() + charBlock },
+    { role: "user", content: contextMessage + ragExtracts },
   ];
 
   try {
@@ -116,9 +148,11 @@ const GM_PRETURN_TIMEOUT_MS = 4000;
 
 export async function planGameMasterTurn(input: GameMasterPreTurnInput): Promise<GameMasterTurnBrief> {
   const contextMessage = buildPreTurnContextMessage(input);
+  const { system: charBlock, characterId } = await getCharacterContextBlock(input.characterName);
+  const ragExtracts = await getCharacterRagExtracts(characterId, input.userMessage, contextMessage.slice(0, 600));
   const messages: Array<{ role: "system" | "user"; content: string }> = [
-    { role: "system", content: getGameMasterPreTurnPrompt() },
-    { role: "user", content: contextMessage },
+    { role: "system", content: getGameMasterPreTurnPrompt() + charBlock },
+    { role: "user", content: contextMessage + ragExtracts },
   ];
 
   // Capture le modèle dès maintenant : si l'utilisateur change la config en cours de tour,

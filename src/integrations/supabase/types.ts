@@ -77,6 +77,56 @@ export type Database = {
         }
         Relationships: []
       }
+      character_prompts: {
+        Row: {
+          ce_que_tu_ne_fais_jamais: string
+          ce_que_tu_sais_utilisateur: string
+          character_id: string
+          created_at: string
+          dynamique_conversation: string
+          identite_fondamentale: string
+          profondeur_par_niveau: string
+          qui_tu_es: string
+          situation_summary: string
+          sujets_sensibles: string
+          updated_at: string
+        }
+        Insert: {
+          ce_que_tu_ne_fais_jamais?: string
+          ce_que_tu_sais_utilisateur?: string
+          character_id: string
+          created_at?: string
+          dynamique_conversation?: string
+          identite_fondamentale?: string
+          profondeur_par_niveau?: string
+          qui_tu_es?: string
+          situation_summary?: string
+          sujets_sensibles?: string
+          updated_at?: string
+        }
+        Update: {
+          ce_que_tu_ne_fais_jamais?: string
+          ce_que_tu_sais_utilisateur?: string
+          character_id?: string
+          created_at?: string
+          dynamique_conversation?: string
+          identite_fondamentale?: string
+          profondeur_par_niveau?: string
+          qui_tu_es?: string
+          situation_summary?: string
+          sujets_sensibles?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_prompts_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: true
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       characters: {
         Row: {
           backstory: string | null
