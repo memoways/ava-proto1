@@ -19,6 +19,7 @@ interface Props {
 
 const STATE_LABELS: Record<AudioState, string> = {
   idle: "Clique pour parler",
+  mic_starting: "Ouverture du micro…",
   user_speaking: "Tu parles — clique pour envoyer",
   max_thinking: "Max réfléchit…",
   max_speaking: "Max répond…",
@@ -32,7 +33,7 @@ const ConversationScreen = ({
   onPTTRelease,
   onHangUp,
 }: Props) => {
-  const disabled = audioState === "max_thinking" || audioState === "max_speaking";
+  const disabled = audioState === "mic_starting" || audioState === "max_thinking" || audioState === "max_speaking";
   const recording = audioState === "user_speaking";
 
   const { buttonHandlers } = usePushToTalk({
@@ -113,7 +114,7 @@ const ConversationScreen = ({
               )}
               aria-label={recording ? "Cliquer pour envoyer" : "Cliquer pour parler"}
             >
-              {audioState === "max_thinking" ? (
+              {audioState === "mic_starting" || audioState === "max_thinking" ? (
                 <Loader2 className="h-7 w-7 animate-spin text-primary" />
               ) : recording ? (
                 <MicOff className="h-7 w-7 text-destructive-foreground" />
