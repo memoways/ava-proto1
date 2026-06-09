@@ -139,15 +139,23 @@ export class DeepgramSTT {
   }
 
   async start() {
-    const config = await getDeepgramToken();
-    this.config = config;
-
-    // Get microphone
+    // Get microphone first: browsers are stricter when media permission is
+    // requested after an awaited network call instead of directly from a user gesture.
     this.stream = await withTimeout(
       "microphone_permission",
       navigator.mediaDevices.getUserMedia({ audio: true }),
       10000,
     );
+
+    let config: DeepgramConfig;
+    try {
+      config = await getDeepgramToken();
+      this.config = config;
+    } catch (err) {
+      this.stream.getTracks().forEach((track) => track.stop());
+      this.stream = null;
+      throw err;
+    }
 
     // Connect to Deepgram WebSocket
     const wsUrl = `wss://api.deepgram.com/v1/listen?model=${config.model}&language=${config.language}&smart_format=true&interim_results=true&vad_events=true&endpointing=false`;
