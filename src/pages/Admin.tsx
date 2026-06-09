@@ -539,70 +539,57 @@ export default function Admin() {
             <div className="max-w-3xl">
               <h2 className="text-lg font-semibold mb-2">Sync Notion → DB</h2>
               <p className="text-sm text-muted-foreground mb-4">
-                Synchronise les 4 bases Notion (Characters, Storyworld, Gameplay, Vidéos) vers la base de données et régénère les embeddings.
+                Synchronise la base <strong>Caractères AVA</strong> (seule source) : champs éditoriaux,
+                résumé situation actuelle et embeddings RAG (corps de page uniquement, scoping strict par personnage).
               </p>
               <div className="border rounded-lg p-4 mb-4">
-                <p className="text-xs font-mono text-muted-foreground mb-2">Databases Notion configurées :</p>
-                {Object.entries(AVA_NOTION_DATABASES).map(([k, v]) => (
-                  <div key={k} className="text-sm flex justify-between py-1">
-                    <span className="font-medium">{k}</span>
-                    <span className="font-mono text-xs text-muted-foreground">{v}</span>
-                  </div>
-                ))}
+                <p className="text-xs font-mono text-muted-foreground mb-2">Database Notion configurée :</p>
+                <div className="text-sm flex justify-between py-1">
+                  <span className="font-medium">characters</span>
+                  <span className="font-mono text-xs text-muted-foreground">{AVA_NOTION_DATABASES.characters}</span>
+                </div>
               </div>
-              <Button onClick={triggerSync} disabled={syncing} size="lg">
-                {syncing ? "Sync en cours... (peut prendre ~60s)" : "Lancer le Sync"}
-              </Button>
+              <div className="flex gap-3 flex-wrap">
+                <Button onClick={() => triggerSync()} disabled={syncing} size="lg">
+                  {syncing ? "Sync en cours…" : "Sync incrémental"}
+                </Button>
+                <Button onClick={() => triggerSync({ wipeAll: true })} disabled={syncing} size="lg" variant="destructive">
+                  {syncing ? "Sync en cours…" : "⚠️ Wipe & rebuild RAG"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                « Wipe & rebuild » supprime tous les embeddings puis reconstruit depuis zéro.
+                À utiliser après un changement majeur dans Notion ou un changement de provider d'embeddings.
+              </p>
 
               {syncReport && !syncReport.error && (
                 <div className="mt-6 space-y-4">
                   <div className="flex items-center gap-2 text-sm font-medium text-primary">
                     ✅ Sync terminé le {new Date(syncReport.synced_at).toLocaleString("fr-FR")}
+                    {syncReport.wiped_all && <span className="text-xs text-yellow-400">(wipe global)</span>}
                   </div>
 
-                  {/* Per-table results */}
-                  <div className="grid grid-cols-2 gap-3">
-                    {syncReport.results && Object.entries(syncReport.results).filter(([k]) => !k.endsWith('_diff')).map(([table, stats]: [string, any]) => {
-                      const embStats = syncReport.embedding_stats?.[table];
-                      const diff = syncReport.results?.[`${table}_diff`];
-                      return (
-                        <div key={table} className="border rounded-lg p-3">
-                          <h4 className="font-semibold text-sm capitalize mb-1">{table.replace(/_/g, ' ')}</h4>
-                          <div className="text-xs space-y-0.5 text-muted-foreground">
-                            {stats.error ? (
-                              <p className="text-destructive">❌ {stats.error}</p>
-                            ) : (
-                              <p>📄 {stats.synced}/{stats.total} entrées synchronisées</p>
-                            )}
-                            {diff && (
-                              <p className={diff.delta > 0 ? 'text-green-400' : diff.delta < 0 ? 'text-red-400' : ''}>
-                                🔢 Embeddings: {diff.before} → {diff.after} ({diff.delta > 0 ? '+' : ''}{diff.delta})
-                              </p>
-                            )}
-                            {embStats && (
-                              <>
-                                <p>🧩 {embStats.chunks_created} chunk{embStats.chunks_created > 1 ? 's' : ''} RAG créé{embStats.chunks_created > 1 ? 's' : ''}</p>
-                                <p>📝 {(embStats.chars_embedded / 1000).toFixed(1)}k caractères embeddings</p>
-                              </>
-                            )}
-                          </div>
+                  <div className="space-y-2">
+                    {(syncReport.per_character || []).map((c: any) => (
+                      <div key={c.id} className="border rounded-lg p-3">
+                        <h4 className="font-semibold text-sm mb-1">🎭 {c.name}</h4>
+                        <div className="grid grid-cols-2 gap-x-4 text-xs text-muted-foreground">
+                          <p>📄 Page : {c.page_chars} chars</p>
+                          <p>🧩 RAG : {c.chunks_created} chunks</p>
+                          <p>✏️ Champs : {c.prompt_fields_filled}/7 remplis</p>
+                          <p>📝 Résumé : {c.summary_chars} chars</p>
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
 
-                  {/* Global stats */}
                   <div className="border rounded-lg p-3 bg-muted/30">
-                    <p className="text-sm font-medium">📊 Total embeddings en base : <span className="font-bold">{syncReport.total_embeddings_in_db}</span></p>
-                    {syncReport.embedding_stats && (() => {
-                      const totalChunks = Object.values(syncReport.embedding_stats as Record<string, { chunks_created: number; chars_embedded: number }>).reduce((s, e) => s + e.chunks_created, 0);
-                      const totalChars = Object.values(syncReport.embedding_stats as Record<string, { chunks_created: number; chars_embedded: number }>).reduce((s, e) => s + e.chars_embedded, 0);
-                      return (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Cette sync : {totalChunks} chunks créés, ~{Math.ceil(totalChars / 4)} tokens OpenAI consommés pour les embeddings
-                        </p>
-                      );
-                    })()}
+                    <p className="text-sm font-medium">
+                      📊 Total embeddings en base : <span className="font-bold">{syncReport.total_embeddings_in_db}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Latence sync : {syncReport.latency_ms}ms · {syncReport.characters_synced} personnage(s) traité(s)
+                    </p>
                   </div>
                 </div>
               )}
@@ -614,6 +601,7 @@ export default function Admin() {
               )}
             </div>
           </TabsContent>
+
         </Tabs>
       </div>
     </div>
