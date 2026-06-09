@@ -200,12 +200,9 @@ export function buildKnowledgeContextFromRAG(matches: RAGMatch[]): MaxTurnKnowle
   };
 }
 
-// Default Notion database IDs for AVA project
+// Default Notion database IDs for AVA project — only Caractères AVA is synced now.
 export const AVA_NOTION_DATABASES = {
   characters: '30362322e59580bbb7b8dd49d516b341',
-  storyworld: '30362322e595806e9ef2fc62b7819980',
-  gameplay_steps: '73282ee05a414cee8307ae98ff48546d',
-  video_triggers: '478685a5b31e45b5bc534bcf905b9124',
 };
 
 /**
