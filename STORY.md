@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-24 (session 23 — sélecteur STT input multi-providers pour Lovable : onglet Admin `STT Config`, config globale persistée `ava_stt_settings`, façade `src/services/stt`, Deepgram fallback par défaut, Gamilab préparé via Browser SDK, Whisper/AssemblyAI préparés, edge function de statut sans exposition de secrets)
+> **Last Updated**: 2026-06-09 (session 24 — refonte RAG & prompts : base unique « Caractères AVA », table `character_prompts` avec 7 champs éditoriaux, `situation_summary` GM, isolation stricte par personnage dans les embeddings, admin réorganisé avec éditeur personnage et triggers vidéo dédiés)
 
 ---
 
@@ -64,6 +64,40 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-06-09 — Refonte RAG & prompts : base unique « Caractères AVA » 🔷
+
+**Intent**: L'expérience Max souffrait d'une fragmentation des sources de vérité : le récit narratif vivait dans la base *Storyworld AVA*, les règles de gameplay dans *Gameplay Steps*, les triggers vidéo dans *Video Triggers*, et le cadrage des personnages était éparpillé entre des `system_prompt` bruts et des propriétés Notion non structurées. Conséquences : fuites de contexte entre personnages (chunks d'Ava remontaient dans le RAG de Max), system prompts figés et difficiles à itérer, et le Game Master manquait d'une vision synthétique de la situation actuelle du personnage. Le besoin : une **source unique par personnage** — sa page Notion — où le corps de page = mémoire RAG et 7 propriétés éditoriales = system prompt structuré, avec isolation stricte des embeddings et un résumé de situation pour le GM.
+
+**Tool**: Codex
+
+**Outcome**:
+1. **Source unique Notion** — abandon des bases *Storyworld AVA*, *Gameplay Steps* et *Video Triggers*. Seule la *Base Caractères AVA* (`30362322e59580bbb7b8dd49d516b341`) est synchronisée. Le corps de page = récit pour le RAG, les 7 propriétés `rich_text` = cadrage éditorial.
+2. **Schéma `character_prompts`** — nouvelle table (1 ligne / personnage) avec `identite_fondamentale`, `qui_tu_es`, `ce_que_tu_ne_fais_jamais`, `ce_que_tu_sais_utilisateur`, `dynamique_conversation`, `sujets_sensibles`, `profondeur_par_niveau` + `situation_summary` générée auto. RLS SELECT public, mutations réservées au `service_role`.
+3. **`situation_summary` générée par LLM** — à chaque sync, OpenRouter (Gemini 2.0 Flash) résume factuellement le corps de page en 100–150 mots. Ce résumé est injecté dans le system prompt GM (`## SITUATION ACTUELLE DU PERSONNAGE`) pour qu'il connaisse l'état du personnage sans lire tout le RAG.
+4. **Max contextualisé par les 7 champs** — `maxAgent.ts` charge `character_prompts` par nom et compose le system prompt avec les 7 sections exactes (`## IDENTITÉ FONDAMENTALE`… `## PROFONDEUR PAR NIVEAU`). Le `system_prompt` legacy sur `characters` n'est plus lu. Le RAG est forcé avec `characterId` non-null : aucun chunk d'un autre personnage ne peut fuiter.
+5. **Game Master enrichi** — `gameMasterPRD4.ts` reçoit la `situation_summary` du personnage actif. Avant chaque évaluation, il exécute une requête RAG scopée (`characterId`) sur 2 extraits et les injecte dans son user prompt (`## EXTRAITS NARRATIFS PERTINENTS`). Le GM évalue donc à la fois la situation globale et les faits narratifs pertinents du tour.
+6. **Edge function `sync-notion` refondue** — payload réduit à `databases.characters`. Pour chaque page : upsert `characters`, extraction des 7 rich_text → `character_prompts`, génération `situation_summary`, puis **wipe + rebuild** des embeddings du personnage uniquement (`DELETE WHERE character_id = X`, puis chunk + embed Voyage avec préfixe `Personnage: <nom>`). Réponse enrichie : chunks par personnage, longueur résumé, champs remplis.
+7. **Éditeur personnage dans l'admin** — nouveau `CharacterEditorTab` : sélecteur (Max en premier), 7 textarea éditoriaux éditables, `situation_summary` read-only + bouton « Régénérer », bouton « Resync depuis Notion », preview du system prompt final compilé. Avertissement explicite : les modifs locales sont possibles mais écrasées au prochain sync Notion.
+8. **Game Master comme personnage éditorial** — les champs Notion du personnage « Game Master » (qui existent aussi dans la base Caractères) sont affichés dans le tab `Mécanique > Game Master`, juste sous le prompt principal, via le composant réutilisable `CharacterPromptEditorPanel`.
+9. **Triggers vidéo déplacés** — sortis du tab Game Master pour devenir un tab `Mécanique > Triggers vidéo` à part entière, avec `VideoTriggersEditor`.
+10. **Admin réorganisée** — 5 groupes clairs : `📊 Données`, `📚 Contenu Notion`, `🎭 Personnages`, `🎮 Mécanique`, `🔧 Technique`. Le tab `Personnages` ne liste plus les entrées section (`Identité & Présentation`) ni le `Game Master`.
+11. **Filtrage anti-section** — `sync-notion` et `CharacterEditorTab` ignorent silencieusement `Identité & Présentation` et `Game Master` dans la liste des personnages jouables. Max est trié en tête.
+12. **Documentation** — `docs/plan_refonte_rag_caracteres.md` documente l'architecture complète : mapping Notion ↔ DB ↔ UI, contrat edge function, schéma DB, étapes de test, hors-scope GM/niveaux.
+
+**Ce que ça change** : on passe d'un RAG global et d'un system prompt monolithique à une **architecture personnage-native** où chaque protagoniste a sa mémoire isolée (embeddings scopés), son cadrage éditorial décomposé en 7 leviers indépendants, et son résumé de situation pour le GM. Cela rend le système immédiatement extensible à Ava, Léo et Emma (mêmes structures Notion), tout en éliminant les fuites de contexte entre personnages. Côté éditorial, les 7 champs permettent d'itérer sur l'identité, les interdits, la dynamique conversationnelle et la profondeur par niveau sans toucher au code — un changement dans Notion est synchronisé et répercuté dans les prompts en temps réel.
+
+**Validation**:
+- Migration DB appliquée : `character_prompts` créée avec RLS + GRANTs.
+- Sync Notion wipe & rebuild : embeddings ne contiennent que `source_table='characters'` avec `character_id` non-null.
+- Admin → Personnages → Max : les 7 champs sont remplis, `situation_summary` générée, preview du prompt visible.
+- `npx tsc --noEmit` : OK.
+- `npm test` : passants.
+- Build Vite : OK.
+
+**Time**: ~3h (plan architecture → migration DB → refactor edge function → services/agents → composants admin → nettoyage Notion → tests/build → documentation).
+
+---
 
 ### 2026-05-24 — Sélecteur STT input multi-providers pour Lovable 🔷
 
