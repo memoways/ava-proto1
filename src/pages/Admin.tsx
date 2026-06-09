@@ -13,7 +13,7 @@ import LLMConfigTab from "@/components/LLMConfigTab";
 import TTSConfigTab from "@/components/TTSConfigTab";
 import STTConfigTab from "@/components/STTConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
-import MaxPromptControlTab from "@/components/MaxPromptControlTab";
+import CharacterEditorTab from "@/components/CharacterEditorTab";
 import MaxPromptTestTab from "@/components/MaxPromptTestTab";
 import PipelineTraceTab from "@/components/PipelineTraceTab";
 import AntiHallucinationValidatorTab from "@/components/AntiHallucinationValidatorTab";
