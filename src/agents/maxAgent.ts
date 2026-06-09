@@ -2,7 +2,8 @@ import { callLLM, callLLMWithUsage, streamLLM, type LLMUsage } from "@/services/
 import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, MaxConstraintCheckResult, MaxTurnKnowledgeContext } from "@/types";
-import { getAntiHallucinationValidatorSettings, getLLMSettings, getMaxPromptControlSettings } from "@/services/settingsService";
+import { getAntiHallucinationValidatorSettings, getLLMSettings } from "@/services/settingsService";
+import { buildCharacterPromptSections, loadCharacterPromptByName, clearCharacterPromptCache } from "@/services/characterPromptService";
 
 // Fallback minimal system prompt if DB fetch fails
 const FALLBACK_SYSTEM_PROMPT = `Tu es un personnage dans une expérience narrative interactive. Parle à la première personne, en français, de façon concise (2-3 phrases). Utilise le CONTEXTE NARRATIF ci-dessous comme source de vérité.`;
