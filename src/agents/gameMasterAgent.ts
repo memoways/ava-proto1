@@ -48,6 +48,8 @@ export interface GameMasterInput {
   currentTrustLevel: number;
   triggeredIds: string[];
   timeElapsedSeconds: number;
+  /** Active character name (Max / Ava / …). Enables injection of situation_summary + scoped RAG. */
+  characterName?: string;
 }
 
 export interface GameMasterPreTurnInput {
@@ -57,6 +59,8 @@ export interface GameMasterPreTurnInput {
   triggeredIds: string[];
   timeElapsedSeconds: number;
   knowledgeContext?: MaxTurnKnowledgeContext;
+  /** Active character name (Max / Ava / …). */
+  characterName?: string;
 }
 
 const DEFAULT_TURN_BRIEF: GameMasterTurnBrief = {
