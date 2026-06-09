@@ -67,8 +67,7 @@ export interface LLMSettings {
 const LLM_STORAGE_KEY = "ava_llm_settings";
 
 export const OPENROUTER_MODELS = [
-  { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash", description: "Défaut live — très rapide, fiable" },
-  { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "Rapide, fiable, bonne qualité" },
+  { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "Défaut live — rapide, fiable, bonne qualité" },
   { id: "openai/gpt-4o-mini", label: "GPT-4o Mini", description: "Très rapide, économique" },
   { id: "x-ai/grok-3-mini-beta", label: "Grok 3 Mini", description: "Rapide, conversationnel, bon en roleplay" },
   { id: "qwen/qwen-2.5-72b-instruct", label: "Qwen 2.5 72B", description: "Qualité correcte mais trop lent pour le live voice-to-voice" },
@@ -87,7 +86,7 @@ const llmDefaults: LLMSettings = {
   // Le GM ne fait QUE du JSON structuré déterministe (brief de tour, évaluation post-turn).
   // Un modèle "flash/lite" est ~5-10x plus rapide qu'un 72B pour la même qualité sur cette tâche
   // → réduit drastiquement la latence du GM pre-turn (vue dans le panneau Latence & blocage).
-  LLM_MODEL_GM: "google/gemini-2.0-flash-001",
+  LLM_MODEL_GM: "google/gemini-2.5-flash",
   LLM_TEMPERATURE: defaultSettings.LLM_TEMPERATURE,
   LLM_MAX_TOKENS: Math.min(defaultSettings.LLM_MAX_TOKENS, 220),
   LLM_TOP_P: defaultSettings.LLM_TOP_P,
@@ -97,13 +96,14 @@ const llmDefaults: LLMSettings = {
 };
 
 const DEPRECATED_OPENROUTER_MODELS: Record<string, string> = {
+  "google/gemini-2.0-flash-001": "google/gemini-2.5-flash",
   "qwen/qwen-2.5-32b-instruct": "qwen/qwen-2.5-72b-instruct",
 };
 
 const SLOW_LIVE_MODEL_FALLBACKS: Record<string, string> = {
-  "qwen/qwen-2.5-72b-instruct": "google/gemini-2.0-flash-001",
-  "meta-llama/llama-3.1-70b-instruct": "google/gemini-2.0-flash-001",
-  "google/gemini-2.5-pro-preview-06-05": "google/gemini-2.0-flash-001",
+  "qwen/qwen-2.5-72b-instruct": "google/gemini-2.5-flash",
+  "meta-llama/llama-3.1-70b-instruct": "google/gemini-2.5-flash",
+  "google/gemini-2.5-pro-preview-06-05": "google/gemini-2.5-flash",
 };
 
 export type LLMModelField = "LLM_MODEL" | "LLM_MODEL_GM";

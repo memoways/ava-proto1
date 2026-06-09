@@ -71,7 +71,7 @@ export interface ExperienceState {
 export type OnboardingVariant = "A" | "B";
 export type VoiceModality = "micro_ouvert" | "push_to_talk";
 
-export type AudioState = "idle" | "user_speaking" | "max_thinking" | "max_speaking";
+export type AudioState = "idle" | "mic_starting" | "user_speaking" | "max_thinking" | "max_speaking";
 
 export interface VideoTrigger {
   id: string;

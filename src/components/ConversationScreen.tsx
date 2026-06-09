@@ -28,6 +28,7 @@ interface ConversationScreenProps {
 
 const statusLabels: Record<AudioState, string> = {
   idle: "En attente…",
+  mic_starting: "Micro en cours…",
   user_speaking: "Max écoute…",
   max_thinking: "Max réfléchit…",
   max_speaking: "Max parle…",

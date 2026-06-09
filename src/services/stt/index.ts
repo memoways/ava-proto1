@@ -45,6 +45,9 @@ export async function createConfiguredSTT(
   opts?: STTCreateOptions,
 ): Promise<STTSession> {
   const provider = await resolveRuntimeSTTProvider();
-  if (provider === "gamilab") return new GamilabSTT(onTranscript, opts);
+  if (provider === "gamilab") {
+    void Promise.resolve(opts?.initialStream).then((stream) => stream?.getTracks().forEach((track) => track.stop())).catch(() => {});
+    return new GamilabSTT(onTranscript, opts);
+  }
   return createDeepgramSTT(onTranscript, opts);
 }
