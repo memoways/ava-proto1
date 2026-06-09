@@ -521,6 +521,7 @@ const IndexPRD4 = () => {
     let initialStream: Promise<MediaStream> | undefined;
     try {
       initialStream = navigator.mediaDevices?.getUserMedia({ audio: true });
+      initialStream?.catch(() => { /* handled below when createSTT awaits it */ });
       // Always start a fresh STT per turn for robustness (avoid stale WS, paused state, etc.)
       const nextTurn = conversationRef.current.filter((m) => m.role === "user").length + 1;
       if (latencyOverlayEnabled) {
@@ -536,6 +537,7 @@ const IndexPRD4 = () => {
       setAudioState("user_speaking");
     } catch (err) {
       console.warn("[PRD4] PTT start failed:", err);
+      void initialStream?.then((stream) => stream.getTracks().forEach((track) => track.stop())).catch(() => {});
       endLatencySegment(sttLatencySegmentRef.current);
       sttLatencySegmentRef.current = null;
       teardownSTT();
