@@ -1,10 +1,10 @@
 /** PRD4 — Écran 8 : Conversation avec Max (toggle-to-talk, fond Max plein écran) */
+import { useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, MicOff, PhoneOff, Loader2 } from "lucide-react";
 import maxLarge from "@/assets/characters/max-large.jpg";
 import maxAvatar from "@/assets/characters/max.jpg";
 import type { AudioState, ConversationMessage } from "@/types";
-import { usePushToTalk } from "@/hooks/usePushToTalk";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -36,12 +36,24 @@ const ConversationScreen = ({
   const disabled = audioState === "mic_starting" || audioState === "max_thinking" || audioState === "max_speaking";
   const recording = audioState === "user_speaking";
 
-  const { buttonHandlers } = usePushToTalk({
-    enabled: !disabled,
-    onPress: onPTTPress,
-    onRelease: onPTTRelease,
-    mode: "toggle",
-  });
+  const handleToggleTalk = useCallback(() => {
+    if (audioState === "idle") onPTTPress();
+    if (audioState === "user_speaking") onPTTRelease();
+  }, [audioState, onPTTPress, onPTTRelease]);
+
+  useEffect(() => {
+    const isTypingTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      return target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Space" || event.repeat || isTypingTarget(event.target)) return;
+      event.preventDefault();
+      handleToggleTalk();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleToggleTalk]);
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
@@ -104,7 +116,7 @@ const ConversationScreen = ({
           {/* PTT */}
           <div className="flex flex-col items-center gap-2">
             <button
-              {...buttonHandlers}
+              onClick={handleToggleTalk}
               disabled={disabled}
               className={cn(
                 "flex h-20 w-20 items-center justify-center rounded-full border-2 backdrop-blur-md transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40",
