@@ -527,9 +527,10 @@ const IndexPRD4 = () => {
       sttLatencySegmentRef.current = latencyOverlayEnabled
         ? startLatencySegment({ segment: "STT", service: latencyServiceLabel(getConfiguredSTTServiceInfo()) })
         : null;
-      setAudioState("user_speaking");
+      setAudioState("mic_starting");
       setUserSubtitle("");
       await createSTT();
+      setAudioState("user_speaking");
     } catch (err) {
       console.warn("[PRD4] PTT start failed:", err);
       endLatencySegment(sttLatencySegmentRef.current);
