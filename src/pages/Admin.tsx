@@ -41,10 +41,16 @@ const TAB_GROUPS = [
     id: "content",
     label: "📚 Contenu Notion",
     tabs: [
-      { id: "characters", label: "Personnages" },
+      { id: "sync", label: "Sync Notion" },
       { id: "embeddings", label: "Embeddings" },
       { id: "rag", label: "RAG Test" },
-      { id: "sync", label: "Sync Notion" },
+    ],
+  },
+  {
+    id: "characters",
+    label: "🎭 Personnages",
+    tabs: [
+      { id: "character-editor", label: "Éditeur personnage" },
     ],
   },
   {
@@ -52,13 +58,12 @@ const TAB_GROUPS = [
     label: "🎮 Mécanique",
     tabs: [
       { id: "gamemaster", label: "Game Master" },
-      { id: "max-prompt", label: "Max Prompt" },
       { id: "validator", label: "Validateur" },
       { id: "metrics", label: "Métriques hallu." },
       { id: "latency", label: "Latence & blocage" },
       { id: "latency-telemetry", label: "Latences (PostHog)" },
       { id: "max-test", label: "Test Max" },
-        { id: "pipeline", label: "Pipeline" },
+      { id: "pipeline", label: "Pipeline" },
     ],
   },
   {
