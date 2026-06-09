@@ -56,6 +56,8 @@ export interface STTSession {
 export interface STTCreateOptions {
   onError?: STTErrorCallback;
   getTelemetryContext?: () => STTTelemetryContext;
+  /** Optional microphone stream request started synchronously from the user gesture. */
+  initialStream?: MediaStream | Promise<MediaStream>;
 }
 
 export interface STTProviderRuntimeStatus {

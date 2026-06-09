@@ -65,6 +65,7 @@ export class DeepgramSTT {
   private lastFinalTelemetry: STTFinalTelemetry | null = null;
   private manualMode = false;
   private config: DeepgramConfig | null = null;
+  private initialStream?: MediaStream | Promise<MediaStream>;
 
   /** Disable automatic silence-based finalization. Caller must invoke `flush()` to end an utterance. */
   setManualMode(manual: boolean) {
@@ -76,10 +77,11 @@ export class DeepgramSTT {
   }
 
 
-  constructor(onTranscript: TranscriptCallback, opts?: { onError?: STTErrorCallback; getTelemetryContext?: () => STTTelemetryContext }) {
+  constructor(onTranscript: TranscriptCallback, opts?: { onError?: STTErrorCallback; getTelemetryContext?: () => STTTelemetryContext; initialStream?: MediaStream | Promise<MediaStream> }) {
     this.onTranscript = onTranscript;
     this.onError = opts?.onError;
     this.getTelemetryContext = opts?.getTelemetryContext;
+    this.initialStream = opts?.initialStream;
   }
 
   get isActive() {
@@ -141,9 +143,13 @@ export class DeepgramSTT {
   async start() {
     // Get microphone first: browsers are stricter when media permission is
     // requested after an awaited network call instead of directly from a user gesture.
+    const streamPromise = this.initialStream
+      ? Promise.resolve(this.initialStream)
+      : navigator.mediaDevices.getUserMedia({ audio: true });
+    this.initialStream = undefined;
     this.stream = await withTimeout(
       "microphone_permission",
-      navigator.mediaDevices.getUserMedia({ audio: true }),
+      streamPromise,
       10000,
     );
 
