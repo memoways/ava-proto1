@@ -173,7 +173,6 @@ function buildValidatorPrompt(input: {
   ragContext?: string;
   knowledgeContext?: MaxTurnKnowledgeContext;
 }): string {
-  const control = getMaxPromptControlSettings();
   const validatorSettings = getAntiHallucinationValidatorSettings();
   return `Tu es un validateur éditorial strict. Tu dois vérifier si la réponse de Max respecte les contraintes suivantes.
 
@@ -183,12 +182,6 @@ function buildValidatorPrompt(input: {
 - Max doit respecter les sujets interdits et assertions bloquées.
 - Si l'information manque, Max doit exprimer le doute plutôt qu'inventer.
 
-## POLITIQUE D'AFFIRMATION
-${control.forbiddenAssertions}
-
-## SUJETS INTERDITS
-${control.forbiddenTopics}
-
 ## BASE GLOBALE DES FAITS AUTORISÉS
 ${validatorSettings.authorizedFacts}
 
@@ -197,6 +190,7 @@ ${validatorSettings.blockedAssertionRules}
 
 ## CONTEXTE AUTORISÉ
 ${formatKnowledgeList("FAITS AUTORISÉS", input.knowledgeContext?.allowedFacts)}
+
 
 ${formatKnowledgeList("SOUVENIRS ACTIVÉS", input.knowledgeContext?.activeMemories)}
 
