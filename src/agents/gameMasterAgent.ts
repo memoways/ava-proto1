@@ -148,9 +148,11 @@ const GM_PRETURN_TIMEOUT_MS = 4000;
 
 export async function planGameMasterTurn(input: GameMasterPreTurnInput): Promise<GameMasterTurnBrief> {
   const contextMessage = buildPreTurnContextMessage(input);
+  const { system: charBlock, characterId } = await getCharacterContextBlock(input.characterName);
+  const ragExtracts = await getCharacterRagExtracts(characterId, input.userMessage, contextMessage.slice(0, 600));
   const messages: Array<{ role: "system" | "user"; content: string }> = [
-    { role: "system", content: getGameMasterPreTurnPrompt() },
-    { role: "user", content: contextMessage },
+    { role: "system", content: getGameMasterPreTurnPrompt() + charBlock },
+    { role: "user", content: contextMessage + ragExtracts },
   ];
 
   // Capture le modèle dès maintenant : si l'utilisateur change la config en cours de tour,
