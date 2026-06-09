@@ -223,49 +223,34 @@ export default function Admin() {
     setSavingChar(false);
   }
 
-  async function triggerSync() {
+  async function triggerSync(opts: { wipeAll?: boolean } = {}) {
     setSyncing(true);
     setSyncReport(null);
-    const tableKeys = Object.keys(AVA_NOTION_DATABASES) as (keyof typeof AVA_NOTION_DATABASES)[];
-    const combinedResults: Record<string, any> = {};
-    const combinedEmbeddingStats: Record<string, any> = {};
-    let lastTotalEmbeddings = 0;
-    let hadError = false;
-
-    for (const key of tableKeys) {
-      try {
-        toast.info(`Sync ${key}...`);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 120000);
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ databases: { [key]: AVA_NOTION_DATABASES[key] } }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        if (data.results) Object.assign(combinedResults, data.results);
-        if (data.embedding_stats) Object.assign(combinedEmbeddingStats, data.embedding_stats);
-        if (data.embedding_diff) Object.assign(combinedResults, { [`${key}_diff`]: data.embedding_diff[key] });
-        if (data.total_embeddings_in_db) lastTotalEmbeddings = data.total_embeddings_in_db;
-      } catch (err: any) {
-        hadError = true;
-        combinedResults[key] = { error: err.name === 'AbortError' ? 'Timeout (>120s)' : err.message };
-        toast.error(`Erreur sync ${key}: ${err.name === 'AbortError' ? 'Timeout' : err.message}`);
-      }
+    try {
+      toast.info(opts.wipeAll ? "Wipe & rebuild RAG…" : "Sync Notion…");
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 180000);
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          databases: { characters: AVA_NOTION_DATABASES.characters },
+          wipe_all: !!opts.wipeAll,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setSyncReport({ ...data, synced_at: new Date().toISOString() });
+      clearSystemPromptCache();
+      toast.success(`Sync OK : ${data.characters_synced} personnage(s), ${data.total_embeddings_in_db} embeddings total`);
+      loadEmbeddings();
+    } catch (err: any) {
+      const msg = err.name === "AbortError" ? "Timeout (>180s)" : err.message;
+      setSyncReport({ error: msg });
+      toast.error(`Erreur sync : ${msg}`);
     }
-
-    setSyncReport({
-      success: !hadError,
-      results: combinedResults,
-      embedding_stats: combinedEmbeddingStats,
-      total_embeddings_in_db: lastTotalEmbeddings,
-      synced_at: new Date().toISOString(),
-    });
-    if (!hadError) toast.success("Sync Notion terminé !");
-    loadEmbeddings();
     setSyncing(false);
   }
 
