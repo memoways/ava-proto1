@@ -92,10 +92,12 @@ const DEFAULT_RESPONSE: GameMasterResponse = {
  */
 export async function callGameMaster(input: GameMasterInput): Promise<GameMasterResponse> {
   const contextMessage = buildContextMessage(input);
+  const { system: charBlock, characterId } = await getCharacterContextBlock(input.characterName);
+  const ragExtracts = await getCharacterRagExtracts(characterId, input.userMessage, contextMessage.slice(0, 600));
 
   const messages: Array<{ role: "system" | "user"; content: string }> = [
-    { role: "system", content: getGameMasterSystemPrompt() },
-    { role: "user", content: contextMessage },
+    { role: "system", content: getGameMasterSystemPrompt() + charBlock },
+    { role: "user", content: contextMessage + ragExtracts },
   ];
 
   try {
