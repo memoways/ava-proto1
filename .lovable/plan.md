@@ -1,157 +1,93 @@
+## Étape 0 — Documentation
 
-# Plan — TTS multi-providers + monitoring Consommation Voix
+Créer `docs/plan_refonte_rag_caracteres.md` : version longue et détaillée du plan ci-dessous (objectifs, schéma DB complet avec SQL, contrats edge function, mapping Notion ↔ DB ↔ UI, structure nav admin, étapes de migration des données, plan de test, hors-scope GM/niveaux). Ce document sert de référence persistante.
 
-Livré en 2 phases distinctes pour minimiser le risque de régression. Phase 1 ne touche pas au monitoring existant ; Phase 2 ne touche pas au pipeline audio.
+## Étape 1 — Migration DB
 
----
+Nouvelle table `public.character_prompts` (1 ligne / personnage) :
+- `character_id` uuid PK FK → `characters.id` ON DELETE CASCADE
+- `identite_fondamentale text`, `qui_tu_es text`, `ce_que_tu_ne_fais_jamais text`, `ce_que_tu_sais_utilisateur text`, `dynamique_conversation text`, `sujets_sensibles text`, `profondeur_par_niveau text`
+- `situation_summary text` (résumé court pour le GM, généré au sync)
+- `created_at`, `updated_at` + trigger `update_updated_at_column`
+- GRANT SELECT/INSERT/UPDATE/DELETE authenticated, GRANT ALL service_role
+- RLS activée, policies : SELECT à tous authenticated, mutations via service_role/admin
+- On laisse `characters.system_prompt` en place (deprecated, non lu)
 
-## Phase 1 — Refonte TTS multi-providers
+## Étape 2 — Edge function `sync-notion` refactor
 
-### Objectif
-Remplacer l'appel direct "ElevenLabs only" par une abstraction `TTSProvider` permettant de choisir l'un des 4 services depuis l'admin, sans changer le comportement runtime côté `Index.tsx` / `TTSQueue`.
+- Retirer entièrement les branches `storyworld`, `gameplay_steps`, `video_triggers` du payload accepté et de la logique
+- Seule entrée : `databases.characters`
+- Pour chaque page Caractères :
+  1. Upsert dans `characters` (nom, archétype, page body comme backstory)
+  2. Extraire les 7 nouvelles propriétés rich_text et upsert dans `character_prompts`
+  3. Générer `situation_summary` via OpenRouter (`LLM_MODEL_GM` par défaut, prompt court : "résume la situation actuelle du personnage en 100-150 mots, factuel" — input = corps de page)
+  4. **Wipe puis ré-insérer** les embeddings du personnage : `DELETE FROM embeddings WHERE character_id = <id>`, puis chunker uniquement le **corps de page** (pas les propriétés) avec un préfixe header, embed (Voyage), insert avec `source_table='characters'` et `character_id=<id>` non-null
+- Avant la boucle, si flag `wipe_all=true` dans la requête : `DELETE FROM embeddings` global
+- Réponse enrichie : nb chunks par personnage, longueur situation_summary
 
-### Providers cibles
-1. **ElevenLabs** (existant, conservé tel quel)
-2. **Inworld TTS** — API REST, modèles `inworld-tts-1` / `inworld-tts-1-max`
-3. **StepAudio** (Step-Audio / StepFun) — API REST, voix FR
-4. **Hume AI Octave** — API REST, voix expressives
+## Étape 3 — Service settings refactor
 
-Une 5e (Cartesia, Deepgram Aura, OpenAI TTS) pourra être ajoutée sans refactor — l'archi est ouverte.
+`src/services/settingsService.ts` :
+- Marquer `MaxPromptControlSettings` deprecated (laisser le code mais non utilisé)
+- Nouveau module `src/services/characterPromptService.ts` :
+  - `CharacterPrompt` interface (7 champs + situation_summary + character_id/name)
+  - `loadCharacterPrompt(characterId): Promise<CharacterPrompt | null>`
+  - `saveCharacterPrompt(characterId, partial): Promise<void>`
+  - `listCharacterPrompts(): Promise<CharacterPromptWithName[]>` (join `characters`)
+  - Cache mémoire simple + `clearCharacterPromptCache(characterId?)`
+- `AVA_NOTION_DATABASES` dans `ragService.ts` : ne garder que `characters`
 
-### Architecture
+## Étape 4 — Agents
 
-```text
-src/services/tts/
-  index.ts                  ← façade publique : generateSpeech(), TTSQueue
-  types.ts                  ← TTSProvider interface, TTSRequest, TTSResponse
-  registry.ts               ← map { elevenlabs, inworld, stepaudio, hume } → provider
-  providers/
-    elevenlabs.ts           ← wrap existant (appelle proxy-tts)
-    inworld.ts              ← appelle proxy-tts-inworld
-    stepaudio.ts            ← appelle proxy-tts-stepaudio
-    hume.ts                 ← appelle proxy-tts-hume
+`src/agents/maxAgent.ts` :
+- `buildMaxSystemPrompt` charge `character_prompts` pour le personnage actif (par nom) et compose le prompt avec sections nommées exactement : `## IDENTITÉ FONDAMENTALE`, `## QUI TU ES`, `## CE QUE TU NE FAIS JAMAIS`, `## CE QUE TU SAIS DE L'UTILISATEUR`, `## DYNAMIQUE DE LA CONVERSATION`, `## SUJETS SENSIBLES`, `## PROFONDEUR PAR NIVEAU`
+- `GAMEPLAY_RULES` conservé
+- RAG `## CONTEXTE NARRATIF` injecté comme source de vérité
+- Cache invalidable via `clearSystemPromptCache()`
+- Tous les appels RAG forcent `characterId` non-null (vérifier call sites dans `prd4Orchestrator`, `conversationOrchestrator`, `maxTestPipeline`)
 
-supabase/functions/
-  proxy-tts/                ← inchangé (ElevenLabs)
-  proxy-tts-inworld/        ← nouveau
-  proxy-tts-stepaudio/      ← nouveau
-  proxy-tts-hume/           ← nouveau
+`src/agents/gameMasterAgent.ts` et `gameMasterPRD4.ts` :
+- Charger `character_prompts.situation_summary` et l'injecter dans le system prompt GM (section `## SITUATION ACTUELLE DU PERSONNAGE`)
+- Avant chaque évaluation : `queryRAG(userMessage, recentContext, 2, undefined, { characterId })` et injecter les 2 extraits dans le user prompt du GM (section `## EXTRAITS NARRATIFS PERTINENTS`)
+
+## Étape 5 — Admin UI
+
+Réorganiser `TAB_GROUPS` dans `src/pages/Admin.tsx` :
+```
+📊 Données        : Sessions, Questionnaires
+📚 Contenu Notion : Sync Notion, Embeddings, RAG Test
+🎭 Personnages    : sélecteur (Max / Ava / Léo / Emma) → onglet éditorial unique
+🎮 Mécanique      : Game Master, Validateur, Métriques hallu., Pipeline, Test Max
+🔧 Technique      : LLM, TTS, STT, Consommation LLM, Consommation Voix, Latence, Latences PostHog
 ```
 
-Chaque provider expose la même signature :
-```ts
-interface TTSProvider {
-  id: "elevenlabs" | "inworld" | "stepaudio" | "hume";
-  label: string;
-  generate(text: string, opts: CommonTTSOptions): Promise<{ blob: Blob; meta: ProviderMeta }>;
-  defaultSettings(): ProviderSettings;
-  settingsSchema: SettingsField[];  // pour rendu auto dans TTS Config
-}
-```
+Nouveau composant `src/components/CharacterEditorTab.tsx` :
+- Sélecteur de personnage (dropdown alimenté par `listCharacterPrompts`)
+- 7 textarea pour les champs éditoriaux + 1 textarea read-only pour `situation_summary` (avec bouton "Régénérer" qui rappelle l'edge function pour ce personnage)
+- Bouton "Resync depuis Notion" (déclenche sync pour ce personnage)
+- Preview du system prompt final généré (read-only)
+- Pas de bouton "Sauvegarder dans Notion" — l'édition Notion reste maître ; les modifs locales sont possibles mais écrasées au prochain sync (toast d'avertissement)
 
-### Sélection du provider actif
+Onglet `Sync Notion` :
+- Bouton "Wipe & rebuild RAG (toutes les pages Caractères)" → POST `sync-notion` avec `{ wipe_all: true, databases: { characters: <id> } }`
+- Bouton "Sync incrémental" → sans `wipe_all`
+- Retirer les sections storyworld/gameplay/video du rapport
 
-- Nouvelle clé dans `admin_settings` : `tts_active_provider` (default `"elevenlabs"`).
-- Chargée au boot via `settingsService` et exposée par `getActiveTTSProvider()`.
-- `generateSpeech(text, opts)` (façade) délègue à `registry[active].generate(...)`.
-- **Aucun changement** dans `Index.tsx` ni `TTSQueue` : ils continuent à appeler `generateSpeech()` comme aujourd'hui.
+Supprimer / déplacer :
+- `MaxPromptControlTab` → remplacé par `CharacterEditorTab` (le fichier reste dans le repo mais n'est plus utilisé ; suppression possible si plus aucune route ne le référence)
+- Onglet "Personnages" actuel (édition `system_prompt` brut) → masqué (la source devient `character_prompts`)
 
-### Refonte de l'onglet "Voix" → "TTS Config"
+## Étape 6 — Validation manuelle
 
-`src/components/VoiceConfigTab.tsx` devient `TTSConfigTab.tsx`, structuré comme `LLMConfigTab` :
+1. Lancer la migration DB (approbation utilisateur)
+2. Sync Notion incrémentale → vérifier qu'une ligne `character_prompts` existe pour Max et que les 7 champs sont remplis
+3. Wipe & rebuild RAG → vérifier que `embeddings` ne contient que `source_table='characters'` avec `character_id` non-null
+4. Tester une session vocale Max via `/` (PRD4) → vérifier dans la console que le system prompt contient bien les 7 nouvelles sections et que le GM reçoit la situation_summary
 
-1. **Sélecteur de provider actif** (radio + descriptif + bouton "Définir comme actif")
-2. **Section par provider** (accordéon), avec :
-   - Réglages spécifiques (voix, modèle, stabilité, vitesse, format audio…) générés depuis `settingsSchema`
-   - Bouton "🔊 Tester ce provider" (utilise le provider de la section, pas le provider actif)
-   - Statut secret : `ELEVENLABS_API_KEY` configurée ✓ / `INWORLD_API_KEY` manquante ⚠️
-3. **Section comparaison rapide** : un même texte joué successivement par chaque provider (utile pour A/B).
+## Hors scope (prochaine mise à jour)
 
-Persistance : une clé par provider dans `admin_settings` (`tts_settings_elevenlabs`, `tts_settings_inworld`, …).
+- Donner plus de poids au Game Master pour orchestrer les niveaux à partir de `Profondeur par niveau` (lecture par niveau) et déclencher des vidéos entre les niveaux.
 
-### Secrets requis
+## Prérequis utilisateur côté Notion
 
-À ajouter via `secrets--add_secret` au début de la phase :
-- `INWORLD_API_KEY`
-- `STEPAUDIO_API_KEY`
-- `HUME_API_KEY`
-
-(Note : je demanderai à l'utilisateur les clés au moment de démarrer la phase, pas maintenant.)
-
-### Garde-fous régression
-- ElevenLabs reste branché à `proxy-tts` existant, signature inchangée, défaut actif.
-- La façade `generateSpeech` garde la même signature publique → `Index.tsx`, `TTSQueue`, tests existants restent verts.
-- Renommer "Voix" → "TTS Config" dans `Admin.tsx` (1 ligne), garder `tab=voice` pour ne pas casser les liens.
-- Tests unitaires nouveaux : registry mapping + selection.
-
----
-
-## Phase 2 — Panel "Consommation Voix"
-
-### Objectif
-Ajouter un onglet à côté de "Consommation" (renommé "Consommation LLM"), monitoring multi-providers basé sur la table existante `audio_latencies` enrichie.
-
-### Renommages dans `Admin.tsx`
-- `usage` → label "Consommation LLM" (id inchangé)
-- Nouveau tab `voice-usage` → label "Consommation Voix"
-
-### Enrichissement données
-
-Migration `audio_latencies` :
-- Ajout colonnes : `provider text`, `status_code int`, `error_type text` (`ok` / `quota` / `auth` / `network` / `server` / `client`), `error_message text`.
-- Backfill : `provider = 'elevenlabs'` pour les lignes existantes.
-
-Côté providers (Phase 1 déjà en place) : chaque `provider.generate()` retourne `meta` qui est passé à `recordAudioLatency()` — donc Phase 2 n'a qu'à lire ces champs.
-
-### Composant `VoiceUsageTab.tsx`
-
-Sur une fenêtre temporelle sélectionnable (24h / 7j / total) :
-
-- **Cartes par provider** (ElevenLabs, Inworld, StepAudio, Hume) :
-  - Requêtes totales / succès / erreurs (+ % succès)
-  - Répartition codes HTTP : 200 / 401 / 429 / 5xx (mini bar chart)
-  - Latence first-byte p50 / p95
-  - Latence totale p50 / p95
-  - Dernière erreur (timestamp + message tronqué)
-- **Bandeau d'alerte** si taux d'erreur > 10% sur 24h
-- **Tableau comparatif** côte-à-côte (1 ligne par provider, colonnes : req, succès, p50, p95, erreurs)
-
-Requêtes : `supabase.from('audio_latencies').select(...)` agrégé côté client (volumes modestes), filtrage par fenêtre temporelle.
-
-### Garde-fous régression
-- Lecture seule. Aucun impact sur le pipeline voix.
-- La phase 1 garantit que `provider`, `status_code`, `error_type` sont déjà alimentés avant que ce panel ne soit livré.
-
----
-
-## Détails techniques
-
-### Question quotas/coûts (hors scope monitoring de base, prévu extensible)
-Aucun appel `/v1/usage` ou équivalent provider dans Phase 2 — le coût et le quota restant ne seront pas affichés (peuvent être ajoutés en Phase 3 si besoin, sans toucher au schéma).
-
-### PostHog
-Les events `audio_latency` envoyés depuis `latencyTelemetry.ts` reçoivent automatiquement les nouveaux champs (`provider`, `status_code`, `error_type`) → exploitables aussi côté PostHog Insights sans travail supplémentaire.
-
-### Fichiers touchés (estimation)
-
-Phase 1 (~10 fichiers) :
-- nouveaux : `src/services/tts/{index,types,registry}.ts`, `src/services/tts/providers/{elevenlabs,inworld,stepaudio,hume}.ts`, `src/components/TTSConfigTab.tsx`, 3 edge functions
-- modifiés : `src/pages/Admin.tsx` (label + import), `src/services/settingsService.ts` (clés par provider), `src/pages/Index.tsx` (aucun changement attendu — import via façade)
-- supprimé/déprécié : `src/components/VoiceConfigTab.tsx` (logique migrée)
-
-Phase 2 (~4 fichiers) :
-- nouveaux : `src/components/admin/VoiceUsageTab.tsx`, 1 migration SQL
-- modifiés : `src/pages/Admin.tsx` (rename + nouvel onglet), `src/services/latencyTelemetry.ts` (4 nouveaux champs)
-
-### Risques identifiés
-- **Inworld / StepAudio / Hume** : APIs moins documentées qu'ElevenLabs ; je vérifierai les endpoints + formats au moment de coder chaque proxy et signalerai tout blocage.
-- **Latence ajoutée** : nulle — la façade est un simple lookup de map ; `Index.tsx` ne change pas.
-- **Régression ElevenLabs** : couverte par les tests unitaires existants (`elevenLabsTTS.test.ts`) qui resteront verts car le provider ElevenLabs reste un wrapper 1:1 du code actuel.
-
----
-
-## Validation à chaque phase
-1. Build + tests verts
-2. Test manuel du provider actif en jeu (ElevenLabs par défaut → comportement identique)
-3. Test du bouton "Tester ce provider" pour chaque provider configuré
-4. Phase 2 : vérifier que le panel se peuple correctement après quelques tours de jeu
+Ajouter / renommer dans la base **Caractères AVA** les 7 propriétés rich_text avec les noms exacts ci-dessus, et les remplir pour Max. Le corps de la page Max contient le récit (film + post-film) qui ira au RAG.
