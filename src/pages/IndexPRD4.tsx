@@ -568,7 +568,7 @@ const IndexPRD4 = () => {
         setUserSubtitle("");
         teardownSTT();
       }
-    }, 600);
+    }, 1700);
   }, [endLatencySegment, setAudioState, teardownSTT]);
 
   const handleHangUp = useCallback(() => {
