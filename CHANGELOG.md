@@ -4,6 +4,37 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.26.0] - 2026-06-09 — Refonte RAG & prompts : base unique « Caractères AVA »
+
+Objectif de départ : recentrer toute la mémoire narrative et le cadrage éditorial des personnages sur **une seule base Notion** — la *Base Caractères AVA* — et abandonner les bases Storyworld AVA, Gameplay Steps et Video Triggers. La page Notion de chaque personnage devient la source unique du récit (RAG) et du cadrage éditorial (system prompt structuré en 7 champs), avec isolation stricte par personnage dans les embeddings et un résumé de situation généré pour le Game Master.
+
+### Ajouté
+- **Table `public.character_prompts`** — nouvelle table 1 ligne / personnage avec 7 champs éditoriaux (`identite_fondamentale`, `qui_tu_es`, `ce_que_tu_ne_fais_jamais`, `ce_que_tu_sais_utilisateur`, `dynamique_conversation`, `sujets_sensibles`, `profondeur_par_niveau`) + `situation_summary` générée automatiquement, FK `characters.id`, RLS + GRANTs.
+- **Service `characterPromptService.ts`** — interface `CharacterPrompt`, lecture par `character_id` ou par nom, sauvegarde, liste jointe avec `characters`, cache mémoire simple avec invalidation.
+- **Génération `situation_summary`** — dans `sync-notion`, résumé factuel 100–150 mots généré via OpenRouter (`google/gemini-2.0-flash-001`) à partir du corps de page tronqué, injecté dans le system prompt GM.
+- **Admin — onglet `Personnages`** — nouveau `CharacterEditorTab` avec sélecteur de personnage, 7 textarea éditoriaux, `situation_summary` read-only + bouton « Régénérer », bouton « Resync depuis Notion », preview du system prompt final compilé.
+- **Admin — onglet `Mécanique > Game Master`** — intégration des champs éditoriaux Notion du personnage « Game Master » (via `CharacterPromptEditorPanel`) sous le prompt principal du GM.
+- **Admin — onglet `Mécanique > Triggers vidéo`** — extraction de l'éditeur de triggers vidéo dans un tab dédié, séparé du Game Master.
+- **Composant réutilisable `CharacterPromptEditorPanel`** — panneau d'édition des 7 champs + situation_summary + preview, partagé entre `CharacterEditorTab` et `GameMasterConfigTab`.
+- **Wipe complet par personnage** — `sync-notion` supprime et ré-insère les embeddings uniquement pour le `character_id` concerné, avec préfixe `Personnage: <nom> | Partie i/N`.
+
+### Modifié
+- **Edge function `sync-notion`** — payload réduit à `databases.characters` uniquement. Les bases Storyworld, Gameplay Steps et Video Triggers sont ignorées. Pour chaque page Caractère : upsert `characters`, extraction des 7 propriétés rich_text → `character_prompts`, génération `situation_summary`, wipe + rebuild embeddings du personnage. Réponse enrichie avec `chunks_created`, `summary_chars`, `prompt_fields_filled`.
+- **`maxAgent.ts`** — `buildMaxSystemPrompt` charge `character_prompts` par nom et compose le prompt avec les 7 sections nommées exactes (`## IDENTITÉ FONDAMENTALE`, `## QUI TU ES`, `## CE QUE TU NE FAIS JAMAIS`, `## CE QUE TU SAIS DE L'UTILISATEUR`, `## DYNAMIQUE DE LA CONVERSATION`, `## SUJETS SENSIBLES`, `## PROFONDEUR PAR NIVEAU`). RAG forcé avec `characterId` non-null. `system_prompt` legacy sur `characters` non lu.
+- **`gameMasterAgent.ts` + `gameMasterPRD4.ts`** — system prompt enrichi de `## SITUATION ACTUELLE DU PERSONNAGE (<nom>)`. Avant chaque évaluation : requête RAG scopée `characterId` (2 extraits) injectés dans le user prompt sous `## EXTRAITS NARRATIFS PERTINENTS`.
+- **`ragService.ts`** — `AVA_NOTION_DATABASES` ne garde que `characters`. Retrait des IDs Storyworld, Gameplay Steps, Video Triggers.
+- **Admin — réorganisation des tabs** — 5 groupes : `📊 Données`, `📚 Contenu Notion`, `🎭 Personnages`, `🎮 Mécanique` (Game Master, Validateur, Métriques hallu., Pipeline, Test Max, Latence, Triggers vidéo), `🔧 Technique`.
+- **Filtre anti-section** — `sync-notion` et `CharacterEditorTab` ignorent silencieusement les entrées `Identité & Présentation` et `Game Master` dans la liste des personnages. Max est affiché en premier dans le sélecteur.
+
+### Vérifié
+- `npx tsc --noEmit` : OK.
+- `npm test` : passants.
+- Build Vite : OK.
+
+### Notes
+- Côté Notion, les 7 propriétés `rich_text` doivent exister sur la base *Caractères AVA* et être remplies pour Max. Le corps de page Max contient le récit complet (film + post-film) qui alimente le RAG.
+- Hors scope (prochaine mise à jour) : donner plus de poids au Game Master pour orchestrer les niveaux à partir de `Profondeur par niveau` et déclencher des vidéos entre niveaux.
+
 ## [0.25.0] - 2026-05-24 — Sélecteur STT input multi-providers pour Lovable
 
 Objectif de départ : préparer dans le repo l'ajout d'un sélecteur global de provider STT pour l'input vocal, conformément au PRD *Ajout sélection SST en input*, en gardant Deepgram fonctionnel par défaut, en ajoutant Gamilab comme provider prioritaire via Browser SDK, et en préparant OpenAI Whisper / AssemblyAI sans hardcoder de secrets ni casser le pipeline PRD4.
