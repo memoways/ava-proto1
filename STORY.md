@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-05-24 (session 23 — sélecteur STT input multi-providers pour Lovable : onglet Admin `STT Config`, config globale persistée `ava_stt_settings`, façade `src/services/stt`, Deepgram fallback par défaut, Gamilab préparé via Browser SDK, Whisper/AssemblyAI préparés, edge function de statut sans exposition de secrets)
+> **Last Updated**: 2026-06-09 (session 24 — refonte RAG & prompts : base unique « Caractères AVA », table `character_prompts` avec 7 champs éditoriaux, `situation_summary` GM, isolation stricte par personnage dans les embeddings, admin réorganisé avec éditeur personnage et triggers vidéo dédiés)
 
 ---
 
