@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import VideoTriggersEditor from "@/components/VideoTriggersEditor";
+import CharacterPromptEditorPanel from "@/components/CharacterPromptEditorPanel";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
@@ -333,8 +333,18 @@ export default function GameMasterConfigTab() {
         </div>
       </section>
 
-      {/* ===== TRIGGERS ===== */}
-      <VideoTriggersEditor />
+      {/* ===== GAME MASTER CHARACTER FIELDS (synced from Notion) ===== */}
+      <section className="border rounded-lg p-4 space-y-4">
+        <div>
+          <h3 className="font-semibold text-base mb-1">🎭 Champs éditoriaux du Game Master</h3>
+          <p className="text-xs text-muted-foreground">
+            Champs synchronisés depuis Notion (Base Caractères AVA, personnage « Game Master ») et injectés dans le system prompt
+            du Game Master à chaque tour.
+          </p>
+        </div>
+        <CharacterPromptEditorPanel characterId={null} characterName="Game Master" hideHeader />
+      </section>
+
 
       {/* Config Summary */}
       <section className="border rounded-lg p-4 bg-muted/20">
