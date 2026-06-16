@@ -9,14 +9,8 @@ interface VariantFrameProps {
   children: ReactNode;
 }
 
-/** Bandeau "Game Master" discret pour la variante gm_host. */
-export const GMHostChip = ({ text }: { text?: string }) => (
-  <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs uppercase tracking-wider text-primary">
-    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-    Game Master
-    {text ? <span className="ml-2 normal-case tracking-normal text-foreground/80">— {text}</span> : null}
-  </div>
-);
+/** Conservé pour compat: ne rend plus le chip "Game Master". */
+export const GMHostChip = (_: { text?: string }) => null;
 
 /** Phrase voix-off (texte italique sobre, sans TTS). */
 export const VoiceoverLine = ({ text }: { text?: string }) =>
@@ -26,9 +20,8 @@ export const VoiceoverLine = ({ text }: { text?: string }) =>
     </p>
   ) : null;
 
-const VariantFrame = ({ variant, voiceoverText, gmHostText, children }: VariantFrameProps) => (
+const VariantFrame = ({ variant, voiceoverText, children }: VariantFrameProps) => (
   <div className="flex flex-col items-center">
-    {variant === "gm_host" ? <GMHostChip text={gmHostText} /> : null}
     {variant === "voiceover_hybrid" ? <VoiceoverLine text={voiceoverText} /> : null}
     {children}
   </div>
