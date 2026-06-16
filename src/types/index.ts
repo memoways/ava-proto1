@@ -78,12 +78,20 @@ export interface VideoTrigger {
   title: string;
   type: "intro" | "interlude" | "mid_conversation";
   themes: string[];
-  placeholder_text: string;
+  /** Texte d'attente joué pendant la transition (legacy, optionnel). */
+  placeholder_text?: string;
   priority: number;
   transition_style: string;
+  /** Contexte injecté dans Max après la vidéo pour qu'il puisse y faire référence. */
   post_video_context: string | null;
-  duration_seconds: number;
+  /** Synonyme `Contexte` (Notion). Identique à `post_video_context`. */
+  context?: string | null;
+  /** Description objective de ce qui se passe dans la vidéo (utile au GM pour décider). */
+  description?: string | null;
+  duration_seconds?: number;
   video_url?: string | null;
+  /** ID Notion source (présent si la vidéo provient de la base Vidéos AVA). */
+  notion_id?: string | null;
 }
 
 export interface GameState {

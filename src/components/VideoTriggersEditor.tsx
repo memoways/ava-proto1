@@ -3,46 +3,40 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { Pencil, Save, X, Plus, Trash2, RefreshCw } from "lucide-react";
+import { Pencil, Save, X, RefreshCw, ExternalLink } from "lucide-react";
+import {
+  listVideoTriggers,
+  updateVideoTriggerOnNotion,
+  type VideoTriggerRow,
+  type UpdateVideoTriggerPatch,
+} from "@/services/videoTriggerService";
 
-interface VideoTrigger {
-  id: string;
-  title: string;
-  type: string;
-  themes: string[];
-  video_url: string | null;
-  placeholder_text: string | null;
-  post_video_context: string | null;
-  duration_seconds: number | null;
-  priority: number | null;
-  transition_style: string | null;
-}
+const TYPE_OPTIONS = ["intro", "interlude", "mid_conversation"];
+const TRANSITION_OPTIONS = ["fade_black", "glitch", "screen_share"];
 
 export default function VideoTriggersEditor() {
-  const [triggers, setTriggers] = useState<VideoTrigger[]>([]);
+  const [triggers, setTriggers] = useState<VideoTriggerRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Partial<VideoTrigger>>({});
+  const [draft, setDraft] = useState<Partial<VideoTriggerRow>>({});
   const [newTheme, setNewTheme] = useState("");
 
   const fetchTriggers = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("video_triggers")
-      .select("id, title, type, themes, video_url, placeholder_text, post_video_context, duration_seconds, priority, transition_style")
-      .order("priority", { ascending: true });
-    if (error) {
-      toast.error("Erreur chargement triggers : " + error.message);
-    } else {
-      setTriggers(data ?? []);
+    try {
+      const rows = await listVideoTriggers();
+      setTriggers(rows);
+    } catch (err) {
+      toast.error("Erreur chargement triggers : " + (err as Error).message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => { fetchTriggers(); }, [fetchTriggers]);
 
-  function startEdit(t: VideoTrigger) {
+  function startEdit(t: VideoTriggerRow) {
     setEditingId(t.id);
     setDraft({ ...t });
     setNewTheme("");
@@ -58,9 +52,7 @@ export default function VideoTriggersEditor() {
     const tag = newTheme.trim().toLowerCase();
     if (!tag) return;
     const current = draft.themes ?? [];
-    if (!current.includes(tag)) {
-      setDraft({ ...draft, themes: [...current, tag] });
-    }
+    if (!current.includes(tag)) setDraft({ ...draft, themes: [...current, tag] });
     setNewTheme("");
   }
 
@@ -70,52 +62,31 @@ export default function VideoTriggersEditor() {
 
   async function saveTrigger() {
     if (!editingId || !draft.title?.trim()) return;
-    const { error } = await supabase
-      .from("video_triggers")
-      .update({
+    const row = triggers.find((t) => t.id === editingId);
+    if (!row?.notion_id) {
+      toast.error("Cette ligne n'a pas d'ID Notion — re-synchronise la base d'abord.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const patch: UpdateVideoTriggerPatch = {
         title: draft.title,
-        themes: draft.themes ?? [],
-        video_url: draft.video_url || null,
-        placeholder_text: draft.placeholder_text || null,
-        post_video_context: draft.post_video_context || null,
-        duration_seconds: draft.duration_seconds ?? 10,
+        context: draft.context ?? "",
+        description: draft.description ?? "",
         priority: draft.priority ?? 1,
-        transition_style: draft.transition_style || "fade_black",
-      })
-      .eq("id", editingId);
-    if (error) {
-      toast.error("Erreur sauvegarde : " + error.message);
-    } else {
-      toast.success("Trigger mis à jour ✓");
+        themes: draft.themes ?? [],
+        type: draft.type ?? "interlude",
+        transition_style: draft.transition_style ?? "fade_black",
+        video_url: draft.video_url || null,
+      };
+      await updateVideoTriggerOnNotion(row.notion_id, patch);
+      toast.success("Sauvegardé sur Notion ✓");
       cancelEdit();
-      fetchTriggers();
-    }
-  }
-
-  async function addTrigger() {
-    const { error } = await supabase.from("video_triggers").insert({
-      title: "Nouveau trigger",
-      type: "cinematic",
-      themes: [],
-      priority: (triggers.length + 1),
-    });
-    if (error) {
-      toast.error("Erreur création : " + error.message);
-    } else {
-      toast.success("Trigger créé");
-      fetchTriggers();
-    }
-  }
-
-  async function deleteTrigger(id: string) {
-    if (!confirm("Supprimer ce trigger ?")) return;
-    const { error } = await supabase.from("video_triggers").delete().eq("id", id);
-    if (error) {
-      toast.error("Erreur suppression : " + error.message);
-    } else {
-      toast.success("Trigger supprimé");
-      if (editingId === id) cancelEdit();
-      fetchTriggers();
+      await fetchTriggers();
+    } catch (err) {
+      toast.error("Erreur sauvegarde Notion : " + (err as Error).message);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -127,21 +98,18 @@ export default function VideoTriggersEditor() {
         <div>
           <h3 className="font-semibold text-base mb-1">🎬 Triggers vidéo</h3>
           <p className="text-xs text-muted-foreground">
-            Thématiques de conversation déclenchant des séquences vidéo cinématiques. Éditez les thèmes, URLs et paramètres.
+            Source : base Notion <span className="font-mono">🎬 Vidéos AVA</span>. Le Game Master choisit une vidéo selon les <em>thèmes</em> abordés dans la conversation. Édition d'un champ → <strong>Sauvegarder</strong> pousse la modification sur Notion.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchTriggers}>
-            <RefreshCw className="h-3 w-3 mr-1" /> Refresh
-          </Button>
-          <Button size="sm" onClick={addTrigger}>
-            <Plus className="h-3 w-3 mr-1" /> Ajouter
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={fetchTriggers}>
+          <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+        </Button>
       </div>
 
       {triggers.length === 0 && (
-        <p className="text-sm text-muted-foreground/60 text-center py-4">Aucun trigger vidéo en base.</p>
+        <p className="text-sm text-muted-foreground/60 text-center py-4">
+          Aucune vidéo en base. Lance une sync Notion depuis l'onglet <em>Contenu Notion → Vidéos</em>.
+        </p>
       )}
 
       {triggers.map((t) => {
@@ -157,12 +125,18 @@ export default function VideoTriggersEditor() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Type</label>
-                  <Input value={draft.type ?? "cinematic"} disabled className="opacity-60" />
+                  <select
+                    value={draft.type ?? "interlude"}
+                    onChange={(e) => setDraft({ ...draft, type: e.target.value })}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    {TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Thèmes (mots-clés déclencheurs)</label>
+                <label className="text-xs font-medium text-muted-foreground">Thèmes (déclencheurs pour le Game Master)</label>
                 <div className="flex flex-wrap gap-1 mt-1 mb-2">
                   {(draft.themes ?? []).map((tag) => (
                     <span key={tag} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded flex items-center gap-1">
@@ -187,38 +161,42 @@ export default function VideoTriggersEditor() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">URL vidéo</label>
-                  <Input value={draft.video_url ?? ""} onChange={(e) => setDraft({ ...draft, video_url: e.target.value })} placeholder="https://…" />
+                  <label className="text-xs font-medium text-muted-foreground">URL Gumlet</label>
+                  <Input value={draft.video_url ?? ""} onChange={(e) => setDraft({ ...draft, video_url: e.target.value })} placeholder="https://play.gumlet.io/…" />
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Texte placeholder</label>
-                  <Input value={draft.placeholder_text ?? ""} onChange={(e) => setDraft({ ...draft, placeholder_text: e.target.value })} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Durée (s)</label>
-                  <Input type="number" value={draft.duration_seconds ?? 10} onChange={(e) => setDraft({ ...draft, duration_seconds: Number(e.target.value) })} />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Priorité</label>
-                  <Input type="number" value={draft.priority ?? 1} onChange={(e) => setDraft({ ...draft, priority: Number(e.target.value) })} />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Transition</label>
-                  <Input value={draft.transition_style ?? "fade_black"} onChange={(e) => setDraft({ ...draft, transition_style: e.target.value })} />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Priorité</label>
+                    <Input type="number" value={draft.priority ?? 1} onChange={(e) => setDraft({ ...draft, priority: Number(e.target.value) })} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Transition</label>
+                    <select
+                      value={draft.transition_style ?? "fade_black"}
+                      onChange={(e) => setDraft({ ...draft, transition_style: e.target.value })}
+                      className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                    >
+                      {TRANSITION_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Contexte post-vidéo (injecté dans la conversation)</label>
-                <Textarea value={draft.post_video_context ?? ""} onChange={(e) => setDraft({ ...draft, post_video_context: e.target.value })} className="min-h-[60px] text-sm" />
+                <label className="text-xs font-medium text-muted-foreground">Contexte (injecté dans Max après la vidéo)</label>
+                <Textarea value={draft.context ?? ""} onChange={(e) => setDraft({ ...draft, context: e.target.value })} className="min-h-[60px] text-sm" />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Description (ce qui se passe dans la vidéo, factuel)</label>
+                <Textarea value={draft.description ?? ""} onChange={(e) => setDraft({ ...draft, description: e.target.value })} className="min-h-[80px] text-sm" />
               </div>
 
               <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={cancelEdit}><X className="h-3 w-3 mr-1" /> Annuler</Button>
-                <Button size="sm" onClick={saveTrigger}><Save className="h-3 w-3 mr-1" /> Sauvegarder</Button>
+                <Button variant="outline" size="sm" onClick={cancelEdit} disabled={saving}><X className="h-3 w-3 mr-1" /> Annuler</Button>
+                <Button size="sm" onClick={saveTrigger} disabled={saving}>
+                  <Save className="h-3 w-3 mr-1" /> {saving ? "Sauvegarde…" : "Sauvegarder sur Notion"}
+                </Button>
               </div>
             </div>
           );
@@ -227,15 +205,24 @@ export default function VideoTriggersEditor() {
         return (
           <div key={t.id} className="border rounded-lg p-3 bg-muted/10 group">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-mono text-sm font-semibold">{t.title}</span>
                 <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{t.type}</span>
-                {t.priority && <span className="text-xs text-muted-foreground">P{t.priority}</span>}
+                {t.priority != null && <span className="text-xs text-muted-foreground">P{t.priority}</span>}
+                {t.notion_id && (
+                  <a
+                    href={`https://www.notion.so/${t.notion_id.replace(/-/g, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-muted-foreground/70 hover:text-primary inline-flex items-center gap-0.5"
+                  >
+                    Notion <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
               </div>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="sm" onClick={() => startEdit(t)}><Pencil className="h-3 w-3" /></Button>
-                <Button variant="ghost" size="sm" onClick={() => deleteTrigger(t.id)} className="hover:text-destructive"><Trash2 className="h-3 w-3" /></Button>
-              </div>
+              <Button variant="ghost" size="sm" onClick={() => startEdit(t)}>
+                <Pencil className="h-3 w-3 mr-1" /> Éditer
+              </Button>
             </div>
             <div className="flex flex-wrap gap-1 mt-2">
               {(t.themes ?? []).map((tag) => (
@@ -243,6 +230,8 @@ export default function VideoTriggersEditor() {
               ))}
               {(!t.themes || t.themes.length === 0) && <span className="text-xs text-muted-foreground/50 italic">Aucun thème</span>}
             </div>
+            {t.context && <p className="text-xs text-muted-foreground mt-2"><strong>Contexte :</strong> {t.context}</p>}
+            {t.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2"><strong>Description :</strong> {t.description}</p>}
             {t.video_url && <p className="text-xs text-muted-foreground mt-1 truncate">🔗 {t.video_url}</p>}
           </div>
         );
