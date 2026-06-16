@@ -707,16 +707,7 @@ const IndexPRD4 = () => {
     case "conversation_max":
       return (
         <>
-          <ConversationScreen
-            audioState={state.audioState}
-            userSubtitle={userSubtitle}
-            maxSubtitle={maxSubtitle}
-            conversationLog={state.conversationLog}
-            onPTTPress={handlePTTPress}
-            onPTTRelease={handlePTTRelease}
-            onHangUp={handleHangUp}
-          />
-          {activeVideo?.video_url && (
+          {activeVideo?.video_url ? (
             <GumletVideoPlayer
               videoUrl={activeVideo.video_url}
               onComplete={() => {
@@ -729,6 +720,16 @@ const IndexPRD4 = () => {
                 trackEvent("prd4_video_completed", { session_id: sessionIdRef.current, video_id: activeVideo.id, skipped: true });
                 setActiveVideo(null);
               }}
+            />
+          ) : (
+            <ConversationScreen
+              audioState={state.audioState}
+              userSubtitle={userSubtitle}
+              maxSubtitle={maxSubtitle}
+              conversationLog={state.conversationLog}
+              onPTTPress={handlePTTPress}
+              onPTTRelease={handlePTTRelease}
+              onHangUp={handleHangUp}
             />
           )}
           <LatencyOverlay enabled={latencyOverlayEnabled} segments={latencySegments} currentTurn={latencyCurrentTurn} />
