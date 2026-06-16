@@ -136,6 +136,9 @@ const IndexPRD4 = () => {
 
   useEffect(() => {
     void loadSTTSettingsFromDB();
+    void loadGiffStartSettingsFromDB().then(setGiffSettings).catch((e) =>
+      console.warn("[PRD4] giff settings load failed:", e),
+    );
   }, []);
 
   // ---- Helpers conversation -------------------------------------------------
