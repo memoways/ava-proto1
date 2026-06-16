@@ -247,7 +247,9 @@ export async function processConversationTurn(
 
     let trigger: VideoTrigger | null = null;
     if (gameMasterResponse.trigger_video_id) {
-      trigger = DEMO_TRIGGERS[gameMasterResponse.trigger_video_id] || null;
+      const videos = await getVideoTriggersCached();
+      const row = videos.find((v) => v.id === gameMasterResponse.trigger_video_id);
+      trigger = row ? rowToTrigger(row) : null;
     }
 
     const gm_post_ms = Math.round(performance.now() - gmPostStart);
