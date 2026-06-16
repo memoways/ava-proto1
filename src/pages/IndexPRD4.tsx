@@ -11,7 +11,7 @@ import type { AudioState, ConversationMessage, FilmAnswer } from "@/types";
 import { trackEvent } from "@/services/posthogService";
 import { summarizeRole } from "@/services/roleProfileService";
 import { processPRD4Turn } from "@/services/prd4Orchestrator";
-import { createPRD4Session, endPRD4Session, updatePRD4Conversation } from "@/services/prd4Session";
+import { createPRD4Session, endPRD4Session, updatePRD4Conversation, updatePRD4Onboarding } from "@/services/prd4Session";
 import { createConfiguredSTT, loadSTTSettingsFromDB, type STTSession } from "@/services/stt";
 import { TTSQueue, chunkTextForTTS } from "@/services/elevenLabsTTS";
 import { getLLMSettings } from "@/services/settingsService";
