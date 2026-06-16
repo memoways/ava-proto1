@@ -350,6 +350,11 @@ export interface QuestionnairePRD4Technical {
   max_latency_ms: number | null;
   ptt_errors: number;
   transcript_available: boolean;
+  ava_start_variant?: string | null;
+  has_seen_film?: string | null;
+  user_posture_raw?: string | null;
+  user_posture_mode?: string | null;
+  onboarding_duration_ms?: number | null;
 }
 
 export interface QuestionnairePRD4Data {
