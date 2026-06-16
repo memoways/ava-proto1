@@ -669,6 +669,9 @@ const IndexPRD4 = () => {
     conversationRef.current = [];
     turnLatenciesRef.current = [];
     sessionDurationRef.current = 0;
+    triggeredVideoIdsRef.current = [];
+    pendingPostVideoContextRef.current = null;
+    setActiveVideo(null);
     endedRef.current = false;
   }, [reset]);
 
