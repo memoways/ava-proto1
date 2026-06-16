@@ -369,6 +369,10 @@ export default function Admin() {
           </TabsContent>
 
           {/* ==================== EMBEDDINGS ==================== */}
+          <TabsContent value="videos">
+            <VideosListTab />
+          </TabsContent>
+
           <TabsContent value="embeddings">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
