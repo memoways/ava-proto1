@@ -39,6 +39,9 @@ import {
 import WelcomeScreen from "@/components/prd4/WelcomeScreen";
 import FilmQuestionScreen from "@/components/prd4/FilmQuestionScreen";
 import TeaserScreen from "@/components/prd4/TeaserScreen";
+import TeaserRappelScreen from "@/components/prd4/TeaserRappelScreen";
+import PostureCaptureScreen from "@/components/prd4/PostureCaptureScreen";
+import TransitionScreen from "@/components/prd4/TransitionScreen";
 import RoleCaptureScreen from "@/components/prd4/RoleCaptureScreen";
 import RoleSummaryScreen from "@/components/prd4/RoleSummaryScreen";
 import CharacterSelectScreen from "@/components/prd4/CharacterSelectScreen";
@@ -50,7 +53,13 @@ import ThanksScreen from "@/components/ThanksScreen";
 import GumletVideoPlayer from "@/components/GumletVideoPlayer";
 import { savePRD4Questionnaire, syncPRD4QuestionnaireToNotion } from "@/services/prd4Questionnaire";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
-import type { QuestionnairePRD4Answers, QuestionnairePRD4Data } from "@/types";
+import {
+  GIFF_START_DEFAULTS,
+  loadGiffStartSettingsFromDB,
+  type GiffStartSettings,
+} from "@/services/giffStartSettings";
+import { createPRD4Session as _createPRD4Session, updatePRD4Onboarding } from "@/services/prd4Session";
+import type { QuestionnairePRD4Answers, QuestionnairePRD4Data, UserPosture } from "@/types";
 
 const SESSION_DURATION_S = 5 * 60; // PRD4 §11 : ~5 min cible.
 
