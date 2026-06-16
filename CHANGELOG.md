@@ -24,10 +24,14 @@ Objectif : connecter la base Notion **« 🎬 Vidéos AVA »** au back-office, t
 - **`AVA_NOTION_DATABASES`** — ajout de `videos: '478685a5b31e45b5bc534bcf905b9124'`. Le bouton « Sync Notion » envoie maintenant `characters + videos` en un seul appel.
 - **Type `VideoTrigger`** — `placeholder_text` et `duration_seconds` deviennent optionnels ; ajout de `context`, `description`, `notion_id`.
 
+### Corrigé
+- **Bug STT — input vocal ignoré les premiers essais** (`deepgramSTT.ts`, `settings.json`, `ConversationScreen` legacy + PRD4) : ajustement du seuil de silence et de la logique de détection VAD pour éviter que la parole utilisateur ne nécessite 3–4 tentatives avant d'être prise en compte.
+- **Bug 400 `databases.characters is required` sur `sync-notion`** : la version déployée de l'edge function était obsolète (pré-refactor `databases.videos`). Redéploiement forcé de `sync-notion` et `update-notion-video` pour synchroniser le code source avec l'environnement live.
+
 ### Vérifié
 - Migration appliquée (colonnes `context`, `description` + purge des lignes sans `notion_id`).
 - Edge functions `sync-notion` et `update-notion-video` déployées.
-
+- Sync Notion Vidéos (back-office → Notion) fonctionnel après redeploy.
 
 
 ## [0.26.0] - 2026-06-09 — Refonte RAG & prompts : base unique « Caractères AVA »

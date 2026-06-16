@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-06-09 (session 24 — refonte RAG & prompts : base unique « Caractères AVA », table `character_prompts` avec 7 champs éditoriaux, `situation_summary` GM, isolation stricte par personnage dans les embeddings, admin réorganisé avec éditeur personnage et triggers vidéo dédiés)
+> **Last Updated**: 2026-06-16 (session 25 — triggers vidéo Notion + cinématiques pilotées par le Game Master, sync bidirectionnelle Notion ↔ Supabase, corrections bug STT et redeploy edge functions)
 
 ---
 
@@ -64,6 +64,33 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-06-16 — Triggers vidéo Notion + cinématiques pilotées par le Game Master 🔷
+
+**Intent**: Les vidéos AVA (film, teasers, interludes) vivaient dans une base Notion séparée, mais le prototype ne les exploitait pas dynamiquement. Le tab *Triggers vidéo* de l'admin contenait des données fake et n'avait aucun lien avec Notion. Le Game Master, bien qu'architecturé pour déclencher des événements cinématiques, ne choisissait jamais réellement de vidéo. Le besoin : connecter la base **« 🎬 Vidéos AVA »** au back-office, en faire la source de vérité éditoriale, et donner au Game Master la capacité d'intercaler une vidéo plein écran quand la thématique de la discussion recoupe celle d'un clip disponible.
+
+**Tool**: Codex
+
+**Outcome**:
+1. **Sync bidirectionnelle Notion ↔ Supabase** — la base Notion « Vidéos AVA » (`478685a5b31e45b5bc534bcf905b9124`) est synchronisée via `sync-notion` (upsert dans `video_triggers` avec mapping complet des propriétés : titre, contexte, description, priorité, thèmes, type, style de transition, URL Gumlet). Les anciens triggers fakes sont purgés. L'edge function `update-notion-video` permet de PATCH une page Notion depuis l'admin et de miroir la modification dans Supabase.
+2. **Admin réorganisé** — nouveau tab `Contenu Notion > Vidéos` avec liste épurée (titre + chips thèmes + lien Notion) et bouton « Sync Notion ». Le tab `Mécanique > Triggers vidéo` devient un éditeur en lecture/écriture vers Notion : plus de boutons *Ajouter*/*Supprimer*, champ *Description* ajouté, labels renommés selon la nomenclature Notion.
+3. **Game Master enrichi de vidéos disponibles** — les Game Masters (legacy et PRD4) reçoivent désormais la liste des vidéos disponibles avec leurs thèmes, priorité et statut `already_triggered`. Ils évaluent la thématique de la discussion et choisissent éventuellement un `trigger_video_id`.
+4. **Lecture vidéo intercalée en conversation PRD4** — après le TTS de Max, si le GM a choisi une vidéo, `GumletVideoPlayer` monte en overlay plein écran sur `ConversationScreen`. L'utilisateur peut skip. À la fin, le `Contexte` Notion de la vidéo est injecté dans l'historique comme note système (`postVideoContext`) pour que Max reprenne la discussion en tenant compte du contenu visionné.
+5. **Corrections immédiates** — bug STT où l'input vocal nécessitait 3–4 essais avant d'être pris en compte (ajustement seuil VAD/silence). Bug 400 `databases.characters is required` sur `sync-notion` corrigé par redéploiement forcé des edge functions.
+
+**Ce que ça change** : le prototype passe d'une conversation purement texte/voice à une expérience **hybride conversation-cinéma**. Le Game Master orchestre non seulement le fil narratif et la confiance, mais aussi le rythme cinématique : quand l'utilisateur aborde un sujet lié à une vidéo disponible (flashback, révélation, ambiance), le système coupe Max, joue le clip, puis revient à Max qui commente naturellement ce qui vient d'être vu. Côté éditorial, toute la vidéothèque est pilotable depuis Notion : ajouter une vidéo, changer ses thèmes ou son contexte, et voir le résultat reflété dans le back-office et le Game Master en temps réel après sync.
+
+**Validation**:
+- Migration DB appliquée (`context`, `description` sur `video_triggers` + purge fakes).
+- Edge functions `sync-notion` et `update-notion-video` déployées et fonctionnelles.
+- Admin → Contenu Notion → Vidéos : sync réussi, liste affichée.
+- Admin → Mécanique → Triggers vidéo : édition d'une description sauvegardée vers Notion et reflétée dans Supabase.
+- `npx tsc --noEmit` : OK.
+- Build Vite : OK.
+
+**Time**: ~2h30 (plan architecture → migration DB → edge functions → services/agents → composants admin → branchement PRD4 → corrections bugs → documentation).
+
+---
 
 ### 2026-06-09 — Refonte RAG & prompts : base unique « Caractères AVA » 🔷
 
