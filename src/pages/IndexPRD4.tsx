@@ -168,17 +168,58 @@ const IndexPRD4 = () => {
 
 
   // ---- Welcome / Film / Teaser ----------------------------------------------
-  const handleStart = useCallback(() => setPhase("film_question"), [setPhase]);
+  const handleStart = useCallback(() => {
+    onboardingStartedAtRef.current = Date.now();
+    firstMaxResponseAtRef.current = null;
+    trackEvent("giff_onboarding_started", {
+      variant: giffSettingsRef.current.active_start_variant,
+      use_giff_flow: giffSettingsRef.current.use_giff_flow,
+    });
+    setPhase("film_question");
+  }, [setPhase]);
   const handleFilmAnswer = useCallback(
     (a: FilmAnswer) => {
       setFilmAnswer(a);
-      // "pas_vu" et "rappel" → vidéo teaser ; "vu" → role_capture direct
-      setPhase(a === "vu" ? "role_capture" : "teaser");
+      trackEvent("giff_film_answered", { answer: a });
+      const useGiff = giffSettingsRef.current.use_giff_flow;
+      if (a === "vu") {
+        setPhase(useGiff ? "posture_capture" : "role_capture");
+      } else {
+        setPhase("teaser");
+      }
     },
     [setFilmAnswer, setPhase],
   );
-  const handleTeaserContinue = useCallback(() => { markTeaserSeen(false); setPhase("role_capture"); }, [markTeaserSeen, setPhase]);
-  const handleTeaserSkip = useCallback(() => { markTeaserSeen(true); setPhase("role_capture"); }, [markTeaserSeen, setPhase]);
+  const handleTeaserContinue = useCallback(() => {
+    markTeaserSeen(false);
+    setPhase(giffSettingsRef.current.use_giff_flow ? "posture_capture" : "role_capture");
+  }, [markTeaserSeen, setPhase]);
+  const handleTeaserSkip = useCallback(() => {
+    markTeaserSeen(true);
+    setPhase(giffSettingsRef.current.use_giff_flow ? "posture_capture" : "role_capture");
+  }, [markTeaserSeen, setPhase]);
+
+  // ---- Posture capture (GIFF) ----------------------------------------------
+  const handlePostureSubmit = useCallback(
+    (raw: string) => {
+      setUserPosture({ raw, mode: "voice" });
+      trackEvent("giff_posture_captured", { mode: "voice", length: raw.length });
+      setPhase("transition_max");
+    },
+    [setUserPosture, setPhase],
+  );
+  const handlePostureSurprise = useCallback(() => {
+    setUserPosture({ raw: "", mode: "surprise" });
+    trackEvent("giff_posture_captured", { mode: "surprise", length: 0 });
+    setPhase("transition_max");
+  }, [setUserPosture, setPhase]);
+  const handlePosturePTTError = useCallback(
+    (err: Error) => {
+      incrementPttError();
+      trackEvent("prd4_ptt_error", { phase: "posture_capture", message: err.message });
+    },
+    [incrementPttError],
+  );
 
   // ---- Role capture → summarize-role (LLM) ----------------------------------
   const handleRoleSubmit = useCallback(
