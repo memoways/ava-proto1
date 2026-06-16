@@ -788,11 +788,26 @@ const IndexPRD4 = () => {
   // ---- Render ---------------------------------------------------------------
   switch (state.phase) {
     case "welcome":
-      return <WelcomeScreen onStart={handleStart} />;
+      return <WelcomeScreen onStart={handleStart} settings={giffSettings} />;
     case "film_question":
-      return <FilmQuestionScreen onAnswer={handleFilmAnswer} />;
+      return <FilmQuestionScreen onAnswer={handleFilmAnswer} settings={giffSettings} />;
     case "teaser":
-      return <TeaserScreen onContinue={handleTeaserContinue} onSkip={handleTeaserSkip} />;
+      return giffSettings.use_giff_flow ? (
+        <TeaserRappelScreen settings={giffSettings} onContinue={handleTeaserContinue} />
+      ) : (
+        <TeaserScreen onContinue={handleTeaserContinue} onSkip={handleTeaserSkip} />
+      );
+    case "posture_capture":
+      return (
+        <PostureCaptureScreen
+          settings={giffSettings}
+          onSubmit={handlePostureSubmit}
+          onSurprise={handlePostureSurprise}
+          onPTTError={handlePosturePTTError}
+        />
+      );
+    case "transition_max":
+      return <TransitionScreen onContinue={handleAnswered} />;
     case "role_capture":
       return (
         <RoleCaptureScreen
