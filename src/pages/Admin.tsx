@@ -25,6 +25,7 @@ import SessionsTab, { type SessionRow } from "@/components/admin/SessionsTab";
 import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
 import LLMUsageTab from "@/components/admin/LLMUsageTab";
 import VoiceUsageTab from "@/components/admin/VoiceUsageTab";
+import VideosListTab from "@/components/admin/VideosListTab";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -43,6 +44,7 @@ const TAB_GROUPS = [
     label: "📚 Contenu Notion",
     tabs: [
       { id: "sync", label: "Sync Notion" },
+      { id: "videos", label: "Vidéos" },
       { id: "embeddings", label: "Embeddings" },
       { id: "rag", label: "RAG Test" },
     ],
@@ -236,7 +238,10 @@ export default function Admin() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          databases: { characters: AVA_NOTION_DATABASES.characters },
+          databases: {
+            characters: AVA_NOTION_DATABASES.characters,
+            videos: AVA_NOTION_DATABASES.videos,
+          },
           wipe_all: !!opts.wipeAll,
         }),
         signal: controller.signal,
@@ -367,6 +372,10 @@ export default function Admin() {
           </TabsContent>
 
           {/* ==================== EMBEDDINGS ==================== */}
+          <TabsContent value="videos">
+            <VideosListTab />
+          </TabsContent>
+
           <TabsContent value="embeddings">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>

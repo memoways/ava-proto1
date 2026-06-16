@@ -4,6 +4,32 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.27.0] - 2026-06-16 — Triggers vidéo Notion + cinématiques pilotées par le Game Master
+
+Objectif : connecter la base Notion **« 🎬 Vidéos AVA »** au back-office, transformer le tab *Triggers vidéo* en éditeur bidirectionnel Notion ↔ Supabase, et faire en sorte que le **Game Master déclenche réellement des vidéos** intercalées dans la conversation avec Max (PRD4 + legacy), en fonction de la thématique de l'échange.
+
+### Ajouté
+- **Sync base « Vidéos AVA »** (`databases.videos` dans `sync-notion`) — upsert dans `video_triggers` mappé sur les propriétés Notion : `Titre de la vidéo`, `Contexte`, `Description`, `Priorité`, `Thèmes`, `Type`, `Style de transition`, `URL Gumlet`. Prune des lignes dont la page Notion a disparu, et purge des anciens triggers fakes (sans `notion_id`).
+- **Edge function `update-notion-video`** — PATCH la page Notion (rich_text, multi_select, select, number, url, title) et miroir la modification dans Supabase. Messages d'erreur explicites en cas de 403/404 (intégration non partagée).
+- **Service `videoTriggerService.ts`** — `listVideoTriggers`, `updateVideoTriggerOnNotion`, cache 30 s `getVideoTriggersCached` utilisé par les Game Masters pour décider d'un déclenchement vidéo.
+- **Admin — onglet `Contenu Notion > Vidéos`** — liste épurée (titre + chips thèmes + lien Notion) avec bouton « Sync Notion ».
+- **Colonnes `context` et `description`** sur `video_triggers` (migration `ALTER TABLE`).
+- **Champ `trigger_video_id`** dans `PRD4PostTurnEvaluation` — le Game Master PRD4 reçoit la liste des vidéos disponibles + `already_triggered` et choisit éventuellement un id à jouer.
+- **Lecture vidéo en plein écran pendant la conversation PRD4** — `GumletVideoPlayer` monté en overlay sur `ConversationScreen` quand le GM trigge une vidéo après le TTS de Max. À la fin (ou skip), le `Contexte` Notion est injecté dans Max au tour suivant via `postVideoContext`.
+
+### Modifié
+- **`VideoTriggersEditor`** — suppression des boutons *Ajouter* et *Supprimer* (la source de vérité est Notion). Ajout du champ **Description**. Renommage des labels (`Contexte`, `URL Gumlet`, `Style de transition`). « Sauvegarder » pousse vers Notion via `update-notion-video` puis re-synchronise la ligne.
+- **`gameMasterAgent.ts`** (legacy) — injecte le bloc `## VIDÉOS DISPONIBLES` (id, titre, type, priorité, thèmes, description, `already_triggered`) dans le user prompt du GM.
+- **`conversationOrchestrator.ts`** (legacy) — suppression du dict `DEMO_TRIGGERS`. Le mapping `trigger_video_id → VideoTrigger` se fait désormais à partir de `getVideoTriggersCached()`.
+- **`AVA_NOTION_DATABASES`** — ajout de `videos: '478685a5b31e45b5bc534bcf905b9124'`. Le bouton « Sync Notion » envoie maintenant `characters + videos` en un seul appel.
+- **Type `VideoTrigger`** — `placeholder_text` et `duration_seconds` deviennent optionnels ; ajout de `context`, `description`, `notion_id`.
+
+### Vérifié
+- Migration appliquée (colonnes `context`, `description` + purge des lignes sans `notion_id`).
+- Edge functions `sync-notion` et `update-notion-video` déployées.
+
+
+
 ## [0.26.0] - 2026-06-09 — Refonte RAG & prompts : base unique « Caractères AVA »
 
 Objectif de départ : recentrer toute la mémoire narrative et le cadrage éditorial des personnages sur **une seule base Notion** — la *Base Caractères AVA* — et abandonner les bases Storyworld AVA, Gameplay Steps et Video Triggers. La page Notion de chaque personnage devient la source unique du récit (RAG) et du cadrage éditorial (system prompt structuré en 7 champs), avec isolation stricte par personnage dans les embeddings et un résumé de situation généré pour le Game Master.

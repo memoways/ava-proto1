@@ -2,12 +2,14 @@
  * PRD4 — Évaluateur post-tour du Game Master.
  *
  * Appelé en void après chaque réponse de Max (n'est jamais sur le chemin
- * critique du TTS). Retourne le schéma PRD4 §10.3 et persiste l'entrée dans
- * `sessions.gm_post_turn_log` (jsonb append-only).
+ * critique du TTS). Retourne le schéma PRD4 §10.3 + un éventuel `trigger_video_id`
+ * choisi parmi les vidéos disponibles (table `video_triggers`).
+ * Persiste l'entrée dans `sessions.gm_post_turn_log` (jsonb append-only).
  */
 import { callLLMWithUsage } from "@/services/openRouterLLM";
 import { supabase } from "@/integrations/supabase/client";
 import { getLLMSettings } from "@/services/settingsService";
+import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import type { ConversationMessage, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 
 export interface PRD4PostTurnInput {
@@ -18,6 +20,8 @@ export interface PRD4PostTurnInput {
   userRole: UserRoleProfile | null;
   turnIndex: number;
   timeElapsedSeconds: number;
+  /** IDs de triggers vidéo déjà joués (évite de rejouer). */
+  triggeredVideoIds?: string[];
 }
 
 const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
@@ -31,6 +35,7 @@ const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
   end_recommended: false,
   moderation_flag: false,
   notes: "Évaluation par défaut (LLM indisponible).",
+  trigger_video_id: null,
 };
 
 const GM_POST_TURN_TIMEOUT_MS = 6000;
@@ -48,12 +53,20 @@ Tu retournes EXACTEMENT cet objet :
   "next_turn_guidance": string,     // 1 phrase concise pour guider Max au prochain tour
   "end_recommended": boolean,       // true si la session a atteint un point naturel de fin
   "moderation_flag": boolean,       // true si contenu problématique
-  "notes": string                   // 1 phrase courte de raison
+  "notes": string,                  // 1 phrase courte de raison
+  "trigger_video_id": string | null // ID d'une vidéo à jouer ; voir bloc VIDÉOS DISPONIBLES
 }
 
-Règles :
-- "end_recommended" = true seulement si la conversation a vraiment trouvé une clôture naturelle, ou si elle est en train d'échouer (hors-sujet répété, abandon). Sois conservateur — la session dure ~5 minutes max et sera coupée par le timer si besoin.
-- Pas de markdown, pas de \`\`\`, pas de commentaire. Uniquement l'objet JSON.`;
+Règles "trigger_video_id" :
+- Renseigne UNIQUEMENT un id présent dans la liste VIDÉOS DISPONIBLES.
+- Choisis une vidéo dont au moins un \`themes\` recoupe sémantiquement les sujets de l'échange courant.
+- Si plusieurs matchs : prends la plus grande priorité (number le plus petit = plus prioritaire).
+- N'utilise JAMAIS un id présent dans \`already_triggered\`.
+- Sois conservateur : si aucun match évident, retourne null. On préfère 0 vidéo qu'une vidéo hors-sujet.
+
+Règles "end_recommended" : true seulement si la conversation a vraiment trouvé une clôture naturelle, ou si elle est en train d'échouer. Sois conservateur — la session dure ~5 min max.
+
+Pas de markdown, pas de \`\`\`, pas de commentaire. Uniquement l'objet JSON.`;
 
 function extractJson(text: string): unknown {
   const trimmed = text.trim().replace(/^```json\s*|```$/g, "").trim();
@@ -70,16 +83,29 @@ function extractJson(text: string): unknown {
   }
 }
 
-function buildUserPrompt(input: PRD4PostTurnInput): string {
+function buildUserPrompt(input: PRD4PostTurnInput, videos: VideoTriggerRow[]): string {
   const recent = input.conversationHistory.slice(-6).map((m) =>
     `${m.role === "user" ? "UTILISATEUR" : "MAX"}: ${m.content}`
   ).join("\n");
+
+  const triggered = input.triggeredVideoIds ?? [];
+  const videoLines = videos.length
+    ? videos
+        .map((v) => `- id=${v.id} | titre="${v.title}" | type=${v.type} | priorité=${v.priority ?? "?"} | thèmes=[${(v.themes ?? []).join(", ") || "—"}]${v.description ? ` | description="${v.description.slice(0, 160)}"` : ""}`)
+        .join("\n")
+    : "(aucune)";
 
   return `## PROFIL JOUEUR
 ${input.userRole?.summary_for_max || "(profil indisponible)"}
 
 ## TEMPS ÉCOULÉ
 ${Math.floor(input.timeElapsedSeconds / 60)}min ${input.timeElapsedSeconds % 60}s sur ~5 min cible — tour #${input.turnIndex}
+
+## VIDÉOS DISPONIBLES
+${videoLines}
+
+## already_triggered
+${triggered.length ? triggered.join(", ") : "(aucune)"}
 
 ## HISTORIQUE RÉCENT
 ${recent || "(aucun)"}
@@ -88,12 +114,11 @@ ${recent || "(aucun)"}
 UTILISATEUR: ${input.userMessage}
 MAX: ${input.maxResponse}
 
-Retourne l'évaluation JSON.`;
+Retourne l'évaluation JSON (inclure trigger_video_id si une vidéo est pertinente).`;
 }
 
 /**
  * Évalue le tour qui vient de se jouer. Toujours résout (jamais throw).
- * Persiste dans `sessions.gm_post_turn_log` si sessionId fourni.
  */
 export async function evaluatePostTurnPRD4(
   input: PRD4PostTurnInput,
@@ -101,13 +126,16 @@ export async function evaluatePostTurnPRD4(
   const startedAt = performance.now();
   let result: PRD4PostTurnEvaluation;
   let model = "";
+  const videos = await getVideoTriggersCached();
+  const validIds = new Set(videos.map((v) => v.id));
+  const triggered = new Set(input.triggeredVideoIds ?? []);
   try {
     const llm = getLLMSettings();
     model = llm.LLM_MODEL_GM;
     const callRes = await callLLMWithUsage(
       [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: buildUserPrompt(input) },
+        { role: "user", content: buildUserPrompt(input, videos) },
       ],
       {
         model: llm.LLM_MODEL_GM,
@@ -123,6 +151,8 @@ export async function evaluatePostTurnPRD4(
       console.warn("[GM-PRD4] no JSON in response:", callRes.content.slice(0, 200));
       result = { ...DEFAULT_RESULT, notes: "Réponse LLM non parsable (fallback)." };
     } else {
+      const rawTrigger = parsed.trigger_video_id ? String(parsed.trigger_video_id) : null;
+      const safeTrigger = rawTrigger && validIds.has(rawTrigger) && !triggered.has(rawTrigger) ? rawTrigger : null;
       result = {
         engagement_delta: Number(parsed.engagement_delta ?? 0),
         confusion_detected: Boolean(parsed.confusion_detected),
@@ -134,6 +164,7 @@ export async function evaluatePostTurnPRD4(
         end_recommended: Boolean(parsed.end_recommended),
         moderation_flag: Boolean(parsed.moderation_flag),
         notes: String(parsed.notes || ""),
+        trigger_video_id: safeTrigger,
       };
     }
     model = callRes.model || model;
@@ -150,7 +181,6 @@ export async function evaluatePostTurnPRD4(
     created_at: new Date().toISOString(),
   };
 
-  // Persist append-only — best effort, never blocks.
   if (input.sessionId) {
     void appendToGmPostTurnLog(input.sessionId, enriched).catch((err) => {
       console.warn("[GM-PRD4] persist failed:", err);
@@ -161,8 +191,6 @@ export async function evaluatePostTurnPRD4(
 }
 
 async function appendToGmPostTurnLog(sessionId: string, entry: PRD4PostTurnEvaluation): Promise<void> {
-  // Lecture-modification-écriture : pas d'append SQL atomique côté client.
-  // Pour ~25 tours max c'est acceptable, et les écritures sont séquentielles par session.
   const { data, error } = await supabase
     .from("sessions")
     .select("gm_post_turn_log")

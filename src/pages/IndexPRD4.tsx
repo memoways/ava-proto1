@@ -47,7 +47,9 @@ import ConversationScreen from "@/components/prd4/ConversationScreen";
 import EndSessionScreen from "@/components/prd4/EndSessionScreen";
 import QuestionnaireScreenPRD4 from "@/components/prd4/QuestionnaireScreenPRD4";
 import ThanksScreen from "@/components/ThanksScreen";
+import GumletVideoPlayer from "@/components/GumletVideoPlayer";
 import { savePRD4Questionnaire, syncPRD4QuestionnaireToNotion } from "@/services/prd4Questionnaire";
+import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import type { QuestionnairePRD4Answers, QuestionnairePRD4Data } from "@/types";
 
 const SESSION_DURATION_S = 5 * 60; // PRD4 §11 : ~5 min cible.
@@ -92,7 +94,10 @@ const IndexPRD4 = () => {
   userRoleRef.current = state.userRoleProfile;
   const turnLatenciesRef = useRef<number[]>([]);
   const sessionDurationRef = useRef<number>(0);
+  const triggeredVideoIdsRef = useRef<string[]>([]);
+  const pendingPostVideoContextRef = useRef<string | null>(null);
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
+  const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
 
 
   // Timer 5 minutes — démarré quand on entre en conversation, fin auto à 0.
@@ -199,6 +204,9 @@ const IndexPRD4 = () => {
     conversationRef.current = [];
     turnLatenciesRef.current = [];
     sessionDurationRef.current = 0;
+    triggeredVideoIdsRef.current = [];
+    pendingPostVideoContextRef.current = null;
+    setActiveVideo(null);
 
 
     // Crée la session DB
@@ -295,6 +303,8 @@ const IndexPRD4 = () => {
         : undefined;
 
       try {
+        const postVideoContext = pendingPostVideoContextRef.current ?? undefined;
+        pendingPostVideoContextRef.current = null;
         const result = await processPRD4Turn({
           sessionId: sessionIdRef.current,
           conversationHistory: conversationRef.current.slice(0, -1),
@@ -302,6 +312,8 @@ const IndexPRD4 = () => {
           userRole: userRoleRef.current,
           timeElapsedSeconds: elapsed,
           characterName: "Max",
+          triggeredVideoIds: triggeredVideoIdsRef.current,
+          postVideoContext,
           onLatencySegment: handleLatencySegment,
         });
 
@@ -420,15 +432,29 @@ const IndexPRD4 = () => {
           void updatePRD4Conversation(sessionIdRef.current, conversationRef.current);
         }
 
-        // GM post-turn : vérifie end_recommended sans bloquer
-        void result.postTurnPromise.then((ev) => {
+        // GM post-turn : vérifie end_recommended + trigger vidéo sans bloquer
+        void result.postTurnPromise.then(async (ev) => {
           trackEvent("prd4_gm_post_turn", {
             session_id: sessionIdRef.current,
             turn_index: ev.turn_index,
             engagement_delta: ev.engagement_delta,
             end_recommended: ev.end_recommended,
+            trigger_video_id: ev.trigger_video_id ?? null,
             latency_ms: ev.latency_ms,
           });
+          if (ev.trigger_video_id && !triggeredVideoIdsRef.current.includes(ev.trigger_video_id)) {
+            try {
+              const videos = await getVideoTriggersCached();
+              const row = videos.find((v) => v.id === ev.trigger_video_id) || null;
+              if (row?.video_url) {
+                triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, row.id];
+                trackEvent("prd4_video_triggered", { session_id: sessionIdRef.current, video_id: row.id, title: row.title });
+                setActiveVideo(row);
+              }
+            } catch (err) {
+              console.warn("[PRD4] video trigger failed:", err);
+            }
+          }
           if (ev.end_recommended && !endedRef.current) {
             endedRef.current = true;
             void finalizeAndEnd("gm_end_recommended");
@@ -643,6 +669,9 @@ const IndexPRD4 = () => {
     conversationRef.current = [];
     turnLatenciesRef.current = [];
     sessionDurationRef.current = 0;
+    triggeredVideoIdsRef.current = [];
+    pendingPostVideoContextRef.current = null;
+    setActiveVideo(null);
     endedRef.current = false;
   }, [reset]);
 
@@ -678,15 +707,31 @@ const IndexPRD4 = () => {
     case "conversation_max":
       return (
         <>
-          <ConversationScreen
-            audioState={state.audioState}
-            userSubtitle={userSubtitle}
-            maxSubtitle={maxSubtitle}
-            conversationLog={state.conversationLog}
-            onPTTPress={handlePTTPress}
-            onPTTRelease={handlePTTRelease}
-            onHangUp={handleHangUp}
-          />
+          {activeVideo?.video_url ? (
+            <GumletVideoPlayer
+              videoUrl={activeVideo.video_url}
+              onComplete={() => {
+                pendingPostVideoContextRef.current = activeVideo.context || activeVideo.post_video_context || null;
+                trackEvent("prd4_video_completed", { session_id: sessionIdRef.current, video_id: activeVideo.id, skipped: false });
+                setActiveVideo(null);
+              }}
+              onSkip={() => {
+                pendingPostVideoContextRef.current = activeVideo.context || activeVideo.post_video_context || null;
+                trackEvent("prd4_video_completed", { session_id: sessionIdRef.current, video_id: activeVideo.id, skipped: true });
+                setActiveVideo(null);
+              }}
+            />
+          ) : (
+            <ConversationScreen
+              audioState={state.audioState}
+              userSubtitle={userSubtitle}
+              maxSubtitle={maxSubtitle}
+              conversationLog={state.conversationLog}
+              onPTTPress={handlePTTPress}
+              onPTTRelease={handlePTTRelease}
+              onHangUp={handleHangUp}
+            />
+          )}
           <LatencyOverlay enabled={latencyOverlayEnabled} segments={latencySegments} currentTurn={latencyCurrentTurn} />
         </>
       );

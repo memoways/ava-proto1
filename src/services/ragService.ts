@@ -200,9 +200,12 @@ export function buildKnowledgeContextFromRAG(matches: RAGMatch[]): MaxTurnKnowle
   };
 }
 
-// Default Notion database IDs for AVA project — only Caractères AVA is synced now.
+// Default Notion database IDs for AVA project.
+// - characters: Base Caractères AVA (personnages éditoriaux + RAG)
+// - videos: Base "🎬 Vidéos AVA" (triggers vidéo joués par le Game Master)
 export const AVA_NOTION_DATABASES = {
   characters: '30362322e59580bbb7b8dd49d516b341',
+  videos: '478685a5b31e45b5bc534bcf905b9124',
 };
 
 /**

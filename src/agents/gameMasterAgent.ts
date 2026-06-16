@@ -4,6 +4,7 @@ import type { ConversationMessage, GameMasterResponse, GameMasterTurnBrief, MaxT
 import { getLLMSettings, getGMPromptSettings, getGameplaySettings } from "@/services/settingsService";
 import { loadCharacterPromptByName } from "@/services/characterPromptService";
 import { queryRAG } from "@/services/ragService";
+import { getVideoTriggersCached } from "@/services/videoTriggerService";
 
 // System prompt is now loaded from settings (editable in admin)
 function getGameMasterSystemPrompt(): string {
@@ -95,9 +96,18 @@ export async function callGameMaster(input: GameMasterInput): Promise<GameMaster
   const { system: charBlock, characterId } = await getCharacterContextBlock(input.characterName);
   const ragExtracts = await getCharacterRagExtracts(characterId, input.userMessage, contextMessage.slice(0, 600));
 
+  // Inject available video triggers from Supabase (synced from Notion "Vidéos AVA").
+  const videos = await getVideoTriggersCached();
+  const triggeredSet = new Set(input.triggeredIds || []);
+  const videoBlock = videos.length
+    ? `\n\n## VIDÉOS DISPONIBLES\n${videos
+        .map((v) => `- id=${v.id} | titre="${v.title}" | type=${v.type} | priorité=${v.priority ?? "?"} | thèmes=[${(v.themes ?? []).join(", ") || "—"}]${v.description ? ` | description="${v.description.slice(0, 160)}"` : ""}`)
+        .join("\n")}\n## already_triggered\n${[...triggeredSet].join(", ") || "(aucune)"}\n\nSi un thème de la conversation recoupe les \`thèmes\` d'une vidéo non encore jouée, retourne son id dans \`trigger_video_id\`.`
+    : "";
+
   const messages: Array<{ role: "system" | "user"; content: string }> = [
     { role: "system", content: getGameMasterSystemPrompt() + charBlock },
-    { role: "user", content: contextMessage + ragExtracts },
+    { role: "user", content: contextMessage + ragExtracts + videoBlock },
   ];
 
   try {

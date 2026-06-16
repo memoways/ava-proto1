@@ -17,7 +17,7 @@ interface NotionPage {
 }
 
 interface SyncRequest {
-  databases?: { characters?: string };
+  databases?: { characters?: string; videos?: string };
   /** When true, delete ALL embeddings before re-inserting. */
   wipe_all?: boolean;
   /** Optional: only sync this single character by Notion page ID. */
@@ -36,9 +36,18 @@ function extractTitle(prop: any): string {
 function extractSelect(prop: any): string | null {
   return prop?.select?.name || null;
 }
+function extractMultiSelect(prop: any): string[] {
+  if (!prop?.multi_select) return [];
+  return prop.multi_select.map((o: any) => o.name).filter(Boolean);
+}
+function extractNumber(prop: any): number | null {
+  return typeof prop?.number === "number" ? prop.number : null;
+}
+function extractUrl(prop: any): string | null {
+  return prop?.url || null;
+}
 
 // ---- Property name mapping (Notion → DB column) ----
-// We accept multiple aliases so the customer can keep their preferred Notion labels.
 const PROMPT_FIELD_ALIASES: Record<string, string[]> = {
   identite_fondamentale: ["Identité fondamentale", "Identite fondamentale"],
   qui_tu_es: ["Qui tu es"],
@@ -79,8 +88,6 @@ serve(async (req) => {
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     const VOYAGE_API_KEY = Deno.env.get('VOYAGE_API_KEY');
     const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY');
-    if (!OPENAI_API_KEY && !VOYAGE_API_KEY) throw new Error('No embedding provider configured');
-    const useVoyage = !!VOYAGE_API_KEY;
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -88,26 +95,17 @@ serve(async (req) => {
 
     const body: SyncRequest = await req.json().catch(() => ({}));
     const charactersDbId = body.databases?.characters;
-    if (!charactersDbId) {
-      return new Response(JSON.stringify({ error: "databases.characters is required" }), {
+    const videosDbId = body.databases?.videos;
+    if (!charactersDbId && !videosDbId) {
+      return new Response(JSON.stringify({ error: "databases.characters or databases.videos is required" }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Global wipe (used by "Wipe & rebuild RAG" button)
-    let wipedAll = false;
-    if (body.wipe_all) {
-      const { error: delErr } = await supabase
-        .from('embeddings')
-        .delete()
-        .not('id', 'is', null);
-      if (delErr) {
-        console.error('[sync-notion] Global wipe failed:', delErr);
-      } else {
-        wipedAll = true;
-        console.log('[sync-notion] Global wipe: all embeddings deleted');
-      }
+    if (charactersDbId && !OPENAI_API_KEY && !VOYAGE_API_KEY) {
+      throw new Error('No embedding provider configured');
     }
+    const useVoyage = !!VOYAGE_API_KEY;
 
     // ---- Notion helpers ----
     async function fetchNotionDatabase(databaseId: string): Promise<NotionPage[]> {
@@ -132,6 +130,79 @@ serve(async (req) => {
         cursor = data.has_more ? data.next_cursor : undefined;
       } while (cursor);
       return pages;
+    }
+
+    // ========== SYNC VIDEOS (independent path) ==========
+    let videosSynced = 0;
+    const perVideo: any[] = [];
+    if (videosDbId) {
+      console.log('[sync-notion] Syncing videos DB:', videosDbId);
+      // Purge legacy fakes that never had a notion_id
+      await supabase.from('video_triggers').delete().is('notion_id', null);
+
+      const videoPages = await fetchNotionDatabase(videosDbId);
+      const seenNotionIds: string[] = [];
+
+      for (const page of videoPages) {
+        const props = page.properties;
+        const title = extractTitle(props['Titre de la vidéo']) || extractTitle(props['Titre']) || '';
+        if (!title.trim()) continue;
+        const context = extractRichText(props['Contexte']);
+        const description = extractRichText(props['Description']);
+        const priority = extractNumber(props['Priorité']) ?? extractNumber(props['Priorite']) ?? 1;
+        const themes = extractMultiSelect(props['Thèmes']) || extractMultiSelect(props['Themes']);
+        const type = extractSelect(props['Type']) || 'interlude';
+        const transition = extractSelect(props['Style de transition']) || 'fade_black';
+        const videoUrl = extractUrl(props['URL Gumlet']) || extractUrl(props['URL']);
+
+        const record = {
+          notion_id: page.id,
+          title,
+          type,
+          themes,
+          video_url: videoUrl,
+          priority,
+          transition_style: transition,
+          context,
+          description,
+          post_video_context: context, // back-compat for legacy code path
+          updated_at: new Date().toISOString(),
+        };
+        const { error: vErr } = await supabase
+          .from('video_triggers')
+          .upsert(record, { onConflict: 'notion_id' });
+        if (vErr) {
+          console.error(`[sync-notion] video upsert error for ${title}:`, vErr);
+          continue;
+        }
+        seenNotionIds.push(page.id);
+        videosSynced++;
+        perVideo.push({ title, themes, priority, type, has_url: !!videoUrl });
+      }
+
+      // Optional: prune rows whose Notion page disappeared
+      if (seenNotionIds.length) {
+        await supabase
+          .from('video_triggers')
+          .delete()
+          .not('notion_id', 'is', null)
+          .not('notion_id', 'in', `(${seenNotionIds.map((id) => `"${id}"`).join(',')})`);
+      }
+    }
+
+    // Global wipe (used by "Wipe & rebuild RAG" button)
+    let wipedAll = false;
+    if (body.wipe_all && charactersDbId) {
+      const { error: delErr } = await supabase
+        .from('embeddings')
+        .delete()
+        .not('id', 'is', null);
+      if (delErr) {
+        console.error('[sync-notion] Global wipe failed:', delErr);
+      } else {
+        wipedAll = true;
+        console.log('[sync-notion] Global wipe: all embeddings deleted');
+      }
     }
 
     function extractBlockText(block: any): string {
@@ -264,7 +335,7 @@ serve(async (req) => {
           method: 'POST',
           headers: { Authorization: `Bearer ${OPENROUTER_API_KEY}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'google/gemini-2.0-flash-001',
+            model: 'google/gemini-2.5-flash',
             messages: [{ role: 'user', content: prompt }],
             temperature: 0.3,
             max_tokens: 260,
@@ -283,16 +354,16 @@ serve(async (req) => {
     }
 
     // ========== SYNC CHARACTERS ==========
-    console.log('[sync-notion] Syncing characters DB:', charactersDbId);
-    const pages = await fetchNotionDatabase(charactersDbId);
-    const filtered = body.only_notion_id ? pages.filter((p) => p.id === body.only_notion_id) : pages;
     const perCharacter: any[] = [];
+    if (charactersDbId) {
+      console.log('[sync-notion] Syncing characters DB:', charactersDbId);
+      const pages = await fetchNotionDatabase(charactersDbId);
+      const filtered = body.only_notion_id ? pages.filter((p) => p.id === body.only_notion_id) : pages;
 
-    for (const page of filtered) {
+      for (const page of filtered) {
       const props = page.properties;
       const name = extractTitle(props['Nom du caractère']);
       if (!name) continue;
-      // Skip non-character entries (Notion section headers)
       if (name.trim().toLowerCase() === 'identité & présentation' || name.trim().toLowerCase() === 'identite & presentation') {
         console.log(`[sync-notion] Skipping non-character entry: "${name}"`);
         continue;
@@ -306,7 +377,6 @@ serve(async (req) => {
 
       console.log(`[sync-notion] "${name}": page=${pageContent.length} chars, archetype=${archetype}`);
 
-      // 1) Upsert characters (DO NOT touch system_prompt — deprecated path)
       const charRecord = {
         notion_id: page.id,
         name,
@@ -325,11 +395,8 @@ serve(async (req) => {
         continue;
       }
 
-      // 2) Extract 7 prompt fields and upsert character_prompts
       const promptFields = extractPromptFields(props);
       const filledCount = Object.values(promptFields).filter((v) => v && v.trim()).length;
-
-      // 3) Generate situation_summary
       const situationSummary = await generateSituationSummary(name, pageContent);
 
       const { error: promptErr } = await supabase
@@ -345,7 +412,6 @@ serve(async (req) => {
         );
       if (promptErr) console.error(`[sync-notion] character_prompts upsert error for ${name}:`, promptErr);
 
-      // 4) Wipe + rebuild embeddings for this character (page body only)
       if (!wipedAll) {
         await supabase
           .from('embeddings')
@@ -380,9 +446,9 @@ serve(async (req) => {
         summary_chars: situationSummary.length,
         prompt_fields_filled: filledCount,
       });
+      }
     }
 
-    // Stats globales
     const { count: totalEmb } = await supabase
       .from('embeddings')
       .select('id', { count: 'exact', head: true });
@@ -391,6 +457,8 @@ serve(async (req) => {
       success: true,
       characters_synced: perCharacter.length,
       per_character: perCharacter,
+      videos_synced: videosSynced,
+      per_video: perVideo,
       wiped_all: wipedAll,
       total_embeddings_in_db: totalEmb || 0,
       latency_ms: Date.now() - startedAt,
