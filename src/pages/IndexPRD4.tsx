@@ -94,7 +94,9 @@ const IndexPRD4 = () => {
   userRoleRef.current = state.userRoleProfile;
   const turnLatenciesRef = useRef<number[]>([]);
   const sessionDurationRef = useRef<number>(0);
+  const triggeredVideoIdsRef = useRef<string[]>([]);
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
+  const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
 
 
   // Timer 5 minutes — démarré quand on entre en conversation, fin auto à 0.
