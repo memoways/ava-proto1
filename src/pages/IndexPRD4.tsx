@@ -95,6 +95,7 @@ const IndexPRD4 = () => {
   const turnLatenciesRef = useRef<number[]>([]);
   const sessionDurationRef = useRef<number>(0);
   const triggeredVideoIdsRef = useRef<string[]>([]);
+  const pendingPostVideoContextRef = useRef<string | null>(null);
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
 
@@ -299,6 +300,8 @@ const IndexPRD4 = () => {
         : undefined;
 
       try {
+        const postVideoContext = pendingPostVideoContextRef.current ?? undefined;
+        pendingPostVideoContextRef.current = null;
         const result = await processPRD4Turn({
           sessionId: sessionIdRef.current,
           conversationHistory: conversationRef.current.slice(0, -1),
@@ -307,6 +310,7 @@ const IndexPRD4 = () => {
           timeElapsedSeconds: elapsed,
           characterName: "Max",
           triggeredVideoIds: triggeredVideoIdsRef.current,
+          postVideoContext,
           onLatencySegment: handleLatencySegment,
         });
 
