@@ -49,6 +49,10 @@ export function useExperienceState() {
     setState((s) => ({ ...s, userRoleProfile: profile }));
   }, []);
 
+  const setUserPosture = useCallback((posture: UserPosture | null) => {
+    setState((s) => ({ ...s, userPosture: posture }));
+  }, []);
+
   const setSelectedCharacter = useCallback(
     (character: ExperienceState["selectedCharacter"]) => {
       setState((s) => ({ ...s, selectedCharacter: character }));
