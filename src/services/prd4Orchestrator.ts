@@ -126,6 +126,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         userRole: input.userRole,
         turnIndex,
         timeElapsedSeconds: input.timeElapsedSeconds,
+        triggeredVideoIds: input.triggeredVideoIds,
       });
     } finally {
       input.onLatencySegment?.({
