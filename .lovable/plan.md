@@ -1,100 +1,103 @@
 
-# Plan — Triggers vidéo synchronisés depuis Notion + déclenchement par le Game Master
+# Plan — Démarrage AVA pour installation GIFF
 
-## Source confirmée (Notion)
-Base « 🎬 Vidéos AVA » (id `478685a5b31e45b5bc534bcf905b9124`, data source `009ca428-f888-43f4-a1ef-6c8dbefd6967`).
-Propriétés réelles : `Titre de la vidéo` (title), `Contexte` (text), `Description` (text), `Priorité` (number), `Thèmes` (multi_select), `Type` (select: intro/interlude/mid_conversation), `Style de transition` (select), `URL Gumlet` (url).
+Objectif : nouveau parcours court (< 45s) entre "Commencer" et le premier échange avec Max, avec 3 variantes choisissables dans l'admin. L'ancien parcours long (création de personnage complète) reste accessible via un flag admin pour les tests internes. Questionnaire inchangé.
 
-## 1. Migration BDD (`video_triggers`)
-- Ajouter colonnes `context text` (= Contexte Notion) et `description text`.
-- `placeholder_text` devient inutilisé (gardé nullable pour ne rien casser, désaffiché dans l'UI).
-- Pas d'autres changements de schéma.
+## 1. Nouveau flow court (par défaut)
 
-## 2. Edge function `sync-notion`
-- Étendre la requête : accepter `databases.videos` en plus de `databases.characters`.
-- Pour chaque page de la base Vidéos AVA :
-  - `upsert` dans `video_triggers` (clé `notion_id`) avec mapping :
-    - `title` ← Titre de la vidéo
-    - `context` ← Contexte
-    - `description` ← Description
-    - `priority` ← Priorité
-    - `themes` ← Thèmes (array)
-    - `type` ← Type
-    - `transition_style` ← Style de transition
-    - `video_url` ← URL Gumlet
-    - `post_video_context` ← Contexte (back-compat pour le code legacy qui l'injecte dans Max)
-- Rapport renvoyé : `videos_synced`, `per_video`.
-
-## 3. Nouvelle edge function `update-notion-video`
-- Inputs : `notion_id`, propriétés modifiées.
-- PATCH `https://api.notion.com/v1/pages/{notion_id}` avec mapping inverse (titre, contexte, description, priorité, thèmes, type, style, url).
-- Réponse : `{ ok: true, updated_at }` ou message d'erreur clair si 403 (« partagez la base avec l'intégration Notion »).
-- Après succès, lance un mini re-sync de la ligne pour s'assurer que la BDD est cohérente.
-
-## 4. Service front
-- `src/services/ragService.ts` : ajouter `videos: '478685a5-b31e-45b5-bc53-4bcf905b9124'` dans `AVA_NOTION_DATABASES` et passer cet ID au sync.
-- Nouveau `src/services/videoTriggerService.ts` : `listVideoTriggers()`, `updateVideoTrigger(id, patch)` qui appelle `update-notion-video` puis met à jour la ligne Supabase locale.
-
-## 5. UI Admin
-
-### Onglet « Contenu Notion » → nouveau sous-onglet `Vidéos`
-- Liste simple (titre + chips thématiques, rien d'autre).
-- Bouton « Re-sync vidéos » qui appelle `sync-notion` avec `databases.videos`.
-
-### Onglet « Mécanique → Triggers vidéo » (`VideoTriggersEditor.tsx`)
-- Supprimer le bouton « Ajouter ».
-- Supprimer le bouton « Supprimer » par ligne (la source de vérité est Notion).
-- Ajouter le champ éditable **Description** (textarea longue) + label « Contexte » (renommé depuis `post_video_context`).
-- Renommer les champs visibles selon la nomenclature Notion : Titre, Contexte, Description, Priorité, Thèmes, Type, URL Gumlet, Style de transition.
-- Supprimer `placeholder_text` et `duration_seconds` de l'UI.
-- « Sauvegarder » appelle `updateVideoTrigger` → PATCH Notion → refresh ligne. Toast clair en cas d'erreur Notion.
-- Wipe initial : `DELETE FROM video_triggers` au premier sync (les 3 fakes disparaissent automatiquement car remplacés par upsert sur `notion_id` ; on prévoit en plus un `DELETE WHERE notion_id IS NULL` lors de la sync vidéos pour purger les anciens exemples sans `notion_id`).
-
-## 6. Décision du Game Master (déclenchement vidéo)
-
-### 6a. Legacy (`gameMasterAgent.ts` + `conversationOrchestrator.ts`)
-- Supprimer le dict `DEMO_TRIGGERS`.
-- Charger les `video_triggers` actifs (cache 30 s) depuis Supabase ; passer au GM la liste `{id, title, themes, priority, already_triggered}`.
-- Mettre à jour le prompt GM pour qu'il choisisse `trigger_video_id` parmi les vidéos disponibles uniquement si la thématique de la discussion recoupe `themes` (sinon `null`). Priorité = tie-break.
-- Conserver « never trigger same video twice ».
-- Le `post_video_context` (= Contexte Notion) reste injecté dans Max au tour suivant pour qu'il « ait vu » la vidéo.
-
-### 6b. PRD4 (`gameMasterPRD4.ts` + `prd4Orchestrator.ts` + `IndexPRD4.tsx`)
-- Ajouter dans la promesse post-turn GM un appel léger « video selector » (peut être combiné dans le même LLM call) qui renvoie `trigger_video_id | null` selon la même logique thématique.
-- `processPRD4Turn` retourne `pendingVideoTrigger` dans `postTurnPromise`.
-- Dans `IndexPRD4.tsx` :
-  - Après que Max a fini de parler (TTS terminé), si `pendingVideoTrigger` est non null et non déjà joué : passer en phase `video_trigger`, monter `GumletVideoPlayer` en plein écran.
-  - Activer les contrôles natifs Gumlet (play/pause/volume + skip déjà présent).
-  - À la fin (`onComplete`) ou skip (`onSkip`) : injecter `context` comme system note dans l'historique pour le prochain tour de Max, puis revenir à l'écran conversation exactement dans l'état précédent (mic prêt, position d'historique inchangée).
-- Aucun message n'est consommé par la vidéo : la discussion reprend au tour suivant côté utilisateur.
-
-## 7. Documentation / mémoires
-- Mettre à jour `CHANGELOG.md` + `STORY.md` (nouvelle source Notion `videos`, déclenchement vidéo PRD4).
-- Mettre à jour `mem://logic/video-triggers`.
-
-## Détails techniques
 ```text
-Notion (Vidéos AVA)
-  └─ sync-notion ──► public.video_triggers (notion_id, title, context, description,
-                                            priority, themes[], type, transition_style,
-                                            video_url, post_video_context=context)
-
-Conversation tour N
-  user ─► STT ─► Max ─► TTS ──┐
-                              ├─► GM post-turn (parmi video_triggers non triggered,
-                              │     choisit id si themes ∩ topics(discussion))
-                              ▼
-                       phase=video_trigger ─► GumletVideoPlayer
-                              │
-                              ▼ onComplete/onSkip
-                       inject Contexte dans history (system note)
-                              │
-                              ▼
-                       phase=conversation (tour N+1)
+Welcome  →  FilmQuestion  →  [TeaserRappel si "non"/"rappel"]  →  PostureCapture  →  Conversation Max
 ```
 
-## Hors scope
-- Pas de nouvelle table.
-- Pas de modification du player Gumlet (déjà OK).
-- Pas de création de vidéos depuis l'app (bouton Ajouter retiré).
-- Pas d'embeddings sur la base vidéos.
+- Tous les écrans nouveaux sont sobres, cinéma, texte court.
+- Pas de présentation de Max. La transition vers la conversation est directe (pas d'écran "appel en cours").
+- Posture saisie en push-to-talk (1 phrase max), avec bouton **Me laisser surprendre** qui ignore la posture.
+- Chrono `onboarding_started_at` posé au clic "Commencer", `first_max_response_at` posé à la fin du premier TTS de Max.
+
+## 2. Les 3 variantes (champ admin `active_start_variant`)
+
+Toutes partagent le même flow, seule la "voix" du wrapper change. Pas de TTS pendant l'onboarding (cf. décision : variante A = texte uniquement).
+
+- **gm_host** — chaque écran porte une mini-attribution « Game Master » (chip discret en haut) et utilise les textes `gm_host_intro_text` / `gm_host_handoff_text` configurables.
+- **gm_invisible** — aucun marqueur GM, juste les textes neutres (`welcome_text`, `posture_question`).
+- **voiceover_hybrid** — pas de GM visible, mais une phrase d'intro italique stylée « voix off » (`voiceover_intro_text`) en haut de l'écran d'accueil et de la posture.
+
+## 3. Admin
+
+Nouvel onglet **« Démarrage GIFF »** dans le groupe **🎮 Mécanique**.
+
+Champs (stockés via `admin_settings` clé `ava_giff_start_settings`) :
+
+```text
+active_start_variant: "gm_host" | "gm_invisible" | "voiceover_hybrid"
+use_giff_flow:        boolean   # true = nouveau flow court ; false = ancien flow long
+max_start_duration_seconds: number (default 45)
+welcome_text, promise_text
+teaser_text_short
+posture_question
+allow_surprise_me: boolean
+gm_host_intro_text, gm_host_handoff_text
+voiceover_intro_text
+```
+
+Tous les textes ont des valeurs par défaut tirées du PRD §5. Bouton « Reset aux valeurs PRD ».
+
+## 4. Données stockées par session
+
+Étendre `sessions` (migration) avec colonnes nullables :
+
+```text
+ava_start_variant TEXT
+has_seen_film     TEXT   ("vu" | "pas_vu" | "rappel")
+teaser_shown      BOOLEAN
+user_posture_raw  TEXT
+user_posture_mode TEXT   ("voice" | "surprise")
+onboarding_started_at   TIMESTAMPTZ
+first_max_response_at   TIMESTAMPTZ
+onboarding_duration_ms  INTEGER
+```
+
+Persistance via `prd4Session.updatePRD4Onboarding(...)` (nouvelle helper). Événements PostHog : `giff_onboarding_started`, `giff_film_answered`, `giff_posture_captured`, `giff_first_max_response` (avec `duration_ms` et `variant`). Affichés ensuite dans l'onglet Sessions de l'admin (colonne « Variante » + durée).
+
+## 5. Implémentation technique
+
+### Fichiers à créer
+- `src/components/prd4/PostureCaptureScreen.tsx` — PTT 1 phrase + bouton "Me laisser surprendre", inspiré de `RoleCaptureScreen` mais radicalement allégé (pas de MIN_CHARS strict, pas de bullet list).
+- `src/components/prd4/TransitionScreen.tsx` — léger fondu noir 800ms entre posture et conversation (remplace `CallingMaxScreen` dans le flow GIFF).
+- `src/components/GMHostChip.tsx` / `VoiceoverLine.tsx` — wrappers visuels réutilisables pour les variantes.
+- `src/components/admin/GiffStartTab.tsx` — éditeur des champs admin.
+- `src/services/giffStartSettings.ts` — load/save (`admin_settings` + `localStorage` fallback, même pattern que les autres settings).
+- `supabase/migrations/<ts>_add_giff_onboarding_to_sessions.sql` — ajoute les colonnes ci-dessus.
+
+### Fichiers à modifier
+- `src/types/index.ts` — ajouter `AvaStartVariant`, étendre `ExperiencePhase` avec `"posture_capture"` et `"transition_max"`, ajouter `userPosture` à `ExperienceState`, ajouter le payload `onboarding` au type questionnaire technique (déjà existant, on ajoute juste les nouveaux champs).
+- `src/hooks/useExperienceState.ts` — nouvel `setUserPosture`, conserver les phases existantes (l'ancien flow continue de fonctionner).
+- `src/pages/IndexPRD4.tsx` :
+  - Au montage, lit `giffStartSettings`. Si `use_giff_flow` est `true`, redirige les transitions : Welcome → FilmQuestion → (Teaser si non/rappel) → PostureCapture → TransitionScreen → ConversationMax. Si `false`, comportement actuel inchangé.
+  - Mémorise `onboardingStartedAtRef` au clic Start ; calcule `onboarding_duration_ms` à la première réponse Max ; appelle `updatePRD4Onboarding`.
+  - Passe la `variant` aux écrans pour qu'ils affichent l'habillage adéquat.
+- `src/components/prd4/WelcomeScreen.tsx`, `FilmQuestionScreen.tsx`, `TeaserScreen.tsx` — accepter `variant` + textes injectés (props), garder les valeurs par défaut actuelles si non fournis (rétro-compat).
+- `src/pages/Admin.tsx` — ajouter l'onglet `giff-start` dans le groupe « Mécanique ».
+- `src/services/prd4Session.ts` — `updatePRD4Onboarding(sessionId, payload)`.
+- `src/services/posthogService.ts` (si nécessaire) — exposer les nouveaux event types.
+
+## 6. Critères d'acceptation (depuis le PRD §8)
+
+- [ ] Les 3 variantes sont choisissables dans l'admin et changent visuellement le démarrage.
+- [ ] La question « As-tu vu le film ? » est présente avec 3 boutons (Oui / Non / Je ne m'en souviens pas bien).
+- [ ] Rappel court affiché si « non » ou « rappel ».
+- [ ] L'utilisateur définit seulement une posture rapide en PTT.
+- [ ] Le bouton « Me laisser surprendre » saute la posture et marque `user_posture_mode = "surprise"`.
+- [ ] Le premier échange avec Max démarre en moins de 45s sur le flow par défaut (mesuré et stocké).
+- [ ] Max n'est pas présenté explicitement (aucune mention "avatar IA" ni présentation).
+- [ ] Questionnaire existant inchangé.
+- [ ] Variante + durée stockées en base et visibles dans l'onglet Sessions.
+- [ ] Push-to-talk reste fonctionnel pendant la conversation.
+- [ ] Le flag admin permet de revenir à l'ancien flow long sans déploiement.
+
+## 7. Hors-scope (explicite)
+
+- Pas de TTS Game Master pendant l'onboarding (décision : texte uniquement pour la variante A).
+- Pas de modification du questionnaire post-session.
+- Pas de nouveaux micro-événements Game Master en cours de conversation.
+- Pas de suppression du code de l'ancien flow (RoleCapture, RoleSummary, CharacterSelect, CallingMax restent et restent atteignables via `use_giff_flow = false`).
