@@ -271,12 +271,26 @@ const IndexPRD4 = () => {
     setActiveVideo(null);
 
 
-    // Crée la session DB
+    // Crée la session DB (rôle complet en legacy, sinon null + posture en GIFF)
     try {
-      if (state.userRoleProfile) {
+      const useGiff = giffSettingsRef.current.use_giff_flow;
+      if (state.userRoleProfile || useGiff) {
         const sid = await createPRD4Session(state.userRoleProfile, "max");
         sessionIdRef.current = sid;
         trackEvent("prd4_session_started", { session_id: sid });
+        // Persistance onboarding GIFF (best-effort)
+        if (useGiff) {
+          const startedAt = onboardingStartedAtRef.current;
+          const posture = userPostureRef.current;
+          void updatePRD4Onboarding(sid, {
+            ava_start_variant: giffSettingsRef.current.active_start_variant,
+            has_seen_film: state.hasSeenFilm ?? null,
+            teaser_shown: state.teaserSeen,
+            user_posture_raw: posture?.raw ?? null,
+            user_posture_mode: posture?.mode ?? null,
+            onboarding_started_at: startedAt ? new Date(startedAt).toISOString() : null,
+          });
+        }
       }
     } catch (err) {
       console.warn("[PRD4] createSession failed (continuing without DB persistence):", err);
@@ -307,8 +321,30 @@ const IndexPRD4 = () => {
     } catch (err) {
       console.warn("[TTS] opening failed:", err);
     }
+
+    // Marque le first_max_response et calcule la durée onboarding
+    if (giffSettingsRef.current.use_giff_flow && !firstMaxResponseAtRef.current) {
+      firstMaxResponseAtRef.current = Date.now();
+      const startedAt = onboardingStartedAtRef.current;
+      const durationMs = startedAt ? firstMaxResponseAtRef.current - startedAt : null;
+      const target = giffSettingsRef.current.max_start_duration_seconds * 1000;
+      trackEvent("giff_first_max_response", {
+        session_id: sessionIdRef.current,
+        variant: giffSettingsRef.current.active_start_variant,
+        duration_ms: durationMs,
+        under_target: durationMs != null ? durationMs <= target : null,
+      });
+      if (sessionIdRef.current) {
+        void updatePRD4Onboarding(sessionIdRef.current, {
+          first_max_response_at: new Date(firstMaxResponseAtRef.current).toISOString(),
+          onboarding_duration_ms: durationMs,
+        });
+      }
+    }
+
     setAudioState("idle");
-  }, [addMessage, setAudioState, setPhase, state.userRoleProfile, timer]);
+  }, [addMessage, setAudioState, setPhase, state.hasSeenFilm, state.teaserSeen, state.userRoleProfile, timer]);
+
 
   // ---- Conversation : process turn ------------------------------------------
   const processTurn = useCallback(
