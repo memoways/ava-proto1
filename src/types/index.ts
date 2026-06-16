@@ -56,12 +56,20 @@ export interface UserRoleProfile {
 
 export type FilmAnswer = "vu" | "pas_vu" | "rappel";
 
+export type UserPostureMode = "voice" | "surprise";
+
+export interface UserPosture {
+  raw: string;
+  mode: UserPostureMode;
+}
+
 export interface ExperienceState {
   phase: ExperiencePhase;
   hasSeenFilm: FilmAnswer | null;
   teaserSeen: boolean;
   teaserSkipped: boolean;
   userRoleProfile: UserRoleProfile | null;
+  userPosture: UserPosture | null;
   selectedCharacter: "max" | "emma" | "ava" | "leo";
   conversationLog: ConversationMessage[];
   turnCount: number;
