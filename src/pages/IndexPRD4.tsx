@@ -58,7 +58,6 @@ import {
   loadGiffStartSettingsFromDB,
   type GiffStartSettings,
 } from "@/services/giffStartSettings";
-import { createPRD4Session as _createPRD4Session, updatePRD4Onboarding } from "@/services/prd4Session";
 import type { QuestionnairePRD4Answers, QuestionnairePRD4Data, UserPosture } from "@/types";
 
 const SESSION_DURATION_S = 5 * 60; // PRD4 §11 : ~5 min cible.
