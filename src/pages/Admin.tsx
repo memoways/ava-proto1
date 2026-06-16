@@ -502,6 +502,10 @@ export default function Admin() {
             <VideoTriggersEditor />
           </TabsContent>
 
+          <TabsContent value="giff-start">
+            <GiffStartTab />
+          </TabsContent>
+
 
 
           <TabsContent value="validator">
