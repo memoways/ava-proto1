@@ -69,6 +69,7 @@ const IndexPRD4 = () => {
     setFilmAnswer,
     markTeaserSeen,
     setRoleProfile,
+    setUserPosture,
     setAudioState,
     addMessage,
     incrementPttError,
@@ -79,6 +80,7 @@ const IndexPRD4 = () => {
   const [userSubtitle, setUserSubtitle] = useState("");
   const [maxSubtitle, setMaxSubtitle] = useState("");
   const [summarizing, setSummarizing] = useState(false);
+  const [giffSettings, setGiffSettings] = useState<GiffStartSettings>(GIFF_START_DEFAULTS);
   const latencyOverlayEnabled = useLatencyOverlayEnabled();
   const {
     segments: latencySegments,
@@ -100,12 +102,20 @@ const IndexPRD4 = () => {
   const endedRef = useRef(false);
   const userRoleRef = useRef(state.userRoleProfile);
   userRoleRef.current = state.userRoleProfile;
+  const userPostureRef = useRef<UserPosture | null>(state.userPosture);
+  userPostureRef.current = state.userPosture;
   const turnLatenciesRef = useRef<number[]>([]);
   const sessionDurationRef = useRef<number>(0);
   const triggeredVideoIdsRef = useRef<string[]>([]);
   const pendingPostVideoContextRef = useRef<string | null>(null);
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
+  // Chrono onboarding GIFF
+  const onboardingStartedAtRef = useRef<number | null>(null);
+  const firstMaxResponseAtRef = useRef<number | null>(null);
+  const giffSettingsRef = useRef<GiffStartSettings>(GIFF_START_DEFAULTS);
+  giffSettingsRef.current = giffSettings;
+
 
 
   // Timer 5 minutes — démarré quand on entre en conversation, fin auto à 0.
