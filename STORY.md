@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-06-16 (session 25 — triggers vidéo Notion + cinématiques pilotées par le Game Master, sync bidirectionnelle Notion ↔ Supabase, corrections bug STT et redeploy edge functions)
+> **Last Updated**: 2026-06-16 (session 26 — Démarrage GIFF, 3 variantes admin, nouveau flow onboarding < 45 s)
 
 ---
 
@@ -64,6 +64,34 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-06-16 — Démarrage GIFF (< 45 s, 3 variantes admin) 🔷
+
+**Intent**: L'onboarding existant (capture rôle + résumé + choix personnage + appel Max) durait plusieurs minutes — incompatible avec une installation en cabine GIFF où le joueur doit être lancé en moins d'une minute. Le PRD *Démarrage AVA pour installation GIFF* impose un parcours court (< 45 s entre « Commencer » et le premier mot de Max), configurable depuis l'admin avec 3 variantes A/B/C, tout en gardant l'ancien flow accessible via flag.
+
+**Tool**: Codex
+
+**Outcome**:
+1. **Nouveau flow GIFF** — `Welcome → FilmQuestion → (TeaserRappel si besoin) → PostureCapture → Transition → Conversation Max`. Chronométré de `onboarding_started_at` (clic « Commencer ») à `first_max_response_at` (premier TTS de Max). Cible < 45 s.
+2. **3 variantes testables** (`gm_host`, `gm_invisible`, `voiceover_hybrid`) — chip « Game Master » sur chaque écran, texte neutre sans marqueur, ou voix-off en italique. Appliquées via le wrapper `StartVariantFrame`. Pas de TTS d'onboarding (texte uniquement).
+3. **Posture utilisateur** — `PostureCaptureScreen` avec PTT (1 phrase max) + bouton « Me laisser surprendre ». La posture brute (`user_posture_raw`) et le mode (`user_posture_mode`: `spoken` | `surprise`) sont persistés sur la session.
+4. **Admin — onglet « Démarrage GIFF »** (`Mécanique > giff-start`) : choix de la variante active, flag `use_giff_flow`, durée cible, et édition de tous les textes UX (accueil, promesse, rappel, posture, intro/handoff GM, voix off). Service `giffStartSettings.ts` persiste dans `admin_settings` + fallback localStorage.
+5. **Persistance onboarding** — migration DB ajoutant `ava_start_variant`, `has_seen_film`, `teaser_shown`, `user_posture_raw`, `user_posture_mode`, `onboarding_started_at`, `first_max_response_at`, `onboarding_duration_ms` sur la table `sessions`.
+6. **Télémétrie PostHog** — événements `giff_onboarding_started`, `giff_film_answered`, `giff_posture_captured`, `giff_first_max_response` (avec `duration_ms` et booléen `under_target`).
+7. **Rétro-compatibilité** — si `use_giff_flow = false`, le flow legacy complet (RoleCapture → RoleSummary → CharacterSelect → CallingMax) est conservé inchangé. Le flag est editable en temps réel depuis l'admin.
+8. **Architecture** — `IndexPRD4.tsx` branche le flow selon les settings. `createPRD4Session` accepte `userRole = null` en mode GIFF. Le questionnaire technique embarque les nouveaux champs.
+
+**Ce que ça change** : le prototype gagne un **mode cabine** où l'utilisateur est face à Max en moins d'une minute, avec une posture narrative minimale (« qui je suis / ce qui m'amène ») plutôt qu'une création de personnage complète. Les 3 variantes permettent de tester en production quel framing (Game Master visible, invisible, ou voix-off) maximise l'engagement sans refaire de code. L'ancien flow reste dispo pour les sessions longues ou les démos approfondies.
+
+**Validation**:
+- Migration DB appliquée (nouvelles colonnes `sessions`).
+- `npx tsc --noEmit` : OK.
+- Build Vite : OK.
+- Admin → Mécanique → Démarrage GIFF : settings editables, fallback localStorage fonctionnel.
+
+**Time**: ~2h (lecture PRD → plan + 3 questions → implémentation 6 fichiers + migration + service + admin → build → documentation).
+
+---
 
 ### 2026-06-16 — Triggers vidéo Notion + cinématiques pilotées par le Game Master 🔷
 
