@@ -710,6 +710,21 @@ const IndexPRD4 = () => {
             onPTTRelease={handlePTTRelease}
             onHangUp={handleHangUp}
           />
+          {activeVideo?.video_url && (
+            <GumletVideoPlayer
+              videoUrl={activeVideo.video_url}
+              onComplete={() => {
+                pendingPostVideoContextRef.current = activeVideo.context || activeVideo.post_video_context || null;
+                trackEvent("prd4_video_completed", { session_id: sessionIdRef.current, video_id: activeVideo.id, skipped: false });
+                setActiveVideo(null);
+              }}
+              onSkip={() => {
+                pendingPostVideoContextRef.current = activeVideo.context || activeVideo.post_video_context || null;
+                trackEvent("prd4_video_completed", { session_id: sessionIdRef.current, video_id: activeVideo.id, skipped: true });
+                setActiveVideo(null);
+              }}
+            />
+          )}
           <LatencyOverlay enabled={latencyOverlayEnabled} segments={latencySegments} currentTurn={latencyCurrentTurn} />
         </>
       );
