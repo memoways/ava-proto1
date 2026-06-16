@@ -4,6 +4,26 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.28.0] - 2026-06-16 — Démarrage GIFF (< 45 s, 3 variantes admin)
+
+Implémente le **PRD « Démarrage AVA pour installation GIFF »** : nouveau parcours court entre l'écran d'accueil et le premier échange avec Max, configurable depuis l'admin avec 3 variantes testables. L'ancien flow long (création complète de personnage) reste accessible via flag.
+
+### Ajouté
+- **Nouveau flow GIFF** : `Welcome → FilmQuestion → (Rappel court si besoin) → PostureCapture → Transition → Conversation Max`. Cible : moins de 45 s entre « Commencer » et le premier mot de Max.
+- **3 variantes de démarrage** (`gm_host`, `gm_invisible`, `voiceover_hybrid`) — chips/voix-off appliqués sur chaque écran via `StartVariantFrame`. Pas de TTS d'onboarding (texte uniquement).
+- **Écrans `PostureCaptureScreen`** (PTT 1 phrase + bouton « Me laisser surprendre »), **`TeaserRappelScreen`** (rappel texte court), **`TransitionScreen`** (fondu 800 ms).
+- **Admin — onglet « Démarrage GIFF »** (`Mécanique > giff-start`) : édition de la variante active, du flag `use_giff_flow`, de la durée cible et de tous les textes UX (accueil, promesse, rappel, posture, intro/handoff GM, voix off).
+- **Service `giffStartSettings.ts`** — persistance via `admin_settings` (clé `ava_giff_start_settings`) + fallback localStorage.
+- **Persistance onboarding sur `sessions`** — nouvelles colonnes `ava_start_variant`, `has_seen_film`, `teaser_shown`, `user_posture_raw`, `user_posture_mode`, `onboarding_started_at`, `first_max_response_at`, `onboarding_duration_ms`.
+- **Événements PostHog** : `giff_onboarding_started`, `giff_film_answered`, `giff_posture_captured`, `giff_first_max_response` (avec `duration_ms` et `under_target`).
+- **Type `UserPosture`** (`{ raw, mode }`) + champ `userPosture` sur `ExperienceState`. Phases supplémentaires : `posture_capture`, `transition_max`.
+
+### Modifié
+- **`IndexPRD4.tsx`** — branche le flow selon `giffSettings.use_giff_flow`. Chronomètre l'onboarding du clic « Commencer » au premier TTS de Max. `createPRD4Session` peut être appelée sans `userRoleProfile` lorsque le flow GIFF est actif.
+- **`WelcomeScreen`, `FilmQuestionScreen`** — acceptent désormais `settings` et affichent textes/wrappers de variante en mode GIFF (rétro-compat préservée si pas de settings).
+- **`prd4Session.ts`** — `createPRD4Session` accepte `userRole = null` + champs additionnels ; nouvelle helper `updatePRD4Onboarding(sessionId, payload)`.
+- **Questionnaire technical** — ajoute `ava_start_variant`, `has_seen_film`, `user_posture_raw`, `user_posture_mode`, `onboarding_duration_ms` au payload sauvegardé.
+
 ## [0.27.0] - 2026-06-16 — Triggers vidéo Notion + cinématiques pilotées par le Game Master
 
 Objectif : connecter la base Notion **« 🎬 Vidéos AVA »** au back-office, transformer le tab *Triggers vidéo* en éditeur bidirectionnel Notion ↔ Supabase, et faire en sorte que le **Game Master déclenche réellement des vidéos** intercalées dans la conversation avec Max (PRD4 + legacy), en fonction de la thématique de l'échange.

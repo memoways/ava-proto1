@@ -27,6 +27,8 @@ export type ExperiencePhase =
   | "role_summary"
   | "character_select"
   | "calling_max"
+  | "posture_capture"
+  | "transition_max"
   | "conversation_max"
   | "end_session"
   | "questionnaire"
@@ -54,12 +56,20 @@ export interface UserRoleProfile {
 
 export type FilmAnswer = "vu" | "pas_vu" | "rappel";
 
+export type UserPostureMode = "voice" | "surprise";
+
+export interface UserPosture {
+  raw: string;
+  mode: UserPostureMode;
+}
+
 export interface ExperienceState {
   phase: ExperiencePhase;
   hasSeenFilm: FilmAnswer | null;
   teaserSeen: boolean;
   teaserSkipped: boolean;
   userRoleProfile: UserRoleProfile | null;
+  userPosture: UserPosture | null;
   selectedCharacter: "max" | "emma" | "ava" | "leo";
   conversationLog: ConversationMessage[];
   turnCount: number;
@@ -340,6 +350,11 @@ export interface QuestionnairePRD4Technical {
   max_latency_ms: number | null;
   ptt_errors: number;
   transcript_available: boolean;
+  ava_start_variant?: string | null;
+  has_seen_film?: string | null;
+  user_posture_raw?: string | null;
+  user_posture_mode?: string | null;
+  onboarding_duration_ms?: number | null;
 }
 
 export interface QuestionnairePRD4Data {

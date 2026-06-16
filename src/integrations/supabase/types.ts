@@ -401,62 +401,86 @@ export type Database = {
       sessions: {
         Row: {
           admin_note: string | null
+          ava_start_variant: string | null
           branch: string | null
           conversation_log: Json | null
           duration_seconds: number | null
           ended_at: string | null
+          first_max_response_at: string | null
           game_over_reason: string | null
           gm_post_turn_log: Json
+          has_seen_film: string | null
           id: string
           modalite_voix: string | null
           name: string | null
           narrative_end: boolean | null
+          onboarding_duration_ms: number | null
+          onboarding_started_at: string | null
           personnage_appele: string | null
           player_role: Json | null
           questionnaire_responses: Json | null
           started_at: string | null
+          teaser_shown: boolean | null
           triggers_activated: string[] | null
           trust_level: number | null
+          user_posture_mode: string | null
+          user_posture_raw: string | null
           variante_onboarding: string | null
         }
         Insert: {
           admin_note?: string | null
+          ava_start_variant?: string | null
           branch?: string | null
           conversation_log?: Json | null
           duration_seconds?: number | null
           ended_at?: string | null
+          first_max_response_at?: string | null
           game_over_reason?: string | null
           gm_post_turn_log?: Json
+          has_seen_film?: string | null
           id?: string
           modalite_voix?: string | null
           name?: string | null
           narrative_end?: boolean | null
+          onboarding_duration_ms?: number | null
+          onboarding_started_at?: string | null
           personnage_appele?: string | null
           player_role?: Json | null
           questionnaire_responses?: Json | null
           started_at?: string | null
+          teaser_shown?: boolean | null
           triggers_activated?: string[] | null
           trust_level?: number | null
+          user_posture_mode?: string | null
+          user_posture_raw?: string | null
           variante_onboarding?: string | null
         }
         Update: {
           admin_note?: string | null
+          ava_start_variant?: string | null
           branch?: string | null
           conversation_log?: Json | null
           duration_seconds?: number | null
           ended_at?: string | null
+          first_max_response_at?: string | null
           game_over_reason?: string | null
           gm_post_turn_log?: Json
+          has_seen_film?: string | null
           id?: string
           modalite_voix?: string | null
           name?: string | null
           narrative_end?: boolean | null
+          onboarding_duration_ms?: number | null
+          onboarding_started_at?: string | null
           personnage_appele?: string | null
           player_role?: Json | null
           questionnaire_responses?: Json | null
           started_at?: string | null
+          teaser_shown?: boolean | null
           triggers_activated?: string[] | null
           trust_level?: number | null
+          user_posture_mode?: string | null
+          user_posture_raw?: string | null
           variante_onboarding?: string | null
         }
         Relationships: []

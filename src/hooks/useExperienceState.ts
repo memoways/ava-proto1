@@ -11,6 +11,7 @@ import type {
   ExperiencePhase,
   ExperienceState,
   FilmAnswer,
+  UserPosture,
   UserRoleProfile,
 } from "@/types";
 
@@ -20,6 +21,7 @@ const initialState: ExperienceState = {
   teaserSeen: false,
   teaserSkipped: false,
   userRoleProfile: null,
+  userPosture: null,
   selectedCharacter: "max",
   conversationLog: [],
   turnCount: 0,
@@ -45,6 +47,10 @@ export function useExperienceState() {
 
   const setRoleProfile = useCallback((profile: UserRoleProfile | null) => {
     setState((s) => ({ ...s, userRoleProfile: profile }));
+  }, []);
+
+  const setUserPosture = useCallback((posture: UserPosture | null) => {
+    setState((s) => ({ ...s, userPosture: posture }));
   }, []);
 
   const setSelectedCharacter = useCallback(
@@ -82,6 +88,7 @@ export function useExperienceState() {
     setFilmAnswer,
     markTeaserSeen,
     setRoleProfile,
+    setUserPosture,
     setSelectedCharacter,
     setAudioState,
     addMessage,
