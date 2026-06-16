@@ -306,6 +306,7 @@ const IndexPRD4 = () => {
           userRole: userRoleRef.current,
           timeElapsedSeconds: elapsed,
           characterName: "Max",
+          triggeredVideoIds: triggeredVideoIdsRef.current,
           onLatencySegment: handleLatencySegment,
         });
 
@@ -424,15 +425,29 @@ const IndexPRD4 = () => {
           void updatePRD4Conversation(sessionIdRef.current, conversationRef.current);
         }
 
-        // GM post-turn : vérifie end_recommended sans bloquer
-        void result.postTurnPromise.then((ev) => {
+        // GM post-turn : vérifie end_recommended + trigger vidéo sans bloquer
+        void result.postTurnPromise.then(async (ev) => {
           trackEvent("prd4_gm_post_turn", {
             session_id: sessionIdRef.current,
             turn_index: ev.turn_index,
             engagement_delta: ev.engagement_delta,
             end_recommended: ev.end_recommended,
+            trigger_video_id: ev.trigger_video_id ?? null,
             latency_ms: ev.latency_ms,
           });
+          if (ev.trigger_video_id && !triggeredVideoIdsRef.current.includes(ev.trigger_video_id)) {
+            try {
+              const videos = await getVideoTriggersCached();
+              const row = videos.find((v) => v.id === ev.trigger_video_id) || null;
+              if (row?.video_url) {
+                triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, row.id];
+                trackEvent("prd4_video_triggered", { session_id: sessionIdRef.current, video_id: row.id, title: row.title });
+                setActiveVideo(row);
+              }
+            } catch (err) {
+              console.warn("[PRD4] video trigger failed:", err);
+            }
+          }
           if (ev.end_recommended && !endedRef.current) {
             endedRef.current = true;
             void finalizeAndEnd("gm_end_recommended");
