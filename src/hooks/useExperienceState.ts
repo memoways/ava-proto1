@@ -88,6 +88,7 @@ export function useExperienceState() {
     setFilmAnswer,
     markTeaserSeen,
     setRoleProfile,
+    setUserPosture,
     setSelectedCharacter,
     setAudioState,
     addMessage,
