@@ -25,6 +25,7 @@ import SessionsTab, { type SessionRow } from "@/components/admin/SessionsTab";
 import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
 import LLMUsageTab from "@/components/admin/LLMUsageTab";
 import VoiceUsageTab from "@/components/admin/VoiceUsageTab";
+import VideosListTab from "@/components/admin/VideosListTab";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -43,6 +44,7 @@ const TAB_GROUPS = [
     label: "📚 Contenu Notion",
     tabs: [
       { id: "sync", label: "Sync Notion" },
+      { id: "videos", label: "Vidéos" },
       { id: "embeddings", label: "Embeddings" },
       { id: "rag", label: "RAG Test" },
     ],
