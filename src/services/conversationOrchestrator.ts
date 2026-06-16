@@ -6,43 +6,23 @@ import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, ConversationPipelineTimings, ConversationPipelineTrace, ConversationValidationTrace, GameMasterResponse, GameMasterTurnBrief, MaxConstraintCheckResult, MaxTurnKnowledgeContext, VideoTrigger } from "@/types";
 import { getGameplaySettings, getLLMSettings } from "@/services/settingsService";
 import { createTurnTimer } from "@/services/latencyTelemetry";
+import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 
-// Demo triggers for the prototype
-const DEMO_TRIGGERS: Record<string, VideoTrigger> = {
-  trigger_famille: {
-    id: "trigger_famille",
-    title: "Flashback famille",
-    type: "mid_conversation",
-    themes: ["famille", "parents", "enfance"],
-    placeholder_text: "Max se souvient de son enfance avec Ava. Des images de leur maison familiale, des rires partagés, avant que tout change...",
-    priority: 1,
-    transition_style: "fade_black",
-    post_video_context: "Tu viens de te souvenir de ton enfance avec Ava. Ces souvenirs te rendent nostalgique mais aussi plus déterminé.",
-    duration_seconds: 8,
-  },
-  trigger_secret: {
-    id: "trigger_secret",
-    title: "Le message cryptique",
-    type: "mid_conversation",
-    themes: ["secret", "mystère", "vérité"],
-    placeholder_text: "Le dernier message d'Ava apparaît à l'écran. Des symboles étranges, des coordonnées partielles, un avertissement...",
-    priority: 2,
-    transition_style: "fade_black",
-    post_video_context: "Tu as montré le message d'Ava. C'est un pas vers la confiance.",
-    duration_seconds: 10,
-  },
-  trigger_disparition: {
-    id: "trigger_disparition",
-    title: "Le jour de la disparition",
-    type: "mid_conversation",
-    themes: ["disparition", "absence", "recherche"],
-    placeholder_text: "Reconstitution du dernier jour où Ava a été vue. Son appartement vide, des indices laissés derrière elle...",
-    priority: 3,
-    transition_style: "fade_black",
-    post_video_context: "Tu as partagé ce que tu sais sur sa disparition. La confiance grandit.",
-    duration_seconds: 12,
-  },
-};
+function rowToTrigger(row: VideoTriggerRow): VideoTrigger {
+  return {
+    id: row.id,
+    title: row.title,
+    type: (row.type as VideoTrigger["type"]) || "interlude",
+    themes: row.themes ?? [],
+    priority: row.priority ?? 1,
+    transition_style: row.transition_style ?? "fade_black",
+    post_video_context: row.context ?? row.post_video_context ?? null,
+    context: row.context,
+    description: row.description,
+    video_url: row.video_url ?? null,
+    notion_id: row.notion_id,
+  };
+}
 
 export interface ConversationTurnResult {
   maxResponse: string;
