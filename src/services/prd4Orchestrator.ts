@@ -25,6 +25,8 @@ export interface PRD4TurnInput {
   timeElapsedSeconds: number;
   /** Personnage appelé (PRD4 : "max" toujours, autres grisés). */
   characterName?: string;
+  /** IDs de triggers vidéo déjà joués durant la session. */
+  triggeredVideoIds?: string[];
   onLatencySegment?: (event: PRD4LatencySegmentEvent) => void;
 }
 
