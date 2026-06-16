@@ -38,7 +38,7 @@ const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
   trigger_video_id: null,
 };
 
-const GM_POST_TURN_TIMEOUT_MS = 6000;
+const GM_POST_TURN_TIMEOUT_MS = 12000;
 
 const SYSTEM_PROMPT = `Tu es le Game Master d'une expérience narrative en temps réel de ~5 minutes entre un joueur et Max (père d'Ava). Après chaque échange (1 message utilisateur + 1 réponse de Max), tu produis une évaluation structurée en JSON STRICT — aucun texte hors JSON.
 
@@ -57,12 +57,13 @@ Tu retournes EXACTEMENT cet objet :
   "trigger_video_id": string | null // ID d'une vidéo à jouer ; voir bloc VIDÉOS DISPONIBLES
 }
 
-Règles "trigger_video_id" :
+Règles "trigger_video_id" — PRIORITÉ HAUTE, c'est le principal levier narratif :
 - Renseigne UNIQUEMENT un id présent dans la liste VIDÉOS DISPONIBLES.
-- Choisis une vidéo dont au moins un \`themes\` recoupe sémantiquement les sujets de l'échange courant.
-- Si plusieurs matchs : prends la plus grande priorité (number le plus petit = plus prioritaire).
+- DÈS QU'un thème de la vidéo (champ \`themes\`) est abordé sémantiquement par le joueur OU par Max dans le dernier échange, DÉCLENCHE la vidéo. Tolère les fautes d'orthographe et variantes (ex: "patricarcat" = "patriarcat", "famille" ⊃ parents/sœur/père/frère/enfance/fratrie, "trahison" ⊃ mensonge/cacher/secret, "secrets" ⊃ cacher/vérité/dissimuler, "confiance" ⊃ doute/méfiance). Sois LARGE dans le matching sémantique.
+- Si plusieurs matchs possibles : prends la priorité la plus haute (number le plus petit = plus prioritaire).
 - N'utilise JAMAIS un id présent dans \`already_triggered\`.
-- Sois conservateur : si aucun match évident, retourne null. On préfère 0 vidéo qu'une vidéo hors-sujet.
+- Ne déclenche PAS deux vidéos dans le même tour, et évite deux tours consécutifs si possible.
+- Le seul cas où tu retournes null : aucun thème vidéo n'a réellement été touché. En cas de doute raisonnable, DÉCLENCHE — l'expérience repose sur ces cinématiques.
 
 Règles "end_recommended" : true seulement si la conversation a vraiment trouvé une clôture naturelle, ou si elle est en train d'échouer. Sois conservateur — la session dure ~5 min max.
 
