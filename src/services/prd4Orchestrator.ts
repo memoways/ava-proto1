@@ -27,6 +27,8 @@ export interface PRD4TurnInput {
   characterName?: string;
   /** IDs de triggers vidéo déjà joués durant la session. */
   triggeredVideoIds?: string[];
+  /** Contexte injecté dans Max suite à la vidéo précédente. */
+  postVideoContext?: string;
   onLatencySegment?: (event: PRD4LatencySegmentEvent) => void;
 }
 
@@ -91,6 +93,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     conversationHistory: input.conversationHistory,
     userMessage: input.userMessage,
     ragContext: ragContext || undefined,
+    postVideoContext: input.postVideoContext,
     session_id: input.sessionId ?? undefined,
     knowledgeContext,
     userRoleSummary: input.userRole?.summary_for_max,
