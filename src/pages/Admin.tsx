@@ -238,7 +238,10 @@ export default function Admin() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          databases: { characters: AVA_NOTION_DATABASES.characters },
+          databases: {
+            characters: AVA_NOTION_DATABASES.characters,
+            videos: AVA_NOTION_DATABASES.videos,
+          },
           wipe_all: !!opts.wipeAll,
         }),
         signal: controller.signal,
