@@ -11,6 +11,7 @@ import type {
   ExperiencePhase,
   ExperienceState,
   FilmAnswer,
+  UserPosture,
   UserRoleProfile,
 } from "@/types";
 
@@ -20,6 +21,7 @@ const initialState: ExperienceState = {
   teaserSeen: false,
   teaserSkipped: false,
   userRoleProfile: null,
+  userPosture: null,
   selectedCharacter: "max",
   conversationLog: [],
   turnCount: 0,
