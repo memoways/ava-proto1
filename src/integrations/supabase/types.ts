@@ -580,7 +580,9 @@ export type Database = {
       }
       video_triggers: {
         Row: {
+          context: string | null
           created_at: string | null
+          description: string | null
           duration_seconds: number | null
           gameplay_step_id: string | null
           id: string
@@ -596,7 +598,9 @@ export type Database = {
           video_url: string | null
         }
         Insert: {
+          context?: string | null
           created_at?: string | null
+          description?: string | null
           duration_seconds?: number | null
           gameplay_step_id?: string | null
           id?: string
@@ -612,7 +616,9 @@ export type Database = {
           video_url?: string | null
         }
         Update: {
+          context?: string | null
           created_at?: string | null
+          description?: string | null
           duration_seconds?: number | null
           gameplay_step_id?: string | null
           id?: string

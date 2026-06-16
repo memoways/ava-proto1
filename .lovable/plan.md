@@ -1,93 +1,100 @@
-## Étape 0 — Documentation
 
-Créer `docs/plan_refonte_rag_caracteres.md` : version longue et détaillée du plan ci-dessous (objectifs, schéma DB complet avec SQL, contrats edge function, mapping Notion ↔ DB ↔ UI, structure nav admin, étapes de migration des données, plan de test, hors-scope GM/niveaux). Ce document sert de référence persistante.
+# Plan — Triggers vidéo synchronisés depuis Notion + déclenchement par le Game Master
 
-## Étape 1 — Migration DB
+## Source confirmée (Notion)
+Base « 🎬 Vidéos AVA » (id `478685a5b31e45b5bc534bcf905b9124`, data source `009ca428-f888-43f4-a1ef-6c8dbefd6967`).
+Propriétés réelles : `Titre de la vidéo` (title), `Contexte` (text), `Description` (text), `Priorité` (number), `Thèmes` (multi_select), `Type` (select: intro/interlude/mid_conversation), `Style de transition` (select), `URL Gumlet` (url).
 
-Nouvelle table `public.character_prompts` (1 ligne / personnage) :
-- `character_id` uuid PK FK → `characters.id` ON DELETE CASCADE
-- `identite_fondamentale text`, `qui_tu_es text`, `ce_que_tu_ne_fais_jamais text`, `ce_que_tu_sais_utilisateur text`, `dynamique_conversation text`, `sujets_sensibles text`, `profondeur_par_niveau text`
-- `situation_summary text` (résumé court pour le GM, généré au sync)
-- `created_at`, `updated_at` + trigger `update_updated_at_column`
-- GRANT SELECT/INSERT/UPDATE/DELETE authenticated, GRANT ALL service_role
-- RLS activée, policies : SELECT à tous authenticated, mutations via service_role/admin
-- On laisse `characters.system_prompt` en place (deprecated, non lu)
+## 1. Migration BDD (`video_triggers`)
+- Ajouter colonnes `context text` (= Contexte Notion) et `description text`.
+- `placeholder_text` devient inutilisé (gardé nullable pour ne rien casser, désaffiché dans l'UI).
+- Pas d'autres changements de schéma.
 
-## Étape 2 — Edge function `sync-notion` refactor
+## 2. Edge function `sync-notion`
+- Étendre la requête : accepter `databases.videos` en plus de `databases.characters`.
+- Pour chaque page de la base Vidéos AVA :
+  - `upsert` dans `video_triggers` (clé `notion_id`) avec mapping :
+    - `title` ← Titre de la vidéo
+    - `context` ← Contexte
+    - `description` ← Description
+    - `priority` ← Priorité
+    - `themes` ← Thèmes (array)
+    - `type` ← Type
+    - `transition_style` ← Style de transition
+    - `video_url` ← URL Gumlet
+    - `post_video_context` ← Contexte (back-compat pour le code legacy qui l'injecte dans Max)
+- Rapport renvoyé : `videos_synced`, `per_video`.
 
-- Retirer entièrement les branches `storyworld`, `gameplay_steps`, `video_triggers` du payload accepté et de la logique
-- Seule entrée : `databases.characters`
-- Pour chaque page Caractères :
-  1. Upsert dans `characters` (nom, archétype, page body comme backstory)
-  2. Extraire les 7 nouvelles propriétés rich_text et upsert dans `character_prompts`
-  3. Générer `situation_summary` via OpenRouter (`LLM_MODEL_GM` par défaut, prompt court : "résume la situation actuelle du personnage en 100-150 mots, factuel" — input = corps de page)
-  4. **Wipe puis ré-insérer** les embeddings du personnage : `DELETE FROM embeddings WHERE character_id = <id>`, puis chunker uniquement le **corps de page** (pas les propriétés) avec un préfixe header, embed (Voyage), insert avec `source_table='characters'` et `character_id=<id>` non-null
-- Avant la boucle, si flag `wipe_all=true` dans la requête : `DELETE FROM embeddings` global
-- Réponse enrichie : nb chunks par personnage, longueur situation_summary
+## 3. Nouvelle edge function `update-notion-video`
+- Inputs : `notion_id`, propriétés modifiées.
+- PATCH `https://api.notion.com/v1/pages/{notion_id}` avec mapping inverse (titre, contexte, description, priorité, thèmes, type, style, url).
+- Réponse : `{ ok: true, updated_at }` ou message d'erreur clair si 403 (« partagez la base avec l'intégration Notion »).
+- Après succès, lance un mini re-sync de la ligne pour s'assurer que la BDD est cohérente.
 
-## Étape 3 — Service settings refactor
+## 4. Service front
+- `src/services/ragService.ts` : ajouter `videos: '478685a5-b31e-45b5-bc53-4bcf905b9124'` dans `AVA_NOTION_DATABASES` et passer cet ID au sync.
+- Nouveau `src/services/videoTriggerService.ts` : `listVideoTriggers()`, `updateVideoTrigger(id, patch)` qui appelle `update-notion-video` puis met à jour la ligne Supabase locale.
 
-`src/services/settingsService.ts` :
-- Marquer `MaxPromptControlSettings` deprecated (laisser le code mais non utilisé)
-- Nouveau module `src/services/characterPromptService.ts` :
-  - `CharacterPrompt` interface (7 champs + situation_summary + character_id/name)
-  - `loadCharacterPrompt(characterId): Promise<CharacterPrompt | null>`
-  - `saveCharacterPrompt(characterId, partial): Promise<void>`
-  - `listCharacterPrompts(): Promise<CharacterPromptWithName[]>` (join `characters`)
-  - Cache mémoire simple + `clearCharacterPromptCache(characterId?)`
-- `AVA_NOTION_DATABASES` dans `ragService.ts` : ne garder que `characters`
+## 5. UI Admin
 
-## Étape 4 — Agents
+### Onglet « Contenu Notion » → nouveau sous-onglet `Vidéos`
+- Liste simple (titre + chips thématiques, rien d'autre).
+- Bouton « Re-sync vidéos » qui appelle `sync-notion` avec `databases.videos`.
 
-`src/agents/maxAgent.ts` :
-- `buildMaxSystemPrompt` charge `character_prompts` pour le personnage actif (par nom) et compose le prompt avec sections nommées exactement : `## IDENTITÉ FONDAMENTALE`, `## QUI TU ES`, `## CE QUE TU NE FAIS JAMAIS`, `## CE QUE TU SAIS DE L'UTILISATEUR`, `## DYNAMIQUE DE LA CONVERSATION`, `## SUJETS SENSIBLES`, `## PROFONDEUR PAR NIVEAU`
-- `GAMEPLAY_RULES` conservé
-- RAG `## CONTEXTE NARRATIF` injecté comme source de vérité
-- Cache invalidable via `clearSystemPromptCache()`
-- Tous les appels RAG forcent `characterId` non-null (vérifier call sites dans `prd4Orchestrator`, `conversationOrchestrator`, `maxTestPipeline`)
+### Onglet « Mécanique → Triggers vidéo » (`VideoTriggersEditor.tsx`)
+- Supprimer le bouton « Ajouter ».
+- Supprimer le bouton « Supprimer » par ligne (la source de vérité est Notion).
+- Ajouter le champ éditable **Description** (textarea longue) + label « Contexte » (renommé depuis `post_video_context`).
+- Renommer les champs visibles selon la nomenclature Notion : Titre, Contexte, Description, Priorité, Thèmes, Type, URL Gumlet, Style de transition.
+- Supprimer `placeholder_text` et `duration_seconds` de l'UI.
+- « Sauvegarder » appelle `updateVideoTrigger` → PATCH Notion → refresh ligne. Toast clair en cas d'erreur Notion.
+- Wipe initial : `DELETE FROM video_triggers` au premier sync (les 3 fakes disparaissent automatiquement car remplacés par upsert sur `notion_id` ; on prévoit en plus un `DELETE WHERE notion_id IS NULL` lors de la sync vidéos pour purger les anciens exemples sans `notion_id`).
 
-`src/agents/gameMasterAgent.ts` et `gameMasterPRD4.ts` :
-- Charger `character_prompts.situation_summary` et l'injecter dans le system prompt GM (section `## SITUATION ACTUELLE DU PERSONNAGE`)
-- Avant chaque évaluation : `queryRAG(userMessage, recentContext, 2, undefined, { characterId })` et injecter les 2 extraits dans le user prompt du GM (section `## EXTRAITS NARRATIFS PERTINENTS`)
+## 6. Décision du Game Master (déclenchement vidéo)
 
-## Étape 5 — Admin UI
+### 6a. Legacy (`gameMasterAgent.ts` + `conversationOrchestrator.ts`)
+- Supprimer le dict `DEMO_TRIGGERS`.
+- Charger les `video_triggers` actifs (cache 30 s) depuis Supabase ; passer au GM la liste `{id, title, themes, priority, already_triggered}`.
+- Mettre à jour le prompt GM pour qu'il choisisse `trigger_video_id` parmi les vidéos disponibles uniquement si la thématique de la discussion recoupe `themes` (sinon `null`). Priorité = tie-break.
+- Conserver « never trigger same video twice ».
+- Le `post_video_context` (= Contexte Notion) reste injecté dans Max au tour suivant pour qu'il « ait vu » la vidéo.
 
-Réorganiser `TAB_GROUPS` dans `src/pages/Admin.tsx` :
+### 6b. PRD4 (`gameMasterPRD4.ts` + `prd4Orchestrator.ts` + `IndexPRD4.tsx`)
+- Ajouter dans la promesse post-turn GM un appel léger « video selector » (peut être combiné dans le même LLM call) qui renvoie `trigger_video_id | null` selon la même logique thématique.
+- `processPRD4Turn` retourne `pendingVideoTrigger` dans `postTurnPromise`.
+- Dans `IndexPRD4.tsx` :
+  - Après que Max a fini de parler (TTS terminé), si `pendingVideoTrigger` est non null et non déjà joué : passer en phase `video_trigger`, monter `GumletVideoPlayer` en plein écran.
+  - Activer les contrôles natifs Gumlet (play/pause/volume + skip déjà présent).
+  - À la fin (`onComplete`) ou skip (`onSkip`) : injecter `context` comme system note dans l'historique pour le prochain tour de Max, puis revenir à l'écran conversation exactement dans l'état précédent (mic prêt, position d'historique inchangée).
+- Aucun message n'est consommé par la vidéo : la discussion reprend au tour suivant côté utilisateur.
+
+## 7. Documentation / mémoires
+- Mettre à jour `CHANGELOG.md` + `STORY.md` (nouvelle source Notion `videos`, déclenchement vidéo PRD4).
+- Mettre à jour `mem://logic/video-triggers`.
+
+## Détails techniques
+```text
+Notion (Vidéos AVA)
+  └─ sync-notion ──► public.video_triggers (notion_id, title, context, description,
+                                            priority, themes[], type, transition_style,
+                                            video_url, post_video_context=context)
+
+Conversation tour N
+  user ─► STT ─► Max ─► TTS ──┐
+                              ├─► GM post-turn (parmi video_triggers non triggered,
+                              │     choisit id si themes ∩ topics(discussion))
+                              ▼
+                       phase=video_trigger ─► GumletVideoPlayer
+                              │
+                              ▼ onComplete/onSkip
+                       inject Contexte dans history (system note)
+                              │
+                              ▼
+                       phase=conversation (tour N+1)
 ```
-📊 Données        : Sessions, Questionnaires
-📚 Contenu Notion : Sync Notion, Embeddings, RAG Test
-🎭 Personnages    : sélecteur (Max / Ava / Léo / Emma) → onglet éditorial unique
-🎮 Mécanique      : Game Master, Validateur, Métriques hallu., Pipeline, Test Max
-🔧 Technique      : LLM, TTS, STT, Consommation LLM, Consommation Voix, Latence, Latences PostHog
-```
 
-Nouveau composant `src/components/CharacterEditorTab.tsx` :
-- Sélecteur de personnage (dropdown alimenté par `listCharacterPrompts`)
-- 7 textarea pour les champs éditoriaux + 1 textarea read-only pour `situation_summary` (avec bouton "Régénérer" qui rappelle l'edge function pour ce personnage)
-- Bouton "Resync depuis Notion" (déclenche sync pour ce personnage)
-- Preview du system prompt final généré (read-only)
-- Pas de bouton "Sauvegarder dans Notion" — l'édition Notion reste maître ; les modifs locales sont possibles mais écrasées au prochain sync (toast d'avertissement)
-
-Onglet `Sync Notion` :
-- Bouton "Wipe & rebuild RAG (toutes les pages Caractères)" → POST `sync-notion` avec `{ wipe_all: true, databases: { characters: <id> } }`
-- Bouton "Sync incrémental" → sans `wipe_all`
-- Retirer les sections storyworld/gameplay/video du rapport
-
-Supprimer / déplacer :
-- `MaxPromptControlTab` → remplacé par `CharacterEditorTab` (le fichier reste dans le repo mais n'est plus utilisé ; suppression possible si plus aucune route ne le référence)
-- Onglet "Personnages" actuel (édition `system_prompt` brut) → masqué (la source devient `character_prompts`)
-
-## Étape 6 — Validation manuelle
-
-1. Lancer la migration DB (approbation utilisateur)
-2. Sync Notion incrémentale → vérifier qu'une ligne `character_prompts` existe pour Max et que les 7 champs sont remplis
-3. Wipe & rebuild RAG → vérifier que `embeddings` ne contient que `source_table='characters'` avec `character_id` non-null
-4. Tester une session vocale Max via `/` (PRD4) → vérifier dans la console que le system prompt contient bien les 7 nouvelles sections et que le GM reçoit la situation_summary
-
-## Hors scope (prochaine mise à jour)
-
-- Donner plus de poids au Game Master pour orchestrer les niveaux à partir de `Profondeur par niveau` (lecture par niveau) et déclencher des vidéos entre les niveaux.
-
-## Prérequis utilisateur côté Notion
-
-Ajouter / renommer dans la base **Caractères AVA** les 7 propriétés rich_text avec les noms exacts ci-dessus, et les remplir pour Max. Le corps de la page Max contient le récit (film + post-film) qui ira au RAG.
+## Hors scope
+- Pas de nouvelle table.
+- Pas de modification du player Gumlet (déjà OK).
+- Pas de création de vidéos depuis l'app (bouton Ajouter retiré).
+- Pas d'embeddings sur la base vidéos.
