@@ -27,6 +27,8 @@ export type ExperiencePhase =
   | "role_summary"
   | "character_select"
   | "calling_max"
+  | "posture_capture"
+  | "transition_max"
   | "conversation_max"
   | "end_session"
   | "questionnaire"
