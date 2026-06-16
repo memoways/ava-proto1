@@ -47,7 +47,9 @@ import ConversationScreen from "@/components/prd4/ConversationScreen";
 import EndSessionScreen from "@/components/prd4/EndSessionScreen";
 import QuestionnaireScreenPRD4 from "@/components/prd4/QuestionnaireScreenPRD4";
 import ThanksScreen from "@/components/ThanksScreen";
+import GumletVideoPlayer from "@/components/GumletVideoPlayer";
 import { savePRD4Questionnaire, syncPRD4QuestionnaireToNotion } from "@/services/prd4Questionnaire";
+import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import type { QuestionnairePRD4Answers, QuestionnairePRD4Data } from "@/types";
 
 const SESSION_DURATION_S = 5 * 60; // PRD4 §11 : ~5 min cible.
