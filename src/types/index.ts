@@ -297,6 +297,8 @@ export interface PRD4PostTurnEvaluation {
   end_recommended: boolean;
   moderation_flag: boolean;
   notes: string;
+  /** ID du trigger vidéo à jouer après la réponse de Max (null si aucun). */
+  trigger_video_id?: string | null;
   /** Renseignés côté client après l'appel LLM. */
   turn_index?: number;
   latency_ms?: number;
