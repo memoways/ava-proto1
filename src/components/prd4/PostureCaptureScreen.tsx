@@ -82,6 +82,13 @@ const PostureCaptureScreen = ({ settings, onSubmit, onSurprise, onPTTError }: Pr
     stt.flush();
     stt.pause();
     setRecording(false);
+    // Filet de sécu: si aucun "final" n'arrive après pause, on promeut l'interim courant
+    setInterim((curInterim) => {
+      if (curInterim.trim().length > 0) {
+        setTranscript((prev) => (prev ? `${prev} ${curInterim}` : curInterim).trim());
+      }
+      return "";
+    });
   }, []);
 
   const { buttonHandlers } = usePushToTalk({
