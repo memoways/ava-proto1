@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-06-16 (session 26 — Démarrage GIFF, 3 variantes admin, nouveau flow onboarding < 45 s)
+> **Last Updated**: 2026-06-17 (session 27 — Labels GM, déclenchement vidéo fiabilisé, diction TTS plus naturelle, suppression module GIFF)
 
 ---
 
