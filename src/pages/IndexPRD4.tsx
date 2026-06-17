@@ -160,19 +160,15 @@ const IndexPRD4 = () => {
   const handleStart = useCallback(() => {
     onboardingStartedAtRef.current = Date.now();
     firstMaxResponseAtRef.current = null;
-    trackEvent("giff_onboarding_started", {
-      variant: giffSettingsRef.current.active_start_variant,
-      use_giff_flow: giffSettingsRef.current.use_giff_flow,
-    });
+    trackEvent("prd4_onboarding_started", {});
     setPhase("film_question");
   }, [setPhase]);
   const handleFilmAnswer = useCallback(
     (a: FilmAnswer) => {
       setFilmAnswer(a);
-      trackEvent("giff_film_answered", { answer: a });
-      const useGiff = giffSettingsRef.current.use_giff_flow;
+      trackEvent("prd4_film_answered", { answer: a });
       if (a === "vu") {
-        setPhase(useGiff ? "posture_capture" : "role_capture");
+        setPhase("posture_capture");
       } else {
         setPhase("teaser");
       }
@@ -181,11 +177,11 @@ const IndexPRD4 = () => {
   );
   const handleTeaserContinue = useCallback(() => {
     markTeaserSeen(false);
-    setPhase(giffSettingsRef.current.use_giff_flow ? "posture_capture" : "role_capture");
+    setPhase("posture_capture");
   }, [markTeaserSeen, setPhase]);
   const handleTeaserSkip = useCallback(() => {
     markTeaserSeen(true);
-    setPhase(giffSettingsRef.current.use_giff_flow ? "posture_capture" : "role_capture");
+    setPhase("posture_capture");
   }, [markTeaserSeen, setPhase]);
 
   // ---- Posture capture (GIFF) ----------------------------------------------
