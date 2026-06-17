@@ -4,6 +4,31 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.31.0] - 2026-06-17 — GM label pass parallèle, déclenchement vidéo déterministe
+
+### Ajouté
+- **GM Label Pass (`gameMasterLabelPRD4.ts`)** — agent LLM léger (mono-tâche, ≤120 tokens, timeout 4 s) qui extrait `labels: { themes, topics, intentions }` (max 4 au total) du dernier message utilisateur. Lancé EN PARALLÈLE de Max LLM par `processPRD4Turn`, donc les labels sont disponibles avant la fin du TTS de Max.
+- **Matcher vidéo déterministe (`videoTriggerMatcher.ts`)** — remplace le matching LLM fragile par une logique client-side : normalisation des accents, tolérance aux coquilles (`patricarcat` → `patriarcat`), synonymes (`famille` ⊃ père/mère/sœur/enfance, `patriarcat` ⊃ viril/violence/machisme, `trahison` ⊃ mensonge/secret, `pandémie` ⊃ protogynie/virus). Un seul thème/synonyme commun entre les labels utilisateur et les `themes` d'une vidéo suffit pour déclencher. Priorité par `priority` ascendante.
+- **Plan d'architecture** : `docs/plan_game_master_labels_videos.md` documente le flux parallèle (Max LLM + GM Label Pass) et le rôle du matcher déterministe.
+
+### Modifié
+- **`prd4Orchestrator.ts`** — `processPRD4Turn` expose désormais `labelPromise: Promise<PRD4LabelResult>` en plus de `postTurnPromise`. Le label pass est lancé en parallèle, sans impacter le chemin critique STT→LLM→TTS.
+- **`IndexPRD4.tsx`** — consomme `labelPromise` pour :
+  1. Attacher les labels au dernier message utilisateur dans `conversationRef` + persistance DB + `setLastUserLabels` (visible admin).
+  2. Appeler `pickVideoForLabels(...)` dès que les labels sont résolus ; si match → `setActiveVideo` immédiatement (pendant ou juste après le TTS de Max).
+  3. Traquer `prd4_gm_label` et `prd4_video_triggered` dans PostHog (source du match incluse).
+- **Post-turn GM (`gameMasterPRD4.ts`)** — garde-fou conservé : si le label pass n'a déclenché aucune vidéo et que le post-turn retourne un `trigger_video_id`, celui-ci est joué en fallback. Les labels du post-turn servent aussi de fallback si le label pass a échoué (`ok: false`).
+
+### Corrigé
+- **Déclenchement vidéo fragile** — le GM post-turn évaluait à la fois labels, engagement, guidance et choix de vidéo dans un seul prompt lourd, ce qui causait des omissions fréquentes de `trigger_video_id` (ex. session « patriarcat/famille » sans vidéo « couteau »). Séparer le label pass (léger + parallèle) et le matcher déterministe (fiable) résout le problème.
+
+### Hors-scope / Non-régression
+- Aucune modification de l'UI joueur (`ConversationScreen` inchangé). Les labels restent visibles uniquement dans l'admin (`SessionsTab`).
+- Pas de migration DB (les labels existent déjà dans `sessions.conversation_log[].labels`).
+- Pipeline STT/TTS et agent Max inchangés.
+
+---
+
 ## [0.30.0] - 2026-06-17 — Flux conversationnel stabilisé, STT/TTS fluides, sonneries d'appel
 
 ### Ajouté

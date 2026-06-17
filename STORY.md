@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-06-17 (session 28 — Flux conversationnel stabilisé, STT/TTS fluides, sonneries d'appel)
+> **Last Updated**: 2026-06-17 (session 29 — GM label pass parallèle + matcher vidéo déterministe)
 
 ---
 
@@ -109,9 +109,30 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 **Time**: ~1h30 (diagnostic UX → retrait HUD transcript → réécriture STT live → ajustement TTS → sonneries Web Audio → textes UX).
 
+---
 
+### 2026-06-17 — GM label pass parallèle + matcher vidéo déterministe 🔷
 
+**Intent**: Le Game Master post-turn échouait systématiquement à déclencher la vidéo « couteau » même quand l'utilisateur parlait explicitement de famille et de patriarcat. En creusant : le prompt GM mélangeait extraction de labels, évaluation d'engagement, guidance pour Max ET choix de vidéo dans une seule requête lourde — résultat, le LLM oubliait fréquemment le champ `trigger_video_id`. De plus, tout le travail GM était séquentiel (après Max), donc les labels n'étaient pas exploitables pendant que Max parlait. Il fallait séparer les préoccupations : un agent léger pour les labels en parallèle de Max, et un matcher côté client pour les vidéos.
 
+**Tool**: Lovable
+
+**Outcome**:
+1. **GM Label Pass (`gameMasterLabelPRD4.ts`)** — agent LLM dédié, prompt mono-tâche (extrait uniquement `{themes, topics, intentions}`, max 4 items, pas d'invention). Timeout 4 s, max 120 tokens. L'exécution est lancée en parallèle de Max LLM dans `processPRD4Turn` via `labelPromise`, donc les labels sont prêts bien avant la fin du tour.
+2. **Matcher déterministe (`videoTriggerMatcher.ts`)** — logique client-side qui remplace le choix LLM de vidéo. Normalise les accents, corrige les coquilles Notion connues (`patricarcat` → `patriarcat`), et étend les thèmes par synonymes (`famille` englobe père/mère/sœur/enfance, `patriarcat` englobe viril/violence/machisme, `trahison` englobe mensonge/secret, `pandémie` englobe protogynie/virus). Un seul thème ou synonyme commun entre les labels utilisateur et les `themes` d'une vidéo disponible suffit pour la déclencher. En cas d'échec du label pass, un fallback scanne les tokens bruts du message utilisateur.
+3. **Orchestrateur modifié (`prd4Orchestrator.ts`)** — `processPRD4Turn` retourne `labelPromise` en plus de `postTurnPromise`. Le label pass est lancé en parallèle, sans impacter le chemin critique STT→LLM→TTS.
+4. **Intégration conversation (`IndexPRD4.tsx`)** — consomme `labelPromise` pour attacher les labels au message utilisateur (persistance DB + state admin) et pour appeler `pickVideoForLabels`. En cas de match, `activeVideo` est activé immédiatement (le joueur voit la cinématique après le TTS de Max). Le post-turn GM reste comme garde-fou : si le label pass n'a rien déclenché mais que le post-turn retourne un `trigger_video_id`, celui-ci est joué en fallback. PostHog trace `prd4_gm_label` (latence, modèle, nombre de labels) et `prd4_video_triggered` (source du match : themes/topics/intentions/raw_message).
+5. **Documentation** — `docs/plan_game_master_labels_videos.md` consigne l'architecture cible : parallélisme Max/Label Pass, matcher déterministe, rôle du post-turn en garde-fou.
+
+**Ce que ça change** : le Game Master devient **fiable sur le déclenchement vidéo**. Avant, le succès dépendait de la volonté du LLM de remplir un champ dans un JSON complexe ; maintenant, un thème utilisateur qui matche un thème vidéo déclenche automatiquement le clip, quelle que soit la qualité de la réponse Max. Le label pass parallèle réduit aussi la latence perçue : les labels sont calculés pendant que Max pense et parle, pas après. Le post-turn GM peut se concentrer sur l'engagement, la confusion et la recommandation de fin de session, sans être surchargé.
+
+**Validation**:
+- `npx tsc --noEmit` : OK.
+- Build Vite : OK.
+
+**Time**: ~1h (analyse des échecs GM → architecture → implémentation 3 fichiers + orchestrateur + page → tests build → documentation).
+
+---
 
 ### 2026-06-16 — Démarrage GIFF (< 45 s, 3 variantes admin) 🔷
 
