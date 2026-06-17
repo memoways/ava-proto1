@@ -638,16 +638,31 @@ const IndexPRD4 = () => {
           // Garde-fou vidéo : on attend le label pass d'abord pour éviter une double sélection.
           await labelHandling;
           if (!videoTriggeredThisTurn && ev.trigger_video_id && !triggeredVideoIdsRef.current.includes(ev.trigger_video_id)) {
-            try {
-              const videos = await getVideoTriggersCached();
-              const row = videos.find((v) => v.id === ev.trigger_video_id) || null;
-              if (row?.video_url) {
-                triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, row.id];
-                trackEvent("prd4_video_triggered", { session_id: sessionIdRef.current, video_id: row.id, title: row.title, source: "post_turn_fallback" });
-                setActiveVideo(row);
+            const settings = videoTriggerSettingsRef.current;
+            const userTurnNumber = conversationRef.current.filter((m) => m.role === "user").length;
+            const blocked = !settings.ENABLED
+              || userTurnNumber < settings.MIN_TURNS_BEFORE_FIRST
+              || (userTurnNumber - lastVideoTurnRef.current) < settings.MIN_TURNS_BETWEEN
+              || (settings.MAX_PER_SESSION > 0 && triggeredVideoIdsRef.current.length >= settings.MAX_PER_SESSION);
+            if (blocked) {
+              trackEvent("prd4_video_gate_blocked", {
+                session_id: sessionIdRef.current,
+                reason: "post_turn_fallback_gate",
+                user_turn: userTurnNumber,
+              });
+            } else {
+              try {
+                const videos = await getVideoTriggersCached();
+                const row = videos.find((v) => v.id === ev.trigger_video_id) || null;
+                if (row?.video_url) {
+                  triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, row.id];
+                  lastVideoTurnRef.current = userTurnNumber;
+                  trackEvent("prd4_video_triggered", { session_id: sessionIdRef.current, video_id: row.id, title: row.title, source: "post_turn_fallback" });
+                  setActiveVideo(row);
+                }
+              } catch (err) {
+                console.warn("[PRD4] post-turn video trigger fallback failed:", err);
               }
-            } catch (err) {
-              console.warn("[PRD4] post-turn video trigger fallback failed:", err);
             }
           }
           if (ev.end_recommended && !endedRef.current) {
