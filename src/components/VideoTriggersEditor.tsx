@@ -213,6 +213,8 @@ export default function VideoTriggersEditor() {
   if (loading) return <p className="text-sm text-muted-foreground">Chargement des triggers…</p>;
 
   return (
+    <div className="space-y-4">
+    <VideoTriggerRulesPanel />
     <section className="border rounded-lg p-4 space-y-3">
       <div className="flex items-center justify-between">
         <div>
