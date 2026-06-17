@@ -17,6 +17,9 @@ interface GumletVideoPlayerProps {
 const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVideoPlayerProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const playerRef = useRef<Player | null>(null);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
 
   const isGumletEndedMessage = useCallback((data: unknown) => {
     if (!data || typeof data !== "object") return false;
@@ -65,6 +68,7 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
         playerRef.current = player;
         player.on("ready", forceAudioOn);
         player.on("play", forceAudioOn);
+        player.on("ended", () => onCompleteRef.current());
         player.on("timeupdate", () => {
           if (retryCount < 6) {
             retryCount += 1;
