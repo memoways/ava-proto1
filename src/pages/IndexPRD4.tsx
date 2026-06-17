@@ -204,14 +204,14 @@ const IndexPRD4 = () => {
     (raw: string) => {
       setUserPosture({ raw, mode: "voice" });
       trackEvent("giff_posture_captured", { mode: "voice", length: raw.length });
-      setPhase("transition_max");
+      setPhase("character_select");
     },
     [setUserPosture, setPhase],
   );
   const handlePostureSurprise = useCallback(() => {
     setUserPosture({ raw: "", mode: "surprise" });
     trackEvent("giff_posture_captured", { mode: "surprise", length: 0 });
-    setPhase("transition_max");
+    setPhase("character_select");
   }, [setUserPosture, setPhase]);
   const handlePosturePTTError = useCallback(
     (err: Error) => {
