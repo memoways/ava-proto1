@@ -26,7 +26,7 @@ import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
 import LLMUsageTab from "@/components/admin/LLMUsageTab";
 import VoiceUsageTab from "@/components/admin/VoiceUsageTab";
 import VideosListTab from "@/components/admin/VideosListTab";
-import GiffStartTab from "@/components/admin/GiffStartTab";
+
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
