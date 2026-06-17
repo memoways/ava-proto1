@@ -91,6 +91,14 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const rag_ms = Math.round(performance.now() - ragStart);
   input.onLatencySegment?.({ type: "end", segment: "RAG", service: "RAG", durationMs: rag_ms });
 
+  // --- GM Label Pass (parallèle à Max) ---------------------------------------
+  const labelPromise: Promise<PRD4LabelResult> = labelUserTurnPRD4({
+    sessionId: input.sessionId,
+    userMessage: input.userMessage,
+    conversationHistory: input.conversationHistory,
+    userPostureRaw: input.userPostureRaw ?? null,
+  });
+
   // --- Max --------------------------------------------------------------------
   const maxStart = performance.now();
   input.onLatencySegment?.({ type: "start", segment: "LLM", service: "Max LLM" });
