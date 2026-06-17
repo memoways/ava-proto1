@@ -505,7 +505,65 @@ const IndexPRD4 = () => {
           void updatePRD4Conversation(sessionIdRef.current, conversationRef.current);
         }
 
-        // GM post-turn : labels, end_recommended + trigger vidéo (jamais bloquant)
+        // ---- Label pass (parallèle à Max) : labels + trigger vidéo déterministe
+        // Une seule vidéo par tour : on mémorise si quelque chose a été déclenché ici
+        // pour que le post-turn (garde-fou) ne re-déclenche pas.
+        let videoTriggeredThisTurn = false;
+        const labelHandling = result.labelPromise.then(async (lab) => {
+          const labels = lab.labels;
+          const total = (labels.themes?.length ?? 0) + (labels.topics?.length ?? 0) + (labels.intentions?.length ?? 0);
+
+          // Attache les labels au dernier message utilisateur (state + persistance).
+          if (total > 0) {
+            setLastUserLabels(labels);
+            const log = conversationRef.current;
+            for (let i = log.length - 1; i >= 0; i--) {
+              if (log[i].role === "user") {
+                log[i] = { ...log[i], labels };
+                break;
+              }
+            }
+            if (sessionIdRef.current) {
+              void updatePRD4Conversation(sessionIdRef.current, conversationRef.current);
+            }
+          }
+
+          // Matcher déterministe (un seul thème commun suffit).
+          let pickedVideoId: string | null = null;
+          try {
+            const videos = await getVideoTriggersCached();
+            const match = pickVideoForLabels(labels, videos, triggeredVideoIdsRef.current, userText);
+            if (match) {
+              pickedVideoId = match.row.id;
+              triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, match.row.id];
+              videoTriggeredThisTurn = true;
+              trackEvent("prd4_video_triggered", {
+                session_id: sessionIdRef.current,
+                video_id: match.row.id,
+                title: match.row.title,
+                source: match.source,
+                matched_term: match.matchedTerm,
+                matched_theme: match.matchedVideoTheme,
+              });
+              setActiveVideo(match.row);
+            }
+          } catch (err) {
+            console.warn("[PRD4] label-driven video trigger failed:", err);
+          }
+
+          trackEvent("prd4_gm_label", {
+            session_id: sessionIdRef.current,
+            ok: lab.ok,
+            latency_ms: lab.latency_ms,
+            model: lab.model,
+            n_themes: labels.themes?.length ?? 0,
+            n_topics: labels.topics?.length ?? 0,
+            n_intentions: labels.intentions?.length ?? 0,
+            trigger_video_id: pickedVideoId,
+          });
+        }).catch((err) => console.warn("[PRD4] label pass handling failed:", err));
+
+        // ---- GM post-turn : engagement, end_recommended + garde-fou vidéo
         void result.postTurnPromise.then(async (ev) => {
           trackEvent("prd4_gm_post_turn", {
             session_id: sessionIdRef.current,
@@ -516,13 +574,18 @@ const IndexPRD4 = () => {
             latency_ms: ev.latency_ms,
             labels: ev.labels ?? null,
           });
-          // Attache les labels GM au dernier message utilisateur (affichage chips)
+          // Fallback labels si le label pass a échoué et que le post-turn en a quand même produit.
           if (ev.labels) {
             const total = (ev.labels.themes?.length ?? 0) + (ev.labels.topics?.length ?? 0) + (ev.labels.intentions?.length ?? 0);
-            if (total > 0) {
+            const log = conversationRef.current;
+            const lastUserHasLabels = (() => {
+              for (let i = log.length - 1; i >= 0; i--) {
+                if (log[i].role === "user") return !!log[i].labels;
+              }
+              return false;
+            })();
+            if (total > 0 && !lastUserHasLabels) {
               setLastUserLabels(ev.labels);
-              // Mettre aussi à jour conversationRef pour la persistance ultérieure
-              const log = conversationRef.current;
               for (let i = log.length - 1; i >= 0; i--) {
                 if (log[i].role === "user") {
                   log[i] = { ...log[i], labels: ev.labels };
@@ -534,17 +597,19 @@ const IndexPRD4 = () => {
               }
             }
           }
-          if (ev.trigger_video_id && !triggeredVideoIdsRef.current.includes(ev.trigger_video_id)) {
+          // Garde-fou vidéo : on attend le label pass d'abord pour éviter une double sélection.
+          await labelHandling;
+          if (!videoTriggeredThisTurn && ev.trigger_video_id && !triggeredVideoIdsRef.current.includes(ev.trigger_video_id)) {
             try {
               const videos = await getVideoTriggersCached();
               const row = videos.find((v) => v.id === ev.trigger_video_id) || null;
               if (row?.video_url) {
                 triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, row.id];
-                trackEvent("prd4_video_triggered", { session_id: sessionIdRef.current, video_id: row.id, title: row.title });
+                trackEvent("prd4_video_triggered", { session_id: sessionIdRef.current, video_id: row.id, title: row.title, source: "post_turn_fallback" });
                 setActiveVideo(row);
               }
             } catch (err) {
-              console.warn("[PRD4] video trigger failed:", err);
+              console.warn("[PRD4] post-turn video trigger fallback failed:", err);
             }
           }
           if (ev.end_recommended && !endedRef.current) {
