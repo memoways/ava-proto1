@@ -171,7 +171,6 @@ export async function evaluatePostTurnPRD4(
     } else {
       const rawTrigger = parsed.trigger_video_id ? String(parsed.trigger_video_id) : null;
       const safeTrigger = rawTrigger && validIds.has(rawTrigger) && !triggered.has(rawTrigger) ? rawTrigger : null;
-      result = {
       const rawLabels = (parsed as { labels?: { themes?: unknown[]; topics?: unknown[]; intentions?: unknown[] } }).labels;
       const cleanList = (list: unknown[] | undefined): string[] =>
         Array.isArray(list)
