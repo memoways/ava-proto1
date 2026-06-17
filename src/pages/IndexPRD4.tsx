@@ -760,15 +760,14 @@ const IndexPRD4 = () => {
   // ---- Render ---------------------------------------------------------------
   switch (state.phase) {
     case "welcome":
-      return <WelcomeScreen onStart={handleStart} settings={giffSettings} />;
+      return <WelcomeScreen onStart={handleStart} />;
     case "film_question":
-      return <FilmQuestionScreen onAnswer={handleFilmAnswer} settings={giffSettings} />;
+      return <FilmQuestionScreen onAnswer={handleFilmAnswer} />;
     case "teaser":
       return <TeaserScreen onContinue={handleTeaserContinue} onSkip={handleTeaserSkip} />;
     case "posture_capture":
       return (
         <PostureCaptureScreen
-          settings={giffSettings}
           onSubmit={handlePostureSubmit}
           onSurprise={handlePostureSurprise}
           onPTTError={handlePosturePTTError}
