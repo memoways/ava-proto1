@@ -116,20 +116,14 @@ const ConversationScreen = ({
       <section className="relative z-10 px-4 pb-6 md:px-8 md:pb-8">
         <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-3">
           {displayedMax && (
-            <p
-              key={`max-${displayedMax.length}`}
-              className="animate-fade-in text-center font-serif text-xl leading-snug text-foreground drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] md:text-2xl"
-            >
+            <p className="text-center font-serif text-xl leading-snug text-foreground drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] md:text-2xl transition-opacity duration-200">
               {displayedMax}
             </p>
           )}
           {displayedUser && (
             <p
-              key={`usr-${displayedUser.length}`}
-              className={cn(
-                "animate-fade-in text-center text-base italic leading-snug drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] md:text-lg",
-                recording ? "text-primary/90" : "text-foreground/80",
-              )}
+              className="text-center text-base italic leading-snug text-white/95 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)] md:text-lg"
+              aria-live="polite"
             >
               « {displayedUser} »
             </p>
