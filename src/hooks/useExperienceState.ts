@@ -11,6 +11,7 @@ import type {
   ExperiencePhase,
   ExperienceState,
   FilmAnswer,
+  PRD4TurnLabels,
   UserPosture,
   UserRoleProfile,
 } from "@/types";
