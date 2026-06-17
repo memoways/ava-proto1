@@ -29,6 +29,8 @@ export interface PRD4TurnInput {
   triggeredVideoIds?: string[];
   /** Contexte injecté dans Max suite à la vidéo précédente. */
   postVideoContext?: string;
+  /** GIFF — posture initiale de l'utilisateur (question/intention exprimée avant l'appel). */
+  userPostureRaw?: string | null;
   onLatencySegment?: (event: PRD4LatencySegmentEvent) => void;
 }
 
@@ -89,6 +91,9 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   // --- Max --------------------------------------------------------------------
   const maxStart = performance.now();
   input.onLatencySegment?.({ type: "start", segment: "LLM", service: "Max LLM" });
+  const postureSummary = input.userPostureRaw?.trim()
+    ? `L'utilisateur a démarré la conversation en exprimant ceci (à garder en mémoire tout au long de l'échange comme contexte de qui il est et de ce qu'il vient chercher) : « ${input.userPostureRaw.trim()} »`
+    : undefined;
   const maxInput: MaxAgentInput = {
     conversationHistory: input.conversationHistory,
     userMessage: input.userMessage,
@@ -96,7 +101,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     postVideoContext: input.postVideoContext,
     session_id: input.sessionId ?? undefined,
     knowledgeContext,
-    userRoleSummary: input.userRole?.summary_for_max,
+    userRoleSummary: input.userRole?.summary_for_max ?? postureSummary,
   };
   let maxResponse = "";
   let max_ms = 0;
@@ -127,6 +132,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         userMessage: input.userMessage,
         maxResponse,
         userRole: input.userRole,
+        userPostureRaw: input.userPostureRaw ?? null,
         turnIndex,
         timeElapsedSeconds: input.timeElapsedSeconds,
         triggeredVideoIds: input.triggeredVideoIds,

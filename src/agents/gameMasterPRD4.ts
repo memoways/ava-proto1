@@ -18,6 +18,8 @@ export interface PRD4PostTurnInput {
   userMessage: string;
   maxResponse: string;
   userRole: UserRoleProfile | null;
+  /** GIFF — posture initiale exprimée par l'utilisateur avant l'appel. */
+  userPostureRaw?: string | null;
   turnIndex: number;
   timeElapsedSeconds: number;
   /** IDs de triggers vidéo déjà joués (évite de rejouer). */
@@ -98,6 +100,9 @@ function buildUserPrompt(input: PRD4PostTurnInput, videos: VideoTriggerRow[]): s
 
   return `## PROFIL JOUEUR
 ${input.userRole?.summary_for_max || "(profil indisponible)"}
+
+## POSTURE INITIALE DU JOUEUR (intention / question exprimée avant le début de l'appel — à garder en mémoire pour évaluer la cohérence de l'échange)
+${input.userPostureRaw?.trim() || "(non renseignée)"}
 
 ## TEMPS ÉCOULÉ
 ${Math.floor(input.timeElapsedSeconds / 60)}min ${input.timeElapsedSeconds % 60}s sur ~5 min cible — tour #${input.turnIndex}

@@ -406,6 +406,7 @@ const IndexPRD4 = () => {
           conversationHistory: conversationRef.current.slice(0, -1),
           userMessage: userText,
           userRole: userRoleRef.current,
+          userPostureRaw: userPostureRef.current?.raw ?? null,
           timeElapsedSeconds: elapsed,
           characterName: "Max",
           triggeredVideoIds: triggeredVideoIdsRef.current,
