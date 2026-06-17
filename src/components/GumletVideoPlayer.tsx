@@ -27,47 +27,65 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
 
   // Extract asset ID from various Gumlet URL formats
   const getEmbedUrl = useCallback((url: string) => {
-    // Already an embed URL
     if (url.includes("play.gumlet.io/embed/")) return url;
-    
-    // Extract asset ID from gumlet.tv/watch/{id} or similar
     const match = url.match(/(?:watch|embed)\/([a-f0-9]+)/i);
     if (match) {
       const assetId = match[1];
-      return `https://play.gumlet.io/embed/${assetId}?preload=true&autoplay=true`;
+      return `https://play.gumlet.io/embed/${assetId}?preload=true&autoplay=true&muted=false`;
     }
-    
-    // Fallback: use as-is
     return url;
   }, []);
 
   const embedUrl = getEmbedUrl(videoUrl);
 
-  // Initialize Player.js and unmute as soon as the player is ready
+  // Force audio ON: unmute on ready, on play, periodically during the first
+  // seconds, and on any user gesture (fallback if browser re-mutes autoplay).
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
 
-    // Small delay ensures Gumlet's player inside the iframe has booted
-    const timer = setTimeout(() => {
-      try {
-        const player = new Player(iframe);
-        playerRef.current = player;
+    let player: Player | null = null;
+    let cancelled = false;
+    let retryCount = 0;
 
-        player.on("ready", async () => {
-          try {
-            await player.unmute();
-            await player.setVolume(100);
-          } catch (err) {
-            console.warn("Gumlet unmute failed:", err);
+    const forceAudioOn = async () => {
+      if (!player) return;
+      try {
+        await player.setVolume(100);
+        await player.unmute();
+      } catch (err) {
+        // silent
+      }
+    };
+
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+      try {
+        player = new Player(iframe);
+        playerRef.current = player;
+        player.on("ready", forceAudioOn);
+        player.on("play", forceAudioOn);
+        player.on("timeupdate", () => {
+          if (retryCount < 6) {
+            retryCount += 1;
+            forceAudioOn();
           }
         });
       } catch (err) {
         console.warn("Player.js init failed:", err);
       }
-    }, 500);
+    }, 300);
 
-    return () => clearTimeout(timer);
+    const onUserGesture = () => forceAudioOn();
+    window.addEventListener("click", onUserGesture);
+    window.addEventListener("touchstart", onUserGesture);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      window.removeEventListener("click", onUserGesture);
+      window.removeEventListener("touchstart", onUserGesture);
+    };
   }, [embedUrl]);
 
   // Listen for Gumlet player events via postMessage
