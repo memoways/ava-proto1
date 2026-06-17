@@ -54,7 +54,7 @@ const ConversationScreen = ({
     let us = "";
     for (let i = conversationLog.length - 1; i >= 0; i--) {
       const m = conversationLog[i];
-      if (!mx && m.role === "assistant") mx = m.content;
+      if (!mx && m.role === "max") mx = m.content;
       else if (!us && m.role === "user") us = m.content;
       if (mx && us) break;
     }
