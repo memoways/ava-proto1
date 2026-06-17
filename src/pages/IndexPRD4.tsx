@@ -162,8 +162,10 @@ const IndexPRD4 = () => {
     onboardingStartedAtRef.current = Date.now();
     firstMaxResponseAtRef.current = null;
     trackEvent("prd4_onboarding_started", {});
-    setPhase("film_question");
-  }, [setPhase]);
+    // L'écran "As-tu vu le film ?" est retiré : on enchaîne directement sur le teaser.
+    setFilmAnswer("rappel");
+    setPhase("teaser");
+  }, [setFilmAnswer, setPhase]);
   const handleFilmAnswer = useCallback(
     (a: FilmAnswer) => {
       setFilmAnswer(a);
@@ -700,7 +702,18 @@ const IndexPRD4 = () => {
   }, [endLatencySegment, incrementPttError, processTurn, setAudioState, teardownSTT]);
 
   const handlePTTPress = useCallback(async () => {
-    if (isProcessingRef.current || endedRef.current) return;
+    if (endedRef.current) return;
+    // Filet anti-blocage : si le verrou est resté coincé mais que l'état audio est
+    // au repos (signe que le tour précédent a bien fini), on libère le verrou.
+    if (isProcessingRef.current && state.audioState === "idle") {
+      console.warn("[PRD4] PTT: stale processing lock detected — releasing.");
+      if (processingWatchdogRef.current) {
+        window.clearTimeout(processingWatchdogRef.current);
+        processingWatchdogRef.current = null;
+      }
+      isProcessingRef.current = false;
+    }
+    if (isProcessingRef.current) return;
     let initialStream: Promise<MediaStream> | undefined;
     try {
       initialStream = navigator.mediaDevices?.getUserMedia({ audio: true });
@@ -736,6 +749,7 @@ const IndexPRD4 = () => {
     setAudioState,
     startLatencySegment,
     startLatencyTurn,
+    state.audioState,
     teardownSTT,
   ]);
 

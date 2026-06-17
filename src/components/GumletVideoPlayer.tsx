@@ -32,7 +32,7 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
     const match = url.match(/(?:watch|embed)\/([a-f0-9]+)/i);
     if (match) {
       const assetId = match[1];
-      return `https://play.gumlet.io/embed/${assetId}?preload=true&autoplay=true`;
+      return `https://play.gumlet.io/embed/${assetId}?preload=true&autoplay=true&muted=false`;
     }
     
     // Fallback: use as-is
