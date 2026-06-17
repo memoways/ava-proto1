@@ -102,6 +102,10 @@ const IndexPRD4 = () => {
   const turnLatenciesRef = useRef<number[]>([]);
   const sessionDurationRef = useRef<number>(0);
   const triggeredVideoIdsRef = useRef<string[]>([]);
+  const lastVideoTurnRef = useRef<number>(-Infinity);
+  const videoTriggerSettingsRef = useRef<import("@/services/settingsService").VideoTriggerSettings>(
+    require("@/services/settingsService").videoTriggerDefaults,
+  );
   const pendingPostVideoContextRef = useRef<string | null>(null);
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
