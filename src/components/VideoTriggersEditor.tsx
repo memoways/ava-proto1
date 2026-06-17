@@ -359,5 +359,6 @@ export default function VideoTriggersEditor() {
         );
       })}
     </section>
+    </div>
   );
 }
