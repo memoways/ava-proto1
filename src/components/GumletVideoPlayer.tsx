@@ -65,6 +65,7 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
         playerRef.current = player;
         player.on("ready", forceAudioOn);
         player.on("play", forceAudioOn);
+        player.on("ended", () => onComplete());
         player.on("timeupdate", () => {
           if (retryCount < 6) {
             retryCount += 1;
