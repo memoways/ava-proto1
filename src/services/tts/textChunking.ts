@@ -65,8 +65,8 @@ export function extractSentences(text: string): [string[], string] {
   return [sentences, remaining];
 }
 
-const SINGLE_REQUEST_MAX_CHARS = 700;
-const CHUNK_TARGET_CHARS = 420;
+const SINGLE_REQUEST_MAX_CHARS = 900;
+const CHUNK_TARGET_CHARS = 600;
 
 /** Prepares TTS segments long enough to preserve diction. Short responses stay one chunk. */
 export function chunkTextForTTS(text: string): string[] {
