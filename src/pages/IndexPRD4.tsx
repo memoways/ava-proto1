@@ -69,6 +69,7 @@ const IndexPRD4 = () => {
     incrementPttError,
     endExperience,
     reset,
+    setLastUserLabels,
   } = useExperienceState();
 
   const [userSubtitle, setUserSubtitle] = useState("");
