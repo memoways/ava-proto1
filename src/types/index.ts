@@ -318,6 +318,8 @@ export interface PRD4PostTurnEvaluation {
   notes: string;
   /** ID du trigger vidéo à jouer après la réponse de Max (null si aucun). */
   trigger_video_id?: string | null;
+  /** Labels conversationnels extraits du message utilisateur (max 4 total). */
+  labels?: PRD4TurnLabels | null;
   /** Renseignés côté client après l'appel LLM. */
   turn_index?: number;
   latency_ms?: number;
