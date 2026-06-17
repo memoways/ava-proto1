@@ -176,9 +176,9 @@ export async function evaluatePostTurnPRD4(
         Array.isArray(list)
           ? list.map((v) => String(v).trim().toLowerCase()).filter((v) => v && v.length <= 30).slice(0, 4)
           : [];
-      let themes = cleanList(rawLabels?.themes);
-      let topics = cleanList(rawLabels?.topics);
-      let intentions = cleanList(rawLabels?.intentions);
+      const themes = cleanList(rawLabels?.themes);
+      const topics = cleanList(rawLabels?.topics);
+      const intentions = cleanList(rawLabels?.intentions);
       // Cap total à 4 labels (priorité themes > topics > intentions)
       const cap = 4;
       const total = () => themes.length + topics.length + intentions.length;
