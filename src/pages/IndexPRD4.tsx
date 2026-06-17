@@ -546,12 +546,34 @@ const IndexPRD4 = () => {
           // Matcher déterministe (un seul thème commun suffit).
           let pickedVideoId: string | null = null;
           try {
-            const videos = await getVideoTriggersCached();
-            const match = pickVideoForLabels(labels, videos, triggeredVideoIdsRef.current, userText);
-            if (match) {
-              pickedVideoId = match.row.id;
-              triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, match.row.id];
-              videoTriggeredThisTurn = true;
+            const settings = videoTriggerSettingsRef.current;
+            const userTurnNumber = conversationRef.current.filter((m) => m.role === "user").length;
+            const labelsCount = (labels.themes?.length ?? 0) + (labels.topics?.length ?? 0) + (labels.intentions?.length ?? 0);
+            const gateReason = !settings.ENABLED
+              ? "disabled"
+              : userTurnNumber < settings.MIN_TURNS_BEFORE_FIRST
+                ? "before_first"
+                : (userTurnNumber - lastVideoTurnRef.current) < settings.MIN_TURNS_BETWEEN
+                  ? "too_soon"
+                  : (settings.MAX_PER_SESSION > 0 && triggeredVideoIdsRef.current.length >= settings.MAX_PER_SESSION)
+                    ? "max_reached"
+                    : labelsCount < settings.MIN_LABELS_REQUIRED
+                      ? "not_enough_labels"
+                      : null;
+            if (gateReason) {
+              trackEvent("prd4_video_gate_blocked", {
+                session_id: sessionIdRef.current,
+                reason: gateReason,
+                user_turn: userTurnNumber,
+              });
+            } else {
+              const videos = await getVideoTriggersCached();
+              const match = pickVideoForLabels(labels, videos, triggeredVideoIdsRef.current, userText);
+              if (match) {
+                pickedVideoId = match.row.id;
+                triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, match.row.id];
+                lastVideoTurnRef.current = userTurnNumber;
+                videoTriggeredThisTurn = true;
               trackEvent("prd4_video_triggered", {
                 session_id: sessionIdRef.current,
                 video_id: match.row.id,
