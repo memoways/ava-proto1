@@ -38,6 +38,7 @@ const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
   moderation_flag: false,
   notes: "Évaluation par défaut (LLM indisponible).",
   trigger_video_id: null,
+  labels: { themes: [], topics: [], intentions: [] },
 };
 
 const GM_POST_TURN_TIMEOUT_MS = 12000;
@@ -46,30 +47,41 @@ const SYSTEM_PROMPT = `Tu es le Game Master d'une expérience narrative en temps
 
 Tu retournes EXACTEMENT cet objet :
 {
+  "labels": {                       // Labels extraits du DERNIER message utilisateur. Max 4 labels au total cumulés sur les 3 listes. Ne PAS inventer : si rien d'évident, mets une liste vide. Ne force jamais.
+    "themes": string[],             // Grand thème narratif (1-3 mots, en minuscules). Ex: "famille", "patriarcat", "trahison", "secrets", "confiance", "deuil", "violence", "mémoire". Vide si pas clair.
+    "topics": string[],             // Sujet concret évoqué (1-3 mots). Ex: "sœur", "enfance", "disparition", "film", "police". Vide si pas clair.
+    "intentions": string[]          // Intention de l'utilisateur (1-2 mots). Ex: "question", "défi", "empathie", "doute", "provocation". Vide si pas claire.
+  },
   "engagement_delta": number,       // -2..+2 — qualité de l'échange pour le joueur
   "confusion_detected": boolean,    // true si le joueur semble perdu ou Max contradictoire
-  "role_usage_quality": "low" | "medium" | "high" | "unknown", // Max exploite-t-il le profil joueur ?
-  "topics_covered": string[],       // 1-4 mots-clés courts des sujets abordés
-  "transition_recommended": boolean,// faut-il proposer un changement de rythme ?
-  "cinematic_hint": string | null,  // suggestion narrative courte ou null
+  "role_usage_quality": "low" | "medium" | "high" | "unknown",
+  "topics_covered": string[],       // duplicate compacté de labels.topics (rétro-compat)
+  "transition_recommended": boolean,
+  "cinematic_hint": string | null,
   "next_turn_guidance": string,     // 1 phrase concise pour guider Max au prochain tour
-  "end_recommended": boolean,       // true si la session a atteint un point naturel de fin
-  "moderation_flag": boolean,       // true si contenu problématique
-  "notes": string,                  // 1 phrase courte de raison
-  "trigger_video_id": string | null // ID d'une vidéo à jouer ; voir bloc VIDÉOS DISPONIBLES
+  "end_recommended": boolean,
+  "moderation_flag": boolean,
+  "notes": string,
+  "trigger_video_id": string | null // voir bloc VIDÉOS DISPONIBLES
 }
 
-Règles "trigger_video_id" — PRIORITÉ HAUTE, c'est le principal levier narratif :
-- Renseigne UNIQUEMENT un id présent dans la liste VIDÉOS DISPONIBLES.
-- DÈS QU'un thème de la vidéo (champ \`themes\`) est abordé sémantiquement par le joueur OU par Max dans le dernier échange, DÉCLENCHE la vidéo. Tolère les fautes d'orthographe et variantes (ex: "patricarcat" = "patriarcat", "famille" ⊃ parents/sœur/père/frère/enfance/fratrie, "trahison" ⊃ mensonge/cacher/secret, "secrets" ⊃ cacher/vérité/dissimuler, "confiance" ⊃ doute/méfiance). Sois LARGE dans le matching sémantique.
-- Si plusieurs matchs possibles : prends la priorité la plus haute (number le plus petit = plus prioritaire).
-- N'utilise JAMAIS un id présent dans \`already_triggered\`.
-- Ne déclenche PAS deux vidéos dans le même tour, et évite deux tours consécutifs si possible.
-- Le seul cas où tu retournes null : aucun thème vidéo n'a réellement été touché. En cas de doute raisonnable, DÉCLENCHE — l'expérience repose sur ces cinématiques.
+Règles "labels" :
+- MAX 4 labels au total (additionnés sur themes + topics + intentions).
+- NE PAS inventer ni extrapoler. Si le message utilisateur est trop court / vague / général (ex: "salut", "ok", "je sais pas"), retourne des listes vides.
+- N'utilise que des mots simples, minuscules, sans accents superflus, sans phrase.
+- Pour "themes", privilégie les grands thèmes narratifs : famille, patriarcat, trahison, secrets, confiance, deuil, violence, mémoire, identité, amour, mensonge.
 
-Règles "end_recommended" : true seulement si la conversation a vraiment trouvé une clôture naturelle, ou si elle est en train d'échouer. Sois conservateur — la session dure ~5 min max.
+Règles "trigger_video_id" — PRIORITÉ HAUTE :
+- Compare \`labels.themes\` aux champs \`themes\` de VIDÉOS DISPONIBLES.
+- Tolère synonymes/fautes : "patricarcat"="patriarcat" ; "famille" ⊃ parents/sœur/père/frère/enfance/fratrie ; "trahison" ⊃ mensonge/cacher/secret ; "secrets" ⊃ cacher/vérité.
+- DÈS QU'UN thème de la vidéo recoupe un label \`themes\` que tu viens d'extraire → renseigne \`trigger_video_id\` avec l'id de la vidéo.
+- Plusieurs matchs : prends la priorité la plus haute (number le plus petit = plus prioritaire).
+- Jamais d'id déjà présent dans \`already_triggered\`.
+- Si \`labels.themes\` est vide, retourne null (pas de trigger sans label clair).
 
-Pas de markdown, pas de \`\`\`, pas de commentaire. Uniquement l'objet JSON.`;
+Règles "end_recommended" : true seulement si la conversation a trouvé une clôture naturelle, ou si elle échoue.
+
+Pas de markdown, pas de \`\`\`. Uniquement l'objet JSON.`;
 
 function extractJson(text: string): unknown {
   const trimmed = text.trim().replace(/^```json\s*|```$/g, "").trim();
