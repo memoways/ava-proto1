@@ -167,5 +167,6 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     },
     ragMatches: matchesCount,
     postTurnPromise,
+    labelPromise,
   };
 }
