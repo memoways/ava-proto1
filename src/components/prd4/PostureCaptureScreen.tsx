@@ -17,7 +17,7 @@ interface Props {
 
 const MIN_CHARS = 4;
 
-const PostureCaptureScreen = ({ settings, onSubmit, onSurprise, onPTTError }: Props) => {
+const PostureCaptureScreen = ({ settings, onSubmit, onPTTError }: Props) => {
   const [transcript, setTranscript] = useState("");
   const [interim, setInterim] = useState("");
   const [recording, setRecording] = useState(false);
