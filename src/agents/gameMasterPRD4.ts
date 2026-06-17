@@ -172,10 +172,31 @@ export async function evaluatePostTurnPRD4(
       const rawTrigger = parsed.trigger_video_id ? String(parsed.trigger_video_id) : null;
       const safeTrigger = rawTrigger && validIds.has(rawTrigger) && !triggered.has(rawTrigger) ? rawTrigger : null;
       result = {
+      const rawLabels = (parsed as { labels?: { themes?: unknown[]; topics?: unknown[]; intentions?: unknown[] } }).labels;
+      const cleanList = (list: unknown[] | undefined): string[] =>
+        Array.isArray(list)
+          ? list.map((v) => String(v).trim().toLowerCase()).filter((v) => v && v.length <= 30).slice(0, 4)
+          : [];
+      let themes = cleanList(rawLabels?.themes);
+      let topics = cleanList(rawLabels?.topics);
+      let intentions = cleanList(rawLabels?.intentions);
+      // Cap total à 4 labels (priorité themes > topics > intentions)
+      const cap = 4;
+      const total = () => themes.length + topics.length + intentions.length;
+      while (total() > cap) {
+        if (intentions.length) intentions.pop();
+        else if (topics.length) topics.pop();
+        else themes.pop();
+      }
+      const labels = { themes, topics, intentions };
+      const topicsCovered = Array.isArray(parsed.topics_covered) && parsed.topics_covered.length
+        ? parsed.topics_covered.slice(0, 6).map(String)
+        : topics;
+      result = {
         engagement_delta: Number(parsed.engagement_delta ?? 0),
         confusion_detected: Boolean(parsed.confusion_detected),
         role_usage_quality: (parsed.role_usage_quality as PRD4PostTurnEvaluation["role_usage_quality"]) || "unknown",
-        topics_covered: Array.isArray(parsed.topics_covered) ? parsed.topics_covered.slice(0, 6).map(String) : [],
+        topics_covered: topicsCovered,
         transition_recommended: Boolean(parsed.transition_recommended),
         cinematic_hint: parsed.cinematic_hint ? String(parsed.cinematic_hint) : null,
         next_turn_guidance: String(parsed.next_turn_guidance || DEFAULT_RESULT.next_turn_guidance),
@@ -183,6 +204,7 @@ export async function evaluatePostTurnPRD4(
         moderation_flag: Boolean(parsed.moderation_flag),
         notes: String(parsed.notes || ""),
         trigger_video_id: safeTrigger,
+        labels,
       };
     }
     model = callRes.model || model;
