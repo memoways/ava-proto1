@@ -48,7 +48,8 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
     const iframe = iframeRef.current;
     if (!iframe) return;
 
-    const initPlayer = () => {
+    // Small delay ensures Gumlet's player inside the iframe has booted
+    const timer = setTimeout(() => {
       try {
         const player = new Player(iframe);
         playerRef.current = player;
@@ -64,13 +65,9 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
       } catch (err) {
         console.warn("Player.js init failed:", err);
       }
-    };
+    }, 500);
 
-    // Always wait for the iframe to finish loading so Gumlet's player is ready
-    if (iframe.src) {
-      iframe.addEventListener("load", initPlayer);
-      return () => iframe.removeEventListener("load", initPlayer);
-    }
+    return () => clearTimeout(timer);
   }, [embedUrl]);
 
   // Listen for Gumlet player events via postMessage
