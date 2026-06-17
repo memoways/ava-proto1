@@ -6,7 +6,7 @@
 
 import { prepareTextForTTS } from "@/services/tts/textPrep";
 
-const MIN_SENTENCE_LEN = 25;
+const MIN_SENTENCE_LEN = 80;
 const ABBREVIATIONS = new Set([
   "m", "mme", "mlle", "dr", "pr", "me", "st", "ste",
   "etc", "cf", "p", "pp", "vs", "ex", "no", "n°",
