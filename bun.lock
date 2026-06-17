@@ -6,6 +6,7 @@
       "name": "vite_react_shadcn_ts",
       "dependencies": {
         "@grainql/analytics-web": "^3.4.0",
+        "@gumlet/player.js": "^3.0.8",
         "@hookform/resolvers": "^3.10.0",
         "@radix-ui/react-accordion": "^1.2.11",
         "@radix-ui/react-alert-dialog": "^1.1.14",
@@ -171,6 +172,8 @@
     "@floating-ui/utils": ["@floating-ui/utils@0.2.10", "", {}, "sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ=="],
 
     "@grainql/analytics-web": ["@grainql/analytics-web@3.4.2", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@grainql/analytics-web/-/analytics-web-3.4.2.tgz", { "optionalDependencies": { "rrweb-snapshot": "^2.0.0-alpha.18" }, "peerDependencies": { "react": ">=16.8.0" }, "optionalPeers": ["react"] }, "sha512-aj/eb+NtprdLdpEdXBFj2/7oBd6PAUKFwjQ0evOgH6qMCShX6Mbg/++Q0TgP++xFWRZGgTa0VizwVBQWGXRVpg=="],
+
+    "@gumlet/player.js": ["@gumlet/player.js@3.0.8", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@gumlet/player.js/-/player.js-3.0.8.tgz", {}, "sha512-Ec91RwBFXuAdSfdSokXWaYxic+Qs4T7CHQoVeMdQNBg80S1kGKJw5IsHbLcWkkTDD8JvX2P37LRmV/hcCR98yg=="],
 
     "@hookform/resolvers": ["@hookform/resolvers@3.10.0", "", { "peerDependencies": { "react-hook-form": "^7.0.0" } }, "sha512-79Dv+3mDF7i+2ajj7SkypSKHhl1cbln1OGavqrsF7p6mbUv11xpqpacPsGDCTRvCSjEEIez2ef1NveSVL3b0Ag=="],
 

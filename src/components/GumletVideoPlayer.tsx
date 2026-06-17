@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
+import { Player } from "@gumlet/player.js";
 
 interface GumletVideoPlayerProps {
   videoUrl: string;
@@ -15,6 +16,7 @@ interface GumletVideoPlayerProps {
  */
 const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVideoPlayerProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const playerRef = useRef<Player | null>(null);
 
   const isGumletEndedMessage = useCallback((data: unknown) => {
     if (!data || typeof data !== "object") return false;
@@ -32,12 +34,41 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
     const match = url.match(/(?:watch|embed)\/([a-f0-9]+)/i);
     if (match) {
       const assetId = match[1];
-      return `https://play.gumlet.io/embed/${assetId}?preload=true&autoplay=true&muted=false`;
+      return `https://play.gumlet.io/embed/${assetId}?preload=true&autoplay=true`;
     }
     
     // Fallback: use as-is
     return url;
   }, []);
+
+  const embedUrl = getEmbedUrl(videoUrl);
+
+  // Initialize Player.js and unmute as soon as the player is ready
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    // Small delay ensures Gumlet's player inside the iframe has booted
+    const timer = setTimeout(() => {
+      try {
+        const player = new Player(iframe);
+        playerRef.current = player;
+
+        player.on("ready", async () => {
+          try {
+            await player.unmute();
+            await player.setVolume(100);
+          } catch (err) {
+            console.warn("Gumlet unmute failed:", err);
+          }
+        });
+      } catch (err) {
+        console.warn("Player.js init failed:", err);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [embedUrl]);
 
   // Listen for Gumlet player events via postMessage
   useEffect(() => {
@@ -63,7 +94,6 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
     return () => window.removeEventListener("message", handleMessage);
   }, [isGumletEndedMessage, onComplete]);
 
-  const embedUrl = getEmbedUrl(videoUrl);
 
   return (
     <div className="fixed inset-0 z-0 bg-background">
