@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import playerjs from "@gumlet/player.js";
+import { Player } from "@gumlet/player.js";
 
 interface GumletVideoPlayerProps {
   videoUrl: string;
