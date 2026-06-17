@@ -2,17 +2,137 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Pencil, Save, X, RefreshCw, ExternalLink } from "lucide-react";
+import { Pencil, Save, X, RefreshCw, ExternalLink, Settings as SettingsIcon } from "lucide-react";
 import {
   listVideoTriggers,
   updateVideoTriggerOnNotion,
   type VideoTriggerRow,
   type UpdateVideoTriggerPatch,
 } from "@/services/videoTriggerService";
+import {
+  loadVideoTriggerSettingsFromDB,
+  saveVideoTriggerSettingsToDB,
+  resetVideoTriggerSettings,
+  videoTriggerDefaults,
+  type VideoTriggerSettings,
+} from "@/services/settingsService";
 
 const TYPE_OPTIONS = ["intro", "interlude", "mid_conversation"];
 const TRANSITION_OPTIONS = ["fade_black", "glitch", "screen_share"];
+
+function VideoTriggerRulesPanel() {
+  const [settings, setSettings] = useState<VideoTriggerSettings>(videoTriggerDefaults);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const s = await loadVideoTriggerSettingsFromDB();
+        setSettings(s);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const update = (patch: Partial<VideoTriggerSettings>) => setSettings((s) => ({ ...s, ...patch }));
+
+  async function save() {
+    setSaving(true);
+    try {
+      await saveVideoTriggerSettingsToDB(settings);
+      toast.success("Réglages enregistrés ✓");
+    } catch (err) {
+      toast.error("Erreur sauvegarde : " + (err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function reset() {
+    const d = resetVideoTriggerSettings();
+    setSettings(d);
+    toast.success("Réglages réinitialisés");
+  }
+
+  if (loading) return null;
+
+  return (
+    <section className="border rounded-lg p-4 space-y-3 bg-muted/5">
+      <div className="flex items-center gap-2">
+        <SettingsIcon className="h-4 w-4 text-primary" />
+        <h3 className="font-semibold text-base">Règles de déclenchement</h3>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Gouvernent <em>quand</em> une cinématique peut se déclencher pendant une session, indépendamment du matching thématique.
+      </p>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="flex items-center justify-between border rounded p-3 col-span-2 md:col-span-1">
+          <div>
+            <div className="text-sm font-medium">Cinématiques actives</div>
+            <div className="text-xs text-muted-foreground">Désactiver pour bloquer toutes les vidéos en jeu.</div>
+          </div>
+          <Switch checked={settings.ENABLED} onCheckedChange={(v) => update({ ENABLED: v })} />
+        </div>
+
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Tours utilisateur avant la 1re vidéo</label>
+          <Input
+            type="number"
+            min={0}
+            value={settings.MIN_TURNS_BEFORE_FIRST}
+            onChange={(e) => update({ MIN_TURNS_BEFORE_FIRST: Math.max(0, Number(e.target.value) || 0) })}
+          />
+          <p className="text-[10px] text-muted-foreground mt-1">Ex: 3 = aucune vidéo avant le 3e tour de parole.</p>
+        </div>
+
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Tours min. entre 2 vidéos</label>
+          <Input
+            type="number"
+            min={0}
+            value={settings.MIN_TURNS_BETWEEN}
+            onChange={(e) => update({ MIN_TURNS_BETWEEN: Math.max(0, Number(e.target.value) || 0) })}
+          />
+          <p className="text-[10px] text-muted-foreground mt-1">Délai de respiration entre cinématiques.</p>
+        </div>
+
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Max. de vidéos / session</label>
+          <Input
+            type="number"
+            min={0}
+            value={settings.MAX_PER_SESSION}
+            onChange={(e) => update({ MAX_PER_SESSION: Math.max(0, Number(e.target.value) || 0) })}
+          />
+          <p className="text-[10px] text-muted-foreground mt-1">0 = illimité.</p>
+        </div>
+
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Labels min. requis</label>
+          <Input
+            type="number"
+            min={0}
+            value={settings.MIN_LABELS_REQUIRED}
+            onChange={(e) => update({ MIN_LABELS_REQUIRED: Math.max(0, Number(e.target.value) || 0) })}
+          />
+          <p className="text-[10px] text-muted-foreground mt-1">Nombre min. de thèmes/sujets/intentions extraits du tour.</p>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" size="sm" onClick={reset} disabled={saving}>Réinitialiser</Button>
+        <Button size="sm" onClick={save} disabled={saving}>
+          <Save className="h-3 w-3 mr-1" /> {saving ? "Sauvegarde…" : "Enregistrer"}
+        </Button>
+      </div>
+    </section>
+  );
+}
 
 export default function VideoTriggersEditor() {
   const [triggers, setTriggers] = useState<VideoTriggerRow[]>([]);
