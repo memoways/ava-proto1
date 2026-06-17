@@ -41,6 +41,38 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
     return url;
   }, []);
 
+  // Initialize Player.js and unmute as soon as the player is ready
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    // Wait for iframe to load before creating the player
+    const initPlayer = () => {
+      try {
+        const player = new Player(iframe);
+        playerRef.current = player;
+
+        player.on("ready", async () => {
+          try {
+            await player.unmute();
+            await player.setVolume(100);
+          } catch (err) {
+            console.warn("Gumlet unmute failed:", err);
+          }
+        });
+      } catch (err) {
+        console.warn("Player.js init failed:", err);
+      }
+    };
+
+    if (iframe.contentDocument?.readyState === "complete" || iframe.src) {
+      initPlayer();
+    } else {
+      iframe.addEventListener("load", initPlayer);
+      return () => iframe.removeEventListener("load", initPlayer);
+    }
+  }, [embedUrl]);
+
   // Listen for Gumlet player events via postMessage
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
