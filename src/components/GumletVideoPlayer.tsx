@@ -17,6 +17,9 @@ interface GumletVideoPlayerProps {
 const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVideoPlayerProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const playerRef = useRef<Player | null>(null);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
 
   const isGumletEndedMessage = useCallback((data: unknown) => {
     if (!data || typeof data !== "object") return false;
