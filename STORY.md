@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-06-17 (session 28 — Flux conversationnel stabilisé, STT/TTS fluides, sonneries d'appel)
+> **Last Updated**: 2026-06-17 (session 29 — GM label pass parallèle + matcher vidéo déterministe)
 
 ---
 
