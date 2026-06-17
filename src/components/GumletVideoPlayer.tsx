@@ -99,7 +99,6 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
     return () => window.removeEventListener("message", handleMessage);
   }, [isGumletEndedMessage, onComplete]);
 
-  const embedUrl = getEmbedUrl(videoUrl);
 
   return (
     <div className="fixed inset-0 z-0 bg-background">
