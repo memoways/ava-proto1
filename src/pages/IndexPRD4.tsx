@@ -162,8 +162,10 @@ const IndexPRD4 = () => {
     onboardingStartedAtRef.current = Date.now();
     firstMaxResponseAtRef.current = null;
     trackEvent("prd4_onboarding_started", {});
-    setPhase("film_question");
-  }, [setPhase]);
+    // L'écran "As-tu vu le film ?" est retiré : on enchaîne directement sur le teaser.
+    setFilmAnswer("rappel");
+    setPhase("teaser");
+  }, [setFilmAnswer, setPhase]);
   const handleFilmAnswer = useCallback(
     (a: FilmAnswer) => {
       setFilmAnswer(a);
