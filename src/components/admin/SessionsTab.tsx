@@ -517,6 +517,25 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
                       return (
                         <div key={i} className={`mb-2 text-sm ${msg.role === "max" ? "text-blue-300" : "text-green-300"}`}>
                           <span className="font-bold">{msg.role === "max" ? "Max" : "User"}:</span> {msg.content}
+                          {msg.role === "user" && msg.labels && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {(msg.labels.themes ?? []).map((t: string, k: number) => (
+                                <span key={`th-${k}`} className="text-[10px] uppercase tracking-wide bg-primary/15 text-primary border border-primary/40 px-1.5 py-0.5 rounded">
+                                  {t}
+                                </span>
+                              ))}
+                              {(msg.labels.topics ?? []).map((t: string, k: number) => (
+                                <span key={`tp-${k}`} className="text-[10px] uppercase tracking-wide bg-amber-500/15 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded">
+                                  {t}
+                                </span>
+                              ))}
+                              {(msg.labels.intentions ?? []).map((t: string, k: number) => (
+                                <span key={`in-${k}`} className="text-[10px] uppercase tracking-wide bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.5 rounded">
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           {msg.role === "max" && (fb || blocker) && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {fb && (
