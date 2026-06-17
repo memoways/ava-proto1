@@ -48,7 +48,6 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
     const iframe = iframeRef.current;
     if (!iframe) return;
 
-    // Wait for iframe to load before creating the player
     const initPlayer = () => {
       try {
         const player = new Player(iframe);
@@ -67,9 +66,8 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
       }
     };
 
-    if (iframe.contentDocument?.readyState === "complete" || iframe.src) {
-      initPlayer();
-    } else {
+    // Always wait for the iframe to finish loading so Gumlet's player is ready
+    if (iframe.src) {
       iframe.addEventListener("load", initPlayer);
       return () => iframe.removeEventListener("load", initPlayer);
     }
