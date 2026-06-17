@@ -53,6 +53,11 @@ import GumletVideoPlayer from "@/components/GumletVideoPlayer";
 import { savePRD4Questionnaire, syncPRD4QuestionnaireToNotion } from "@/services/prd4Questionnaire";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import { pickVideoForLabels } from "@/services/videoTriggerMatcher";
+import {
+  loadVideoTriggerSettingsFromDB,
+  videoTriggerDefaults,
+  type VideoTriggerSettings,
+} from "@/services/settingsService";
 import type { QuestionnairePRD4Answers, QuestionnairePRD4Data, UserPosture } from "@/types";
 
 const SESSION_DURATION_S = 5 * 60; // PRD4 §11 : ~5 min cible.
