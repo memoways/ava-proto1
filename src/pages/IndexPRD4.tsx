@@ -712,9 +712,7 @@ const IndexPRD4 = () => {
           max_latency_ms: max,
           ptt_errors: state.pttErrors,
           transcript_available: conversationRef.current.length > 0,
-          ava_start_variant: giffSettingsRef.current.use_giff_flow
-            ? giffSettingsRef.current.active_start_variant
-            : null,
+          ava_start_variant: null,
           has_seen_film: state.hasSeenFilm,
           user_posture_raw: state.userPosture?.raw ?? null,
           user_posture_mode: state.userPosture?.mode ?? null,
