@@ -17,11 +17,6 @@ const FilmQuestionScreen = ({ onAnswer, settings }: Props) => {
       <h2 className="font-serif text-3xl font-light text-foreground md:text-4xl">
         As-tu vu le film <em>Où est Ava&nbsp;?</em>
       </h2>
-      <p className="text-muted-foreground">
-        {giff
-          ? "Si tu ne l'as pas vu, on te fait un rappel très court."
-          : "Si tu ne l'as pas vu — ou s'il date un peu — on peut t'en faire un rappel."}
-      </p>
       <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
         <Button variant="outline" size="lg" onClick={() => onAnswer("vu")} className="min-w-[200px]">
           Oui

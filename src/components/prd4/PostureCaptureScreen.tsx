@@ -1,7 +1,7 @@
 /** PRD GIFF — Capture rapide de la posture utilisateur (PTT 1 phrase + Surprise me). */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, Mic, MicOff, Sparkles } from "lucide-react";
+import { Loader2, Mic, MicOff } from "lucide-react";
 import { createConfiguredSTT, loadSTTSettingsFromDB, type STTSession } from "@/services/stt";
 import { usePushToTalk } from "@/hooks/usePushToTalk";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,7 @@ interface Props {
 
 const MIN_CHARS = 4;
 
-const PostureCaptureScreen = ({ settings, onSubmit, onSurprise, onPTTError }: Props) => {
+const PostureCaptureScreen = ({ settings, onSubmit, onPTTError }: Props) => {
   const [transcript, setTranscript] = useState("");
   const [interim, setInterim] = useState("");
   const [recording, setRecording] = useState(false);
@@ -117,8 +117,8 @@ const PostureCaptureScreen = ({ settings, onSubmit, onSurprise, onPTTError }: Pr
           gmHostText={settings.gm_host_handoff_text}
         >
           <div className="w-full space-y-6 text-center">
-            <h2 className="font-serif text-3xl font-light text-foreground md:text-4xl">
-              {settings.posture_question}
+            <h2 className="font-serif text-2xl font-light text-foreground md:text-3xl">
+              Tu peux poser une question, exprimer une émotion ou partager une intention pour démarrer l'expérience.
             </h2>
 
             <div className="space-y-3 rounded-md border border-border bg-muted/20 p-5">
@@ -171,16 +171,6 @@ const PostureCaptureScreen = ({ settings, onSubmit, onSurprise, onPTTError }: Pr
               >
                 Continuer
               </Button>
-              {settings.allow_surprise_me && (
-                <button
-                  type="button"
-                  onClick={onSurprise}
-                  className="inline-flex items-center gap-2 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Me laisser surprendre
-                </button>
-              )}
             </div>
           </div>
         </VariantFrame>

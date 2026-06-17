@@ -301,9 +301,7 @@ const IndexPRD4 = () => {
     timer.start();
 
     // Réplique d'ouverture de Max (scriptée pour amorcer)
-    const opening = state.userRoleProfile?.summary_for_user
-      ? "Allô ?… Oui, j'écoute. À qui ai-je affaire ?"
-      : "Allô ?";
+    const opening = "Hallo... à qui ai-je affaire ?";
     setMaxSubtitle(opening);
     const openingMsg: ConversationMessage = { role: "max", content: opening, timestamp: Date.now() };
     conversationRef.current = [openingMsg];
@@ -408,6 +406,7 @@ const IndexPRD4 = () => {
           conversationHistory: conversationRef.current.slice(0, -1),
           userMessage: userText,
           userRole: userRoleRef.current,
+          userPostureRaw: userPostureRef.current?.raw ?? null,
           timeElapsedSeconds: elapsed,
           characterName: "Max",
           triggeredVideoIds: triggeredVideoIdsRef.current,
@@ -792,11 +791,7 @@ const IndexPRD4 = () => {
     case "film_question":
       return <FilmQuestionScreen onAnswer={handleFilmAnswer} settings={giffSettings} />;
     case "teaser":
-      return giffSettings.use_giff_flow ? (
-        <TeaserRappelScreen settings={giffSettings} onContinue={handleTeaserContinue} />
-      ) : (
-        <TeaserScreen onContinue={handleTeaserContinue} onSkip={handleTeaserSkip} />
-      );
+      return <TeaserScreen onContinue={handleTeaserContinue} onSkip={handleTeaserSkip} />;
     case "posture_capture":
       return (
         <PostureCaptureScreen
