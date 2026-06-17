@@ -246,11 +246,11 @@ export const ELEVENLABS_MODELS = [
 
 const ttsDefaults: TTSSettings = {
   modelId: "eleven_multilingual_v2",
-  stability: 0.62,
-  similarityBoost: 0.88,
-  style: 0.08,
+  stability: 0.50,
+  similarityBoost: 0.82,
+  style: 0.18,
   useSpeakerBoost: true,
-  speed: 0.92,
+  speed: 1.0,
   outputFormat: "mp3_44100_128",
   optimizeStreamingLatency: 0,
   languageCode: "fr",

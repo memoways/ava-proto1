@@ -1,10 +1,9 @@
 /** PRD4 — Écran 8 : Conversation avec Max (toggle-to-talk, fond Max plein écran) */
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { Mic, MicOff, PhoneOff, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo } from "react";
+import { Mic, Square, PhoneOff, Loader2 } from "lucide-react";
 import maxLarge from "@/assets/characters/max-large.jpg";
 import maxAvatar from "@/assets/characters/max.jpg";
-import type { AudioState, ConversationMessage, PRD4TurnLabels } from "@/types";
+import type { AudioState, ConversationMessage } from "@/types";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -15,45 +14,6 @@ interface Props {
   onPTTPress: () => void;
   onPTTRelease: () => void;
   onHangUp: () => void;
-}
-
-const STATE_LABELS: Record<AudioState, string> = {
-  idle: "Clique pour parler",
-  mic_starting: "Ouverture du micro…",
-  user_speaking: "Tu parles — clique pour envoyer",
-  max_thinking: "Max réfléchit…",
-  max_speaking: "Max répond…",
-};
-
-function LabelChips({ labels }: { labels: PRD4TurnLabels | null | undefined }) {
-  if (!labels) return null;
-  const items: { kind: "theme" | "topic" | "intent"; value: string }[] = [];
-  for (const v of labels.themes ?? []) items.push({ kind: "theme", value: v });
-  for (const v of labels.topics ?? []) items.push({ kind: "topic", value: v });
-  for (const v of labels.intentions ?? []) items.push({ kind: "intent", value: v });
-  if (items.length === 0) return null;
-  const colorFor = (k: string) =>
-    k === "theme"
-      ? "bg-primary/15 text-primary border-primary/30"
-      : k === "topic"
-      ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-      : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
-  return (
-    <div className="mt-1 flex flex-wrap justify-end gap-1">
-      {items.slice(0, 4).map((it, i) => (
-        <span
-          key={`${it.kind}-${it.value}-${i}`}
-          className={cn(
-            "rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide backdrop-blur-sm",
-            colorFor(it.kind),
-          )}
-          title={it.kind}
-        >
-          {it.value}
-        </span>
-      ))}
-    </div>
-  );
 }
 
 const ConversationScreen = ({
@@ -70,7 +30,7 @@ const ConversationScreen = ({
 
   const handleToggleTalk = useCallback(() => {
     if (audioState === "idle") onPTTPress();
-    if (audioState === "user_speaking") onPTTRelease();
+    else if (audioState === "user_speaking") onPTTRelease();
   }, [audioState, onPTTPress, onPTTRelease]);
 
   useEffect(() => {
@@ -87,14 +47,32 @@ const ConversationScreen = ({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleToggleTalk]);
 
-  // Auto-scroll transcript on new messages
-  const scrollRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [conversationLog.length, userSubtitle, maxSubtitle]);
+  // Derive the last Max and last user message from the conversation log so
+  // they persist on screen between turns (until replaced on the next turn).
+  const { lastMaxText, lastUserText } = useMemo(() => {
+    let mx = "";
+    let us = "";
+    for (let i = conversationLog.length - 1; i >= 0; i--) {
+      const m = conversationLog[i];
+      if (!mx && m.role === "max") mx = m.content;
+      else if (!us && m.role === "user") us = m.content;
+      if (mx && us) break;
+    }
+    return { lastMaxText: mx, lastUserText: us };
+  }, [conversationLog]);
 
-  // Display only last ~6 messages in HUD
-  const recent = useMemo(() => conversationLog.slice(-6), [conversationLog]);
+  // While Max is generating, show the streaming maxSubtitle; otherwise fallback
+  // to the last assistant message from the log.
+  const displayedMax =
+    (audioState === "max_speaking" || audioState === "max_thinking") && maxSubtitle
+      ? maxSubtitle
+      : lastMaxText;
+
+  // While the user is speaking, show the live interim STT text; otherwise the
+  // last finalized user message from the log.
+  const displayedUser = recording || audioState === "mic_starting"
+    ? userSubtitle
+    : lastUserText;
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
@@ -104,12 +82,12 @@ const ConversationScreen = ({
         style={{ backgroundImage: `url(${maxLarge})` }}
         aria-hidden
       />
-      {/* Dark gradients to keep face area clear */}
+      {/* Dark gradients to keep face area clear and bottom legible */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "linear-gradient(to bottom, hsl(var(--background)/0.85) 0%, hsl(var(--background)/0.15) 18%, hsl(var(--background)/0.05) 45%, hsl(var(--background)/0.55) 78%, hsl(var(--background)/0.95) 100%)",
+            "linear-gradient(to bottom, hsl(var(--background)/0.55) 0%, hsl(var(--background)/0.08) 22%, hsl(var(--background)/0.05) 45%, hsl(var(--background)/0.75) 78%, hsl(var(--background)/0.97) 100%)",
         }}
         aria-hidden
       />
@@ -119,95 +97,76 @@ const ConversationScreen = ({
         <div className="flex items-center gap-3 rounded-full border border-border/40 bg-background/60 px-3 py-2 backdrop-blur-md">
           <img src={maxAvatar} alt="" className="h-8 w-8 rounded-full border border-border object-cover" />
           <div className="pr-2">
-            <p className="text-xs font-medium text-foreground leading-none">Max</p>
+            <p className="text-xs font-medium leading-none text-foreground">Max</p>
             <p className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">en ligne</p>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
+        <button
           onClick={onHangUp}
-          className="rounded-full border border-border/40 bg-background/60 text-foreground/80 backdrop-blur-md hover:bg-destructive/20 hover:text-destructive"
+          className="flex items-center gap-2 rounded-full border border-border/40 bg-background/60 px-3 py-2 text-sm text-foreground/80 backdrop-blur-md transition-colors hover:bg-destructive/20 hover:text-destructive"
         >
-          <PhoneOff className="mr-2 h-4 w-4" />
+          <PhoneOff className="h-4 w-4" />
           Terminer
-        </Button>
+        </button>
       </header>
 
-      {/* Transcript */}
-      <div className="relative z-10 flex-1 px-4 md:px-8">
-        <div
-          ref={scrollRef}
-          className="mx-auto max-h-[55vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border/30 bg-background/40 p-4 backdrop-blur-md"
-        >
-          {recent.length === 0 ? (
-            <p className="text-center text-xs italic text-muted-foreground">La conversation commence…</p>
-          ) : (
-            <div className="space-y-3">
-              {recent.map((m, i) => (
-                <div key={`${m.timestamp}-${i}`} className={cn("flex flex-col", m.role === "user" ? "items-end" : "items-start")}>
-                  <div
-                    className={cn(
-                      "max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-snug drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)]",
-                      m.role === "user"
-                        ? "bg-primary/25 text-foreground"
-                        : "bg-background/70 text-foreground font-serif",
-                    )}
-                  >
-                    {m.content}
-                  </div>
-                  {m.role === "user" && <LabelChips labels={m.labels} />}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      <div className="flex-1" />
 
-      {/* Bottom HUD — live STT + PTT */}
-      <footer className="relative z-10 px-4 pb-5 md:px-8 md:pb-7">
-        <div className="mx-auto w-full max-w-3xl space-y-3">
-          {/* Live STT subtitle (mise à jour en temps réel pendant la parole) */}
-          <div className="min-h-[2.5rem] text-center">
-            {(recording || userSubtitle) && userSubtitle && (
-              <p className="text-sm italic text-foreground/85 drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]">
-                « {userSubtitle} »
-              </p>
-            )}
-            {audioState === "max_speaking" && maxSubtitle && (
-              <p className="font-serif text-lg leading-snug text-foreground drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] md:text-xl">
-                {maxSubtitle}
-              </p>
-            )}
-          </div>
-
-          {/* PTT */}
-          <div className="flex flex-col items-center gap-2">
-            <button
-              onClick={handleToggleTalk}
-              disabled={disabled}
-              className={cn(
-                "flex h-20 w-20 items-center justify-center rounded-full border-2 backdrop-blur-md transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40",
-                recording
-                  ? "scale-110 border-destructive bg-destructive/30 shadow-[0_0_40px_-5px_hsl(var(--destructive)/0.7)]"
-                  : "border-primary/60 bg-background/60 hover:border-primary hover:bg-background/80",
-              )}
-              aria-label={recording ? "Cliquer pour envoyer" : "Cliquer pour parler"}
+      {/* Bottom: Max line, then user line (subtitle style — replaced each turn) */}
+      <section className="relative z-10 px-4 pb-6 md:px-8 md:pb-8">
+        <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-3">
+          {displayedMax && (
+            <p
+              key={`max-${displayedMax.length}`}
+              className="animate-fade-in text-center font-serif text-xl leading-snug text-foreground drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] md:text-2xl"
             >
-              {audioState === "mic_starting" || audioState === "max_thinking" ? (
-                <Loader2 className="h-7 w-7 animate-spin text-primary" />
-              ) : recording ? (
-                <MicOff className="h-7 w-7 text-destructive-foreground" />
-              ) : (
-                <Mic className="h-7 w-7 text-foreground" />
-              )}
-            </button>
-            <p className="text-xs font-medium uppercase tracking-wider text-foreground/90 drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]">
-              {STATE_LABELS[audioState]}
+              {displayedMax}
             </p>
-          </div>
+          )}
+          {displayedUser && (
+            <p
+              key={`usr-${displayedUser.length}`}
+              className={cn(
+                "animate-fade-in text-center text-base italic leading-snug drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] md:text-lg",
+                recording ? "text-primary/90" : "text-foreground/80",
+              )}
+            >
+              « {displayedUser} »
+            </p>
+          )}
+
+          {/* Status helper line */}
+          <p className="min-h-[1.25rem] text-xs uppercase tracking-[0.18em] text-muted-foreground/80">
+            {audioState === "idle" && "Clique pour parler"}
+            {audioState === "mic_starting" && "Micro en cours d'ouverture…"}
+            {audioState === "user_speaking" && "Enregistrement — clique pour envoyer"}
+            {audioState === "max_thinking" && "Max réfléchit…"}
+            {audioState === "max_speaking" && "Max répond…"}
+          </p>
+
+          {/* Toggle Mic button — clear start/stop switch */}
+          <button
+            onClick={handleToggleTalk}
+            disabled={disabled}
+            className={cn(
+              "mt-1 flex items-center gap-3 rounded-full border-2 px-6 py-3 text-sm font-semibold uppercase tracking-wider backdrop-blur-md transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40",
+              recording
+                ? "border-destructive bg-destructive text-destructive-foreground shadow-[0_0_36px_-4px_hsl(var(--destructive)/0.8)] animate-pulse"
+                : "border-primary bg-primary text-primary-foreground hover:brightness-110",
+            )}
+            aria-label={recording ? "Arrêter l'enregistrement" : "Démarrer l'enregistrement"}
+          >
+            {audioState === "mic_starting" || audioState === "max_thinking" ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : recording ? (
+              <Square className="h-5 w-5 fill-current" />
+            ) : (
+              <Mic className="h-5 w-5" />
+            )}
+            <span>{recording ? "Arrêter" : "Démarrer"}</span>
+          </button>
         </div>
-      </footer>
+      </section>
     </div>
   );
 };
