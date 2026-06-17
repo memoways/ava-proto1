@@ -41,6 +41,8 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
     return url;
   }, []);
 
+  const embedUrl = getEmbedUrl(videoUrl);
+
   // Initialize Player.js and unmute as soon as the player is ready
   useEffect(() => {
     const iframe = iframeRef.current;
