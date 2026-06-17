@@ -45,6 +45,8 @@ export interface PRD4TurnResult {
   ragMatches: number;
   /** Promesse résolue quand le GM post-turn a fini (à attendre en arrière-plan). */
   postTurnPromise: Promise<PRD4PostTurnEvaluation>;
+  /** Label pass lancé en parallèle de Max (résout en général avant la fin du TTS). */
+  labelPromise: Promise<PRD4LabelResult>;
 }
 
 export type PRD4LatencySegmentEvent =
