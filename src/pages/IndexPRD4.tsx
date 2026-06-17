@@ -504,7 +504,7 @@ const IndexPRD4 = () => {
           void updatePRD4Conversation(sessionIdRef.current, conversationRef.current);
         }
 
-        // GM post-turn : vérifie end_recommended + trigger vidéo sans bloquer
+        // GM post-turn : labels, end_recommended + trigger vidéo (jamais bloquant)
         void result.postTurnPromise.then(async (ev) => {
           trackEvent("prd4_gm_post_turn", {
             session_id: sessionIdRef.current,
@@ -513,7 +513,26 @@ const IndexPRD4 = () => {
             end_recommended: ev.end_recommended,
             trigger_video_id: ev.trigger_video_id ?? null,
             latency_ms: ev.latency_ms,
+            labels: ev.labels ?? null,
           });
+          // Attache les labels GM au dernier message utilisateur (affichage chips)
+          if (ev.labels) {
+            const total = (ev.labels.themes?.length ?? 0) + (ev.labels.topics?.length ?? 0) + (ev.labels.intentions?.length ?? 0);
+            if (total > 0) {
+              setLastUserLabels(ev.labels);
+              // Mettre aussi à jour conversationRef pour la persistance ultérieure
+              const log = conversationRef.current;
+              for (let i = log.length - 1; i >= 0; i--) {
+                if (log[i].role === "user") {
+                  log[i] = { ...log[i], labels: ev.labels };
+                  break;
+                }
+              }
+              if (sessionIdRef.current) {
+                void updatePRD4Conversation(sessionIdRef.current, conversationRef.current);
+              }
+            }
+          }
           if (ev.trigger_video_id && !triggeredVideoIdsRef.current.includes(ev.trigger_video_id)) {
             try {
               const videos = await getVideoTriggersCached();
