@@ -9,6 +9,7 @@
  */
 import { simulateMaxResponse, type MaxAgentInput } from "@/agents/maxAgent";
 import { evaluatePostTurnPRD4 } from "@/agents/gameMasterPRD4";
+import { labelUserTurnPRD4, type PRD4LabelResult } from "@/agents/gameMasterLabelPRD4";
 import {
   buildKnowledgeContextFromRAG,
   formatRAGContext,
@@ -44,6 +45,8 @@ export interface PRD4TurnResult {
   ragMatches: number;
   /** Promesse résolue quand le GM post-turn a fini (à attendre en arrière-plan). */
   postTurnPromise: Promise<PRD4PostTurnEvaluation>;
+  /** Label pass lancé en parallèle de Max (résout en général avant la fin du TTS). */
+  labelPromise: Promise<PRD4LabelResult>;
 }
 
 export type PRD4LatencySegmentEvent =
@@ -87,6 +90,14 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   }
   const rag_ms = Math.round(performance.now() - ragStart);
   input.onLatencySegment?.({ type: "end", segment: "RAG", service: "RAG", durationMs: rag_ms });
+
+  // --- GM Label Pass (parallèle à Max) ---------------------------------------
+  const labelPromise: Promise<PRD4LabelResult> = labelUserTurnPRD4({
+    sessionId: input.sessionId,
+    userMessage: input.userMessage,
+    conversationHistory: input.conversationHistory,
+    userPostureRaw: input.userPostureRaw ?? null,
+  });
 
   // --- Max --------------------------------------------------------------------
   const maxStart = performance.now();
@@ -156,5 +167,6 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     },
     ragMatches: matchesCount,
     postTurnPromise,
+    labelPromise,
   };
 }
