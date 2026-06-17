@@ -4,6 +4,26 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.30.0] - 2026-06-17 — Flux conversationnel stabilisé, STT/TTS fluides, sonneries d'appel
+
+### Ajouté
+- **Sonneries d'appel** (`CallingMaxScreen`) — 3 sonneries classiques (dual-tone 440/480 Hz, tremolo) via Web Audio API avant que Max décroche. Compteur `ring/3` affiché à l'écran.
+- **Bouton PTT unique explicite** — un seul bouton « Démarrer / Arrêter » avec icônes `Mic`/`Square`, pulse rouge enregistrement, raccourci espace. Remplace le double bouton start/stop confus.
+
+### Modifié
+- **UI conversation rétablie** — suppression du HUD transcript scrollable et des sous-titres en overlay. Retour à l'affichage classique : phrase de Max en bas (texte blanc lisible), parole utilisateur en dessous. Remplacement par tour de parole, pas de cumul.
+- **STT live — lisibilité et continuité** : texte utilisateur en blanc (`text-white/95`), pas de rouge. Pas d'animation `fade-in` ni de `key` dynamique qui provoquaient des flashs et des coupures. Le transcript live se met à jour en continu, corrige au fur et à mesure, sans jamais vider ou couper la phrase en cours.
+- **TTS ElevenLabs — fluidité** : `stability: 0.50` (moins raide), `similarityBoost: 0.82`, `style: 0.18` (plus d'expressivité), `speed: 1.0` (pas de ralentissement artificiel). Moins de hachage, prononciation plus naturelle.
+- **Flow onboarding hard-codé complet** : `Welcome → FilmQuestion → (Teaser si non vu) → PostureCapture → CharacterSelect → CallingMax → Conversation`. Retour de `CharacterSelect` avec vignettes (Max actif, 3 autres grisés).
+- **Première phrase de Max** fixée à : *« Hallo... à qui ai-je affaire ? »*
+- **Textes UX** : suppression du bouton « Me laisser surprendre » sur `PostureCaptureScreen`. Texte `PostureCaptureScreen` changé en *« Tu peux poser une question, exprimer une émotion ou partager une intention pour démarrer l'expérience. »* Suppression de la phrase *« Le film suit une famille... »* sur `CharacterSelect`.
+
+### Corrigé
+- **Bug STT — flashs et perte de texte** : le `key` dynamique et la classe `animate-fade-in` sur les messages provoquaient un remontage complet à chaque caractère intermédiaire. Remplacé par `transition-opacity duration-200` sur Max et texte statique sur l'utilisateur.
+- **Bug TTS — Max mâchait ses mots** : les paramètres trop agressifs (`stability: 0.62`, `speed: 0.92`) et les chunks courts rendaient la voix saccadée. Corrigé par des paramètres plus neutres et des seuils de chunking plus élevés (portés en v0.29.0 et affinés ici).
+
+---
+
 ## [0.29.0] - 2026-06-17 — Labels GM, déclenchement vidéo fiabilisé, diction TTS plus naturelle, suppression module GIFF
 
 ### Ajouté

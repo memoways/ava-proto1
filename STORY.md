@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-06-17 (session 27 — Labels GM, déclenchement vidéo fiabilisé, diction TTS plus naturelle, suppression module GIFF)
+> **Last Updated**: 2026-06-17 (session 28 — Flux conversationnel stabilisé, STT/TTS fluides, sonneries d'appel)
 
 ---
 
@@ -78,6 +78,38 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 4. **HUD transcript** — `ConversationScreen` affiche désormais les 6 derniers messages en panneau scrollable, en plus du sous-titre live STT.
 5. **TTS plus fluide** — chunks plus longs (`MIN_SENTENCE_LEN: 25 → 80`, `CHUNK_TARGET_CHARS: 420 → 600`), defaults voix Max ajustés (`stability: 0.62`, `similarityBoost: 0.88`, `style: 0.08`, `speed: 0.92`) pour limiter le hachage et améliorer la prononciation.
 6. **Suppression du module GIFF** — onglet admin, service `giffStartSettings`, composants `StartVariantFrame` et `TeaserRappelScreen` supprimés. Flow figé : `Welcome → FilmQuestion → (Teaser si non vu) → PostureCapture → CharacterSelect → CallingMax → Conversation`.
+
+**Validation**:
+- `npx tsc --noEmit` : OK.
+- Build Vite : OK.
+
+**Time**: ~2h.
+
+---
+
+### 2026-06-17 — Flux conversationnel stabilisé, STT/TTS fluides, sonneries d'appel 🔷
+
+**Intent**: Les tests révèlent que la nouvelle UI conversation (HUD transcript + sous-titres en overlay) casse complètement la lisibilité : flashs rouges, texte qui disparaît, impossible de suivre ce que l'on dit ou ce que Max répond. La parole de Max est hachée par des paramètres TTS trop défensifs. L'écran d'appel à Max est trop abrupt (pas de sonnerie). Le bouton PTT n'est pas clair. Il faut revenir à la mécanique éprouvée : écran personnages, appel avec sonneries, conversation simple (phrase Max + parole utilisateur), tout en conservant les améliorations STT live et les labels GM.
+
+**Tool**: Lovable
+
+**Outcome**:
+1. **Rétablissement du flux éprouvé** — retour de `CharacterSelect` avec vignettes 2×2 (Max actif, Emma/Ava/Léo grisés + cadenas) et de `CallingMaxScreen` avec 3 sonneries classiques (Web Audio API, dual-tone 440/480 Hz, tremolo) avant que Max ne décroche.
+2. **UI conversation simplifiée** — suppression du HUD transcript scrollable et des sous-titres en overlay. Retour à l'affichage classique : la dernière phrase de Max reste visible en bas (texte blanc lisible, ombre portée), la parole utilisateur apparaît en dessous. Remplacement par tour de parole, pas de cumul de messages à l'écran.
+3. **STT live — lisibilité et continuité** : le texte utilisateur passe en blanc sobre (`text-white/95`), suppression du rouge agressif. Plus d'animation `fade-in` ni de `key` dynamique qui provoquaient des flashs et des coupures à chaque caractère intermédiaire. Le transcript se met à jour en continu, corrige au fur et à mesure, sans jamais vider ou couper la phrase en cours.
+4. **TTS ElevenLabs — fluidité** : ajustement des defaults voix Max (`stability: 0.50`, `similarityBoost: 0.82`, `style: 0.18`, `speed: 1.0`) pour une diction plus naturelle, moins raide, moins hachée. Les chunks plus longs (portés en v0.29.0) sont conservés.
+5. **Bouton PTT unique explicite** — un seul bouton « Démarrer / Arrêter » avec icônes `Mic`/`Square`, pulse rouge pendant l'enregistrement, raccourci espace. Remplace le double bouton start/stop confus.
+6. **Textes UX alignés** : suppression du bouton « Me laisser surprendre » sur `PostureCaptureScreen`. Texte de posture changé en *« Tu peux poser une question, exprimer une émotion ou partager une intention pour démarrer l'expérience. »*. Suppression de la phrase introductive du film sur `CharacterSelect`. Première phrase de Max fixée à : *« Hallo... à qui ai-je affaire ? »*.
+
+**Ce que ça change** : on revient à une **mécanique conversationnelle éprouvée** où l'utilisateur voit toujours ce que Max vient de dire, voit sa propre parole se construire en temps réel sans flash, et déclenche l'enregistrement avec un bouton unique sans ambiguïté. La fluidité TTS est restaurée (Max ne « mâche » plus ses mots). L'appel à Max est préparé par 3 sonneries classiques qui ancrent l'illusion téléphonique. C'est un retour en arrière volontaire sur l'UI transcript expérimentale au profit de la stabilité perçue par le joueur.
+
+**Validation**:
+- `npx tsc --noEmit` : OK.
+- Build Vite : OK.
+
+**Time**: ~1h30 (diagnostic UX → retrait HUD transcript → réécriture STT live → ajustement TTS → sonneries Web Audio → textes UX).
+
+
 
 
 
