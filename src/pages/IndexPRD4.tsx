@@ -75,7 +75,6 @@ const IndexPRD4 = () => {
   const [userSubtitle, setUserSubtitle] = useState("");
   const [maxSubtitle, setMaxSubtitle] = useState("");
   const [summarizing, setSummarizing] = useState(false);
-  const [giffSettings, setGiffSettings] = useState<GiffStartSettings>(GIFF_START_DEFAULTS);
   const latencyOverlayEnabled = useLatencyOverlayEnabled();
   const {
     segments: latencySegments,
