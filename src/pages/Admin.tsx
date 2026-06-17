@@ -62,7 +62,7 @@ const TAB_GROUPS = [
     label: "🎮 Mécanique",
     tabs: [
       { id: "gamemaster", label: "Game Master" },
-      { id: "giff-start", label: "Démarrage GIFF" },
+      
       { id: "video-triggers", label: "Triggers vidéo" },
       { id: "validator", label: "Validateur" },
       { id: "metrics", label: "Métriques hallu." },
