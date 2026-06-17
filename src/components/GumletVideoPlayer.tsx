@@ -16,6 +16,7 @@ interface GumletVideoPlayerProps {
  */
 const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVideoPlayerProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const playerRef = useRef<Player | null>(null);
 
   const isGumletEndedMessage = useCallback((data: unknown) => {
     if (!data || typeof data !== "object") return false;
@@ -33,7 +34,7 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
     const match = url.match(/(?:watch|embed)\/([a-f0-9]+)/i);
     if (match) {
       const assetId = match[1];
-      return `https://play.gumlet.io/embed/${assetId}?preload=true&autoplay=true&muted=false`;
+      return `https://play.gumlet.io/embed/${assetId}?preload=true&autoplay=true`;
     }
     
     // Fallback: use as-is
