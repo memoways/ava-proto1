@@ -128,6 +128,15 @@ export interface ConversationMessage {
   pipeline?: ConversationPipelineTimings;
   /** Si le Game Master pre-turn est tombé en fallback, on garde la raison pour debug. */
   gmFallback?: GameMasterFallbackInfo | null;
+  /** Labels GM (thèmes/sujets/intentions) — attachés au message utilisateur après évaluation post-turn. */
+  labels?: PRD4TurnLabels | null;
+}
+
+/** Labels conversationnels produits par le GM PRD4 après chaque tour (≤4 au total, vides si pas évident). */
+export interface PRD4TurnLabels {
+  themes: string[];
+  topics: string[];
+  intentions: string[];
 }
 
 export interface ConversationPipelineTimings {
