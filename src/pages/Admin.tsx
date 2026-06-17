@@ -26,7 +26,7 @@ import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
 import LLMUsageTab from "@/components/admin/LLMUsageTab";
 import VoiceUsageTab from "@/components/admin/VoiceUsageTab";
 import VideosListTab from "@/components/admin/VideosListTab";
-import GiffStartTab from "@/components/admin/GiffStartTab";
+
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -62,7 +62,7 @@ const TAB_GROUPS = [
     label: "🎮 Mécanique",
     tabs: [
       { id: "gamemaster", label: "Game Master" },
-      { id: "giff-start", label: "Démarrage GIFF" },
+      
       { id: "video-triggers", label: "Triggers vidéo" },
       { id: "validator", label: "Validateur" },
       { id: "metrics", label: "Métriques hallu." },
@@ -502,9 +502,7 @@ export default function Admin() {
             <VideoTriggersEditor />
           </TabsContent>
 
-          <TabsContent value="giff-start">
-            <GiffStartTab />
-          </TabsContent>
+
 
 
 

@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-06-16 (session 26 — Démarrage GIFF, 3 variantes admin, nouveau flow onboarding < 45 s)
+> **Last Updated**: 2026-06-17 (session 27 — Labels GM, déclenchement vidéo fiabilisé, diction TTS plus naturelle, suppression module GIFF)
 
 ---
 
@@ -64,6 +64,22 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-06-17 — Labels GM, déclenchement vidéo fiabilisé, diction TTS plus naturelle, suppression module GIFF 🔷
+
+**Intent**: Lors des tests, le Game Master n'arrivait pas à déclencher la vidéo « couteau » même quand la conversation tournait clairement sur les thématiques famille/patriarcat. En parallèle, la diction TTS d'ElevenLabs était hachée et le module « Démarrage GIFF » introduisait une complexité inutile par rapport à la mécanique stable hard-codée. Il fallait aussi rendre visibles (côté joueur et côté admin) les labels thématiques que le GM analyse à chaque tour.
+
+**Tool**: Lovable
+
+**Outcome**:
+1. **Labels GM par tour** — nouveau champ `labels: { themes, topics, intentions }` (max 4 cumulés) sur `PRD4PostTurnEvaluation`, extrait du message utilisateur. Pas d'invention : listes vides si rien d'évident. Affichés en chips colorées dans le HUD `ConversationScreen` et dans `SessionsTab` (admin).
+2. **Déclenchement vidéo basé sur les labels** — le prompt GM est réorganisé : extraire d'abord `labels`, puis comparer `labels.themes` aux `themes` des vidéos disponibles. Synonymes/fautes tolérés. Plus de trigger si aucun thème clair.
+3. **Persistance des labels** — re-save de `sessions.conversation_log` après l'évaluation post-turn pour conserver les labels sur le message utilisateur dans la DB.
+4. **HUD transcript** — `ConversationScreen` affiche désormais les 6 derniers messages en panneau scrollable, en plus du sous-titre live STT.
+5. **TTS plus fluide** — chunks plus longs (`MIN_SENTENCE_LEN: 25 → 80`, `CHUNK_TARGET_CHARS: 420 → 600`), defaults voix Max ajustés (`stability: 0.62`, `similarityBoost: 0.88`, `style: 0.08`, `speed: 0.92`) pour limiter le hachage et améliorer la prononciation.
+6. **Suppression du module GIFF** — onglet admin, service `giffStartSettings`, composants `StartVariantFrame` et `TeaserRappelScreen` supprimés. Flow figé : `Welcome → FilmQuestion → (Teaser si non vu) → PostureCapture → CharacterSelect → CallingMax → Conversation`.
+
+
 
 ### 2026-06-16 — Démarrage GIFF (< 45 s, 3 variantes admin) 🔷
 

@@ -1,10 +1,10 @@
 /** PRD4 — Écran 8 : Conversation avec Max (toggle-to-talk, fond Max plein écran) */
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, MicOff, PhoneOff, Loader2 } from "lucide-react";
 import maxLarge from "@/assets/characters/max-large.jpg";
 import maxAvatar from "@/assets/characters/max.jpg";
-import type { AudioState, ConversationMessage } from "@/types";
+import type { AudioState, ConversationMessage, PRD4TurnLabels } from "@/types";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -25,10 +25,42 @@ const STATE_LABELS: Record<AudioState, string> = {
   max_speaking: "Max répond…",
 };
 
+function LabelChips({ labels }: { labels: PRD4TurnLabels | null | undefined }) {
+  if (!labels) return null;
+  const items: { kind: "theme" | "topic" | "intent"; value: string }[] = [];
+  for (const v of labels.themes ?? []) items.push({ kind: "theme", value: v });
+  for (const v of labels.topics ?? []) items.push({ kind: "topic", value: v });
+  for (const v of labels.intentions ?? []) items.push({ kind: "intent", value: v });
+  if (items.length === 0) return null;
+  const colorFor = (k: string) =>
+    k === "theme"
+      ? "bg-primary/15 text-primary border-primary/30"
+      : k === "topic"
+      ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+      : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+  return (
+    <div className="mt-1 flex flex-wrap justify-end gap-1">
+      {items.slice(0, 4).map((it, i) => (
+        <span
+          key={`${it.kind}-${it.value}-${i}`}
+          className={cn(
+            "rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide backdrop-blur-sm",
+            colorFor(it.kind),
+          )}
+          title={it.kind}
+        >
+          {it.value}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 const ConversationScreen = ({
   audioState,
   userSubtitle,
   maxSubtitle,
+  conversationLog,
   onPTTPress,
   onPTTRelease,
   onHangUp,
@@ -55,6 +87,15 @@ const ConversationScreen = ({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleToggleTalk]);
 
+  // Auto-scroll transcript on new messages
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [conversationLog.length, userSubtitle, maxSubtitle]);
+
+  // Display only last ~6 messages in HUD
+  const recent = useMemo(() => conversationLog.slice(-6), [conversationLog]);
+
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
       {/* Background photo (Max plein cadre) */}
@@ -63,7 +104,7 @@ const ConversationScreen = ({
         style={{ backgroundImage: `url(${maxLarge})` }}
         aria-hidden
       />
-      {/* Dark gradients to keep face area clear, only edges dimmed */}
+      {/* Dark gradients to keep face area clear */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -73,7 +114,7 @@ const ConversationScreen = ({
         aria-hidden
       />
 
-      {/* HUD top — pinned to edges, away from face */}
+      {/* HUD top */}
       <header className="relative z-10 flex items-start justify-between p-4 md:p-6">
         <div className="flex items-center gap-3 rounded-full border border-border/40 bg-background/60 px-3 py-2 backdrop-blur-md">
           <img src={maxAvatar} alt="" className="h-8 w-8 rounded-full border border-border object-cover" />
@@ -93,22 +134,49 @@ const ConversationScreen = ({
         </Button>
       </header>
 
-      {/* Spacer — leave Max's face visible */}
-      <div className="relative z-10 flex-1" />
+      {/* Transcript */}
+      <div className="relative z-10 flex-1 px-4 md:px-8">
+        <div
+          ref={scrollRef}
+          className="mx-auto max-h-[55vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border/30 bg-background/40 p-4 backdrop-blur-md"
+        >
+          {recent.length === 0 ? (
+            <p className="text-center text-xs italic text-muted-foreground">La conversation commence…</p>
+          ) : (
+            <div className="space-y-3">
+              {recent.map((m, i) => (
+                <div key={`${m.timestamp}-${i}`} className={cn("flex flex-col", m.role === "user" ? "items-end" : "items-start")}>
+                  <div
+                    className={cn(
+                      "max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-snug drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)]",
+                      m.role === "user"
+                        ? "bg-primary/25 text-foreground"
+                        : "bg-background/70 text-foreground font-serif",
+                    )}
+                  >
+                    {m.content}
+                  </div>
+                  {m.role === "user" && <LabelChips labels={m.labels} />}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
-      {/* Bottom HUD — subtitles + PTT */}
+      {/* Bottom HUD — live STT + PTT */}
       <footer className="relative z-10 px-4 pb-5 md:px-8 md:pb-7">
-        <div className="mx-auto w-full max-w-3xl space-y-4">
-          {/* Subtitles */}
-          <div className="min-h-[3.5rem] space-y-2 text-center">
-            {maxSubtitle && (
-              <p className="font-serif text-lg leading-snug text-foreground drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] md:text-xl">
-                {maxSubtitle}
+        <div className="mx-auto w-full max-w-3xl space-y-3">
+          {/* Live STT subtitle (mise à jour en temps réel pendant la parole) */}
+          <div className="min-h-[2.5rem] text-center">
+            {(recording || userSubtitle) && userSubtitle && (
+              <p className="text-sm italic text-foreground/85 drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]">
+                « {userSubtitle} »
               </p>
             )}
-            {userSubtitle && (
-              <p className="text-sm italic text-foreground/80 drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]">
-                « {userSubtitle} »
+            {audioState === "max_speaking" && maxSubtitle && (
+              <p className="font-serif text-lg leading-snug text-foreground drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] md:text-xl">
+                {maxSubtitle}
               </p>
             )}
           </div>

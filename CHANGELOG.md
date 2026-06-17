@@ -4,6 +4,26 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.29.0] - 2026-06-17 — Labels GM, déclenchement vidéo fiabilisé, diction TTS plus naturelle, suppression module GIFF
+
+### Ajouté
+- **Labels conversationnels GM** : nouveau champ `labels: { themes, topics, intentions }` (max 4 au total) sur `PRD4PostTurnEvaluation`, extrait du message utilisateur après chaque tour. Vide si rien d'évident (pas d'invention).
+- **Affichage des labels** dans le HUD de conversation (`ConversationScreen`) — chips colorées sous chaque message utilisateur (thème = primary, sujet = ambre, intention = vert).
+- **Affichage des labels dans l'admin** (`SessionsTab`) — chips sous chaque message utilisateur du détail de session.
+- **Persistance des labels** sur `sessions.conversation_log` (re-save après l'évaluation GM).
+- **HUD transcript** : `ConversationScreen` affiche désormais les 6 derniers messages dans un panneau scrollable, en plus du sous-titre live STT.
+
+### Modifié
+- **Game Master prompt** : étape 1 → extraire `labels` du message utilisateur ; étape 2 → matcher `labels.themes` aux `themes` des vidéos disponibles pour déclencher `trigger_video_id`. Synonymes tolérés (famille/sœur/père, patriarcat/patricarcat, etc.). Plus de trigger si `themes` est vide.
+- **TTS ElevenLabs — diction plus fluide** : chunks plus longs (`MIN_SENTENCE_LEN: 25 → 80`, `CHUNK_TARGET_CHARS: 420 → 600`, `SINGLE_REQUEST_MAX_CHARS: 700 → 900`) pour éviter le hachage. Defaults voix Max ajustés (`stability: 0.62`, `similarityBoost: 0.88`, `style: 0.08`, `speed: 0.92`) pour une prononciation plus posée.
+- **Flow d'onboarding hard-codé** : `Welcome → FilmQuestion → (Teaser si non vu) → PostureCapture → CharacterSelect → CallingMax → Conversation`. Plus de branchement conditionnel.
+
+### Supprimé
+- **Module « Démarrage GIFF »** : onglet admin, service `giffStartSettings`, composants `StartVariantFrame`, `TeaserRappelScreen`. Les réglages amenaient une complexité inutile au regard de la mécanique stabilisée.
+- Props `settings` sur `WelcomeScreen`, `FilmQuestionScreen`, `PostureCaptureScreen`.
+
+
+
 ## [0.28.0] - 2026-06-16 — Démarrage GIFF (< 45 s, 3 variantes admin)
 
 Implémente le **PRD « Démarrage AVA pour installation GIFF »** : nouveau parcours court entre l'écran d'accueil et le premier échange avec Max, configurable depuis l'admin avec 3 variantes testables. L'ancien flow long (création complète de personnage) reste accessible via flag.

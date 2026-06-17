@@ -11,6 +11,7 @@ import type {
   ExperiencePhase,
   ExperienceState,
   FilmAnswer,
+  PRD4TurnLabels,
   UserPosture,
   UserRoleProfile,
 } from "@/types";
@@ -76,6 +77,21 @@ export function useExperienceState() {
     setState((s) => ({ ...s, pttErrors: s.pttErrors + 1 }));
   }, []);
 
+  /** Met à jour les labels GM du dernier message utilisateur antérieur à `beforeTimestamp` (ou le plus récent). */
+  const setLastUserLabels = useCallback((labels: PRD4TurnLabels) => {
+    setState((s) => {
+      const log = s.conversationLog;
+      for (let i = log.length - 1; i >= 0; i--) {
+        if (log[i].role === "user") {
+          const next = [...log];
+          next[i] = { ...next[i], labels };
+          return { ...s, conversationLog: next };
+        }
+      }
+      return s;
+    });
+  }, []);
+
   const endExperience = useCallback((reason: string) => {
     setState((s) => ({ ...s, phase: "end_session", endReason: reason }));
   }, []);
@@ -92,6 +108,7 @@ export function useExperienceState() {
     setSelectedCharacter,
     setAudioState,
     addMessage,
+    setLastUserLabels,
     incrementPttError,
     endExperience,
     reset,

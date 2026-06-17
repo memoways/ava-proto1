@@ -39,7 +39,6 @@ import {
 import WelcomeScreen from "@/components/prd4/WelcomeScreen";
 import FilmQuestionScreen from "@/components/prd4/FilmQuestionScreen";
 import TeaserScreen from "@/components/prd4/TeaserScreen";
-import TeaserRappelScreen from "@/components/prd4/TeaserRappelScreen";
 import PostureCaptureScreen from "@/components/prd4/PostureCaptureScreen";
 import TransitionScreen from "@/components/prd4/TransitionScreen";
 import RoleCaptureScreen from "@/components/prd4/RoleCaptureScreen";
@@ -53,11 +52,6 @@ import ThanksScreen from "@/components/ThanksScreen";
 import GumletVideoPlayer from "@/components/GumletVideoPlayer";
 import { savePRD4Questionnaire, syncPRD4QuestionnaireToNotion } from "@/services/prd4Questionnaire";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
-import {
-  GIFF_START_DEFAULTS,
-  loadGiffStartSettingsFromDB,
-  type GiffStartSettings,
-} from "@/services/giffStartSettings";
 import type { QuestionnairePRD4Answers, QuestionnairePRD4Data, UserPosture } from "@/types";
 
 const SESSION_DURATION_S = 5 * 60; // PRD4 §11 : ~5 min cible.
@@ -75,12 +69,12 @@ const IndexPRD4 = () => {
     incrementPttError,
     endExperience,
     reset,
+    setLastUserLabels,
   } = useExperienceState();
 
   const [userSubtitle, setUserSubtitle] = useState("");
   const [maxSubtitle, setMaxSubtitle] = useState("");
   const [summarizing, setSummarizing] = useState(false);
-  const [giffSettings, setGiffSettings] = useState<GiffStartSettings>(GIFF_START_DEFAULTS);
   const latencyOverlayEnabled = useLatencyOverlayEnabled();
   const {
     segments: latencySegments,
@@ -110,11 +104,9 @@ const IndexPRD4 = () => {
   const pendingPostVideoContextRef = useRef<string | null>(null);
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
-  // Chrono onboarding GIFF
+  // Chrono onboarding (mesure du time-to-first-Max-response)
   const onboardingStartedAtRef = useRef<number | null>(null);
   const firstMaxResponseAtRef = useRef<number | null>(null);
-  const giffSettingsRef = useRef<GiffStartSettings>(GIFF_START_DEFAULTS);
-  giffSettingsRef.current = giffSettings;
 
 
 
@@ -136,9 +128,6 @@ const IndexPRD4 = () => {
 
   useEffect(() => {
     void loadSTTSettingsFromDB();
-    void loadGiffStartSettingsFromDB().then(setGiffSettings).catch((e) =>
-      console.warn("[PRD4] giff settings load failed:", e),
-    );
   }, []);
 
   // ---- Helpers conversation -------------------------------------------------
@@ -171,19 +160,15 @@ const IndexPRD4 = () => {
   const handleStart = useCallback(() => {
     onboardingStartedAtRef.current = Date.now();
     firstMaxResponseAtRef.current = null;
-    trackEvent("giff_onboarding_started", {
-      variant: giffSettingsRef.current.active_start_variant,
-      use_giff_flow: giffSettingsRef.current.use_giff_flow,
-    });
+    trackEvent("prd4_onboarding_started", {});
     setPhase("film_question");
   }, [setPhase]);
   const handleFilmAnswer = useCallback(
     (a: FilmAnswer) => {
       setFilmAnswer(a);
-      trackEvent("giff_film_answered", { answer: a });
-      const useGiff = giffSettingsRef.current.use_giff_flow;
+      trackEvent("prd4_film_answered", { answer: a });
       if (a === "vu") {
-        setPhase(useGiff ? "posture_capture" : "role_capture");
+        setPhase("posture_capture");
       } else {
         setPhase("teaser");
       }
@@ -192,11 +177,11 @@ const IndexPRD4 = () => {
   );
   const handleTeaserContinue = useCallback(() => {
     markTeaserSeen(false);
-    setPhase(giffSettingsRef.current.use_giff_flow ? "posture_capture" : "role_capture");
+    setPhase("posture_capture");
   }, [markTeaserSeen, setPhase]);
   const handleTeaserSkip = useCallback(() => {
     markTeaserSeen(true);
-    setPhase(giffSettingsRef.current.use_giff_flow ? "posture_capture" : "role_capture");
+    setPhase("posture_capture");
   }, [markTeaserSeen, setPhase]);
 
   // ---- Posture capture (GIFF) ----------------------------------------------
@@ -271,27 +256,20 @@ const IndexPRD4 = () => {
     setActiveVideo(null);
 
 
-    // Crée la session DB (rôle complet en legacy, sinon null + posture en GIFF)
+    // Crée la session DB (toujours, en mode hard-codé) — persiste posture utilisateur
     try {
-      const useGiff = giffSettingsRef.current.use_giff_flow;
-      if (state.userRoleProfile || useGiff) {
-        const sid = await createPRD4Session(state.userRoleProfile, "max");
-        sessionIdRef.current = sid;
-        trackEvent("prd4_session_started", { session_id: sid });
-        // Persistance onboarding GIFF (best-effort)
-        if (useGiff) {
-          const startedAt = onboardingStartedAtRef.current;
-          const posture = userPostureRef.current;
-          void updatePRD4Onboarding(sid, {
-            ava_start_variant: giffSettingsRef.current.active_start_variant,
-            has_seen_film: state.hasSeenFilm ?? null,
-            teaser_shown: state.teaserSeen,
-            user_posture_raw: posture?.raw ?? null,
-            user_posture_mode: posture?.mode ?? null,
-            onboarding_started_at: startedAt ? new Date(startedAt).toISOString() : null,
-          });
-        }
-      }
+      const sid = await createPRD4Session(state.userRoleProfile, "max");
+      sessionIdRef.current = sid;
+      trackEvent("prd4_session_started", { session_id: sid });
+      const startedAt = onboardingStartedAtRef.current;
+      const posture = userPostureRef.current;
+      void updatePRD4Onboarding(sid, {
+        has_seen_film: state.hasSeenFilm ?? null,
+        teaser_shown: state.teaserSeen,
+        user_posture_raw: posture?.raw ?? null,
+        user_posture_mode: posture?.mode ?? null,
+        onboarding_started_at: startedAt ? new Date(startedAt).toISOString() : null,
+      });
     } catch (err) {
       console.warn("[PRD4] createSession failed (continuing without DB persistence):", err);
     }
@@ -321,16 +299,13 @@ const IndexPRD4 = () => {
     }
 
     // Marque le first_max_response et calcule la durée onboarding
-    if (giffSettingsRef.current.use_giff_flow && !firstMaxResponseAtRef.current) {
+    if (!firstMaxResponseAtRef.current) {
       firstMaxResponseAtRef.current = Date.now();
       const startedAt = onboardingStartedAtRef.current;
       const durationMs = startedAt ? firstMaxResponseAtRef.current - startedAt : null;
-      const target = giffSettingsRef.current.max_start_duration_seconds * 1000;
-      trackEvent("giff_first_max_response", {
+      trackEvent("prd4_first_max_response", {
         session_id: sessionIdRef.current,
-        variant: giffSettingsRef.current.active_start_variant,
         duration_ms: durationMs,
-        under_target: durationMs != null ? durationMs <= target : null,
       });
       if (sessionIdRef.current) {
         void updatePRD4Onboarding(sessionIdRef.current, {
@@ -529,7 +504,7 @@ const IndexPRD4 = () => {
           void updatePRD4Conversation(sessionIdRef.current, conversationRef.current);
         }
 
-        // GM post-turn : vérifie end_recommended + trigger vidéo sans bloquer
+        // GM post-turn : labels, end_recommended + trigger vidéo (jamais bloquant)
         void result.postTurnPromise.then(async (ev) => {
           trackEvent("prd4_gm_post_turn", {
             session_id: sessionIdRef.current,
@@ -538,7 +513,26 @@ const IndexPRD4 = () => {
             end_recommended: ev.end_recommended,
             trigger_video_id: ev.trigger_video_id ?? null,
             latency_ms: ev.latency_ms,
+            labels: ev.labels ?? null,
           });
+          // Attache les labels GM au dernier message utilisateur (affichage chips)
+          if (ev.labels) {
+            const total = (ev.labels.themes?.length ?? 0) + (ev.labels.topics?.length ?? 0) + (ev.labels.intentions?.length ?? 0);
+            if (total > 0) {
+              setLastUserLabels(ev.labels);
+              // Mettre aussi à jour conversationRef pour la persistance ultérieure
+              const log = conversationRef.current;
+              for (let i = log.length - 1; i >= 0; i--) {
+                if (log[i].role === "user") {
+                  log[i] = { ...log[i], labels: ev.labels };
+                  break;
+                }
+              }
+              if (sessionIdRef.current) {
+                void updatePRD4Conversation(sessionIdRef.current, conversationRef.current);
+              }
+            }
+          }
           if (ev.trigger_video_id && !triggeredVideoIdsRef.current.includes(ev.trigger_video_id)) {
             try {
               const videos = await getVideoTriggersCached();
@@ -737,9 +731,7 @@ const IndexPRD4 = () => {
           max_latency_ms: max,
           ptt_errors: state.pttErrors,
           transcript_available: conversationRef.current.length > 0,
-          ava_start_variant: giffSettingsRef.current.use_giff_flow
-            ? giffSettingsRef.current.active_start_variant
-            : null,
+          ava_start_variant: null,
           has_seen_film: state.hasSeenFilm,
           user_posture_raw: state.userPosture?.raw ?? null,
           user_posture_mode: state.userPosture?.mode ?? null,
@@ -787,15 +779,14 @@ const IndexPRD4 = () => {
   // ---- Render ---------------------------------------------------------------
   switch (state.phase) {
     case "welcome":
-      return <WelcomeScreen onStart={handleStart} settings={giffSettings} />;
+      return <WelcomeScreen onStart={handleStart} />;
     case "film_question":
-      return <FilmQuestionScreen onAnswer={handleFilmAnswer} settings={giffSettings} />;
+      return <FilmQuestionScreen onAnswer={handleFilmAnswer} />;
     case "teaser":
       return <TeaserScreen onContinue={handleTeaserContinue} onSkip={handleTeaserSkip} />;
     case "posture_capture":
       return (
         <PostureCaptureScreen
-          settings={giffSettings}
           onSubmit={handlePostureSubmit}
           onSurprise={handlePostureSurprise}
           onPTTError={handlePosturePTTError}
