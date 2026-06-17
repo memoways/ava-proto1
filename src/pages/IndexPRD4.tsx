@@ -749,6 +749,7 @@ const IndexPRD4 = () => {
     setAudioState,
     startLatencySegment,
     startLatencyTurn,
+    state.audioState,
     teardownSTT,
   ]);
 
