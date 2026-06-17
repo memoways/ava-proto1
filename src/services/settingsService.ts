@@ -406,6 +406,53 @@ export function resetGameplaySettings(): GameplaySettings {
   return { ...gameplayDefaults };
 }
 
+// ===== Video Trigger Settings =====
+
+export interface VideoTriggerSettings {
+  /** Si false, aucune vidéo cinématique ne se déclenche en jeu. */
+  ENABLED: boolean;
+  /** Nombre minimum d'échanges utilisateur avant la 1re vidéo cinématique. */
+  MIN_TURNS_BEFORE_FIRST: number;
+  /** Nombre minimum de tours utilisateur entre deux cinématiques. */
+  MIN_TURNS_BETWEEN: number;
+  /** Nombre max de cinématiques sur une session (0 = illimité). */
+  MAX_PER_SESSION: number;
+  /** Réservé : ne déclenche que si au moins N labels ont été extraits ce tour. */
+  MIN_LABELS_REQUIRED: number;
+}
+
+const VIDEO_TRIGGER_STORAGE_KEY = "ava_video_trigger_settings";
+
+export const videoTriggerDefaults: VideoTriggerSettings = {
+  ENABLED: true,
+  MIN_TURNS_BEFORE_FIRST: 3,
+  MIN_TURNS_BETWEEN: 3,
+  MAX_PER_SESSION: 0,
+  MIN_LABELS_REQUIRED: 1,
+};
+
+export function getVideoTriggerSettings(): VideoTriggerSettings {
+  try {
+    const stored = localStorage.getItem(VIDEO_TRIGGER_STORAGE_KEY);
+    if (stored) return { ...videoTriggerDefaults, ...JSON.parse(stored) };
+  } catch { /* ignore */ }
+  return { ...videoTriggerDefaults };
+}
+
+export async function loadVideoTriggerSettingsFromDB(): Promise<VideoTriggerSettings> {
+  return loadFromDB(VIDEO_TRIGGER_STORAGE_KEY, videoTriggerDefaults);
+}
+
+export async function saveVideoTriggerSettingsToDB(settings: VideoTriggerSettings): Promise<void> {
+  await saveToDB(VIDEO_TRIGGER_STORAGE_KEY, settings);
+}
+
+export function resetVideoTriggerSettings(): VideoTriggerSettings {
+  localStorage.removeItem(VIDEO_TRIGGER_STORAGE_KEY);
+  supabase.from("admin_settings" as any).delete().eq("key", VIDEO_TRIGGER_STORAGE_KEY).then(() => {});
+  return { ...videoTriggerDefaults };
+}
+
 // ===== Game Master Prompt Settings =====
 
 export interface GameMasterPromptSettings {

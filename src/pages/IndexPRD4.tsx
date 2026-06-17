@@ -53,6 +53,11 @@ import GumletVideoPlayer from "@/components/GumletVideoPlayer";
 import { savePRD4Questionnaire, syncPRD4QuestionnaireToNotion } from "@/services/prd4Questionnaire";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import { pickVideoForLabels } from "@/services/videoTriggerMatcher";
+import {
+  loadVideoTriggerSettingsFromDB,
+  videoTriggerDefaults,
+  type VideoTriggerSettings,
+} from "@/services/settingsService";
 import type { QuestionnairePRD4Answers, QuestionnairePRD4Data, UserPosture } from "@/types";
 
 const SESSION_DURATION_S = 5 * 60; // PRD4 §11 : ~5 min cible.
@@ -102,6 +107,8 @@ const IndexPRD4 = () => {
   const turnLatenciesRef = useRef<number[]>([]);
   const sessionDurationRef = useRef<number>(0);
   const triggeredVideoIdsRef = useRef<string[]>([]);
+  const lastVideoTurnRef = useRef<number>(-Infinity);
+  const videoTriggerSettingsRef = useRef<VideoTriggerSettings>(videoTriggerDefaults);
   const pendingPostVideoContextRef = useRef<string | null>(null);
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
@@ -255,8 +262,14 @@ const IndexPRD4 = () => {
     turnLatenciesRef.current = [];
     sessionDurationRef.current = 0;
     triggeredVideoIdsRef.current = [];
+    lastVideoTurnRef.current = -Infinity;
     pendingPostVideoContextRef.current = null;
     setActiveVideo(null);
+
+    // Recharge les règles de déclenchement vidéo (admin)
+    loadVideoTriggerSettingsFromDB()
+      .then((s) => { videoTriggerSettingsRef.current = s; })
+      .catch(() => { videoTriggerSettingsRef.current = videoTriggerDefaults; });
 
 
     // Crée la session DB (toujours, en mode hard-codé) — persiste posture utilisateur
@@ -533,21 +546,44 @@ const IndexPRD4 = () => {
           // Matcher déterministe (un seul thème commun suffit).
           let pickedVideoId: string | null = null;
           try {
-            const videos = await getVideoTriggersCached();
-            const match = pickVideoForLabels(labels, videos, triggeredVideoIdsRef.current, userText);
-            if (match) {
-              pickedVideoId = match.row.id;
-              triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, match.row.id];
-              videoTriggeredThisTurn = true;
-              trackEvent("prd4_video_triggered", {
+            const settings = videoTriggerSettingsRef.current;
+            const userTurnNumber = conversationRef.current.filter((m) => m.role === "user").length;
+            const labelsCount = (labels.themes?.length ?? 0) + (labels.topics?.length ?? 0) + (labels.intentions?.length ?? 0);
+            const gateReason = !settings.ENABLED
+              ? "disabled"
+              : userTurnNumber < settings.MIN_TURNS_BEFORE_FIRST
+                ? "before_first"
+                : (userTurnNumber - lastVideoTurnRef.current) < settings.MIN_TURNS_BETWEEN
+                  ? "too_soon"
+                  : (settings.MAX_PER_SESSION > 0 && triggeredVideoIdsRef.current.length >= settings.MAX_PER_SESSION)
+                    ? "max_reached"
+                    : labelsCount < settings.MIN_LABELS_REQUIRED
+                      ? "not_enough_labels"
+                      : null;
+            if (gateReason) {
+              trackEvent("prd4_video_gate_blocked", {
                 session_id: sessionIdRef.current,
-                video_id: match.row.id,
-                title: match.row.title,
-                source: match.source,
-                matched_term: match.matchedTerm,
-                matched_theme: match.matchedVideoTheme,
+                reason: gateReason,
+                user_turn: userTurnNumber,
               });
-              setActiveVideo(match.row);
+            } else {
+              const videos = await getVideoTriggersCached();
+              const match = pickVideoForLabels(labels, videos, triggeredVideoIdsRef.current, userText);
+              if (match) {
+                pickedVideoId = match.row.id;
+                triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, match.row.id];
+                lastVideoTurnRef.current = userTurnNumber;
+                videoTriggeredThisTurn = true;
+                trackEvent("prd4_video_triggered", {
+                  session_id: sessionIdRef.current,
+                  video_id: match.row.id,
+                  title: match.row.title,
+                  source: match.source,
+                  matched_term: match.matchedTerm,
+                  matched_theme: match.matchedVideoTheme,
+                });
+                setActiveVideo(match.row);
+              }
             }
           } catch (err) {
             console.warn("[PRD4] label-driven video trigger failed:", err);
@@ -602,16 +638,31 @@ const IndexPRD4 = () => {
           // Garde-fou vidéo : on attend le label pass d'abord pour éviter une double sélection.
           await labelHandling;
           if (!videoTriggeredThisTurn && ev.trigger_video_id && !triggeredVideoIdsRef.current.includes(ev.trigger_video_id)) {
-            try {
-              const videos = await getVideoTriggersCached();
-              const row = videos.find((v) => v.id === ev.trigger_video_id) || null;
-              if (row?.video_url) {
-                triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, row.id];
-                trackEvent("prd4_video_triggered", { session_id: sessionIdRef.current, video_id: row.id, title: row.title, source: "post_turn_fallback" });
-                setActiveVideo(row);
+            const settings = videoTriggerSettingsRef.current;
+            const userTurnNumber = conversationRef.current.filter((m) => m.role === "user").length;
+            const blocked = !settings.ENABLED
+              || userTurnNumber < settings.MIN_TURNS_BEFORE_FIRST
+              || (userTurnNumber - lastVideoTurnRef.current) < settings.MIN_TURNS_BETWEEN
+              || (settings.MAX_PER_SESSION > 0 && triggeredVideoIdsRef.current.length >= settings.MAX_PER_SESSION);
+            if (blocked) {
+              trackEvent("prd4_video_gate_blocked", {
+                session_id: sessionIdRef.current,
+                reason: "post_turn_fallback_gate",
+                user_turn: userTurnNumber,
+              });
+            } else {
+              try {
+                const videos = await getVideoTriggersCached();
+                const row = videos.find((v) => v.id === ev.trigger_video_id) || null;
+                if (row?.video_url) {
+                  triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, row.id];
+                  lastVideoTurnRef.current = userTurnNumber;
+                  trackEvent("prd4_video_triggered", { session_id: sessionIdRef.current, video_id: row.id, title: row.title, source: "post_turn_fallback" });
+                  setActiveVideo(row);
+                }
+              } catch (err) {
+                console.warn("[PRD4] post-turn video trigger fallback failed:", err);
               }
-            } catch (err) {
-              console.warn("[PRD4] post-turn video trigger fallback failed:", err);
             }
           }
           if (ev.end_recommended && !endedRef.current) {
