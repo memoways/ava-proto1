@@ -574,15 +574,16 @@ const IndexPRD4 = () => {
                 triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, match.row.id];
                 lastVideoTurnRef.current = userTurnNumber;
                 videoTriggeredThisTurn = true;
-              trackEvent("prd4_video_triggered", {
-                session_id: sessionIdRef.current,
-                video_id: match.row.id,
-                title: match.row.title,
-                source: match.source,
-                matched_term: match.matchedTerm,
-                matched_theme: match.matchedVideoTheme,
-              });
-              setActiveVideo(match.row);
+                trackEvent("prd4_video_triggered", {
+                  session_id: sessionIdRef.current,
+                  video_id: match.row.id,
+                  title: match.row.title,
+                  source: match.source,
+                  matched_term: match.matchedTerm,
+                  matched_theme: match.matchedVideoTheme,
+                });
+                setActiveVideo(match.row);
+              }
             }
           } catch (err) {
             console.warn("[PRD4] label-driven video trigger failed:", err);
