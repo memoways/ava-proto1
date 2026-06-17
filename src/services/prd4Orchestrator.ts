@@ -9,6 +9,7 @@
  */
 import { simulateMaxResponse, type MaxAgentInput } from "@/agents/maxAgent";
 import { evaluatePostTurnPRD4 } from "@/agents/gameMasterPRD4";
+import { labelUserTurnPRD4, type PRD4LabelResult } from "@/agents/gameMasterLabelPRD4";
 import {
   buildKnowledgeContextFromRAG,
   formatRAGContext,
