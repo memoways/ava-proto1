@@ -129,10 +129,10 @@ ${triggered.length ? triggered.join(", ") : "(aucune)"}
 ${recent || "(aucun)"}
 
 ## DERNIER ÉCHANGE (à évaluer)
-UTILISATEUR: ${input.userMessage}
-MAX: ${input.maxResponse}
+UTILISATEUR (à labéliser) : ${input.userMessage}
+MAX : ${input.maxResponse}
 
-Retourne l'évaluation JSON (inclure trigger_video_id si une vidéo est pertinente).`;
+Retourne l'évaluation JSON. Extrais d'abord \`labels\` à partir du message UTILISATEUR uniquement (max 4 labels, vides si pas évident). Puis renseigne \`trigger_video_id\` si un de tes \`labels.themes\` recoupe les \`themes\` d'une vidéo disponible.`;
 }
 
 /**
