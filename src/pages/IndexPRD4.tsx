@@ -104,11 +104,9 @@ const IndexPRD4 = () => {
   const pendingPostVideoContextRef = useRef<string | null>(null);
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
-  // Chrono onboarding GIFF
+  // Chrono onboarding (mesure du time-to-first-Max-response)
   const onboardingStartedAtRef = useRef<number | null>(null);
   const firstMaxResponseAtRef = useRef<number | null>(null);
-  const giffSettingsRef = useRef<GiffStartSettings>(GIFF_START_DEFAULTS);
-  giffSettingsRef.current = giffSettings;
 
 
 
