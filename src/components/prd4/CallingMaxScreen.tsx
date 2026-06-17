@@ -1,5 +1,5 @@
 /** PRD4 — Écran 7 : Appel Max (sonnerie + animation visio) */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Phone } from "lucide-react";
 import maxImg from "@/assets/characters/max.jpg";
 
@@ -7,13 +7,57 @@ interface Props {
   onAnswered: () => void;
 }
 
-const RING_MS = 1100;
-const RINGS = 3; // ~3.3s total
-const PICKUP_DELAY_MS = 400;
+const RING_MS = 1500;
+const RINGS = 3;
+const PICKUP_DELAY_MS = 500;
+
+/** Synthesized classic phone ringtone via Web Audio API. */
+function useRingtone(active: boolean, rings: number, intervalMs: number) {
+  const ctxRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AudioCtx();
+    ctxRef.current = ctx;
+
+    const playRing = (startAt: number) => {
+      // Classic dual-tone phone ring (~440/480 Hz) lasting ~0.9s
+      const duration = 0.9;
+      [440, 480].forEach((freq) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        const t0 = ctx.currentTime + startAt;
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(0.18, t0 + 0.05);
+        // small tremolo for that classic ring shape
+        g.gain.setValueAtTime(0.18, t0 + duration - 0.1);
+        g.gain.linearRampToValueAtTime(0, t0 + duration);
+        osc.connect(g).connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + duration);
+      });
+    };
+
+    for (let i = 0; i < rings; i++) {
+      playRing((i * intervalMs) / 1000);
+    }
+
+    return () => {
+      ctx.close().catch(() => {});
+      ctxRef.current = null;
+    };
+  }, [active, rings, intervalMs]);
+}
 
 const CallingMaxScreen = ({ onAnswered }: Props) => {
   const [ring, setRing] = useState(1);
   const [pickingUp, setPickingUp] = useState(false);
+  useRingtone(true, RINGS, RING_MS);
 
   useEffect(() => {
     const intervals: number[] = [];
@@ -33,7 +77,6 @@ const CallingMaxScreen = ({ onAnswered }: Props) => {
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
       <div className="space-y-8">
         <div className="relative mx-auto h-44 w-44">
-          {/* multiple staggered rings to suggest sonnerie */}
           <span
             className="absolute inset-0 animate-ping rounded-full border-2 border-primary/40"
             style={{ animationDuration: "1.6s" }}
