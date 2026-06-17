@@ -1,7 +1,7 @@
 /** PRD GIFF — Capture rapide de la posture utilisateur (PTT 1 phrase + Surprise me). */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, Mic, MicOff, Sparkles } from "lucide-react";
+import { Loader2, Mic, MicOff } from "lucide-react";
 import { createConfiguredSTT, loadSTTSettingsFromDB, type STTSession } from "@/services/stt";
 import { usePushToTalk } from "@/hooks/usePushToTalk";
 import { cn } from "@/lib/utils";
