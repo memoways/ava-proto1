@@ -117,8 +117,8 @@ const PostureCaptureScreen = ({ settings, onSubmit, onSurprise, onPTTError }: Pr
           gmHostText={settings.gm_host_handoff_text}
         >
           <div className="w-full space-y-6 text-center">
-            <h2 className="font-serif text-3xl font-light text-foreground md:text-4xl">
-              {settings.posture_question}
+            <h2 className="font-serif text-2xl font-light text-foreground md:text-3xl">
+              Tu peux poser une question, exprimer une émotion ou partager une intention pour démarrer l'expérience.
             </h2>
 
             <div className="space-y-3 rounded-md border border-border bg-muted/20 p-5">
@@ -171,16 +171,6 @@ const PostureCaptureScreen = ({ settings, onSubmit, onSurprise, onPTTError }: Pr
               >
                 Continuer
               </Button>
-              {settings.allow_surprise_me && (
-                <button
-                  type="button"
-                  onClick={onSurprise}
-                  className="inline-flex items-center gap-2 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Me laisser surprendre
-                </button>
-              )}
             </div>
           </div>
         </VariantFrame>
