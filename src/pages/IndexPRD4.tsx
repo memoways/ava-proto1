@@ -262,8 +262,14 @@ const IndexPRD4 = () => {
     turnLatenciesRef.current = [];
     sessionDurationRef.current = 0;
     triggeredVideoIdsRef.current = [];
+    lastVideoTurnRef.current = -Infinity;
     pendingPostVideoContextRef.current = null;
     setActiveVideo(null);
+
+    // Recharge les règles de déclenchement vidéo (admin)
+    loadVideoTriggerSettingsFromDB()
+      .then((s) => { videoTriggerSettingsRef.current = s; })
+      .catch(() => { videoTriggerSettingsRef.current = videoTriggerDefaults; });
 
 
     // Crée la session DB (toujours, en mode hard-codé) — persiste posture utilisateur
