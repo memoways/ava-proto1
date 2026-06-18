@@ -48,7 +48,7 @@ describe("GumletVideoPlayer", () => {
     );
 
     expect(screen.getByTitle("Video player").tagName).toBe("VIDEO");
-    expect(screen.getByTitle("Video player")).toHaveAttribute("muted", "");
+    expect(screen.getByTitle("Video player")).not.toHaveAttribute("muted");
   });
 
   it("calls onSkip from the overlay button", () => {
