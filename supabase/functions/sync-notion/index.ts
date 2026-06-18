@@ -53,6 +53,9 @@ const PROMPT_FIELD_ALIASES: Record<string, string[]> = {
   qui_tu_es: ["Qui tu es"],
   ce_que_tu_ne_fais_jamais: ["Ce que tu ne fais jamais"],
   ce_que_tu_sais_utilisateur: [
+    "Qui t'appelle",
+    "Qui t’appelle",
+    "Qui t appelle",
     "Ce que tu sais de l'utilisateur",
     "Ce que tu sais de l’utilisateur",
     "Ce que tu sais de l utilisateur",
