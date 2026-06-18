@@ -6,6 +6,7 @@
  * Fin de session : 5 min OU `end_recommended` du GM.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useExperienceState } from "@/hooks/useExperienceState";
 import type { AudioState, ConversationMessage, FilmAnswer } from "@/types";
 import { trackEvent } from "@/services/posthogService";
@@ -175,8 +176,12 @@ const IndexPRD4 = () => {
     // sert aussi de gesture pour débloquer l'autoplay audio.
     void prefetchOpeningTTS().catch((e) => console.warn("[TTS] prefetch opening failed:", e));
     // L'écran "As-tu vu le film ?" est retiré : on enchaîne directement sur le teaser.
-    setFilmAnswer("rappel");
-    setPhase("teaser");
+    // Monte le player vidéo pendant le handler du clic « Commencer » pour
+    // maximiser les chances d'autoplay avec son (activation utilisateur).
+    flushSync(() => {
+      setFilmAnswer("rappel");
+      setPhase("teaser");
+    });
   }, [setFilmAnswer, setPhase]);
   const handleFilmAnswer = useCallback(
     (a: FilmAnswer) => {

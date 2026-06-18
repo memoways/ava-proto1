@@ -18,6 +18,7 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const playerRef = useRef<Player | null>(null);
   const onCompleteRef = useRef(onComplete);
+  const hasCompletedRef = useRef(false);
   onCompleteRef.current = onComplete;
 
 
@@ -29,17 +30,54 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
   }, []);
 
   // Extract asset ID from various Gumlet URL formats
+  const completeOnce = useCallback(() => {
+    if (hasCompletedRef.current) return;
+    hasCompletedRef.current = true;
+    onCompleteRef.current();
+  }, []);
+
+  const forceAudioOn = useCallback(async () => {
+    const player = playerRef.current;
+    if (!player) return;
+    try {
+      await player.setVolume(100);
+      await player.unmute();
+      try { await player.play(); } catch { /* Browser may still require a direct user gesture. */ }
+    } catch {
+      // silent: autoplay policies vary by browser/device.
+    }
+  }, []);
+
   const getEmbedUrl = useCallback((url: string) => {
-    if (url.includes("play.gumlet.io/embed/")) return url;
+    const withAudioDefaults = (rawUrl: string) => {
+      try {
+        const parsed = new URL(rawUrl);
+        parsed.searchParams.set("preload", "true");
+        parsed.searchParams.set("autoplay", "true");
+        parsed.searchParams.set("muted", "false");
+        parsed.searchParams.set("volume", "100");
+        parsed.searchParams.set("playsinline", "true");
+        return parsed.toString();
+      } catch {
+        const separator = rawUrl.includes("?") ? "&" : "?";
+        return `${rawUrl}${separator}preload=true&autoplay=true&muted=false&volume=100&playsinline=true`;
+      }
+    };
+
+    if (url.includes("play.gumlet.io/embed/")) return withAudioDefaults(url);
     const match = url.match(/(?:watch|embed)\/([a-f0-9]+)/i);
     if (match) {
       const assetId = match[1];
-      return `https://play.gumlet.io/embed/${assetId}?preload=true&autoplay=true&muted=false`;
+      return withAudioDefaults(`https://play.gumlet.io/embed/${assetId}`);
     }
-    return url;
+    return withAudioDefaults(url);
   }, []);
 
   const embedUrl = getEmbedUrl(videoUrl);
+
+  useEffect(() => {
+    hasCompletedRef.current = false;
+  }, [embedUrl]);
 
   // Force audio ON: unmute on ready, on play, periodically during the first
   // seconds, and on any user gesture (fallback if browser re-mutes autoplay).
@@ -51,56 +89,53 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
     let cancelled = false;
     let retryCount = 0;
 
-    const forceAudioOn = async () => {
-      if (!player) return;
-      try {
-        await player.setVolume(100);
-        await player.unmute();
-        // Re-déclenche play() après unmute : si le navigateur a forcé un
-        // autoplay muté (politique d'autoplay), cela tente de relancer la
-        // lecture avec son grâce au gesture utilisateur récent (clic Commencer).
-        try { await player.play(); } catch { /* ignore */ }
-      } catch (err) {
-        // silent
-      }
-    };
-
     const timer = setTimeout(() => {
       if (cancelled) return;
       try {
         player = new Player(iframe);
         playerRef.current = player;
-        player.on("ready", forceAudioOn);
-        player.on("play", forceAudioOn);
-        player.on("ended", () => onCompleteRef.current());
+        player.on("ready", () => void forceAudioOn());
+        player.on("play", () => void forceAudioOn());
+        player.on("ended", completeOnce);
         player.on("timeupdate", () => {
           if (retryCount < 6) {
             retryCount += 1;
-            forceAudioOn();
+            void forceAudioOn();
           }
         });
+        void forceAudioOn();
       } catch (err) {
         console.warn("Player.js init failed:", err);
       }
-    }, 300);
+    }, 0);
 
-    const onUserGesture = () => forceAudioOn();
-    window.addEventListener("click", onUserGesture);
-    window.addEventListener("touchstart", onUserGesture);
+    const retryTimers = [100, 300, 700, 1200, 2000, 3500, 5500].map((delay) =>
+      window.setTimeout(() => void forceAudioOn(), delay),
+    );
+
+    const onUserGesture = () => void forceAudioOn();
+    window.addEventListener("pointerdown", onUserGesture, { capture: true });
+    window.addEventListener("click", onUserGesture, { capture: true });
+    window.addEventListener("touchstart", onUserGesture, { capture: true });
+    window.addEventListener("keydown", onUserGesture, { capture: true });
 
     return () => {
       cancelled = true;
       clearTimeout(timer);
-      window.removeEventListener("click", onUserGesture);
-      window.removeEventListener("touchstart", onUserGesture);
+      retryTimers.forEach((retryTimer) => clearTimeout(retryTimer));
+      if (playerRef.current === player) playerRef.current = null;
+      window.removeEventListener("pointerdown", onUserGesture, { capture: true });
+      window.removeEventListener("click", onUserGesture, { capture: true });
+      window.removeEventListener("touchstart", onUserGesture, { capture: true });
+      window.removeEventListener("keydown", onUserGesture, { capture: true });
     };
-  }, [embedUrl]);
+  }, [completeOnce, embedUrl, forceAudioOn]);
 
   // Listen for Gumlet player events via postMessage
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (isGumletEndedMessage(event.data)) {
-        onComplete();
+        completeOnce();
         return;
       }
 
@@ -108,7 +143,7 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
         try {
           const parsed = JSON.parse(event.data);
           if (isGumletEndedMessage(parsed)) {
-            onComplete();
+            completeOnce();
           }
         } catch {
           // not JSON, ignore
@@ -118,7 +153,7 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [isGumletEndedMessage, onComplete]);
+  }, [completeOnce, isGumletEndedMessage]);
 
 
   return (
@@ -130,7 +165,8 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
         title="Video player"
         className="absolute inset-0 w-full h-full"
         style={{ border: "none" }}
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+        allow="autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write; accelerometer; gyroscope"
+        onLoad={() => void forceAudioOn()}
         allowFullScreen
       />
 
