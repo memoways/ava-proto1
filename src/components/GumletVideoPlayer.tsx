@@ -15,7 +15,7 @@ interface GumletVideoPlayerProps {
   onReady?: () => void;
   /** Keep mounted/preloaded but visually hidden until the experience starts. */
   active?: boolean;
-  /** Whether the iframe should request autoplay in its URL. */
+  /** Whether the player should request autoplay. */
   autoPlay?: boolean;
   /** Show the skip button overlay. */
   showSkip?: boolean;
@@ -68,7 +68,10 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       video.muted = false;
       video.defaultMuted = false;
       video.volume = 1;
-      void video.play().catch(() => { /* Browser may still require a gesture. */ });
+      const playAttempt = video.play();
+      if (playAttempt && typeof playAttempt.catch === "function") {
+        void playAttempt.catch(() => { /* Browser may still require a gesture. */ });
+      }
     }
 
     const player = playerRef.current;
@@ -253,6 +256,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
         <video
           ref={videoRef}
           title="Video player"
+          data-source={hlsUrl}
           className="absolute inset-0 h-full w-full object-cover"
           controls={active}
           playsInline
