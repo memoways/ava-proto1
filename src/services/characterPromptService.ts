@@ -22,7 +22,7 @@ export const CHARACTER_PROMPT_FIELDS: Array<{
   { key: "identite_fondamentale", label: "Identité fondamentale", hint: "Qui le personnage est, fondamentalement." },
   { key: "qui_tu_es", label: "Qui tu es", hint: "Posture, ton, manière d'être dans la conversation." },
   { key: "ce_que_tu_ne_fais_jamais", label: "Ce que tu ne fais jamais", hint: "Interdits absolus." },
-  { key: "ce_que_tu_sais_utilisateur", label: "Ce que tu sais de l'utilisateur", hint: "Cadrage de la relation à l'interlocuteur." },
+  { key: "ce_que_tu_sais_utilisateur", label: "Qui t'appelle", hint: "Cadrage de la relation à l'interlocuteur (champ Notion : « Qui t'appelle »)." },
   { key: "dynamique_conversation", label: "Dynamique de la conversation", hint: "Comment la conversation se déroule, rythme, retenue." },
   { key: "sujets_sensibles", label: "Sujets sensibles", hint: "Sujets délicats et manière de les aborder ou esquiver." },
   { key: "profondeur_par_niveau", label: "Profondeur par niveau", hint: "Ce qui peut être révélé / abordé selon le niveau de confiance." },
