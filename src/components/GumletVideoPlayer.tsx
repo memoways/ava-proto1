@@ -64,6 +64,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     try {
       // Do not await here: all three commands must be dispatched in the same
       // user-gesture call stack when triggered by « Commencer ».
+      void player.play().catch(() => { /* Browser may still require a gesture. */ });
       void player.setVolume(100).catch(() => { /* silent */ });
       void player.unmute().catch(() => { /* silent */ });
       void player.play().catch(() => { /* Browser may still require a gesture. */ });

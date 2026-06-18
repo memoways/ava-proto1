@@ -169,6 +169,10 @@ const IndexPRD4 = () => {
 
 
   // ---- Welcome / Film / Teaser ----------------------------------------------
+  const forceTeaserAudioOn = useCallback(() => {
+    teaserPlayerRef.current?.playWithAudio();
+  }, []);
+
   const handleStart = useCallback(() => {
     onboardingStartedAtRef.current = Date.now();
     firstMaxResponseAtRef.current = null;
@@ -180,7 +184,7 @@ const IndexPRD4 = () => {
     // Le player teaser est déjà monté/préchargé sur l'accueil : cette commande
     // part directement dans le call stack du clic utilisateur, ce qui est le
     // maximum possible pour obtenir autoplay + audio non muté côté navigateur.
-    teaserPlayerRef.current?.playWithAudio();
+    forceTeaserAudioOn();
     // L'écran "As-tu vu le film ?" est retiré : on enchaîne directement sur le teaser.
     // Monte le player vidéo pendant le handler du clic « Commencer » pour
     // maximiser les chances d'autoplay avec son (activation utilisateur).
@@ -188,7 +192,7 @@ const IndexPRD4 = () => {
       setFilmAnswer("rappel");
       setPhase("teaser");
     });
-  }, [setFilmAnswer, setPhase]);
+  }, [forceTeaserAudioOn, setFilmAnswer, setPhase]);
   const handleFilmAnswer = useCallback(
     (a: FilmAnswer) => {
       setFilmAnswer(a);
@@ -946,7 +950,7 @@ const IndexPRD4 = () => {
             autoPlay={false}
             showSkip={false}
           />
-          <WelcomeScreen onStart={handleStart} videoReady={teaserPlayerReady} />
+          <WelcomeScreen onStart={handleStart} onStartIntent={forceTeaserAudioOn} videoReady={teaserPlayerReady} />
         </>
       );
     case "film_question":
