@@ -62,7 +62,7 @@ import {
 import type { QuestionnairePRD4Answers, QuestionnairePRD4Data, UserPosture } from "@/types";
 
 const SESSION_DURATION_S = 5 * 60; // PRD4 §11 : ~5 min cible.
-const TEASER_VIDEO_URL = "https://video.gumlet.io/673f29f4a5e1bf70aa645cb7/6a188e39fdee17a44c1ea049/main.m3u8";
+const TEASER_VIDEO_URL = "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049";
 
 const IndexPRD4 = () => {
   const {
