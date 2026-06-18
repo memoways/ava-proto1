@@ -65,12 +65,16 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   const forceAudioOn = useCallback(() => {
     const video = videoRef.current;
     if (video) {
-      video.muted = false;
-      video.defaultMuted = false;
-      video.volume = 1;
-      const playAttempt = video.play();
-      if (playAttempt && typeof playAttempt.catch === "function") {
-        void playAttempt.catch(() => { /* Browser may still require a gesture. */ });
+      try {
+        video.muted = false;
+        video.defaultMuted = false;
+        video.volume = 1;
+        const playAttempt = video.play();
+        if (playAttempt && typeof playAttempt.catch === "function") {
+          void playAttempt.catch(() => { /* Browser may still require a gesture. */ });
+        }
+      } catch {
+        // silent: test environments and some browsers may throw synchronously.
       }
     }
 
