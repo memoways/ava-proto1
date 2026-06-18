@@ -247,11 +247,10 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     hls.attachMedia(video);
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
       onReadyRef.current?.();
-      if (active) forceAudioOn();
     });
 
     return () => hls.destroy();
-  }, [hlsUrl, active, forceAudioOn]);
+  }, [hlsUrl]);
 
   // Listen for Gumlet player events via postMessage
   useEffect(() => {
