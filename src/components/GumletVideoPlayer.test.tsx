@@ -34,7 +34,22 @@ describe("GumletVideoPlayer", () => {
 
     expect(screen.getByTitle("Video player")).toHaveAttribute(
       "src",
-      "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049?preload=true&autoplay=true",
+      "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049?preload=true&autoplay=true&muted=false&volume=100&playsinline=true",
+    );
+  });
+
+  it("overrides muted embed URLs so audio starts enabled", () => {
+    render(
+      <GumletVideoPlayer
+        videoUrl="https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049?muted=true&volume=0"
+        onComplete={() => {}}
+        onSkip={() => {}}
+      />,
+    );
+
+    expect(screen.getByTitle("Video player")).toHaveAttribute(
+      "src",
+      "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049?muted=false&volume=100&preload=true&autoplay=true&playsinline=true",
     );
   });
 
