@@ -56,6 +56,10 @@ const GumletVideoPlayer = ({ videoUrl, onComplete, onSkip, children }: GumletVid
       try {
         await player.setVolume(100);
         await player.unmute();
+        // Re-déclenche play() après unmute : si le navigateur a forcé un
+        // autoplay muté (politique d'autoplay), cela tente de relancer la
+        // lecture avec son grâce au gesture utilisateur récent (clic Commencer).
+        try { await player.play(); } catch { /* ignore */ }
       } catch (err) {
         // silent
       }
