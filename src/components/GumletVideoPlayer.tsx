@@ -270,9 +270,11 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
           controls={active}
           playsInline
           preload="auto"
-          autoPlay={autoPlay && active}
+          autoPlay
           muted={false}
-          onCanPlay={() => onReadyRef.current?.()}
+          onCanPlay={() => { onReadyRef.current?.(); if (active) forceAudioOn(); }}
+          onLoadedData={() => { if (active) forceAudioOn(); }}
+          onLoadedMetadata={() => { if (active) forceAudioOn(); }}
           onPlay={forceAudioOn}
           onEnded={completeOnce}
         />
