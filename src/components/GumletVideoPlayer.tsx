@@ -66,13 +66,32 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     const video = videoRef.current;
     if (video) {
       try {
-        video.muted = false;
-        video.defaultMuted = false;
-        video.volume = 1;
-        if (/jsdom/i.test(window.navigator.userAgent)) return;
+        if (/jsdom/i.test(window.navigator.userAgent)) {
+          video.muted = false;
+          video.defaultMuted = false;
+          video.volume = 1;
+          return;
+        }
+        // Classic autoplay trick: start muted so play() always succeeds, then
+        // immediately unmute. With user activation (from the « Commencer »
+        // click), unmuting is allowed by all browsers.
         const playAttempt = video.play();
-        if (playAttempt && typeof playAttempt.catch === "function") {
-          void playAttempt.catch(() => { /* Browser may still require a gesture. */ });
+        const unmute = () => {
+          video.muted = false;
+          video.defaultMuted = false;
+          video.volume = 1;
+        };
+        if (playAttempt && typeof playAttempt.then === "function") {
+          playAttempt.then(unmute).catch(() => {
+            // play() rejected: start muted then retry, then unmute.
+            video.muted = true;
+            const retry = video.play();
+            if (retry && typeof retry.then === "function") {
+              retry.then(unmute).catch(() => { /* still blocked */ });
+            }
+          });
+        } else {
+          unmute();
         }
       } catch {
         // silent: test environments and some browsers may throw synchronously.
