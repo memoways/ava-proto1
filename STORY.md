@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-06-17 (session 29 — GM label pass parallèle + matcher vidéo déterministe)
+> **Last Updated**: 2026-06-18 (session 30 — cache audio d'ouverture, avatar Max, mapping Notion « Qui t'appelle », autoplay vidéo HLS)
 
 ---
 
@@ -64,6 +64,32 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-06-18 — Cache audio d'ouverture, avatar Max, mapping Notion « Qui t'appelle », autoplay vidéo HLS 🔷
+
+**Intent**: Trois irritants identifiés en test : (1) la première phrase de Max — pourtant fixe — était regénérée à chaque démarrage de conversation via ElevenLabs, ce qui ajoutait 1–2 s de silence avant la voix ; (2) l'avatar Max n'était plus aligné avec la direction artistique souhaitée ; (3) la propriété Notion `Ce que tu sais de l'utilisateur` était mal nommée côté éditorial — elle décrit en réalité *qui appelle Max*, donc à renommer en `Qui t'appelle`. En parallèle, plusieurs allers-retours sur le player vidéo pour forcer l'autoplay avec son activé : tentative de passage à un `<video>` + hls.js natif pour la vidéo d'intro, qui n'a pas décodé de frames dans le preview, donc retour à l'iframe Gumlet pour l'intro tout en gardant le chemin HLS natif disponible pour d'éventuelles URLs `.m3u8`.
+
+**Tool**: Lovable
+
+**Outcome**:
+1. **Cache audio d'ouverture (`openingTTSCache.ts`)** — pré-génère et stocke l'audio ElevenLabs de *« Hallo... à qui ai-je affaire ? »*. Au moment de l'appel, l'audio est joué depuis le cache sans round-trip TTS. Latence perçue ≈ 0 ms.
+2. **Nouvel avatar Max** — image appliquée dans `CharacterSelect` (vignette active) et en fond plein écran de `ConversationScreen`.
+3. **Renommage Notion `Qui t'appelle`** — `sync-notion`, `characterPromptService.ts`, composition du system prompt Max et `CharacterPromptEditorPanel` (admin) alignés sur le nouveau nom de propriété. Pas de migration DB nécessaire (la table `character_prompts` reste typée par champ, c'est le mapping Notion qui change).
+4. **Player vidéo HLS natif** — `GumletVideoPlayer` détecte les URLs `.m3u8` et bascule sur `<video>` + `hls.js` avec `autoplay`, `muted=false`, `volume=1.0` forcés. Les URLs iframe (`gumlet.tv/watch/{id}`, `play.gumlet.io/embed/{id}`) conservent le rendu via iframe Gumlet.
+5. **Vidéo d'intro revenue à l'embed iframe** — la tentative HLS native sur l'intro n'a pas décodé de frames dans l'environnement de preview (vidéo bloquée à 0:00). Retour à `https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049` qui exploite l'autoplay + audio gérés nativement par Gumlet via le geste utilisateur du clic « Commencer ».
+6. **Pas de migration d'URLs Notion** — décision explicite de **ne PAS** réécrire les URLs `gumlet.tv/watch/{id}` de la base *Vidéos AVA* vers `https://video.gumlet.io/.../main.m3u8`. Le player iframe Gumlet supporte ces URLs nativement et le rendu in-game est stable. Migrer aurait exposé les vidéos in-game au même bug de décodage que l'intro.
+
+**Ce que ça change** : le démarrage de la conversation est instantané (Max parle dès la fin du dernier ring), l'identité visuelle de Max est rafraîchie, et la nomenclature Notion devient cohérente avec le rôle réel du champ. Côté vidéo, l'infrastructure peut désormais lire indifféremment des URLs iframe Gumlet ou des manifests HLS natifs selon ce que la base Notion fournit — sans forcer une migration risquée.
+
+**Validation**:
+- `npx tsc --noEmit` : OK.
+- Build Vite : OK.
+- Audio d'ouverture vérifié en preview (Max parle dès l'arrivée sur `ConversationScreen`).
+- Sync Notion vérifié avec la nouvelle propriété `Qui t'appelle`.
+
+**Time**: ~2h (cache TTS → avatar → renommage Notion → itérations player vidéo HLS vs iframe → documentation).
+
+---
 
 ### 2026-06-17 — Labels GM, déclenchement vidéo fiabilisé, diction TTS plus naturelle, suppression module GIFF 🔷
 
