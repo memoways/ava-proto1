@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.32.0] - 2026-06-18 — Cache audio d'ouverture, avatar Max, mapping Notion « Qui t'appelle », autoplay vidéo HLS
+
+### Ajouté
+- **Cache audio d'ouverture (`openingTTSCache.ts`)** — pré-génère et met en cache le TTS ElevenLabs de la phrase fixe de Max *« Hallo... à qui ai-je affaire ? »*. Au démarrage de la conversation, Max parle immédiatement sans attendre la génération TTS (latence ≈ 0 ms côté joueur).
+- **Nouvel avatar Max** — image appliquée dans la vignette `CharacterSelect` (sélection de personnage) et en fond plein écran de `ConversationScreen`.
+- **Player vidéo HLS natif (`GumletVideoPlayer`)** — détection automatique des URLs `.m3u8` et bascule sur `<video>` + `hls.js` avec `autoplay`, `muted=false`, `volume=1.0` forcés pour garantir l'audio activé par défaut. Les URLs iframe (`gumlet.tv/watch/{id}`, `play.gumlet.io/embed/{id}`) conservent le rendu via iframe Gumlet.
+
+### Modifié
+- **Renommage propriété Notion** — `Ce que tu sais de l'utilisateur` → `Qui t'appelle` dans la base *Base Caractères AVA*. Mises à jour alignées : `sync-notion` (extraction de propriété), `characterPromptService.ts` (champ `qui_t_appelle`), composition du system prompt Max, panneau admin `CharacterPromptEditorPanel`.
+- **Vidéo d'intro** — revenue à l'embed iframe `https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049` après que le décodage HLS natif a échoué dans l'environnement de preview (vidéo bloquée à 0:00). L'iframe Gumlet gère nativement l'autoplay + audio via le geste utilisateur du clic « Commencer ».
+
+### Hors-scope / Non-régression
+- **Aucune migration** des URLs Notion `gumlet.tv/watch/{id}` vers `https://video.gumlet.io/.../main.m3u8`. La base *Vidéos AVA* reste inchangée : le player iframe Gumlet supporte ces URLs nativement et le rendu in-game est stable.
+- Pas de migration DB. Le renommage de la propriété Notion ne touche que la couche mapping côté code.
+
+---
+
 ## [0.31.0] - 2026-06-17 — GM label pass parallèle, déclenchement vidéo déterministe
 
 ### Ajouté
