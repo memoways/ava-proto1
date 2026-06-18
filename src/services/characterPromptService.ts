@@ -145,7 +145,7 @@ export function buildCharacterPromptSections(p: CharacterPrompt | null): string 
     ["IDENTITÉ FONDAMENTALE", p.identite_fondamentale],
     ["QUI TU ES", p.qui_tu_es],
     ["CE QUE TU NE FAIS JAMAIS", p.ce_que_tu_ne_fais_jamais],
-    ["CE QUE TU SAIS DE L'UTILISATEUR", p.ce_que_tu_sais_utilisateur],
+    ["QUI T'APPELLE", p.ce_que_tu_sais_utilisateur],
     ["DYNAMIQUE DE LA CONVERSATION", p.dynamique_conversation],
     ["SUJETS SENSIBLES", p.sujets_sensibles],
     ["PROFONDEUR PAR NIVEAU", p.profondeur_par_niveau],
