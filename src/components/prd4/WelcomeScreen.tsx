@@ -5,9 +5,11 @@ import { prefetchOpeningTTS } from "@/services/openingTTSCache";
 
 interface Props {
   onStart: () => void;
+  onStartIntent?: () => void;
+  videoReady?: boolean;
 }
 
-const WelcomeScreen = ({ onStart }: Props) => {
+const WelcomeScreen = ({ onStart, onStartIntent, videoReady = true }: Props) => {
   // Pré-charge l'audio de la phrase d'ouverture dès l'arrivée sur l'accueil,
   // pour qu'il soit prêt instantanément quand l'utilisateur entre en conversation.
   useEffect(() => {
@@ -31,10 +33,13 @@ const WelcomeScreen = ({ onStart }: Props) => {
           </p>
           <Button
             size="lg"
+            onPointerDown={onStartIntent}
+            onTouchStart={onStartIntent}
             onClick={onStart}
+            disabled={!videoReady}
             className="mt-6 min-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            Commencer
+            {videoReady ? "Commencer" : "Préparation…"}
           </Button>
         </div>
       </div>

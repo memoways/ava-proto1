@@ -23,7 +23,7 @@ describe("GumletVideoPlayer", () => {
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it("builds the Gumlet embed URL from a watch URL", () => {
+  it("builds the direct Gumlet HLS URL from a watch URL", () => {
     render(
       <GumletVideoPlayer
         videoUrl="https://gumlet.tv/watch/6a188e39fdee17a44c1ea049"
@@ -33,12 +33,12 @@ describe("GumletVideoPlayer", () => {
     );
 
     expect(screen.getByTitle("Video player")).toHaveAttribute(
-      "src",
-      "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049?preload=true&autoplay=true&muted=false&volume=100&playsinline=true",
+      "data-source",
+      "https://video.gumlet.io/673f29f4a5e1bf70aa645cb7/6a188e39fdee17a44c1ea049/main.m3u8",
     );
   });
 
-  it("overrides muted embed URLs so audio starts enabled", () => {
+  it("uses the native video player for muted Gumlet embed URLs so audio can be forced on", () => {
     render(
       <GumletVideoPlayer
         videoUrl="https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049?muted=true&volume=0"
@@ -47,10 +47,8 @@ describe("GumletVideoPlayer", () => {
       />,
     );
 
-    expect(screen.getByTitle("Video player")).toHaveAttribute(
-      "src",
-      "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049?muted=false&volume=100&preload=true&autoplay=true&playsinline=true",
-    );
+    expect(screen.getByTitle("Video player").tagName).toBe("VIDEO");
+    expect(screen.getByTitle("Video player")).not.toHaveAttribute("muted");
   });
 
   it("calls onSkip from the overlay button", () => {
