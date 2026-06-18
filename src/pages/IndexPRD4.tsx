@@ -935,41 +935,36 @@ const IndexPRD4 = () => {
 
 
   // ---- Render ---------------------------------------------------------------
+  if (state.phase === "welcome" || state.phase === "teaser") {
+    const teaserActive = state.phase === "teaser";
+
+    return (
+      <>
+        <GumletVideoPlayer
+          key="teaser-player"
+          ref={teaserPlayerRef}
+          videoUrl={TEASER_VIDEO_URL}
+          onComplete={handleTeaserContinue}
+          onSkip={handleTeaserSkip}
+          onReady={() => setTeaserPlayerReady(true)}
+          active={teaserActive}
+          autoPlay={false}
+          showSkip={teaserActive}
+        />
+        {!teaserActive ? (
+          <WelcomeScreen onStart={handleStart} onStartIntent={forceTeaserAudioOn} videoReady={teaserPlayerReady} />
+        ) : null}
+      </>
+    );
+  }
+
   switch (state.phase) {
     case "welcome":
-      return (
-        <>
-          <GumletVideoPlayer
-            key="teaser-player"
-            ref={teaserPlayerRef}
-            videoUrl={TEASER_VIDEO_URL}
-            onComplete={handleTeaserContinue}
-            onSkip={handleTeaserSkip}
-            onReady={() => setTeaserPlayerReady(true)}
-            active={false}
-            autoPlay={false}
-            showSkip={false}
-          />
-          <WelcomeScreen onStart={handleStart} onStartIntent={forceTeaserAudioOn} videoReady={teaserPlayerReady} />
-        </>
-      );
+      return null;
     case "film_question":
       return <FilmQuestionScreen onAnswer={handleFilmAnswer} />;
     case "teaser":
-      return (
-        <>
-          <GumletVideoPlayer
-            key="teaser-player"
-            ref={teaserPlayerRef}
-            videoUrl={TEASER_VIDEO_URL}
-            onComplete={handleTeaserContinue}
-            onSkip={handleTeaserSkip}
-            onReady={() => setTeaserPlayerReady(true)}
-            active
-            autoPlay={false}
-          />
-        </>
-      );
+      return null;
     case "posture_capture":
       return (
         <PostureCaptureScreen
