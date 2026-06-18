@@ -40,7 +40,6 @@ import {
 
 import WelcomeScreen from "@/components/prd4/WelcomeScreen";
 import FilmQuestionScreen from "@/components/prd4/FilmQuestionScreen";
-import TeaserScreen from "@/components/prd4/TeaserScreen";
 import PostureCaptureScreen from "@/components/prd4/PostureCaptureScreen";
 import TransitionScreen from "@/components/prd4/TransitionScreen";
 import RoleCaptureScreen from "@/components/prd4/RoleCaptureScreen";
@@ -51,7 +50,7 @@ import ConversationScreen from "@/components/prd4/ConversationScreen";
 import EndSessionScreen from "@/components/prd4/EndSessionScreen";
 import QuestionnaireScreenPRD4 from "@/components/prd4/QuestionnaireScreenPRD4";
 import ThanksScreen from "@/components/ThanksScreen";
-import GumletVideoPlayer from "@/components/GumletVideoPlayer";
+import GumletVideoPlayer, { type GumletVideoPlayerHandle } from "@/components/GumletVideoPlayer";
 import { savePRD4Questionnaire, syncPRD4QuestionnaireToNotion } from "@/services/prd4Questionnaire";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import { pickVideoForLabels } from "@/services/videoTriggerMatcher";
@@ -63,6 +62,7 @@ import {
 import type { QuestionnairePRD4Answers, QuestionnairePRD4Data, UserPosture } from "@/types";
 
 const SESSION_DURATION_S = 5 * 60; // PRD4 §11 : ~5 min cible.
+const TEASER_VIDEO_URL = "https://gumlet.tv/watch/6a188e39fdee17a44c1ea049";
 
 const IndexPRD4 = () => {
   const {
@@ -114,9 +114,11 @@ const IndexPRD4 = () => {
   const pendingPostVideoContextRef = useRef<string | null>(null);
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
+  const [teaserPlayerReady, setTeaserPlayerReady] = useState(false);
   // Chrono onboarding (mesure du time-to-first-Max-response)
   const onboardingStartedAtRef = useRef<number | null>(null);
   const firstMaxResponseAtRef = useRef<number | null>(null);
+  const teaserPlayerRef = useRef<GumletVideoPlayerHandle | null>(null);
 
 
 
@@ -175,6 +177,10 @@ const IndexPRD4 = () => {
     // joue instantanément lors de l'entrée en conversation. Le clic utilisateur
     // sert aussi de gesture pour débloquer l'autoplay audio.
     void prefetchOpeningTTS().catch((e) => console.warn("[TTS] prefetch opening failed:", e));
+    // Le player teaser est déjà monté/préchargé sur l'accueil : cette commande
+    // part directement dans le call stack du clic utilisateur, ce qui est le
+    // maximum possible pour obtenir autoplay + audio non muté côté navigateur.
+    teaserPlayerRef.current?.playWithAudio();
     // L'écran "As-tu vu le film ?" est retiré : on enchaîne directement sur le teaser.
     // Monte le player vidéo pendant le handler du clic « Commencer » pour
     // maximiser les chances d'autoplay avec son (activation utilisateur).
@@ -927,11 +933,39 @@ const IndexPRD4 = () => {
   // ---- Render ---------------------------------------------------------------
   switch (state.phase) {
     case "welcome":
-      return <WelcomeScreen onStart={handleStart} />;
+      return (
+        <>
+          <GumletVideoPlayer
+            key="teaser-player"
+            ref={teaserPlayerRef}
+            videoUrl={TEASER_VIDEO_URL}
+            onComplete={handleTeaserContinue}
+            onSkip={handleTeaserSkip}
+            onReady={() => setTeaserPlayerReady(true)}
+            active={false}
+            autoPlay={false}
+            showSkip={false}
+          />
+          <WelcomeScreen onStart={handleStart} videoReady={teaserPlayerReady} />
+        </>
+      );
     case "film_question":
       return <FilmQuestionScreen onAnswer={handleFilmAnswer} />;
     case "teaser":
-      return <TeaserScreen onContinue={handleTeaserContinue} onSkip={handleTeaserSkip} />;
+      return (
+        <>
+          <GumletVideoPlayer
+            key="teaser-player"
+            ref={teaserPlayerRef}
+            videoUrl={TEASER_VIDEO_URL}
+            onComplete={handleTeaserContinue}
+            onSkip={handleTeaserSkip}
+            onReady={() => setTeaserPlayerReady(true)}
+            active
+            autoPlay={false}
+          />
+        </>
+      );
     case "posture_capture":
       return (
         <PostureCaptureScreen
