@@ -14,6 +14,7 @@ import { processPRD4Turn } from "@/services/prd4Orchestrator";
 import { createPRD4Session, endPRD4Session, updatePRD4Conversation, updatePRD4Onboarding } from "@/services/prd4Session";
 import { createConfiguredSTT, loadSTTSettingsFromDB, type STTSession } from "@/services/stt";
 import { TTSQueue, chunkTextForTTS } from "@/services/elevenLabsTTS";
+import { prefetchOpeningTTS, playOpeningTTS, OPENING_LINE } from "@/services/openingTTSCache";
 import { getLLMSettings } from "@/services/settingsService";
 import {
   buildVoiceTurnCompletedPayload,
@@ -169,6 +170,10 @@ const IndexPRD4 = () => {
     onboardingStartedAtRef.current = Date.now();
     firstMaxResponseAtRef.current = null;
     trackEvent("prd4_onboarding_started", {});
+    // Pré-génère l'audio de la phrase d'ouverture de Max (cache) pour qu'elle
+    // joue instantanément lors de l'entrée en conversation. Le clic utilisateur
+    // sert aussi de gesture pour débloquer l'autoplay audio.
+    void prefetchOpeningTTS().catch((e) => console.warn("[TTS] prefetch opening failed:", e));
     // L'écran "As-tu vu le film ?" est retiré : on enchaîne directement sur le teaser.
     setFilmAnswer("rappel");
     setPhase("teaser");
@@ -295,23 +300,30 @@ const IndexPRD4 = () => {
     timer.start();
 
     // Réplique d'ouverture de Max (scriptée pour amorcer)
-    const opening = "Hallo... à qui ai-je affaire ?";
+    const opening = OPENING_LINE;
     setMaxSubtitle(opening);
     const openingMsg: ConversationMessage = { role: "max", content: opening, timestamp: Date.now() };
     conversationRef.current = [openingMsg];
     addMessage(openingMsg);
     setAudioState("max_speaking");
 
-    // TTS de l'ouverture
+    // TTS de l'ouverture — utilise le cache pré-chargé pour démarrer en même
+    // temps que l'affichage du sous-titre. Fallback à TTSQueue si la génération
+    // a échoué (réessaie en streaming).
     try {
-      const queue = new TTSQueue({ onError: (e) => console.warn("[TTS] opening error:", e.message) });
-      ttsQueueRef.current = queue;
-      for (const chunk of chunkTextForTTS(opening)) {
-        queue.enqueue(chunk, { session_id: sessionIdRef.current ?? undefined });
-      }
-      await queue.drain();
+      await playOpeningTTS();
     } catch (err) {
-      console.warn("[TTS] opening failed:", err);
+      console.warn("[TTS] cached opening failed, falling back to streaming:", err);
+      try {
+        const queue = new TTSQueue({ onError: (e) => console.warn("[TTS] opening error:", e.message) });
+        ttsQueueRef.current = queue;
+        for (const chunk of chunkTextForTTS(opening)) {
+          queue.enqueue(chunk, { session_id: sessionIdRef.current ?? undefined });
+        }
+        await queue.drain();
+      } catch (err2) {
+        console.warn("[TTS] opening fallback failed:", err2);
+      }
     }
 
     // Marque le first_max_response et calcule la durée onboarding

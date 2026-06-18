@@ -1,11 +1,19 @@
 /** PRD4 — Écran 1 : Accueil */
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { prefetchOpeningTTS } from "@/services/openingTTSCache";
 
 interface Props {
   onStart: () => void;
 }
 
 const WelcomeScreen = ({ onStart }: Props) => {
+  // Pré-charge l'audio de la phrase d'ouverture dès l'arrivée sur l'accueil,
+  // pour qu'il soit prêt instantanément quand l'utilisateur entre en conversation.
+  useEffect(() => {
+    void prefetchOpeningTTS().catch(() => { /* silent */ });
+  }, []);
+
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[hsl(var(--fade-overlay))]" />
