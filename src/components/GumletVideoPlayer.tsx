@@ -69,6 +69,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
         video.muted = false;
         video.defaultMuted = false;
         video.volume = 1;
+        if (/jsdom/i.test(window.navigator.userAgent)) return;
         const playAttempt = video.play();
         if (playAttempt && typeof playAttempt.catch === "function") {
           void playAttempt.catch(() => { /* Browser may still require a gesture. */ });
