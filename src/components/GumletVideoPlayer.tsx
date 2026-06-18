@@ -125,7 +125,11 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
   const embedUrl = getEmbedUrl(videoUrl);
   const gumletAssetId = getGumletAssetId(videoUrl);
-  const hlsUrl = gumletAssetId ? `https://video.gumlet.io/${GUMLET_COLLECTION_ID}/${gumletAssetId}/main.m3u8` : null;
+  const hlsUrl = videoUrl.endsWith(".m3u8")
+    ? videoUrl
+    : gumletAssetId
+      ? `https://video.gumlet.io/${GUMLET_COLLECTION_ID}/${gumletAssetId}/main.m3u8`
+      : null;
 
   useImperativeHandle(ref, () => ({
     playWithAudio: () => {
