@@ -1,5 +1,8 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
+import Hls from "hls.js";
 import { Player } from "@gumlet/player.js";
+
+const GUMLET_COLLECTION_ID = "673f29f4a5e1bf70aa645cb7";
 
 export interface GumletVideoPlayerHandle {
   playWithAudio: () => void;
@@ -36,6 +39,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   children,
 }, ref) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<Player | null>(null);
   const onCompleteRef = useRef(onComplete);
   const onReadyRef = useRef(onReady);
@@ -59,6 +63,14 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   }, []);
 
   const forceAudioOn = useCallback(() => {
+    const video = videoRef.current;
+    if (video) {
+      video.muted = false;
+      video.defaultMuted = false;
+      video.volume = 1;
+      void video.play().catch(() => { /* Browser may still require a gesture. */ });
+    }
+
     const player = playerRef.current;
     if (!player) return;
     try {
@@ -71,6 +83,11 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     } catch {
       // silent: autoplay policies vary by browser/device.
     }
+  }, []);
+
+  const getGumletAssetId = useCallback((url: string) => {
+    const match = url.match(/(?:watch|embed)\/([a-f0-9]+)/i);
+    return match?.[1] ?? null;
   }, []);
 
   const getEmbedUrl = useCallback((url: string) => {
@@ -99,6 +116,8 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   }, [autoPlay]);
 
   const embedUrl = getEmbedUrl(videoUrl);
+  const gumletAssetId = getGumletAssetId(videoUrl);
+  const hlsUrl = gumletAssetId ? `https://video.gumlet.io/${GUMLET_COLLECTION_ID}/${gumletAssetId}/main.m3u8` : null;
 
   useImperativeHandle(ref, () => ({
     playWithAudio: () => {
@@ -175,6 +194,31 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     if (active) forceAudioOn();
   }, [active, forceAudioOn]);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !hlsUrl) return;
+
+    video.muted = false;
+    video.defaultMuted = false;
+    video.volume = 1;
+    video.preload = "auto";
+
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = hlsUrl;
+      onReadyRef.current?.();
+      return;
+    }
+
+    if (!Hls.isSupported()) return;
+
+    const hls = new Hls({ autoStartLoad: true });
+    hls.loadSource(hlsUrl);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => onReadyRef.current?.());
+
+    return () => hls.destroy();
+  }, [hlsUrl]);
+
   // Listen for Gumlet player events via postMessage
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -205,19 +249,34 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       className={`fixed inset-0 z-0 bg-background transition-opacity duration-200 ${active ? "opacity-100" : "pointer-events-none opacity-0"}`}
       aria-hidden={!active}
     >
-      {/* Gumlet iframe — full viewport */}
-      <iframe
-        ref={iframeRef}
-        src={embedUrl}
-        title="Video player"
-        className="absolute inset-0 w-full h-full"
-        style={{ border: "none" }}
-        allow="autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write; accelerometer; gyroscope"
-        onLoad={() => {
-          if (active) forceAudioOn();
-        }}
-        allowFullScreen
-      />
+      {hlsUrl ? (
+        <video
+          ref={videoRef}
+          title="Video player"
+          className="absolute inset-0 h-full w-full object-cover"
+          controls={active}
+          playsInline
+          preload="auto"
+          autoPlay={autoPlay && active}
+          muted={false}
+          onCanPlay={() => onReadyRef.current?.()}
+          onPlay={forceAudioOn}
+          onEnded={completeOnce}
+        />
+      ) : (
+        <iframe
+          ref={iframeRef}
+          src={embedUrl}
+          title="Video player"
+          className="absolute inset-0 w-full h-full"
+          style={{ border: "none" }}
+          allow="autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write; accelerometer; gyroscope"
+          onLoad={() => {
+            if (active) forceAudioOn();
+          }}
+          allowFullScreen
+        />
+      )}
 
       {/* Overlay content (HUD, etc.) */}
       {active ? children : null}
