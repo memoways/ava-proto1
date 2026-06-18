@@ -959,12 +959,8 @@ const IndexPRD4 = () => {
   }
 
   switch (state.phase) {
-    case "welcome":
-      return null;
     case "film_question":
       return <FilmQuestionScreen onAnswer={handleFilmAnswer} />;
-    case "teaser":
-      return null;
     case "posture_capture":
       return (
         <PostureCaptureScreen
