@@ -51,7 +51,7 @@ function buildFastPreTurnBrief(input: {
     allowed_knowledge: input.knowledgeContext?.allowedFacts?.slice(0, 3) || [],
     forbidden_topics: input.knowledgeContext?.forbiddenTopics?.slice(0, 3) || [],
     blocked_assertions: input.knowledgeContext?.blockedAssertions?.slice(0, 3) || [],
-    style_instructions: ["réponse orale courte", "2 phrases maximum", "poser une question simple"],
+    style_instructions: ["réponse orale courte", "2 phrases maximum"],
     trigger_hint: null,
     notes: "Brief local instantané (GM pré-tour LLM désactivé sur le hot path live)",
     fallback: {
