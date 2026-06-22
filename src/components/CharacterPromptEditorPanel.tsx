@@ -118,13 +118,7 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
     }
     setResyncing(false);
   }
-      clearSystemPromptCache();
-      await loadActive(resolvedId);
-    } catch (err: any) {
-      toast.error("Resync échoué : " + (err.message || err));
-    }
-    setResyncing(false);
-  }
+
 
   const preview = prompt ? buildCharacterPromptSections({ ...prompt, ...(draft as any) }) : "";
 
