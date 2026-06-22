@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-06-22 (session 31 — cloisonnement RAG par personnage, sync Notion découpé, Max obéissant, validateur optionnel)
+> **Last Updated**: 2026-06-22 (session 31 — audit Max hallucinations : mismatch nom DB, RAG enfin injecté, fin des esquives "Lausanne")
 
 ---
 
@@ -64,6 +64,24 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-06-22 — Audit Max hallucinations : Max utilise enfin son RAG et sa fiche Notion 🔷
+
+**Intent.** Test utilisateur : on demande à Max « Où habites-tu ? ». Le RAG Test admin remonte parfaitement « *Vous habitez dans un vieil appartement plein de charme à Lausanne en Suisse.* » (score 0.797), mais en conversation Max esquive (« je ne suis pas encore revenu chez moi », « je préfère ne pas en parler »). Comprendre pourquoi le pipeline live ignore ses sources.
+
+**Outcome.** Audit sévère qui révèle 4 bugs en chaîne :
+1. **Bug critique silencieux** : la DB stocke `"Max Lorenzo"`, l'app passe `"Max"`. Toutes les lookups `.eq("name", "Max")` retournent `null` → Max tourne sur un **fallback générique d'une ligne**, sans fiche Notion ni system_prompt riche (4547 chars perdus), et le cloisonnement RAG par personnage est désactivé (characterId null = tous personnages). Fix : cascade `exact → "Name %" → "Name%"` dans `findCharacterRowByName`.
+2. **RAG brut shunté** dans `buildMaxSystemPrompt` : la condition `!hasStructuredKnowledge` n'était jamais vraie dès qu'il y avait ≥1 match, donc le bloc « CONTEXTE NARRATIF — SOURCE DE VÉRITÉ » n'était **jamais** injecté en prod. Désormais toujours injecté avec préambule explicite.
+3. **Troncature destructrice à 300 chars** : les chunks Notion font ~1000 chars, « Lausanne » tombait au milieu donc coupé. Élevé à 900/1200, top-3 → top-5.
+4. **Label « hypothèse » contre-productif** : tout match `similarity < 0.55` était injecté comme « piste partielle » + assertions bloquées « ne jamais inventer de lieu ». Max recevait l'info ET l'ordre de ne pas l'affirmer. Supprimé.
+
+Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync Notion) est désormais injecté en tête de fiche.
+
+**Validation.** Lancer une conversation, demander « Où habites-tu ? » → Max doit répondre « À Lausanne, dans un vieil appartement… ». Vérifier dans la console que `[MaxAgent] Loaded system_prompt for "Max" → "Max Lorenzo" (4547 chars)` apparaît au premier tour.
+
+**Why it matters.** Trois bugs cumulés faisaient que Max ignorait à la fois sa fiche, son system_prompt riche et son RAG, et qu'on lui interdisait en plus d'affirmer les rares faits qui survivaient à la troncature. Le RAG Test admin trompait : il montrait que l'info était dans la base, masquant qu'elle n'arrivait jamais au LLM. Cette session ferme la boucle entre Notion → RAG → prompt → réponse.
+
+---
 
 ### 2026-06-22 — Cloisonnement RAG par personnage, sync Notion découpé, Max obéissant, validateur optionnel 🔷
 

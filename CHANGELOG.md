@@ -4,7 +4,26 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.34.0] - 2026-06-22 — Max utilise enfin le RAG : fin des esquives "Lausanne"
+
+### Corrigé (criticité 🔴)
+- **Mismatch de nom de personnage `"Max"` vs `"Max Lorenzo"`** — la DB stocke `"Max Lorenzo"` mais l'orchestrateur appelle `simulateMaxResponse({ characterName: "Max" })`. Toutes les lookups (`getCharacterSystemPrompt`, `loadCharacterPromptByName`, `resolveCharacterIdByName`) faisaient un `.eq("name", "Max")` strict et retournaient `null`. Conséquences silencieuses : (a) le `system_prompt` de 4547 chars de Max n'était **jamais** injecté → fallback générique d'1 ligne, (b) **aucun champ Notion** n'était injecté (Identité, Qui tu es, Dynamique…), (c) `characterId = null` faisait retomber le RAG sur **tous les personnages** au lieu de cloisonner Max. Fix : cascade de lookup `exact → "Name %" → "Name%"` dans `characterPromptService.ts` (`findCharacterRowByName`) + même cascade dans `getCharacterSystemPrompt`.
+- **`ragContext` brut jamais injecté en prod** — `buildMaxSystemPrompt` n'ajoutait le bloc « CONTEXTE NARRATIF — SOURCE DE VÉRITÉ » que si `!hasStructuredKnowledge`, condition jamais vraie dès qu'il y avait ≥1 match. Le RAG complet est désormais **toujours** injecté avec un préambule explicite *« ce sont des faits canoniques que tu peux énoncer librement »*.
+- **Troncature destructrice à 300 caractères** — `MAX_KNOWLEDGE_ITEM_CHARS` 300 → **900**, `MAX_RAG_CONTEXT_CHARS` 420 → **1200**, top-3 → **top-5**. Les chunks Notion font ~1000 chars et le mot « Lausanne » tombait au milieu donc coupé.
+- **Label « hypothèse » contre-productif** — tout match `similarity < 0.55` était injecté comme `[H1] Piste partielle seulement: …` + assertions bloquées par défaut (« Ne jamais inventer de lieu… »). Max recevait simultanément l'info correcte ET l'ordre de ne pas l'affirmer → esquive systématique. Branche `hypotheses` supprimée, `forbiddenTopics` vidé, `blockedAssertions` réduit à *« ne pas inventer de personnage/événement absent du contexte »*.
+
+### Ajouté
+- **`situation_summary` injecté dans le system prompt** — le résumé factuel 100-150 mots généré par la sync Notion (lieu, âge, famille, événements récents) est désormais en tête de la `FICHE PERSONNAGE` sous l'étiquette *« SITUATION ACTUELLE (canon — faits vrais que tu peux énoncer librement) »*.
+- **`resolveCanonicalCharacterName(name)`** — utilitaire exporté pour récupérer le nom canonique DB depuis un prénom court.
+
+### Hors-scope
+- Pas de migration SQL, pas de modif de la sync Notion.
+- Validateur anti-hallucination : déjà `off` par défaut depuis 0.33.0.
+
+---
+
 ## [0.33.0] - 2026-06-22 — Cloisonnement RAG par personnage, sync Notion découpé, Max obéissant aux instructions, validateur optionnel
+
 
 ### Ajouté
 - **Cloisonnement RAG par personnage** — `queryRAG` / `getRAGContext` propagent désormais `characterId` (résolu via `resolveCharacterIdByName` dans `characterPromptService.ts`). `match_embeddings_voyage` filtre côté SQL : impossible que des chunks d'Ava/Léo/Emma remontent dans le contexte de Max. L'onglet **RAG Test** (Admin) ajoute un sélecteur de personnage et affiche le `character_name` de chaque chunk retourné.
