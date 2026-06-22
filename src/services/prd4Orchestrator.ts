@@ -15,6 +15,7 @@ import {
   formatRAGContext,
   queryRAG,
 } from "@/services/ragService";
+import { resolveCharacterIdByName } from "@/services/characterPromptService";
 import { getGameplaySettings } from "@/services/settingsService";
 import type { ConversationMessage, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 
