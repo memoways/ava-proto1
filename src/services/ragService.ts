@@ -135,8 +135,10 @@ export async function queryRAGDetailed(
   }
 }
 
-const MAX_RAG_CONTEXT_CHARS = 420;
-const MAX_KNOWLEDGE_ITEM_CHARS = 300;
+// Generous limits: les chunks RAG sont déjà ~1000 chars. Tronquer à 300 coupait
+// au milieu de phrases (ex: "…habites à Lausanne" perdu).
+const MAX_RAG_CONTEXT_CHARS = 1200;
+const MAX_KNOWLEDGE_ITEM_CHARS = 900;
 
 function compactText(text: string, maxChars: number): string {
   const clean = text.replace(/\s+/g, " ").trim();
@@ -150,7 +152,7 @@ function compactText(text: string, maxChars: number): string {
 export function formatRAGContext(matches: RAGMatch[]): string {
   if (!matches.length) return "";
   return matches
-    .slice(0, 3)
+    .slice(0, 5)
     .map((m, i) => `[${i + 1}] (${m.source_table}, score: ${m.similarity.toFixed(2)})\n${compactText(m.content, MAX_RAG_CONTEXT_CHARS)}`)
     .join("\n\n");
 }
@@ -178,24 +180,19 @@ export function buildKnowledgeContextFromRAG(matches: RAGMatch[]): MaxTurnKnowle
   }
 
   const sorted = [...matches].sort((a, b) => b.similarity - a.similarity);
-  const allowedFacts = sorted.slice(0, 3).map((match, index) => `[F${index + 1}] ${compactText(match.content, MAX_KNOWLEDGE_ITEM_CHARS)}`);
+  const allowedFacts = sorted.slice(0, 5).map((match, index) => `[F${index + 1}] ${compactText(match.content, MAX_KNOWLEDGE_ITEM_CHARS)}`);
   const activeMemories = sorted.slice(0, 2).map((match, index) => `[M${index + 1}] ${compactText(match.content, MAX_KNOWLEDGE_ITEM_CHARS)}`);
-  const hypotheses = sorted
-    .filter((match) => match.similarity < 0.55)
-    .slice(0, 2)
-    .map((match, index) => `[H${index + 1}] Piste partielle seulement: ${compactText(match.content, MAX_KNOWLEDGE_ITEM_CHARS)}`);
 
+  // PAS d'hypothèses : tout chunk remonté par le RAG est considéré comme fait
+  // canonique du récit. Étiqueter en "hypothèse" pousse Max à esquiver des
+  // informations correctes (ex. son lieu d'habitation).
   return {
     allowedFacts,
     activeMemories,
-    hypotheses,
-    forbiddenTopics: [
-      "Toute information absente des faits autorisés du tour",
-      "Toute révélation non encore débloquée par la progression narrative",
-    ],
+    hypotheses: [],
+    forbiddenTopics: [],
     blockedAssertions: [
-      "Ne jamais transformer une hypothèse en souvenir certain",
-      "Ne jamais inventer de détail concret (date, lieu, action, intention) absent des faits autorisés",
+      "Ne jamais inventer un personnage, un événement ou une relation absent du contexte narratif",
     ],
   };
 }

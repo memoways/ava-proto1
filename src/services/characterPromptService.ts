@@ -80,32 +80,54 @@ export async function loadCharacterPrompt(characterId: string): Promise<Characte
   return prompt;
 }
 
+/**
+ * Lookup a character by display name with fallback cascade:
+ *   1. exact match (case-insensitive)
+ *   2. starts-with "Name " (handles "Max" → "Max Lorenzo")
+ *   3. starts-with "Name"
+ * This protects against name drift between UI ("Max") and DB ("Max Lorenzo").
+ */
+async function findCharacterRowByName(name: string): Promise<{ id: string; name: string } | null> {
+  if (!name?.trim()) return null;
+  const trimmed = name.trim();
+  // 1. Exact
+  let res = await supabase.from("characters").select("id, name").ilike("name", trimmed).maybeSingle();
+  if (res.data) return res.data as { id: string; name: string };
+  // 2. "Name " prefix (most common: first name lookup)
+  res = await supabase.from("characters").select("id, name").ilike("name", `${trimmed} %`).limit(1).maybeSingle();
+  if (res.data) return res.data as { id: string; name: string };
+  // 3. "Name" prefix (looser)
+  res = await supabase.from("characters").select("id, name").ilike("name", `${trimmed}%`).limit(1).maybeSingle();
+  if (res.data) return res.data as { id: string; name: string };
+  console.warn(`[characterPromptService] No character found for name="${name}"`);
+  return null;
+}
+
 export async function loadCharacterPromptByName(name: string): Promise<CharacterPrompt | null> {
   if (byNameCache.has(name)) return byNameCache.get(name)!;
-  const { data: charRow, error: charErr } = await supabase
-    .from("characters")
-    .select("id, name")
-    .eq("name", name)
-    .maybeSingle();
-  if (charErr || !charRow) return null;
+  const charRow = await findCharacterRowByName(name);
+  if (!charRow) return null;
   const prompt = await loadCharacterPrompt(charRow.id);
+  if (prompt) byNameCache.set(name, prompt);
   return prompt;
 }
 
 const idByNameCache = new Map<string, string>();
-/** Resolve the characters.id row from a display name (case-insensitive). Cached in-memory. */
+/** Resolve the characters.id row from a display name with fallback cascade. Cached in-memory. */
 export async function resolveCharacterIdByName(name: string): Promise<string | null> {
   if (!name) return null;
   const key = name.trim().toLowerCase();
   if (idByNameCache.has(key)) return idByNameCache.get(key)!;
-  const { data } = await supabase
-    .from("characters")
-    .select("id, name")
-    .ilike("name", name)
-    .maybeSingle();
-  const id = (data as any)?.id || null;
+  const row = await findCharacterRowByName(name);
+  const id = row?.id || null;
   if (id) idByNameCache.set(key, id);
   return id;
+}
+
+/** Resolve the canonical full character name (e.g. "Max" → "Max Lorenzo"). */
+export async function resolveCanonicalCharacterName(name: string): Promise<string | null> {
+  const row = await findCharacterRowByName(name);
+  return row?.name || null;
 }
 
 export async function saveCharacterPrompt(
@@ -158,6 +180,8 @@ export async function listCharactersWithPrompts(): Promise<CharacterListEntry[]>
 export function buildCharacterPromptSections(p: CharacterPrompt | null): string {
   if (!p) return "";
   const sections: Array<[string, string]> = [
+    // Situation actuelle d'abord : c'est le résumé factuel le plus dense (lieu, âge, famille…).
+    ["SITUATION ACTUELLE (canon — faits vrais que tu peux énoncer librement)", p.situation_summary],
     ["IDENTITÉ FONDAMENTALE", p.identite_fondamentale],
     ["QUI TU ES", p.qui_tu_es],
     ["CE QUE TU NE FAIS JAMAIS", p.ce_que_tu_ne_fais_jamais],

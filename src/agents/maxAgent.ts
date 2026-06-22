@@ -34,19 +34,23 @@ async function getCharacterSystemPrompt(name = "Max"): Promise<string> {
   if (cachedSystemPrompts[name]) return cachedSystemPrompts[name];
 
   try {
-    const { data, error } = await supabase
-      .from("characters")
-      .select("system_prompt, name, personality")
-      .eq("name", name)
-      .maybeSingle();
+    // Cascade lookup: exact, "Name %", "Name%" — DB stocke "Max Lorenzo" mais l'app passe "Max".
+    const tryFetch = async (filter: (q: any) => any) => {
+      const { data } = await filter(supabase.from("characters").select("system_prompt, name, personality")).maybeSingle();
+      return data as { system_prompt: string | null; name: string } | null;
+    };
+    let data = await tryFetch((q) => q.ilike("name", name));
+    if (!data) data = await tryFetch((q) => q.ilike("name", `${name} %`).limit(1));
+    if (!data) data = await tryFetch((q) => q.ilike("name", `${name}%`).limit(1));
 
-    if (error || !data?.system_prompt) {
-      console.warn(`[MaxAgent] Could not fetch system_prompt for ${name}, using fallback`);
+    if (!data?.system_prompt) {
+      console.warn(`[MaxAgent] Could not fetch system_prompt for "${name}" (DB has no match or empty system_prompt), using fallback`);
       return FALLBACK_SYSTEM_PROMPT;
     }
 
+    cachedSystemPrompts[name] = data.system_prompt;
     cachedSystemPrompts[data.name] = data.system_prompt;
-    console.log(`[MaxAgent] Loaded system_prompt for ${data.name} (${data.system_prompt.length} chars)`);
+    console.log(`[MaxAgent] Loaded system_prompt for "${name}" → "${data.name}" (${data.system_prompt.length} chars)`);
     return data.system_prompt;
   } catch (err) {
     console.error("[MaxAgent] DB error:", err);
@@ -312,16 +316,19 @@ async function buildMaxSystemPrompt(
 
   prompt += `\n\n## HISTORIQUE RÉCENT DU TOUR\n${formatRecentHistory(conversationHistory)}`;
 
-  prompt += `\n\n## CONTEXTE AUTORISÉ DU TOUR\n${formatKnowledgeList("### FAITS AUTORISÉS", knowledgeContext?.allowedFacts)}\n\n${formatKnowledgeList("### SOUVENIRS ACTIVÉS", knowledgeContext?.activeMemories)}\n\n${formatKnowledgeList("### HYPOTHÈSES (à ne jamais affirmer comme vraies)", knowledgeContext?.hypotheses)}\n\n${formatKnowledgeList("### SUJETS INTERDITS", knowledgeContext?.forbiddenTopics)}\n\n${formatKnowledgeList("### ASSERTIONS BLOQUÉES", knowledgeContext?.blockedAssertions)}`;
+  // RAG brut TOUJOURS injecté comme source de vérité (les faits qui en sortent sont
+  // des extraits validés du récit Notion — pas des hypothèses). Le bloc structuré
+  // ci-dessous ne sert qu'à signaler d'éventuels sujets interdits / assertions bloquées.
+  if (ragContext) {
+    prompt += `\n\n## CONTEXTE NARRATIF — SOURCE DE VÉRITÉ\nLes informations ci-dessous sont des faits canoniques sur ta vie, extraits de ton histoire. Tu peux les énoncer librement comme si tu t'en souvenais (lieux, dates, noms, événements). Tu n'inventes RIEN au-delà.\n\n${ragContext}`;
+  }
 
-  const hasStructuredKnowledge = Boolean(
-    knowledgeContext?.allowedFacts?.length ||
-    knowledgeContext?.activeMemories?.length ||
-    knowledgeContext?.hypotheses?.length,
+  const hasContextualGuards = Boolean(
+    knowledgeContext?.forbiddenTopics?.length ||
+    knowledgeContext?.blockedAssertions?.length,
   );
-
-  if (ragContext && !hasStructuredKnowledge) {
-    prompt += `\n\n## CONTEXTE NARRATIF (SOURCE DE VÉRITÉ — utilise ces informations)\n${ragContext}`;
+  if (hasContextualGuards) {
+    prompt += `\n\n## GARDE-FOUS DU TOUR\n${formatKnowledgeList("### SUJETS INTERDITS", knowledgeContext?.forbiddenTopics)}\n\n${formatKnowledgeList("### ASSERTIONS BLOQUÉES", knowledgeContext?.blockedAssertions)}`;
   }
 
   if (postVideoContext) {
