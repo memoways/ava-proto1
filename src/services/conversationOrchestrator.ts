@@ -4,7 +4,7 @@ import { buildKnowledgeContextFromRAG, formatRAGContext, queryRAG, rewriteRAGQue
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, ConversationPipelineTimings, ConversationPipelineTrace, ConversationValidationTrace, GameMasterResponse, GameMasterTurnBrief, MaxConstraintCheckResult, MaxTurnKnowledgeContext, VideoTrigger } from "@/types";
-import { getGameplaySettings, getLLMSettings } from "@/services/settingsService";
+import { getAntiHallucinationValidatorSettings, getGameplaySettings, getLLMSettings } from "@/services/settingsService";
 import { createTurnTimer } from "@/services/latencyTelemetry";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 
