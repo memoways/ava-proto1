@@ -626,6 +626,13 @@ export function resetMaxPromptControlSettings(): MaxPromptControlSettings {
 // ===== Anti-hallucination Validator Settings =====
 
 export interface AntiHallucinationValidatorSettings {
+  /**
+   * Mode opérationnel du validateur :
+   * - "off"     : aucun appel LLM, zéro latence.
+   * - "observe" : validateur lancé en arrière-plan (trace seulement, ne remplace JAMAIS la réponse).
+   * - "enforce" : comportement historique (1 retry + fallback générique si non-compliant).
+   */
+  mode: "off" | "observe" | "enforce";
   authorizedFacts: string;
   blockedAssertionRules: string;
 }
@@ -633,6 +640,7 @@ export interface AntiHallucinationValidatorSettings {
 const ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY = "ava_anti_hallucination_validator_settings";
 
 const antiHallucinationValidatorDefaults: AntiHallucinationValidatorSettings = {
+  mode: "off",
   authorizedFacts: `Max est le père d'Ava.
 Ava a disparu.
 Max ne dispose que d'informations partielles.
