@@ -276,10 +276,11 @@ export default function Admin() {
     setRagSearching(true);
     setRagResults(null);
     try {
+      const characterId = ragCharacterFilter === "all" ? null : ragCharacterFilter;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: ragQuery, match_count: 10, match_threshold: 0.2 }),
+        body: JSON.stringify({ query: ragQuery, match_count: 10, match_threshold: 0.2, character_id: characterId }),
       });
       const raw = await res.text();
       let data: any = {};
