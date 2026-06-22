@@ -577,16 +577,20 @@ export default function Admin() {
                 </div>
               </div>
               <div className="flex gap-3 flex-wrap">
-                <Button onClick={() => triggerSync()} disabled={syncing} size="lg">
-                  {syncing ? "Sync en cours…" : "Sync incrémental"}
+                <Button onClick={() => triggerSync({ mode: "rag_only" })} disabled={syncing} size="lg">
+                  {syncing ? "Sync en cours…" : "Sync RAG (pages Notion)"}
                 </Button>
-                <Button onClick={() => triggerSync({ wipeAll: true })} disabled={syncing} size="lg" variant="destructive">
+                <Button onClick={() => triggerSync({ mode: "full" })} disabled={syncing} size="lg" variant="outline">
+                  {syncing ? "Sync en cours…" : "Sync complète (RAG + champs)"}
+                </Button>
+                <Button onClick={() => triggerSync({ wipeAll: true, mode: "full" })} disabled={syncing} size="lg" variant="destructive">
                   {syncing ? "Sync en cours…" : "⚠️ Wipe & rebuild RAG"}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                « Wipe & rebuild » supprime tous les embeddings puis reconstruit depuis zéro.
-                À utiliser après un changement majeur dans Notion ou un changement de provider d'embeddings.
+                <strong>Sync RAG</strong> (par défaut) ne touche QUE les embeddings du corps des pages Notion — les champs éditoriaux des personnages restent intacts.
+                <br/><strong>Sync complète</strong> re-synchronise aussi les 7 champs éditoriaux + le résumé de situation (équivalent à un « Resync » par personnage pour tous d'un coup).
+                <br/><strong>Wipe & rebuild</strong> supprime tous les embeddings puis reconstruit depuis zéro — à utiliser après un changement de provider d'embeddings.
               </p>
 
               {syncReport && !syncReport.error && (
