@@ -109,6 +109,7 @@ export default function Admin() {
   const [ragResults, setRagResults] = useState<any[] | null>(null);
   const [ragSearching, setRagSearching] = useState(false);
   const [ragError, setRagError] = useState<string | null>(null);
+  const [ragCharacterFilter, setRagCharacterFilter] = useState<string>("all"); // "all" | character.id
   const [characters, setCharacters] = useState<any[]>([]);
   const [editingChar, setEditingChar] = useState<any | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
