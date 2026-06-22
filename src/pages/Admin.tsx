@@ -450,19 +450,32 @@ export default function Admin() {
               <p className="text-sm text-muted-foreground mb-3">
                 Teste la recherche sémantique en envoyant une requête au pipeline RAG.
               </p>
-              <div className="flex gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4">
+                <select
+                  value={ragCharacterFilter}
+                  onChange={(e) => setRagCharacterFilter(e.target.value)}
+                  className="bg-muted/30 border rounded px-2 py-2 text-sm"
+                >
+                  <option value="all">Tous les personnages (+ partagé)</option>
+                  {characters.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
                 <input
                   type="text"
                   value={ragQuery}
                   onChange={(e) => setRagQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && testRAG()}
                   placeholder="Ex: famille de Max, virus, chalet de montagne..."
-                  className="flex-1 bg-muted/30 border rounded px-3 py-2 text-sm"
+                  className="flex-1 min-w-[260px] bg-muted/30 border rounded px-3 py-2 text-sm"
                 />
                 <Button onClick={testRAG} disabled={ragSearching || !ragQuery.trim()}>
                   {ragSearching ? "Recherche..." : "Chercher"}
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Le scoping par personnage reproduit ce que voit Max en conversation : seuls les chunks de ce personnage (et les chunks partagés à <code>character_id = NULL</code>) sont retournés.
+              </p>
 
               {ragError && (
                 <div className="border border-destructive/50 bg-destructive/10 rounded-lg p-3 mb-4">
@@ -478,15 +491,20 @@ export default function Admin() {
               {ragResults && !ragError && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">{ragResults.length} résultat(s)</p>
-                  {ragResults.map((m: any, i: number) => (
-                    <div key={m.id} className="border rounded-lg p-3 mb-3">
-                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                        <span>#{i + 1} — {m.source_table}</span>
-                        <span>Similarité: {(m.similarity * 100).toFixed(1)}%</span>
+                  {ragResults.map((m: any, i: number) => {
+                    const charName = m.character_id
+                      ? (characters.find((c) => c.id === m.character_id)?.name || `char ${String(m.character_id).slice(0, 8)}`)
+                      : "(partagé — character_id NULL)";
+                    return (
+                      <div key={m.id} className="border rounded-lg p-3 mb-3">
+                        <div className="flex justify-between text-xs text-muted-foreground mb-1 gap-2 flex-wrap">
+                          <span>#{i + 1} — <strong className="text-foreground">{charName}</strong> <span className="opacity-60">· {m.source_table}</span></span>
+                          <span>Similarité: {(m.similarity * 100).toFixed(1)}%</span>
+                        </div>
+                        <pre className="text-sm whitespace-pre-wrap">{m.content}</pre>
                       </div>
-                      <pre className="text-sm whitespace-pre-wrap">{m.content}</pre>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
