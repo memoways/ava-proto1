@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-06-18 (session 30 — cache audio d'ouverture, avatar Max, mapping Notion « Qui t'appelle », autoplay vidéo HLS)
+> **Last Updated**: 2026-06-22 (session 31 — cloisonnement RAG par personnage, sync Notion découpé, Max obéissant, validateur optionnel)
 
 ---
 
@@ -64,6 +64,26 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-06-22 — Cloisonnement RAG par personnage, sync Notion découpé, Max obéissant, validateur optionnel 🔷
+
+**Intent**: Audit demandé par Ulrich après constat que (1) Max posait une question à chaque tour malgré des instructions Notion qui disaient le contraire, (2) on n'était pas sûr que le RAG soit bien cloisonné par personnage (risque qu'en parlant à Max on récupère des chunks d'Ava/Léo/Emma), (3) le bouton « Resync Notion » du panneau personnage effaçait les embeddings à chaque édition de champ, ce qui rendait les itérations éditoriales coûteuses, et (4) le validateur anti-hallucination ajoutait un appel LLM par tour sans toggle pour le désactiver.
+
+**Tool**: Lovable
+
+**Outcome**:
+1. **RAG cloisonné** — `queryRAG` / `getRAGContext` reçoivent `characterId` (résolu via `resolveCharacterIdByName`) et filtrent côté SQL via `match_embeddings_voyage`. L'onglet RAG Test affiche le `character_name` de chaque chunk pour vérification visuelle.
+2. **Sync Notion à 3 modes** — `sync-notion` accepte `mode: "full" | "fields_only" | "rag_only"`. Le bouton « ↻ Resync Notion » du panneau personnage utilise `fields_only` : éditer un champ et resync ne touche plus aux embeddings. L'admin sync sépare les actions « Sync RAG » et « Sync complète ».
+3. **Max suit Notion** — réorganisation de `buildMaxSystemPrompt` : les champs Notion (Identité, Qui tu es, Qui t'appelle, Dynamique de la conversation…) sont injectés AVANT `GAMEPLAY_RULES`, avec un préambule de priorité. Suppression de la règle hardcodée « tu poses des questions pour juger la sincérité » dans `GAMEPLAY_RULES` et de « pose une question simple » dans `buildFastPreTurnBrief`.
+4. **Validateur optionnel** — `AntiHallucinationValidatorSettings.mode` (`off | observe | enforce`), défaut `off`. Sélecteur dans l'onglet `🛡️ Validateur`. Mode `observe` = log sans bloquer, `enforce` = comportement historique.
+
+**Why it matters**: Le cloisonnement RAG est une condition sine qua non pour passer de 1 à N personnages crédibles. Le découplage sync débloque les itérations éditoriales rapides (Ulrich édite un champ Notion, resync 2 s, teste — sans payer un re-embedding complet). La réorganisation du prompt Max rend enfin Notion *réellement* source de vérité éditoriale pour le comportement conversationnel : ce qui est écrit dans *Dynamique de la conversation* est appliqué, pas overridé par du code.
+
+**Files**: `src/services/characterPromptService.ts`, `src/services/conversationOrchestrator.ts`, `src/services/prd4Orchestrator.ts`, `src/services/settingsService.ts`, `src/agents/maxAgent.ts`, `src/components/CharacterPromptEditorPanel.tsx`, `src/components/AntiHallucinationValidatorTab.tsx`, `src/pages/Admin.tsx`, `supabase/functions/sync-notion/index.ts`.
+
+**Follow-up**: Lancer une sync complète une fois en prod pour tagger les embeddings legacy avec `character_id`. Affiner le champ *Dynamique de la conversation* de Max dans Notion pour calibrer le ton (laconique, ne pas poser de question systématique, laisser l'interlocuteur conduire).
+
+---
 
 ### 2026-06-18 — Cache audio d'ouverture, avatar Max, mapping Notion « Qui t'appelle », autoplay vidéo HLS 🔷
 

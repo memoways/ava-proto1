@@ -4,6 +4,30 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.33.0] - 2026-06-22 — Cloisonnement RAG par personnage, sync Notion découpé, Max obéissant aux instructions, validateur optionnel
+
+### Ajouté
+- **Cloisonnement RAG par personnage** — `queryRAG` / `getRAGContext` propagent désormais `characterId` (résolu via `resolveCharacterIdByName` dans `characterPromptService.ts`). `match_embeddings_voyage` filtre côté SQL : impossible que des chunks d'Ava/Léo/Emma remontent dans le contexte de Max. L'onglet **RAG Test** (Admin) ajoute un sélecteur de personnage et affiche le `character_name` de chaque chunk retourné.
+- **Modes de sync Notion découplés** — l'Edge Function `sync-notion` accepte `mode: "full" | "fields_only" | "rag_only"`. `fields_only` met à jour uniquement les champs `character_prompts` (Identité, Qui tu es, Qui t'appelle, Dynamique de la conversation…) **sans toucher aux embeddings**. `rag_only` re-chunk + ré-embed sans réécrire les champs. `full` (défaut) fait les deux.
+- **Validateur anti-hallucination optionnel** — `AntiHallucinationValidatorSettings.mode` (`off | observe | enforce`) ajouté dans `settingsService.ts`, exposé via sélecteur dans l'onglet `🛡️ Validateur`. Défaut : `off` (latence -1 appel LLM/tour).
+
+### Modifié
+- **Bouton « ↻ Resync Notion »** (panneau personnage) — appelle désormais `sync-notion` en mode `fields_only`. Conséquence : éditer un champ dans Notion et resync n'efface plus jamais les embeddings.
+- **UI Admin Sync** — sépare les actions « Sync RAG » (mode `rag_only`) et « Sync complète » (mode `full`).
+- **`maxAgent.ts` — ordre de composition du system prompt** : les champs Notion sont injectés **AVANT** `GAMEPLAY_RULES`, avec un préambule explicite *« les instructions Notion sont prioritaires sur les règles techniques »*. La règle hardcodée « tu poses des questions pour juger la sincérité » est supprimée de `GAMEPLAY_RULES`, et `buildFastPreTurnBrief` n'ajoute plus « pose une question simple ». Max suit désormais ce que dit le champ *Dynamique de la conversation* de Notion.
+
+### Corrigé
+- **Pollution de contexte inter-personnages** — `processConversationTurn` / `prd4Orchestrator` ne transmettaient pas `characterId` à la couche RAG, donc Max pouvait recevoir des chunks Ava/Léo/Emma. Corrigé en bout de chaîne.
+- **Max trop « assistant »** — Max posait une question à chaque tour malgré les instructions Notion contraires. Cause racine : règles hardcodées dans `GAMEPLAY_RULES` et `buildFastPreTurnBrief` qui surchargeaient Notion. Résolu par la réorganisation du prompt.
+
+### Hors-scope / Non-régression
+- Aucune migration SQL : `character_id` existait déjà sur la table `embeddings` et `match_embeddings_voyage` acceptait déjà le filtre.
+- Pipeline STT/TTS, sonneries, onboarding, déclenchement vidéo : inchangés.
+- Après déploiement, lancer **une** sync complète pour s'assurer que tous les embeddings existants sont taggés `character_id` (les nouveaux le sont automatiquement).
+
+---
+
+
 ## [0.32.0] - 2026-06-18 — Cache audio d'ouverture, avatar Max, mapping Notion « Qui t'appelle », autoplay vidéo HLS
 
 ### Ajouté
