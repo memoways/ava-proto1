@@ -229,11 +229,17 @@ export default function Admin() {
     setSavingChar(false);
   }
 
-  async function triggerSync(opts: { wipeAll?: boolean } = {}) {
+  async function triggerSync(opts: { wipeAll?: boolean; mode?: "full" | "rag_only" | "fields_only" } = {}) {
     setSyncing(true);
     setSyncReport(null);
+    const mode = opts.mode || "rag_only";
     try {
-      toast.info(opts.wipeAll ? "Wipe & rebuild RAG…" : "Sync Notion…");
+      const label = opts.wipeAll
+        ? "Wipe & rebuild RAG…"
+        : mode === "rag_only" ? "Sync RAG (pages Notion)…"
+        : mode === "fields_only" ? "Sync champs personnages…"
+        : "Sync complète (RAG + champs)…";
+      toast.info(label);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 180000);
       const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
@@ -245,15 +251,16 @@ export default function Admin() {
             videos: AVA_NOTION_DATABASES.videos,
           },
           wipe_all: !!opts.wipeAll,
+          mode,
         }),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      setSyncReport({ ...data, synced_at: new Date().toISOString() });
+      setSyncReport({ ...data, synced_at: new Date().toISOString(), mode });
       clearSystemPromptCache();
-      toast.success(`Sync OK : ${data.characters_synced} personnage(s), ${data.total_embeddings_in_db} embeddings total`);
+      toast.success(`Sync OK (${mode}) : ${data.characters_synced} personnage(s), ${data.total_embeddings_in_db} embeddings total`);
       loadEmbeddings();
     } catch (err: any) {
       const msg = err.name === "AbortError" ? "Timeout (>180s)" : err.message;
