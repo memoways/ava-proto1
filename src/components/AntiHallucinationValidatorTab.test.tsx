@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 
 vi.mock("@/services/settingsService", () => {
   const defaults = {
+    mode: "off",
     authorizedFacts: "Fait global A\nFait global B",
     blockedAssertionRules: "Règle globale 1",
   };

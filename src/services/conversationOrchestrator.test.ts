@@ -42,6 +42,12 @@ describe("conversationOrchestrator — anti-hallucination", () => {
   beforeEach(() => {
     (callLLM as any).mockReset();
     localStorage.clear();
+    // Active explicitement le validateur en mode enforce pour ces tests
+    // (le défaut produit est "off" pour ne pas parasiter la conversation live).
+    localStorage.setItem(
+      "ava_anti_hallucination_validator_settings",
+      JSON.stringify({ mode: "enforce", authorizedFacts: "", blockedAssertionRules: "" }),
+    );
   });
   afterEach(() => vi.restoreAllMocks());
 

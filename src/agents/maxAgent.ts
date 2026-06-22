@@ -8,21 +8,24 @@ import { buildCharacterPromptSections, loadCharacterPromptByName, clearCharacter
 // Fallback minimal system prompt if DB fetch fails
 const FALLBACK_SYSTEM_PROMPT = `Tu es un personnage dans une expérience narrative interactive. Parle à la première personne, en français, de façon concise (2-3 phrases). Utilise le CONTEXTE NARRATIF ci-dessous comme source de vérité.`;
 
-// Gameplay rules — always appended regardless of character
+// Gameplay rules — always appended regardless of character.
+// IMPORTANT: ces règles sont des INVARIANTS TECHNIQUES uniquement.
+// Toute consigne éditoriale (poser ou non des questions, ton, rythme, retenue, etc.)
+// doit venir des sections "FICHE PERSONNAGE" issues de Notion, qui priment.
 const GAMEPLAY_RULES = `
-## RÈGLES DE JEU
-- Parle UNIQUEMENT à la première personne, en français
-- JAMAIS de narration ("*il soupire*"), JAMAIS de méta-commentaires
-- Tes émotions passent par tes mots, ton rythme, tes hésitations
-- Tu poses des questions à l'interlocuteur pour jauger sa sincérité
-- Réponds de façon très concise (1-2 phrases max, 45 mots maximum) car c'est une conversation orale temps réel
-- Ne révèle pas tout d'un coup — construis la confiance progressivement
+## RÈGLES TECHNIQUES (INVARIANTS)
+- Parle UNIQUEMENT à la première personne, en français.
+- JAMAIS de narration ("*il soupire*"), JAMAIS de méta-commentaires.
+- Tes émotions passent par tes mots, ton rythme, tes hésitations.
+- Réponds de façon très concise (1-2 phrases max, 45 mots maximum) car c'est une conversation orale temps réel.
+- N'invente AUCUN fait absent du CONTEXTE AUTORISÉ DU TOUR ci-dessous.
+- Si tu ne sais pas quelque chose, dis-le plutôt que d'inventer.
 
-## RÈGLE CRITIQUE — CONTEXTE NARRATIF
-Le bloc "CONTEXTE NARRATIF" ci-dessous contient des informations issues de ta mémoire et du monde.
-Ces informations sont LA SOURCE DE VÉRITÉ ABSOLUE. Tu DOIS les utiliser pour répondre.
-Ne contredis JAMAIS ces informations. Si tu ne sais pas quelque chose, dis-le plutôt que d'inventer.
-N'invente AUCUN fait qui ne figure pas dans le contexte narratif.`;
+## PRIORITÉ DES INSTRUCTIONS
+Les sections "FICHE PERSONNAGE" (issues de Notion) ci-dessus DÉFINISSENT TON COMPORTEMENT.
+Si une instruction de la fiche contredit une règle générique (par exemple "ne pose pas de questions"),
+SUIS LA FICHE PERSONNAGE. Ne pose pas systématiquement de questions à l'interlocuteur :
+ne le fais que si ta fiche y invite explicitement.`;
 
 const cachedSystemPrompts: Record<string, string> = {};
 let systemPromptPromise: Promise<string> | null = null;
@@ -289,14 +292,19 @@ async function buildMaxSystemPrompt(
   const characterPrompt = await getCharacterSystemPrompt(characterName);
   const characterFields = await loadCharacterPromptByName(characterName);
   const fieldsSections = buildCharacterPromptSections(characterFields);
-  let prompt = `${characterPrompt}\n${GAMEPLAY_RULES}`;
+
+  // Ordre : (1) prompt de base personnage  →  (2) FICHE PERSONNAGE (champs Notion, PRIORITAIRES)
+  //         →  (3) règles techniques génériques (qui rappellent que la fiche prime).
+  let prompt = characterPrompt;
   if (fieldsSections) {
-    prompt += `\n\n${fieldsSections}`;
+    prompt += `\n\n# FICHE PERSONNAGE (source éditoriale — prioritaire sur toute règle générique)\n${fieldsSections}`;
   }
+  prompt += `\n${GAMEPLAY_RULES}`;
 
   if (userRoleSummary && userRoleSummary.trim()) {
-    prompt += `\n\n## INTERLOCUTEUR (qui t'appelle)\n${userRoleSummary.trim()}\n\nUtilise ces éléments pour personnaliser tes réponses : adresse-toi à cette personne en cohérence avec qui elle dit être, sans jamais contredire sa présentation. Tu peux questionner sa sincérité si quelque chose te paraît étrange, mais reste poli.`;
+    prompt += `\n\n## INTERLOCUTEUR (qui t'appelle)\n${userRoleSummary.trim()}\n\nUtilise ces éléments pour personnaliser tes réponses : adresse-toi à cette personne en cohérence avec qui elle dit être, sans jamais contredire sa présentation.`;
   }
+
 
   if (sessionSummary && sessionSummary.trim()) {
     prompt += `\n\n## SOUVENIRS DE LA SESSION (résumé compressé des tours précédents)\n${sessionSummary.trim()}`;

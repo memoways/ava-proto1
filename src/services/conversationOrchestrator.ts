@@ -4,7 +4,7 @@ import { buildKnowledgeContextFromRAG, formatRAGContext, queryRAG, rewriteRAGQue
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, ConversationPipelineTimings, ConversationPipelineTrace, ConversationValidationTrace, GameMasterResponse, GameMasterTurnBrief, MaxConstraintCheckResult, MaxTurnKnowledgeContext, VideoTrigger } from "@/types";
-import { getGameplaySettings, getLLMSettings } from "@/services/settingsService";
+import { getAntiHallucinationValidatorSettings, getGameplaySettings, getLLMSettings } from "@/services/settingsService";
 import { createTurnTimer } from "@/services/latencyTelemetry";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 
@@ -51,7 +51,7 @@ function buildFastPreTurnBrief(input: {
     allowed_knowledge: input.knowledgeContext?.allowedFacts?.slice(0, 3) || [],
     forbidden_topics: input.knowledgeContext?.forbiddenTopics?.slice(0, 3) || [],
     blocked_assertions: input.knowledgeContext?.blockedAssertions?.slice(0, 3) || [],
-    style_instructions: ["réponse orale courte", "2 phrases maximum", "poser une question simple"],
+    style_instructions: ["réponse orale courte", "2 phrases maximum"],
     trigger_hint: null,
     notes: "Brief local instantané (GM pré-tour LLM désactivé sur le hot path live)",
     fallback: {
@@ -291,6 +291,71 @@ async function generateValidatedMaxResponse(input: MaxAgentInput): Promise<Valid
   let max_ms = 0;
   let validator_ms = 0;
 
+  const validatorMode = (() => {
+    try { return getAntiHallucinationValidatorSettings().mode; } catch { return "enforce" as const; }
+  })();
+
+  // Mode "off" : on saute totalement le validateur (zéro latence, zéro fallback).
+  if (validatorMode === "off") {
+    const maxStart = performance.now();
+    const { response } = await simulateMaxResponse(input);
+    max_ms = performance.now() - maxStart;
+    return {
+      response,
+      validation: {
+        attempts: 1,
+        regenerated: false,
+        finalStatus: "passed",
+        reports: [{
+          attempt: 1,
+          response,
+          compliant: true,
+          summary: "Validateur désactivé (mode=off).",
+          violations: [],
+          safe_points: ["Validateur off"],
+        }],
+      },
+      timings: { max_ms: Math.round(max_ms), validator_ms: 0 },
+    };
+  }
+
+  // Mode "observe" : on génère Max, on lance le validateur en background pour la trace,
+  // mais on diffuse TOUJOURS la réponse originale (jamais de fallback).
+  if (validatorMode === "observe") {
+    const maxStart = performance.now();
+    const { response } = await simulateMaxResponse(input);
+    max_ms = performance.now() - maxStart;
+    // Lancement non bloquant pour alimenter la trace, sans toucher au retour.
+    validateAttempt(input, response).then((v) => {
+      reports.push({
+        attempt: 1,
+        response,
+        compliant: v.compliant,
+        summary: v.summary,
+        violations: v.violations,
+        safe_points: v.safe_points,
+      });
+    }).catch(() => {});
+    return {
+      response,
+      validation: {
+        attempts: 1,
+        regenerated: false,
+        finalStatus: "passed",
+        reports: [{
+          attempt: 1,
+          response,
+          compliant: true,
+          summary: "Validateur en mode observe (non bloquant).",
+          violations: [],
+          safe_points: ["Validateur observe"],
+        }],
+      },
+      timings: { max_ms: Math.round(max_ms), validator_ms: 0 },
+    };
+  }
+
+  // Mode "enforce" : comportement historique (retry + fallback).
   for (let attempt = 1; attempt <= MAX_VALIDATION_RETRIES + 1; attempt++) {
     const attemptInput = buildAttemptInput(input, reports);
     const maxStart = performance.now();

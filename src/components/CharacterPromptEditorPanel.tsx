@@ -104,12 +104,13 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
         body: JSON.stringify({
           databases: { characters: AVA_NOTION_DATABASES.characters },
           only_notion_id: notionId,
+          mode: "fields_only",
         }),
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       const item = data.per_character?.[0];
-      toast.success(`Resync OK : ${item?.chunks_created || 0} chunks, ${item?.prompt_fields_filled || 0}/7 champs, résumé ${item?.summary_chars || 0} chars`);
+      toast.success(`Champs éditoriaux resyncés : ${item?.prompt_fields_filled || 0}/7 champs, résumé ${item?.summary_chars || 0} chars (RAG inchangé)`);
       clearSystemPromptCache();
       await loadActive(resolvedId);
     } catch (err: any) {
@@ -117,6 +118,7 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
     }
     setResyncing(false);
   }
+
 
   const preview = prompt ? buildCharacterPromptSections({ ...prompt, ...(draft as any) }) : "";
 

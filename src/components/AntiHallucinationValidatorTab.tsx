@@ -134,9 +134,28 @@ export default function AntiHallucinationValidatorTab() {
         </div>
       </div>
 
+      <section className="rounded-lg border p-4 space-y-3">
+        <Label htmlFor="validator-mode" className="text-base">Mode opérationnel</Label>
+        <select
+          id="validator-mode"
+          value={settings.mode}
+          onChange={(e) => updateField("mode" as any, e.target.value as any)}
+          className="bg-muted/30 border rounded px-3 py-2 text-sm"
+        >
+          <option value="off">off — aucun appel validateur (défaut, zéro latence)</option>
+          <option value="observe">observe — log en arrière-plan (n'altère pas la réponse)</option>
+          <option value="enforce">enforce — 1 retry + fallback générique si non-compliant</option>
+        </select>
+        <ul className="text-xs text-muted-foreground list-disc pl-5 space-y-1">
+          <li><strong>off</strong> : Max parle directement, sans deuxième appel LLM. À utiliser quand on stabilise sa voix éditoriale.</li>
+          <li><strong>observe</strong> : le validateur tourne après coup (non bloquant) pour alimenter la trace, mais la réponse diffusée reste celle de Max.</li>
+          <li><strong>enforce</strong> : comportement historique — retry puis fallback « Je ne peux pas l'affirmer… ». Tend à rendre Max plat si le RAG est faible.</li>
+        </ul>
+      </section>
+
       {hasChanges && (
         <div className="rounded-lg border border-yellow-700/50 bg-yellow-900/30 px-4 py-2 text-sm text-yellow-300">
-          ⚠️ Modifications non sauvegardées — cliquez sur “Sauvegarder” pour les persister.
+          ⚠️ Modifications non sauvegardées — cliquez sur "Sauvegarder" pour les persister.
         </div>
       )}
 

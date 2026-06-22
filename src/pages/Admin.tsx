@@ -109,6 +109,7 @@ export default function Admin() {
   const [ragResults, setRagResults] = useState<any[] | null>(null);
   const [ragSearching, setRagSearching] = useState(false);
   const [ragError, setRagError] = useState<string | null>(null);
+  const [ragCharacterFilter, setRagCharacterFilter] = useState<string>("all"); // "all" | character.id
   const [characters, setCharacters] = useState<any[]>([]);
   const [editingChar, setEditingChar] = useState<any | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
@@ -229,11 +230,17 @@ export default function Admin() {
     setSavingChar(false);
   }
 
-  async function triggerSync(opts: { wipeAll?: boolean } = {}) {
+  async function triggerSync(opts: { wipeAll?: boolean; mode?: "full" | "rag_only" | "fields_only" } = {}) {
     setSyncing(true);
     setSyncReport(null);
+    const mode = opts.mode || "rag_only";
     try {
-      toast.info(opts.wipeAll ? "Wipe & rebuild RAG…" : "Sync Notion…");
+      const label = opts.wipeAll
+        ? "Wipe & rebuild RAG…"
+        : mode === "rag_only" ? "Sync RAG (pages Notion)…"
+        : mode === "fields_only" ? "Sync champs personnages…"
+        : "Sync complète (RAG + champs)…";
+      toast.info(label);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 180000);
       const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
@@ -245,15 +252,16 @@ export default function Admin() {
             videos: AVA_NOTION_DATABASES.videos,
           },
           wipe_all: !!opts.wipeAll,
+          mode,
         }),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      setSyncReport({ ...data, synced_at: new Date().toISOString() });
+      setSyncReport({ ...data, synced_at: new Date().toISOString(), mode });
       clearSystemPromptCache();
-      toast.success(`Sync OK : ${data.characters_synced} personnage(s), ${data.total_embeddings_in_db} embeddings total`);
+      toast.success(`Sync OK (${mode}) : ${data.characters_synced} personnage(s), ${data.total_embeddings_in_db} embeddings total`);
       loadEmbeddings();
     } catch (err: any) {
       const msg = err.name === "AbortError" ? "Timeout (>180s)" : err.message;
@@ -268,10 +276,11 @@ export default function Admin() {
     setRagSearching(true);
     setRagResults(null);
     try {
+      const characterId = ragCharacterFilter === "all" ? null : ragCharacterFilter;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: ragQuery, match_count: 10, match_threshold: 0.2 }),
+        body: JSON.stringify({ query: ragQuery, match_count: 10, match_threshold: 0.2, character_id: characterId }),
       });
       const raw = await res.text();
       let data: any = {};
@@ -441,19 +450,32 @@ export default function Admin() {
               <p className="text-sm text-muted-foreground mb-3">
                 Teste la recherche sémantique en envoyant une requête au pipeline RAG.
               </p>
-              <div className="flex gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4">
+                <select
+                  value={ragCharacterFilter}
+                  onChange={(e) => setRagCharacterFilter(e.target.value)}
+                  className="bg-muted/30 border rounded px-2 py-2 text-sm"
+                >
+                  <option value="all">Tous les personnages (+ partagé)</option>
+                  {characters.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
                 <input
                   type="text"
                   value={ragQuery}
                   onChange={(e) => setRagQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && testRAG()}
                   placeholder="Ex: famille de Max, virus, chalet de montagne..."
-                  className="flex-1 bg-muted/30 border rounded px-3 py-2 text-sm"
+                  className="flex-1 min-w-[260px] bg-muted/30 border rounded px-3 py-2 text-sm"
                 />
                 <Button onClick={testRAG} disabled={ragSearching || !ragQuery.trim()}>
                   {ragSearching ? "Recherche..." : "Chercher"}
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Le scoping par personnage reproduit ce que voit Max en conversation : seuls les chunks de ce personnage (et les chunks partagés à <code>character_id = NULL</code>) sont retournés.
+              </p>
 
               {ragError && (
                 <div className="border border-destructive/50 bg-destructive/10 rounded-lg p-3 mb-4">
@@ -469,15 +491,20 @@ export default function Admin() {
               {ragResults && !ragError && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">{ragResults.length} résultat(s)</p>
-                  {ragResults.map((m: any, i: number) => (
-                    <div key={m.id} className="border rounded-lg p-3 mb-3">
-                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                        <span>#{i + 1} — {m.source_table}</span>
-                        <span>Similarité: {(m.similarity * 100).toFixed(1)}%</span>
+                  {ragResults.map((m: any, i: number) => {
+                    const charName = m.character_id
+                      ? (characters.find((c) => c.id === m.character_id)?.name || `char ${String(m.character_id).slice(0, 8)}`)
+                      : "(partagé — character_id NULL)";
+                    return (
+                      <div key={m.id} className="border rounded-lg p-3 mb-3">
+                        <div className="flex justify-between text-xs text-muted-foreground mb-1 gap-2 flex-wrap">
+                          <span>#{i + 1} — <strong className="text-foreground">{charName}</strong> <span className="opacity-60">· {m.source_table}</span></span>
+                          <span>Similarité: {(m.similarity * 100).toFixed(1)}%</span>
+                        </div>
+                        <pre className="text-sm whitespace-pre-wrap">{m.content}</pre>
                       </div>
-                      <pre className="text-sm whitespace-pre-wrap">{m.content}</pre>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -570,16 +597,20 @@ export default function Admin() {
                 </div>
               </div>
               <div className="flex gap-3 flex-wrap">
-                <Button onClick={() => triggerSync()} disabled={syncing} size="lg">
-                  {syncing ? "Sync en cours…" : "Sync incrémental"}
+                <Button onClick={() => triggerSync({ mode: "rag_only" })} disabled={syncing} size="lg">
+                  {syncing ? "Sync en cours…" : "Sync RAG (pages Notion)"}
                 </Button>
-                <Button onClick={() => triggerSync({ wipeAll: true })} disabled={syncing} size="lg" variant="destructive">
+                <Button onClick={() => triggerSync({ mode: "full" })} disabled={syncing} size="lg" variant="outline">
+                  {syncing ? "Sync en cours…" : "Sync complète (RAG + champs)"}
+                </Button>
+                <Button onClick={() => triggerSync({ wipeAll: true, mode: "full" })} disabled={syncing} size="lg" variant="destructive">
                   {syncing ? "Sync en cours…" : "⚠️ Wipe & rebuild RAG"}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                « Wipe & rebuild » supprime tous les embeddings puis reconstruit depuis zéro.
-                À utiliser après un changement majeur dans Notion ou un changement de provider d'embeddings.
+                <strong>Sync RAG</strong> (par défaut) ne touche QUE les embeddings du corps des pages Notion — les champs éditoriaux des personnages restent intacts.
+                <br/><strong>Sync complète</strong> re-synchronise aussi les 7 champs éditoriaux + le résumé de situation (équivalent à un « Resync » par personnage pour tous d'un coup).
+                <br/><strong>Wipe & rebuild</strong> supprime tous les embeddings puis reconstruit depuis zéro — à utiliser après un changement de provider d'embeddings.
               </p>
 
               {syncReport && !syncReport.error && (
