@@ -291,6 +291,71 @@ async function generateValidatedMaxResponse(input: MaxAgentInput): Promise<Valid
   let max_ms = 0;
   let validator_ms = 0;
 
+  const validatorMode = (() => {
+    try { return getAntiHallucinationValidatorSettings().mode; } catch { return "enforce" as const; }
+  })();
+
+  // Mode "off" : on saute totalement le validateur (zéro latence, zéro fallback).
+  if (validatorMode === "off") {
+    const maxStart = performance.now();
+    const { response } = await simulateMaxResponse(input);
+    max_ms = performance.now() - maxStart;
+    return {
+      response,
+      validation: {
+        attempts: 1,
+        regenerated: false,
+        finalStatus: "passed",
+        reports: [{
+          attempt: 1,
+          response,
+          compliant: true,
+          summary: "Validateur désactivé (mode=off).",
+          violations: [],
+          safe_points: ["Validateur off"],
+        }],
+      },
+      timings: { max_ms: Math.round(max_ms), validator_ms: 0 },
+    };
+  }
+
+  // Mode "observe" : on génère Max, on lance le validateur en background pour la trace,
+  // mais on diffuse TOUJOURS la réponse originale (jamais de fallback).
+  if (validatorMode === "observe") {
+    const maxStart = performance.now();
+    const { response } = await simulateMaxResponse(input);
+    max_ms = performance.now() - maxStart;
+    // Lancement non bloquant pour alimenter la trace, sans toucher au retour.
+    validateAttempt(input, response).then((v) => {
+      reports.push({
+        attempt: 1,
+        response,
+        compliant: v.compliant,
+        summary: v.summary,
+        violations: v.violations,
+        safe_points: v.safe_points,
+      });
+    }).catch(() => {});
+    return {
+      response,
+      validation: {
+        attempts: 1,
+        regenerated: false,
+        finalStatus: "passed",
+        reports: [{
+          attempt: 1,
+          response,
+          compliant: true,
+          summary: "Validateur en mode observe (non bloquant).",
+          violations: [],
+          safe_points: ["Validateur observe"],
+        }],
+      },
+      timings: { max_ms: Math.round(max_ms), validator_ms: 0 },
+    };
+  }
+
+  // Mode "enforce" : comportement historique (retry + fallback).
   for (let attempt = 1; attempt <= MAX_VALIDATION_RETRIES + 1; attempt++) {
     const attemptInput = buildAttemptInput(input, reports);
     const maxStart = performance.now();
