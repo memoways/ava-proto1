@@ -92,6 +92,22 @@ export async function loadCharacterPromptByName(name: string): Promise<Character
   return prompt;
 }
 
+const idByNameCache = new Map<string, string>();
+/** Resolve the characters.id row from a display name (case-insensitive). Cached in-memory. */
+export async function resolveCharacterIdByName(name: string): Promise<string | null> {
+  if (!name) return null;
+  const key = name.trim().toLowerCase();
+  if (idByNameCache.has(key)) return idByNameCache.get(key)!;
+  const { data } = await supabase
+    .from("characters")
+    .select("id, name")
+    .ilike("name", name)
+    .maybeSingle();
+  const id = (data as any)?.id || null;
+  if (id) idByNameCache.set(key, id);
+  return id;
+}
+
 export async function saveCharacterPrompt(
   characterId: string,
   partial: Partial<Omit<CharacterPrompt, "character_id" | "name" | "updated_at">>,
