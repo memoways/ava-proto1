@@ -365,8 +365,11 @@ serve(async (req) => {
 
     // ========== SYNC CHARACTERS ==========
     const perCharacter: any[] = [];
+    const mode: "full" | "fields_only" | "rag_only" = body.mode || "full";
+    const doFields = mode === "full" || mode === "fields_only";
+    const doRag = mode === "full" || mode === "rag_only";
     if (charactersDbId) {
-      console.log('[sync-notion] Syncing characters DB:', charactersDbId);
+      console.log(`[sync-notion] Syncing characters DB: ${charactersDbId} (mode=${mode})`);
       const pages = await fetchNotionDatabase(charactersDbId);
       const filtered = body.only_notion_id ? pages.filter((p) => p.id === body.only_notion_id) : pages;
 
@@ -379,22 +382,23 @@ serve(async (req) => {
         continue;
       }
 
-      const pageContent = await fetchPageContent(page.id);
+      // Page content is only needed when we touch RAG or generate summary (fields mode includes summary).
+      const pageContent = (doRag || doFields) ? await fetchPageContent(page.id) : '';
       const resume = extractRichText(props['Résumé']);
       const archetype = extractSelect(props['Archétype narratif']) || '';
       const mbti = extractSelect(props['Type MBTI']) || '';
       const genre = extractSelect(props['Genre']);
 
-      console.log(`[sync-notion] "${name}": page=${pageContent.length} chars, archetype=${archetype}`);
+      console.log(`[sync-notion] "${name}": page=${pageContent.length} chars, archetype=${archetype}, mode=${mode}`);
 
-      const charRecord = {
+      const charRecord: Record<string, unknown> = {
         notion_id: page.id,
         name,
-        backstory: pageContent || resume,
         personality: `${archetype}${mbti ? ` - ${mbti}` : ''}`.trim(),
         branch: genre === 'Femme' ? 'female' : 'male',
         updated_at: new Date().toISOString(),
       };
+      if (doRag) charRecord.backstory = pageContent || resume;
       const { data: charRow, error: charErr } = await supabase
         .from('characters')
         .upsert(charRecord, { onConflict: 'notion_id' })
@@ -405,52 +409,59 @@ serve(async (req) => {
         continue;
       }
 
-      const promptFields = extractPromptFields(props);
-      const filledCount = Object.values(promptFields).filter((v) => v && v.trim()).length;
-      const situationSummary = await generateSituationSummary(name, pageContent);
+      let filledCount = 0;
+      let situationSummary = '';
+      if (doFields) {
+        const promptFields = extractPromptFields(props);
+        filledCount = Object.values(promptFields).filter((v) => v && v.trim()).length;
+        situationSummary = await generateSituationSummary(name, pageContent);
 
-      const { error: promptErr } = await supabase
-        .from('character_prompts')
-        .upsert(
-          {
-            character_id: charRow.id,
-            ...promptFields,
-            situation_summary: situationSummary,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'character_id' },
-        );
-      if (promptErr) console.error(`[sync-notion] character_prompts upsert error for ${name}:`, promptErr);
-
-      if (!wipedAll) {
-        await supabase
-          .from('embeddings')
-          .delete()
-          .eq('source_table', 'characters')
-          .eq('character_id', charRow.id);
+        const { error: promptErr } = await supabase
+          .from('character_prompts')
+          .upsert(
+            {
+              character_id: charRow.id,
+              ...promptFields,
+              situation_summary: situationSummary,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'character_id' },
+          );
+        if (promptErr) console.error(`[sync-notion] character_prompts upsert error for ${name}:`, promptErr);
       }
 
       let chunksCreated = 0;
-      if (pageContent.trim().length >= 10) {
-        const headerPrefix = `Personnage: ${name}${archetype ? ` | Archétype: ${archetype}` : ''}`;
-        const chunks = chunkText(pageContent);
-        for (let i = 0; i < chunks.length; i++) {
-          const chunkContent = `${headerPrefix} | Partie ${i + 1}/${chunks.length}\n${chunks[i]}`;
-          const emb = await generateEmbedding(chunkContent);
-          const payload = buildEmbeddingPayload(emb, charRow.id);
-          await supabase.from('embeddings').insert({
-            source_table: 'characters',
-            source_id: charRow.id,
-            content: chunkContent,
-            ...payload,
-          });
-          chunksCreated++;
+      if (doRag) {
+        if (!wipedAll) {
+          await supabase
+            .from('embeddings')
+            .delete()
+            .eq('source_table', 'characters')
+            .eq('character_id', charRow.id);
+        }
+
+        if (pageContent.trim().length >= 10) {
+          const headerPrefix = `Personnage: ${name}${archetype ? ` | Archétype: ${archetype}` : ''}`;
+          const chunks = chunkText(pageContent);
+          for (let i = 0; i < chunks.length; i++) {
+            const chunkContent = `${headerPrefix} | Partie ${i + 1}/${chunks.length}\n${chunks[i]}`;
+            const emb = await generateEmbedding(chunkContent);
+            const payload = buildEmbeddingPayload(emb, charRow.id);
+            await supabase.from('embeddings').insert({
+              source_table: 'characters',
+              source_id: charRow.id,
+              content: chunkContent,
+              ...payload,
+            });
+            chunksCreated++;
+          }
         }
       }
 
       perCharacter.push({
         name,
         id: charRow.id,
+        mode,
         page_chars: pageContent.length,
         chunks_created: chunksCreated,
         summary_chars: situationSummary.length,
