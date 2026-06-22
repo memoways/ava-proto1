@@ -22,6 +22,13 @@ interface SyncRequest {
   wipe_all?: boolean;
   /** Optional: only sync this single character by Notion page ID. */
   only_notion_id?: string;
+  /**
+   * Character sync scope:
+   * - "full" (default) : prompts fields + RAG embeddings + situation_summary
+   * - "fields_only"    : only character_prompts fields + situation_summary (NO embeddings touched)
+   * - "rag_only"       : only re-embed page content (NO character_prompts touched)
+   */
+  mode?: "full" | "fields_only" | "rag_only";
 }
 
 // --- Notion property extractors ---
