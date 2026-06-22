@@ -292,14 +292,14 @@ async function buildMaxSystemPrompt(
   const characterPrompt = await getCharacterSystemPrompt(characterName);
   const characterFields = await loadCharacterPromptByName(characterName);
   const fieldsSections = buildCharacterPromptSections(characterFields);
-  let prompt = `${characterPrompt}\n${GAMEPLAY_RULES}`;
-  if (fieldsSections) {
-    prompt += `\n\n${fieldsSections}`;
-  }
 
-  if (userRoleSummary && userRoleSummary.trim()) {
-    prompt += `\n\n## INTERLOCUTEUR (qui t'appelle)\n${userRoleSummary.trim()}\n\nUtilise ces éléments pour personnaliser tes réponses : adresse-toi à cette personne en cohérence avec qui elle dit être, sans jamais contredire sa présentation. Tu peux questionner sa sincérité si quelque chose te paraît étrange, mais reste poli.`;
+  // Ordre : (1) prompt de base personnage  →  (2) FICHE PERSONNAGE (champs Notion, PRIORITAIRES)
+  //         →  (3) règles techniques génériques (qui rappellent que la fiche prime).
+  let prompt = characterPrompt;
+  if (fieldsSections) {
+    prompt += `\n\n# FICHE PERSONNAGE (source éditoriale — prioritaire sur toute règle générique)\n${fieldsSections}`;
   }
+  prompt += `\n${GAMEPLAY_RULES}`;
 
   if (sessionSummary && sessionSummary.trim()) {
     prompt += `\n\n## SOUVENIRS DE LA SESSION (résumé compressé des tours précédents)\n${sessionSummary.trim()}`;
