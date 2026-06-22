@@ -72,12 +72,16 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   let matchesCount = 0;
   try {
     const recent = input.conversationHistory.slice(-4).map((m) => m.content).join(" ");
+    // Cloisonnement RAG : on ne récupère QUE les chunks du personnage courant
+    // (les chunks shared/storyworld avec character_id NULL restent visibles).
+    const characterId = await resolveCharacterIdByName(input.characterName || "Max");
     const matches = await queryRAG(
       input.userMessage,
       recent,
       gameplay?.RAG_TOP_K ?? 5,
       undefined,
       {
+        characterId,
         rerank: gameplay?.RAG_RERANK_ENABLED,
         retrieveK: gameplay?.RAG_RETRIEVE_K,
         provider: gameplay?.RAG_EMBEDDING_PROVIDER,
