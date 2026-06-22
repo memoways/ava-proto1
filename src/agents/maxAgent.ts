@@ -301,6 +301,11 @@ async function buildMaxSystemPrompt(
   }
   prompt += `\n${GAMEPLAY_RULES}`;
 
+  if (userRoleSummary && userRoleSummary.trim()) {
+    prompt += `\n\n## INTERLOCUTEUR (qui t'appelle)\n${userRoleSummary.trim()}\n\nUtilise ces éléments pour personnaliser tes réponses : adresse-toi à cette personne en cohérence avec qui elle dit être, sans jamais contredire sa présentation.`;
+  }
+
+
   if (sessionSummary && sessionSummary.trim()) {
     prompt += `\n\n## SOUVENIRS DE LA SESSION (résumé compressé des tours précédents)\n${sessionSummary.trim()}`;
   }
