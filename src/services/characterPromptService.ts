@@ -10,6 +10,7 @@ export interface CharacterPrompt {
   dynamique_conversation: string;
   sujets_sensibles: string;
   profondeur_par_niveau: string;
+  timeline: string;
   situation_summary: string;
   updated_at?: string;
 }

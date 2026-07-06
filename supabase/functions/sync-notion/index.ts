@@ -70,6 +70,7 @@ const PROMPT_FIELD_ALIASES: Record<string, string[]> = {
   dynamique_conversation: ["Dynamique de la conversation"],
   sujets_sensibles: ["Sujets sensibles"],
   profondeur_par_niveau: ["Profondeur par niveau"],
+  timeline: ["Timeline", "Chronologie", "Historique"],
 };
 
 function extractPromptFields(props: Record<string, any>): Record<string, string> {
