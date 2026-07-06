@@ -10,6 +10,7 @@ export interface CharacterPrompt {
   dynamique_conversation: string;
   sujets_sensibles: string;
   profondeur_par_niveau: string;
+  timeline: string;
   situation_summary: string;
   updated_at?: string;
 }
@@ -26,6 +27,7 @@ export const CHARACTER_PROMPT_FIELDS: Array<{
   { key: "dynamique_conversation", label: "Dynamique de la conversation", hint: "Comment la conversation se déroule, rythme, retenue." },
   { key: "sujets_sensibles", label: "Sujets sensibles", hint: "Sujets délicats et manière de les aborder ou esquiver." },
   { key: "profondeur_par_niveau", label: "Profondeur par niveau", hint: "Ce qui peut être révélé / abordé selon le niveau de confiance." },
+  { key: "timeline", label: "Timeline", hint: "Chronologie / historique des événements marquants du personnage. Aide à situer sa mémoire par rapport au moment présent." },
 ];
 
 const EMPTY: Omit<CharacterPrompt, "character_id" | "name" | "updated_at"> = {
@@ -36,6 +38,7 @@ const EMPTY: Omit<CharacterPrompt, "character_id" | "name" | "updated_at"> = {
   dynamique_conversation: "",
   sujets_sensibles: "",
   profondeur_par_niveau: "",
+  timeline: "",
   situation_summary: "",
 };
 
@@ -72,6 +75,7 @@ export async function loadCharacterPrompt(characterId: string): Promise<Characte
     dynamique_conversation: row.dynamique_conversation || "",
     sujets_sensibles: row.sujets_sensibles || "",
     profondeur_par_niveau: row.profondeur_par_niveau || "",
+    timeline: row.timeline || "",
     situation_summary: row.situation_summary || "",
     updated_at: row.updated_at,
   };
@@ -164,7 +168,7 @@ export async function listCharactersWithPrompts(): Promise<CharacterListEntry[]>
   return chars.map((c: any) => {
     const p = byId.get(c.id);
     const len = p
-      ? [p.identite_fondamentale, p.qui_tu_es, p.ce_que_tu_ne_fais_jamais, p.ce_que_tu_sais_utilisateur, p.dynamique_conversation, p.sujets_sensibles, p.profondeur_par_niveau]
+      ? [p.identite_fondamentale, p.qui_tu_es, p.ce_que_tu_ne_fais_jamais, p.ce_que_tu_sais_utilisateur, p.dynamique_conversation, p.sujets_sensibles, p.profondeur_par_niveau, p.timeline]
           .reduce((s: number, v: string) => s + (v?.length || 0), 0)
       : 0;
     return {
@@ -182,6 +186,7 @@ export function buildCharacterPromptSections(p: CharacterPrompt | null): string 
   const sections: Array<[string, string]> = [
     // Situation actuelle d'abord : c'est le résumé factuel le plus dense (lieu, âge, famille…).
     ["SITUATION ACTUELLE (canon — faits vrais que tu peux énoncer librement)", p.situation_summary],
+    ["TIMELINE (chronologie des événements marquants — repère-toi ici avant de répondre à toute question sur ton passé ou le contexte temporel)", p.timeline],
     ["IDENTITÉ FONDAMENTALE", p.identite_fondamentale],
     ["QUI TU ES", p.qui_tu_es],
     ["CE QUE TU NE FAIS JAMAIS", p.ce_que_tu_ne_fais_jamais],

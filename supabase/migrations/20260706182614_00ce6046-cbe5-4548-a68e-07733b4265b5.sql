@@ -1,0 +1,1 @@
+ALTER TABLE public.character_prompts ADD COLUMN IF NOT EXISTS timeline text NOT NULL DEFAULT '';

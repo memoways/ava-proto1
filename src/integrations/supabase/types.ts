@@ -89,6 +89,7 @@ export type Database = {
           qui_tu_es: string
           situation_summary: string
           sujets_sensibles: string
+          timeline: string
           updated_at: string
         }
         Insert: {
@@ -102,6 +103,7 @@ export type Database = {
           qui_tu_es?: string
           situation_summary?: string
           sujets_sensibles?: string
+          timeline?: string
           updated_at?: string
         }
         Update: {
@@ -115,6 +117,7 @@ export type Database = {
           qui_tu_es?: string
           situation_summary?: string
           sujets_sensibles?: string
+          timeline?: string
           updated_at?: string
         }
         Relationships: [
