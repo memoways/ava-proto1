@@ -27,6 +27,7 @@ export const CHARACTER_PROMPT_FIELDS: Array<{
   { key: "dynamique_conversation", label: "Dynamique de la conversation", hint: "Comment la conversation se déroule, rythme, retenue." },
   { key: "sujets_sensibles", label: "Sujets sensibles", hint: "Sujets délicats et manière de les aborder ou esquiver." },
   { key: "profondeur_par_niveau", label: "Profondeur par niveau", hint: "Ce qui peut être révélé / abordé selon le niveau de confiance." },
+  { key: "timeline", label: "Timeline", hint: "Chronologie / historique des événements marquants du personnage. Aide à situer sa mémoire par rapport au moment présent." },
 ];
 
 const EMPTY: Omit<CharacterPrompt, "character_id" | "name" | "updated_at"> = {
@@ -37,6 +38,7 @@ const EMPTY: Omit<CharacterPrompt, "character_id" | "name" | "updated_at"> = {
   dynamique_conversation: "",
   sujets_sensibles: "",
   profondeur_par_niveau: "",
+  timeline: "",
   situation_summary: "",
 };
 
@@ -73,6 +75,7 @@ export async function loadCharacterPrompt(characterId: string): Promise<Characte
     dynamique_conversation: row.dynamique_conversation || "",
     sujets_sensibles: row.sujets_sensibles || "",
     profondeur_par_niveau: row.profondeur_par_niveau || "",
+    timeline: row.timeline || "",
     situation_summary: row.situation_summary || "",
     updated_at: row.updated_at,
   };
