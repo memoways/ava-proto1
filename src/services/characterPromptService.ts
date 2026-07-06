@@ -186,6 +186,7 @@ export function buildCharacterPromptSections(p: CharacterPrompt | null): string 
   const sections: Array<[string, string]> = [
     // Situation actuelle d'abord : c'est le résumé factuel le plus dense (lieu, âge, famille…).
     ["SITUATION ACTUELLE (canon — faits vrais que tu peux énoncer librement)", p.situation_summary],
+    ["TIMELINE (chronologie des événements marquants — repère-toi ici avant de répondre à toute question sur ton passé ou le contexte temporel)", p.timeline],
     ["IDENTITÉ FONDAMENTALE", p.identite_fondamentale],
     ["QUI TU ES", p.qui_tu_es],
     ["CE QUE TU NE FAIS JAMAIS", p.ce_que_tu_ne_fais_jamais],
