@@ -168,7 +168,7 @@ export async function listCharactersWithPrompts(): Promise<CharacterListEntry[]>
   return chars.map((c: any) => {
     const p = byId.get(c.id);
     const len = p
-      ? [p.identite_fondamentale, p.qui_tu_es, p.ce_que_tu_ne_fais_jamais, p.ce_que_tu_sais_utilisateur, p.dynamique_conversation, p.sujets_sensibles, p.profondeur_par_niveau]
+      ? [p.identite_fondamentale, p.qui_tu_es, p.ce_que_tu_ne_fais_jamais, p.ce_que_tu_sais_utilisateur, p.dynamique_conversation, p.sujets_sensibles, p.profondeur_par_niveau, p.timeline]
           .reduce((s: number, v: string) => s + (v?.length || 0), 0)
       : 0;
     return {
