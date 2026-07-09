@@ -19,9 +19,14 @@ import {
   loadHumeSettingsFromDB,
   saveHumeSettingsToDB,
   resetHumeSettings,
+  getGradiumSettings,
+  loadGradiumSettingsFromDB,
+  saveGradiumSettingsToDB,
+  resetGradiumSettings,
   INWORLD_MODELS,
   type InworldSettings,
   type HumeSettings,
+  type GradiumSettings,
 } from "@/services/tts/providerSettings";
 import {
   getTTSSettings,
@@ -53,6 +58,11 @@ export default function TTSConfigTab() {
   const [huSaved, setHuSaved] = useState<HumeSettings>(getHumeSettings());
   const [savingHu, setSavingHu] = useState(false);
 
+  // Gradium settings
+  const [grSettings, setGrSettings] = useState<GradiumSettings>(getGradiumSettings());
+  const [grSaved, setGrSaved] = useState<GradiumSettings>(getGradiumSettings());
+  const [savingGr, setSavingGr] = useState(false);
+
   // Test
   const [testing, setTesting] = useState<TTSProviderId | null>(null);
 
@@ -61,11 +71,13 @@ export default function TTSConfigTab() {
     loadTTSSettingsFromDB().then((s) => { setElSettings(s); setElSaved(s); });
     loadInworldSettingsFromDB().then((s) => { setIwSettings(s); setIwSaved(s); });
     loadHumeSettingsFromDB().then((s) => { setHuSettings(s); setHuSaved(s); });
+    loadGradiumSettingsFromDB().then((s) => { setGrSettings(s); setGrSaved(s); });
   }, []);
 
   const elHasChanges = JSON.stringify(elSettings) !== JSON.stringify(elSaved);
   const iwHasChanges = JSON.stringify(iwSettings) !== JSON.stringify(iwSaved);
   const huHasChanges = JSON.stringify(huSettings) !== JSON.stringify(huSaved);
+  const grHasChanges = JSON.stringify(grSettings) !== JSON.stringify(grSaved);
 
   async function handleActivate(id: TTSProviderId) {
     setActiveProviderState(id);
@@ -151,6 +163,26 @@ export default function TTSConfigTab() {
     setHuSettings(d); setHuSaved(d);
     toast.success("Hume réinitialisé");
   }
+
+  // Gradium helpers
+  function updateGr(patch: Partial<GradiumSettings>) {
+    const current = { ...grSettings, ...patch };
+    localStorage.setItem("ava_tts_settings_gradium", JSON.stringify(current));
+    setGrSettings(current);
+  }
+  async function saveGr() {
+    setSavingGr(true);
+    await saveGradiumSettingsToDB(grSettings);
+    setGrSaved(grSettings);
+    toast.success("Gradium sauvegardé ✓");
+    setSavingGr(false);
+  }
+  function resetGr() {
+    const d = resetGradiumSettings();
+    setGrSettings(d); setGrSaved(d);
+    toast.success("Gradium réinitialisé");
+  }
+
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -409,6 +441,70 @@ export default function TTSConfigTab() {
               className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="fr" />
           </label>
         </div>
+      </section>
+
+      {/* ===== Gradium panel ===== */}
+      <section className="border rounded-lg p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-base">🎙️ Gradium TTS</h3>
+            <p className="text-xs text-muted-foreground">REST batch — 237 voix, latence faible</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={resetGr}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
+            <Button size="sm" onClick={() => testProvider("gradium")} disabled={testing === "gradium"}>
+              {testing === "gradium" ? "..." : "🔊 Tester"}
+            </Button>
+            <Button size="sm" onClick={saveGr} disabled={savingGr || !grHasChanges}
+              className={grHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
+              <Save className="w-3 h-3 mr-1" />{savingGr ? "..." : "Sauver"}
+            </Button>
+          </div>
+        </div>
+
+        {grHasChanges && (
+          <div className="bg-yellow-900/30 border border-yellow-700/50 rounded px-3 py-1 text-xs text-yellow-300">
+            ⚠️ Modifications Gradium non sauvegardées
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-muted-foreground">Voice ID</span>
+            <input value={grSettings.voiceId}
+              onChange={(e) => updateGr({ voiceId: e.target.value })}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="YTpq7expH9539ERJ" />
+            <span className="block text-xs text-muted-foreground/60">
+              Voir <a href="https://docs.gradium.ai/guides/voices/all-voices" target="_blank" rel="noreferrer" className="underline">catalogue Gradium (237 voix)</a>
+            </span>
+          </label>
+
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-muted-foreground">Format audio</span>
+            <select value={grSettings.outputFormat}
+              onChange={(e) => updateGr({ outputFormat: e.target.value as GradiumSettings["outputFormat"] })}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm">
+              <option value="mp3">MP3</option>
+              <option value="wav">WAV</option>
+              <option value="opus">Opus</option>
+              <option value="pcm">PCM</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <SliderRow label="Vitesse" value={grSettings.speed} min={0.5} max={2} step={0.05}
+            onChange={(v) => updateGr({ speed: v })} />
+          <SliderRow label="Temperature" value={grSettings.temperature} min={0} max={1.5} step={0.05}
+            onChange={(v) => updateGr({ temperature: v })} />
+        </div>
+
+        <label className="space-y-1 text-sm block">
+          <span className="font-medium text-muted-foreground">Langue</span>
+          <input value={grSettings.language}
+            onChange={(e) => updateGr({ language: e.target.value.trim().toLowerCase() || "fr" })}
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="fr" />
+        </label>
       </section>
     </div>
   );

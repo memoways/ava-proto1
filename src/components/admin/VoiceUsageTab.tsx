@@ -27,6 +27,7 @@ const COST_PER_1K_CHARS_USD: Record<TTSProviderId, number> = {
   elevenlabs: 0.30,
   hume: 0.20,
   inworld: 0.005,
+  gradium: 0.15,
 };
 
 const fmtUsd = (v: number) =>

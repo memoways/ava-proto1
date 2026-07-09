@@ -1,4 +1,4 @@
-export type STTProviderId = "deepgram" | "gamilab" | "openai_whisper" | "assemblyai";
+export type STTProviderId = "deepgram" | "gamilab" | "openai_whisper" | "assemblyai" | "gradium";
 
 export type STTProviderStatus = "ready" | "missing_config" | "error" | "disabled";
 

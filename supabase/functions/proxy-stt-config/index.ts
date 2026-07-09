@@ -22,6 +22,7 @@ serve(async (req) => {
         gamilab: Boolean(gamilabPortalId && gamilabPortalToken),
         openai_whisper: Boolean(Deno.env.get("OPENAI_API_KEY")),
         assemblyai: Boolean(Deno.env.get("ASSEMBLYAI_API_KEY")),
+        gradium: Boolean(Deno.env.get("GRADIUM_API_KEY")),
       },
     }),
     {

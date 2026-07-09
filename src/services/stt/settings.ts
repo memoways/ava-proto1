@@ -8,6 +8,7 @@ export const STT_PROVIDER_IDS: STTProviderId[] = [
   "gamilab",
   "openai_whisper",
   "assemblyai",
+  "gradium",
 ];
 
 export const DEFAULT_STT_SETTINGS: STTSettings = {
