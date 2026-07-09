@@ -17,6 +17,7 @@ const DEFAULT_RUNTIME_CONFIG: STTRuntimeConfig = {
     gamilab: false,
     openai_whisper: false,
     assemblyai: false,
+    gradium: false,
   },
 };
 
@@ -41,6 +42,7 @@ export async function getSTTRuntimeConfig(): Promise<STTRuntimeConfig> {
         gamilab: Boolean(data.configured?.gamilab ?? DEFAULT_RUNTIME_CONFIG.configured.gamilab),
         openai_whisper: Boolean(data.configured?.openai_whisper ?? DEFAULT_RUNTIME_CONFIG.configured.openai_whisper),
         assemblyai: Boolean(data.configured?.assemblyai ?? DEFAULT_RUNTIME_CONFIG.configured.assemblyai),
+        gradium: Boolean(data.configured?.gradium ?? DEFAULT_RUNTIME_CONFIG.configured.gradium),
       },
     };
     return cachedConfig;
@@ -77,6 +79,11 @@ export async function getSTTProviderRuntimeStatuses(): Promise<Record<STTProvide
       provider: "assemblyai",
       status: config.configured.assemblyai ? "ready" : "missing_config",
       message: config.configured.assemblyai ? "Prêt via proxy-stt-assemblyai (Universal Streaming v3)" : "Secret ASSEMBLYAI_API_KEY requis",
+    },
+    gradium: {
+      provider: "gradium",
+      status: config.configured.gradium ? "ready" : "missing_config",
+      message: config.configured.gradium ? "Prêt via proxy-stt-gradium (REST batch)" : "Secret GRADIUM_API_KEY requis",
     },
   };
 }

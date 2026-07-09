@@ -1,6 +1,7 @@
 import { DeepgramSTT } from "@/services/deepgramSTT";
 import { debugLogger } from "@/services/debugLogger";
 import { GamilabSTT } from "./providers/gamilabSTT";
+import { GradiumSTT } from "./providers/gradiumSTT";
 import { getSTTRuntimeConfig } from "./runtimeConfig";
 import { loadSTTSettingsFromDB } from "./settings";
 import type { STTCreateOptions, STTProviderId, STTSession, TranscriptCallback } from "./types";
@@ -30,6 +31,7 @@ export async function resolveRuntimeSTTProvider(providerId?: STTProviderId): Pro
 
   const config = await getSTTRuntimeConfig();
   if (selectedProvider === "gamilab" && config.configured.gamilab) return "gamilab";
+  if (selectedProvider === "gradium" && config.configured.gradium) return "gradium";
 
   debugLogger.log({
     service: "stt",
@@ -48,6 +50,10 @@ export async function createConfiguredSTT(
   if (provider === "gamilab") {
     void Promise.resolve(opts?.initialStream).then((stream) => stream?.getTracks().forEach((track) => track.stop())).catch(() => {});
     return new GamilabSTT(onTranscript, opts);
+  }
+  if (provider === "gradium") {
+    void Promise.resolve(opts?.initialStream).then((stream) => stream?.getTracks().forEach((track) => track.stop())).catch(() => {});
+    return new GradiumSTT(onTranscript, opts);
   }
   return createDeepgramSTT(onTranscript, opts);
 }

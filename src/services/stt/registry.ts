@@ -33,6 +33,14 @@ export const STT_PROVIDER_LIST: STTProviderDefinition[] = [
     expectedSecrets: ["ASSEMBLYAI_API_KEY"],
     implemented: true,
   },
+  {
+    id: "gradium",
+    label: "Gradium",
+    description: "STT Gradium (REST batch) — transcription haute qualité, faible latence.",
+    mode: "batch",
+    expectedSecrets: ["GRADIUM_API_KEY"],
+    implemented: true,
+  },
 ];
 
 export function getSTTProviderDefinition(providerId: STTProviderId): STTProviderDefinition;
