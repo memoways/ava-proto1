@@ -12,7 +12,7 @@
  *   4. Optionally add a proxy edge function under supabase/functions/proxy-tts-<name>/
  */
 
-export type TTSProviderId = "elevenlabs" | "inworld" | "hume";
+export type TTSProviderId = "elevenlabs" | "inworld" | "hume" | "gradium";
 
 /** Stitching context — most providers ignore it, ElevenLabs uses it for prosody continuity. */
 export interface TTSGenerateContext {

@@ -7,18 +7,21 @@ import type { TTSProvider, TTSProviderId } from "@/services/tts/types";
 import { elevenLabsProvider } from "@/services/tts/providers/elevenlabs";
 import { inworldProvider } from "@/services/tts/providers/inworld";
 import { humeProvider } from "@/services/tts/providers/hume";
+import { gradiumProvider } from "@/services/tts/providers/gradium";
 import { getActiveProviderId } from "@/services/tts/providerSettings";
 
 export const TTS_PROVIDERS: Record<TTSProviderId, TTSProvider> = {
   elevenlabs: elevenLabsProvider,
   inworld: inworldProvider,
   hume: humeProvider,
+  gradium: gradiumProvider,
 };
 
 export const TTS_PROVIDER_LIST: TTSProvider[] = [
   elevenLabsProvider,
   inworldProvider,
   humeProvider,
+  gradiumProvider,
 ];
 
 export function getActiveProvider(): TTSProvider {

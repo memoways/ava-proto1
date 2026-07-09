@@ -99,6 +99,48 @@ export function resetHumeSettings(): HumeSettings {
   return { ...humeDefaults };
 }
 
+// ---------------- Gradium ----------------
+
+export interface GradiumSettings {
+  voiceId: string;
+  outputFormat: "mp3" | "wav" | "opus" | "pcm";
+  speed: number;
+  temperature: number;
+  language: string;
+}
+
+const GRADIUM_KEY = "ava_tts_settings_gradium";
+
+const gradiumDefaults: GradiumSettings = {
+  voiceId: "YTpq7expH9539ERJ",
+  outputFormat: "mp3",
+  speed: 1,
+  temperature: 0.7,
+  language: "fr",
+};
+
+export function getGradiumSettings(): GradiumSettings {
+  try {
+    const stored = localStorage.getItem(GRADIUM_KEY);
+    if (stored) return { ...gradiumDefaults, ...JSON.parse(stored) };
+  } catch { /* ignore */ }
+  return { ...gradiumDefaults };
+}
+
+export async function loadGradiumSettingsFromDB(): Promise<GradiumSettings> {
+  return loadFromDB(GRADIUM_KEY, gradiumDefaults);
+}
+
+export async function saveGradiumSettingsToDB(settings: GradiumSettings): Promise<void> {
+  await saveToDB(GRADIUM_KEY, settings);
+}
+
+export function resetGradiumSettings(): GradiumSettings {
+  localStorage.removeItem(GRADIUM_KEY);
+  supabase.from("admin_settings" as never).delete().eq("key", GRADIUM_KEY).then(() => {});
+  return { ...gradiumDefaults };
+}
+
 // ---------------- Active provider selection ----------------
 
 import type { TTSProviderId } from "@/services/tts/types";
@@ -106,12 +148,14 @@ import type { TTSProviderId } from "@/services/tts/types";
 const ACTIVE_KEY = "ava_tts_active_provider";
 const DEFAULT_PROVIDER: TTSProviderId = "elevenlabs";
 
+const VALID_PROVIDERS: TTSProviderId[] = ["elevenlabs", "inworld", "hume", "gradium"];
+
 export function getActiveProviderId(): TTSProviderId {
   try {
     const stored = localStorage.getItem(ACTIVE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as { provider?: TTSProviderId };
-      if (parsed?.provider === "elevenlabs" || parsed?.provider === "inworld" || parsed?.provider === "hume") {
+      if (parsed?.provider && VALID_PROVIDERS.includes(parsed.provider)) {
         return parsed.provider;
       }
     }

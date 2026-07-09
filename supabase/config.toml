@@ -15,6 +15,13 @@ verify_jwt = false
 [functions.proxy-tts-hume]
 verify_jwt = false
 
+[functions.proxy-tts-gradium]
+verify_jwt = false
+
+[functions.proxy-stt-gradium]
+verify_jwt = false
+
+
 [functions.sync-notion]
 verify_jwt = false
 
