@@ -19,9 +19,14 @@ import {
   loadHumeSettingsFromDB,
   saveHumeSettingsToDB,
   resetHumeSettings,
+  getGradiumSettings,
+  loadGradiumSettingsFromDB,
+  saveGradiumSettingsToDB,
+  resetGradiumSettings,
   INWORLD_MODELS,
   type InworldSettings,
   type HumeSettings,
+  type GradiumSettings,
 } from "@/services/tts/providerSettings";
 import {
   getTTSSettings,
@@ -53,6 +58,11 @@ export default function TTSConfigTab() {
   const [huSaved, setHuSaved] = useState<HumeSettings>(getHumeSettings());
   const [savingHu, setSavingHu] = useState(false);
 
+  // Gradium settings
+  const [grSettings, setGrSettings] = useState<GradiumSettings>(getGradiumSettings());
+  const [grSaved, setGrSaved] = useState<GradiumSettings>(getGradiumSettings());
+  const [savingGr, setSavingGr] = useState(false);
+
   // Test
   const [testing, setTesting] = useState<TTSProviderId | null>(null);
 
@@ -61,11 +71,13 @@ export default function TTSConfigTab() {
     loadTTSSettingsFromDB().then((s) => { setElSettings(s); setElSaved(s); });
     loadInworldSettingsFromDB().then((s) => { setIwSettings(s); setIwSaved(s); });
     loadHumeSettingsFromDB().then((s) => { setHuSettings(s); setHuSaved(s); });
+    loadGradiumSettingsFromDB().then((s) => { setGrSettings(s); setGrSaved(s); });
   }, []);
 
   const elHasChanges = JSON.stringify(elSettings) !== JSON.stringify(elSaved);
   const iwHasChanges = JSON.stringify(iwSettings) !== JSON.stringify(iwSaved);
   const huHasChanges = JSON.stringify(huSettings) !== JSON.stringify(huSaved);
+  const grHasChanges = JSON.stringify(grSettings) !== JSON.stringify(grSaved);
 
   async function handleActivate(id: TTSProviderId) {
     setActiveProviderState(id);
