@@ -86,7 +86,7 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ### 2026-07-09 — Intégration de Gradium comme provider STT/TTS 🔷
 
-**Intent.** Le prototype dispose déjà de plusieurs backends STT (Deepgram, Gamilab, OpenAI Whisper, AssemblyAI) et TTS (ElevenLabs, Inworld, Hume), mais chacun a ses contraintes de latence, coût ou disponibilité. Gradius propose des API REST Speech-to-Text (batch, NDJSON) et Text-to-Speech (voix naturelles, 237 voix) avec une latence faible et un modèle économique clair. L'objectif est de proposer Gradium comme alternative dans les menus Admin et d'abstraire les appels via les Edge Functions.
+**Intent.** Le prototype dispose déjà de plusieurs backends STT (Deepgram, Gamilab, OpenAI Whisper, AssemblyAI) et TTS (ElevenLabs, Inworld, Hume), mais chacun a ses contraintes de latence, coût ou disponibilité. Gradium propose des API REST Speech-to-Text (batch, NDJSON) et Text-to-Speech (voix naturelles, 237 voix) avec une latence faible et un modèle économique clair. L'objectif est de proposer Gradium comme alternative dans les menus Admin et d'abstraire les appels via les Edge Functions.
 
 **Outcome.**
 1. **Edge Functions proxy** — création de `proxy-stt-gradium` (POST vers `api.gradium.ai/api/post/speech/asr`, agrégation des lignes NDJSON `type: text`) et `proxy-tts-gradium` (POST vers `api.gradium.ai/api/post/speech/tts` avec `only_audio=true`, retour du blob audio brut). Les deux utilisent la clé `GRADIUM_API_KEY` côté Edge Function (jamais exposée client).
