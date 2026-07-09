@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-06-22 (session 31 — audit Max hallucinations : mismatch nom DB, RAG enfin injecté, fin des esquives "Lausanne")
+> **Last Updated**: 2026-07-09 (session 32/33 — sync Notion Timeline + providers Gradium STT/TTS)
 
 ---
 
@@ -58,12 +58,54 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 | Deepgram | STT streaming avec VAD, provider input par défaut |
 | Gamilab | Provider STT/ASR live stratégique, préparé via Browser SDK |
 | ElevenLabs | TTS voix custom de Max (paramètres ajustables) |
+| Gradium | Provider STT batch + TTS REST alternatif (intégré via proxies Edge Functions) |
 | OpenAI | Embeddings text-embedding-3-small (1536 dim) |
 | Notion | Source de vérité éditoriale (contenus, personnages, règles) |
 
 ---
 
 ## Feature Chronicle
+
+### 2026-07-06 — Champ Timeline Notion : mémoire temporelle du personnage 🔷
+
+**Intent.** Max (et les autres personnages) mélangeaient le passé et le présent : ils pouvaient décrire des souvenirs comme s'ils se passaient maintenant, et inversement. La base Notion **Base Caractères AVA** a été enrichie d'une propriété **Timeline** pour définir, chronologiquement, l'historique des actions du personnage avant et pendant l'intrigue.
+
+**Outcome.**
+1. **Migration `character_prompts.timeline`** — nouvelle colonne `text NOT NULL DEFAULT ''` côté Lovable Cloud pour stocker le champ Timeline.
+2. **Sync Notion mise à jour** — `sync-notion` synchronise la propriété Notion `Timeline` (et ses alias `Chronologie`, `Historique`) dans `p.timeline`.
+3. **Injection dans le system prompt** — dans `buildCharacterPromptSections`, le bloc `CHRONOLOGIE / MÉMOIRE HISTORIQUE` est injecté juste sous `SITUATION ACTUELLE`, avant `IDENTITÉ FONDAMENTALE`. Il rappelle au personnage *« ce que tu as vécu / ce que tu sais du passé »*. Lors d'une question, Max se situe d'abord dans cette timeline, puis complète via le RAG.
+
+**Validation.**
+- Une resync Notion a été lancée : les fiches personnages doivent maintenant afficher le champ Timeline dans `CharacterPromptEditorPanel`.
+- En conversation, demander « Où en es-tu ? » ou « Que s'est-il passé avant ? » → Max aligne son propos sur la Timeline + RAG.
+
+**Why it matters.** Avant, le passé et le présent étaient plats dans le prompt : Max n'avait pas de repère temporel. Timeline crée une mémoire historique canonique que le personnage convoque en priorité, tout en laissant le RAG enrichir avec les détails. Cela réduit les anachronismes et les hallucinations temporelles.
+
+**Files.** `supabase/migrations/20260706182614_00ce6046-cbe5-4548-a68e-07733b4265b5.sql`, `src/integrations/supabase/types.ts`, `src/services/characterPromptService.ts`, `supabase/functions/sync-notion/index.ts`.
+
+---
+
+### 2026-07-09 — Intégration de Gradium comme provider STT/TTS 🔷
+
+**Intent.** Le prototype dispose déjà de plusieurs backends STT (Deepgram, Gamilab, OpenAI Whisper, AssemblyAI) et TTS (ElevenLabs, Inworld, Hume), mais chacun a ses contraintes de latence, coût ou disponibilité. Gradium propose des API REST Speech-to-Text (batch, NDJSON) et Text-to-Speech (voix naturelles, 237 voix) avec une latence faible et un modèle économique clair. L'objectif est de proposer Gradium comme alternative dans les menus Admin et d'abstraire les appels via les Edge Functions.
+
+**Outcome.**
+1. **Edge Functions proxy** — création de `proxy-stt-gradium` (POST vers `api.gradium.ai/api/post/speech/asr`, agrégation des lignes NDJSON `type: text`) et `proxy-tts-gradium` (POST vers `api.gradium.ai/api/post/speech/tts` avec `only_audio=true`, retour du blob audio brut). Les deux utilisent la clé `GRADIUM_API_KEY` côté Edge Function (jamais exposée client).
+2. **Providers côté client** — ajout de `GradiumSTT` (enregistrement `MediaRecorder`, envoi batch, callback final) et `gradiumProvider` TTS (paramètres `voiceId`, `outputFormat`, `speed`, `temperature`, `language` via `providerSettings.ts`).
+3. **Registres et sélection** — `gradium` enregistré dans `STT_PROVIDER_LIST`, `runtimeConfig.ts`, menu Admin `STT Config` ; et dans `TTSProviderId`, `TTS_PROVIDERS`, menu TTS Admin.
+4. **UI Admin** — `VoiceUsageTab` affiche le coût Gradium TTS (~0.15/1k caractères). `TTSConfigTab` expose un panneau Gradium complet (Voice ID, format audio `mp3|wav|opus|pcm`, speed, temperature, langue).
+5. **Sécurité** — `supabase/config.toml` désactive la vérification JWT pour les nouveaux proxies (`proxy-stt-gradium`, `proxy-tts-gradium`) car ils sont appelés directement depuis le client.
+
+**Validation.**
+- `npx tsc --noEmit` : OK.
+- Les providers apparaissent dans les menus STT/TTS de l'admin.
+- Dès que `GRADIUM_API_KEY` est configurée, on peut tester le STT/TTS Gradium dans une conversation.
+
+**Why it matters.** Gradium offre un provider STT/TTS full-stack alternatif, abrité derrière nos proxies, et intégré dans l'abstraction existante. Cela réduit la dépendance à un seul fournisseur et permet de comparer la qualité/latence en conditions réelles avec les mêmes contrôles admin. Le tarif indicatif (0.15/1k caractères TTS) est compétitif.
+
+**Files.** `src/services/stt/providers/gradiumSTT.ts`, `src/services/tts/providers/gradium.ts`, `supabase/functions/proxy-stt-gradium/index.ts`, `supabase/functions/proxy-tts-gradium/index.ts`, `src/services/stt/registry.ts`, `src/services/stt/runtimeConfig.ts`, `src/services/tts/providerSettings.ts`, `src/services/tts/registry.ts`, `src/components/TTSConfigTab.tsx`, `src/components/admin/VoiceUsageTab.tsx`, `supabase/config.toml`.
+
+---
 
 ### 2026-06-22 — Audit Max hallucinations : Max utilise enfin son RAG et sa fiche Notion 🔷
 
