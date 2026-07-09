@@ -58,6 +58,7 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 | Deepgram | STT streaming avec VAD, provider input par défaut |
 | Gamilab | Provider STT/ASR live stratégique, préparé via Browser SDK |
 | ElevenLabs | TTS voix custom de Max (paramètres ajustables) |
+| Gradium | Provider STT batch + TTS REST alternatif (intégré via proxies Edge Functions) |
 | OpenAI | Embeddings text-embedding-3-small (1536 dim) |
 | Notion | Source de vérité éditoriale (contenus, personnages, règles) |
 
