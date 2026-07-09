@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-06-22 (session 31 — audit Max hallucinations : mismatch nom DB, RAG enfin injecté, fin des esquives "Lausanne")
+> **Last Updated**: 2026-07-09 (session 32/33 — sync Notion Timeline + providers Gradium STT/TTS)
 
 ---
 

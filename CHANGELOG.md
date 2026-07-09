@@ -4,6 +4,54 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.36.0] - 2026-07-09 — Providers STT/TTS Gradium intégrés
+
+### Ajouté
+- **Edge Function `proxy-stt-gradium`** — proxy REST vers Gradium ASR. Accepte un fichier audio brut ou multipart, agrège le flux NDJSON de réponses `type: text` et retourne `{ text, provider, upstream_ms }`.
+- **Edge Function `proxy-tts-gradium`** — proxy vers Gradium TTS (`api.post.speech.tts`, `only_audio=true`). Retourne le blob audio avec le `Content-Type` correspondant au format demandé (`mp3`, `wav`, `opus`, `pcm`).
+- **Provider STT Gradium** — `src/services/stt/providers/gradiumSTT.ts` : enregistrement microphone via `MediaRecorder`, envoi batch vers `proxy-stt-gradium`, callback `onTranscript` final. Supporte `getTelemetryContext` pour la télémétrie latence.
+- **Provider TTS Gradium** — `src/services/tts/providers/gradium.ts` : appel `proxy-tts-gradium` avec retry/timeout 12s, retour `blob + meta`.
+- **Paramètres Gradium dans l'admin** — `providerSettings.ts` avec `GradiumSettings` (`voiceId`, `outputFormat`, `speed`, `temperature`, `language`) ; panneau dédié dans `TTSConfigTab`.
+- **Sélection dans les menus Admin** — `gradium` ajouté à `STT_PROVIDER_LIST`, `runtimeConfig.ts`, au menu STT ; et à `TTSProviderId`, `TTS_PROVIDERS`, au menu TTS.
+- **Coût TTS** — `VoiceUsageTab` affiche le tarif indicatif Gradium (~0.15/1k caractères).
+
+### Modifié
+- **`src/services/stt/registry.ts`** / **`runtimeConfig.ts`** / **`types.ts`** / **`index.ts`** — étendus pour le provider `gradium` (mode `batch`, secret attendu `GRADIUM_API_KEY`).
+- **`src/services/tts/types.ts`** / **`registry.ts`** / **`providerSettings.ts`** — support du provider `gradium`.
+- **`supabase/config.toml`** — `sb_verify_jwt = false` pour `proxy-stt-gradium` et `proxy-tts-gradium`, afin d'autoriser les appels directs client.
+- **`proxy-stt-config`** — ajout de `GRADIUM_API_KEY` dans la liste des secrets détectés pour la config STT.
+
+### Validation
+- `npx tsc --noEmit` OK.
+- Les menus Admin STT/TTS affichent « Gradium ».
+- Test dès configuration de `GRADIUM_API_KEY` dans les secrets projet.
+
+### Hors-scope / Non-régression
+- Deepgram reste le provider STT par défaut, ElevenLabs le TTS par défaut.
+- La façade STT/TTS reste le seul point d'entrée ; pas d'appel direct Deepgram/Gradium côté client.
+
+---
+
+## [0.35.0] - 2026-07-06 — Champ Timeline Notion : temporalité de la mémoire personnage
+
+### Ajouté
+- **Colonne `timeline` sur `character_prompts`** — migration SQL ajoutant `timeline text NOT NULL DEFAULT ''`, persistant le champ Notion dans la base pour chaque personnage.
+- **Sync Notion du champ `Timeline`** — `sync-notion` reconnaît la propriété Notion `Timeline` (alias `Chronologie`, `Historique`) et l'écrit dans `p.timeline`.
+- **Injection `timeline` dans le system prompt** — `buildCharacterPromptSections` ajoute un bloc `CHRONOLOGIE / MÉMOIRE HISTORIQUE` sous `SITUATION ACTUELLE` (avant `IDENTITÉ FONDAMENTALE`) pour ancrer le personnage dans son passé canonique.
+
+### Modifié
+- **`characterPromptService.ts`** — type `CharacterPrompt` étendu (`timeline`), valeur `EMPTY` mise à jour, mapping depuis la DB (`listCharactersWithPrompts` inclut `timeline`).
+- **`src/integrations/supabase/types.ts`** — `Database` type mis à jour avec la nouvelle colonne.
+
+### Validation
+- Resync Notion lancée sur les personnages pour peupler `timeline`.
+- La fiche personnage dans `CharacterPromptEditorPanel` affiche désormais le champ Timeline.
+
+### Hors-scope
+- Pas de changement du découpage RAG/chunking ; le RAG reste le mécanisme d'enrichissement complémentaire.
+
+---
+
 ## [0.34.0] - 2026-06-22 — Max utilise enfin le RAG : fin des esquives "Lausanne"
 
 ### Corrigé (criticité 🔴)
