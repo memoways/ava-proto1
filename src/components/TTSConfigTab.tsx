@@ -164,6 +164,26 @@ export default function TTSConfigTab() {
     toast.success("Hume réinitialisé");
   }
 
+  // Gradium helpers
+  function updateGr(patch: Partial<GradiumSettings>) {
+    const current = { ...grSettings, ...patch };
+    localStorage.setItem("ava_tts_settings_gradium", JSON.stringify(current));
+    setGrSettings(current);
+  }
+  async function saveGr() {
+    setSavingGr(true);
+    await saveGradiumSettingsToDB(grSettings);
+    setGrSaved(grSettings);
+    toast.success("Gradium sauvegardé ✓");
+    setSavingGr(false);
+  }
+  function resetGr() {
+    const d = resetGradiumSettings();
+    setGrSettings(d); setGrSaved(d);
+    toast.success("Gradium réinitialisé");
+  }
+
+
   return (
     <div className="max-w-4xl space-y-8">
       <div>
