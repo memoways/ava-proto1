@@ -92,10 +92,16 @@ function extractPromptFields(props: Record<string, any>): Record<string, string>
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
+  // Require an authenticated admin caller — this endpoint uses service role
+  // to rewrite characters, video_triggers, and embeddings.
+  const auth = await requireAdmin(req, corsHeaders);
+  if (!auth.ok) return auth.response!;
+
   const startedAt = Date.now();
   try {
     const NOTION_API_KEY = Deno.env.get('NOTION_API_KEY');
     if (!NOTION_API_KEY) throw new Error('NOTION_API_KEY is not configured');
+
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     const VOYAGE_API_KEY = Deno.env.get('VOYAGE_API_KEY');
