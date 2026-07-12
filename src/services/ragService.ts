@@ -212,9 +212,14 @@ export async function syncNotion(databases: Record<string, string> = AVA_NOTION_
   const startTime = Date.now();
   const debugId = debugLogger.logFetch("notion", "Sync Notion → Supabase", `${SUPABASE_URL}/functions/v1/sync-notion`, databases);
 
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
   const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ databases }),
   });
 
