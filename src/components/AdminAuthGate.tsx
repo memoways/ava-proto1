@@ -1,99 +1,111 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import type { Session } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-
-const STORAGE_KEY = "admin_auth_ok";
-const ADMIN_USER = "game-master";
-const ADMIN_PASS = "jesuisdieu";
 
 interface Props {
   children: React.ReactNode;
 }
 
 export default function AdminAuthGate({ children }: Props) {
-  const [authed, setAuthed] = useState(false);
-  const [user, setUser] = useState("");
-  const [pass, setPass] = useState("");
+  const navigate = useNavigate();
+  const [session, setSession] = useState<Session | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const ok = sessionStorage.getItem(STORAGE_KEY) === "1";
-      setAuthed(ok);
-    } catch {
-      // ignore
-    }
-    setLoading(false);
+    let mounted = true;
+
+    const checkRole = async (uid: string) => {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", uid)
+        .eq("role", "admin")
+        .maybeSingle();
+      if (!mounted) return;
+      if (error) {
+        console.error("[AdminAuthGate] role check failed", error);
+        setIsAdmin(false);
+      } else {
+        setIsAdmin(!!data);
+      }
+      setLoading(false);
+    };
+
+    // Register listener FIRST
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      if (newSession?.user) {
+        // Defer to avoid deadlock
+        setTimeout(() => checkRole(newSession.user.id), 0);
+      } else {
+        setIsAdmin(false);
+        setLoading(false);
+      }
+    });
+
+    // Then read current session
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      if (data.session?.user) {
+        checkRole(data.session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (user.trim() === ADMIN_USER && pass === ADMIN_PASS) {
-      try {
-        sessionStorage.setItem(STORAGE_KEY, "1");
-      } catch {
-        // ignore
-      }
-      setAuthed(true);
-      toast.success("Accès admin autorisé");
-    } else {
-      toast.error("Identifiants invalides");
-      setPass("");
-    }
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast.success("Déconnexion effectuée");
+    navigate("/auth");
   };
 
-  const handleLogout = () => {
-    try {
-      sessionStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // ignore
-    }
-    setAuthed(false);
-    setUser("");
-    setPass("");
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-sm text-muted-foreground">Vérification des droits…</p>
+      </div>
+    );
+  }
 
-  if (loading) return null;
-
-  if (!authed) {
+  if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <form
-          onSubmit={handleSubmit}
-          className="w-full max-w-sm space-y-5 rounded-lg border border-border bg-card p-6 shadow-lg"
-        >
-          <div className="space-y-1">
-            <h1 className="text-xl font-semibold">Accès Admin</h1>
-            <p className="text-sm text-muted-foreground">
-              Identifiez-vous pour accéder au panneau d'administration.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="admin-user">Utilisateur</Label>
-            <Input
-              id="admin-user"
-              autoComplete="username"
-              value={user}
-              onChange={(e) => setUser(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="admin-pass">Mot de passe</Label>
-            <Input
-              id="admin-pass"
-              type="password"
-              autoComplete="current-password"
-              value={pass}
-              onChange={(e) => setPass(e.target.value)}
-            />
-          </div>
-          <Button type="submit" className="w-full">
-            Se connecter
+        <div className="w-full max-w-sm space-y-4 rounded-lg border border-border bg-card p-6 shadow-lg text-center">
+          <h1 className="text-xl font-semibold">Accès Admin</h1>
+          <p className="text-sm text-muted-foreground">
+            Vous devez vous connecter pour accéder au back-office.
+          </p>
+          <Button className="w-full" onClick={() => navigate("/auth")}>
+            Aller à la page de connexion
           </Button>
-        </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-md space-y-4 rounded-lg border border-border bg-card p-6 shadow-lg text-center">
+          <h1 className="text-xl font-semibold">Accès refusé</h1>
+          <p className="text-sm text-muted-foreground">
+            Le compte <strong>{session.user.email}</strong> n'a pas le rôle admin.
+            Contactez un administrateur pour obtenir les droits.
+          </p>
+          <Button variant="outline" className="w-full" onClick={handleLogout}>
+            Se déconnecter
+          </Button>
+        </div>
       </div>
     );
   }
@@ -107,7 +119,7 @@ export default function AdminAuthGate({ children }: Props) {
         onClick={handleLogout}
         className="absolute right-3 top-3 z-50"
       >
-        Déconnexion
+        Déconnexion ({session.user.email})
       </Button>
       {children}
     </div>
