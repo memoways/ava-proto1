@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { listVideoTriggers, type VideoTriggerRow } from "@/services/videoTriggerService";
+import { supabase } from "@/integrations/supabase/client";
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
