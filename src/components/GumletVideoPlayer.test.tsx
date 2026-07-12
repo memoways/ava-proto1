@@ -23,7 +23,7 @@ describe("GumletVideoPlayer", () => {
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it("builds the direct Gumlet HLS URL from a watch URL", () => {
+  it("builds the Gumlet embed URL from a watch URL", () => {
     render(
       <GumletVideoPlayer
         videoUrl="https://gumlet.tv/watch/6a188e39fdee17a44c1ea049"
@@ -32,13 +32,15 @@ describe("GumletVideoPlayer", () => {
       />,
     );
 
-    expect(screen.getByTitle("Video player")).toHaveAttribute(
-      "data-source",
-      "https://video.gumlet.io/673f29f4a5e1bf70aa645cb7/6a188e39fdee17a44c1ea049/main.m3u8",
+    const player = screen.getByTitle("Video player");
+    expect(player.tagName).toBe("IFRAME");
+    expect(player).toHaveAttribute(
+      "src",
+      expect.stringContaining("https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049"),
     );
   });
 
-  it("uses the native video player for muted Gumlet embed URLs so audio can be forced on", () => {
+  it("overrides muted Gumlet embed parameters so audio can be requested", () => {
     render(
       <GumletVideoPlayer
         videoUrl="https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049?muted=true&volume=0"
@@ -47,8 +49,10 @@ describe("GumletVideoPlayer", () => {
       />,
     );
 
-    expect(screen.getByTitle("Video player").tagName).toBe("VIDEO");
-    expect(screen.getByTitle("Video player")).not.toHaveAttribute("muted");
+    const player = screen.getByTitle("Video player");
+    expect(player.tagName).toBe("IFRAME");
+    expect(player.getAttribute("src")).toContain("muted=false");
+    expect(player.getAttribute("src")).toContain("volume=100");
   });
 
   it("calls onSkip from the overlay button", () => {

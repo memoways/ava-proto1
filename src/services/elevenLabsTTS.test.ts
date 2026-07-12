@@ -15,9 +15,10 @@ describe("elevenLabsTTS text preparation", () => {
   });
 
   it("does not split on common French abbreviations or decimal numbers", () => {
-    const [sentences, leftover] = extractSentences("Dr. Martin arrive à 3.14 exactement. Tu comprends ?");
+    const firstSentence = "Dr. Martin arrive à 3.14 exactement pour présenter calmement les résultats détaillés de son analyse.";
+    const [sentences, leftover] = extractSentences(`${firstSentence} Tu comprends ?`);
 
-    expect(sentences).toEqual(["Dr. Martin arrive à 3.14 exactement."]);
+    expect(sentences).toEqual([firstSentence]);
     expect(leftover).toBe("Tu comprends ?");
   });
 });

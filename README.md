@@ -2,8 +2,11 @@
 
 > **Statut**: 🟡 En cours  
 > **Type**: 🧪 Prototype  
+> **Diffusion**: 🔒 Interne uniquement — non public, tests utilisateurs prévus en septembre 2026
 > **Créé avec**: Lovable  
 > **Démarré**: 2026-03-07  
+
+La mise en public est bloquée par la [release gate](docs/public_release_gate.md). Un aperçu interne peut être utilisé pour le développement, mais aucun lien ne doit être diffusé à des testeurs externes avant validation des critères de sécurité, persistance et endurance.
 
 > **Mise à jour récente (2026-05-22) — PRD4 : nouveau parcours post-film + rôle utilisateur + Max contextualisé** : refonte structurante livrée en 6 phases. L'onboarding A/B est supprimé au profit d'un parcours unique *« tu viens de voir le film, tu appelles quelqu'un »*. Le joueur définit son rôle à la voix (push-to-talk + résumé Gemini Flash), Max reçoit ce rôle dans son system prompt, 4 personnages s'affichent (Max actif, Emma/Ava/Léo grisés), le GM pré-tour est retiré du chemin temps réel et le GM post-turn tourne en async (`sessions.gm_post_turn_log`). Nouveau questionnaire 10 questions + mapping Notion avec accents exacts. Back-office enrichi (rôle utilisateur + timeline GM post-turn). Détails : `CHANGELOG.md`, `STORY.md`, `docs/plan_prd4_implementation.md`, PRD `documents/PRD_4_prototype_mai_2026.md`.
 

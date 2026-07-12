@@ -4,6 +4,30 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.37.1] - 2026-07-12 — Phase 0 de stabilisation pré-public
+
+### Ajouté
+- **Release gate publique** — le projet est explicitement classé « interne uniquement » jusqu'à validation des critères de septembre 2026.
+- **Test E2E Playwright** — parcours PRD4 complet avec onboarding vocal simulé et trois tours de conversation, sans appel fournisseur réel.
+- **Test PostgreSQL RLS isolé** — reproduction PGlite des policies `sessions`, démontrant que `INSERT ... RETURNING` échoue et qu'un `UPDATE` anonyme touche zéro ligne sans policy `SELECT`.
+
+### Corrigé
+- **Baseline npm reproductible** — `package-lock.json` resynchronisé avec `@gumlet/player.js` et `hls.js`.
+- **Suite Vitest** — attentes STT/TTS/Gumlet alignées avec le runtime actuel ; mocks de l'orchestrateur complétés pour éliminer les rejets asynchrones cachés.
+- **Setup de tests** — compatible avec les environnements Vitest `jsdom` et `node`.
+
+### Validation
+- `npm run build` : OK.
+- `npx tsc --noEmit` : OK.
+- `npm test` : 47 tests unitaires verts avant ajout du test RLS.
+- `npm run test:rls` : 2 preuves RLS vertes, confirmant le stop-ship persistance.
+- `npm run test:e2e` : parcours de trois tours ajouté et exécuté localement avec Chromium.
+
+### Stop-ship restant
+- Le contrat de persistance anonyme `sessions` doit être redessiné en phase 1. Aucune policy `SELECT USING (true)` n'a été ajoutée pour masquer le problème.
+
+---
+
 ## [0.37.0] - 2026-07-12 — Auth admin + hardening RLS
 
 ### Ajouté
