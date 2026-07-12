@@ -30,9 +30,14 @@ export default function VideosListTab() {
     setSyncing(true);
     toast.info("Sync Vidéos AVA…");
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ databases: { videos: AVA_NOTION_DATABASES.videos } }),
       });
       if (!res.ok) throw new Error(await res.text());
