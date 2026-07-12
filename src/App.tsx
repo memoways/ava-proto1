@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import IndexPRD4 from "./pages/IndexPRD4";
 import Admin from "./pages/Admin";
 import AdminAuthGate from "./components/AdminAuthGate";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import DebugPanel from "./components/DebugPanel";
 import { debugLogger } from "./services/debugLogger";
@@ -23,6 +24,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<IndexPRD4 />} />
+          <Route path="/auth" element={<Auth />} />
           <Route path="/admin" element={<AdminAuthGate><Admin /></AdminAuthGate>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
