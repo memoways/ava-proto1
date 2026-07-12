@@ -11,15 +11,17 @@ serve(async (req) => {
   }
 
   const gamilabPortalId = Deno.env.get("GAMILAB_PORTAL_ID") || null;
-  const gamilabPortalToken = Deno.env.get("GAMILAB_API_KEY") || null;
+  const hasGamilabToken = Boolean(Deno.env.get("GAMILAB_API_KEY"));
 
+  // NOTE: We intentionally do NOT return GAMILAB_API_KEY in the response.
+  // Any client-side Gamilab initialisation must go through a dedicated
+  // server-side proxy that keeps the secret token on the edge.
   return new Response(
     JSON.stringify({
       gamilabPortalId,
-      gamilabPortalToken,
       configured: {
         deepgram: Boolean(Deno.env.get("DEEPGRAM_API_KEY")),
-        gamilab: Boolean(gamilabPortalId && gamilabPortalToken),
+        gamilab: Boolean(gamilabPortalId && hasGamilabToken),
         openai_whisper: Boolean(Deno.env.get("OPENAI_API_KEY")),
         assemblyai: Boolean(Deno.env.get("ASSEMBLYAI_API_KEY")),
         gradium: Boolean(Deno.env.get("GRADIUM_API_KEY")),

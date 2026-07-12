@@ -98,9 +98,14 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
       const notionId = (charRow as any)?.notion_id;
       if (!notionId) throw new Error("Personnage sans notion_id");
 
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           databases: { characters: AVA_NOTION_DATABASES.characters },
           only_notion_id: notionId,

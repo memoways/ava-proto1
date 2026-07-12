@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { listVideoTriggers, type VideoTriggerRow } from "@/services/videoTriggerService";
+import { supabase } from "@/integrations/supabase/client";
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
@@ -29,9 +30,14 @@ export default function VideosListTab() {
     setSyncing(true);
     toast.info("Sync Vidéos AVA…");
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ databases: { videos: AVA_NOTION_DATABASES.videos } }),
       });
       if (!res.ok) throw new Error(await res.text());

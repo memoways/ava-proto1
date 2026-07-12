@@ -5,6 +5,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+// Short-lived Deepgram token TTL (seconds). Long enough to open the WebSocket
+// and cover a typical game turn, short enough that a leaked token is useless.
+const TOKEN_TTL_SECONDS = 60;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -16,36 +20,47 @@ serve(async (req) => {
       throw new Error('DEEPGRAM_API_KEY is not configured');
     }
 
-    // Return the temporary Deepgram API key for client-side WebSocket connection
-    // In production, use Deepgram's temporary key API for better security
-    const response = await fetch('https://api.deepgram.com/v1/manage/keys', {
-      method: 'GET',
+    // Request a short-lived scoped token from Deepgram instead of returning
+    // the permanent project key to the browser.
+    const grantRes = await fetch('https://api.deepgram.com/v1/auth/grant', {
+      method: 'POST',
       headers: {
         'Authorization': `Token ${DEEPGRAM_API_KEY}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ ttl_seconds: TOKEN_TTL_SECONDS }),
     });
 
-    // For the prototype, we return the key directly
-    // The client will use it to establish a WebSocket connection to Deepgram
+    if (!grantRes.ok) {
+      const errText = await grantRes.text();
+      console.error(`[proxy-stt] Deepgram grant error [${grantRes.status}]:`, errText);
+      return new Response(
+        JSON.stringify({ error: `Deepgram grant failed: ${grantRes.status}`, details: errText }),
+        { status: grantRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    const grant = await grantRes.json();
+    const shortLivedToken = grant.access_token ?? grant.token;
+    if (!shortLivedToken) {
+      throw new Error('Deepgram grant response missing access_token');
+    }
+
     return new Response(
-      JSON.stringify({ 
-        key: DEEPGRAM_API_KEY,
+      JSON.stringify({
+        key: shortLivedToken,
+        expires_in: grant.expires_in ?? TOKEN_TTL_SECONDS,
         model: 'nova-2',
         language: 'fr',
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error: unknown) {
     console.error('Error in proxy-stt:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 });

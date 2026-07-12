@@ -243,9 +243,14 @@ export default function Admin() {
       toast.info(label);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 180000);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           databases: {
             characters: AVA_NOTION_DATABASES.characters,

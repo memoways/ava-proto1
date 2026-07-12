@@ -110,6 +110,45 @@ serve(async (req) => {
     const stream = body.stream ?? true;
     const timeoutMs = clampTimeoutMs(body.timeout_ms, stream ? 18000 : 15000);
 
+    // Guardrails against turning this endpoint into an open LLM proxy.
+    // Allowed model provider prefixes actually used by the AVA game.
+    const ALLOWED_MODEL_PREFIXES = [
+      'google/', 'qwen/', 'anthropic/', 'openai/', 'meta-llama/',
+      'x-ai/', 'mistralai/', 'deepseek/',
+    ];
+    if (typeof model !== 'string' || !ALLOWED_MODEL_PREFIXES.some((p) => model.startsWith(p))) {
+      return new Response(
+        JSON.stringify({ error: `Model not allowed: ${model}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+    if (!Array.isArray(body.messages) || body.messages.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'messages must be a non-empty array' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+    if (body.messages.length > 60) {
+      return new Response(
+        JSON.stringify({ error: 'messages array too large' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+    const totalChars = body.messages.reduce((s, m) => s + (typeof m?.content === 'string' ? m.content.length : 0), 0);
+    if (totalChars > 60000) {
+      return new Response(
+        JSON.stringify({ error: 'messages payload too large' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+    if (typeof max_tokens !== 'number' || max_tokens > 4000 || max_tokens < 1) {
+      return new Response(
+        JSON.stringify({ error: 'max_tokens out of range (1-4000)' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+
     const response = await fetchWithTimeout(OPENROUTER_URL, {
       method: 'POST',
       headers: {
