@@ -29,6 +29,10 @@ function richText(value: string | undefined | null) {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
+  const auth = await requireAdmin(req, corsHeaders);
+  if (!auth.ok) return auth.response!;
+
+
   try {
     const NOTION_API_KEY = Deno.env.get('NOTION_API_KEY');
     if (!NOTION_API_KEY) throw new Error('NOTION_API_KEY is not configured');
