@@ -12,6 +12,11 @@ interface DeepgramConfig {
   language: string;
 }
 
+/** Temporary tokens returned by /v1/auth/grant are JWTs and use Bearer auth. */
+export function getDeepgramWebSocketProtocols(accessToken: string): ["bearer", string] {
+  return ["bearer", accessToken];
+}
+
 export async function getDeepgramToken(): Promise<DeepgramConfig> {
   const startTime = Date.now();
   const debugId = debugLogger.logFetch("stt", "Get Deepgram token", `proxy-stt`);
@@ -171,7 +176,7 @@ export class DeepgramSTT {
     // Connect to Deepgram WebSocket
     const wsUrl = `wss://api.deepgram.com/v1/listen?model=${config.model}&language=${config.language}&smart_format=true&interim_results=true&vad_events=true&endpointing=false`;
 
-    this.ws = new WebSocket(wsUrl, ['token', config.key]);
+    this.ws = new WebSocket(wsUrl, getDeepgramWebSocketProtocols(config.key));
     const openTimeout = setTimeout(() => {
       if (this.ws?.readyState !== WebSocket.OPEN) {
         const error = new Error("Deepgram WebSocket open timeout");

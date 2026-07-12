@@ -22,6 +22,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 ### Corrigé
 - Le contrat Gamilab attendu par le SDK (`portalId` + token) est restauré en mode interne avec réponse `no-store`.
 - L'échec Deepgram `403` est expliqué comme un manque de permission **Member** sur la clé utilisée pour générer les jetons temporaires.
+- Le WebSocket Deepgram authentifie désormais ces jetons temporaires avec le schéma `Bearer` au lieu du schéma `Token` réservé aux clés API.
 - La migration Phase 1 est divisée en étapes expansion/verrouillage afin d'éviter une interruption pendant le déploiement Lovable.
 
 ### Validation
