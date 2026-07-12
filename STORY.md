@@ -103,6 +103,8 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 
+### 2026-07-06 — Champ Timeline Notion : mémoire temporelle du personnage 🔷
+
 **Intent.** Max (et les autres personnages) mélangeaient le passé et le présent : ils pouvaient décrire des souvenirs comme s'ils se passaient maintenant, et inversement. La base Notion **Base Caractères AVA** a été enrichie d'une propriété **Timeline** pour définir, chronologiquement, l'historique des actions du personnage avant et pendant l'intrigue.
 
 **Outcome.**

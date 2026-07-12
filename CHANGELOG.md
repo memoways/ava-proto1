@@ -42,6 +42,8 @@ Les investigations ont identifié des travaux de hardening suivants, non inclus 
 ---
 
 
+## [0.36.0] - 2026-07-09 — Providers STT/TTS Gradium intégrés
+
 ### Ajouté
 - **Edge Function `proxy-stt-gradium`** — proxy REST vers Gradium ASR. Accepte un fichier audio brut ou multipart, agrège le flux NDJSON de réponses `type: text` et retourne `{ text, provider, upstream_ms }`.
 - **Edge Function `proxy-tts-gradium`** — proxy vers Gradium TTS (`api.post.speech.tts`, `only_audio=true`). Retourne le blob audio avec le `Content-Type` correspondant au format demandé (`mp3`, `wav`, `opus`, `pcm`).
