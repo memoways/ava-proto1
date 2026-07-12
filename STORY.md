@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-09 (session 32/33 — sync Notion Timeline + providers Gradium STT/TTS)
+> **Last Updated**: 2026-07-12 (session 34 — auth admin + hardening RLS, admins initialisés)
 
 ---
 
@@ -65,6 +65,43 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+
+### 2026-07-12 — Auth admin et hardening RLS : la back-office devient sérieux 🔷
+
+**Intent.** Le scan de sécurité a révélé que l'admin était accessible sans vraie authentification (ou via des mécanismes fragiles), et que plusieurs tables exposaient des permissions trop larges (`USING (true)`, accès anonymes en écriture, publication realtime sur `llm_usage`). Il fallait mettre en place une authentification admin robuste (email/password Supabase Auth), un système de rôles, et verrouiller les RLS avant de continuer à enrichir le prototype.
+
+**Tool.** Lovable / Supabase / security scanner.
+
+**Outcome.**
+1. **Auth admin email/password** — nouvelle page `/auth` qui permet de s'inscrire ou se connecter. `AdminAuthGate` vérifie à la fois le JWT Supabase **et** le rôle `admin` dans `public.user_roles` avant d'afficher `/admin`.
+2. **Infrastructure de rôles** — migration créant :
+   - `public.app_role` (enum : `admin`, `moderator`, `user`)
+   - `public.user_roles` (`user_id`, `role`, unique couple)
+   - `public.has_role(_user_id uuid, _role app_role)` en `SECURITY DEFINER` pour éviter les boucles RLS récursives.
+3. **Admins initialisés** — `ulrich.fischer@memoways.com` et `romed@paradigmafilms.ch` ont été promus `admin`.
+4. **Hardening RLS ciblé** — correction de 10 findings spécifiques :
+   - `sessions` : suppression des policies anonymes dupliquées, `UPDATE` limité aux 4 dernières heures, `SELECT`/`DELETE` admin-only.
+   - `llm_usage` : `UPDATE` limité aux 2 dernières heures, retrait de la publication realtime côté client.
+   - `openrouter_cost_error_logs` : `UPDATE` limité aux 2 dernières heures.
+   - `admin_settings` : `SELECT` anonyme restreint aux clés `ava_%` (runtime keys) ; admins en accès total.
+   - `characters`, `audio_latencies`, `turn_latencies`, `session_summaries` : lectures et écritures verrouillées aux admins (les insertions anonymes de télémétrie restent autorisées).
+5. **Findings résolus** : `SUPA_rls_policy_always_true`, `admin_settings_public_rw`, `audio_latencies_public_rw`, `characters_public_rw`, `llm_usage_public_rw`, `openrouter_cost_error_logs_public_rw`, `realtime_llm_usage_exposure`, `session_summaries_public_rw`, `sessions_public_rw`, `turn_latencies_public_rw`.
+
+**Why it matters.** Le prototype passait d'un back-office « confiance implicite » à un modèle RBAC classique : un admin ne peut plus être spoofé côté client, et les tables sensibles sont explicitement scellées. C'est une condition nécessaire pour ouvrir l'admin à plusieurs collaborateurs (Ulrich, Romed) et pour respecter les exigences du scanner de sécurité avant la live. Les 10 corrections RLS ferment les fuites de données les plus évidentes (latency logs, usage LLM, settings, etc.).
+
+**Files.** `src/pages/Auth.tsx`, `src/components/AdminAuthGate.tsx`, `src/App.tsx`, `src/integrations/supabase/types.ts`, `supabase/migrations/20260712150404_e1fc5992-c18a-4dd1-8ca1-8d18cad6fd53.sql`, `supabase/migrations/20260712152143_7df66392-9869-40ed-903d-5314e15c0828.sql`.
+
+**Reste à faire.** Le scan a identifié 5 chantiers de sécurité non traités dans cette session :
+- Verrouiller `sync-notion` avec un check admin (actuellement endpoint public capable d'effacer tous les embeddings).
+- Ne plus envoyer la clé Deepgram brute au client dans `proxy-stt` (clés temporaires ou proxy websocket serveur).
+- Ne plus exposer le token Gamilab dans `proxy-stt-config`.
+- Restreindre `proxy-llm` aux modèles du jeu et à une session valide.
+- Protéger `update-notion-video` par auth admin.
+- Révoquer `EXECUTE` sur les fonctions `SECURITY DEFINER` inutiles côté client.
+
+---
+
 
 ### 2026-07-06 — Champ Timeline Notion : mémoire temporelle du personnage 🔷
 

@@ -4,6 +4,43 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.37.0] - 2026-07-12 — Auth admin + hardening RLS
+
+### Ajouté
+- **Authentification admin (Supabase Auth)** — page `/auth` avec formulaire email/mot de passe. Seuls les utilisateurs possédant le rôle `admin` dans `public.user_roles` peuvent accéder à `/admin` (`AdminAuthGate` redirige les non-admins).
+- **Rôles utilisateurs** — migration créant l'enum `app_role`, la table `user_roles`, et la fonction de sécurité `has_role(user_id, role)` (SECURITY DEFINER) utilisée par les policies RLS.
+- **Admins initialisés** — `ulrich.fischer@memoways.com` et `romed@paradigmafilms.ch` ont été promus `admin`.
+
+### Modifié
+- **RLS hardening** — 10 policies trop permissives corrigées :
+  - `sessions` : suppression des doublons anonymes `INSERT`/`UPDATE` ; `UPDATE` limité aux sessions récentes (< 4 h) ; `SELECT`/`DELETE` réservés aux admins.
+  - `llm_usage` : `UPDATE` restreint aux 2 dernières heures ; suppression de la publication realtime `supabase_realtime` pour éviter l'exposition côté client.
+  - `openrouter_cost_error_logs` : `UPDATE` restreint aux 2 dernières heures.
+  - `admin_settings` : `SELECT` anonyme limité aux clés préfixées `ava_%` (runtime keys) ; les admins conservent l'accès complet.
+  - `characters`, `audio_latencies`, `turn_latencies`, `session_summaries` : lectures/écritures réservées aux admins (les insertions anonymes de télémétrie/session restent autorisées là où c'était nécessaire).
+- **`src/integrations/supabase/types.ts`** — types mis à jour avec `user_roles`, `app_role`, `has_role`.
+- **`src/App.tsx`** — route `/auth` ajoutée ; `/admin` protégée par `AdminAuthGate`.
+
+### Sécurité — reste à traiter
+Les investigations ont identifié des travaux de hardening suivants, non inclus dans cette livraison :
+- **`sync-notion`** : endpoint public (`verify_jwt = false`) capable d'effacer/réécrire personnages, vidéos et embeddings. Il faut y exiger un JWT admin via `has_role`.
+- **`proxy-stt`** : retourne la vraie clé Deepgram permanente au client. À remplacer par des clés temporaires/scoped ou par un proxy websocket côté serveur.
+- **`proxy-stt-config`** : retourne le token Gamilab brut. À ne plus exposer ; ne renvoyer que l'ID de portail et un flag `configured`.
+- **`proxy-llm`** : proxy ouvert vers OpenRouter sans authentification ni liste de modèles autorisés. À restreindre aux modèles du jeu et lier à une session valide.
+- **`update-notion-video`** : endpoint public permettant de modifier contenus Notion et vidéos. À protéger par JWT admin.
+- **Fonctions `SECURITY DEFINER` exécutables par `anon`/`authenticated`** — à révoquer l'EXECUTE si elles ne sont pas censées être appelées par les clients.
+
+### Validation
+- Migration appliquée en base.
+- Connexion admin fonctionnelle sur `/auth` ; redirection refusée pour utilisateurs sans rôle admin.
+- Les 10 findings RLS spécifiés (`SUPA_rls_policy_always_true`, `admin_settings_public_rw`, `audio_latencies_public_rw`, `characters_public_rw`, `llm_usage_public_rw`, `openrouter_cost_error_logs_public_rw`, `realtime_llm_usage_exposure`, `session_summaries_public_rw`, `sessions_public_rw`, `turn_latencies_public_rw`) marqués résolus.
+
+### Hors-scope
+- Aucun changement de logique métier du jeu (pipeline STT/LLM/TTS, GM, vidéos) ; uniquement de la sécurité backend/admin.
+
+---
+
+
 ## [0.36.0] - 2026-07-09 — Providers STT/TTS Gradium intégrés
 
 ### Ajouté
