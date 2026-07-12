@@ -4,7 +4,6 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
-
 ## [0.37.0] - 2026-07-12 — Auth admin + hardening RLS
 
 ### Ajouté
