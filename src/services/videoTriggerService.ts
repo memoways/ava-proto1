@@ -65,9 +65,14 @@ export async function updateVideoTriggerOnNotion(
   notionId: string,
   patch: UpdateVideoTriggerPatch,
 ): Promise<void> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
   const res = await fetch(`${SUPABASE_URL}/functions/v1/update-notion-video`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ notion_id: notionId, ...patch }),
   });
   const text = await res.text();
