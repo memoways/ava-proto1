@@ -1,4 +1,5 @@
 import { debugLogger } from "./debugLogger";
+import { supabase } from "@/integrations/supabase/client";
 import type { MaxTurnKnowledgeContext } from "@/types";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
