@@ -4,6 +4,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import type { QuestionnairePRD4Data } from "@/types";
+import { authenticatedFunctionFetch } from "@/services/gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -23,7 +24,7 @@ export async function syncPRD4QuestionnaireToNotion(
   data: QuestionnairePRD4Data,
 ): Promise<void> {
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-questionnaire`, {
+    const res = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/sync-questionnaire`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

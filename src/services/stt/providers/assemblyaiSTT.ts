@@ -1,6 +1,7 @@
 import { debugLogger } from "@/services/debugLogger";
 import { recordAudioLatency } from "@/services/latencyTelemetry";
 import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types";
+import { authenticatedFunctionFetch } from "@/services/gameAuth";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const TOKEN_ENDPOINT = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/proxy-stt-assemblyai`;
@@ -46,7 +47,7 @@ export class AssemblyAISTT implements STTSession {
   }
 
   async start() {
-    const tokenRes = await fetch(TOKEN_ENDPOINT);
+    const tokenRes = await authenticatedFunctionFetch(TOKEN_ENDPOINT);
     if (!tokenRes.ok) throw new Error(`AssemblyAI token error: ${tokenRes.status}`);
     const { token, sample_rate = 16000 } = await tokenRes.json();
 

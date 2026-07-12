@@ -2,6 +2,7 @@ import { debugLogger } from "@/services/debugLogger";
 import { recordAudioLatency } from "@/services/latencyTelemetry";
 import { selectMediaRecorderMimeType } from "@/services/browserCapabilities";
 import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types";
+import { authenticatedFunctionFetch } from "@/services/gameAuth";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const ENDPOINT = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/proxy-stt-whisper`;
@@ -139,7 +140,7 @@ export class OpenAIWhisperSTT implements STTSession {
     form.append("file", blob, `audio.${ext}`);
     form.append("language", "fr");
     form.append("model", "whisper-1");
-    const res = await fetch(ENDPOINT, { method: "POST", body: form });
+    const res = await authenticatedFunctionFetch(ENDPOINT, { method: "POST", body: form });
     if (!res.ok) throw new Error(`Whisper proxy ${res.status}: ${await res.text()}`);
     const data = await res.json();
     return (data.text || "").trim();

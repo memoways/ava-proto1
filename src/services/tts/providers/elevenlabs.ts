@@ -8,6 +8,7 @@ import { getTTSSettings } from "@/services/settingsService";
 import { debugLogger } from "@/services/debugLogger";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
 import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
+import { authenticatedFunctionFetch } from "@/services/gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -43,7 +44,7 @@ export const elevenLabsProvider: TTSProvider = {
     const debugId = debugLogger.logFetch("tts", `TTS-EL "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts`, body);
     const timeout = createTimeoutSignal(12000);
 
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-tts`, {
+    const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-tts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

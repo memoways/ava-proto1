@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "./debugLogger";
 import type { ConversationMessage } from "@/types";
+import { authenticatedFunctionFetch } from "./gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -41,7 +42,7 @@ export async function summarizeSessionAsync(
   const startTime = Date.now();
   const debugId = debugLogger.logFetch("other", `summarize-session (turn=${turnCount})`, `${SUPABASE_URL}/functions/v1/summarize-session`, { session_id: sessionId, turn_count: turnCount });
   try {
-    const r = await fetch(`${SUPABASE_URL}/functions/v1/summarize-session`, {
+    const r = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/summarize-session`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

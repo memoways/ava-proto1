@@ -1,6 +1,7 @@
 // Hume Octave TTS proxy — POST /v0/tts/file, returns binary audio to the client.
 // Docs: https://dev.hume.ai/docs/text-to-speech-tts/overview
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,6 +19,8 @@ interface ReqBody {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const denied = await enforceGameRequest(req, "proxy-tts-hume", corsHeaders);
+  if (denied) return denied;
 
   try {
     const apiKey = Deno.env.get("HUME_API_KEY");

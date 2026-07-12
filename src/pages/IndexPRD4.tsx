@@ -40,7 +40,6 @@ import {
 
 import WelcomeScreen from "@/components/prd4/WelcomeScreen";
 import FilmQuestionScreen from "@/components/prd4/FilmQuestionScreen";
-import PostureCaptureScreen from "@/components/prd4/PostureCaptureScreen";
 import TransitionScreen from "@/components/prd4/TransitionScreen";
 import RoleCaptureScreen from "@/components/prd4/RoleCaptureScreen";
 import RoleSummaryScreen from "@/components/prd4/RoleSummaryScreen";
@@ -60,6 +59,7 @@ import {
   type VideoTriggerSettings,
 } from "@/services/settingsService";
 import type { QuestionnairePRD4Answers, QuestionnairePRD4Data, UserPosture } from "@/types";
+import { ensureGameAuth, isGameSecurityEnabled } from "@/services/gameAuth";
 
 const SESSION_DURATION_S = 5 * 60; // PRD4 §11 : ~5 min cible.
 const TEASER_VIDEO_URL = "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049";
@@ -71,7 +71,6 @@ const IndexPRD4 = () => {
     setFilmAnswer,
     markTeaserSeen,
     setRoleProfile,
-    setUserPosture,
     setAudioState,
     addMessage,
     incrementPttError,
@@ -139,6 +138,16 @@ const IndexPRD4 = () => {
   }, [state.phase]);
 
   useEffect(() => {
+    if (isGameSecurityEnabled()) {
+      void ensureGameAuth().catch((error) => {
+        console.error("[Auth] Anonymous game session unavailable:", error);
+        toast({
+          title: "Connexion temporairement indisponible",
+          description: "Actualise la page avant de commencer l'expérience.",
+          variant: "destructive",
+        });
+      });
+    }
     void loadSTTSettingsFromDB();
   }, []);
 
@@ -198,7 +207,7 @@ const IndexPRD4 = () => {
       setFilmAnswer(a);
       trackEvent("prd4_film_answered", { answer: a });
       if (a === "vu") {
-        setPhase("posture_capture");
+        setPhase("character_select");
       } else {
         setPhase("teaser");
       }
@@ -207,34 +216,12 @@ const IndexPRD4 = () => {
   );
   const handleTeaserContinue = useCallback(() => {
     markTeaserSeen(false);
-    setPhase("posture_capture");
+    setPhase("character_select");
   }, [markTeaserSeen, setPhase]);
   const handleTeaserSkip = useCallback(() => {
     markTeaserSeen(true);
-    setPhase("posture_capture");
-  }, [markTeaserSeen, setPhase]);
-
-  // ---- Posture capture (GIFF) ----------------------------------------------
-  const handlePostureSubmit = useCallback(
-    (raw: string) => {
-      setUserPosture({ raw, mode: "voice" });
-      trackEvent("giff_posture_captured", { mode: "voice", length: raw.length });
-      setPhase("character_select");
-    },
-    [setUserPosture, setPhase],
-  );
-  const handlePostureSurprise = useCallback(() => {
-    setUserPosture({ raw: "", mode: "surprise" });
-    trackEvent("giff_posture_captured", { mode: "surprise", length: 0 });
     setPhase("character_select");
-  }, [setUserPosture, setPhase]);
-  const handlePosturePTTError = useCallback(
-    (err: Error) => {
-      incrementPttError();
-      trackEvent("prd4_ptt_error", { phase: "posture_capture", message: err.message });
-    },
-    [incrementPttError],
-  );
+  }, [markTeaserSeen, setPhase]);
 
   // ---- Role capture → summarize-role (LLM) ----------------------------------
   const handleRoleSubmit = useCallback(
@@ -961,14 +948,6 @@ const IndexPRD4 = () => {
   switch (state.phase) {
     case "film_question":
       return <FilmQuestionScreen onAnswer={handleFilmAnswer} />;
-    case "posture_capture":
-      return (
-        <PostureCaptureScreen
-          onSubmit={handlePostureSubmit}
-          onSurprise={handlePostureSurprise}
-          onPTTError={handlePosturePTTError}
-        />
-      );
     case "transition_max":
       return <TransitionScreen onContinue={handleAnswered} />;
     case "role_capture":

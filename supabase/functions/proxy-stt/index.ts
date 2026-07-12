@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,6 +14,8 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  const denied = await enforceGameRequest(req, "proxy-stt", corsHeaders);
+  if (denied) return denied;
 
   try {
     const DEEPGRAM_API_KEY = Deno.env.get('DEEPGRAM_API_KEY');
@@ -34,9 +37,17 @@ serve(async (req) => {
     if (!grantRes.ok) {
       const errText = await grantRes.text();
       console.error(`[proxy-stt] Deepgram grant error [${grantRes.status}]:`, errText);
+      const forbidden = grantRes.status === 403;
       return new Response(
-        JSON.stringify({ error: `Deepgram grant failed: ${grantRes.status}`, details: errText }),
-        { status: grantRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        JSON.stringify({
+          error: forbidden
+            ? 'Deepgram API key needs Member permission for temporary tokens'
+            : `Deepgram grant failed: ${grantRes.status}`,
+          code: forbidden ? 'DEEPGRAM_GRANT_PERMISSION' : 'DEEPGRAM_GRANT_FAILED',
+          upstream_status: grantRes.status,
+          details: errText,
+        }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 

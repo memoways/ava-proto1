@@ -3,6 +3,7 @@
 // a structured `user_role_profile_json` used by Max (summary_for_max) and
 // shown back to the player (summary_for_user).
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -63,6 +64,8 @@ function extractJson(text: string): Record<string, unknown> | null {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const denied = await enforceGameRequest(req, "summarize-role", corsHeaders);
+  if (denied) return denied;
 
   const startedAt = Date.now();
   try {

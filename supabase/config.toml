@@ -21,6 +21,21 @@ verify_jwt = false
 [functions.proxy-stt-gradium]
 verify_jwt = false
 
+[functions.proxy-stt-whisper]
+verify_jwt = false
+
+[functions.proxy-stt-assemblyai]
+verify_jwt = false
+
+[functions.proxy-stt-config]
+verify_jwt = false
+
+[functions.summarize-role]
+verify_jwt = false
+
+[functions.sync-questionnaire]
+verify_jwt = false
+
 
 [functions.sync-notion]
 verify_jwt = false

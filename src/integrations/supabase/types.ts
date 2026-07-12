@@ -426,6 +426,7 @@ export type Database = {
           teaser_shown: boolean | null
           triggers_activated: string[] | null
           trust_level: number | null
+          user_id: string | null
           user_posture_mode: string | null
           user_posture_raw: string | null
           variante_onboarding: string | null
@@ -454,6 +455,7 @@ export type Database = {
           teaser_shown?: boolean | null
           triggers_activated?: string[] | null
           trust_level?: number | null
+          user_id?: string | null
           user_posture_mode?: string | null
           user_posture_raw?: string | null
           variante_onboarding?: string | null
@@ -482,6 +484,7 @@ export type Database = {
           teaser_shown?: boolean | null
           triggers_activated?: string[] | null
           trust_level?: number | null
+          user_id?: string | null
           user_posture_mode?: string | null
           user_posture_raw?: string | null
           variante_onboarding?: string | null

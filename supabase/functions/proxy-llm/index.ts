@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -53,6 +54,8 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+  const denied = await enforceGameRequest(req, "proxy-llm", corsHeaders);
+  if (denied) return denied;
 
   try {
     const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY');

@@ -4,9 +4,9 @@ const PROJECT_ID = "iralfqlslqndgvexixis";
 const SUPABASE_ORIGIN = `https://${PROJECT_ID}.supabase.co`;
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const CHARACTER_ID = "22222222-2222-4222-8222-222222222222";
+const ANONYMOUS_USER_ID = "33333333-3333-4333-8333-333333333333";
 
 const TRANSCRIPTS = [
-  "Je veux comprendre ce qui est arrivé à Ava.",
   "Où étais-tu la dernière fois que tu as vu Ava ?",
   "Pourquoi ne fais-tu pas confiance à la police ?",
   "Quel souvenir important gardes-tu de ta sœur ?",
@@ -99,6 +99,24 @@ async function installNetworkFakes(page: Page) {
   await page.route("https://gamilab.ch/**", (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
   await page.route("https://eu.i.posthog.com/**", (route) => route.fulfill({ status: 200, body: "{}" }));
 
+  await page.route(`${SUPABASE_ORIGIN}/auth/v1/signup`, (route) => json(route, {
+    access_token: "e2e-anonymous-access-token",
+    token_type: "bearer",
+    expires_in: 3600,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    refresh_token: "e2e-anonymous-refresh-token",
+    user: {
+      id: ANONYMOUS_USER_ID,
+      aud: "authenticated",
+      role: "authenticated",
+      is_anonymous: true,
+      app_metadata: { provider: "anonymous", providers: ["anonymous"] },
+      user_metadata: {},
+      identities: [],
+      created_at: new Date().toISOString(),
+    },
+  }));
+
   await page.route(`${SUPABASE_ORIGIN}/rest/v1/**`, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -128,6 +146,7 @@ async function installNetworkFakes(page: Page) {
   await page.route(`${SUPABASE_ORIGIN}/functions/v1/**`, async (route) => {
     const request = route.request();
     const functionName = new URL(request.url()).pathname.split("/").pop();
+    expect(request.headers().authorization).toBe("Bearer e2e-anonymous-access-token");
 
     if (functionName === "proxy-stt") {
       return json(route, { key: "e2e-short-lived-token", expires_in: 60, model: "nova-2", language: "fr" });
@@ -186,19 +205,15 @@ test("parcours PRD4 heureux avec trois tours de conversation", async ({ page }) 
   await expect(page.getByRole("button", { name: "Commencer" })).toBeEnabled();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
-
-  await page.getByRole("button", { name: "Cliquer pour parler" }).click();
-  await expect(page.getByText(TRANSCRIPTS[0])).toBeVisible();
-  await page.getByRole("button", { name: "Cliquer pour arrêter" }).click();
-  await expect(page.getByRole("button", { name: "Continuer" })).toBeEnabled();
-  await page.getByRole("button", { name: "Continuer" }).click();
+  await expect(page.getByRole("heading", { name: "À qui veux-tu parler ?" })).toBeVisible();
+  await expect(page.getByText(/poser une question, exprimer une émotion/i)).toHaveCount(0);
 
   await page.getByRole("button", { name: "Appeler Max" }).click();
   await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeVisible({ timeout: 10_000 });
 
   for (let turn = 1; turn <= 3; turn += 1) {
     await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
-    await expect(page.getByText(new RegExp(TRANSCRIPTS[turn].slice(0, 24)))).toBeVisible();
+    await expect(page.getByText(new RegExp(TRANSCRIPTS[turn - 1].slice(0, 24)))).toBeVisible();
     await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
     await expect(page.getByText(`Réponse de Max pour le tour ${turn}.`)).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();

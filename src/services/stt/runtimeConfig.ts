@@ -1,4 +1,5 @@
 import type { STTProviderId, STTProviderRuntimeStatus } from "./types";
+import { authenticatedFunctionFetch } from "@/services/gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
   || (import.meta.env.VITE_SUPABASE_PROJECT_ID ? `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co` : "");
@@ -28,7 +29,7 @@ export async function getSTTRuntimeConfig(): Promise<STTRuntimeConfig> {
   if (!SUPABASE_URL) return DEFAULT_RUNTIME_CONFIG;
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/proxy-stt-config`, {
+    const res = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-stt-config`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
     });

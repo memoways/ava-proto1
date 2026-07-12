@@ -1,6 +1,7 @@
 import { trackLLMCall } from "./llmUsageTracker";
 import { debugLogger } from "./debugLogger";
 import { TimeoutError, withTimeout } from "./asyncUtils";
+import { authenticatedFunctionFetch } from "./gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -44,7 +45,7 @@ function normalizeTimeoutError(err: unknown, label: string, timeoutMs: number): 
 
 async function fetchProxyLLM(body: Record<string, unknown>, timeoutMs: number, label: string): Promise<Response> {
   const controller = new AbortController();
-  const fetchPromise = fetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
+  const fetchPromise = authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

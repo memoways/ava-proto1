@@ -4,6 +4,35 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.38.0] - 2026-07-12 — Phase 1 sécurité sessions et fournisseurs
+
+### Ajouté
+- Identité Supabase anonyme transparente pour le parcours public, sans formulaire ni collecte de PII.
+- Ownership RLS des sessions via `user_id = auth.uid()` et protection des champs administratifs.
+- Quotas PostgreSQL atomiques par utilisateur pour STT, LLM, TTS, RAG, résumés et synchronisation Notion.
+- Garde Edge partagée retournant `401`, `429` avec `Retry-After`, ou `503` en cas d'indisponibilité du contrôle.
+
+### Modifié
+- L'activation des JWT/quota Edge est contrôlée par `GAME_SECURITY_ENFORCED`; elle reste désactivée par défaut pour permettre un déploiement Lovable sans coupure.
+- L'authentification frontend est contrôlée par `VITE_GAME_SECURITY_ENABLED` et s'active après la migration d'expansion.
+- Tous les appels frontend correspondants transmettent le vrai access token Supabase ; la clé publique n'est plus utilisée comme faux Bearer token.
+- Les résumés de session et questionnaires vérifient en plus l'appartenance de la session.
+- Le passage de la vidéo d'introduction ouvre directement la sélection des quatre personnages ; l'écran de dictée préalable est retiré du parcours.
+
+### Corrigé
+- Le contrat Gamilab attendu par le SDK (`portalId` + token) est restauré en mode interne avec réponse `no-store`.
+- L'échec Deepgram `403` est expliqué comme un manque de permission **Member** sur la clé utilisée pour générer les jetons temporaires.
+- La migration Phase 1 est divisée en étapes expansion/verrouillage afin d'éviter une interruption pendant le déploiement Lovable.
+
+### Validation
+- 58 tests Vitest verts, dont cinq preuves PostgreSQL RLS/ownership/quota.
+- Build et TypeScript verts.
+- Garde partagée et 15 Edge Functions validées par `deno check`.
+- Parcours Playwright de trois tours vert avec authentification anonyme simulée.
+- Déploiement distant volontairement non effectué : branche Supabase/Lovable inaccessible depuis cette session.
+
+---
+
 ## [0.37.1] - 2026-07-12 — Phase 0 de stabilisation pré-public
 
 ### Ajouté

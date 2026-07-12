@@ -5,12 +5,14 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { ConversationMessage, UserRoleProfile } from "@/types";
 import type { Json } from "@/integrations/supabase/types";
+import { ensureGameAuth } from "@/services/gameAuth";
 
 export async function createPRD4Session(
   userRole: UserRoleProfile | null,
   character = "max",
   extra?: Record<string, unknown>,
 ): Promise<string> {
+  await ensureGameAuth();
   const { data, error } = await supabase
     .from("sessions")
     .insert({

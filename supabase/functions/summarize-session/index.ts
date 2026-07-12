@@ -2,6 +2,7 @@
 // stored in `session_summaries` and injected back into Max's system prompt.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,7 +20,6 @@ interface ConversationMessage {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
   const startedAt = Date.now();
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -36,6 +36,8 @@ serve(async (req) => {
     const sessionId = (body?.session_id || "").toString();
     const conversation: ConversationMessage[] = Array.isArray(body?.conversation) ? body.conversation : [];
     const turnCount = Number(body?.turn_count ?? 0);
+    const denied = await enforceGameRequest(req, "summarize-session", corsHeaders, sessionId || null);
+    if (denied) return denied;
 
     if (!sessionId || !conversation.length) {
       return new Response(JSON.stringify({ error: "session_id and conversation are required" }), {

@@ -2,6 +2,7 @@ import { debugLogger } from "@/services/debugLogger";
 import { recordAudioLatency } from "@/services/latencyTelemetry";
 import { selectMediaRecorderMimeType } from "@/services/browserCapabilities";
 import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types";
+import { authenticatedFunctionFetch } from "@/services/gameAuth";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const ENDPOINT = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/proxy-stt-gradium`;
@@ -111,7 +112,7 @@ export class GradiumSTT implements STTSession {
 
   private async transcribe(blob: Blob): Promise<string> {
     const contentType = blob.type || "audio/webm";
-    const res = await fetch(ENDPOINT, {
+    const res = await authenticatedFunctionFetch(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": contentType },
       body: blob,

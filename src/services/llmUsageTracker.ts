@@ -11,6 +11,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { authenticatedFunctionFetch } from "./gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const COST_ERROR_LOG_STORAGE_KEY = "ava_openrouter_cost_error_logs";
@@ -167,16 +168,11 @@ export async function fetchGenerationCost(
   total_tokens: number;
 } | null> {
   try {
-    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), COST_FETCH_TIMEOUT_MS);
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
+    const res = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": SUPABASE_KEY,
-        "Authorization": `Bearer ${SUPABASE_KEY}`,
-      },
+      headers: { "Content-Type": "application/json" },
       signal: controller.signal,
       body: JSON.stringify({
         _action: "get_generation_cost",

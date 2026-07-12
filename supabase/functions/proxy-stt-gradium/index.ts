@@ -2,6 +2,7 @@
 // Docs: https://docs.gradium.ai/guides/speech-to-text-rest
 // Response is NDJSON; we aggregate `text` messages into one final string.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,8 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const denied = await enforceGameRequest(req, "proxy-stt-gradium", corsHeaders);
+  if (denied) return denied;
 
   try {
     const apiKey = Deno.env.get("GRADIUM_API_KEY");
@@ -23,7 +26,7 @@ serve(async (req) => {
     if (contentType.startsWith("multipart/form-data")) {
       const form = await req.formData();
       const file = form.get("file");
-      if (!(file instanceof File) && !(file instanceof Blob)) {
+      if (!(file instanceof File)) {
         return new Response(JSON.stringify({ error: "Missing 'file' field" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

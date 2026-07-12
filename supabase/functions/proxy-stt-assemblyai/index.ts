@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +9,8 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const denied = await enforceGameRequest(req, "proxy-stt-assemblyai", corsHeaders);
+  if (denied) return denied;
 
   try {
     const apiKey = Deno.env.get("ASSEMBLYAI_API_KEY");

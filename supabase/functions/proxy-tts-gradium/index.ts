@@ -1,6 +1,7 @@
 // Gradium TTS proxy — POST /api/post/speech/tts (only_audio=true → raw audio bytes).
 // Docs: https://docs.gradium.ai/guides/text-to-speech-rest
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,6 +26,8 @@ const CONTENT_TYPES: Record<string, string> = {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const denied = await enforceGameRequest(req, "proxy-tts-gradium", corsHeaders);
+  if (denied) return denied;
 
   try {
     const apiKey = Deno.env.get("GRADIUM_API_KEY");

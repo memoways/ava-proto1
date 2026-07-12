@@ -4,6 +4,7 @@
  * en `UserRoleProfile` structuré.
  */
 import type { UserRoleProfile } from "@/types";
+import { authenticatedFunctionFetch } from "@/services/gameAuth";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 
@@ -15,7 +16,7 @@ export interface SummarizeRoleResult {
 
 export async function summarizeRole(rawInput: string): Promise<SummarizeRoleResult> {
   const url = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/summarize-role`;
-  const res = await fetch(url, {
+  const res = await authenticatedFunctionFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ raw_input: rawInput }),

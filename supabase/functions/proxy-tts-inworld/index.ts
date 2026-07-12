@@ -5,6 +5,7 @@
 // Docs: https://docs.inworld.ai/tts/tts.md
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { decode as base64Decode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,6 +25,8 @@ interface ReqBody {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const denied = await enforceGameRequest(req, "proxy-tts-inworld", corsHeaders);
+  if (denied) return denied;
 
   try {
     const apiKey = Deno.env.get("INWORLD_API_KEY");
@@ -155,7 +158,7 @@ serve(async (req) => {
     }
 
     const audioBytes = base64Decode(b64);
-    return new Response(audioBytes, {
+    return new Response(audioBytes.slice().buffer as ArrayBuffer, {
       headers: { ...corsHeaders, "Content-Type": "audio/mpeg" },
     });
   } catch (error: unknown) {

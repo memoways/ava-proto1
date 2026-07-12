@@ -2,6 +2,7 @@ import { debugLogger } from "./debugLogger";
 import { recordAudioLatency } from "./latencyTelemetry";
 import { createTimeoutSignal, withTimeout } from "./asyncUtils";
 import { getBrowserDiagnostics, selectMediaRecorderMimeType } from "./browserCapabilities";
+import { authenticatedFunctionFetch } from "./gameAuth";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 
@@ -15,7 +16,7 @@ export async function getDeepgramToken(): Promise<DeepgramConfig> {
   const startTime = Date.now();
   const debugId = debugLogger.logFetch("stt", "Get Deepgram token", `proxy-stt`);
   const timeout = createTimeoutSignal(5000);
-  const res = await fetch(
+  const res = await authenticatedFunctionFetch(
     `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/proxy-stt`,
     {
       method: 'POST',
@@ -25,7 +26,11 @@ export async function getDeepgramToken(): Promise<DeepgramConfig> {
   ).finally(timeout.cancel);
   if (!res.ok) {
     debugLogger.logResponse(debugId, "stt", "Deepgram token", res.status, startTime);
-    throw new Error(`Failed to get Deepgram token: ${res.status}`);
+    const payload = await res.json().catch(() => null) as { code?: string; error?: string } | null;
+    if (payload?.code === "DEEPGRAM_GRANT_PERMISSION") {
+      throw new Error("Deepgram indisponible : la clé doit avoir la permission Member.");
+    }
+    throw new Error(payload?.error || `Failed to get Deepgram token: ${res.status}`);
   }
   debugLogger.logResponse(debugId, "stt", "Deepgram token OK", res.status, startTime);
   return res.json();

@@ -10,10 +10,12 @@ Le projet n'est pas public. Aucun lien d'aperçu ou de production ne doit être 
 
 ## Critères obligatoires avant ouverture
 
-- [ ] Build, typecheck, tests unitaires, test RLS et test E2E verts dans une installation propre.
+- [x] Build, typecheck, tests unitaires, test RLS et test E2E verts localement.
 - [ ] Création, mise à jour, clôture et questionnaire d'une session vérifiés avec un client anonyme sur une branche Supabase isolée.
-- [ ] Impossible pour une session de lire ou modifier une autre session.
-- [ ] Proxys payants protégés par un jeton de session et des quotas.
+- [x] Isolation de deux identités et impossibilité de lire/modifier la session voisine prouvées dans PostgreSQL 17 isolé.
+- [x] Proxys payants protégés par JWT anonyme et quotas atomiques dans le code versionné.
+- [ ] Anonymous Sign-Ins et CAPTCHA activés sur l'environnement externe.
+- [ ] Publication Lovable repassée en privé/interne (`publish_visibility` est actuellement `public`).
 - [ ] Parcours de 15 minutes validé sans désordre de tours ni croissance non bornée du contexte.
 - [ ] Consentement/information micro et analytics validés.
 - [ ] Headers de sécurité contrôlés sur l'URL réellement servie.
@@ -32,14 +34,17 @@ npm run test:e2e
 
 Le test E2E simule localement Gumlet, Supabase, Deepgram, le LLM et le TTS. Il ne consomme aucun quota fournisseur et ne modifie aucune donnée distante.
 
-## Blocage RLS confirmé
+## Contrat RLS Phase 1
 
-Le test `src/integration/sessionsRls.integration.test.ts` reproduit les policies versionnées dans PostgreSQL 17 isolé :
+Le test `src/integration/sessionsRls.integration.test.ts` applique la migration Phase 1 réelle dans PostgreSQL 17 isolé et confirme :
 
-- `INSERT ... RETURNING id` est rejeté sans policy `SELECT` ;
-- `UPDATE sessions ... WHERE id = ...` affecte zéro ligne sans policy `SELECT`.
+- la clé publique seule ne peut plus créer de session ;
+- une identité anonyme peut créer, relire et mettre à jour sa propre session ;
+- une seconde identité ne peut ni lire ni modifier cette session ;
+- les champs administratifs et les side effects liés à une session sont protégés ;
+- les quotas fournisseurs sont atomiques.
 
-Ce test est une caractérisation du stop-ship, pas une acceptation du comportement. La phase 1 devra introduire une propriété de session vérifiable côté serveur ou déplacer les mutations derrière une Edge Function. Une lecture anonyme globale de `sessions` est explicitement interdite.
+Le smoke test sur branche distante reste obligatoire avant ouverture. Une lecture anonyme globale de `sessions` reste explicitement interdite.
 
 ## Procédure d'ouverture
 

@@ -1,6 +1,7 @@
 // Lightweight query rewriter — turns a follow-up like "et toi ?" into a self-contained
 // search query that RAG (vector + rerank) can match meaningfully.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +14,8 @@ const MODEL = "google/gemini-3-flash-preview";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const denied = await enforceGameRequest(req, "rewrite-query", corsHeaders);
+  if (denied) return denied;
 
   const startedAt = Date.now();
   try {

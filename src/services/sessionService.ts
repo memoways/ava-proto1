@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "./debugLogger";
 import type { Json } from "@/integrations/supabase/types";
 import type { ConversationMessage, QuestionnaireData } from "@/types";
+import { authenticatedFunctionFetch, ensureGameAuth } from "./gameAuth";
 
 export interface SessionRecord {
   id: string;
@@ -18,6 +19,7 @@ export interface SessionRecord {
 
 /** Create a new session row and return its ID */
 export async function createSession(branch = "male"): Promise<string> {
+  await ensureGameAuth();
   debugLogger.log({ service: "session", level: "info", direction: "out", label: "Create session", detail: `branch=${branch}` });
   const { data, error } = await supabase
     .from("sessions")
@@ -139,7 +141,7 @@ export async function syncQuestionnaireToNotion(
   try {
     const startTime = Date.now();
     const debugId = debugLogger.logFetch("notion", "Sync questionnaire → Notion", `${SUPABASE_URL}/functions/v1/sync-questionnaire`, { sessionId });
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-questionnaire`, {
+    const res = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/sync-questionnaire`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

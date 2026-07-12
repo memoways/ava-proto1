@@ -8,6 +8,7 @@ import { getGradiumSettings } from "@/services/tts/providerSettings";
 import { debugLogger } from "@/services/debugLogger";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
 import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
+import { authenticatedFunctionFetch } from "@/services/gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -35,7 +36,7 @@ export const gradiumProvider: TTSProvider = {
     const debugId = debugLogger.logFetch("tts", `TTS-GR "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts-gradium`, body);
     const timeout = createTimeoutSignal(12000);
 
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-tts-gradium`, {
+    const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-tts-gradium`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

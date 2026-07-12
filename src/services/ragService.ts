@@ -1,6 +1,7 @@
 import { debugLogger } from "./debugLogger";
 import { supabase } from "@/integrations/supabase/client";
 import type { MaxTurnKnowledgeContext } from "@/types";
+import { authenticatedFunctionFetch } from "./gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -35,7 +36,7 @@ export interface RAGQueryOptions {
 }
 
 async function callQueryRag(payload: Record<string, unknown>): Promise<{ matches: RAGMatch[]; embedding_provider?: string; rerank_used?: boolean; latency_ms?: number; error?: string; status?: number }> {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
+  const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -215,7 +216,7 @@ export async function syncNotion(databases: Record<string, string> = AVA_NOTION_
 
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
+  const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -238,7 +239,7 @@ export async function syncNotion(databases: Record<string, string> = AVA_NOTION_
 /** Lightweight LLM-based query rewriter — turns "et toi ?" into a self-contained search query. */
 export async function rewriteRAGQuery(userMessage: string, recentContext?: string, characterName?: string): Promise<string | null> {
   try {
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/rewrite-query`, {
+    const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/rewrite-query`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_message: userMessage, recent_context: recentContext, character_name: characterName }),

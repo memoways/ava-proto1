@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +9,8 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const denied = await enforceGameRequest(req, "proxy-stt-whisper", corsHeaders);
+  if (denied) return denied;
 
   try {
     const apiKey = Deno.env.get("OPENAI_API_KEY");
@@ -17,7 +20,7 @@ serve(async (req) => {
     const file = inForm.get("file");
     const language = (inForm.get("language") as string) || "fr";
     const model = (inForm.get("model") as string) || "whisper-1";
-    if (!(file instanceof File) && !(file instanceof Blob)) {
+    if (!(file instanceof File)) {
       return new Response(JSON.stringify({ error: "Missing 'file' field" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
