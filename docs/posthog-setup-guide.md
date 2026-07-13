@@ -13,15 +13,18 @@ Voir aussi : `docs/posthog_latency_observability_audit.md` pour l'audit critique
 
 ### 1.1 Initialisation
 
-Fichier : `src/services/posthogService.ts` (appelé depuis `src/main.tsx` via `initPostHog()`).
+Fichier : `src/services/posthogService.ts` (activé depuis `src/main.tsx` via `initializeAnalyticsFromStoredConsent()`).
 
 Options activées :
-- `capture_pageview: true` — vue de page automatique sur chaque navigation
+- `$pageview` explicite après initialisation — la première vue ne peut pas être perdue pendant le chargement du SDK
 - `capture_pageleave: true` — événement de sortie de page
-- `autocapture: true` — clics, soumissions de formulaire, changements d'input
-- `session_recording: { maskAllInputs: false }` — **enregistrement de session activé**, inputs non masqués (jeu = pas de PII sensible)
+- `autocapture: false` — aucun clic, formulaire ou changement d'input automatique
+- `disable_session_recording: true` — aucun replay de session
+- `persistence: "memory"` et `person_profiles: "never"` — pas de profil persistant
 
-`identifyUser(sessionId)` est appelé au démarrage d'une session de jeu (`Index.tsx`) avec l'ID de session Supabase comme `distinct_id`. Toutes les actions du joueur sont donc attachées à cette session.
+Pendant les tests internes, la collecte technique structurée est active par défaut et le panneau est masqué. `VITE_PRIVACY_NOTICE_ENABLED=true` rétablit le panneau et l'opt-in pour l'expérience finale. Les appels émis pendant le chargement asynchrone du SDK sont conservés dans une file bornée, puis rejoués.
+
+`identifyUser(sessionId)` est appelé après création de la session (`IndexPRD4.tsx`) avec l'ID Supabase pseudonyme. Les événements suivants sont ainsi corrélés à la session sans créer de profil personne.
 
 ### 1.2 Pipeline de télémétrie latence
 
@@ -52,25 +55,26 @@ Les événements `voice_turn_completed` et `voice_error` sont aussi persistés e
 
 ### 2.2 Événements de jeu / funnel
 
-Envoyés depuis `src/pages/Index.tsx` :
+Le parcours actuel envoie notamment depuis `src/pages/IndexPRD4.tsx` :
 
 | Event | Quand | Propriétés |
 |---|---|---|
-| `game_started` | Démarrage session | `session_id`, `variant` (A/B), `voice_modality` |
-| `ab_choice_made` | Choix A/B | `variant` |
-| `voice_modality_assigned` | Assignation modalité | `modality` |
-| `phase_changed` | Changement d'écran | `phase` (`intro_video`, `ab_choice`, `character_select`, `ringing`, `conversation`, `gate`, `game_over`, `questionnaire`, `thanks`) |
-| `character_selected` | Choix personnage | `character` |
-| `intro_video_completed` | Fin vidéo intro | — |
-| `video_trigger_activated` | Vidéo in-game déclenchée par GM | `trigger_id`, `trigger_title` |
-| `game_over` | Fin de partie | `reason`, `trust_level`, `duration` |
-| `questionnaire_submitted` | Soumission questionnaire | `session_id`, `variant`, `voice_modality` |
-| `tts_error` | Échec TTS pendant la conversation | (détails erreur) |
+| `prd4_phase_changed` | Changement d'écran | `phase` |
+| `prd4_onboarding_started` | Démarrage du parcours | — |
+| `prd4_session_started` | Session Supabase créée | `session_id` |
+| `prd4_session_duration_loaded` | Durée admin chargée | `duration_seconds` |
+| `prd4_turn_completed` | Tour terminé | `session_id`, `turn_index`, latences |
+| `prd4_gm_post_turn` | Analyse GM asynchrone | labels, engagement, recommandations, latence |
+| `prd4_video_triggered` / `prd4_video_completed` | Vidéo dynamique | `session_id`, `video_id`, source/état |
+| `prd4_persistence_result` | Écriture critique | opération, succès, `session_id` |
+| `prd4_session_ended` | Fin de session | raison, durée, nombre de tours |
+| `prd4_questionnaire_submitted` | Questionnaire | `session_id`, durée et nombre de tours |
 
-### 2.3 Autocapture & session replay
+### 2.3 Autocapture, logs et session replay
 
-- Tous les clics/inputs sont capturés automatiquement (`autocapture`).
-- Les sessions sont **enregistrées intégralement** (rrweb) et accessibles dans **Session Replay**.
+- L'autocapture et le replay restent désactivés : ils ne sont pas nécessaires aux métriques de fluidité.
+- Les erreurs techniques structurées sont conservées après caviardage des tokens, clés et JWT.
+- Les transcriptions, réponses libres, réponses brutes et contenus narratifs ne sont jamais envoyés à PostHog.
 
 ---
 

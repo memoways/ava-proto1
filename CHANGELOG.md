@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.41.2] - 2026-07-13 — Télémétrie interne continue
+
+### Modifié
+- Le panneau d'information voix/analytics est masqué pendant les tests internes. Il reste versionné et se réactive pour l'expérience finale avec `VITE_PRIVACY_NOTICE_ENABLED=true` dans Lovable.
+- En mode interne, PostHog et Grain démarrent automatiquement ; un ancien refus local ne peut plus désactiver les mesures de la campagne.
+- Les événements déclenchés pendant le chargement asynchrone de PostHog sont mis en attente puis rejoués dans l'ordre, avec une limite mémoire de 200 opérations.
+- `$pageview`, `$pageleave`, les événements PRD4, les latences, erreurs techniques et résultats de persistance restent mesurés. Les secrets sont caviardés et les transcriptions/réponses libres restent exclues.
+- La session pseudonyme est utilisée comme identifiant PostHog après sa création, sans profil personne persistant, autocapture ni session replay.
+
+### Corrigé
+- Mise à jour ciblée de `posthog-js` de `1.372.1` à `1.399.4`, supprimant la chaîne OpenTelemetry vulnérable et évitant une file d'envoi bloquée après opt-in.
+
+### Validation
+- Tests dédiés des doubles écritures PostHog + Supabase pour `turn_latencies`, `audio_latencies`, `voice_turn_events` et `voice_error_events`.
+- Parcours Playwright confirmant que le panneau est absent, que le bouton reste utilisable et qu'une requête PostHog quitte réellement le navigateur.
+
 ## [0.41.1] - 2026-07-13 — Résilience ElevenLabs 429
 
 ### Corrigé

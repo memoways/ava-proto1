@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-13 (Phase 4 protections pré-public versionnées)
+> **Last Updated**: 2026-07-13 (télémétrie interne continue, panneau final conservé)
 
 ---
 
@@ -65,6 +65,16 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-07-13 — Tests internes : mesurer sans interrompre l'entrée 🔷
+
+**Intent.** Retirer temporairement le panneau voix/analytics de l'accueil tout en conservant sa version finale et en garantissant que la campagne interne fournisse bien les métriques nécessaires.
+
+**Correction.** Le mode interne est désormais le défaut : PostHog et Grain démarrent sans dépendre d'un ancien choix local, les événements précoces attendent la fin du chargement du SDK et la session pseudonyme corrèle les événements suivants. Le panneau complet revient avec `VITE_PRIVACY_NOTICE_ENABLED=true` dans Lovable.
+
+**Périmètre des données.** Pageview/pageleave, phases PRD4, persistance, STT/RAG/LLM/TTS, p50/p95 et erreurs techniques sont conservés. Les erreurs sont caviardées avant PostHog ; autocapture, replay, profils persistants, transcriptions et réponses libres restent exclus. Les tables Supabase de télémétrie n'ont jamais été conditionnées par le consentement et restent actives.
+
+**Validation.** Tests unitaires PostHog et doubles écritures internes, plus un parcours navigateur qui constate une vraie requête PostHog sans afficher le panneau.
 
 ### 2026-07-13 — Correctif TTS : absorber les saturations ElevenLabs 🔷
 

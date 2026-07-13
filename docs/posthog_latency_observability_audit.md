@@ -1,5 +1,7 @@
 # Audit observabilité latence — Max voice-to-voice + PostHog
 
+> Suivi du 13 juillet 2026 : la configuration décrite dans le snapshot initial ci-dessous a été durcie. Le parcours courant utilise `IndexPRD4.tsx`, l'autocapture et le replay sont désactivés, les événements structurés restent actifs en mode interne, et les mesures agrégées sont aussi persistées dans `voice_turn_events` / `voice_error_events`. Voir `docs/posthog-setup-guide.md` pour l'état opérationnel courant.
+
 Date: 2026-05-22
 Projet PostHog: `137897`
 Host PostHog: `https://eu.i.posthog.com`

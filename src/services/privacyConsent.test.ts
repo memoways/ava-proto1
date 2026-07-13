@@ -30,6 +30,7 @@ describe("privacyConsent", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    vi.stubEnv("VITE_PRIVACY_NOTICE_ENABLED", "true");
   });
 
   it("persists the required acknowledgement separately from optional analytics", () => {
@@ -89,5 +90,28 @@ describe("privacyConsent", () => {
       expect(analytics.disablePostHog).toHaveBeenCalledOnce();
       expect(analytics.disableGrainAnalytics).toHaveBeenCalledOnce();
     });
+  });
+
+  it("enables technical analytics without displaying consent during internal tests", async () => {
+    vi.stubEnv("VITE_PRIVACY_NOTICE_ENABLED", "false");
+
+    initializeAnalyticsFromStoredConsent();
+
+    await vi.waitFor(() => {
+      expect(analytics.enablePostHog).toHaveBeenCalledOnce();
+      expect(analytics.enableGrainAnalytics).toHaveBeenCalledOnce();
+    });
+  });
+
+  it("does not disable internal telemetry when an old preference is cleared", async () => {
+    vi.stubEnv("VITE_PRIVACY_NOTICE_ENABLED", "false");
+
+    clearPrivacyPreferences();
+
+    await vi.waitFor(() => {
+      expect(analytics.enablePostHog).toHaveBeenCalledOnce();
+      expect(analytics.enableGrainAnalytics).toHaveBeenCalledOnce();
+    });
+    expect(analytics.disablePostHog).not.toHaveBeenCalled();
   });
 });

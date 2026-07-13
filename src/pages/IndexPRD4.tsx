@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useExperienceState } from "@/hooks/useExperienceState";
 import type { AudioState, ConversationMessage, FilmAnswer } from "@/types";
-import { trackEvent } from "@/services/posthogService";
+import { identifyUser, trackEvent } from "@/services/posthogService";
 import { summarizeRole } from "@/services/roleProfileService";
 import { processPRD4Turn } from "@/services/prd4Orchestrator";
 import { createPRD4Session, endPRD4Session, updatePRD4Conversation, updatePRD4Onboarding } from "@/services/prd4Session";
@@ -74,6 +74,7 @@ import type { QuestionnairePRD4Answers, QuestionnairePRD4Data, UserPosture } fro
 import { ensureGameAuth, isGameCaptchaEnabled, isGameSecurityEnabled } from "@/services/gameAuth";
 import {
   getPrivacyPreferences,
+  isPrivacyNoticeEnabled,
   savePrivacyPreferences,
   type PrivacyPreferences,
 } from "@/services/privacyConsent";
@@ -182,7 +183,7 @@ const IndexPRD4 = () => {
   // pas la latence réseau. Avec CAPTCHA, l'identité attend sa preuve utilisateur.
   useEffect(() => {
     if (
-      privacyPreferences?.voiceAndStorageAcknowledged &&
+      (!isPrivacyNoticeEnabled() || privacyPreferences?.voiceAndStorageAcknowledged) &&
       isGameSecurityEnabled() &&
       !isGameCaptchaEnabled()
     ) {
@@ -236,7 +237,7 @@ const IndexPRD4 = () => {
   }, []);
 
   const handleStart = useCallback(async (captchaToken?: string): Promise<boolean> => {
-    if (!privacyPreferences?.voiceAndStorageAcknowledged) return false;
+    if (isPrivacyNoticeEnabled() && !privacyPreferences?.voiceAndStorageAcknowledged) return false;
     if (isGameSecurityEnabled()) {
       try {
         await withTimeout("anonymous_game_auth", ensureGameAuth(captchaToken), 5_000);
@@ -370,6 +371,7 @@ const IndexPRD4 = () => {
     try {
       const sid = await createPRD4Session(state.userRoleProfile, "max");
       sessionIdRef.current = sid;
+      identifyUser(sid, { experience: "prd4", character: "max" });
       trackEvent("prd4_session_started", { session_id: sid });
       const startedAt = onboardingStartedAtRef.current;
       const posture = userPostureRef.current;

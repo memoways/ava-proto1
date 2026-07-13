@@ -9,11 +9,11 @@ Cette phase pose les protections nécessaires avant les tests utilisateurs de se
 
 ## Protections déjà versionnées
 
-- l'utilisateur doit prendre connaissance du traitement vocal et de la conservation pseudonyme avant de commencer ;
-- PostHog et Grain restent éteints tant que l'utilisateur n'accepte pas les mesures optionnelles ;
+- le panneau d'information et de choix final est conservé derrière `VITE_PRIVACY_NOTICE_ENABLED=true` ;
+- pendant les tests internes, ce flag reste absent ou à `false` : le panneau est masqué et les mesures techniques PostHog/Grain sont actives par défaut ;
 - PostHog n'utilise ni cookie persistant, ni autocapture, ni replay, ni profil personne ;
-- les propriétés de texte libre et messages d'erreur sont retirées des événements PostHog ;
-- le SDK Gamilab n'est plus exécuté au chargement de la page : il est chargé après l'information obligatoire, puis préchauffé pendant le teaser ;
+- les transcriptions, réponses libres et réponses brutes sont retirées des événements PostHog ; les erreurs techniques restent disponibles après caviardage des secrets ;
+- le SDK Gamilab n'est plus exécuté au chargement de la page : il est préchauffé au démarrage du teaser ;
 - hCaptcha est prêt de manière conditionnelle : tant que `VITE_HCAPTCHA_SITE_KEY` est absent, le parcours actuel ne change pas ;
 - `/auth` ne propose plus d'inscription admin publique ;
 - une page `/confidentialite` permet de modifier le choix analytics.
@@ -34,9 +34,9 @@ L'ordre est important. Ne pas activer la vérification CAPTCHA côté Supabase a
 
 ## Smoke test obligatoire
 
-- refus de démarrer tant que l'information vocale n'est pas cochée ;
-- démarrage possible sans accepter les analytics ;
-- aucune requête PostHog/Grain avant opt-in ;
+- en mode interne, aucun panneau affiché et démarrage direct avec requêtes PostHog visibles ;
+- `turn_latency`, `audio_latency`, `voice_turn_completed`, `voice_error` et `prd4_persistence_result` visibles dans PostHog et/ou les tables internes correspondantes ;
+- pour la recette finale, activer `VITE_PRIVACY_NOTICE_ENABLED=true`, puis vérifier le blocage avant information et l'opt-in analytics séparé ;
 - widget CAPTCHA exigé dans une nouvelle fenêtre privée ;
 - création de session Supabase, trois tours STT → RAG → LLM → TTS, questionnaire et clôture ;
 - Deepgram puis Gamilab testés séparément ; pour Gamilab, le SDK doit se charger pendant le teaser et non au premier affichage ;
@@ -73,7 +73,7 @@ Aucun `DELETE` automatique n'est livré dans cette phase : l'état des dépendan
 
 - confirmer que le projet PostHog utilise la région UE et que la capture d'IP est désactivée dans sa console ;
 - ne pas réactiver autocapture, replay, surveys ou profils utilisateurs ;
-- vérifier dans l'onglet Réseau que seuls les événements techniques prévus partent après opt-in ;
+- vérifier dans l'onglet Réseau que seuls les événements techniques prévus partent ; en mode final, ils ne doivent partir qu'après opt-in ;
 - documenter les sous-traitants STT, RAG, LLM et TTS retenus pour les tests ;
 - le token portail Gamilab est encore consommé par son SDK navigateur : obtenir de Gamilab un mécanisme éphémère officiellement supporté avant une ouverture large.
 
@@ -97,7 +97,7 @@ curl -I https://URL-DE-TEST
 
 ## Dette supply-chain connue
 
-`npm audit --omit=dev` reste à **23 alertes de production** (14 modérées, 9 élevées), comme dans l'audit initial. L'ajout du composant hCaptcha n'a introduit aucune alerte transitive supplémentaire. Les chemins concernés passent notamment par React Router, PostHog/OpenTelemetry, Recharts/lodash et Supabase/ws.
+Après la mise à jour ciblée de PostHog, `npm audit --omit=dev` est passé de **23 à 12 alertes de production** (4 modérées, 8 élevées). La chaîne PostHog/OpenTelemetry et les alertes protobuf associées ont disparu. Les chemins restants passent notamment par React Router, DOMPurify, Recharts/lodash et Supabase/ws.
 
 Ne pas exécuter `npm audit fix` aveuglément. Traiter par petits lots, en commençant par React Router et les dépendances réellement chargées dans le navigateur, avec typecheck, suite complète et Playwright après chaque lot. Cette dette doit être qualifiée ou corrigée avant l'ouverture publique.
 

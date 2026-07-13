@@ -8,7 +8,7 @@
 
 La mise en public est bloquée par la [release gate](docs/public_release_gate.md). Un aperçu interne peut être utilisé pour le développement, mais aucun lien ne doit être diffusé à des testeurs externes avant validation des critères de sécurité, persistance et endurance.
 
-> **Mise à jour récente (2026-07-13) — Phase 4 : protections pré-public** : information vocale obligatoire, analytics réellement optionnelles, hCaptcha conditionnel, SDK Gamilab différé et inscription admin retirée. L'activation console, la purge 30 jours, les headers et la validation du texte restent des critères bloquants ; la diffusion reste interne. Détails : [`docs/phase4_privacy_prepublic_runbook.md`](docs/phase4_privacy_prepublic_runbook.md).
+> **Mise à jour récente (2026-07-13) — télémétrie des tests internes** : le panneau voix/analytics est temporairement masqué et les événements techniques PostHog/Grain sont actifs par défaut. Le panneau final reste disponible avec `VITE_PRIVACY_NOTICE_ENABLED=true`. Autocapture, replay, profils persistants et texte libre restent exclus. Détails : [`docs/phase4_privacy_prepublic_runbook.md`](docs/phase4_privacy_prepublic_runbook.md).
 
 > **Mise à jour précédente (2026-07-13) — Phase 3 : canary interne** : la durée est pilotée uniquement par `TIMEOUT_SECONDS` dans le slider admin ; le timer et le Game Master suivent cette valeur. Les seuils de promotion/rollback sont codifiés, la persistance devient observable et PostHog n'utilise plus autocapture ni session replay. Détails : [`docs/phase3_internal_canary_runbook.md`](docs/phase3_internal_canary_runbook.md).
 

@@ -3,12 +3,14 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   getPrivacyPreferences,
+  isInternalAnalyticsMode,
   savePrivacyPreferences,
   type PrivacyPreferences,
 } from "@/services/privacyConsent";
 
 export default function Privacy() {
   const [preferences, setPreferences] = useState<PrivacyPreferences | null>(() => getPrivacyPreferences());
+  const internalAnalyticsMode = isInternalAnalyticsMode();
 
   const setAnalytics = (analyticsAllowed: boolean) => {
     setPreferences(savePrivacyPreferences({
@@ -41,20 +43,26 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-xl font-semibold">Mesures optionnelles</h2>
+          <h2 className="text-xl font-semibold">
+            {internalAnalyticsMode ? "Mesures techniques des tests internes" : "Mesures optionnelles"}
+          </h2>
           <p>
-            Avec ton accord, PostHog Cloud EU et Grain reçoivent uniquement des événements techniques structurés :
+            {internalAnalyticsMode
+              ? "Pendant les tests internes, PostHog Cloud EU et Grain reçoivent les événements techniques structurés nécessaires à la mesure de la fluidité : "
+              : "Avec ton accord, PostHog Cloud EU et Grain reçoivent uniquement des événements techniques structurés : "}
             étapes du parcours, durées, erreurs et état de persistance. L’autocapture, les cartes de chaleur et les
             enregistrements de session sont désactivés. Les transcriptions et réponses libres ne sont pas envoyées à ces outils.
           </p>
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={() => setAnalytics(true)} disabled={preferences?.analyticsAllowed === true}>
-              Autoriser les mesures
-            </Button>
-            <Button variant="outline" onClick={() => setAnalytics(false)} disabled={preferences?.analyticsAllowed !== true}>
-              Refuser les mesures
-            </Button>
-          </div>
+          {!internalAnalyticsMode ? (
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={() => setAnalytics(true)} disabled={preferences?.analyticsAllowed === true}>
+                Autoriser les mesures
+              </Button>
+              <Button variant="outline" onClick={() => setAnalytics(false)} disabled={preferences?.analyticsAllowed !== true}>
+                Refuser les mesures
+              </Button>
+            </div>
+          ) : null}
         </section>
 
         <section className="space-y-3">
@@ -67,7 +75,9 @@ export default function Privacy() {
         </section>
 
         <p className="text-sm text-muted-foreground">
-          Aucun choix analytics n’empêche d’utiliser l’expérience. Le traitement vocal et la conservation de la session
+          {internalAnalyticsMode
+            ? "Ces mesures techniques sont actives pendant la campagne interne. Le panneau de choix sera réactivé pour l’expérience finale."
+            : "Aucun choix analytics n’empêche d’utiliser l’expérience."} Le traitement vocal et la conservation de la session
           restent nécessaires au protocole de test.
         </p>
 

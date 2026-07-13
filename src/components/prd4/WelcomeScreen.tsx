@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { prefetchOpeningTTS } from "@/services/openingTTSCache";
-import type { PrivacyPreferences } from "@/services/privacyConsent";
+import { isPrivacyNoticeEnabled, type PrivacyPreferences } from "@/services/privacyConsent";
 
 interface Props {
   onStart: (captchaToken?: string) => Promise<boolean>;
@@ -29,7 +29,8 @@ const WelcomeScreen = ({
   const [captchaToken, setCaptchaToken] = useState<string | undefined>();
   const [starting, setStarting] = useState(false);
   const captchaRef = useRef<HCaptcha>(null);
-  const voiceAcknowledged = privacyPreferences?.voiceAndStorageAcknowledged === true;
+  const privacyNoticeEnabled = isPrivacyNoticeEnabled();
+  const voiceAcknowledged = !privacyNoticeEnabled || privacyPreferences?.voiceAndStorageAcknowledged === true;
   const analyticsAllowed = privacyPreferences?.analyticsAllowed === true;
 
   // Pré-charge l'audio de la phrase d'ouverture dès l'arrivée sur l'accueil,
@@ -53,39 +54,41 @@ const WelcomeScreen = ({
             Cette expérience te propose d'entrer dans le monde du film et d'appeler
             ses protagonistes.
           </p>
-          <div className="mx-auto max-w-xl space-y-3 rounded-lg border border-border/80 bg-card/70 p-4 text-left text-sm">
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="voice-consent"
-                checked={voiceAcknowledged}
-                onCheckedChange={(checked) => onPrivacyChange({
-                  voiceAndStorageAcknowledged: checked === true,
-                  analyticsAllowed,
-                })}
-              />
-              <Label htmlFor="voice-consent" className="cursor-pointer font-normal leading-relaxed">
-                J’ai compris que ma voix sera transcrite pour faire fonctionner l’expérience et que la conversation
-                sera conservée de manière pseudonyme pour les tests.
-              </Label>
+          {privacyNoticeEnabled ? (
+            <div className="mx-auto max-w-xl space-y-3 rounded-lg border border-border/80 bg-card/70 p-4 text-left text-sm">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="voice-consent"
+                  checked={voiceAcknowledged}
+                  onCheckedChange={(checked) => onPrivacyChange({
+                    voiceAndStorageAcknowledged: checked === true,
+                    analyticsAllowed,
+                  })}
+                />
+                <Label htmlFor="voice-consent" className="cursor-pointer font-normal leading-relaxed">
+                  J’ai compris que ma voix sera transcrite pour faire fonctionner l’expérience et que la conversation
+                  sera conservée de manière pseudonyme pour les tests.
+                </Label>
+              </div>
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="analytics-consent"
+                  checked={analyticsAllowed}
+                  onCheckedChange={(checked) => onPrivacyChange({
+                    voiceAndStorageAcknowledged: voiceAcknowledged,
+                    analyticsAllowed: checked === true,
+                  })}
+                />
+                <Label htmlFor="analytics-consent" className="cursor-pointer font-normal leading-relaxed">
+                  J’accepte les mesures techniques optionnelles pour améliorer la fluidité. Aucun replay, clic ou texte
+                  libre n’est enregistré par les outils analytics.
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Le second choix est facultatif et modifiable. <Link to="/confidentialite" className="underline underline-offset-2">En savoir plus</Link>
+              </p>
             </div>
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="analytics-consent"
-                checked={analyticsAllowed}
-                onCheckedChange={(checked) => onPrivacyChange({
-                  voiceAndStorageAcknowledged: voiceAcknowledged,
-                  analyticsAllowed: checked === true,
-                })}
-              />
-              <Label htmlFor="analytics-consent" className="cursor-pointer font-normal leading-relaxed">
-                J’accepte les mesures techniques optionnelles pour améliorer la fluidité. Aucun replay, clic ou texte
-                libre n’est enregistré par les outils analytics.
-              </Label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Le second choix est facultatif et modifiable. <Link to="/confidentialite" className="underline underline-offset-2">En savoir plus</Link>
-            </p>
-          </div>
+          ) : null}
           {HCAPTCHA_ENABLED && HCAPTCHA_SITE_KEY ? (
             <div className="flex justify-center">
               <HCaptcha

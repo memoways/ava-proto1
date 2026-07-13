@@ -43,12 +43,25 @@ async function installNetworkFakes(
   let simulatedNetworkDrops = 0;
   let triggeredVideoLoads = 0;
   let ttsCallCount = 0;
+  let posthogRequestCount = 0;
   const maxMessageCounts: number[] = [];
   const sessionUpdates: unknown[] = [];
 
   await page.addInitScript(({ transcripts, simulateAudio }: { transcripts: string[]; simulateAudio: boolean }) => {
     let websocketIndex = 0;
     localStorage.setItem("ava_gameplay_settings", JSON.stringify({ RAG_SUMMARY_EVERY_N_TURNS: 4 }));
+    // PostHog intentionally filters HeadlessChrome as a bot. Use a regular
+    // browser UA so this E2E can attest that real-user telemetry reaches the
+    // network without weakening the production bot filter.
+    Object.defineProperty(navigator, "userAgent", {
+      configurable: true,
+      value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/149.0.0.0 Safari/537.36",
+    });
+    Object.defineProperty(navigator, "webdriver", { configurable: true, value: false });
+    Object.defineProperty(navigator, "userAgentData", {
+      configurable: true,
+      value: { brands: [{ brand: "Chromium", version: "149" }, { brand: "Google Chrome", version: "149" }] },
+    });
 
     if (simulateAudio) {
       type AudioTestWindow = Window & {
@@ -164,7 +177,10 @@ async function installNetworkFakes(
     });
   });
   await page.route("https://gamilab.ch/**", (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
-  await page.route("https://eu.i.posthog.com/**", (route) => route.fulfill({ status: 200, body: "{}" }));
+  await page.route("https://eu.i.posthog.com/**", (route) => {
+    posthogRequestCount += 1;
+    return route.fulfill({ status: 200, body: "{}" });
+  });
 
   await page.route(`${SUPABASE_ORIGIN}/auth/v1/signup`, (route) => json(route, {
     access_token: "e2e-anonymous-access-token",
@@ -335,6 +351,7 @@ async function installNetworkFakes(
     getTriggeredVideoLoads: () => triggeredVideoLoads,
     getSessionUpdates: () => sessionUpdates,
     getTtsCallCount: () => ttsCallCount,
+    getPosthogRequestCount: () => posthogRequestCount,
   };
 }
 
@@ -342,7 +359,7 @@ test("parcours PRD4 heureux avec trois tours de conversation", async ({ page }) 
   const fakes = await installNetworkFakes(page);
 
   await page.goto("/");
-  await page.getByLabel(/J’ai compris que ma voix/).check();
+  await expect(page.getByLabel(/J’ai compris que ma voix/)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Commencer" })).toBeEnabled();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
@@ -362,6 +379,7 @@ test("parcours PRD4 heureux avec trois tours de conversation", async ({ page }) 
 
   expect(fakes.getMaxTurnCount()).toBe(3);
   expect(fakes.getSessionUpdates().length).toBeGreaterThanOrEqual(1);
+  await expect.poll(fakes.getPosthogRequestCount, { timeout: 10_000 }).toBeGreaterThan(0);
 });
 
 test("une réponse vocale plus longue que le watchdog est lue jusqu'au bout", async ({ page }) => {
@@ -372,7 +390,6 @@ test("une réponse vocale plus longue que le watchdog est lue jusqu'au bout", as
   });
 
   await page.goto("/");
-  await page.getByLabel(/J’ai compris que ma voix/).check();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
   await page.getByRole("button", { name: "Appeler Max" }).click();
@@ -403,7 +420,6 @@ test("un 429 system_busy ElevenLabs est rejoué une fois puis la voix démarre",
   });
 
   await page.goto("/");
-  await page.getByLabel(/J’ai compris que ma voix/).check();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
   await page.getByRole("button", { name: "Appeler Max" }).click();
@@ -430,7 +446,6 @@ test("endurance accélérée de 35 tours avec mémoire bornée et pannes récup�
   });
 
   await page.goto("/");
-  await page.getByLabel(/J’ai compris que ma voix/).check();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
   await page.getByRole("button", { name: "Appeler Max" }).click();

@@ -3,6 +3,19 @@ import { disablePostHog, enablePostHog } from "@/services/posthogService";
 export const PRIVACY_CONSENT_VERSION = "2026-07-13";
 export const PRIVACY_CONSENT_STORAGE_KEY = "ava_privacy_consent";
 
+/**
+ * Internal tests need uninterrupted technical telemetry. The notice remains in
+ * the bundle and can be restored for the final experience from Lovable with:
+ * VITE_PRIVACY_NOTICE_ENABLED=true.
+ */
+export function isPrivacyNoticeEnabled(): boolean {
+  return import.meta.env.VITE_PRIVACY_NOTICE_ENABLED === "true";
+}
+
+export function isInternalAnalyticsMode(): boolean {
+  return !isPrivacyNoticeEnabled();
+}
+
 export interface PrivacyPreferences {
   version: typeof PRIVACY_CONSENT_VERSION;
   voiceAndStorageAcknowledged: boolean;
@@ -53,7 +66,8 @@ export function savePrivacyPreferences(
 
 export function applyAnalyticsPreference(allowed: boolean): void {
   const revision = ++analyticsPreferenceRevision;
-  if (allowed) {
+  const effectiveAllowed = isInternalAnalyticsMode() || allowed;
+  if (effectiveAllowed) {
     enablePostHog();
     void loadGrainModule().then((grain) => {
       if (revision !== analyticsPreferenceRevision) return;
