@@ -3,7 +3,12 @@
  * Reads voice + voice-quality settings via `getTTSSettings()` from settingsService.
  */
 
-import type { TTSProvider, TTSGenerateContext, TTSGenerateResult } from "@/services/tts/types";
+import type {
+  TTSGenerateContext,
+  TTSGenerateResult,
+  TTSProvider,
+  TTSProviderRequestError,
+} from "@/services/tts/types";
 import { getTTSSettings } from "@/services/settingsService";
 import { debugLogger } from "@/services/debugLogger";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
@@ -11,6 +16,36 @@ import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function parseJsonRecord(value: string): Record<string, unknown> | null {
+  try {
+    return asRecord(JSON.parse(value));
+  } catch {
+    return null;
+  }
+}
+
+export function parseElevenLabsErrorDetails(raw: string): {
+  type?: string;
+  code?: string;
+} {
+  const outer = parseJsonRecord(raw);
+  const rawDetails = outer?.details;
+  const providerBody = typeof rawDetails === "string"
+    ? parseJsonRecord(rawDetails)
+    : asRecord(rawDetails) ?? outer;
+  const detail = asRecord(providerBody?.detail) ?? providerBody;
+  const type = typeof detail?.type === "string" ? detail.type : undefined;
+  const codeCandidate = detail?.code ?? detail?.status;
+  const code = typeof codeCandidate === "string" ? codeCandidate : undefined;
+  return { type, code };
+}
 
 export const elevenLabsProvider: TTSProvider = {
   id: "elevenlabs",
@@ -55,8 +90,12 @@ export const elevenLabsProvider: TTSProvider = {
     if (!response.ok) {
       const err = await response.text();
       debugLogger.logResponse(debugId, "tts", "TTS-EL", response.status, startTime, err);
-      const error = new Error(`TTS error: ${response.status} - ${err}`);
-      (error as Error & { statusCode?: number }).statusCode = response.status;
+      const details = parseElevenLabsErrorDetails(err);
+      const suffix = details.code ? ` (${details.code})` : "";
+      const error = new Error(`ElevenLabs TTS error: ${response.status}${suffix}`) as TTSProviderRequestError;
+      error.statusCode = response.status;
+      error.providerErrorType = details.type;
+      error.providerErrorCode = details.code;
       throw error;
     }
 

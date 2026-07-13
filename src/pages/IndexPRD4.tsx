@@ -557,7 +557,14 @@ const IndexPRD4 = () => {
         // TTS streaming
         let ttsLatencySegmentDone = false;
         const queue = new TTSQueue({
-          onError: (e) => console.warn("[TTS] turn error:", e.message),
+          onError: (e) => {
+            console.warn("[TTS] turn error:", e.message);
+            toast({
+              title: "Voix temporairement indisponible",
+              description: "La réponse de Max reste affichée. Tu peux continuer la conversation.",
+              variant: "destructive",
+            });
+          },
           onFirstPlaybackStart: () => {
             // La voix a réellement démarré : sa fin est désormais pilotée par
             // l'événement média `ended` et par le détecteur de lecture bloquée.

@@ -18,6 +18,7 @@ interface NetworkFakeOptions {
   triggerVideoAtLabel?: number;
   ttsSuccess?: boolean;
   maxResponse?: string;
+  ttsBusyOnce?: boolean;
 }
 
 function json(route: Route, body: unknown, status = 200) {
@@ -41,6 +42,7 @@ async function installNetworkFakes(
   let summaryLastTurn = 0;
   let simulatedNetworkDrops = 0;
   let triggeredVideoLoads = 0;
+  let ttsCallCount = 0;
   const maxMessageCounts: number[] = [];
   const sessionUpdates: unknown[] = [];
 
@@ -255,10 +257,21 @@ async function installNetworkFakes(
       return json(route, { matches: [], embedding_provider: "e2e", rerank_used: false, latency_ms: 1 });
     }
     if (functionName === "proxy-tts") {
+      ttsCallCount += 1;
+      if (options.ttsBusyOnce && ttsCallCount === 1) {
+        return json(route, {
+          error: "ElevenLabs error: 429",
+          details: JSON.stringify({
+            detail: { type: "rate_limit_error", code: "system_busy", status: "system_busy" },
+          }),
+        }, 429);
+      }
       if (options.ttsSuccess) {
         return route.fulfill({ status: 200, contentType: "audio/mpeg", body: "e2e-audio" });
       }
-      return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "TTS disabled in E2E" }) });
+      // Permanent test disablement is deliberately non-retryable. Transient
+      // recovery is covered separately by the explicit 429 system_busy case.
+      return route.fulfill({ status: 422, contentType: "application/json", body: JSON.stringify({ error: "TTS disabled in E2E" }) });
     }
     if (functionName === "proxy-llm") {
       const payload = request.postDataJSON() as { messages?: Array<{ role: string; content: string }> };
@@ -321,6 +334,7 @@ async function installNetworkFakes(
     getSimulatedNetworkDrops: () => simulatedNetworkDrops,
     getTriggeredVideoLoads: () => triggeredVideoLoads,
     getSessionUpdates: () => sessionUpdates,
+    getTtsCallCount: () => ttsCallCount,
   };
 }
 
@@ -379,6 +393,28 @@ test("une réponse vocale plus longue que le watchdog est lue jusqu'au bout", as
   );
   expect(audioState?.paused).toBe(0);
   await expect(page.getByText("Le tour a pris trop de temps")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
+});
+
+test("un 429 system_busy ElevenLabs est rejoué une fois puis la voix démarre", async ({ page }) => {
+  const fakes = await installNetworkFakes(page, ["Peux-tu me répondre malgré la saturation ?"], {
+    ttsSuccess: true,
+    ttsBusyOnce: true,
+  });
+
+  await page.goto("/");
+  await page.getByLabel(/J’ai compris que ma voix/).check();
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await page.getByRole("button", { name: "Appeler Max" }).click();
+  await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
+
+  await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+  await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+
+  await expect(page.getByText("Réponse de Max pour le tour 1.")).toBeVisible({ timeout: 10_000 });
+  await expect.poll(fakes.getTtsCallCount).toBeGreaterThanOrEqual(2);
+  await expect(page.getByText("Voix temporairement indisponible")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
 });
 

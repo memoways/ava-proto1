@@ -19,6 +19,7 @@ interface PendingEntry {
 interface TTSQueueOptions {
   onError?: (err: Error) => void;
   onFirstPlaybackStart?: (latencyMs: number) => void;
+  maxConcurrentGenerations?: number;
 }
 
 export class TTSQueue {
@@ -39,11 +40,14 @@ export class TTSQueue {
   private onFirstPlaybackStart?: (latencyMs: number) => void;
   private errorReported = false;
   private lastError?: Error;
+  private activeGenerations = 0;
+  private readonly maxConcurrentGenerations: number;
   private readonly abortController = new AbortController();
 
   constructor(opts?: TTSQueueOptions) {
     this.onError = opts?.onError;
     this.onFirstPlaybackStart = opts?.onFirstPlaybackStart;
+    this.maxConcurrentGenerations = Math.max(1, Math.floor(opts?.maxConcurrentGenerations ?? 2));
   }
 
   private reportError(err: unknown) {
@@ -102,11 +106,12 @@ export class TTSQueue {
   }
 
   private flushPending(): void {
-    while (this.pending.length > 0) {
+    while (this.pending.length > 0 && this.activeGenerations < this.maxConcurrentGenerations) {
       const head = this.pending[0];
       const next = this.pending[1];
       const nextText = next?.text;
       this.pending.shift();
+      this.activeGenerations++;
       this.startGeneration(head, nextText);
     }
   }
@@ -114,6 +119,7 @@ export class TTSQueue {
   private startGeneration(entry: PendingEntry, nextText?: string): void {
     if (this._cancelled) {
       entry.rejectBlob(new Error("TTS queue cancelled"));
+      this.activeGenerations--;
       return;
     }
     const previousText = this.lastSentText || undefined;
@@ -134,7 +140,11 @@ export class TTSQueue {
         console.log(`[TTS-Queue] Generated #${this.generationCount} in ${genTime.toFixed(0)}ms stitch=${stitchTag} (${entry.text.slice(0, 40)}...)`);
         entry.resolveBlob(blob);
       })
-      .catch(entry.rejectBlob);
+      .catch(entry.rejectBlob)
+      .finally(() => {
+        this.activeGenerations--;
+        if (!this._cancelled) this.scheduleFlush();
+      });
   }
 
   async drain(): Promise<{

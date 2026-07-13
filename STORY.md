@@ -66,6 +66,14 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-07-13 — Correctif TTS : absorber les saturations ElevenLabs 🔷
+
+**Cause.** ElevenLabs a retourné `429 rate_limit_error / system_busy` après avoir reçu le texte. Le fournisseur était temporairement saturé ; l'application ne faisait aucun retry et pouvait donc laisser une réponse affichée mais muette ou partielle.
+
+**Correction.** Le payload d'erreur imbriqué est maintenant normalisé. Une saturation ElevenLabs est rejouée une seule fois après 650–899 ms, tandis que crédits, authentification et erreurs client restent non retryables. La file ne lance plus que deux générations en parallèle et affiche un état dégradé explicite si la voix échoue encore.
+
+**Validation.** Parsing, retry borné, crédits non rejoués et concurrence testés unitairement. Le navigateur reproduit un premier `429 system_busy`, reçoit l'audio au second appel et termine ensuite les scénarios TTS long et 35 tours. Aucun secret ni Edge Function n'est modifié.
+
 ### 2026-07-13 — Phase 4 : confidentialité et protections pré-public 🔷
 
 **Intent.** Préparer les tests de septembre sans ouvrir le projet et sans modifier la durée éditable dans l'admin.

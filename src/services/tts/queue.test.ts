@@ -63,4 +63,36 @@ describe("TTSQueue drain status", () => {
     expect(result.status).toBe("cancelled");
     expect(vi.mocked(generateSpeech).mock.calls[0][1]?.signal?.aborted).toBe(true);
   });
+
+  it("limits parallel generation to two segments while keeping playback ordered", async () => {
+    const resolvers: Array<(blob: Blob) => void> = [];
+    let active = 0;
+    let maxActive = 0;
+    vi.mocked(generateSpeech).mockImplementation(() => new Promise<Blob>((resolve) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      resolvers.push((blob) => {
+        active -= 1;
+        resolve(blob);
+      });
+    }));
+    vi.mocked(playAudioBlob).mockResolvedValue({ status: "played", playbackStartMs: 0, playbackTotalMs: 0 });
+    const queue = new TTSQueue({ maxConcurrentGenerations: 2 });
+
+    for (const text of ["Première phrase.", "Deuxième phrase.", "Troisième phrase.", "Quatrième phrase."]) {
+      queue.enqueue(text);
+    }
+    const drained = queue.drain();
+
+    await vi.waitFor(() => expect(vi.mocked(generateSpeech)).toHaveBeenCalledTimes(2));
+    resolvers[0](new Blob(["one"]));
+    await vi.waitFor(() => expect(vi.mocked(generateSpeech)).toHaveBeenCalledTimes(3));
+    resolvers[1](new Blob(["two"]));
+    await vi.waitFor(() => expect(vi.mocked(generateSpeech)).toHaveBeenCalledTimes(4));
+    resolvers[2](new Blob(["three"]));
+    resolvers[3](new Blob(["four"]));
+
+    await expect(drained).resolves.toMatchObject({ status: "played", playedSegments: 4 });
+    expect(maxActive).toBe(2);
+  });
 });

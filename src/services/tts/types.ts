@@ -48,3 +48,11 @@ export interface TTSProvider {
   /** Generates speech for a single text segment. Throws on error. */
   generate(text: string, ctx?: TTSGenerateContext): Promise<TTSGenerateResult>;
 }
+
+/** Structured provider failure used for bounded retry decisions. */
+export interface TTSProviderRequestError extends Error {
+  statusCode?: number;
+  providerErrorType?: string;
+  providerErrorCode?: string;
+  retryCount?: number;
+}

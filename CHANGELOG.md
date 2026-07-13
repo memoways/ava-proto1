@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.41.1] - 2026-07-13 — Résilience ElevenLabs 429
+
+### Corrigé
+- Les réponses ElevenLabs `429 system_busy`, `rate_limit_exceeded` et `concurrent_limit_exceeded` sont reconnues dans le payload imbriqué puis rejouées une seule fois après un délai court avec jitter.
+- Les erreurs permanentes de crédits, droits ou paramètres ne sont jamais rejouées.
+- La génération TTS est plafonnée à deux segments simultanés, tout en conservant l'ordre de lecture.
+- Après l'échec du retry, le texte reste disponible et un message utilisateur explique que seule la voix est temporairement indisponible.
+
+### Observabilité
+- Les mesures TTS enregistrent `retry_count` et le code fournisseur structuré, sans recopier le corps d'erreur complet.
+
+### Validation
+- Tests unitaires du parsing `system_busy`, du retry unique, de l'absence de retry sur crédits et de la concurrence maximale.
+- Parcours Playwright `429 → retry → audio` vert, ainsi que le TTS long et l'endurance de 35 tours.
+- Aucun changement de secret, de durée admin, de voix active ou d'Edge Function.
+
 ## [0.41.0] - 2026-07-13 — Phase 4 protections pré-public
 
 ### Confidentialité
