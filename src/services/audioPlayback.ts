@@ -1,6 +1,6 @@
-import { withTimeout } from "@/services/asyncUtils";
+import { AUDIO_PLAYBACK_STALL_DEADLINE_MS } from "@/config/experienceRuntime";
 
-export type PlaybackErrorType = "not_allowed" | "not_supported" | "aborted" | "network" | "unknown";
+export type PlaybackErrorType = "not_allowed" | "not_supported" | "aborted" | "network" | "stalled" | "unknown";
 
 export interface PlaybackErrorInfo {
   type: PlaybackErrorType;
@@ -32,6 +32,7 @@ export function classifyPlaybackError(err: unknown): PlaybackErrorInfo {
   if (name === "NotAllowedError") return { type: "not_allowed", name, message };
   if (name === "NotSupportedError") return { type: "not_supported", name, message };
   if (name === "AbortError") return { type: "aborted", name, message };
+  if (name === "TimeoutError" || /stalled/i.test(message)) return { type: "stalled", name, message };
   if (/network/i.test(message)) return { type: "network", name, message };
   return { type: "unknown", name, message };
 }
@@ -56,7 +57,7 @@ export function isAudioPlaybackUnlocked(): boolean {
 
 export async function playAudioBlobRobust(
   blob: Blob,
-  timeoutMs = 20000,
+  stallTimeoutMs = AUDIO_PLAYBACK_STALL_DEADLINE_MS,
   onPlaybackStart?: (playbackStartMs: number) => void,
   signal?: AbortSignal,
 ): Promise<PlaybackResult> {
@@ -65,6 +66,8 @@ export async function playAudioBlobRobust(
   const t0 = performance.now();
   let playbackStartMs: number | undefined;
   let abortListener: (() => void) | null = null;
+  let stallTimer: ReturnType<typeof setTimeout> | null = null;
+  let settled = false;
   const abortPlayback = () => {
     try { audio.pause(); } catch { /* ignore */ }
   };
@@ -73,28 +76,50 @@ export async function playAudioBlobRobust(
     if (signal?.aborted) {
       throw new DOMException("Audio playback aborted", "AbortError");
     }
-    await withTimeout("audio_playback", new Promise<void>((resolve, reject) => {
-      audio.onended = () => resolve();
-      audio.onerror = () => reject(new Error("Audio playback failed"));
+    await new Promise<void>((resolve, reject) => {
+      const finish = (callback: () => void) => {
+        if (settled) return;
+        settled = true;
+        if (stallTimer) clearTimeout(stallTimer);
+        stallTimer = null;
+        callback();
+      };
+      const armStallTimer = () => {
+        if (settled) return;
+        if (stallTimer) clearTimeout(stallTimer);
+        stallTimer = setTimeout(() => {
+          const error = new Error(`Audio playback stalled for ${stallTimeoutMs}ms`);
+          error.name = "TimeoutError";
+          abortPlayback();
+          finish(() => reject(error));
+        }, stallTimeoutMs);
+      };
+
+      audio.onended = () => finish(resolve);
+      audio.onerror = () => finish(() => reject(new Error("Audio playback failed")));
+      audio.onplaying = armStallTimer;
+      audio.ontimeupdate = armStallTimer;
       abortListener = () => {
         abortPlayback();
-        reject(new DOMException("Audio playback aborted", "AbortError"));
+        finish(() => reject(new DOMException("Audio playback aborted", "AbortError")));
       };
       signal?.addEventListener("abort", abortListener, { once: true });
+      armStallTimer();
       audio.play()
         .then(() => {
+          if (settled) return;
           playbackStartMs = Math.round(performance.now() - t0);
           onPlaybackStart?.(playbackStartMs);
+          armStallTimer();
         })
-        .catch(reject);
-    }), timeoutMs, () => {
-      abortPlayback();
+        .catch((error) => finish(() => reject(error)));
     });
     return { status: "played", playbackStartMs, playbackTotalMs: Math.round(performance.now() - t0) };
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
     return { status: "failed", playbackStartMs, playbackTotalMs: Math.round(performance.now() - t0), error, errorInfo: classifyPlaybackError(err) };
   } finally {
+    if (stallTimer) clearTimeout(stallTimer);
     if (abortListener) signal?.removeEventListener("abort", abortListener);
     URL.revokeObjectURL(audioUrl);
   }

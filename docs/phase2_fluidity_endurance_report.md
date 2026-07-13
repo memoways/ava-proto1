@@ -14,7 +14,8 @@ La phase 2 ne change ni les fournisseurs configurés ni les secrets. Elle ajoute
 - Durée nominale : **15 minutes** (`VITE_SESSION_DURATION_MINUTES`, valeur par défaut `15`).
 - Clôture Game Master interdite avant **12 minutes** (`VITE_SESSION_MINIMUM_CLOSURE_MINUTES`, valeur par défaut `12`).
 - Budget de réponse conversationnelle : **5 secondes** avant réponse de repli.
-- Watchdog d'un tour : **15 secondes** avant annulation et restitution du contrôle à l'utilisateur.
+- Watchdog avant première voix : **15 secondes** avant annulation et restitution du contrôle à l'utilisateur.
+- Une fois la voix démarrée, la lecture va jusqu'à l'événement média `ended` ; seul un blocage sans progression pendant 15 secondes l'interrompt.
 - RAG : soft timeout à **2 secondes** ; un échec ne bloque pas la réponse de Max.
 - Historique récent envoyé au LLM : **10 messages maximum**, complété par un résumé persistant compact.
 - Lecture du résumé : soft timeout à **600 ms**.
@@ -33,7 +34,8 @@ La phase 2 ne change ni les fournisseurs configurés ni les secrets. Elle ajoute
 - Chaque tour possède un identifiant de séquence et un `AbortController`.
 - Une réponse devenue obsolète ne peut plus modifier l'interface ou déclencher un TTS.
 - Démarrer un nouveau tour annule le travail fournisseur restant du tour précédent.
-- Le watchdog annule le LLM/TTS et rend toujours le bouton de parole utilisable.
+- Le watchdog annule un LLM/TTS qui n'a pas réussi à démarrer et rend le bouton de parole utilisable.
+- Le watchdog est désarmé au premier son : une réponse longue n'est jamais tronquée par une limite absolue de tour.
 - La file TTS annule aussi bien la génération distante que la lecture audio locale.
 
 ### Tolérance aux pannes et latence

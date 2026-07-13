@@ -66,6 +66,14 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-07-13 — Correctif Phase 2 : le watchdog ne coupe plus Max 🔷
+
+**Cause.** Le watchdog global de 15 secondes englobait par erreur la durée de lecture. Une réponse générée rapidement mais parlée pendant plus de 15 secondes était donc annulée au milieu, exactement au moment où la console affichait `turn watchdog fired`.
+
+**Correction.** Le délai de 15 secondes couvre seulement l'attente de la première voix. Dès que l'audio démarre, le navigateur attend son événement `ended`. Un détecteur séparé arrête encore une lecture réellement figée après 15 secondes sans progression.
+
+**Validation.** Lecture unitaire simulée de 25 secondes, blocage audio simulé et parcours Playwright plus long que le watchdog : tous verts. Aucun contrat fournisseur, secret ou Edge Function n'est modifié.
+
 ### 2026-07-13 — Phase 2 : tenir 15 minutes sans dérive de latence 🔷
 
 **Intent.** Faire de la fluidité une propriété du runtime : contexte borné, tours annulables, budgets de latence explicites et récupération automatique après panne fournisseur.

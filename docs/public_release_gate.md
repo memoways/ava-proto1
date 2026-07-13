@@ -52,7 +52,7 @@ Le smoke test distant du 13 juillet 2026 confirme `401` sans JWT, `201` avec ide
 
 ## Contrat fluidité Phase 2
 
-La Phase 2 borne la durée à 15 minutes, la mémoire récente à 10 messages, le RAG à 2 secondes et le watchdog d'un tour à 15 secondes. Les travaux obsolètes sont annulés et les erreurs RAG/LLM/TTS restituent le contrôle à l'utilisateur. Les preuves et la procédure de recette sont détaillées dans [`phase2_fluidity_endurance_report.md`](phase2_fluidity_endurance_report.md).
+La Phase 2 borne la durée à 15 minutes, la mémoire récente à 10 messages, le RAG à 2 secondes et l'attente de la première voix à 15 secondes. Une lecture commencée va jusqu'à l'événement `ended`, avec récupération uniquement si sa position ne progresse plus pendant 15 secondes. Les travaux obsolètes sont annulés et les erreurs RAG/LLM/TTS restituent le contrôle à l'utilisateur. Les preuves et la procédure de recette sont détaillées dans [`phase2_fluidity_endurance_report.md`](phase2_fluidity_endurance_report.md).
 
 ## Procédure d'ouverture
 

@@ -4,10 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.39.1] - 2026-07-13 — Lecture TTS complète
+
+### Corrigé
+- Le watchdog de 15 secondes est arrêté dès que la première lecture audio démarre ; il ne coupe plus une réponse longue en cours de lecture.
+- La fin normale du TTS est pilotée par l'événement média `ended`, y compris lorsque la réponse dépasse 15 ou 20 secondes.
+- Un détecteur de stagnation distinct conserve la récupération automatique si la position de lecture n'avance plus pendant 15 secondes.
+
+### Validation
+- Test unitaire d'une lecture progressive simulée de 25 secondes, sans interruption.
+- Test unitaire d'un média réellement figé, correctement arrêté après le délai de stagnation.
+- Parcours Playwright reproduisant une réponse plus longue que le watchdog, lue entièrement sans appel à `pause()`.
+
+---
+
 ## [0.39.0] - 2026-07-13 — Phase 2 fluidité et endurance 15 minutes
 
 ### Ajouté
-- Contrat runtime centralisé : session de 15 minutes, clôture Game Master après 12 minutes minimum, budget de réponse de 5 secondes et watchdog de 15 secondes.
+- Contrat runtime centralisé : session de 15 minutes, clôture Game Master après 12 minutes minimum, budget de réponse de 5 secondes et watchdog de première voix de 15 secondes.
 - Mémoire conversationnelle bornée à 10 messages récents, complétée par le résumé persistant de la session.
 - Compte à rebours visible pendant la conversation et tests d'endurance orchestrateur/navigateur.
 

@@ -7,6 +7,13 @@ function readPositiveMinutes(name: string, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+function readPositiveMilliseconds(name: string, fallback: number): number {
+  const raw = import.meta.env[name];
+  if (typeof raw !== "string" || !raw.trim()) return fallback;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? Math.round(value) : fallback;
+}
+
 /** Public test target. Can be shortened in preview/E2E without changing the flow. */
 export const SESSION_DURATION_SECONDS = Math.round(
   readPositiveMinutes("VITE_SESSION_DURATION_MINUTES", 15) * MINUTE_SECONDS,
@@ -21,8 +28,14 @@ export const SESSION_MINIMUM_CLOSURE_SECONDS = Math.min(
 /** User-visible response deadline. RAG/LLM must fail soft before this budget expires. */
 export const TURN_RESPONSE_DEADLINE_MS = 5_000;
 
-/** Absolute recovery deadline including TTS/playback cleanup. */
-export const TURN_RECOVERY_DEADLINE_MS = 15_000;
+/** Maximum wait before the first audio starts. It must never cap legitimate playback duration. */
+export const TURN_FIRST_AUDIO_DEADLINE_MS = readPositiveMilliseconds(
+  "VITE_TURN_FIRST_AUDIO_DEADLINE_MS",
+  15_000,
+);
+
+/** Abort audio only when its playback clock stops progressing for this long. */
+export const AUDIO_PLAYBACK_STALL_DEADLINE_MS = 15_000;
 
 /** Recent context sent as chat messages; older exchanges live in the compressed summary. */
 export const MAX_RECENT_CONVERSATION_MESSAGES = 10;

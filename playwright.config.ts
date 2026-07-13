@@ -19,7 +19,10 @@ export default defineConfig({
   webServer: {
     command: "npm run dev -- --host 127.0.0.1 --port 4173",
     url: "http://127.0.0.1:4173",
-    env: { VITE_GAME_SECURITY_ENABLED: "true" },
+    env: {
+      VITE_GAME_SECURITY_ENABLED: "true",
+      VITE_TURN_FIRST_AUDIO_DEADLINE_MS: "500",
+    },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

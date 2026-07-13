@@ -63,7 +63,7 @@ import { ensureGameAuth, isGameSecurityEnabled } from "@/services/gameAuth";
 import {
   SESSION_DURATION_SECONDS,
   SESSION_MINIMUM_CLOSURE_SECONDS,
-  TURN_RECOVERY_DEADLINE_MS,
+  TURN_FIRST_AUDIO_DEADLINE_MS,
 } from "@/config/experienceRuntime";
 
 const TEASER_VIDEO_URL = "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049";
@@ -379,7 +379,8 @@ const IndexPRD4 = () => {
         !turnController.signal.aborted &&
         !endedRef.current;
 
-      // Watchdog absolu : aucun tour ne peut garder le micro verrouillé au-delà de 15 s.
+      // Watchdog d'amorçage : protège l'attente RAG/LLM/TTS, mais ne doit jamais
+      // imposer une durée maximale à une lecture audio qui progresse normalement.
       if (processingWatchdogRef.current) window.clearTimeout(processingWatchdogRef.current);
       processingWatchdogRef.current = window.setTimeout(() => {
         if (!isCurrentTurn()) return;
@@ -394,7 +395,7 @@ const IndexPRD4 = () => {
           turn_sequence: turnSequence,
           reason: "recovery_deadline",
         });
-      }, TURN_RECOVERY_DEADLINE_MS);
+      }, TURN_FIRST_AUDIO_DEADLINE_MS);
       setAudioState("max_thinking");
       setUserSubtitle(userText);
 
@@ -483,6 +484,12 @@ const IndexPRD4 = () => {
         const queue = new TTSQueue({
           onError: (e) => console.warn("[TTS] turn error:", e.message),
           onFirstPlaybackStart: () => {
+            // La voix a réellement démarré : sa fin est désormais pilotée par
+            // l'événement média `ended` et par le détecteur de lecture bloquée.
+            if (processingWatchdogRef.current) {
+              window.clearTimeout(processingWatchdogRef.current);
+              processingWatchdogRef.current = null;
+            }
             if (ttsLatencySegmentDone) return;
             ttsLatencySegmentDone = true;
             endLatencySegment(ttsLatencySegmentId);

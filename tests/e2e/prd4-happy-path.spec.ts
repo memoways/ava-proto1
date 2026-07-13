@@ -16,6 +16,8 @@ interface NetworkFakeOptions {
   failMaxAt?: number;
   dropRagAt?: number;
   triggerVideoAtLabel?: number;
+  ttsSuccess?: boolean;
+  maxResponse?: string;
 }
 
 function json(route: Route, body: unknown, status = 200) {
@@ -42,9 +44,53 @@ async function installNetworkFakes(
   const maxMessageCounts: number[] = [];
   const sessionUpdates: unknown[] = [];
 
-  await page.addInitScript((transcripts: string[]) => {
+  await page.addInitScript(({ transcripts, simulateAudio }: { transcripts: string[]; simulateAudio: boolean }) => {
     let websocketIndex = 0;
     localStorage.setItem("ava_gameplay_settings", JSON.stringify({ RAG_SUMMARY_EVERY_N_TURNS: 4 }));
+
+    if (simulateAudio) {
+      type AudioTestWindow = Window & {
+        __e2eLongAudio?: boolean;
+        __e2eAudioState?: { ended: number; paused: number };
+      };
+      const testWindow = window as AudioTestWindow;
+      testWindow.__e2eAudioState = { ended: 0, paused: 0 };
+
+      class E2EAudio {
+        onended: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        onplaying: (() => void) | null = null;
+        ontimeupdate: (() => void) | null = null;
+        private endTimer: number | null = null;
+        private progressTimer: number | null = null;
+
+        private clearTimers() {
+          if (this.endTimer !== null) window.clearTimeout(this.endTimer);
+          if (this.progressTimer !== null) window.clearInterval(this.progressTimer);
+          this.endTimer = null;
+          this.progressTimer = null;
+        }
+
+        play() {
+          const durationMs = testWindow.__e2eLongAudio ? 1_200 : 10;
+          this.onplaying?.();
+          this.progressTimer = window.setInterval(() => this.ontimeupdate?.(), 100);
+          this.endTimer = window.setTimeout(() => {
+            this.clearTimers();
+            if (testWindow.__e2eAudioState) testWindow.__e2eAudioState.ended += 1;
+            this.onended?.();
+          }, durationMs);
+          return Promise.resolve();
+        }
+
+        pause() {
+          this.clearTimers();
+          if (testWindow.__e2eAudioState) testWindow.__e2eAudioState.paused += 1;
+        }
+      }
+
+      Object.defineProperty(window, "Audio", { configurable: true, value: E2EAudio });
+    }
 
     class E2EWebSocket {
       static readonly OPEN = 1;
@@ -97,7 +143,7 @@ async function installNetworkFakes(
     });
     Object.defineProperty(window, "WebSocket", { configurable: true, value: E2EWebSocket });
     Object.defineProperty(window, "MediaRecorder", { configurable: true, value: E2EMediaRecorder });
-  }, transcripts);
+  }, { transcripts, simulateAudio: options.ttsSuccess === true });
 
   await page.route("https://play.gumlet.io/**", (route) => {
     if (route.request().url().includes("e2e-family")) triggeredVideoLoads += 1;
@@ -203,6 +249,9 @@ async function installNetworkFakes(
       return json(route, { matches: [], embedding_provider: "e2e", rerank_used: false, latency_ms: 1 });
     }
     if (functionName === "proxy-tts") {
+      if (options.ttsSuccess) {
+        return route.fulfill({ status: 200, contentType: "audio/mpeg", body: "e2e-audio" });
+      }
       return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "TTS disabled in E2E" }) });
     }
     if (functionName === "proxy-llm") {
@@ -237,7 +286,7 @@ async function installNetworkFakes(
         if (maxTurnCount === options.failMaxAt) {
           return json(route, { error: "simulated_provider_failure" }, 503);
         }
-        content = `Réponse de Max pour le tour ${maxTurnCount}.`;
+        content = options.maxResponse ?? `Réponse de Max pour le tour ${maxTurnCount}.`;
       }
       return json(route, {
         id: `generation-${maxTurnCount}`,
@@ -292,6 +341,37 @@ test("parcours PRD4 heureux avec trois tours de conversation", async ({ page }) 
 
   expect(fakes.getMaxTurnCount()).toBe(3);
   expect(fakes.getSessionUpdates().length).toBeGreaterThanOrEqual(1);
+});
+
+test("une réponse vocale plus longue que le watchdog est lue jusqu'au bout", async ({ page }) => {
+  const longResponse = "D'accord, je vais reprendre calmement. La tension à la maison est palpable. Emma et moi ne nous parlons presque plus, et Léo comme Ava restent profondément affectés. J'essaie de les protéger sans toujours savoir si je fais les bons choix.";
+  await installNetworkFakes(page, ["Raconte-moi toute la suite sans couper."], {
+    ttsSuccess: true,
+    maxResponse: longResponse,
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await page.getByRole("button", { name: "Appeler Max" }).click();
+  await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
+
+  await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+  await page.evaluate(() => {
+    (window as Window & { __e2eLongAudio?: boolean }).__e2eLongAudio = true;
+  });
+  await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+
+  await expect(page.getByText(longResponse)).toBeVisible({ timeout: 10_000 });
+  await expect.poll(async () => page.evaluate(() =>
+    (window as Window & { __e2eAudioState?: { ended: number } }).__e2eAudioState?.ended ?? 0,
+  )).toBeGreaterThanOrEqual(2);
+  const audioState = await page.evaluate(() =>
+    (window as Window & { __e2eAudioState?: { ended: number; paused: number } }).__e2eAudioState,
+  );
+  expect(audioState?.paused).toBe(0);
+  await expect(page.getByText("Le tour a pris trop de temps")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
 });
 
 test("endurance accélérée de 35 tours avec mémoire bornée et pannes récupérables", async ({ page }) => {
