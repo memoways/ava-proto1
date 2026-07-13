@@ -11,10 +11,10 @@ export function initPostHog() {
     api_host: POSTHOG_HOST,
     capture_pageview: true,
     capture_pageleave: true,
-    autocapture: true,
-    session_recording: {
-      maskAllInputs: false,
-    },
+    // Phase 3 reste interne : seules les métriques explicitement conçues sont
+    // envoyées. Aucun clic, saisie, micro ou replay de session n'est collecté.
+    autocapture: false,
+    disable_session_recording: true,
   });
   initialized = true;
 }

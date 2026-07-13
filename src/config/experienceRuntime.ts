@@ -1,12 +1,3 @@
-const MINUTE_SECONDS = 60;
-
-function readPositiveMinutes(name: string, fallback: number): number {
-  const raw = import.meta.env[name];
-  if (typeof raw !== "string" || !raw.trim()) return fallback;
-  const value = Number(raw);
-  return Number.isFinite(value) && value > 0 ? value : fallback;
-}
-
 function readPositiveMilliseconds(name: string, fallback: number): number {
   const raw = import.meta.env[name];
   if (typeof raw !== "string" || !raw.trim()) return fallback;
@@ -14,16 +5,22 @@ function readPositiveMilliseconds(name: string, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? Math.round(value) : fallback;
 }
 
-/** Public test target. Can be shortened in preview/E2E without changing the flow. */
-export const SESSION_DURATION_SECONDS = Math.round(
-  readPositiveMinutes("VITE_SESSION_DURATION_MINUTES", 15) * MINUTE_SECONDS,
-);
+export const MIN_SESSION_DURATION_SECONDS = 120;
+export const MAX_SESSION_DURATION_SECONDS = 1_800;
+export const FALLBACK_SESSION_DURATION_SECONDS = 600;
+export const SESSION_MINIMUM_CLOSURE_RATIO = 0.8;
 
-/** The GM may suggest a natural ending only after this point. Explicit hang-up remains available. */
-export const SESSION_MINIMUM_CLOSURE_SECONDS = Math.min(
-  SESSION_DURATION_SECONDS,
-  Math.round(readPositiveMinutes("VITE_SESSION_MINIMUM_CLOSURE_MINUTES", 12) * MINUTE_SECONDS),
-);
+/** Treat DB/localStorage settings as untrusted and keep them inside the admin slider contract. */
+export function normalizeSessionDurationSeconds(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return FALLBACK_SESSION_DURATION_SECONDS;
+  return Math.min(MAX_SESSION_DURATION_SECONDS, Math.max(MIN_SESSION_DURATION_SECONDS, Math.round(parsed)));
+}
+
+/** Preserve the Phase 2 12/15 closure ratio for any duration chosen in the admin. */
+export function getSessionMinimumClosureSeconds(durationSeconds: unknown): number {
+  return Math.floor(normalizeSessionDurationSeconds(durationSeconds) * SESSION_MINIMUM_CLOSURE_RATIO);
+}
 
 /** User-visible response deadline. RAG/LLM must fail soft before this budget expires. */
 export const TURN_RESPONSE_DEADLINE_MS = 5_000;

@@ -11,7 +11,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { getLLMSettings } from "@/services/settingsService";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import type { ConversationMessage, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
-import { SESSION_DURATION_SECONDS, SESSION_MINIMUM_CLOSURE_SECONDS } from "@/config/experienceRuntime";
 
 export interface PRD4PostTurnInput {
   sessionId: string | null;
@@ -23,6 +22,8 @@ export interface PRD4PostTurnInput {
   userPostureRaw?: string | null;
   turnIndex: number;
   timeElapsedSeconds: number;
+  sessionDurationSeconds: number;
+  minimumClosureSeconds: number;
   /** IDs de triggers vidéo déjà joués (évite de rejouer). */
   triggeredVideoIds?: string[];
   signal?: AbortSignal;
@@ -45,7 +46,7 @@ const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
 
 const GM_POST_TURN_TIMEOUT_MS = 12000;
 
-const SYSTEM_PROMPT = `Tu es le Game Master d'une expérience narrative en temps réel de ~15 minutes entre un joueur et Max (père d'Ava). Après chaque échange (1 message utilisateur + 1 réponse de Max), tu produis une évaluation structurée en JSON STRICT — aucun texte hors JSON.
+const SYSTEM_PROMPT = `Tu es le Game Master d'une expérience narrative en temps réel dont la durée est configurée par l'administration, entre un joueur et Max (père d'Ava). Après chaque échange (1 message utilisateur + 1 réponse de Max), tu produis une évaluation structurée en JSON STRICT — aucun texte hors JSON.
 
 Tu retournes EXACTEMENT cet objet :
 {
@@ -81,7 +82,7 @@ Règles "trigger_video_id" — PRIORITÉ HAUTE :
 - Jamais d'id déjà présent dans \`already_triggered\`.
 - Si \`labels.themes\` est vide, retourne null (pas de trigger sans label clair).
 
-Règles "end_recommended" : false avant 12 minutes. À partir de 12 minutes, true seulement si la conversation a trouvé une clôture naturelle ou échoue durablement.
+Règles "end_recommended" : respecte le seuil de clôture fourni dans le contexte. Après ce seuil, true seulement si la conversation a trouvé une clôture naturelle ou échoue durablement.
 
 Pas de markdown, pas de \`\`\`. Uniquement l'objet JSON.`;
 
@@ -119,7 +120,7 @@ ${input.userRole?.summary_for_max || "(profil indisponible)"}
 ${input.userPostureRaw?.trim() || "(non renseignée)"}
 
 ## TEMPS ÉCOULÉ
-  ${Math.floor(input.timeElapsedSeconds / 60)}min ${input.timeElapsedSeconds % 60}s sur ~${Math.round(SESSION_DURATION_SECONDS / 60)} min cible — clôture naturelle autorisée après ${Math.round(SESSION_MINIMUM_CLOSURE_SECONDS / 60)} min — tour #${input.turnIndex}
+  ${Math.floor(input.timeElapsedSeconds / 60)}min ${input.timeElapsedSeconds % 60}s sur ~${Math.round(input.sessionDurationSeconds / 60)} min configurées — clôture naturelle autorisée après ${Math.floor(input.minimumClosureSeconds / 60)}min ${input.minimumClosureSeconds % 60}s — tour #${input.turnIndex}
 
 ## VIDÉOS DISPONIBLES
 ${videoLines}

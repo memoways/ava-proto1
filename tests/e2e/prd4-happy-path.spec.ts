@@ -211,7 +211,13 @@ async function installNetworkFakes(
         updated_at: new Date().toISOString(),
       }] : []);
     }
-    if (table === "admin_settings" || table === "character_prompts") {
+    if (table === "admin_settings") {
+      if (url.searchParams.get("key") === "eq.ava_gameplay_settings") {
+        return json(route, { value: { TIMEOUT_SECONDS: 930 } });
+      }
+      return json(route, null);
+    }
+    if (table === "character_prompts") {
       return json(route, []);
     }
     if (table === "characters") {
@@ -389,7 +395,7 @@ test("endurance accélérée de 35 tours avec mémoire bornée et pannes récup�
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
   await page.getByRole("button", { name: "Appeler Max" }).click();
-  await expect(page.getByLabel("Temps restant")).toHaveText(/15:00|14:59/, { timeout: 10_000 });
+  await expect(page.getByLabel("Temps restant")).toHaveText(/15:30|15:29/, { timeout: 10_000 });
 
   for (let turn = 1; turn <= 35; turn += 1) {
     await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();

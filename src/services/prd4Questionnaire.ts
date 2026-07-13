@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import type { QuestionnairePRD4Data } from "@/types";
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
+import { trackEvent } from "@/services/posthogService";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -16,6 +17,11 @@ export async function savePRD4Questionnaire(
     .from("sessions")
     .update({ questionnaire_responses: JSON.parse(JSON.stringify(data)) as Json })
     .eq("id", sessionId);
+  trackEvent("prd4_persistence_result", {
+    operation: "save_questionnaire",
+    success: !error,
+    session_id: sessionId,
+  });
   if (error) console.warn("[PRD4 questionnaire] save failed:", error.message);
 }
 

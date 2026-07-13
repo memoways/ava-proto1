@@ -4,27 +4,43 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import type { ConversationMessage, UserRoleProfile } from "@/types";
-import type { Json } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/integrations/supabase/types";
 import { ensureGameAuth } from "@/services/gameAuth";
+import { trackEvent } from "@/services/posthogService";
+
+type SessionInsert = Database["public"]["Tables"]["sessions"]["Insert"];
+
+function trackPersistence(operation: string, success: boolean, sessionId?: string): void {
+  trackEvent("prd4_persistence_result", {
+    operation,
+    success,
+    ...(sessionId ? { session_id: sessionId } : {}),
+  });
+}
 
 export async function createPRD4Session(
   userRole: UserRoleProfile | null,
   character = "max",
-  extra?: Record<string, unknown>,
+  extra?: SessionInsert,
 ): Promise<string> {
   await ensureGameAuth();
+  const session: SessionInsert = {
+    started_at: new Date().toISOString(),
+    personnage_appele: character,
+    player_role: (userRole as unknown as Json) ?? null,
+    modalite_voix: "push_to_talk",
+    ...extra,
+  };
   const { data, error } = await supabase
     .from("sessions")
-    .insert({
-      started_at: new Date().toISOString(),
-      personnage_appele: character,
-      player_role: (userRole as unknown as Json) ?? null,
-      modalite_voix: "push_to_talk",
-      ...(extra as any),
-    } as any)
+    .insert(session)
     .select("id")
     .single();
-  if (error) throw error;
+  if (error) {
+    trackPersistence("create_session", false);
+    throw error;
+  }
+  trackPersistence("create_session", true, data.id);
   return data.id;
 }
 
@@ -45,8 +61,9 @@ export async function updatePRD4Onboarding(
 ): Promise<void> {
   const { error } = await supabase
     .from("sessions")
-    .update(payload as any)
+    .update(payload)
     .eq("id", sessionId);
+  trackPersistence("update_onboarding", !error, sessionId);
   if (error) console.warn("[PRD4 session] update onboarding failed:", error.message);
 }
 
@@ -59,6 +76,7 @@ export async function updatePRD4Conversation(
     .from("sessions")
     .update({ conversation_log: JSON.parse(JSON.stringify(conversation)) as Json })
     .eq("id", sessionId);
+  trackPersistence("update_conversation", !error, sessionId);
   if (error) console.warn("[PRD4 session] update conversation failed:", error.message);
 }
 
@@ -77,5 +95,6 @@ export async function endPRD4Session(
       duration_seconds: durationSeconds,
     })
     .eq("id", sessionId);
+  trackPersistence("end_session", !error, sessionId);
   if (error) console.warn("[PRD4 session] end failed:", error.message);
 }

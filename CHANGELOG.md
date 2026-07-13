@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.40.0] - 2026-07-13 — Phase 3 canary interne
+
+### Corrigé
+- La durée de l'expérience n'est plus doublée par une constante de 15 minutes : le timer, la clôture Game Master et la persistance utilisent `TIMEOUT_SECONDS`, chargé depuis le slider admin avant la conversation.
+- Le prompt Game Master et le résumé de session ne supposent plus une durée fixe.
+
+### Ajouté
+- Décision canary déterministe avec trois états : promotion, attente ou rollback.
+- Seuils internes : 5 sessions, 30 tours, p95 premier son à 5 secondes, erreurs à 2 % et persistance à 99,5 %.
+- Événement `prd4_persistence_result` couvrant les opérations critiques et runbook de canary/rollback.
+
+### Confidentialité
+- Autocapture et session replay PostHog désactivés ; les événements de performance explicitement conçus restent actifs.
+
+### Activation restante
+- Publier sur Lovable en restant privé, redéployer `summarize-session`, exécuter le canary interne et approuver le budget maximal par session.
+
 ## [0.39.1] - 2026-07-13 — Lecture TTS complète
 
 ### Corrigé

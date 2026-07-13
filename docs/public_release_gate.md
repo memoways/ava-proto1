@@ -18,12 +18,16 @@ Le projet n'est pas public. Aucun lien d'aperçu ou de production ne doit être 
 - [ ] CAPTCHA activé sur l'environnement externe.
 - [ ] Publication Lovable repassée en privé/interne (`publish_visibility` est actuellement `public`).
 - [ ] Parcours de 15 minutes validé sans désordre de tours ni croissance non bornée du contexte.
-  - [x] Timer 15 minutes, clôture GM après 12 minutes minimum, contexte récent borné à 10 messages.
+  - [x] Timer piloté par `TIMEOUT_SECONDS` dans l'admin, clôture GM après 80 % de cette durée, contexte récent borné à 10 messages.
   - [x] Endurance automatisée : 30 × 35 tours côté orchestrateur et 35 tours dans le navigateur avec pannes injectées.
   - [ ] Session réelle déployée de 15 minutes avec fournisseurs réels et relevé p50/p95.
 - [ ] Consentement/information micro et analytics validés.
 - [ ] Headers de sécurité contrôlés sur l'URL réellement servie.
 - [ ] Seuils de latence et de rollback définis et observables.
+  - [x] Seuils codifiés et panneau canary interne : p95 premier son ≤ 5 s, erreurs de tours ≤ 2 %, persistance ≥ 99,5 %.
+  - [x] Événements explicites de persistance disponibles dans PostHog, sans autocapture ni session replay.
+  - [ ] Budget maximum par session approuvé et configuré dans la procédure de décision.
+  - [ ] Canary interne réel exécuté sur au moins 5 sessions et 30 tours.
 
 ## Commandes de contrôle Phase 0
 
@@ -52,7 +56,7 @@ Le smoke test distant du 13 juillet 2026 confirme `401` sans JWT, `201` avec ide
 
 ## Contrat fluidité Phase 2
 
-La Phase 2 borne la durée à 15 minutes, la mémoire récente à 10 messages, le RAG à 2 secondes et l'attente de la première voix à 15 secondes. Une lecture commencée va jusqu'à l'événement `ended`, avec récupération uniquement si sa position ne progresse plus pendant 15 secondes. Les travaux obsolètes sont annulés et les erreurs RAG/LLM/TTS restituent le contrôle à l'utilisateur. Les preuves et la procédure de recette sont détaillées dans [`phase2_fluidity_endurance_report.md`](phase2_fluidity_endurance_report.md).
+La Phase 2 utilise la durée configurée par le slider admin, borne la mémoire récente à 10 messages, le RAG à 2 secondes et l'attente de la première voix à 15 secondes. Une lecture commencée va jusqu'à l'événement `ended`, avec récupération uniquement si sa position ne progresse plus pendant 15 secondes. Les travaux obsolètes sont annulés et les erreurs RAG/LLM/TTS restituent le contrôle à l'utilisateur. Les preuves et la procédure de recette sont détaillées dans [`phase2_fluidity_endurance_report.md`](phase2_fluidity_endurance_report.md).
 
 ## Procédure d'ouverture
 

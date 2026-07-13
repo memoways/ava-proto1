@@ -4,12 +4,20 @@ export function useTimer(durationSeconds: number, onTimeout: () => void) {
   const [remaining, setRemaining] = useState(durationSeconds);
   const [isRunning, setIsRunning] = useState(false);
   const onTimeoutRef = useRef(onTimeout);
+  const durationRef = useRef(durationSeconds);
+  const isRunningRef = useRef(false);
   onTimeoutRef.current = onTimeout;
+  durationRef.current = durationSeconds;
+
+  useEffect(() => {
+    if (!isRunningRef.current) setRemaining(durationSeconds);
+  }, [durationSeconds]);
 
   useEffect(() => {
     if (!isRunning) return;
     if (remaining <= 0) {
       onTimeoutRef.current();
+      isRunningRef.current = false;
       setIsRunning(false);
       return;
     }
@@ -17,12 +25,19 @@ export function useTimer(durationSeconds: number, onTimeout: () => void) {
     return () => clearInterval(id);
   }, [isRunning, remaining]);
 
-  const start = useCallback(() => setIsRunning(true), []);
-  const pause = useCallback(() => setIsRunning(false), []);
-  const reset = useCallback(() => {
-    setRemaining(durationSeconds);
+  const start = useCallback(() => {
+    isRunningRef.current = true;
+    setIsRunning(true);
+  }, []);
+  const pause = useCallback(() => {
+    isRunningRef.current = false;
     setIsRunning(false);
-  }, [durationSeconds]);
+  }, []);
+  const reset = useCallback((nextDurationSeconds?: number) => {
+    isRunningRef.current = false;
+    setRemaining(nextDurationSeconds ?? durationRef.current);
+    setIsRunning(false);
+  }, []);
 
   const minutes = Math.floor(remaining / 60);
   const seconds = remaining % 60;

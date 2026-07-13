@@ -3,6 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  evaluateCanaryReadiness,
+  INTERNAL_CANARY_THRESHOLDS,
+  type CanaryCheckStatus,
+} from "@/services/releaseReadiness";
 
 interface TurnRow {
   id: string;
@@ -199,6 +204,25 @@ export default function LatencyTelemetryTab() {
     };
   }, [voiceTurns]);
 
+  const canaryReadiness = useMemo(() => {
+    const firstSoundValues = voiceTurns
+      .map((turn) => turn.metadata_json?.t_turn_voice_ready_ms)
+      .filter((value): value is number => typeof value === "number" && value >= 0);
+    const failedTurns = voiceTurns.filter((turn) => turn.severity === "failed").length;
+    const sessionCount = new Set(voiceTurns.map((turn) => turn.session_id).filter(Boolean)).size;
+
+    return evaluateCanaryReadiness({
+      sessionCount,
+      turnCount: voiceTurns.length,
+      p95FirstSoundMs: firstSoundValues.length ? percentile(firstSoundValues, 95) : null,
+      turnErrorRate: voiceTurns.length ? failedTurns / voiceTurns.length : null,
+      // Ces deux mesures sont suivies dans PostHog et doivent rester bloquantes tant
+      // que le budget et la fenêtre de canary ne sont pas validés par le responsable.
+      persistenceRate: null,
+      costPerSessionUsd: null,
+    });
+  }, [voiceTurns]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -235,6 +259,37 @@ export default function LatencyTelemetryTab() {
           <div className="text-muted-foreground">TTS génération totale</div>
           <div className="font-mono">méd {fmt(audioStats.tts_total_median)} · p95 {fmt(audioStats.tts_total_p95)}</div>
         </div>
+      </div>
+
+      <div className="border rounded p-3 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="text-sm font-semibold">Canary interne — décision de déploiement</h3>
+            <p className="text-xs text-muted-foreground">
+              Fenêtre locale des {voiceTurns.length} derniers tours voix. La gate publique reste fermée.
+            </p>
+          </div>
+          <Badge variant={canaryReadiness.decision === "rollback" ? "destructive" : "secondary"}>
+            {canaryReadiness.decision === "promote"
+              ? "PROMOUVOIR"
+              : canaryReadiness.decision === "rollback"
+                ? "ROLLBACK"
+                : "EN ATTENTE"}
+          </Badge>
+        </div>
+        <div className="grid md:grid-cols-2 gap-1.5 text-xs">
+          {canaryReadiness.checks.map((check) => (
+            <div key={check.key} className="flex items-center gap-2 rounded border px-2 py-1.5">
+              <CanaryStatus status={check.status} />
+              <span>{check.detail}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Seuils codifiés : au moins {INTERNAL_CANARY_THRESHOLDS.minimumSessions} sessions et {INTERNAL_CANARY_THRESHOLDS.minimumTurns} tours,
+          p95 premier son ≤ {INTERNAL_CANARY_THRESHOLDS.maximumP95FirstSoundMs / 1000}s, erreurs ≤ {INTERNAL_CANARY_THRESHOLDS.maximumTurnErrorRate * 100}%
+          et persistance ≥ {INTERNAL_CANARY_THRESHOLDS.minimumPersistenceRate * 100}%. Le budget par session doit être approuvé avant toute promotion.
+        </p>
       </div>
 
       <div className="border rounded p-3 space-y-3">
@@ -365,4 +420,9 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
       <div className="font-mono">{value}</div>
     </div>
   );
+}
+
+function CanaryStatus({ status }: { status: CanaryCheckStatus }) {
+  const label = status === "pass" ? "OK" : status === "fail" ? "ÉCHEC" : "ATTENTE";
+  return <Badge variant={status === "fail" ? "destructive" : "outline"}>{label}</Badge>;
 }

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Save, RotateCcw } from "lucide-react";
 import { SPEECH_MODES } from "@/services/speechModes";
+import { MAX_SESSION_DURATION_SECONDS, MIN_SESSION_DURATION_SECONDS } from "@/config/experienceRuntime";
 import {
   getGMPromptSettings,
   saveGMPromptSettings,
@@ -171,8 +172,8 @@ export default function GameMasterConfigTab() {
           <Slider
             value={[gameplay.TIMEOUT_SECONDS]}
             onValueChange={([v]) => updateGameplay({ TIMEOUT_SECONDS: v })}
-            min={120}
-            max={1800}
+            min={MIN_SESSION_DURATION_SECONDS}
+            max={MAX_SESSION_DURATION_SECONDS}
             step={30}
           />
           <div className="flex justify-between text-xs text-muted-foreground mt-1">

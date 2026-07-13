@@ -3,7 +3,7 @@
  *
  * Phase 3 : Max contextualisé (résumé du rôle joueur injecté), conversation
  * réelle STT + TTS via TTSQueue, GM post-turn PRD4 en void (jamais bloquant).
- * Fin de session : 15 min OU clôture naturelle du GM après le seuil minimum.
+ * Fin de session : durée admin OU clôture naturelle du GM après le seuil minimum.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -16,7 +16,13 @@ import { createPRD4Session, endPRD4Session, updatePRD4Conversation, updatePRD4On
 import { createConfiguredSTT, loadSTTSettingsFromDB, type STTSession } from "@/services/stt";
 import { TTSQueue, chunkTextForTTS } from "@/services/elevenLabsTTS";
 import { prefetchOpeningTTS, playOpeningTTS, OPENING_LINE } from "@/services/openingTTSCache";
-import { getLLMSettings } from "@/services/settingsService";
+import {
+  getGameplaySettings,
+  getLLMSettings,
+  loadGameplaySettingsFromDB,
+  type GameplaySettings,
+} from "@/services/settingsService";
+import { withTimeout } from "@/services/asyncUtils";
 import {
   buildVoiceTurnCompletedPayload,
   createVoiceTurnId,
@@ -61,8 +67,8 @@ import {
 import type { QuestionnairePRD4Answers, QuestionnairePRD4Data, UserPosture } from "@/types";
 import { ensureGameAuth, isGameSecurityEnabled } from "@/services/gameAuth";
 import {
-  SESSION_DURATION_SECONDS,
-  SESSION_MINIMUM_CLOSURE_SECONDS,
+  getSessionMinimumClosureSeconds,
+  normalizeSessionDurationSeconds,
   TURN_FIRST_AUDIO_DEADLINE_MS,
 } from "@/config/experienceRuntime";
 
@@ -86,6 +92,8 @@ const IndexPRD4 = () => {
   const [userSubtitle, setUserSubtitle] = useState("");
   const [maxSubtitle, setMaxSubtitle] = useState("");
   const [summarizing, setSummarizing] = useState(false);
+  const initialSessionDuration = normalizeSessionDurationSeconds(getGameplaySettings().TIMEOUT_SECONDS);
+  const [sessionDurationSeconds, setSessionDurationSeconds] = useState(initialSessionDuration);
   const latencyOverlayEnabled = useLatencyOverlayEnabled();
   const {
     segments: latencySegments,
@@ -114,6 +122,8 @@ const IndexPRD4 = () => {
   userPostureRef.current = state.userPosture;
   const turnLatenciesRef = useRef<number[]>([]);
   const sessionDurationRef = useRef<number>(0);
+  const configuredSessionDurationRef = useRef<number>(initialSessionDuration);
+  const gameplaySettingsLoadRef = useRef<Promise<GameplaySettings> | null>(null);
   const triggeredVideoIdsRef = useRef<string[]>([]);
   const lastVideoTurnRef = useRef<number>(-Infinity);
   const videoTriggerSettingsRef = useRef<VideoTriggerSettings>(videoTriggerDefaults);
@@ -128,14 +138,14 @@ const IndexPRD4 = () => {
 
 
 
-  // Timer 15 minutes — démarré quand on entre en conversation, fin auto à 0.
+  // Timer piloté par le réglage admin TIMEOUT_SECONDS, fin auto à 0.
   const handleTimeout = useCallback(() => {
     if (endedRef.current) return;
     endedRef.current = true;
-    void finalizeAndEnd("timeout_15min");
+    void finalizeAndEnd("timeout_configured_duration");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const timer = useTimer(SESSION_DURATION_SECONDS, handleTimeout);
+  const timer = useTimer(sessionDurationSeconds, handleTimeout);
   const timerRef = useRef(timer);
   timerRef.current = timer;
 
@@ -156,6 +166,13 @@ const IndexPRD4 = () => {
       });
     }
     void loadSTTSettingsFromDB();
+    const settingsPromise = loadGameplaySettingsFromDB();
+    gameplaySettingsLoadRef.current = settingsPromise;
+    void settingsPromise.then((settings) => {
+      const duration = normalizeSessionDurationSeconds(settings.TIMEOUT_SECONDS);
+      configuredSessionDurationRef.current = duration;
+      setSessionDurationSeconds(duration);
+    });
   }, []);
 
   // ---- Helpers conversation -------------------------------------------------
@@ -177,7 +194,8 @@ const IndexPRD4 = () => {
     async (reason: string) => {
       cleanupAudio();
       const sid = sessionIdRef.current;
-      const duration = SESSION_DURATION_SECONDS - (timerRef.current?.remaining ?? SESSION_DURATION_SECONDS);
+      const configuredDuration = configuredSessionDurationRef.current;
+      const duration = configuredDuration - (timerRef.current?.remaining ?? configuredDuration);
       sessionDurationRef.current = duration;
       if (sid) {
         await endPRD4Session(sid, reason, conversationRef.current, duration).catch((e) =>
@@ -277,6 +295,18 @@ const IndexPRD4 = () => {
 
   // ---- Calling → conversation : créer session + ouvrir TTS ------------------
   const handleAnswered = useCallback(async () => {
+    // La lecture démarre au montage et ne peut retarder l'ouverture de l'appel
+    // de plus de 800 ms. En cas de réseau lent, le dernier réglage admin mis en
+    // cache reste préférable à une interface bloquée.
+    const gameplaySettings = await withTimeout(
+      "gameplay_settings_before_call",
+      gameplaySettingsLoadRef.current ?? loadGameplaySettingsFromDB(),
+      800,
+    ).catch(() => getGameplaySettings());
+    const configuredDuration = normalizeSessionDurationSeconds(gameplaySettings.TIMEOUT_SECONDS);
+    configuredSessionDurationRef.current = configuredDuration;
+    setSessionDurationSeconds(configuredDuration);
+
     setPhase("conversation_max");
     endedRef.current = false;
     conversationRef.current = [];
@@ -311,9 +341,10 @@ const IndexPRD4 = () => {
       console.warn("[PRD4] createSession failed (continuing without DB persistence):", err);
     }
 
-    // Démarre le timer de session (15 min par défaut).
-    timer.reset();
+    // Le réglage admin est relu au démarrage pour éviter un cache public obsolète.
+    timer.reset(configuredDuration);
     timer.start();
+    trackEvent("prd4_session_duration_loaded", { duration_seconds: configuredDuration });
 
     // Réplique d'ouverture de Max (scriptée pour amorcer)
     const opening = OPENING_LINE;
@@ -405,7 +436,8 @@ const IndexPRD4 = () => {
 
       const turnIndex = conversationRef.current.filter((m) => m.role === "user").length;
       const turnId = createVoiceTurnId(sessionIdRef.current, turnIndex);
-      const elapsed = SESSION_DURATION_SECONDS - (timerRef.current?.remaining ?? SESSION_DURATION_SECONDS);
+      const configuredDuration = configuredSessionDurationRef.current;
+      const elapsed = configuredDuration - (timerRef.current?.remaining ?? configuredDuration);
       const llmSettings = (() => { try { return getLLMSettings(); } catch { return null; } })();
       const ttsService = getConfiguredTTSServiceInfo();
       const ragService = getConfiguredRAGServiceInfo();
@@ -728,14 +760,15 @@ const IndexPRD4 = () => {
               }
             }
           }
-          if (ev.end_recommended && elapsed >= SESSION_MINIMUM_CLOSURE_SECONDS && !endedRef.current) {
+          const minimumClosureSeconds = getSessionMinimumClosureSeconds(configuredSessionDurationRef.current);
+          if (ev.end_recommended && elapsed >= minimumClosureSeconds && !endedRef.current) {
             endedRef.current = true;
             void finalizeAndEnd("gm_end_recommended");
-          } else if (ev.end_recommended && elapsed < SESSION_MINIMUM_CLOSURE_SECONDS) {
+          } else if (ev.end_recommended && elapsed < minimumClosureSeconds) {
             trackEvent("prd4_early_end_blocked", {
               session_id: sessionIdRef.current,
               elapsed_seconds: elapsed,
-              minimum_closure_seconds: SESSION_MINIMUM_CLOSURE_SECONDS,
+              minimum_closure_seconds: minimumClosureSeconds,
             });
           }
         });

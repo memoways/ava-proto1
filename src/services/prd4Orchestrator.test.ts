@@ -17,6 +17,7 @@ vi.mock("@/services/ragService", () => ({
 vi.mock("@/services/characterPromptService", () => ({ resolveCharacterIdByName: vi.fn() }));
 vi.mock("@/services/settingsService", () => ({
   getGameplaySettings: vi.fn(() => ({
+    TIMEOUT_SECONDS: 930,
     RAG_TOP_K: 5,
     RAG_RERANK_ENABLED: true,
     RAG_RETRIEVE_K: 15,
@@ -106,6 +107,11 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     expect(vi.mocked(summarizeSessionAsync).mock.calls[0][1].at(-1)?.content).toBe("Je vous écoute.");
     await result.labelPromise;
     await result.postTurnPromise;
+    expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0]).toMatchObject({
+      conversationHistory: expect.any(Array),
+      sessionDurationSeconds: 930,
+      minimumClosureSeconds: 744,
+    });
     expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0].conversationHistory).toHaveLength(10);
   });
 
@@ -145,7 +151,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
           conversationHistory: history,
           userMessage,
           userRole: null,
-          timeElapsedSeconds: Math.floor((turn / 35) * 15 * 60),
+          timeElapsedSeconds: Math.floor((turn / 35) * 930),
         });
         expect(result.memory.recentMessages).toBeLessThanOrEqual(10);
         history.push(

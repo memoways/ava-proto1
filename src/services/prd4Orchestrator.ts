@@ -24,6 +24,8 @@ import {
   RAG_DEGRADED_MODE_DEADLINE_MS,
   SUMMARY_FETCH_DEADLINE_MS,
   TURN_RESPONSE_DEADLINE_MS,
+  getSessionMinimumClosureSeconds,
+  normalizeSessionDurationSeconds,
 } from "@/config/experienceRuntime";
 import type { ConversationMessage, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 
@@ -80,6 +82,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const gameplay = (() => {
     try { return getGameplaySettings(); } catch { return null; }
   })();
+  const sessionDurationSeconds = normalizeSessionDurationSeconds(gameplay?.TIMEOUT_SECONDS);
+  const minimumClosureSeconds = getSessionMinimumClosureSeconds(sessionDurationSeconds);
   const summaryPromise = input.sessionId
     ? withTimeout(
         "prd4_summary_fetch",
@@ -186,6 +190,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         userPostureRaw: input.userPostureRaw ?? null,
         turnIndex,
         timeElapsedSeconds: input.timeElapsedSeconds,
+        sessionDurationSeconds,
+        minimumClosureSeconds,
         triggeredVideoIds: input.triggeredVideoIds,
         signal: input.signal,
       });

@@ -66,6 +66,16 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-07-13 — Phase 3 : préparer le canary sans ouvrir au public 🔷
+
+**Intent.** Transformer les critères abstraits de déploiement progressif en une décision explicite et réversible, tout en conservant l'application en accès interne.
+
+**Correction structurante.** La durée de 15 minutes ajoutée en Phase 2 doublonnait le réglage `TIMEOUT_SECONDS` déjà piloté par le slider admin. Le runtime recharge désormais ce réglage avant la conversation et l'utilise pour le timer, le seuil de clôture du GM à 80 % et la durée persistée. Les prompts ne supposent plus une durée fixe.
+
+**Outcome.** Un panneau canary applique les seuils p95 premier son, erreurs et taille d'échantillon ; la persistance émet un événement explicite. Une métrique absente ou un budget non validé bloque la promotion. PostHog conserve les événements utiles, mais autocapture et session replay sont désactivés.
+
+**Activation restante.** Publier en restant privé, redéployer `summarize-session`, exécuter au moins 5 sessions et 30 tours, puis valider le budget par session. Le runbook est dans `docs/phase3_internal_canary_runbook.md`.
+
 ### 2026-07-13 — Correctif Phase 2 : le watchdog ne coupe plus Max 🔷
 
 **Cause.** Le watchdog global de 15 secondes englobait par erreur la durée de lecture. Une réponse générée rapidement mais parlée pendant plus de 15 secondes était donc annulée au milieu, exactement au moment où la console affichait `turn watchdog fired`.
@@ -78,13 +88,13 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 **Intent.** Faire de la fluidité une propriété du runtime : contexte borné, tours annulables, budgets de latence explicites et récupération automatique après panne fournisseur.
 
-**Outcome.** La session dure désormais 15 minutes, le GM ne peut pas la clore avant 12 minutes, l'historique récent est plafonné à 10 messages et complété par le résumé persistant. Le RAG a un soft timeout de 2 secondes, chaque tour est annulable et un watchdog de 15 secondes rend le contrôle à l'utilisateur. Le compte à rebours est visible dans l'expérience.
+**Outcome.** La session suit la durée choisie dans l'admin, le GM ne peut pas la clore avant 80 % de cette durée, l'historique récent est plafonné à 10 messages et complété par le résumé persistant. Le RAG a un soft timeout de 2 secondes, chaque tour est annulable et un watchdog de 15 secondes rend le contrôle à l'utilisateur. Le compte à rebours est visible dans l'expérience.
 
 **Découverte.** Le soak navigateur a exposé une vraie course push-to-talk : le timer de fermeture d'un ancien enregistrement pouvait fermer le STT suivant. L'ancien timer est maintenant annulé et lié à son instance STT d'origine.
 
 **Validation.** TypeScript, build et suite Vitest verts ; 30 × 35 tours orchestrateur simulés ; parcours Playwright de 3 et 35 tours verts avec déconnexion RAG, erreur LLM 503, erreurs TTS et trigger vidéo injectés. L'historique LLM reste borné pendant toute l'épreuve.
 
-**Activation restante.** Publier le frontend, redéployer uniquement `summarize-session`, puis réaliser une session réelle de 15 minutes avec fournisseurs réels et relever les p50/p95. La release gate reste fermée jusque-là.
+**Activation restante.** Publier le frontend, redéployer uniquement `summarize-session`, puis régler l'admin sur 15 minutes pour le scénario cible et relever les p50/p95 avec fournisseurs réels. La release gate reste fermée jusque-là.
 
 **Files.** `src/config/experienceRuntime.ts`, `src/services/conversationMemory.ts`, `src/services/prd4Orchestrator.ts`, `src/pages/IndexPRD4.tsx`, `tests/e2e/prd4-happy-path.spec.ts`, `docs/phase2_fluidity_endurance_report.md`.
 

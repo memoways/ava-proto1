@@ -1,18 +1,18 @@
-# Phase 2 — Fluidité et endurance sur 15 minutes
+# Phase 2 — Fluidité et endurance sur la durée configurée
 
 Date : 13 juillet 2026
 Statut : **implémentation locale validée — activation et recette réelle Lovable à effectuer**
 
 ## Objectif
 
-Garantir qu'une conversation puisse rester fluide pendant 15 minutes sans croissance non bornée du contexte, mélange de tours, blocage de l'interface ou cascade de latence lorsqu'un fournisseur devient lent ou indisponible.
+Garantir qu'une conversation puisse rester fluide pendant toute la durée choisie dans l'interface admin, notamment pour le scénario cible de 15 minutes, sans croissance non bornée du contexte, mélange de tours, blocage de l'interface ou cascade de latence lorsqu'un fournisseur devient lent ou indisponible.
 
 La phase 2 ne change ni les fournisseurs configurés ni les secrets. Elle ajoute des bornes, de l'annulation et des chemins de récupération autour du pipeline existant.
 
 ## Contrat runtime
 
-- Durée nominale : **15 minutes** (`VITE_SESSION_DURATION_MINUTES`, valeur par défaut `15`).
-- Clôture Game Master interdite avant **12 minutes** (`VITE_SESSION_MINIMUM_CLOSURE_MINUTES`, valeur par défaut `12`).
+- Durée nominale : valeur `TIMEOUT_SECONDS` enregistrée par le slider admin, bornée entre 2 et 30 minutes. La valeur de secours locale est 10 minutes uniquement si le réglage distant est absent ou invalide.
+- Clôture Game Master interdite avant **80 % de la durée configurée** (12 minutes pour une session réglée à 15 minutes).
 - Budget de réponse conversationnelle : **5 secondes** avant réponse de repli.
 - Watchdog avant première voix : **15 secondes** avant annulation et restitution du contrôle à l'utilisateur.
 - Une fois la voix démarrée, la lecture va jusqu'à l'événement média `ended` ; seul un blocage sans progression pendant 15 secondes l'interrompt.
@@ -43,7 +43,7 @@ La phase 2 ne change ni les fournisseurs configurés ni les secrets. Elle ajoute
 - Le RAG est fail-soft : timeout, déconnexion ou erreur fournisseur n'empêchent pas Max de répondre.
 - Le LLM reçoit uniquement le budget restant du tour ; une réponse locale de repli évite un écran figé.
 - Le résumé mémoire est hors du chemin critique lorsqu'il dépasse son budget.
-- Le compte à rebours de 15 minutes est visible pendant la conversation.
+- Le compte à rebours reflète exactement la durée chargée depuis l'admin avant le début de la conversation.
 
 ## Incident réel découvert pendant le soak
 
@@ -68,19 +68,19 @@ Le lint global conserve une dette historique dans des fichiers non modifiés par
 Après le push sur `main` :
 
 1. laisser Lovable reconstruire et publier le frontend ;
-2. redéployer uniquement l'Edge Function `summarize-session`, dont le prompt a été aligné sur 15 minutes ;
+2. redéployer uniquement l'Edge Function `summarize-session`, dont le prompt ne suppose plus une durée fixe ;
 3. ne modifier aucun secret fournisseur ;
 4. vérifier un tour Deepgram ou Gamilab, une réponse LLM/RAG et un TTS ;
-5. exécuter une session réelle de 15 minutes et relever les p50/p95 par étape dans le dashboard existant.
+5. régler le slider admin sur la durée de recette souhaitée, exécuter la session réelle complète et relever les p50/p95 par étape dans le dashboard existant.
 
 Rollback : republier le commit précédent pour le frontend et redéployer la version précédente de `summarize-session`. Aucune migration de base n'est requise par cette phase.
 
 ## Critère de sortie
 
-La partie code de la phase 2 est terminée. La release gate reste fermée jusqu'à une session réelle de 15 minutes sur l'environnement déployé, avec fournisseurs réels, confirmant :
+La partie code de la phase 2 est terminée. La release gate reste fermée jusqu'à une session réelle sur l'environnement déployé, réglée à 15 minutes pour le test cible et utilisant les fournisseurs réels, confirmant :
 
 - aucun mélange ou saut de tour ;
 - aucune perte durable du bouton de parole ;
-- fin de session correcte à 15 minutes ;
+- fin de session correcte à la valeur du slider admin ;
 - p95 compatible avec la fluidité attendue ;
 - absence de croissance progressive de la latence.
