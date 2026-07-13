@@ -4,6 +4,10 @@
 
 CREATE SCHEMA IF NOT EXISTS private;
 REVOKE ALL ON SCHEMA private FROM PUBLIC, anon, authenticated;
+-- Authenticated callers need schema resolution for the narrowly granted
+-- private.has_role helper used by RLS. Objects in the schema remain hidden
+-- unless they also carry an explicit object-level grant.
+GRANT USAGE ON SCHEMA private TO authenticated, service_role;
 
 ALTER TABLE public.sessions
   ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
@@ -38,7 +42,7 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  IF public.has_role(auth.uid(), 'admin'::public.app_role) THEN
+  IF private.has_role(auth.uid(), 'admin'::public.app_role) THEN
     RETURN NEW;
   END IF;
 
@@ -102,16 +106,16 @@ CREATE POLICY "Participant update own active session"
 
 CREATE POLICY "Admin read sessions"
   ON public.sessions FOR SELECT TO authenticated
-  USING (public.has_role((SELECT auth.uid()), 'admin'::public.app_role));
+  USING (private.has_role((SELECT auth.uid()), 'admin'::public.app_role));
 
 CREATE POLICY "Admin update sessions"
   ON public.sessions FOR UPDATE TO authenticated
-  USING (public.has_role((SELECT auth.uid()), 'admin'::public.app_role))
-  WITH CHECK (public.has_role((SELECT auth.uid()), 'admin'::public.app_role));
+  USING (private.has_role((SELECT auth.uid()), 'admin'::public.app_role))
+  WITH CHECK (private.has_role((SELECT auth.uid()), 'admin'::public.app_role));
 
 CREATE POLICY "Admin delete sessions"
   ON public.sessions FOR DELETE TO authenticated
-  USING (public.has_role((SELECT auth.uid()), 'admin'::public.app_role));
+  USING (private.has_role((SELECT auth.uid()), 'admin'::public.app_role));
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.sessions TO authenticated;
 

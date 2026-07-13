@@ -33,6 +33,12 @@ describe("Phase 1 sessions RLS and provider quotas", () => {
       create type public.app_role as enum ('admin');
       create function public.has_role(uuid, public.app_role) returns boolean
         language sql stable as $$ select false $$;
+      create schema private;
+      alter function public.has_role(uuid, public.app_role) set schema private;
+      revoke all on function private.has_role(uuid, public.app_role) from public;
+      grant usage on schema private to authenticated, service_role;
+      grant execute on function private.has_role(uuid, public.app_role)
+        to authenticated, service_role;
 
       create table public.sessions (
         id uuid primary key default gen_random_uuid(),
