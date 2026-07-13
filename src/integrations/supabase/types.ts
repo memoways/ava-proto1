@@ -699,6 +699,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      consume_game_rate_limit: {
+        Args: { p_bucket: string; p_session_id?: string }
+        Returns: Json
+      }
       match_embeddings: {
         Args: {
           match_count?: number
