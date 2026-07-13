@@ -6,23 +6,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
-type Mode = "signin" | "signup";
-
 export default function Auth() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // If already signed in, redirect to /admin
+    // Anonymous participant sessions are not admin sessions.
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate("/admin", { replace: true });
+      if (data.session && data.session.user.is_anonymous !== true) {
+        navigate("/admin", { replace: true });
+      }
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) navigate("/admin", { replace: true });
+      if (session && session.user.is_anonymous !== true) {
+        navigate("/admin", { replace: true });
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, [navigate]);
@@ -32,19 +33,9 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: `${window.location.origin}/admin` },
-        });
-        if (error) throw error;
-        toast.success("Compte créé. Vérifie ton email si la confirmation est activée.");
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        toast.success("Connexion réussie");
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      toast.success("Connexion réussie");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erreur inconnue";
       toast.error(message);
@@ -61,10 +52,10 @@ export default function Auth() {
       >
         <div className="space-y-1">
           <h1 className="text-xl font-semibold">
-            {mode === "signin" ? "Connexion Admin" : "Créer un compte Admin"}
+            Connexion Admin
           </h1>
           <p className="text-sm text-muted-foreground">
-            Accès réservé aux administrateurs du back-office.
+            Accès réservé aux comptes administrateurs créés sur invitation.
           </p>
         </div>
 
@@ -86,7 +77,7 @@ export default function Auth() {
           <Input
             id="password"
             type="password"
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -95,18 +86,8 @@ export default function Auth() {
         </div>
 
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "..." : mode === "signin" ? "Se connecter" : "Créer le compte"}
+          {loading ? "..." : "Se connecter"}
         </Button>
-
-        <button
-          type="button"
-          className="w-full text-xs text-muted-foreground hover:text-foreground transition"
-          onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-        >
-          {mode === "signin"
-            ? "Pas de compte ? Créer un compte admin"
-            : "Déjà un compte ? Se connecter"}
-        </button>
       </form>
     </div>
   );

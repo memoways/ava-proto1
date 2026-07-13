@@ -12,7 +12,7 @@ type GamilabSingleton = {
   pause_recording?: () => Promise<void>;
   resume_recording?: () => Promise<void>;
   stop_recording?: () => Promise<void>;
-  on: (event: string, cb: (payload: any) => void) => unknown;
+  on: <T>(event: string, cb: (payload: T) => void) => unknown;
   off: (ref: unknown) => void;
 };
 
@@ -22,28 +22,72 @@ declare global {
   }
 }
 
+const GAMILAB_SDK_URL = "https://gamilab.ch/js/sdk.js";
+let singletonPromise: Promise<GamilabSingleton> | null = null;
+
 /**
  * Wait for the SDK to initialise. The SDK fires `gami:init` repeatedly until
  * `evt.detail.Gami()` is called; we cache the singleton on `window`.
  */
 function getGamiSingleton(timeoutMs = 5000): Promise<GamilabSingleton> {
   if (window.__gami_singleton__) return Promise.resolve(window.__gami_singleton__);
-  return new Promise((resolve, reject) => {
+  if (singletonPromise) return singletonPromise;
+
+  singletonPromise = new Promise((resolve, reject) => {
+    let settled = false;
+    const timer: { id?: number } = {};
+    let script: HTMLScriptElement | null = null;
+    const cleanup = () => {
+      window.removeEventListener("gami:init", handler);
+      if (timer.id !== undefined) window.clearTimeout(timer.id);
+    };
+    const fail = (message: string) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      script?.remove();
+      reject(new Error(message));
+    };
     const handler = (evt: Event) => {
       const detail = (evt as CustomEvent).detail;
-      if (detail?.Gami) {
+      if (!settled && detail?.Gami) {
+        settled = true;
         const gami = detail.Gami() as GamilabSingleton;
         window.__gami_singleton__ = gami;
-        window.removeEventListener("gami:init", handler);
+        cleanup();
         resolve(gami);
       }
     };
+
+    // Register before injecting the third-party script so the first init event
+    // cannot be missed. The script is loaded only after the user has accepted
+    // the required voice/storage information.
     window.addEventListener("gami:init", handler);
-    setTimeout(() => {
-      window.removeEventListener("gami:init", handler);
-      reject(new Error("Gamilab SDK never fired gami:init (script https://gamilab.ch/js/sdk.js not loaded?)"));
-    }, timeoutMs);
+    script = document.querySelector<HTMLScriptElement>(`script[src="${GAMILAB_SDK_URL}"]`);
+    if (!script) {
+      script = document.createElement("script");
+      script.src = GAMILAB_SDK_URL;
+      script.async = true;
+      script.defer = true;
+      script.dataset.avaGamilabSdk = "true";
+      document.head.appendChild(script);
+    }
+    script.addEventListener("error", () => fail("Impossible de charger le SDK Gamilab."), { once: true });
+    timer.id = window.setTimeout(
+      () => fail(`Gamilab SDK never fired gami:init (${GAMILAB_SDK_URL}).`),
+      timeoutMs,
+    );
+  }).catch((error) => {
+    singletonPromise = null;
+    throw error;
   });
+
+  return singletonPromise;
+}
+
+/** Starts loading Gamilab during the teaser without delaying the first PTT. */
+export async function prefetchGamilabSDK(): Promise<void> {
+  await getGamiSingleton(10_000);
 }
 
 /**
@@ -155,7 +199,7 @@ export class GamilabSTT implements STTSession {
 
   private bindEvents(gami: GamilabSingleton) {
     this.listeners.push(
-      gami.on("text_current", (payload: any) => {
+      gami.on("text_current", (payload: unknown) => {
         if (this._paused) return;
         const text = this.extractText(payload);
         if (!text) return;
@@ -166,7 +210,7 @@ export class GamilabSTT implements STTSession {
     );
 
     this.listeners.push(
-      gami.on("text_history", (payload: any) => {
+      gami.on("text_history", (payload: unknown) => {
         if (this._paused) return;
         const text = this.extractText(payload);
         if (!text) return;
@@ -187,11 +231,14 @@ export class GamilabSTT implements STTSession {
     );
   }
 
-  private extractText(payload: any): string {
+  private extractText(payload: unknown): string {
     if (typeof payload === "string") return payload.trim();
-    if (typeof payload?.text === "string") return payload.text.trim();
-    if (typeof payload?.transcript === "string") return payload.transcript.trim();
     if (Array.isArray(payload)) return payload.map((item) => this.extractText(item)).filter(Boolean).join(" ").trim();
+    if (payload && typeof payload === "object") {
+      const candidate = payload as { text?: unknown; transcript?: unknown };
+      if (typeof candidate.text === "string") return candidate.text.trim();
+      if (typeof candidate.transcript === "string") return candidate.transcript.trim();
+    }
     return "";
   }
 

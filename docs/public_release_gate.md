@@ -16,13 +16,22 @@ Le projet n'est pas public. Aucun lien d'aperçu ou de production ne doit être 
 - [x] Proxys payants protégés par JWT anonyme et quotas atomiques, activés et testés sur l'environnement Lovable.
 - [x] Anonymous Sign-Ins activé et vérifié sur l'environnement externe.
 - [ ] CAPTCHA activé sur l'environnement externe.
+  - [x] Frontend hCaptcha conditionnel et transmission de la preuve à Supabase Auth.
+  - [ ] Site/secret configurés dans Lovable/Supabase et smoke test en fenêtre privée.
 - [ ] Publication Lovable repassée en privé/interne (`publish_visibility` est actuellement `public`).
 - [ ] Parcours de 15 minutes validé sans désordre de tours ni croissance non bornée du contexte.
   - [x] Timer piloté par `TIMEOUT_SECONDS` dans l'admin, clôture GM après 80 % de cette durée, contexte récent borné à 10 messages.
   - [x] Endurance automatisée : 30 × 35 tours côté orchestrateur et 35 tours dans le navigateur avec pannes injectées.
   - [ ] Session réelle déployée de 15 minutes avec fournisseurs réels et relevé p50/p95.
 - [ ] Consentement/information micro et analytics validés.
+  - [x] Information vocale obligatoire avant démarrage et page `/confidentialite`.
+  - [x] Analytics optionnelles, éteintes avant opt-in, sans autocapture/replay/texte libre.
+  - [ ] Texte, liste des sous-traitants et base légale relus par le responsable du test.
+- [ ] Rétention à 30 jours testée sur branche puis purge planifiée et observée.
+- [ ] Inscription email publique désactivée dans Supabase Auth.
+  - [x] Création de compte admin retirée du frontend ; connexion sur invitation uniquement.
 - [ ] Headers de sécurité contrôlés sur l'URL réellement servie.
+- [ ] Alertes `npm audit --omit=dev` qualifiées et vulnérabilités navigateur corrigées ou acceptées formellement.
 - [ ] Seuils de latence et de rollback définis et observables.
   - [x] Seuils codifiés et panneau canary interne : p95 premier son ≤ 5 s, erreurs de tours ≤ 2 %, persistance ≥ 99,5 %.
   - [x] Événements explicites de persistance disponibles dans PostHog, sans autocapture ni session replay.
@@ -64,3 +73,5 @@ La Phase 2 utilise la durée configurée par le slider admin, borne la mémoire 
 2. Joindre les résultats au rapport de stabilisation.
 3. Faire relire sécurité, confidentialité et budget fournisseur.
 4. Modifier le statut uniquement après décision explicite du responsable projet.
+
+La procédure d'activation sans coupure de la Phase 4 est détaillée dans [`phase4_privacy_prepublic_runbook.md`](phase4_privacy_prepublic_runbook.md).

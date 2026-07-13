@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-13 (session 36 — Phase 2 fluidité/endurance validée localement)
+> **Last Updated**: 2026-07-13 (Phase 4 protections pré-public versionnées)
 
 ---
 
@@ -65,6 +65,16 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-07-13 — Phase 4 : confidentialité et protections pré-public 🔷
+
+**Intent.** Préparer les tests de septembre sans ouvrir le projet et sans modifier la durée éditable dans l'admin.
+
+**Outcome.** Le démarrage exige désormais une information claire sur la voix et la conservation pseudonyme. PostHog et Grain restent éteints avant un opt-in séparé, et les propriétés de texte libre sont filtrées. hCaptcha est prêt derrière une site key conditionnelle, l'inscription admin disparaît du frontend et Gamilab ne charge plus son SDK tiers avant l'accord requis.
+
+**Fluidité préservée.** Sans CAPTCHA, l'identité anonyme se préchauffe dès l'acceptation ; avec CAPTCHA elle attend la preuve. Gamilab se charge pendant le teaser. `TIMEOUT_SECONDS` reste la seule source de durée.
+
+**Activation restante.** Configurer hCaptcha et fermer les inscriptions dans Supabase, tester puis planifier la purge 30 jours, vérifier les headers servis par Lovable et faire valider le texte de confidentialité. La release gate reste fermée. Voir `docs/phase4_privacy_prepublic_runbook.md`.
 
 ### 2026-07-13 — Phase 3 : préparer le canary sans ouvrir au public 🔷
 
@@ -1388,10 +1398,11 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 | 2026-04-24 | Bible factuelle / sujets verrouillés non encore modélisés explicitement | Haut | Phase 3 étendue : politique de vérité à 4 niveaux |
 | 2026-04-24 | Politique de vérité à 4 niveaux (certain/probable/inconnu/interdit) reportée | Moyen | Refactor `MaxTurnKnowledgeContext` + prompt validateur |
 | 2026-04-24 | Bible factuelle pas encore éditable depuis l'admin | Moyen | UI dédiée pour les faits autorisés globaux |
-| 2026-07-13 | CAPTCHA absent alors que les inscriptions anonymes sont actives | Haut avant tests externes | Configurer Turnstile/hCaptcha sur le domaine de test avant septembre |
+| 2026-07-13 | CAPTCHA prêt dans le frontend mais pas encore activé dans Supabase | Haut avant tests externes | Suivre le runbook Phase 4 dans l'ordre site key → frontend → secret/Auth |
 | 2026-07-13 | Le SDK Gamilab exige encore le token portail dans le navigateur | Haut avant ouverture | Obtenir un jeton éphémère ou un échange serveur officiellement supporté |
 | 2026-07-13 | Site Lovable visible par toute personne possédant l'URL | Moyen | Repasser en privé/interne ou assumer explicitement cette visibilité avant diffusion |
 | 2026-07-13 | Tenue réelle de 15 minutes et P50/P95 non encore mesurés | Haut | Phase 2 : soak multi-provider, mémoire, reprise réseau et budget de latence |
+| 2026-07-13 | Purge 30 jours et headers Lovable non encore attestés | Haut avant tests externes | Tester sur branche, planifier le Job et vérifier les headers de l'URL servie |
 
 ---
 

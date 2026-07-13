@@ -328,6 +328,7 @@ test("parcours PRD4 heureux avec trois tours de conversation", async ({ page }) 
   const fakes = await installNetworkFakes(page);
 
   await page.goto("/");
+  await page.getByLabel(/J’ai compris que ma voix/).check();
   await expect(page.getByRole("button", { name: "Commencer" })).toBeEnabled();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
@@ -357,6 +358,7 @@ test("une réponse vocale plus longue que le watchdog est lue jusqu'au bout", as
   });
 
   await page.goto("/");
+  await page.getByLabel(/J’ai compris que ma voix/).check();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
   await page.getByRole("button", { name: "Appeler Max" }).click();
@@ -392,6 +394,7 @@ test("endurance accélérée de 35 tours avec mémoire bornée et pannes récup�
   });
 
   await page.goto("/");
+  await page.getByLabel(/J’ai compris que ma voix/).check();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
   await page.getByRole("button", { name: "Appeler Max" }).click();

@@ -12,6 +12,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 import {
   authenticatedFunctionFetch,
   ensureGameAuth,
+  isGameCaptchaEnabled,
   resetGameAuthForTests,
 } from "./gameAuth";
 
@@ -52,6 +53,23 @@ describe("gameAuth", () => {
     expect(first?.access_token).toBe("test-access-token");
     expect(second).toBe(first);
     expect(auth.signInAnonymously).toHaveBeenCalledTimes(1);
+  });
+
+  it("forwards the CAPTCHA proof when creating an anonymous identity", async () => {
+    auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    auth.signInAnonymously.mockResolvedValue({ data: { session }, error: null });
+
+    await ensureGameAuth("captcha-proof");
+
+    expect(auth.signInAnonymously).toHaveBeenCalledWith({
+      options: { captchaToken: "captcha-proof" },
+    });
+  });
+
+  it("reports CAPTCHA as optional until its public site key is configured", () => {
+    expect(isGameCaptchaEnabled()).toBe(false);
+    vi.stubEnv("VITE_HCAPTCHA_SITE_KEY", "10000000-ffff-ffff-ffff-000000000001");
+    expect(isGameCaptchaEnabled()).toBe(true);
   });
 
   it("adds the user JWT to Edge Function requests", async () => {

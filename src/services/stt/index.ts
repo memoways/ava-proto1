@@ -1,6 +1,6 @@
 import { DeepgramSTT } from "@/services/deepgramSTT";
 import { debugLogger } from "@/services/debugLogger";
-import { GamilabSTT } from "./providers/gamilabSTT";
+import { GamilabSTT, prefetchGamilabSDK } from "./providers/gamilabSTT";
 import { GradiumSTT } from "./providers/gradiumSTT";
 import { getSTTRuntimeConfig } from "./runtimeConfig";
 import { loadSTTSettingsFromDB } from "./settings";
@@ -20,6 +20,7 @@ export {
   saveSTTSettingsToDB,
 } from "./settings";
 export { getSTTProviderRuntimeStatuses, getSTTRuntimeConfig, resetSTTRuntimeConfigCache } from "./runtimeConfig";
+export { prefetchGamilabSDK };
 
 function createDeepgramSTT(onTranscript: TranscriptCallback, opts?: STTCreateOptions): STTSession {
   return new DeepgramSTT(onTranscript, opts);

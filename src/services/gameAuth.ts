@@ -9,11 +9,15 @@ export function isGameSecurityEnabled(): boolean {
   return import.meta.env.VITE_GAME_SECURITY_ENABLED === "true";
 }
 
+export function isGameCaptchaEnabled(): boolean {
+  return isGameSecurityEnabled() && Boolean(import.meta.env.VITE_HCAPTCHA_SITE_KEY);
+}
+
 /**
  * Gives public participants a Supabase identity without adding a sign-up step.
  * The identity is required by session ownership RLS and protected Edge Functions.
  */
-export async function ensureGameAuth(): Promise<Session | null> {
+export async function ensureGameAuth(captchaToken?: string): Promise<Session | null> {
   if (!isGameSecurityEnabled()) return null;
   if (pendingGameAuth) return pendingGameAuth;
 
@@ -22,7 +26,9 @@ export async function ensureGameAuth(): Promise<Session | null> {
     if (sessionError) throw sessionError;
     if (existing.session) return existing.session;
 
-    const { data, error } = await supabase.auth.signInAnonymously();
+    const { data, error } = await supabase.auth.signInAnonymously(
+      captchaToken ? { options: { captchaToken } } : undefined,
+    );
     if (error) throw error;
     if (!data.session) throw new Error("Anonymous game authentication returned no session");
     return data.session;

@@ -4,6 +4,27 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.41.0] - 2026-07-13 — Phase 4 protections pré-public
+
+### Confidentialité
+- Information vocale et conservation pseudonyme obligatoires avant le démarrage ; choix analytics distinct, facultatif et modifiable depuis `/confidentialite`.
+- PostHog et Grain ne démarrent plus avant opt-in. Autocapture, replay, cookies persistants, profils et propriétés de texte libre sont exclus.
+- Le SDK tiers Gamilab est chargé seulement après l'information obligatoire, puis préchauffé pendant le teaser pour ne pas dégrader le premier push-to-talk.
+
+### Sécurité
+- Intégration hCaptcha conditionnelle pour les identités Supabase anonymes ; l'absence de site key conserve le parcours interne actuel.
+- Création publique de comptes admin retirée de `/auth` ; seuls les comptes sur invitation peuvent se connecter.
+- Langue du document corrigée et politique `no-referrer` appliquée.
+
+### Validation
+- Tests unitaires du consentement, de l'opt-in/opt-out PostHog, du filtrage du texte libre et de la preuve CAPTCHA.
+- Parcours Playwright adaptés à l'information vocale obligatoire.
+- Runbook Lovable/Supabase avec ordre d'activation, rollback, rétention et headers.
+
+### Sans changement
+- La durée reste entièrement pilotée par `TIMEOUT_SECONDS` dans le slider admin.
+- La release gate reste fermée jusqu'à l'activation et aux preuves externes du runbook.
+
 ## [0.40.0] - 2026-07-13 — Phase 3 canary interne
 
 ### Corrigé

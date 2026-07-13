@@ -13,7 +13,13 @@ import { trackEvent } from "@/services/posthogService";
 import { summarizeRole } from "@/services/roleProfileService";
 import { processPRD4Turn } from "@/services/prd4Orchestrator";
 import { createPRD4Session, endPRD4Session, updatePRD4Conversation, updatePRD4Onboarding } from "@/services/prd4Session";
-import { createConfiguredSTT, loadSTTSettingsFromDB, type STTSession } from "@/services/stt";
+import {
+  createConfiguredSTT,
+  getSTTProvider,
+  loadSTTSettingsFromDB,
+  prefetchGamilabSDK,
+  type STTSession,
+} from "@/services/stt";
 import { TTSQueue, chunkTextForTTS } from "@/services/elevenLabsTTS";
 import { prefetchOpeningTTS, playOpeningTTS, OPENING_LINE } from "@/services/openingTTSCache";
 import {
@@ -65,7 +71,12 @@ import {
   type VideoTriggerSettings,
 } from "@/services/settingsService";
 import type { QuestionnairePRD4Answers, QuestionnairePRD4Data, UserPosture } from "@/types";
-import { ensureGameAuth, isGameSecurityEnabled } from "@/services/gameAuth";
+import { ensureGameAuth, isGameCaptchaEnabled, isGameSecurityEnabled } from "@/services/gameAuth";
+import {
+  getPrivacyPreferences,
+  savePrivacyPreferences,
+  type PrivacyPreferences,
+} from "@/services/privacyConsent";
 import {
   getSessionMinimumClosureSeconds,
   normalizeSessionDurationSeconds,
@@ -92,6 +103,7 @@ const IndexPRD4 = () => {
   const [userSubtitle, setUserSubtitle] = useState("");
   const [maxSubtitle, setMaxSubtitle] = useState("");
   const [summarizing, setSummarizing] = useState(false);
+  const [privacyPreferences, setPrivacyPreferences] = useState<PrivacyPreferences | null>(() => getPrivacyPreferences());
   const initialSessionDuration = normalizeSessionDurationSeconds(getGameplaySettings().TIMEOUT_SECONDS);
   const [sessionDurationSeconds, setSessionDurationSeconds] = useState(initialSessionDuration);
   const latencyOverlayEnabled = useLatencyOverlayEnabled();
@@ -155,16 +167,6 @@ const IndexPRD4 = () => {
   }, [state.phase]);
 
   useEffect(() => {
-    if (isGameSecurityEnabled()) {
-      void ensureGameAuth().catch((error) => {
-        console.error("[Auth] Anonymous game session unavailable:", error);
-        toast({
-          title: "Connexion temporairement indisponible",
-          description: "Actualise la page avant de commencer l'expérience.",
-          variant: "destructive",
-        });
-      });
-    }
     void loadSTTSettingsFromDB();
     const settingsPromise = loadGameplaySettingsFromDB();
     gameplaySettingsLoadRef.current = settingsPromise;
@@ -174,6 +176,21 @@ const IndexPRD4 = () => {
       setSessionDurationSeconds(duration);
     });
   }, []);
+
+  // Sans CAPTCHA, démarre l'identité anonyme dès que l'information obligatoire
+  // est acceptée. Le clic « Commencer » réutilise cette promesse et ne paie donc
+  // pas la latence réseau. Avec CAPTCHA, l'identité attend sa preuve utilisateur.
+  useEffect(() => {
+    if (
+      privacyPreferences?.voiceAndStorageAcknowledged &&
+      isGameSecurityEnabled() &&
+      !isGameCaptchaEnabled()
+    ) {
+      void ensureGameAuth().catch(() => {
+        // handleStart affichera une erreur actionnable si le second essai échoue.
+      });
+    }
+  }, [privacyPreferences?.voiceAndStorageAcknowledged]);
 
   // ---- Helpers conversation -------------------------------------------------
   const cleanupAudio = useCallback(() => {
@@ -214,7 +231,32 @@ const IndexPRD4 = () => {
     teaserPlayerRef.current?.playWithAudio();
   }, []);
 
-  const handleStart = useCallback(() => {
+  const handlePrivacyChange = useCallback((choice: Pick<PrivacyPreferences, "voiceAndStorageAcknowledged" | "analyticsAllowed">) => {
+    setPrivacyPreferences(savePrivacyPreferences(choice));
+  }, []);
+
+  const handleStart = useCallback(async (captchaToken?: string): Promise<boolean> => {
+    if (!privacyPreferences?.voiceAndStorageAcknowledged) return false;
+    if (isGameSecurityEnabled()) {
+      try {
+        await withTimeout("anonymous_game_auth", ensureGameAuth(captchaToken), 5_000);
+      } catch (error) {
+        console.error("[Auth] Anonymous game session unavailable:", error);
+        toast({
+          title: "Connexion temporairement indisponible",
+          description: "Réessaie la vérification avant de commencer l'expérience.",
+          variant: "destructive",
+        });
+        return false;
+      }
+    }
+    // Gamilab reste hors de la page tant que l'information obligatoire n'a pas
+    // été acceptée, puis se précharge pendant le teaser pour préserver la latence.
+    if (getSTTProvider() === "gamilab") {
+      void prefetchGamilabSDK().catch((error) => {
+        console.warn("[Gamilab] SDK prefetch failed; PTT will retry:", error);
+      });
+    }
     onboardingStartedAtRef.current = Date.now();
     firstMaxResponseAtRef.current = null;
     trackEvent("prd4_onboarding_started", {});
@@ -233,7 +275,8 @@ const IndexPRD4 = () => {
       setFilmAnswer("rappel");
       setPhase("teaser");
     });
-  }, [forceTeaserAudioOn, setFilmAnswer, setPhase]);
+    return true;
+  }, [forceTeaserAudioOn, privacyPreferences, setFilmAnswer, setPhase]);
   const handleFilmAnswer = useCallback(
     (a: FilmAnswer) => {
       setFilmAnswer(a);
@@ -1058,7 +1101,13 @@ const IndexPRD4 = () => {
           showSkip={teaserActive}
         />
         {!teaserActive ? (
-          <WelcomeScreen onStart={handleStart} onStartIntent={forceTeaserAudioOn} videoReady={teaserPlayerReady} />
+          <WelcomeScreen
+            onStart={handleStart}
+            onStartIntent={forceTeaserAudioOn}
+            videoReady={teaserPlayerReady}
+            privacyPreferences={privacyPreferences}
+            onPrivacyChange={handlePrivacyChange}
+          />
         ) : null}
       </>
     );

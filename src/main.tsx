@@ -1,9 +1,8 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { initPostHog } from "./services/posthogService";
-import "./services/grainAnalytics";
+import { initializeAnalyticsFromStoredConsent } from "./services/privacyConsent";
 
-initPostHog();
+initializeAnalyticsFromStoredConsent();
 
 createRoot(document.getElementById("root")!).render(<App />);

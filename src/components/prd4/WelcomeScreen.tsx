@@ -1,15 +1,37 @@
 /** PRD4 — Écran 1 : Accueil */
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import HCaptcha from "@hcaptcha/react-hcaptcha";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { prefetchOpeningTTS } from "@/services/openingTTSCache";
+import type { PrivacyPreferences } from "@/services/privacyConsent";
 
 interface Props {
-  onStart: () => void;
+  onStart: (captchaToken?: string) => Promise<boolean>;
   onStartIntent?: () => void;
   videoReady?: boolean;
+  privacyPreferences: PrivacyPreferences | null;
+  onPrivacyChange: (choice: Pick<PrivacyPreferences, "voiceAndStorageAcknowledged" | "analyticsAllowed">) => void;
 }
 
-const WelcomeScreen = ({ onStart, onStartIntent, videoReady = true }: Props) => {
+const HCAPTCHA_SITE_KEY = import.meta.env.VITE_HCAPTCHA_SITE_KEY as string | undefined;
+const HCAPTCHA_ENABLED = import.meta.env.VITE_GAME_SECURITY_ENABLED === "true" && Boolean(HCAPTCHA_SITE_KEY);
+
+const WelcomeScreen = ({
+  onStart,
+  onStartIntent,
+  videoReady = true,
+  privacyPreferences,
+  onPrivacyChange,
+}: Props) => {
+  const [captchaToken, setCaptchaToken] = useState<string | undefined>();
+  const [starting, setStarting] = useState(false);
+  const captchaRef = useRef<HCaptcha>(null);
+  const voiceAcknowledged = privacyPreferences?.voiceAndStorageAcknowledged === true;
+  const analyticsAllowed = privacyPreferences?.analyticsAllowed === true;
+
   // Pré-charge l'audio de la phrase d'ouverture dès l'arrivée sur l'accueil,
   // pour qu'il soit prêt instantanément quand l'utilisateur entre en conversation.
   useEffect(() => {
@@ -31,15 +53,74 @@ const WelcomeScreen = ({ onStart, onStartIntent, videoReady = true }: Props) => 
             Cette expérience te propose d'entrer dans le monde du film et d'appeler
             ses protagonistes.
           </p>
+          <div className="mx-auto max-w-xl space-y-3 rounded-lg border border-border/80 bg-card/70 p-4 text-left text-sm">
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="voice-consent"
+                checked={voiceAcknowledged}
+                onCheckedChange={(checked) => onPrivacyChange({
+                  voiceAndStorageAcknowledged: checked === true,
+                  analyticsAllowed,
+                })}
+              />
+              <Label htmlFor="voice-consent" className="cursor-pointer font-normal leading-relaxed">
+                J’ai compris que ma voix sera transcrite pour faire fonctionner l’expérience et que la conversation
+                sera conservée de manière pseudonyme pour les tests.
+              </Label>
+            </div>
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="analytics-consent"
+                checked={analyticsAllowed}
+                onCheckedChange={(checked) => onPrivacyChange({
+                  voiceAndStorageAcknowledged: voiceAcknowledged,
+                  analyticsAllowed: checked === true,
+                })}
+              />
+              <Label htmlFor="analytics-consent" className="cursor-pointer font-normal leading-relaxed">
+                J’accepte les mesures techniques optionnelles pour améliorer la fluidité. Aucun replay, clic ou texte
+                libre n’est enregistré par les outils analytics.
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Le second choix est facultatif et modifiable. <Link to="/confidentialite" className="underline underline-offset-2">En savoir plus</Link>
+            </p>
+          </div>
+          {HCAPTCHA_ENABLED && HCAPTCHA_SITE_KEY ? (
+            <div className="flex justify-center">
+              <HCaptcha
+                ref={captchaRef}
+                sitekey={HCAPTCHA_SITE_KEY}
+                theme="dark"
+                onVerify={setCaptchaToken}
+                onExpire={() => setCaptchaToken(undefined)}
+                onError={() => setCaptchaToken(undefined)}
+              />
+            </div>
+          ) : null}
           <Button
             size="lg"
             onPointerDown={onStartIntent}
             onTouchStart={onStartIntent}
-            onClick={onStart}
-            disabled={!videoReady}
+            onClick={async () => {
+              setStarting(true);
+              const started = await onStart(captchaToken);
+              setStarting(false);
+              if (!started) {
+                captchaRef.current?.resetCaptcha();
+                setCaptchaToken(undefined);
+              }
+            }}
+            disabled={starting || !videoReady || !voiceAcknowledged || Boolean(HCAPTCHA_ENABLED && !captchaToken)}
             className="mt-6 min-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            {videoReady ? "Commencer" : "Préparation…"}
+            {!videoReady
+              ? "Préparation…"
+              : starting
+                ? "Démarrage…"
+                : HCAPTCHA_ENABLED && !captchaToken
+                  ? "Vérification…"
+                  : "Commencer"}
           </Button>
         </div>
       </div>
