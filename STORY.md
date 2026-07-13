@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-12 (session 34 — auth admin + hardening RLS, admins initialisés)
+> **Last Updated**: 2026-07-13 (session 35 — Phase 1 activée et validée sur Lovable)
 
 ---
 
@@ -65,6 +65,20 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-07-13 — Phase 1 activée sans casser le parcours public 🔷
+
+**Intent.** Passer du hardening versionné à une protection réellement active, sans interrompre STT/LLM/RAG/TTS ni réintroduire l'écran de dictée supprimé après la vidéo.
+
+**Outcome.** Anonymous Sign-Ins activé, migration d'expansion puis de verrouillage appliquées, frontend sécurisé publié et `GAME_SECURITY_ENFORCED=true` enregistré dans Lovable. Les 17 Edge Functions ont été redéployées avec leur garde JWT/quota partagée. Une clé publique seule reçoit `401`; une identité anonyme crée une session liée à son `user_id`; le 61e appel sur une limite de 60 est refusé et l'Edge Function retourne `429`.
+
+**Validation.** 59 tests Vitest, build Vite et parcours Playwright local verts. Le même parcours de trois tours passe sur le bundle live avec fournisseurs simulés. Les appels réels minimaux sont verts : Deepgram 1,47 s (jeton 60 s), LLM 1,83 s, RAG Voyage 1,63 s et TTS ElevenLabs 1,41 s. Gamilab est configuré et son contrat navigateur est restauré.
+
+**Ce qui reste fermé.** La release gate de septembre reste fermée : CAPTCHA absent, secret portail Gamilab encore remis au SDK navigateur, visibilité Lovable « Anyone with the URL », headers à auditer et soak de 15 minutes à exécuter. Le scan Lovable conserve trois warnings intentionnels à revoir (télémétrie anonyme et limiteur `SECURITY DEFINER`).
+
+**Files.** `docs/phase1_security_hardening_report.md`, `docs/public_release_gate.md`, `docs/lovable_phase1_activation_runbook.md`, `CHANGELOG.md`, `STORY.md`.
+
+**Time.** ~2 h de déploiement contrôlé, vérifications distantes et documentation.
 
 
 ### 2026-07-12 — Auth admin et hardening RLS : la back-office devient sérieux 🔷
@@ -1341,6 +1355,10 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 | 2026-04-24 | Bible factuelle / sujets verrouillés non encore modélisés explicitement | Haut | Phase 3 étendue : politique de vérité à 4 niveaux |
 | 2026-04-24 | Politique de vérité à 4 niveaux (certain/probable/inconnu/interdit) reportée | Moyen | Refactor `MaxTurnKnowledgeContext` + prompt validateur |
 | 2026-04-24 | Bible factuelle pas encore éditable depuis l'admin | Moyen | UI dédiée pour les faits autorisés globaux |
+| 2026-07-13 | CAPTCHA absent alors que les inscriptions anonymes sont actives | Haut avant tests externes | Configurer Turnstile/hCaptcha sur le domaine de test avant septembre |
+| 2026-07-13 | Le SDK Gamilab exige encore le token portail dans le navigateur | Haut avant ouverture | Obtenir un jeton éphémère ou un échange serveur officiellement supporté |
+| 2026-07-13 | Site Lovable visible par toute personne possédant l'URL | Moyen | Repasser en privé/interne ou assumer explicitement cette visibilité avant diffusion |
+| 2026-07-13 | Tenue réelle de 15 minutes et P50/P95 non encore mesurés | Haut | Phase 2 : soak multi-provider, mémoire, reprise réseau et budget de latence |
 
 ---
 

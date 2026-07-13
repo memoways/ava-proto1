@@ -26,11 +26,12 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - La migration Phase 1 est divisée en étapes expansion/verrouillage afin d'éviter une interruption pendant le déploiement Lovable.
 
 ### Validation
-- 58 tests Vitest verts, dont cinq preuves PostgreSQL RLS/ownership/quota.
+- 59 tests Vitest verts, dont cinq preuves PostgreSQL RLS/ownership/quota.
 - Build et TypeScript verts.
-- Garde partagée et 15 Edge Functions validées par `deno check`.
-- Parcours Playwright de trois tours vert avec authentification anonyme simulée.
-- Déploiement distant volontairement non effectué : branche Supabase/Lovable inaccessible depuis cette session.
+- Garde partagée incluse dans 17 Edge Functions redéployées sur Lovable Cloud.
+- Parcours Playwright de trois tours vert localement et sur le bundle servi par `proto1.parle-a-ava.com` avec les fournisseurs simulés.
+- Migration de verrouillage appliquée : clé publique seule `401`, identité anonyme `201`, quota atomique `429` après 60 appels.
+- Smoke tests fournisseurs réels verts après enforcement : Deepgram, Gamilab, OpenRouter, RAG Voyage et ElevenLabs.
 
 ---
 

@@ -13,8 +13,9 @@ Le projet n'est pas public. Aucun lien d'aperçu ou de production ne doit être 
 - [x] Build, typecheck, tests unitaires, test RLS et test E2E verts localement.
 - [ ] Création, mise à jour, clôture et questionnaire d'une session vérifiés avec un client anonyme sur une branche Supabase isolée.
 - [x] Isolation de deux identités et impossibilité de lire/modifier la session voisine prouvées dans PostgreSQL 17 isolé.
-- [x] Proxys payants protégés par JWT anonyme et quotas atomiques dans le code versionné.
-- [ ] Anonymous Sign-Ins et CAPTCHA activés sur l'environnement externe.
+- [x] Proxys payants protégés par JWT anonyme et quotas atomiques, activés et testés sur l'environnement Lovable.
+- [x] Anonymous Sign-Ins activé et vérifié sur l'environnement externe.
+- [ ] CAPTCHA activé sur l'environnement externe.
 - [ ] Publication Lovable repassée en privé/interne (`publish_visibility` est actuellement `public`).
 - [ ] Parcours de 15 minutes validé sans désordre de tours ni croissance non bornée du contexte.
 - [ ] Consentement/information micro et analytics validés.
@@ -44,7 +45,7 @@ Le test `src/integration/sessionsRls.integration.test.ts` applique la migration 
 - les champs administratifs et les side effects liés à une session sont protégés ;
 - les quotas fournisseurs sont atomiques.
 
-Le smoke test sur branche distante reste obligatoire avant ouverture. Une lecture anonyme globale de `sessions` reste explicitement interdite.
+Le smoke test distant du 13 juillet 2026 confirme `401` sans JWT, `201` avec identité anonyme propriétaire, isolation RLS et `429` après quota. Une lecture anonyme globale de `sessions` reste explicitement interdite.
 
 ## Procédure d'ouverture
 

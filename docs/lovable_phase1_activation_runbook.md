@@ -2,6 +2,8 @@
 
 Date : 12 juillet 2026
 
+Statut au 13 juillet 2026 : séquence A → C exécutée sur l'environnement Lovable. Les deux flags sont actifs, les deux migrations sont appliquées et les smoke tests RLS/Edge/fournisseurs sont verts. Conserver ce document comme procédure de contrôle et de rollback.
+
 ## Objectif
 
 Lovable reste l'unique gestionnaire du déploiement et des secrets. Aucun secret ne doit être ajouté à Git, au frontend ou à une capture. La Phase 1 est livrée désactivée par défaut : le premier déploiement restaure le parcours actuel sans imposer immédiatement la nouvelle authentification.

@@ -1,14 +1,14 @@
 # Phase 1 — Sessions publiques et protection des fournisseurs
 
-Date : 12 juillet 2026
+Date : 13 juillet 2026
 
 ## Résultat
 
-Le contrat de sécurité est implémenté et validé localement sans ajouter d'étape visible au parcours. Son activation distante est volontairement protégée par deux flags et deux migrations successives : le code peut être déployé par Lovable sans interrompre les intégrations actuelles, puis verrouillé après smoke test.
+Le contrat de sécurité est désormais activé sur l'environnement Lovable/Supabase sans ajouter d'étape visible au parcours. Le frontend sécurisé, les 17 Edge Functions, la migration d'expansion et la migration de verrouillage ont été appliqués dans l'ordre prévu. `VITE_GAME_SECURITY_ENABLED=true` et `GAME_SECURITY_ENFORCED=true` sont actifs.
 
-La release gate reste fermée : le projet Lovable a été retrouvé et sa base Supabase est active, mais le connecteur Supabase refuse l'accès et le connecteur Lovable exige le scope `projects:write` même pour une requête SQL de contrôle. La migration et les fonctions n'ont donc pas été déployées à distance.
+Les contrôles distants confirment qu'une clé publique seule est refusée (`401`), qu'une identité anonyme peut créer une session propriétaire et que les fournisseurs principaux restent fonctionnels. La release gate publique reste néanmoins fermée : CAPTCHA, mécanisme Gamilab éphémère, soak de 15 minutes et revue de visibilité doivent encore être traités avant septembre.
 
-Lovable signale par ailleurs l'application comme publiée avec `publish_visibility: public`. Cela contredit le statut métier « interne uniquement » et doit être corrigé ou explicitement justifié avant tout autre partage.
+Lovable indique toujours que le site est visible par « Anyone with the URL ». Cette publication technique sert aux contrôles internes ; le lien ne doit pas être diffusé à des testeurs externes tant que la release gate reste fermée.
 
 ## Architecture retenue
 
@@ -36,15 +36,31 @@ Lovable signale par ailleurs l'application comme publiée avec `publish_visibili
 
 Ces valeurs protègent les quotas fournisseurs tout en restant largement au-dessus du débit normal d'une conversation. Les réponses bloquées utilisent HTTP `429` et `Retry-After`.
 
-## Validation locale
+## Validation locale et distante
 
 - TypeScript : OK.
 - Build de production : OK.
-- Vitest : 20 fichiers, 58 tests verts.
+- Vitest : 20 fichiers, 59 tests verts.
 - PostgreSQL 17 isolé : clé `anon` refusée, séparation de deux utilisateurs, champs protégés, quota atomique et side effects liés au propriétaire.
 - Playwright Chromium : parcours PRD4 de trois tours vert avec authentification anonyme et JWT exigé sur chaque appel Edge.
 - ESLint sur les nouveaux fichiers : OK.
-- Deno : garde partagée et 15 Edge Functions vérifiées statiquement.
+- Edge : garde partagée incluse dans 17 Edge Functions redéployées sur Lovable Cloud.
+- Domaine live : bundle sécurisé présent, ancien écran de dictée absent, parcours Playwright de trois tours vert.
+- RLS distant : clé publique seule refusée (`401`), session authentifiée créée (`201`) avec `user_id` lié.
+- Quota distant : 61 appels concurrents sur une limite de 60 donnent exactement 60 autorisations et 1 refus ; l'appel Edge suivant retourne `429` avec `Retry-After`.
+- Fournisseurs réels après enforcement : Deepgram `200` avec jeton 60 s, Gamilab configuré, LLM `200`, RAG Voyage `200`, TTS ElevenLabs `200` avec audio.
+
+## Latences de smoke test distant
+
+| Appel minimal | Latence observée |
+|---|---:|
+| Configuration STT + quota | 870 ms |
+| Deepgram, émission du jeton temporaire | 1 470 ms |
+| LLM, réponse de 3 tokens | 1 829 ms |
+| RAG Voyage, 1 résultat | 1 631 ms |
+| TTS ElevenLabs, « Test. » | 1 405 ms |
+
+Ces mesures incluent le réseau et le fournisseur. Elles valident l'absence de régression bloquante, mais ne remplacent pas les percentiles P50/P95 ni le soak de 15 minutes prévu en Phase 2.
 
 ## Déploiement sûr — ordre obligatoire
 
@@ -52,8 +68,9 @@ La procédure détaillée, réversible et adaptée aux secrets Lovable est dans 
 
 ## Limites restantes
 
-- Activation distante non effectuée faute d'autorisation SQL/déploiement sur le projet Lovable/Supabase.
 - Publication Lovable actuellement déclarée publique, à repasser en privé/interne.
 - CAPTCHA non activé : il nécessite une site key et une secret key propres au domaine de test.
 - La durée de 15 minutes et les tests de soak appartiennent à la Phase 2.
 - Les tables de télémétrie et de coûts conservent des policies historiques à traiter séparément sans perturber le hot path.
+- Le scan Lovable conserve trois warnings génériques : policies anonymes d'insertion, fonction `SECURITY DEFINER` exécutable par les utilisateurs authentifiés et policy `WITH CHECK (true)`. Ils correspondent aux écritures de télémétrie et au limiteur contrôlé par `auth.uid()` ; ils doivent rester documentés et être revus avant l'ouverture, pas corrigés automatiquement.
+- Les Security/Performance Advisors natifs n'ont pas pu être lus via le connecteur (`permission denied`) ; le scan Lovable a servi de contrôle de remplacement.
