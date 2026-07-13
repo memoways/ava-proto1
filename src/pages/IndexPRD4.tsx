@@ -3,7 +3,7 @@
  *
  * Phase 3 : Max contextualisé (résumé du rôle joueur injecté), conversation
  * réelle STT + TTS via TTSQueue, GM post-turn PRD4 en void (jamais bloquant).
- * Fin de session : 5 min OU `end_recommended` du GM.
+ * Fin de session : 15 min OU clôture naturelle du GM après le seuil minimum.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -60,8 +60,12 @@ import {
 } from "@/services/settingsService";
 import type { QuestionnairePRD4Answers, QuestionnairePRD4Data, UserPosture } from "@/types";
 import { ensureGameAuth, isGameSecurityEnabled } from "@/services/gameAuth";
+import {
+  SESSION_DURATION_SECONDS,
+  SESSION_MINIMUM_CLOSURE_SECONDS,
+  TURN_RECOVERY_DEADLINE_MS,
+} from "@/config/experienceRuntime";
 
-const SESSION_DURATION_S = 5 * 60; // PRD4 §11 : ~5 min cible.
 const TEASER_VIDEO_URL = "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049";
 
 const IndexPRD4 = () => {
@@ -96,10 +100,13 @@ const IndexPRD4 = () => {
   const sttRef = useRef<STTSession | null>(null);
   const ttsQueueRef = useRef<TTSQueue | null>(null);
   const sttLatencySegmentRef = useRef<string | null>(null);
+  const pttReleaseResetTimerRef = useRef<number | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const conversationRef = useRef<ConversationMessage[]>([]);
   const isProcessingRef = useRef(false);
   const processingWatchdogRef = useRef<number | null>(null);
+  const activeTurnControllerRef = useRef<AbortController | null>(null);
+  const activeTurnSequenceRef = useRef(0);
   const endedRef = useRef(false);
   const userRoleRef = useRef(state.userRoleProfile);
   userRoleRef.current = state.userRoleProfile;
@@ -121,14 +128,14 @@ const IndexPRD4 = () => {
 
 
 
-  // Timer 5 minutes — démarré quand on entre en conversation, fin auto à 0.
+  // Timer 15 minutes — démarré quand on entre en conversation, fin auto à 0.
   const handleTimeout = useCallback(() => {
     if (endedRef.current) return;
     endedRef.current = true;
-    void finalizeAndEnd("timeout_5min");
+    void finalizeAndEnd("timeout_15min");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const timer = useTimer(SESSION_DURATION_S, handleTimeout);
+  const timer = useTimer(SESSION_DURATION_SECONDS, handleTimeout);
   const timerRef = useRef(timer);
   timerRef.current = timer;
 
@@ -153,6 +160,13 @@ const IndexPRD4 = () => {
 
   // ---- Helpers conversation -------------------------------------------------
   const cleanupAudio = useCallback(() => {
+    activeTurnSequenceRef.current += 1;
+    activeTurnControllerRef.current?.abort("experience-cleanup");
+    activeTurnControllerRef.current = null;
+    if (pttReleaseResetTimerRef.current) {
+      window.clearTimeout(pttReleaseResetTimerRef.current);
+      pttReleaseResetTimerRef.current = null;
+    }
     try { sttRef.current?.stop(); } catch { /* ignore */ }
     sttRef.current = null;
     try { ttsQueueRef.current?.cancel(); } catch { /* ignore */ }
@@ -163,7 +177,7 @@ const IndexPRD4 = () => {
     async (reason: string) => {
       cleanupAudio();
       const sid = sessionIdRef.current;
-      const duration = SESSION_DURATION_S - (timerRef.current?.remaining ?? SESSION_DURATION_S);
+      const duration = SESSION_DURATION_SECONDS - (timerRef.current?.remaining ?? SESSION_DURATION_SECONDS);
       sessionDurationRef.current = duration;
       if (sid) {
         await endPRD4Session(sid, reason, conversationRef.current, duration).catch((e) =>
@@ -297,7 +311,7 @@ const IndexPRD4 = () => {
       console.warn("[PRD4] createSession failed (continuing without DB persistence):", err);
     }
 
-    // Démarre le timer 5 min
+    // Démarre le timer de session (15 min par défaut).
     timer.reset();
     timer.start();
 
@@ -354,14 +368,33 @@ const IndexPRD4 = () => {
     async (userText: string) => {
       if (isProcessingRef.current || !userText.trim() || endedRef.current) return;
       isProcessingRef.current = true;
-      // Watchdog : si le tour ne se termine pas en 60s, on libère le verrou pour ne pas bloquer l'UX
+      activeTurnControllerRef.current?.abort("superseded-turn");
+      const turnController = new AbortController();
+      activeTurnControllerRef.current = turnController;
+      const turnSequence = activeTurnSequenceRef.current + 1;
+      activeTurnSequenceRef.current = turnSequence;
+      const isCurrentTurn = () =>
+        activeTurnSequenceRef.current === turnSequence &&
+        activeTurnControllerRef.current === turnController &&
+        !turnController.signal.aborted &&
+        !endedRef.current;
+
+      // Watchdog absolu : aucun tour ne peut garder le micro verrouillé au-delà de 15 s.
       if (processingWatchdogRef.current) window.clearTimeout(processingWatchdogRef.current);
       processingWatchdogRef.current = window.setTimeout(() => {
+        if (!isCurrentTurn()) return;
         console.warn("[PRD4] turn watchdog fired — releasing processing lock");
+        turnController.abort("turn-recovery-deadline");
+        try { ttsQueueRef.current?.cancel(); } catch { /* ignore */ }
         isProcessingRef.current = false;
         setAudioState("idle");
         toast({ title: "Le tour a pris trop de temps", description: "Tu peux reparler.", variant: "destructive" });
-      }, 60_000);
+        trackEvent("prd4_turn_recovered", {
+          session_id: sessionIdRef.current,
+          turn_sequence: turnSequence,
+          reason: "recovery_deadline",
+        });
+      }, TURN_RECOVERY_DEADLINE_MS);
       setAudioState("max_thinking");
       setUserSubtitle(userText);
 
@@ -371,7 +404,7 @@ const IndexPRD4 = () => {
 
       const turnIndex = conversationRef.current.filter((m) => m.role === "user").length;
       const turnId = createVoiceTurnId(sessionIdRef.current, turnIndex);
-      const elapsed = SESSION_DURATION_S - (timerRef.current?.remaining ?? SESSION_DURATION_S);
+      const elapsed = SESSION_DURATION_SECONDS - (timerRef.current?.remaining ?? SESSION_DURATION_SECONDS);
       const llmSettings = (() => { try { return getLLMSettings(); } catch { return null; } })();
       const ttsService = getConfiguredTTSServiceInfo();
       const ragService = getConfiguredRAGServiceInfo();
@@ -417,7 +450,10 @@ const IndexPRD4 = () => {
           triggeredVideoIds: triggeredVideoIdsRef.current,
           postVideoContext,
           onLatencySegment: handleLatencySegment,
+          signal: turnController.signal,
         });
+
+        if (!isCurrentTurn()) return;
 
         const ttsStart = performance.now();
         const blocker =
@@ -453,6 +489,8 @@ const IndexPRD4 = () => {
           },
         });
         ttsQueueRef.current = queue;
+        const cancelTurnTTS = () => queue.cancel();
+        turnController.signal.addEventListener("abort", cancelTurnTTS, { once: true });
         const ttsLatencySegmentId = latencyOverlayEnabled
           ? startLatencySegment({ segment: "TTS", service: latencyServiceLabel(ttsService) })
           : null;
@@ -460,8 +498,10 @@ const IndexPRD4 = () => {
           queue.enqueue(chunk, { session_id: sessionIdRef.current ?? undefined, turn_id: turnId, turn_index: turnIndex });
         }
         const ttsResult = await queue.drain().finally(() => {
+          turnController.signal.removeEventListener("abort", cancelTurnTTS);
           if (!ttsLatencySegmentDone) endLatencySegment(ttsLatencySegmentId);
         });
+        if (!isCurrentTurn()) return;
         const tts_ms = ttsResult.firstPlaybackStartMs || ttsResult.generationWallMs || Math.round(performance.now() - ttsStart);
         if (maxMsg.pipeline) {
           maxMsg.pipeline.tts_ms = tts_ms;
@@ -539,6 +579,7 @@ const IndexPRD4 = () => {
         // pour que le post-turn (garde-fou) ne re-déclenche pas.
         let videoTriggeredThisTurn = false;
         const labelHandling = result.labelPromise.then(async (lab) => {
+          if (!isCurrentTurn()) return;
           const labels = lab.labels;
           const total = (labels.themes?.length ?? 0) + (labels.topics?.length ?? 0) + (labels.intentions?.length ?? 0);
 
@@ -617,6 +658,7 @@ const IndexPRD4 = () => {
 
         // ---- GM post-turn : engagement, end_recommended + garde-fou vidéo
         void result.postTurnPromise.then(async (ev) => {
+          if (!isCurrentTurn()) return;
           trackEvent("prd4_gm_post_turn", {
             session_id: sessionIdRef.current,
             turn_index: ev.turn_index,
@@ -679,9 +721,15 @@ const IndexPRD4 = () => {
               }
             }
           }
-          if (ev.end_recommended && !endedRef.current) {
+          if (ev.end_recommended && elapsed >= SESSION_MINIMUM_CLOSURE_SECONDS && !endedRef.current) {
             endedRef.current = true;
             void finalizeAndEnd("gm_end_recommended");
+          } else if (ev.end_recommended && elapsed < SESSION_MINIMUM_CLOSURE_SECONDS) {
+            trackEvent("prd4_early_end_blocked", {
+              session_id: sessionIdRef.current,
+              elapsed_seconds: elapsed,
+              minimum_closure_seconds: SESSION_MINIMUM_CLOSURE_SECONDS,
+            });
           }
         });
 
@@ -695,15 +743,18 @@ const IndexPRD4 = () => {
         }
 
       } catch (err) {
+        if (turnController.signal.aborted || activeTurnSequenceRef.current !== turnSequence) return;
         console.error("[PRD4] turn failed:", err);
         toast({ title: "Erreur dans la conversation", description: "Réessaie.", variant: "destructive" });
       } finally {
-        if (processingWatchdogRef.current) {
-          window.clearTimeout(processingWatchdogRef.current);
-          processingWatchdogRef.current = null;
+        if (activeTurnSequenceRef.current === turnSequence) {
+          if (processingWatchdogRef.current) {
+            window.clearTimeout(processingWatchdogRef.current);
+            processingWatchdogRef.current = null;
+          }
+          isProcessingRef.current = false;
+          setAudioState("idle");
         }
-        isProcessingRef.current = false;
-        setAudioState("idle");
       }
     },
     [
@@ -713,6 +764,7 @@ const IndexPRD4 = () => {
       finalizeAndEnd,
       latencyOverlayEnabled,
       setAudioState,
+      setLastUserLabels,
       startLatencySegment,
     ],
   );
@@ -776,9 +828,20 @@ const IndexPRD4 = () => {
         window.clearTimeout(processingWatchdogRef.current);
         processingWatchdogRef.current = null;
       }
+      activeTurnControllerRef.current?.abort("stale-processing-lock");
+      activeTurnControllerRef.current = null;
+      activeTurnSequenceRef.current += 1;
       isProcessingRef.current = false;
     }
     if (isProcessingRef.current) return;
+    if (pttReleaseResetTimerRef.current) {
+      window.clearTimeout(pttReleaseResetTimerRef.current);
+      pttReleaseResetTimerRef.current = null;
+    }
+    // Le nouveau geste utilisateur invalide les analyses asynchrones du tour précédent.
+    activeTurnControllerRef.current?.abort("new-user-turn");
+    activeTurnControllerRef.current = null;
+    activeTurnSequenceRef.current += 1;
     let initialStream: Promise<MediaStream> | undefined;
     try {
       initialStream = navigator.mediaDevices?.getUserMedia({ audio: true });
@@ -827,7 +890,11 @@ const IndexPRD4 = () => {
     }
     stt.flush(); // déclenche le isFinal → processTurn si du texte a été capté
     // Si rien n'a été capté, on remet l'état au repos pour permettre une nouvelle tentative
-    window.setTimeout(() => {
+    if (pttReleaseResetTimerRef.current) window.clearTimeout(pttReleaseResetTimerRef.current);
+    pttReleaseResetTimerRef.current = window.setTimeout(() => {
+      pttReleaseResetTimerRef.current = null;
+      // Un nouveau tour a déjà créé une autre session STT : ce timer est obsolète.
+      if (sttRef.current !== stt) return;
       endLatencySegment(sttLatencySegmentRef.current);
       sttLatencySegmentRef.current = null;
       if (!isProcessingRef.current) {
@@ -903,7 +970,16 @@ const IndexPRD4 = () => {
         setPhase("thanks");
       }
     },
-    [setPhase, state.pttErrors, state.selectedCharacter, state.teaserSeen, state.teaserSkipped, state.userRoleProfile],
+    [
+      setPhase,
+      state.hasSeenFilm,
+      state.pttErrors,
+      state.selectedCharacter,
+      state.teaserSeen,
+      state.teaserSkipped,
+      state.userPosture,
+      state.userRoleProfile,
+    ],
   );
 
   const handleRestart = useCallback(() => {
@@ -916,6 +992,9 @@ const IndexPRD4 = () => {
     sessionDurationRef.current = 0;
     triggeredVideoIdsRef.current = [];
     pendingPostVideoContextRef.current = null;
+    activeTurnControllerRef.current?.abort("experience-restart");
+    activeTurnControllerRef.current = null;
+    activeTurnSequenceRef.current += 1;
     setActiveVideo(null);
     endedRef.current = false;
   }, [reset]);
@@ -993,6 +1072,7 @@ const IndexPRD4 = () => {
               userSubtitle={userSubtitle}
               maxSubtitle={maxSubtitle}
               conversationLog={state.conversationLog}
+              sessionTimeRemaining={timer.formatted}
               onPTTPress={handlePTTPress}
               onPTTRelease={handlePTTRelease}
               onHangUp={handleHangUp}

@@ -58,16 +58,29 @@ export async function playAudioBlobRobust(
   blob: Blob,
   timeoutMs = 20000,
   onPlaybackStart?: (playbackStartMs: number) => void,
+  signal?: AbortSignal,
 ): Promise<PlaybackResult> {
   const audioUrl = URL.createObjectURL(blob);
   const audio = new Audio(audioUrl);
   const t0 = performance.now();
   let playbackStartMs: number | undefined;
+  let abortListener: (() => void) | null = null;
+  const abortPlayback = () => {
+    try { audio.pause(); } catch { /* ignore */ }
+  };
 
   try {
+    if (signal?.aborted) {
+      throw new DOMException("Audio playback aborted", "AbortError");
+    }
     await withTimeout("audio_playback", new Promise<void>((resolve, reject) => {
       audio.onended = () => resolve();
       audio.onerror = () => reject(new Error("Audio playback failed"));
+      abortListener = () => {
+        abortPlayback();
+        reject(new DOMException("Audio playback aborted", "AbortError"));
+      };
+      signal?.addEventListener("abort", abortListener, { once: true });
       audio.play()
         .then(() => {
           playbackStartMs = Math.round(performance.now() - t0);
@@ -75,13 +88,14 @@ export async function playAudioBlobRobust(
         })
         .catch(reject);
     }), timeoutMs, () => {
-      try { audio.pause(); } catch { /* ignore */ }
+      abortPlayback();
     });
     return { status: "played", playbackStartMs, playbackTotalMs: Math.round(performance.now() - t0) };
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
     return { status: "failed", playbackStartMs, playbackTotalMs: Math.round(performance.now() - t0), error, errorInfo: classifyPlaybackError(err) };
   } finally {
+    if (abortListener) signal?.removeEventListener("abort", abortListener);
     URL.revokeObjectURL(audioUrl);
   }
 }

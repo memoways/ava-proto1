@@ -30,11 +30,25 @@ export function withTimeout<T>(
   });
 }
 
-export function createTimeoutSignal(timeoutMs: number): { signal: AbortSignal; cancel: () => void } {
+export function createTimeoutSignal(
+  timeoutMs: number,
+  parentSignal?: AbortSignal,
+): { signal: AbortSignal; cancel: () => void } {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const abortFromParent = () => controller.abort(parentSignal?.reason);
+
+  if (parentSignal?.aborted) {
+    abortFromParent();
+  } else {
+    parentSignal?.addEventListener("abort", abortFromParent, { once: true });
+  }
+
   return {
     signal: controller.signal,
-    cancel: () => clearTimeout(timeoutId),
+    cancel: () => {
+      clearTimeout(timeoutId);
+      parentSignal?.removeEventListener("abort", abortFromParent);
+    },
   };
 }

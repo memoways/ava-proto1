@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { TimeoutError, withTimeout } from "@/services/asyncUtils";
+import { createTimeoutSignal, TimeoutError, withTimeout } from "@/services/asyncUtils";
 
 describe("withTimeout", () => {
   it("resolves with the wrapped value before the deadline", async () => {
@@ -21,5 +21,18 @@ describe("withTimeout", () => {
       timeoutMs: 250,
     });
     vi.useRealTimers();
+  });
+});
+
+describe("createTimeoutSignal", () => {
+  it("relays cancellation from a parent signal", () => {
+    const parent = new AbortController();
+    const linked = createTimeoutSignal(10_000, parent.signal);
+
+    parent.abort("stale-turn");
+
+    expect(linked.signal.aborted).toBe(true);
+    expect(linked.signal.reason).toBe("stale-turn");
+    linked.cancel();
   });
 });

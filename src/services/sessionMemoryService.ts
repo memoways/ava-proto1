@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "./debugLogger";
 import type { ConversationMessage } from "@/types";
 import { authenticatedFunctionFetch } from "./gameAuth";
+import { createTimeoutSignal } from "./asyncUtils";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -42,6 +43,7 @@ export async function summarizeSessionAsync(
   const startTime = Date.now();
   const debugId = debugLogger.logFetch("other", `summarize-session (turn=${turnCount})`, `${SUPABASE_URL}/functions/v1/summarize-session`, { session_id: sessionId, turn_count: turnCount });
   try {
+    const timeout = createTimeoutSignal(5_000);
     const r = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/summarize-session`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -50,7 +52,8 @@ export async function summarizeSessionAsync(
         conversation: conversation.map((m) => ({ role: m.role, content: m.content })),
         turn_count: turnCount,
       }),
-    });
+      signal: timeout.signal,
+    }).finally(timeout.cancel);
     if (!r.ok) {
       const txt = await r.text();
       debugLogger.logResponse(debugId, "other", "summarize-session failed", r.status, startTime, txt.slice(0, 200));

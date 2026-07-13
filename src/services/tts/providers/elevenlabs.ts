@@ -42,7 +42,7 @@ export const elevenLabsProvider: TTSProvider = {
     const startTime = Date.now();
     const tRequest = performance.now();
     const debugId = debugLogger.logFetch("tts", `TTS-EL "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts`, body);
-    const timeout = createTimeoutSignal(12000);
+    const timeout = createTimeoutSignal(12000, ctx?.signal);
 
     const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-tts`, {
       method: "POST",

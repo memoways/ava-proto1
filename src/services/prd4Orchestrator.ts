@@ -17,6 +17,14 @@ import {
 } from "@/services/ragService";
 import { resolveCharacterIdByName } from "@/services/characterPromptService";
 import { getGameplaySettings } from "@/services/settingsService";
+import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
+import { selectRecentConversation, selectUnsummarizedConversation } from "@/services/conversationMemory";
+import { withTimeout } from "@/services/asyncUtils";
+import {
+  RAG_DEGRADED_MODE_DEADLINE_MS,
+  SUMMARY_FETCH_DEADLINE_MS,
+  TURN_RESPONSE_DEADLINE_MS,
+} from "@/config/experienceRuntime";
 import type { ConversationMessage, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 
 export interface PRD4TurnInput {
@@ -34,6 +42,8 @@ export interface PRD4TurnInput {
   /** GIFF — posture initiale de l'utilisateur (question/intention exprimée avant l'appel). */
   userPostureRaw?: string | null;
   onLatencySegment?: (event: PRD4LatencySegmentEvent) => void;
+  /** Abort when the UI has moved to a newer turn or ended the session. */
+  signal?: AbortSignal;
 }
 
 export interface PRD4TurnResult {
@@ -44,6 +54,11 @@ export interface PRD4TurnResult {
     total_ms: number;
   };
   ragMatches: number;
+  memory: {
+    totalMessages: number;
+    recentMessages: number;
+    summaryLastTurn: number;
+  };
   /** Promesse résolue quand le GM post-turn a fini (à attendre en arrière-plan). */
   postTurnPromise: Promise<PRD4PostTurnEvaluation>;
   /** Label pass lancé en parallèle de Max (résout en général avant la fin du TTS). */
@@ -54,15 +69,24 @@ export type PRD4LatencySegmentEvent =
   | { type: "start"; segment: "RAG" | "LLM" | "GM"; service: string }
   | { type: "end"; segment: "RAG" | "LLM" | "GM"; service: string; durationMs: number };
 
-const MAX_TURN_TIMEOUT_MS = 10000;
 const MAX_FALLBACK_RESPONSE =
   "Je vous entends, mais la ligne accroche. Répétez juste l'essentiel, s'il vous plaît.";
 
 export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnResult> {
   const t0 = performance.now();
+  const responseDeadlineAt = t0 + TURN_RESPONSE_DEADLINE_MS;
+  const turnIndex = input.conversationHistory.filter((m) => m.role === "user").length + 1;
+  const recentConversation = selectRecentConversation(input.conversationHistory);
   const gameplay = (() => {
     try { return getGameplaySettings(); } catch { return null; }
   })();
+  const summaryPromise = input.sessionId
+    ? withTimeout(
+        "prd4_summary_fetch",
+        fetchSessionSummary(input.sessionId),
+        SUMMARY_FETCH_DEADLINE_MS,
+      ).catch(() => null)
+    : Promise.resolve(null);
 
   // --- RAG (best-effort, non-bloquant en cas d'erreur) -----------------------
   const ragStart = performance.now();
@@ -71,21 +95,27 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   let knowledgeContext = buildKnowledgeContextFromRAG([]);
   let matchesCount = 0;
   try {
-    const recent = input.conversationHistory.slice(-4).map((m) => m.content).join(" ");
+    const recent = recentConversation.slice(-4).map((m) => m.content).join(" ");
     // Cloisonnement RAG : on ne récupère QUE les chunks du personnage courant
     // (les chunks shared/storyworld avec character_id NULL restent visibles).
     const characterId = await resolveCharacterIdByName(input.characterName || "Max");
-    const matches = await queryRAG(
-      input.userMessage,
-      recent,
-      gameplay?.RAG_TOP_K ?? 5,
-      undefined,
-      {
-        characterId,
-        rerank: gameplay?.RAG_RERANK_ENABLED,
-        retrieveK: gameplay?.RAG_RETRIEVE_K,
-        provider: gameplay?.RAG_EMBEDDING_PROVIDER,
-      },
+    const matches = await withTimeout(
+      "prd4_rag",
+      queryRAG(
+        input.userMessage,
+        recent,
+        gameplay?.RAG_TOP_K ?? 5,
+        undefined,
+        {
+          characterId,
+          rerank: gameplay?.RAG_RERANK_ENABLED,
+          retrieveK: gameplay?.RAG_RETRIEVE_K,
+          provider: gameplay?.RAG_EMBEDDING_PROVIDER,
+          signal: input.signal,
+          timeoutMs: RAG_DEGRADED_MODE_DEADLINE_MS,
+        },
+      ),
+      RAG_DEGRADED_MODE_DEADLINE_MS,
     );
     matchesCount = matches.length;
     ragContext = formatRAGContext(matches);
@@ -100,32 +130,38 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const labelPromise: Promise<PRD4LabelResult> = labelUserTurnPRD4({
     sessionId: input.sessionId,
     userMessage: input.userMessage,
-    conversationHistory: input.conversationHistory,
+    conversationHistory: recentConversation,
     userPostureRaw: input.userPostureRaw ?? null,
+    signal: input.signal,
   });
 
   // --- Max --------------------------------------------------------------------
   const maxStart = performance.now();
   input.onLatencySegment?.({ type: "start", segment: "LLM", service: "Max LLM" });
+  const summaryRecord = await summaryPromise;
   const postureSummary = input.userPostureRaw?.trim()
     ? `L'utilisateur a démarré la conversation en exprimant ceci (à garder en mémoire tout au long de l'échange comme contexte de qui il est et de ce qu'il vient chercher) : « ${input.userPostureRaw.trim()} »`
     : undefined;
   const maxInput: MaxAgentInput = {
-    conversationHistory: input.conversationHistory,
+    conversationHistory: recentConversation,
     userMessage: input.userMessage,
     ragContext: ragContext || undefined,
     postVideoContext: input.postVideoContext,
     session_id: input.sessionId ?? undefined,
     knowledgeContext,
+    sessionSummary: summaryRecord?.summary,
     userRoleSummary: input.userRole?.summary_for_max ?? postureSummary,
   };
   let maxResponse = "";
   let max_ms = 0;
   try {
+    const remainingMs = Math.floor(responseDeadlineAt - performance.now());
+    if (remainingMs < 250) throw new Error("PRD4 response deadline exhausted after RAG");
     const { response } = await simulateMaxResponse(maxInput, {
       characterName: input.characterName || "Max",
       featureKey: "prd4_chat",
-      timeoutMs: MAX_TURN_TIMEOUT_MS,
+      timeoutMs: Math.min(4_000, remainingMs),
+      signal: input.signal,
     });
     maxResponse = response;
   } catch (err) {
@@ -137,14 +173,13 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   }
 
   // --- GM post-turn (void) ---------------------------------------------------
-  const turnIndex = input.conversationHistory.filter((m) => m.role === "user").length + 1;
   const postTurnPromise = (async () => {
     const gmStart = performance.now();
     input.onLatencySegment?.({ type: "start", segment: "GM", service: "GM post-turn" });
     try {
       return await evaluatePostTurnPRD4({
         sessionId: input.sessionId,
-        conversationHistory: input.conversationHistory,
+        conversationHistory: recentConversation,
         userMessage: input.userMessage,
         maxResponse,
         userRole: input.userRole,
@@ -152,6 +187,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         turnIndex,
         timeElapsedSeconds: input.timeElapsedSeconds,
         triggeredVideoIds: input.triggeredVideoIds,
+        signal: input.signal,
       });
     } finally {
       input.onLatencySegment?.({
@@ -163,6 +199,24 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     }
   })();
 
+  const summaryEvery = gameplay?.RAG_SUMMARY_EVERY_N_TURNS ?? 4;
+  const lastSummarizedTurn = summaryRecord?.last_turn ?? 0;
+  if (
+    input.sessionId &&
+    summaryEvery > 0 &&
+    turnIndex - lastSummarizedTurn >= summaryEvery
+  ) {
+    const pendingSummary = selectUnsummarizedConversation(
+      [
+        ...input.conversationHistory,
+        { role: "user", content: input.userMessage, timestamp: Date.now() },
+        { role: "max", content: maxResponse, timestamp: Date.now() },
+      ],
+      lastSummarizedTurn,
+    );
+    void summarizeSessionAsync(input.sessionId, pendingSummary, turnIndex);
+  }
+
   return {
     maxResponse,
     timings: {
@@ -171,6 +225,11 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       total_ms: Math.round(performance.now() - t0),
     },
     ragMatches: matchesCount,
+    memory: {
+      totalMessages: input.conversationHistory.length,
+      recentMessages: recentConversation.length,
+      summaryLastTurn: lastSummarizedTurn,
+    },
     postTurnPromise,
     labelPromise,
   };

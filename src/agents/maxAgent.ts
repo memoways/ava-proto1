@@ -134,7 +134,7 @@ export interface SimulateMaxResult {
 
 export async function simulateMaxResponse(
   input: MaxAgentInput,
-  opts?: { characterName?: string; featureKey?: string; timeoutMs?: number },
+  opts?: { characterName?: string; featureKey?: string; timeoutMs?: number; signal?: AbortSignal },
 ): Promise<SimulateMaxResult> {
   const characterName = opts?.characterName || "Max";
   const systemPrompt = await buildMaxSystemPrompt(
@@ -162,6 +162,7 @@ export async function simulateMaxResponse(
     max_tokens: llm.LLM_MAX_TOKENS,
     top_p: llm.LLM_TOP_P,
     timeoutMs: opts?.timeoutMs,
+    signal: opts?.signal,
     feature_key: opts?.featureKey || "max_prompt_test",
   });
 
@@ -279,11 +280,6 @@ function formatKnowledgeList(title: string, values?: string[]): string {
   return `${title}\n${values.map((value) => `- ${value}`).join("\n")}`;
 }
 
-function formatRecentHistory(history: ConversationMessage[]): string {
-  if (!history.length) return "- aucun historique récent";
-  return history.slice(-6).map((msg) => `- ${msg.role === "user" ? "UTILISATEUR" : "MAX"}: ${msg.content}`).join("\n");
-}
-
 async function buildMaxSystemPrompt(
   ragContext?: string,
   postVideoContext?: string,
@@ -313,8 +309,6 @@ async function buildMaxSystemPrompt(
   if (sessionSummary && sessionSummary.trim()) {
     prompt += `\n\n## SOUVENIRS DE LA SESSION (résumé compressé des tours précédents)\n${sessionSummary.trim()}`;
   }
-
-  prompt += `\n\n## HISTORIQUE RÉCENT DU TOUR\n${formatRecentHistory(conversationHistory)}`;
 
   // RAG brut TOUJOURS injecté comme source de vérité (les faits qui en sortent sont
   // des extraits validés du récit Notion — pas des hypothèses). Le bloc structuré

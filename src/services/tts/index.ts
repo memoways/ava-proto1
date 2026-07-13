@@ -83,8 +83,9 @@ export async function generateSpeech(text: string, opts?: TTSOptions): Promise<B
 export function playAudioBlob(
   blob: Blob,
   onPlaybackStart?: (playbackStartMs: number) => void,
+  signal?: AbortSignal,
 ): Promise<PlaybackResult> {
-  return playAudioBlobRobust(blob, undefined, onPlaybackStart).then((result) => {
+  return playAudioBlobRobust(blob, undefined, onPlaybackStart, signal).then((result) => {
     if (result.status === "played") return result;
     const error = result.error || new Error("Audio playback failed");
     (error as Error & { playbackErrorType?: string }).playbackErrorType = result.errorInfo?.type;
@@ -95,5 +96,5 @@ export function playAudioBlob(
 /** Convenience: generate + play. */
 export async function speakText(text: string, opts?: TTSOptions): Promise<void> {
   const blob = await generateSpeech(text, opts);
-  await playAudioBlob(blob);
+  await playAudioBlob(blob, undefined, opts?.signal);
 }

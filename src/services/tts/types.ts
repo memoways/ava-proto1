@@ -26,6 +26,8 @@ export interface TTSGenerateContext {
   session_id?: string | null;
   turn_id?: string | null;
   turn_index?: number | null;
+  /** Cancels provider generation when the owning conversation turn becomes stale. */
+  signal?: AbortSignal;
 }
 
 export interface TTSGenerateResult {

@@ -39,6 +39,7 @@ export class TTSQueue {
   private onFirstPlaybackStart?: (latencyMs: number) => void;
   private errorReported = false;
   private lastError?: Error;
+  private readonly abortController = new AbortController();
 
   constructor(opts?: TTSQueueOptions) {
     this.onError = opts?.onError;
@@ -76,12 +77,13 @@ export class TTSQueue {
           if (this.firstPlaybackStartMs !== null || this.firstEnqueuedAt === null) return;
           this.firstPlaybackStartMs = Math.max(0, Math.round(performance.now() - this.firstEnqueuedAt));
           this.onFirstPlaybackStart?.(this.firstPlaybackStartMs);
-        });
+        }, this.abortController.signal);
         this.playbackStartMsTotal += result?.playbackStartMs ?? 0;
         this.playbackTotalMs += result?.playbackTotalMs ?? Math.round(performance.now() - playStart);
         this.playbackCount++;
         console.log(`[TTS-Queue] Played sentence #${this.playbackCount} in ${(performance.now() - playStart).toFixed(0)}ms`);
       } catch (err) {
+        if (this._cancelled) return;
         console.error("[TTS-Queue] Error:", err);
         this.failedCount++;
         this.lastError = err instanceof Error ? err : new Error(String(err));
@@ -122,6 +124,7 @@ export class TTSQueue {
       ...entry.options,
       previousText,
       nextText,
+      signal: this.abortController.signal,
     })
       .then((blob) => {
         const genTime = performance.now() - genStart;
@@ -161,6 +164,7 @@ export class TTSQueue {
 
   cancel(): void {
     this._cancelled = true;
+    this.abortController.abort("tts-queue-cancelled");
     const error = new Error("TTS queue cancelled");
     this.lastError = error;
     while (this.pending.length > 0) {

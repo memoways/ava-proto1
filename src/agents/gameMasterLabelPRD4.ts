@@ -30,6 +30,7 @@ export interface PRD4LabelInput {
   userMessage: string;
   conversationHistory: ConversationMessage[];
   userPostureRaw?: string | null;
+  signal?: AbortSignal;
 }
 
 export interface PRD4LabelResult {
@@ -91,6 +92,7 @@ export async function labelUserTurnPRD4(input: PRD4LabelInput): Promise<PRD4Labe
         timeoutMs: LABEL_TIMEOUT_MS,
         feature_key: "prd4_gm_label",
         session_id: input.sessionId ?? undefined,
+        signal: input.signal,
       },
     );
     model = res.model || model;

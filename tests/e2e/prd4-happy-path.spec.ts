@@ -12,6 +12,12 @@ const TRANSCRIPTS = [
   "Quel souvenir important gardes-tu de ta sœur ?",
 ];
 
+interface NetworkFakeOptions {
+  failMaxAt?: number;
+  dropRagAt?: number;
+  triggerVideoAtLabel?: number;
+}
+
 function json(route: Route, body: unknown, status = 200) {
   return route.fulfill({
     status,
@@ -21,12 +27,24 @@ function json(route: Route, body: unknown, status = 200) {
   });
 }
 
-async function installNetworkFakes(page: Page) {
+async function installNetworkFakes(
+  page: Page,
+  transcripts: string[] = TRANSCRIPTS,
+  options: NetworkFakeOptions = {},
+) {
   let maxTurnCount = 0;
+  let labelCallCount = 0;
+  let ragCallCount = 0;
+  let summaryCallCount = 0;
+  let summaryLastTurn = 0;
+  let simulatedNetworkDrops = 0;
+  let triggeredVideoLoads = 0;
+  const maxMessageCounts: number[] = [];
   const sessionUpdates: unknown[] = [];
 
   await page.addInitScript((transcripts: string[]) => {
     let websocketIndex = 0;
+    localStorage.setItem("ava_gameplay_settings", JSON.stringify({ RAG_SUMMARY_EVERY_N_TURNS: 4 }));
 
     class E2EWebSocket {
       static readonly OPEN = 1;
@@ -79,10 +97,11 @@ async function installNetworkFakes(page: Page) {
     });
     Object.defineProperty(window, "WebSocket", { configurable: true, value: E2EWebSocket });
     Object.defineProperty(window, "MediaRecorder", { configurable: true, value: E2EMediaRecorder });
-  }, TRANSCRIPTS);
+  }, transcripts);
 
-  await page.route("https://play.gumlet.io/**", (route) =>
-    route.fulfill({
+  await page.route("https://play.gumlet.io/**", (route) => {
+    if (route.request().url().includes("e2e-family")) triggeredVideoLoads += 1;
+    return route.fulfill({
       status: 200,
       contentType: "text/html",
       body: `<!doctype html><title>Gumlet fake</title><script>
@@ -94,8 +113,8 @@ async function installNetworkFakes(page: Page) {
         }), "*");
         ready(); setTimeout(ready, 100); setTimeout(ready, 300);
       </script>`,
-    }),
-  );
+    });
+  });
   await page.route("https://gamilab.ch/**", (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
   await page.route("https://eu.i.posthog.com/**", (route) => route.fulfill({ status: 200, body: "{}" }));
 
@@ -122,7 +141,31 @@ async function installNetworkFakes(page: Page) {
     const url = new URL(request.url());
     const table = url.pathname.split("/").pop();
 
-    if (table === "admin_settings" || table === "video_triggers" || table === "character_prompts" || table === "session_summaries") {
+    if (table === "video_triggers") {
+      return json(route, options.triggerVideoAtLabel ? [{
+        id: "44444444-4444-4444-8444-444444444444",
+        notion_id: null,
+        title: "Famille E2E",
+        type: "interlude",
+        themes: ["famille"],
+        video_url: "https://play.gumlet.io/embed/e2e-family",
+        context: "Max vient de revoir un souvenir familial.",
+        description: "Vidéo simulée pour le test d'endurance.",
+        priority: 1,
+        transition_style: "fade_black",
+        post_video_context: "Le souvenir familial vient d'être montré.",
+        updated_at: new Date().toISOString(),
+      }] : []);
+    }
+    if (table === "session_summaries") {
+      return json(route, summaryLastTurn > 0 ? [{
+        session_id: SESSION_ID,
+        summary: "- Résumé E2E borné.",
+        last_turn: summaryLastTurn,
+        updated_at: new Date().toISOString(),
+      }] : []);
+    }
+    if (table === "admin_settings" || table === "character_prompts") {
       return json(route, []);
     }
     if (table === "characters") {
@@ -134,7 +177,7 @@ async function installNetworkFakes(page: Page) {
       }]);
     }
     if (table === "sessions" && request.method() === "POST") {
-      return json(route, [{ id: SESSION_ID }], 201);
+      return json(route, { id: SESSION_ID }, 201);
     }
     if (table === "sessions" && request.method() === "PATCH") {
       sessionUpdates.push(request.postDataJSON());
@@ -152,6 +195,11 @@ async function installNetworkFakes(page: Page) {
       return json(route, { key: "e2e-short-lived-token", expires_in: 60, model: "nova-2", language: "fr" });
     }
     if (functionName === "query-rag") {
+      ragCallCount += 1;
+      if (ragCallCount === options.dropRagAt) {
+        simulatedNetworkDrops += 1;
+        return route.abort("internetdisconnected");
+      }
       return json(route, { matches: [], embedding_provider: "e2e", rerank_used: false, latency_ms: 1 });
     }
     if (functionName === "proxy-tts") {
@@ -161,8 +209,13 @@ async function installNetworkFakes(page: Page) {
       const payload = request.postDataJSON() as { messages?: Array<{ role: string; content: string }> };
       const system = payload.messages?.[0]?.content ?? "";
       let content: string;
-      if (system.includes("extrait uniquement") || system.includes("labels")) {
-        content = JSON.stringify({ themes: [], topics: [], intentions: [] });
+      if (system.includes("analyste du Game Master")) {
+        labelCallCount += 1;
+        content = JSON.stringify(
+          labelCallCount === options.triggerVideoAtLabel
+            ? { themes: ["famille"], topics: [], intentions: ["question"] }
+            : { themes: [], topics: [], intentions: [] },
+        );
       } else if (system.includes("Game Master") || system.includes("end_recommended")) {
         content = JSON.stringify({
           labels: { themes: [], topics: [], intentions: [] },
@@ -180,6 +233,10 @@ async function installNetworkFakes(page: Page) {
         });
       } else {
         maxTurnCount += 1;
+        maxMessageCounts.push(payload.messages?.length ?? 0);
+        if (maxTurnCount === options.failMaxAt) {
+          return json(route, { error: "simulated_provider_failure" }, 503);
+        }
         content = `Réponse de Max pour le tour ${maxTurnCount}.`;
       }
       return json(route, {
@@ -189,11 +246,25 @@ async function installNetworkFakes(page: Page) {
         usage: { prompt_tokens: 10, completion_tokens: 8, total_tokens: 18 },
       });
     }
+    if (functionName === "summarize-session") {
+      summaryCallCount += 1;
+      const payload = request.postDataJSON() as { turn_count?: number };
+      summaryLastTurn = payload.turn_count ?? summaryLastTurn;
+      return json(route, {
+        summary: "- Résumé E2E borné.",
+        last_turn: payload.turn_count ?? 0,
+        latency_ms: 1,
+      });
+    }
     return json(route, {});
   });
 
   return {
     getMaxTurnCount: () => maxTurnCount,
+    getMaxMessageCounts: () => maxMessageCounts,
+    getSummaryCallCount: () => summaryCallCount,
+    getSimulatedNetworkDrops: () => simulatedNetworkDrops,
+    getTriggeredVideoLoads: () => triggeredVideoLoads,
     getSessionUpdates: () => sessionUpdates,
   };
 }
@@ -221,4 +292,51 @@ test("parcours PRD4 heureux avec trois tours de conversation", async ({ page }) 
 
   expect(fakes.getMaxTurnCount()).toBe(3);
   expect(fakes.getSessionUpdates().length).toBeGreaterThanOrEqual(1);
+});
+
+test("endurance accélérée de 35 tours avec mémoire bornée et pannes récupérables", async ({ page }) => {
+  test.setTimeout(180_000);
+  const transcripts = Array.from({ length: 35 }, (_, index) =>
+    `Question d'endurance numéro ${index + 1} à propos de Max et Ava.`,
+  );
+  const fakes = await installNetworkFakes(page, transcripts, {
+    triggerVideoAtLabel: 3,
+    dropRagAt: 12,
+    failMaxAt: 18,
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await page.getByRole("button", { name: "Appeler Max" }).click();
+  await expect(page.getByLabel("Temps restant")).toHaveText(/15:00|14:59/, { timeout: 10_000 });
+
+  for (let turn = 1; turn <= 35; turn += 1) {
+    await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+    await expect(page.getByText(transcripts[turn - 1], { exact: false })).toBeVisible();
+    await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+
+    const skipVideo = page.getByRole("button", { name: /Passer/ });
+    if (turn === 3) {
+      await expect(skipVideo).toBeVisible({ timeout: 10_000 });
+      await skipVideo.click();
+    }
+
+    const expected = turn === 18
+      ? /la ligne accroche/i
+      : new RegExp(`Réponse de Max pour le tour ${turn}`);
+    await expect(page.getByText(expected)).toBeVisible({ timeout: 10_000 });
+
+    if (turn !== 3 && await skipVideo.isVisible().catch(() => false)) {
+      await skipVideo.click();
+    }
+    await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
+  }
+
+  expect(fakes.getMaxTurnCount()).toBe(35);
+  expect(Math.max(...fakes.getMaxMessageCounts())).toBeLessThanOrEqual(12);
+  await expect.poll(fakes.getSummaryCallCount, { timeout: 5_000 }).toBeGreaterThanOrEqual(8);
+  expect(fakes.getSimulatedNetworkDrops()).toBe(1);
+  expect(fakes.getTriggeredVideoLoads()).toBeGreaterThanOrEqual(1);
+  expect(fakes.getSessionUpdates().length).toBeGreaterThanOrEqual(35);
 });

@@ -34,7 +34,7 @@ export const gradiumProvider: TTSProvider = {
     const startTime = Date.now();
     const tRequest = performance.now();
     const debugId = debugLogger.logFetch("tts", `TTS-GR "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts-gradium`, body);
-    const timeout = createTimeoutSignal(12000);
+    const timeout = createTimeoutSignal(12000, ctx?.signal);
 
     const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-tts-gradium`, {
       method: "POST",

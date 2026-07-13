@@ -4,6 +4,34 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.39.0] - 2026-07-13 — Phase 2 fluidité et endurance 15 minutes
+
+### Ajouté
+- Contrat runtime centralisé : session de 15 minutes, clôture Game Master après 12 minutes minimum, budget de réponse de 5 secondes et watchdog de 15 secondes.
+- Mémoire conversationnelle bornée à 10 messages récents, complétée par le résumé persistant de la session.
+- Compte à rebours visible pendant la conversation et tests d'endurance orchestrateur/navigateur.
+
+### Modifié
+- RAG et résumé chargés en parallèle avec soft timeouts ; le LLM utilise uniquement le budget restant du tour.
+- Chaque tour, appel LLM et génération TTS est annulable ; une réponse obsolète ne peut plus modifier l'interface.
+- Le prompt de résumé de session est aligné sur une expérience de 15 minutes.
+
+### Corrigé
+- Course push-to-talk où la fermeture différée de l'ancien STT pouvait interrompre une nouvelle prise de parole.
+- Croissance et duplication de l'historique OpenRouter au fil de la session.
+- Blocage possible du bouton de parole après une panne RAG, LLM ou TTS.
+
+### Validation
+- TypeScript, build de production et suite Vitest complète verts.
+- 30 sessions de 35 tours, soit 1 050 tours orchestrateur simulés, sans désordre ni contexte non borné.
+- Deux parcours Playwright verts : 3 tours nominalement et 35 tours avec pannes RAG/LLM/TTS injectées.
+- Lint des fichiers modifiés vert ; dette lint globale historique conservée hors périmètre.
+
+### Activation restante
+- Publier le frontend Lovable, redéployer `summarize-session`, puis effectuer une session réelle de 15 minutes avec relevé p50/p95.
+
+---
+
 ## [0.38.0] - 2026-07-12 — Phase 1 sécurité sessions et fournisseurs
 
 ### Ajouté

@@ -11,6 +11,7 @@ interface Props {
   userSubtitle: string;
   maxSubtitle: string;
   conversationLog: ConversationMessage[];
+  sessionTimeRemaining: string;
   onPTTPress: () => void;
   onPTTRelease: () => void;
   onHangUp: () => void;
@@ -21,6 +22,7 @@ const ConversationScreen = ({
   userSubtitle,
   maxSubtitle,
   conversationLog,
+  sessionTimeRemaining,
   onPTTPress,
   onPTTRelease,
   onHangUp,
@@ -101,13 +103,21 @@ const ConversationScreen = ({
             <p className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">en ligne</p>
           </div>
         </div>
-        <button
-          onClick={onHangUp}
-          className="flex items-center gap-2 rounded-full border border-border/40 bg-background/60 px-3 py-2 text-sm text-foreground/80 backdrop-blur-md transition-colors hover:bg-destructive/20 hover:text-destructive"
-        >
-          <PhoneOff className="h-4 w-4" />
-          Terminer
-        </button>
+        <div className="flex items-center gap-2">
+          <span
+            aria-label="Temps restant"
+            className="rounded-full border border-border/40 bg-background/60 px-3 py-2 font-mono text-xs text-foreground/70 backdrop-blur-md"
+          >
+            {sessionTimeRemaining}
+          </span>
+          <button
+            onClick={onHangUp}
+            className="flex items-center gap-2 rounded-full border border-border/40 bg-background/60 px-3 py-2 text-sm text-foreground/80 backdrop-blur-md transition-colors hover:bg-destructive/20 hover:text-destructive"
+          >
+            <PhoneOff className="h-4 w-4" />
+            Terminer
+          </button>
+        </div>
       </header>
 
       <div className="flex-1" />

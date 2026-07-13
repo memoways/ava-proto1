@@ -2,6 +2,7 @@ import { debugLogger } from "./debugLogger";
 import { supabase } from "@/integrations/supabase/client";
 import type { MaxTurnKnowledgeContext } from "@/types";
 import { authenticatedFunctionFetch } from "./gameAuth";
+import { createTimeoutSignal } from "./asyncUtils";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -33,14 +34,23 @@ export interface RAGQueryOptions {
   retrieveK?: number;
   /** Pre-rewritten search query — when provided, used as-is instead of userMessage+context. */
   rewrittenQuery?: string;
+  /** Cancels an obsolete conversation turn. */
+  signal?: AbortSignal;
+  /** Hard client deadline; callers should fall back to an empty RAG result. */
+  timeoutMs?: number;
 }
 
-async function callQueryRag(payload: Record<string, unknown>): Promise<{ matches: RAGMatch[]; embedding_provider?: string; rerank_used?: boolean; latency_ms?: number; error?: string; status?: number }> {
+async function callQueryRag(
+  payload: Record<string, unknown>,
+  options?: { signal?: AbortSignal; timeoutMs?: number },
+): Promise<{ matches: RAGMatch[]; embedding_provider?: string; rerank_used?: boolean; latency_ms?: number; error?: string; status?: number }> {
+  const timeout = createTimeoutSignal(options?.timeoutMs ?? 5000, options?.signal);
   const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-  });
+    signal: timeout.signal,
+  }).finally(timeout.cancel);
   if (!response.ok) {
     const err = await response.text();
     return { matches: [], error: `HTTP ${response.status}: ${err.slice(0, 300)}`, status: response.status };
@@ -79,7 +89,7 @@ export async function queryRAG(
       provider: options.provider,
       rerank: options.rerank,
       retrieve_k: options.retrieveK,
-    });
+    }, { signal: options.signal, timeoutMs: options.timeoutMs });
     if (res.error) {
       debugLogger.logResponse(debugId, "rag", "RAG query", res.status || 500, startTime, res.error);
       return [];
@@ -120,7 +130,7 @@ export async function queryRAGDetailed(
       provider: options.provider,
       rerank: options.rerank,
       retrieve_k: options.retrieveK,
-    });
+    }, { signal: options.signal, timeoutMs: options.timeoutMs });
     return {
       matches: res.matches,
       latencyMs: Math.round(performance.now() - startedAt),
@@ -210,7 +220,7 @@ export const AVA_NOTION_DATABASES = {
 /**
  * Trigger a Notion → Supabase sync (manual, for admin use).
  */
-export async function syncNotion(databases: Record<string, string> = AVA_NOTION_DATABASES): Promise<any> {
+export async function syncNotion(databases: Record<string, string> = AVA_NOTION_DATABASES): Promise<unknown> {
   const startTime = Date.now();
   const debugId = debugLogger.logFetch("notion", "Sync Notion → Supabase", `${SUPABASE_URL}/functions/v1/sync-notion`, databases);
 

@@ -48,4 +48,19 @@ describe("TTSQueue drain status", () => {
     expect(result.failedSegments).toBe(1);
     expect(result.error?.message).toContain("Audio playback failed");
   });
+
+  it("aborts in-flight generation when the owning turn is cancelled", async () => {
+    vi.mocked(generateSpeech).mockImplementation((_text, options) => new Promise((_resolve, reject) => {
+      options?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+    }));
+    const queue = new TTSQueue();
+
+    queue.enqueue("Bonjour.");
+    await Promise.resolve();
+    queue.cancel();
+    const result = await queue.drain();
+
+    expect(result.status).toBe("cancelled");
+    expect(vi.mocked(generateSpeech).mock.calls[0][1]?.signal?.aborted).toBe(true);
+  });
 });

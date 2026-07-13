@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getLLMSettings } from "@/services/settingsService";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import type { ConversationMessage, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
+import { SESSION_DURATION_SECONDS, SESSION_MINIMUM_CLOSURE_SECONDS } from "@/config/experienceRuntime";
 
 export interface PRD4PostTurnInput {
   sessionId: string | null;
@@ -24,6 +25,7 @@ export interface PRD4PostTurnInput {
   timeElapsedSeconds: number;
   /** IDs de triggers vidéo déjà joués (évite de rejouer). */
   triggeredVideoIds?: string[];
+  signal?: AbortSignal;
 }
 
 const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
@@ -43,7 +45,7 @@ const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
 
 const GM_POST_TURN_TIMEOUT_MS = 12000;
 
-const SYSTEM_PROMPT = `Tu es le Game Master d'une expérience narrative en temps réel de ~5 minutes entre un joueur et Max (père d'Ava). Après chaque échange (1 message utilisateur + 1 réponse de Max), tu produis une évaluation structurée en JSON STRICT — aucun texte hors JSON.
+const SYSTEM_PROMPT = `Tu es le Game Master d'une expérience narrative en temps réel de ~15 minutes entre un joueur et Max (père d'Ava). Après chaque échange (1 message utilisateur + 1 réponse de Max), tu produis une évaluation structurée en JSON STRICT — aucun texte hors JSON.
 
 Tu retournes EXACTEMENT cet objet :
 {
@@ -79,7 +81,7 @@ Règles "trigger_video_id" — PRIORITÉ HAUTE :
 - Jamais d'id déjà présent dans \`already_triggered\`.
 - Si \`labels.themes\` est vide, retourne null (pas de trigger sans label clair).
 
-Règles "end_recommended" : true seulement si la conversation a trouvé une clôture naturelle, ou si elle échoue.
+Règles "end_recommended" : false avant 12 minutes. À partir de 12 minutes, true seulement si la conversation a trouvé une clôture naturelle ou échoue durablement.
 
 Pas de markdown, pas de \`\`\`. Uniquement l'objet JSON.`;
 
@@ -117,7 +119,7 @@ ${input.userRole?.summary_for_max || "(profil indisponible)"}
 ${input.userPostureRaw?.trim() || "(non renseignée)"}
 
 ## TEMPS ÉCOULÉ
-${Math.floor(input.timeElapsedSeconds / 60)}min ${input.timeElapsedSeconds % 60}s sur ~5 min cible — tour #${input.turnIndex}
+  ${Math.floor(input.timeElapsedSeconds / 60)}min ${input.timeElapsedSeconds % 60}s sur ~${Math.round(SESSION_DURATION_SECONDS / 60)} min cible — clôture naturelle autorisée après ${Math.round(SESSION_MINIMUM_CLOSURE_SECONDS / 60)} min — tour #${input.turnIndex}
 
 ## VIDÉOS DISPONIBLES
 ${videoLines}
@@ -162,6 +164,7 @@ export async function evaluatePostTurnPRD4(
         timeoutMs: GM_POST_TURN_TIMEOUT_MS,
         feature_key: "prd4_gm_post_turn",
         session_id: input.sessionId ?? undefined,
+        signal: input.signal,
       },
     );
     const parsed = extractJson(callRes.content) as Partial<PRD4PostTurnEvaluation> | null;

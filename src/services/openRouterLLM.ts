@@ -21,6 +21,8 @@ interface LLMOptions {
   feature_key?: string;
   /** Session ID for cost tracking */
   session_id?: string | null;
+  /** Cancels an obsolete conversation turn before its result reaches the UI. */
+  signal?: AbortSignal;
 }
 
 type StreamCallback = (text: string, done: boolean) => void;
@@ -43,8 +45,16 @@ function normalizeTimeoutError(err: unknown, label: string, timeoutMs: number): 
   return err instanceof Error ? err : new Error(String(err));
 }
 
-async function fetchProxyLLM(body: Record<string, unknown>, timeoutMs: number, label: string): Promise<Response> {
+async function fetchProxyLLM(
+  body: Record<string, unknown>,
+  timeoutMs: number,
+  label: string,
+  parentSignal?: AbortSignal,
+): Promise<Response> {
   const controller = new AbortController();
+  const abortFromParent = () => controller.abort(parentSignal?.reason);
+  if (parentSignal?.aborted) abortFromParent();
+  else parentSignal?.addEventListener("abort", abortFromParent, { once: true });
   const fetchPromise = authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -55,7 +65,12 @@ async function fetchProxyLLM(body: Record<string, unknown>, timeoutMs: number, l
   try {
     return await withTimeout(label, fetchPromise, timeoutMs, () => controller.abort());
   } catch (err) {
+    if (parentSignal?.aborted) {
+      throw new DOMException("Conversation turn aborted", "AbortError");
+    }
     throw normalizeTimeoutError(err, label, timeoutMs);
+  } finally {
+    parentSignal?.removeEventListener("abort", abortFromParent);
   }
 }
 
@@ -93,6 +108,7 @@ export async function streamLLM(
       },
       timeoutMs,
       `LLM stream ${model}`,
+      options?.signal,
     );
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -247,6 +263,7 @@ export async function callLLMWithUsage(
       },
       timeoutMs,
       `LLM request ${model}`,
+      options?.signal,
     );
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
