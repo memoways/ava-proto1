@@ -65,6 +65,7 @@ describe("conversationOrchestrator — anti-hallucination", () => {
       game_over_reason: null,
       gate_reached: false,
       moderation_flag: false,
+      notes: "",
     });
     localStorage.clear();
     // Active explicitement le validateur en mode enforce pour ces tests
