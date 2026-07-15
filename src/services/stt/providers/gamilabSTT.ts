@@ -33,7 +33,7 @@ function getGamiSingleton(timeoutMs = 5000): Promise<GamilabSingleton> {
   if (window.__gami_singleton__) return Promise.resolve(window.__gami_singleton__);
   if (singletonPromise) return singletonPromise;
 
-  singletonPromise = new Promise((resolve, reject) => {
+  singletonPromise = new Promise<GamilabSingleton>((resolve, reject) => {
     let settled = false;
     const timer: { id?: number } = {};
     let script: HTMLScriptElement | null = null;
