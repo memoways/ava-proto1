@@ -4,6 +4,26 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.42.0] - 2026-07-15 — Sécurité, RAG Voyage et routage LLM unifié
+
+### Sécurité
+- Nouveau garde-fou `requireAdmin` (`supabase/functions/_shared/adminAuth.ts`) : `sync-notion` et `update-notion-video` exigent un JWT avec rôle `admin`. Les clients (services RAG, videoTrigger, Admin) transmettent désormais `Authorization: Bearer` systématiquement.
+- `proxy-stt` génère un token Deepgram temporaire (TTL 60s) au lieu d'exposer la clé maîtresse ; `proxy-stt-config` ne renvoie plus le secret Gamilab.
+- `proxy-llm` durci contre l'usage en proxy ouvert (allow-list de modèles, plafond 60 messages, 4000 tokens et 60k caractères).
+- Migration DB : fonction `has_role` déplacée du schéma `public` vers `private`, retrait de la politique DELETE permissive sur `embeddings`, accès `admin_settings` restreint au rôle `admin` (les joueurs anonymes ne voient que les clés runtime `ava_%`).
+- 20 findings de sécurité corrigés au total sur les deux passes de scan.
+
+### RAG Voyage
+- Correction de l'onglet Admin > RAG : la requête de test passait via `fetch` brut et échouait sur `Invalid game identity` ; elle utilise désormais `authenticatedFunctionFetch` (JWT admin). Le flux public utilisait déjà l'identité de jeu et n'était pas impacté.
+- Refonte de `PipelineSchema` (Admin > Pipeline) pour refléter l'architecture réelle : STT multi-provider, rewrite → RAG (embed voyage-3 → pgvector → rerank rerank-2.5, fallback OpenAI), Max/GM/validateur, TTS multi-provider.
+
+### Routage LLM unifié
+- Migration de `rewrite-query` et `summarize-session` depuis Lovable AI Gateway vers OpenRouter (`google/gemini-2.5-flash`). 100% des appels LLM du prototype passent désormais par OpenRouter, ce qui unifie le suivi de coûts via `llm_usage`.
+- Voyage reste indépendant pour les embeddings et le rerank.
+
+### Déploiement
+- Redéploiement des 17 Edge Functions à partir du commit `9a90300` sur Lovable Cloud (toutes ✅), puis redéploiement de `rewrite-query` et `summarize-session` après migration OpenRouter.
+
 ## [0.41.2] - 2026-07-13 — Télémétrie interne continue
 
 ### Modifié
