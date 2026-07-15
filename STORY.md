@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-13 (télémétrie interne continue, panneau final conservé)
+> **Last Updated**: 2026-07-15 (hardening sécurité, RAG Voyage rétabli côté admin, routage LLM 100% OpenRouter)
 
 ---
 
