@@ -1426,6 +1426,17 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 
 ## Contrats de session (DBC)
 
+### Session 2026-07-15 — Sécurité + RAG + LLM unifié
+
+**Livré :**
+- 20 findings de sécurité corrigés (2 passes) : garde admin sur `sync-notion`/`update-notion-video`, `proxy-stt` avec token Deepgram temporaire, `proxy-stt-config` sans secret Gamilab, `proxy-llm` durci, `has_role` déplacée dans `private`, RLS `admin_settings` restreintes.
+- RAG Voyage rétabli côté Admin (auth JWT via `authenticatedFunctionFetch`). Flux public inchangé et fonctionnel.
+- `PipelineSchema` (Admin > Pipeline) refondu pour refléter l'architecture réelle (STT/Rewrite/RAG/Max/GM/Validateur/TTS + providers).
+- `rewrite-query` et `summarize-session` migrés vers OpenRouter (`google/gemini-2.5-flash`) → 100% des appels LLM via OpenRouter.
+- Redéploiement des 17 Edge Functions depuis le commit `9a90300`.
+
+**Reste :** valider en session live l'endurance après les nouvelles gardes admin ; envisager de router les embeddings/rerank Voyage via un proxy pour couper toute exposition frontale.
+
 ### Dernière session
 
 **Préconditions vérifiées au départ :**
