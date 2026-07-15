@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
+import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { clearSystemPromptCache } from "@/agents/maxAgent";
 import { hydrateAllSettings } from "@/services/settingsService";
 import LLMConfigTab from "@/components/LLMConfigTab";
@@ -282,7 +283,7 @@ export default function Admin() {
     setRagResults(null);
     try {
       const characterId = ragCharacterFilter === "all" ? null : ragCharacterFilter;
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
+      const res = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: ragQuery, match_count: 10, match_threshold: 0.2, character_id: characterId }),
