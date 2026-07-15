@@ -55,10 +55,10 @@ serve(async (req) => {
 
     const userPrompt = `Historique récent:\n${recentContext || "(vide)"}\n\nDernière phrase de l'utilisateur: ${userMessage}\n\nRequête de recherche autonome:`;
 
-    const aiRes = await fetch(LOVABLE_AI_URL, {
+    const aiRes = await fetch(OPENROUTER_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
