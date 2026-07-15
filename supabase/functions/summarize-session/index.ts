@@ -66,10 +66,10 @@ serve(async (req) => {
 
     const userPrompt = `Résumé précédent (à enrichir, pas à répéter mot pour mot):\n${previousSummary || "(aucun)"}\n\nÉchanges récents:\n${recent}\n\nProduis le nouveau résumé compressé:`;
 
-    const aiRes = await fetch(LOVABLE_AI_URL, {
+    const aiRes = await fetch(OPENROUTER_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
