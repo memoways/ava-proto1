@@ -284,7 +284,7 @@ export class DeepgramSTT {
       selectedMimeType: this.selectedMimeType,
       turn_id: context.turn_id,
       provider: "Deepgram",
-      model: this.config?.model || "nova-2",
+      model: this.config?.model || "nova-3",
       language: this.config?.language || "fr",
     };
     recordAudioLatency({
@@ -296,7 +296,7 @@ export class DeepgramSTT {
       metadata: {
         turn_id: context.turn_id ?? null,
         provider: "Deepgram",
-        model: this.config?.model || "nova-2",
+        model: this.config?.model || "nova-3",
         mode: "realtime",
         language: this.config?.language || "fr",
         silence_window_ms: DeepgramSTT.SILENCE_DELAY_MS,
