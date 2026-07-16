@@ -153,9 +153,18 @@ export class DeepgramSTT {
   async start() {
     // Get microphone first: browsers are stricter when media permission is
     // requested after an awaited network call instead of directly from a user gesture.
+    // High-quality mono capture with browser DSP for better STT accuracy.
     const streamPromise = this.initialStream
       ? Promise.resolve(this.initialStream)
-      : navigator.mediaDevices.getUserMedia({ audio: true });
+      : navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 1,
+            sampleRate: 48000,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
     this.initialStream = undefined;
     this.stream = await withTimeout(
       "microphone_permission",
@@ -174,7 +183,7 @@ export class DeepgramSTT {
     }
 
     // Connect to Deepgram WebSocket
-    const wsUrl = `wss://api.deepgram.com/v1/listen?model=${config.model}&language=${config.language}&smart_format=true&interim_results=true&vad_events=true&endpointing=false`;
+    const wsUrl = `wss://api.deepgram.com/v1/listen?model=${config.model}&language=${config.language}&smart_format=true&punctuate=true&filler_words=false&numerals=true&interim_results=true&vad_events=true&endpointing=false`;
 
     this.ws = new WebSocket(wsUrl, getDeepgramWebSocketProtocols(config.key));
     const openTimeout = setTimeout(() => {
@@ -275,7 +284,7 @@ export class DeepgramSTT {
       selectedMimeType: this.selectedMimeType,
       turn_id: context.turn_id,
       provider: "Deepgram",
-      model: this.config?.model || "nova-2",
+      model: this.config?.model || "nova-3",
       language: this.config?.language || "fr",
     };
     recordAudioLatency({
@@ -287,7 +296,7 @@ export class DeepgramSTT {
       metadata: {
         turn_id: context.turn_id ?? null,
         provider: "Deepgram",
-        model: this.config?.model || "nova-2",
+        model: this.config?.model || "nova-3",
         mode: "realtime",
         language: this.config?.language || "fr",
         silence_window_ms: DeepgramSTT.SILENCE_DELAY_MS,
@@ -301,12 +310,15 @@ export class DeepgramSTT {
     if (!this.stream || !this.ws) return;
 
     this.selectedMimeType = selectMediaRecorderMimeType();
-    const options = this.selectedMimeType ? { mimeType: this.selectedMimeType } : undefined;
+    const options: MediaRecorderOptions = {
+      audioBitsPerSecond: 128000,
+    };
+    if (this.selectedMimeType) options.mimeType = this.selectedMimeType;
     debugLogger.log({
       service: "stt",
       level: "info",
       direction: "in",
-      label: `MediaRecorder selected ${this.selectedMimeType || "browser-default"}`,
+      label: `MediaRecorder selected ${this.selectedMimeType || "browser-default"} @128kbps`,
       payload: JSON.stringify(getBrowserDiagnostics(this.selectedMimeType)),
     });
 
@@ -318,7 +330,8 @@ export class DeepgramSTT {
       }
     };
 
-    this.mediaRecorder.start(250);
+    // Smaller timeslice = lower latency for the interim results loop.
+    this.mediaRecorder.start(150);
   }
 
   stop() {
