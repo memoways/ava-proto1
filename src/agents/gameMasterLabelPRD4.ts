@@ -43,11 +43,40 @@ export interface PRD4LabelResult {
 const EMPTY: PRD4TurnLabels = { themes: [], topics: [], intentions: [] };
 
 function extractJson(text: string): unknown {
-  const trimmed = text.trim().replace(/^```json\s*|```$/g, "").trim();
-  try { return JSON.parse(trimmed); } catch { /* fallthrough */ }
-  const match = trimmed.match(/\{[\s\S]*\}/);
-  if (!match) return null;
-  try { return JSON.parse(match[0]); } catch { return null; }
+  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```$/i, "").trim();
+  try { return JSON.parse(trimmed); } catch { /* scan below */ }
+  for (const candidate of jsonObjectCandidates(trimmed)) {
+    try { return JSON.parse(candidate); } catch { /* try next balanced object */ }
+  }
+  return null;
+}
+
+function jsonObjectCandidates(text: string): string[] {
+  const out: string[] = [];
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === "{") {
+      if (depth === 0) start = i;
+      depth += 1;
+    } else if (ch === "}" && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && start >= 0) out.push(text.slice(start, i + 1));
+    }
+  }
+  return out;
 }
 
 function cleanList(list: unknown, max = 4): string[] {
