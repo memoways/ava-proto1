@@ -4,6 +4,26 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.43.1] - 2026-07-16 — Dictionnaire STT, réglages par provider et correction Gradium TTS
+
+### TTS Gradium
+- Gradium retournait un corps vide pour le format `mp3`, ce qui provoquait `Audio playback failed` ; le format par défaut passe à `wav` et le proxy remplace `mp3` par `wav` côté serveur.
+- L'ID de voix Max (`b5ioHAR7JuHVLskk`) est intégré au provider Gradium.
+
+### STT — dictionnaire custom et réglages par provider
+- Nouveau dictionnaire custom global (`ava_stt_dictionary`) pour privilégier les noms propres et le jargon de l'univers AVA (Max, Ava, Protogyny, MemoWays, etc.) lors de la transcription.
+- Le dictionnaire est injecté automatiquement dans les providers compatibles : Deepgram (`keyterm`), AssemblyAI (`keyterms_prompt`), OpenAI Whisper (`prompt`). Gradium et Gamilab ne l'utilisent pas ; l'interface affiche explicitement ✓ ou ✗ par provider.
+- Onglet Admin STT Config : le dictionnaire est désormais visible en haut de page avec un compteur de termes, une zone de saisie texte et une réinitialisation aux valeurs par défaut.
+- Nouveaux réglages API par provider, persistés dans `admin_settings.ava_stt_provider_settings` et consommés par le runtime STT :
+  - Deepgram : modèle, langue, smart formatting, ponctuation, résultats intermédiaires, VAD, endpointing, utterance end, filler words, numéraux.
+  - AssemblyAI : format turns, silence de fin de tour et seuil de confiance.
+  - OpenAI Whisper : modèle, langue, température.
+  - Gradium : langue.
+  - Gamilab : section grisée, non configurable.
+
+### Fichiers
+- `src/components/STTConfigTab.tsx`, `src/components/stt/ProviderSettingsPanel.tsx`, `src/services/stt/dictionary.ts`, `src/services/stt/providerSettings.ts`, `src/services/stt/registry.ts`, `src/services/stt/types.ts`, `src/services/deepgramSTT.ts`, `src/services/stt/providers/assemblyaiSTT.ts`, `src/services/stt/providers/openaiWhisperSTT.ts`, `src/services/stt/providers/gradiumSTT.ts`, `supabase/functions/proxy-stt-whisper/index.ts`, `supabase/functions/proxy-stt-gradium/index.ts`, `src/services/tts/providerSettings.ts`, `src/services/tts/providers/gradium.ts`, `supabase/functions/proxy-tts-gradium/index.ts`.
+
 ## [0.43.0] - 2026-07-16 — Qualité STT, finalisation sans coupure et vidéos toujours sonores
 
 ### STT Deepgram — qualité et réactivité (Lovable)
