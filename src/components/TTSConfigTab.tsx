@@ -386,11 +386,14 @@ export default function TTSConfigTab() {
             </div>
           </div>
           <SliderRow label="Speaking rate" value={iwSettings.speakingRate} min={0.5} max={2} step={0.05}
-            onChange={(v) => updateIw({ speakingRate: v })} />
+            onChange={(v) => updateIw({ speakingRate: v })}
+            tooltip="Vitesse de parole. 0.5 = deux fois plus lent ; 2 = deux fois plus rapide." minLabel="0.5 lent" maxLabel="2 rapide" />
         </div>
 
         <SliderRow label="Temperature (legacy tts-1 uniquement)" value={iwSettings.temperature} min={0} max={2} step={0.05}
-          onChange={(v) => updateIw({ temperature: v })} />
+          onChange={(v) => updateIw({ temperature: v })}
+          tooltip="Variabilité de l'intonation (uniquement pour les modèles tts-1 legacy). À 0, le rendu est très déterministe ; à 2, très expressif et imprévisible."
+          minLabel="Déterministe" maxLabel="Très expressif" />
       </section>
 
       {/* ===== Hume Octave panel ===== */}
