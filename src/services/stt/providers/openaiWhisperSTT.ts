@@ -5,6 +5,8 @@ import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types"
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { requestLatestRecorderData } from "../finalization";
 import { getDictionaryTerms } from "../dictionary";
+import { getSTTProviderSettings } from "../providerSettings";
+
 
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
@@ -148,15 +150,17 @@ export class OpenAIWhisperSTT implements STTSession {
   private async transcribe(blob: Blob): Promise<string> {
     const form = new FormData();
     const ext = (this.mimeType.includes("mp4") ? "mp4" : "webm");
+    const w = getSTTProviderSettings("openai_whisper");
     form.append("file", blob, `audio.${ext}`);
-    form.append("language", "fr");
-    form.append("model", "whisper-1");
+    form.append("language", w.language || "fr");
+    form.append("model", w.model || "whisper-1");
+    form.append("temperature", String(w.temperature ?? 0));
     // Whisper `prompt` biases recognition toward the listed terms (≤ 224 tokens).
-    // Send a short "Contexte: …" phrase built from the project dictionary.
     const dict = getDictionaryTerms();
     if (dict.length > 0) {
       form.append("prompt", `Contexte : ${dict.join(", ")}.`);
     }
+
     const res = await authenticatedFunctionFetch(ENDPOINT, { method: "POST", body: form });
     if (!res.ok) throw new Error(`Whisper proxy ${res.status}: ${await res.text()}`);
     const data = await res.json();

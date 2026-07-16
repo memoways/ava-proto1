@@ -4,9 +4,11 @@ import { selectMediaRecorderMimeType } from "@/services/browserCapabilities";
 import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types";
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { requestLatestRecorderData } from "../finalization";
+import { getSTTProviderSettings } from "../providerSettings";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const ENDPOINT = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/proxy-stt-gradium`;
+
 
 /**
  * Gradium STT (batch REST). Records mic audio via MediaRecorder and sends the
@@ -121,11 +123,16 @@ export class GradiumSTT implements STTSession {
 
   private async transcribe(blob: Blob): Promise<string> {
     const contentType = blob.type || "audio/webm";
-    const res = await authenticatedFunctionFetch(ENDPOINT, {
+    const g = getSTTProviderSettings("gradium");
+    const url = g.language && g.language !== "auto"
+      ? `${ENDPOINT}?language=${encodeURIComponent(g.language)}`
+      : ENDPOINT;
+    const res = await authenticatedFunctionFetch(url, {
       method: "POST",
       headers: { "Content-Type": contentType },
       body: blob,
     });
+
     if (!res.ok) throw new Error(`Gradium proxy ${res.status}: ${await res.text()}`);
     const data = await res.json();
     return (data.text || "").trim();

@@ -21,6 +21,8 @@ serve(async (req) => {
     const language = (inForm.get("language") as string) || "fr";
     const model = (inForm.get("model") as string) || "whisper-1";
     const prompt = (inForm.get("prompt") as string) || "";
+    const temperatureRaw = (inForm.get("temperature") as string) || "";
+    const temperature = temperatureRaw ? Number.parseFloat(temperatureRaw) : NaN;
     if (!(file instanceof File)) {
       return new Response(JSON.stringify({ error: "Missing 'file' field" }), {
         status: 400,
@@ -32,9 +34,11 @@ serve(async (req) => {
     const filename = (file as File).name || "audio.webm";
     outForm.append("file", file, filename);
     outForm.append("model", model);
-    outForm.append("language", language);
+    if (language && language !== "auto") outForm.append("language", language);
     outForm.append("response_format", "json");
     if (prompt.trim()) outForm.append("prompt", prompt.trim());
+    if (Number.isFinite(temperature)) outForm.append("temperature", String(Math.max(0, Math.min(1, temperature))));
+
 
 
     const startedAt = Date.now();
