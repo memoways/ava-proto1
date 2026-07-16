@@ -544,6 +544,7 @@ export default function TTSConfigTab() {
                 <option key={f} value={f}>{f}</option>
               ))}
             </select>
+            <span className="block text-xs text-muted-foreground/60">MP3 n'est pas supporté par Gradium. WAV recommandé pour la compatibilité navigateur.</span>
           </label>
         </div>
 
