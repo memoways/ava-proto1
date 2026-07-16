@@ -1187,21 +1187,27 @@ const IndexPRD4 = () => {
 
   const teaserActive = state.phase === "teaser";
   const interludeActive = state.phase === "conversation_max" && Boolean(activeVideo?.video_url);
-  const playerVideoUrl = interludeActive && activeVideo?.video_url
-    ? activeVideo.video_url
-    : TEASER_VIDEO_URL;
 
   return (
     <>
       <GumletVideoPlayer
         ref={teaserPlayerRef}
-        videoUrl={playerVideoUrl}
-        onComplete={teaserActive ? handleTeaserContinue : () => finishActiveVideo(false)}
-        onSkip={teaserActive ? handleTeaserSkip : () => finishActiveVideo(true)}
+        videoUrl={TEASER_VIDEO_URL}
+        onComplete={handleTeaserContinue}
+        onSkip={handleTeaserSkip}
         onReady={teaserActive || state.phase === "welcome" ? () => setTeaserPlayerReady(true) : undefined}
-        active={teaserActive || interludeActive}
+        active={teaserActive}
         autoPlay={false}
-        showSkip={teaserActive || interludeActive}
+        playbackMode="embed"
+        showSkip={teaserActive}
+      />
+      <GumletVideoPlayer
+        videoUrl={activeVideo?.video_url || TEASER_VIDEO_URL}
+        onComplete={() => finishActiveVideo(false)}
+        onSkip={() => finishActiveVideo(true)}
+        active={interludeActive}
+        playbackMode="native"
+        showSkip={interludeActive}
       />
       {screen}
     </>

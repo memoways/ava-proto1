@@ -55,6 +55,21 @@ describe("GumletVideoPlayer", () => {
     expect((player as HTMLVideoElement).volume).toBe(1);
   });
 
+  it("keeps the first video on the Gumlet embed without an audio activation screen", () => {
+    render(
+      <GumletVideoPlayer
+        videoUrl="https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049"
+        onComplete={() => {}}
+        onSkip={() => {}}
+        playbackMode="embed"
+        autoPlay={false}
+      />,
+    );
+
+    expect(screen.getByTitle("Video player").tagName).toBe("IFRAME");
+    expect(screen.queryByRole("button", { name: /activer le son/i })).not.toBeInTheDocument();
+  });
+
   it("keeps the same native media element when the Gumlet video changes", () => {
     const { rerender } = render(
       <GumletVideoPlayer

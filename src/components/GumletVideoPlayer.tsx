@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
 import Hls from "hls.js";
 import { Player } from "@gumlet/player.js";
 
@@ -29,6 +29,8 @@ interface GumletVideoPlayerProps {
   active?: boolean;
   /** Whether the player should request autoplay. */
   autoPlay?: boolean;
+  /** Use the proven Gumlet embed (teaser) or native HLS (later cinematics). */
+  playbackMode?: "embed" | "native";
   /** Show the skip button overlay. */
   showSkip?: boolean;
   /** Optional overlay content (e.g. HUD) rendered on top of the video */
@@ -47,6 +49,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   onReady,
   active = true,
   autoPlay = true,
+  playbackMode = "native",
   showSkip = true,
   children,
 }, ref) => {
@@ -57,7 +60,6 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   const onReadyRef = useRef(onReady);
   const hasCompletedRef = useRef(false);
   const activeRef = useRef(active);
-  const [audioBlocked, setAudioBlocked] = useState(false);
   onCompleteRef.current = onComplete;
   onReadyRef.current = onReady;
   activeRef.current = active;
@@ -85,23 +87,16 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     const video = videoRef.current;
     if (video) {
       try {
-        // Never start muted: a muted autoplay fallback can keep playing silently
-        // (and WebKit pauses media that is unmuted outside a user gesture).
-        // If audible playback is denied, keep the video paused and expose the
-        // explicit recovery control below instead of showing a silent video.
         video.muted = false;
         video.defaultMuted = false;
         video.volume = 1;
         if (!canControlNativeMedia()) return;
         const playAttempt = video.play();
         if (playAttempt && typeof playAttempt.then === "function") {
-          playAttempt.then(() => setAudioBlocked(false)).catch(() => {
-            pauseNativeVideo(video);
-            setAudioBlocked(true);
-          });
+          playAttempt.catch(() => pauseNativeVideo(video));
         }
       } catch {
-        setAudioBlocked(true);
+        pauseNativeVideo(video);
       }
       return;
     }
@@ -109,12 +104,13 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     const player = playerRef.current;
     if (!player) return;
     try {
-      void Promise.all([player.setVolume(100), player.unmute()])
-        .then(() => player.play())
-        .then(() => setAudioBlocked(false))
-        .catch(() => setAudioBlocked(true));
+      // Dispatch every command synchronously inside the user-gesture stack.
+      // Waiting for setVolume/unmute first makes play() lose that activation.
+      void player.setVolume(100).catch(() => { /* retry on next gesture */ });
+      void player.unmute().catch(() => { /* retry on next gesture */ });
+      void player.play().catch(() => { /* retry on next gesture */ });
     } catch {
-      setAudioBlocked(true);
+      // Retried by ready/load and subsequent user gestures.
     }
   }, []);
 
@@ -156,7 +152,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   }, [autoPlay]);
 
   const embedUrl = getEmbedUrl(videoUrl);
-  const hlsUrl = getNativePlaybackUrl(videoUrl);
+  const hlsUrl = playbackMode === "native" ? getNativePlaybackUrl(videoUrl) : null;
 
   useImperativeHandle(ref, () => ({
     playWithAudio: () => {
@@ -166,7 +162,6 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
   useEffect(() => {
     hasCompletedRef.current = false;
-    setAudioBlocked(false);
   }, [videoUrl]);
 
   // Force audio ON: unmute on ready, on play, periodically during the first
@@ -261,7 +256,6 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       return;
     }
 
-    setAudioBlocked(false);
     pauseNativeVideo(videoRef.current);
     try {
       void playerRef.current?.pause().catch(() => { /* player may not be ready */ });
@@ -269,6 +263,25 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       // Player teardown can race a phase change.
     }
   }, [active, forceAudioOn]);
+
+  // Later cinematics use native HLS. Retry audible playback while the stream
+  // becomes ready and on any in-video user gesture, without inserting a gate.
+  useEffect(() => {
+    if (!active || !hlsUrl) return;
+    const retryTimers = [100, 300, 700, 1200, 2000, 3500].map((delay) =>
+      window.setTimeout(forceAudioOn, delay),
+    );
+    const onUserGesture = () => forceAudioOn();
+    window.addEventListener("pointerdown", onUserGesture, { capture: true });
+    window.addEventListener("touchstart", onUserGesture, { capture: true });
+    window.addEventListener("keydown", onUserGesture, { capture: true });
+    return () => {
+      retryTimers.forEach((timer) => window.clearTimeout(timer));
+      window.removeEventListener("pointerdown", onUserGesture, { capture: true });
+      window.removeEventListener("touchstart", onUserGesture, { capture: true });
+      window.removeEventListener("keydown", onUserGesture, { capture: true });
+    };
+  }, [active, forceAudioOn, hlsUrl]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -374,16 +387,6 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
       {/* Overlay content (HUD, etc.) */}
       {active ? children : null}
-
-      {active && audioBlocked ? (
-        <button
-          type="button"
-          onClick={forceAudioOn}
-          className="absolute inset-0 z-40 flex items-center justify-center bg-black/55 text-base font-medium text-white backdrop-blur-sm"
-        >
-          Activer le son et lancer la vidéo
-        </button>
-      ) : null}
 
       {/* Skip button */}
       {showSkip ? (

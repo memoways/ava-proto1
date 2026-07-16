@@ -23,8 +23,8 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 ### Vidéos Gumlet — fin fiable et audio systématique
 - Lovable a élargi la détection de fin Gumlet (`ended`, `complete`, `finish`) et ajouté un fallback temporel à moins de 0,4 seconde de la durée lorsque l'embed n'émet pas `ended`, garantissant le retour automatique à la conversation.
 - Les URLs Gumlet `watch/embed` sont converties en manifestes HLS natifs. Le player n'utilise donc plus l'autoplay iframe que Gumlet documente comme systématiquement muet.
-- Un seul élément `<video>` reste monté pendant toute l'expérience : le clic « Commencer » autorise sa lecture sonore, puis le teaser et les interludes réutilisent ce même élément avec `muted=false` et volume à 100 %.
-- Toute remise en sourdine ou baisse de volume est corrigée. Si une politique navigateur refuse exceptionnellement l'audio, la vidéo reste en pause avec une action « Activer le son » au lieu de continuer silencieusement.
+- Le teaser conserve l'iframe Gumlet préchargée qui fonctionnait déjà : le clic « Commencer » lui envoie immédiatement `play`, `unmute` et volume à 100 % dans le geste utilisateur, sans écran ni bouton intermédiaire.
+- Les interludes utilisent un player HLS natif séparé et persistant, avec `muted=false`, volume à 100 % et plusieurs retries automatiques au chargement. Toute remise en sourdine ou baisse de volume est corrigée sans ajouter de gate visuelle.
 - Les messages `postMessage` de fin sont limités à l'iframe réellement contrôlée afin qu'un message tiers ne puisse pas terminer une vidéo.
 
 ### Dépendances
