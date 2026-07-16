@@ -184,7 +184,7 @@ export async function evaluatePostTurnPRD4(
       {
         model: llm.LLM_MODEL_GM,
         temperature: 0.2,
-        max_tokens: llm.LLM_MAX_TOKENS_GM ?? 250,
+        max_tokens: llm.LLM_MAX_TOKENS_GM ?? 600,
         timeoutMs: GM_POST_TURN_TIMEOUT_MS,
         feature_key: "prd4_gm_post_turn",
         session_id: input.sessionId ?? undefined,
