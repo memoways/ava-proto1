@@ -34,6 +34,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Les URLs Gumlet `watch/embed` sont toutes converties en manifestes HLS directs. Safari utilise son décodage HLS natif ; Chrome et Firefox passent par `hls.js`.
 - Un unique élément `<video>` est monté avant l'accueil puis conservé pendant toute l'expérience. Le clic initial « Commencer » applique synchroniquement `muted=false`, `volume=1` et `play()` avant l'authentification ; les interludes changent seulement la source de cet élément déjà autorisé et démarrent sans nouveau clic.
 - Le lecteur garde `autoplay`, `playsInline` et aucun contrôle navigateur. Une remise en sourdine pendant une lecture active est immédiatement corrigée, sans écran ni bouton Play intermédiaire.
+- Correctif post-publication : Chromium/Brave peut retourner `"maybe"` pour `canPlayType(application/vnd.apple.mpegurl)` tout en terminant avec `MediaError.code=4`. La sélection donne désormais la priorité à `Hls.isSupported()` ; le HLS natif n'est utilisé qu'en fallback. « Commencer » attend `MANIFEST_PARSED`, supprimant les appels `play()` sans source supportée.
 - Le clic « Passer » effectue un hard-stop avant la transition : mute/pause/retour à zéro, destruction de l'instance HLS et suppression de la source. Un compteur de génération empêche une ancienne promesse `play()` de relancer le média après le skip.
 - Les identifiants Gumlet doivent maintenant être des IDs hexadécimaux complets de 24 caractères ; une URL invalide ne peut plus être partiellement transformée en faux manifeste HLS.
 
@@ -48,6 +49,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 ### Validation
 - 101 tests unitaires locaux verts, dont les cas de conservation préfixe finalisé + queue interim, absence de duplication d'un transcript cumulatif, isolation Gamilab/Deepgram, modèle Deepgram effectif et budget Max après RAG.
 - 28 tests de régression critiques verts, six scénarios Chromium complets et quatre variantes média Firefox/WebKit vertes. Les parcours couvrent le même lecteur du teaser à l'interlude, l'autoplay sonore, l'arrêt sur skip et l'endurance 35 tours.
+- Un smoke test supplémentaire sans mock sur le vrai manifeste Gumlet confirme sous Chromium `currentSrc=blob:`, `readyState=4`, durée 77 s, progression réelle, `muted=false`, volume `1` et aucune erreur média.
 - Build Vite de production et lint ciblé des fichiers modifiés verts ; `git diff --check` sans erreur.
 - Manifeste HLS du teaser vérifié en HTTP 200 avec piste audio AAC dédiée.
 

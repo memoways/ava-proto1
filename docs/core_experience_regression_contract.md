@@ -16,6 +16,8 @@ Ce contrat transforme les incidents récurrents en invariants exécutables. La C
 - Le teaser et toutes les cinématiques suivantes utilisent le même élément `<video>` natif persistant ; aucun iframe média cross-origin n'est autorisé dans ce parcours.
 - Le clic initial « Commencer » applique synchroniquement `defaultMuted=false`, `muted=false`, `volume=1` puis `play()` au lecteur préchargé, avant toute attente réseau.
 - Chaque source suivante est convertie vers le HLS direct Gumlet et démarre automatiquement sur ce même élément, sans contrôle navigateur et sans nouveau clic.
+- Sur Chromium/Firefox, `Hls.isSupported()` est prioritaire sur `canPlayType(m3u8)` : le média doit utiliser le moteur `hls.js` et exposer une `currentSrc` en `blob:`. Le HLS natif n'est qu'un fallback lorsque MSE/hls.js est indisponible.
+- L'accueil reste en « Préparation… » jusqu'à `MANIFEST_PARSED` (ou `canplay` pour une source native), afin qu'aucun `play()` ne parte avant qu'une source décodable soit attachée.
 - Seul un identifiant Gumlet hexadécimal complet de 24 caractères peut être converti en manifeste HLS.
 - « Passer » mute, met en pause et remet à zéro, détruit HLS et supprime la source avant d'appeler la transition parente. Toute promesse `play()` appartenant à une ancienne génération est ignorée.
 
@@ -29,5 +31,5 @@ Ce contrat transforme les incidents récurrents en invariants exécutables. La C
 - `npm run test:regression` : contrats critiques STT, audio, vidéo et orchestration.
 - `npm run test:unit` : suite unitaire sans dépendance distante.
 - `npm run build` : compilation de production.
-- `npm run test:e2e` : six parcours Chromium (multi-tours, transcription, TTS, vidéo intercalée) plus les deux contrats média rejoués sous Firefox et WebKit.
+- `npm run test:e2e` : six parcours Chromium (multi-tours, transcription, TTS, vidéo intercalée) plus les deux contrats média rejoués sous Firefox et WebKit ; Chromium/Firefox exigent explicitement le moteur `hls.js` et une source `blob:`.
 - `npm run test:quality` : gate locale avant commit/push.

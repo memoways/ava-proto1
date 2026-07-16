@@ -47,6 +47,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   const stoppingRef = useRef(false);
   const playbackRequestedRef = useRef(false);
   const [sourceEpoch, setSourceEpoch] = useState(0);
+  const [playbackEngine, setPlaybackEngine] = useState<"pending" | "hls.js" | "native-hls" | "native-file" | "unsupported">("pending");
   const source = useMemo(() => resolveNativeVideoSource(videoUrl), [videoUrl]);
 
   onCompleteRef.current = onComplete;
@@ -130,6 +131,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     hasCompletedRef.current = false;
     stoppingRef.current = false;
     sourceGenerationRef.current += 1;
+    setPlaybackEngine("pending");
   }, [source.url, sourceEpoch]);
 
   useEffect(() => {
@@ -144,11 +146,44 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     video.volume = 1;
 
     if (source.kind === "file") {
+      setPlaybackEngine("native-file");
       video.src = source.url;
       if (canControlNativeMedia()) video.load();
-      onReadyRef.current?.();
       if (activeRef.current || playbackRequestedRef.current) playWithAudio();
       return () => {
+        if (generation !== sourceGenerationRef.current) return;
+        pauseVideo(video);
+        video.removeAttribute("src");
+        if (canControlNativeMedia()) video.load();
+      };
+    }
+
+    // hls.js documents that Chromium can return "maybe" for the HLS MIME type
+    // while still failing actual playback. Prefer MSE/hls.js whenever it is
+    // supported; direct native HLS is only the fallback (Safari/WebKit, etc.).
+    if (Hls.isSupported()) {
+      setPlaybackEngine("hls.js");
+      const hls = new Hls({
+        autoStartLoad: true,
+        enableWorker: true,
+        startLevel: -1,
+      });
+      hlsRef.current = hls;
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (generation !== sourceGenerationRef.current) return;
+        onReadyRef.current?.();
+        if (activeRef.current || playbackRequestedRef.current) playWithAudio();
+      });
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (!data.fatal || generation !== sourceGenerationRef.current) return;
+        console.error("[Video] Fatal HLS error:", data.type, data.details);
+      });
+      hls.attachMedia(video);
+      hls.loadSource(source.url);
+
+      return () => {
+        if (hlsRef.current === hls) hlsRef.current = null;
+        try { hls.destroy(); } catch { /* already destroyed by a hard stop */ }
         if (generation !== sourceGenerationRef.current) return;
         pauseVideo(video);
         video.removeAttribute("src");
@@ -157,9 +192,9 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     }
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      setPlaybackEngine("native-hls");
       video.src = source.url;
       if (canControlNativeMedia()) video.load();
-      onReadyRef.current?.();
       if (activeRef.current || playbackRequestedRef.current) playWithAudio();
       return () => {
         if (generation !== sourceGenerationRef.current) return;
@@ -169,43 +204,10 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       };
     }
 
-    if (!Hls.isSupported()) {
-      if (canControlNativeMedia()) {
-        console.error("[Video] HLS playback is not supported by this browser.");
-      }
-      return;
+    setPlaybackEngine("unsupported");
+    if (canControlNativeMedia()) {
+      console.error("[Video] HLS playback is not supported by this browser.");
     }
-
-    const hls = new Hls({
-      autoStartLoad: true,
-      enableWorker: true,
-      startLevel: -1,
-    });
-    hlsRef.current = hls;
-    hls.loadSource(source.url);
-    hls.attachMedia(video);
-    // The source is armed before the welcome action becomes available. If the
-    // manifest is still loading when the user clicks, playbackRequestedRef
-    // preserves the intent and MANIFEST_PARSED retries play on the same node.
-    onReadyRef.current?.();
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      if (generation !== sourceGenerationRef.current) return;
-      onReadyRef.current?.();
-      if (activeRef.current || playbackRequestedRef.current) playWithAudio();
-    });
-    hls.on(Hls.Events.ERROR, (_event, data) => {
-      if (!data.fatal || generation !== sourceGenerationRef.current) return;
-      console.error("[Video] Fatal HLS error:", data.type, data.details);
-    });
-
-    return () => {
-      if (hlsRef.current === hls) hlsRef.current = null;
-      try { hls.destroy(); } catch { /* already destroyed by a hard stop */ }
-      if (generation !== sourceGenerationRef.current) return;
-      pauseVideo(video);
-      video.removeAttribute("src");
-      if (canControlNativeMedia()) video.load();
-    };
   }, [pauseVideo, playWithAudio, source.kind, source.url, sourceEpoch]);
 
   useEffect(() => {
@@ -233,6 +235,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
         ref={videoRef}
         title="Video player"
         data-source={source.url}
+        data-playback-engine={playbackEngine}
         className="absolute inset-0 h-full w-full object-cover"
         controls={false}
         playsInline

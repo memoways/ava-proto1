@@ -399,7 +399,7 @@ async function installNetworkFakes(
   };
 }
 
-test("le teaser démarre automatiquement avec le son puis Passer coupe tout", async ({ page }) => {
+test("le teaser démarre automatiquement avec le son puis Passer coupe tout", async ({ page }, testInfo) => {
   await installNetworkFakes(page);
 
   await page.goto("/");
@@ -422,6 +422,17 @@ test("le teaser démarre automatiquement avec le son puis Passer coupe tout", as
       video.volume === 1,
     );
   }), { timeout: 5_000 }).toBe(true);
+
+  const playbackPath = await page.locator("video[title='Video player']").evaluate((video) => ({
+    currentSrc: (video as HTMLVideoElement).currentSrc,
+    engine: (video as HTMLVideoElement).dataset.playbackEngine,
+  }));
+  if (testInfo.project.name !== "webkit-media") {
+    expect(playbackPath.engine).toBe("hls.js");
+    expect(playbackPath.currentSrc).toMatch(/^blob:/);
+  } else {
+    expect(["hls.js", "native-hls"]).toContain(playbackPath.engine);
+  }
 
   const pauseCountBeforeSkip = await page.evaluate(() =>
     (window as Window & { __e2eNativeVideoState?: { pauseCount: number } }).__e2eNativeVideoState?.pauseCount ?? 0,
