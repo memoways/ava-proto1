@@ -153,9 +153,18 @@ export class DeepgramSTT {
   async start() {
     // Get microphone first: browsers are stricter when media permission is
     // requested after an awaited network call instead of directly from a user gesture.
+    // High-quality mono capture with browser DSP for better STT accuracy.
     const streamPromise = this.initialStream
       ? Promise.resolve(this.initialStream)
-      : navigator.mediaDevices.getUserMedia({ audio: true });
+      : navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 1,
+            sampleRate: 48000,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
     this.initialStream = undefined;
     this.stream = await withTimeout(
       "microphone_permission",
