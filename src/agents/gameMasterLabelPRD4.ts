@@ -10,7 +10,7 @@ import { callLLMWithUsage } from "@/services/openRouterLLM";
 import { getLLMSettings } from "@/services/settingsService";
 import type { ConversationMessage, PRD4TurnLabels } from "@/types";
 
-const LABEL_TIMEOUT_MS = 4000;
+const LABEL_TIMEOUT_MS = 10000;
 
 const SYSTEM_PROMPT = `Tu es l'analyste du Game Master d'une expérience narrative en temps réel. Pour CHAQUE message utilisateur que tu reçois, tu extrais des labels concis. Retourne EXCLUSIVEMENT un JSON strict :
 {
