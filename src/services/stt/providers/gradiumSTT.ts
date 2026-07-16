@@ -108,7 +108,7 @@ export class GradiumSTT implements STTSession {
             turn_id: context.turn_id ?? null,
             provider: "Gradium",
             model: "gradium-asr",
-            mode: "streamed-batch",
+            mode: "batch",
             language: "fr",
             trigger,
           },
@@ -137,17 +137,12 @@ export class GradiumSTT implements STTSession {
     });
 
     if (!res.ok) throw new Error(`Gradium proxy ${res.status}: ${await res.text()}`);
+    if (!res.body) return "";
 
-    // Streaming NDJSON — emit partial transcripts as segments arrive so the
-    // subtitle overlay updates in real time instead of waiting for the whole
-    // utterance to be processed.
-    const contentType = res.headers.get("content-type") || "";
-    if (!res.body || !contentType.includes("ndjson")) {
-      // Backward-compat fallback if the proxy still returns aggregated JSON.
-      const data = await res.json().catch(() => ({ text: "" }));
-      return (data.text || "").trim();
-    }
-
+    // The proxy streams Gradium's NDJSON body verbatim. We parse it
+    // incrementally so partial `text` segments show up as the transcript is
+    // still being produced. If the proxy ever falls back to aggregated JSON
+    // (single object with `{ text: "..." }`), we still handle that below.
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -164,8 +159,11 @@ export class GradiumSTT implements STTSession {
         if (msg?.type === "text" && typeof msg.text === "string") {
           parts.push(msg.text);
           emitPartial();
+        } else if (typeof msg?.text === "string" && msg.type === undefined) {
+          // Aggregated JSON fallback: single `{ text, provider, ... }` object.
+          parts.push(msg.text);
         }
-      } catch { /* keepalive / non-JSON */ }
+      } catch { /* keepalive or non-JSON line — skip */ }
     };
 
     while (true) {
