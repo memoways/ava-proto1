@@ -276,18 +276,39 @@ export default function TTSConfigTab() {
         </div>
 
         <SliderRow label="Stabilité" value={elSettings.stability} min={0} max={1} step={0.05}
-          onChange={(v) => updateEl({ stability: v })} />
+          onChange={(v) => updateEl({ stability: v })}
+          tooltip="Contrôle la constance de la voix entre deux générations. À 0, la voix est plus expressive et variable ; à 1, elle devient très stable, presque monotone."
+          minLabel="Expressif / variable" maxLabel="Stable / constant" />
         <SliderRow label="Similarity Boost" value={elSettings.similarityBoost} min={0} max={1} step={0.05}
-          onChange={(v) => updateEl({ similarityBoost: v })} />
+          onChange={(v) => updateEl({ similarityBoost: v })}
+          tooltip="Rapproche la voix générée du timbre du speaker original. À 0, la voix est plus neutre ; à 1, elle colle au maximum au clone."
+          minLabel="Neutre" maxLabel="Proche du clone" />
         <SliderRow label="Style" value={elSettings.style} min={0} max={1} step={0.05}
-          onChange={(v) => updateEl({ style: v })} />
+          onChange={(v) => updateEl({ style: v })}
+          tooltip="Accentue le style dramatique / théâtral de la lecture. À 0, le rendu est naturel et conversationnel ; à 1, il devient très stylisé."
+          minLabel="Naturel" maxLabel="Théâtral" />
         <SliderRow label="Vitesse" value={elSettings.speed} min={0.7} max={1.2} step={0.02}
-          onChange={(v) => updateEl({ speed: v })} />
+          onChange={(v) => updateEl({ speed: v })}
+          tooltip="Vitesse de lecture globale. 1 = vitesse normale." minLabel="0.7 lent" maxLabel="1.2 rapide" />
         <SliderRow label="Optimize streaming latency" value={elSettings.optimizeStreamingLatency} min={0} max={4} step={1}
-          onChange={(v) => updateEl({ optimizeStreamingLatency: Math.round(v) })} format={(v) => v.toString()} />
+          onChange={(v) => updateEl({ optimizeStreamingLatency: Math.round(v) })} format={(v) => v.toString()}
+          tooltip="Compromis entre qualité et latence pour le streaming. 0 = qualité maximale ; 4 = latence minimale, utile pour le dialogue temps réel."
+          minLabel="Qualité max" maxLabel="Latence min" />
 
         <div className="flex items-center justify-between py-2">
-          <label className="text-sm">Speaker Boost</label>
+          <div className="flex items-center gap-1.5">
+            <label className="text-sm">Speaker Boost</label>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" className="text-muted-foreground/60 hover:text-primary transition-colors">
+                  <HelpCircle className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <p className="text-xs leading-relaxed">Renforce la projection et la présence globale de la voix, comme un léger boost de volume/clarté.</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
           <Switch checked={elSettings.useSpeakerBoost} onCheckedChange={(v) => updateEl({ useSpeakerBoost: v })} />
         </div>
       </section>
