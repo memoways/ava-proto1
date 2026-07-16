@@ -9,7 +9,13 @@ const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const ENDPOINT = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/proxy-stt-gradium`;
 const GRADIUM_WS_URL = "wss://api.gradium.ai/api/speech/asr";
 const TARGET_SAMPLE_RATE = 24_000;
+// Gradium recommends 1920-sample (80 ms) chunks at 24 kHz. ScriptProcessor
+// only accepts power-of-two sizes, so we use 2048 samples and let Gradium
+// re-align internally — still delivers a frame roughly every 85 ms.
 const PROCESSOR_BUFFER_SIZE = 2048;
+// delay_in_frames: 1 frame = 80 ms. Lower = more reactive partials.
+// 4 frames = ~320 ms tail before the model emits text.
+const GRADIUM_DELAY_IN_FRAMES = 4;
 const FLUSH_TIMEOUT_MS = 2500;
 
 
@@ -38,9 +44,7 @@ export class GradiumSTT implements STTSession {
   private lastFinalTelemetry: import("../types").STTFinalTelemetryBase | null = null;
   private flushPromise: Promise<void> | null = null;
   private initialStream?: MediaStream | Promise<MediaStream>;
-  private segmentOrder: Array<string | number> = [];
-  private segments = new Map<string | number, string>();
-  private looseSegments: string[] = [];
+  private textParts: string[] = [];
 
   constructor(onTranscript: TranscriptCallback, opts?: STTCreateOptions) {
     this.onTranscript = onTranscript;
@@ -81,7 +85,7 @@ export class GradiumSTT implements STTSession {
       this.ws!.onopen = () => {
         window.clearTimeout(timeout);
         const g = getSTTProviderSettings("gradium");
-        const jsonConfig: Record<string, unknown> = { delay_in_frames: 8 };
+        const jsonConfig: Record<string, unknown> = { delay_in_frames: GRADIUM_DELAY_IN_FRAMES };
         if (g.language && g.language !== "auto") jsonConfig.language = g.language;
         this.ws!.send(JSON.stringify({
           type: "setup",
@@ -183,13 +187,10 @@ export class GradiumSTT implements STTSession {
         if (!this.firstPartialAt) this.firstPartialAt = this.lastMessageAt;
         const text = msg.text.trim();
         if (!text) return;
-        const streamId = typeof msg.stream_id === "number" || typeof msg.stream_id === "string" ? msg.stream_id : null;
-        if (streamId !== null) {
-          if (!this.segments.has(streamId)) this.segmentOrder.push(streamId);
-          this.segments.set(streamId, text);
-        } else if (this.looseSegments[this.looseSegments.length - 1] !== text) {
-          this.looseSegments.push(text);
-        }
+        // Gradium `text` messages are cumulative segments — each one is a new
+        // piece of the transcript, to be concatenated with spaces. Do NOT
+        // deduplicate: repeated words like "oui oui" are legitimate.
+        this.textParts.push(text);
         this.onTranscript(this.getCompleteTranscript(), false);
       } else if (msg?.type === "flushed") {
         this.flushAckAt = performance.now();
@@ -203,14 +204,11 @@ export class GradiumSTT implements STTSession {
   }
 
   private getCompleteTranscript(): string {
-    const ordered = this.segmentOrder.map((key) => this.segments.get(key)).filter(Boolean) as string[];
-    return [...ordered, ...this.looseSegments].join(" ").replace(/\s+/g, " ").trim();
+    return this.textParts.join(" ").replace(/\s+/g, " ").trim();
   }
 
   private resetTranscriptBuffers() {
-    this.segmentOrder = [];
-    this.segments.clear();
-    this.looseSegments = [];
+    this.textParts = [];
     this.firstPartialAt = 0;
     this.lastMessageAt = 0;
     this.flushAckAt = 0;
