@@ -373,16 +373,42 @@ export default function TTSConfigTab() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <p className="text-xs font-medium mb-2">Delivery mode (tts-2)</p>
+            <div className="flex items-center gap-1.5 mb-2">
+              <p className="text-xs font-medium">Delivery mode (tts-2)</p>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground/60 hover:text-primary transition-colors">
+                    <HelpCircle className="w-3.5 h-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-xs leading-relaxed">Contrôle la variabilité expressive de l'intonation : STABLE = très régulier, BALANCED = compromis, CREATIVE = plus emphatique et variable.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
             <div className="flex gap-2">
-              {(["STABLE", "BALANCED", "CREATIVE"] as const).map((m) => (
-                <button key={m} onClick={() => updateIw({ deliveryMode: m })}
-                  className={`flex-1 px-2 py-1.5 border rounded text-xs ${
-                    iwSettings.deliveryMode === m ? "bg-primary/10 border-primary" : "hover:bg-accent/50"
-                  }`}>
-                  {m}
-                </button>
-              ))}
+              {(["STABLE", "BALANCED", "CREATIVE"] as const).map((m) => {
+                const deliveryTooltip: Record<string, string> = {
+                  STABLE: "Intonation très régulière et prévisible — clarté maximale.",
+                  BALANCED: "Compromis entre expressivité et stabilité.",
+                  CREATIVE: "Intonation plus variée, emphatique et imprévisible.",
+                };
+                return (
+                  <Tooltip key={m}>
+                    <TooltipTrigger asChild>
+                      <button onClick={() => updateIw({ deliveryMode: m })}
+                        className={`flex-1 px-2 py-1.5 border rounded text-xs ${
+                          iwSettings.deliveryMode === m ? "bg-primary/10 border-primary" : "hover:bg-accent/50"
+                        }`}>
+                        {m}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p className="text-xs leading-relaxed">{deliveryTooltip[m]}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
             </div>
           </div>
           <SliderRow label="Speaking rate" value={iwSettings.speakingRate} min={0.5} max={2} step={0.05}
