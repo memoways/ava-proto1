@@ -3,6 +3,7 @@ import { recordAudioLatency } from "./latencyTelemetry";
 import { createTimeoutSignal, withTimeout } from "./asyncUtils";
 import { getBrowserDiagnostics, selectMediaRecorderMimeType } from "./browserCapabilities";
 import { authenticatedFunctionFetch } from "./gameAuth";
+import { combineTranscriptParts, requestLatestRecorderData, waitForCondition } from "./stt/finalization";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 
@@ -62,9 +63,11 @@ export class DeepgramSTT {
   private mediaRecorder: MediaRecorder | null = null;
   private stream: MediaStream | null = null;
   private silenceTimer: ReturnType<typeof setTimeout> | null = null;
-  private pendingFlushTimer: ReturnType<typeof setTimeout> | null = null;
   private fullTranscript = "";
   private latestInterimTranscript = "";
+  private lastResultAt = 0;
+  private finalizeAcknowledgedAt = 0;
+  private flushPromise: Promise<void> | null = null;
   /** Timestamp (performance.now()) du dernier mot reçu — sert à mesurer la latence STT après silence. */
   private lastSpeechAt = 0;
   private static SILENCE_DELAY_MS = 900;
@@ -111,13 +114,11 @@ export class DeepgramSTT {
   pause() {
     this._paused = true;
     if (this.silenceTimer) clearTimeout(this.silenceTimer);
-    if (this.pendingFlushTimer) clearTimeout(this.pendingFlushTimer);
   }
 
   /** Resume listening after pause */
   resume() {
     this._paused = false;
-    if (this.pendingFlushTimer) clearTimeout(this.pendingFlushTimer);
     this.fullTranscript = "";
     this.latestInterimTranscript = "";
     if (this.mediaRecorder?.state === "paused") {
@@ -126,28 +127,39 @@ export class DeepgramSTT {
   }
 
   /** Force-finalize current transcript (used by push-to-talk on release) */
-  flush() {
-    if (this.silenceTimer) clearTimeout(this.silenceTimer);
-    if (this.pendingFlushTimer) clearTimeout(this.pendingFlushTimer);
-    try { this.mediaRecorder?.requestData(); } catch { /* noop */ }
+  flush(): Promise<void> {
+    if (this.flushPromise) return this.flushPromise;
+    this.flushPromise = this.finalizeCurrentTurn().finally(() => {
+      this.flushPromise = null;
+    });
+    return this.flushPromise;
+  }
 
-    const startedAt = performance.now();
-    const finalize = () => {
-      const finalText = (this.fullTranscript || this.latestInterimTranscript).trim();
-      if (!finalText && performance.now() - startedAt < 1200) {
-        this.pendingFlushTimer = setTimeout(finalize, 250);
-        return;
-      }
-      this.pendingFlushTimer = null;
-      this.fullTranscript = "";
-      this.latestInterimTranscript = "";
-      if (finalText) {
-        debugLogger.log({ service: "stt", level: "info", direction: "in", label: `STT flush (PTT): "${finalText.slice(0, 100)}"` });
-        this.recordFinalTelemetry(finalText, "ptt_flush");
-        this.onTranscript(finalText, true);
-      }
-    };
-    this.pendingFlushTimer = setTimeout(finalize, this.fullTranscript || this.latestInterimTranscript ? 0 : 350);
+  private async finalizeCurrentTurn(): Promise<void> {
+    if (this.silenceTimer) clearTimeout(this.silenceTimer);
+    await requestLatestRecorderData(this.mediaRecorder);
+    try { this.mediaRecorder?.pause(); } catch { /* unsupported; finalization still bounded */ }
+
+    const finalizeSentAt = performance.now();
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      try { this.ws.send(JSON.stringify({ type: "Finalize" })); } catch { /* fallback below */ }
+    }
+
+    // Deepgram may omit `from_finalize` when little audio remains, so also
+    // accept a short quiet period after the last revised result.
+    await waitForCondition(() => {
+      if (this.finalizeAcknowledgedAt >= finalizeSentAt) return true;
+      const elapsed = performance.now() - finalizeSentAt;
+      return elapsed >= 450 && this.lastResultAt > 0 && performance.now() - this.lastResultAt >= 250;
+    }, 1500);
+
+    const finalText = combineTranscriptParts(this.fullTranscript, this.latestInterimTranscript);
+    this.fullTranscript = "";
+    this.latestInterimTranscript = "";
+    if (!finalText) return;
+    debugLogger.log({ service: "stt", level: "info", direction: "in", label: `STT flush (PTT): "${finalText.slice(0, 100)}"` });
+    this.recordFinalTelemetry(finalText, "ptt_flush");
+    this.onTranscript(finalText, true);
   }
 
   async start() {
@@ -221,8 +233,10 @@ export class DeepgramSTT {
 
       const data = JSON.parse(event.data);
       if (data.type === 'Results') {
+        if (data.from_finalize) this.finalizeAcknowledgedAt = performance.now();
         const transcript = data.channel?.alternatives?.[0]?.transcript || '';
         if (transcript) {
+          this.lastResultAt = performance.now();
           const isFinal = data.is_final;
           if (isFinal) {
             this.fullTranscript += (this.fullTranscript ? ' ' : '') + transcript;
@@ -257,9 +271,8 @@ export class DeepgramSTT {
   private resetSilenceTimer() {
     if (this.manualMode) return;
     if (this.silenceTimer) clearTimeout(this.silenceTimer);
-    if (this.pendingFlushTimer) clearTimeout(this.pendingFlushTimer);
     this.silenceTimer = setTimeout(() => {
-      const finalText = (this.fullTranscript || this.latestInterimTranscript).trim();
+      const finalText = combineTranscriptParts(this.fullTranscript, this.latestInterimTranscript);
       if (finalText) {
         console.log('[Deepgram] 2s silence detected, finalizing');
         debugLogger.log({ service: "stt", level: "info", direction: "in", label: `STT final: "${finalText.slice(0, 100)}"` });

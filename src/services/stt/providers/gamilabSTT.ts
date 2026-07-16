@@ -2,6 +2,7 @@ import { debugLogger } from "@/services/debugLogger";
 import { recordAudioLatency } from "@/services/latencyTelemetry";
 import { getSTTRuntimeConfig } from "../runtimeConfig";
 import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types";
+import { pickMostCompleteTranscript, waitForCondition } from "../finalization";
 
 type GamilabSingleton = {
   connect: (host?: string) => Promise<void>;
@@ -104,6 +105,9 @@ export class GamilabSTT implements STTSession {
   private _active = false;
   private _paused = false;
   private fullTranscript = "";
+  private latestLiveTranscript = "";
+  private manualMode = false;
+  private flushPromise: Promise<void> | null = null;
   private startedAt = 0;
   private firstPartialAt = 0;
   private lastTextAt = 0;
@@ -127,9 +131,7 @@ export class GamilabSTT implements STTSession {
     return this.lastFinalTelemetry;
   }
 
-  setManualMode(_manual: boolean) {
-    /* Gamilab manages turn finalization via silence/text_history events */
-  }
+  setManualMode(manual: boolean) { this.manualMode = manual; }
 
   async start() {
     const config = await getSTTRuntimeConfig();
@@ -171,12 +173,30 @@ export class GamilabSTT implements STTSession {
   resume() {
     this._paused = false;
     this.fullTranscript = "";
+    this.latestLiveTranscript = "";
     void this.gami?.resume_recording?.();
   }
 
-  flush() {
-    const finalText = this.fullTranscript.trim();
+  flush(): Promise<void> {
+    if (this.flushPromise) return this.flushPromise;
+    this.flushPromise = this.finalizeCurrentTurn().finally(() => {
+      this.flushPromise = null;
+    });
+    return this.flushPromise;
+  }
+
+  private async finalizeCurrentTurn(): Promise<void> {
+    const requestedAt = performance.now();
+    // Stop accepting new audio while keeping listeners alive for the provider's
+    // delayed text_history correction.
+    try { await this.gami?.pause_recording?.(); } catch { /* preserve latest live text */ }
+    await waitForCondition(
+      () => this.lastTextAt >= requestedAt && performance.now() - this.lastTextAt >= 180,
+      1200,
+    );
+    const finalText = pickMostCompleteTranscript(this.fullTranscript, this.latestLiveTranscript);
     this.fullTranscript = "";
+    this.latestLiveTranscript = "";
     if (finalText) this.emitFinal(finalText, "ptt_flush");
   }
 
@@ -195,6 +215,7 @@ export class GamilabSTT implements STTSession {
     // Do NOT disconnect — keep singleton hot for the next turn
     this.gami = null;
     this.fullTranscript = "";
+    this.latestLiveTranscript = "";
   }
 
   private bindEvents(gami: GamilabSingleton) {
@@ -205,6 +226,7 @@ export class GamilabSTT implements STTSession {
         if (!text) return;
         if (!this.firstPartialAt) this.firstPartialAt = performance.now();
         this.lastTextAt = performance.now();
+        this.latestLiveTranscript = text;
         this.onTranscript(text, false);
       }),
     );
@@ -222,10 +244,18 @@ export class GamilabSTT implements STTSession {
     this.listeners.push(
       gami.on("silence", (isSilence: boolean) => {
         if (!isSilence || this._paused) return;
-        const finalText = this.fullTranscript.trim();
+        const finalText = pickMostCompleteTranscript(this.fullTranscript, this.latestLiveTranscript);
         if (finalText) {
-          this.fullTranscript = "";
-          this.emitFinal(finalText, "silence");
+          if (this.manualMode) {
+            // Keep the corrected history as the flush fallback until the user
+            // explicitly clicks send.
+            this.fullTranscript = finalText;
+            this.onTranscript(finalText, false);
+          } else {
+            this.fullTranscript = "";
+            this.latestLiveTranscript = "";
+            this.emitFinal(finalText, "silence");
+          }
         }
       }),
     );

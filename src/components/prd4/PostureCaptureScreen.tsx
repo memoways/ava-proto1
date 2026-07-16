@@ -19,6 +19,7 @@ const PostureCaptureScreen = ({ onSubmit, onPTTError }: Props) => {
   const [interim, setInterim] = useState("");
   const [recording, setRecording] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sttRef = useRef<STTSession | null>(null);
 
@@ -73,22 +74,21 @@ const PostureCaptureScreen = ({ onSubmit, onPTTError }: Props) => {
     }
   }, [ensureSTT, handleSTTError]);
 
-  const handleRelease = useCallback(() => {
+  const handleRelease = useCallback(async () => {
     const stt = sttRef.current;
     if (!stt) return;
-    stt.flush();
-    stt.pause();
     setRecording(false);
-    setInterim((curInterim) => {
-      if (curInterim.trim().length > 0) {
-        setTranscript((prev) => (prev ? `${prev} ${curInterim}` : curInterim).trim());
-      }
-      return "";
-    });
+    setFinalizing(true);
+    try {
+      await stt.flush();
+      stt.pause();
+    } finally {
+      setFinalizing(false);
+    }
   }, []);
 
   const { buttonHandlers } = usePushToTalk({
-    enabled: true,
+    enabled: !finalizing,
     onPress: handlePress,
     onRelease: handleRelease,
     mode: "toggle",
@@ -102,7 +102,7 @@ const PostureCaptureScreen = ({ onSubmit, onPTTError }: Props) => {
   }, []);
 
   const displayText = (transcript + (interim ? ` ${interim}` : "")).trim();
-  const canSubmit = transcript.trim().length >= MIN_CHARS && !recording;
+  const canSubmit = transcript.trim().length >= MIN_CHARS && !recording && !finalizing;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10">
@@ -115,6 +115,7 @@ const PostureCaptureScreen = ({ onSubmit, onPTTError }: Props) => {
           <button
             type="button"
             {...buttonHandlers}
+            disabled={finalizing}
             className={cn(
               "relative mx-auto flex h-20 w-20 items-center justify-center rounded-full border-2 transition-all select-none",
               "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background",
@@ -124,7 +125,7 @@ const PostureCaptureScreen = ({ onSubmit, onPTTError }: Props) => {
             )}
             aria-label={recording ? "Cliquer pour arrêter" : "Cliquer pour parler"}
           >
-            {starting ? (
+            {starting || finalizing ? (
               <Loader2 className="h-7 w-7 animate-spin text-primary" />
             ) : recording ? (
               <MicOff className="h-7 w-7 text-destructive" />
@@ -134,7 +135,9 @@ const PostureCaptureScreen = ({ onSubmit, onPTTError }: Props) => {
           </button>
 
           <p className="text-center text-xs text-muted-foreground">
-            {recording
+            {finalizing
+              ? "Finalisation de tout ce qui a été dit…"
+              : recording
               ? "🔴 Enregistrement… clique à nouveau (ou Espace) pour valider."
               : "Clique sur le micro (ou Espace) pour parler. Une phrase suffit."}
           </p>

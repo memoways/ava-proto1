@@ -47,7 +47,8 @@ export interface STTSession {
   stop(): void | Promise<void>;
   pause(): void;
   resume(): void;
-  flush(): void;
+  /** Resolve only after the provider has preserved its latest audio/text tail. */
+  flush(): Promise<void>;
   setManualMode(manual: boolean): void;
   getStream?(): MediaStream | null;
   getLastFinalTelemetry?(): STTFinalTelemetryBase | null;

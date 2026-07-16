@@ -7,7 +7,7 @@ interface SubtitleOverlayProps {
 }
 
 const SubtitleOverlay = ({ userText, maxText, audioState }: SubtitleOverlayProps) => {
-  const showUser = audioState === "user_speaking" && userText;
+  const showUser = (audioState === "user_speaking" || audioState === "user_finalizing") && userText;
   const showMax = (audioState === "max_speaking" || audioState === "max_thinking") && maxText;
 
   return (

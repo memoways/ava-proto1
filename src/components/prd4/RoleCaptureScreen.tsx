@@ -27,6 +27,7 @@ const RoleCaptureScreen = ({ onSubmit, onPTTError, submitting = false }: Props) 
   const [interim, setInterim] = useState("");
   const [recording, setRecording] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sttRef = useRef<STTSession | null>(null);
 
@@ -84,16 +85,21 @@ const RoleCaptureScreen = ({ onSubmit, onPTTError, submitting = false }: Props) 
     }
   }, [ensureSTT, handleSTTError]);
 
-  const handleRelease = useCallback(() => {
+  const handleRelease = useCallback(async () => {
     const stt = sttRef.current;
     if (!stt) return;
-    stt.flush();
-    stt.pause();
     setRecording(false);
+    setFinalizing(true);
+    try {
+      await stt.flush();
+      stt.pause();
+    } finally {
+      setFinalizing(false);
+    }
   }, []);
 
   const { buttonHandlers } = usePushToTalk({
-    enabled: !submitting,
+    enabled: !submitting && !finalizing,
     onPress: handlePress,
     onRelease: handleRelease,
     mode: "toggle",
@@ -108,7 +114,7 @@ const RoleCaptureScreen = ({ onSubmit, onPTTError, submitting = false }: Props) 
   }, []);
 
   const displayText = (transcript + (interim ? ` ${interim}` : "")).trim();
-  const canSubmit = transcript.trim().length >= MIN_CHARS && !recording && !submitting;
+  const canSubmit = transcript.trim().length >= MIN_CHARS && !recording && !finalizing && !submitting;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10">
@@ -152,18 +158,18 @@ const RoleCaptureScreen = ({ onSubmit, onPTTError, submitting = false }: Props) 
             <button
               type="button"
               {...buttonHandlers}
-              disabled={submitting}
+              disabled={submitting || finalizing}
               className={cn(
                 "relative flex h-24 w-24 items-center justify-center rounded-full border-2 transition-all select-none",
                 "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background",
                 recording
                   ? "border-destructive bg-destructive/20 scale-110 shadow-[0_0_40px_-5px_hsl(var(--destructive)/0.6)]"
                   : "border-primary/60 bg-card hover:border-primary",
-                submitting && "opacity-50 cursor-not-allowed",
+                (submitting || finalizing) && "opacity-50 cursor-not-allowed",
               )}
               aria-label={recording ? "Cliquer pour arrêter et envoyer" : "Cliquer pour parler"}
             >
-              {starting ? (
+              {starting || finalizing ? (
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               ) : recording ? (
                 <MicOff className="h-8 w-8 text-destructive" />
@@ -174,7 +180,9 @@ const RoleCaptureScreen = ({ onSubmit, onPTTError, submitting = false }: Props) 
           </div>
 
           <p className="text-center text-xs text-muted-foreground">
-            {recording
+            {finalizing
+              ? "Finalisation de tout ce qui a été dit…"
+              : recording
               ? "🔴 Enregistrement… clique à nouveau (ou Espace) pour arrêter et valider ce segment."
               : "Clique sur le micro (ou la barre d'espace) pour parler. Clique à nouveau pour arrêter. Tu peux faire plusieurs prises."}
           </p>

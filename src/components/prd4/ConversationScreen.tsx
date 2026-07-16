@@ -27,7 +27,7 @@ const ConversationScreen = ({
   onPTTRelease,
   onHangUp,
 }: Props) => {
-  const disabled = audioState === "mic_starting" || audioState === "max_thinking" || audioState === "max_speaking";
+  const disabled = audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "max_thinking" || audioState === "max_speaking";
   const recording = audioState === "user_speaking";
 
   const handleToggleTalk = useCallback(() => {
@@ -72,7 +72,7 @@ const ConversationScreen = ({
 
   // While the user is speaking, show the live interim STT text; otherwise the
   // last finalized user message from the log.
-  const displayedUser = recording || audioState === "mic_starting"
+  const displayedUser = recording || audioState === "mic_starting" || audioState === "user_finalizing"
     ? userSubtitle
     : lastUserText;
 
@@ -144,6 +144,7 @@ const ConversationScreen = ({
             {audioState === "idle" && "Clique pour parler"}
             {audioState === "mic_starting" && "Micro en cours d'ouverture…"}
             {audioState === "user_speaking" && "Enregistrement — clique pour envoyer"}
+            {audioState === "user_finalizing" && "Finalisation de tout ce qui a été dit…"}
             {audioState === "max_thinking" && "Max réfléchit…"}
             {audioState === "max_speaking" && "Max répond…"}
           </p>
@@ -160,7 +161,7 @@ const ConversationScreen = ({
             )}
             aria-label={recording ? "Arrêter l'enregistrement" : "Démarrer l'enregistrement"}
           >
-            {audioState === "mic_starting" || audioState === "max_thinking" ? (
+            {audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "max_thinking" ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : recording ? (
               <Square className="h-5 w-5 fill-current" />

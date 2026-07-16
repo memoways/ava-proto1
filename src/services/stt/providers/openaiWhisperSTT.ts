@@ -3,6 +3,7 @@ import { recordAudioLatency } from "@/services/latencyTelemetry";
 import { selectMediaRecorderMimeType } from "@/services/browserCapabilities";
 import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types";
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
+import { requestLatestRecorderData } from "../finalization";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const ENDPOINT = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/proxy-stt-whisper`;
@@ -24,11 +25,14 @@ export class OpenAIWhisperSTT implements STTSession {
   private _paused = false;
   private startedAt = 0;
   private lastFinalTelemetry: import("../types").STTFinalTelemetryBase | null = null;
+  private finalizePromise: Promise<void> | null = null;
+  private initialStream?: MediaStream | Promise<MediaStream>;
 
   constructor(onTranscript: TranscriptCallback, opts?: STTCreateOptions) {
     this.onTranscript = onTranscript;
     this.onError = opts?.onError;
     this.getTelemetryContext = opts?.getTelemetryContext;
+    this.initialStream = opts?.initialStream;
   }
 
   get isActive() {
@@ -45,7 +49,10 @@ export class OpenAIWhisperSTT implements STTSession {
   }
 
   async start() {
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    this.stream = await Promise.resolve(
+      this.initialStream ?? navigator.mediaDevices.getUserMedia({ audio: true }),
+    );
+    this.initialStream = undefined;
     this.mimeType = selectMediaRecorderMimeType();
     this.recorder = new MediaRecorder(this.stream, this.mimeType ? { mimeType: this.mimeType } : undefined);
     this.chunks = [];
@@ -69,8 +76,8 @@ export class OpenAIWhisperSTT implements STTSession {
     try { this.recorder?.resume(); } catch { /* ignore */ }
   }
 
-  flush() {
-    void this.finalize("ptt_flush");
+  flush(): Promise<void> {
+    return this.finalize("ptt_flush");
   }
 
   async stop() {
@@ -84,17 +91,19 @@ export class OpenAIWhisperSTT implements STTSession {
   }
 
   private async finalize(trigger: "ptt_flush" | "stop") {
+    if (this.finalizePromise) return this.finalizePromise;
+    this.finalizePromise = this.finalizeOnce(trigger).finally(() => {
+      this.finalizePromise = null;
+    });
+    return this.finalizePromise;
+  }
+
+  private async finalizeOnce(trigger: "ptt_flush" | "stop") {
     if (!this.recorder) return;
     try {
       // Force a final dataavailable
-      if (this.recorder.state === "recording") {
-        await new Promise<void>((resolve) => {
-          const handler = () => resolve();
-          this.recorder?.addEventListener("dataavailable", handler, { once: true });
-          try { this.recorder?.requestData(); } catch { resolve(); }
-          setTimeout(resolve, 300);
-        });
-      }
+      await requestLatestRecorderData(this.recorder);
+      try { this.recorder.pause(); } catch { /* unsupported; captured tail is already snapshotted */ }
       const blob = new Blob(this.chunks, { type: this.mimeType || "audio/webm" });
       this.chunks = [];
       if (blob.size < 1000) return; // ignore empty

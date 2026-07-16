@@ -5,7 +5,7 @@
  * réelle STT + TTS via TTSQueue, GM post-turn PRD4 en void (jamais bloquant).
  * Fin de session : durée admin OU clôture naturelle du GM après le seuil minimum.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { useExperienceState } from "@/hooks/useExperienceState";
 import type { AudioState, ConversationMessage, FilmAnswer } from "@/types";
@@ -121,7 +121,7 @@ const IndexPRD4 = () => {
   const sttRef = useRef<STTSession | null>(null);
   const ttsQueueRef = useRef<TTSQueue | null>(null);
   const sttLatencySegmentRef = useRef<string | null>(null);
-  const pttReleaseResetTimerRef = useRef<number | null>(null);
+  const pttFinalizingRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
   const conversationRef = useRef<ConversationMessage[]>([]);
   const isProcessingRef = useRef(false);
@@ -198,10 +198,7 @@ const IndexPRD4 = () => {
     activeTurnSequenceRef.current += 1;
     activeTurnControllerRef.current?.abort("experience-cleanup");
     activeTurnControllerRef.current = null;
-    if (pttReleaseResetTimerRef.current) {
-      window.clearTimeout(pttReleaseResetTimerRef.current);
-      pttReleaseResetTimerRef.current = null;
-    }
+    pttFinalizingRef.current = false;
     try { sttRef.current?.stop(); } catch { /* ignore */ }
     sttRef.current = null;
     try { ttsQueueRef.current?.cancel(); } catch { /* ignore */ }
@@ -926,10 +923,7 @@ const IndexPRD4 = () => {
       isProcessingRef.current = false;
     }
     if (isProcessingRef.current) return;
-    if (pttReleaseResetTimerRef.current) {
-      window.clearTimeout(pttReleaseResetTimerRef.current);
-      pttReleaseResetTimerRef.current = null;
-    }
+    if (pttFinalizingRef.current) return;
     // Le nouveau geste utilisateur invalide les analyses asynchrones du tour précédent.
     activeTurnControllerRef.current?.abort("new-user-turn");
     activeTurnControllerRef.current = null;
@@ -973,28 +967,31 @@ const IndexPRD4 = () => {
     teardownSTT,
   ]);
 
-  const handlePTTRelease = useCallback(() => {
+  const handlePTTRelease = useCallback(async () => {
     const stt = sttRef.current;
-    if (!stt) {
+    if (!stt || pttFinalizingRef.current) {
       // Nothing recording — just normalize state
-      setAudioState("idle");
+      if (!stt) setAudioState("idle");
       return;
     }
-    stt.flush(); // déclenche le isFinal → processTurn si du texte a été capté
-    // Si rien n'a été capté, on remet l'état au repos pour permettre une nouvelle tentative
-    if (pttReleaseResetTimerRef.current) window.clearTimeout(pttReleaseResetTimerRef.current);
-    pttReleaseResetTimerRef.current = window.setTimeout(() => {
-      pttReleaseResetTimerRef.current = null;
-      // Un nouveau tour a déjà créé une autre session STT : ce timer est obsolète.
-      if (sttRef.current !== stt) return;
-      endLatencySegment(sttLatencySegmentRef.current);
-      sttLatencySegmentRef.current = null;
-      if (!isProcessingRef.current) {
-        setAudioState("idle");
-        setUserSubtitle("");
-        teardownSTT();
+    pttFinalizingRef.current = true;
+    setAudioState("user_finalizing");
+    try {
+      // Every provider resolves only after its audio tail and latest transcript
+      // revision have been preserved. The final callback starts processTurn.
+      await stt.flush();
+    } finally {
+      pttFinalizingRef.current = false;
+      if (sttRef.current === stt) {
+        endLatencySegment(sttLatencySegmentRef.current);
+        sttLatencySegmentRef.current = null;
+        if (!isProcessingRef.current) {
+          setAudioState("idle");
+          setUserSubtitle("");
+          teardownSTT();
+        }
       }
-    }, 1700);
+    }
   }, [endLatencySegment, setAudioState, teardownSTT]);
 
   const handleHangUp = useCallback(() => {
@@ -1091,80 +1088,68 @@ const IndexPRD4 = () => {
     endedRef.current = false;
   }, [reset]);
 
+  const finishActiveVideo = useCallback((skipped: boolean) => {
+    if (!activeVideo) return;
+    pendingPostVideoContextRef.current = activeVideo.context || activeVideo.post_video_context || null;
+    trackEvent("prd4_video_completed", {
+      session_id: sessionIdRef.current,
+      video_id: activeVideo.id,
+      skipped,
+    });
+    setActiveVideo(null);
+  }, [activeVideo]);
+
 
   // ---- Render ---------------------------------------------------------------
-  if (state.phase === "welcome" || state.phase === "teaser") {
-    const teaserActive = state.phase === "teaser";
-
-    return (
-      <>
-        <GumletVideoPlayer
-          key="teaser-player"
-          ref={teaserPlayerRef}
-          videoUrl={TEASER_VIDEO_URL}
-          onComplete={handleTeaserContinue}
-          onSkip={handleTeaserSkip}
-          onReady={() => setTeaserPlayerReady(true)}
-          active={teaserActive}
-          autoPlay={false}
-          showSkip={teaserActive}
-        />
-        {!teaserActive ? (
-          <WelcomeScreen
-            onStart={handleStart}
-            onStartIntent={forceTeaserAudioOn}
-            videoReady={teaserPlayerReady}
-            privacyPreferences={privacyPreferences}
-            onPrivacyChange={handlePrivacyChange}
-          />
-        ) : null}
-      </>
-    );
-  }
-
+  let screen: ReactNode = null;
   switch (state.phase) {
+    case "welcome":
+      screen = (
+        <WelcomeScreen
+          onStart={handleStart}
+          onStartIntent={forceTeaserAudioOn}
+          videoReady={teaserPlayerReady}
+          privacyPreferences={privacyPreferences}
+          onPrivacyChange={handlePrivacyChange}
+        />
+      );
+      break;
+    case "teaser":
+      break;
     case "film_question":
-      return <FilmQuestionScreen onAnswer={handleFilmAnswer} />;
+      screen = <FilmQuestionScreen onAnswer={handleFilmAnswer} />;
+      break;
     case "transition_max":
-      return <TransitionScreen onContinue={handleAnswered} />;
+      screen = <TransitionScreen onContinue={handleAnswered} />;
+      break;
     case "role_capture":
-      return (
+      screen = (
         <RoleCaptureScreen
           onSubmit={handleRoleSubmit}
           onPTTError={handleRolePTTError}
           submitting={summarizing}
         />
       );
+      break;
     case "role_summary":
-      return state.userRoleProfile ? (
+      screen = state.userRoleProfile ? (
         <RoleSummaryScreen
           profile={state.userRoleProfile}
           onConfirm={handleRoleConfirm}
           onRestart={handleRoleRestart}
         />
       ) : null;
+      break;
     case "character_select":
-      return <CharacterSelectScreen onSelectMax={handleSelectMax} onLockedClick={handleLockedClick} />;
+      screen = <CharacterSelectScreen onSelectMax={handleSelectMax} onLockedClick={handleLockedClick} />;
+      break;
     case "calling_max":
-      return <CallingMaxScreen onAnswered={handleAnswered} />;
+      screen = <CallingMaxScreen onAnswered={handleAnswered} />;
+      break;
     case "conversation_max":
-      return (
+      screen = (
         <>
-          {activeVideo?.video_url ? (
-            <GumletVideoPlayer
-              videoUrl={activeVideo.video_url}
-              onComplete={() => {
-                pendingPostVideoContextRef.current = activeVideo.context || activeVideo.post_video_context || null;
-                trackEvent("prd4_video_completed", { session_id: sessionIdRef.current, video_id: activeVideo.id, skipped: false });
-                setActiveVideo(null);
-              }}
-              onSkip={() => {
-                pendingPostVideoContextRef.current = activeVideo.context || activeVideo.post_video_context || null;
-                trackEvent("prd4_video_completed", { session_id: sessionIdRef.current, video_id: activeVideo.id, skipped: true });
-                setActiveVideo(null);
-              }}
-            />
-          ) : (
+          {!activeVideo?.video_url ? (
             <ConversationScreen
               audioState={state.audioState}
               userSubtitle={userSubtitle}
@@ -1175,28 +1160,52 @@ const IndexPRD4 = () => {
               onPTTRelease={handlePTTRelease}
               onHangUp={handleHangUp}
             />
-          )}
+          ) : null}
           <LatencyOverlay enabled={latencyOverlayEnabled} segments={latencySegments} currentTurn={latencyCurrentTurn} />
         </>
       );
+      break;
     case "end_session":
-      return <EndSessionScreen onContinue={handleEndContinue} />;
+      screen = <EndSessionScreen onContinue={handleEndContinue} />;
+      break;
     case "questionnaire":
-      return (
+      screen = (
         <QuestionnaireScreenPRD4
           teaserSeen={state.teaserSeen}
           onSubmit={handleQuestionnaireSubmit}
           onSkip={handleRestart}
           submitting={submittingQuestionnaire}
         />
-
       );
+      break;
     case "thanks":
-      return <ThanksScreen onRestart={handleRestart} />;
+      screen = <ThanksScreen onRestart={handleRestart} />;
+      break;
     default:
-      return null;
-
+      break;
   }
+
+  const teaserActive = state.phase === "teaser";
+  const interludeActive = state.phase === "conversation_max" && Boolean(activeVideo?.video_url);
+  const playerVideoUrl = interludeActive && activeVideo?.video_url
+    ? activeVideo.video_url
+    : TEASER_VIDEO_URL;
+
+  return (
+    <>
+      <GumletVideoPlayer
+        ref={teaserPlayerRef}
+        videoUrl={playerVideoUrl}
+        onComplete={teaserActive ? handleTeaserContinue : () => finishActiveVideo(false)}
+        onSkip={teaserActive ? handleTeaserSkip : () => finishActiveVideo(true)}
+        onReady={teaserActive || state.phase === "welcome" ? () => setTeaserPlayerReady(true) : undefined}
+        active={teaserActive || interludeActive}
+        autoPlay={false}
+        showSkip={teaserActive || interludeActive}
+      />
+      {screen}
+    </>
+  );
 };
 
 export default IndexPRD4;

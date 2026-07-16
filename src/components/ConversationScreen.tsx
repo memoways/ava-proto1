@@ -30,6 +30,7 @@ const statusLabels: Record<AudioState, string> = {
   idle: "En attente…",
   mic_starting: "Micro en cours…",
   user_speaking: "Max écoute…",
+  user_finalizing: "Transcription en cours de finalisation…",
   max_thinking: "Max réfléchit…",
   max_speaking: "Max parle…",
 };

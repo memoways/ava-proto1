@@ -1,8 +1,20 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import Hls from "hls.js";
 import { Player } from "@gumlet/player.js";
 
 const GUMLET_COLLECTION_ID = "673f29f4a5e1bf70aa645cb7";
+
+const canControlNativeMedia = () =>
+  typeof window !== "undefined" && !/jsdom/i.test(window.navigator.userAgent);
+
+const pauseNativeVideo = (video: HTMLVideoElement | null) => {
+  if (video && canControlNativeMedia()) video.pause();
+};
+
+const resetNativeVideo = (video: HTMLVideoElement) => {
+  video.removeAttribute("src");
+  if (canControlNativeMedia()) video.load();
+};
 
 export interface GumletVideoPlayerHandle {
   playWithAudio: () => void;
@@ -24,9 +36,9 @@ interface GumletVideoPlayerProps {
 }
 
 /**
- * Full-screen responsive Gumlet video player via iframe embed.
- * Only play/pause + volume controls are shown (configured via Gumlet dashboard).
- * Includes a "Passer" skip button overlay.
+ * Full-screen Gumlet player. Gumlet assets use their native HLS stream so audio
+ * remains under first-party media-element control; unknown URLs keep an iframe
+ * fallback. Includes a "Passer" skip button overlay.
  */
 const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerProps>(({
   videoUrl,
@@ -44,8 +56,11 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   const onCompleteRef = useRef(onComplete);
   const onReadyRef = useRef(onReady);
   const hasCompletedRef = useRef(false);
+  const activeRef = useRef(active);
+  const [audioBlocked, setAudioBlocked] = useState(false);
   onCompleteRef.current = onComplete;
   onReadyRef.current = onReady;
+  activeRef.current = active;
 
 
   const isGumletEndedMessage = useCallback((data: unknown) => {
@@ -70,49 +85,36 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     const video = videoRef.current;
     if (video) {
       try {
-        if (/jsdom/i.test(window.navigator.userAgent)) {
-          video.muted = false;
-          video.defaultMuted = false;
-          video.volume = 1;
-          return;
-        }
-        // Classic autoplay trick: start muted so play() always succeeds, then
-        // immediately unmute. With user activation (from the « Commencer »
-        // click), unmuting is allowed by all browsers.
+        // Never start muted: a muted autoplay fallback can keep playing silently
+        // (and WebKit pauses media that is unmuted outside a user gesture).
+        // If audible playback is denied, keep the video paused and expose the
+        // explicit recovery control below instead of showing a silent video.
+        video.muted = false;
+        video.defaultMuted = false;
+        video.volume = 1;
+        if (!canControlNativeMedia()) return;
         const playAttempt = video.play();
-        const unmute = () => {
-          video.muted = false;
-          video.defaultMuted = false;
-          video.volume = 1;
-        };
         if (playAttempt && typeof playAttempt.then === "function") {
-          playAttempt.then(unmute).catch(() => {
-            // play() rejected: start muted then retry, then unmute.
-            video.muted = true;
-            const retry = video.play();
-            if (retry && typeof retry.then === "function") {
-              retry.then(unmute).catch(() => { /* still blocked */ });
-            }
+          playAttempt.then(() => setAudioBlocked(false)).catch(() => {
+            pauseNativeVideo(video);
+            setAudioBlocked(true);
           });
-        } else {
-          unmute();
         }
       } catch {
-        // silent: test environments and some browsers may throw synchronously.
+        setAudioBlocked(true);
       }
+      return;
     }
 
     const player = playerRef.current;
     if (!player) return;
     try {
-      // Do not await here: all three commands must be dispatched in the same
-      // user-gesture call stack when triggered by « Commencer ».
-      void player.play().catch(() => { /* Browser may still require a gesture. */ });
-      void player.setVolume(100).catch(() => { /* silent */ });
-      void player.unmute().catch(() => { /* silent */ });
-      void player.play().catch(() => { /* Browser may still require a gesture. */ });
+      void Promise.all([player.setVolume(100), player.unmute()])
+        .then(() => player.play())
+        .then(() => setAudioBlocked(false))
+        .catch(() => setAudioBlocked(true));
     } catch {
-      // silent: autoplay policies vary by browser/device.
+      setAudioBlocked(true);
     }
   }, []);
 
@@ -120,6 +122,13 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     const match = url.match(/(?:watch|embed)\/([a-f0-9]+)/i);
     return match?.[1] ?? null;
   }, []);
+
+  const getNativePlaybackUrl = useCallback((url: string) => {
+    if (/\.m3u8(?:$|\?)/i.test(url)) return url;
+    const assetId = getGumletAssetId(url);
+    if (!assetId) return null;
+    return `https://video.gumlet.io/${GUMLET_COLLECTION_ID}/${assetId}/main.m3u8`;
+  }, [getGumletAssetId]);
 
   const getEmbedUrl = useCallback((url: string) => {
     const withAudioDefaults = (rawUrl: string) => {
@@ -147,8 +156,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   }, [autoPlay]);
 
   const embedUrl = getEmbedUrl(videoUrl);
-  const gumletAssetId = getGumletAssetId(videoUrl);
-  const hlsUrl = videoUrl.endsWith(".m3u8") ? videoUrl : null;
+  const hlsUrl = getNativePlaybackUrl(videoUrl);
 
   useImperativeHandle(ref, () => ({
     playWithAudio: () => {
@@ -158,7 +166,8 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
   useEffect(() => {
     hasCompletedRef.current = false;
-  }, [embedUrl]);
+    setAudioBlocked(false);
+  }, [videoUrl]);
 
   // Force audio ON: unmute on ready, on play, periodically during the first
   // seconds, and on any user gesture (fallback if browser re-mutes autoplay).
@@ -200,6 +209,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
           } catch { /* ignore */ }
         });
         player.on("play", forceAudioOnIfActive);
+        player.on("volumeChange", forceAudioOnIfActive);
         player.on("ended", completeOnce);
         player.on("timeupdate", (data: unknown) => {
           if (retryCount < 6) {
@@ -246,7 +256,18 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   }, [active, completeOnce, embedUrl, forceAudioOn]);
 
   useEffect(() => {
-    if (active) forceAudioOn();
+    if (active) {
+      forceAudioOn();
+      return;
+    }
+
+    setAudioBlocked(false);
+    pauseNativeVideo(videoRef.current);
+    try {
+      void playerRef.current?.pause().catch(() => { /* player may not be ready */ });
+    } catch {
+      // Player teardown can race a phase change.
+    }
   }, [active, forceAudioOn]);
 
   useEffect(() => {
@@ -260,39 +281,42 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = hlsUrl;
+      if (canControlNativeMedia()) video.load();
       onReadyRef.current?.();
-      return;
+      if (activeRef.current) forceAudioOn();
+      return () => {
+        pauseNativeVideo(video);
+        resetNativeVideo(video);
+      };
     }
 
     if (!Hls.isSupported()) return;
 
-    const hls = new Hls({ autoStartLoad: true });
+    const hls = new Hls({
+      autoStartLoad: true,
+      enableWorker: true,
+      startLevel: -1,
+    });
     hls.loadSource(hlsUrl);
     hls.attachMedia(video);
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
       onReadyRef.current?.();
+      if (activeRef.current) forceAudioOn();
     });
 
-    return () => hls.destroy();
-  }, [hlsUrl]);
+    return () => {
+      pauseNativeVideo(video);
+      hls.destroy();
+      resetNativeVideo(video);
+    };
+  }, [forceAudioOn, hlsUrl]);
 
   // Listen for Gumlet player events via postMessage
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
       if (isGumletEndedMessage(event.data)) {
         completeOnce();
-        return;
-      }
-
-      if (typeof event.data === "string") {
-        try {
-          const parsed = JSON.parse(event.data);
-          if (isGumletEndedMessage(parsed)) {
-            completeOnce();
-          }
-        } catch {
-          // not JSON, ignore
-        }
       }
     };
 
@@ -321,6 +345,16 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
           onLoadedData={() => { if (active) forceAudioOn(); }}
           onLoadedMetadata={() => { if (active) forceAudioOn(); }}
           onPlay={forceAudioOn}
+          onPlaying={() => {
+            const video = videoRef.current;
+            if (!video) return;
+            if (video.muted || video.volume < 1) forceAudioOn();
+          }}
+          onVolumeChange={() => {
+            const video = videoRef.current;
+            if (!video || !active) return;
+            if (video.muted || video.volume < 1) forceAudioOn();
+          }}
           onEnded={completeOnce}
         />
       ) : (
@@ -340,6 +374,16 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
       {/* Overlay content (HUD, etc.) */}
       {active ? children : null}
+
+      {active && audioBlocked ? (
+        <button
+          type="button"
+          onClick={forceAudioOn}
+          className="absolute inset-0 z-40 flex items-center justify-center bg-black/55 text-base font-medium text-white backdrop-blur-sm"
+        >
+          Activer le son et lancer la vidéo
+        </button>
+      ) : null}
 
       {/* Skip button */}
       {showSkip ? (

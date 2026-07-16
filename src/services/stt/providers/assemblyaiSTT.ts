@@ -2,6 +2,7 @@ import { debugLogger } from "@/services/debugLogger";
 import { recordAudioLatency } from "@/services/latencyTelemetry";
 import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types";
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
+import { waitForCondition } from "../finalization";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const TOKEN_ENDPOINT = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/proxy-stt-assemblyai`;
@@ -22,7 +23,12 @@ export class AssemblyAISTT implements STTSession {
   private processor: ScriptProcessorNode | null = null;
   private _active = false;
   private _paused = false;
+  private capturePaused = false;
   private fullTranscript = "";
+  private manualMode = false;
+  private lastTurnEndedAt = 0;
+  private flushPromise: Promise<void> | null = null;
+  private initialStream?: MediaStream | Promise<MediaStream>;
   private startedAt = 0;
   private firstPartialAt = 0;
   private lastFinalTelemetry: import("../types").STTFinalTelemetryBase | null = null;
@@ -31,6 +37,7 @@ export class AssemblyAISTT implements STTSession {
     this.onTranscript = onTranscript;
     this.onError = opts?.onError;
     this.getTelemetryContext = opts?.getTelemetryContext;
+    this.initialStream = opts?.initialStream;
   }
 
   get isActive() {
@@ -42,17 +49,21 @@ export class AssemblyAISTT implements STTSession {
   getLastFinalTelemetry() {
     return this.lastFinalTelemetry;
   }
-  setManualMode(_manual: boolean) {
-    /* AssemblyAI handles turn detection itself */
-  }
+  setManualMode(manual: boolean) { this.manualMode = manual; }
 
   async start() {
     const tokenRes = await authenticatedFunctionFetch(TOKEN_ENDPOINT);
     if (!tokenRes.ok) throw new Error(`AssemblyAI token error: ${tokenRes.status}`);
     const { token, sample_rate = 16000 } = await tokenRes.json();
 
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: sample_rate, channelCount: 1 } });
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    this.stream = await Promise.resolve(
+      this.initialStream ?? navigator.mediaDevices.getUserMedia({ audio: { sampleRate: sample_rate, channelCount: 1 } }),
+    );
+    this.initialStream = undefined;
+    const AudioCtx = window.AudioContext || (window as Window & {
+      webkitAudioContext?: typeof AudioContext;
+    }).webkitAudioContext;
+    if (!AudioCtx) throw new Error("Web Audio API unavailable");
     this.audioCtx = new AudioCtx({ sampleRate: sample_rate });
     this.source = this.audioCtx.createMediaStreamSource(this.stream);
     this.processor = this.audioCtx.createScriptProcessor(4096, 1, 1);
@@ -80,7 +91,7 @@ export class AssemblyAISTT implements STTSession {
     this.ws.onclose = () => debugLogger.log({ service: "stt", level: "info", direction: "in", label: "AssemblyAI WS closed" });
 
     this.processor.onaudioprocess = (e) => {
-      if (this._paused || this.ws?.readyState !== WebSocket.OPEN) return;
+      if (this._paused || this.capturePaused || this.ws?.readyState !== WebSocket.OPEN) return;
       const input = e.inputBuffer.getChannelData(0);
       const pcm = floatTo16BitPCM(input);
       this.ws.send(pcm);
@@ -90,12 +101,27 @@ export class AssemblyAISTT implements STTSession {
     this.processor.connect(this.audioCtx.destination);
     this._active = true;
     this._paused = false;
+    this.capturePaused = false;
   }
 
-  pause() { this._paused = true; }
-  resume() { this._paused = false; this.fullTranscript = ""; }
+  pause() { this._paused = true; this.capturePaused = true; }
+  resume() { this._paused = false; this.capturePaused = false; this.fullTranscript = ""; }
 
-  flush() {
+  flush(): Promise<void> {
+    if (this.flushPromise) return this.flushPromise;
+    this.flushPromise = this.finalizeCurrentTurn().finally(() => {
+      this.flushPromise = null;
+    });
+    return this.flushPromise;
+  }
+
+  private async finalizeCurrentTurn(): Promise<void> {
+    this.capturePaused = true;
+    const requestedAt = performance.now();
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      try { this.ws.send(JSON.stringify({ type: "ForceEndpoint" })); } catch { /* use latest running text */ }
+    }
+    await waitForCondition(() => this.lastTurnEndedAt >= requestedAt, 1300);
     const finalText = this.fullTranscript.trim();
     this.fullTranscript = "";
     if (finalText) this.emitFinal(finalText, "ptt_flush");
@@ -125,9 +151,17 @@ export class AssemblyAISTT implements STTSession {
         const transcript = (data.transcript || "").trim();
         if (!transcript) return;
         if (!this.firstPartialAt) this.firstPartialAt = performance.now();
+        // v3 `transcript` is the complete running text for the current turn.
+        // Keep every revision so flush always has a fallback before EOT arrives.
+        this.fullTranscript = transcript;
         if (data.end_of_turn) {
-          this.fullTranscript = transcript;
-          this.emitFinal(transcript, "silence");
+          this.lastTurnEndedAt = performance.now();
+          if (!this.manualMode) {
+            this.fullTranscript = "";
+            this.emitFinal(transcript, "silence");
+          } else {
+            this.onTranscript(transcript, false);
+          }
         } else {
           this.onTranscript(transcript, false);
         }
