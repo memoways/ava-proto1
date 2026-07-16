@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, RotateCcw, Save } from "lucide-react";
+import { AlertCircle, BookOpen, CheckCircle2, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DEFAULT_STT_SETTINGS,
   STT_PROVIDER_LIST,
@@ -18,6 +19,15 @@ import {
   type STTSettings,
 } from "@/services/stt";
 import type { STTProviderRuntimeStatus } from "@/services/stt/types";
+import {
+  DEFAULT_STT_DICTIONARY_TERMS,
+  STT_DICTIONARY_MAX_TERMS,
+  loadDictionaryFromDB,
+  saveDictionaryToDB,
+  termsToText,
+  textToTerms,
+} from "@/services/stt/dictionary";
+
 
 const STATUS_LABELS: Record<STTProviderStatus, string> = {
   ready: "Configuré",
