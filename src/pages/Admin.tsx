@@ -77,9 +77,9 @@ const TAB_GROUPS = [
     id: "tech",
     label: "🔧 Technique",
     tabs: [
+      { id: "stt", label: "STT Config" },
       { id: "llm", label: "LLM Config" },
       { id: "voice", label: "TTS Config" },
-      { id: "stt", label: "STT Config" },
       { id: "usage", label: "Consommation LLM" },
       { id: "voice-usage", label: "Consommation Voix" },
     ],

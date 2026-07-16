@@ -19,13 +19,17 @@ export const STT_DICTIONARY_MAX_TERMS = 100;
 
 /** Baseline: proper nouns from the AVA storyworld — used when the DB is empty. */
 export const DEFAULT_STT_DICTIONARY_TERMS: string[] = [
+  "Protogyne",
   "Max",
-  "Ava",
   "Emma",
   "Léo",
-  "Protogyny",
-  "MemoWays",
-  "Ulrich Fischer",
+  "Ava",
+  "Mona",
+  "Peter",
+  "Anne",
+  "Agotha",
+  "Philippe",
+  "Karine",
 ];
 
 export interface STTDictionary {
