@@ -528,19 +528,40 @@ export default function TTSConfigTab() {
 }
 
 function SliderRow({
-  label, value, min, max, step, onChange, format,
+  label, value, min, max, step, onChange, format, tooltip, minLabel, maxLabel,
 }: {
   label: string; value: number; min: number; max: number; step: number;
   onChange: (v: number) => void; format?: (v: number) => string;
+  tooltip?: string; minLabel?: string; maxLabel?: string;
 }) {
   const fmt = format ?? ((v) => v.toFixed(2));
   return (
     <div>
-      <div className="flex justify-between mb-1">
-        <label className="text-sm font-medium text-muted-foreground">{label}</label>
+      <div className="flex justify-between items-center mb-1">
+        <div className="flex items-center gap-1.5">
+          <label className="text-sm font-medium text-muted-foreground">{label}</label>
+          {tooltip && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" className="text-muted-foreground/60 hover:text-primary transition-colors">
+                  <HelpCircle className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <p className="text-xs leading-relaxed">{tooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
         <span className="text-sm font-mono">{fmt(value)}</span>
       </div>
       <Slider value={[value]} onValueChange={([v]) => onChange(v)} min={min} max={max} step={step} />
+      {(minLabel || maxLabel) && (
+        <div className="flex justify-between mt-1 text-[10px] text-muted-foreground/60">
+          <span>{minLabel ?? fmt(min)}</span>
+          <span>{maxLabel ?? fmt(max)}</span>
+        </div>
+      )}
     </div>
   );
 }
