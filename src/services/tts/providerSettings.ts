@@ -103,21 +103,50 @@ export function resetHumeSettings(): HumeSettings {
 
 export interface GradiumSettings {
   voiceId: string;
-  outputFormat: "mp3" | "wav" | "opus" | "pcm";
-  speed: number;
-  temperature: number;
-  language: string;
+  outputFormat:
+    | "wav"
+    | "mp3"
+    | "opus"
+    | "ulaw_8000"
+    | "mulaw_8000"
+    | "alaw_8000"
+    | "pcm"
+    | "pcm_8000"
+    | "pcm_16000"
+    | "pcm_22050"
+    | "pcm_24000"
+    | "pcm_44100"
+    | "pcm_48000";
+  /** Sampling temperature (0.0–1.4). 0 = deterministic. */
+  temp: number;
+  /** Voice similarity (1.0–4.0). Higher = closer to target voice. */
+  cfgCoef: number;
+  /** Speech speed padding bonus (-4.0 to 4.0). Negative = faster, positive = slower. */
+  paddingBonus: number;
+  /** Text rewriting rules — usually a language code like "fr", "en". */
+  rewriteRules: string;
+  /** Optional pronunciation dictionary id, applied per request. */
+  pronunciationId: string;
 }
+
+export const GRADIUM_OUTPUT_FORMATS: GradiumSettings["outputFormat"][] = [
+  "wav", "mp3", "opus",
+  "ulaw_8000", "mulaw_8000", "alaw_8000",
+  "pcm", "pcm_8000", "pcm_16000", "pcm_22050", "pcm_24000", "pcm_44100", "pcm_48000",
+];
 
 const GRADIUM_KEY = "ava_tts_settings_gradium";
 
 const gradiumDefaults: GradiumSettings = {
-  voiceId: "YTpq7expH9539ERJ",
+  voiceId: "b5ioHAR7JuHVLskk",
   outputFormat: "mp3",
-  speed: 1,
-  temperature: 0.7,
-  language: "fr",
+  temp: 0.7,
+  cfgCoef: 2.0,
+  paddingBonus: 0.0,
+  rewriteRules: "fr",
+  pronunciationId: "",
 };
+
 
 export function getGradiumSettings(): GradiumSettings {
   try {
