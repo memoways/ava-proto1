@@ -39,11 +39,19 @@ serve(async (req) => {
     }
 
     const startedAt = Date.now();
-    const res = await fetch("https://api.gradium.ai/api/post/speech/asr", {
+    // Optional language hint forwarded via json_config query param (mirror of TTS convention).
+    const reqUrl = new URL(req.url);
+    const language = reqUrl.searchParams.get("language") || "";
+    const upstream = new URL("https://api.gradium.ai/api/post/speech/asr");
+    if (language && language !== "auto") {
+      upstream.searchParams.set("json_config", JSON.stringify({ language }));
+    }
+    const res = await fetch(upstream.toString(), {
       method: "POST",
       headers: { "x-api-key": apiKey, "Content-Type": contentType },
       body: audio,
     });
+
 
     if (!res.ok || !res.body) {
       const errText = await res.text();
