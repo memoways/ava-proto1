@@ -163,9 +163,3 @@ export class OpenAIWhisperSTT implements STTSession {
     return (data.text || "").trim();
   }
 }
-
-    if (!res.ok) throw new Error(`Whisper proxy ${res.status}: ${await res.text()}`);
-    const data = await res.json();
-    return (data.text || "").trim();
-  }
-}
