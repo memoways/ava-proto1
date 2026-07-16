@@ -72,13 +72,19 @@ export class AssemblyAISTT implements STTSession {
     this.source = this.audioCtx.createMediaStreamSource(this.stream);
     this.processor = this.audioCtx.createScriptProcessor(4096, 1, 1);
 
-    // AssemblyAI v3 accepts a `keyterms_prompt` JSON array to bias recognition
-    // toward proper nouns and domain jargon. Skip when the dictionary is empty.
+    // AssemblyAI v3 accepts a `keyterms_prompt` JSON array + turn-detection knobs.
     const keyterms = getDictionaryTerms();
-    const keytermsParam = keyterms.length > 0
-      ? `&keyterms_prompt=${encodeURIComponent(JSON.stringify(keyterms))}`
-      : "";
-    const wsUrl = `wss://streaming.assemblyai.com/v3/ws?sample_rate=${sample_rate}&format_turns=true${keytermsParam}&token=${encodeURIComponent(token)}`;
+    const aa = getSTTProviderSettings("assemblyai");
+    const params = new URLSearchParams({
+      sample_rate: String(sample_rate),
+      format_turns: aa.formatTurns ? "true" : "false",
+      min_end_of_turn_silence_when_confident: String(Math.round(aa.minEndOfTurnSilenceWhenConfident)),
+      end_of_turn_confidence_threshold: String(aa.endOfTurnConfidenceThreshold),
+      token,
+    });
+    if (keyterms.length > 0) params.set("keyterms_prompt", JSON.stringify(keyterms));
+    const wsUrl = `wss://streaming.assemblyai.com/v3/ws?${params.toString()}`;
+
 
     this.ws = new WebSocket(wsUrl);
     this.ws.binaryType = "arraybuffer";
