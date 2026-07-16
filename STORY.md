@@ -66,6 +66,20 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-07-16 — Gradium STT passe en temps réel par WebSocket et parsing JSON Game Master durci 🔷
+
+**Intent.** Résoudre les trois défauts récurrents du provider STT Gradium : absence de transcription temps réel, latence très supérieure aux autres services, et erreurs JSON intermittentes venant en réalité du post-traitement Game Master.
+
+**STT Gradium — streaming natif.** Le provider abandonnait un mode batch REST qui transcodait l'audio en WAV puis attendait tout le résultat. Il utilise maintenant le WebSocket Gradium (`wss://api.gradium.ai/api/speech/asr`) en conservant la clé API côté Edge Function : un endpoint `GET` sur `proxy-stt-gradium` mint un token court, que le navigateur utilise pour ouvrir le WebSocket. Le provider envoie un message `setup` avec le modèle `default`, le format PCM et la langue configurée dans l'admin, puis déverse les chunks audio 16 bits mono depuis un `AudioContext` à 24 kHz. Les messages `text` arrivent partiels et sont immédiatement réémis à `onTranscript` avec `isFinal=false` ; le message final marque `isFinal=true`. Les segments finaux et partiels sont réassemblés avec gestion d'ordre et une concaténation de segments orphelins en fin de flux pour ne rien perdre. Cela ramène la latence perçue au niveau des autres providers et montre la parole utilisateur pendant qu'elle est prononcée.
+
+**Isolation.** Toutes les modifications sont confinées à Gradium. Deepgram, Gamilab, Whisper et AssemblyAI n'ont pas été touchés et continuent de fonctionner avec leurs mécanismes respectifs.
+
+**Parsing JSON Game Master.** L'erreur JSON de la capture d'écran provenait de l'évaluation post-tour et du label pass, pas du STT. Le LLM renvoie parfois un JSON valide entouré d'explications ou de fragments de markdown, ce qui faisait échouer `JSON.parse` brut. Les modules `gameMasterPRD4.ts` et `gameMasterLabelPRD4.ts` intègrent désormais `jsonObjectCandidates` : un parseur qui balaie la réponse en profondeur, repère tous les objets JSON équilibrés et ignore les chaînes de caractères et le markdown autour, avant de retomber sur un résultat par défaut si aucun JSON valide n'est trouvé.
+
+**Fichiers.** `src/services/stt/providers/gradiumSTT.ts`, `supabase/functions/proxy-stt-gradium/index.ts`, `src/agents/gameMasterPRD4.ts`, `src/agents/gameMasterLabelPRD4.ts`.
+
+**Activation restante.** Tester le WebSocket Gradium avec des sessions réelles sur Chrome, Firefox et Safari ; vérifier que Deepgram et Gamilab restent inchangés en parallèle.
+
 ### 2026-07-16 — Dictionnaire STT et réglages par provider dans l'admin 🔷
 
 **Intent.** Améliorer la reconnaissance des mots propres à l'univers AVA (noms de personnages, "Protogyny", "MemoWays") et donner les leviers de réglage API STT directement depuis l'admin, sans toucher au code.
