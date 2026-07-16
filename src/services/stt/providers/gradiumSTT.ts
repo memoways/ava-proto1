@@ -44,9 +44,7 @@ export class GradiumSTT implements STTSession {
   private lastFinalTelemetry: import("../types").STTFinalTelemetryBase | null = null;
   private flushPromise: Promise<void> | null = null;
   private initialStream?: MediaStream | Promise<MediaStream>;
-  private segmentOrder: Array<string | number> = [];
-  private segments = new Map<string | number, string>();
-  private looseSegments: string[] = [];
+  private textParts: string[] = [];
 
   constructor(onTranscript: TranscriptCallback, opts?: STTCreateOptions) {
     this.onTranscript = onTranscript;
