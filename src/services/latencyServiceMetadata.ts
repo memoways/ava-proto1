@@ -1,7 +1,7 @@
 import type { LatencySegmentKey, LatencyServiceInfo } from "@/services/latencySegments";
 import { getGameplaySettings, getLLMSettings, getTTSSettings } from "@/services/settingsService";
 import { getSTTProvider, getSTTProviderDefinition } from "@/services/stt";
-import { getActiveProviderId, getHumeSettings, getInworldSettings } from "@/services/tts/providerSettings";
+import { getActiveProviderId, getGradiumSettings, getHumeSettings, getInworldSettings } from "@/services/tts/providerSettings";
 import { DEEPGRAM_DEFAULT_MODEL } from "../../supabase/functions/_shared/deepgramDefaults";
 
 export function getConfiguredTTSServiceInfo(): LatencyServiceInfo {
