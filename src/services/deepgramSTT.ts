@@ -266,10 +266,24 @@ export class DeepgramSTT {
       throw err;
     }
 
-    // Connect to Deepgram WebSocket (with the project keyterm dictionary).
+    // Connect to Deepgram WebSocket with project keyterm dictionary + admin overrides.
     const keyterms = getDictionaryTerms();
-    const wsUrl = buildDeepgramWebSocketUrl(config, { keyterms });
-    console.info("[Deepgram] Connecting", { model: config.model, language: config.language, keyterms: keyterms.length });
+    const dg = getSTTProviderSettings("deepgram");
+    const wsUrl = buildDeepgramWebSocketUrl(config, {
+      keyterms,
+      model: dg.model,
+      language: dg.language,
+      smartFormat: dg.smartFormat,
+      punctuate: dg.punctuate,
+      interimResults: dg.interimResults,
+      vadEvents: dg.vadEvents,
+      fillerWords: dg.fillerWords,
+      numerals: dg.numerals,
+      endpointing: dg.endpointing,
+      utteranceEndMs: dg.utteranceEndMs,
+    });
+    console.info("[Deepgram] Connecting", { model: dg.model || config.model, language: dg.language || config.language, keyterms: keyterms.length });
+
 
 
     this.ws = new WebSocket(wsUrl, getDeepgramWebSocketProtocols(config.key));
