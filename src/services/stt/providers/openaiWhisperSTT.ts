@@ -4,6 +4,8 @@ import { selectMediaRecorderMimeType } from "@/services/browserCapabilities";
 import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types";
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { requestLatestRecorderData } from "../finalization";
+import { getDictionaryTerms } from "../dictionary";
+
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const ENDPOINT = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/proxy-stt-whisper`;
