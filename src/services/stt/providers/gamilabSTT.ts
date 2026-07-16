@@ -2,7 +2,8 @@ import { debugLogger } from "@/services/debugLogger";
 import { recordAudioLatency } from "@/services/latencyTelemetry";
 import { getSTTRuntimeConfig } from "../runtimeConfig";
 import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types";
-import { pickMostCompleteTranscript, waitForCondition } from "../finalization";
+import { waitForCondition } from "../finalization";
+import { buildGamilabTranscript, isMeaningfulGamilabTranscript } from "./gamilabTranscript";
 
 type GamilabSingleton = {
   connect: (host?: string) => Promise<void>;
@@ -194,7 +195,7 @@ export class GamilabSTT implements STTSession {
       () => this.lastTextAt >= requestedAt && performance.now() - this.lastTextAt >= 180,
       1200,
     );
-    const finalText = pickMostCompleteTranscript(this.fullTranscript, this.latestLiveTranscript);
+    const finalText = this.getCompleteTranscript();
     this.fullTranscript = "";
     this.latestLiveTranscript = "";
     if (finalText) this.emitFinal(finalText, "ptt_flush");
@@ -223,11 +224,11 @@ export class GamilabSTT implements STTSession {
       gami.on("text_current", (payload: unknown) => {
         if (this._paused) return;
         const text = this.extractText(payload);
-        if (!text) return;
+        if (!isMeaningfulGamilabTranscript(text)) return;
         if (!this.firstPartialAt) this.firstPartialAt = performance.now();
         this.lastTextAt = performance.now();
         this.latestLiveTranscript = text;
-        this.onTranscript(text, false);
+        this.onTranscript(this.getCompleteTranscript(), false);
       }),
     );
 
@@ -235,16 +236,22 @@ export class GamilabSTT implements STTSession {
       gami.on("text_history", (payload: unknown) => {
         if (this._paused) return;
         const text = this.extractText(payload);
-        if (!text) return;
+        if (!isMeaningfulGamilabTranscript(text)) return;
         this.lastTextAt = performance.now();
         this.fullTranscript = text;
+        // text_history is the corrected cumulative source. If it already
+        // contains the live fragment, do not append that fragment twice.
+        if (text.toLocaleLowerCase().includes(this.latestLiveTranscript.toLocaleLowerCase())) {
+          this.latestLiveTranscript = "";
+        }
+        this.onTranscript(this.getCompleteTranscript(), false);
       }),
     );
 
     this.listeners.push(
       gami.on("silence", (isSilence: boolean) => {
         if (!isSilence || this._paused) return;
-        const finalText = pickMostCompleteTranscript(this.fullTranscript, this.latestLiveTranscript);
+        const finalText = this.getCompleteTranscript();
         if (finalText) {
           if (this.manualMode) {
             // Keep the corrected history as the flush fallback until the user
@@ -259,6 +266,10 @@ export class GamilabSTT implements STTSession {
         }
       }),
     );
+  }
+
+  private getCompleteTranscript(): string {
+    return buildGamilabTranscript(this.fullTranscript, this.latestLiveTranscript);
   }
 
   private extractText(payload: unknown): string {

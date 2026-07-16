@@ -16,16 +16,19 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Le contrat commun `STTSession.flush()` est désormais asynchrone : le pipeline attend que le provider ait préservé la dernière donnée audio et la dernière révision de texte avant de lancer RAG/LLM/TTS.
 - Deepgram demande le dernier bloc `MediaRecorder`, envoie le contrôle officiel `Finalize`, attend la réponse révisée puis combine la partie finalisée et la queue encore interim. Le précédent `fullTranscript || latestInterimTranscript` pouvait supprimer la fin de phrase.
 - AssemblyAI conserve le transcript courant complet et envoie `ForceEndpoint`; Gamilab conserve à la fois `text_current` et `text_history` et utilise la version la plus complète.
+- Gamilab ignore désormais ses placeholders d'activité composés uniquement de points/ellipses, reconstruit `text_history + text_current` et réémet le transcript complet à chaque amélioration dynamique au lieu de remplacer la parole par `« … … … »`.
 - OpenAI Whisper et Gradium attendent le dernier événement `dataavailable`, figent l'enregistrement puis transcrivent le blob complet.
 - Le mode manuel PTT empêche AssemblyAI et Gamilab d'envoyer prématurément un tour sur une détection de silence. Les écrans conversation, rôle et posture affichent un état de finalisation et bloquent un second clic ou une validation trop précoce.
+- Le texte utilisateur reste visible en entier pendant la capture, la finalisation, la réflexion et la réponse de Max ; l'écran utilise le live cumulatif puis le dernier message utilisateur finalisé sans phase vide.
 - La factory STT instancie maintenant réellement OpenAI Whisper et AssemblyAI lorsqu'ils sont sélectionnés et configurés ; auparavant ces choix retombaient silencieusement sur Deepgram.
 
 ### Vidéos Gumlet — fin fiable et audio systématique
 - Lovable a élargi la détection de fin Gumlet (`ended`, `complete`, `finish`) et ajouté un fallback temporel à moins de 0,4 seconde de la durée lorsque l'embed n'émet pas `ended`, garantissant le retour automatique à la conversation.
 - Les URLs Gumlet `watch/embed` sont converties en manifestes HLS natifs. Le player n'utilise donc plus l'autoplay iframe que Gumlet documente comme systématiquement muet.
-- Le teaser conserve l'iframe Gumlet préchargée qui fonctionnait déjà : le clic « Commencer » lui envoie immédiatement `play`, `unmute` et volume à 100 % dans le geste utilisateur, sans écran ni bouton intermédiaire.
-- Les interludes utilisent un player HLS natif séparé et persistant, avec `muted=false`, volume à 100 % et plusieurs retries automatiques au chargement. Toute remise en sourdine ou baisse de volume est corrigée sans ajouter de gate visuelle.
+- Le teaser conserve l'iframe Gumlet préchargée qui fonctionnait déjà, avec `autoplay=true` et contrôles masqués. Le clic « Commencer » lui envoie immédiatement `play`, `unmute` et volume à 100 % dans le geste utilisateur, sans écran ni bouton Play intermédiaire.
+- Les interludes utilisent un player HLS natif séparé et persistant, toujours en autoplay, sans contrôles navigateur, avec `muted=false`, volume à 100 % et plusieurs retries automatiques au chargement. Toute remise en sourdine ou baisse de volume est corrigée sans ajouter de gate visuelle.
 - Les messages `postMessage` de fin sont limités à l'iframe réellement contrôlée afin qu'un message tiers ne puisse pas terminer une vidéo.
+- Le clic « Passer » coupe explicitement la vidéo et le son, remet la lecture à zéro, puis seulement déclenche la suite du parcours ; aucun audio ne reste actif en arrière-plan.
 
 ### Dépendances
 - `bun.lock` resynchronisé avec les dépendances déclarées : hCaptcha présent, PostHog résolu sur la branche récente compatible et ancienne chaîne OpenTelemetry/protobuf inutilisée retirée du lockfile.

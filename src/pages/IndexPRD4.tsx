@@ -1197,7 +1197,7 @@ const IndexPRD4 = () => {
         onSkip={handleTeaserSkip}
         onReady={teaserActive || state.phase === "welcome" ? () => setTeaserPlayerReady(true) : undefined}
         active={teaserActive}
-        autoPlay={false}
+        autoPlay
         playbackMode="embed"
         showSkip={teaserActive}
       />

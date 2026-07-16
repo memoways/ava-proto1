@@ -62,12 +62,30 @@ describe("GumletVideoPlayer", () => {
         onComplete={() => {}}
         onSkip={() => {}}
         playbackMode="embed"
-        autoPlay={false}
+        autoPlay
       />,
     );
 
     expect(screen.getByTitle("Video player").tagName).toBe("IFRAME");
+    expect(screen.getByTitle("Video player").getAttribute("src")).toContain("autoplay=true");
+    expect(screen.getByTitle("Video player").getAttribute("src")).toContain("disable_player_controls=true");
     expect(screen.queryByRole("button", { name: /activer le son/i })).not.toBeInTheDocument();
+  });
+
+  it("autoplays native cinematics without browser media controls", () => {
+    render(
+      <GumletVideoPlayer
+        videoUrl="https://gumlet.tv/watch/67a281cac82041cdc3714c0c"
+        onComplete={() => {}}
+        onSkip={() => {}}
+      />,
+    );
+
+    const player = screen.getByTitle("Video player") as HTMLVideoElement;
+    expect(player.autoplay).toBe(true);
+    expect(player.controls).toBe(false);
+    expect(player.muted).toBe(false);
+    expect(player.volume).toBe(1);
   });
 
   it("keeps the same native media element when the Gumlet video changes", () => {
@@ -96,7 +114,7 @@ describe("GumletVideoPlayer", () => {
     );
   });
 
-  it("calls onSkip from the overlay button", () => {
+  it("stops and rewinds playback before calling onSkip", () => {
     const onSkip = vi.fn();
 
     render(
@@ -107,8 +125,12 @@ describe("GumletVideoPlayer", () => {
       />,
     );
 
+    const player = screen.getByTitle("Video player") as HTMLVideoElement;
+    player.currentTime = 12;
     fireEvent.click(screen.getByRole("button", { name: /passer/i }));
 
+    expect(player.muted).toBe(true);
+    expect(player.currentTime).toBe(0);
     expect(onSkip).toHaveBeenCalledTimes(1);
   });
 });

@@ -60,6 +60,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   const onReadyRef = useRef(onReady);
   const hasCompletedRef = useRef(false);
   const activeRef = useRef(active);
+  const stoppingRef = useRef(false);
   onCompleteRef.current = onComplete;
   onReadyRef.current = onReady;
   activeRef.current = active;
@@ -83,7 +84,34 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     onCompleteRef.current();
   }, []);
 
+  const stopPlayback = useCallback(() => {
+    // Takes precedence over autoplay/volumeChange retries until next activation.
+    stoppingRef.current = true;
+    const video = videoRef.current;
+    if (video) {
+      // Hard-cut sound synchronously even if pause is delayed by the browser.
+      // The next activation explicitly unmutes before playback.
+      video.muted = true;
+      pauseNativeVideo(video);
+      try { video.currentTime = 0; } catch { /* media may not have metadata yet */ }
+    }
+
+    const player = playerRef.current;
+    if (player) {
+      // Dispatch both commands before the parent removes/hides the player.
+      void player.mute().catch(() => { /* pause remains the primary stop */ });
+      void player.pause().catch(() => { /* player may already be stopped */ });
+      void player.setCurrentTime(0).catch(() => { /* duration may not be ready */ });
+    }
+  }, []);
+
+  const handleSkip = useCallback(() => {
+    stopPlayback();
+    onSkip();
+  }, [onSkip, stopPlayback]);
+
   const forceAudioOn = useCallback(() => {
+    if (stoppingRef.current) return;
     const video = videoRef.current;
     if (video) {
       try {
@@ -135,10 +163,11 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
         parsed.searchParams.set("muted", "false");
         parsed.searchParams.set("volume", "100");
         parsed.searchParams.set("playsinline", "true");
+        parsed.searchParams.set("disable_player_controls", "true");
         return parsed.toString();
       } catch {
         const separator = rawUrl.includes("?") ? "&" : "?";
-        return `${rawUrl}${separator}preload=true&autoplay=${autoPlay ? "true" : "false"}&muted=false&volume=100&playsinline=true`;
+        return `${rawUrl}${separator}preload=true&autoplay=${autoPlay ? "true" : "false"}&muted=false&volume=100&playsinline=true&disable_player_controls=true`;
       }
     };
 
@@ -162,6 +191,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
   useEffect(() => {
     hasCompletedRef.current = false;
+    stoppingRef.current = false;
   }, [videoUrl]);
 
   // Force audio ON: unmute on ready, on play, periodically during the first
@@ -197,6 +227,10 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
         playerRef.current = player;
         player.on("ready", () => {
           handleReady();
+          if (!active) {
+            void player?.pause().catch(() => { /* player may still be settling */ });
+            void player?.setCurrentTime(0).catch(() => { /* start from the beginning on first click */ });
+          }
           try {
             player?.getDuration((d: number) => {
               if (typeof d === "number" && Number.isFinite(d) && d > 0) lastKnownDuration = d;
@@ -252,6 +286,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
   useEffect(() => {
     if (active) {
+      stoppingRef.current = false;
       forceAudioOn();
       return;
     }
@@ -349,7 +384,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
           title="Video player"
           data-source={hlsUrl}
           className="absolute inset-0 h-full w-full object-cover"
-          controls={active}
+          controls={false}
           playsInline
           preload="auto"
           autoPlay={active}
@@ -391,7 +426,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       {/* Skip button */}
       {showSkip ? (
         <button
-          onClick={onSkip}
+          onClick={handleSkip}
           className="absolute bottom-8 right-8 z-30 text-xs text-muted-foreground/80 hover:text-foreground transition-colors font-mono px-3 py-1.5 rounded-md bg-black/40 backdrop-blur-sm border border-border/20 hover:bg-black/60"
         >
           Passer →
