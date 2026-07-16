@@ -486,6 +486,7 @@ export default function TTSConfigTab() {
               <option value="wav">WAV</option>
               <option value="pcm">PCM</option>
             </select>
+            <span className="block text-xs text-muted-foreground/60">MP3 = compact, WAV = non compressé, PCM = brut.</span>
           </label>
 
           <label className="space-y-1 text-sm">
@@ -493,6 +494,7 @@ export default function TTSConfigTab() {
             <input value={huSettings.languageCode}
               onChange={(e) => updateHu({ languageCode: e.target.value.trim().toLowerCase() || "fr" })}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="fr" />
+            <span className="block text-xs text-muted-foreground/60">Code ISO 639-1 (fr, en, es…) pour guider la prononciation.</span>
           </label>
         </div>
       </section>
