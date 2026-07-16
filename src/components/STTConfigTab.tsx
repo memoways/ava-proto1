@@ -68,6 +68,29 @@ export default function STTConfigTab() {
 
 
   const hasChanges = useMemo(() => JSON.stringify(settings) !== JSON.stringify(saved), [settings, saved]);
+  const dictTerms = useMemo(() => textToTerms(dictText), [dictText]);
+  const dictHasChanges = dictText !== dictSaved;
+  const dictOverLimit = dictTerms.length >= STT_DICTIONARY_MAX_TERMS;
+
+  async function saveDictionary() {
+    setDictSaving(true);
+    try {
+      const saved = await saveDictionaryToDB({ terms: dictTerms });
+      const text = termsToText(saved.terms);
+      setDictText(text);
+      setDictSaved(text);
+      toast.success(`Dictionnaire sauvegardé (${saved.terms.length} termes)`);
+    } finally {
+      setDictSaving(false);
+    }
+  }
+
+  function resetDictionary() {
+    const text = termsToText(DEFAULT_STT_DICTIONARY_TERMS);
+    setDictText(text);
+    toast.info("Dictionnaire réinitialisé — sauvegarde nécessaire");
+  }
+
 
   function refreshStatuses() {
     resetSTTRuntimeConfigCache();
