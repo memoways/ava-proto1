@@ -137,7 +137,48 @@ export class GradiumSTT implements STTSession {
     });
 
     if (!res.ok) throw new Error(`Gradium proxy ${res.status}: ${await res.text()}`);
-    const data = await res.json();
-    return (data.text || "").trim();
+    if (!res.body) return "";
+
+    // The proxy streams Gradium's NDJSON body verbatim. We parse it
+    // incrementally so partial `text` segments show up as the transcript is
+    // still being produced. If the proxy ever falls back to aggregated JSON
+    // (single object with `{ text: "..." }`), we still handle that below.
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const parts: string[] = [];
+    const emitPartial = () => {
+      const partial = parts.join(" ").replace(/\s+/g, " ").trim();
+      if (partial) this.onTranscript(partial, false);
+    };
+    const handleLine = (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      try {
+        const msg = JSON.parse(trimmed);
+        if (msg?.type === "text" && typeof msg.text === "string") {
+          parts.push(msg.text);
+          emitPartial();
+        } else if (typeof msg?.text === "string" && msg.type === undefined) {
+          // Aggregated JSON fallback: single `{ text, provider, ... }` object.
+          parts.push(msg.text);
+        }
+      } catch { /* keepalive or non-JSON line — skip */ }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = buffer.indexOf("\n")) >= 0) {
+        handleLine(buffer.slice(0, nl));
+        buffer = buffer.slice(nl + 1);
+      }
+    }
+    if (buffer.trim()) handleLine(buffer);
+
+    return parts.join(" ").replace(/\s+/g, " ").trim();
   }
 }
+
