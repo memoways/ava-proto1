@@ -5,6 +5,8 @@ import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types"
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { requestLatestRecorderData } from "../finalization";
 import { getDictionaryTerms } from "../dictionary";
+import { getSTTProviderSettings } from "../providerSettings";
+
 
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
