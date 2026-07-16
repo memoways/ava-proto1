@@ -50,9 +50,13 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
   const isGumletEndedMessage = useCallback((data: unknown) => {
     if (!data || typeof data !== "object") return false;
-
-    const message = data as { type?: string; event?: string };
-    return message.type === "gumlet" && message.event === "ended";
+    const message = data as { type?: string; event?: string; name?: string; method?: string };
+    const eventName = (message.event || message.name || message.method || "").toLowerCase();
+    if (message.type === "gumlet" && (eventName === "ended" || eventName === "complete" || eventName === "finish")) {
+      return true;
+    }
+    // player.js relay: { event: "ended" } sans type
+    return eventName === "ended" || eventName === "complete";
   }, []);
 
   // Extract asset ID from various Gumlet URL formats
@@ -173,18 +177,42 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       forceAudioOnIfActive();
     };
 
+    let lastKnownDuration = 0;
+    const checkEndFromTime = (current: unknown) => {
+      const t = typeof current === "number" ? current : Number(current);
+      if (!Number.isFinite(t) || lastKnownDuration <= 0) return;
+      // Fallback : certains navigateurs/embeds ne dispatchent pas "ended".
+      // On considère la vidéo terminée dès qu'on est à <0.4s de la fin.
+      if (t >= lastKnownDuration - 0.4) completeOnce();
+    };
+
     const timer = setTimeout(() => {
       if (cancelled) return;
       try {
         player = new Player(iframe);
         playerRef.current = player;
-        player.on("ready", handleReady);
+        player.on("ready", () => {
+          handleReady();
+          try {
+            player?.getDuration((d: number) => {
+              if (typeof d === "number" && Number.isFinite(d) && d > 0) lastKnownDuration = d;
+            });
+          } catch { /* ignore */ }
+        });
         player.on("play", forceAudioOnIfActive);
         player.on("ended", completeOnce);
-        player.on("timeupdate", () => {
+        player.on("timeupdate", (data: unknown) => {
           if (retryCount < 6) {
             retryCount += 1;
             forceAudioOnIfActive();
+          }
+          // Player.js émet { seconds, duration } dans timeupdate
+          if (data && typeof data === "object") {
+            const payload = data as { seconds?: number; duration?: number };
+            if (typeof payload.duration === "number" && payload.duration > 0) {
+              lastKnownDuration = payload.duration;
+            }
+            checkEndFromTime(payload.seconds);
           }
         });
         forceAudioOnIfActive();
