@@ -16,9 +16,10 @@ interface ReqBody {
   jsonConfig?: Record<string, unknown>;
 }
 
+// Note: Gradium API does NOT support "mp3" — supported formats per
+// https://docs.gradium.ai/api-reference/endpoint/tts-post
 const CONTENT_TYPES: Record<string, string> = {
   wav: "audio/wav",
-  mp3: "audio/mpeg",
   opus: "audio/ogg",
   pcm: "audio/pcm",
   ulaw_8000: "audio/basic",
@@ -31,6 +32,7 @@ const CONTENT_TYPES: Record<string, string> = {
   pcm_44100: "audio/pcm",
   pcm_48000: "audio/pcm",
 };
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
