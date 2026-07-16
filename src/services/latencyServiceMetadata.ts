@@ -25,6 +25,15 @@ export function getConfiguredTTSServiceInfo(): LatencyServiceInfo {
         mode: settings.format,
       };
     }
+    if (provider === "gradium") {
+      const settings = getGradiumSettings();
+      return {
+        serviceProvider: "Gradium",
+        serviceName: "gradium",
+        model: settings.voiceId || "gradium-tts",
+        mode: "streaming",
+      };
+    }
     return {
       serviceProvider: "ElevenLabs",
       serviceName: "elevenlabs",
