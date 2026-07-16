@@ -188,6 +188,7 @@ export default function TTSConfigTab() {
 
 
   return (
+    <TooltipProvider delayDuration={150}>
     <div className="max-w-4xl space-y-8">
       <div>
         <h2 className="text-lg font-semibold">TTS Config — Multi-providers</h2>
