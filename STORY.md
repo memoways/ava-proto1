@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-16 (contrats anti-régression STT/LLM/vidéo, Deepgram nova-3, autoplay sonore, dictionnaire STT et réglages par provider)
+> **Last Updated**: 2026-07-16 (dictionnaire STT ajusté, tooltips TTS, conversion Gradium STT WAV)
 
 ---
 
@@ -70,15 +70,29 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 **Intent.** Améliorer la reconnaissance des mots propres à l'univers AVA (noms de personnages, "Protogyny", "MemoWays") et donner les leviers de réglage API STT directement depuis l'admin, sans toucher au code.
 
-**Dictionnaire custom.** Un dictionnaire global partagé (`ava_stt_dictionary`) est désormais éditable dans Admin > STT Config. Il est injecté automatiquement dans les providers compatibles : Deepgram via le paramètre `keyterm` (nova-3), AssemblyAI via `keyterms_prompt`, OpenAI Whisper via le champ `prompt`. Gradium et Gamilab ne supportent pas encore ce mécanisme ; l'interface affiche explicitement ✓ ou ✗ par provider avec la méthode utilisée.
+**Dictionnaire custom.** Un dictionnaire global partagé (`ava_stt_dictionary`) est désormais éditable dans Admin > STT Config. Les valeurs par défaut sont : Protogyne, Max, Emma, Léo, Ava, Mona, Peter, Anne, Agotha, Philippe, Karine. Il est injecté automatiquement dans les providers compatibles : Deepgram via le paramètre `keyterm` (nova-3), AssemblyAI via `keyterms_prompt`, OpenAI Whisper via le champ `prompt`. Gradium et Gamilab ne supportent pas encore ce mécanisme ; l'interface affiche explicitement ✓ ou ✗ par provider avec la méthode utilisée.
 
 **Réglages par provider.** Chaque carte STT expose un panneau "Réglages API" : Deepgram (modèle, langue, smart format, ponctuation, résultats intermédiaires, VAD, endpointing, utterance end, filler words, numéraux), AssemblyAI (format turns, silence de fin de tour et seuil de confiance), OpenAI Whisper (modèle, langue, température), Gradium (langue). Gamilab reste grisé et non configurable. Les valeurs sont persistées dans `admin_settings.ava_stt_provider_settings` et lues par le runtime STT pour construire les connexions WebSocket et les requêtes batch.
 
+**Navigation.** L'ordre des onglets dans Admin > Technique est désormais : STT Config, LLM Config, TTS Config.
+
 **TTS Gradium.** Correction du format audio : Gradium renvoie un corps vide pour `mp3`, le format par défaut passe à `wav` et le proxy remplace silencieusement `mp3` par `wav`. L'ID de voix Max (`b5ioHAR7JuHVLskk`) est intégré au provider Gradium.
 
-**Fichiers.** `src/components/STTConfigTab.tsx`, `src/components/stt/ProviderSettingsPanel.tsx`, `src/services/stt/dictionary.ts`, `src/services/stt/providerSettings.ts`, `src/services/stt/registry.ts`, `src/services/stt/types.ts`, `src/services/deepgramSTT.ts`, `src/services/stt/providers/assemblyaiSTT.ts`, `src/services/stt/providers/openaiWhisperSTT.ts`, `src/services/stt/providers/gradiumSTT.ts`, `supabase/functions/proxy-stt-whisper/index.ts`, `supabase/functions/proxy-stt-gradium/index.ts`, `src/services/tts/providerSettings.ts`, `src/services/tts/providers/gradium.ts`, `supabase/functions/proxy-tts-gradium/index.ts`.
+**Fichiers.** `src/components/STTConfigTab.tsx`, `src/components/stt/ProviderSettingsPanel.tsx`, `src/services/stt/dictionary.ts`, `src/services/stt/providerSettings.ts`, `src/services/stt/registry.ts`, `src/services/stt/types.ts`, `src/services/deepgramSTT.ts`, `src/services/stt/providers/assemblyaiSTT.ts`, `src/services/stt/providers/openaiWhisperSTT.ts`, `src/services/stt/providers/gradiumSTT.ts`, `supabase/functions/proxy-stt-whisper/index.ts`, `supabase/functions/proxy-stt-gradium/index.ts`, `src/services/tts/providerSettings.ts`, `src/services/tts/providers/gradium.ts`, `supabase/functions/proxy-tts-gradium/index.ts`, `src/pages/Admin.tsx`.
 
 **Activation restante.** Tester les providers alternatifs avec le dictionnaire et les nouveaux réglages en conditions réelles ; le provider actif reste Deepgram par défaut.
+
+### 2026-07-16 — Tooltips TTS et conversion Gradium STT en WAV 🔷
+
+**Intent.** Rendre les réglages TTS compréhensibles sans connaître l'API sous-jacente, et corriger l'erreur de format audio qui bloquait le provider STT Gradium.
+
+**TTS Config.** Chaque slider ou sélecteur reçoit une infobulle expliquant l'effet produit et les deux extrêmes. ElevenLabs explicite la stabilité (expressif ↔ stable), la similarité (neutre ↔ proche du clone), le style (naturel ↔ théâtral), la vitesse, la latence et le speaker boost. Inworld documente le speaking rate, la temperature et les trois modes de delivery (stable/balanced/creative). Hume précise le format audio et les codes langue. Gradium indique la temperature (déterministe ↔ très créatif), la voice similarity (générique ↔ très fidèle) et le padding bonus (rapide ↔ lent), avec une note indiquant que `mp3` n'est pas supporté.
+
+**STT Gradium.** Le provider Gradium exige `audio/wav`, `audio/pcm` ou `audio/ogg`, mais l'enregistrement navigateur produit du `webm/opus`. Le provider convertit maintenant le blob enregistré en WAV 16 kHz mono 16 bits via `AudioContext` avant de l'envoyer au proxy, ce qui le rend utilisable en pratique.
+
+**Fichiers.** `src/components/TTSConfigTab.tsx`, `src/services/stt/audioToWav.ts`, `src/services/stt/providers/gradiumSTT.ts`.
+
+**Activation restante.** Valider la conversion WAV avec des enregistrements réels sur Chrome et Firefox ; le provider actif reste Deepgram par défaut.
 
 ### 2026-07-16 — Ne plus perdre la fin d'une parole, ne plus montrer une vidéo muette 🔷
 

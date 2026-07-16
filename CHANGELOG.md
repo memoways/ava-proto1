@@ -4,6 +4,25 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.43.2] - 2026-07-16 — Valeurs par défaut du dictionnaire, ordre des tabs, tooltips TTS et conversion Gradium STT
+
+### Dictionnaire STT
+- Les valeurs par défaut du dictionnaire global sont désormais : Protogyne, Max, Emma, Léo, Ava, Mona, Peter, Anne, Agotha, Philippe, Karine.
+- L'ordre des onglets dans Admin > Technique est ajusté : STT Config, LLM Config, TTS Config.
+
+### TTS Config — tooltips et extrêmes explicites
+- Ajout d'infobulles sur chaque réglage TTS pour expliquer l'effet produit et différencier les deux extrêmes du slider.
+- ElevenLabs : stabilité (expressif ↔ stable), similarité boost (neutre ↔ proche du clone), style (naturel ↔ théâtral), vitesse, latence, speaker boost.
+- Inworld : speaking rate, temperature, delivery mode (stable/balanced/creative).
+- Hume : précisions sur le format audio et les codes langue.
+- Gradium : temperature (déterministe ↔ très créatif), voice similarity (générique ↔ très fidèle), padding bonus (rapide ↔ lent) ; note explicative indiquant que `mp3` n'est pas supporté.
+
+### STT Gradium — conversion WAV 16 kHz mono
+- Gradium STT requiert un format audio `audio/wav`, `audio/pcm` ou `audio/ogg`, mais le navigateur enregistre en `webm/opus`. Le provider convertit désormais le blob enregistré en WAV 16 kHz mono 16 bits via `AudioContext` avant l'envoi au proxy.
+
+### Fichiers
+- `src/services/stt/dictionary.ts`, `src/pages/Admin.tsx`, `src/components/TTSConfigTab.tsx`, `src/services/stt/audioToWav.ts`, `src/services/stt/providers/gradiumSTT.ts`.
+
 ## [0.43.1] - 2026-07-16 — Dictionnaire STT, réglages par provider et correction Gradium TTS
 
 ### TTS Gradium
