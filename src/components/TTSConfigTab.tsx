@@ -549,13 +549,19 @@ export default function TTSConfigTab() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <SliderRow label="Temperature (temp)" value={grSettings.temp} min={0} max={1.4} step={0.05}
-            onChange={(v) => updateGr({ temp: v })} />
+            onChange={(v) => updateGr({ temp: v })}
+            tooltip="Variabilité créative de la génération. 0 = déterministe (même texte → même audio) ; 1.4 = très expressif et variable."
+            minLabel="Déterministe" maxLabel="Très créatif" />
           <SliderRow label="Voice similarity (cfg_coef)" value={grSettings.cfgCoef} min={1} max={4} step={0.05}
-            onChange={(v) => updateGr({ cfgCoef: v })} />
+            onChange={(v) => updateGr({ cfgCoef: v })}
+            tooltip="Rapprochement avec la voix cible. 1 = voix générique, moins ressemblante ; 4 = reproduction très fidèle du timbre cible."
+            minLabel="Générique" maxLabel="Très fidèle" />
         </div>
 
-        <SliderRow label="Vitesse (padding_bonus) — négatif = plus rapide" value={grSettings.paddingBonus} min={-4} max={4} step={0.1}
-          onChange={(v) => updateGr({ paddingBonus: v })} />
+        <SliderRow label="Vitesse (padding_bonus)" value={grSettings.paddingBonus} min={-4} max={4} step={0.1}
+          onChange={(v) => updateGr({ paddingBonus: v })}
+          tooltip="Ajuste la vitesse de lecture en ajoutant ou retirant du silence. Négatif = plus rapide, positif = plus lent."
+          minLabel="-4 rapide" maxLabel="+4 lent" />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="space-y-1 text-sm">
