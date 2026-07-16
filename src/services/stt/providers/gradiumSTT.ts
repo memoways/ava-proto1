@@ -187,13 +187,10 @@ export class GradiumSTT implements STTSession {
         if (!this.firstPartialAt) this.firstPartialAt = this.lastMessageAt;
         const text = msg.text.trim();
         if (!text) return;
-        const streamId = typeof msg.stream_id === "number" || typeof msg.stream_id === "string" ? msg.stream_id : null;
-        if (streamId !== null) {
-          if (!this.segments.has(streamId)) this.segmentOrder.push(streamId);
-          this.segments.set(streamId, text);
-        } else if (this.looseSegments[this.looseSegments.length - 1] !== text) {
-          this.looseSegments.push(text);
-        }
+        // Gradium `text` messages are cumulative segments — each one is a new
+        // piece of the transcript, to be concatenated with spaces. Do NOT
+        // deduplicate: repeated words like "oui oui" are legitimate.
+        this.textParts.push(text);
         this.onTranscript(this.getCompleteTranscript(), false);
       } else if (msg?.type === "flushed") {
         this.flushAckAt = performance.now();
@@ -207,14 +204,11 @@ export class GradiumSTT implements STTSession {
   }
 
   private getCompleteTranscript(): string {
-    const ordered = this.segmentOrder.map((key) => this.segments.get(key)).filter(Boolean) as string[];
-    return [...ordered, ...this.looseSegments].join(" ").replace(/\s+/g, " ").trim();
+    return this.textParts.join(" ").replace(/\s+/g, " ").trim();
   }
 
   private resetTranscriptBuffers() {
-    this.segmentOrder = [];
-    this.segments.clear();
-    this.looseSegments = [];
+    this.textParts = [];
     this.firstPartialAt = 0;
     this.lastMessageAt = 0;
     this.flushAckAt = 0;
