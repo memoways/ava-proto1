@@ -150,17 +150,24 @@ const gradiumDefaults: GradiumSettings = {
 
 
 
+function migrateGradium(s: GradiumSettings): GradiumSettings {
+  // "mp3" was previously allowed but is not a valid Gradium output_format.
+  if ((s.outputFormat as string) === "mp3") return { ...s, outputFormat: "wav" };
+  return s;
+}
+
 export function getGradiumSettings(): GradiumSettings {
   try {
     const stored = localStorage.getItem(GRADIUM_KEY);
-    if (stored) return { ...gradiumDefaults, ...JSON.parse(stored) };
+    if (stored) return migrateGradium({ ...gradiumDefaults, ...JSON.parse(stored) });
   } catch { /* ignore */ }
   return { ...gradiumDefaults };
 }
 
 export async function loadGradiumSettingsFromDB(): Promise<GradiumSettings> {
-  return loadFromDB(GRADIUM_KEY, gradiumDefaults);
+  return migrateGradium(await loadFromDB(GRADIUM_KEY, gradiumDefaults));
 }
+
 
 export async function saveGradiumSettingsToDB(settings: GradiumSettings): Promise<void> {
   await saveToDB(GRADIUM_KEY, settings);
