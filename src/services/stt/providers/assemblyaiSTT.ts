@@ -70,7 +70,14 @@ export class AssemblyAISTT implements STTSession {
     this.source = this.audioCtx.createMediaStreamSource(this.stream);
     this.processor = this.audioCtx.createScriptProcessor(4096, 1, 1);
 
-    const wsUrl = `wss://streaming.assemblyai.com/v3/ws?sample_rate=${sample_rate}&format_turns=true&token=${encodeURIComponent(token)}`;
+    // AssemblyAI v3 accepts a `keyterms_prompt` JSON array to bias recognition
+    // toward proper nouns and domain jargon. Skip when the dictionary is empty.
+    const keyterms = getDictionaryTerms();
+    const keytermsParam = keyterms.length > 0
+      ? `&keyterms_prompt=${encodeURIComponent(JSON.stringify(keyterms))}`
+      : "";
+    const wsUrl = `wss://streaming.assemblyai.com/v3/ws?sample_rate=${sample_rate}&format_turns=true${keytermsParam}&token=${encodeURIComponent(token)}`;
+
     this.ws = new WebSocket(wsUrl);
     this.ws.binaryType = "arraybuffer";
 
