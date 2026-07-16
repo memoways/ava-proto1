@@ -183,7 +183,7 @@ export class DeepgramSTT {
     }
 
     // Connect to Deepgram WebSocket
-    const wsUrl = `wss://api.deepgram.com/v1/listen?model=${config.model}&language=${config.language}&smart_format=true&interim_results=true&vad_events=true&endpointing=false`;
+    const wsUrl = `wss://api.deepgram.com/v1/listen?model=${config.model}&language=${config.language}&smart_format=true&punctuate=true&filler_words=false&numerals=true&interim_results=true&vad_events=true&endpointing=false`;
 
     this.ws = new WebSocket(wsUrl, getDeepgramWebSocketProtocols(config.key));
     const openTimeout = setTimeout(() => {
