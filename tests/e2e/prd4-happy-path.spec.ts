@@ -53,11 +53,9 @@ async function installNetworkFakes(
     type E2ETestWindow = Window & {
       __e2eLongAudio?: boolean;
       __e2eAudioState?: { ended: number; paused: number };
-      __e2eVideoState?: { playing: boolean; muted: boolean; playCount: number; stopCount: number };
       __e2eNativeVideoState?: { playing: boolean; playCount: number; pauseCount: number };
     };
     const testWindow = window as E2ETestWindow;
-    testWindow.__e2eVideoState = { playing: false, muted: true, playCount: 0, stopCount: 0 };
     testWindow.__e2eNativeVideoState = { playing: false, playCount: 0, pauseCount: 0 };
     Object.defineProperty(HTMLMediaElement.prototype, "play", {
       configurable: true,
@@ -77,25 +75,6 @@ async function installNetworkFakes(
           testWindow.__e2eNativeVideoState.pauseCount += 1;
         }
       },
-    });
-    window.addEventListener("message", (event) => {
-      let message: { context?: string; event?: string } | null = null;
-      try {
-        message = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-      } catch { /* unrelated postMessage */ }
-      if (message?.context !== "e2e-video-state" || !testWindow.__e2eVideoState) return;
-      if (message.event === "play") {
-        testWindow.__e2eVideoState.playing = true;
-        testWindow.__e2eVideoState.playCount += 1;
-      } else if (message.event === "unmute") {
-        testWindow.__e2eVideoState.muted = false;
-      } else if (message.event === "pause" || message.event === "unload") {
-        testWindow.__e2eVideoState.playing = false;
-        testWindow.__e2eVideoState.stopCount += 1;
-      } else if (message.event === "mute" || message.event === "init") {
-        testWindow.__e2eVideoState.muted = true;
-        if (message.event === "init") testWindow.__e2eVideoState.playing = false;
-      }
     });
     localStorage.setItem("ava_gameplay_settings", JSON.stringify({ RAG_SUMMARY_EVERY_N_TURNS: 4 }));
     // PostHog intentionally filters HeadlessChrome as a bot. Use a regular
@@ -233,56 +212,6 @@ async function installNetworkFakes(
     Object.defineProperty(window, "MediaRecorder", { configurable: true, value: E2EMediaRecorder });
   }, { transcripts, simulateAudio: options.ttsSuccess === true });
 
-  await page.route("https://play.gumlet.io/**", (route) => {
-    return route.fulfill({
-      status: 200,
-      contentType: "text/html",
-      body: `<!doctype html><title>Gumlet fake</title><script>
-        const playerListeners = {};
-        let playing = false;
-        let muted = true;
-        const report = (event) => parent.postMessage(JSON.stringify({ context: "e2e-video-state", event }), "*");
-        const emit = (event, value) => {
-          for (const listener of playerListeners[event] || []) {
-            parent.postMessage(JSON.stringify({ context: "player.js", version: "3.0", event, value, listener }), "*");
-          }
-        };
-        const ready = () => parent.postMessage(JSON.stringify({
-          context: "player.js",
-          version: "3.0",
-          event: "ready",
-          value: {
-            src: location.href,
-            events: ["ready", "play", "pause", "ended", "timeupdate", "volumeChange"],
-            methods: ["play", "pause", "mute", "unmute", "setVolume", "setCurrentTime", "getDuration"]
-          }
-        }), "*");
-        addEventListener("message", (event) => {
-          let command;
-          try { command = typeof event.data === "string" ? JSON.parse(event.data) : event.data; } catch { return; }
-          if (command?.context !== "player.js") return;
-          if (command.method === "addEventListener") {
-            (playerListeners[command.value] ||= []).push(command.listener);
-          } else if (command.method === "play") {
-            if (!playing) { playing = true; report("play"); emit("play"); }
-          } else if (command.method === "pause") {
-            if (playing) { playing = false; report("pause"); emit("pause"); }
-          } else if (command.method === "mute") {
-            if (!muted) { muted = true; report("mute"); emit("volumeChange"); }
-          } else if (command.method === "unmute") {
-            if (muted) { muted = false; report("unmute"); emit("volumeChange"); }
-          } else if (command.method === "getDuration") {
-            parent.postMessage(JSON.stringify({ context: "player.js", version: "3.0", event: "getDuration", value: 30, listener: command.listener }), "*");
-          } else if (command.method === "setVolume" || command.method === "setCurrentTime") {
-            parent.postMessage(JSON.stringify({ context: "player.js", version: "3.0", event: command.method, value: true, listener: command.listener }), "*");
-          }
-        });
-        addEventListener("pagehide", () => report("unload"));
-        report("init");
-        ready(); setTimeout(ready, 100); setTimeout(ready, 300);
-      </script>`,
-    });
-  });
   await page.route("https://video.gumlet.io/**", (route) => {
     if (route.request().url().includes(E2E_VIDEO_ASSET_ID)) triggeredVideoLoads += 1;
     return route.fulfill({
@@ -474,23 +403,38 @@ test("le teaser démarre automatiquement avec le son puis Passer coupe tout", as
   await installNetworkFakes(page);
 
   await page.goto("/");
+  const playerBeforeStart = await page.locator("video[title='Video player']").elementHandle();
+  expect(playerBeforeStart).not.toBeNull();
+  await expect(page.locator("iframe[title='Video player']")).toHaveCount(0);
   await page.getByRole("button", { name: "Commencer" }).click();
 
   await expect.poll(() => page.evaluate(() => {
     const state = (window as Window & {
-      __e2eVideoState?: { playing: boolean; muted: boolean; playCount: number };
-    }).__e2eVideoState;
-    return Boolean(state?.playing && !state.muted && state.playCount > 0);
+      __e2eNativeVideoState?: { playing: boolean; playCount: number };
+    }).__e2eNativeVideoState;
+    const video = document.querySelector("video[title='Video player']") as HTMLVideoElement | null;
+    return Boolean(
+      state?.playing &&
+      state.playCount > 0 &&
+      video?.autoplay &&
+      !video.controls &&
+      !video.muted &&
+      video.volume === 1,
+    );
   }), { timeout: 5_000 }).toBe(true);
 
+  const pauseCountBeforeSkip = await page.evaluate(() =>
+    (window as Window & { __e2eNativeVideoState?: { pauseCount: number } }).__e2eNativeVideoState?.pauseCount ?? 0,
+  );
   await page.getByRole("button", { name: /Passer/ }).click();
   await expect(page.getByRole("heading", { name: "À qui veux-tu parler ?" })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => {
+  await expect.poll(() => page.evaluate((previousPauseCount) => {
     const state = (window as Window & {
-      __e2eVideoState?: { playing: boolean; muted: boolean; stopCount: number };
-    }).__e2eVideoState;
-    return Boolean(state && !state.playing && state.muted && state.stopCount > 0);
-  }), { timeout: 5_000 }).toBe(true);
+      __e2eNativeVideoState?: { playing: boolean; pauseCount: number };
+    }).__e2eNativeVideoState;
+    const video = document.querySelector("video[title='Video player']") as HTMLVideoElement | null;
+    return Boolean(state && !state.playing && state.pauseCount > previousPauseCount && video?.muted);
+  }, pauseCountBeforeSkip), { timeout: 5_000 }).toBe(true);
 });
 
 test("une cinématique HLS démarre automatiquement puis Passer coupe son média", async ({ page }) => {
@@ -502,6 +446,8 @@ test("une cinématique HLS démarre automatiquement puis Passer coupe son média
   await installNetworkFakes(page, transcripts, { triggerVideoAtLabel: 3 });
 
   await page.goto("/");
+  const persistentPlayer = await page.locator("video[title='Video player']").elementHandle();
+  expect(persistentPlayer).not.toBeNull();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
   await page.getByRole("button", { name: "Appeler Max" }).click();
@@ -517,6 +463,10 @@ test("une cinématique HLS démarre automatiquement puis Passer coupe son média
 
   const skipVideo = page.getByRole("button", { name: /Passer/ });
   await expect(skipVideo).toBeVisible({ timeout: 10_000 });
+  expect(await page.locator("video[title='Video player']").evaluate((video, initialPlayer) =>
+    video === initialPlayer,
+  persistentPlayer)).toBe(true);
+  await expect(page.locator("iframe[title='Video player']")).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => {
     const state = (window as Window & {
       __e2eNativeVideoState?: { playing: boolean; playCount: number };

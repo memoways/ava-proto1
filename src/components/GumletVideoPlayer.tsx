@@ -1,20 +1,9 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
-import { Player } from "@gumlet/player.js";
-
-const GUMLET_COLLECTION_ID = "673f29f4a5e1bf70aa645cb7";
+import { resolveNativeVideoSource } from "@/services/videoPlayback";
 
 const canControlNativeMedia = () =>
   typeof window !== "undefined" && !/jsdom/i.test(window.navigator.userAgent);
-
-const pauseNativeVideo = (video: HTMLVideoElement | null) => {
-  if (video && canControlNativeMedia()) video.pause();
-};
-
-const resetNativeVideo = (video: HTMLVideoElement) => {
-  video.removeAttribute("src");
-  if (canControlNativeMedia()) video.load();
-};
 
 export interface GumletVideoPlayerHandle {
   playWithAudio: () => void;
@@ -26,22 +15,18 @@ interface GumletVideoPlayerProps {
   onComplete: () => void;
   onSkip: () => void;
   onReady?: () => void;
-  /** Keep mounted/preloaded but visually hidden until the experience starts. */
+  /** Keep the single media element mounted/preloaded but visually hidden. */
   active?: boolean;
-  /** Whether the player should request autoplay. */
-  autoPlay?: boolean;
-  /** Use the proven Gumlet embed (teaser) or native HLS (later cinematics). */
-  playbackMode?: "embed" | "native";
   /** Show the skip button overlay. */
   showSkip?: boolean;
-  /** Optional overlay content (e.g. HUD) rendered on top of the video */
+  /** Optional overlay content (e.g. HUD) rendered on top of the video. */
   children?: React.ReactNode;
 }
 
 /**
- * Full-screen Gumlet player. Gumlet assets use their native HLS stream so audio
- * remains under first-party media-element control; unknown URLs keep an iframe
- * fallback. Includes a "Passer" skip button overlay.
+ * One persistent native player for the teaser and every later cinematic.
+ * The initial "Commencer" gesture blesses this exact media element; subsequent
+ * videos only swap its source, as recommended by WebKit autoplay guidance.
  */
 const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerProps>(({
   videoUrl,
@@ -49,39 +34,29 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   onSkip,
   onReady,
   active = true,
-  autoPlay = true,
-  playbackMode = "native",
   showSkip = true,
   children,
 }, ref) => {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const playerRef = useRef<Player | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const onCompleteRef = useRef(onComplete);
   const onReadyRef = useRef(onReady);
-  const hasCompletedRef = useRef(false);
   const activeRef = useRef(active);
+  const sourceGenerationRef = useRef(0);
+  const hasCompletedRef = useRef(false);
   const stoppingRef = useRef(false);
   const playbackRequestedRef = useRef(false);
-  const [iframeEpoch, setIframeEpoch] = useState(0);
+  const [sourceEpoch, setSourceEpoch] = useState(0);
+  const source = useMemo(() => resolveNativeVideoSource(videoUrl), [videoUrl]);
+
   onCompleteRef.current = onComplete;
   onReadyRef.current = onReady;
   activeRef.current = active;
 
-
-  const isGumletEndedMessage = useCallback((data: unknown) => {
-    if (!data || typeof data !== "object") return false;
-    const message = data as { type?: string; event?: string; name?: string; method?: string };
-    const eventName = (message.event || message.name || message.method || "").toLowerCase();
-    if (message.type === "gumlet" && (eventName === "ended" || eventName === "complete" || eventName === "finish")) {
-      return true;
-    }
-    // player.js relay: { event: "ended" } sans type
-    return eventName === "ended" || eventName === "complete";
+  const pauseVideo = useCallback((video: HTMLVideoElement | null) => {
+    if (video && canControlNativeMedia()) video.pause();
   }, []);
 
-  // Extract asset ID from various Gumlet URL formats
   const completeOnce = useCallback(() => {
     if (hasCompletedRef.current) return;
     hasCompletedRef.current = true;
@@ -89,281 +64,117 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   }, []);
 
   const stopPlayback = useCallback(() => {
-    // Takes precedence over autoplay/volumeChange retries until next activation.
+    sourceGenerationRef.current += 1;
     stoppingRef.current = true;
     playbackRequestedRef.current = false;
+
     const video = videoRef.current;
-    if (video) {
-      // Hard-cut sound synchronously even if pause is delayed by the browser.
-      // The next activation explicitly unmutes before playback.
-      video.muted = true;
-      pauseNativeVideo(video);
-      try { video.currentTime = 0; } catch { /* media may not have metadata yet */ }
-      try { hlsRef.current?.stopLoad(); } catch { /* stream may already be detached */ }
-      try { hlsRef.current?.detachMedia(); } catch { /* stream may already be detached */ }
-      resetNativeVideo(video);
+    if (!video) return;
+
+    // Mute first so the sound is cut synchronously, even if the decoder takes
+    // another task to acknowledge pause/detach.
+    video.muted = true;
+    video.defaultMuted = true;
+    pauseVideo(video);
+    try { video.currentTime = 0; } catch { /* metadata may not exist yet */ }
+
+    const hls = hlsRef.current;
+    hlsRef.current = null;
+    if (hls) {
+      try { hls.stopLoad(); } catch { /* already stopped */ }
+      try { hls.detachMedia(); } catch { /* already detached */ }
+      try { hls.destroy(); } catch { /* already destroyed */ }
     }
 
-    const player = playerRef.current;
-    if (player) {
-      // Dispatch both commands before the parent removes/hides the player.
-      void player.mute().catch(() => { /* pause remains the primary stop */ });
-      void player.pause().catch(() => { /* player may already be stopped */ });
-      void player.setCurrentTime(0).catch(() => { /* duration may not be ready */ });
-    }
+    video.removeAttribute("src");
+    if (canControlNativeMedia()) video.load();
+    // Recreate the native pipeline while hidden. This keeps the same <video>
+    // element but makes a later replay/restart possible even when the URL did
+    // not change (for example after an authentication failure).
+    setSourceEpoch((epoch) => epoch + 1);
+  }, [pauseVideo]);
 
-    const iframe = iframeRef.current;
-    if (iframe) {
-      // Player.js commands are asynchronous and may still be queued when the
-      // phase changes. Navigating the iframe cuts its decoder/audio process
-      // synchronously; remounting then preloads a clean, stopped player.
-      try { iframe.src = "about:blank"; } catch { /* iframe may already be gone */ }
-      playerRef.current = null;
-      setIframeEpoch((epoch) => epoch + 1);
-    }
-  }, []);
-
-  const handleSkip = useCallback(() => {
-    stopPlayback();
-    onSkip();
-  }, [onSkip, stopPlayback]);
-
-  const forceAudioOn = useCallback(() => {
-    if (stoppingRef.current) return;
+  const playWithAudio = useCallback(() => {
     const video = videoRef.current;
-    if (video) {
-      try {
-        video.muted = false;
-        video.defaultMuted = false;
-        video.volume = 1;
-        if (!canControlNativeMedia()) return;
-        const playAttempt = video.play();
-        if (playAttempt && typeof playAttempt.then === "function") {
-          playAttempt.catch(() => pauseNativeVideo(video));
-        }
-      } catch {
-        pauseNativeVideo(video);
-      }
-      return;
-    }
+    if (!video) return;
 
-    const player = playerRef.current;
-    if (!player) return;
+    playbackRequestedRef.current = true;
+    stoppingRef.current = false;
+    video.defaultMuted = false;
+    video.muted = false;
+    video.volume = 1;
+
+    if (!canControlNativeMedia()) return;
+    const generation = sourceGenerationRef.current;
     try {
-      // Dispatch every command synchronously inside the user-gesture stack.
-      // The first play consumes the activation; volume/unmute then restore the
-      // audible state before the second play confirms it without another click.
-      void player.play().catch(() => { /* second play remains available */ });
-      void player.setVolume(100).catch(() => { /* retry on next gesture */ });
-      void player.unmute().catch(() => { /* retry on next gesture */ });
-      void player.play().catch(() => { /* retry on next gesture */ });
-    } catch {
-      // Retried by ready/load and subsequent user gestures.
-    }
-  }, []);
-
-  const getGumletAssetId = useCallback((url: string) => {
-    const match = url.match(/(?:watch|embed)\/([a-f0-9]{24})(?:[/?#]|$)/i);
-    return match?.[1] ?? null;
-  }, []);
-
-  const getNativePlaybackUrl = useCallback((url: string) => {
-    if (/\.m3u8(?:$|\?)/i.test(url)) return url;
-    const assetId = getGumletAssetId(url);
-    if (!assetId) return null;
-    return `https://video.gumlet.io/${GUMLET_COLLECTION_ID}/${assetId}/main.m3u8`;
-  }, [getGumletAssetId]);
-
-  const getEmbedUrl = useCallback((url: string) => {
-    const withAudioDefaults = (rawUrl: string) => {
-      try {
-        const parsed = new URL(rawUrl);
-        parsed.searchParams.set("preload", "true");
-        parsed.searchParams.set("autoplay", autoPlay ? "true" : "false");
-        parsed.searchParams.set("muted", "false");
-        parsed.searchParams.set("volume", "100");
-        parsed.searchParams.set("playsinline", "true");
-        parsed.searchParams.set("disable_player_controls", "true");
-        return parsed.toString();
-      } catch {
-        const separator = rawUrl.includes("?") ? "&" : "?";
-        return `${rawUrl}${separator}preload=true&autoplay=${autoPlay ? "true" : "false"}&muted=false&volume=100&playsinline=true&disable_player_controls=true`;
+      const attempt = video.play();
+      if (attempt && typeof attempt.catch === "function") {
+        void attempt.catch((error: unknown) => {
+          if (generation !== sourceGenerationRef.current || stoppingRef.current) return;
+          console.warn("[Video] Audible autoplay rejected:", error);
+        });
       }
-    };
-
-    if (url.includes("play.gumlet.io/embed/")) return withAudioDefaults(url);
-    const match = url.match(/(?:watch|embed)\/([a-f0-9]{24})(?:[/?#]|$)/i);
-    if (match) {
-      const assetId = match[1];
-      return withAudioDefaults(`https://play.gumlet.io/embed/${assetId}`);
+    } catch (error) {
+      if (generation === sourceGenerationRef.current && !stoppingRef.current) {
+        console.warn("[Video] Audible autoplay failed:", error);
+      }
     }
-    return withAudioDefaults(url);
-  }, [autoPlay]);
-
-  const embedUrl = getEmbedUrl(videoUrl);
-  const hlsUrl = playbackMode === "native" ? getNativePlaybackUrl(videoUrl) : null;
+  }, []);
 
   useImperativeHandle(ref, () => ({
-    playWithAudio: () => {
-      playbackRequestedRef.current = true;
-      stoppingRef.current = false;
-      forceAudioOn();
-    },
+    playWithAudio,
     stop: stopPlayback,
-  }), [forceAudioOn, stopPlayback]);
+  }), [playWithAudio, stopPlayback]);
 
   useEffect(() => {
     hasCompletedRef.current = false;
     stoppingRef.current = false;
-    playbackRequestedRef.current = false;
-  }, [videoUrl]);
-
-  // Force audio ON: unmute on ready, on play, periodically during the first
-  // seconds, and on any user gesture (fallback if browser re-mutes autoplay).
-  useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-
-    let player: Player | null = null;
-    let cancelled = false;
-    let retryCount = 0;
-    const forceAudioOnIfRequested = () => {
-      if (active || playbackRequestedRef.current) forceAudioOn();
-    };
-    const handleReady = () => {
-      onReadyRef.current?.();
-      forceAudioOnIfRequested();
-    };
-
-    let lastKnownDuration = 0;
-    const checkEndFromTime = (current: unknown) => {
-      const t = typeof current === "number" ? current : Number(current);
-      if (!Number.isFinite(t) || lastKnownDuration <= 0) return;
-      // Fallback : certains navigateurs/embeds ne dispatchent pas "ended".
-      // On considère la vidéo terminée dès qu'on est à <0.4s de la fin.
-      if (t >= lastKnownDuration - 0.4) completeOnce();
-    };
-
-    const timer = setTimeout(() => {
-      if (cancelled) return;
-      try {
-        player = new Player(iframe);
-        playerRef.current = player;
-        player.on("ready", () => {
-          handleReady();
-          if (!active && !playbackRequestedRef.current) {
-            void player?.pause().catch(() => { /* player may still be settling */ });
-            void player?.setCurrentTime(0).catch(() => { /* start from the beginning on first click */ });
-          }
-          try {
-            player?.getDuration((d: number) => {
-              if (typeof d === "number" && Number.isFinite(d) && d > 0) lastKnownDuration = d;
-            });
-          } catch { /* ignore */ }
-        });
-        player.on("play", forceAudioOnIfRequested);
-        player.on("volumeChange", forceAudioOnIfRequested);
-        player.on("ended", completeOnce);
-        player.on("timeupdate", (data: unknown) => {
-          if (retryCount < 6) {
-            retryCount += 1;
-            forceAudioOnIfRequested();
-          }
-          // Player.js émet { seconds, duration } dans timeupdate
-          if (data && typeof data === "object") {
-            const payload = data as { seconds?: number; duration?: number };
-            if (typeof payload.duration === "number" && payload.duration > 0) {
-              lastKnownDuration = payload.duration;
-            }
-            checkEndFromTime(payload.seconds);
-          }
-        });
-        forceAudioOnIfRequested();
-      } catch (err) {
-        console.warn("Player.js init failed:", err);
-      }
-    }, 0);
-
-    const retryTimers = [100, 300, 700, 1200, 2000, 3500, 5500].map((delay) =>
-      window.setTimeout(forceAudioOnIfRequested, delay),
-    );
-
-    const onUserGesture = () => {
-      if (active || playbackRequestedRef.current) forceAudioOn();
-    };
-    window.addEventListener("pointerdown", onUserGesture, { capture: true });
-    window.addEventListener("click", onUserGesture, { capture: true });
-    window.addEventListener("touchstart", onUserGesture, { capture: true });
-    window.addEventListener("keydown", onUserGesture, { capture: true });
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-      retryTimers.forEach((retryTimer) => clearTimeout(retryTimer));
-      if (playerRef.current === player) playerRef.current = null;
-      window.removeEventListener("pointerdown", onUserGesture, { capture: true });
-      window.removeEventListener("click", onUserGesture, { capture: true });
-      window.removeEventListener("touchstart", onUserGesture, { capture: true });
-      window.removeEventListener("keydown", onUserGesture, { capture: true });
-    };
-  }, [active, completeOnce, embedUrl, forceAudioOn, iframeEpoch]);
-
-  useEffect(() => {
-    if (active) {
-      stoppingRef.current = false;
-      playbackRequestedRef.current = true;
-      forceAudioOn();
-      return;
-    }
-
-    pauseNativeVideo(videoRef.current);
-    try {
-      void playerRef.current?.pause().catch(() => { /* player may not be ready */ });
-    } catch {
-      // Player teardown can race a phase change.
-    }
-  }, [active, forceAudioOn]);
-
-  // Later cinematics use native HLS. Retry audible playback while the stream
-  // becomes ready and on any in-video user gesture, without inserting a gate.
-  useEffect(() => {
-    if (!active || !hlsUrl) return;
-    const retryTimers = [100, 300, 700, 1200, 2000, 3500].map((delay) =>
-      window.setTimeout(forceAudioOn, delay),
-    );
-    const onUserGesture = () => forceAudioOn();
-    window.addEventListener("pointerdown", onUserGesture, { capture: true });
-    window.addEventListener("touchstart", onUserGesture, { capture: true });
-    window.addEventListener("keydown", onUserGesture, { capture: true });
-    return () => {
-      retryTimers.forEach((timer) => window.clearTimeout(timer));
-      window.removeEventListener("pointerdown", onUserGesture, { capture: true });
-      window.removeEventListener("touchstart", onUserGesture, { capture: true });
-      window.removeEventListener("keydown", onUserGesture, { capture: true });
-    };
-  }, [active, forceAudioOn, hlsUrl]);
+    sourceGenerationRef.current += 1;
+  }, [source.url, sourceEpoch]);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !hlsUrl) return;
+    if (!video) return;
 
-    video.muted = false;
-    video.defaultMuted = false;
-    video.volume = 1;
+    const generation = sourceGenerationRef.current;
+    const playbackIntended = activeRef.current || playbackRequestedRef.current;
     video.preload = "auto";
+    video.defaultMuted = !playbackIntended;
+    video.muted = !playbackIntended;
+    video.volume = 1;
 
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = hlsUrl;
+    if (source.kind === "file") {
+      video.src = source.url;
       if (canControlNativeMedia()) video.load();
       onReadyRef.current?.();
-      if (activeRef.current) forceAudioOn();
+      if (activeRef.current || playbackRequestedRef.current) playWithAudio();
       return () => {
-        pauseNativeVideo(video);
-        resetNativeVideo(video);
+        if (generation !== sourceGenerationRef.current) return;
+        pauseVideo(video);
+        video.removeAttribute("src");
+        if (canControlNativeMedia()) video.load();
       };
     }
 
-    if (!Hls.isSupported()) return;
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = source.url;
+      if (canControlNativeMedia()) video.load();
+      onReadyRef.current?.();
+      if (activeRef.current || playbackRequestedRef.current) playWithAudio();
+      return () => {
+        if (generation !== sourceGenerationRef.current) return;
+        pauseVideo(video);
+        video.removeAttribute("src");
+        if (canControlNativeMedia()) video.load();
+      };
+    }
+
+    if (!Hls.isSupported()) {
+      if (canControlNativeMedia()) {
+        console.error("[Video] HLS playback is not supported by this browser.");
+      }
+      return;
+    }
 
     const hls = new Hls({
       autoStartLoad: true,
@@ -371,91 +182,102 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       startLevel: -1,
     });
     hlsRef.current = hls;
-    hls.loadSource(hlsUrl);
+    hls.loadSource(source.url);
     hls.attachMedia(video);
+    // The source is armed before the welcome action becomes available. If the
+    // manifest is still loading when the user clicks, playbackRequestedRef
+    // preserves the intent and MANIFEST_PARSED retries play on the same node.
+    onReadyRef.current?.();
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      if (generation !== sourceGenerationRef.current) return;
       onReadyRef.current?.();
-      if (activeRef.current) forceAudioOn();
+      if (activeRef.current || playbackRequestedRef.current) playWithAudio();
+    });
+    hls.on(Hls.Events.ERROR, (_event, data) => {
+      if (!data.fatal || generation !== sourceGenerationRef.current) return;
+      console.error("[Video] Fatal HLS error:", data.type, data.details);
     });
 
     return () => {
-      pauseNativeVideo(video);
-      hls.destroy();
       if (hlsRef.current === hls) hlsRef.current = null;
-      resetNativeVideo(video);
+      try { hls.destroy(); } catch { /* already destroyed by a hard stop */ }
+      if (generation !== sourceGenerationRef.current) return;
+      pauseVideo(video);
+      video.removeAttribute("src");
+      if (canControlNativeMedia()) video.load();
     };
-  }, [forceAudioOn, hlsUrl]);
+  }, [pauseVideo, playWithAudio, source.kind, source.url, sourceEpoch]);
 
-  // Listen for Gumlet player events via postMessage
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
-      if (isGumletEndedMessage(event.data)) {
-        completeOnce();
-      }
-    };
+    if (active) {
+      stoppingRef.current = false;
+      playbackRequestedRef.current = true;
+      playWithAudio();
+      return;
+    }
+    playbackRequestedRef.current = false;
+    pauseVideo(videoRef.current);
+  }, [active, pauseVideo, playWithAudio]);
 
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [completeOnce, isGumletEndedMessage]);
-
+  const handleSkip = useCallback(() => {
+    stopPlayback();
+    onSkip();
+  }, [onSkip, stopPlayback]);
 
   return (
     <div
       className={`fixed inset-0 z-0 bg-background transition-opacity duration-200 ${active ? "opacity-100" : "pointer-events-none opacity-0"}`}
       aria-hidden={!active}
     >
-      {hlsUrl ? (
-        <video
-          ref={videoRef}
-          title="Video player"
-          data-source={hlsUrl}
-          className="absolute inset-0 h-full w-full object-cover"
-          controls={false}
-          playsInline
-          preload="auto"
-          autoPlay={active}
-          muted={false}
-          onCanPlay={() => { onReadyRef.current?.(); if (active) forceAudioOn(); }}
-          onLoadedData={() => { if (active) forceAudioOn(); }}
-          onLoadedMetadata={() => { if (active) forceAudioOn(); }}
-          onPlay={forceAudioOn}
-          onPlaying={() => {
-            const video = videoRef.current;
-            if (!video) return;
-            if (video.muted || video.volume < 1) forceAudioOn();
-          }}
-          onVolumeChange={() => {
-            const video = videoRef.current;
-            if (!video || !active) return;
-            if (video.muted || video.volume < 1) forceAudioOn();
-          }}
-          onEnded={completeOnce}
-        />
-      ) : (
-        <iframe
-          key={iframeEpoch}
-          ref={iframeRef}
-          src={embedUrl}
-          title="Video player"
-          className="absolute inset-0 w-full h-full"
-          style={{ border: "none" }}
-          allow="autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write; accelerometer; gyroscope"
-          onLoad={() => {
-            if (active) forceAudioOn();
-          }}
-          allowFullScreen
-        />
-      )}
+      <video
+        ref={videoRef}
+        title="Video player"
+        data-source={source.url}
+        className="absolute inset-0 h-full w-full object-cover"
+        controls={false}
+        playsInline
+        preload="auto"
+        autoPlay
+        muted={false}
+        onCanPlay={() => {
+          onReadyRef.current?.();
+          if (activeRef.current || playbackRequestedRef.current) playWithAudio();
+        }}
+        onLoadedData={() => {
+          if (activeRef.current || playbackRequestedRef.current) playWithAudio();
+        }}
+        onPlay={() => {
+          const video = videoRef.current;
+          if (!video || stoppingRef.current) return;
+          if (!activeRef.current && !playbackRequestedRef.current) {
+            pauseVideo(video);
+            try { video.currentTime = 0; } catch { /* metadata may not exist yet */ }
+            return;
+          }
+          if (video.muted || video.volume !== 1) {
+            video.defaultMuted = false;
+            video.muted = false;
+            video.volume = 1;
+          }
+        }}
+        onVolumeChange={() => {
+          const video = videoRef.current;
+          if (!video || stoppingRef.current || !activeRef.current) return;
+          if (video.muted || video.volume !== 1) {
+            video.defaultMuted = false;
+            video.muted = false;
+            video.volume = 1;
+          }
+        }}
+        onEnded={completeOnce}
+      />
 
-      {/* Overlay content (HUD, etc.) */}
       {active ? children : null}
 
-      {/* Skip button */}
       {showSkip ? (
         <button
           onClick={handleSkip}
-          className="absolute bottom-8 right-8 z-30 text-xs text-muted-foreground/80 hover:text-foreground transition-colors font-mono px-3 py-1.5 rounded-md bg-black/40 backdrop-blur-sm border border-border/20 hover:bg-black/60"
+          className="absolute bottom-8 right-8 z-30 rounded-md border border-border/20 bg-black/40 px-3 py-1.5 font-mono text-xs text-muted-foreground/80 backdrop-blur-sm transition-colors hover:bg-black/60 hover:text-foreground"
         >
           Passer →
         </button>

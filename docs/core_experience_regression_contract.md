@@ -13,10 +13,11 @@ Ce contrat transforme les incidents récurrents en invariants exécutables. La C
 ## Invariants vidéo/audio
 
 - Aucun écran d'activation sonore ni contrôle Play n'est rendu.
-- Le clic initial « Commencer » active immédiatement le teaser préchargé et conserve la demande `play → volume 100 % → unmute → play` jusqu'au `ready` du player.
-- Les cinématiques HLS suivantes sont en autoplay, sans contrôles et avec `muted=false`, volume `1`.
+- Le teaser et toutes les cinématiques suivantes utilisent le même élément `<video>` natif persistant ; aucun iframe média cross-origin n'est autorisé dans ce parcours.
+- Le clic initial « Commencer » applique synchroniquement `defaultMuted=false`, `muted=false`, `volume=1` puis `play()` au lecteur préchargé, avant toute attente réseau.
+- Chaque source suivante est convertie vers le HLS direct Gumlet et démarre automatiquement sur ce même élément, sans contrôle navigateur et sans nouveau clic.
 - Seul un identifiant Gumlet hexadécimal complet de 24 caractères peut être converti en manifeste HLS.
-- « Passer » coupe, met en pause et remet à zéro avant la transition ; l'iframe est détruite/rechargée et le HLS est détaché afin que l'arrêt ne dépende pas d'une commande asynchrone.
+- « Passer » mute, met en pause et remet à zéro, détruit HLS et supprime la source avant d'appeler la transition parente. Toute promesse `play()` appartenant à une ancienne génération est ignorée.
 
 ## Invariant réponse Max
 
@@ -28,5 +29,5 @@ Ce contrat transforme les incidents récurrents en invariants exécutables. La C
 - `npm run test:regression` : contrats critiques STT, audio, vidéo et orchestration.
 - `npm run test:unit` : suite unitaire sans dépendance distante.
 - `npm run build` : compilation de production.
-- `npm run test:e2e` : parcours navigateur multi-tours, transcription visible, TTS, vidéo intercalée et contrats d'état autoplay/skip pour iframe et HLS.
+- `npm run test:e2e` : six parcours Chromium (multi-tours, transcription, TTS, vidéo intercalée) plus les deux contrats média rejoués sous Firefox et WebKit.
 - `npm run test:quality` : gate locale avant commit/push.

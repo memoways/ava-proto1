@@ -16,11 +16,10 @@
     "test:watch": "vitest",
     "test:rls": "vitest run src/integration/sessionsRls.integration.test.ts",
     "test:e2e": "playwright test",
-    "test:e2e:install": "playwright install chromium"
+    "test:e2e:install": "playwright install chromium firefox webkit"
   },
   "dependencies": {
     "@grainql/analytics-web": "^3.4.0",
-    "@gumlet/player.js": "^3.0.8",
     "@hcaptcha/react-hcaptcha": "^2.0.2",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",

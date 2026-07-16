@@ -30,24 +30,24 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ### Vidéos Gumlet — fin fiable et audio systématique
 - Lovable a élargi la détection de fin Gumlet (`ended`, `complete`, `finish`) et ajouté un fallback temporel à moins de 0,4 seconde de la durée lorsque l'embed n'émet pas `ended`, garantissant le retour automatique à la conversation.
-- Les URLs Gumlet `watch/embed` sont converties en manifestes HLS natifs. Le player n'utilise donc plus l'autoplay iframe que Gumlet documente comme systématiquement muet.
-- Le teaser conserve l'iframe Gumlet préchargée et demande explicitement l'autoplay. Le clic initial « Commencer » passe désormais le player à l'état actif avant toute attente d'authentification, lance `play`, volume à 100 %, `unmute`, puis `play`, et mémorise cette intention jusqu'à l'événement Gumlet `ready` : un `pause()` tardif ne peut plus annuler le démarrage. Aucun écran ni bouton Play intermédiaire n'est ajouté.
-- Les interludes utilisent un player HLS natif séparé et persistant, toujours en autoplay, sans contrôles navigateur, avec `muted=false`, volume à 100 % et plusieurs retries automatiques au chargement. Toute remise en sourdine ou baisse de volume est corrigée sans ajouter de gate visuelle.
-- Les messages `postMessage` de fin sont limités à l'iframe réellement contrôlée afin qu'un message tiers ne puisse pas terminer une vidéo.
-- Le clic « Passer » effectue un hard-stop avant la transition : mute/pause/retour à zéro, arrêt et détachement HLS, suppression de la source native, ou navigation immédiate de l'iframe vers `about:blank` puis recréation d'un player propre. L'arrêt ne dépend donc plus de la disponibilité ou de la vitesse de Player.js.
+- L'investigation finale confirme que Gumlet force l'audio muet pour l'autoplay de son iframe et peut donc réafficher sa propre gate « Activer le son ». Le parcours ne rend désormais plus aucune iframe vidéo et la dépendance Player.js est retirée.
+- Les URLs Gumlet `watch/embed` sont toutes converties en manifestes HLS directs. Safari utilise son décodage HLS natif ; Chrome et Firefox passent par `hls.js`.
+- Un unique élément `<video>` est monté avant l'accueil puis conservé pendant toute l'expérience. Le clic initial « Commencer » applique synchroniquement `muted=false`, `volume=1` et `play()` avant l'authentification ; les interludes changent seulement la source de cet élément déjà autorisé et démarrent sans nouveau clic.
+- Le lecteur garde `autoplay`, `playsInline` et aucun contrôle navigateur. Une remise en sourdine pendant une lecture active est immédiatement corrigée, sans écran ni bouton Play intermédiaire.
+- Le clic « Passer » effectue un hard-stop avant la transition : mute/pause/retour à zéro, destruction de l'instance HLS et suppression de la source. Un compteur de génération empêche une ancienne promesse `play()` de relancer le média après le skip.
 - Les identifiants Gumlet doivent maintenant être des IDs hexadécimaux complets de 24 caractères ; une URL invalide ne peut plus être partiellement transformée en faux manifeste HLS.
 
 ### Compound engineering — gates anti-régression
 - Nouveau contrat exécutable `docs/core_experience_regression_contract.md` pour les invariants STT, transcription visible, budget Max, autoplay audio et arrêt sur « Passer ».
 - Nouvelles commandes `test:regression`, `test:unit` et `test:quality` ; la gate critique couvre séparément Deepgram, Gamilab, finalisation, métadonnées, orchestration, audio et vidéo.
-- Workflow GitHub Actions sur chaque pull request et push `main` : installation reproductible, tests critiques et unitaires, build de production, puis six parcours Playwright, dont deux contrats média explicites (`playing=true/muted=false` après démarrage, puis arrêt observé après « Passer ») pour le teaser iframe et les cinématiques HLS.
+- Workflow GitHub Actions sur chaque pull request et push `main` : installation reproductible, tests critiques et unitaires, build de production, puis six parcours Playwright. Les deux contrats média exigent désormais l'absence d'iframe, un unique nœud vidéo conservé du teaser à l'interlude, `playing=true/muted=false/volume=1` après démarrage et un arrêt observé avant la transition « Passer ».
 
 ### Dépendances
 - `bun.lock` resynchronisé avec les dépendances déclarées : hCaptcha présent, PostHog résolu sur la branche récente compatible et ancienne chaîne OpenTelemetry/protobuf inutilisée retirée du lockfile.
 
 ### Validation
-- 102 tests unitaires locaux verts, dont les nouveaux cas de conservation préfixe finalisé + queue interim, absence de duplication d'un transcript cumulatif, isolation Gamilab/Deepgram, modèle Deepgram effectif et budget Max après RAG.
-- 29 tests de régression critiques verts et six scénarios Playwright complets verts, dont les contrats autoplay/skip iframe et HLS, 35 tours et une cinématique intercalée.
+- 101 tests unitaires locaux verts, dont les cas de conservation préfixe finalisé + queue interim, absence de duplication d'un transcript cumulatif, isolation Gamilab/Deepgram, modèle Deepgram effectif et budget Max après RAG.
+- 28 tests de régression critiques verts, six scénarios Chromium complets et quatre variantes média Firefox/WebKit vertes. Les parcours couvrent le même lecteur du teaser à l'interlude, l'autoplay sonore, l'arrêt sur skip et l'endurance 35 tours.
 - Build Vite de production et lint ciblé des fichiers modifiés verts ; `git diff --check` sans erreur.
 - Manifeste HLS du teaser vérifié en HTTP 200 avec piste audio AAC dédiée.
 

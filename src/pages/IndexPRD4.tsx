@@ -148,7 +148,7 @@ const IndexPRD4 = () => {
   // Chrono onboarding (mesure du time-to-first-Max-response)
   const onboardingStartedAtRef = useRef<number | null>(null);
   const firstMaxResponseAtRef = useRef<number | null>(null);
-  const teaserPlayerRef = useRef<GumletVideoPlayerHandle | null>(null);
+  const cinematicPlayerRef = useRef<GumletVideoPlayerHandle | null>(null);
 
 
 
@@ -226,12 +226,12 @@ const IndexPRD4 = () => {
 
 
   // ---- Welcome / Film / Teaser ----------------------------------------------
-  const forceTeaserAudioOn = useCallback(() => {
+  const unlockCinematicPlayback = useCallback(() => {
     // This callback runs on the initial pointer/touch gesture. It unlocks the
     // top-level audio context for the whole session and starts the preloaded
-    // Gumlet embed audibly without any additional play/audio button.
-    void unlockAudioPlayback().catch(() => { /* iframe activation still proceeds */ });
-    teaserPlayerRef.current?.playWithAudio();
+    // native cinematic player without any additional play button.
+    void unlockAudioPlayback().catch(() => { /* native video activation still proceeds */ });
+    cinematicPlayerRef.current?.playWithAudio();
   }, []);
 
   const handlePrivacyChange = useCallback((choice: Pick<PrivacyPreferences, "voiceAndStorageAcknowledged" | "analyticsAllowed">) => {
@@ -244,7 +244,7 @@ const IndexPRD4 = () => {
     // Enter the teaser and issue playback while the click still owns browser
     // activation. Authentication can safely finish in parallel with this
     // public/preloaded cinematic; on failure we stop and return to welcome.
-    forceTeaserAudioOn();
+    unlockCinematicPlayback();
     flushSync(() => {
       setFilmAnswer("rappel");
       setPhase("teaser");
@@ -254,7 +254,7 @@ const IndexPRD4 = () => {
       try {
         await withTimeout("anonymous_game_auth", ensureGameAuth(captchaToken), 5_000);
       } catch (error) {
-        teaserPlayerRef.current?.stop();
+        cinematicPlayerRef.current?.stop();
         flushSync(() => setPhase("welcome"));
         console.error("[Auth] Anonymous game session unavailable:", error);
         toast({
@@ -280,7 +280,7 @@ const IndexPRD4 = () => {
     // sert aussi de gesture pour débloquer l'autoplay audio.
     void prefetchOpeningTTS().catch((e) => console.warn("[TTS] prefetch opening failed:", e));
     return true;
-  }, [forceTeaserAudioOn, privacyPreferences, setFilmAnswer, setPhase]);
+  }, [privacyPreferences, setFilmAnswer, setPhase, unlockCinematicPlayback]);
   const handleFilmAnswer = useCallback(
     (a: FilmAnswer) => {
       setFilmAnswer(a);
@@ -1113,7 +1113,7 @@ const IndexPRD4 = () => {
       screen = (
         <WelcomeScreen
           onStart={handleStart}
-          onStartIntent={forceTeaserAudioOn}
+          onStartIntent={unlockCinematicPlayback}
           videoReady={teaserPlayerReady}
           privacyPreferences={privacyPreferences}
           onPrivacyChange={handlePrivacyChange}
@@ -1193,29 +1193,24 @@ const IndexPRD4 = () => {
 
   const teaserActive = state.phase === "teaser";
   const interludeActive = state.phase === "conversation_max" && Boolean(activeVideo?.video_url);
+  const cinematicActive = teaserActive || interludeActive;
+  const cinematicVideoUrl = interludeActive && activeVideo?.video_url
+    ? activeVideo.video_url
+    : TEASER_VIDEO_URL;
 
   return (
     <>
-      {/* Gumlet force-mutes iframe autoplay. The initial "Commencer" gesture
-          starts this preloaded player automatically and audibly instead. */}
+      {/* A single persistent native element is used for every cinematic. The
+          initial "Commencer" gesture authorizes audible playback on this exact
+          element; later videos only replace its HLS source. */}
       <GumletVideoPlayer
-        ref={teaserPlayerRef}
-        videoUrl={TEASER_VIDEO_URL}
-        onComplete={handleTeaserContinue}
-        onSkip={handleTeaserSkip}
+        ref={cinematicPlayerRef}
+        videoUrl={cinematicVideoUrl}
+        onComplete={interludeActive ? () => finishActiveVideo(false) : handleTeaserContinue}
+        onSkip={interludeActive ? () => finishActiveVideo(true) : handleTeaserSkip}
         onReady={teaserActive || state.phase === "welcome" ? () => setTeaserPlayerReady(true) : undefined}
-        active={teaserActive}
-        autoPlay
-        playbackMode="embed"
-        showSkip={teaserActive}
-      />
-      <GumletVideoPlayer
-        videoUrl={activeVideo?.video_url || TEASER_VIDEO_URL}
-        onComplete={() => finishActiveVideo(false)}
-        onSkip={() => finishActiveVideo(true)}
-        active={interludeActive}
-        playbackMode="native"
-        showSkip={interludeActive}
+        active={cinematicActive}
+        showSkip={cinematicActive}
       />
       {screen}
     </>
