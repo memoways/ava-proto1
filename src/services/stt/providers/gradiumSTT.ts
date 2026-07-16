@@ -85,7 +85,7 @@ export class GradiumSTT implements STTSession {
       this.ws!.onopen = () => {
         window.clearTimeout(timeout);
         const g = getSTTProviderSettings("gradium");
-        const jsonConfig: Record<string, unknown> = { delay_in_frames: 8 };
+        const jsonConfig: Record<string, unknown> = { delay_in_frames: GRADIUM_DELAY_IN_FRAMES };
         if (g.language && g.language !== "auto") jsonConfig.language = g.language;
         this.ws!.send(JSON.stringify({
           type: "setup",
