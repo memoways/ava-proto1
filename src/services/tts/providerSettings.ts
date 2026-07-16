@@ -105,7 +105,6 @@ export interface GradiumSettings {
   voiceId: string;
   outputFormat:
     | "wav"
-    | "mp3"
     | "opus"
     | "ulaw_8000"
     | "mulaw_8000"
@@ -129,8 +128,10 @@ export interface GradiumSettings {
   pronunciationId: string;
 }
 
+// Note: Gradium API does NOT support "mp3" — supported formats per
+// https://docs.gradium.ai/api-reference/endpoint/tts-post
 export const GRADIUM_OUTPUT_FORMATS: GradiumSettings["outputFormat"][] = [
-  "wav", "mp3", "opus",
+  "wav", "opus",
   "ulaw_8000", "mulaw_8000", "alaw_8000",
   "pcm", "pcm_8000", "pcm_16000", "pcm_22050", "pcm_24000", "pcm_44100", "pcm_48000",
 ];
@@ -139,13 +140,14 @@ const GRADIUM_KEY = "ava_tts_settings_gradium";
 
 const gradiumDefaults: GradiumSettings = {
   voiceId: "b5ioHAR7JuHVLskk",
-  outputFormat: "mp3",
+  outputFormat: "wav",
   temp: 0.7,
   cfgCoef: 2.0,
   paddingBonus: 0.0,
   rewriteRules: "fr",
   pronunciationId: "",
 };
+
 
 
 export function getGradiumSettings(): GradiumSettings {
