@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Save, RotateCcw, CheckCircle2 } from "lucide-react";
+import { Save, RotateCcw, CheckCircle2, HelpCircle } from "lucide-react";
 import { generateSpeech, playAudioBlob } from "@/services/tts";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
 import type { TTSProviderId } from "@/services/tts/types";
@@ -187,6 +188,7 @@ export default function TTSConfigTab() {
 
 
   return (
+    <TooltipProvider delayDuration={150}>
     <div className="max-w-4xl space-y-8">
       <div>
         <h2 className="text-lg font-semibold">TTS Config — Multi-providers</h2>
@@ -274,18 +276,39 @@ export default function TTSConfigTab() {
         </div>
 
         <SliderRow label="Stabilité" value={elSettings.stability} min={0} max={1} step={0.05}
-          onChange={(v) => updateEl({ stability: v })} />
+          onChange={(v) => updateEl({ stability: v })}
+          tooltip="Contrôle la constance de la voix entre deux générations. À 0, la voix est plus expressive et variable ; à 1, elle devient très stable, presque monotone."
+          minLabel="Expressif / variable" maxLabel="Stable / constant" />
         <SliderRow label="Similarity Boost" value={elSettings.similarityBoost} min={0} max={1} step={0.05}
-          onChange={(v) => updateEl({ similarityBoost: v })} />
+          onChange={(v) => updateEl({ similarityBoost: v })}
+          tooltip="Rapproche la voix générée du timbre du speaker original. À 0, la voix est plus neutre ; à 1, elle colle au maximum au clone."
+          minLabel="Neutre" maxLabel="Proche du clone" />
         <SliderRow label="Style" value={elSettings.style} min={0} max={1} step={0.05}
-          onChange={(v) => updateEl({ style: v })} />
+          onChange={(v) => updateEl({ style: v })}
+          tooltip="Accentue le style dramatique / théâtral de la lecture. À 0, le rendu est naturel et conversationnel ; à 1, il devient très stylisé."
+          minLabel="Naturel" maxLabel="Théâtral" />
         <SliderRow label="Vitesse" value={elSettings.speed} min={0.7} max={1.2} step={0.02}
-          onChange={(v) => updateEl({ speed: v })} />
+          onChange={(v) => updateEl({ speed: v })}
+          tooltip="Vitesse de lecture globale. 1 = vitesse normale." minLabel="0.7 lent" maxLabel="1.2 rapide" />
         <SliderRow label="Optimize streaming latency" value={elSettings.optimizeStreamingLatency} min={0} max={4} step={1}
-          onChange={(v) => updateEl({ optimizeStreamingLatency: Math.round(v) })} format={(v) => v.toString()} />
+          onChange={(v) => updateEl({ optimizeStreamingLatency: Math.round(v) })} format={(v) => v.toString()}
+          tooltip="Compromis entre qualité et latence pour le streaming. 0 = qualité maximale ; 4 = latence minimale, utile pour le dialogue temps réel."
+          minLabel="Qualité max" maxLabel="Latence min" />
 
         <div className="flex items-center justify-between py-2">
-          <label className="text-sm">Speaker Boost</label>
+          <div className="flex items-center gap-1.5">
+            <label className="text-sm">Speaker Boost</label>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" className="text-muted-foreground/60 hover:text-primary transition-colors">
+                  <HelpCircle className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <p className="text-xs leading-relaxed">Renforce la projection et la présence globale de la voix, comme un léger boost de volume/clarté.</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
           <Switch checked={elSettings.useSpeakerBoost} onCheckedChange={(v) => updateEl({ useSpeakerBoost: v })} />
         </div>
       </section>
@@ -350,24 +373,53 @@ export default function TTSConfigTab() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <p className="text-xs font-medium mb-2">Delivery mode (tts-2)</p>
+            <div className="flex items-center gap-1.5 mb-2">
+              <p className="text-xs font-medium">Delivery mode (tts-2)</p>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground/60 hover:text-primary transition-colors">
+                    <HelpCircle className="w-3.5 h-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-xs leading-relaxed">Contrôle la variabilité expressive de l'intonation : STABLE = très régulier, BALANCED = compromis, CREATIVE = plus emphatique et variable.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
             <div className="flex gap-2">
-              {(["STABLE", "BALANCED", "CREATIVE"] as const).map((m) => (
-                <button key={m} onClick={() => updateIw({ deliveryMode: m })}
-                  className={`flex-1 px-2 py-1.5 border rounded text-xs ${
-                    iwSettings.deliveryMode === m ? "bg-primary/10 border-primary" : "hover:bg-accent/50"
-                  }`}>
-                  {m}
-                </button>
-              ))}
+              {(["STABLE", "BALANCED", "CREATIVE"] as const).map((m) => {
+                const deliveryTooltip: Record<string, string> = {
+                  STABLE: "Intonation très régulière et prévisible — clarté maximale.",
+                  BALANCED: "Compromis entre expressivité et stabilité.",
+                  CREATIVE: "Intonation plus variée, emphatique et imprévisible.",
+                };
+                return (
+                  <Tooltip key={m}>
+                    <TooltipTrigger asChild>
+                      <button onClick={() => updateIw({ deliveryMode: m })}
+                        className={`flex-1 px-2 py-1.5 border rounded text-xs ${
+                          iwSettings.deliveryMode === m ? "bg-primary/10 border-primary" : "hover:bg-accent/50"
+                        }`}>
+                        {m}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p className="text-xs leading-relaxed">{deliveryTooltip[m]}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
             </div>
           </div>
           <SliderRow label="Speaking rate" value={iwSettings.speakingRate} min={0.5} max={2} step={0.05}
-            onChange={(v) => updateIw({ speakingRate: v })} />
+            onChange={(v) => updateIw({ speakingRate: v })}
+            tooltip="Vitesse de parole. 0.5 = deux fois plus lent ; 2 = deux fois plus rapide." minLabel="0.5 lent" maxLabel="2 rapide" />
         </div>
 
         <SliderRow label="Temperature (legacy tts-1 uniquement)" value={iwSettings.temperature} min={0} max={2} step={0.05}
-          onChange={(v) => updateIw({ temperature: v })} />
+          onChange={(v) => updateIw({ temperature: v })}
+          tooltip="Variabilité de l'intonation (uniquement pour les modèles tts-1 legacy). À 0, le rendu est très déterministe ; à 2, très expressif et imprévisible."
+          minLabel="Déterministe" maxLabel="Très expressif" />
       </section>
 
       {/* ===== Hume Octave panel ===== */}
@@ -434,6 +486,7 @@ export default function TTSConfigTab() {
               <option value="wav">WAV</option>
               <option value="pcm">PCM</option>
             </select>
+            <span className="block text-xs text-muted-foreground/60">MP3 = compact, WAV = non compressé, PCM = brut.</span>
           </label>
 
           <label className="space-y-1 text-sm">
@@ -441,6 +494,7 @@ export default function TTSConfigTab() {
             <input value={huSettings.languageCode}
               onChange={(e) => updateHu({ languageCode: e.target.value.trim().toLowerCase() || "fr" })}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="fr" />
+            <span className="block text-xs text-muted-foreground/60">Code ISO 639-1 (fr, en, es…) pour guider la prononciation.</span>
           </label>
         </div>
       </section>
@@ -490,18 +544,25 @@ export default function TTSConfigTab() {
                 <option key={f} value={f}>{f}</option>
               ))}
             </select>
+            <span className="block text-xs text-muted-foreground/60">MP3 n'est pas supporté par Gradium. WAV recommandé pour la compatibilité navigateur.</span>
           </label>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <SliderRow label="Temperature (temp)" value={grSettings.temp} min={0} max={1.4} step={0.05}
-            onChange={(v) => updateGr({ temp: v })} />
+            onChange={(v) => updateGr({ temp: v })}
+            tooltip="Variabilité créative de la génération. 0 = déterministe (même texte → même audio) ; 1.4 = très expressif et variable."
+            minLabel="Déterministe" maxLabel="Très créatif" />
           <SliderRow label="Voice similarity (cfg_coef)" value={grSettings.cfgCoef} min={1} max={4} step={0.05}
-            onChange={(v) => updateGr({ cfgCoef: v })} />
+            onChange={(v) => updateGr({ cfgCoef: v })}
+            tooltip="Rapprochement avec la voix cible. 1 = voix générique, moins ressemblante ; 4 = reproduction très fidèle du timbre cible."
+            minLabel="Générique" maxLabel="Très fidèle" />
         </div>
 
-        <SliderRow label="Vitesse (padding_bonus) — négatif = plus rapide" value={grSettings.paddingBonus} min={-4} max={4} step={0.1}
-          onChange={(v) => updateGr({ paddingBonus: v })} />
+        <SliderRow label="Vitesse (padding_bonus)" value={grSettings.paddingBonus} min={-4} max={4} step={0.1}
+          onChange={(v) => updateGr({ paddingBonus: v })}
+          tooltip="Ajuste la vitesse de lecture en ajoutant ou retirant du silence. Négatif = plus rapide, positif = plus lent."
+          minLabel="-4 rapide" maxLabel="+4 lent" />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="space-y-1 text-sm">
@@ -523,23 +584,45 @@ export default function TTSConfigTab() {
 
       </section>
     </div>
+  </TooltipProvider>
   );
 }
 
 function SliderRow({
-  label, value, min, max, step, onChange, format,
+  label, value, min, max, step, onChange, format, tooltip, minLabel, maxLabel,
 }: {
   label: string; value: number; min: number; max: number; step: number;
   onChange: (v: number) => void; format?: (v: number) => string;
+  tooltip?: string; minLabel?: string; maxLabel?: string;
 }) {
   const fmt = format ?? ((v) => v.toFixed(2));
   return (
     <div>
-      <div className="flex justify-between mb-1">
-        <label className="text-sm font-medium text-muted-foreground">{label}</label>
+      <div className="flex justify-between items-center mb-1">
+        <div className="flex items-center gap-1.5">
+          <label className="text-sm font-medium text-muted-foreground">{label}</label>
+          {tooltip && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" className="text-muted-foreground/60 hover:text-primary transition-colors">
+                  <HelpCircle className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <p className="text-xs leading-relaxed">{tooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
         <span className="text-sm font-mono">{fmt(value)}</span>
       </div>
       <Slider value={[value]} onValueChange={([v]) => onChange(v)} min={min} max={max} step={step} />
+      {(minLabel || maxLabel) && (
+        <div className="flex justify-between mt-1 text-[10px] text-muted-foreground/60">
+          <span>{minLabel ?? fmt(min)}</span>
+          <span>{maxLabel ?? fmt(max)}</span>
+        </div>
+      )}
     </div>
   );
 }
