@@ -61,8 +61,8 @@ serve(async (req) => {
       JSON.stringify({
         key: shortLivedToken,
         expires_in: grant.expires_in ?? TOKEN_TTL_SECONDS,
-        model: 'nova-2',
-        language: 'fr',
+        model: Deno.env.get('DEEPGRAM_MODEL') || 'nova-3',
+        language: Deno.env.get('DEEPGRAM_LANGUAGE') || 'fr',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
