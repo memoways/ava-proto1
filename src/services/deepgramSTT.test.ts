@@ -49,5 +49,29 @@ describe("Deepgram token diagnostics", () => {
     expect(url.searchParams.get("language")).toBe("fr");
     expect(url.searchParams.get("interim_results")).toBe("true");
     expect(url.searchParams.get("endpointing")).toBe("false");
+    expect(url.searchParams.getAll("keyterm")).toEqual([]);
+  });
+
+  it("appends each dictionary term as a repeated keyterm query param", () => {
+    const url = new URL(
+      buildDeepgramWebSocketUrl(
+        { model: "nova-3", language: "fr" },
+        { keyterms: ["Ava", "Protogyny", "Ulrich Fischer", "  ", ""] },
+      ),
+    );
+    expect(url.searchParams.getAll("keyterm")).toEqual([
+      "Ava",
+      "Protogyny",
+      "Ulrich Fischer",
+    ]);
+  });
+
+  it("caps keyterms at Deepgram's 100-term limit", () => {
+    const terms = Array.from({ length: 150 }, (_, i) => `term${i}`);
+    const url = new URL(
+      buildDeepgramWebSocketUrl({ model: "nova-3", language: "fr" }, { keyterms: terms }),
+    );
+    expect(url.searchParams.getAll("keyterm")).toHaveLength(100);
   });
 });
+

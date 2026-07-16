@@ -5,6 +5,8 @@ import { getBrowserDiagnostics, selectMediaRecorderMimeType } from "./browserCap
 import { authenticatedFunctionFetch } from "./gameAuth";
 import { combineTranscriptParts, requestLatestRecorderData, waitForCondition } from "./stt/finalization";
 import { DEEPGRAM_DEFAULT_LANGUAGE, DEEPGRAM_DEFAULT_MODEL } from "../../supabase/functions/_shared/deepgramDefaults";
+import { getDictionaryTerms } from "./stt/dictionary";
+
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 
@@ -29,7 +31,10 @@ export function normalizeDeepgramConfig(payload: Partial<DeepgramConfig>): Deepg
   };
 }
 
-export function buildDeepgramWebSocketUrl(config: Pick<DeepgramConfig, "model" | "language">): string {
+export function buildDeepgramWebSocketUrl(
+  config: Pick<DeepgramConfig, "model" | "language">,
+  options?: { keyterms?: string[] },
+): string {
   const params = new URLSearchParams({
     model: config.model,
     language: config.language,
@@ -41,8 +46,17 @@ export function buildDeepgramWebSocketUrl(config: Pick<DeepgramConfig, "model" |
     vad_events: "true",
     endpointing: "false",
   });
+  // Deepgram Nova-3 supports `keyterm` (prompting). The param may repeat; each
+  // value is URL-encoded automatically by URLSearchParams. Cap at 100 (upstream
+  // hard limit) and skip empties to avoid a 400.
+  const keyterms = (options?.keyterms ?? [])
+    .map((t) => (typeof t === "string" ? t.trim() : ""))
+    .filter(Boolean)
+    .slice(0, 100);
+  for (const term of keyterms) params.append("keyterm", term);
   return `wss://api.deepgram.com/v1/listen?${params.toString()}`;
 }
+
 
 /** Temporary tokens returned by /v1/auth/grant are JWTs and use Bearer auth. */
 export function getDeepgramWebSocketProtocols(accessToken: string): ["bearer", string] {
@@ -226,9 +240,11 @@ export class DeepgramSTT {
       throw err;
     }
 
-    // Connect to Deepgram WebSocket
-    const wsUrl = buildDeepgramWebSocketUrl(config);
-    console.info("[Deepgram] Connecting", { model: config.model, language: config.language });
+    // Connect to Deepgram WebSocket (with the project keyterm dictionary).
+    const keyterms = getDictionaryTerms();
+    const wsUrl = buildDeepgramWebSocketUrl(config, { keyterms });
+    console.info("[Deepgram] Connecting", { model: config.model, language: config.language, keyterms: keyterms.length });
+
 
     this.ws = new WebSocket(wsUrl, getDeepgramWebSocketProtocols(config.key));
     const openTimeout = setTimeout(() => {
