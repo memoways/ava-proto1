@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-16 (contrats anti-régression STT/LLM/vidéo, Deepgram nova-3, autoplay sonore, dictionnaire STT et réglages par provider)
+> **Last Updated**: 2026-07-16 (dictionnaire STT ajusté, tooltips TTS, conversion Gradium STT WAV)
 
 ---
 
