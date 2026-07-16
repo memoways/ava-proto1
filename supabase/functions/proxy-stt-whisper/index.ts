@@ -20,6 +20,7 @@ serve(async (req) => {
     const file = inForm.get("file");
     const language = (inForm.get("language") as string) || "fr";
     const model = (inForm.get("model") as string) || "whisper-1";
+    const prompt = (inForm.get("prompt") as string) || "";
     if (!(file instanceof File)) {
       return new Response(JSON.stringify({ error: "Missing 'file' field" }), {
         status: 400,
@@ -33,6 +34,8 @@ serve(async (req) => {
     outForm.append("model", model);
     outForm.append("language", language);
     outForm.append("response_format", "json");
+    if (prompt.trim()) outForm.append("prompt", prompt.trim());
+
 
     const startedAt = Date.now();
     const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
