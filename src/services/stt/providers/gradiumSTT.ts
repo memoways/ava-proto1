@@ -9,7 +9,13 @@ const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const ENDPOINT = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/proxy-stt-gradium`;
 const GRADIUM_WS_URL = "wss://api.gradium.ai/api/speech/asr";
 const TARGET_SAMPLE_RATE = 24_000;
+// Gradium recommends 1920-sample (80 ms) chunks at 24 kHz. ScriptProcessor
+// only accepts power-of-two sizes, so we use 2048 samples and let Gradium
+// re-align internally — still delivers a frame roughly every 85 ms.
 const PROCESSOR_BUFFER_SIZE = 2048;
+// delay_in_frames: 1 frame = 80 ms. Lower = more reactive partials.
+// 4 frames = ~320 ms tail before the model emits text.
+const GRADIUM_DELAY_IN_FRAMES = 4;
 const FLUSH_TIMEOUT_MS = 2500;
 
 
