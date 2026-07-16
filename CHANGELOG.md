@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.43.3] - 2026-07-16 — Gradium STT en temps réel par WebSocket et parsing JSON Game Master renforcé
+
+### Gradium STT — temps réel et latence réduite
+- Passage du mode batch REST au streaming WebSocket natif (`wss://api.gradium.ai/api/speech/asr`).
+- Le proxy Edge Function expose désormais un endpoint `GET` qui mint un token Gradium à usage unique et à durée courte, gardant la clé API côté serveur.
+- Le provider navigateur ouvre un WebSocket, envoie la configuration `setup` (modèle `default`, format PCM, langue depuis les réglages STT Gradium), puis stream les chunks audio en PCM 16 bits mono depuis un `AudioContext` à 24 kHz.
+- Les messages `text` partiels (`isFinal=false`) sont envoyés au fur et à mesure à l'orchestrateur, ce qui rend la transcription visible pendant que l'utilisateur parle. Le message final marque `isFinal=true`.
+- Les segments `final` et `text` sont réassemblés avec gestion d'ordre ; les segments orphelins sont concaténés en fin de flux pour ne rien perdre.
+- Les autres providers STT (Deepgram, Gamilab, Whisper, AssemblyAI) sont strictement préservés : les modifications sont isolées à Gradium.
+
+### Game Master — extraction JSON robuste
+- Les évaluations post-tour (`gameMasterPRD4.ts`) et l'extraction de labels (`gameMasterLabelPRD4.ts`) ajoutent un parseur `jsonObjectCandidates` qui balaie la réponse LLM pour trouver tous les objets JSON équilibrés, en ignorant le texte autour et les faux débuts de chaîne.
+- Corrige les erreurs de parsing JSON intermittentes lorsque le LLM renvoie du JSON valide noyé dans des explications ou des fragments de markdown.
+
+### Fichiers
+- `src/services/stt/providers/gradiumSTT.ts`, `supabase/functions/proxy-stt-gradium/index.ts`, `src/agents/gameMasterPRD4.ts`, `src/agents/gameMasterLabelPRD4.ts`.
+
 ## [0.43.2] - 2026-07-16 — Valeurs par défaut du dictionnaire, ordre des tabs, tooltips TTS et conversion Gradium STT
 
 ### Dictionnaire STT
