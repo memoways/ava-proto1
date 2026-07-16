@@ -50,9 +50,13 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
   const isGumletEndedMessage = useCallback((data: unknown) => {
     if (!data || typeof data !== "object") return false;
-
-    const message = data as { type?: string; event?: string };
-    return message.type === "gumlet" && message.event === "ended";
+    const message = data as { type?: string; event?: string; name?: string; method?: string };
+    const eventName = (message.event || message.name || message.method || "").toLowerCase();
+    if (message.type === "gumlet" && (eventName === "ended" || eventName === "complete" || eventName === "finish")) {
+      return true;
+    }
+    // player.js relay: { event: "ended" } sans type
+    return eventName === "ended" || eventName === "complete";
   }, []);
 
   // Extract asset ID from various Gumlet URL formats
