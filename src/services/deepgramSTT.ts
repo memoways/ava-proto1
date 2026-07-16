@@ -31,21 +31,44 @@ export function normalizeDeepgramConfig(payload: Partial<DeepgramConfig>): Deepg
   };
 }
 
+export interface DeepgramUrlOverrides {
+  keyterms?: string[];
+  smartFormat?: boolean;
+  punctuate?: boolean;
+  interimResults?: boolean;
+  vadEvents?: boolean;
+  fillerWords?: boolean;
+  numerals?: boolean;
+  /** Milliseconds. 0 → send "false" (disabled). */
+  endpointing?: number;
+  /** Milliseconds. 0 → skip. */
+  utteranceEndMs?: number;
+  /** Overrides the token-provided model. */
+  model?: string;
+  /** Overrides the token-provided language. */
+  language?: string;
+}
+
 export function buildDeepgramWebSocketUrl(
   config: Pick<DeepgramConfig, "model" | "language">,
-  options?: { keyterms?: string[] },
+  options?: DeepgramUrlOverrides,
 ): string {
+  const model = options?.model?.trim() || config.model;
+  const language = options?.language?.trim() || config.language;
   const params = new URLSearchParams({
-    model: config.model,
-    language: config.language,
-    smart_format: "true",
-    punctuate: "true",
-    filler_words: "false",
-    numerals: "true",
-    interim_results: "true",
-    vad_events: "true",
-    endpointing: "false",
+    model,
+    language,
+    smart_format: (options?.smartFormat ?? true) ? "true" : "false",
+    punctuate: (options?.punctuate ?? true) ? "true" : "false",
+    filler_words: (options?.fillerWords ?? false) ? "true" : "false",
+    numerals: (options?.numerals ?? true) ? "true" : "false",
+    interim_results: (options?.interimResults ?? true) ? "true" : "false",
+    vad_events: (options?.vadEvents ?? true) ? "true" : "false",
+    endpointing: options?.endpointing && options.endpointing > 0 ? String(Math.round(options.endpointing)) : "false",
   });
+  if (options?.utteranceEndMs && options.utteranceEndMs > 0) {
+    params.set("utterance_end_ms", String(Math.round(options.utteranceEndMs)));
+  }
   // Deepgram Nova-3 supports `keyterm` (prompting). The param may repeat; each
   // value is URL-encoded automatically by URLSearchParams. Cap at 100 (upstream
   // hard limit) and skip empties to avoid a 400.
@@ -56,6 +79,7 @@ export function buildDeepgramWebSocketUrl(
   for (const term of keyterms) params.append("keyterm", term);
   return `wss://api.deepgram.com/v1/listen?${params.toString()}`;
 }
+
 
 
 /** Temporary tokens returned by /v1/auth/grant are JWTs and use Bearer auth. */
