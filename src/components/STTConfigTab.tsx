@@ -195,6 +195,58 @@ export default function STTConfigTab() {
         })}
       </section>
 
+      <section className="rounded-lg border border-border bg-card/40 p-4">
+        <div className="mb-2 flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold">Dictionnaire custom (mots-clés)</h3>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Noms propres et jargon à privilégier — un terme par ligne. Injecté
+              automatiquement à l'ouverture de chaque session :
+              <span className="font-mono"> Deepgram (keyterm)</span>,
+              <span className="font-mono"> AssemblyAI (keyterms_prompt)</span>,
+              <span className="font-mono"> Whisper (prompt)</span>.
+              Gradium / Gamilab : non supportés pour l'instant.
+            </p>
+          </div>
+          <Badge variant={dictOverLimit ? "destructive" : "secondary"}>
+            {dictTerms.length} / {STT_DICTIONARY_MAX_TERMS}
+          </Badge>
+        </div>
+
+        <Textarea
+          value={dictText}
+          onChange={(e) => setDictText(e.target.value)}
+          rows={8}
+          spellCheck={false}
+          className="font-mono text-sm"
+          placeholder={"Max\nAva\nEmma\nLéo\nProtogyny\nMemoWays"}
+        />
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            onClick={saveDictionary}
+            disabled={dictSaving || !dictHasChanges}
+            className={dictHasChanges ? "bg-green-600 hover:bg-green-700" : ""}
+          >
+            <Save className="mr-2 h-4 w-4" />
+            {dictSaving ? "Sauvegarde..." : "Sauver le dictionnaire"}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={resetDictionary}>
+            <RotateCcw className="mr-2 h-4 w-4" />
+            Réinitialiser aux valeurs par défaut
+          </Button>
+          {dictHasChanges && (
+            <span className="text-xs text-amber-400">Modifications non sauvegardées</span>
+          )}
+        </div>
+      </section>
+
+
+
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={save} disabled={saving || !hasChanges} className={hasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
           <Save className="mr-2 h-4 w-4" />
