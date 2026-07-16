@@ -6,6 +6,8 @@ import { authenticatedFunctionFetch } from "./gameAuth";
 import { combineTranscriptParts, requestLatestRecorderData, waitForCondition } from "./stt/finalization";
 import { DEEPGRAM_DEFAULT_LANGUAGE, DEEPGRAM_DEFAULT_MODEL } from "../../supabase/functions/_shared/deepgramDefaults";
 import { getDictionaryTerms } from "./stt/dictionary";
+import { getSTTProviderSettings } from "./stt/providerSettings";
+
 
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
