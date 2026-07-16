@@ -13,10 +13,10 @@ Ce contrat transforme les incidents récurrents en invariants exécutables. La C
 ## Invariants vidéo/audio
 
 - Aucun écran d'activation sonore ni contrôle Play n'est rendu.
-- Le clic initial « Commencer » lance le teaser préchargé avec `play → volume 100 % → unmute → play`.
+- Le clic initial « Commencer » active immédiatement le teaser préchargé et conserve la demande `play → volume 100 % → unmute → play` jusqu'au `ready` du player.
 - Les cinématiques HLS suivantes sont en autoplay, sans contrôles et avec `muted=false`, volume `1`.
 - Seul un identifiant Gumlet hexadécimal complet de 24 caractères peut être converti en manifeste HLS.
-- « Passer » coupe, met en pause et remet à zéro avant la transition.
+- « Passer » coupe, met en pause et remet à zéro avant la transition ; l'iframe est détruite/rechargée et le HLS est détaché afin que l'arrêt ne dépende pas d'une commande asynchrone.
 
 ## Invariant réponse Max
 
@@ -28,5 +28,5 @@ Ce contrat transforme les incidents récurrents en invariants exécutables. La C
 - `npm run test:regression` : contrats critiques STT, audio, vidéo et orchestration.
 - `npm run test:unit` : suite unitaire sans dépendance distante.
 - `npm run build` : compilation de production.
-- `npm run test:e2e` : parcours navigateur multi-tours, transcription visible, TTS et vidéo intercalée.
+- `npm run test:e2e` : parcours navigateur multi-tours, transcription visible, TTS, vidéo intercalée et contrats d'état autoplay/skip pour iframe et HLS.
 - `npm run test:quality` : gate locale avant commit/push.

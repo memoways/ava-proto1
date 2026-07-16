@@ -50,6 +50,53 @@ async function installNetworkFakes(
 
   await page.addInitScript(({ transcripts, simulateAudio }: { transcripts: string[]; simulateAudio: boolean }) => {
     let websocketIndex = 0;
+    type E2ETestWindow = Window & {
+      __e2eLongAudio?: boolean;
+      __e2eAudioState?: { ended: number; paused: number };
+      __e2eVideoState?: { playing: boolean; muted: boolean; playCount: number; stopCount: number };
+      __e2eNativeVideoState?: { playing: boolean; playCount: number; pauseCount: number };
+    };
+    const testWindow = window as E2ETestWindow;
+    testWindow.__e2eVideoState = { playing: false, muted: true, playCount: 0, stopCount: 0 };
+    testWindow.__e2eNativeVideoState = { playing: false, playCount: 0, pauseCount: 0 };
+    Object.defineProperty(HTMLMediaElement.prototype, "play", {
+      configurable: true,
+      value() {
+        if (this instanceof HTMLVideoElement && testWindow.__e2eNativeVideoState) {
+          testWindow.__e2eNativeVideoState.playing = true;
+          testWindow.__e2eNativeVideoState.playCount += 1;
+        }
+        return Promise.resolve();
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "pause", {
+      configurable: true,
+      value() {
+        if (this instanceof HTMLVideoElement && testWindow.__e2eNativeVideoState) {
+          testWindow.__e2eNativeVideoState.playing = false;
+          testWindow.__e2eNativeVideoState.pauseCount += 1;
+        }
+      },
+    });
+    window.addEventListener("message", (event) => {
+      let message: { context?: string; event?: string } | null = null;
+      try {
+        message = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+      } catch { /* unrelated postMessage */ }
+      if (message?.context !== "e2e-video-state" || !testWindow.__e2eVideoState) return;
+      if (message.event === "play") {
+        testWindow.__e2eVideoState.playing = true;
+        testWindow.__e2eVideoState.playCount += 1;
+      } else if (message.event === "unmute") {
+        testWindow.__e2eVideoState.muted = false;
+      } else if (message.event === "pause" || message.event === "unload") {
+        testWindow.__e2eVideoState.playing = false;
+        testWindow.__e2eVideoState.stopCount += 1;
+      } else if (message.event === "mute" || message.event === "init") {
+        testWindow.__e2eVideoState.muted = true;
+        if (message.event === "init") testWindow.__e2eVideoState.playing = false;
+      }
+    });
     localStorage.setItem("ava_gameplay_settings", JSON.stringify({ RAG_SUMMARY_EVERY_N_TURNS: 4 }));
     // PostHog intentionally filters HeadlessChrome as a bot. Use a regular
     // browser UA so this E2E can attest that real-user telemetry reaches the
@@ -65,11 +112,6 @@ async function installNetworkFakes(
     });
 
     if (simulateAudio) {
-      type AudioTestWindow = Window & {
-        __e2eLongAudio?: boolean;
-        __e2eAudioState?: { ended: number; paused: number };
-      };
-      const testWindow = window as AudioTestWindow;
       testWindow.__e2eAudioState = { ended: 0, paused: 0 };
 
       class E2EAudio {
@@ -196,12 +238,47 @@ async function installNetworkFakes(
       status: 200,
       contentType: "text/html",
       body: `<!doctype html><title>Gumlet fake</title><script>
+        const playerListeners = {};
+        let playing = false;
+        let muted = true;
+        const report = (event) => parent.postMessage(JSON.stringify({ context: "e2e-video-state", event }), "*");
+        const emit = (event, value) => {
+          for (const listener of playerListeners[event] || []) {
+            parent.postMessage(JSON.stringify({ context: "player.js", version: "3.0", event, value, listener }), "*");
+          }
+        };
         const ready = () => parent.postMessage(JSON.stringify({
           context: "player.js",
           version: "3.0",
           event: "ready",
-          value: { src: location.href, events: ["ready", "play", "ended"], methods: ["play", "unmute", "setVolume"] }
+          value: {
+            src: location.href,
+            events: ["ready", "play", "pause", "ended", "timeupdate", "volumeChange"],
+            methods: ["play", "pause", "mute", "unmute", "setVolume", "setCurrentTime", "getDuration"]
+          }
         }), "*");
+        addEventListener("message", (event) => {
+          let command;
+          try { command = typeof event.data === "string" ? JSON.parse(event.data) : event.data; } catch { return; }
+          if (command?.context !== "player.js") return;
+          if (command.method === "addEventListener") {
+            (playerListeners[command.value] ||= []).push(command.listener);
+          } else if (command.method === "play") {
+            if (!playing) { playing = true; report("play"); emit("play"); }
+          } else if (command.method === "pause") {
+            if (playing) { playing = false; report("pause"); emit("pause"); }
+          } else if (command.method === "mute") {
+            if (!muted) { muted = true; report("mute"); emit("volumeChange"); }
+          } else if (command.method === "unmute") {
+            if (muted) { muted = false; report("unmute"); emit("volumeChange"); }
+          } else if (command.method === "getDuration") {
+            parent.postMessage(JSON.stringify({ context: "player.js", version: "3.0", event: "getDuration", value: 30, listener: command.listener }), "*");
+          } else if (command.method === "setVolume" || command.method === "setCurrentTime") {
+            parent.postMessage(JSON.stringify({ context: "player.js", version: "3.0", event: command.method, value: true, listener: command.listener }), "*");
+          }
+        });
+        addEventListener("pagehide", () => report("unload"));
+        report("init");
         ready(); setTimeout(ready, 100); setTimeout(ready, 300);
       </script>`,
     });
@@ -392,6 +469,73 @@ async function installNetworkFakes(
     getPosthogRequestCount: () => posthogRequestCount,
   };
 }
+
+test("le teaser démarre automatiquement avec le son puis Passer coupe tout", async ({ page }) => {
+  await installNetworkFakes(page);
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer" }).click();
+
+  await expect.poll(() => page.evaluate(() => {
+    const state = (window as Window & {
+      __e2eVideoState?: { playing: boolean; muted: boolean; playCount: number };
+    }).__e2eVideoState;
+    return Boolean(state?.playing && !state.muted && state.playCount > 0);
+  }), { timeout: 5_000 }).toBe(true);
+
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await expect(page.getByRole("heading", { name: "À qui veux-tu parler ?" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => {
+    const state = (window as Window & {
+      __e2eVideoState?: { playing: boolean; muted: boolean; stopCount: number };
+    }).__e2eVideoState;
+    return Boolean(state && !state.playing && state.muted && state.stopCount > 0);
+  }), { timeout: 5_000 }).toBe(true);
+});
+
+test("une cinématique HLS démarre automatiquement puis Passer coupe son média", async ({ page }) => {
+  const transcripts = [
+    "Parle-moi de Max.",
+    "Que sais-tu au sujet d'Ava ?",
+    "Montre-moi le souvenir familial.",
+  ];
+  await installNetworkFakes(page, transcripts, { triggerVideoAtLabel: 3 });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await page.getByRole("button", { name: "Appeler Max" }).click();
+  for (let turn = 1; turn <= 3; turn += 1) {
+    await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+    await expect(page.getByText(transcripts[turn - 1], { exact: false })).toBeVisible();
+    await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+    if (turn < 3) {
+      await expect(page.getByText(`Réponse de Max pour le tour ${turn}.`)).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
+    }
+  }
+
+  const skipVideo = page.getByRole("button", { name: /Passer/ });
+  await expect(skipVideo).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => page.evaluate(() => {
+    const state = (window as Window & {
+      __e2eNativeVideoState?: { playing: boolean; playCount: number };
+    }).__e2eNativeVideoState;
+    const video = document.querySelector("video");
+    return Boolean(state?.playing && state.playCount > 0 && video && !video.muted && video.autoplay);
+  }), { timeout: 5_000 }).toBe(true);
+
+  const pauseCountBeforeSkip = await page.evaluate(() =>
+    (window as Window & { __e2eNativeVideoState?: { pauseCount: number } }).__e2eNativeVideoState?.pauseCount ?? 0,
+  );
+  await skipVideo.click();
+  await expect.poll(() => page.evaluate((previousPauseCount) => {
+    const state = (window as Window & {
+      __e2eNativeVideoState?: { playing: boolean; pauseCount: number };
+    }).__e2eNativeVideoState;
+    return Boolean(state && !state.playing && state.pauseCount > previousPauseCount);
+  }, pauseCountBeforeSkip), { timeout: 5_000 }).toBe(true);
+});
 
 test("parcours PRD4 heureux avec trois tours de conversation", async ({ page }) => {
   const fakes = await installNetworkFakes(page);

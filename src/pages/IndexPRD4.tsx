@@ -240,10 +240,22 @@ const IndexPRD4 = () => {
 
   const handleStart = useCallback(async (captchaToken?: string): Promise<boolean> => {
     if (isPrivacyNoticeEnabled() && !privacyPreferences?.voiceAndStorageAcknowledged) return false;
+
+    // Enter the teaser and issue playback while the click still owns browser
+    // activation. Authentication can safely finish in parallel with this
+    // public/preloaded cinematic; on failure we stop and return to welcome.
+    forceTeaserAudioOn();
+    flushSync(() => {
+      setFilmAnswer("rappel");
+      setPhase("teaser");
+    });
+
     if (isGameSecurityEnabled()) {
       try {
         await withTimeout("anonymous_game_auth", ensureGameAuth(captchaToken), 5_000);
       } catch (error) {
+        teaserPlayerRef.current?.stop();
+        flushSync(() => setPhase("welcome"));
         console.error("[Auth] Anonymous game session unavailable:", error);
         toast({
           title: "Connexion temporairement indisponible",
@@ -267,17 +279,6 @@ const IndexPRD4 = () => {
     // joue instantanément lors de l'entrée en conversation. Le clic utilisateur
     // sert aussi de gesture pour débloquer l'autoplay audio.
     void prefetchOpeningTTS().catch((e) => console.warn("[TTS] prefetch opening failed:", e));
-    // Le player teaser est déjà monté/préchargé sur l'accueil : cette commande
-    // part directement dans le call stack du clic utilisateur, ce qui est le
-    // maximum possible pour obtenir autoplay + audio non muté côté navigateur.
-    forceTeaserAudioOn();
-    // L'écran "As-tu vu le film ?" est retiré : on enchaîne directement sur le teaser.
-    // Monte le player vidéo pendant le handler du clic « Commencer » pour
-    // maximiser les chances d'autoplay avec son (activation utilisateur).
-    flushSync(() => {
-      setFilmAnswer("rappel");
-      setPhase("teaser");
-    });
     return true;
   }, [forceTeaserAudioOn, privacyPreferences, setFilmAnswer, setPhase]);
   const handleFilmAnswer = useCallback(
@@ -1204,7 +1205,7 @@ const IndexPRD4 = () => {
         onSkip={handleTeaserSkip}
         onReady={teaserActive || state.phase === "welcome" ? () => setTeaserPlayerReady(true) : undefined}
         active={teaserActive}
-        autoPlay={false}
+        autoPlay
         playbackMode="embed"
         showSkip={teaserActive}
       />

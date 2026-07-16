@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import Hls from "hls.js";
 import { Player } from "@gumlet/player.js";
 
@@ -18,6 +18,7 @@ const resetNativeVideo = (video: HTMLVideoElement) => {
 
 export interface GumletVideoPlayerHandle {
   playWithAudio: () => void;
+  stop: () => void;
 }
 
 interface GumletVideoPlayerProps {
@@ -56,11 +57,14 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<Player | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const onCompleteRef = useRef(onComplete);
   const onReadyRef = useRef(onReady);
   const hasCompletedRef = useRef(false);
   const activeRef = useRef(active);
   const stoppingRef = useRef(false);
+  const playbackRequestedRef = useRef(false);
+  const [iframeEpoch, setIframeEpoch] = useState(0);
   onCompleteRef.current = onComplete;
   onReadyRef.current = onReady;
   activeRef.current = active;
@@ -87,6 +91,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   const stopPlayback = useCallback(() => {
     // Takes precedence over autoplay/volumeChange retries until next activation.
     stoppingRef.current = true;
+    playbackRequestedRef.current = false;
     const video = videoRef.current;
     if (video) {
       // Hard-cut sound synchronously even if pause is delayed by the browser.
@@ -94,6 +99,9 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       video.muted = true;
       pauseNativeVideo(video);
       try { video.currentTime = 0; } catch { /* media may not have metadata yet */ }
+      try { hlsRef.current?.stopLoad(); } catch { /* stream may already be detached */ }
+      try { hlsRef.current?.detachMedia(); } catch { /* stream may already be detached */ }
+      resetNativeVideo(video);
     }
 
     const player = playerRef.current;
@@ -102,6 +110,16 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       void player.mute().catch(() => { /* pause remains the primary stop */ });
       void player.pause().catch(() => { /* player may already be stopped */ });
       void player.setCurrentTime(0).catch(() => { /* duration may not be ready */ });
+    }
+
+    const iframe = iframeRef.current;
+    if (iframe) {
+      // Player.js commands are asynchronous and may still be queued when the
+      // phase changes. Navigating the iframe cuts its decoder/audio process
+      // synchronously; remounting then preloads a clean, stopped player.
+      try { iframe.src = "about:blank"; } catch { /* iframe may already be gone */ }
+      playerRef.current = null;
+      setIframeEpoch((epoch) => epoch + 1);
     }
   }, []);
 
@@ -187,13 +205,17 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
   useImperativeHandle(ref, () => ({
     playWithAudio: () => {
+      playbackRequestedRef.current = true;
+      stoppingRef.current = false;
       forceAudioOn();
     },
-  }), [forceAudioOn]);
+    stop: stopPlayback,
+  }), [forceAudioOn, stopPlayback]);
 
   useEffect(() => {
     hasCompletedRef.current = false;
     stoppingRef.current = false;
+    playbackRequestedRef.current = false;
   }, [videoUrl]);
 
   // Force audio ON: unmute on ready, on play, periodically during the first
@@ -205,12 +227,12 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     let player: Player | null = null;
     let cancelled = false;
     let retryCount = 0;
-    const forceAudioOnIfActive = () => {
-      if (active) forceAudioOn();
+    const forceAudioOnIfRequested = () => {
+      if (active || playbackRequestedRef.current) forceAudioOn();
     };
     const handleReady = () => {
       onReadyRef.current?.();
-      forceAudioOnIfActive();
+      forceAudioOnIfRequested();
     };
 
     let lastKnownDuration = 0;
@@ -229,7 +251,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
         playerRef.current = player;
         player.on("ready", () => {
           handleReady();
-          if (!active) {
+          if (!active && !playbackRequestedRef.current) {
             void player?.pause().catch(() => { /* player may still be settling */ });
             void player?.setCurrentTime(0).catch(() => { /* start from the beginning on first click */ });
           }
@@ -239,13 +261,13 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
             });
           } catch { /* ignore */ }
         });
-        player.on("play", forceAudioOnIfActive);
-        player.on("volumeChange", forceAudioOnIfActive);
+        player.on("play", forceAudioOnIfRequested);
+        player.on("volumeChange", forceAudioOnIfRequested);
         player.on("ended", completeOnce);
         player.on("timeupdate", (data: unknown) => {
           if (retryCount < 6) {
             retryCount += 1;
-            forceAudioOnIfActive();
+            forceAudioOnIfRequested();
           }
           // Player.js émet { seconds, duration } dans timeupdate
           if (data && typeof data === "object") {
@@ -256,18 +278,18 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
             checkEndFromTime(payload.seconds);
           }
         });
-        forceAudioOnIfActive();
+        forceAudioOnIfRequested();
       } catch (err) {
         console.warn("Player.js init failed:", err);
       }
     }, 0);
 
     const retryTimers = [100, 300, 700, 1200, 2000, 3500, 5500].map((delay) =>
-      window.setTimeout(forceAudioOnIfActive, delay),
+      window.setTimeout(forceAudioOnIfRequested, delay),
     );
 
     const onUserGesture = () => {
-      if (active) forceAudioOn();
+      if (active || playbackRequestedRef.current) forceAudioOn();
     };
     window.addEventListener("pointerdown", onUserGesture, { capture: true });
     window.addEventListener("click", onUserGesture, { capture: true });
@@ -284,11 +306,12 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       window.removeEventListener("touchstart", onUserGesture, { capture: true });
       window.removeEventListener("keydown", onUserGesture, { capture: true });
     };
-  }, [active, completeOnce, embedUrl, forceAudioOn]);
+  }, [active, completeOnce, embedUrl, forceAudioOn, iframeEpoch]);
 
   useEffect(() => {
     if (active) {
       stoppingRef.current = false;
+      playbackRequestedRef.current = true;
       forceAudioOn();
       return;
     }
@@ -347,6 +370,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       enableWorker: true,
       startLevel: -1,
     });
+    hlsRef.current = hls;
     hls.loadSource(hlsUrl);
     hls.attachMedia(video);
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -357,6 +381,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     return () => {
       pauseNativeVideo(video);
       hls.destroy();
+      if (hlsRef.current === hls) hlsRef.current = null;
       resetNativeVideo(video);
     };
   }, [forceAudioOn, hlsUrl]);
@@ -409,6 +434,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
         />
       ) : (
         <iframe
+          key={iframeEpoch}
           ref={iframeRef}
           src={embedUrl}
           title="Video player"

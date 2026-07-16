@@ -31,23 +31,23 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 ### Vidéos Gumlet — fin fiable et audio systématique
 - Lovable a élargi la détection de fin Gumlet (`ended`, `complete`, `finish`) et ajouté un fallback temporel à moins de 0,4 seconde de la durée lorsque l'embed n'émet pas `ended`, garantissant le retour automatique à la conversation.
 - Les URLs Gumlet `watch/embed` sont converties en manifestes HLS natifs. Le player n'utilise donc plus l'autoplay iframe que Gumlet documente comme systématiquement muet.
-- Le teaser conserve l'iframe Gumlet préchargée qui fonctionnait déjà, avec l'autoplay interne Gumlet désactivé car Gumlet le force en mode muet. Le clic initial « Commencer » lance automatiquement la vidéo par la séquence synchrone `play`, volume à 100 %, `unmute`, puis `play`, et déverrouille l'audio de la session dans le même geste utilisateur, sans écran ni bouton Play intermédiaire.
+- Le teaser conserve l'iframe Gumlet préchargée et demande explicitement l'autoplay. Le clic initial « Commencer » passe désormais le player à l'état actif avant toute attente d'authentification, lance `play`, volume à 100 %, `unmute`, puis `play`, et mémorise cette intention jusqu'à l'événement Gumlet `ready` : un `pause()` tardif ne peut plus annuler le démarrage. Aucun écran ni bouton Play intermédiaire n'est ajouté.
 - Les interludes utilisent un player HLS natif séparé et persistant, toujours en autoplay, sans contrôles navigateur, avec `muted=false`, volume à 100 % et plusieurs retries automatiques au chargement. Toute remise en sourdine ou baisse de volume est corrigée sans ajouter de gate visuelle.
 - Les messages `postMessage` de fin sont limités à l'iframe réellement contrôlée afin qu'un message tiers ne puisse pas terminer une vidéo.
-- Le clic « Passer » coupe explicitement la vidéo et le son, remet la lecture à zéro, puis seulement déclenche la suite du parcours ; aucun audio ne reste actif en arrière-plan.
+- Le clic « Passer » effectue un hard-stop avant la transition : mute/pause/retour à zéro, arrêt et détachement HLS, suppression de la source native, ou navigation immédiate de l'iframe vers `about:blank` puis recréation d'un player propre. L'arrêt ne dépend donc plus de la disponibilité ou de la vitesse de Player.js.
 - Les identifiants Gumlet doivent maintenant être des IDs hexadécimaux complets de 24 caractères ; une URL invalide ne peut plus être partiellement transformée en faux manifeste HLS.
 
 ### Compound engineering — gates anti-régression
 - Nouveau contrat exécutable `docs/core_experience_regression_contract.md` pour les invariants STT, transcription visible, budget Max, autoplay audio et arrêt sur « Passer ».
 - Nouvelles commandes `test:regression`, `test:unit` et `test:quality` ; la gate critique couvre séparément Deepgram, Gamilab, finalisation, métadonnées, orchestration, audio et vidéo.
-- Workflow GitHub Actions sur chaque pull request et push `main` : installation reproductible, tests critiques et unitaires, build de production, puis quatre parcours Playwright (3 tours, audio long, retry TTS et endurance 35 tours avec cinématique).
+- Workflow GitHub Actions sur chaque pull request et push `main` : installation reproductible, tests critiques et unitaires, build de production, puis six parcours Playwright, dont deux contrats média explicites (`playing=true/muted=false` après démarrage, puis arrêt observé après « Passer ») pour le teaser iframe et les cinématiques HLS.
 
 ### Dépendances
 - `bun.lock` resynchronisé avec les dépendances déclarées : hCaptcha présent, PostHog résolu sur la branche récente compatible et ancienne chaîne OpenTelemetry/protobuf inutilisée retirée du lockfile.
 
 ### Validation
 - 102 tests unitaires locaux verts, dont les nouveaux cas de conservation préfixe finalisé + queue interim, absence de duplication d'un transcript cumulatif, isolation Gamilab/Deepgram, modèle Deepgram effectif et budget Max après RAG.
-- 29 tests de régression critiques verts et quatre scénarios Playwright complets verts, dont 35 tours et une cinématique HLS.
+- 29 tests de régression critiques verts et six scénarios Playwright complets verts, dont les contrats autoplay/skip iframe et HLS, 35 tours et une cinématique intercalée.
 - Build Vite de production et lint ciblé des fichiers modifiés verts ; `git diff --check` sans erreur.
 - Manifeste HLS du teaser vérifié en HTTP 200 avec piste audio AAC dédiée.
 

@@ -67,19 +67,19 @@ describe("GumletVideoPlayer", () => {
     expect(screen.getByTitle("Video player").tagName).toBe("IFRAME");
   });
 
-  it("keeps the first video preloaded without Gumlet's forced-muted iframe autoplay", () => {
+  it("requests autoplay for the first Gumlet video without showing player controls", () => {
     render(
       <GumletVideoPlayer
         videoUrl="https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049"
         onComplete={() => {}}
         onSkip={() => {}}
         playbackMode="embed"
-        autoPlay={false}
+        autoPlay
       />,
     );
 
     expect(screen.getByTitle("Video player").tagName).toBe("IFRAME");
-    expect(screen.getByTitle("Video player").getAttribute("src")).toContain("autoplay=false");
+    expect(screen.getByTitle("Video player").getAttribute("src")).toContain("autoplay=true");
     expect(screen.getByTitle("Video player").getAttribute("src")).toContain("disable_player_controls=true");
     expect(screen.queryByRole("button", { name: /activer le son/i })).not.toBeInTheDocument();
   });
