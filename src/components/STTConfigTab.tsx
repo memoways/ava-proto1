@@ -49,13 +49,23 @@ export default function STTConfigTab() {
   const [saving, setSaving] = useState(false);
   const [statuses, setStatuses] = useState<Record<STTProviderId, STTProviderRuntimeStatus> | null>(null);
 
+  const [dictText, setDictText] = useState<string>(termsToText(DEFAULT_STT_DICTIONARY_TERMS));
+  const [dictSaved, setDictSaved] = useState<string>(termsToText(DEFAULT_STT_DICTIONARY_TERMS));
+  const [dictSaving, setDictSaving] = useState(false);
+
   useEffect(() => {
     loadSTTSettingsFromDB().then((loaded) => {
       setSettings(loaded);
       setSaved(loaded);
     });
+    loadDictionaryFromDB().then(({ terms }) => {
+      const text = termsToText(terms);
+      setDictText(text);
+      setDictSaved(text);
+    });
     refreshStatuses();
   }, []);
+
 
   const hasChanges = useMemo(() => JSON.stringify(settings) !== JSON.stringify(saved), [settings, saved]);
 
