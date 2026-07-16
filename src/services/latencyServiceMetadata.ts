@@ -2,6 +2,7 @@ import type { LatencySegmentKey, LatencyServiceInfo } from "@/services/latencySe
 import { getGameplaySettings, getLLMSettings, getTTSSettings } from "@/services/settingsService";
 import { getSTTProvider, getSTTProviderDefinition } from "@/services/stt";
 import { getActiveProviderId, getHumeSettings, getInworldSettings } from "@/services/tts/providerSettings";
+import { DEEPGRAM_DEFAULT_MODEL } from "../../supabase/functions/_shared/deepgramDefaults";
 
 export function getConfiguredTTSServiceInfo(): LatencyServiceInfo {
   try {
@@ -42,11 +43,11 @@ export function getConfiguredSTTServiceInfo(): LatencyServiceInfo {
     return {
       serviceProvider: provider.label,
       serviceName: provider.id,
-      model: provider.id === "deepgram" ? "nova-2" : provider.id,
+      model: provider.id === "deepgram" ? DEEPGRAM_DEFAULT_MODEL : provider.id,
       mode: provider.mode,
     };
   } catch {
-    return { serviceProvider: "Deepgram", serviceName: "deepgram", model: "nova-2", mode: "streaming" };
+    return { serviceProvider: "Deepgram", serviceName: "deepgram", model: DEEPGRAM_DEFAULT_MODEL, mode: "streaming" };
   }
 }
 

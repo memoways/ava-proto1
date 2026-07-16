@@ -37,6 +37,7 @@ import { queryRAG } from "@/services/ragService";
 import { resolveCharacterIdByName } from "@/services/characterPromptService";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { processPRD4Turn } from "@/services/prd4Orchestrator";
+import { MAX_LLM_RESPONSE_DEADLINE_MS, TURN_RESPONSE_DEADLINE_MS } from "@/config/experienceRuntime";
 import type { ConversationMessage, PRD4PostTurnEvaluation } from "@/types";
 
 function makeConversation(turns: number): ConversationMessage[] {
@@ -132,7 +133,30 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
 
     expect(result.maxResponse).toBe("Je vous écoute.");
     expect(simulateMaxResponse).toHaveBeenCalledOnce();
-    expect(result.timings.total_ms).toBeLessThanOrEqual(5_000);
+    expect(result.timings.total_ms).toBeLessThanOrEqual(TURN_RESPONSE_DEADLINE_MS);
+  });
+
+  it("preserves a full Max generation window after a stalled RAG", async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetchSessionSummary).mockResolvedValue(null);
+    vi.mocked(queryRAG).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(simulateMaxResponse).mockImplementation(() => new Promise((resolve) => {
+      setTimeout(() => resolve({ response: "Réponse complète de Max.", systemPrompt: "system" }), 3_500);
+    }));
+
+    const turnPromise = processPRD4Turn({
+      sessionId: "session-soak",
+      conversationHistory: [],
+      userMessage: "Alors, comment vas-tu ?",
+      userRole: null,
+      timeElapsedSeconds: 60,
+    });
+    await vi.advanceTimersByTimeAsync(5_500);
+    const result = await turnPromise;
+
+    expect(result.maxResponse).toBe("Réponse complète de Max.");
+    expect(vi.mocked(simulateMaxResponse).mock.calls[0][1]?.timeoutMs).toBe(MAX_LLM_RESPONSE_DEADLINE_MS);
+    expect(result.timings.total_ms).toBeLessThanOrEqual(TURN_RESPONSE_DEADLINE_MS);
   });
 
   it("keeps ordering and bounded context across thirty simulated 35-turn sessions", async () => {

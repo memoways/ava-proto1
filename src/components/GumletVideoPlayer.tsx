@@ -133,7 +133,9 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     if (!player) return;
     try {
       // Dispatch every command synchronously inside the user-gesture stack.
-      // Waiting for setVolume/unmute first makes play() lose that activation.
+      // The first play consumes the activation; volume/unmute then restore the
+      // audible state before the second play confirms it without another click.
+      void player.play().catch(() => { /* second play remains available */ });
       void player.setVolume(100).catch(() => { /* retry on next gesture */ });
       void player.unmute().catch(() => { /* retry on next gesture */ });
       void player.play().catch(() => { /* retry on next gesture */ });
@@ -143,7 +145,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   }, []);
 
   const getGumletAssetId = useCallback((url: string) => {
-    const match = url.match(/(?:watch|embed)\/([a-f0-9]+)/i);
+    const match = url.match(/(?:watch|embed)\/([a-f0-9]{24})(?:[/?#]|$)/i);
     return match?.[1] ?? null;
   }, []);
 
@@ -172,7 +174,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     };
 
     if (url.includes("play.gumlet.io/embed/")) return withAudioDefaults(url);
-    const match = url.match(/(?:watch|embed)\/([a-f0-9]+)/i);
+    const match = url.match(/(?:watch|embed)\/([a-f0-9]{24})(?:[/?#]|$)/i);
     if (match) {
       const assetId = match[1];
       return withAudioDefaults(`https://play.gumlet.io/embed/${assetId}`);

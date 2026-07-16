@@ -5,6 +5,7 @@ const SUPABASE_ORIGIN = `https://${PROJECT_ID}.supabase.co`;
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const CHARACTER_ID = "22222222-2222-4222-8222-222222222222";
 const ANONYMOUS_USER_ID = "33333333-3333-4333-8333-333333333333";
+const E2E_VIDEO_ASSET_ID = "aaaaaaaaaaaaaaaaaaaaaaaa";
 
 const TRANSCRIPTS = [
   "Où étais-tu la dernière fois que tu as vu Ava ?",
@@ -114,12 +115,14 @@ async function installNetworkFakes(
       onmessage: ((event: MessageEvent) => void) | null = null;
       onerror: (() => void) | null = null;
       onclose: (() => void) | null = null;
+      private transcript = "";
 
       constructor(url: string | URL) {
         const isDeepgram = String(url).startsWith("wss://api.deepgram.com/");
         const transcript = isDeepgram
           ? transcripts[websocketIndex++] ?? `Tour simulé ${websocketIndex}`
           : "";
+        this.transcript = transcript;
         setTimeout(() => {
           this.onopen?.();
           if (!isDeepgram) return;
@@ -133,7 +136,21 @@ async function installNetworkFakes(
         }, 0);
       }
 
-      send() {}
+      send(data: string | Blob | ArrayBuffer) {
+        if (typeof data !== "string") return;
+        try {
+          const command = JSON.parse(data) as { type?: string };
+          if (command.type !== "Finalize") return;
+          setTimeout(() => this.onmessage?.(new MessageEvent("message", {
+            data: JSON.stringify({
+              type: "Results",
+              is_final: true,
+              from_finalize: true,
+              channel: { alternatives: [{ transcript: this.transcript }] },
+            }),
+          })), 0);
+        } catch { /* binary audio and unrelated commands are ignored */ }
+      }
       close() {
         this.readyState = 3;
         this.onclose?.();
@@ -142,9 +159,23 @@ async function installNetworkFakes(
 
     class E2EMediaRecorder {
       static isTypeSupported() { return true; }
-      state: "inactive" | "recording" = "inactive";
+      state: "inactive" | "recording" | "paused" = "inactive";
       ondataavailable: ((event: BlobEvent) => void) | null = null;
+      private dataAvailableListeners: EventListenerOrEventListenerObject[] = [];
       start() { this.state = "recording"; }
+      pause() { this.state = "paused"; }
+      addEventListener(type: string, listener: EventListenerOrEventListenerObject) {
+        if (type === "dataavailable") this.dataAvailableListeners.push(listener);
+      }
+      requestData() {
+        const event = { data: new Blob(["audio"]) } as BlobEvent;
+        this.ondataavailable?.(event);
+        const listeners = this.dataAvailableListeners.splice(0);
+        listeners.forEach((listener) => {
+          if (typeof listener === "function") listener(event);
+          else listener.handleEvent(event);
+        });
+      }
       stop() { this.state = "inactive"; }
     }
 
@@ -161,7 +192,6 @@ async function installNetworkFakes(
   }, { transcripts, simulateAudio: options.ttsSuccess === true });
 
   await page.route("https://play.gumlet.io/**", (route) => {
-    if (route.request().url().includes("e2e-family")) triggeredVideoLoads += 1;
     return route.fulfill({
       status: 200,
       contentType: "text/html",
@@ -174,6 +204,14 @@ async function installNetworkFakes(
         }), "*");
         ready(); setTimeout(ready, 100); setTimeout(ready, 300);
       </script>`,
+    });
+  });
+  await page.route("https://video.gumlet.io/**", (route) => {
+    if (route.request().url().includes(E2E_VIDEO_ASSET_ID)) triggeredVideoLoads += 1;
+    return route.fulfill({
+      status: 200,
+      contentType: "application/vnd.apple.mpegurl",
+      body: "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:1\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-ENDLIST\n",
     });
   });
   await page.route("https://gamilab.ch/**", (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
@@ -212,7 +250,7 @@ async function installNetworkFakes(
         title: "Famille E2E",
         type: "interlude",
         themes: ["famille"],
-        video_url: "https://play.gumlet.io/embed/e2e-family",
+        video_url: `https://play.gumlet.io/embed/${E2E_VIDEO_ASSET_ID}`,
         context: "Max vient de revoir un souvenir familial.",
         description: "Vidéo simulée pour le test d'endurance.",
         priority: 1,
@@ -262,7 +300,7 @@ async function installNetworkFakes(
     expect(request.headers().authorization).toBe("Bearer e2e-anonymous-access-token");
 
     if (functionName === "proxy-stt") {
-      return json(route, { key: "e2e-short-lived-token", expires_in: 60, model: "nova-2", language: "fr" });
+      return json(route, { key: "e2e-short-lived-token", expires_in: 60, model: "nova-3", language: "fr" });
     }
     if (functionName === "query-rag") {
       ragCallCount += 1;

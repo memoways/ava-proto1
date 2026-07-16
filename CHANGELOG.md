@@ -21,20 +21,33 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Le mode manuel PTT empêche AssemblyAI et Gamilab d'envoyer prématurément un tour sur une détection de silence. Les écrans conversation, rôle et posture affichent un état de finalisation et bloquent un second clic ou une validation trop précoce.
 - Le texte utilisateur reste visible en entier pendant la capture, la finalisation, la réflexion et la réponse de Max ; l'écran utilise le live cumulatif puis le dernier message utilisateur finalisé sans phase vide.
 - La factory STT instancie maintenant réellement OpenAI Whisper et AssemblyAI lorsqu'ils sont sélectionnés et configurés ; auparavant ces choix retombaient silencieusement sur Deepgram.
+- La métadonnée de l'overlay n'annonce plus l'ancien `nova-2` codé en dur : le proxy et le frontend partagent désormais la même source de vérité `nova-3` / `fr`, tout en respectant une surcharge serveur explicite. Le runtime journalise le modèle et la langue réellement demandés sans exposer le token temporaire.
+- Le badge STT mesure la durée complète du geste de parole, du clic « Démarrer » à la finalisation ; il ne doit pas être interprété comme une latence réseau Deepgram. Les métriques persistées continuent de séparer la latence de service.
+
+### Réponse Max — le STT n'est plus accusé à tort
+- L'analyse de la capture Deepgram a montré que le WebSocket s'était connecté et fermé normalement ; le message « la ligne accroche » provenait du timeout LLM. Le budget global de 5 s laissait seulement ~2,8 s à Max après un RAG de 2 s.
+- Max conserve désormais une fenêtre de génération de 8 s dans un budget de tour de 11 s. Un test simule un RAG bloqué pendant 2 s puis une réponse LLM en 3,5 s et interdit le fallback trompeur.
 
 ### Vidéos Gumlet — fin fiable et audio systématique
 - Lovable a élargi la détection de fin Gumlet (`ended`, `complete`, `finish`) et ajouté un fallback temporel à moins de 0,4 seconde de la durée lorsque l'embed n'émet pas `ended`, garantissant le retour automatique à la conversation.
 - Les URLs Gumlet `watch/embed` sont converties en manifestes HLS natifs. Le player n'utilise donc plus l'autoplay iframe que Gumlet documente comme systématiquement muet.
-- Le teaser conserve l'iframe Gumlet préchargée qui fonctionnait déjà, avec `autoplay=true` et contrôles masqués. Le clic « Commencer » lui envoie immédiatement `play`, `unmute` et volume à 100 % dans le geste utilisateur, sans écran ni bouton Play intermédiaire.
+- Le teaser conserve l'iframe Gumlet préchargée qui fonctionnait déjà, avec l'autoplay interne Gumlet désactivé car Gumlet le force en mode muet. Le clic initial « Commencer » lance automatiquement la vidéo par la séquence synchrone `play`, volume à 100 %, `unmute`, puis `play`, et déverrouille l'audio de la session dans le même geste utilisateur, sans écran ni bouton Play intermédiaire.
 - Les interludes utilisent un player HLS natif séparé et persistant, toujours en autoplay, sans contrôles navigateur, avec `muted=false`, volume à 100 % et plusieurs retries automatiques au chargement. Toute remise en sourdine ou baisse de volume est corrigée sans ajouter de gate visuelle.
 - Les messages `postMessage` de fin sont limités à l'iframe réellement contrôlée afin qu'un message tiers ne puisse pas terminer une vidéo.
 - Le clic « Passer » coupe explicitement la vidéo et le son, remet la lecture à zéro, puis seulement déclenche la suite du parcours ; aucun audio ne reste actif en arrière-plan.
+- Les identifiants Gumlet doivent maintenant être des IDs hexadécimaux complets de 24 caractères ; une URL invalide ne peut plus être partiellement transformée en faux manifeste HLS.
+
+### Compound engineering — gates anti-régression
+- Nouveau contrat exécutable `docs/core_experience_regression_contract.md` pour les invariants STT, transcription visible, budget Max, autoplay audio et arrêt sur « Passer ».
+- Nouvelles commandes `test:regression`, `test:unit` et `test:quality` ; la gate critique couvre séparément Deepgram, Gamilab, finalisation, métadonnées, orchestration, audio et vidéo.
+- Workflow GitHub Actions sur chaque pull request et push `main` : installation reproductible, tests critiques et unitaires, build de production, puis quatre parcours Playwright (3 tours, audio long, retry TTS et endurance 35 tours avec cinématique).
 
 ### Dépendances
 - `bun.lock` resynchronisé avec les dépendances déclarées : hCaptcha présent, PostHog résolu sur la branche récente compatible et ancienne chaîne OpenTelemetry/protobuf inutilisée retirée du lockfile.
 
 ### Validation
-- 97 tests Vitest verts, dont les nouveaux cas de conservation préfixe finalisé + queue interim, absence de duplication d'un transcript cumulatif et fallback vers le texte live le plus complet.
+- 102 tests unitaires locaux verts, dont les nouveaux cas de conservation préfixe finalisé + queue interim, absence de duplication d'un transcript cumulatif, isolation Gamilab/Deepgram, modèle Deepgram effectif et budget Max après RAG.
+- 29 tests de régression critiques verts et quatre scénarios Playwright complets verts, dont 35 tours et une cinématique HLS.
 - Build Vite de production et lint ciblé des fichiers modifiés verts ; `git diff --check` sans erreur.
 - Manifeste HLS du teaser vérifié en HTTP 200 avec piste audio AAC dédiée.
 

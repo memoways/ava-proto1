@@ -4,7 +4,11 @@ const authenticatedFunctionFetch = vi.hoisted(() => vi.fn());
 
 vi.mock("./gameAuth", () => ({ authenticatedFunctionFetch }));
 
-import { getDeepgramToken, getDeepgramWebSocketProtocols } from "./deepgramSTT";
+import {
+  buildDeepgramWebSocketUrl,
+  getDeepgramToken,
+  getDeepgramWebSocketProtocols,
+} from "./deepgramSTT";
 
 describe("Deepgram token diagnostics", () => {
   beforeEach(() => authenticatedFunctionFetch.mockReset());
@@ -23,5 +27,27 @@ describe("Deepgram token diagnostics", () => {
       "bearer",
       "temporary-jwt",
     ]);
+  });
+
+  it("uses the shared nova-3 baseline when the proxy omits optional metadata", async () => {
+    authenticatedFunctionFetch.mockResolvedValue(new Response(JSON.stringify({
+      key: "temporary-jwt",
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+
+    await expect(getDeepgramToken()).resolves.toEqual({
+      key: "temporary-jwt",
+      model: "nova-3",
+      language: "fr",
+    });
+  });
+
+  it("builds the live stream from the effective token configuration", () => {
+    const url = new URL(buildDeepgramWebSocketUrl({ model: "nova-3", language: "fr" }));
+
+    expect(url.origin + url.pathname).toBe("wss://api.deepgram.com/v1/listen");
+    expect(url.searchParams.get("model")).toBe("nova-3");
+    expect(url.searchParams.get("language")).toBe("fr");
+    expect(url.searchParams.get("interim_results")).toBe("true");
+    expect(url.searchParams.get("endpointing")).toBe("false");
   });
 });

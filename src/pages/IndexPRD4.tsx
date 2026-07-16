@@ -22,6 +22,7 @@ import {
 } from "@/services/stt";
 import { TTSQueue, chunkTextForTTS } from "@/services/elevenLabsTTS";
 import { prefetchOpeningTTS, playOpeningTTS, OPENING_LINE } from "@/services/openingTTSCache";
+import { unlockAudioPlayback } from "@/services/audioPlayback";
 import {
   getGameplaySettings,
   getLLMSettings,
@@ -226,6 +227,10 @@ const IndexPRD4 = () => {
 
   // ---- Welcome / Film / Teaser ----------------------------------------------
   const forceTeaserAudioOn = useCallback(() => {
+    // This callback runs on the initial pointer/touch gesture. It unlocks the
+    // top-level audio context for the whole session and starts the preloaded
+    // Gumlet embed audibly without any additional play/audio button.
+    void unlockAudioPlayback().catch(() => { /* iframe activation still proceeds */ });
     teaserPlayerRef.current?.playWithAudio();
   }, []);
 
@@ -1190,6 +1195,8 @@ const IndexPRD4 = () => {
 
   return (
     <>
+      {/* Gumlet force-mutes iframe autoplay. The initial "Commencer" gesture
+          starts this preloaded player automatically and audibly instead. */}
       <GumletVideoPlayer
         ref={teaserPlayerRef}
         videoUrl={TEASER_VIDEO_URL}
@@ -1197,7 +1204,7 @@ const IndexPRD4 = () => {
         onSkip={handleTeaserSkip}
         onReady={teaserActive || state.phase === "welcome" ? () => setTeaserPlayerReady(true) : undefined}
         active={teaserActive}
-        autoPlay
+        autoPlay={false}
         playbackMode="embed"
         showSkip={teaserActive}
       />

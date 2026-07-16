@@ -22,6 +22,7 @@ import { selectRecentConversation, selectUnsummarizedConversation } from "@/serv
 import { withTimeout } from "@/services/asyncUtils";
 import {
   RAG_DEGRADED_MODE_DEADLINE_MS,
+  MAX_LLM_RESPONSE_DEADLINE_MS,
   SUMMARY_FETCH_DEADLINE_MS,
   TURN_RESPONSE_DEADLINE_MS,
   getSessionMinimumClosureSeconds,
@@ -164,7 +165,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     const { response } = await simulateMaxResponse(maxInput, {
       characterName: input.characterName || "Max",
       featureKey: "prd4_chat",
-      timeoutMs: Math.min(4_000, remainingMs),
+      timeoutMs: Math.min(MAX_LLM_RESPONSE_DEADLINE_MS, remainingMs),
       signal: input.signal,
     });
     maxResponse = response;

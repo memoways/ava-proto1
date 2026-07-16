@@ -4,13 +4,44 @@ import { createTimeoutSignal, withTimeout } from "./asyncUtils";
 import { getBrowserDiagnostics, selectMediaRecorderMimeType } from "./browserCapabilities";
 import { authenticatedFunctionFetch } from "./gameAuth";
 import { combineTranscriptParts, requestLatestRecorderData, waitForCondition } from "./stt/finalization";
+import { DEEPGRAM_DEFAULT_LANGUAGE, DEEPGRAM_DEFAULT_MODEL } from "../../supabase/functions/_shared/deepgramDefaults";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 
-interface DeepgramConfig {
+export interface DeepgramConfig {
   key: string;
   model: string;
   language: string;
+}
+
+export function normalizeDeepgramConfig(payload: Partial<DeepgramConfig>): DeepgramConfig {
+  if (typeof payload.key !== "string" || !payload.key.trim()) {
+    throw new Error("Deepgram token response is missing its temporary access token");
+  }
+  return {
+    key: payload.key,
+    model: typeof payload.model === "string" && payload.model.trim()
+      ? payload.model.trim()
+      : DEEPGRAM_DEFAULT_MODEL,
+    language: typeof payload.language === "string" && payload.language.trim()
+      ? payload.language.trim()
+      : DEEPGRAM_DEFAULT_LANGUAGE,
+  };
+}
+
+export function buildDeepgramWebSocketUrl(config: Pick<DeepgramConfig, "model" | "language">): string {
+  const params = new URLSearchParams({
+    model: config.model,
+    language: config.language,
+    smart_format: "true",
+    punctuate: "true",
+    filler_words: "false",
+    numerals: "true",
+    interim_results: "true",
+    vad_events: "true",
+    endpointing: "false",
+  });
+  return `wss://api.deepgram.com/v1/listen?${params.toString()}`;
 }
 
 /** Temporary tokens returned by /v1/auth/grant are JWTs and use Bearer auth. */
@@ -39,7 +70,8 @@ export async function getDeepgramToken(): Promise<DeepgramConfig> {
     throw new Error(payload?.error || `Failed to get Deepgram token: ${res.status}`);
   }
   debugLogger.logResponse(debugId, "stt", "Deepgram token OK", res.status, startTime);
-  return res.json();
+  const payload = await res.json() as Partial<DeepgramConfig>;
+  return normalizeDeepgramConfig(payload);
 }
 
 type TranscriptCallback = (text: string, isFinal: boolean) => void;
@@ -195,7 +227,8 @@ export class DeepgramSTT {
     }
 
     // Connect to Deepgram WebSocket
-    const wsUrl = `wss://api.deepgram.com/v1/listen?model=${config.model}&language=${config.language}&smart_format=true&punctuate=true&filler_words=false&numerals=true&interim_results=true&vad_events=true&endpointing=false`;
+    const wsUrl = buildDeepgramWebSocketUrl(config);
+    console.info("[Deepgram] Connecting", { model: config.model, language: config.language });
 
     this.ws = new WebSocket(wsUrl, getDeepgramWebSocketProtocols(config.key));
     const openTimeout = setTimeout(() => {
@@ -297,8 +330,8 @@ export class DeepgramSTT {
       selectedMimeType: this.selectedMimeType,
       turn_id: context.turn_id,
       provider: "Deepgram",
-      model: this.config?.model || "nova-3",
-      language: this.config?.language || "fr",
+      model: this.config?.model || DEEPGRAM_DEFAULT_MODEL,
+      language: this.config?.language || DEEPGRAM_DEFAULT_LANGUAGE,
     };
     recordAudioLatency({
       session_id: context.session_id ?? undefined,
@@ -309,9 +342,9 @@ export class DeepgramSTT {
       metadata: {
         turn_id: context.turn_id ?? null,
         provider: "Deepgram",
-        model: this.config?.model || "nova-3",
+        model: this.config?.model || DEEPGRAM_DEFAULT_MODEL,
         mode: "realtime",
-        language: this.config?.language || "fr",
+        language: this.config?.language || DEEPGRAM_DEFAULT_LANGUAGE,
         silence_window_ms: DeepgramSTT.SILENCE_DELAY_MS,
         trigger,
         selected_mime_type: this.selectedMimeType,

@@ -22,8 +22,14 @@ export function getSessionMinimumClosureSeconds(durationSeconds: unknown): numbe
   return Math.floor(normalizeSessionDurationSeconds(durationSeconds) * SESSION_MINIMUM_CLOSURE_RATIO);
 }
 
-/** User-visible response deadline. RAG/LLM must fail soft before this budget expires. */
-export const TURN_RESPONSE_DEADLINE_MS = 5_000;
+/**
+ * User-visible response deadline. RAG may consume two seconds, so Max must keep
+ * a real generation window instead of inheriting the small remainder.
+ */
+export const TURN_RESPONSE_DEADLINE_MS = 11_000;
+
+/** A normal Max generation must not be mistaken for an STT/network failure. */
+export const MAX_LLM_RESPONSE_DEADLINE_MS = 8_000;
 
 /** Maximum wait before the first audio starts. It must never cap legitimate playback duration. */
 export const TURN_FIRST_AUDIO_DEADLINE_MS = readPositiveMilliseconds(

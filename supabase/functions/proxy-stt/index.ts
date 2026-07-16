@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
+import { DEEPGRAM_DEFAULT_LANGUAGE, DEEPGRAM_DEFAULT_MODEL } from "../_shared/deepgramDefaults.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,8 +62,8 @@ serve(async (req) => {
       JSON.stringify({
         key: shortLivedToken,
         expires_in: grant.expires_in ?? TOKEN_TTL_SECONDS,
-        model: Deno.env.get('DEEPGRAM_MODEL') || 'nova-3',
-        language: Deno.env.get('DEEPGRAM_LANGUAGE') || 'fr',
+        model: Deno.env.get('DEEPGRAM_MODEL') || DEEPGRAM_DEFAULT_MODEL,
+        language: Deno.env.get('DEEPGRAM_LANGUAGE') || DEEPGRAM_DEFAULT_LANGUAGE,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
