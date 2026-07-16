@@ -525,6 +525,7 @@ export default function TTSConfigTab() {
 
       </section>
     </div>
+    </TooltipProvider>
   );
 }
 
