@@ -108,7 +108,7 @@ export class GradiumSTT implements STTSession {
             turn_id: context.turn_id ?? null,
             provider: "Gradium",
             model: "gradium-asr",
-            mode: "batch",
+            mode: "streamed-batch",
             language: "fr",
             trigger,
           },
@@ -137,7 +137,50 @@ export class GradiumSTT implements STTSession {
     });
 
     if (!res.ok) throw new Error(`Gradium proxy ${res.status}: ${await res.text()}`);
-    const data = await res.json();
-    return (data.text || "").trim();
+
+    // Streaming NDJSON — emit partial transcripts as segments arrive so the
+    // subtitle overlay updates in real time instead of waiting for the whole
+    // utterance to be processed.
+    const contentType = res.headers.get("content-type") || "";
+    if (!res.body || !contentType.includes("ndjson")) {
+      // Backward-compat fallback if the proxy still returns aggregated JSON.
+      const data = await res.json().catch(() => ({ text: "" }));
+      return (data.text || "").trim();
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const parts: string[] = [];
+    const emitPartial = () => {
+      const partial = parts.join(" ").replace(/\s+/g, " ").trim();
+      if (partial) this.onTranscript(partial, false);
+    };
+    const handleLine = (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      try {
+        const msg = JSON.parse(trimmed);
+        if (msg?.type === "text" && typeof msg.text === "string") {
+          parts.push(msg.text);
+          emitPartial();
+        }
+      } catch { /* keepalive / non-JSON */ }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = buffer.indexOf("\n")) >= 0) {
+        handleLine(buffer.slice(0, nl));
+        buffer = buffer.slice(nl + 1);
+      }
+    }
+    if (buffer.trim()) handleLine(buffer);
+
+    return parts.join(" ").replace(/\s+/g, " ").trim();
   }
 }
+
