@@ -238,9 +238,11 @@ export class DeepgramSTT {
       throw err;
     }
 
-    // Connect to Deepgram WebSocket
-    const wsUrl = buildDeepgramWebSocketUrl(config);
-    console.info("[Deepgram] Connecting", { model: config.model, language: config.language });
+    // Connect to Deepgram WebSocket (with the project keyterm dictionary).
+    const keyterms = getDictionaryTerms();
+    const wsUrl = buildDeepgramWebSocketUrl(config, { keyterms });
+    console.info("[Deepgram] Connecting", { model: config.model, language: config.language, keyterms: keyterms.length });
+
 
     this.ws = new WebSocket(wsUrl, getDeepgramWebSocketProtocols(config.key));
     const openTimeout = setTimeout(() => {
