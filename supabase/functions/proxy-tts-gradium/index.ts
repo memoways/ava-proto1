@@ -16,9 +16,10 @@ interface ReqBody {
   jsonConfig?: Record<string, unknown>;
 }
 
+// Note: Gradium API does NOT support "mp3" — supported formats per
+// https://docs.gradium.ai/api-reference/endpoint/tts-post
 const CONTENT_TYPES: Record<string, string> = {
   wav: "audio/wav",
-  mp3: "audio/mpeg",
   opus: "audio/ogg",
   pcm: "audio/pcm",
   ulaw_8000: "audio/basic",
@@ -32,6 +33,7 @@ const CONTENT_TYPES: Record<string, string> = {
   pcm_48000: "audio/pcm",
 };
 
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   const denied = await enforceGameRequest(req, "proxy-tts-gradium", corsHeaders);
@@ -44,7 +46,9 @@ serve(async (req) => {
     const body: ReqBody = await req.json();
     if (!body.text?.trim()) throw new Error("Text is required");
 
-    const outputFormat = body.outputFormat || "mp3";
+    const requestedFormat = body.outputFormat || "wav";
+    // Gradium does not support "mp3" — fall back to "wav" if a legacy client sends it.
+    const outputFormat = requestedFormat === "mp3" ? "wav" : requestedFormat;
     const payload: Record<string, unknown> = {
       text: body.text,
       voice_id: body.voiceId || "b5ioHAR7JuHVLskk",
@@ -78,13 +82,22 @@ serve(async (req) => {
     }
 
     const audio = await response.arrayBuffer();
+    const upstreamCT = response.headers.get("content-type") || "";
+    console.log(`[proxy-tts-gradium] upstream ok status=${response.status} bytes=${audio.byteLength} upstream-content-type=${upstreamCT}`);
+    if (audio.byteLength === 0) {
+      return new Response(
+        JSON.stringify({ error: "Gradium returned empty audio", upstreamContentType: upstreamCT, format: outputFormat }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
     return new Response(audio, {
       headers: {
         ...corsHeaders,
-        "Content-Type": CONTENT_TYPES[outputFormat] || "audio/mpeg",
+        "Content-Type": CONTENT_TYPES[outputFormat] || "audio/wav",
         "Cache-Control": "no-store",
       },
     });
+
   } catch (error: unknown) {
     console.error("[proxy-tts-gradium] Error:", error);
     const msg = error instanceof Error ? error.message : "Unknown error";
