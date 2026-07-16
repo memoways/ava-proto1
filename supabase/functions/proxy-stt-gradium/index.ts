@@ -1,6 +1,6 @@
-// Gradium STT proxy — batch mode via POST /api/post/speech/asr.
-// Docs: https://docs.gradium.ai/guides/speech-to-text-rest
-// Response is NDJSON; we aggregate `text` messages into one final string.
+// Gradium STT proxy.
+// - GET: mint a short-lived browser WebSocket token (no API key in client)
+// - POST: legacy REST batch fallback via /api/post/speech/asr
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 
@@ -8,7 +8,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 serve(async (req) => {
@@ -19,6 +19,30 @@ serve(async (req) => {
   try {
     const apiKey = Deno.env.get("GRADIUM_API_KEY");
     if (!apiKey) throw new Error("GRADIUM_API_KEY not configured");
+
+    if (req.method === "GET") {
+      const tokenRes = await fetch("https://api.gradium.ai/api/api-keys/token", {
+        headers: { "x-api-key": apiKey },
+      });
+      const body = await tokenRes.text();
+      if (!tokenRes.ok) {
+        console.error(`[proxy-stt-gradium] token ${tokenRes.status}: ${body.slice(0, 500)}`);
+        return new Response(JSON.stringify({ error: `Gradium token ${tokenRes.status}` }), {
+          status: tokenRes.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
+        });
+      }
+      return new Response(body, {
+        headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
+      });
+    }
+
+    if (req.method !== "POST") {
+      return new Response(JSON.stringify({ error: "Method not allowed" }), {
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Accept either multipart with `file`, or raw audio body.
     let audio: ArrayBuffer;
