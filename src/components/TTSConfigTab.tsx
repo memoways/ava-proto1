@@ -24,6 +24,8 @@ import {
   saveGradiumSettingsToDB,
   resetGradiumSettings,
   INWORLD_MODELS,
+  GRADIUM_OUTPUT_FORMATS,
+
   type InworldSettings,
   type HumeSettings,
   type GradiumSettings,
@@ -473,9 +475,9 @@ export default function TTSConfigTab() {
             <span className="font-medium text-muted-foreground">Voice ID</span>
             <input value={grSettings.voiceId}
               onChange={(e) => updateGr({ voiceId: e.target.value })}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="YTpq7expH9539ERJ" />
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="b5ioHAR7JuHVLskk (Max)" />
             <span className="block text-xs text-muted-foreground/60">
-              Voir <a href="https://docs.gradium.ai/guides/voices/all-voices" target="_blank" rel="noreferrer" className="underline">catalogue Gradium (237 voix)</a>
+              Défaut : <code>b5ioHAR7JuHVLskk</code> (Max) — voir <a href="https://docs.gradium.ai/guides/voices/all-voices" target="_blank" rel="noreferrer" className="underline">catalogue Gradium</a>
             </span>
           </label>
 
@@ -484,27 +486,41 @@ export default function TTSConfigTab() {
             <select value={grSettings.outputFormat}
               onChange={(e) => updateGr({ outputFormat: e.target.value as GradiumSettings["outputFormat"] })}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm">
-              <option value="mp3">MP3</option>
-              <option value="wav">WAV</option>
-              <option value="opus">Opus</option>
-              <option value="pcm">PCM</option>
+              {GRADIUM_OUTPUT_FORMATS.map((f) => (
+                <option key={f} value={f}>{f}</option>
+              ))}
             </select>
           </label>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <SliderRow label="Vitesse" value={grSettings.speed} min={0.5} max={2} step={0.05}
-            onChange={(v) => updateGr({ speed: v })} />
-          <SliderRow label="Temperature" value={grSettings.temperature} min={0} max={1.5} step={0.05}
-            onChange={(v) => updateGr({ temperature: v })} />
+          <SliderRow label="Temperature (temp)" value={grSettings.temp} min={0} max={1.4} step={0.05}
+            onChange={(v) => updateGr({ temp: v })} />
+          <SliderRow label="Voice similarity (cfg_coef)" value={grSettings.cfgCoef} min={1} max={4} step={0.05}
+            onChange={(v) => updateGr({ cfgCoef: v })} />
         </div>
 
-        <label className="space-y-1 text-sm block">
-          <span className="font-medium text-muted-foreground">Langue</span>
-          <input value={grSettings.language}
-            onChange={(e) => updateGr({ language: e.target.value.trim().toLowerCase() || "fr" })}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="fr" />
-        </label>
+        <SliderRow label="Vitesse (padding_bonus) — négatif = plus rapide" value={grSettings.paddingBonus} min={-4} max={4} step={0.1}
+          onChange={(v) => updateGr({ paddingBonus: v })} />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-muted-foreground">Rewrite rules</span>
+            <input value={grSettings.rewriteRules}
+              onChange={(e) => updateGr({ rewriteRules: e.target.value })}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="fr" />
+            <span className="block text-xs text-muted-foreground/60">Code langue (fr, en, de, es, pt) ou règles custom. Vide = désactivé.</span>
+          </label>
+
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-muted-foreground">Pronunciation ID</span>
+            <input value={grSettings.pronunciationId}
+              onChange={(e) => updateGr({ pronunciationId: e.target.value })}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="(optionnel)" />
+            <span className="block text-xs text-muted-foreground/60">Dictionnaire de prononciations Gradium, appliqué par requête.</span>
+          </label>
+        </div>
+
       </section>
     </div>
   );

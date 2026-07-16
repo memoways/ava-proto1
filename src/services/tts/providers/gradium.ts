@@ -1,6 +1,9 @@
 /**
  * Gradium TTS provider — wraps the `proxy-tts-gradium` edge function.
  * Docs: https://docs.gradium.ai/guides/text-to-speech-rest
+ * Advanced params (temp/cfg_coef/padding_bonus/rewrite_rules/pronunciation_id)
+ * are sent via `json_config` (Gradium REST expects it as a URL-encoded query
+ * param, which the proxy handles).
  */
 
 import type { TTSProvider, TTSGenerateContext, TTSGenerateResult } from "@/services/tts/types";
@@ -22,13 +25,19 @@ export const gradiumProvider: TTSProvider = {
     const preparedText = prepareTextForTTS(text);
     const voiceId = ctx?.voiceId || s.voiceId;
 
+    const jsonConfig: Record<string, number | string> = {
+      temp: s.temp,
+      cfg_coef: s.cfgCoef,
+      padding_bonus: s.paddingBonus,
+    };
+    if (s.rewriteRules.trim()) jsonConfig.rewrite_rules = s.rewriteRules.trim();
+    if (s.pronunciationId.trim()) jsonConfig.pronunciation_id = s.pronunciationId.trim();
+
     const body = {
       text: preparedText,
       voiceId,
       outputFormat: s.outputFormat,
-      speed: s.speed,
-      temperature: s.temperature,
-      language: s.language,
+      jsonConfig,
     };
 
     const startTime = Date.now();
