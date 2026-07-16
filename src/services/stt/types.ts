@@ -24,7 +24,12 @@ export interface STTProviderDefinition {
   mode: STTMode;
   expectedSecrets: string[];
   implemented: boolean;
+  /** Whether the provider consumes the shared STT custom dictionary. */
+  supportsDictionary: boolean;
+  /** Human-readable description of how the dictionary is injected. */
+  dictionaryMethod?: string;
 }
+
 
 export interface STTSettings {
   activeProvider: STTProviderId;
