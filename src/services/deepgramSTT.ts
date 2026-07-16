@@ -29,7 +29,10 @@ export function normalizeDeepgramConfig(payload: Partial<DeepgramConfig>): Deepg
   };
 }
 
-export function buildDeepgramWebSocketUrl(config: Pick<DeepgramConfig, "model" | "language">): string {
+export function buildDeepgramWebSocketUrl(
+  config: Pick<DeepgramConfig, "model" | "language">,
+  options?: { keyterms?: string[] },
+): string {
   const params = new URLSearchParams({
     model: config.model,
     language: config.language,
@@ -41,8 +44,17 @@ export function buildDeepgramWebSocketUrl(config: Pick<DeepgramConfig, "model" |
     vad_events: "true",
     endpointing: "false",
   });
+  // Deepgram Nova-3 supports `keyterm` (prompting). The param may repeat; each
+  // value is URL-encoded automatically by URLSearchParams. Cap at 100 (upstream
+  // hard limit) and skip empties to avoid a 400.
+  const keyterms = (options?.keyterms ?? [])
+    .map((t) => (typeof t === "string" ? t.trim() : ""))
+    .filter(Boolean)
+    .slice(0, 100);
+  for (const term of keyterms) params.append("keyterm", term);
   return `wss://api.deepgram.com/v1/listen?${params.toString()}`;
 }
+
 
 /** Temporary tokens returned by /v1/auth/grant are JWTs and use Bearer auth. */
 export function getDeepgramWebSocketProtocols(accessToken: string): ["bearer", string] {
