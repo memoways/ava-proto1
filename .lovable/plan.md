@@ -1,62 +1,84 @@
+# STT Config — Dictionnaire visible + réglages API par service
+
 ## Contexte
 
-Cinq providers STT sont branchés dans le projet : **Deepgram** (actif par défaut, Nova‑3), **AssemblyAI**, **OpenAI Whisper**, **Gradium** et **Gamilab**. La qualité se dégrade surtout sur les noms propres du récit (Max, Ava, Emma, Léo, Protogyny, MemoWays, etc.) et le vocabulaire spécifique.
-
-## Support natif d'un dictionnaire custom par provider
-
-| Provider | Mécanisme natif | Où le passer | Efficacité pour noms propres |
-| --- | --- | --- | --- |
-| Deepgram Nova‑3 | `keyterm` (prompting) — jusqu'à 100 termes, boost sémantique fort | Query param sur le WS `wss://…/v1/listen?keyterm=Ava&keyterm=Protogyny…` | ⭐⭐⭐⭐⭐ (le meilleur) |
-| Deepgram (legacy) | `keywords=Ava:2` (intensifier) | Query param | ⭐⭐⭐ (déprécié en Nova‑3) |
-| AssemblyAI | `word_boost: [...]` + `boost_param: high` | Body JSON de la session | ⭐⭐⭐⭐ |
-| OpenAI Whisper (`whisper-1`) | `prompt` (≤224 tokens, exemples in‑context) | multipart form | ⭐⭐⭐ (fragile, biais stylistique) |
-| OpenAI `gpt-4o-transcribe` | `prompt` idem | multipart form | ⭐⭐⭐ |
-| Gradium | `pronunciation_id` (dictionnaire de prononciation créé côté Gradium) + `rewrite_rules` (côté TTS, non STT) | À confirmer côté STT — la doc STT mentionne `keyterms` selon leurs modèles | ⭐⭐ (à valider avec Nicolas) |
-| Gamilab | SDK propriétaire, pas d'API dictionnaire documentée | — | ❌ |
-
-Deepgram Nova‑3 avec `keyterm` est de loin le levier le plus rentable — c'est aussi le provider actif, donc l'impact est immédiat.
+Le dictionnaire custom existe déjà (section "Dictionnaire custom (mots-clés)" dans `STTConfigTab`, stocké dans `admin_settings.ava_stt_dictionary`) mais est peu visible : situé sous la grille des providers, sans indication par-provider de qui l'utilise. Aucun réglage API par provider n'est actuellement exposé — seul le provider actif est configurable.
 
 ## Objectif
 
-1. Un **dictionnaire projet unique** (liste éditable de termes) stocké en DB, éditable depuis l'admin.
-2. **Injection automatique** de ce dictionnaire dans chaque provider selon son API native.
-3. Focus qualité sur le provider actif (Deepgram Nova‑3), sans dégrader la latence.
+1. Rendre évident où éditer le dictionnaire et quels providers l'utilisent.
+2. Exposer, par provider, les réglages API pertinents.
 
-## Livraison en 3 étapes
+## 1 — Visibilité du dictionnaire
 
-### Étape 1 — Dictionnaire projet (fondation)
+- Sur chaque carte provider dans la grille : badge **"Dictionnaire ✓"** ou **"Dictionnaire ✗"** (couleur secondaire vs muted) + tooltip texte court expliquant la méthode utilisée (`keyterm` / `keyterms_prompt` / `prompt` / non supporté).
+- Ajouter un champ `supportsDictionary: boolean` + `dictionaryMethod?: string` dans `STTProviderDefinition` (`src/services/stt/registry.ts`).
+- Déplacer la section "Dictionnaire custom" **au-dessus** de la grille providers (position plus proéminente) et lui donner un titre h3 plus visible avec le nombre de termes et un lien d'ancre.
 
-- Nouvelle clé `admin_settings.key = "ava_stt_dictionary"` avec `value = { terms: string[] }`.
-- Service `src/services/stt/dictionary.ts` : `getDictionaryTerms()`, `loadDictionaryFromDB()`, `saveDictionaryToDB()` (même pattern que `providerSettings.ts`).
-- Onglet **STT Config** enrichi : textarea "Dictionnaire (un terme par ligne)" + compteur (limite Deepgram 100 termes) + bouton Sauver.
-- Pré‑remplissage initial avec les noms clés du récit (Max, Ava, Emma, Léo, Protogyny, MemoWays, Ulrich Fischer).
+## 2 — Réglages API par provider
 
-### Étape 2 — Deepgram Nova‑3 keyterm (priorité qualité)
+Nouvelle structure : `admin_settings.ava_stt_provider_settings` = `{ deepgram: {...}, assemblyai: {...}, openai_whisper: {...}, gradium: {...}, gamilab: {...} }`, chargée/sauvée via un nouveau service `src/services/stt/providerSettings.ts` (miroir de `tts/providerSettings.ts`).
 
-- `buildDeepgramWebSocketUrl()` accepte un `keyterms: string[]` et ajoute `keyterm=…` répété (URL‑encoder chaque terme, respecter la limite de 100).
-- Le composant qui ouvre la session Deepgram lit `getDictionaryTerms()` juste avant `new WebSocket(url)` et passe la liste.
-- Impact latence : nul (query param).
-- Vérification manuelle : dire "Protogyny" et "Léo" dans une session avant/après.
+Réglages exposés (uniquement ceux réellement utilisés par le code existant + quelques knobs API standard) :
 
-### Étape 3 — Extension aux providers secondaires (best‑effort, sans blocage)
+**Deepgram** (streaming WS)
+- `model` (nova-3, nova-2, nova-2-general) — défaut nova-3
+- `language` (fr-FR, en-US, multi) — défaut fr-FR
+- `smart_format` bool
+- `punctuate` bool
+- `interim_results` bool
+- `endpointing` ms (0-2000, défaut 300)
+- `utterance_end_ms` (1000-3000, défaut 1500)
+- `vad_events` bool
 
-- **AssemblyAI** : ajouter `word_boost` + `boost_param: "high"` dans la config de session (proxy `proxy-stt-assemblyai`).
-- **OpenAI Whisper / gpt‑4o‑transcribe** : concaténer les termes en une phrase prompt courte ("Contexte : Max, Ava, Emma, Léo, Protogyny…") et l'envoyer dans le champ `prompt`.
-- **Gradium** : ajouter un champ optionnel `pronunciationId` côté STT (déjà présent côté TTS) et — action externe — demander à Nicolas Goy si un mécanisme keyterms STT est exposé, avant d'implémenter.
-- **Gamilab** : marquer "non supporté" dans l'UI, aucun code.
+**AssemblyAI** (v3 streaming)
+- `format_turns` bool
+- `min_end_of_turn_silence_when_confident` ms (200-2000)
+- `end_of_turn_confidence_threshold` (0.1-1.0)
 
-Chaque étape est indépendamment mergeable ; l'étape 2 seule règle 90 % du problème sur le provider actif.
+**OpenAI Whisper** (batch)
+- `model` (whisper-1, gpt-4o-transcribe, gpt-4o-mini-transcribe)
+- `language` (fr, en, auto)
+- `temperature` (0.0-1.0)
+
+**Gradium** (batch STT)
+- `language` (fr, en, auto)
+- + note "réglages STT limités"
+
+**Gamilab** — pas de réglages API exposés (aucun paramètre SDK à ce jour → section grisée "Aucun paramètre configurable").
+
+Chaque provider affiche ses réglages dans un bloc dépliable (`<details>`) sur sa carte, avec un bouton **"Sauver réglages"** par provider (pas un save global — évite d'écraser les autres).
+
+## 3 — Câblage runtime
+
+- `deepgramSTT.ts` : `buildDeepgramWebSocketUrl` accepte déjà `keyterms` — lui passer aussi `model`, `language`, `smart_format`, `punctuate`, `interim_results`, `endpointing`, `utterance_end_ms`, `vad_events` depuis les settings chargés.
+- `assemblyaiSTT.ts` : ajouter les 3 paramètres de turn detection à l'URL WS.
+- `openaiWhisperSTT.ts` + `proxy-stt-whisper` : forwarder `model`, `language`, `temperature` dans le FormData.
+- `gradiumSTT.ts` : passer `language` au proxy Gradium STT (si le proxy l'accepte — sinon ajouter).
+
+Aucune migration DB : réutilise `admin_settings` (clé `ava_stt_provider_settings`).
 
 ## Détails techniques
 
-- **Format Deepgram keyterm** : `?model=nova-3&keyterm=Ava&keyterm=Protogyny&keyterm=Ulrich%20Fischer` — les termes multi‑mots sont acceptés tels quels URL‑encodés, pas besoin de guillemets.
-- **Où lire le dictionnaire** : côté client uniquement (les termes ne sont pas des secrets, la clé Deepgram reste côté proxy). L'edge function `proxy-stt` continue de ne renvoyer que `key/model/language` — pas de round‑trip supplémentaire.
-- **Migration DB** : aucune. On réutilise `admin_settings(key, value jsonb)` déjà en place.
-- **Tests** : étendre `deepgramSTT.test.ts` avec un cas "URL contient tous les keyterm".
-- **Doc** : ajouter une note dans `STORY.md` (nouvelle session) et mettre à jour `mem://features/voice-to-voice` pour tracer le mécanisme.
+```text
+src/services/stt/
+├── registry.ts                (+ supportsDictionary, dictionaryMethod)
+├── providerSettings.ts        (NEW — load/save/reset per-provider)
+├── providers/
+│   ├── assemblyaiSTT.ts       (edit — lire settings)
+│   ├── openaiWhisperSTT.ts    (edit — envoyer settings au proxy)
+│   └── gradiumSTT.ts          (edit — langue)
+├── deepgramSTT.ts             (edit — knobs URL WS)
+src/components/
+├── STTConfigTab.tsx           (refactor — dictionnaire en tête, badges, blocs réglages)
+└── stt/                       (NEW dossier)
+    └── ProviderSettingsPanel.tsx   (composant par-provider)
+supabase/functions/
+└── proxy-stt-whisper/index.ts (edit — accepter model/language/temperature)
+```
 
-## Hors périmètre (à discuter si besoin)
+## Hors scope
 
-- Poids par terme (Deepgram Nova‑3 keyterm n'expose plus d'intensifier — c'est binaire).
-- Dictionnaires par personnage (aujourd'hui un seul dictionnaire projet suffit ; à envisager si Emma/Léo introduisent leur propre lexique).
-- Post‑correction LLM (regex ou pass de rewriting sur le transcript final) — plan B si les keyterms ne suffisent pas.
+- Réglages Gamilab (aucune API publique documentée pour le SDK)
+- Filler tokens Whisper avancés / autres modèles STT
+- Preview de transcription à chaud dans l'admin
