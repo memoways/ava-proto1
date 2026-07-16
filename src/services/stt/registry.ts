@@ -8,6 +8,8 @@ export const STT_PROVIDER_LIST: STTProviderDefinition[] = [
     mode: "streaming",
     expectedSecrets: ["DEEPGRAM_API_KEY"],
     implemented: true,
+    supportsDictionary: true,
+    dictionaryMethod: "keyterm (URL param, Nova-3, ≤100 termes)",
   },
   {
     id: "gamilab",
@@ -16,6 +18,8 @@ export const STT_PROVIDER_LIST: STTProviderDefinition[] = [
     mode: "streaming",
     expectedSecrets: ["GAMILAB_PORTAL_ID", "GAMILAB_API_KEY"],
     implemented: true,
+    supportsDictionary: false,
+    dictionaryMethod: "non supporté par le SDK",
   },
   {
     id: "openai_whisper",
@@ -24,6 +28,8 @@ export const STT_PROVIDER_LIST: STTProviderDefinition[] = [
     mode: "batch",
     expectedSecrets: ["OPENAI_API_KEY"],
     implemented: true,
+    supportsDictionary: true,
+    dictionaryMethod: "prompt (≤224 tokens, injecté comme phrase de contexte)",
   },
   {
     id: "assemblyai",
@@ -32,6 +38,8 @@ export const STT_PROVIDER_LIST: STTProviderDefinition[] = [
     mode: "streaming",
     expectedSecrets: ["ASSEMBLYAI_API_KEY"],
     implemented: true,
+    supportsDictionary: true,
+    dictionaryMethod: "keyterms_prompt (JSON array, URL param)",
   },
   {
     id: "gradium",
@@ -40,6 +48,8 @@ export const STT_PROVIDER_LIST: STTProviderDefinition[] = [
     mode: "batch",
     expectedSecrets: ["GRADIUM_API_KEY"],
     implemented: true,
+    supportsDictionary: false,
+    dictionaryMethod: "non supporté par l'API REST",
   },
 ];
 
