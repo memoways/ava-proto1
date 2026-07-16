@@ -5,6 +5,7 @@ import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types"
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { requestLatestRecorderData } from "../finalization";
 import { getSTTProviderSettings } from "../providerSettings";
+import { blobToWav16kMono } from "../audioToWav";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const ENDPOINT = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/proxy-stt-gradium`;
@@ -122,15 +123,17 @@ export class GradiumSTT implements STTSession {
   }
 
   private async transcribe(blob: Blob): Promise<string> {
-    const contentType = blob.type || "audio/webm";
+    // Gradium only accepts audio/wav, audio/pcm or audio/ogg. Browsers record
+    // webm/opus or mp4/aac, so transcode client-side to 16 kHz mono WAV.
+    const wav = await blobToWav16kMono(blob);
     const g = getSTTProviderSettings("gradium");
     const url = g.language && g.language !== "auto"
       ? `${ENDPOINT}?language=${encodeURIComponent(g.language)}`
       : ENDPOINT;
     const res = await authenticatedFunctionFetch(url, {
       method: "POST",
-      headers: { "Content-Type": contentType },
-      body: blob,
+      headers: { "Content-Type": "audio/wav" },
+      body: wav,
     });
 
     if (!res.ok) throw new Error(`Gradium proxy ${res.status}: ${await res.text()}`);
