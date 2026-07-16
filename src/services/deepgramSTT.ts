@@ -310,12 +310,15 @@ export class DeepgramSTT {
     if (!this.stream || !this.ws) return;
 
     this.selectedMimeType = selectMediaRecorderMimeType();
-    const options = this.selectedMimeType ? { mimeType: this.selectedMimeType } : undefined;
+    const options: MediaRecorderOptions = {
+      audioBitsPerSecond: 128000,
+    };
+    if (this.selectedMimeType) options.mimeType = this.selectedMimeType;
     debugLogger.log({
       service: "stt",
       level: "info",
       direction: "in",
-      label: `MediaRecorder selected ${this.selectedMimeType || "browser-default"}`,
+      label: `MediaRecorder selected ${this.selectedMimeType || "browser-default"} @128kbps`,
       payload: JSON.stringify(getBrowserDiagnostics(this.selectedMimeType)),
     });
 
@@ -327,7 +330,8 @@ export class DeepgramSTT {
       }
     };
 
-    this.mediaRecorder.start(250);
+    // Smaller timeslice = lower latency for the interim results loop.
+    this.mediaRecorder.start(150);
   }
 
   stop() {
