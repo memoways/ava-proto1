@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-15 (hardening sécurité, RAG Voyage rétabli côté admin, routage LLM 100% OpenRouter)
+> **Last Updated**: 2026-07-16 (STT sans fin de phrase coupée, Deepgram nova-3, vidéos Gumlet toujours sonores et retour automatique)
 
 ---
 
@@ -65,6 +65,26 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-07-16 — Ne plus perdre la fin d'une parole, ne plus montrer une vidéo muette 🔷
+
+**Intent.** Deux défauts d'immersion revenaient pendant les tests. D'une part, un utilisateur qui cliquait sur « envoyer » juste après son dernier mot pouvait perdre la fin de sa phrase : le texte live l'affichait parfois, mais la correction finale du provider n'était pas encore arrivée. D'autre part, certaines vidéos Gumlet démarraient sans son ou ne rendaient pas toujours la main à la conversation à leur fin. La règle produit devient explicite : tout audio capturé avant le clic doit être conservé, et aucune vidéo ne doit continuer silencieusement.
+
+**Première passe Lovable — qualité Deepgram.** Deepgram passe sur `nova-3` par défaut, configurable par secrets runtime. Le micro demande un signal mono 48 kHz avec les traitements navigateur adaptés à la voix ; le flux active ponctuation, nombres, smart formatting et suppression des hésitations. Les blocs `MediaRecorder` passent de 250 à 150 ms à 128 kb/s. Cette passe améliore la précision et la vitesse des résultats intermédiaires, mais révèle plus clairement la course entre le dernier interim et le clic utilisateur.
+
+**Cause racine STT.** Deepgram finalisait avec `fullTranscript || latestInterimTranscript`. Dès qu'un préfixe avait été marqué final, l'opérateur `||` ignorait donc la queue interim qui contenait souvent les derniers mots. AssemblyAI n'enregistrait pas ses partiels dans l'état lu par `flush()`, Gamilab gardait `text_current` uniquement pour l'affichage et les providers batch lançaient leur travail sans que l'interface attende réellement le dernier `dataavailable`.
+
+**Correction STT multi-provider.** `STTSession.flush()` devient une barrière asynchrone commune et bornée. Deepgram récupère la queue audio, envoie `Finalize`, attend la révision puis réunit préfixe final et queue interim sans duplication. AssemblyAI envoie `ForceEndpoint` et conserve son transcript cumulatif. Gamilab garde texte live et historique corrigé. Whisper et Gradium attendent le dernier blob avant l'appel batch. Le mode PTT manuel interdit aussi une soumission anticipée sur simple silence. Pendant cette courte fenêtre, l'UI affiche *« Finalisation de tout ce qui a été dit… »* et bloque le bouton ; la conversation, la capture du rôle et la capture de posture suivent toutes cette règle. L'audit a en outre montré que Whisper et AssemblyAI, bien que déclarés implémentés, n'étaient pas instanciés par la factory : ce routage est rétabli.
+
+**Correction vidéo, de Lovable au durcissement final.** Lovable a d'abord fiabilisé la sortie : écoute de plusieurs variantes d'événement de fin Gumlet et fallback sur la progression à moins de 0,4 s de la durée. L'audit suivant a confirmé que Gumlet désactive l'audio de ses embeds en autoplay. Les URLs `watch/embed` sont donc converties vers le HLS natif avec piste audio, et un unique élément vidéo persiste du teaser aux interludes afin de conserver l'autorisation sonore du clic « Commencer ». Le volume reste à 100 %, toute sourdine est corrigée et un refus navigateur met la vidéo en pause avec une action sonore explicite plutôt que de la laisser jouer muette. Les messages de fin provenant d'autres fenêtres sont ignorés.
+
+**Dépendances.** La synchronisation Lovable de `bun.lock` remet hCaptcha et la version récente de PostHog en cohérence avec le manifeste, tout en retirant l'ancienne chaîne OpenTelemetry/protobuf devenue inutile.
+
+**Validation.** 97 tests Vitest, build Vite de production, lint ciblé et contrôle du diff sont verts. Les nouveaux tests prouvent que le préfixe finalisé et les derniers mots interim sont tous deux conservés, qu'un transcript cumulatif n'est pas dupliqué et que le texte live reste disponible si la correction finale tarde. Le manifeste HLS du teaser répond en HTTP 200 et expose une piste AAC stéréo.
+
+**Tools.** Lovable pour les premières passes Deepgram et fin vidéo ; Codex pour l'audit des contrats providers, la barrière de finalisation commune, le passage HLS sonore persistant, les tests et la documentation.
+
+**Files.** `src/services/deepgramSTT.ts`, `src/services/stt/`, `supabase/functions/proxy-stt/index.ts`, `src/components/GumletVideoPlayer.tsx`, `src/pages/IndexPRD4.tsx`, `src/components/prd4/ConversationScreen.tsx`, `src/components/prd4/RoleCaptureScreen.tsx`, `src/components/prd4/PostureCaptureScreen.tsx`, `bun.lock`.
 
 ### 2026-07-13 — Tests internes : mesurer sans interrompre l'entrée 🔷
 

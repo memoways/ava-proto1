@@ -4,6 +4,37 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.43.0] - 2026-07-16 — Qualité STT, finalisation sans coupure et vidéos toujours sonores
+
+### STT Deepgram — qualité et réactivité (Lovable)
+- Le proxy Deepgram utilise désormais `nova-3` par défaut et accepte `DEEPGRAM_MODEL` / `DEEPGRAM_LANGUAGE` pour surcharger le modèle et la langue sans modifier le frontend ; la télémétrie reflète ce nouveau défaut.
+- Capture micro mono 48 kHz avec annulation d'écho, réduction de bruit et gain automatique pour améliorer la qualité du signal envoyé au STT.
+- Le WebSocket active explicitement ponctuation, nombres, suppression des filler words, smart formatting et résultats intermédiaires.
+- `MediaRecorder` envoie des blocs toutes les 150 ms au lieu de 250 ms, avec un débit cible de 128 kb/s, afin de réduire la latence du texte live sans dégrader la fin des mots.
+
+### STT multi-provider — aucune queue de phrase abandonnée
+- Le contrat commun `STTSession.flush()` est désormais asynchrone : le pipeline attend que le provider ait préservé la dernière donnée audio et la dernière révision de texte avant de lancer RAG/LLM/TTS.
+- Deepgram demande le dernier bloc `MediaRecorder`, envoie le contrôle officiel `Finalize`, attend la réponse révisée puis combine la partie finalisée et la queue encore interim. Le précédent `fullTranscript || latestInterimTranscript` pouvait supprimer la fin de phrase.
+- AssemblyAI conserve le transcript courant complet et envoie `ForceEndpoint`; Gamilab conserve à la fois `text_current` et `text_history` et utilise la version la plus complète.
+- OpenAI Whisper et Gradium attendent le dernier événement `dataavailable`, figent l'enregistrement puis transcrivent le blob complet.
+- Le mode manuel PTT empêche AssemblyAI et Gamilab d'envoyer prématurément un tour sur une détection de silence. Les écrans conversation, rôle et posture affichent un état de finalisation et bloquent un second clic ou une validation trop précoce.
+- La factory STT instancie maintenant réellement OpenAI Whisper et AssemblyAI lorsqu'ils sont sélectionnés et configurés ; auparavant ces choix retombaient silencieusement sur Deepgram.
+
+### Vidéos Gumlet — fin fiable et audio systématique
+- Lovable a élargi la détection de fin Gumlet (`ended`, `complete`, `finish`) et ajouté un fallback temporel à moins de 0,4 seconde de la durée lorsque l'embed n'émet pas `ended`, garantissant le retour automatique à la conversation.
+- Les URLs Gumlet `watch/embed` sont converties en manifestes HLS natifs. Le player n'utilise donc plus l'autoplay iframe que Gumlet documente comme systématiquement muet.
+- Un seul élément `<video>` reste monté pendant toute l'expérience : le clic « Commencer » autorise sa lecture sonore, puis le teaser et les interludes réutilisent ce même élément avec `muted=false` et volume à 100 %.
+- Toute remise en sourdine ou baisse de volume est corrigée. Si une politique navigateur refuse exceptionnellement l'audio, la vidéo reste en pause avec une action « Activer le son » au lieu de continuer silencieusement.
+- Les messages `postMessage` de fin sont limités à l'iframe réellement contrôlée afin qu'un message tiers ne puisse pas terminer une vidéo.
+
+### Dépendances
+- `bun.lock` resynchronisé avec les dépendances déclarées : hCaptcha présent, PostHog résolu sur la branche récente compatible et ancienne chaîne OpenTelemetry/protobuf inutilisée retirée du lockfile.
+
+### Validation
+- 97 tests Vitest verts, dont les nouveaux cas de conservation préfixe finalisé + queue interim, absence de duplication d'un transcript cumulatif et fallback vers le texte live le plus complet.
+- Build Vite de production et lint ciblé des fichiers modifiés verts ; `git diff --check` sans erreur.
+- Manifeste HLS du teaser vérifié en HTTP 200 avec piste audio AAC dédiée.
+
 ## [0.42.0] - 2026-07-15 — Sécurité, RAG Voyage et routage LLM unifié
 
 ### Sécurité
