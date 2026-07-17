@@ -5,7 +5,7 @@
 
 ## Contexte projet
 
-Expérience narrative interactive voice-to-voice. L'utilisateur parle avec "Max" (personnage fictif dont la sœur Ava a disparu). Pipeline STT → LLM → TTS. Prototype technique pour valider la mécanique avant production vidéo complète.
+Expérience narrative interactive voice-to-voice. L'utilisateur parle avec "Max" (personnage fictif, **père d'Ava** qui a disparu — ~55 ans, vit à Lausanne avec Emma). Pipeline STT → LLM → TTS. Prototype technique pour valider la mécanique avant production vidéo complète.
 
 - Statut : 🟡 En cours (session 23 — 2026-05-24)
 - Équipe : Ulrich Fischer / Memoways
@@ -35,4 +35,7 @@ Expérience narrative interactive voice-to-voice. L'utilisateur parle avec "Max"
 - La façade `src/services/stt` est le seul point d'entrée STT — ne jamais appeler Deepgram directement depuis les composants
 - Les secrets API ne s'exposent jamais côté client — passer par les Edge Functions Supabase
 - Avant d'activer Gamilab STT en prod, valider avec Nicolas Goy (kuon)
+- Le joueur est **anonyme** : toute table lue au runtime doit avoir une policy RLS lisible par `anon` — un SELECT bloqué par RLS renvoie 0 ligne **sans erreur** (piège : `session_summaries` a cassé la mémoire de Max en silence, cf. `docs/analyse-coherence-max.md`). Le résumé de session se lit via le cache mémoire de `sessionMemoryService`, pas en BDD
+- Le canon du personnage vit dans **Notion** (tables `characters`/`character_prompts`), pas dans le repo — vérifier la fiche avant de modifier les prompts hardcodés
+- Les défauts de prompts dans `settingsService.ts` sont surchargés par `admin_settings`/localStorage : modifier un défaut n'a d'effet qu'après reset de la clé concernée dans l'admin
 - Voir STORY.md §Dernière session pour l'état courant exact

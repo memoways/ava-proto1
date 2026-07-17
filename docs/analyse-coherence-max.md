@@ -2,6 +2,8 @@
 
 > Document d'analyse (session 2026-07-16). **Aucune modification de code** : diagnostic des causes probables du manque de cohérence de Max, hypothèses avec avantages/inconvénients, et recommandations d'action.
 > Périmètre : parcours **live PRD4** (`src/pages/IndexPRD4.tsx` + `src/services/prd4Orchestrator.ts`), le seul câblé en production (`src/App.tsx`).
+>
+> **Mise à jour 2026-07-17 — Phases 1 & 2 implémentées** (S1, S2, S3, unification de style, canon documentaire) : voir `docs/implementation-coherence-max.md` pour le détail quoi/pourquoi/comment et les vérifications restantes (fiche Notion notamment).
 
 ---
 
