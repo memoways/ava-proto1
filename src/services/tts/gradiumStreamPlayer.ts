@@ -125,6 +125,7 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
   let firstByteMs = 0;
   let totalBytes = 0;
   let audibleOutput = false;
+  let firstFrameLogged = false;
   const pendingChunks: Float32Array[] = [];
   const liveSources = new Set<AudioBufferSourceNode>();
   const carry: { byte: number | null } = { byte: null };
@@ -255,7 +256,15 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
     try {
       msg = JSON.parse(event.data);
     } catch {
+      if (!firstFrameLogged) {
+        firstFrameLogged = true;
+        debugLogger.log({ service: "tts", level: "warn", direction: "in", label: "TTS-GR-WS first frame is non-JSON", detail: String(event.data).slice(0, 120) });
+      }
       return; // ignore non-JSON frames
+    }
+    if (!firstFrameLogged) {
+      firstFrameLogged = true;
+      debugLogger.log({ service: "tts", level: "info", direction: "in", label: `TTS-GR-WS first frame type=${msg.type ?? "?"}` });
     }
     if (msg.type === "audio" && typeof msg.audio === "string") {
       if (preAudioTimer) { clearTimeout(preAudioTimer); preAudioTimer = null; }
@@ -321,13 +330,21 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
       armPreAudioTimer("tts_gradium_ws_first_chunk", FIRST_CHUNK_TIMEOUT_MS);
     };
     ws.onmessage = handleMessage;
-    ws.onerror = () => fail(new Error("Gradium WS connection error"));
-    ws.onclose = () => {
+    ws.onerror = () => {
+      debugLogger.log({ service: "tts", level: "error", direction: "in", label: "TTS-GR-WS error event", detail: `firstByte=${firstByteMs || "none"} firstFrame=${firstFrameLogged}` });
+      fail(new Error("Gradium WS connection error"));
+    };
+    ws.onclose = (event) => {
       // A clean close after audio means the server finished without an explicit
       // end_of_stream frame (or we missed it) — treat as generation complete.
       if (cancelled || eosReceived) return;
-      if (firstByteMs) onGenerationComplete();
-      else fail(new Error("Gradium WS closed before any audio"));
+      if (firstByteMs) { onGenerationComplete(); return; }
+      // Closed before any audio: surface the close code/reason so a failure
+      // that survives the redeploy is diagnosable in one round-trip (e.g. token
+      // rejected, setup parse error, unexpected message shape).
+      const detail = `code=${event.code} reason=${event.reason || "none"} firstFrame=${firstFrameLogged}`;
+      debugLogger.log({ service: "tts", level: "error", direction: "in", label: "TTS-GR-WS closed before audio", detail });
+      fail(new Error(`Gradium WS closed before any audio (${detail})`));
     };
   };
 

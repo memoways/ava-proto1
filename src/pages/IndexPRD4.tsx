@@ -21,6 +21,14 @@ import {
   type STTSession,
 } from "@/services/stt";
 import { TTSQueue, chunkTextForTTS } from "@/services/elevenLabsTTS";
+import { getActiveProviderId } from "@/services/tts/providerSettings";
+
+// Gradium generates each chunk independently and (REST) blocks until the whole
+// chunk is ready, so finer chunks let the first sentence start much sooner while
+// the rest generates (concurrency 2). Other providers keep the default grouping.
+function ttsChunkOptions() {
+  return getActiveProviderId() === "gradium" ? { maxSingleChars: 160, targetChars: 160 } : undefined;
+}
 import { prefetchOpeningTTS, playOpeningTTS, OPENING_LINE } from "@/services/openingTTSCache";
 import { unlockAudioPlayback } from "@/services/audioPlayback";
 import {
@@ -417,7 +425,7 @@ const IndexPRD4 = () => {
       try {
         const queue = new TTSQueue({ onError: (e) => console.warn("[TTS] opening error:", e.message) });
         ttsQueueRef.current = queue;
-        for (const chunk of chunkTextForTTS(opening)) {
+        for (const chunk of chunkTextForTTS(opening, ttsChunkOptions())) {
           queue.enqueue(chunk, { session_id: sessionIdRef.current ?? undefined });
         }
         await queue.drain();
@@ -598,7 +606,7 @@ const IndexPRD4 = () => {
         const ttsLatencySegmentId = latencyOverlayEnabled
           ? startLatencySegment({ segment: "TTS", service: latencyServiceLabel(ttsService) })
           : null;
-        for (const chunk of chunkTextForTTS(result.maxResponse)) {
+        for (const chunk of chunkTextForTTS(result.maxResponse, ttsChunkOptions())) {
           queue.enqueue(chunk, { session_id: sessionIdRef.current ?? undefined, turn_id: turnId, turn_index: turnIndex });
         }
         const ttsResult = await queue.drain().finally(() => {
