@@ -6,7 +6,7 @@ import { getAntiHallucinationValidatorSettings, getLLMSettings } from "@/service
 import { buildCharacterPromptSections, loadCharacterPromptByName, clearCharacterPromptCache } from "@/services/characterPromptService";
 
 // Fallback minimal system prompt if DB fetch fails
-const FALLBACK_SYSTEM_PROMPT = `Tu es un personnage dans une expérience narrative interactive. Parle à la première personne, en français, de façon concise (2-3 phrases). Utilise le CONTEXTE NARRATIF ci-dessous comme source de vérité.`;
+const FALLBACK_SYSTEM_PROMPT = `Tu es un personnage dans une expérience narrative interactive. Parle à la première personne, en français, de façon concise (1-2 phrases, 45 mots maximum). Utilise le CONTEXTE NARRATIF ci-dessous comme source de vérité.`;
 
 // Gameplay rules — always appended regardless of character.
 // IMPORTANT: ces règles sont des INVARIANTS TECHNIQUES uniquement.
