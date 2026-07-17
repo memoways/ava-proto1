@@ -74,7 +74,7 @@ Aucune migration SQL, aucune modification d'Edge Function, aucune relaxation de 
 
 ## Ce qui reste à faire (Phase 3 de l'analyse — non implémenté ici)
 
-1. **Vérifier la fiche Notion** (annexe B de l'analyse) : identité sans ambiguïté, présent canonique dans `timeline`, retrait des incitations aux questions. **C'est le levier principal restant** — aucune correction code ne compense une fiche ambiguë.
+1. **Vérifier la fiche Notion** (annexe B de l'analyse) : identité sans ambiguïté, présent canonique dans `timeline`, retrait des incitations aux questions. **C'est le levier principal restant** — aucune correction code ne compense une fiche ambiguë. → **Fait le 2026-07-17** sur la base de l'export complet de la fiche : voir `docs/proposition-fiche-max.md` (diagnostic + textes prêts à coller, champ par champ).
 2. **Drive éditorial** (S4 de l'analyse) : objectifs propres de Max, peurs, lignes rouges, arc émotionnel — dans la fiche Notion.
 3. **Structure en actes / beats** (S5 de l'analyse) : chantier design à part entière.
 4. **Test A/B d'un modèle plus capable** (S6) : mesurer latence avant de lever `SLOW_LIVE_MODEL_FALLBACKS`.

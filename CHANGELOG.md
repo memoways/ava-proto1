@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.44.1] - 2026-07-17 — Proposition éditoriale fiche Max + ajustement du bloc temporel
+
+### Proposition — champs du master prompt de Max
+- Nouveau document `docs/proposition-fiche-max.md`, basé sur l'export complet de la fiche Notion « Max Lorenzo » : diagnostic de 6 problèmes (chronologies contradictoires Timeline vs blocs RAG, incitation aux questions dans le champ des règles absolues, longueur « 2 à 6 phrases » vs plafond tokens, absence de drive, absence de règles de persistance, bloc RAG manquant pour la soirée du jour 3) et textes de remplacement prêts à coller, champ par champ, avec tableau de correction des ancres temporelles.
+
+### Bloc temporel — formulation neutre
+- Le libellé de début d'appel du bloc « OÙ EN EST L'APPEL » ne présume plus de la méfiance (« la méfiance est naturelle ») : la fiche de Max établit au contraire une confiance d'emblée. Nouveau libellé : « installe la relation conformément à ta fiche personnage » (`maxAgent.ts::buildTemporalContextBlock`).
+
+### Fichiers
+- `docs/proposition-fiche-max.md`, `src/agents/maxAgent.ts`, `docs/implementation-coherence-max.md`.
+
 ## [0.44.0] - 2026-07-17 — Cohérence de Max : mémoire réparée, présent temporel, Game Master actif léger
 
 > Diagnostic complet : `docs/analyse-coherence-max.md`. Détail d'implémentation : `docs/implementation-coherence-max.md`.
