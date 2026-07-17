@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/services/tts", () => ({
   generateSpeech: vi.fn(),
   playAudioBlob: vi.fn(),
+  // null = provider without streaming → the queue takes the classic blob path.
+  tryCreateStreamingPlayback: vi.fn(() => null),
 }));
 
-import { generateSpeech, playAudioBlob } from "@/services/tts";
+import { generateSpeech, playAudioBlob, tryCreateStreamingPlayback } from "@/services/tts";
 import { TTSQueue } from "@/services/tts/queue";
 
 describe("TTSQueue drain status", () => {
@@ -94,5 +96,41 @@ describe("TTSQueue drain status", () => {
 
     await expect(drained).resolves.toMatchObject({ status: "played", playedSegments: 4 });
     expect(maxActive).toBe(2);
+  });
+
+  it("plays streaming handles sequentially, opening each gate in turn", async () => {
+    const openOrder: string[] = [];
+    const makeHandle = (label: string) => {
+      let resolveFinished!: (v: { playbackTotalMs: number }) => void;
+      const finished = new Promise<{ playbackTotalMs: number }>((res) => { resolveFinished = res; });
+      return {
+        handle: {
+          open: vi.fn(() => openOrder.push(label)),
+          started: Promise.resolve(),
+          finished,
+          generationDone: Promise.resolve({ provider: "gradium", transport: "websocket" }),
+          cancel: vi.fn(),
+        },
+        endPlayback: () => resolveFinished({ playbackTotalMs: 100 }),
+      };
+    };
+    const first = makeHandle("first");
+    const second = makeHandle("second");
+    const handles = [first, second];
+    vi.mocked(tryCreateStreamingPlayback).mockImplementation(() => handles.shift()!.handle as never);
+
+    const queue = new TTSQueue();
+    queue.enqueue("Première phrase.");
+    queue.enqueue("Deuxième phrase.");
+    const drained = queue.drain();
+
+    await vi.waitFor(() => expect(openOrder).toEqual(["first"]));
+    expect(second.handle.open).not.toHaveBeenCalled();
+    first.endPlayback();
+    await vi.waitFor(() => expect(openOrder).toEqual(["first", "second"]));
+    second.endPlayback();
+
+    await expect(drained).resolves.toMatchObject({ status: "played", playedSegments: 2, generatedSegments: 2 });
+    expect(vi.mocked(generateSpeech)).not.toHaveBeenCalled();
   });
 });

@@ -26,6 +26,11 @@ function getAudioContext(): AudioContext | null {
   return audioContext;
 }
 
+/** Shared AudioContext (the one unlockAudioPlayback unlocks) for streaming playback. */
+export function getSharedAudioContext(): AudioContext | null {
+  return getAudioContext();
+}
+
 export function classifyPlaybackError(err: unknown): PlaybackErrorInfo {
   const name = err instanceof DOMException || err instanceof Error ? err.name : "UnknownError";
   const message = err instanceof DOMException || err instanceof Error ? err.message : String(err);

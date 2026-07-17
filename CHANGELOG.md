@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.45.0] - 2026-07-17 — Latence TTS Gradium : streaming WebSocket + lecture progressive
+
+> Audit : Gradium était ~2x plus lent qu'ElevenLabs parce que son proxy attendait la **totalité** de l'audio (`arrayBuffer()`) en **WAV non compressé** (~768 kbps), là où ElevenLabs streame du mp3 en chunked. Aucun fichier ElevenLabs n'est touché.
+
+### Streaming WebSocket Gradium (lecture progressive)
+- Le navigateur minte un token éphémère (GET `proxy-tts-gradium`, même pattern que le STT Gradium) et ouvre `wss://api.gradium.ai/api/speech/tts` en direct : les chunks PCM base64 sont décodés et planifiés sur l'AudioContext partagé — **la voix démarre au premier chunk** au lieu d'attendre la génération complète (`src/services/tts/gradiumStreamPlayer.ts`).
+- Intégration `TTSQueue` via une capacité optionnelle `createStreamingPlayback` (gate de lecture : la phrase N+1 se génère/bufferise pendant que N joue, ordre strict préservé) ; providers sans streaming inchangés octet pour octet.
+- **Fallback REST automatique** si le WS échoue avant le premier son (token, connexion, timeout) — jamais de re-lecture partielle après coup. Barge-in : l'AbortSignal ferme le WS et stoppe toutes les sources audio.
+- Toggle admin « Streaming WebSocket » (actif par défaut) + format `pcm_24000`/`pcm_48000` + bouton « Tester streaming » dans TTS Config.
+- Télémétrie inchangée côté dashboards (`audio_latency`), enrichie de `metadata.transport` (`websocket`/`rest_fallback`) pour comparer avant/après.
+
+### Chemin REST accéléré (fallback + ligne d'ouverture)
+- Le proxy `proxy-tts-gradium` pipe désormais `response.body` en chunked au lieu de bufferiser tout l'audio.
+- Format par défaut `wav` → `opus` (~6x moins d'octets), migration `settingsVersion` des réglages stockés, bascule auto sur WAV si le navigateur ne lit pas l'Ogg/Opus (Safari < 18.4).
+
+### Tests
+- Nouveau test `TTSQueue` : lecture séquentielle des handles streaming (ouverture des gates dans l'ordre). Suite complète 125 verts.
+
 ## [0.44.1] - 2026-07-17 — Proposition éditoriale fiche Max + ajustement du bloc temporel
 
 ### Proposition — champs du master prompt de Max
