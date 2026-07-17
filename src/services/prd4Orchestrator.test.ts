@@ -116,6 +116,46 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0].conversationHistory).toHaveLength(10);
   });
 
+  it("transmet le contexte temporel et la guidance GM à Max", async () => {
+    const result = await processPRD4Turn({
+      sessionId: "session-soak",
+      conversationHistory: makeConversation(6),
+      userMessage: "question-7",
+      userRole: null,
+      timeElapsedSeconds: 5 * 60,
+      gmGuidance: "Laisse un silence, puis évoque Emma.",
+      gmTopicsCovered: ["ava", "lausanne"],
+    });
+
+    expect(vi.mocked(simulateMaxResponse).mock.calls[0][0]).toMatchObject({
+      temporalContext: {
+        timeElapsedSeconds: 300,
+        sessionDurationSeconds: 930,
+        turnIndex: 7,
+      },
+      gmGuidance: {
+        guidance: "Laisse un silence, puis évoque Emma.",
+        topicsCovered: ["ava", "lausanne"],
+      },
+    });
+    await Promise.all([result.labelPromise, result.postTurnPromise]);
+  });
+
+  it("n'attache pas de guidance GM quand elle est vide", async () => {
+    const result = await processPRD4Turn({
+      sessionId: "session-soak",
+      conversationHistory: [],
+      userMessage: "Allô ?",
+      userRole: null,
+      timeElapsedSeconds: 10,
+      gmGuidance: "   ",
+    });
+
+    expect(vi.mocked(simulateMaxResponse).mock.calls[0][0].gmGuidance).toBeUndefined();
+    expect(vi.mocked(simulateMaxResponse).mock.calls[0][0].temporalContext).toMatchObject({ turnIndex: 1 });
+    await Promise.all([result.labelPromise, result.postTurnPromise]);
+  });
+
   it("skips summarization when the cached summary is recent enough", async () => {
     vi.mocked(fetchSessionSummary).mockResolvedValue({
       session_id: "session-soak",

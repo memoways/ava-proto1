@@ -85,6 +85,61 @@ export interface MaxAgentInput {
   sessionSummary?: string;
   /** PRD4 — résumé du rôle inventé par le joueur, injecté à chaque tour. */
   userRoleSummary?: string;
+  /** PRD4 — repères temporels du tour (temps écoulé, tour, phase d'appel). */
+  temporalContext?: MaxTemporalContext;
+  /** PRD4 — consigne de mise en scène produite par le GM au tour précédent. */
+  gmGuidance?: MaxGmGuidance;
+}
+
+export interface MaxTemporalContext {
+  timeElapsedSeconds: number;
+  sessionDurationSeconds: number;
+  turnIndex: number;
+}
+
+export interface MaxGmGuidance {
+  /** next_turn_guidance du GM post-tour du tour précédent. */
+  guidance: string;
+  /** Sujets déjà couverts, cumulés sur la session (dédupliqués). */
+  topicsCovered?: string[];
+}
+
+/**
+ * Bloc temporel injecté dans le system prompt de Max — sans lui, Max n'a
+ * aucune notion du temps écoulé ni de la progression de l'appel (seul le GM
+ * recevait ces repères). Exporté pur pour être testable.
+ */
+export function buildTemporalContextBlock(ctx: MaxTemporalContext): string {
+  const elapsedMinutes = Math.floor(Math.max(0, ctx.timeElapsedSeconds) / 60);
+  const duration = Math.max(1, ctx.sessionDurationSeconds);
+  const progress = Math.min(1, Math.max(0, ctx.timeElapsedSeconds / duration));
+  const phase = progress < 0.25
+    ? "Début de l'appel : vous faites connaissance, la méfiance est naturelle."
+    : progress < 0.75
+      ? "Milieu de l'appel : la conversation est installée, tu peux approfondir."
+      : "L'appel approche de sa fin : resserre l'échange, va à l'essentiel, prépare une sortie naturelle.";
+  const elapsedLabel = elapsedMinutes < 1
+    ? "moins d'une minute"
+    : `environ ${elapsedMinutes} minute${elapsedMinutes > 1 ? "s" : ""}`;
+  return `## OÙ EN EST L'APPEL (repères internes — ne jamais citer ces chiffres)
+- L'appel dure depuis ${elapsedLabel} ; c'est ton ${ctx.turnIndex}e tour de parole.
+- ${phase}
+Utilise ces repères implicitement (rythme, patience, urgence), sans jamais mentionner de compteur, de tour ou de minuterie.`;
+}
+
+/**
+ * Bloc de guidance GM injecté dans le system prompt de Max — reboucle le
+ * next_turn_guidance produit au tour précédent (auparavant calculé puis jeté).
+ * Exporté pur pour être testable.
+ */
+export function buildGmGuidanceBlock(gm: MaxGmGuidance): string {
+  const lines = [`## CONSEIL DE MISE EN SCÈNE (note interne, ne jamais la mentionner)\n${gm.guidance.trim()}`];
+  const topics = (gm.topicsCovered ?? []).filter((t) => t && t.trim()).slice(0, 12);
+  if (topics.length) {
+    lines.push(`Sujets déjà abordés durant l'appel (ne pas re-poser les mêmes bases) : ${topics.join(", ")}.`);
+  }
+  lines.push("Ce conseil oriente ton attitude pour CE tour ; ta fiche personnage reste prioritaire s'il la contredit.");
+  return lines.join("\n");
 }
 
 /**
@@ -94,7 +149,7 @@ export async function callMaxAgent(
   input: MaxAgentInput,
   onChunk: (text: string, done: boolean) => void
 ): Promise<string> {
-  const systemPrompt = await buildMaxSystemPrompt(input.ragContext, input.postVideoContext, input.knowledgeContext, input.conversationHistory, "Max", input.sessionSummary, input.userRoleSummary);
+  const systemPrompt = await buildMaxSystemPrompt(input.ragContext, input.postVideoContext, input.knowledgeContext, input.conversationHistory, "Max", input.sessionSummary, input.userRoleSummary, input.temporalContext, input.gmGuidance);
   debugLogger.log({ service: "llm", level: "info", direction: "out", label: `Max agent: ${input.conversationHistory.length} history + "${input.userMessage.slice(0, 80)}"`, payload: `System prompt: ${systemPrompt.length} chars` });
 
   const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
@@ -145,6 +200,8 @@ export async function simulateMaxResponse(
     characterName,
     input.sessionSummary,
     input.userRoleSummary,
+    input.temporalContext,
+    input.gmGuidance,
   );
   const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
     { role: "system", content: systemPrompt },
@@ -288,6 +345,8 @@ async function buildMaxSystemPrompt(
   characterName: string = "Max",
   sessionSummary?: string,
   userRoleSummary?: string,
+  temporalContext?: MaxTemporalContext,
+  gmGuidance?: MaxGmGuidance,
 ): Promise<string> {
   const characterPrompt = await getCharacterSystemPrompt(characterName);
   const characterFields = await loadCharacterPromptByName(characterName);
@@ -305,9 +364,16 @@ async function buildMaxSystemPrompt(
     prompt += `\n\n## INTERLOCUTEUR (qui t'appelle)\n${userRoleSummary.trim()}\n\nUtilise ces éléments pour personnaliser tes réponses : adresse-toi à cette personne en cohérence avec qui elle dit être, sans jamais contredire sa présentation.`;
   }
 
+  if (temporalContext) {
+    prompt += `\n\n${buildTemporalContextBlock(temporalContext)}`;
+  }
 
   if (sessionSummary && sessionSummary.trim()) {
     prompt += `\n\n## SOUVENIRS DE LA SESSION (résumé compressé des tours précédents)\n${sessionSummary.trim()}`;
+  }
+
+  if (gmGuidance?.guidance?.trim()) {
+    prompt += `\n\n${buildGmGuidanceBlock(gmGuidance)}`;
   }
 
   // RAG brut TOUJOURS injecté comme source de vérité (les faits qui en sortent sont

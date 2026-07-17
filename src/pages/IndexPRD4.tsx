@@ -142,6 +142,9 @@ const IndexPRD4 = () => {
   const lastVideoTurnRef = useRef<number>(-Infinity);
   const videoTriggerSettingsRef = useRef<VideoTriggerSettings>(videoTriggerDefaults);
   const pendingPostVideoContextRef = useRef<string | null>(null);
+  // Boucle GM→Max : guidance produite par le post-tour N, consommée au tour N+1.
+  const pendingGmGuidanceRef = useRef<string | null>(null);
+  const gmTopicsCoveredRef = useRef<string[]>([]);
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
   const [teaserPlayerReady, setTeaserPlayerReady] = useState(false);
@@ -362,6 +365,8 @@ const IndexPRD4 = () => {
     triggeredVideoIdsRef.current = [];
     lastVideoTurnRef.current = -Infinity;
     pendingPostVideoContextRef.current = null;
+    pendingGmGuidanceRef.current = null;
+    gmTopicsCoveredRef.current = [];
     setActiveVideo(null);
 
     // Recharge les règles de déclenchement vidéo (admin)
@@ -520,6 +525,9 @@ const IndexPRD4 = () => {
       try {
         const postVideoContext = pendingPostVideoContextRef.current ?? undefined;
         pendingPostVideoContextRef.current = null;
+        // Consommation one-shot : une guidance périmée ne doit pas survivre à son tour.
+        const gmGuidance = pendingGmGuidanceRef.current;
+        pendingGmGuidanceRef.current = null;
         const result = await processPRD4Turn({
           sessionId: sessionIdRef.current,
           conversationHistory: conversationRef.current.slice(0, -1),
@@ -530,6 +538,8 @@ const IndexPRD4 = () => {
           characterName: "Max",
           triggeredVideoIds: triggeredVideoIdsRef.current,
           postVideoContext,
+          gmGuidance,
+          gmTopicsCovered: gmTopicsCoveredRef.current,
           onLatencySegment: handleLatencySegment,
           signal: turnController.signal,
         });
@@ -753,6 +763,19 @@ const IndexPRD4 = () => {
         // ---- GM post-turn : engagement, end_recommended + garde-fou vidéo
         void result.postTurnPromise.then(async (ev) => {
           if (!isCurrentTurn()) return;
+          // Boucle GM→Max : mémorise la guidance pour le tour suivant et cumule
+          // les sujets couverts (dédupliqués) sur la session.
+          pendingGmGuidanceRef.current = ev.next_turn_guidance?.trim() || null;
+          if (ev.topics_covered?.length) {
+            const known = new Set(gmTopicsCoveredRef.current.map((t) => t.toLowerCase()));
+            for (const topic of ev.topics_covered) {
+              const clean = topic?.trim();
+              if (clean && !known.has(clean.toLowerCase())) {
+                known.add(clean.toLowerCase());
+                gmTopicsCoveredRef.current = [...gmTopicsCoveredRef.current, clean].slice(-24);
+              }
+            }
+          }
           trackEvent("prd4_gm_post_turn", {
             session_id: sessionIdRef.current,
             turn_index: ev.turn_index,

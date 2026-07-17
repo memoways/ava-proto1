@@ -44,6 +44,10 @@ export interface PRD4TurnInput {
   postVideoContext?: string;
   /** GIFF — posture initiale de l'utilisateur (question/intention exprimée avant l'appel). */
   userPostureRaw?: string | null;
+  /** Boucle GM→Max : next_turn_guidance produit par le post-tour du tour précédent. */
+  gmGuidance?: string | null;
+  /** Boucle GM→Max : sujets déjà couverts, cumulés sur la session. */
+  gmTopicsCovered?: string[];
   onLatencySegment?: (event: PRD4LatencySegmentEvent) => void;
   /** Abort when the UI has moved to a newer turn or ended the session. */
   signal?: AbortSignal;
@@ -156,6 +160,14 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     knowledgeContext,
     sessionSummary: summaryRecord?.summary,
     userRoleSummary: input.userRole?.summary_for_max ?? postureSummary,
+    temporalContext: {
+      timeElapsedSeconds: input.timeElapsedSeconds,
+      sessionDurationSeconds,
+      turnIndex,
+    },
+    gmGuidance: input.gmGuidance?.trim()
+      ? { guidance: input.gmGuidance, topicsCovered: input.gmTopicsCovered }
+      : undefined,
   };
   let maxResponse = "";
   let max_ms = 0;
