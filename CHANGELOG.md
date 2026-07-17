@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.45.1] - 2026-07-17 — Latence Gradium : diagnostic streaming + découpage phrase-à-phrase
+
+> Suite au test réel de la 0.45.0 : le streaming WebSocket ne s'activait jamais (encore ~7s). Cause : l'edge function `proxy-tts-gradium` n'avait pas été **redéployée**, donc le GET de mint de token tombait sur l'ancien chemin POST (`await req.json()` sur un body vide → `500 {"error":"Unexpected end of JSON input"}`) → fallback REST à chaque tour. **Action requise : redéployer `proxy-tts-gradium`.**
+
+### Observabilité du WebSocket (`gradiumStreamPlayer.ts`)
+- En cas d'échec WS *après* redeploy, la console indique désormais précisément la cause : `code`/`reason` du `onclose`, type du premier frame reçu (`ready`/`error`/`audio`), frame non-JSON — au lieu d'un « connection error » générique. Réduit le debug à un seul aller-retour.
+
+### Découpage phrase-à-phrase spécifique Gradium
+- `chunkTextForTTS(text, opts?)` accepte des seuils optionnels (`maxSingleChars`/`targetChars`) ; défauts inchangés (900/600) → **ElevenLabs et les autres providers strictement préservés**.
+- `IndexPRD4` passe des seuils fins (~160) **uniquement quand Gradium est actif** : une réponse de plusieurs phrases démarre sur un 1er morceau court (REST ~2-3s, ou WS immédiat) pendant que la suite se génère (concurrence 2 déjà en place). Filet de latence même si le WS échoue.
+
+### Tests
+- Nouveau `textChunking.test.ts` (4 cas) : découpage fin Gradium, comportement par défaut préservé, réponses courtes non découpées. Suite complète 129 verts.
+
 ## [0.45.0] - 2026-07-17 — Latence TTS Gradium : streaming WebSocket + lecture progressive
 
 > Audit : Gradium était ~2x plus lent qu'ElevenLabs parce que son proxy attendait la **totalité** de l'audio (`arrayBuffer()`) en **WAV non compressé** (~768 kbps), là où ElevenLabs streame du mp3 en chunked. Aucun fichier ElevenLabs n'est touché.

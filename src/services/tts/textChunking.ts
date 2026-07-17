@@ -68,11 +68,25 @@ export function extractSentences(text: string): [string[], string] {
 const SINGLE_REQUEST_MAX_CHARS = 900;
 const CHUNK_TARGET_CHARS = 600;
 
-/** Prepares TTS segments long enough to preserve diction. Short responses stay one chunk. */
-export function chunkTextForTTS(text: string): string[] {
+/** Tuning knobs for chunk granularity. Defaults preserve the historical behaviour. */
+export interface ChunkTextOptions {
+  /** Responses at or below this length stay a single chunk. Default 900. */
+  maxSingleChars?: number;
+  /** Target upper bound when grouping sentences into chunks. Default 600. */
+  targetChars?: number;
+}
+
+/**
+ * Prepares TTS segments long enough to preserve diction. Short responses stay
+ * one chunk. Callers may pass smaller thresholds (e.g. Gradium) so the first
+ * sentence starts playing sooner while the rest is still generating.
+ */
+export function chunkTextForTTS(text: string, opts?: ChunkTextOptions): string[] {
+  const maxSingle = opts?.maxSingleChars ?? SINGLE_REQUEST_MAX_CHARS;
+  const target = opts?.targetChars ?? CHUNK_TARGET_CHARS;
   const prepared = prepareTextForTTS(text);
   if (!prepared) return [];
-  if (prepared.length <= SINGLE_REQUEST_MAX_CHARS) return [prepared];
+  if (prepared.length <= maxSingle) return [prepared];
 
   const [sentences, leftover] = extractSentences(prepared);
   const parts = leftover && leftover.length > 3 ? [...sentences, leftover] : sentences;
@@ -81,7 +95,7 @@ export function chunkTextForTTS(text: string): string[] {
 
   for (const part of parts) {
     if (!current) { current = part; continue; }
-    if ((current + " " + part).length <= CHUNK_TARGET_CHARS) {
+    if ((current + " " + part).length <= target) {
       current += " " + part;
     } else {
       chunks.push(current);
