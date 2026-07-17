@@ -13,10 +13,28 @@ export interface SessionSummaryRecord {
   updated_at: string;
 }
 
+// Cache mémoire des résumés, alimenté par la réponse de summarize-session.
+// Nécessaire car la policy RLS (migration 20260712150404) réserve le SELECT
+// sur session_summaries aux admins : le joueur anonyme ne peut PAS relire
+// son résumé en BDD. Sans ce cache, le bloc "SOUVENIRS DE LA SESSION" n'est
+// jamais injecté dans le prompt de Max et la re-summarisation se déclenche
+// à chaque tour (last_turn perçu = 0). Les sessions ne survivent pas à un
+// rechargement de page (historique en mémoire), donc ce cache suffit au live.
+const summaryCache = new Map<string, SessionSummaryRecord>();
+
+/** Test/admin helper — vide le cache mémoire des résumés. */
+export function clearSessionSummaryCache(): void {
+  summaryCache.clear();
+}
+
 /** Fetch the latest compressed summary for a session (null if none). */
 export async function fetchSessionSummary(sessionId: string | undefined): Promise<SessionSummaryRecord | null> {
   if (!sessionId) return null;
+  const cached = summaryCache.get(sessionId);
+  if (cached) return cached;
   try {
+    // Fallback BDD : ne renvoie une ligne que pour un utilisateur admin
+    // (RLS admin-only) — utile au banc d'essai, silencieusement vide en live.
     const { data, error } = await supabase
       .from("session_summaries")
       .select("session_id, summary, last_turn, updated_at")
@@ -26,7 +44,9 @@ export async function fetchSessionSummary(sessionId: string | undefined): Promis
       console.warn("[SessionMemory] fetch error", error.message);
       return null;
     }
-    return (data as SessionSummaryRecord | null) ?? null;
+    const record = (data as SessionSummaryRecord | null) ?? null;
+    if (record) summaryCache.set(sessionId, record);
+    return record;
   } catch (err) {
     console.warn("[SessionMemory] fetch exception", err);
     return null;
@@ -60,7 +80,16 @@ export async function summarizeSessionAsync(
       return;
     }
     const data = await r.json();
-    debugLogger.logResponse(debugId, "other", `summary updated (${data?.summary?.length || 0} chars)`, 200, startTime);
+    const summary = typeof data?.summary === "string" ? data.summary.trim() : "";
+    if (summary) {
+      summaryCache.set(sessionId, {
+        session_id: sessionId,
+        summary,
+        last_turn: Number.isFinite(Number(data?.last_turn)) ? Number(data.last_turn) : turnCount,
+        updated_at: new Date().toISOString(),
+      });
+    }
+    debugLogger.logResponse(debugId, "other", `summary updated (${summary.length} chars)`, 200, startTime);
   } catch (err) {
     debugLogger.logError("other", "summarize-session exception", err);
   }

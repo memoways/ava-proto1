@@ -116,6 +116,27 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0].conversationHistory).toHaveLength(10);
   });
 
+  it("skips summarization when the cached summary is recent enough", async () => {
+    vi.mocked(fetchSessionSummary).mockResolvedValue({
+      session_id: "session-soak",
+      summary: "- L'utilisateur cherche Ava.",
+      last_turn: 34,
+      updated_at: new Date().toISOString(),
+    });
+
+    const result = await processPRD4Turn({
+      sessionId: "session-soak",
+      conversationHistory: makeConversation(35),
+      userMessage: "question-36",
+      userRole: null,
+      timeElapsedSeconds: 14 * 60,
+    });
+
+    expect(result.memory.summaryLastTurn).toBe(34);
+    expect(summarizeSessionAsync).not.toHaveBeenCalled();
+    await Promise.all([result.labelPromise, result.postTurnPromise]);
+  });
+
   it("falls back from a stalled RAG after two seconds and still answers", async () => {
     vi.useFakeTimers();
     vi.mocked(fetchSessionSummary).mockResolvedValue(null);
