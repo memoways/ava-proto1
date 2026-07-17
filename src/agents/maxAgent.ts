@@ -114,7 +114,7 @@ export function buildTemporalContextBlock(ctx: MaxTemporalContext): string {
   const duration = Math.max(1, ctx.sessionDurationSeconds);
   const progress = Math.min(1, Math.max(0, ctx.timeElapsedSeconds / duration));
   const phase = progress < 0.25
-    ? "Début de l'appel : vous faites connaissance, la méfiance est naturelle."
+    ? "Début de l'appel : vous faites connaissance — installe la relation conformément à ta fiche personnage."
     : progress < 0.75
       ? "Milieu de l'appel : la conversation est installée, tu peux approfondir."
       : "L'appel approche de sa fin : resserre l'échange, va à l'essentiel, prépare une sortie naturelle.";
