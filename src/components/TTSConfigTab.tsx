@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { Save, RotateCcw, CheckCircle2, HelpCircle } from "lucide-react";
-import { generateSpeech, playAudioBlob } from "@/services/tts";
+import { generateSpeech, playAudioBlob, tryCreateStreamingPlayback } from "@/services/tts";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
 import type { TTSProviderId } from "@/services/tts/types";
 import {
@@ -68,6 +68,7 @@ export default function TTSConfigTab() {
 
   // Test
   const [testing, setTesting] = useState<TTSProviderId | null>(null);
+  const [testingStream, setTestingStream] = useState(false);
 
   useEffect(() => {
     loadActiveProviderFromDB().then(setActiveProviderState);
@@ -99,6 +100,28 @@ export default function TTSConfigTab() {
       toast.error(`Erreur test ${id}: ${err instanceof Error ? err.message.slice(0, 120) : "inconnu"}`);
     } finally {
       setTesting(null);
+    }
+  }, []);
+
+  const testGradiumStreaming = useCallback(async () => {
+    setTestingStream(true);
+    try {
+      const handle = tryCreateStreamingPlayback(TEST_PHRASE, { providerId: "gradium" });
+      if (!handle) {
+        toast.error("Streaming indisponible (désactivé ou non supporté par ce navigateur)");
+        return;
+      }
+      const t0 = performance.now();
+      handle.open();
+      await handle.started;
+      const firstAudioMs = Math.round(performance.now() - t0);
+      await handle.finished;
+      toast.success(`Test streaming terminé — premier son en ${firstAudioMs}ms`);
+    } catch (err) {
+      console.error("TTS streaming test error (gradium):", err);
+      toast.error(`Erreur test streaming: ${err instanceof Error ? err.message.slice(0, 120) : "inconnu"}`);
+    } finally {
+      setTestingStream(false);
     }
   }, []);
 
@@ -504,12 +527,15 @@ export default function TTSConfigTab() {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-base">🎙️ Gradium TTS</h3>
-            <p className="text-xs text-muted-foreground">REST batch — 237 voix, latence faible</p>
+            <p className="text-xs text-muted-foreground">Streaming WebSocket (fallback REST) — 237 voix</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetGr}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
             <Button size="sm" onClick={() => testProvider("gradium")} disabled={testing === "gradium"}>
-              {testing === "gradium" ? "..." : "🔊 Tester"}
+              {testing === "gradium" ? "..." : "🔊 Tester REST"}
+            </Button>
+            <Button size="sm" onClick={testGradiumStreaming} disabled={testingStream}>
+              {testingStream ? "..." : "🔊 Tester streaming"}
             </Button>
             <Button size="sm" onClick={saveGr} disabled={savingGr || !grHasChanges}
               className={grHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
@@ -544,7 +570,30 @@ export default function TTSConfigTab() {
                 <option key={f} value={f}>{f}</option>
               ))}
             </select>
-            <span className="block text-xs text-muted-foreground/60">MP3 n'est pas supporté par Gradium. WAV recommandé pour la compatibilité navigateur.</span>
+            <span className="block text-xs text-muted-foreground/60">Format du chemin REST (fallback). Opus recommandé (~6x plus léger que WAV) ; bascule auto sur WAV si le navigateur ne lit pas l'Ogg/Opus (Safari &lt; 18.4). MP3 non supporté par Gradium.</span>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border rounded-md p-3 bg-accent/20">
+          <label className="flex items-center justify-between gap-3 text-sm sm:col-span-1">
+            <div>
+              <span className="font-medium">Streaming WebSocket</span>
+              <span className="block text-xs text-muted-foreground/60">Lecture progressive : la voix démarre dès les premiers chunks audio. Fallback REST automatique en cas d'échec.</span>
+            </div>
+            <Switch checked={grSettings.streamingEnabled}
+              onCheckedChange={(v) => updateGr({ streamingEnabled: v })} />
+          </label>
+
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-muted-foreground">Format streaming</span>
+            <select value={grSettings.streamingFormat}
+              onChange={(e) => updateGr({ streamingFormat: e.target.value as GradiumSettings["streamingFormat"] })}
+              disabled={!grSettings.streamingEnabled}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50">
+              <option value="pcm_24000">pcm_24000 (léger, recommandé)</option>
+              <option value="pcm_48000">pcm_48000 (natif Gradium)</option>
+            </select>
+            <span className="block text-xs text-muted-foreground/60">PCM brut envoyé sur le WebSocket. 24 kHz = moitié moins de données ; 48 kHz = qualité native.</span>
           </label>
         </div>
 

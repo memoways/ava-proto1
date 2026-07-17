@@ -6,14 +6,20 @@
  * that support it (currently ElevenLabs only — others ignore it).
  */
 
-import { generateSpeech, playAudioBlob, type TTSOptions } from "@/services/tts";
+import { generateSpeech, playAudioBlob, tryCreateStreamingPlayback, type TTSOptions } from "@/services/tts";
+import type { TTSStreamPlaybackHandle } from "@/services/tts/types";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
+
+/** What a generation resolves to: a full audio Blob, or a gated streaming handle. */
+type Playable =
+  | { kind: "blob"; blob: Blob }
+  | { kind: "stream"; handle: TTSStreamPlaybackHandle };
 
 interface PendingEntry {
   text: string;
   options?: TTSOptions;
-  resolveBlob: (b: Blob) => void;
-  rejectBlob: (e: unknown) => void;
+  resolvePlayable: (p: Playable) => void;
+  rejectPlayable: (e: unknown) => void;
 }
 
 interface TTSQueueOptions {
@@ -57,35 +63,51 @@ export class TTSQueue {
     try { this.onError?.(e); } catch { /* ignore */ }
   }
 
+  private markFirstPlayback(): void {
+    if (this.firstPlaybackStartMs !== null || this.firstEnqueuedAt === null) return;
+    this.firstPlaybackStartMs = Math.max(0, Math.round(performance.now() - this.firstEnqueuedAt));
+    this.onFirstPlaybackStart?.(this.firstPlaybackStartMs);
+  }
+
   enqueue(text: string, options?: TTSOptions): void {
     if (this._cancelled || !text.trim()) return;
     this.firstEnqueuedAt ??= performance.now();
 
-    let resolveBlob!: (b: Blob) => void;
-    let rejectBlob!: (e: unknown) => void;
-    const blobPromise = new Promise<Blob>((resolve, reject) => {
-      resolveBlob = resolve;
-      rejectBlob = reject;
+    let resolvePlayable!: (p: Playable) => void;
+    let rejectPlayable!: (e: unknown) => void;
+    const playablePromise = new Promise<Playable>((resolve, reject) => {
+      resolvePlayable = resolve;
+      rejectPlayable = reject;
     });
 
-    this.pending.push({ text: prepareTextForTTS(text), options, resolveBlob, rejectBlob });
+    this.pending.push({ text: prepareTextForTTS(text), options, resolvePlayable, rejectPlayable });
     this.scheduleFlush();
 
     this.queue = this.queue.then(async () => {
       if (this._cancelled) return;
       try {
-        const blob = await blobPromise;
-        if (this._cancelled) return;
+        const playable = await playablePromise;
+        if (this._cancelled) {
+          if (playable.kind === "stream") playable.handle.cancel();
+          return;
+        }
         const playStart = performance.now();
-        const result = await playAudioBlob(blob, () => {
-          if (this.firstPlaybackStartMs !== null || this.firstEnqueuedAt === null) return;
-          this.firstPlaybackStartMs = Math.max(0, Math.round(performance.now() - this.firstEnqueuedAt));
-          this.onFirstPlaybackStart?.(this.firstPlaybackStartMs);
-        }, this.abortController.signal);
-        this.playbackStartMsTotal += result?.playbackStartMs ?? 0;
-        this.playbackTotalMs += result?.playbackTotalMs ?? Math.round(performance.now() - playStart);
-        this.playbackCount++;
-        console.log(`[TTS-Queue] Played sentence #${this.playbackCount} in ${(performance.now() - playStart).toFixed(0)}ms`);
+        if (playable.kind === "blob") {
+          const result = await playAudioBlob(playable.blob, () => this.markFirstPlayback(), this.abortController.signal);
+          this.playbackStartMsTotal += result?.playbackStartMs ?? 0;
+          this.playbackTotalMs += result?.playbackTotalMs ?? Math.round(performance.now() - playStart);
+          this.playbackCount++;
+          console.log(`[TTS-Queue] Played sentence #${this.playbackCount} in ${(performance.now() - playStart).toFixed(0)}ms`);
+        } else {
+          playable.handle.open();
+          await playable.handle.started;
+          this.markFirstPlayback();
+          this.playbackStartMsTotal += Math.round(performance.now() - playStart);
+          const result = await playable.handle.finished;
+          this.playbackTotalMs += result.playbackTotalMs;
+          this.playbackCount++;
+          console.log(`[TTS-Queue] Played sentence #${this.playbackCount} (streamed) in ${(performance.now() - playStart).toFixed(0)}ms`);
+        }
       } catch (err) {
         if (this._cancelled) return;
         console.error("[TTS-Queue] Error:", err);
@@ -118,7 +140,7 @@ export class TTSQueue {
 
   private startGeneration(entry: PendingEntry, nextText?: string): void {
     if (this._cancelled) {
-      entry.rejectBlob(new Error("TTS queue cancelled"));
+      entry.rejectPlayable(new Error("TTS queue cancelled"));
       this.activeGenerations--;
       return;
     }
@@ -126,21 +148,42 @@ export class TTSQueue {
     this.lastSentText = entry.text;
 
     const genStart = performance.now();
-    generateSpeech(entry.text, {
+    const genOptions: TTSOptions = {
       ...entry.options,
       previousText,
       nextText,
       signal: this.abortController.signal,
-    })
+    };
+
+    // Streaming-capable provider (currently Gradium): generation starts now and
+    // buffers behind the handle's closed gate; the chain link opens it in turn.
+    const handle = tryCreateStreamingPlayback(entry.text, genOptions);
+    if (handle) {
+      entry.resolvePlayable({ kind: "stream", handle });
+      handle.generationDone
+        .then((stats) => {
+          this.generationWallMs = Math.max(this.generationWallMs, Math.round(performance.now() - (this.firstEnqueuedAt ?? genStart)));
+          this.generationCount++;
+          console.log(`[TTS-Queue] Generated #${this.generationCount} in ${(performance.now() - genStart).toFixed(0)}ms transport=${stats.transport} (${entry.text.slice(0, 40)}...)`);
+        })
+        .catch(() => { /* surfaced by the chain link via started/finished */ })
+        .finally(() => {
+          this.activeGenerations--;
+          if (!this._cancelled) this.scheduleFlush();
+        });
+      return;
+    }
+
+    generateSpeech(entry.text, genOptions)
       .then((blob) => {
         const genTime = performance.now() - genStart;
         this.generationWallMs = Math.max(this.generationWallMs, Math.round(performance.now() - (this.firstEnqueuedAt ?? genStart)));
         this.generationCount++;
         const stitchTag = `${previousText ? "P" : "-"}${nextText ? "N" : "-"}`;
         console.log(`[TTS-Queue] Generated #${this.generationCount} in ${genTime.toFixed(0)}ms stitch=${stitchTag} (${entry.text.slice(0, 40)}...)`);
-        entry.resolveBlob(blob);
+        entry.resolvePlayable({ kind: "blob", blob });
       })
-      .catch(entry.rejectBlob)
+      .catch(entry.rejectPlayable)
       .finally(() => {
         this.activeGenerations--;
         if (!this._cancelled) this.scheduleFlush();
@@ -179,7 +222,7 @@ export class TTSQueue {
     this.lastError = error;
     while (this.pending.length > 0) {
       const entry = this.pending.shift();
-      entry?.rejectBlob(error);
+      entry?.rejectPlayable(error);
     }
   }
 

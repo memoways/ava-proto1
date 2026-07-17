@@ -41,12 +41,51 @@ export interface TTSGenerateResult {
   };
 }
 
+/** Generation stats reported by a streaming playback handle (for telemetry). */
+export interface TTSStreamGenerationStats {
+  provider: TTSProviderId;
+  model?: string;
+  /** "websocket" when audio streamed live, "rest_fallback" when the blob path took over. */
+  transport: "websocket" | "rest_fallback";
+  statusCode?: number;
+  /** Time to first audio chunk (ms since handle creation). */
+  firstByteMs?: number;
+  /** Time until all audio was generated/received (ms since handle creation). */
+  totalMs?: number;
+}
+
+/**
+ * Progressive playback of one text segment. Generation starts immediately on
+ * creation and buffers behind a closed gate; audio only becomes audible after
+ * `open()` — this is how TTSQueue keeps sentences strictly sequential while
+ * still generating ahead.
+ */
+export interface TTSStreamPlaybackHandle {
+  /** Opens the playback gate: buffered + future audio gets scheduled from here on. */
+  open(): void;
+  /** Resolves when audio is audible (requires open()). Rejects on failure before that. */
+  started: Promise<void>;
+  /** Resolves when playback of all audio has finished. Rejects on error/abort. */
+  finished: Promise<{ playbackTotalMs: number }>;
+  /** Resolves when generation completed (all audio received/buffered) — before or
+   *  after playback ends. Used by TTSQueue to release its concurrency slot. */
+  generationDone: Promise<TTSStreamGenerationStats>;
+  /** Stops generation and playback immediately. Idempotent. */
+  cancel(reason?: unknown): void;
+}
+
 export interface TTSProvider {
   id: TTSProviderId;
   label: string;
   description: string;
   /** Generates speech for a single text segment. Throws on error. */
   generate(text: string, ctx?: TTSGenerateContext): Promise<TTSGenerateResult>;
+  /**
+   * Optional streaming capability (progressive playback). Returns null when
+   * streaming is disabled/unsupported — callers then use `generate()`.
+   * Providers without this member always use the blob path.
+   */
+  createStreamingPlayback?(text: string, ctx?: TTSGenerateContext): TTSStreamPlaybackHandle | null;
 }
 
 /** Structured provider failure used for bounded retry decisions. */

@@ -126,6 +126,12 @@ export interface GradiumSettings {
   rewriteRules: string;
   /** Optional pronunciation dictionary id, applied per request. */
   pronunciationId: string;
+  /** WebSocket streaming (progressive playback). Falls back to REST on failure. */
+  streamingEnabled: boolean;
+  /** Raw PCM format requested over the WebSocket ("pcm_48000" is Gradium's native rate). */
+  streamingFormat: "pcm_24000" | "pcm_48000";
+  /** Bumped when defaults change so migrateGradium can upgrade stored values once. */
+  settingsVersion?: number;
 }
 
 // Note: Gradium API does NOT support "mp3" — supported formats per
@@ -140,20 +146,34 @@ const GRADIUM_KEY = "ava_tts_settings_gradium";
 
 const gradiumDefaults: GradiumSettings = {
   voiceId: "b5ioHAR7JuHVLskk",
-  outputFormat: "wav",
+  outputFormat: "opus",
   temp: 0.7,
   cfgCoef: 2.0,
   paddingBonus: 0.0,
   rewriteRules: "fr",
   pronunciationId: "",
+  streamingEnabled: true,
+  streamingFormat: "pcm_24000",
+  settingsVersion: 2,
 };
 
 
 
 function migrateGradium(s: GradiumSettings): GradiumSettings {
+  let next = s;
   // "mp3" was previously allowed but is not a valid Gradium output_format.
-  if ((s.outputFormat as string) === "mp3") return { ...s, outputFormat: "wav" };
-  return s;
+  if ((next.outputFormat as string) === "mp3") next = { ...next, outputFormat: "opus" };
+  // v2: default REST format moved wav → opus (~6x fewer bytes). A stored "wav"
+  // predating v2 is almost certainly the old default, not a deliberate choice;
+  // re-selecting wav in the admin saves with settingsVersion 2 and sticks.
+  if ((next.settingsVersion ?? 1) < 2) {
+    next = {
+      ...next,
+      outputFormat: next.outputFormat === "wav" ? "opus" : next.outputFormat,
+      settingsVersion: 2,
+    };
+  }
+  return next;
 }
 
 export function getGradiumSettings(): GradiumSettings {

@@ -1,4 +1,6 @@
-// Gradium TTS proxy — POST /api/post/speech/tts (only_audio=true → raw audio bytes).
+// Gradium TTS proxy.
+// - GET: mint a short-lived browser WebSocket token (no API key in client)
+// - POST: REST batch via /api/post/speech/tts (only_audio=true → raw audio bytes)
 // Docs: https://docs.gradium.ai/guides/text-to-speech-rest
 // Advanced params live in json_config, passed as a URL-encoded JSON query param.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -6,7 +8,9 @@ import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 interface ReqBody {
@@ -42,6 +46,30 @@ serve(async (req) => {
   try {
     const apiKey = Deno.env.get("GRADIUM_API_KEY");
     if (!apiKey) throw new Error("GRADIUM_API_KEY is not configured");
+
+    if (req.method === "GET") {
+      const tokenRes = await fetch("https://api.gradium.ai/api/api-keys/token", {
+        headers: { "x-api-key": apiKey },
+      });
+      const tokenBody = await tokenRes.text();
+      if (!tokenRes.ok) {
+        console.error(`[proxy-tts-gradium] token ${tokenRes.status}: ${tokenBody.slice(0, 500)}`);
+        return new Response(JSON.stringify({ error: `Gradium token ${tokenRes.status}` }), {
+          status: tokenRes.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
+        });
+      }
+      return new Response(tokenBody, {
+        headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
+      });
+    }
+
+    if (req.method !== "POST") {
+      return new Response(JSON.stringify({ error: "Method not allowed" }), {
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const body: ReqBody = await req.json();
     if (!body.text?.trim()) throw new Error("Text is required");
@@ -81,16 +109,18 @@ serve(async (req) => {
       );
     }
 
-    const audio = await response.arrayBuffer();
+    // Pipe the upstream body straight through instead of buffering it, so the
+    // client starts receiving audio while Gradium is still generating/sending.
+    // (Empty-audio detection moved client-side: blob.size === 0 in gradium.ts.)
     const upstreamCT = response.headers.get("content-type") || "";
-    console.log(`[proxy-tts-gradium] upstream ok status=${response.status} bytes=${audio.byteLength} upstream-content-type=${upstreamCT}`);
-    if (audio.byteLength === 0) {
+    console.log(`[proxy-tts-gradium] upstream ok status=${response.status} upstream-content-type=${upstreamCT} (streaming)`);
+    if (!response.body) {
       return new Response(
-        JSON.stringify({ error: "Gradium returned empty audio", upstreamContentType: upstreamCT, format: outputFormat }),
+        JSON.stringify({ error: "Gradium returned no body", upstreamContentType: upstreamCT, format: outputFormat }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-    return new Response(audio, {
+    return new Response(response.body, {
       headers: {
         ...corsHeaders,
         "Content-Type": CONTENT_TYPES[outputFormat] || "audio/wav",
