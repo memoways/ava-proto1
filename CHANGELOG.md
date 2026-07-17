@@ -4,6 +4,32 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.44.0] - 2026-07-17 — Cohérence de Max : mémoire réparée, présent temporel, Game Master actif léger
+
+> Diagnostic complet : `docs/analyse-coherence-max.md`. Détail d'implémentation : `docs/implementation-coherence-max.md`.
+
+### Mémoire de session réparée (bug RLS silencieux)
+- La migration `20260712150404` réservait le SELECT sur `session_summaries` aux admins ; le joueur anonyme recevait 0 ligne **sans erreur**. Le bloc « SOUVENIRS DE LA SESSION » n'était donc jamais injecté dans le prompt de Max (amnésie au-delà des 10 derniers messages ≈ 5 échanges) et la re-summarisation LLM se déclenchait à chaque tour dès le tour 4.
+- Correctif sans toucher à la sécurité : `summarize-session` renvoie déjà `{summary, last_turn}` — mise en cache mémoire côté client (`sessionMemoryService`), lue avant la BDD (fallback conservé pour l'admin/banc d'essai).
+
+### Présent temporel de Max
+- Nouveau bloc « OÙ EN EST L'APPEL » dans le system prompt : durée écoulée, numéro de tour, phase d'appel (début/milieu/fin) avec consigne d'usage implicite. Max n'avait jusqu'ici **aucun** repère temporel (seul le GM les recevait).
+
+### Game Master actif léger (boucle GM→Max)
+- Le `next_turn_guidance` produit par le GM post-tour (auparavant calculé puis jeté) est désormais rebouclé : mémorisé au tour N, injecté au tour N+1 via le bloc « CONSEIL DE MISE EN SCÈNE », avec le cumul dédupliqué des sujets déjà couverts. Consommation one-shot (une guidance périmée ne survit pas à son tour), fiche personnage explicitement prioritaire, zéro appel LLM supplémentaire.
+
+### Règles de style unifiées
+- Retrait des incitations aux questions (« poser une question de contrôle », « questions qui testent l'autre ») qui contredisaient la règle « ne pose pas systématiquement de questions » ; longueur harmonisée à 1-2 phrases / 45 mots partout (y compris le prompt de fallback). ⚠️ Nécessite un reset des clés `ava_max_prompt_control_settings` / `ava_gm_prompt_settings` dans l'admin si elles ont déjà été sauvegardées.
+
+### Canon documentaire
+- `CLAUDE.md` et `STORY.md` corrigés : Max est le **père** d'Ava (~55 ans, Lausanne, avec Emma) — le pitch initial « frère développeur 28 ans » est marqué comme archive. Nouvelles règles projet : piège des SELECT RLS silencieux pour le joueur anonyme, canon personnage dans Notion, défauts de prompts surchargés par `admin_settings`.
+
+### Tests
+- 16 nouveaux tests unitaires (cache de résumés, blocs temporel et guidance, transmission orchestrateur, non-re-summarisation) ; suite complète 119 verts.
+
+### Fichiers
+- `src/services/sessionMemoryService.ts`, `src/agents/maxAgent.ts`, `src/services/prd4Orchestrator.ts`, `src/pages/IndexPRD4.tsx`, `src/services/settingsService.ts`, `CLAUDE.md`, `STORY.md`, `docs/analyse-coherence-max.md`, `docs/implementation-coherence-max.md`.
+
 ## [0.43.3] - 2026-07-16 — Gradium STT en temps réel par WebSocket et parsing JSON Game Master renforcé
 
 ### Gradium STT — temps réel et latence réduite

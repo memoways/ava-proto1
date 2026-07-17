@@ -38,6 +38,11 @@ avec Max en visioconférence. Un Game Master IA orchestre l'expérience :
 confiance, triggers vidéo, game over. Prototype 1 = valider le pipeline technique.
 ```
 
+> ⚠️ **Vision initiale périmée (note 2026-07-17).** Le canon actuel du personnage
+> a changé depuis ce pitch : **Max est le père d'Ava** (~55 ans, vit à Lausanne
+> avec Emma), pas son frère. La source de vérité runtime est la fiche Notion
+> (tables `characters` / `character_prompts`). Voir `docs/analyse-coherence-max.md` §Cause 5.
+
 ### Target Human
 
 ```
