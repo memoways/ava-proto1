@@ -264,6 +264,7 @@ export async function callLLMWithUsage(
         max_tokens: options?.max_tokens,
         top_p: options?.top_p,
         timeout_ms: timeoutMs,
+        reasoning: options?.reasoning ?? isReasoningEnabledForModel(model),
       },
       timeoutMs,
       `LLM request ${model}`,
