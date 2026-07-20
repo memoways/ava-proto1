@@ -173,27 +173,17 @@ export default function LLMConfigTab() {
           <label className="text-sm font-medium text-muted-foreground mb-2 block">Modèle</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {OPENROUTER_MODELS.map((m) => (
-              <button
+              <ModelCard
                 key={m.id}
-                onClick={() => {
+                model={m}
+                active={settings.LLM_MODEL === m.id}
+                expanded={expandedMax === m.id}
+                onSelect={() => {
                   updateLocal({ LLM_MODEL: m.id });
                   setCustomModel("");
                 }}
-                className={`text-left p-3 border rounded-lg transition-colors ${
-                  settings.LLM_MODEL === m.id
-                    ? "bg-primary/10 border-primary"
-                    : "hover:bg-accent/50"
-                }`}
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-sm">{m.label}</span>
-                  {settings.LLM_MODEL === m.id && (
-                    <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">actif</span>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">{m.description}</p>
-                <p className="text-xs font-mono text-muted-foreground/60 mt-0.5">{m.id}</p>
-              </button>
+                onToggle={() => setExpandedMax(expandedMax === m.id ? null : m.id)}
+              />
             ))}
           </div>
 
