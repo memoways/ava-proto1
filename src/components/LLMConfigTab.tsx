@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Save, RotateCcw, ChevronDown, ChevronUp, Zap, Scale, Sparkles } from "lucide-react";
+import { Save, RotateCcw, ChevronDown, ChevronUp, Zap, Scale, Sparkles, Brain } from "lucide-react";
 import {
   getLLMSettings,
   saveLLMSettingsLocal,
