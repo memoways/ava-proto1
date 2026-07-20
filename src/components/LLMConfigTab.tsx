@@ -304,11 +304,15 @@ export default function LLMConfigTab() {
                 model={m}
                 active={settings.LLM_MODEL_GM === m.id}
                 expanded={expandedGM === m.id}
+                reasoningEnabled={settings.LLM_REASONING?.[m.id] === true}
                 onSelect={() => {
                   updateLocal({ LLM_MODEL_GM: m.id });
                   setCustomModelGM("");
                 }}
                 onToggle={() => setExpandedGM(expandedGM === m.id ? null : m.id)}
+                onToggleReasoning={(enabled) =>
+                  updateLocal({ LLM_REASONING: { ...settings.LLM_REASONING, [m.id]: enabled } })
+                }
               />
             ))}
           </div>
