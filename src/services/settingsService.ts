@@ -300,6 +300,7 @@ function normalizeLLMSettings(settings: LLMSettings): LLMSettings {
     LLM_MODEL_GM: gmModel.modelId,
     LLM_MAX_TOKENS: Math.min(settings.LLM_MAX_TOKENS || llmDefaults.LLM_MAX_TOKENS, 220),
     LLM_TOP_P: Math.min(settings.LLM_TOP_P || llmDefaults.LLM_TOP_P, 0.9),
+    LLM_REASONING: settings.LLM_REASONING && typeof settings.LLM_REASONING === "object" ? settings.LLM_REASONING : {},
   };
 }
 
