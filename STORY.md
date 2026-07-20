@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-16 (Gradium STT WebSocket temps réel, parsing JSON Game Master, dictionnaire STT ajusté, tooltips TTS, conversion Gradium STT WAV)
+> **Last Updated**: 2026-07-20 (LLM Config : 12 modèles récents, cartes avec coûts et avantages/inconvénients)
 
 ---
 
@@ -70,6 +70,25 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-07-20 — LLM Config : 12 modèles récents, coûts et fiches avantages/inconvénients 🔷
+
+**Intent.** La liste de modèles affichée dans Admin > LLM Config était composée en partie de modèles obsolètes, sans indication de coût ni de compromis. L'objectif est de proposer une sélection actualisée de 12 modèles, avec les informations nécessaires pour choisir le bon LLM pour Max (voice-to-voice temps réel) et pour le Game Master (analyse structurée), tout en conservant les modèles déjà utilisés.
+
+**Sélection de 12 modèles.** `src/services/settingsService.ts` remplace les anciens modèles par une liste maintenue, organisée en trois tiers :
+- **Rapide** : Gemini 2.5 Flash, GPT-5 Mini, DeepSeek V3.1, Llama 4 Maverick — pour la latence live et les coûts faibles.
+- **Équilibré** : GPT-4o, Claude Sonnet 4, Grok 4, Grok 3, Mistral Large 2411 — compromis qualité/prix/latence.
+- **Premium** : Gemini 2.5 Pro, GPT-5, Claude Opus 4.1 — pour la profondeur narrative et les tests qualitatifs, au prix d'une latence plus élevée.
+
+Chaque modèle expose désormais un `tier`, les coûts input/output au million de tokens, une description et deux listes (`pros`/`cons`). Les modèles précédemment utilisés (Gemini 2.5 Flash/Pro, GPT-4o, Claude Sonnet 4, Grok 3) sont conservés ; les anciens identifiants (Qwen, Llama 3.1, GPT-4o Mini, Grok Mini, Grok 2, Mistral Large legacy) sont redirigés silencieusement vers les nouveaux équivalents via `DEPRECATED_OPENROUTER_MODELS`.
+
+**Cartes de modèles détaillées.** L'interface `LLMConfigTab.tsx` remplace les simples boutons par des `ModelCard` : chaque carte affiche le nom, le badge de tier coloré, le coût input/output permanent et un toggle "Détails" qui déploie les avantages et inconvénients. Cela permet de comparer les modèles sans quitter l'admin et sans connaître OpenRouter.
+
+**Correction build.** `src/services/tts/gradiumStreamPlayer.ts` utilisait `buffer.copyToChannel(samples, 0)`, incompatible avec le type `Float32Array` attendu par cette API ; le code passe à `buffer.getChannelData(0).set(samples)` pour garantir le build et le maintien du lecteur streaming Gradium.
+
+**Fichiers.** `src/services/settingsService.ts`, `src/components/LLMConfigTab.tsx`, `src/services/tts/gradiumStreamPlayer.ts`.
+
+**Activation restante.** Vérifier que les réglages existants en production basculent correctement sur les nouveaux IDs mappés, et ajuster les choix par défaut de Max et du Game Master après tests qualitatifs.
 
 ### 2026-07-16 — Gradium STT passe en temps réel par WebSocket et parsing JSON Game Master durci 🔷
 

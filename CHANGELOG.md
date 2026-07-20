@@ -4,6 +4,30 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.46.0] - 2026-07-20 — LLM Config : 12 modèles récents, coûts et fiches avantages/inconvénients
+
+### Liste de modèles actualisée (`src/services/settingsService.ts`)
+- Remplacement des modèles vieillissants par une sélection de 12 modèles récents et pertinents pour le voice-to-voice temps réel (Max) et l'analyse structurée (Game Master) :
+  - **Fast** : Gemini 2.5 Flash, GPT-5 Mini, DeepSeek V3.1, Llama 4 Maverick.
+  - **Balanced** : GPT-4o, Claude Sonnet 4, Grok 4, Grok 3, Mistral Large 2411.
+  - **Premium** : Gemini 2.5 Pro, GPT-5, Claude Opus 4.1.
+- Conservation des modèles effectivement utilisés jusqu'ici (Gemini 2.5 Flash, Gemini 2.5 Pro, GPT-4o, Claude Sonnet 4, Grok 3) ; les anciens modèles obsolètes (Qwen, Llama 3.1, GPT-4o Mini, Grok Mini, Grok 2, Mistral Large legacy) sont mappés vers les nouveaux équivalents via `DEPRECATED_OPENROUTER_MODELS`.
+- Chaque modèle expose désormais : tier (`fast`/`balanced`/`premium`), coûts input/output au million de tokens, description et liste d'avantages/inconvénients.
+
+### Interface Admin — cartes de modèles détaillées (`src/components/LLMConfigTab.tsx`)
+- Remplacement des simples boutons de sélection par des `ModelCard` enrichies.
+- Badge de tier visuel (Rapide / Équilibré / Premium) avec icône et couleur.
+- Coûts input/output affichés en permanence sous chaque modèle.
+- Toggle "Détails" par modèle qui déploie deux colonnes : avantages (✓) et inconvénients (✗), pour choisir le modèle en connaissance de cause.
+- Sélection indépendante pour Max et pour le Game Master, avec un état d'expansion séparé pour chaque section.
+
+### Compatibilité et corrections
+- Mapping des anciens identifiants de modèles sauvegardés dans `admin_settings` et `localStorage` vers les nouveaux modèles, sans casser les réglages existants.
+- Correction d'une erreur de build dans `src/services/tts/gradiumStreamPlayer.ts` : remplacement de `buffer.copyToChannel(samples, 0)` par `buffer.getChannelData(0).set(samples)` pour garantir la compatibilité TypeScript du lecteur streaming Gradium.
+
+### Fichiers
+- `src/services/settingsService.ts`, `src/components/LLMConfigTab.tsx`, `src/services/tts/gradiumStreamPlayer.ts`.
+
 ## [0.45.1] - 2026-07-17 — Latence Gradium : diagnostic streaming + découpage phrase-à-phrase
 
 > Suite au test réel de la 0.45.0 : le streaming WebSocket ne s'activait jamais (encore ~7s). Cause : l'edge function `proxy-tts-gradium` n'avait pas été **redéployée**, donc le GET de mint de token tombait sur l'ancien chemin POST (`await req.json()` sur un body vide → `500 {"error":"Unexpected end of JSON input"}`) → fallback REST à chaque tour. **Action requise : redéployer `proxy-tts-gradium`.**
