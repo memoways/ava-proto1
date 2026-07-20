@@ -218,7 +218,14 @@ const llmDefaults: LLMSettings = {
 
 const DEPRECATED_OPENROUTER_MODELS: Record<string, string> = {
   "google/gemini-2.0-flash-001": "google/gemini-2.5-flash",
-  "qwen/qwen-2.5-32b-instruct": "qwen/qwen-2.5-72b-instruct",
+  "qwen/qwen-2.5-32b-instruct": "google/gemini-2.5-flash",
+  "qwen/qwen-2.5-72b-instruct": "google/gemini-2.5-flash",
+  "meta-llama/llama-3.1-70b-instruct": "meta-llama/llama-4-maverick",
+  "meta-llama/llama-3.1-8b-instruct": "meta-llama/llama-4-maverick",
+  "openai/gpt-4o-mini": "openai/gpt-5-mini",
+  "x-ai/grok-3-mini-beta": "x-ai/grok-3-beta",
+  "x-ai/grok-2-1212": "x-ai/grok-3-beta",
+  "mistralai/mistral-large": "mistralai/mistral-large-2411",
 };
 
 const SLOW_LIVE_MODEL_FALLBACKS: Record<string, string> = {
