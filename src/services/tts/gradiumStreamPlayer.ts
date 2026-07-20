@@ -200,7 +200,7 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
       gain.connect(ctx.destination);
     }
     const buffer = ctx.createBuffer(1, samples.length, sampleRate);
-    buffer.copyToChannel(samples, 0);
+    buffer.getChannelData(0).set(samples);
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(gain);

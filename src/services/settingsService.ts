@@ -66,19 +66,140 @@ export interface LLMSettings {
 
 const LLM_STORAGE_KEY = "ava_llm_settings";
 
-export const OPENROUTER_MODELS = [
-  { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "Défaut live — rapide, fiable, bonne qualité" },
-  { id: "openai/gpt-4o-mini", label: "GPT-4o Mini", description: "Très rapide, économique" },
-  { id: "x-ai/grok-3-mini-beta", label: "Grok 3 Mini", description: "Rapide, conversationnel, bon en roleplay" },
-  { id: "qwen/qwen-2.5-72b-instruct", label: "Qwen 2.5 72B", description: "Qualité correcte mais trop lent pour le live voice-to-voice" },
-  { id: "x-ai/grok-3-beta", label: "Grok 3", description: "Top qualité xAI, raisonnement fort" },
-  { id: "x-ai/grok-2-1212", label: "Grok 2", description: "Équilibré vitesse/qualité" },
-  { id: "google/gemini-2.5-pro-preview-06-05", label: "Gemini 2.5 Pro", description: "Top qualité, plus lent" },
-  { id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4", description: "Excellent en roleplay" },
-  { id: "openai/gpt-4o", label: "GPT-4o", description: "Polyvalent, rapide" },
-  { id: "meta-llama/llama-3.1-70b-instruct", label: "Llama 3.1 70B", description: "Open source, performant" },
-  { id: "meta-llama/llama-3.1-8b-instruct", label: "Llama 3.1 8B", description: "Ultra rapide, léger" },
-  { id: "mistralai/mistral-large", label: "Mistral Large", description: "Bon en français" },
+export interface OpenRouterModel {
+  id: string;
+  label: string;
+  description: string;
+  tier: "fast" | "balanced" | "premium";
+  costInput: string;   // USD / 1M tokens input
+  costOutput: string;  // USD / 1M tokens output
+  pros: string[];
+  cons: string[];
+}
+
+// Liste maintenue : 12 modèles récents, adaptés au voice-to-voice temps réel (Max) ou à l'analyse JSON (GM).
+// Prix indicatifs OpenRouter (USD / 1M tokens) — vérifier openrouter.ai/models pour la valeur exacte.
+export const OPENROUTER_MODELS: OpenRouterModel[] = [
+  {
+    id: "google/gemini-2.5-flash",
+    label: "Gemini 2.5 Flash",
+    description: "Défaut live — rapide, fiable, excellent rapport qualité/prix",
+    tier: "fast",
+    costInput: "$0.30",
+    costOutput: "$2.50",
+    pros: ["Latence très basse (~400ms TTFT)", "Bon français", "Fiable pour JSON structuré (GM)", "Contexte 1M tokens"],
+    cons: ["Moins nuancé qu'un Pro sur le roleplay long", "Créativité limitée en température basse"],
+  },
+  {
+    id: "google/gemini-2.5-pro-preview-06-05",
+    label: "Gemini 2.5 Pro",
+    description: "Top qualité Google, raisonnement fort, plus lent",
+    tier: "premium",
+    costInput: "$1.25",
+    costOutput: "$10.00",
+    pros: ["Raisonnement profond", "Contexte 2M tokens", "Excellent en analyse narrative"],
+    cons: ["Latence ~1.5-2s (trop lent pour voice live)", "Coût x4 vs Flash"],
+  },
+  {
+    id: "openai/gpt-5",
+    label: "GPT-5",
+    description: "Modèle phare OpenAI — qualité maximale, roleplay riche",
+    tier: "premium",
+    costInput: "$10.00",
+    costOutput: "$30.00",
+    pros: ["Meilleure cohérence de personnage sur longue conversation", "Excellent français littéraire", "Suivi d'instructions parfait"],
+    cons: ["Cher", "Latence ~1-1.5s", "Overkill pour le GM"],
+  },
+  {
+    id: "openai/gpt-5-mini",
+    label: "GPT-5 Mini",
+    description: "Version compacte de GPT-5 — rapide et abordable",
+    tier: "fast",
+    costInput: "$0.50",
+    costOutput: "$2.00",
+    pros: ["Qualité proche GPT-5 sur dialogues courts", "Latence live-friendly", "Bon en JSON strict"],
+    cons: ["Moins créatif que GPT-5", "Peut lisser les nuances émotionnelles"],
+  },
+  {
+    id: "openai/gpt-4o",
+    label: "GPT-4o",
+    description: "Polyvalent, référence stable — bonne baseline",
+    tier: "balanced",
+    costInput: "$2.50",
+    costOutput: "$10.00",
+    pros: ["Très stable", "Excellent français", "Bonne latence (~600ms)"],
+    cons: ["Génération plus datée face à GPT-5", "Coût moyen sans avantage clair"],
+  },
+  {
+    id: "anthropic/claude-sonnet-4",
+    label: "Claude Sonnet 4",
+    description: "Roleplay émotionnel et nuancé, style naturel",
+    tier: "balanced",
+    costInput: "$3.00",
+    costOutput: "$15.00",
+    pros: ["Le meilleur pour le roleplay incarné", "Ne casse pas le personnage", "Français littéraire chaleureux"],
+    cons: ["Latence ~1s", "Parfois trop verbeux (max_tokens à surveiller)"],
+  },
+  {
+    id: "anthropic/claude-opus-4.1",
+    label: "Claude Opus 4.1",
+    description: "Modèle premium Anthropic — profondeur maximale",
+    tier: "premium",
+    costInput: "$15.00",
+    costOutput: "$75.00",
+    pros: ["Nuances émotionnelles inégalées", "Excellent sur ambiguïté narrative", "Mémoire contextuelle solide"],
+    cons: ["Très cher (x25 vs Flash)", "Latence 1.5-2s — pas pour live", "Réservé aux tests premium"],
+  },
+  {
+    id: "x-ai/grok-4",
+    label: "Grok 4",
+    description: "Nouveau flagship xAI — vif, spontané, bon en dialogue",
+    tier: "balanced",
+    costInput: "$5.00",
+    costOutput: "$15.00",
+    pros: ["Réponses vivantes et non-lisses", "Bonne inertie de personnage", "Contexte 256k"],
+    cons: ["Français parfois moins soigné", "Peut sortir du cadre plus facilement"],
+  },
+  {
+    id: "x-ai/grok-3-beta",
+    label: "Grok 3",
+    description: "Raisonnement solide xAI, encore compétitif",
+    tier: "balanced",
+    costInput: "$3.00",
+    costOutput: "$15.00",
+    pros: ["Bon compromis qualité/prix", "Style conversationnel"],
+    cons: ["Sera remplacé par Grok 4", "Moins de nuances émotionnelles que Claude"],
+  },
+  {
+    id: "deepseek/deepseek-chat-v3.1",
+    label: "DeepSeek V3.1",
+    description: "Open-weight ultra-compétitif — excellent rapport qualité/prix",
+    tier: "fast",
+    costInput: "$0.27",
+    costOutput: "$1.10",
+    pros: ["Prix imbattable", "Qualité proche GPT-4o", "Latence correcte"],
+    cons: ["Français moins fluide que Gemini/Claude", "Moins fiable sur JSON strict"],
+  },
+  {
+    id: "meta-llama/llama-4-maverick",
+    label: "Llama 4 Maverick",
+    description: "Meta Llama 4 — open source, très rapide et très économique",
+    tier: "fast",
+    costInput: "$0.20",
+    costOutput: "$0.60",
+    pros: ["Le moins cher de la liste", "Latence ultra-basse", "Contexte 1M"],
+    cons: ["Français correct mais pas premium", "Roleplay parfois plat"],
+  },
+  {
+    id: "mistralai/mistral-large-2411",
+    label: "Mistral Large 2411",
+    description: "Champion français — natif européen, RGPD-friendly",
+    tier: "balanced",
+    costInput: "$2.00",
+    costOutput: "$6.00",
+    pros: ["Meilleur français natif du panel", "Hébergement UE possible", "Bon suivi d'instructions"],
+    cons: ["Moins créatif que Claude/GPT-5", "Latence ~800ms"],
+  },
 ];
 
 const llmDefaults: LLMSettings = {
@@ -97,7 +218,14 @@ const llmDefaults: LLMSettings = {
 
 const DEPRECATED_OPENROUTER_MODELS: Record<string, string> = {
   "google/gemini-2.0-flash-001": "google/gemini-2.5-flash",
-  "qwen/qwen-2.5-32b-instruct": "qwen/qwen-2.5-72b-instruct",
+  "qwen/qwen-2.5-32b-instruct": "google/gemini-2.5-flash",
+  "qwen/qwen-2.5-72b-instruct": "google/gemini-2.5-flash",
+  "meta-llama/llama-3.1-70b-instruct": "meta-llama/llama-4-maverick",
+  "meta-llama/llama-3.1-8b-instruct": "meta-llama/llama-4-maverick",
+  "openai/gpt-4o-mini": "openai/gpt-5-mini",
+  "x-ai/grok-3-mini-beta": "x-ai/grok-3-beta",
+  "x-ai/grok-2-1212": "x-ai/grok-3-beta",
+  "mistralai/mistral-large": "mistralai/mistral-large-2411",
 };
 
 const SLOW_LIVE_MODEL_FALLBACKS: Record<string, string> = {
