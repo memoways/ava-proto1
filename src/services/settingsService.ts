@@ -62,6 +62,13 @@ export interface LLMSettings {
   LLM_TOP_P: number;
   LLM_TEMPERATURE_GM: number;
   LLM_MAX_TOKENS_GM: number;
+  /** Par modèle : reasoning activé ou non (défaut : désactivé pour tous). */
+  LLM_REASONING: Record<string, boolean>;
+}
+
+export function isReasoningEnabledForModel(modelId: string, settings?: LLMSettings): boolean {
+  const s = settings ?? getLLMSettings();
+  return s.LLM_REASONING?.[modelId] === true;
 }
 
 const LLM_STORAGE_KEY = "ava_llm_settings";
