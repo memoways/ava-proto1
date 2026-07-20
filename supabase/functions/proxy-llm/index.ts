@@ -151,6 +151,29 @@ serve(async (req) => {
       );
     }
 
+    // Hybrid reasoning models (GPT-5, o1/o3, DeepSeek V3.1, Grok reasoning, Gemini thinking).
+    // Par défaut, OpenRouter active le mode "reasoning" qui consomme des tokens invisibles
+    // dans max_tokens ET ajoute plusieurs secondes de latence. Pour un usage voice live,
+    // on désactive systématiquement le reasoning (ou effort minimal) pour ces modèles.
+    const isReasoningModel =
+      /^openai\/(gpt-5|o1|o3|o4)/.test(model) ||
+      /^deepseek\/deepseek-(chat-v3\.1|r1)/.test(model) ||
+      /^x-ai\/grok-(4|3-mini)/.test(model);
+
+    const upstreamBody: Record<string, unknown> = {
+      model,
+      messages: body.messages,
+      temperature,
+      max_tokens,
+      top_p,
+      stream,
+      usage: { include: true },
+    };
+    if (isReasoningModel) {
+      // OpenRouter normalise: enabled:false pour hybrid (DeepSeek V3.1),
+      // effort:"minimal" pour GPT-5/o-series. On envoie les deux, l'upstream ignore l'inapplicable.
+      upstreamBody.reasoning = { enabled: false, effort: "minimal", exclude: true };
+    }
 
     const response = await fetchWithTimeout(OPENROUTER_URL, {
       method: 'POST',
@@ -160,19 +183,11 @@ serve(async (req) => {
         'HTTP-Referer': 'https://ava-prototype.lovable.app',
         'X-Title': 'AVA Prototype 1',
       },
-      body: JSON.stringify({
-        model,
-        messages: body.messages,
-        temperature,
-        max_tokens,
-        top_p,
-        stream,
-        // Request usage info for tracking
-        usage: { include: true },
-      }),
+      body: JSON.stringify(upstreamBody),
     }, timeoutMs).catch((error) => {
       if (error instanceof DOMException && error.name === "AbortError") {
         return new Response(
+
           JSON.stringify({ error: `OpenRouter timeout after ${timeoutMs}ms` }),
           { status: 504, headers: { 'Content-Type': 'application/json' } },
         );
