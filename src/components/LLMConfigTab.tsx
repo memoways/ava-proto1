@@ -16,12 +16,91 @@ import {
   type LLMSettings,
 } from "@/services/settingsService";
 
+const TIER_META: Record<string, { icon: typeof Zap; label: string; className: string }> = {
+  fast: { icon: Zap, label: "Rapide", className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
+  balanced: { icon: Scale, label: "Équilibré", className: "bg-sky-500/15 text-sky-400 border-sky-500/30" },
+  premium: { icon: Sparkles, label: "Premium", className: "bg-purple-500/15 text-purple-400 border-purple-500/30" },
+};
+
+function ModelCard({
+  model,
+  active,
+  expanded,
+  onSelect,
+  onToggle,
+}: {
+  model: (typeof OPENROUTER_MODELS)[number];
+  active: boolean;
+  expanded: boolean;
+  onSelect: () => void;
+  onToggle: () => void;
+}) {
+  const tier = TIER_META[model.tier] ?? TIER_META.balanced;
+  const TierIcon = tier.icon;
+  return (
+    <div
+      className={`text-left border rounded-lg transition-colors ${
+        active ? "bg-primary/10 border-primary" : "hover:bg-accent/50"
+      }`}
+    >
+      <button onClick={onSelect} className="w-full text-left p-3">
+        <div className="flex justify-between items-center gap-2">
+          <span className="font-medium text-sm">{model.label}</span>
+          <div className="flex items-center gap-1.5">
+            <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${tier.className}`}>
+              <TierIcon className="w-2.5 h-2.5" />
+              {tier.label}
+            </span>
+            {active && <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">actif</span>}
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mt-0.5">{model.description}</p>
+        <p className="text-xs font-mono text-muted-foreground/60 mt-0.5">{model.id}</p>
+      </button>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-muted-foreground border-t border-border/50 hover:bg-accent/30"
+      >
+        <span>
+          💰 In {model.costInput} · Out {model.costOutput} <span className="text-muted-foreground/60">/ 1M tok</span>
+        </span>
+        <span className="flex items-center gap-1">
+          {expanded ? "Masquer" : "Détails"}
+          {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+        </span>
+      </button>
+      {expanded && (
+        <div className="px-3 pb-3 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs border-t border-border/50">
+          <div>
+            <div className="font-semibold text-emerald-400 mb-1">✓ Avantages</div>
+            <ul className="space-y-0.5 text-muted-foreground list-disc list-inside">
+              {model.pros.map((p, i) => (
+                <li key={i}>{p}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <div className="font-semibold text-orange-400 mb-1">✗ Inconvénients</div>
+            <ul className="space-y-0.5 text-muted-foreground list-disc list-inside">
+              {model.cons.map((c, i) => (
+                <li key={i}>{c}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LLMConfigTab() {
   const [settings, setSettings] = useState<LLMSettings>(getLLMSettings());
   const [savedSettings, setSavedSettings] = useState<LLMSettings>(getLLMSettings());
   const [customModel, setCustomModel] = useState("");
   const [customModelGM, setCustomModelGM] = useState("");
   const [saving, setSaving] = useState(false);
+  const [expandedMax, setExpandedMax] = useState<string | null>(null);
+  const [expandedGM, setExpandedGM] = useState<string | null>(null);
 
   useEffect(() => {
     loadLLMSettingsFromDB().then((s) => {
