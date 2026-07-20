@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-16 (Gradium STT WebSocket temps réel, parsing JSON Game Master, dictionnaire STT ajusté, tooltips TTS, conversion Gradium STT WAV)
+> **Last Updated**: 2026-07-20 (LLM Config : 12 modèles récents, cartes avec coûts et avantages/inconvénients)
 
 ---
 
