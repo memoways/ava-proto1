@@ -27,14 +27,18 @@ function ModelCard({
   model,
   active,
   expanded,
+  reasoningEnabled,
   onSelect,
   onToggle,
+  onToggleReasoning,
 }: {
   model: (typeof OPENROUTER_MODELS)[number];
   active: boolean;
   expanded: boolean;
+  reasoningEnabled: boolean;
   onSelect: () => void;
   onToggle: () => void;
+  onToggleReasoning: (enabled: boolean) => void;
 }) {
   const tier = TIER_META[model.tier] ?? TIER_META.balanced;
   const TierIcon = tier.icon;
@@ -58,6 +62,22 @@ function ModelCard({
         <p className="text-xs text-muted-foreground mt-0.5">{model.description}</p>
         <p className="text-xs font-mono text-muted-foreground/60 mt-0.5">{model.id}</p>
       </button>
+      <div
+        className="flex items-center justify-between px-3 py-1.5 text-xs border-t border-border/50"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <label
+          className="flex items-center gap-1.5 cursor-pointer select-none text-muted-foreground"
+          title="Active le mode raisonnement du modèle (plus lent, plus coûteux, meilleure analyse). Désactivé par défaut."
+        >
+          <Brain className="w-3 h-3" />
+          <span>Reasoning</span>
+          <Switch checked={reasoningEnabled} onCheckedChange={onToggleReasoning} className="scale-75 ml-1" />
+          <span className={reasoningEnabled ? "text-primary" : "text-muted-foreground/60"}>
+            {reasoningEnabled ? "ON" : "OFF"}
+          </span>
+        </label>
+      </div>
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-muted-foreground border-t border-border/50 hover:bg-accent/30"
