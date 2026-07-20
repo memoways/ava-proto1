@@ -22,6 +22,8 @@ interface LLMRequest {
   top_p?: number;
   stream?: boolean;
   timeout_ms?: number;
+  /** Explicit reasoning toggle from client. undefined => disabled by default for reasoning models. */
+  reasoning?: boolean;
   // Special action for cost lookup
   _action?: string;
   generation_id?: string;
@@ -153,12 +155,13 @@ serve(async (req) => {
 
     // Hybrid reasoning models (GPT-5, o1/o3, DeepSeek V3.1, Grok reasoning, Gemini thinking).
     // Par défaut, OpenRouter active le mode "reasoning" qui consomme des tokens invisibles
-    // dans max_tokens ET ajoute plusieurs secondes de latence. Pour un usage voice live,
-    // on désactive systématiquement le reasoning (ou effort minimal) pour ces modèles.
+    // dans max_tokens ET ajoute plusieurs secondes de latence. Le client peut forcer
+    // l'activation via body.reasoning=true ; sinon on désactive pour les modèles concernés.
     const isReasoningModel =
       /^openai\/(gpt-5|o1|o3|o4)/.test(model) ||
       /^deepseek\/deepseek-(chat-v3\.1|r1)/.test(model) ||
       /^x-ai\/grok-(4|3-mini)/.test(model);
+    const reasoningRequested = body.reasoning === true;
 
     const upstreamBody: Record<string, unknown> = {
       model,
@@ -169,7 +172,10 @@ serve(async (req) => {
       stream,
       usage: { include: true },
     };
-    if (isReasoningModel) {
+    if (reasoningRequested) {
+      // Laisse OpenRouter appliquer l'effort par défaut du modèle, mais expose les traces.
+      upstreamBody.reasoning = { enabled: true, exclude: false };
+    } else if (isReasoningModel) {
       // OpenRouter normalise: enabled:false pour hybrid (DeepSeek V3.1),
       // effort:"minimal" pour GPT-5/o-series. On envoie les deux, l'upstream ignore l'inapplicable.
       upstreamBody.reasoning = { enabled: false, effort: "minimal", exclude: true };

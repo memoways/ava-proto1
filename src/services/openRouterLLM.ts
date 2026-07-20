@@ -2,6 +2,7 @@ import { trackLLMCall } from "./llmUsageTracker";
 import { debugLogger } from "./debugLogger";
 import { TimeoutError, withTimeout } from "./asyncUtils";
 import { authenticatedFunctionFetch } from "./gameAuth";
+import { isReasoningEnabledForModel } from "./settingsService";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -23,6 +24,8 @@ interface LLMOptions {
   session_id?: string | null;
   /** Cancels an obsolete conversation turn before its result reaches the UI. */
   signal?: AbortSignal;
+  /** Force enable/disable reasoning. If undefined, reads from LLMSettings.LLM_REASONING[model]. */
+  reasoning?: boolean;
 }
 
 type StreamCallback = (text: string, done: boolean) => void;
@@ -105,6 +108,7 @@ export async function streamLLM(
         max_tokens: options?.max_tokens,
         top_p: options?.top_p,
         timeout_ms: timeoutMs,
+        reasoning: options?.reasoning ?? isReasoningEnabledForModel(model),
       },
       timeoutMs,
       `LLM stream ${model}`,
@@ -260,6 +264,7 @@ export async function callLLMWithUsage(
         max_tokens: options?.max_tokens,
         top_p: options?.top_p,
         timeout_ms: timeoutMs,
+        reasoning: options?.reasoning ?? isReasoningEnabledForModel(model),
       },
       timeoutMs,
       `LLM request ${model}`,

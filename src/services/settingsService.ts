@@ -62,6 +62,13 @@ export interface LLMSettings {
   LLM_TOP_P: number;
   LLM_TEMPERATURE_GM: number;
   LLM_MAX_TOKENS_GM: number;
+  /** Par modèle : reasoning activé ou non (défaut : désactivé pour tous). */
+  LLM_REASONING: Record<string, boolean>;
+}
+
+export function isReasoningEnabledForModel(modelId: string, settings?: LLMSettings): boolean {
+  const s = settings ?? getLLMSettings();
+  return s.LLM_REASONING?.[modelId] === true;
 }
 
 const LLM_STORAGE_KEY = "ava_llm_settings";
@@ -214,6 +221,7 @@ const llmDefaults: LLMSettings = {
   LLM_TEMPERATURE_GM: 0.3,
   // Le brief JSON fait ~150 tokens utiles ; 180 = marge confortable, plus de gaspillage de génération.
   LLM_MAX_TOKENS_GM: 180,
+  LLM_REASONING: {},
 };
 
 const DEPRECATED_OPENROUTER_MODELS: Record<string, string> = {
@@ -292,6 +300,7 @@ function normalizeLLMSettings(settings: LLMSettings): LLMSettings {
     LLM_MODEL_GM: gmModel.modelId,
     LLM_MAX_TOKENS: Math.min(settings.LLM_MAX_TOKENS || llmDefaults.LLM_MAX_TOKENS, 220),
     LLM_TOP_P: Math.min(settings.LLM_TOP_P || llmDefaults.LLM_TOP_P, 0.9),
+    LLM_REASONING: settings.LLM_REASONING && typeof settings.LLM_REASONING === "object" ? settings.LLM_REASONING : {},
   };
 }
 

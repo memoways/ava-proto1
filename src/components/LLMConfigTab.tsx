@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Save, RotateCcw, ChevronDown, ChevronUp, Zap, Scale, Sparkles } from "lucide-react";
+import { Save, RotateCcw, ChevronDown, ChevronUp, Zap, Scale, Sparkles, Brain } from "lucide-react";
 import {
   getLLMSettings,
   saveLLMSettingsLocal,
@@ -26,14 +27,18 @@ function ModelCard({
   model,
   active,
   expanded,
+  reasoningEnabled,
   onSelect,
   onToggle,
+  onToggleReasoning,
 }: {
   model: (typeof OPENROUTER_MODELS)[number];
   active: boolean;
   expanded: boolean;
+  reasoningEnabled: boolean;
   onSelect: () => void;
   onToggle: () => void;
+  onToggleReasoning: (enabled: boolean) => void;
 }) {
   const tier = TIER_META[model.tier] ?? TIER_META.balanced;
   const TierIcon = tier.icon;
@@ -57,6 +62,22 @@ function ModelCard({
         <p className="text-xs text-muted-foreground mt-0.5">{model.description}</p>
         <p className="text-xs font-mono text-muted-foreground/60 mt-0.5">{model.id}</p>
       </button>
+      <div
+        className="flex items-center justify-between px-3 py-1.5 text-xs border-t border-border/50"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <label
+          className="flex items-center gap-1.5 cursor-pointer select-none text-muted-foreground"
+          title="Active le mode raisonnement du modèle (plus lent, plus coûteux, meilleure analyse). Désactivé par défaut."
+        >
+          <Brain className="w-3 h-3" />
+          <span>Reasoning</span>
+          <Switch checked={reasoningEnabled} onCheckedChange={onToggleReasoning} className="scale-75 ml-1" />
+          <span className={reasoningEnabled ? "text-primary" : "text-muted-foreground/60"}>
+            {reasoningEnabled ? "ON" : "OFF"}
+          </span>
+        </label>
+      </div>
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-muted-foreground border-t border-border/50 hover:bg-accent/30"
@@ -178,11 +199,15 @@ export default function LLMConfigTab() {
                 model={m}
                 active={settings.LLM_MODEL === m.id}
                 expanded={expandedMax === m.id}
+                reasoningEnabled={settings.LLM_REASONING?.[m.id] === true}
                 onSelect={() => {
                   updateLocal({ LLM_MODEL: m.id });
                   setCustomModel("");
                 }}
                 onToggle={() => setExpandedMax(expandedMax === m.id ? null : m.id)}
+                onToggleReasoning={(enabled) =>
+                  updateLocal({ LLM_REASONING: { ...settings.LLM_REASONING, [m.id]: enabled } })
+                }
               />
             ))}
           </div>
@@ -279,11 +304,15 @@ export default function LLMConfigTab() {
                 model={m}
                 active={settings.LLM_MODEL_GM === m.id}
                 expanded={expandedGM === m.id}
+                reasoningEnabled={settings.LLM_REASONING?.[m.id] === true}
                 onSelect={() => {
                   updateLocal({ LLM_MODEL_GM: m.id });
                   setCustomModelGM("");
                 }}
                 onToggle={() => setExpandedGM(expandedGM === m.id ? null : m.id)}
+                onToggleReasoning={(enabled) =>
+                  updateLocal({ LLM_REASONING: { ...settings.LLM_REASONING, [m.id]: enabled } })
+                }
               />
             ))}
           </div>
