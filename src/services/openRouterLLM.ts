@@ -2,6 +2,7 @@ import { trackLLMCall } from "./llmUsageTracker";
 import { debugLogger } from "./debugLogger";
 import { TimeoutError, withTimeout } from "./asyncUtils";
 import { authenticatedFunctionFetch } from "./gameAuth";
+import { isReasoningEnabledForModel } from "./settingsService";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
