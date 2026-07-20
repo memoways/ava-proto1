@@ -221,6 +221,7 @@ const llmDefaults: LLMSettings = {
   LLM_TEMPERATURE_GM: 0.3,
   // Le brief JSON fait ~150 tokens utiles ; 180 = marge confortable, plus de gaspillage de génération.
   LLM_MAX_TOKENS_GM: 180,
+  LLM_REASONING: {},
 };
 
 const DEPRECATED_OPENROUTER_MODELS: Record<string, string> = {
