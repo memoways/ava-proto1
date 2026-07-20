@@ -176,9 +176,13 @@ serve(async (req) => {
       // Laisse OpenRouter appliquer l'effort par défaut du modèle, mais expose les traces.
       upstreamBody.reasoning = { enabled: true, exclude: false };
     } else if (isReasoningModel) {
-      // OpenRouter normalise: enabled:false pour hybrid (DeepSeek V3.1),
-      // effort:"minimal" pour GPT-5/o-series. On envoie les deux, l'upstream ignore l'inapplicable.
-      upstreamBody.reasoning = { enabled: false, effort: "minimal", exclude: true };
+      // GPT-5 / o-series : reasoning obligatoire côté OpenAI — on ne peut PAS envoyer enabled:false
+      // (400 "Reasoning is mandatory for this endpoint"). On force l'effort minimal + exclusion.
+      // DeepSeek V3.1 / Grok hybrides : acceptent enabled:false pour couper totalement.
+      const isOpenAIReasoning = /^openai\/(gpt-5|o1|o3|o4)/.test(model);
+      upstreamBody.reasoning = isOpenAIReasoning
+        ? { effort: "minimal", exclude: true }
+        : { enabled: false, exclude: true };
     }
 
     const response = await fetchWithTimeout(OPENROUTER_URL, {
