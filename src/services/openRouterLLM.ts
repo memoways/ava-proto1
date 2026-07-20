@@ -24,6 +24,8 @@ interface LLMOptions {
   session_id?: string | null;
   /** Cancels an obsolete conversation turn before its result reaches the UI. */
   signal?: AbortSignal;
+  /** Force enable/disable reasoning. If undefined, reads from LLMSettings.LLM_REASONING[model]. */
+  reasoning?: boolean;
 }
 
 type StreamCallback = (text: string, done: boolean) => void;
