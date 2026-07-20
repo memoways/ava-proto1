@@ -199,11 +199,15 @@ export default function LLMConfigTab() {
                 model={m}
                 active={settings.LLM_MODEL === m.id}
                 expanded={expandedMax === m.id}
+                reasoningEnabled={settings.LLM_REASONING?.[m.id] === true}
                 onSelect={() => {
                   updateLocal({ LLM_MODEL: m.id });
                   setCustomModel("");
                 }}
                 onToggle={() => setExpandedMax(expandedMax === m.id ? null : m.id)}
+                onToggleReasoning={(enabled) =>
+                  updateLocal({ LLM_REASONING: { ...settings.LLM_REASONING, [m.id]: enabled } })
+                }
               />
             ))}
           </div>
