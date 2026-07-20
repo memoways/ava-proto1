@@ -22,6 +22,8 @@ interface LLMRequest {
   top_p?: number;
   stream?: boolean;
   timeout_ms?: number;
+  /** Explicit reasoning toggle from client. undefined => disabled by default for reasoning models. */
+  reasoning?: boolean;
   // Special action for cost lookup
   _action?: string;
   generation_id?: string;
