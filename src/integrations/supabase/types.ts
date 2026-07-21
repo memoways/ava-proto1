@@ -166,53 +166,6 @@ export type Database = {
         }
         Relationships: []
       }
-      conversation_turn_traces: {
-        Row: {
-          character_name: string
-          created_at: string
-          id: string
-          schema_version: number
-          session_id: string
-          status: string
-          trace: Json
-          turn_id: string
-          turn_index: number
-          updated_at: string
-        }
-        Insert: {
-          character_name?: string
-          created_at?: string
-          id?: string
-          schema_version?: number
-          session_id: string
-          status?: string
-          trace: Json
-          turn_id: string
-          turn_index: number
-          updated_at?: string
-        }
-        Update: {
-          character_name?: string
-          created_at?: string
-          id?: string
-          schema_version?: number
-          session_id?: string
-          status?: string
-          trace?: Json
-          turn_id?: string
-          turn_index?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversation_turn_traces_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "sessions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       embeddings: {
         Row: {
           character_id: string | null
@@ -454,7 +407,6 @@ export type Database = {
           ava_start_variant: string | null
           branch: string | null
           conversation_log: Json | null
-          diagnostic_trace_enabled: boolean
           duration_seconds: number | null
           ended_at: string | null
           first_max_response_at: string | null
@@ -484,7 +436,6 @@ export type Database = {
           ava_start_variant?: string | null
           branch?: string | null
           conversation_log?: Json | null
-          diagnostic_trace_enabled?: boolean
           duration_seconds?: number | null
           ended_at?: string | null
           first_max_response_at?: string | null
@@ -514,7 +465,6 @@ export type Database = {
           ava_start_variant?: string | null
           branch?: string | null
           conversation_log?: Json | null
-          diagnostic_trace_enabled?: boolean
           duration_seconds?: number | null
           ended_at?: string | null
           first_max_response_at?: string | null
@@ -798,15 +748,6 @@ export type Database = {
           source_id: string
           source_table: string
         }[]
-      }
-      patch_conversation_turn_trace: {
-        Args: {
-          p_path: string[]
-          p_session_id: string
-          p_turn_index: number
-          p_value: Json
-        }
-        Returns: undefined
       }
     }
     Enums: {
