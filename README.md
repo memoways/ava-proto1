@@ -6,6 +6,12 @@
 > **Créé avec**: Lovable  
 > **Démarré**: 2026-03-07  
 
+## Plateforme de référence
+
+**Lovable compile le code et publie le site.** Le backend, la base de données, les Edge Functions et les secrets passent par **Lovable Cloud**, avec **Supabase fourni par Lovable**. Il ne faut pas remplacer cette chaîne par un build, un déploiement, un hébergeur ou un projet Supabase externe.
+
+Les développements réalisés depuis un autre environnement doivent rester compatibles avec Lovable et être ramenés dans le projet Lovable avant toute validation ou publication. Les instructions obligatoires destinées à tous les agents et outils du dépôt sont dans [`AGENTS.md`](AGENTS.md).
+
 La mise en public est bloquée par la [release gate](docs/public_release_gate.md). Un aperçu interne peut être utilisé pour le développement, mais aucun lien ne doit être diffusé à des testeurs externes avant validation des critères de sécurité, persistance et endurance.
 
 > **Mise à jour récente (2026-07-21) — traces causales de Max** : les administrateurs peuvent lancer une session PRD4 explicitement tracée et inspecter chaque tour (mémoire, RAG et scores, prompt assemblé, payload OpenRouter exact, modèle, réponse et latences). La trace causale est enregistrée avant l’affichage et le TTS ; en cas d’échec d’écriture, le tour n’est pas diffusé et peut être rejoué. Détails : [`docs/max-causal-tracing.md`](docs/max-causal-tracing.md).

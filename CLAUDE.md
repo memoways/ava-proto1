@@ -11,11 +11,17 @@ Expérience narrative interactive voice-to-voice. L'utilisateur parle avec "Max"
 - Équipe : Ulrich Fischer / Memoways
 - Démarré : 2026-03-07
 
+## Plateforme de build et publication (règle obligatoire)
+
+**Lovable est la plateforme de référence et l'unique chaîne de livraison.** Lovable compile le code et publie le site ; Lovable Cloud, avec Supabase fourni par Lovable, héberge le backend, les données, les Edge Functions et les secrets.
+
+Toute modification effectuée hors de Lovable doit rester compatible avec Lovable et y être ramenée avant validation ou publication. Ne pas mettre en place de build, de déploiement, de projet Supabase ou d'hébergement alternatif. Avant toute action sur le build, les variables d'environnement, les migrations, les Edge Functions ou la publication, vérifier qu'elle cible Lovable / Lovable Cloud. La règle complète commune à tous les agents est dans `AGENTS.md`.
+
 ## Stack
 
-- Outil d'origine : Lovable
+- Plateforme : Lovable (compilation et publication)
 - Frontend : React + TypeScript + Tailwind + shadcn/ui
-- Backend : Supabase via Lovable Cloud (BDD, Edge Functions, pgvector)
+- Backend : Lovable Cloud avec Supabase fourni par Lovable (BDD, Edge Functions, pgvector)
 - STT : Deepgram (provider par défaut + VAD) — façade multi-providers dans `src/services/stt`
 - LLM : OpenRouter (multi-modèles : Qwen, Claude, Grok, Llama, Gemini)
 - TTS : ElevenLabs (voix custom de Max)
