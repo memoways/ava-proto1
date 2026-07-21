@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-21 (activation Lovable Cloud du diagnostic causal PRD4)
+> **Last Updated**: 2026-07-21 (synthèse sémantique complète des questions RAG)
 
 ---
 
@@ -71,15 +71,17 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
-### 2026-07-21 — Les vraies questions des joueurs alimentent le laboratoire 🔁
+### 2026-07-21 — Les vraies questions des joueurs deviennent une taxonomie RAG fiable 🔷
 
 **Intent.** Partir des usages réels plutôt que d’une collection figée de presets : les questions des conversations passées deviennent automatiquement des cas de test RAG.
 
-**Corpus vivant.** Jusqu’à 3 000 questions issues des 500 dernières sessions sont détectées, normalisées et regroupées en familles de formulations proches. Pour chaque famille, l’interface conserve comme représentante la formulation utilisateur la plus centrale — une question médiane réelle, pas une phrase inventée par un LLM — et affiche le nombre d’occurrences ainsi que les variantes regroupées. Les vingt familles prioritaires sont recalculées au chargement puis toutes les 60 secondes.
+**Corpus complet et qualitatif.** Toutes les sessions sont parcourues par pagination et tous leurs tours utilisateurs sont évalués. Le filtre rejette small talk, tests micro, remerciements, fragments et questions sans contexte. Les formulations restantes passent par une analyse sémantique hiérarchique : intention précise, fusion des paraphrases, sélection pondérée par fréquence et reformulation autonome. Les vingt questions produites sont donc des types compréhensibles et impactants, pas un échantillon récent présenté comme une moyenne.
 
 **Contrôle éditorial.** Depuis Données → Sessions, une case sous chaque question permet de l’épingler dans le Laboratoire RAG. Ces choix sont persistés dans une table admin-only séparée de l’historique, remontent en priorité dans la liste et disparaissent en cascade avec la session source.
 
-**Confidentialité.** Le clustering s’exécute dans le navigateur administrateur et n’ajoute aucun envoi de conversations à Voyage ou OpenRouter.
+**Fluidité et actualisation.** Le calcul a quitté le thread principal du navigateur. Une Edge Function admin le réalise en arrière-plan, stocke le résultat dans Lovable Cloud et ne transmet à l’interface que vingt questions compactes. Un trigger invalide le cache à chaque changement de conversation ; la régénération est temporisée à cinq minutes ou déclenchée immédiatement par l’administrateur. Pendant ce temps, le dernier corpus valide reste utilisable.
+
+**Confidentialité.** Seules les questions candidates sont envoyées à OpenRouter pour classification/synthèse ; les réponses de Max et les conversations complètes ne quittent pas Lovable Cloud. La fonction, le cache et les secrets restent réservés aux administrateurs.
 
 ### 2026-07-21 — Un laboratoire pour comprendre et régler le RAG 🧪
 

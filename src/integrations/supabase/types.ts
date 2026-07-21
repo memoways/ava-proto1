@@ -421,6 +421,60 @@ export type Database = {
         }
         Relationships: []
       }
+      rag_lab_question_corpus_cache: {
+        Row: {
+          built_revision: number
+          error: string | null
+          excluded_question_count: number
+          generated_at: string | null
+          generation_model: string | null
+          id: boolean
+          questions: Json
+          refresh_started_at: string | null
+          session_count: number
+          source_question_count: number
+          source_revision: number
+          status: string
+          unique_question_count: number
+          updated_at: string
+          user_turn_count: number
+        }
+        Insert: {
+          built_revision?: number
+          error?: string | null
+          excluded_question_count?: number
+          generated_at?: string | null
+          generation_model?: string | null
+          id?: boolean
+          questions?: Json
+          refresh_started_at?: string | null
+          session_count?: number
+          source_question_count?: number
+          source_revision?: number
+          status?: string
+          unique_question_count?: number
+          updated_at?: string
+          user_turn_count?: number
+        }
+        Update: {
+          built_revision?: number
+          error?: string | null
+          excluded_question_count?: number
+          generated_at?: string | null
+          generation_model?: string | null
+          id?: boolean
+          questions?: Json
+          refresh_started_at?: string | null
+          session_count?: number
+          source_question_count?: number
+          source_revision?: number
+          status?: string
+          unique_question_count?: number
+          updated_at?: string
+          user_turn_count?: number
+        }
+        Relationships: []
+      }
       rag_lab_pinned_questions: {
         Row: {
           character_name: string | null

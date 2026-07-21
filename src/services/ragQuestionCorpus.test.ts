@@ -1,53 +1,66 @@
 import { describe, expect, it } from "vitest";
+import { isQuestionLike, parseRAGQuestionCorpus } from "./ragQuestionCorpus";
 import {
-  clusterConversationQuestions,
-  isQuestionLike,
-  questionSimilarity,
-  type ConversationQuestionOccurrence,
-} from "./ragQuestionCorpus";
+  groupExactQuestions,
+  questionQuality,
+  type CorpusOccurrence,
+} from "../../supabase/functions/rag-question-corpus/core";
 
-function occurrence(
-  sourceKey: string,
-  question: string,
-  options: Partial<ConversationQuestionOccurrence> = {},
-): ConversationQuestionOccurrence {
-  return {
-    sourceKey,
-    sessionId: sourceKey.split(":")[0],
-    messageIndex: Number(sourceKey.split(":")[1]),
-    question,
-    characterName: "Max",
-    occurredAt: "2026-07-21T10:00:00Z",
-    pinned: false,
-    ...options,
-  };
-}
-
-describe("corpus de questions du laboratoire RAG", () => {
+describe("corpus sémantique de questions du laboratoire RAG", () => {
   it("reconnaît les questions vocales même sans point d’interrogation", () => {
     expect(isQuestionLike("Tu sais où habite Ava")).toBe(true);
     expect(isQuestionLike("Pourquoi elle est partie")).toBe(true);
     expect(isQuestionLike("Je voulais simplement vous remercier")).toBe(false);
   });
 
-  it("rapproche des formulations sémantiquement équivalentes courantes", () => {
-    expect(questionSimilarity("Où habites-tu ?", "Tu vis où ?")).toBeGreaterThan(0.9);
-    expect(questionSimilarity("Où habites-tu ?", "Pourquoi Ava a disparu ?")).toBeLessThan(0.4);
+  it("valide et normalise la réponse légère du cache serveur", () => {
+    const result = parseRAGQuestionCorpus({
+      questions: [{
+        id: "q-ava",
+        question: "Pourquoi Ava a-t-elle disparu ?",
+        occurrences: 17,
+        variants: ["Pourquoi Ava a disparu ?"],
+        characterNames: ["Max"],
+        latestAt: null,
+        pinned: false,
+        sourceKeys: [],
+      }],
+      sourceQuestionCount: 96,
+      excludedQuestionCount: 42,
+      userTurnCount: 138,
+      uniqueQuestionCount: 61,
+      sessionCount: 25,
+      sourceRevision: 9,
+      builtRevision: 9,
+      updatedAt: "2026-07-21T10:00:00Z",
+      generationModel: "google/gemini-2.5-flash",
+      processing: false,
+      stale: false,
+      error: null,
+    });
+
+    expect(result.questions[0]).toMatchObject({ occurrences: 17, question: "Pourquoi Ava a-t-elle disparu ?" });
+    expect(result).toMatchObject({ sourceQuestionCount: 96, excludedQuestionCount: 42, processing: false });
   });
 
-  it("compacte les variantes, choisit une formulation centrale et priorise les questions épinglées", () => {
-    const result = clusterConversationQuestions([
-      occurrence("s1:0", "Où habites-tu ?"),
-      occurrence("s2:0", "Tu vis où ?"),
-      occurrence("s3:0", "Où habitez-vous ?"),
-      occurrence("s4:0", "Pourquoi Ava a disparu ?"),
-      occurrence("s5:0", "Quel est ton métier ?", { pinned: true }),
-    ]);
+  it("écarte le small talk, les fragments et les questions sans contexte", () => {
+    expect(questionQuality("Comment ça va ?")).toMatchObject({ keep: false, reason: "small_talk" });
+    expect(questionQuality("Et pourquoi ?")).toMatchObject({ keep: false, reason: "question_sans_contexte" });
+    expect(questionQuality("Est-ce que Ava aurait découvert quelque chose avant sa disparition ?").keep).toBe(true);
+  });
 
-    expect(result).toHaveLength(3);
-    expect(result[0]).toMatchObject({ pinned: true, occurrences: 1 });
-    const homeCluster = result.find((question) => question.variants.includes("Où habites-tu ?"));
-    expect(homeCluster?.occurrences).toBe(3);
-    expect(homeCluster?.variants).toEqual(expect.arrayContaining(["Où habites-tu ?", "Tu vis où ?", "Où habitez-vous ?"]));
+  it("compte toutes les répétitions exactes avant la synthèse sémantique", () => {
+    const base: Omit<CorpusOccurrence, "sourceKey" | "question"> = {
+      characterName: "Max",
+      occurredAt: null,
+      pinned: false,
+    };
+    const groups = groupExactQuestions([
+      { ...base, sourceKey: "s1:0", question: "Pourquoi Ava a disparu ?" },
+      { ...base, sourceKey: "s2:0", question: "Pourquoi Ava a disparu?" },
+      { ...base, sourceKey: "s3:0", question: "Où habite Max ?" },
+    ]);
+    expect(groups).toHaveLength(2);
+    expect(groups[0].occurrences).toHaveLength(2);
   });
 });

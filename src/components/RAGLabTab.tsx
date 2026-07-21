@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, Beaker, Copy, Download, History, RefreshCw, Search, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -79,6 +79,7 @@ export default function RAGLabTab() {
   const [questionCorpusLoading, setQuestionCorpusLoading] = useState(false);
   const [questionCorpusError, setQuestionCorpusError] = useState<string | null>(null);
   const [selectedFrequentQuestionId, setSelectedFrequentQuestionId] = useState("");
+  const questionCorpusRequestInFlight = useRef(false);
 
   useEffect(() => {
     void supabase
@@ -97,27 +98,39 @@ export default function RAGLabTab() {
       });
   }, []);
 
-  const loadQuestionCorpus = useCallback(async (notify = false) => {
+  const loadQuestionCorpus = useCallback(async (forceRefresh = false, notify = false) => {
+    if (questionCorpusRequestInFlight.current) return;
+    questionCorpusRequestInFlight.current = true;
     setQuestionCorpusLoading(true);
     try {
-      const corpus = await fetchRAGQuestionCorpus(20);
+      const corpus = await fetchRAGQuestionCorpus(forceRefresh);
       setQuestionCorpus(corpus);
-      setQuestionCorpusError(null);
-      if (notify) toast.success(`${corpus.questions.length} questions types actualisées`);
+      setQuestionCorpusError(corpus.error);
+      if (notify) {
+        if (corpus.processing) toast.success("Analyse complète lancée en arrière-plan");
+        else toast.success(`${corpus.questions.length} questions types actualisées`);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setQuestionCorpusError(message);
       if (notify) toast.error(`Questions passées indisponibles : ${message}`);
     } finally {
+      questionCorpusRequestInFlight.current = false;
       setQuestionCorpusLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadQuestionCorpus();
-    const refreshInterval = window.setInterval(() => void loadQuestionCorpus(), 60_000);
+    void loadQuestionCorpus(false);
+    const refreshInterval = window.setInterval(() => void loadQuestionCorpus(false), 5 * 60_000);
     return () => window.clearInterval(refreshInterval);
   }, [loadQuestionCorpus]);
+
+  useEffect(() => {
+    if (!questionCorpus?.processing) return;
+    const poll = window.setInterval(() => void loadQuestionCorpus(false), 3_000);
+    return () => window.clearInterval(poll);
+  }, [loadQuestionCorpus, questionCorpus?.processing]);
 
   const character = characters.find((option) => option.id === characterId);
   const finalRankById = useMemo(
@@ -259,11 +272,11 @@ export default function RAGLabTab() {
               <div>
                 <Label className="flex items-center gap-2"><History className="h-4 w-4" /> Questions fréquentes des conversations</Label>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Les formulations proches sont regroupées ; la formulation la plus centrale devient la question représentative du groupe.
+                  Tous les tours utilisateurs sont filtrés, analysés par intention sémantique, puis synthétisés en questions autonomes et réellement utiles au RAG.
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => void loadQuestionCorpus(true)} disabled={questionCorpusLoading}>
-                <RefreshCw className={`mr-1 h-4 w-4 ${questionCorpusLoading ? "animate-spin" : ""}`} /> Actualiser
+              <Button variant="outline" size="sm" onClick={() => void loadQuestionCorpus(true, true)} disabled={questionCorpusLoading || questionCorpus?.processing}>
+                <RefreshCw className={`mr-1 h-4 w-4 ${questionCorpusLoading || questionCorpus?.processing ? "animate-spin" : ""}`} /> Régénérer l’analyse
               </Button>
             </div>
             <Select
@@ -274,10 +287,10 @@ export default function RAGLabTab() {
                 setSelectedFrequentQuestionId(id);
                 setQuery(frequentQuestion.question);
               }}
-              disabled={questionCorpusLoading && !questionCorpus}
+              disabled={(questionCorpusLoading || questionCorpus?.processing) && !questionCorpus?.questions.length}
             >
               <SelectTrigger aria-label="Questions fréquentes des conversations">
-                <SelectValue placeholder={questionCorpusLoading ? "Analyse des conversations…" : "Choisir parmi les questions les plus posées…"} />
+                <SelectValue placeholder={questionCorpusLoading || questionCorpus?.processing ? "Analyse sémantique en arrière-plan…" : "Choisir parmi les questions les plus posées…"} />
               </SelectTrigger>
               <SelectContent>
                 {(questionCorpus?.questions || []).map((item) => (
@@ -288,15 +301,21 @@ export default function RAGLabTab() {
               </SelectContent>
             </Select>
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span>{questionCorpus?.questions.length ?? 0} groupes issus de {questionCorpus?.sourceQuestionCount ?? 0} questions · {questionCorpus?.sessionCount ?? 0} sessions</span>
+              <span>
+                {questionCorpus?.questions.length ?? 0} types synthétiques · {questionCorpus?.sourceQuestionCount ?? 0} questions retenues sur {questionCorpus?.userTurnCount ?? 0} tours · {questionCorpus?.sessionCount ?? 0} sessions
+              </span>
               {questionCorpus?.updatedAt && <span>· actualisé à {new Date(questionCorpus.updatedAt).toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit" })}</span>}
-              <Badge variant="outline">auto 60 s</Badge>
+              {questionCorpus?.excludedQuestionCount !== undefined && <Badge variant="outline">{questionCorpus.excludedQuestionCount} bruits/fragments écartés</Badge>}
+              <Badge variant="outline">cache serveur</Badge>
+              {questionCorpus?.processing && <Badge variant="secondary"><RefreshCw className="mr-1 h-3 w-3 animate-spin" /> analyse en cours</Badge>}
+              {questionCorpus?.stale && !questionCorpus.processing && <Badge variant="secondary">mise à jour programmée</Badge>}
             </div>
             {selectedFrequentQuestion && (
               <div className="rounded-md border bg-background/50 p-3 text-xs">
                 <div className="flex flex-wrap items-center gap-2">
                   {selectedFrequentQuestion.pinned && <Badge>Épinglée depuis Sessions</Badge>}
                   <Badge variant="secondary">{selectedFrequentQuestion.occurrences} occurrence{selectedFrequentQuestion.occurrences > 1 ? "s" : ""}</Badge>
+                  {selectedFrequentQuestion.theme && <Badge variant="outline">{selectedFrequentQuestion.theme}</Badge>}
                   {selectedFrequentQuestion.characterNames.map((name) => <Badge key={name} variant="outline">{name}</Badge>)}
                 </div>
                 {selectedFrequentQuestion.variants.length > 1 && (
@@ -304,7 +323,6 @@ export default function RAGLabTab() {
                 )}
               </div>
             )}
-            {questionCorpus?.warning && <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-100">{questionCorpus.warning}</p>}
             {questionCorpusError && <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">Chargement impossible : {questionCorpusError}</p>}
           </div>
           <div className="space-y-2">

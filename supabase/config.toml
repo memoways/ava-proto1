@@ -48,3 +48,6 @@ verify_jwt = false
 
 [functions.summarize-session]
 verify_jwt = false
+
+[functions.rag-question-corpus]
+verify_jwt = false

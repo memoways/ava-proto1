@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.48.2] - 2026-07-21 — Synthèse sémantique fiable et Laboratoire RAG fluide
+
+### Corrigé
+- La liste ne prend plus un échantillon des dernières sessions : tous les tours utilisateurs de toutes les sessions sont parcourus par pagination.
+- Le regroupement lexical approximatif est remplacé par une analyse sémantique hiérarchique via OpenRouter/Gemini : chaque formulation reçoit une intention, les intentions équivalentes sont fusionnées, puis les vingt types les plus fréquents et les plus utiles sont reformulés en vraies questions autonomes.
+- Le small talk, les tests micro, les remerciements, les questions sans contexte et les phrases manifestement tronquées sont exclus avant la synthèse puis contrôlés une seconde fois par le modèle.
+
+### Performance
+- Le navigateur ne télécharge plus les `conversation_log` et n’exécute plus de clustering quadratique sur le thread principal.
+- Le corpus synthétique est calculé par l’Edge Function admin `rag-question-corpus`, conservé dans un cache Lovable Cloud et renvoyé immédiatement à l’interface.
+- Toute modification d’une conversation ou d’une question épinglée invalide le cache par trigger. Une régénération se lance en arrière-plan au plus toutes les cinq minutes, avec bouton de régénération immédiate et suivi léger de l’état.
+- Une erreur de synthèse conserve le dernier corpus valide au lieu de bloquer l’onglet.
+
+### Observabilité et sécurité
+- L’interface indique le nombre total de tours parcourus, les questions retenues, les bruits/fragments écartés, les sessions couvertes et l’état de l’analyse.
+- Le corpus et sa fonction restent réservés aux administrateurs ; les secrets OpenRouter et l’historique complet ne sont jamais exposés au navigateur.
+- **Déploiement Lovable Cloud requis** : migration `20260721233000_rag_lab_semantic_question_cache.sql` et Edge Function `rag-question-corpus`.
+
 ## [0.48.1] - 2026-07-21 — Corpus vivant de questions pour le Laboratoire RAG
 
 ### Ajouté

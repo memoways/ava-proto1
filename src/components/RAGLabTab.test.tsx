@@ -55,9 +55,17 @@ describe("RAGLabTab", () => {
         sourceKeys: ["session-1:0"],
       }],
       sourceQuestionCount: 24,
+      excludedQuestionCount: 11,
+      userTurnCount: 35,
+      uniqueQuestionCount: 18,
       sessionCount: 5,
+      sourceRevision: 4,
+      builtRevision: 4,
       updatedAt: "2026-07-21T10:00:00Z",
-      pinnedStorageAvailable: true,
+      generationModel: "google/gemini-2.5-flash",
+      processing: false,
+      stale: false,
+      error: null,
     });
     vi.mocked(queryRAGDetailed).mockResolvedValue({
       matches: [
@@ -95,7 +103,7 @@ describe("RAGLabTab", () => {
 
     expect(screen.getByText("Laboratoire RAG")).toBeInTheDocument();
     expect(await screen.findByText("Questions fréquentes des conversations")).toBeInTheDocument();
-    expect(screen.getByText(/1 groupes issus de 24 questions/)).toBeInTheDocument();
+    expect(screen.getByText(/1 types synthétiques · 24 questions retenues sur 35 tours/)).toBeInTheDocument();
     const runButton = screen.getByRole("button", { name: "Lancer l’expérience RAG" });
     await waitFor(() => expect(runButton).toBeEnabled());
     fireEvent.click(runButton);

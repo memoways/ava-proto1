@@ -52,6 +52,7 @@ describe("Phase 1 sessions RLS and provider quotas", () => {
         questionnaire_responses jsonb,
         duration_seconds integer,
         name text,
+        personnage_appele text,
         admin_note text
       );
       alter table public.sessions enable row level security;
@@ -80,10 +81,15 @@ describe("Phase 1 sessions RLS and provider quotas", () => {
       "../../supabase/migrations/20260721210000_rag_lab_pinned_questions.sql",
       import.meta.url,
     );
+    const ragLabCorpusMigrationUrl = new URL(
+      "../../supabase/migrations/20260721233000_rag_lab_semantic_question_cache.sql",
+      import.meta.url,
+    );
     await db.exec(await readFile(expandMigrationUrl, "utf8"));
     await db.exec(await readFile(enforceMigrationUrl, "utf8"));
     await db.exec(await readFile(diagnosticTraceMigrationUrl, "utf8"));
     await db.exec(await readFile(ragLabQuestionsMigrationUrl, "utf8"));
+    await db.exec(await readFile(ragLabCorpusMigrationUrl, "utf8"));
   });
 
   afterEach(async () => {
@@ -282,5 +288,32 @@ describe("Phase 1 sessions RLS and provider quotas", () => {
       [adminSession.rows[0].id],
     );
     expect(remaining.rows).toHaveLength(0);
+  });
+
+  it("marks the semantic question cache stale without exposing it to participants", async () => {
+    await db.exec("reset role");
+    const before = await db.query<{ source_revision: number }>(
+      "select source_revision from public.rag_lab_question_corpus_cache where id = true",
+    );
+
+    await authenticate(db, USER_B);
+    const created = await db.query<{ id: string }>(
+      "insert into public.sessions default values returning id",
+    );
+    await db.query(
+      `update public.sessions
+          set conversation_log = '[{"role":"user","content":"Pourquoi Ava a-t-elle disparu ?"}]'::jsonb
+        where id = $1`,
+      [created.rows[0].id],
+    );
+    const hidden = await db.query("select id from public.rag_lab_question_corpus_cache");
+    expect(hidden.rows).toHaveLength(0);
+
+    await db.exec("reset role");
+    const after = await db.query<{ source_revision: number; status: string }>(
+      "select source_revision, status from public.rag_lab_question_corpus_cache where id = true",
+    );
+    expect(after.rows[0].source_revision).toBeGreaterThan(before.rows[0].source_revision);
+    expect(after.rows[0].status).toBe("stale");
   });
 });
