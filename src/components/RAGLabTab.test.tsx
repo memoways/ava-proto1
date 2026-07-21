@@ -32,12 +32,33 @@ vi.mock("@/services/ragService", async (importOriginal) => {
   };
 });
 
+vi.mock("@/services/ragQuestionCorpus", () => ({
+  fetchRAGQuestionCorpus: vi.fn(),
+}));
+
 import { queryRAGDetailed } from "@/services/ragService";
+import { fetchRAGQuestionCorpus } from "@/services/ragQuestionCorpus";
 import RAGLabTab from "./RAGLabTab";
 
 describe("RAGLabTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(fetchRAGQuestionCorpus).mockResolvedValue({
+      questions: [{
+        id: "question-home",
+        question: "Où habites-tu ?",
+        occurrences: 8,
+        variants: ["Où habites-tu ?", "Tu vis où ?"],
+        characterNames: ["Max"],
+        latestAt: "2026-07-21T10:00:00Z",
+        pinned: true,
+        sourceKeys: ["session-1:0"],
+      }],
+      sourceQuestionCount: 24,
+      sessionCount: 5,
+      updatedAt: "2026-07-21T10:00:00Z",
+      pinnedStorageAvailable: true,
+    });
     vi.mocked(queryRAGDetailed).mockResolvedValue({
       matches: [
         { id: "chunk-b", source_table: "characters", source_id: "page-b", character_id: "max-id", content: "Max habite à Lausanne.", similarity: 0.96, retrieval_similarity: 0.61, rerank_score: 0.96, retrieval_rank: 2 },
@@ -73,6 +94,8 @@ describe("RAGLabTab", () => {
     render(<RAGLabTab />);
 
     expect(screen.getByText("Laboratoire RAG")).toBeInTheDocument();
+    expect(await screen.findByText("Questions fréquentes des conversations")).toBeInTheDocument();
+    expect(screen.getByText(/1 groupes issus de 24 questions/)).toBeInTheDocument();
     const runButton = screen.getByRole("button", { name: "Lancer l’expérience RAG" });
     await waitFor(() => expect(runButton).toBeEnabled());
     fireEvent.click(runButton);

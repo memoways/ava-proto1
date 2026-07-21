@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, Beaker, Copy, Download, Search, SlidersHorizontal } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowDown, Beaker, Copy, Download, History, RefreshCw, Search, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
   type RAGQueryDetailed,
 } from "@/services/ragService";
 import { getGameplaySettings } from "@/services/settingsService";
+import { fetchRAGQuestionCorpus, type RAGQuestionCorpusResult } from "@/services/ragQuestionCorpus";
 
 type CharacterOption = { id: string; name: string };
 type RerankModel = "rerank-2.5" | "rerank-2.5-lite";
@@ -74,6 +75,10 @@ export default function RAGLabTab() {
   const [rewrittenQuery, setRewrittenQuery] = useState<string | null>(null);
   const [result, setResult] = useState<RAGQueryDetailed | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [questionCorpus, setQuestionCorpus] = useState<RAGQuestionCorpusResult | null>(null);
+  const [questionCorpusLoading, setQuestionCorpusLoading] = useState(false);
+  const [questionCorpusError, setQuestionCorpusError] = useState<string | null>(null);
+  const [selectedFrequentQuestionId, setSelectedFrequentQuestionId] = useState("");
 
   useEffect(() => {
     void supabase
@@ -92,6 +97,28 @@ export default function RAGLabTab() {
       });
   }, []);
 
+  const loadQuestionCorpus = useCallback(async (notify = false) => {
+    setQuestionCorpusLoading(true);
+    try {
+      const corpus = await fetchRAGQuestionCorpus(20);
+      setQuestionCorpus(corpus);
+      setQuestionCorpusError(null);
+      if (notify) toast.success(`${corpus.questions.length} questions types actualisées`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setQuestionCorpusError(message);
+      if (notify) toast.error(`Questions passées indisponibles : ${message}`);
+    } finally {
+      setQuestionCorpusLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadQuestionCorpus();
+    const refreshInterval = window.setInterval(() => void loadQuestionCorpus(), 60_000);
+    return () => window.clearInterval(refreshInterval);
+  }, [loadQuestionCorpus]);
+
   const character = characters.find((option) => option.id === characterId);
   const finalRankById = useMemo(
     () => new Map((result?.matches || []).map((match, index) => [match.id, index + 1])),
@@ -109,6 +136,7 @@ export default function RAGLabTab() {
   }, [candidateById, result, selectedIds]);
   const formattedContext = useMemo(() => formatRAGContext(selectedMatches), [selectedMatches]);
   const knowledgeContext = useMemo(() => buildKnowledgeContextFromRAG(selectedMatches), [selectedMatches]);
+  const selectedFrequentQuestion = questionCorpus?.questions.find((item) => item.id === selectedFrequentQuestionId);
 
   async function runExperiment() {
     if (!query.trim()) {
@@ -216,19 +244,76 @@ export default function RAGLabTab() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Cas de test</Label>
+              <Label>Preset technique</Label>
               <Select onValueChange={(id) => {
                 const preset = PRESETS.find((item) => item.id === id);
-                if (preset) { setQuery(preset.query); setRecentContext(preset.context); }
+                if (preset) { setQuery(preset.query); setRecentContext(preset.context); setSelectedFrequentQuestionId(""); }
               }}>
                 <SelectTrigger><SelectValue placeholder="Charger un exemple…" /></SelectTrigger>
                 <SelectContent>{PRESETS.map((preset) => <SelectItem key={preset.id} value={preset.id}>{preset.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
+          <div className="space-y-2 rounded-lg border bg-muted/10 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <Label className="flex items-center gap-2"><History className="h-4 w-4" /> Questions fréquentes des conversations</Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Les formulations proches sont regroupées ; la formulation la plus centrale devient la question représentative du groupe.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => void loadQuestionCorpus(true)} disabled={questionCorpusLoading}>
+                <RefreshCw className={`mr-1 h-4 w-4 ${questionCorpusLoading ? "animate-spin" : ""}`} /> Actualiser
+              </Button>
+            </div>
+            <Select
+              value={selectedFrequentQuestionId}
+              onValueChange={(id) => {
+                const frequentQuestion = questionCorpus?.questions.find((item) => item.id === id);
+                if (!frequentQuestion) return;
+                setSelectedFrequentQuestionId(id);
+                setQuery(frequentQuestion.question);
+              }}
+              disabled={questionCorpusLoading && !questionCorpus}
+            >
+              <SelectTrigger aria-label="Questions fréquentes des conversations">
+                <SelectValue placeholder={questionCorpusLoading ? "Analyse des conversations…" : "Choisir parmi les questions les plus posées…"} />
+              </SelectTrigger>
+              <SelectContent>
+                {(questionCorpus?.questions || []).map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.pinned ? "★ " : ""}{item.question} · {item.occurrences}×
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span>{questionCorpus?.questions.length ?? 0} groupes issus de {questionCorpus?.sourceQuestionCount ?? 0} questions · {questionCorpus?.sessionCount ?? 0} sessions</span>
+              {questionCorpus?.updatedAt && <span>· actualisé à {new Date(questionCorpus.updatedAt).toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit" })}</span>}
+              <Badge variant="outline">auto 60 s</Badge>
+            </div>
+            {selectedFrequentQuestion && (
+              <div className="rounded-md border bg-background/50 p-3 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  {selectedFrequentQuestion.pinned && <Badge>Épinglée depuis Sessions</Badge>}
+                  <Badge variant="secondary">{selectedFrequentQuestion.occurrences} occurrence{selectedFrequentQuestion.occurrences > 1 ? "s" : ""}</Badge>
+                  {selectedFrequentQuestion.characterNames.map((name) => <Badge key={name} variant="outline">{name}</Badge>)}
+                </div>
+                {selectedFrequentQuestion.variants.length > 1 && (
+                  <p className="mt-2 text-muted-foreground">Variantes regroupées : {selectedFrequentQuestion.variants.join(" · ")}</p>
+                )}
+              </div>
+            )}
+            {questionCorpus?.warning && <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-100">{questionCorpus.warning}</p>}
+            {questionCorpusError && <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">Chargement impossible : {questionCorpusError}</p>}
+          </div>
           <div className="space-y-2">
-            <Label>Question utilisateur</Label>
-            <Textarea value={query} onChange={(event) => setQuery(event.target.value)} className="min-h-20" />
+            <Label>Question manuelle ou sélectionnée</Label>
+            <Textarea
+              value={query}
+              onChange={(event) => { setQuery(event.target.value); setSelectedFrequentQuestionId(""); }}
+              className="min-h-20"
+            />
           </div>
           <div className="space-y-2">
             <Label>Contexte récent (optionnel)</Label>

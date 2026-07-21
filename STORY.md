@@ -71,6 +71,16 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-07-21 — Les vraies questions des joueurs alimentent le laboratoire 🔁
+
+**Intent.** Partir des usages réels plutôt que d’une collection figée de presets : les questions des conversations passées deviennent automatiquement des cas de test RAG.
+
+**Corpus vivant.** Jusqu’à 3 000 questions issues des 500 dernières sessions sont détectées, normalisées et regroupées en familles de formulations proches. Pour chaque famille, l’interface conserve comme représentante la formulation utilisateur la plus centrale — une question médiane réelle, pas une phrase inventée par un LLM — et affiche le nombre d’occurrences ainsi que les variantes regroupées. Les vingt familles prioritaires sont recalculées au chargement puis toutes les 60 secondes.
+
+**Contrôle éditorial.** Depuis Données → Sessions, une case sous chaque question permet de l’épingler dans le Laboratoire RAG. Ces choix sont persistés dans une table admin-only séparée de l’historique, remontent en priorité dans la liste et disparaissent en cascade avec la session source.
+
+**Confidentialité.** Le clustering s’exécute dans le navigateur administrateur et n’ajoute aucun envoi de conversations à Voyage ou OpenRouter.
+
 ### 2026-07-21 — Un laboratoire pour comprendre et régler le RAG 🧪
 
 **Intent.** Séparer clairement deux besoins : les Traces Max expliquent une réponse live déjà diffusée ; le nouveau Laboratoire RAG permet d’expérimenter volontairement la recherche documentaire sans déclencher Max, le Game Master ou le validateur.

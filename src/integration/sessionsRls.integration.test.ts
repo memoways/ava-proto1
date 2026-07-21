@@ -76,9 +76,14 @@ describe("Phase 1 sessions RLS and provider quotas", () => {
       "../../supabase/migrations/20260721120000_conversation_turn_traces.sql",
       import.meta.url,
     );
+    const ragLabQuestionsMigrationUrl = new URL(
+      "../../supabase/migrations/20260721210000_rag_lab_pinned_questions.sql",
+      import.meta.url,
+    );
     await db.exec(await readFile(expandMigrationUrl, "utf8"));
     await db.exec(await readFile(enforceMigrationUrl, "utf8"));
     await db.exec(await readFile(diagnosticTraceMigrationUrl, "utf8"));
+    await db.exec(await readFile(ragLabQuestionsMigrationUrl, "utf8"));
   });
 
   afterEach(async () => {
@@ -236,6 +241,45 @@ describe("Phase 1 sessions RLS and provider quotas", () => {
     const remaining = await db.query(
       "select id from public.conversation_turn_traces where session_id = $1",
       [sessionId],
+    );
+    expect(remaining.rows).toHaveLength(0);
+  });
+
+  it("reserves RAG laboratory pinned questions to admins and deletes them with their session", async () => {
+    await authenticate(db, USER_B);
+    const participantSession = await db.query<{ id: string }>(
+      "insert into public.sessions default values returning id",
+    );
+    await expect(db.query(
+      "insert into public.rag_lab_pinned_questions (session_id, message_index, question) values ($1, 0, 'Où habites-tu ?')",
+      [participantSession.rows[0].id],
+    )).rejects.toThrow(/row-level security|permission denied/i);
+
+    await db.exec("reset role");
+    await db.exec(`
+      create or replace function private.has_role(candidate uuid, requested public.app_role)
+      returns boolean language sql stable
+      as $$ select candidate = '${USER_A}'::uuid and requested = 'admin'::public.app_role $$;
+    `);
+    await authenticate(db, USER_A);
+    const adminSession = await db.query<{ id: string }>(
+      "insert into public.sessions default values returning id",
+    );
+    await db.query(
+      "insert into public.rag_lab_pinned_questions (session_id, message_index, question) values ($1, 0, 'Où habites-tu ?')",
+      [adminSession.rows[0].id],
+    );
+    const pinned = await db.query(
+      "select question from public.rag_lab_pinned_questions where session_id = $1",
+      [adminSession.rows[0].id],
+    );
+    expect(pinned.rows).toHaveLength(1);
+
+    await db.query("delete from public.sessions where id = $1", [adminSession.rows[0].id]);
+    await db.exec("reset role");
+    const remaining = await db.query(
+      "select id from public.rag_lab_pinned_questions where session_id = $1",
+      [adminSession.rows[0].id],
     );
     expect(remaining.rows).toHaveLength(0);
   });

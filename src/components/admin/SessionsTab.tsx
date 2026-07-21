@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity, ScanSearch } from "lucide-react";
+import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity, ScanSearch, FlaskConical } from "lucide-react";
 import { Link } from "react-router-dom";
+import { isQuestionLike } from "@/services/ragQuestionCorpus";
 
 /** Onglet admin où corriger la cause racine selon le type de fallback GM. */
 const FALLBACK_TARGET_TAB: Record<string, { tab: string; label: string }> = {
@@ -213,6 +215,67 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [noteInput, setNoteInput] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [pinnedMessageIndexes, setPinnedMessageIndexes] = useState<Set<number>>(new Set());
+  const [pinningMessageIndexes, setPinningMessageIndexes] = useState<Set<number>>(new Set());
+  const [pinnedStorageReady, setPinnedStorageReady] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!selected) {
+      setPinnedMessageIndexes(new Set());
+      setPinnedStorageReady(null);
+      return;
+    }
+    let active = true;
+    setPinnedStorageReady(null);
+    void supabase
+      .from("rag_lab_pinned_questions")
+      .select("message_index")
+      .eq("session_id", selected.id)
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          setPinnedMessageIndexes(new Set());
+          setPinnedStorageReady(false);
+          return;
+        }
+        setPinnedMessageIndexes(new Set((data || []).map((row) => row.message_index)));
+        setPinnedStorageReady(true);
+      });
+    return () => { active = false; };
+  }, [selected]);
+
+  async function toggleRAGLabQuestion(messageIndex: number, question: string, checked: boolean) {
+    if (!selected || pinningMessageIndexes.has(messageIndex)) return;
+    setPinningMessageIndexes((current) => new Set(current).add(messageIndex));
+    try {
+      const request = checked
+        ? supabase.from("rag_lab_pinned_questions").insert({
+            session_id: selected.id,
+            message_index: messageIndex,
+            question: question.trim().slice(0, 600),
+            character_name: selected.personnage_appele || "Max",
+          })
+        : supabase.from("rag_lab_pinned_questions").delete().eq("session_id", selected.id).eq("message_index", messageIndex);
+      const { error } = await request;
+      if (error) throw new Error(error.message);
+      setPinnedMessageIndexes((current) => {
+        const next = new Set(current);
+        if (checked) next.add(messageIndex);
+        else next.delete(messageIndex);
+        return next;
+      });
+      toast.success(checked ? "Question envoyée au Laboratoire RAG" : "Question retirée du Laboratoire RAG");
+    } catch (error) {
+      setPinnedStorageReady(false);
+      toast.error(`Laboratoire RAG indisponible : ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setPinningMessageIndexes((current) => {
+        const next = new Set(current);
+        next.delete(messageIndex);
+        return next;
+      });
+    }
+  }
 
   async function deleteSession(id: string) {
     if (!confirm("Supprimer cette session définitivement ?")) return;
@@ -533,6 +596,18 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
                       return (
                         <div key={i} className={`mb-2 text-sm ${msg.role === "max" ? "text-blue-300" : "text-green-300"}`}>
                           <span className="font-bold">{msg.role === "max" ? "Max" : "User"}:</span> {msg.content}
+                          {msg.role === "user" && typeof msg.content === "string" && isQuestionLike(msg.content) && (
+                            <label className="mt-1.5 flex w-fit cursor-pointer items-center gap-2 rounded border border-border/70 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
+                              <Checkbox
+                                checked={pinnedMessageIndexes.has(i)}
+                                disabled={pinnedStorageReady !== true || pinningMessageIndexes.has(i)}
+                                onCheckedChange={(checked) => void toggleRAGLabQuestion(i, msg.content, checked === true)}
+                                aria-label="Envoyer question dans le laboratoire RAG"
+                              />
+                              <FlaskConical className="h-3 w-3" />
+                              <span>{pinnedStorageReady === false ? "Migration Laboratoire RAG requise" : "Envoyer question dans le laboratoire RAG"}</span>
+                            </label>
+                          )}
                           {msg.role === "max" && selected.diagnostic_trace_enabled && causalTurn > 0 && (
                             <div className="mt-1">
                               <Link

@@ -421,6 +421,44 @@ export type Database = {
         }
         Relationships: []
       }
+      rag_lab_pinned_questions: {
+        Row: {
+          character_name: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          message_index: number
+          question: string
+          session_id: string
+        }
+        Insert: {
+          character_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message_index: number
+          question: string
+          session_id: string
+        }
+        Update: {
+          character_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message_index?: number
+          question?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rag_lab_pinned_questions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_summaries: {
         Row: {
           created_at: string

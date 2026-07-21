@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.48.1] - 2026-07-21 — Corpus vivant de questions pour le Laboratoire RAG
+
+### Ajouté
+- Le Laboratoire RAG charge les questions réellement posées dans les 500 dernières sessions et présente jusqu’à 20 questions types avant la saisie manuelle.
+- Les formulations proches sont regroupées localement et sans appel LLM ; la formulation réelle la plus centrale du groupe sert de question représentative. La fréquence, les variantes, les personnages concernés et la récence restent visibles.
+- Détection des questions vocales sans point d’interrogation, actualisation automatique toutes les 60 secondes et bouton d’actualisation manuelle.
+- Dans **Données → Sessions**, chaque question utilisateur possède une case **« Envoyer question dans le laboratoire RAG »**. Les questions ainsi épinglées remontent en priorité et peuvent être retirées avec la même case.
+- Nouvelle table `rag_lab_pinned_questions`, réservée aux administrateurs par RLS et supprimée en cascade avec la session source.
+
+### Confidentialité et performance
+- Le regroupement est déterministe dans le navigateur : aucun historique supplémentaire n’est envoyé à OpenRouter ou Voyage.
+- Le corpus est borné à 3 000 occurrences et 600 formulations uniques pour maintenir une actualisation fluide.
+
+### Tests
+- Couverture de la détection, de la similarité, du choix de la question représentative, du chargement UI et de l’épinglage depuis Sessions.
+- Test PostgreSQL de refus participant, accès administrateur et suppression en cascade ; 140 tests unitaires et 9 tests RLS validés.
+- **Migration requise dans Lovable Cloud** : `20260721210000_rag_lab_pinned_questions.sql`.
+
 ## [0.48.0] - 2026-07-21 — Laboratoire RAG par personnage
 
 ### Ajouté
