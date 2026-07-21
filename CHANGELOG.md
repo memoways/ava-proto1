@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.47.1] - 2026-07-21 — Activation du diagnostic causal dans Lovable Cloud
+
+### Déploiement
+- Application effective de la migration `conversation_turn_traces` dans la base PostgreSQL Cloud de Lovable, avec `sessions.diagnostic_trace_enabled`, RLS, triggers et fonction de patch atomique.
+- Redéploiement des Edge Functions `proxy-llm` et `query-rag` afin que les traces live reçoivent le payload OpenRouter exact et le `search_input` RAG effectif.
+- Les sessions normales restent inchangées : aucune trace détaillée n’est écrite sans activation explicite par un administrateur.
+
+### Validation
+- L’API publiée reconnaît désormais la colonne, la table et la fonction de trace ; l’erreur `42703/PGRST204` n’est plus reproduite.
+- Build de production et 26 tests ciblés (orchestrateur, prompt, RAG, mémoire et traces) validés.
+
 ## [0.47.0] - 2026-07-21 — Traçabilité causale des réponses de Max
 
 ### Ajouté

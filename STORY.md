@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-21 (traces causales persistantes des réponses PRD4 de Max)
+> **Last Updated**: 2026-07-21 (activation Lovable Cloud du diagnostic causal PRD4)
 
 ---
 
@@ -82,6 +82,16 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 **Sécurité.** RLS, triggers et proxy réservent activation et consultation aux administrateurs. Les traces disparaissent avec leur session et ne contiennent ni clé API, ni JWT, ni en-tête d’autorisation.
 
 **Détails.** `docs/max-causal-tracing.md`.
+
+### 2026-07-21 — Le diagnostic causal est activé dans Lovable Cloud 🔷
+
+**Incident de déploiement.** Le code de traçage avait été publié avant sa migration de base : une session tracée échouait avec `42703/PGRST204` car Lovable Cloud ne lance pas automatiquement une migration historique lors d’un simple push GitHub.
+
+**Correction.** Lovable Cloud a appliqué la migration horodatée de `conversation_turn_traces`, puis a redéployé `proxy-llm` et `query-rag`. La colonne de session, la table de traces, la fonction de patch atomique et la protection RLS sont désormais présentes dans l’environnement qui héberge AVA.
+
+**Validation.** L’API reconnaît les nouveaux objets sans les exposer aux visiteurs anonymes ; la build de production passe et 26 tests ciblés couvrent l’orchestrateur, le prompt, le RAG, la mémoire et la traçabilité. Une nouvelle session lancée depuis Admin peut donc être analysée tour par tour.
+
+**Leçon opérationnelle.** Pour toute évolution backend Lovable, le commit GitHub et l’application effective de la migration Cloud sont deux étapes distinctes ; la release doit vérifier les deux avant d’activer l’interface correspondante.
 
 ### 2026-07-20 — LLM Config : 12 modèles récents, coûts et fiches avantages/inconvénients 🔷
 
