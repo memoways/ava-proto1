@@ -4,6 +4,25 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.48.0] - 2026-07-21 — Laboratoire RAG par personnage
+
+### Ajouté
+- L’ancien onglet **Test Max** devient un laboratoire exclusivement consacré au RAG : choix du personnage, question, contexte récent, presets et paramètres expérimentaux isolés des réglages live.
+- Visualisation du funnel complet : entrée réellement vectorisée → candidats pgvector → reranking Voyage → sélection des cinq chunks maximum injectés dans le prompt.
+- Comparaison, pour chaque chunk, du rang et du score cosine avant reranking avec le rang et le score Voyage après reranking ; provenance personnage/partagé et identifiants sources conservés.
+- Sélection manuelle de chunks pour prévisualiser le bloc RAG formaté et le contexte de connaissance exactement dérivé pour Max, avec copie et export JSON.
+- Paramètres Voyage expérimentaux : activation du reranking, vivier `retrieve_k`, sortie `top_k`, seuil cosine, troncature et choix entre `rerank-2.5` et `rerank-2.5-lite`. Le modèle d’embedding reste verrouillé sur les vecteurs déjà indexés en 1024 dimensions.
+
+### Simplifié
+- Suppression de l’ancien pipeline UI artificiel GM → Max → validateur et de son service `maxTestPipeline`, désormais redondants avec les traces causales PRD4.
+- Suppression du second écran **RAG Test** basique dans Contenu Notion : le laboratoire devient l’unique outil de test RAG.
+- Conservation de l’identifiant d’URL historique `?tab=max-test` pour ne pas casser les liens existants.
+
+### Backend et tests
+- `query-rag` renvoie également le vivier vectoriel avant reranking, le rang initial, le modèle de reranking et son éventuelle erreur ; en cas d’échec Voyage, la sortie retombe proprement sur le top vectoriel demandé.
+- Tests ciblés du contrat diagnostic et du parcours UI retrieval → reranking → injection ; build de production validé.
+- **Déploiement requis** : redéployer l’Edge Function `query-rag` pour activer le vivier pré-reranking et le choix du modèle Voyage dans l’environnement distant.
+
 ## [0.47.1] - 2026-07-21 — Activation du diagnostic causal dans Lovable Cloud
 
 ### Déploiement

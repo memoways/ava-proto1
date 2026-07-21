@@ -20,6 +20,9 @@ interface RAGRequest {
   provider?: "voyage" | "openai";
   rerank?: boolean;
   retrieve_k?: number;
+  rerank_model?: "rerank-2.5" | "rerank-2.5-lite";
+  rerank_truncation?: boolean;
+  include_retrieval_matches?: boolean;
 }
 
 async function embedOpenAI(text: string, apiKey: string): Promise<number[]> {
@@ -44,11 +47,18 @@ async function embedVoyage(text: string, apiKey: string, inputType: "query" | "d
   return d.data[0].embedding;
 }
 
-async function rerankVoyage(query: string, documents: string[], apiKey: string, topK: number): Promise<Array<{ index: number; relevance_score: number }>> {
+async function rerankVoyage(
+  query: string,
+  documents: string[],
+  apiKey: string,
+  topK: number,
+  model: "rerank-2.5" | "rerank-2.5-lite",
+  truncation: boolean,
+): Promise<Array<{ index: number; relevance_score: number }>> {
   const r = await fetch(`${VOYAGE_API_URL}/rerank`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'rerank-2.5', query, documents, top_k: topK, truncation: true }),
+    body: JSON.stringify({ model, query, documents, top_k: topK, truncation }),
   });
   if (!r.ok) throw new Error(`Voyage rerank ${r.status}: ${await r.text()}`);
   const d = await r.json();
@@ -87,6 +97,8 @@ serve(async (req) => {
     const matchThreshold = body.match_threshold ?? 0.3;
     const characterId = body.character_id || null;
     const useRerank = body.rerank !== false && provider === "voyage" && !!VOYAGE_API_KEY;
+    const rerankModel = body.rerank_model === "rerank-2.5-lite" ? "rerank-2.5-lite" : "rerank-2.5";
+    const rerankTruncation = body.rerank_truncation !== false;
 
     // 1. Embed query with chosen provider
     let matches: any[] = [];
@@ -129,16 +141,23 @@ serve(async (req) => {
     }
 
     // 2. Optional rerank with Voyage rerank-2.5
+    const retrievalMatches = matches.map((match, index) => ({
+      ...match,
+      retrieval_similarity: match.similarity,
+      retrieval_rank: index + 1,
+    }));
     let rerankUsed = false;
+    let rerankError: string | null = null;
     if (useRerank && providerUsed === "voyage" && matches.length > 0) {
       try {
         const docs = matches.map((m) => m.content);
-        const reranked = await rerankVoyage(userQuery, docs, VOYAGE_API_KEY!, matchCount);
+        const reranked = await rerankVoyage(userQuery, docs, VOYAGE_API_KEY!, matchCount, rerankModel, rerankTruncation);
         // Map indices back to matches and attach rerank_score
         const reorderedMap = new Map(reranked.map((r) => [r.index, r.relevance_score]));
         matches = reranked.map((r) => ({
           ...matches[r.index],
           retrieval_similarity: matches[r.index].similarity,
+          retrieval_rank: r.index + 1,
           rerank_score: r.relevance_score,
           similarity: r.relevance_score, // overwrite for downstream consumers that read .similarity
         }));
@@ -146,6 +165,8 @@ serve(async (req) => {
         console.log(`[query-rag] Reranked ${docs.length}→${matches.length} (top score=${matches[0]?.rerank_score?.toFixed(3)})`);
       } catch (rerr) {
         console.error('[query-rag] Rerank failed, returning vector-only matches:', rerr);
+        rerankError = rerr instanceof Error ? rerr.message : String(rerr);
+        matches = retrievalMatches.slice(0, matchCount);
       }
     } else {
       matches = matches.slice(0, matchCount);
@@ -155,10 +176,13 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       matches,
+      ...(body.include_retrieval_matches ? { retrieval_matches: retrievalMatches } : {}),
       query: userQuery,
       search_input: searchInput,
       embedding_provider: providerUsed,
       rerank_used: rerankUsed,
+      rerank_model: useRerank ? rerankModel : null,
+      rerank_error: rerankError,
       character_id: characterId,
       latency_ms: Date.now() - startedAt,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

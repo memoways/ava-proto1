@@ -71,6 +71,16 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-07-21 — Un laboratoire pour comprendre et régler le RAG 🧪
+
+**Intent.** Séparer clairement deux besoins : les Traces Max expliquent une réponse live déjà diffusée ; le nouveau Laboratoire RAG permet d’expérimenter volontairement la recherche documentaire sans déclencher Max, le Game Master ou le validateur.
+
+**Expérience.** L’administrateur choisit un personnage, formule une question et peut ajouter un contexte récent. Il observe ensuite la requête réellement vectorisée, le vivier pgvector filtré par personnage, le reclassement Voyage et les cinq chunks maximum retenus pour l’injection. Chaque résultat conserve sa provenance, son rang cosine initial et son rang/score après reranking.
+
+**Réglages sans risque.** Le seuil, `retrieve_k`, `top_k`, la réécriture, le provider, la troncature et les rerankers `rerank-2.5`/`rerank-2.5-lite` sont modifiables pour une expérience sans changer la configuration live. Le modèle d’embedding ne peut pas être changé à la volée : les vecteurs de documents doivent rester compatibles avec l’index existant.
+
+**Simplification.** Le simulateur Max artificiel et le RAG Test basique disparaissent. Le premier est remplacé par Traces Max pour le diagnostic causal ; le second est absorbé par le laboratoire, qui devient l’unique écran d’expérimentation RAG.
+
 ### 2026-07-21 — Chaque réponse de Max devient explicable tour par tour 🔷
 
 **Intent.** Remplacer les vues de debug fragmentées par une preuve causale persistante : retrouver exactement ce que Max a reçu, le contexte RAG retenu, le payload réellement envoyé au modèle et la réponse qui en est sortie.

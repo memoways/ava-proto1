@@ -16,6 +16,8 @@ export interface RAGMatch {
   retrieval_similarity?: number;
   /** Score returned by Voyage rerank-2.5 if reranking was applied. */
   rerank_score?: number;
+  /** 1-based position returned by pgvector before reranking. */
+  retrieval_rank?: number;
   /** Owning character (null for shared sources like storyworld). */
   character_id?: string | null;
 }
@@ -32,6 +34,12 @@ export interface RAGQueryOptions {
   rerank?: boolean;
   /** Override retrieve_k (top fetched before rerank). */
   retrieveK?: number;
+  /** Voyage reranker override used by the isolated RAG laboratory. */
+  rerankModel?: "rerank-2.5" | "rerank-2.5-lite";
+  /** Whether Voyage may truncate over-long reranker inputs. */
+  rerankTruncation?: boolean;
+  /** Return the full pre-rerank pool. Reserved for diagnostics to keep live payloads small. */
+  includeRetrievalMatches?: boolean;
   /** Pre-rewritten search query — when provided, used as-is instead of userMessage+context. */
   rewrittenQuery?: string;
   /** Cancels an obsolete conversation turn. */
@@ -43,7 +51,7 @@ export interface RAGQueryOptions {
 async function callQueryRag(
   payload: Record<string, unknown>,
   options?: { signal?: AbortSignal; timeoutMs?: number },
-): Promise<{ matches: RAGMatch[]; query?: string; search_input?: string; embedding_provider?: string; rerank_used?: boolean; latency_ms?: number; error?: string; status?: number }> {
+): Promise<{ matches: RAGMatch[]; retrieval_matches?: RAGMatch[]; query?: string; search_input?: string; embedding_provider?: string; rerank_used?: boolean; rerank_model?: string; rerank_error?: string; latency_ms?: number; error?: string; status?: number }> {
   const timeout = createTimeoutSignal(options?.timeoutMs ?? 5000, options?.signal);
   const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
     method: "POST",
@@ -58,10 +66,13 @@ async function callQueryRag(
   const data = await response.json();
   return {
     matches: data.matches || [],
+    retrieval_matches: data.retrieval_matches || [],
     query: data.query,
     search_input: data.search_input,
     embedding_provider: data.embedding_provider,
     rerank_used: data.rerank_used,
+    rerank_model: data.rerank_model,
+    rerank_error: data.rerank_error,
     latency_ms: data.latency_ms,
   };
 }
@@ -91,6 +102,9 @@ export async function queryRAG(
       provider: options.provider,
       rerank: options.rerank,
       retrieve_k: options.retrieveK,
+      rerank_model: options.rerankModel,
+      rerank_truncation: options.rerankTruncation,
+      include_retrieval_matches: options.includeRetrievalMatches,
     }, { signal: options.signal, timeoutMs: options.timeoutMs });
     if (res.error) {
       debugLogger.logResponse(debugId, "rag", "RAG query", res.status || 500, startTime, res.error);
@@ -106,9 +120,13 @@ export async function queryRAG(
 
 export interface RAGQueryDetailed {
   matches: RAGMatch[];
+  /** Full vector candidate pool, in cosine-similarity order, before reranking. */
+  retrievalMatches: RAGMatch[];
   latencyMs: number;
   embeddingProvider?: string;
   rerankUsed?: boolean;
+  rerankModel?: string;
+  rerankError?: string;
   serverLatencyMs?: number;
   searchInput: string;
   request: {
@@ -121,6 +139,8 @@ export interface RAGQueryDetailed {
     provider: "voyage" | "openai" | null;
     rerankRequested: boolean;
     retrieveK: number;
+    rerankModel: "rerank-2.5" | "rerank-2.5-lite";
+    rerankTruncation: boolean;
   };
   error?: string;
 }
@@ -145,12 +165,18 @@ export async function queryRAGDetailed(
       provider: options.provider,
       rerank: options.rerank,
       retrieve_k: options.retrieveK,
+      rerank_model: options.rerankModel,
+      rerank_truncation: options.rerankTruncation,
+      include_retrieval_matches: options.includeRetrievalMatches,
     }, { signal: options.signal, timeoutMs: options.timeoutMs });
     return {
       matches: res.matches,
+      retrievalMatches: res.retrieval_matches?.length ? res.retrieval_matches : res.matches,
       latencyMs: Math.round(performance.now() - startedAt),
       embeddingProvider: res.embedding_provider,
       rerankUsed: res.rerank_used,
+      rerankModel: res.rerank_model,
+      rerankError: res.rerank_error,
       serverLatencyMs: res.latency_ms,
       searchInput: res.search_input || options.rewrittenQuery || [userMessage, recentContext ? `Contexte récent: ${recentContext}` : ""].filter(Boolean).join("\n\n"),
       request: {
@@ -163,12 +189,15 @@ export async function queryRAGDetailed(
         provider: options.provider ?? null,
         rerankRequested: options.rerank !== false,
         retrieveK: options.retrieveK ?? Math.max(matchCount, 15),
+        rerankModel: options.rerankModel ?? "rerank-2.5",
+        rerankTruncation: options.rerankTruncation !== false,
       },
       error: res.error,
     };
   } catch (err) {
     return {
       matches: [],
+      retrievalMatches: [],
       latencyMs: Math.round(performance.now() - startedAt),
       searchInput: options.rewrittenQuery || [userMessage, recentContext ? `Contexte récent: ${recentContext}` : ""].filter(Boolean).join("\n\n"),
       request: {
@@ -181,6 +210,8 @@ export async function queryRAGDetailed(
         provider: options.provider ?? null,
         rerankRequested: options.rerank !== false,
         retrieveK: options.retrieveK ?? Math.max(matchCount, 15),
+        rerankModel: options.rerankModel ?? "rerank-2.5",
+        rerankTruncation: options.rerankTruncation !== false,
       },
       error: err instanceof Error ? err.message : String(err),
     };

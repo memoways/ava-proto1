@@ -7,7 +7,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
-import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { clearSystemPromptCache } from "@/agents/maxAgent";
 import { hydrateAllSettings } from "@/services/settingsService";
 import LLMConfigTab from "@/components/LLMConfigTab";
@@ -16,7 +15,7 @@ import STTConfigTab from "@/components/STTConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
 import CharacterEditorTab from "@/components/CharacterEditorTab";
 import VideoTriggersEditor from "@/components/VideoTriggersEditor";
-import MaxPromptTestTab from "@/components/MaxPromptTestTab";
+import RAGLabTab from "@/components/RAGLabTab";
 import PipelineTraceTab from "@/components/PipelineTraceTab";
 import AntiHallucinationValidatorTab from "@/components/AntiHallucinationValidatorTab";
 import HallucinationMetricsTab from "@/components/HallucinationMetricsTab";
@@ -48,7 +47,6 @@ const TAB_GROUPS = [
       { id: "sync", label: "Sync Notion" },
       { id: "videos", label: "Vidéos" },
       { id: "embeddings", label: "Embeddings" },
-      { id: "rag", label: "RAG Test" },
     ],
   },
   {
@@ -69,7 +67,7 @@ const TAB_GROUPS = [
       { id: "metrics", label: "Métriques hallu." },
       { id: "latency", label: "Latence & blocage" },
       { id: "latency-telemetry", label: "Latences (PostHog)" },
-      { id: "max-test", label: "Test Max" },
+      { id: "max-test", label: "Laboratoire RAG" },
       { id: "pipeline", label: "Traces Max" },
     ],
   },
@@ -106,11 +104,6 @@ export default function Admin() {
   const [syncReport, setSyncReport] = useState<any | null>(null);
   const [embFilter, setEmbFilter] = useState<string>("all");
   const [loading, setLoading] = useState(false);
-  const [ragQuery, setRagQuery] = useState("");
-  const [ragResults, setRagResults] = useState<any[] | null>(null);
-  const [ragSearching, setRagSearching] = useState(false);
-  const [ragError, setRagError] = useState<string | null>(null);
-  const [ragCharacterFilter, setRagCharacterFilter] = useState<string>("all"); // "all" | character.id
   const [characters, setCharacters] = useState<any[]>([]);
   const [editingChar, setEditingChar] = useState<any | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
@@ -277,53 +270,6 @@ export default function Admin() {
     setSyncing(false);
   }
 
-  async function testRAG() {
-    if (!ragQuery.trim()) return;
-    setRagSearching(true);
-    setRagResults(null);
-    try {
-      const characterId = ragCharacterFilter === "all" ? null : ragCharacterFilter;
-      const res = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: ragQuery, match_count: 10, match_threshold: 0.2, character_id: characterId }),
-      });
-      const raw = await res.text();
-      let data: any = {};
-      try { data = JSON.parse(raw); } catch { /* non-JSON response */ }
-
-      if (!res.ok || data.error) {
-        const rawMsg = typeof data.error === "string" ? data.error : (raw || `HTTP ${res.status}`);
-        let friendly = rawMsg;
-        if (/insufficient_quota|exceeded your current quota/i.test(rawMsg)) {
-          friendly = "Quota OpenAI épuisé (embeddings). Recharge ton compte OpenAI ou bascule les embeddings sur un autre fournisseur.";
-        } else if (/OPENAI_API_KEY/i.test(rawMsg)) {
-          friendly = "Clé OPENAI_API_KEY manquante côté edge function.";
-        } else if (/429/.test(rawMsg)) {
-          friendly = "Rate-limit OpenAI (429). Réessaie dans quelques secondes.";
-        } else if (/401|403|invalid_api_key/i.test(rawMsg)) {
-          friendly = "Clé OpenAI invalide ou non autorisée.";
-        }
-        toast.error(`RAG indisponible : ${friendly}`);
-        setRagResults([]);
-        // Stocker le détail brut pour affichage
-        (window as any).__lastRagError = rawMsg;
-        setRagError(friendly + (rawMsg && rawMsg !== friendly ? `\n\nDétail technique :\n${rawMsg}` : ""));
-        return;
-      }
-
-      setRagError(null);
-      setRagResults(data.matches || []);
-    } catch (e: any) {
-      const msg = e?.message || "Erreur réseau";
-      toast.error(`Erreur RAG : ${msg}`);
-      setRagError(msg);
-      setRagResults([]);
-    } finally {
-      setRagSearching(false);
-    }
-  }
-
   const filteredEmbeddings =
     embFilter === "all"
       ? embeddings
@@ -449,73 +395,6 @@ export default function Admin() {
             </div>
           </TabsContent>
 
-          {/* ==================== RAG TEST ==================== */}
-          <TabsContent value="rag">
-            <div className="max-w-3xl">
-              <h2 className="text-lg font-semibold mb-2">Test RAG</h2>
-              <p className="text-sm text-muted-foreground mb-3">
-                Teste la recherche sémantique en envoyant une requête au pipeline RAG.
-              </p>
-              <div className="flex flex-wrap gap-2 mb-4">
-                <select
-                  value={ragCharacterFilter}
-                  onChange={(e) => setRagCharacterFilter(e.target.value)}
-                  className="bg-muted/30 border rounded px-2 py-2 text-sm"
-                >
-                  <option value="all">Tous les personnages (+ partagé)</option>
-                  {characters.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  value={ragQuery}
-                  onChange={(e) => setRagQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && testRAG()}
-                  placeholder="Ex: famille de Max, virus, chalet de montagne..."
-                  className="flex-1 min-w-[260px] bg-muted/30 border rounded px-3 py-2 text-sm"
-                />
-                <Button onClick={testRAG} disabled={ragSearching || !ragQuery.trim()}>
-                  {ragSearching ? "Recherche..." : "Chercher"}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground mb-3">
-                Le scoping par personnage reproduit ce que voit Max en conversation : seuls les chunks de ce personnage (et les chunks partagés à <code>character_id = NULL</code>) sont retournés.
-              </p>
-
-              {ragError && (
-                <div className="border border-destructive/50 bg-destructive/10 rounded-lg p-3 mb-4">
-                  <p className="text-sm font-semibold text-destructive mb-1">⚠️ Recherche RAG impossible</p>
-                  <pre className="text-xs whitespace-pre-wrap text-destructive/90 font-mono">{ragError}</pre>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Astuce : si le quota OpenAI est épuisé, recharge ton compte sur platform.openai.com,
-                    ou demande de migrer les embeddings vers Lovable AI Gateway (gratuit).
-                  </p>
-                </div>
-              )}
-
-              {ragResults && !ragError && (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">{ragResults.length} résultat(s)</p>
-                  {ragResults.map((m: any, i: number) => {
-                    const charName = m.character_id
-                      ? (characters.find((c) => c.id === m.character_id)?.name || `char ${String(m.character_id).slice(0, 8)}`)
-                      : "(partagé — character_id NULL)";
-                    return (
-                      <div key={m.id} className="border rounded-lg p-3 mb-3">
-                        <div className="flex justify-between text-xs text-muted-foreground mb-1 gap-2 flex-wrap">
-                          <span>#{i + 1} — <strong className="text-foreground">{charName}</strong> <span className="opacity-60">· {m.source_table}</span></span>
-                          <span>Similarité: {(m.similarity * 100).toFixed(1)}%</span>
-                        </div>
-                        <pre className="text-sm whitespace-pre-wrap">{m.content}</pre>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </TabsContent>
-
           {/* ==================== CHARACTER EDITOR ==================== */}
           <TabsContent value="character-editor">
             <CharacterEditorTab />
@@ -555,7 +434,7 @@ export default function Admin() {
           </TabsContent>
 
           <TabsContent value="max-test">
-            <MaxPromptTestTab />
+            <RAGLabTab />
           </TabsContent>
 
           <TabsContent value="pipeline">

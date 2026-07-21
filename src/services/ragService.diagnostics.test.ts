@@ -24,6 +24,7 @@ describe("queryRAGDetailed — requête réellement envoyée", () => {
       search_input: "Où est Ava ?\n\nContexte récent: Max a parlé de Lausanne",
       embedding_provider: "voyage",
       rerank_used: true,
+      rerank_model: "rerank-2.5-lite",
       latency_ms: 17,
     }), { status: 200 }));
 
@@ -32,6 +33,9 @@ describe("queryRAGDetailed — requête réellement envoyée", () => {
       provider: "voyage",
       rerank: true,
       retrieveK: 15,
+      rerankModel: "rerank-2.5-lite",
+      rerankTruncation: false,
+      includeRetrievalMatches: true,
     });
 
     const requestInit = vi.mocked(authenticatedFunctionFetch).mock.calls[0][1] as RequestInit;
@@ -40,6 +44,9 @@ describe("queryRAGDetailed — requête réellement envoyée", () => {
     expect(body).toMatchObject({
       user_message: "Où est Ava ?",
       recent_context: "Max a parlé de Lausanne",
+      rerank_model: "rerank-2.5-lite",
+      rerank_truncation: false,
+      include_retrieval_matches: true,
     });
     expect(result.searchInput).toBe("Où est Ava ?\n\nContexte récent: Max a parlé de Lausanne");
   });
@@ -49,8 +56,10 @@ describe("queryRAGDetailed — requête réellement envoyée", () => {
       { id: "2", source_table: "storyworld", source_id: "b", content: "Second", similarity: 0.97, retrieval_similarity: 0.62, rerank_score: 0.97 },
       { id: "1", source_table: "characters", source_id: "a", content: "Premier", similarity: 0.88, retrieval_similarity: 0.84, rerank_score: 0.88 },
     ];
+    const retrievalMatches = [...matches].reverse();
     vi.mocked(authenticatedFunctionFetch).mockResolvedValue(new Response(JSON.stringify({
       matches,
+      retrieval_matches: retrievalMatches,
       search_input: "Ava domicile Lausanne",
       embedding_provider: "voyage",
       rerank_used: true,
@@ -66,6 +75,7 @@ describe("queryRAGDetailed — requête réellement envoyée", () => {
     expect(body.query).toBe("Ava domicile Lausanne");
     expect(result.searchInput).toBe("Ava domicile Lausanne");
     expect(result.matches).toEqual(matches);
+    expect(result.retrievalMatches).toEqual(retrievalMatches);
     expect(result.matches.map((match) => match.id)).toEqual(["2", "1"]);
   });
 });
