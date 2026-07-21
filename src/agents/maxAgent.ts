@@ -232,7 +232,10 @@ export class SimulateMaxResponseError extends Error {
   readonly diagnosticContext: SimulateMaxDiagnosticContext;
 
   constructor(message: string, diagnosticContext: SimulateMaxDiagnosticContext, cause?: unknown) {
-    super(message, { cause });
+    super(message);
+    if (cause !== undefined) {
+      (this as { cause?: unknown }).cause = cause;
+    }
     this.name = "SimulateMaxResponseError";
     this.diagnosticContext = diagnosticContext;
   }
