@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { fetchConversationTurnTraces } from "@/services/conversationTraceService";
 import type { ConversationTurnTraceRow, ConversationTurnTraceV1 } from "@/types";
-import { Copy, Download, ExternalLink, RefreshCw } from "lucide-react";
+import { CircleHelp, Copy, Download, ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 interface DiagnosticSession {
@@ -153,6 +153,38 @@ export default function PipelineTraceTab() {
           </a>
         </Button>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CircleHelp className="h-4 w-4" /> Mode d’emploi rapide
+          </CardTitle>
+          <CardDescription>Quatre étapes pour comprendre pourquoi Max a produit une réponse.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <ol className="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
+            {[
+              ["1", "Lancer", "Clique sur « Lancer une session tracée ». Le mode reste actif pendant toute cette session."],
+              ["2", "Converser", "Parle normalement avec Max. Chaque réponse générée est enregistrée avant son affichage et sa lecture."],
+              ["3", "Choisir le tour", "Reviens ici, rafraîchis, puis sélectionne la session et le tour à examiner."],
+              ["4", "Analyser", "Ouvre les huit sections, copie un élément ou exporte le JSON complet pour le comparer."],
+            ].map(([number, title, description]) => (
+              <li key={number} className="rounded-md border bg-muted/10 p-3">
+                <div className="mb-1 flex items-center gap-2">
+                  <Badge variant="secondary">{number}</Badge>
+                  <span className="font-medium">{title}</span>
+                </div>
+                <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>
+              </li>
+            ))}
+          </ol>
+          <div className="rounded-md border border-violet-500/30 bg-violet-500/10 p-3 text-xs text-muted-foreground">
+            <strong className="text-foreground">Repère rapide :</strong> réponse incohérente → vérifie mémoire, RAG et prompt ;
+            ton ou comportement étrange → vérifie prompt maître et guidance GM ; réponse lente → ouvre les latences ;
+            modèle inattendu → compare configuration demandée et modèle retourné.
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

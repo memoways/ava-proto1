@@ -6,13 +6,38 @@ Le mode diagnostic PRD4 relie chaque réponse générée de Max à l’ensemble 
 
 Le mode est désactivé par défaut. Une session normale ne demande aucun payload détaillé au proxy et n’écrit aucune ligne dans `conversation_turn_traces`.
 
-## Utilisation
+## Mode d’emploi express
 
 1. Se connecter à `/admin` avec un compte portant le rôle `admin`.
 2. Ouvrir **Mécanique → Traces Max**.
 3. Cliquer sur **Lancer une session tracée** et jouer la session PRD4 dans le nouvel onglet.
-4. Revenir dans **Traces Max**, choisir la session et le tour, ou utiliser **Analyser ce tour** depuis la conversation de l’onglet Sessions.
-5. Déplier les huit catégories, copier une section ou exporter le JSON complet.
+4. Parler normalement avec Max : chaque réponse générée est enregistrée avant son affichage et sa lecture.
+5. Revenir dans **Traces Max**, cliquer sur **Rafraîchir**, puis choisir la session et le tour.
+6. Déplier les huit catégories, copier une section ou exporter le JSON complet.
+
+Il existe aussi un raccourci : dans **Admin → Sessions**, ouvrir une session marquée **Tracée**, puis cliquer sur **Analyser ce tour** sous la réponse de Max concernée.
+
+## Que regarder selon le problème ?
+
+| Problème observé | Sections à vérifier en premier |
+|---|---|
+| Max invente ou contredit un fait | Mémoire, chunks RAG et scores, prompt système final |
+| Max oublie ce qui a été dit | Historique sélectionné, résumé compressé et dernier tour résumé |
+| Le ton ou le comportement de Max paraît incorrect | Prompt maître, fiche personnage, règles techniques et guidance GM causale |
+| Le mauvais modèle ou de mauvais réglages semblent utilisés | Payload OpenRouter exact, modèle demandé/retourné, température, tokens et raisonnement |
+| La réponse est lente | Chronologie et section Latences : RAG, assemblage, LLM, proxy et écriture de trace |
+| La réponse affichée diffère de la génération | Sortie LLM brute, réponse diffusée et origine `llm`/`fallback` |
+
+Les blocs **Labels GM** et **GM post-tour** n’expliquent pas la réponse courante : le premier tourne en parallèle et le second prépare le tour suivant. La seule guidance GM causale éventuelle est celle héritée du tour précédent.
+
+## Exemple de diagnostic
+
+Si Max donne un lieu incorrect :
+
+1. ouvrir **Chunks RAG sélectionnés et scores** pour voir si le bon fait a été retrouvé ;
+2. vérifier **Contexte formaté injecté** pour confirmer qu’il a réellement rejoint le prompt ;
+3. ouvrir **Prompt système final**, puis **Payload OpenRouter exact**, et vérifier que leur message `system` est identique ;
+4. comparer **Sortie LLM brute** et **Réponse diffusée** pour déterminer si l’erreur vient du modèle ou d’un fallback.
 
 Le paramètre d’URL `?diagnostic=full` n’accorde aucun privilège : le navigateur vérifie le rôle, le proxy LLM le revérifie, et la base refuse l’activation ainsi que toute lecture/écriture à un non-administrateur.
 

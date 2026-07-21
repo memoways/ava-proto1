@@ -66,6 +66,8 @@ describe("PipelineTraceTab", () => {
       </MemoryRouter>,
     );
 
+    expect(screen.getByText("Mode d’emploi rapide")).toBeInTheDocument();
+    expect(screen.getByText("Repère rapide :")).toBeInTheDocument();
     expect(await screen.findByText("Chronologie — tour 1")).toBeInTheDocument();
     expect(screen.getByText("GM labels (parallèle)")).toBeInTheDocument();
     expect(screen.getByText("GM post-tour (pour la suite)")).toBeInTheDocument();
