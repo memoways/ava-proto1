@@ -55,6 +55,19 @@ export async function authenticatedFunctionFetch(
   return fetch(input, { ...init, headers });
 }
 
+/** Server-backed authorization check used before honoring privileged game modes. */
+export async function isCurrentUserAdmin(): Promise<boolean> {
+  const session = await ensureGameAuth();
+  if (!session?.user) return false;
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", session.user.id)
+    .eq("role", "admin")
+    .maybeSingle();
+  return !error && data?.role === "admin";
+}
+
 /** Test-only reset for deterministic auth lifecycle specs. */
 export function resetGameAuthForTests(): void {
   pendingGameAuth = null;

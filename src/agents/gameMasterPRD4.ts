@@ -6,11 +6,11 @@
  * choisi parmi les vidéos disponibles (table `video_triggers`).
  * Persiste l'entrée dans `sessions.gm_post_turn_log` (jsonb append-only).
  */
-import { callLLMWithUsage } from "@/services/openRouterLLM";
+import { callLLMWithUsage, LLMProxyRequestError } from "@/services/openRouterLLM";
 import { supabase } from "@/integrations/supabase/client";
 import { getLLMSettings } from "@/services/settingsService";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
-import type { ConversationMessage, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
+import type { ConversationMessage, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, TraceMessage, UserRoleProfile } from "@/types";
 
 export interface PRD4PostTurnInput {
   sessionId: string | null;
@@ -27,7 +27,18 @@ export interface PRD4PostTurnInput {
   /** IDs de triggers vidéo déjà joués (évite de rejouer). */
   triggeredVideoIds?: string[];
   signal?: AbortSignal;
+  diagnosticTrace?: boolean;
 }
+
+export type PRD4PostTurnDetailedResult = PRD4PostTurnEvaluation & {
+  diagnostic?: {
+    messages: TraceMessage[];
+    llm: LLMCallDiagnosticTrace | null;
+    rawResponse: string | null;
+    parsedOutput: PRD4PostTurnEvaluation;
+    error: string | null;
+  };
+};
 
 const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
   engagement_delta: 0,
@@ -166,21 +177,25 @@ Retourne l'évaluation JSON. Extrais d'abord \`labels\` à partir du message UTI
  */
 export async function evaluatePostTurnPRD4(
   input: PRD4PostTurnInput,
-): Promise<PRD4PostTurnEvaluation> {
+): Promise<PRD4PostTurnDetailedResult> {
   const startedAt = performance.now();
   let result: PRD4PostTurnEvaluation;
   let model = "";
   const videos = await getVideoTriggersCached();
   const validIds = new Set(videos.map((v) => v.id));
   const triggered = new Set(input.triggeredVideoIds ?? []);
+  const messages: TraceMessage[] = [
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "user", content: buildUserPrompt(input, videos) },
+  ];
+  let llmTrace: LLMCallDiagnosticTrace | null = null;
+  let rawResponse: string | null = null;
+  let diagnosticError: string | null = null;
   try {
     const llm = getLLMSettings();
     model = llm.LLM_MODEL_GM;
     const callRes = await callLLMWithUsage(
-      [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: buildUserPrompt(input, videos) },
-      ],
+      messages,
       {
         model: llm.LLM_MODEL_GM,
         temperature: 0.2,
@@ -189,12 +204,16 @@ export async function evaluatePostTurnPRD4(
         feature_key: "prd4_gm_post_turn",
         session_id: input.sessionId ?? undefined,
         signal: input.signal,
+        diagnostic_trace: input.diagnosticTrace === true,
       },
     );
+    llmTrace = callRes.diagnosticTrace;
+    rawResponse = callRes.content;
     const parsed = extractJson(callRes.content) as Partial<PRD4PostTurnEvaluation> | null;
     if (!parsed) {
       console.warn("[GM-PRD4] no JSON in response:", callRes.content.slice(0, 200));
       result = { ...DEFAULT_RESULT, notes: "Réponse LLM non parsable (fallback)." };
+      diagnosticError = "Réponse JSON non parsable";
     } else {
       const rawTrigger = parsed.trigger_video_id ? String(parsed.trigger_video_id) : null;
       const safeTrigger = rawTrigger && validIds.has(rawTrigger) && !triggered.has(rawTrigger) ? rawTrigger : null;
@@ -237,6 +256,8 @@ export async function evaluatePostTurnPRD4(
   } catch (err) {
     console.error("[GM-PRD4] error:", err);
     result = { ...DEFAULT_RESULT, notes: `Erreur LLM: ${(err as Error).message?.slice(0, 100) || "inconnue"}` };
+    diagnosticError = err instanceof Error ? err.message : String(err);
+    llmTrace = err instanceof LLMProxyRequestError ? err.diagnosticTrace : llmTrace;
   }
 
   const enriched: PRD4PostTurnEvaluation = {
@@ -253,7 +274,16 @@ export async function evaluatePostTurnPRD4(
     });
   }
 
-  return enriched;
+  return input.diagnosticTrace ? {
+    ...enriched,
+    diagnostic: {
+      messages,
+      llm: llmTrace,
+      rawResponse,
+      parsedOutput: enriched,
+      error: diagnosticError,
+    },
+  } : enriched;
 }
 
 async function appendToGmPostTurnLog(sessionId: string, entry: PRD4PostTurnEvaluation): Promise<void> {

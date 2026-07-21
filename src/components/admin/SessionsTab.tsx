@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity } from "lucide-react";
+import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity, ScanSearch } from "lucide-react";
 import { Link } from "react-router-dom";
 
 /** Onglet admin où corriger la cause racine selon le type de fallback GM. */
@@ -34,6 +34,7 @@ export interface SessionRow {
   gm_post_turn_log?: any;
   personnage_appele?: string | null;
   modalite_voix?: string | null;
+  diagnostic_trace_enabled?: boolean;
 }
 
 const fmt = (d: string | null) => d ? new Date(d).toLocaleString("fr-CH") : "—";
@@ -282,6 +283,11 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
                   }`}>
                     {s.ended_at ? "Terminée" : "En cours"}
                   </span>
+                  {s.diagnostic_trace_enabled && (
+                    <span className="inline-block rounded-full bg-violet-500/20 px-2 py-0.5 text-violet-300">
+                      Tracée
+                    </span>
+                  )}
                   <p className="mt-1">Trust: {s.trust_level ?? 0} | {s.duration_seconds ?? "—"}s</p>
                 </div>
               </div>
@@ -373,6 +379,13 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
                 {selected.name || `Session ${selected.id.slice(0, 8)}`}
               </h2>
               <div className="flex items-center gap-2">
+                {selected.diagnostic_trace_enabled && (
+                  <Link to={`/admin?tab=pipeline&session=${selected.id}`}>
+                    <Button size="sm" variant="outline">
+                      <ScanSearch className="mr-1 h-3 w-3" /> Analyser les tours
+                    </Button>
+                  </Link>
+                )}
                 <Link to={`/admin?tab=latency&session=${selected.id}`}>
                   <Button size="sm" variant="outline">
                     <Activity className="w-3 h-3 mr-1" /> Voir latences
@@ -514,9 +527,22 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
                     selected.conversation_log.map((msg: any, i: number) => {
                       const fb = msg.gmFallback;
                       const blocker = msg.pipeline?.blocker;
+                      const causalTurn = selected.conversation_log
+                        .slice(0, i)
+                        .filter((previous) => previous?.role === "user").length;
                       return (
                         <div key={i} className={`mb-2 text-sm ${msg.role === "max" ? "text-blue-300" : "text-green-300"}`}>
                           <span className="font-bold">{msg.role === "max" ? "Max" : "User"}:</span> {msg.content}
+                          {msg.role === "max" && selected.diagnostic_trace_enabled && causalTurn > 0 && (
+                            <div className="mt-1">
+                              <Link
+                                to={`/admin?tab=pipeline&session=${selected.id}&turn=${causalTurn}`}
+                                className="inline-flex items-center gap-1 text-[11px] font-medium text-violet-300 hover:underline"
+                              >
+                                <ScanSearch className="h-3 w-3" /> Analyser ce tour
+                              </Link>
+                            </div>
+                          )}
                           {msg.role === "user" && msg.labels && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {(msg.labels.themes ?? []).map((t: string, k: number) => (

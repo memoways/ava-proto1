@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
+import { requireAdmin } from "../_shared/adminAuth.ts";
+import { buildOpenRouterPayload } from "./payload.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,6 +26,8 @@ interface LLMRequest {
   timeout_ms?: number;
   /** Explicit reasoning toggle from client. undefined => disabled by default for reasoning models. */
   reasoning?: boolean;
+  /** Admin diagnostic mode: return request metadata, never credentials/headers. */
+  diagnostic_trace?: boolean;
   // Special action for cost lookup
   _action?: string;
   generation_id?: string;
@@ -53,6 +57,7 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
 }
 
 serve(async (req) => {
+  const proxyStartedAt = Date.now();
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -66,6 +71,11 @@ serve(async (req) => {
     }
 
     const body: LLMRequest = await req.json();
+
+    if (body.diagnostic_trace === true) {
+      const adminAuth = await requireAdmin(req, corsHeaders);
+      if (!adminAuth.ok) return adminAuth.response!;
+    }
 
     // ===== GENERATION COST LOOKUP =====
     if (body._action === "get_generation_cost" && body.generation_id) {
@@ -108,11 +118,7 @@ serve(async (req) => {
     }
 
     // ===== STANDARD CHAT COMPLETION =====
-    const model = body.model || "qwen/qwen-2.5-72b-instruct";
-    const temperature = body.temperature ?? 0.8;
-    const max_tokens = body.max_tokens ?? 500;
-    const top_p = body.top_p ?? 0.95;
-    const stream = body.stream ?? true;
+    const { model, temperature, max_tokens, top_p, stream, upstreamBody } = buildOpenRouterPayload(body);
     const timeoutMs = clampTimeoutMs(body.timeout_ms, stream ? 18000 : 15000);
 
     // Guardrails against turning this endpoint into an open LLM proxy.
@@ -153,38 +159,7 @@ serve(async (req) => {
       );
     }
 
-    // Hybrid reasoning models (GPT-5, o1/o3, DeepSeek V3.1, Grok reasoning, Gemini thinking).
-    // Par défaut, OpenRouter active le mode "reasoning" qui consomme des tokens invisibles
-    // dans max_tokens ET ajoute plusieurs secondes de latence. Le client peut forcer
-    // l'activation via body.reasoning=true ; sinon on désactive pour les modèles concernés.
-    const isReasoningModel =
-      /^openai\/(gpt-5|o1|o3|o4)/.test(model) ||
-      /^deepseek\/deepseek-(chat-v3\.1|r1)/.test(model) ||
-      /^x-ai\/grok-(4|3-mini)/.test(model);
-    const reasoningRequested = body.reasoning === true;
-
-    const upstreamBody: Record<string, unknown> = {
-      model,
-      messages: body.messages,
-      temperature,
-      max_tokens,
-      top_p,
-      stream,
-      usage: { include: true },
-    };
-    if (reasoningRequested) {
-      // Laisse OpenRouter appliquer l'effort par défaut du modèle, mais expose les traces.
-      upstreamBody.reasoning = { enabled: true, exclude: false };
-    } else if (isReasoningModel) {
-      // GPT-5 / o-series : reasoning obligatoire côté OpenAI — on ne peut PAS envoyer enabled:false
-      // (400 "Reasoning is mandatory for this endpoint"). On force l'effort minimal + exclusion.
-      // DeepSeek V3.1 / Grok hybrides : acceptent enabled:false pour couper totalement.
-      const isOpenAIReasoning = /^openai\/(gpt-5|o1|o3|o4)/.test(model);
-      upstreamBody.reasoning = isOpenAIReasoning
-        ? { effort: "minimal", exclude: true }
-        : { enabled: false, exclude: true };
-    }
-
+    const upstreamStartedAt = Date.now();
     const response = await fetchWithTimeout(OPENROUTER_URL, {
       method: 'POST',
       headers: {
@@ -204,12 +179,33 @@ serve(async (req) => {
       }
       throw error;
     });
+    const upstreamLatencyMs = Date.now() - upstreamStartedAt;
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`OpenRouter error [${response.status}]:`, errorText);
+      const diagnostic = body.diagnostic_trace === true ? {
+        clientPayload: {
+          messages: body.messages,
+          stream,
+          model: body.model,
+          temperature: body.temperature,
+          max_tokens: body.max_tokens,
+          top_p: body.top_p,
+          timeout_ms: body.timeout_ms,
+          reasoning: body.reasoning === true,
+        },
+        upstreamPayload: upstreamBody,
+        requestedModel: model,
+        returnedModel: model,
+        provider: null,
+        generationId: null,
+        usage: null,
+        upstreamLatencyMs,
+        proxyLatencyMs: Date.now() - proxyStartedAt,
+      } : undefined;
       return new Response(
-        JSON.stringify({ error: `OpenRouter error: ${response.status}`, details: errorText }),
+        JSON.stringify({ error: `OpenRouter error: ${response.status}`, details: errorText, _ava_trace: diagnostic }),
         {
           status: response.status,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -226,6 +222,28 @@ serve(async (req) => {
 
     // For non-streaming, return JSON
     const data = await response.json();
+    if (body.diagnostic_trace === true) {
+      data._ava_trace = {
+        clientPayload: {
+          messages: body.messages,
+          stream,
+          model: body.model,
+          temperature: body.temperature,
+          max_tokens: body.max_tokens,
+          top_p: body.top_p,
+          timeout_ms: body.timeout_ms,
+          reasoning: body.reasoning === true,
+        },
+        upstreamPayload: upstreamBody,
+        requestedModel: model,
+        returnedModel: typeof data.model === "string" && data.model ? data.model : model,
+        provider: typeof data.provider === "string" ? data.provider : null,
+        generationId: typeof data.id === "string" ? data.id : null,
+        usage: data.usage || null,
+        upstreamLatencyMs,
+        proxyLatencyMs: Date.now() - proxyStartedAt,
+      };
+    }
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

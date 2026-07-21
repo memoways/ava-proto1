@@ -72,8 +72,13 @@ describe("Phase 1 sessions RLS and provider quotas", () => {
       "../../supabase/migrations/20260712165020_enforce_public_game_security.sql",
       import.meta.url,
     );
+    const diagnosticTraceMigrationUrl = new URL(
+      "../../supabase/migrations/20260721120000_conversation_turn_traces.sql",
+      import.meta.url,
+    );
     await db.exec(await readFile(expandMigrationUrl, "utf8"));
     await db.exec(await readFile(enforceMigrationUrl, "utf8"));
+    await db.exec(await readFile(diagnosticTraceMigrationUrl, "utf8"));
   });
 
   afterEach(async () => {
@@ -152,5 +157,86 @@ describe("Phase 1 sessions RLS and provider quotas", () => {
     }
 
     expect(last).toMatchObject({ allowed: false, remaining: 0 });
+  });
+
+  it("prevents a participant from enabling diagnostic capture", async () => {
+    await authenticate(db, USER_B);
+    await expect(db.query(
+      "insert into public.sessions (diagnostic_trace_enabled) values (true) returning id",
+    )).rejects.toThrow(/only admins can enable diagnostic traces/i);
+
+    const created = await db.query<{ id: string }>(
+      "insert into public.sessions default values returning id",
+    );
+
+    await expect(db.query(
+      "update public.sessions set diagnostic_trace_enabled = true where id = $1",
+      [created.rows[0].id],
+    )).rejects.toThrow(/diagnostic trace mode is immutable/i);
+  });
+
+  it("allows only an admin to create and read a trace for an enabled session", async () => {
+    await db.exec("reset role");
+    await db.exec(`
+      create or replace function private.has_role(candidate uuid, requested public.app_role)
+      returns boolean language sql stable
+      as $$ select candidate = '${USER_A}'::uuid and requested = 'admin'::public.app_role $$;
+    `);
+    await authenticate(db, USER_A);
+    const created = await db.query<{ id: string }>(
+      "insert into public.sessions (diagnostic_trace_enabled) values (true) returning id",
+    );
+    const sessionId = created.rows[0].id;
+    await expect(db.query(
+      "update public.sessions set diagnostic_trace_enabled = false where id = $1",
+      [sessionId],
+    )).rejects.toThrow(/diagnostic trace mode is immutable/i);
+    await db.query(
+      `insert into public.conversation_turn_traces
+        (session_id, turn_id, turn_index, trace)
+       values ($1, 'turn-1', 1, '{"schemaVersion":1}'::jsonb)`,
+      [sessionId],
+    );
+
+    const adminRead = await db.query(
+      "select turn_index from public.conversation_turn_traces where session_id = $1",
+      [sessionId],
+    );
+    expect(adminRead.rows).toHaveLength(1);
+
+    await authenticate(db, USER_B);
+    const participantRead = await db.query(
+      "select turn_index from public.conversation_turn_traces where session_id = $1",
+      [sessionId],
+    );
+    expect(participantRead.rows).toHaveLength(0);
+  });
+
+  it("deletes all turn traces when their diagnostic session is deleted", async () => {
+    await db.exec("reset role");
+    await db.exec(`
+      create or replace function private.has_role(candidate uuid, requested public.app_role)
+      returns boolean language sql stable
+      as $$ select candidate = '${USER_A}'::uuid and requested = 'admin'::public.app_role $$;
+    `);
+    await authenticate(db, USER_A);
+    const created = await db.query<{ id: string }>(
+      "insert into public.sessions (diagnostic_trace_enabled) values (true) returning id",
+    );
+    const sessionId = created.rows[0].id;
+    await db.query(
+      `insert into public.conversation_turn_traces
+        (session_id, turn_id, turn_index, trace)
+       values ($1, 'turn-1', 1, '{"schemaVersion":1}'::jsonb)`,
+      [sessionId],
+    );
+    await db.query("delete from public.sessions where id = $1", [sessionId]);
+
+    await db.exec("reset role");
+    const remaining = await db.query(
+      "select id from public.conversation_turn_traces where session_id = $1",
+      [sessionId],
+    );
+    expect(remaining.rows).toHaveLength(0);
   });
 });

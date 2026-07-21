@@ -123,7 +123,7 @@ export default function AntiHallucinationValidatorTab() {
         <div>
           <h2 className="text-lg font-semibold">🛡️ Validateur anti-hallucination</h2>
           <p className="text-sm text-muted-foreground">
-            Définissez la base globale des faits autorisés et les règles qui bloquent toute affirmation non autorisée avant TTS.
+            Configuration du validateur utilisé par le banc d’essai.
           </p>
         </div>
         <div className="flex gap-2">
@@ -132,6 +132,10 @@ export default function AntiHallucinationValidatorTab() {
             {saving ? "Sauvegarde..." : "Sauvegarder"}
           </Button>
         </div>
+      </div>
+
+      <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
+        Le validateur n’est actuellement pas exécuté dans le pipeline PRD4 live. Les traces live l’indiquent explicitement comme « non exécuté ».
       </div>
 
       <section className="rounded-lg border p-4 space-y-3">
@@ -143,13 +147,13 @@ export default function AntiHallucinationValidatorTab() {
           className="bg-muted/30 border rounded px-3 py-2 text-sm"
         >
           <option value="off">off — aucun appel validateur (défaut, zéro latence)</option>
-          <option value="observe">observe — log en arrière-plan (n'altère pas la réponse)</option>
-          <option value="enforce">enforce — 1 retry + fallback générique si non-compliant</option>
+          <option value="observe">observe — test non bloquant dans le simulateur</option>
+          <option value="enforce">enforce — retry/fallback dans le simulateur</option>
         </select>
         <ul className="text-xs text-muted-foreground list-disc pl-5 space-y-1">
           <li><strong>off</strong> : Max parle directement, sans deuxième appel LLM. À utiliser quand on stabilise sa voix éditoriale.</li>
-          <li><strong>observe</strong> : le validateur tourne après coup (non bloquant) pour alimenter la trace, mais la réponse diffusée reste celle de Max.</li>
-          <li><strong>enforce</strong> : comportement historique — retry puis fallback « Je ne peux pas l'affirmer… ». Tend à rendre Max plat si le RAG est faible.</li>
+          <li><strong>observe</strong> : le simulateur exécute le contrôle après coup, sans altérer sa réponse.</li>
+          <li><strong>enforce</strong> : le simulateur applique le comportement historique — retry puis fallback « Je ne peux pas l'affirmer… ».</li>
         </ul>
       </section>
 
@@ -172,7 +176,7 @@ export default function AntiHallucinationValidatorTab() {
         </div>
 
         <div className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground">
-          Le validateur combine ces listes globales avec le contexte autorisé du tour (RAG + brief GM) pour décider si une réponse peut être diffusée ou doit être régénérée.
+          Dans le simulateur, le validateur combine ces listes avec le contexte autorisé du tour (RAG + brief GM).
         </div>
 
         <div className="space-y-2">
@@ -203,7 +207,7 @@ export default function AntiHallucinationValidatorTab() {
           <div>
             <h3 className="text-base font-semibold">🔬 Aperçu de la fusion validateur</h3>
             <p className="text-sm text-muted-foreground">
-              Visualise comment les listes globales se combinent avec le brief pré-tour du Game Master, juste avant la validation et le TTS.
+              Visualise, dans le simulateur, comment les listes globales se combinent avec le brief pré-tour du Game Master.
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={refreshTrace}>

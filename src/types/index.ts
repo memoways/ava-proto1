@@ -248,6 +248,14 @@ export interface ConversationPipelineTrace {
   validation?: ConversationValidationTrace;
 }
 
+export type {
+  ConversationTurnTraceRow,
+  ConversationTurnTraceV1,
+  LLMCallDiagnosticTrace,
+  MaxPromptAssemblyTrace,
+  TraceMessage,
+} from "./conversationTrace";
+
 export interface QuestionnaireData {
   // 1 — Global
   experience_rating: number;

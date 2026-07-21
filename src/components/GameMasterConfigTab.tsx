@@ -299,9 +299,9 @@ export default function GameMasterConfigTab() {
           placeholder="System prompt du Game Master..."
         />
         <div className="space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground">Pré-turn planner du Game Master</p>
+          <p className="text-xs font-semibold text-muted-foreground">Pré-turn planner du Game Master (simulateur)</p>
           <p className="text-xs text-muted-foreground">
-            Nouveau: ce prompt prépare le tour avant Max et génère le brief de réponse utilisé par le pipeline.
+            Ce prompt alimente le banc d’essai. Il n’est pas exécuté dans le pipeline PRD4 live.
           </p>
           <Textarea
             value={editPreTurnPrompt}

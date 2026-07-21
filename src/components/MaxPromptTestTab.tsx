@@ -165,6 +165,10 @@ export default function MaxPromptTestTab() {
 
   return (
     <div className="max-w-7xl space-y-6">
+      <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
+        <strong>Simulateur uniquement.</strong> Ce banc d’essai exécute un pipeline configurable distinct du PRD4 live.
+        Pour examiner les causes exactes d’une réponse réellement diffusée par Max, utilisez l’onglet <strong>Traces Max</strong>.
+      </div>
       <div>
         <h2 className="text-lg font-semibold">🧪 Banc d'essai Max — pipeline complet</h2>
         <p className="text-sm text-muted-foreground">

@@ -6,9 +6,9 @@
  * utilisateur. Pas de guidance, pas de trigger : ce dernier est produit côté
  * client (matcher déterministe).
  */
-import { callLLMWithUsage } from "@/services/openRouterLLM";
+import { callLLMWithUsage, LLMProxyRequestError } from "@/services/openRouterLLM";
 import { getLLMSettings } from "@/services/settingsService";
-import type { ConversationMessage, PRD4TurnLabels } from "@/types";
+import type { ConversationMessage, LLMCallDiagnosticTrace, PRD4TurnLabels, TraceMessage } from "@/types";
 
 const LABEL_TIMEOUT_MS = 10000;
 
@@ -31,6 +31,7 @@ export interface PRD4LabelInput {
   conversationHistory: ConversationMessage[];
   userPostureRaw?: string | null;
   signal?: AbortSignal;
+  diagnosticTrace?: boolean;
 }
 
 export interface PRD4LabelResult {
@@ -38,6 +39,13 @@ export interface PRD4LabelResult {
   latency_ms: number;
   model: string;
   ok: boolean;
+  diagnostic?: {
+    messages: TraceMessage[];
+    llm: LLMCallDiagnosticTrace | null;
+    rawResponse: string | null;
+    parsedOutput: PRD4TurnLabels;
+    error: string | null;
+  };
 }
 
 const EMPTY: PRD4TurnLabels = { themes: [], topics: [], intentions: [] };
@@ -106,14 +114,15 @@ Retourne uniquement le JSON {themes, topics, intentions}.`;
 export async function labelUserTurnPRD4(input: PRD4LabelInput): Promise<PRD4LabelResult> {
   const startedAt = performance.now();
   let model = "";
+  const messages: TraceMessage[] = [
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "user", content: buildUserPrompt(input) },
+  ];
   try {
     const llm = getLLMSettings();
     model = llm.LLM_MODEL_GM;
     const res = await callLLMWithUsage(
-      [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: buildUserPrompt(input) },
-      ],
+      messages,
       {
         model: llm.LLM_MODEL_GM,
         temperature: 0.1,
@@ -122,13 +131,26 @@ export async function labelUserTurnPRD4(input: PRD4LabelInput): Promise<PRD4Labe
         feature_key: "prd4_gm_label",
         session_id: input.sessionId ?? undefined,
         signal: input.signal,
+        diagnostic_trace: input.diagnosticTrace === true,
       },
     );
     model = res.model || model;
     const parsed = extractJson(res.content) as Partial<PRD4TurnLabels> | null;
     if (!parsed) {
       console.warn("[GM-label] no JSON in response:", res.content.slice(0, 160));
-      return { labels: EMPTY, latency_ms: Math.round(performance.now() - startedAt), model, ok: false };
+      return {
+        labels: EMPTY,
+        latency_ms: Math.round(performance.now() - startedAt),
+        model,
+        ok: false,
+        diagnostic: input.diagnosticTrace ? {
+          messages,
+          llm: res.diagnosticTrace,
+          rawResponse: res.content,
+          parsedOutput: EMPTY,
+          error: "Réponse JSON non parsable",
+        } : undefined,
+      };
     }
     const themes = cleanList(parsed.themes);
     const topics = cleanList(parsed.topics);
@@ -140,14 +162,34 @@ export async function labelUserTurnPRD4(input: PRD4LabelInput): Promise<PRD4Labe
       else if (topics.length) topics.pop();
       else themes.pop();
     }
+    const labels = { themes, topics, intentions };
     return {
-      labels: { themes, topics, intentions },
+      labels,
       latency_ms: Math.round(performance.now() - startedAt),
       model,
       ok: true,
+      diagnostic: input.diagnosticTrace ? {
+        messages,
+        llm: res.diagnosticTrace,
+        rawResponse: res.content,
+        parsedOutput: labels,
+        error: null,
+      } : undefined,
     };
   } catch (err) {
     console.warn("[GM-label] failed:", err);
-    return { labels: EMPTY, latency_ms: Math.round(performance.now() - startedAt), model, ok: false };
+    return {
+      labels: EMPTY,
+      latency_ms: Math.round(performance.now() - startedAt),
+      model,
+      ok: false,
+      diagnostic: input.diagnosticTrace ? {
+        messages,
+        llm: err instanceof LLMProxyRequestError ? err.diagnosticTrace : null,
+        rawResponse: null,
+        parsedOutput: EMPTY,
+        error: err instanceof Error ? err.message : String(err),
+      } : undefined,
+    };
   }
 }

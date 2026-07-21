@@ -4,6 +4,25 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.47.0] - 2026-07-21 — Traçabilité causale des réponses de Max
+
+### Ajouté
+- Mode diagnostic PRD4 réservé aux administrateurs et verrouillé sur la session.
+- Table RLS `conversation_turn_traces` et contrat versionné `ConversationTurnTraceV1` : mémoire injectée, RAG complet avec scores, prompt sourcé, payload OpenRouter exact, modèle/paramètres/tokens, réponse brute/diffusée, GM et latences.
+- Inspecteur Admin persistant par session et tour, copie par section, export JSON et liens « Analyser ce tour » depuis Sessions.
+
+### Fiabilité et sécurité
+- Écriture causale attendue avant affichage/TTS ; un échec retire le message optimiste et permet de rejouer le même tour.
+- Activation, lecture et écriture protégées côté base et proxy par le rôle admin ; suppression en cascade avec la session ; aucun secret ni en-tête d’authentification enregistré.
+- Les compléments GM sont patchés atomiquement et distingués des causes de la réponse actuelle.
+
+### Corrigé
+- Sans query rewrite, le client RAG n’envoie plus un champ `query` artificiel : l’Edge Function combine réellement le message et le contexte récent et renvoie le `search_input` effectif.
+- Les écrans Admin indiquent désormais que le GM pré-tour et le validateur appartiennent au simulateur et ne sont pas exécutés dans le PRD4 live.
+
+### Tests
+- Couverture orchestrateur, prompt, RAG, payload proxy, inspecteur UI et RLS PostgreSQL (non-admin, admin, cascade).
+
 ## [0.46.0] - 2026-07-20 — LLM Config : 12 modèles récents, coûts et fiches avantages/inconvénients
 
 ### Liste de modèles actualisée (`src/services/settingsService.ts`)

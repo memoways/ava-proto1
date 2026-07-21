@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-20 (LLM Config : 12 modèles récents, cartes avec coûts et avantages/inconvénients)
+> **Last Updated**: 2026-07-21 (traces causales persistantes des réponses PRD4 de Max)
 
 ---
 
@@ -70,6 +70,18 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-07-21 — Chaque réponse de Max devient explicable tour par tour 🔷
+
+**Intent.** Remplacer les vues de debug fragmentées par une preuve causale persistante : retrouver exactement ce que Max a reçu, le contexte RAG retenu, le payload réellement envoyé au modèle et la réponse qui en est sortie.
+
+**Mode diagnostic admin.** Une session tracée se lance depuis Admin et reste marquée pour toute sa durée. Pour chaque tour, le pipeline conserve mémoire, résumé, prompt maître et sections éditoriales, chunks RAG et scores, payload OpenRouter après valeurs par défaut et raisonnement, modèle retourné, tokens, réponse et latences. La trace est écrite avant l’affichage et le TTS ; sans persistance fiable, le tour n’est pas diffusé et reste rejouable.
+
+**Causalité explicite.** La guidance du GM issue du tour précédent est montrée comme cause éventuelle. Les labels parallèles et l’évaluation post-tour sont rattachés au tour mais marqués comme traitements pour la suite. Le GM pré-tour et le validateur sont désormais présentés honnêtement comme outils du simulateur, non exécutés dans le PRD4 live.
+
+**Sécurité.** RLS, triggers et proxy réservent activation et consultation aux administrateurs. Les traces disparaissent avec leur session et ne contiennent ni clé API, ni JWT, ni en-tête d’autorisation.
+
+**Détails.** `docs/max-causal-tracing.md`.
 
 ### 2026-07-20 — LLM Config : 12 modèles récents, coûts et fiches avantages/inconvénients 🔷
 

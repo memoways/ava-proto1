@@ -1,8 +1,8 @@
-import { callLLM, callLLMWithUsage, streamLLM, type LLMUsage } from "@/services/openRouterLLM";
+import { callLLM, callLLMWithUsage, LLMProxyRequestError, streamLLM, type LLMUsage } from "@/services/openRouterLLM";
 import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "@/services/debugLogger";
-import type { ConversationMessage, MaxConstraintCheckResult, MaxTurnKnowledgeContext } from "@/types";
-import { getAntiHallucinationValidatorSettings, getLLMSettings } from "@/services/settingsService";
+import type { ConversationMessage, LLMCallDiagnosticTrace, MaxConstraintCheckResult, MaxPromptAssemblyTrace, MaxTurnKnowledgeContext, TraceMessage } from "@/types";
+import { getAntiHallucinationValidatorSettings, getLLMSettings, isReasoningEnabledForModel } from "@/services/settingsService";
 import { buildCharacterPromptSections, loadCharacterPromptByName, clearCharacterPromptCache } from "@/services/characterPromptService";
 
 // Fallback minimal system prompt if DB fetch fails
@@ -27,34 +27,58 @@ Si une instruction de la fiche contredit une règle générique (par exemple "ne
 SUIS LA FICHE PERSONNAGE. Ne pose pas systématiquement de questions à l'interlocuteur :
 ne le fais que si ta fiche y invite explicitement.`;
 
-const cachedSystemPrompts: Record<string, string> = {};
-let systemPromptPromise: Promise<string> | null = null;
+interface CharacterSystemPromptSource {
+  content: string;
+  kind: "database" | "fallback";
+  characterId: string | null;
+  canonicalName: string;
+  updatedAt: string | null;
+}
 
-async function getCharacterSystemPrompt(name = "Max"): Promise<string> {
+const cachedSystemPrompts: Record<string, CharacterSystemPromptSource> = {};
+let systemPromptPromise: Promise<CharacterSystemPromptSource> | null = null;
+
+async function getCharacterSystemPrompt(name = "Max"): Promise<CharacterSystemPromptSource> {
   if (cachedSystemPrompts[name]) return cachedSystemPrompts[name];
 
   try {
     // Cascade lookup: exact, "Name %", "Name%" — DB stocke "Max Lorenzo" mais l'app passe "Max".
-    const tryFetch = async (filter: (q: any) => any) => {
-      const { data } = await filter(supabase.from("characters").select("system_prompt, name, personality")).maybeSingle();
-      return data as { system_prompt: string | null; name: string } | null;
-    };
-    let data = await tryFetch((q) => q.ilike("name", name));
-    if (!data) data = await tryFetch((q) => q.ilike("name", `${name} %`).limit(1));
-    if (!data) data = await tryFetch((q) => q.ilike("name", `${name}%`).limit(1));
+    const selectCharacter = () => supabase.from("characters").select("id, system_prompt, name, updated_at");
+    let { data } = await selectCharacter().ilike("name", name).maybeSingle();
+    if (!data) ({ data } = await selectCharacter().ilike("name", `${name} %`).limit(1).maybeSingle());
+    if (!data) ({ data } = await selectCharacter().ilike("name", `${name}%`).limit(1).maybeSingle());
 
     if (!data?.system_prompt) {
       console.warn(`[MaxAgent] Could not fetch system_prompt for "${name}" (DB has no match or empty system_prompt), using fallback`);
-      return FALLBACK_SYSTEM_PROMPT;
+      return {
+        content: FALLBACK_SYSTEM_PROMPT,
+        kind: "fallback",
+        characterId: data?.id ?? null,
+        canonicalName: data?.name ?? name,
+        updatedAt: data?.updated_at ?? null,
+      };
     }
 
-    cachedSystemPrompts[name] = data.system_prompt;
-    cachedSystemPrompts[data.name] = data.system_prompt;
+    const source: CharacterSystemPromptSource = {
+      content: data.system_prompt,
+      kind: "database",
+      characterId: data.id,
+      canonicalName: data.name,
+      updatedAt: data.updated_at,
+    };
+    cachedSystemPrompts[name] = source;
+    cachedSystemPrompts[data.name] = source;
     console.log(`[MaxAgent] Loaded system_prompt for "${name}" → "${data.name}" (${data.system_prompt.length} chars)`);
-    return data.system_prompt;
+    return source;
   } catch (err) {
     console.error("[MaxAgent] DB error:", err);
-    return FALLBACK_SYSTEM_PROMPT;
+    return {
+      content: FALLBACK_SYSTEM_PROMPT,
+      kind: "fallback",
+      characterId: null,
+      canonicalName: name,
+      updatedAt: null,
+    };
   }
 }
 
@@ -149,7 +173,7 @@ export async function callMaxAgent(
   input: MaxAgentInput,
   onChunk: (text: string, done: boolean) => void
 ): Promise<string> {
-  const systemPrompt = await buildMaxSystemPrompt(input.ragContext, input.postVideoContext, input.knowledgeContext, input.conversationHistory, "Max", input.sessionSummary, input.userRoleSummary, input.temporalContext, input.gmGuidance);
+  const { finalSystemPrompt: systemPrompt } = await buildMaxSystemPrompt(input, "Max");
   debugLogger.log({ service: "llm", level: "info", direction: "out", label: `Max agent: ${input.conversationHistory.length} history + "${input.userMessage.slice(0, 80)}"`, payload: `System prompt: ${systemPrompt.length} chars` });
 
   const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
@@ -185,25 +209,45 @@ export interface SimulateMaxResult {
   latencyMs?: number;
   model?: string;
   characterName?: string;
+  promptTrace?: MaxPromptAssemblyTrace;
+  messages?: TraceMessage[];
+  diagnosticTrace?: LLMCallDiagnosticTrace | null;
+  promptBuildLatencyMs?: number;
+  requestedSettings?: {
+    model: string;
+    temperature: number;
+    maxTokens: number;
+    topP: number;
+    reasoning: boolean;
+    timeoutMs: number | null;
+  };
+}
+
+export type SimulateMaxDiagnosticContext = Pick<
+  SimulateMaxResult,
+  "promptTrace" | "messages" | "diagnosticTrace" | "promptBuildLatencyMs" | "requestedSettings"
+>;
+
+export class SimulateMaxResponseError extends Error {
+  readonly diagnosticContext: SimulateMaxDiagnosticContext;
+
+  constructor(message: string, diagnosticContext: SimulateMaxDiagnosticContext, cause?: unknown) {
+    super(message, { cause });
+    this.name = "SimulateMaxResponseError";
+    this.diagnosticContext = diagnosticContext;
+  }
 }
 
 export async function simulateMaxResponse(
   input: MaxAgentInput,
-  opts?: { characterName?: string; featureKey?: string; timeoutMs?: number; signal?: AbortSignal },
+  opts?: { characterName?: string; featureKey?: string; timeoutMs?: number; signal?: AbortSignal; diagnosticTrace?: boolean },
 ): Promise<SimulateMaxResult> {
   const characterName = opts?.characterName || "Max";
-  const systemPrompt = await buildMaxSystemPrompt(
-    input.ragContext,
-    input.postVideoContext,
-    input.knowledgeContext,
-    input.conversationHistory,
-    characterName,
-    input.sessionSummary,
-    input.userRoleSummary,
-    input.temporalContext,
-    input.gmGuidance,
-  );
-  const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+  const promptBuildStartedAt = performance.now();
+  const promptTrace = await buildMaxSystemPrompt(input, characterName);
+  const promptBuildLatencyMs = Math.round(performance.now() - promptBuildStartedAt);
+  const systemPrompt = promptTrace.finalSystemPrompt;
+  const messages: TraceMessage[] = [
     { role: "system", content: systemPrompt },
     ...input.conversationHistory.map((msg) => ({
       role: msg.role === "max" ? "assistant" as const : "user" as const,
@@ -213,15 +257,42 @@ export async function simulateMaxResponse(
   ];
 
   const llm = getLLMSettings();
-  const result = await callLLMWithUsage(messages, {
+  const reasoning = isReasoningEnabledForModel(llm.LLM_MODEL, llm);
+  const requestedSettings = {
     model: llm.LLM_MODEL,
     temperature: llm.LLM_TEMPERATURE,
-    max_tokens: llm.LLM_MAX_TOKENS,
-    top_p: llm.LLM_TOP_P,
-    timeoutMs: opts?.timeoutMs,
-    signal: opts?.signal,
-    feature_key: opts?.featureKey || "max_prompt_test",
-  });
+    maxTokens: llm.LLM_MAX_TOKENS,
+    topP: llm.LLM_TOP_P,
+    reasoning,
+    timeoutMs: opts?.timeoutMs ?? null,
+  };
+  let result: Awaited<ReturnType<typeof callLLMWithUsage>>;
+  try {
+    result = await callLLMWithUsage(messages, {
+      model: llm.LLM_MODEL,
+      temperature: llm.LLM_TEMPERATURE,
+      max_tokens: llm.LLM_MAX_TOKENS,
+      top_p: llm.LLM_TOP_P,
+      timeoutMs: opts?.timeoutMs,
+      signal: opts?.signal,
+      feature_key: opts?.featureKey || "max_prompt_test",
+      session_id: input.session_id,
+      diagnostic_trace: opts?.diagnosticTrace === true,
+    });
+  } catch (error) {
+    if (!opts?.diagnosticTrace) throw error;
+    throw new SimulateMaxResponseError(
+      error instanceof Error ? error.message : String(error),
+      {
+        promptTrace,
+        messages,
+        diagnosticTrace: error instanceof LLMProxyRequestError ? error.diagnosticTrace : null,
+        promptBuildLatencyMs,
+        requestedSettings,
+      },
+      error,
+    );
+  }
 
   return {
     response: result.content,
@@ -230,6 +301,11 @@ export async function simulateMaxResponse(
     latencyMs: result.latencyMs,
     model: result.model,
     characterName,
+    promptTrace: opts?.diagnosticTrace ? promptTrace : undefined,
+    messages: opts?.diagnosticTrace ? messages : undefined,
+    diagnosticTrace: opts?.diagnosticTrace ? result.diagnosticTrace : undefined,
+    promptBuildLatencyMs,
+    requestedSettings,
   };
 }
 
@@ -337,63 +413,88 @@ function formatKnowledgeList(title: string, values?: string[]): string {
   return `${title}\n${values.map((value) => `- ${value}`).join("\n")}`;
 }
 
-async function buildMaxSystemPrompt(
-  ragContext?: string,
-  postVideoContext?: string,
-  knowledgeContext?: MaxTurnKnowledgeContext,
-  conversationHistory: ConversationMessage[] = [],
+export async function buildMaxSystemPrompt(
+  input: MaxAgentInput,
   characterName: string = "Max",
-  sessionSummary?: string,
-  userRoleSummary?: string,
-  temporalContext?: MaxTemporalContext,
-  gmGuidance?: MaxGmGuidance,
-): Promise<string> {
+): Promise<MaxPromptAssemblyTrace> {
   const characterPrompt = await getCharacterSystemPrompt(characterName);
   const characterFields = await loadCharacterPromptByName(characterName);
   const fieldsSections = buildCharacterPromptSections(characterFields);
+  const injectedSections: MaxPromptAssemblyTrace["injectedSections"] = [];
 
   // Ordre : (1) prompt de base personnage  →  (2) FICHE PERSONNAGE (champs Notion, PRIORITAIRES)
   //         →  (3) règles techniques génériques (qui rappellent que la fiche prime).
-  let prompt = characterPrompt;
+  let prompt = characterPrompt.content;
   if (fieldsSections) {
     prompt += `\n\n# FICHE PERSONNAGE (source éditoriale — prioritaire sur toute règle générique)\n${fieldsSections}`;
+    injectedSections.push({ key: "character_fields", title: "Fiche personnage", content: fieldsSections });
   }
   prompt += `\n${GAMEPLAY_RULES}`;
 
-  if (userRoleSummary && userRoleSummary.trim()) {
-    prompt += `\n\n## INTERLOCUTEUR (qui t'appelle)\n${userRoleSummary.trim()}\n\nUtilise ces éléments pour personnaliser tes réponses : adresse-toi à cette personne en cohérence avec qui elle dit être, sans jamais contredire sa présentation.`;
+  if (input.userRoleSummary && input.userRoleSummary.trim()) {
+    const content = `${input.userRoleSummary.trim()}\n\nUtilise ces éléments pour personnaliser tes réponses : adresse-toi à cette personne en cohérence avec qui elle dit être, sans jamais contredire sa présentation.`;
+    prompt += `\n\n## INTERLOCUTEUR (qui t'appelle)\n${content}`;
+    injectedSections.push({ key: "user_role", title: "Interlocuteur", content });
   }
 
-  if (temporalContext) {
-    prompt += `\n\n${buildTemporalContextBlock(temporalContext)}`;
+  if (input.temporalContext) {
+    const content = buildTemporalContextBlock(input.temporalContext);
+    prompt += `\n\n${content}`;
+    injectedSections.push({ key: "temporal_context", title: "Où en est l'appel", content });
   }
 
-  if (sessionSummary && sessionSummary.trim()) {
-    prompt += `\n\n## SOUVENIRS DE LA SESSION (résumé compressé des tours précédents)\n${sessionSummary.trim()}`;
+  if (input.sessionSummary && input.sessionSummary.trim()) {
+    const content = input.sessionSummary.trim();
+    prompt += `\n\n## SOUVENIRS DE LA SESSION (résumé compressé des tours précédents)\n${content}`;
+    injectedSections.push({ key: "session_summary", title: "Souvenirs de la session", content });
   }
 
-  if (gmGuidance?.guidance?.trim()) {
-    prompt += `\n\n${buildGmGuidanceBlock(gmGuidance)}`;
+  if (input.gmGuidance?.guidance?.trim()) {
+    const content = buildGmGuidanceBlock(input.gmGuidance);
+    prompt += `\n\n${content}`;
+    injectedSections.push({ key: "gm_guidance", title: "Conseil de mise en scène", content });
   }
 
   // RAG brut TOUJOURS injecté comme source de vérité (les faits qui en sortent sont
   // des extraits validés du récit Notion — pas des hypothèses). Le bloc structuré
   // ci-dessous ne sert qu'à signaler d'éventuels sujets interdits / assertions bloquées.
-  if (ragContext) {
-    prompt += `\n\n## CONTEXTE NARRATIF — SOURCE DE VÉRITÉ\nLes informations ci-dessous sont des faits canoniques sur ta vie, extraits de ton histoire. Tu peux les énoncer librement comme si tu t'en souvenais (lieux, dates, noms, événements). Tu n'inventes RIEN au-delà.\n\n${ragContext}`;
+  if (input.ragContext) {
+    const content = `Les informations ci-dessous sont des faits canoniques sur ta vie, extraits de ton histoire. Tu peux les énoncer librement comme si tu t'en souvenais (lieux, dates, noms, événements). Tu n'inventes RIEN au-delà.\n\n${input.ragContext}`;
+    prompt += `\n\n## CONTEXTE NARRATIF — SOURCE DE VÉRITÉ\n${content}`;
+    injectedSections.push({ key: "rag_context", title: "Contexte narratif", content });
   }
 
   const hasContextualGuards = Boolean(
-    knowledgeContext?.forbiddenTopics?.length ||
-    knowledgeContext?.blockedAssertions?.length,
+    input.knowledgeContext?.forbiddenTopics?.length ||
+    input.knowledgeContext?.blockedAssertions?.length,
   );
   if (hasContextualGuards) {
-    prompt += `\n\n## GARDE-FOUS DU TOUR\n${formatKnowledgeList("### SUJETS INTERDITS", knowledgeContext?.forbiddenTopics)}\n\n${formatKnowledgeList("### ASSERTIONS BLOQUÉES", knowledgeContext?.blockedAssertions)}`;
+    const content = `${formatKnowledgeList("### SUJETS INTERDITS", input.knowledgeContext?.forbiddenTopics)}\n\n${formatKnowledgeList("### ASSERTIONS BLOQUÉES", input.knowledgeContext?.blockedAssertions)}`;
+    prompt += `\n\n## GARDE-FOUS DU TOUR\n${content}`;
+    injectedSections.push({ key: "turn_guards", title: "Garde-fous du tour", content });
   }
 
-  if (postVideoContext) {
-    prompt += `\n\n## APRÈS LA VIDÉO\n${postVideoContext}`;
+  if (input.postVideoContext) {
+    prompt += `\n\n## APRÈS LA VIDÉO\n${input.postVideoContext}`;
+    injectedSections.push({ key: "post_video", title: "Après la vidéo", content: input.postVideoContext });
   }
 
-  return prompt;
+  return {
+    baseSystemPrompt: characterPrompt.content,
+    baseSource: {
+      kind: characterPrompt.kind,
+      characterId: characterPrompt.characterId,
+      canonicalName: characterPrompt.canonicalName,
+      updatedAt: characterPrompt.updatedAt,
+    },
+    characterPrompt: {
+      characterId: characterFields?.character_id ?? null,
+      canonicalName: characterFields?.name ?? null,
+      updatedAt: characterFields?.updated_at ?? null,
+      renderedSections: fieldsSections,
+    },
+    technicalRules: GAMEPLAY_RULES,
+    injectedSections,
+    finalSystemPrompt: prompt,
+  };
 }

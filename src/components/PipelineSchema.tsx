@@ -7,6 +7,7 @@ type Step = {
   role: string;
   provider?: string;
   color: string;
+  activeInPrd4?: boolean;
 };
 
 const STEPS: Step[] = [
@@ -53,24 +54,26 @@ const STEPS: Step[] = [
   },
   {
     id: "gm-pre",
-    label: "GM pré-tour",
-    role: "Brief : mode, ouverture, faits autorisés, interdits",
+    label: "GM pré-tour (simulateur)",
+    role: "Non exécuté dans le PRD4 live",
     provider: "OpenRouter (modèle configurable)",
     color: "bg-accent/30 text-accent-foreground border-accent/40",
+    activeInPrd4: false,
   },
   {
     id: "max",
     label: "Max Agent",
-    role: "Génère la réponse sous contraintes du brief GM + RAG",
+    role: "Génère la réponse avec RAG, mémoire et guidance du tour précédent",
     provider: "OpenRouter (modèle configurable · google/gemini-2.5-flash par défaut)",
     color: "bg-secondary/40 text-secondary-foreground border-secondary",
   },
   {
     id: "validator",
-    label: "Validateur anti-hallucination",
-    role: "Vérifie faits + interdits, retry/fallback",
+    label: "Validateur (simulateur)",
+    role: "Non exécuté dans le PRD4 live",
     provider: "OpenRouter",
     color: "bg-destructive/10 text-destructive-foreground border-destructive/30",
+    activeInPrd4: false,
   },
   {
     id: "tts",
@@ -96,22 +99,22 @@ const STEPS: Step[] = [
 ];
 
 const GLOSSARY: Array<{ term: string; def: string }> = [
-  { term: "GM (Game Master)", def: "Agent LLM arbitre. Avant le tour : produit le brief. Après : score trust, déclenche vidéos." },
-  { term: "Max", def: "Personnage incarné. Génère la réponse vocale sous contraintes du brief GM + RAG." },
+  { term: "GM (Game Master)", def: "En PRD4 live : labels en parallèle et évaluation post-tour pour préparer la suite. Le pré-tour reste réservé au simulateur." },
+  { term: "Max", def: "Personnage incarné. Génère la réponse vocale avec RAG, mémoire et éventuelle guidance GM du tour précédent." },
   { term: "RAG", def: "Retrieval Augmented Generation : récupère des chunks narratifs depuis Notion → Supabase (pgvector)." },
   { term: "Query rewrite", def: "Reformulation LLM de la requête pour lever les références contextuelles (ex : « et toi ? » → « Où habites-tu, Max ? »)." },
   { term: "Voyage", def: "Fournisseur d'embeddings + rerank (voyage-3 · rerank-2.5). OpenAI reste en fallback si Voyage indisponible." },
   { term: "OpenRouter", def: "Passerelle LLM utilisée pour tout le pipeline conversationnel (Max, GM, validateur, résumé de rôle, résumés Notion)." },
   { term: "Lovable AI Gateway", def: "Passerelle LLM utilisée hors OpenRouter pour les tâches courtes : query rewrite + résumé de session." },
-  { term: "Brief de tour", def: "JSON produit par le GM avant Max : mode de parole, faits autorisés, sujets interdits." },
-  { term: "Validateur", def: "LLM juge qui vérifie la réponse de Max avant TTS. Régénère si fait inventé." },
+  { term: "Brief de tour", def: "Objet produit uniquement par le banc d'essai GM pré-tour ; non exécuté dans le PRD4 live." },
+  { term: "Validateur", def: "Contrôle disponible dans le simulateur ; non exécuté dans le PRD4 live." },
   { term: "trust", def: "Score de confiance 0→TRUST_THRESHOLD. Déclenche le gate quand atteint." },
   { term: "Trigger vidéo", def: "Événement narratif Gumlet déclenché par le GM (famille, secret, disparition)." },
   { term: "Fallback", def: "Réponse de prudence si la régénération échoue après MAX_VALIDATION_RETRIES." },
 ];
 
 const PROVIDER_SUMMARY = [
-  { title: "LLM conversationnels", detail: "OpenRouter — Max, GM (pré + post), validateur anti-hallucination, résumé de rôle, résumés Notion." },
+  { title: "LLM conversationnels", detail: "OpenRouter — Max, labels GM, GM post-tour et résumé de rôle. GM pré-tour et validateur : simulateur seulement." },
   { title: "LLM utilitaires", detail: "Lovable AI Gateway — query rewrite RAG + résumé de session post-jeu." },
   { title: "Embeddings + rerank", detail: "Voyage AI (voyage-3 + rerank-2.5). OpenAI text-embedding-3-small en fallback si Voyage renvoie 0." },
   { title: "STT", detail: "Façade multi-providers (src/services/stt) — Deepgram par défaut, Whisper / AssemblyAI / Gradium / Gamilab sélectionnables." },
@@ -136,6 +139,7 @@ export default function PipelineSchema() {
                     <Badge variant="outline" className="text-[10px]">{step.id}</Badge>
                   </div>
                   <p className="mt-1 font-semibold text-sm">{step.label}</p>
+                  {step.activeInPrd4 === false && <Badge variant="outline" className="mt-1 text-[10px]">non exécuté en live</Badge>}
                   <p className="text-xs opacity-80 mt-1">{step.role}</p>
                   {step.provider && (
                     <p className="text-[10px] opacity-70 mt-1 font-mono">{step.provider}</p>
@@ -145,7 +149,7 @@ export default function PipelineSchema() {
             ))}
           </ol>
           <p className="text-xs text-muted-foreground mt-3">
-            Flux : 1→2→3 (rewrite) → 4→5→6 (RAG) → 7 (brief) → 8 (Max) → 9 (validateur) → 10 (TTS joué) · 11 (GM post en parallèle du TTS) · 12 (résumés async en fin de session).
+            PRD4 live : STT → RAG → Max → sauvegarde de la trace diagnostique → TTS. Les labels GM tournent en parallèle ; le GM post-tour prépare le tour suivant. Le GM pré-tour et le validateur ne sont pas exécutés.
           </p>
         </CardContent>
       </Card>

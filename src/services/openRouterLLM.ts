@@ -3,6 +3,7 @@ import { debugLogger } from "./debugLogger";
 import { TimeoutError, withTimeout } from "./asyncUtils";
 import { authenticatedFunctionFetch } from "./gameAuth";
 import { isReasoningEnabledForModel } from "./settingsService";
+import type { LLMCallDiagnosticTrace } from "@/types";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -26,6 +27,8 @@ interface LLMOptions {
   signal?: AbortSignal;
   /** Force enable/disable reasoning. If undefined, reads from LLMSettings.LLM_REASONING[model]. */
   reasoning?: boolean;
+  /** Return the exact sanitized proxy/upstream payload for an admin diagnostic session. */
+  diagnostic_trace?: boolean;
 }
 
 type StreamCallback = (text: string, done: boolean) => void;
@@ -238,6 +241,17 @@ export interface LLMCallResult {
   generationId: string | null;
   model: string;
   latencyMs: number;
+  diagnosticTrace: LLMCallDiagnosticTrace | null;
+}
+
+export class LLMProxyRequestError extends Error {
+  readonly diagnosticTrace: LLMCallDiagnosticTrace | null;
+
+  constructor(message: string, diagnosticTrace: LLMCallDiagnosticTrace | null = null) {
+    super(message);
+    this.name = "LLMProxyRequestError";
+    this.diagnosticTrace = diagnosticTrace;
+  }
 }
 
 /**
@@ -265,6 +279,7 @@ export async function callLLMWithUsage(
         top_p: options?.top_p,
         timeout_ms: timeoutMs,
         reasoning: options?.reasoning ?? isReasoningEnabledForModel(model),
+        diagnostic_trace: options?.diagnostic_trace === true,
       },
       timeoutMs,
       `LLM request ${model}`,
@@ -284,6 +299,14 @@ export async function callLLMWithUsage(
 
   if (!response.ok) {
     const err = await response.text();
+    let diagnosticTrace: LLMCallDiagnosticTrace | null = null;
+    if (options?.diagnostic_trace) {
+      try {
+        diagnosticTrace = (JSON.parse(err)?._ava_trace as LLMCallDiagnosticTrace | undefined) ?? null;
+      } catch {
+        diagnosticTrace = null;
+      }
+    }
     trackLLMCall({
       session_id: options?.session_id,
       feature_key: featureKey,
@@ -291,13 +314,16 @@ export async function callLLMWithUsage(
       status: "error",
       error_message: `HTTP ${response.status}: ${err.slice(0, 200)}`,
     });
-    throw new Error(`LLM error: ${response.status} - ${err}`);
+    throw new LLMProxyRequestError(`LLM error: ${response.status} - ${err}`, diagnosticTrace);
   }
 
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content || '';
   const usage = data.usage || null;
   const generationId = data.id || null;
+  const diagnosticTrace = options?.diagnostic_trace && data._ava_trace
+    ? data._ava_trace as LLMCallDiagnosticTrace
+    : null;
 
   trackLLMCall({
     session_id: options?.session_id,
@@ -314,8 +340,9 @@ export async function callLLMWithUsage(
     content,
     usage,
     generationId,
-    model,
+    model: typeof data.model === "string" && data.model ? data.model : model,
     latencyMs: Math.round(performance.now() - startedAt),
+    diagnosticTrace,
   };
 }
 

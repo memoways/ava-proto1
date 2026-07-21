@@ -156,6 +156,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       matches,
       query: userQuery,
+      search_input: searchInput,
       embedding_provider: providerUsed,
       rerank_used: rerankUsed,
       character_id: characterId,

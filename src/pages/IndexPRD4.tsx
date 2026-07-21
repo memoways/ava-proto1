@@ -80,7 +80,7 @@ import {
   type VideoTriggerSettings,
 } from "@/services/settingsService";
 import type { QuestionnairePRD4Answers, QuestionnairePRD4Data, UserPosture } from "@/types";
-import { ensureGameAuth, isGameCaptchaEnabled, isGameSecurityEnabled } from "@/services/gameAuth";
+import { ensureGameAuth, isCurrentUserAdmin, isGameCaptchaEnabled, isGameSecurityEnabled } from "@/services/gameAuth";
 import {
   getPrivacyPreferences,
   isPrivacyNoticeEnabled,
@@ -104,6 +104,7 @@ const IndexPRD4 = () => {
     setRoleProfile,
     setAudioState,
     addMessage,
+    removeLastMessage,
     incrementPttError,
     endExperience,
     reset,
@@ -132,6 +133,10 @@ const IndexPRD4 = () => {
   const sttLatencySegmentRef = useRef<string | null>(null);
   const pttFinalizingRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
+  const diagnosticTraceRequestedRef = useRef(
+    new URLSearchParams(window.location.search).get("diagnostic") === "full",
+  );
+  const diagnosticTraceEnabledRef = useRef(false);
   const conversationRef = useRef<ConversationMessage[]>([]);
   const isProcessingRef = useRef(false);
   const processingWatchdogRef = useRef<number | null>(null);
@@ -375,6 +380,7 @@ const IndexPRD4 = () => {
     pendingPostVideoContextRef.current = null;
     pendingGmGuidanceRef.current = null;
     gmTopicsCoveredRef.current = [];
+    diagnosticTraceEnabledRef.current = false;
     setActiveVideo(null);
 
     // Recharge les règles de déclenchement vidéo (admin)
@@ -383,12 +389,25 @@ const IndexPRD4 = () => {
       .catch(() => { videoTriggerSettingsRef.current = videoTriggerDefaults; });
 
 
+    let diagnosticTraceEnabled = false;
+    if (diagnosticTraceRequestedRef.current) {
+      diagnosticTraceEnabled = await isCurrentUserAdmin().catch(() => false);
+      if (!diagnosticTraceEnabled) {
+        console.warn("[PRD4] diagnostic request ignored: admin role required");
+      }
+    }
+    diagnosticTraceEnabledRef.current = diagnosticTraceEnabled;
+
     // Crée la session DB (toujours, en mode hard-codé) — persiste posture utilisateur
     try {
-      const sid = await createPRD4Session(state.userRoleProfile, "max");
+      const sid = await createPRD4Session(
+        state.userRoleProfile,
+        "max",
+        diagnosticTraceEnabled ? { diagnostic_trace_enabled: true } : undefined,
+      );
       sessionIdRef.current = sid;
       identifyUser(sid, { experience: "prd4", character: "max" });
-      trackEvent("prd4_session_started", { session_id: sid });
+      trackEvent("prd4_session_started", { session_id: sid, diagnostic_trace_enabled: diagnosticTraceEnabled });
       const startedAt = onboardingStartedAtRef.current;
       const posture = userPostureRef.current;
       void updatePRD4Onboarding(sid, {
@@ -399,6 +418,17 @@ const IndexPRD4 = () => {
         onboarding_started_at: startedAt ? new Date(startedAt).toISOString() : null,
       });
     } catch (err) {
+      if (diagnosticTraceEnabled) {
+        diagnosticTraceEnabledRef.current = false;
+        console.error("[PRD4] diagnostic session creation failed:", err);
+        toast({
+          title: "Session diagnostique indisponible",
+          description: "La réponse ne sera pas jouée sans stockage fiable de la trace. Vérifie la migration puis réessaie.",
+          variant: "destructive",
+        });
+        setPhase("calling_max");
+        return;
+      }
       console.warn("[PRD4] createSession failed (continuing without DB persistence):", err);
     }
 
@@ -550,6 +580,8 @@ const IndexPRD4 = () => {
           gmTopicsCovered: gmTopicsCoveredRef.current,
           onLatencySegment: handleLatencySegment,
           signal: turnController.signal,
+          turnId,
+          diagnosticTraceEnabled: diagnosticTraceEnabledRef.current,
         });
 
         if (!isCurrentTurn()) return;
@@ -863,6 +895,7 @@ const IndexPRD4 = () => {
           session_id: sessionIdRef.current,
           ...result.timings,
           rag_matches: result.ragMatches,
+          trace_id: result.traceId,
         });
         if (typeof result.timings?.total_ms === "number") {
           turnLatenciesRef.current.push(result.timings.total_ms);
@@ -871,7 +904,27 @@ const IndexPRD4 = () => {
       } catch (err) {
         if (turnController.signal.aborted || activeTurnSequenceRef.current !== turnSequence) return;
         console.error("[PRD4] turn failed:", err);
-        toast({ title: "Erreur dans la conversation", description: "Réessaie.", variant: "destructive" });
+        const diagnosticFailure = diagnosticTraceEnabledRef.current;
+        if (diagnosticFailure) {
+          // Le tour n'a pas été diffusé : retire le message optimiste afin qu'un
+          // nouvel appui PTT rejoue bien le même index causal, sans doublon.
+          const current = conversationRef.current;
+          if (current.at(-1)?.timestamp === userMsg.timestamp && current.at(-1)?.role === "user") {
+            conversationRef.current = current.slice(0, -1);
+            removeLastMessage(userMsg.timestamp);
+          }
+          trackEvent("prd4_diagnostic_turn_blocked", {
+            session_id: sessionIdRef.current,
+            turn_id: turnId,
+            turn_index: turnIndex,
+            error: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+          });
+        }
+        toast({
+          title: diagnosticFailure ? "Trace diagnostique non enregistrée" : "Erreur dans la conversation",
+          description: diagnosticFailure ? "La réponse de Max n’a pas été diffusée. Tu peux rejouer le tour après avoir vérifié la base." : "Réessaie.",
+          variant: "destructive",
+        });
       } finally {
         if (activeTurnSequenceRef.current === turnSequence) {
           if (processingWatchdogRef.current) {
@@ -886,6 +939,7 @@ const IndexPRD4 = () => {
     [
       addCompletedLatencySegment,
       addMessage,
+      removeLastMessage,
       endLatencySegment,
       finalizeAndEnd,
       latencyOverlayEnabled,

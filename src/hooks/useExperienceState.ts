@@ -73,6 +73,18 @@ export function useExperienceState() {
     }));
   }, []);
 
+  const removeLastMessage = useCallback((timestamp: number) => {
+    setState((s) => {
+      const last = s.conversationLog.at(-1);
+      if (!last || last.timestamp !== timestamp) return s;
+      return {
+        ...s,
+        conversationLog: s.conversationLog.slice(0, -1),
+        turnCount: last.role === "user" ? Math.max(0, s.turnCount - 1) : s.turnCount,
+      };
+    });
+  }, []);
+
   const incrementPttError = useCallback(() => {
     setState((s) => ({ ...s, pttErrors: s.pttErrors + 1 }));
   }, []);
@@ -108,6 +120,7 @@ export function useExperienceState() {
     setSelectedCharacter,
     setAudioState,
     addMessage,
+    removeLastMessage,
     setLastUserLabels,
     incrementPttError,
     endExperience,

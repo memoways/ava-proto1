@@ -43,7 +43,7 @@ export interface RAGQueryOptions {
 async function callQueryRag(
   payload: Record<string, unknown>,
   options?: { signal?: AbortSignal; timeoutMs?: number },
-): Promise<{ matches: RAGMatch[]; embedding_provider?: string; rerank_used?: boolean; latency_ms?: number; error?: string; status?: number }> {
+): Promise<{ matches: RAGMatch[]; query?: string; search_input?: string; embedding_provider?: string; rerank_used?: boolean; latency_ms?: number; error?: string; status?: number }> {
   const timeout = createTimeoutSignal(options?.timeoutMs ?? 5000, options?.signal);
   const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
     method: "POST",
@@ -58,6 +58,8 @@ async function callQueryRag(
   const data = await response.json();
   return {
     matches: data.matches || [],
+    query: data.query,
+    search_input: data.search_input,
     embedding_provider: data.embedding_provider,
     rerank_used: data.rerank_used,
     latency_ms: data.latency_ms,
@@ -80,7 +82,7 @@ export async function queryRAG(
 
   try {
     const res = await callQueryRag({
-      query: options.rewrittenQuery || userMessage,
+      query: options.rewrittenQuery || undefined,
       user_message: userMessage,
       recent_context: recentContext,
       match_count: matchCount,
@@ -107,6 +109,19 @@ export interface RAGQueryDetailed {
   latencyMs: number;
   embeddingProvider?: string;
   rerankUsed?: boolean;
+  serverLatencyMs?: number;
+  searchInput: string;
+  request: {
+    userMessage: string;
+    recentContext: string;
+    rewrittenQuery: string | null;
+    matchCount: number;
+    matchThreshold: number;
+    characterId: string | null;
+    provider: "voyage" | "openai" | null;
+    rerankRequested: boolean;
+    retrieveK: number;
+  };
   error?: string;
 }
 
@@ -121,7 +136,7 @@ export async function queryRAGDetailed(
   const startedAt = performance.now();
   try {
     const res = await callQueryRag({
-      query: options.rewrittenQuery || userMessage,
+      query: options.rewrittenQuery || undefined,
       user_message: userMessage,
       recent_context: recentContext,
       match_count: matchCount,
@@ -136,12 +151,37 @@ export async function queryRAGDetailed(
       latencyMs: Math.round(performance.now() - startedAt),
       embeddingProvider: res.embedding_provider,
       rerankUsed: res.rerank_used,
+      serverLatencyMs: res.latency_ms,
+      searchInput: res.search_input || options.rewrittenQuery || [userMessage, recentContext ? `Contexte récent: ${recentContext}` : ""].filter(Boolean).join("\n\n"),
+      request: {
+        userMessage,
+        recentContext: recentContext || "",
+        rewrittenQuery: options.rewrittenQuery || null,
+        matchCount,
+        matchThreshold,
+        characterId: options.characterId ?? null,
+        provider: options.provider ?? null,
+        rerankRequested: options.rerank !== false,
+        retrieveK: options.retrieveK ?? Math.max(matchCount, 15),
+      },
       error: res.error,
     };
   } catch (err) {
     return {
       matches: [],
       latencyMs: Math.round(performance.now() - startedAt),
+      searchInput: options.rewrittenQuery || [userMessage, recentContext ? `Contexte récent: ${recentContext}` : ""].filter(Boolean).join("\n\n"),
+      request: {
+        userMessage,
+        recentContext: recentContext || "",
+        rewrittenQuery: options.rewrittenQuery || null,
+        matchCount,
+        matchThreshold,
+        characterId: options.characterId ?? null,
+        provider: options.provider ?? null,
+        rerankRequested: options.rerank !== false,
+        retrieveK: options.retrieveK ?? Math.max(matchCount, 15),
+      },
       error: err instanceof Error ? err.message : String(err),
     };
   }

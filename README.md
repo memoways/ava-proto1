@@ -8,6 +8,8 @@
 
 La mise en public est bloquée par la [release gate](docs/public_release_gate.md). Un aperçu interne peut être utilisé pour le développement, mais aucun lien ne doit être diffusé à des testeurs externes avant validation des critères de sécurité, persistance et endurance.
 
+> **Mise à jour récente (2026-07-21) — traces causales de Max** : les administrateurs peuvent lancer une session PRD4 explicitement tracée et inspecter chaque tour (mémoire, RAG et scores, prompt assemblé, payload OpenRouter exact, modèle, réponse et latences). La trace causale est enregistrée avant l’affichage et le TTS ; en cas d’échec d’écriture, le tour n’est pas diffusé et peut être rejoué. Détails : [`docs/max-causal-tracing.md`](docs/max-causal-tracing.md).
+
 > **Mise à jour récente (2026-07-13) — télémétrie des tests internes** : le panneau voix/analytics est temporairement masqué et les événements techniques PostHog/Grain sont actifs par défaut. Le panneau final reste disponible avec `VITE_PRIVACY_NOTICE_ENABLED=true`. Autocapture, replay, profils persistants et texte libre restent exclus. Détails : [`docs/phase4_privacy_prepublic_runbook.md`](docs/phase4_privacy_prepublic_runbook.md).
 
 > **Mise à jour précédente (2026-07-13) — Phase 3 : canary interne** : la durée est pilotée uniquement par `TIMEOUT_SECONDS` dans le slider admin ; le timer et le Game Master suivent cette valeur. Les seuils de promotion/rollback sont codifiés, la persistance devient observable et PostHog n'utilise plus autocapture ni session replay. Détails : [`docs/phase3_internal_canary_runbook.md`](docs/phase3_internal_canary_runbook.md).
@@ -69,18 +71,18 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] Player vidéo Gumlet (iframe embed responsive plein écran)
 - [x] Contrôle éditorial structuré de Max (persona, objectifs, historique, interdictions d'affirmation)
 - [x] Simulateur admin de réponse Max avec contexte RAG de test
-- [x] Vue admin de trace pipeline conversationnelle (input, RAG, brief GM, décision)
-- [x] Pré-turn planner Game Master avant génération de Max
+- [x] Inspecteur admin persistant des traces PRD4 live, par session et par tour
+- [x] Pré-turn planner Game Master disponible dans le simulateur (non exécuté en PRD4 live)
 - [x] Robustesse du tracking de coûts OpenRouter en cas de génération introuvable temporairement
-- [x] Validation anti-hallucination pré-TTS avec retry + fallback automatique
+- [x] Validation anti-hallucination avec retry + fallback dans le simulateur (non exécutée en PRD4 live)
 - [x] Aperçu admin de la fusion faits globaux + contexte autorisé du tour avant validation
 - [x] Persistance des traces de validation par message dans `conversation_log`
 - [x] Métriques admin de hallucinations (taux régénération + fallback sur 50 dernières sessions)
 - [x] Catalogue formel des modes de parole de Max (6 styles éditoriaux)
 - [x] Schéma visuel du pipeline conversationnel (8 étapes + glossaire)
 - [x] Tests automatisés orchestrateur + validateur + composants admin
-- [x] Pipeline parallélisé (GM pre-turn + Max simultanés via `Promise.all`) pour réduire la latence
-- [x] Validateur anti-hallucination en mode fail-open (timeout 4s + résilience aux JSON malformés)
+- [x] Pipeline PRD4 parallélisé (labels GM en parallèle de Max, GM post-tour destiné au tour suivant)
+- [x] Validateur du simulateur en mode fail-open (timeout 4s + résilience aux JSON malformés)
 - [x] Panneau admin "Latence & blocage" : timings par étape (RAG/GM/Max/validateur/TTS) + détection du point de blocage
 - [x] Accès `/admin` protégé par mot de passe (anti-accès accidentel)
 - [x] Visualisation comparative multi-sessions des latences réelles (barres empilées par session)
@@ -141,11 +143,11 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 Le plan initial visait 5 phases pour réduire les inventions de Max et rendre son comportement éditorialement pilotable.
 
 ### Déjà implémenté
-- **Phase 1 — Visibilité** : `PipelineTraceTab` + schéma visuel `PipelineSchema` (8 étapes) avec glossaire.
-- **Phase 2 — Contrat GM → Max** : brief pré-tour structuré généré par le Game Master avant l'appel à Max + catalogue formel de 6 modes de parole.
-- **Phase 3 — Contrôle de connaissance** : prompt structuré Max (persona, objectifs, contextes, interdictions).
-- **Phase 4 — Validation pré-TTS** : validateur anti-hallucination avec retry + fallback, aperçu admin de la fusion faits globaux + contexte autorisé du tour, et persistance des traces par message dans `conversation_log`.
-- **Phase 5 — Outils éditoriaux** : `MaxPromptControlTab`, `MaxPromptTestTab`, `AntiHallucinationValidatorTab`, `HallucinationMetricsTab` (taux régénération/fallback sur 50 sessions).
+- **PRD4 live** : Max reçoit mémoire bornée, résumé de session, RAG, contexte temporel, profil joueur et éventuelle guidance GM du tour précédent.
+- **Traçabilité** : `PipelineTraceTab` relie chaque réponse diffusée à son entrée, son prompt, son payload OpenRouter exact, ses chunks RAG, ses réglages et ses latences.
+- **Game Master live** : labels en parallèle et évaluation post-tour ; ces traitements sont séparés des causes de la réponse actuelle.
+- **Outils de simulation** : GM pré-tour et validateur restent disponibles dans `MaxPromptTestTab`, mais ne sont pas exécutés dans le PRD4 live.
+- **Outils éditoriaux** : `MaxPromptControlTab`, `MaxPromptTestTab`, `AntiHallucinationValidatorTab`, `HallucinationMetricsTab`.
 
 ### Reste à développer
 - **Politique de vérité à 4 niveaux** (certain / probable / inconnu / interdit) — refactor structurel de `MaxTurnKnowledgeContext` et du prompt validateur.

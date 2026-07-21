@@ -4,7 +4,7 @@ vi.mock("@/agents/maxAgent", () => ({ simulateMaxResponse: vi.fn() }));
 vi.mock("@/agents/gameMasterPRD4", () => ({ evaluatePostTurnPRD4: vi.fn() }));
 vi.mock("@/agents/gameMasterLabelPRD4", () => ({ labelUserTurnPRD4: vi.fn() }));
 vi.mock("@/services/ragService", () => ({
-  queryRAG: vi.fn(),
+  queryRAGDetailed: vi.fn(),
   formatRAGContext: vi.fn(() => ""),
   buildKnowledgeContextFromRAG: vi.fn(() => ({
     allowedFacts: [],
@@ -13,6 +13,10 @@ vi.mock("@/services/ragService", () => ({
     forbiddenTopics: [],
     blockedAssertions: [],
   })),
+}));
+vi.mock("@/services/conversationTraceService", () => ({
+  persistConversationTurnTrace: vi.fn(),
+  patchConversationTurnTrace: vi.fn(),
 }));
 vi.mock("@/services/characterPromptService", () => ({ resolveCharacterIdByName: vi.fn() }));
 vi.mock("@/services/settingsService", () => ({
@@ -24,6 +28,13 @@ vi.mock("@/services/settingsService", () => ({
     RAG_EMBEDDING_PROVIDER: "voyage",
     RAG_SUMMARY_EVERY_N_TURNS: 4,
   })),
+  getLLMSettings: vi.fn(() => ({
+    LLM_MODEL: "openai/gpt-4.1-mini",
+    LLM_TEMPERATURE: 0.7,
+    LLM_MAX_TOKENS: 120,
+    LLM_TOP_P: 0.9,
+  })),
+  isReasoningEnabledForModel: vi.fn(() => false),
 }));
 vi.mock("@/services/sessionMemoryService", () => ({
   fetchSessionSummary: vi.fn(),
@@ -33,7 +44,8 @@ vi.mock("@/services/sessionMemoryService", () => ({
 import { simulateMaxResponse } from "@/agents/maxAgent";
 import { evaluatePostTurnPRD4 } from "@/agents/gameMasterPRD4";
 import { labelUserTurnPRD4 } from "@/agents/gameMasterLabelPRD4";
-import { queryRAG } from "@/services/ragService";
+import { queryRAGDetailed } from "@/services/ragService";
+import { patchConversationTurnTrace, persistConversationTurnTrace } from "@/services/conversationTraceService";
 import { resolveCharacterIdByName } from "@/services/characterPromptService";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { processPRD4Turn } from "@/services/prd4Orchestrator";
@@ -66,7 +78,25 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(resolveCharacterIdByName).mockResolvedValue("character-max");
-    vi.mocked(queryRAG).mockResolvedValue([]);
+    vi.mocked(queryRAGDetailed).mockResolvedValue({
+      matches: [],
+      latencyMs: 1,
+      embeddingProvider: "voyage",
+      rerankUsed: true,
+      serverLatencyMs: 1,
+      searchInput: "question",
+      request: {
+        userMessage: "question",
+        recentContext: "",
+        rewrittenQuery: null,
+        matchCount: 5,
+        matchThreshold: 0.3,
+        characterId: "character-max",
+        provider: "voyage",
+        rerankRequested: true,
+        retrieveK: 15,
+      },
+    });
     vi.mocked(fetchSessionSummary).mockResolvedValue({
       session_id: "session-soak",
       summary: "- L'utilisateur cherche Ava.",
@@ -82,6 +112,8 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     });
     vi.mocked(evaluatePostTurnPRD4).mockResolvedValue(postTurnResult);
     vi.mocked(summarizeSessionAsync).mockResolvedValue();
+    vi.mocked(persistConversationTurnTrace).mockResolvedValue({ id: "trace-1", writeLatencyMs: 3 });
+    vi.mocked(patchConversationTurnTrace).mockResolvedValue();
   });
 
   afterEach(() => {
@@ -180,7 +212,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
   it("falls back from a stalled RAG after two seconds and still answers", async () => {
     vi.useFakeTimers();
     vi.mocked(fetchSessionSummary).mockResolvedValue(null);
-    vi.mocked(queryRAG).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(queryRAGDetailed).mockImplementation(() => new Promise(() => {}));
 
     const turnPromise = processPRD4Turn({
       sessionId: "session-soak",
@@ -200,7 +232,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
   it("preserves a full Max generation window after a stalled RAG", async () => {
     vi.useFakeTimers();
     vi.mocked(fetchSessionSummary).mockResolvedValue(null);
-    vi.mocked(queryRAG).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(queryRAGDetailed).mockImplementation(() => new Promise(() => {}));
     vi.mocked(simulateMaxResponse).mockImplementation(() => new Promise((resolve) => {
       setTimeout(() => resolve({ response: "Réponse complète de Max.", systemPrompt: "system" }), 3_500);
     }));
@@ -218,6 +250,128 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     expect(result.maxResponse).toBe("Réponse complète de Max.");
     expect(vi.mocked(simulateMaxResponse).mock.calls[0][1]?.timeoutMs).toBe(MAX_LLM_RESPONSE_DEADLINE_MS);
     expect(result.timings.total_ms).toBeLessThanOrEqual(TURN_RESPONSE_DEADLINE_MS);
+  });
+
+  it("does not persist or request detailed LLM payloads for a normal session", async () => {
+    const result = await processPRD4Turn({
+      sessionId: "session-normal",
+      conversationHistory: [],
+      userMessage: "Bonjour Max",
+      userRole: null,
+      timeElapsedSeconds: 5,
+    });
+
+    expect(persistConversationTurnTrace).not.toHaveBeenCalled();
+    expect(patchConversationTurnTrace).not.toHaveBeenCalled();
+    expect(vi.mocked(simulateMaxResponse).mock.calls[0][1]).toMatchObject({ diagnosticTrace: false });
+    expect(result.traceId).toBeNull();
+    await Promise.all([result.labelPromise, result.postTurnPromise]);
+  });
+
+  it("persists the complete causal trace before returning a diagnostic response", async () => {
+    vi.mocked(queryRAGDetailed).mockResolvedValue({
+      matches: [{
+        id: "chunk-1",
+        source_table: "characters",
+        source_id: "source-1",
+        content: "Ava habite à Lausanne.",
+        similarity: 0.91,
+        retrieval_similarity: 0.83,
+        rerank_score: 0.91,
+        character_id: "character-max",
+      }],
+      latencyMs: 11,
+      embeddingProvider: "voyage",
+      rerankUsed: true,
+      serverLatencyMs: 8,
+      searchInput: "Où habite Ava ?\n\nContexte récent: Ava",
+      request: {
+        userMessage: "Où habite Ava ?",
+        recentContext: "Ava",
+        rewrittenQuery: null,
+        matchCount: 5,
+        matchThreshold: 0.3,
+        characterId: "character-max",
+        provider: "voyage",
+        rerankRequested: true,
+        retrieveK: 15,
+      },
+    });
+    vi.mocked(simulateMaxResponse).mockResolvedValue({
+      response: "Elle habite à Lausanne.",
+      systemPrompt: "SYSTEM EXACT",
+      promptTrace: {
+        baseSystemPrompt: "BASE",
+        baseSource: { kind: "database", characterId: "character-max", canonicalName: "Max", updatedAt: "2026-07-21" },
+        characterPrompt: { characterId: "character-max", canonicalName: "Max", updatedAt: "2026-07-21", renderedSections: "FICHE" },
+        technicalRules: "RULES",
+        injectedSections: [],
+        finalSystemPrompt: "SYSTEM EXACT",
+      },
+      messages: [
+        { role: "system", content: "SYSTEM EXACT" },
+        { role: "user", content: "Où habite Ava ?" },
+      ],
+      diagnosticTrace: {
+        clientPayload: { model: "openai/gpt-4.1-mini" },
+        upstreamPayload: { model: "openai/gpt-4.1-mini", temperature: 0.7 },
+        requestedModel: "openai/gpt-4.1-mini",
+        returnedModel: "openai/gpt-4.1-mini-2025-04-14",
+        provider: "OpenAI",
+        generationId: "generation-1",
+        usage: { prompt_tokens: 50, completion_tokens: 8, total_tokens: 58 },
+        upstreamLatencyMs: 120,
+        proxyLatencyMs: 125,
+      },
+      promptBuildLatencyMs: 2,
+      requestedSettings: {
+        model: "openai/gpt-4.1-mini",
+        temperature: 0.7,
+        maxTokens: 120,
+        topP: 0.9,
+        reasoning: false,
+        timeoutMs: 8000,
+      },
+    });
+
+    const result = await processPRD4Turn({
+      sessionId: "session-traced",
+      conversationHistory: [],
+      userMessage: "Où habite Ava ?",
+      userRole: null,
+      timeElapsedSeconds: 15,
+      turnId: "turn-stable-1",
+      diagnosticTraceEnabled: true,
+    });
+
+    expect(result.traceId).toBe("trace-1");
+    expect(persistConversationTurnTrace).toHaveBeenCalledOnce();
+    const trace = vi.mocked(persistConversationTurnTrace).mock.calls[0][0];
+    expect(trace.identity).toMatchObject({ sessionId: "session-traced", turnId: "turn-stable-1", turnIndex: 1 });
+    expect(trace.prompt?.finalSystemPrompt).toBe("SYSTEM EXACT");
+    expect(trace.maxCall.messages[0].content).toBe(trace.prompt?.finalSystemPrompt);
+    expect(trace.maxCall.diagnostic?.upstreamPayload).toEqual({ model: "openai/gpt-4.1-mini", temperature: 0.7 });
+    expect(trace.rag.matches[0]).toMatchObject({ retrieval_similarity: 0.83, rerank_score: 0.91 });
+    expect(trace.response).toMatchObject({ rawLlmResponse: "Elle habite à Lausanne.", deliveredResponse: "Elle habite à Lausanne.", source: "llm" });
+    expect(patchConversationTurnTrace).toHaveBeenCalledWith("session-traced", 1, ["timings"], expect.any(Object));
+
+    await Promise.all([result.labelPromise, result.postTurnPromise]);
+    expect(patchConversationTurnTrace).toHaveBeenCalledWith("session-traced", 1, ["gm", "labelPass"], expect.objectContaining({ effect: "parallel_not_causal" }));
+    expect(patchConversationTurnTrace).toHaveBeenCalledWith("session-traced", 1, ["gm", "postTurn"], expect.objectContaining({ effect: "next_turn" }));
+  });
+
+  it("refuses to release a diagnostic response when causal persistence fails", async () => {
+    vi.mocked(persistConversationTurnTrace).mockRejectedValue(new Error("database unavailable"));
+
+    await expect(processPRD4Turn({
+      sessionId: "session-traced",
+      conversationHistory: [],
+      userMessage: "Question sensible",
+      userRole: null,
+      timeElapsedSeconds: 10,
+      diagnosticTraceEnabled: true,
+    })).rejects.toThrow("database unavailable");
+    expect(evaluatePostTurnPRD4).not.toHaveBeenCalled();
   });
 
   it("keeps ordering and bounded context across thirty simulated 35-turn sessions", async () => {

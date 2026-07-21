@@ -70,7 +70,7 @@ const TAB_GROUPS = [
       { id: "latency", label: "Latence & blocage" },
       { id: "latency-telemetry", label: "Latences (PostHog)" },
       { id: "max-test", label: "Test Max" },
-      { id: "pipeline", label: "Pipeline" },
+      { id: "pipeline", label: "Traces Max" },
     ],
   },
   {
