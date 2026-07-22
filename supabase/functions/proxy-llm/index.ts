@@ -118,7 +118,7 @@ serve(async (req) => {
     }
 
     // ===== STANDARD CHAT COMPLETION =====
-    const { model, temperature, max_tokens, top_p, stream, upstreamBody } = buildOpenRouterPayload(body);
+    const { model, max_tokens, stream, upstreamBody } = buildOpenRouterPayload(body);
     const timeoutMs = clampTimeoutMs(body.timeout_ms, stream ? 18000 : 15000);
 
     // Guardrails against turning this endpoint into an open LLM proxy.

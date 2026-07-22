@@ -4,6 +4,7 @@ import { TimeoutError, withTimeout } from "./asyncUtils";
 import { authenticatedFunctionFetch } from "./gameAuth";
 import { isReasoningEnabledForModel } from "./settingsService";
 import type { LLMCallDiagnosticTrace } from "@/types";
+import { getSupportedSamplingParameters } from "./llmModelCapabilities";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -92,6 +93,7 @@ export async function streamLLM(
   const model = options?.model || "qwen/qwen-2.5-72b-instruct";
   const featureKey = options?.feature_key || "chat";
   const timeoutMs = options?.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS;
+  const samplingParameters = getSupportedSamplingParameters(model, options?.temperature, options?.top_p);
 
   const startTime = Date.now();
   const debugId = debugLogger.logFetch("llm", `Stream ${model}`, `${SUPABASE_URL}/functions/v1/proxy-llm`, {
@@ -107,9 +109,8 @@ export async function streamLLM(
         messages,
         stream: true,
         model: options?.model,
-        temperature: options?.temperature,
+        ...samplingParameters,
         max_tokens: options?.max_tokens,
-        top_p: options?.top_p,
         timeout_ms: timeoutMs,
         reasoning: options?.reasoning ?? isReasoningEnabledForModel(model),
       },
@@ -266,6 +267,7 @@ export async function callLLMWithUsage(
   const featureKey = options?.feature_key || "chat";
   const startedAt = performance.now();
   const timeoutMs = options?.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS;
+  const samplingParameters = getSupportedSamplingParameters(model, options?.temperature, options?.top_p);
 
   let response: Response;
   try {
@@ -274,9 +276,8 @@ export async function callLLMWithUsage(
         messages,
         stream: false,
         model: options?.model,
-        temperature: options?.temperature,
+        ...samplingParameters,
         max_tokens: options?.max_tokens,
-        top_p: options?.top_p,
         timeout_ms: timeoutMs,
         reasoning: options?.reasoning ?? isReasoningEnabledForModel(model),
         diagnostic_trace: options?.diagnostic_trace === true,

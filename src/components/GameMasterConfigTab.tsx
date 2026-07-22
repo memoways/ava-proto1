@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Save, RotateCcw } from "lucide-react";
 import { SPEECH_MODES } from "@/services/speechModes";
@@ -136,6 +137,35 @@ export default function GameMasterConfigTab() {
             ⚠️ Modifications non sauvegardées — clique "Sauvegarder" pour persister en base de données.
           </div>
         )}
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <label className="text-sm font-medium text-muted-foreground">Variante du prompt Max</label>
+              <p className="text-xs text-muted-foreground/60 mt-1">
+                Compact v1 utilise uniquement les champs Notion structurés et limite le system prompt à 12 000 caractères.
+              </p>
+            </div>
+            <Select
+              value={gameplay.MAX_PROMPT_VARIANT}
+              onValueChange={(value: "legacy" | "compact_v1") => updateGameplay({ MAX_PROMPT_VARIANT: value })}
+            >
+              <SelectTrigger className="w-[190px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="compact_v1">Compact v1</SelectItem>
+                <SelectItem value="legacy">Legacy (rollback)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {gameplay.MAX_PROMPT_VARIANT === "compact_v1" && (
+            <div className="rounded border border-amber-700/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-200">
+              Le champ historique <code>characters.system_prompt</code> est conservé pour le rollback mais n’est pas lu par le live.
+              Le query rewrite RAG est également legacy et n’est pas exécuté dans le parcours PRD4.
+            </div>
+          )}
+        </div>
 
         {/* Trust Threshold */}
         <div>

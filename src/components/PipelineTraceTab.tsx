@@ -246,6 +246,7 @@ export default function PipelineTraceTab() {
               <AccordionTrigger>1. Prompt maître et prompt système final</AccordionTrigger>
               <AccordionContent className="space-y-4">
                 <JsonBlock label="Provenance" value={trace.prompt ? { baseSource: trace.prompt.baseSource, characterPrompt: trace.prompt.characterPrompt } : null} />
+                <JsonBlock label="Budget du prompt" value={trace.prompt?.budget || "Trace antérieure sans rapport de budget"} />
                 <JsonBlock label="Prompt maître" value={trace.prompt?.baseSystemPrompt || null} />
                 <JsonBlock label="Sections personnage" value={trace.prompt?.characterPrompt.renderedSections || null} />
                 <JsonBlock label="Règles techniques" value={trace.prompt?.technicalRules || null} />
@@ -287,7 +288,23 @@ export default function PipelineTraceTab() {
 
             <AccordionItem value="model" className="rounded-lg border px-4">
               <AccordionTrigger>6. Modèle, paramètres et tokens</AccordionTrigger>
-              <AccordionContent><JsonBlock label="Configuration effective" value={{ requested: trace.maxCall.requestedSettings, returnedModel: trace.maxCall.diagnostic?.returnedModel, provider: trace.maxCall.diagnostic?.provider, generationId: trace.maxCall.diagnostic?.generationId, usage: trace.maxCall.diagnostic?.usage }} /></AccordionContent>
+              <AccordionContent className="space-y-4">
+                <JsonBlock label="Paramètres demandés par l'application" value={trace.maxCall.requestedSettings} />
+                <JsonBlock
+                  label="Paramètres réellement transmis à OpenRouter"
+                  value={trace.maxCall.diagnostic?.upstreamPayload
+                    ? {
+                        model: trace.maxCall.diagnostic.upstreamPayload.model,
+                        temperature: trace.maxCall.diagnostic.upstreamPayload.temperature,
+                        top_p: trace.maxCall.diagnostic.upstreamPayload.top_p,
+                        max_tokens: trace.maxCall.diagnostic.upstreamPayload.max_tokens,
+                        reasoning: trace.maxCall.diagnostic.upstreamPayload.reasoning,
+                      }
+                    : null}
+                />
+                <JsonBlock label="Modèle retourné et fournisseur" value={{ returnedModel: trace.maxCall.diagnostic?.returnedModel, provider: trace.maxCall.diagnostic?.provider, generationId: trace.maxCall.diagnostic?.generationId }} />
+                <JsonBlock label="Tokens exacts renvoyés par OpenRouter" value={trace.maxCall.diagnostic?.usage || null} />
+              </AccordionContent>
             </AccordionItem>
 
             <AccordionItem value="response" className="rounded-lg border px-4">

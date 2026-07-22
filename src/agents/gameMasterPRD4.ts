@@ -95,6 +95,12 @@ Règles "trigger_video_id" — PRIORITÉ HAUTE :
 
 Règles "end_recommended" : respecte le seuil de clôture fourni dans le contexte. Après ce seuil, true seulement si la conversation a trouvé une clôture naturelle ou échoue durablement.
 
+Règles "moderation_flag" :
+- Interprète charitablement les erreurs de transcription, mots déformés, humour ambigu et provocations légères : flag=false.
+- Une critique des actes de Max, même dure, n'est pas une attaque contre l'expérience : flag=false.
+- flag=true seulement pour une insulte explicite ciblée, une menace, un contenu haineux ou un harcèlement sans ambiguïté.
+- Ne recommande jamais la fin sur une première formulation ambiguë. Une fin pour hostilité exige des attaques explicites répétées visibles dans l'historique.
+
 Pas de markdown, pas de \`\`\`. Uniquement l'objet JSON.`;
 
 function extractJson(text: string): unknown {

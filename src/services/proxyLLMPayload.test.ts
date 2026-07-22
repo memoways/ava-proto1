@@ -17,7 +17,7 @@ describe("proxy-llm — payload OpenRouter exact", () => {
     });
   });
 
-  it("capture les paramètres explicites et le raisonnement OpenRouter activé", () => {
+  it("omet les paramètres de sampling non supportés par GPT-5 mini", () => {
     const result = buildOpenRouterPayload({
       messages: [{ role: "system", content: "Exact" }],
       model: "openai/gpt-5-mini",
@@ -30,12 +30,22 @@ describe("proxy-llm — payload OpenRouter exact", () => {
 
     expect(result.upstreamBody).toMatchObject({
       model: "openai/gpt-5-mini",
-      temperature: 0.2,
       max_tokens: 321,
-      top_p: 0.75,
       stream: false,
       reasoning: { enabled: true, exclude: false },
     });
+    expect(result.upstreamBody).not.toHaveProperty("temperature");
+    expect(result.upstreamBody).not.toHaveProperty("top_p");
+  });
+
+  it("conserve temperature et top_p pour un modèle compatible", () => {
+    const result = buildOpenRouterPayload({
+      messages: [{ role: "user", content: "Bonjour" }],
+      model: "google/gemini-2.5-flash",
+      temperature: 0.4,
+      top_p: 0.7,
+    });
+    expect(result.upstreamBody).toMatchObject({ temperature: 0.4, top_p: 0.7 });
   });
 
   it("force l'effort minimal pour un modèle OpenAI reasoning non activé", () => {

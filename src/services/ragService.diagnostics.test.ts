@@ -11,7 +11,7 @@ vi.mock("@/services/debugLogger", () => ({
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
-import { queryRAGDetailed } from "@/services/ragService";
+import { formatMaxRAGContext, queryRAGDetailed, type RAGMatch } from "@/services/ragService";
 
 describe("queryRAGDetailed — requête réellement envoyée", () => {
   beforeEach(() => {
@@ -77,5 +77,41 @@ describe("queryRAGDetailed — requête réellement envoyée", () => {
     expect(result.matches).toEqual(matches);
     expect(result.retrievalMatches).toEqual(retrievalMatches);
     expect(result.matches.map((match) => match.id)).toEqual(["2", "1"]);
+  });
+});
+
+describe("formatMaxRAGContext — contexte live compact", () => {
+  const match = (id: string, content: string): RAGMatch => ({
+    id,
+    source_table: "characters",
+    source_id: `source-${id}`,
+    content,
+    similarity: 0.9,
+  });
+
+  it("injecte au plus trois souvenirs sans métadonnées techniques", () => {
+    const context = formatMaxRAGContext([
+      match("1", "Personnage: Max Lorenzo | Partie 1/9 Une première mémoire canonique."),
+      match("2", "Deuxième mémoire canonique."),
+      match("3", "Troisième mémoire canonique."),
+      match("4", "Quatrième mémoire qui ne doit pas être injectée."),
+    ]);
+    expect(context.match(/Souvenir \d/g)).toHaveLength(3);
+    expect(context).not.toContain("Partie 1/9");
+    expect(context).not.toContain("source_table");
+    expect(context).not.toContain("score");
+    expect(context).not.toContain("Quatrième");
+    expect(context.length).toBeLessThanOrEqual(2_100);
+  });
+
+  it("écarte un chunk qui partage 120 caractères consécutifs", () => {
+    const overlap = "a".repeat(125);
+    const context = formatMaxRAGContext([
+      match("1", `Début ${overlap} fin A.`),
+      match("2", `Autre début ${overlap} fin B.`),
+      match("3", "Mémoire distincte."),
+    ]);
+    expect(context.match(/Souvenir \d/g)).toHaveLength(2);
+    expect(context).not.toContain("fin B");
   });
 });

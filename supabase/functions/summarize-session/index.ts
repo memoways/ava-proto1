@@ -62,7 +62,7 @@ serve(async (req) => {
       `${m.role === "user" ? "UTILISATEUR" : "MAX"}: ${m.content}`
     ).join("\n");
 
-    const systemPrompt = `Tu es un compresseur de mémoire pour un agent narratif (Max) lors d'une session de jeu dont la durée est configurable.\n\nTu produis un résumé en bullet-points (FR) destiné à être réinjecté dans le system prompt de Max au tour suivant.\n\nRègles:\n- Maximum 8 bullets, chacun ≤ 18 mots.\n- Sépare en 3 sections: "Faits sur l'utilisateur", "Sujets déjà abordés", "Promesses/engagements de Max".\n- N'invente RIEN. Si une section est vide, écris "(rien)".\n- Pas de méta-commentaire, pas d'introduction.\n- Conserve les informations utiles à la cohérence (prénoms, détails personnels, choix narratifs).`;
+    const systemPrompt = `Tu es un compresseur de mémoire pour un agent narratif (Max) lors d'une session de jeu dont la durée est configurable.\n\nTu produis un résumé en bullet-points (FR) destiné à être réinjecté dans le system prompt de Max au tour suivant.\n\nRègles:\n- Maximum 9 bullets, chacun ≤ 18 mots.\n- Utilise quatre sections utiles seulement : "Faits sur l'utilisateur", "Sujets déjà abordés", "Promesses/engagements de Max", "État relationnel".\n- Dans "État relationnel", conserve en une ou deux puces la confiance atteinte, les tensions et ce que Max accepte désormais de révéler.\n- N'invente RIEN et omets toute section vide.\n- Pas de méta-commentaire, pas d'introduction.\n- Conserve les informations utiles à la cohérence (prénoms, détails personnels, choix narratifs).`;
 
     const userPrompt = `Résumé précédent (à enrichir, pas à répéter mot pour mot):\n${previousSummary || "(aucun)"}\n\nÉchanges récents:\n${recent}\n\nProduis le nouveau résumé compressé:`;
 

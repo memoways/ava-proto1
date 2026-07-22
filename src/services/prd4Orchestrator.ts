@@ -12,7 +12,7 @@ import { evaluatePostTurnPRD4 } from "@/agents/gameMasterPRD4";
 import { labelUserTurnPRD4, type PRD4LabelResult } from "@/agents/gameMasterLabelPRD4";
 import {
   buildKnowledgeContextFromRAG,
-  formatRAGContext,
+  formatMaxRAGContext,
   queryRAGDetailed,
   type RAGQueryDetailed,
 } from "@/services/ragService";
@@ -121,7 +121,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   let ragDetailed: RAGQueryDetailed | null = null;
   let ragError: string | null = null;
   try {
-    const recent = recentConversation.slice(-4).map((m) => m.content).join(" ");
+    const recent = recentConversation.slice(-2).map((m) => m.content).join(" ");
     // Cloisonnement RAG : on ne récupère QUE les chunks du personnage courant
     // (les chunks shared/storyworld avec character_id NULL restent visibles).
     const characterId = await resolveCharacterIdByName(input.characterName || "Max");
@@ -146,7 +146,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     const matches = ragDetailed.matches;
     ragError = ragDetailed.error || null;
     matchesCount = matches.length;
-    ragContext = formatRAGContext(matches);
+    ragContext = formatMaxRAGContext(matches);
     knowledgeContext = buildKnowledgeContextFromRAG(matches);
   } catch (err) {
     console.warn("[PRD4 orchestrator] RAG failed (non-fatal):", err);

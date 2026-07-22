@@ -2,8 +2,17 @@ import { callLLM, callLLMWithUsage, LLMProxyRequestError, streamLLM, type LLMUsa
 import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, LLMCallDiagnosticTrace, MaxConstraintCheckResult, MaxPromptAssemblyTrace, MaxTurnKnowledgeContext, TraceMessage } from "@/types";
-import { getAntiHallucinationValidatorSettings, getLLMSettings, isReasoningEnabledForModel } from "@/services/settingsService";
+import { getAntiHallucinationValidatorSettings, getGameplaySettings, getLLMSettings, isReasoningEnabledForModel } from "@/services/settingsService";
 import { buildCharacterPromptSections, loadCharacterPromptByName, clearCharacterPromptCache } from "@/services/characterPromptService";
+import {
+  compileCharacterSections,
+  isFallbackGmGuidance,
+  MAX_DYNAMIC_SECTION_CHARS,
+  MAX_STATIC_PROMPT_CHARS,
+  MAX_SYSTEM_PROMPT_CHARS,
+  renderCompiledCharacterSections,
+  truncateAtSentenceBoundary,
+} from "@/agents/maxPromptCompiler";
 
 // Fallback minimal system prompt if DB fetch fails
 const FALLBACK_SYSTEM_PROMPT = `Tu es un personnage dans une expérience narrative interactive. Parle à la première personne, en français, de façon concise (1-2 phrases, 45 mots maximum). Utilise le CONTEXTE NARRATIF ci-dessous comme source de vérité.`;
@@ -26,6 +35,16 @@ Les sections "FICHE PERSONNAGE" (issues de Notion) ci-dessus DÉFINISSENT TON CO
 Si une instruction de la fiche contredit une règle générique (par exemple "ne pose pas de questions"),
 SUIS LA FICHE PERSONNAGE. Ne pose pas systématiquement de questions à l'interlocuteur :
 ne le fais que si ta fiche y invite explicitement.`;
+
+const COMPACT_GAMEPLAY_RULES = `## CONTRAT DE CONVERSATION
+- Tu es le personnage décrit dans cette fiche. Parle à la première personne, en français, sans narration ni commentaire méta.
+- Réponds directement à la demande présente avant toute relance, en 1 ou 2 phrases et 45 mots maximum.
+- Ne termine jamais deux réponses consécutives par une question. Une question utile tous les trois ou quatre tours suffit.
+- Ne rejoue pas une ouverture déjà passée et ne répète pas une information acquise.
+- Garde une interprétation charitable des ambiguïtés, de l'humour et des erreurs de transcription ; au besoin, clarifie sans accuser.
+- Une provocation légère ne ferme pas l'échange. Réserve l'avertissement puis la fermeture aux attaques explicites et répétées.
+- La fiche, la mémoire de session, les souvenirs pertinents et l'historique récent sont tes seules sources factuelles. En cas d'incertitude, dis-le.
+- Le joueur conduit librement la conversation ; garde néanmoins ton drive, ta voix et ta progression relationnelle.`;
 
 interface CharacterSystemPromptSource {
   content: string;
@@ -138,17 +157,14 @@ export function buildTemporalContextBlock(ctx: MaxTemporalContext): string {
   const duration = Math.max(1, ctx.sessionDurationSeconds);
   const progress = Math.min(1, Math.max(0, ctx.timeElapsedSeconds / duration));
   const phase = progress < 0.25
-    ? "Début de l'appel : vous faites connaissance — installe la relation conformément à ta fiche personnage."
+    ? "début : installe la relation sans rejouer une ouverture déjà passée"
     : progress < 0.75
-      ? "Milieu de l'appel : la conversation est installée, tu peux approfondir."
-      : "L'appel approche de sa fin : resserre l'échange, va à l'essentiel, prépare une sortie naturelle.";
+      ? "milieu : approfondis selon la confiance acquise"
+      : "fin proche : va à l'essentiel et prépare une sortie naturelle";
   const elapsedLabel = elapsedMinutes < 1
     ? "moins d'une minute"
     : `environ ${elapsedMinutes} minute${elapsedMinutes > 1 ? "s" : ""}`;
-  return `## OÙ EN EST L'APPEL (repères internes — ne jamais citer ces chiffres)
-- L'appel dure depuis ${elapsedLabel} ; c'est ton ${ctx.turnIndex}e tour de parole.
-- ${phase}
-Utilise ces repères implicitement (rythme, patience, urgence), sans jamais mentionner de compteur, de tour ou de minuterie.`;
+  return `Repère interne : ${elapsedLabel}, tour ${ctx.turnIndex}, ${phase}. Adapte seulement ton rythme ; ne cite jamais ces repères.`;
 }
 
 /**
@@ -157,12 +173,11 @@ Utilise ces repères implicitement (rythme, patience, urgence), sans jamais ment
  * Exporté pur pour être testable.
  */
 export function buildGmGuidanceBlock(gm: MaxGmGuidance): string {
-  const lines = [`## CONSEIL DE MISE EN SCÈNE (note interne, ne jamais la mentionner)\n${gm.guidance.trim()}`];
-  const topics = (gm.topicsCovered ?? []).filter((t) => t && t.trim()).slice(0, 12);
+  const lines = [gm.guidance.trim()];
+  const topics = (gm.topicsCovered ?? []).filter((t) => t && t.trim()).slice(0, 6);
   if (topics.length) {
-    lines.push(`Sujets déjà abordés durant l'appel (ne pas re-poser les mêmes bases) : ${topics.join(", ")}.`);
+    lines.push(`Déjà abordé : ${topics.join(", ")}. Ne repars pas de zéro.`);
   }
-  lines.push("Ce conseil oriente ton attitude pour CE tour ; ta fiche personnage reste prioritaire s'il la contredit.");
   return lines.join("\n");
 }
 
@@ -420,84 +435,256 @@ export async function buildMaxSystemPrompt(
   input: MaxAgentInput,
   characterName: string = "Max",
 ): Promise<MaxPromptAssemblyTrace> {
-  const characterPrompt = await getCharacterSystemPrompt(characterName);
+  const variant = (() => {
+    try { return getGameplaySettings().MAX_PROMPT_VARIANT; } catch { return "legacy" as const; }
+  })();
   const characterFields = await loadCharacterPromptByName(characterName);
-  const fieldsSections = buildCharacterPromptSections(characterFields);
+
+  if (variant === "legacy") {
+    const characterPrompt = await getCharacterSystemPrompt(characterName);
+    const fieldsSections = buildCharacterPromptSections(characterFields);
+    const injectedSections: MaxPromptAssemblyTrace["injectedSections"] = [];
+    let prompt = characterPrompt.content;
+    const legacyBudgetSections: NonNullable<MaxPromptAssemblyTrace["budget"]>["sections"] = [{
+      key: "legacy_system_prompt",
+      title: "characters.system_prompt",
+      chars: characterPrompt.content.length,
+      originalChars: characterPrompt.content.length,
+      included: true,
+      truncated: false,
+    }];
+    if (fieldsSections) {
+      const renderedFields = `\n\n# FICHE PERSONNAGE (source éditoriale — prioritaire sur toute règle générique)\n${fieldsSections}`;
+      prompt += renderedFields;
+      injectedSections.push({ key: "character_fields", title: "Fiche personnage", content: fieldsSections });
+      legacyBudgetSections.push({ key: "character_fields", title: "Fiche personnage", chars: renderedFields.length, originalChars: fieldsSections.length, included: true, truncated: false });
+    }
+    prompt += `\n${GAMEPLAY_RULES}`;
+    legacyBudgetSections.push({ key: "technical_rules", title: "Règles techniques legacy", chars: GAMEPLAY_RULES.length + 1, originalChars: GAMEPLAY_RULES.length, included: true, truncated: false });
+    const legacyStaticChars = prompt.length;
+
+    const legacySections: Array<[string, string, string | undefined]> = [
+      ["user_role", "INTERLOCUTEUR (qui t'appelle)", input.userRoleSummary],
+      ["temporal_context", "OÙ EN EST L'APPEL", input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined],
+      ["session_summary", "SOUVENIRS DE LA SESSION", input.sessionSummary],
+      ["gm_guidance", "CONSEIL DE MISE EN SCÈNE", input.gmGuidance?.guidance?.trim() ? buildGmGuidanceBlock(input.gmGuidance) : undefined],
+      ["rag_context", "CONTEXTE NARRATIF — SOURCE DE VÉRITÉ", input.ragContext],
+      ["post_video", "APRÈS LA VIDÉO", input.postVideoContext],
+    ];
+    for (const [key, title, rawContent] of legacySections) {
+      const content = rawContent?.trim();
+      if (!content) {
+        legacyBudgetSections.push({ key, title, chars: 0, originalChars: 0, included: false, truncated: false, omissionReason: "section_vide" });
+        continue;
+      }
+      const rendered = `\n\n## ${title}\n${content}`;
+      prompt += rendered;
+      injectedSections.push({ key, title, content });
+      legacyBudgetSections.push({ key, title, chars: rendered.length, originalChars: content.length, included: true, truncated: false });
+    }
+
+    const legacyGuards = [
+      ...(input.knowledgeContext?.forbiddenTopics ?? []).map((value) => `Sujet interdit : ${value}`),
+      ...(input.knowledgeContext?.blockedAssertions ?? []).map((value) => `Assertion interdite : ${value}`),
+    ].join("\n");
+    if (legacyGuards) {
+      const title = "GARDE-FOUS DU TOUR";
+      const rendered = `\n\n## ${title}\n${legacyGuards}`;
+      prompt += rendered;
+      injectedSections.push({ key: "turn_guards", title, content: legacyGuards });
+      legacyBudgetSections.push({ key: "turn_guards", title, chars: rendered.length, originalChars: legacyGuards.length, included: true, truncated: false });
+    } else {
+      legacyBudgetSections.push({ key: "turn_guards", title: "GARDE-FOUS DU TOUR", chars: 0, originalChars: 0, included: false, truncated: false, omissionReason: "section_vide" });
+    }
+
+    const conversationChars = input.conversationHistory.reduce((sum, message) => sum + message.content.length, 0) + input.userMessage.length;
+    return {
+      baseSystemPrompt: characterPrompt.content,
+      baseSource: {
+        kind: characterPrompt.kind,
+        characterId: characterPrompt.characterId,
+        canonicalName: characterPrompt.canonicalName,
+        updatedAt: characterPrompt.updatedAt,
+      },
+      characterPrompt: {
+        characterId: characterFields?.character_id ?? null,
+        canonicalName: characterFields?.name ?? null,
+        updatedAt: characterFields?.updated_at ?? null,
+        renderedSections: fieldsSections,
+      },
+      technicalRules: GAMEPLAY_RULES,
+      injectedSections,
+      budget: {
+        variant: "legacy",
+        limitChars: MAX_SYSTEM_PROMPT_CHARS,
+        staticLimitChars: MAX_STATIC_PROMPT_CHARS,
+        staticChars: legacyStaticChars,
+        totalSystemChars: prompt.length,
+        historyChars: conversationChars - input.userMessage.length,
+        currentUserChars: input.userMessage.length,
+        totalMessageChars: prompt.length + conversationChars,
+        systemToConversationRatio: conversationChars ? prompt.length / conversationChars : null,
+        withinBudget: prompt.length <= MAX_SYSTEM_PROMPT_CHARS,
+        sections: legacyBudgetSections,
+      },
+      finalSystemPrompt: prompt,
+    };
+  }
+
+  const compiledFields = compileCharacterSections(characterFields);
+  const budgetSections: NonNullable<MaxPromptAssemblyTrace["budget"]>["sections"] = [];
   const injectedSections: MaxPromptAssemblyTrace["injectedSections"] = [];
+  let prompt = "";
 
-  // Ordre : (1) prompt de base personnage  →  (2) FICHE PERSONNAGE (champs Notion, PRIORITAIRES)
-  //         →  (3) règles techniques génériques (qui rappellent que la fiche prime).
-  let prompt = characterPrompt.content;
-  if (fieldsSections) {
-    prompt += `\n\n# FICHE PERSONNAGE (source éditoriale — prioritaire sur toute règle générique)\n${fieldsSections}`;
-    injectedSections.push({ key: "character_fields", title: "Fiche personnage", content: fieldsSections });
+  if (compiledFields.length) {
+    prompt = "# NOYAU PERSONNAGE\n";
+    budgetSections.push({
+      key: "prompt_header",
+      title: "En-tête du noyau",
+      chars: prompt.length,
+      originalChars: prompt.length,
+      included: true,
+      truncated: false,
+    });
+    for (const section of compiledFields) {
+      const prefix = `\n\n## ${section.title}\n`;
+      const available = MAX_STATIC_PROMPT_CHARS - COMPACT_GAMEPLAY_RULES.length - prompt.length - prefix.length - 2;
+      const content = available > 0
+        ? truncateAtSentenceBoundary(section.content, available)
+        : "";
+      if (!content) {
+        budgetSections.push({
+          key: section.key,
+          title: section.title,
+          chars: 0,
+          originalChars: section.originalChars,
+          included: false,
+          truncated: false,
+          omissionReason: "budget_statique_epuise",
+        });
+        continue;
+      }
+      const rendered = `${prefix}${content}`;
+      prompt += rendered;
+      budgetSections.push({
+        key: section.key,
+        title: section.title,
+        chars: rendered.length,
+        originalChars: section.originalChars,
+        included: true,
+        truncated: section.truncated || content.length < section.content.length,
+      });
+    }
+    prompt += `\n\n${COMPACT_GAMEPLAY_RULES}`;
+  } else {
+    prompt = `${FALLBACK_SYSTEM_PROMPT}\n\n${COMPACT_GAMEPLAY_RULES}`;
+    budgetSections.push({
+      key: "character_fallback",
+      title: "Fallback local minimal",
+      chars: FALLBACK_SYSTEM_PROMPT.length,
+      originalChars: FALLBACK_SYSTEM_PROMPT.length,
+      included: true,
+      truncated: false,
+    });
   }
-  prompt += `\n${GAMEPLAY_RULES}`;
+  budgetSections.push({
+    key: "technical_rules",
+    title: "Contrat de conversation",
+    chars: COMPACT_GAMEPLAY_RULES.length + 2,
+    originalChars: COMPACT_GAMEPLAY_RULES.length,
+    included: true,
+    truncated: false,
+  });
+  const staticChars = prompt.length;
 
-  if (input.userRoleSummary && input.userRoleSummary.trim()) {
-    const content = `${input.userRoleSummary.trim()}\n\nUtilise ces éléments pour personnaliser tes réponses : adresse-toi à cette personne en cohérence avec qui elle dit être, sans jamais contredire sa présentation.`;
-    prompt += `\n\n## INTERLOCUTEUR (qui t'appelle)\n${content}`;
-    injectedSections.push({ key: "user_role", title: "Interlocuteur", content });
+  const appendDynamicSection = (key: keyof typeof MAX_DYNAMIC_SECTION_CHARS, title: string, rawContent?: string) => {
+    const original = rawContent?.trim() ?? "";
+    if (!original) {
+      budgetSections.push({ key, title, chars: 0, originalChars: 0, included: false, truncated: false, omissionReason: "section_vide" });
+      return;
+    }
+    const sectionCap = MAX_DYNAMIC_SECTION_CHARS[key];
+    const sectionContent = truncateAtSentenceBoundary(original, sectionCap);
+    const prefix = `\n\n## ${title}\n`;
+    const remaining = MAX_SYSTEM_PROMPT_CHARS - prompt.length - prefix.length;
+    const content = truncateAtSentenceBoundary(sectionContent, Math.max(0, remaining));
+    if (!content) {
+      budgetSections.push({ key, title, chars: 0, originalChars: original.length, included: false, truncated: false, omissionReason: "budget_systeme_epuise" });
+      return;
+    }
+    prompt += `${prefix}${content}`;
+    injectedSections.push({ key, title, content });
+    budgetSections.push({
+      key,
+      title,
+      chars: prefix.length + content.length,
+      originalChars: original.length,
+      included: true,
+      truncated: content.length < original.length,
+    });
+  };
+
+  // Deterministic dynamic order: call state, caller, memory, GM, guards, RAG, post-video.
+  appendDynamicSection("temporal_context", "ÉTAT DE L'APPEL", input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined);
+  appendDynamicSection("user_role", "RÔLE DE L'INTERLOCUTEUR", input.userRoleSummary);
+  appendDynamicSection("session_summary", "MÉMOIRE DE SESSION", input.sessionSummary);
+
+  const gmGuidance = input.gmGuidance?.guidance?.trim();
+  if (gmGuidance && isFallbackGmGuidance(gmGuidance)) {
+    budgetSections.push({
+      key: "gm_guidance",
+      title: "GUIDANCE GM",
+      chars: 0,
+      originalChars: gmGuidance.length,
+      included: false,
+      truncated: false,
+      omissionReason: "guidance_fallback_sans_information",
+    });
+  } else {
+    appendDynamicSection("gm_guidance", "GUIDANCE GM", gmGuidance && input.gmGuidance ? buildGmGuidanceBlock(input.gmGuidance) : undefined);
   }
 
-  if (input.temporalContext) {
-    const content = buildTemporalContextBlock(input.temporalContext);
-    prompt += `\n\n${content}`;
-    injectedSections.push({ key: "temporal_context", title: "Où en est l'appel", content });
-  }
+  const guards = [
+    ...(input.knowledgeContext?.forbiddenTopics ?? []).map((value) => `Sujet interdit : ${value}`),
+    ...(input.knowledgeContext?.blockedAssertions ?? []).map((value) => `Assertion interdite : ${value}`),
+  ].join("\n");
+  appendDynamicSection("turn_guards", "GARDE-FOUS DU TOUR", guards || undefined);
+  appendDynamicSection("rag_context", "SOUVENIRS PERTINENTS", input.ragContext);
+  appendDynamicSection("post_video", "CONTEXTE POST-VIDÉO", input.postVideoContext);
 
-  if (input.sessionSummary && input.sessionSummary.trim()) {
-    const content = input.sessionSummary.trim();
-    prompt += `\n\n## SOUVENIRS DE LA SESSION (résumé compressé des tours précédents)\n${content}`;
-    injectedSections.push({ key: "session_summary", title: "Souvenirs de la session", content });
-  }
-
-  if (input.gmGuidance?.guidance?.trim()) {
-    const content = buildGmGuidanceBlock(input.gmGuidance);
-    prompt += `\n\n${content}`;
-    injectedSections.push({ key: "gm_guidance", title: "Conseil de mise en scène", content });
-  }
-
-  // RAG brut TOUJOURS injecté comme source de vérité (les faits qui en sortent sont
-  // des extraits validés du récit Notion — pas des hypothèses). Le bloc structuré
-  // ci-dessous ne sert qu'à signaler d'éventuels sujets interdits / assertions bloquées.
-  if (input.ragContext) {
-    const content = `Les informations ci-dessous sont des faits canoniques sur ta vie, extraits de ton histoire. Tu peux les énoncer librement comme si tu t'en souvenais (lieux, dates, noms, événements). Tu n'inventes RIEN au-delà.\n\n${input.ragContext}`;
-    prompt += `\n\n## CONTEXTE NARRATIF — SOURCE DE VÉRITÉ\n${content}`;
-    injectedSections.push({ key: "rag_context", title: "Contexte narratif", content });
-  }
-
-  const hasContextualGuards = Boolean(
-    input.knowledgeContext?.forbiddenTopics?.length ||
-    input.knowledgeContext?.blockedAssertions?.length,
-  );
-  if (hasContextualGuards) {
-    const content = `${formatKnowledgeList("### SUJETS INTERDITS", input.knowledgeContext?.forbiddenTopics)}\n\n${formatKnowledgeList("### ASSERTIONS BLOQUÉES", input.knowledgeContext?.blockedAssertions)}`;
-    prompt += `\n\n## GARDE-FOUS DU TOUR\n${content}`;
-    injectedSections.push({ key: "turn_guards", title: "Garde-fous du tour", content });
-  }
-
-  if (input.postVideoContext) {
-    prompt += `\n\n## APRÈS LA VIDÉO\n${input.postVideoContext}`;
-    injectedSections.push({ key: "post_video", title: "Après la vidéo", content: input.postVideoContext });
-  }
+  const renderedFields = renderCompiledCharacterSections(compiledFields);
+  const historyChars = input.conversationHistory.reduce((sum, message) => sum + message.content.length, 0);
+  const conversationChars = historyChars + input.userMessage.length;
 
   return {
-    baseSystemPrompt: characterPrompt.content,
+    baseSystemPrompt: compiledFields.length ? renderedFields : FALLBACK_SYSTEM_PROMPT,
     baseSource: {
-      kind: characterPrompt.kind,
-      characterId: characterPrompt.characterId,
-      canonicalName: characterPrompt.canonicalName,
-      updatedAt: characterPrompt.updatedAt,
+      kind: compiledFields.length ? "compiled" : "fallback",
+      characterId: characterFields?.character_id ?? null,
+      canonicalName: characterFields?.name ?? characterName,
+      updatedAt: characterFields?.updated_at ?? null,
     },
     characterPrompt: {
       characterId: characterFields?.character_id ?? null,
       canonicalName: characterFields?.name ?? null,
       updatedAt: characterFields?.updated_at ?? null,
-      renderedSections: fieldsSections,
+      renderedSections: renderedFields,
     },
-    technicalRules: GAMEPLAY_RULES,
+    technicalRules: COMPACT_GAMEPLAY_RULES,
     injectedSections,
+    budget: {
+      variant: "compact_v1",
+      limitChars: MAX_SYSTEM_PROMPT_CHARS,
+      staticLimitChars: MAX_STATIC_PROMPT_CHARS,
+      staticChars,
+      totalSystemChars: prompt.length,
+      historyChars,
+      currentUserChars: input.userMessage.length,
+      totalMessageChars: prompt.length + conversationChars,
+      systemToConversationRatio: conversationChars ? prompt.length / conversationChars : null,
+      withinBudget: prompt.length <= MAX_SYSTEM_PROMPT_CHARS,
+      sections: budgetSections,
+    },
     finalSystemPrompt: prompt,
   };
 }

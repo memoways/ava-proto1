@@ -485,6 +485,7 @@ export function saveTTSSettings(settings: Partial<TTSSettings>): TTSSettings {
 // ===== Gameplay / Experience Settings =====
 
 export interface GameplaySettings {
+  MAX_PROMPT_VARIANT: "legacy" | "compact_v1";
   TRUST_THRESHOLD: number;
   TIMEOUT_SECONDS: number;
   MAX_INSULT_TOLERANCE: number;
@@ -492,6 +493,7 @@ export interface GameplaySettings {
   RAG_TOP_K: number;
   RAG_RETRIEVE_K: number;
   RAG_RERANK_ENABLED: boolean;
+  /** Legacy A/B pipeline only. PRD4 deliberately never performs an LLM query rewrite. */
   RAG_QUERY_REWRITE_ENABLED: boolean;
   RAG_EMBEDDING_PROVIDER: "voyage" | "openai";
   RAG_SUMMARY_EVERY_N_TURNS: number;
@@ -501,6 +503,7 @@ export interface GameplaySettings {
 const GAMEPLAY_STORAGE_KEY = "ava_gameplay_settings";
 
 const gameplayDefaults: GameplaySettings = {
+  MAX_PROMPT_VARIANT: ((defaultSettings as any).MAX_PROMPT_VARIANT === "compact_v1" ? "compact_v1" : "legacy"),
   TRUST_THRESHOLD: defaultSettings.TRUST_THRESHOLD,
   TIMEOUT_SECONDS: defaultSettings.TIMEOUT_SECONDS,
   MAX_INSULT_TOLERANCE: defaultSettings.MAX_INSULT_TOLERANCE,
@@ -517,13 +520,28 @@ const gameplayDefaults: GameplaySettings = {
 export function getGameplaySettings(): GameplaySettings {
   try {
     const stored = localStorage.getItem(GAMEPLAY_STORAGE_KEY);
-    if (stored) return { ...gameplayDefaults, ...JSON.parse(stored) };
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return {
+        ...gameplayDefaults,
+        ...parsed,
+        MAX_PROMPT_VARIANT: parsed.MAX_PROMPT_VARIANT === "compact_v1"
+          ? "compact_v1"
+          : parsed.MAX_PROMPT_VARIANT === "legacy"
+            ? "legacy"
+            : gameplayDefaults.MAX_PROMPT_VARIANT,
+      };
+    }
   } catch { /* ignore */ }
   return { ...gameplayDefaults };
 }
 
 export async function loadGameplaySettingsFromDB(): Promise<GameplaySettings> {
-  return loadFromDB(GAMEPLAY_STORAGE_KEY, gameplayDefaults);
+  const loaded = await loadFromDB(GAMEPLAY_STORAGE_KEY, gameplayDefaults);
+  return {
+    ...loaded,
+    MAX_PROMPT_VARIANT: loaded.MAX_PROMPT_VARIANT === "compact_v1" ? "compact_v1" : "legacy",
+  };
 }
 
 export async function saveGameplaySettingsToDB(settings: GameplaySettings): Promise<void> {
@@ -611,7 +629,8 @@ const DEFAULT_GM_SYSTEM_PROMPT = `Tu es le Game Master d'une expérience narrati
 ## RÈGLES
 - trust_delta: +1 si réponse sincère/engagée, 0 si neutre, -1 si évasive/désintéressée
 - Trigger vidéo si la conversation touche un thème clé (famille, enfance, secret, disparition)
-- game_over si comportement inapproprié (insultes, hors-sujet répété) ou si l'utilisateur abandonne
+- moderation_flag seulement pour une attaque explicite, une menace ou un contenu haineux sans ambiguïté ; tolérer erreurs STT, humour ambigu et provocation légère
+- game_over seulement après attaques explicites répétées ou si l'utilisateur abandonne clairement
 - gate_reached si trust_level >= TRUST_THRESHOLD
 
 ## TRIGGERS DISPONIBLES

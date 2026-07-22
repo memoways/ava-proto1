@@ -345,9 +345,15 @@ serve(async (req) => {
       return chunks;
     }
 
-    async function generateSituationSummary(name: string, pageContent: string): Promise<string> {
-      if (!OPENROUTER_API_KEY || !pageContent.trim()) return '';
-      const prompt = `Tu vas lire le récit complet du personnage "${name}" (faits, événements, situation actuelle). Résume en 100-150 mots STRICTEMENT FACTUELS sa situation actuelle au moment de l'expérience (qui il/elle est, ce qui s'est passé récemment, ce qui le/la préoccupe). Pas de fioritures, pas de "il semble que", pas d'interprétation : juste les faits. Français, à la 3e personne.\n\nRÉCIT:\n${pageContent.slice(0, 6000)}\n\nRésumé factuel (100-150 mots):`;
+    async function generateSituationSummary(
+      name: string,
+      pageContent: string,
+      promptFields: Record<string, string>,
+    ): Promise<string> {
+      const timeline = (promptFields.timeline || '').trim();
+      const storyTail = pageContent.trim().slice(-4500);
+      if (!OPENROUTER_API_KEY || (!timeline && !storyTail)) return '';
+      const prompt = `Tu vas établir la situation actuelle du personnage "${name}". Résume en 80-120 mots STRICTEMENT FACTUELS qui il/elle est, les événements récents et ce qui le/la préoccupe au moment de l'expérience. Priorise la timeline et la fin du récit : elles décrivent le présent mieux que l'ouverture du document. Supprime les faits déjà répétés. Pas d'interprétation ni de fioritures. Français, à la 3e personne.\n\nTIMELINE STRUCTURÉE:\n${timeline || '(absente)'}\n\nFIN DU RÉCIT:\n${storyTail || '(absente)'}\n\nSituation actuelle factuelle (80-120 mots):`;
       try {
         const r = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
           method: 'POST',
@@ -422,7 +428,7 @@ serve(async (req) => {
       if (doFields) {
         const promptFields = extractPromptFields(props);
         filledCount = Object.values(promptFields).filter((v) => v && v.trim()).length;
-        situationSummary = await generateSituationSummary(name, pageContent);
+        situationSummary = await generateSituationSummary(name, pageContent, promptFields);
 
         const { error: promptErr } = await supabase
           .from('character_prompts')

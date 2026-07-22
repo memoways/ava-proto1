@@ -28,7 +28,7 @@ export interface LLMCallDiagnosticTrace {
 export interface MaxPromptAssemblyTrace {
   baseSystemPrompt: string;
   baseSource: {
-    kind: "database" | "fallback";
+    kind: "database" | "fallback" | "compiled";
     characterId: string | null;
     canonicalName: string;
     updatedAt: string | null;
@@ -45,6 +45,28 @@ export interface MaxPromptAssemblyTrace {
     title: string;
     content: string;
   }>;
+  /** Added in compact_v1; optional so archived traces remain readable. */
+  budget?: {
+    variant: "legacy" | "compact_v1";
+    limitChars: number;
+    staticLimitChars: number;
+    staticChars: number;
+    totalSystemChars: number;
+    historyChars: number;
+    currentUserChars: number;
+    totalMessageChars: number;
+    systemToConversationRatio: number | null;
+    withinBudget: boolean;
+    sections: Array<{
+      key: string;
+      title: string;
+      chars: number;
+      originalChars: number;
+      included: boolean;
+      truncated: boolean;
+      omissionReason?: string;
+    }>;
+  };
   finalSystemPrompt: string;
 }
 

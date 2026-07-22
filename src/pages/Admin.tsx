@@ -494,7 +494,7 @@ export default function Admin() {
               </div>
               <p className="text-xs text-muted-foreground mt-2">
                 <strong>Sync RAG</strong> (par défaut) ne touche QUE les embeddings du corps des pages Notion — les champs éditoriaux des personnages restent intacts.
-                <br/><strong>Sync complète</strong> re-synchronise aussi les 7 champs éditoriaux + le résumé de situation (équivalent à un « Resync » par personnage pour tous d'un coup).
+                <br/><strong>Sync complète</strong> re-synchronise aussi les 8 champs éditoriaux + le résumé de situation (équivalent à un « Resync » par personnage pour tous d'un coup).
                 <br/><strong>Wipe & rebuild</strong> supprime tous les embeddings puis reconstruit depuis zéro — à utiliser après un changement de provider d'embeddings.
               </p>
 
@@ -512,7 +512,7 @@ export default function Admin() {
                         <div className="grid grid-cols-2 gap-x-4 text-xs text-muted-foreground">
                           <p>📄 Page : {c.page_chars} chars</p>
                           <p>🧩 RAG : {c.chunks_created} chunks</p>
-                          <p>✏️ Champs : {c.prompt_fields_filled}/7 remplis</p>
+                          <p>✏️ Champs : {c.prompt_fields_filled}/8 remplis</p>
                           <p>📝 Résumé : {c.summary_chars} chars</p>
                         </div>
                       </div>

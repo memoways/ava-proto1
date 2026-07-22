@@ -222,11 +222,50 @@ export async function queryRAGDetailed(
 // au milieu de phrases (ex: "…habites à Lausanne" perdu).
 const MAX_RAG_CONTEXT_CHARS = 1200;
 const MAX_KNOWLEDGE_ITEM_CHARS = 900;
+const MAX_MAX_RAG_ITEMS = 3;
+const MAX_MAX_RAG_ITEM_CHARS = 700;
+const MAX_MAX_RAG_CONTEXT_CHARS = 2_100;
+const RAG_OVERLAP_WINDOW_CHARS = 120;
 
 function compactText(text: string, maxChars: number): string {
   const clean = text.replace(/\s+/g, " ").trim();
   if (clean.length <= maxChars) return clean;
   return `${clean.slice(0, maxChars - 1).trim()}…`;
+}
+
+function compactAtSentenceBoundary(text: string, maxChars: number): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (maxChars <= 0) return "";
+  if (clean.length <= maxChars) return clean;
+  if (maxChars === 1) return "…";
+  const candidate = clean.slice(0, maxChars - 1).trimEnd();
+  const matches = [...candidate.matchAll(/[.!?…](?=\s|$)/g)];
+  const sentenceEnd = matches.at(-1)?.index;
+  if (sentenceEnd !== undefined && sentenceEnd + 1 >= Math.floor(maxChars * 0.45)) {
+    return candidate.slice(0, sentenceEnd + 1).trim();
+  }
+  const wordEnd = candidate.lastIndexOf(" ");
+  return `${candidate.slice(0, Math.max(0, wordEnd)).trim()}…`;
+}
+
+function cleanMaxMemoryContent(content: string): string {
+  return content
+    .replace(/\bPartie\s+\d+\s*\/\s*\d+\b\s*[:—-]?/gi, "")
+    .replace(/^\s*\[[^\]]+\]\s*/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sharesConsecutiveWindow(a: string, b: string, windowChars = RAG_OVERLAP_WINDOW_CHARS): boolean {
+  const left = a.toLocaleLowerCase("fr");
+  const right = b.toLocaleLowerCase("fr");
+  if (left.length < windowChars || right.length < windowChars) return false;
+  const shorter = left.length <= right.length ? left : right;
+  const longer = left.length <= right.length ? right : left;
+  for (let index = 0; index <= shorter.length - windowChars; index += 1) {
+    if (longer.includes(shorter.slice(index, index + windowChars))) return true;
+  }
+  return false;
 }
 
 /**
@@ -238,6 +277,31 @@ export function formatRAGContext(matches: RAGMatch[]): string {
     .slice(0, 5)
     .map((m, i) => `[${i + 1}] (${m.source_table}, score: ${m.similarity.toFixed(2)})\n${compactText(m.content, MAX_RAG_CONTEXT_CHARS)}`)
     .join("\n\n");
+}
+
+/**
+ * PRD4 live formatter: metadata stays in the trace, while Max receives only
+ * deduplicated narrative memories within the declared prompt budget.
+ */
+export function formatMaxRAGContext(matches: RAGMatch[]): string {
+  const selected: string[] = [];
+  for (const match of matches) {
+    const clean = cleanMaxMemoryContent(match.content);
+    if (!clean || selected.some((existing) => sharesConsecutiveWindow(existing, clean))) continue;
+    selected.push(compactAtSentenceBoundary(clean, MAX_MAX_RAG_ITEM_CHARS));
+    if (selected.length >= MAX_MAX_RAG_ITEMS) break;
+  }
+
+  let output = "";
+  for (let index = 0; index < selected.length; index += 1) {
+    const prefix = output ? `\n\nSouvenir ${index + 1}\n` : `Souvenir ${index + 1}\n`;
+    const remaining = MAX_MAX_RAG_CONTEXT_CHARS - output.length - prefix.length;
+    if (remaining <= 0) break;
+    const content = compactAtSentenceBoundary(selected[index], remaining);
+    if (!content) break;
+    output += `${prefix}${content}`;
+  }
+  return output;
 }
 
 /** Convenience: query RAG and return formatted context string. */

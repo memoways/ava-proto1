@@ -14,6 +14,7 @@ import {
 import { clearSystemPromptCache } from "@/agents/maxAgent";
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
 import { supabase } from "@/integrations/supabase/client";
+import { getGameplaySettings } from "@/services/settingsService";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -35,6 +36,9 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [resyncing, setResyncing] = useState(false);
+  const [legacyPrompt, setLegacyPrompt] = useState("");
+  const [savedLegacyPrompt, setSavedLegacyPrompt] = useState("");
+  const [savingLegacy, setSavingLegacy] = useState(false);
 
   // Resolve character id from name if necessary
   useEffect(() => {
@@ -60,9 +64,15 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
 
   async function loadActive(id: string) {
     setLoading(true);
-    const p = await loadCharacterPrompt(id);
+    const [p, legacyResult] = await Promise.all([
+      loadCharacterPrompt(id),
+      supabase.from("characters").select("system_prompt").eq("id", id).maybeSingle(),
+    ]);
     setPrompt(p);
     setDraft(p || {});
+    const legacy = legacyResult.data?.system_prompt || "";
+    setLegacyPrompt(legacy);
+    setSavedLegacyPrompt(legacy);
     setLoading(false);
   }
 
@@ -115,7 +125,7 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       const item = data.per_character?.[0];
-      toast.success(`Champs éditoriaux resyncés : ${item?.prompt_fields_filled || 0}/7 champs, résumé ${item?.summary_chars || 0} chars (RAG inchangé)`);
+      toast.success(`Champs éditoriaux resyncés : ${item?.prompt_fields_filled || 0}/8 champs, résumé ${item?.summary_chars || 0} chars (RAG inchangé)`);
       clearSystemPromptCache();
       await loadActive(resolvedId);
     } catch (err: any) {
@@ -124,8 +134,25 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
     setResyncing(false);
   }
 
+  async function handleSaveLegacy() {
+    if (!resolvedId) return;
+    setSavingLegacy(true);
+    const { error } = await supabase
+      .from("characters")
+      .update({ system_prompt: legacyPrompt })
+      .eq("id", resolvedId);
+    if (error) toast.error(`Sauvegarde legacy échouée : ${error.message}`);
+    else {
+      setSavedLegacyPrompt(legacyPrompt);
+      clearSystemPromptCache();
+      toast.success("Prompt legacy sauvegardé pour le rollback");
+    }
+    setSavingLegacy(false);
+  }
+
 
   const preview = prompt ? buildCharacterPromptSections({ ...prompt, ...(draft as any) }) : "";
+  const promptVariant = getGameplaySettings().MAX_PROMPT_VARIANT;
 
   if (!resolvedId) {
     return <p className="text-sm text-muted-foreground">Personnage introuvable. Lance une sync Notion.</p>;
@@ -154,6 +181,11 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
               Les champs ci-dessous sont synchronisés depuis Notion et injectés dans le system prompt à chaque tour.
               Les modifs locales seront écrasées au prochain sync.
             </p>
+            {promptVariant === "compact_v1" && (
+              <p className="text-xs text-emerald-400 mt-1">
+                Compact v1 actif : ces champs structurés sont l’unique source éditoriale du live.
+              </p>
+            )}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleResync} disabled={resyncing}>
@@ -191,14 +223,14 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
         </div>
         <p className="text-xs text-muted-foreground">
           Généré automatiquement à partir du corps de la page Notion lors du sync.
-          Le Game Master reçoit ce texte à chaque tour pour orchestrer l'expérience.
+          Max reçoit ce texte dans son noyau factuel à chaque tour.
         </p>
         <ScrollArea className="h-32 border rounded p-3 bg-background/50">
           <pre className="text-xs whitespace-pre-wrap">{prompt.situation_summary || "(vide — relance un sync)"}</pre>
         </ScrollArea>
       </div>
 
-      {/* 7 champs éditoriaux */}
+      {/* 8 champs éditoriaux + situation actuelle = 9 champs structurés */}
       <div className="space-y-5 border rounded-lg p-4">
         {CHARACTER_PROMPT_FIELDS.map((f) => (
           <div key={f.key} className="space-y-2">
@@ -220,6 +252,35 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
         <ScrollArea className="h-72 mt-3 border rounded p-3 bg-background/50">
           <pre className="text-xs whitespace-pre-wrap">{preview || "(aucune section non vide)"}</pre>
         </ScrollArea>
+      </details>
+
+      <details className="border border-amber-700/40 rounded-lg p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-amber-300">
+          Prompt legacy <span className="font-normal text-muted-foreground">— characters.system_prompt</span>
+        </summary>
+        <div className="mt-3 space-y-3">
+          <p className="text-xs text-muted-foreground">
+            {promptVariant === "compact_v1"
+              ? "Non lu par le live en compact_v1. Conservé et modifiable uniquement pour un rollback temporaire."
+              : "Variante legacy active : ce texte est à nouveau concaténé au prompt live."}
+          </p>
+          <Textarea
+            value={legacyPrompt}
+            onChange={(event) => setLegacyPrompt(event.target.value)}
+            className="min-h-[220px] font-mono text-xs"
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">{legacyPrompt.length} caractères</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSaveLegacy}
+              disabled={savingLegacy || legacyPrompt === savedLegacyPrompt}
+            >
+              {savingLegacy ? "Sauvegarde…" : "Sauvegarder le rollback legacy"}
+            </Button>
+          </div>
+        </div>
       </details>
     </div>
   );

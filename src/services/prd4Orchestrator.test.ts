@@ -6,6 +6,7 @@ vi.mock("@/agents/gameMasterLabelPRD4", () => ({ labelUserTurnPRD4: vi.fn() }));
 vi.mock("@/services/ragService", () => ({
   queryRAGDetailed: vi.fn(),
   formatRAGContext: vi.fn(() => ""),
+  formatMaxRAGContext: vi.fn(() => ""),
   buildKnowledgeContextFromRAG: vi.fn(() => ({
     allowedFacts: [],
     activeMemories: [],
@@ -135,6 +136,8 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       conversationHistory: history.slice(-10),
       sessionSummary: "- L'utilisateur cherche Ava.",
     });
+    expect(vi.mocked(queryRAGDetailed).mock.calls[0][0]).toBe("question-36");
+    expect(vi.mocked(queryRAGDetailed).mock.calls[0][1]).toBe("question-35 response-35");
     expect(vi.mocked(summarizeSessionAsync).mock.calls[0][1]).toHaveLength(8);
     expect(vi.mocked(summarizeSessionAsync).mock.calls[0][1][0].content).toBe("question-33");
     expect(vi.mocked(summarizeSessionAsync).mock.calls[0][1].at(-1)?.content).toBe("Je vous écoute.");
