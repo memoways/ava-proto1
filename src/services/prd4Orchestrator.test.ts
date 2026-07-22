@@ -96,6 +96,8 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
         provider: "voyage",
         rerankRequested: true,
         retrieveK: 15,
+        rerankModel: "rerank-2.5",
+        rerankTruncation: true,
       },
     });
     vi.mocked(fetchSessionSummary).mockResolvedValue({
@@ -298,6 +300,8 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
         provider: "voyage",
         rerankRequested: true,
         retrieveK: 15,
+        rerankModel: "rerank-2.5",
+        rerankTruncation: true,
       },
     });
     vi.mocked(simulateMaxResponse).mockResolvedValue({
