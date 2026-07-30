@@ -254,18 +254,28 @@ async function startTavus(
 ): Promise<Response> {
   const apiKey = Deno.env.get("TAVUS_API_KEY");
   if (!apiKey) return jsonError("Tavus is not configured", 503);
-  const replicaId = safeId(config.replicaId);
-  const personaId = safeId(config.personaId);
-  if (!personaId) return jsonError("A Tavus Echo personaId is required", 400);
+  // Tavus renamed `replica` -> `face` and `persona` -> `pal` in the v2 API.
+  const faceId = safeId(config.replicaId);
+  const palId = safeId(config.personaId);
+  if (!palId) return jsonError("A Tavus Echo PAL id (persona id) is required", 400);
   const maxCallDuration = safeInteger(config.maxDurationSeconds, 60, 3_600, 900);
 
-  const personaResponse = await fetch(
-    `https://tavusapi.com/v2/personas/${encodeURIComponent(personaId)}`,
+  // Current API path first, legacy personas path as a fallback for older accounts.
+  let palResponse = await fetch(
+    `https://tavusapi.com/v2/pals/${encodeURIComponent(palId)}`,
     { headers: { "x-api-key": apiKey } },
   );
-  const persona = await readUpstream(personaResponse, "Tavus persona validation failed");
-  if (safeString(persona.pipeline_mode).toLowerCase() !== "echo") {
-    return jsonError("The Tavus persona must use pipeline_mode=echo", 400);
+  let legacyPersona = false;
+  if (palResponse.status === 404) {
+    palResponse = await fetch(
+      `https://tavusapi.com/v2/personas/${encodeURIComponent(palId)}`,
+      { headers: { "x-api-key": apiKey } },
+    );
+    legacyPersona = palResponse.ok;
+  }
+  const pal = await readUpstream(palResponse, "Tavus PAL validation failed");
+  if (safeString(pal.pipeline_mode).toLowerCase() !== "echo") {
+    return jsonError("The Tavus PAL (persona) must use pipeline_mode=echo", 400);
   }
 
   const requestBody: Record<string, unknown> = {
@@ -280,14 +290,20 @@ async function startTavus(
       participant_left_timeout: 30,
     },
   };
-  if (replicaId) requestBody.replica_id = replicaId;
-  requestBody.persona_id = personaId;
+  if (legacyPersona) {
+    requestBody.persona_id = palId;
+    if (faceId) requestBody.replica_id = faceId;
+  } else {
+    requestBody.pal_id = palId;
+    if (faceId) requestBody.face_id = faceId;
+  }
 
   const upstream = await fetch("https://tavusapi.com/v2/conversations", {
     method: "POST",
     headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
     body: JSON.stringify(requestBody),
   });
+
   const payload = await readUpstream(upstream, "Tavus conversation creation failed");
   const externalSessionId = safeString(payload.conversation_id);
   const conversationUrl = safeHttpsUrl(payload.conversation_url);
