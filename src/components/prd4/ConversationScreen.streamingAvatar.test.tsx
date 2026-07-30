@@ -35,6 +35,7 @@ describe("ConversationScreen streaming avatar", () => {
     expect(video).toBeInstanceOf(HTMLVideoElement);
     expect(video).toHaveAttribute("autoplay");
     expect(video).toHaveAttribute("playsinline");
+    fireEvent.loadedData(video);
     expect(video).toHaveClass("object-cover", "opacity-100");
     expect(attachAvatarMedia).toHaveBeenCalledWith(video);
     expect(screen.getByText("Le texte exact envoyé au fournisseur.")).toBeInTheDocument();
