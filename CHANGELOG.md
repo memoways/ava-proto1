@@ -4,6 +4,27 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.50.0] - 2026-07-30 — Streaming Avatar piloté par le texte Ava
+
+### Ajouté
+- Nouveau mode global **Avatar vidéo** dans **Admin → Technique**, avec l’onglet **Streaming Avatar Config** après **TTS Config** et les configurations non secrètes HeyGen/Tavus.
+- Abstraction `ResponseOutput` et registre extensible : le parcours public choisit entre le TTS local, HeyGen LiveAvatar et Tavus sans modifier le pipeline STT/RAG/LLM.
+- Chargement différé des SDK HeyGen et Daily/Tavus : le mode TTS par défaut n’embarque pas leur coût dans le chemin initial.
+- HeyGen reçoit exclusivement le texte final via `avatar.speak_text` (wrapper SDK `repeat`) ; Tavus exige une persona `pipeline_mode=echo` et reçoit exclusivement `conversation.echo` en modalité texte. Les commandes conversationnelles fournisseur sont absentes.
+- Flux vidéo distant plein écran, photo de Max pendant la connexion, HUD/PTT/sous-titres conservés au-dessus et session avatar maintenue silencieuse pendant les interludes.
+- Edge Function Lovable Cloud `streaming-avatar-session` : identité anonyme et propriété de session obligatoires, quotas, jetons média éphémères, association vérifiée entre session Ava et session fournisseur, réponses `no-store`, fermeture idempotente et secrets uniquement côté serveur.
+- Persistance du mode, du fournisseur, de l’identifiant externe, des latences connexion/première image/première parole et de la raison de repli.
+
+### Fiabilité
+- Préparation du fournisseur en parallèle de la sonnerie ; TTS conservé par défaut.
+- Repli TTS sur indisponibilité ou échec avant la première parole. Une réponse partiellement prononcée n’est jamais répétée et les tours suivants passent en TTS.
+- Découpage éventuel uniquement aux frontières de phrases, avec conservation caractère pour caractère du texte Ava.
+- Nettoyage sur raccrochage, timeout, fin GM, redémarrage, démontage, fermeture de page et erreur fournisseur.
+
+### Tests et exploitation
+- Tests unitaires des commandes textuelles directes, de la sélection d’output, du découpage exact et du rendu vidéo ; 188 tests unitaires et build de production validés.
+- **Activation Lovable Cloud requise** : migration `20260730160000_streaming_avatar_output.sql`, Edge Function `streaming-avatar-session`, puis secrets `LIVEAVATAR_API_KEY` et/ou `TAVUS_API_KEY`. Voir `docs/streaming-avatar-lovable-setup.md`.
+
 ## [0.49.0] - 2026-07-30 — Variante de prompt `rich_v2` pour Max
 
 ### Ajouté

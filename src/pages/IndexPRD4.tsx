@@ -12,7 +12,13 @@ import type { AudioState, ConversationMessage, FilmAnswer } from "@/types";
 import { identifyUser, trackEvent } from "@/services/posthogService";
 import { summarizeRole } from "@/services/roleProfileService";
 import { processPRD4Turn } from "@/services/prd4Orchestrator";
-import { createPRD4Session, endPRD4Session, updatePRD4Conversation, updatePRD4Onboarding } from "@/services/prd4Session";
+import {
+  createPRD4Session,
+  endPRD4Session,
+  updatePRD4Conversation,
+  updatePRD4Onboarding,
+  updatePRD4StreamingAvatar,
+} from "@/services/prd4Session";
 import {
   createConfiguredSTT,
   getSTTProvider,
@@ -20,16 +26,7 @@ import {
   prefetchGamilabSDK,
   type STTSession,
 } from "@/services/stt";
-import { TTSQueue, chunkTextForTTS } from "@/services/elevenLabsTTS";
-import { getActiveProviderId } from "@/services/tts/providerSettings";
-
-// Gradium generates each chunk independently and (REST) blocks until the whole
-// chunk is ready, so finer chunks let the first sentence start much sooner while
-// the rest generates (concurrency 2). Other providers keep the default grouping.
-function ttsChunkOptions() {
-  return getActiveProviderId() === "gradium" ? { maxSingleChars: 160, targetChars: 160 } : undefined;
-}
-import { prefetchOpeningTTS, playOpeningTTS, OPENING_LINE } from "@/services/openingTTSCache";
+import { OPENING_LINE } from "@/services/openingTTSCache";
 import { unlockAudioPlayback } from "@/services/audioPlayback";
 import {
   getGameplaySettings,
@@ -58,6 +55,20 @@ import {
   getConfiguredTTSServiceInfo,
   latencyServiceLabel,
 } from "@/services/latencyServiceMetadata";
+import {
+  AvatarRenderError,
+  createResponseOutput,
+  getOutputSettings,
+  getStreamingAvatarSettings,
+  loadOutputSettingsFromDB,
+  loadStreamingAvatarSettingsFromDB,
+  LocalTTSOutput,
+  type OutputSettings,
+  type ResponseOutput,
+  type ResponseOutputResult,
+  type StreamingAvatarConnectionState,
+  type StreamingAvatarSettings,
+} from "@/services/streamingAvatar";
 
 import WelcomeScreen from "@/components/prd4/WelcomeScreen";
 import FilmQuestionScreen from "@/components/prd4/FilmQuestionScreen";
@@ -129,7 +140,18 @@ const IndexPRD4 = () => {
 
   // Refs pour pipeline conversation
   const sttRef = useRef<STTSession | null>(null);
-  const ttsQueueRef = useRef<TTSQueue | null>(null);
+  const responseOutputRef = useRef<ResponseOutput | null>(null);
+  const outputSettingsRef = useRef<OutputSettings>(getOutputSettings());
+  const avatarSettingsRef = useRef<StreamingAvatarSettings>(getStreamingAvatarSettings());
+  const outputSettingsLoadRef = useRef<Promise<[OutputSettings, StreamingAvatarSettings]> | null>(null);
+  const callPreparationRef = useRef<Promise<void> | null>(null);
+  const expectedAvatarTextRef = useRef(new Map<string, string>());
+  const avatarConnectStartedAtRef = useRef<number | null>(null);
+  const avatarFirstFrameAtRef = useRef<number | null>(null);
+  const avatarFirstSpeechAtRef = useRef<number | null>(null);
+  const [streamingAvatarActive, setStreamingAvatarActive] = useState(false);
+  const [streamingAvatarState, setStreamingAvatarState] =
+    useState<StreamingAvatarConnectionState>("inactive");
   const sttLatencySegmentRef = useRef<string | null>(null);
   const pttFinalizingRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
@@ -186,6 +208,15 @@ const IndexPRD4 = () => {
 
   useEffect(() => {
     void loadSTTSettingsFromDB();
+    const outputPromise = Promise.all([
+      loadOutputSettingsFromDB(),
+      loadStreamingAvatarSettingsFromDB(),
+    ]);
+    outputSettingsLoadRef.current = outputPromise;
+    void outputPromise.then(([output, avatar]) => {
+      outputSettingsRef.current = output;
+      avatarSettingsRef.current = avatar;
+    });
     const settingsPromise = loadGameplaySettingsFromDB();
     gameplaySettingsLoadRef.current = settingsPromise;
     void settingsPromise.then((settings) => {
@@ -218,8 +249,12 @@ const IndexPRD4 = () => {
     pttFinalizingRef.current = false;
     try { sttRef.current?.stop(); } catch { /* ignore */ }
     sttRef.current = null;
-    try { ttsQueueRef.current?.cancel(); } catch { /* ignore */ }
-    ttsQueueRef.current = null;
+    try { responseOutputRef.current?.interrupt(); } catch { /* ignore */ }
+    const output = responseOutputRef.current;
+    responseOutputRef.current = null;
+    if (output) void output.dispose();
+    setStreamingAvatarActive(false);
+    setStreamingAvatarState("inactive");
   }, []);
 
   const finalizeAndEnd = useCallback(
@@ -291,10 +326,6 @@ const IndexPRD4 = () => {
     onboardingStartedAtRef.current = Date.now();
     firstMaxResponseAtRef.current = null;
     trackEvent("prd4_onboarding_started", {});
-    // Pré-génère l'audio de la phrase d'ouverture de Max (cache) pour qu'elle
-    // joue instantanément lors de l'entrée en conversation. Le clic utilisateur
-    // sert aussi de gesture pour débloquer l'autoplay audio.
-    void prefetchOpeningTTS().catch((e) => console.warn("[TTS] prefetch opening failed:", e));
     return true;
   }, [privacyPreferences, setFilmAnswer, setPhase, unlockCinematicPlayback]);
   const handleFilmAnswer = useCallback(
@@ -350,13 +381,257 @@ const IndexPRD4 = () => {
   const handleRoleRestart = useCallback(() => { setRoleProfile(null); setPhase("role_capture"); }, [setRoleProfile, setPhase]);
 
   // ---- Character select / Calling -------------------------------------------
-  const handleSelectMax = useCallback(() => setPhase("calling_max"), [setPhase]);
+  const activateTTSFallback = useCallback(async (reason: string) => {
+    const previous = responseOutputRef.current;
+    if (previous?.mode === "tts") return previous;
+    responseOutputRef.current = null;
+    await previous?.dispose().catch(() => {});
+    const fallback = new LocalTTSOutput();
+    if (sessionIdRef.current) await fallback.prepare({ sessionId: sessionIdRef.current });
+    responseOutputRef.current = fallback;
+    setStreamingAvatarState("failed");
+    const sid = sessionIdRef.current;
+    if (sid) {
+      void updatePRD4StreamingAvatar(sid, {
+        streaming_avatar_fallback_reason: reason.slice(0, 500),
+      });
+    }
+    trackEvent("prd4_streaming_avatar_fallback", {
+      session_id: sid,
+      provider: avatarSettingsRef.current.activeProvider,
+      reason: reason.slice(0, 200),
+    });
+    return fallback;
+  }, []);
+
+  const renderResponseText = useCallback(async (
+    text: string,
+    context: {
+      turnId?: string;
+      turnIndex?: number;
+      signal?: AbortSignal;
+      onPlaybackStart?: () => void;
+    } = {},
+  ): Promise<ResponseOutputResult> => {
+    let output = responseOutputRef.current;
+    if (!output) {
+      output = new LocalTTSOutput();
+      if (sessionIdRef.current) await output.prepare({ sessionId: sessionIdRef.current });
+      responseOutputRef.current = output;
+    }
+    if (output.mode === "streaming_avatar" && context.turnId) {
+      expectedAvatarTextRef.current.set(context.turnId, text);
+    }
+    try {
+      if (output.mode === "tts") setAudioState("max_speaking");
+      return await output.renderText(text, {
+        sessionId: sessionIdRef.current ?? undefined,
+        turnId: context.turnId,
+        turnIndex: context.turnIndex,
+        signal: context.signal,
+        onPlaybackStart: context.onPlaybackStart,
+      });
+    } catch (error) {
+      if (context.signal?.aborted) {
+        return {
+          status: "cancelled",
+          provider: output.provider,
+          firstPlaybackStartMs: 0,
+          playbackTotalMs: 0,
+          generatedSegments: 0,
+          playedSegments: 0,
+          failedSegments: 0,
+          started: false,
+        };
+      }
+      if (output.mode === "tts") {
+        const ttsError = error instanceof Error ? error : new Error(String(error));
+        toast({
+          title: "Voix temporairement indisponible",
+          description: "La réponse de Max reste affichée. Tu peux continuer la conversation.",
+          variant: "destructive",
+        });
+        return {
+          status: "failed",
+          provider: output.provider,
+          firstPlaybackStartMs: 0,
+          playbackTotalMs: 0,
+          generatedSegments: 1,
+          playedSegments: 0,
+          failedSegments: 1,
+          started: false,
+          error: ttsError,
+        };
+      }
+      const started = error instanceof AvatarRenderError && error.started;
+      const message = error instanceof Error ? error.message : String(error);
+      const fallback = await activateTTSFallback(message);
+      if (!started) {
+        setAudioState("max_speaking");
+        return fallback.renderText(text, {
+          sessionId: sessionIdRef.current ?? undefined,
+          turnId: context.turnId,
+          turnIndex: context.turnIndex,
+          signal: context.signal,
+          onPlaybackStart: context.onPlaybackStart,
+        });
+      }
+      return {
+        status: "failed",
+        provider: output.provider,
+        firstPlaybackStartMs: 0,
+        playbackTotalMs: 0,
+        generatedSegments: 1,
+        playedSegments: 0,
+        failedSegments: 1,
+        started: true,
+        error: error instanceof Error ? error : new Error(message),
+      };
+    } finally {
+      if (context.turnId) expectedAvatarTextRef.current.delete(context.turnId);
+    }
+  }, [activateTTSFallback, setAudioState]);
+
+  const prepareCall = useCallback(async () => {
+    avatarConnectStartedAtRef.current = null;
+    avatarFirstFrameAtRef.current = null;
+    avatarFirstSpeechAtRef.current = null;
+    const [outputSettings, avatarSettings] = await (
+      outputSettingsLoadRef.current ??
+      Promise.all([loadOutputSettingsFromDB(), loadStreamingAvatarSettingsFromDB()])
+    );
+    outputSettingsRef.current = outputSettings;
+    avatarSettingsRef.current = avatarSettings;
+
+    let diagnosticTraceEnabled = false;
+    if (diagnosticTraceRequestedRef.current) {
+      diagnosticTraceEnabled = await isCurrentUserAdmin().catch(() => false);
+      if (!diagnosticTraceEnabled) console.warn("[PRD4] diagnostic request ignored: admin role required");
+    }
+    diagnosticTraceEnabledRef.current = diagnosticTraceEnabled;
+
+    const sid = await createPRD4Session(
+      state.userRoleProfile,
+      "max",
+      {
+        diagnostic_trace_enabled: diagnosticTraceEnabled,
+        output_mode: outputSettings.mode,
+        streaming_avatar_provider:
+          outputSettings.mode === "streaming_avatar" ? avatarSettings.activeProvider : null,
+      },
+    );
+    sessionIdRef.current = sid;
+    identifyUser(sid, { experience: "prd4", character: "max" });
+    trackEvent("prd4_session_started", {
+      session_id: sid,
+      diagnostic_trace_enabled: diagnosticTraceEnabled,
+      output_mode: outputSettings.mode,
+      streaming_avatar_provider:
+        outputSettings.mode === "streaming_avatar" ? avatarSettings.activeProvider : null,
+    });
+    const startedAt = onboardingStartedAtRef.current;
+    const posture = userPostureRef.current;
+    void updatePRD4Onboarding(sid, {
+      has_seen_film: state.hasSeenFilm ?? null,
+      teaser_shown: state.teaserSeen,
+      user_posture_raw: posture?.raw ?? null,
+      user_posture_mode: posture?.mode ?? null,
+      onboarding_started_at: startedAt ? new Date(startedAt).toISOString() : null,
+    });
+
+    const output = await createResponseOutput({
+      mode: outputSettings.mode,
+      avatarSettings,
+      callbacks: {
+        onConnectionStateChange: setStreamingAvatarState,
+        onStreamReady: () => {
+          avatarFirstFrameAtRef.current = performance.now();
+          setStreamingAvatarState("ready");
+          const connectStart = avatarConnectStartedAtRef.current;
+          const firstFrameMs = connectStart
+            ? Math.round(avatarFirstFrameAtRef.current - connectStart)
+            : null;
+          void updatePRD4StreamingAvatar(sid, {
+            streaming_avatar_first_frame_ms: firstFrameMs,
+          });
+        },
+        onDisconnected: (reason) => {
+          setStreamingAvatarState("disconnected");
+          void activateTTSFallback(reason || "provider_disconnected");
+        },
+        onSpeakStart: () => {
+          setStreamingAvatarState("speaking");
+          setAudioState("max_speaking");
+          if (avatarFirstSpeechAtRef.current === null) {
+            avatarFirstSpeechAtRef.current = performance.now();
+            const connectStart = avatarConnectStartedAtRef.current;
+            void updatePRD4StreamingAvatar(sid, {
+              streaming_avatar_first_speech_ms: connectStart
+                ? Math.round(avatarFirstSpeechAtRef.current - connectStart)
+                : null,
+            });
+          }
+        },
+        onSpeakEnd: () => setStreamingAvatarState("ready"),
+        onTranscript: (text, turnId) => {
+          const expected = turnId ? expectedAvatarTextRef.current.get(turnId) : undefined;
+          if (expected !== undefined && text !== expected) {
+            trackEvent("prd4_streaming_avatar_transcript_mismatch", {
+              session_id: sid,
+              turn_id: turnId,
+              provider: avatarSettings.activeProvider,
+              expected_length: expected.length,
+              actual_length: text.length,
+            });
+          }
+        },
+      },
+    });
+    responseOutputRef.current = output;
+    setStreamingAvatarActive(output.mode === "streaming_avatar");
+    if (output.mode === "streaming_avatar") avatarConnectStartedAtRef.current = performance.now();
+    try {
+      await output.prepare({ sessionId: sid });
+      // A timeout/disconnect may have installed the TTS fallback while the
+      // provider was still finishing its connection in the background.
+      if (responseOutputRef.current !== output) {
+        await output.dispose().catch(() => {});
+        return;
+      }
+      if (output.mode === "streaming_avatar") {
+        const connectMs = avatarConnectStartedAtRef.current
+          ? Math.round(performance.now() - avatarConnectStartedAtRef.current)
+          : null;
+        void updatePRD4StreamingAvatar(sid, {
+          streaming_avatar_session_id: output.externalSessionId,
+          streaming_avatar_connect_ms: connectMs,
+        });
+      }
+    } catch (error) {
+      if (diagnosticTraceEnabled) diagnosticTraceEnabledRef.current = false;
+      await activateTTSFallback(error instanceof Error ? error.message : String(error));
+    }
+  }, [
+    activateTTSFallback,
+    setAudioState,
+    state.hasSeenFilm,
+    state.teaserSeen,
+    state.userRoleProfile,
+  ]);
+
+  const handleSelectMax = useCallback(() => {
+    setPhase("calling_max");
+    callPreparationRef.current = prepareCall().catch((error) => {
+      console.error("[PRD4] call preparation failed", error);
+      throw error;
+    });
+  }, [prepareCall, setPhase]);
   const handleLockedClick = useCallback(
     (id: "emma" | "ava" | "leo") => trackEvent("prd4_character_locked_clicked", { character: id }),
     [],
   );
 
-  // ---- Calling → conversation : créer session + ouvrir TTS ------------------
+  // ---- Calling → conversation ------------------------------------------------
   const handleAnswered = useCallback(async () => {
     // La lecture démarre au montage et ne peut retarder l'ouverture de l'appel
     // de plus de 800 ms. En cas de réseau lent, le dernier réglage admin mis en
@@ -370,6 +645,32 @@ const IndexPRD4 = () => {
     configuredSessionDurationRef.current = configuredDuration;
     setSessionDurationSeconds(configuredDuration);
 
+    // The provider was started when entering `calling_max`. At the end of the
+    // ringing window, give it only the configured grace period before falling
+    // back to local TTS for this whole session.
+    try {
+      const preparation = callPreparationRef.current ?? prepareCall();
+      callPreparationRef.current = preparation;
+      await withTimeout(
+        "streaming_avatar_after_rings",
+        preparation,
+        avatarSettingsRef.current.fallbackTimeoutMs,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn("[PRD4] call preparation unavailable:", error);
+      if (!sessionIdRef.current) {
+        toast({
+          title: "Appel temporairement indisponible",
+          description: "La session n’a pas pu être ouverte. Réessaie dans un instant.",
+          variant: "destructive",
+        });
+        setPhase("calling_max");
+        return;
+      }
+      await activateTTSFallback(message);
+    }
+
     setPhase("conversation_max");
     endedRef.current = false;
     conversationRef.current = [];
@@ -380,58 +681,12 @@ const IndexPRD4 = () => {
     pendingPostVideoContextRef.current = null;
     pendingGmGuidanceRef.current = null;
     gmTopicsCoveredRef.current = [];
-    diagnosticTraceEnabledRef.current = false;
     setActiveVideo(null);
 
     // Recharge les règles de déclenchement vidéo (admin)
     loadVideoTriggerSettingsFromDB()
       .then((s) => { videoTriggerSettingsRef.current = s; })
       .catch(() => { videoTriggerSettingsRef.current = videoTriggerDefaults; });
-
-
-    let diagnosticTraceEnabled = false;
-    if (diagnosticTraceRequestedRef.current) {
-      diagnosticTraceEnabled = await isCurrentUserAdmin().catch(() => false);
-      if (!diagnosticTraceEnabled) {
-        console.warn("[PRD4] diagnostic request ignored: admin role required");
-      }
-    }
-    diagnosticTraceEnabledRef.current = diagnosticTraceEnabled;
-
-    // Crée la session DB (toujours, en mode hard-codé) — persiste posture utilisateur
-    try {
-      const sid = await createPRD4Session(
-        state.userRoleProfile,
-        "max",
-        diagnosticTraceEnabled ? { diagnostic_trace_enabled: true } : undefined,
-      );
-      sessionIdRef.current = sid;
-      identifyUser(sid, { experience: "prd4", character: "max" });
-      trackEvent("prd4_session_started", { session_id: sid, diagnostic_trace_enabled: diagnosticTraceEnabled });
-      const startedAt = onboardingStartedAtRef.current;
-      const posture = userPostureRef.current;
-      void updatePRD4Onboarding(sid, {
-        has_seen_film: state.hasSeenFilm ?? null,
-        teaser_shown: state.teaserSeen,
-        user_posture_raw: posture?.raw ?? null,
-        user_posture_mode: posture?.mode ?? null,
-        onboarding_started_at: startedAt ? new Date(startedAt).toISOString() : null,
-      });
-    } catch (err) {
-      if (diagnosticTraceEnabled) {
-        diagnosticTraceEnabledRef.current = false;
-        console.error("[PRD4] diagnostic session creation failed:", err);
-        toast({
-          title: "Session diagnostique indisponible",
-          description: "La réponse ne sera pas jouée sans stockage fiable de la trace. Vérifie la migration puis réessaie.",
-          variant: "destructive",
-        });
-        setPhase("calling_max");
-        return;
-      }
-      console.warn("[PRD4] createSession failed (continuing without DB persistence):", err);
-    }
-
     // Le réglage admin est relu au démarrage pour éviter un cache public obsolète.
     timer.reset(configuredDuration);
     timer.start();
@@ -443,25 +698,19 @@ const IndexPRD4 = () => {
     const openingMsg: ConversationMessage = { role: "max", content: opening, timestamp: Date.now() };
     conversationRef.current = [openingMsg];
     addMessage(openingMsg);
-    setAudioState("max_speaking");
+    setAudioState(
+      responseOutputRef.current?.mode === "streaming_avatar"
+        ? "max_thinking"
+        : "max_speaking",
+    );
 
-    // TTS de l'ouverture — utilise le cache pré-chargé pour démarrer en même
-    // temps que l'affichage du sous-titre. Fallback à TTSQueue si la génération
-    // a échoué (réessaie en streaming).
     try {
-      await playOpeningTTS();
+      await renderResponseText(opening, {
+        turnId: `${sessionIdRef.current ?? "local"}:opening`,
+        turnIndex: 0,
+      });
     } catch (err) {
-      console.warn("[TTS] cached opening failed, falling back to streaming:", err);
-      try {
-        const queue = new TTSQueue({ onError: (e) => console.warn("[TTS] opening error:", e.message) });
-        ttsQueueRef.current = queue;
-        for (const chunk of chunkTextForTTS(opening, ttsChunkOptions())) {
-          queue.enqueue(chunk, { session_id: sessionIdRef.current ?? undefined });
-        }
-        await queue.drain();
-      } catch (err2) {
-        console.warn("[TTS] opening fallback failed:", err2);
-      }
+      console.warn("[PRD4] opening output failed:", err);
     }
 
     // Marque le first_max_response et calcule la durée onboarding
@@ -482,7 +731,15 @@ const IndexPRD4 = () => {
     }
 
     setAudioState("idle");
-  }, [addMessage, setAudioState, setPhase, state.hasSeenFilm, state.teaserSeen, state.userRoleProfile, timer]);
+  }, [
+    activateTTSFallback,
+    addMessage,
+    prepareCall,
+    renderResponseText,
+    setAudioState,
+    setPhase,
+    timer,
+  ]);
 
 
   // ---- Conversation : process turn ------------------------------------------
@@ -508,7 +765,7 @@ const IndexPRD4 = () => {
         if (!isCurrentTurn()) return;
         console.warn("[PRD4] turn watchdog fired — releasing processing lock");
         turnController.abort("turn-recovery-deadline");
-        try { ttsQueueRef.current?.cancel(); } catch { /* ignore */ }
+        try { responseOutputRef.current?.interrupt(); } catch { /* ignore */ }
         isProcessingRef.current = false;
         setAudioState("idle");
         toast({ title: "Le tour a pris trop de temps", description: "Tu peux reparler.", variant: "destructive" });
@@ -607,46 +864,49 @@ const IndexPRD4 = () => {
         conversationRef.current = [...conversationRef.current, maxMsg];
         addMessage(maxMsg);
         setMaxSubtitle(result.maxResponse);
-        setAudioState("max_speaking");
+        setAudioState(
+          responseOutputRef.current?.mode === "streaming_avatar"
+            ? "max_thinking"
+            : "max_speaking",
+        );
 
-        // TTS streaming
-        let ttsLatencySegmentDone = false;
-        const queue = new TTSQueue({
-          onError: (e) => {
-            console.warn("[TTS] turn error:", e.message);
-            toast({
-              title: "Voix temporairement indisponible",
-              description: "La réponse de Max reste affichée. Tu peux continuer la conversation.",
-              variant: "destructive",
-            });
-          },
-          onFirstPlaybackStart: () => {
-            // La voix a réellement démarré : sa fin est désormais pilotée par
-            // l'événement média `ended` et par le détecteur de lecture bloquée.
-            if (processingWatchdogRef.current) {
-              window.clearTimeout(processingWatchdogRef.current);
-              processingWatchdogRef.current = null;
-            }
-            if (ttsLatencySegmentDone) return;
-            ttsLatencySegmentDone = true;
-            endLatencySegment(ttsLatencySegmentId);
-          },
-        });
-        ttsQueueRef.current = queue;
-        const cancelTurnTTS = () => queue.cancel();
-        turnController.signal.addEventListener("abort", cancelTurnTTS, { once: true });
-        const ttsLatencySegmentId = latencyOverlayEnabled
-          ? startLatencySegment({ segment: "TTS", service: latencyServiceLabel(ttsService) })
+        // Ava owns the exact final text; the selected output only renders it.
+        // Avatar providers are never allowed to generate or transform a reply.
+        const outputAtStart = responseOutputRef.current;
+        const outputLatencySegmentId = latencyOverlayEnabled
+          ? startLatencySegment({
+              segment: "TTS",
+              service: outputAtStart?.mode === "streaming_avatar"
+                ? `Avatar · ${outputAtStart.provider}`
+                : latencyServiceLabel(ttsService),
+            })
           : null;
-        for (const chunk of chunkTextForTTS(result.maxResponse, ttsChunkOptions())) {
-          queue.enqueue(chunk, { session_id: sessionIdRef.current ?? undefined, turn_id: turnId, turn_index: turnIndex });
-        }
-        const ttsResult = await queue.drain().finally(() => {
-          turnController.signal.removeEventListener("abort", cancelTurnTTS);
-          if (!ttsLatencySegmentDone) endLatencySegment(ttsLatencySegmentId);
+        let outputLatencySegmentDone = false;
+        const onPlaybackStart = () => {
+          if (processingWatchdogRef.current) {
+            window.clearTimeout(processingWatchdogRef.current);
+            processingWatchdogRef.current = null;
+          }
+          if (outputLatencySegmentDone) return;
+          outputLatencySegmentDone = true;
+          endLatencySegment(outputLatencySegmentId);
+        };
+        const outputResult = await renderResponseText(result.maxResponse, {
+          turnId,
+          turnIndex,
+          signal: turnController.signal,
+          onPlaybackStart,
+        }).finally(() => {
+          if (!outputLatencySegmentDone) endLatencySegment(outputLatencySegmentId);
         });
+        if (processingWatchdogRef.current) {
+          window.clearTimeout(processingWatchdogRef.current);
+          processingWatchdogRef.current = null;
+        }
         if (!isCurrentTurn()) return;
-        const tts_ms = ttsResult.firstPlaybackStartMs || ttsResult.generationWallMs || Math.round(performance.now() - ttsStart);
+        const tts_ms =
+          outputResult.firstPlaybackStartMs ||
+          Math.round(performance.now() - ttsStart);
         if (maxMsg.pipeline) {
           maxMsg.pipeline.tts_ms = tts_ms;
           maxMsg.pipeline.tts_first_playback_ms = tts_ms;
@@ -688,7 +948,7 @@ const IndexPRD4 = () => {
             t_rag_total_ms: result.timings.rag_ms,
             t_max_llm_ms: result.timings.max_ms,
             t_tts_total_ms: tts_ms,
-            t_audio_playback_total_ms: ttsResult.playbackTotalMs,
+            t_audio_playback_total_ms: outputResult.playbackTotalMs,
             t_turn_response_ready_ms: result.timings.total_ms,
             t_turn_voice_ready_ms: (result.timings.total_ms ?? 0) + tts_ms,
           },
@@ -698,19 +958,21 @@ const IndexPRD4 = () => {
           },
           rag: { matches_count: result.ragMatches },
           tts: {
-            provider: ttsService.serviceProvider,
-            model: ttsService.model,
-            segments_count: ttsResult.generatedSegments,
-            segments_played: ttsResult.playedSegments,
-            segments_failed: ttsResult.failedSegments,
+            provider: outputResult.provider,
+            model: outputResult.model,
+            segments_count: outputResult.generatedSegments,
+            segments_played: outputResult.playedSegments,
+            segments_failed: outputResult.failedSegments,
           },
           stt: {
             provider: sttTelemetry?.provider,
             model: sttTelemetry?.model,
             mode: "realtime",
           },
-          had_error: ttsResult.status === "failed",
-          error_type: ttsResult.status === "failed" ? "tts" : null,
+          had_error: outputResult.status === "failed",
+          error_type: outputResult.status === "failed"
+            ? (outputAtStart?.mode === "streaming_avatar" ? "streaming_avatar" : "tts")
+            : null,
         }));
 
         // Persist conversation (best effort, fire-and-forget)
@@ -940,6 +1202,7 @@ const IndexPRD4 = () => {
       addCompletedLatencySegment,
       addMessage,
       removeLastMessage,
+      renderResponseText,
       endLatencySegment,
       finalizeAndEnd,
       latencyOverlayEnabled,
@@ -1093,6 +1356,15 @@ const IndexPRD4 = () => {
 
   // Cleanup au démontage
   useEffect(() => () => { cleanupAudio(); }, [cleanupAudio]);
+  useEffect(() => {
+    const closeProvider = () => {
+      const output = responseOutputRef.current;
+      responseOutputRef.current = null;
+      if (output) void output.dispose();
+    };
+    window.addEventListener("pagehide", closeProvider);
+    return () => window.removeEventListener("pagehide", closeProvider);
+  }, []);
 
   // ---- End / Questionnaire --------------------------------------------------
   const handleEndContinue = useCallback(() => setPhase("questionnaire"), [setPhase]);
@@ -1163,6 +1435,7 @@ const IndexPRD4 = () => {
   );
 
   const handleRestart = useCallback(() => {
+    cleanupAudio();
     reset();
     setUserSubtitle("");
     setMaxSubtitle("");
@@ -1176,8 +1449,10 @@ const IndexPRD4 = () => {
     activeTurnControllerRef.current = null;
     activeTurnSequenceRef.current += 1;
     setActiveVideo(null);
+    callPreparationRef.current = null;
+    expectedAvatarTextRef.current.clear();
     endedRef.current = false;
-  }, [reset]);
+  }, [cleanupAudio, reset]);
 
   const finishActiveVideo = useCallback((skipped: boolean) => {
     if (!activeVideo) return;
@@ -1189,6 +1464,15 @@ const IndexPRD4 = () => {
     });
     setActiveVideo(null);
   }, [activeVideo]);
+
+  // Narrative interludes keep the provider session connected but silent.
+  useEffect(() => {
+    if (activeVideo?.video_url) responseOutputRef.current?.interrupt();
+  }, [activeVideo]);
+
+  const attachAvatarMedia = useCallback((element: HTMLMediaElement | null) => {
+    if (element) responseOutputRef.current?.attachMedia(element);
+  }, []);
 
 
   // ---- Render ---------------------------------------------------------------
@@ -1250,6 +1534,9 @@ const IndexPRD4 = () => {
               onPTTPress={handlePTTPress}
               onPTTRelease={handlePTTRelease}
               onHangUp={handleHangUp}
+              streamingAvatarActive={streamingAvatarActive}
+              streamingAvatarState={streamingAvatarState}
+              attachAvatarMedia={attachAvatarMedia}
             />
           ) : null}
           <LatencyOverlay enabled={latencyOverlayEnabled} segments={latencySegments} currentTurn={latencyCurrentTurn} />

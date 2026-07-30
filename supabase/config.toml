@@ -51,3 +51,6 @@ verify_jwt = false
 
 [functions.rag-question-corpus]
 verify_jwt = false
+
+[functions.streaming-avatar-session]
+verify_jwt = false

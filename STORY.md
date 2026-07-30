@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-21 (synthèse sémantique complète des questions RAG)
+> **Last Updated**: 2026-07-30 (streaming avatar HeyGen/Tavus piloté par Ava)
 
 ---
 
@@ -64,12 +64,30 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 | Gamilab | Provider STT/ASR live stratégique, préparé via Browser SDK |
 | ElevenLabs | TTS voix custom de Max (paramètres ajustables) |
 | Gradium | Provider STT streaming WebSocket + TTS REST alternatif (intégré via proxies Edge Functions) |
+| HeyGen LiveAvatar | Rendu vidéo temps réel du texte final d’Ava via `avatar.speak_text` |
+| Tavus | Rendu vidéo temps réel via persona Echo et `conversation.echo` |
 | OpenAI | Embeddings text-embedding-3-small (1536 dim) |
 | Notion | Source de vérité éditoriale (contenus, personnages, règles) |
 
 ---
 
 ## Feature Chronicle
+
+### 2026-07-30 — Ava peut incarner Max en vidéo sans céder la conversation au fournisseur 🔷
+
+**Intent.** Tester des avatars vidéo temps réel sans transformer HeyGen ou Tavus en second agent conversationnel. Ava doit rester l’unique propriétaire du micro, du STT, du RAG, des règles, du LLM et du texte final. Le fournisseur reçoit seulement la réplique terminée et la rend en voix, lip-sync et vidéo.
+
+**Architecture de sortie.** Le parcours public ne parle plus directement à la file TTS : une interface `ResponseOutput` choisit entre `LocalTTSOutput`, `HeyGenStreamingAvatarOutput` et `TavusStreamingAvatarOutput`. Le registre est extensible et les SDK vidéo sont chargés uniquement lorsque le fournisseur correspondant est sélectionné. La phrase d’ouverture et les réponses ordinaires empruntent exactement le même `renderText`, sans chemin conversationnel caché.
+
+**Contrat textuel strict.** HeyGen est commandé par le wrapper SDK `repeat(text)`, qui émet `avatar.speak_text`; `avatar.speak_response` n’est jamais utilisé. Tavus exige une persona `pipeline_mode=echo`, contrôlée côté Edge Function avant création, puis reçoit `conversation.echo` avec `modality: "text"` et `done: true`; `conversation.respond` est absent. En Echo Mode, Perception, STT et LLM Tavus ainsi que son entrée micro sont désactivés. Si une limite impose plusieurs commandes, le texte est découpé uniquement aux frontières de phrases et la concaténation reste identique caractère pour caractère.
+
+**Expérience publique.** La session Ava et le fournisseur se préparent en parallèle des sonneries. Le flux distant remplace progressivement la photo de Max en plein écran, tandis que HUD, chrono, PTT et sous-titres restent au-dessus. HeyGen démarre explicitement sans voice chat ; Daily/Tavus rejoint caméra et micro locaux coupés. Une vidéo narrative interrompt la parole, masque le flux sans fermer la session, puis la conversation reprend avec le même fournisseur.
+
+**Événements et repli.** L’état `max_speaking` dépend des vrais événements de début et de fin, corrélés au tour en cours. Un échec avant la première parole rejoue la réponse en TTS local ; après le début de parole, aucun fragment n’est répété et les tours suivants basculent en TTS. Le fournisseur est fermé sur raccrochage, timeout, fin GM, redémarrage, démontage, fermeture de page ou erreur.
+
+**Administration et sécurité Lovable.** Dans Technique, un switch global **Voix TTS / Avatar vidéo** précède le sous-menu et **Streaming Avatar Config** suit immédiatement **TTS Config**. Les IDs et délais non secrets vivent dans `admin_settings`; `LIVEAVATAR_API_KEY` et `TAVUS_API_KEY` restent dans Lovable Cloud. L’Edge Function unifiée impose toujours identité anonyme, propriété de la session Ava, quota de création, jetons média éphémères, réponses `no-store` et association vérifiable entre session Ava et session fournisseur. Les sessions enregistrent mode, provider, identifiant externe, latences connexion/première image/première parole et raison de repli.
+
+**Validation et activation restante.** 188 tests unitaires et le build Vite sont verts ; le lint ciblé de tous les fichiers touchés est vert. Le TTS reste le défaut. Il faut encore appliquer la migration, publier `streaming-avatar-session`, ajouter les secrets puis exécuter le canary réel HeyGen/Tavus sur Chrome, Safari et mobile depuis Lovable Cloud. Runbook : `docs/streaming-avatar-lovable-setup.md`.
 
 ### 2026-07-21 — Les vraies questions des joueurs deviennent une taxonomie RAG fiable 🔷
 

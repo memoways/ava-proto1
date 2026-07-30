@@ -80,6 +80,28 @@ export async function updatePRD4Conversation(
   if (error) console.warn("[PRD4 session] update conversation failed:", error.message);
 }
 
+export interface PRD4StreamingAvatarPayload {
+  output_mode?: "tts" | "streaming_avatar";
+  streaming_avatar_provider?: "heygen" | "tavus" | null;
+  streaming_avatar_session_id?: string | null;
+  streaming_avatar_connect_ms?: number | null;
+  streaming_avatar_first_frame_ms?: number | null;
+  streaming_avatar_first_speech_ms?: number | null;
+  streaming_avatar_fallback_reason?: string | null;
+}
+
+export async function updatePRD4StreamingAvatar(
+  sessionId: string,
+  payload: PRD4StreamingAvatarPayload,
+): Promise<void> {
+  const { error } = await supabase
+    .from("sessions")
+    .update(payload)
+    .eq("id", sessionId);
+  trackPersistence("update_streaming_avatar", !error, sessionId);
+  if (error) console.warn("[PRD4 session] streaming avatar update failed:", error.message);
+}
+
 export async function endPRD4Session(
   sessionId: string,
   reason: string,

@@ -33,10 +33,11 @@ export async function enforceGameRequest(
   bucket: string,
   corsHeaders: Record<string, string>,
   sessionId: string | null = null,
+  alwaysEnforce = false,
 ): Promise<Response | null> {
   // Lovable must enable this only after the migration and Anonymous Sign-Ins
   // are active. The default keeps the existing internal preview compatible.
-  if (Deno.env.get("GAME_SECURITY_ENFORCED") !== "true") return null;
+  if (!alwaysEnforce && Deno.env.get("GAME_SECURITY_ENFORCED") !== "true") return null;
 
   const authorization = req.headers.get("Authorization") ?? "";
   if (!authorization.startsWith("Bearer ")) {

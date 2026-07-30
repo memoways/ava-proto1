@@ -26,6 +26,14 @@ import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
 import LLMUsageTab from "@/components/admin/LLMUsageTab";
 import VoiceUsageTab from "@/components/admin/VoiceUsageTab";
 import VideosListTab from "@/components/admin/VideosListTab";
+import StreamingAvatarConfigTab from "@/components/StreamingAvatarConfigTab";
+import { Switch } from "@/components/ui/switch";
+import {
+  getOutputSettings,
+  loadOutputSettingsFromDB,
+  saveOutputSettingsToDB,
+  type OutputMode,
+} from "@/services/streamingAvatar";
 
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -78,6 +86,7 @@ const TAB_GROUPS = [
       { id: "stt", label: "STT Config" },
       { id: "llm", label: "LLM Config" },
       { id: "voice", label: "TTS Config" },
+      { id: "streaming-avatar", label: "Streaming Avatar Config" },
       { id: "usage", label: "Consommation LLM" },
       { id: "voice-usage", label: "Consommation Voix" },
     ],
@@ -111,6 +120,7 @@ export default function Admin() {
   const [activeGroup, setActiveGroup] = useState("data");
   const [activeTab, setActiveTab] = useState("sessions");
   const [searchParams, setSearchParams] = useSearchParams();
+  const [outputMode, setOutputMode] = useState<OutputMode>(() => getOutputSettings().mode);
 
   // Lire ?tab=... au montage et lors d'un changement d'URL (ex: lien depuis le tooltip GM fallback)
   useEffect(() => {
@@ -137,6 +147,7 @@ export default function Admin() {
 
   useEffect(() => {
     hydrateAllSettings(); // Load all settings from DB into localStorage
+    void loadOutputSettingsFromDB().then((settings) => setOutputMode(settings.mode));
     loadSessions();
     loadEmbeddings();
     loadCharacters();
@@ -282,6 +293,18 @@ export default function Admin() {
 
   const currentGroup = TAB_GROUPS.find(g => g.id === activeGroup);
 
+  const changeOutputMode = async (mode: OutputMode) => {
+    const previous = outputMode;
+    setOutputMode(mode);
+    try {
+      await saveOutputSettingsToDB({ mode });
+      toast.success(mode === "tts" ? "Output Voix TTS activé" : "Output Avatar vidéo activé");
+    } catch (error) {
+      setOutputMode(previous);
+      toast.error(error instanceof Error ? error.message : "Impossible de sauvegarder l'output");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -312,6 +335,25 @@ export default function Admin() {
 
         {/* ===== TABS WITHIN GROUP ===== */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {activeGroup === "tech" && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/20 px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold">Output de Max</p>
+                <p className="text-xs text-muted-foreground">
+                  Ce choix est figé au démarrage de chaque nouvelle session publique.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={outputMode === "tts" ? "text-sm font-medium" : "text-sm text-muted-foreground"}>Voix TTS</span>
+                <Switch
+                  checked={outputMode === "streaming_avatar"}
+                  onCheckedChange={(checked) => void changeOutputMode(checked ? "streaming_avatar" : "tts")}
+                  aria-label="Basculer entre voix TTS et avatar vidéo"
+                />
+                <span className={outputMode === "streaming_avatar" ? "text-sm font-medium" : "text-sm text-muted-foreground"}>Avatar vidéo</span>
+              </div>
+            </div>
+          )}
           {currentGroup && currentGroup.tabs.length > 1 && (
             <TabsList className="mb-4">
               {currentGroup.tabs.map((tab) => {
@@ -449,6 +491,10 @@ export default function Admin() {
           {/* ==================== TTS CONFIG ==================== */}
           <TabsContent value="voice">
             <TTSConfigTab />
+          </TabsContent>
+
+          <TabsContent value="streaming-avatar">
+            <StreamingAvatarConfigTab />
           </TabsContent>
 
           {/* ==================== STT CONFIG ==================== */}

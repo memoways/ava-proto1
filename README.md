@@ -14,6 +14,8 @@ Les développements réalisés depuis un autre environnement doivent rester comp
 
 La mise en public est bloquée par la [release gate](docs/public_release_gate.md). Un aperçu interne peut être utilisé pour le développement, mais aucun lien ne doit être diffusé à des testeurs externes avant validation des critères de sécurité, persistance et endurance.
 
+> **Mise à jour récente (2026-07-30) — Streaming Avatar piloté par Ava** : l’output public peut rendre le texte final inchangé de Max avec le TTS local, HeyGen LiveAvatar ou Tavus. Les fournisseurs avatar ne participent ni au STT, ni au RAG, ni au raisonnement. L’activation reste en canary, avec TTS par défaut. Procédure Lovable Cloud : [`docs/streaming-avatar-lovable-setup.md`](docs/streaming-avatar-lovable-setup.md).
+
 > **Mise à jour récente (2026-07-21) — traces causales de Max** : les administrateurs peuvent lancer une session PRD4 explicitement tracée et inspecter chaque tour (mémoire, RAG et scores, prompt assemblé, payload OpenRouter exact, modèle, réponse et latences). La trace causale est enregistrée avant l’affichage et le TTS ; en cas d’échec d’écriture, le tour n’est pas diffusé et peut être rejoué. Détails : [`docs/max-causal-tracing.md`](docs/max-causal-tracing.md).
 
 > **Mise à jour récente (2026-07-13) — télémétrie des tests internes** : le panneau voix/analytics est temporairement masqué et les événements techniques PostHog/Grain sont actifs par défaut. Le panneau final reste disponible avec `VITE_PRIVACY_NOTICE_ENABLED=true`. Autocapture, replay, profils persistants et texte libre restent exclus. Détails : [`docs/phase4_privacy_prepublic_runbook.md`](docs/phase4_privacy_prepublic_runbook.md).

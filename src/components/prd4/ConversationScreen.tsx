@@ -1,10 +1,11 @@
 /** PRD4 — Écran 8 : Conversation avec Max (toggle-to-talk, fond Max plein écran) */
 import { useCallback, useEffect, useMemo } from "react";
-import { Mic, Square, PhoneOff, Loader2 } from "lucide-react";
+import { Mic, Square, PhoneOff, Loader2, VideoOff } from "lucide-react";
 import maxLarge from "@/assets/characters/max-large.jpg";
 import maxAvatar from "@/assets/characters/max.jpg";
 import type { AudioState, ConversationMessage } from "@/types";
 import { cn } from "@/lib/utils";
+import type { StreamingAvatarConnectionState } from "@/services/streamingAvatar";
 
 interface Props {
   audioState: AudioState;
@@ -15,6 +16,9 @@ interface Props {
   onPTTPress: () => void;
   onPTTRelease: () => void;
   onHangUp: () => void;
+  streamingAvatarActive?: boolean;
+  streamingAvatarState?: StreamingAvatarConnectionState;
+  attachAvatarMedia?: (element: HTMLMediaElement | null) => void;
 }
 
 const ConversationScreen = ({
@@ -26,6 +30,9 @@ const ConversationScreen = ({
   onPTTPress,
   onPTTRelease,
   onHangUp,
+  streamingAvatarActive = false,
+  streamingAvatarState = "inactive",
+  attachAvatarMedia,
 }: Props) => {
   const disabled = audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "max_thinking" || audioState === "max_speaking";
   const recording = audioState === "user_speaking";
@@ -84,6 +91,21 @@ const ConversationScreen = ({
         style={{ backgroundImage: `url(${maxLarge})` }}
         aria-hidden
       />
+      {streamingAvatarActive && (
+        <video
+          ref={(element) => attachAvatarMedia?.(element)}
+          autoPlay
+          playsInline
+          poster={maxLarge}
+          className={cn(
+            "absolute inset-0 h-full w-full object-cover transition-opacity duration-500",
+            streamingAvatarState === "ready" || streamingAvatarState === "speaking"
+              ? "opacity-100"
+              : "opacity-0",
+          )}
+          aria-label="Flux vidéo en direct de Max"
+        />
+      )}
       {/* Dark gradients to keep face area clear and bottom legible */}
       <div
         className="pointer-events-none absolute inset-0"
@@ -103,6 +125,18 @@ const ConversationScreen = ({
             <p className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">en ligne</p>
           </div>
         </div>
+        {streamingAvatarActive && streamingAvatarState === "connecting" && (
+          <div className="flex items-center gap-2 rounded-full border border-border/40 bg-background/60 px-3 py-2 text-xs text-muted-foreground backdrop-blur-md">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Connexion vidéo…
+          </div>
+        )}
+        {streamingAvatarActive && (streamingAvatarState === "failed" || streamingAvatarState === "disconnected") && (
+          <div className="flex items-center gap-2 rounded-full border border-border/40 bg-background/60 px-3 py-2 text-xs text-muted-foreground backdrop-blur-md">
+            <VideoOff className="h-3.5 w-3.5" />
+            Mode voix
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <span
             aria-label="Temps restant"

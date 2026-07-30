@@ -559,10 +559,17 @@ export type Database = {
           narrative_end: boolean | null
           onboarding_duration_ms: number | null
           onboarding_started_at: string | null
+          output_mode: string
           personnage_appele: string | null
           player_role: Json | null
           questionnaire_responses: Json | null
           started_at: string | null
+          streaming_avatar_connect_ms: number | null
+          streaming_avatar_fallback_reason: string | null
+          streaming_avatar_first_frame_ms: number | null
+          streaming_avatar_first_speech_ms: number | null
+          streaming_avatar_provider: string | null
+          streaming_avatar_session_id: string | null
           teaser_shown: boolean | null
           triggers_activated: string[] | null
           trust_level: number | null
@@ -589,10 +596,17 @@ export type Database = {
           narrative_end?: boolean | null
           onboarding_duration_ms?: number | null
           onboarding_started_at?: string | null
+          output_mode?: string
           personnage_appele?: string | null
           player_role?: Json | null
           questionnaire_responses?: Json | null
           started_at?: string | null
+          streaming_avatar_connect_ms?: number | null
+          streaming_avatar_fallback_reason?: string | null
+          streaming_avatar_first_frame_ms?: number | null
+          streaming_avatar_first_speech_ms?: number | null
+          streaming_avatar_provider?: string | null
+          streaming_avatar_session_id?: string | null
           teaser_shown?: boolean | null
           triggers_activated?: string[] | null
           trust_level?: number | null
@@ -619,10 +633,17 @@ export type Database = {
           narrative_end?: boolean | null
           onboarding_duration_ms?: number | null
           onboarding_started_at?: string | null
+          output_mode?: string
           personnage_appele?: string | null
           player_role?: Json | null
           questionnaire_responses?: Json | null
           started_at?: string | null
+          streaming_avatar_connect_ms?: number | null
+          streaming_avatar_fallback_reason?: string | null
+          streaming_avatar_first_frame_ms?: number | null
+          streaming_avatar_first_speech_ms?: number | null
+          streaming_avatar_provider?: string | null
+          streaming_avatar_session_id?: string | null
           teaser_shown?: boolean | null
           triggers_activated?: string[] | null
           trust_level?: number | null
