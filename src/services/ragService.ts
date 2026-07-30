@@ -222,7 +222,7 @@ export async function queryRAGDetailed(
 // au milieu de phrases (ex: "…habites à Lausanne" perdu).
 const MAX_RAG_CONTEXT_CHARS = 1200;
 const MAX_KNOWLEDGE_ITEM_CHARS = 900;
-const MAX_MAX_RAG_ITEMS = 3;
+export const MAX_MAX_RAG_ITEMS = 3;
 const MAX_MAX_RAG_ITEM_CHARS = 700;
 const MAX_MAX_RAG_CONTEXT_CHARS = 2_100;
 const RAG_OVERLAP_WINDOW_CHARS = 120;

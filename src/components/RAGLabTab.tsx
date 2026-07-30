@@ -13,7 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import {
   buildKnowledgeContextFromRAG,
-  formatRAGContext,
+  formatMaxRAGContext,
+  MAX_MAX_RAG_ITEMS,
   queryRAGDetailed,
   rewriteRAGQuery,
   type RAGMatch,
@@ -147,7 +148,7 @@ export default function RAGLabTab() {
       .map((id) => result.matches.find((match) => match.id === id) || candidateById.get(id))
       .filter((match): match is RAGMatch => Boolean(match));
   }, [candidateById, result, selectedIds]);
-  const formattedContext = useMemo(() => formatRAGContext(selectedMatches), [selectedMatches]);
+  const formattedContext = useMemo(() => formatMaxRAGContext(selectedMatches), [selectedMatches]);
   const knowledgeContext = useMemo(() => buildKnowledgeContextFromRAG(selectedMatches), [selectedMatches]);
   const selectedFrequentQuestion = questionCorpus?.questions.find((item) => item.id === selectedFrequentQuestionId);
 
@@ -200,7 +201,7 @@ export default function RAGLabTab() {
         },
       );
       setResult(response);
-      setSelectedIds(response.matches.slice(0, 5).map((match) => match.id));
+      setSelectedIds(response.matches.slice(0, MAX_MAX_RAG_ITEMS).map((match) => match.id));
       if (response.error) toast.error(response.error);
       else if (response.rerankError) toast.warning("Recherche terminée, mais le reranking a échoué");
       else toast.success(`${response.matches.length} résultat(s) final(aux)`);
@@ -214,8 +215,8 @@ export default function RAGLabTab() {
   function toggleSelection(id: string, checked: boolean) {
     if (checked) {
       if (selectedIds.includes(id)) return;
-      if (selectedIds.length >= 5) {
-        toast.info("Le prompt Max injecte au maximum 5 chunks");
+      if (selectedIds.length >= MAX_MAX_RAG_ITEMS) {
+        toast.info(`Le prompt Max injecte au maximum ${MAX_MAX_RAG_ITEMS} souvenirs`);
         return;
       }
       setSelectedIds((current) => [...current, id]);
@@ -377,7 +378,7 @@ export default function RAGLabTab() {
             <div className="space-y-2">
               <Label>Résultats finaux (top_k)</Label>
               <Input type="number" min="1" max="20" value={matchCount} onChange={(event) => setMatchCount(Number(event.target.value))} />
-              <p className="text-xs text-muted-foreground">Live : {live.RAG_TOP_K} · Max en injecte au plus 5.</p>
+              <p className="text-xs text-muted-foreground">Live : {live.RAG_TOP_K} · Max en injecte au plus {MAX_MAX_RAG_ITEMS}.</p>
             </div>
           </div>
 
@@ -476,7 +477,7 @@ export default function RAGLabTab() {
             <CardHeader className="pb-4">
               <CardTitle className="text-base">4. Candidats et décision d’injection</CardTitle>
               <CardDescription>
-                Le rang vectoriel mesure la proximité sémantique. Le rang final vient du reranker. Cochez jusqu’à cinq chunks pour simuler précisément le contexte envoyé à Max.
+                Le rang vectoriel mesure la proximité sémantique. Le rang final vient du reranker. Cochez jusqu’à {MAX_MAX_RAG_ITEMS} souvenirs pour simuler précisément le contexte envoyé à Max.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
