@@ -144,7 +144,11 @@ describe("buildMaxSystemPrompt — variante rich_v2", () => {
     const budget = result.promptTrace!.budget!;
     expect(budget.staticChars).toBeLessThanOrEqual(RICH_V2_LIMITS.staticMaxChars);
     expect(result.systemPrompt.length).toBeLessThanOrEqual(RICH_V2_LIMITS.systemHardCapChars);
-    const traced = budget.sections.filter((s) => s.included).reduce((sum, s) => sum + s.chars, 0);
+    const staticEnd = budget.sections.findIndex((s) => s.key === "technical_rules");
+    const traced = budget.sections
+      .slice(0, staticEnd + 1)
+      .filter((s) => s.included)
+      .reduce((sum, s) => sum + s.chars, 0);
     expect(traced).toBe(budget.staticChars);
     expect(budget.timelineEvents?.join("\n")).toMatch(/Aujourd'hui à Lausanne/);
     expect(budget.timelineEvents?.join("\n")).toMatch(/Hier — jour 4/);
