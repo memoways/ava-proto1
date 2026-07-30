@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 
-const LEGACY_SYSTEM_PROMPT = "PROMPT_LEGACY_A_NE_JAMAIS_LIRE — ancienne voix de Max.";
-
 vi.mock("@/services/openRouterLLM", () => ({
   callLLM: vi.fn(),
   callLLMWithUsage: vi.fn(),
@@ -9,7 +7,12 @@ vi.mock("@/services/openRouterLLM", () => ({
   LLMProxyRequestError: class extends Error {},
 }));
 vi.mock("@/integrations/supabase/client", () => {
-  const row = { id: "max-id", name: "Max Lorenzo", system_prompt: LEGACY_SYSTEM_PROMPT, updated_at: null };
+  const row = {
+    id: "max-id",
+    name: "Max Lorenzo",
+    system_prompt: "PROMPT_LEGACY_A_NE_JAMAIS_LIRE — ancienne voix de Max.",
+    updated_at: null,
+  };
   return {
     supabase: {
       from: vi.fn(() => ({
