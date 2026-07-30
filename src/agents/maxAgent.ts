@@ -846,7 +846,7 @@ async function buildRichMaxSystemPrompt(
   const conversationChars = historyChars + input.userMessage.length;
 
   return {
-    baseSystemPrompt: compiled.sections.length ? renderedFields : FALLBACK_SYSTEM_PROMPT,
+    baseSystemPrompt: compiled.sections.length ? renderedFields : RICH_V2_FALLBACK_SYSTEM_PROMPT,
     baseSource: {
       kind: compiled.sections.length ? "compiled" : "fallback",
       characterId: characterFields?.character_id ?? null,
