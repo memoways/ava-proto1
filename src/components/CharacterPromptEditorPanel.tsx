@@ -181,9 +181,11 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
               Les champs ci-dessous sont synchronisés depuis Notion et injectés dans le system prompt à chaque tour.
               Les modifs locales seront écrasées au prochain sync.
             </p>
-            {promptVariant === "compact_v1" && (
+            {promptVariant !== "legacy" && (
               <p className="text-xs text-emerald-400 mt-1">
-                Compact v1 actif : ces champs structurés sont l’unique source éditoriale du live.
+                {promptVariant === "rich_v2"
+                  ? "Rich v2 actif : ces champs structurés sont l’unique source éditoriale du live ; characters.system_prompt est legacy et n’est pas lu."
+                  : "Compact v1 actif : ces champs structurés sont l’unique source éditoriale du live."}
               </p>
             )}
           </div>
