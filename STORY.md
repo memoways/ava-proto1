@@ -1571,6 +1571,17 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 
 **Reste :** valider en session live l'endurance après les nouvelles gardes admin ; envisager de router les embeddings/rerank Voyage via un proxy pour couper toute exposition frontale.
 
+### Session 2026-07-30 — Variante `rich_v2` du prompt de Max
+
+**Livré :**
+- Nouveau compilateur `src/agents/maxRichPromptCompiler.ts` : sous-parties (NOYAU / NUANCES / REPÈRES DE VOIX), timeline priorisée (aujourd'hui/hier → séjour 5 jours → pivots anciens), quatre niveaux de profondeur conservés avec ancrage basé sur le résumé de session.
+- `rich_v2` branché dans `maxAgent` (source unique `character_prompts`, jamais `characters.system_prompt`), budgets 18k absolu / 12k noyau / 2,7k RAG (3 × 900), contrat conversationnel dédié.
+- RAG rendu variant-aware (`maxRagVariant.ts`) : souvenirs longs sans métadonnées techniques uniquement pour `rich_v2`.
+- Observabilité étendue : sous-parties, motifs d'omission, timeline retenue et profondeur ancrée dans la trace ; prévisualisation du noyau `rich_v2` dans l'éditeur de personnage.
+- Couverture de tests dédiée (compilateur, agent, RAG) — 178 tests au vert, typecheck propre.
+
+**Reste :** faire tourner `rich_v2` en canary sur des sessions réelles et comparer qualité/latence face à `legacy` avant d'envisager un changement de défaut.
+
 ### Dernière session
 
 **Préconditions vérifiées au départ :**
