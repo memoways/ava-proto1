@@ -112,7 +112,7 @@ describe("RAGLabTab", () => {
     expect(screen.getByText("2 candidat(s)")).toBeInTheDocument();
     expect(screen.getByText("Max habite à Lausanne.")).toBeInTheDocument();
     expect(screen.getAllByText("Injecté")).toHaveLength(2);
-    expect(screen.getByText("Souvenir 1", { selector: "pre" })).toBeInTheDocument();
+    expect(screen.getByText(/Souvenir 1/, { selector: "pre" })).toBeInTheDocument();
     expect(screen.getAllByText(/Max habite à Lausanne\./, { selector: "pre" })).toHaveLength(2);
     expect(queryRAGDetailed).toHaveBeenCalledWith(
       "Où habite Max ?",
