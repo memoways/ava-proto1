@@ -151,7 +151,7 @@ export default function StreamingAvatarConfigTab() {
         </Button>
       </div>
 
-      <StreamingAvatarTestPanel settings={settings} />
+      <StreamingAvatarTestPanel settings={settings} dirty={dirty} />
     </div>
   );
 }
