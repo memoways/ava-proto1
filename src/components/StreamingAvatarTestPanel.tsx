@@ -3,7 +3,12 @@ import { AlertTriangle, CheckCircle2, Loader2, PlayCircle, Square, Video } from 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { createResponseOutput, type ResponseOutput, type StreamingAvatarSettings } from "@/services/streamingAvatar";
+import {
+  createResponseOutput,
+  loadStreamingAvatarSettingsFromDB,
+  type ResponseOutput,
+  type StreamingAvatarSettings,
+} from "@/services/streamingAvatar";
 import { createPRD4Session } from "@/services/prd4Session";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -30,8 +35,10 @@ interface TestSummary {
 
 export default function StreamingAvatarTestPanel({
   settings,
+  dirty = false,
 }: {
   settings: StreamingAvatarSettings;
+  dirty?: boolean;
 }) {
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState<TestLogEntry[]>([]);
@@ -39,6 +46,7 @@ export default function StreamingAvatarTestPanel({
   const videoRef = useRef<HTMLVideoElement>(null);
   const outputRef = useRef<ResponseOutput | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
 
   const push = useCallback((label: string, tone: TestLogEntry["tone"] = "info") => {
     setLogs((current) => [...current, { at: Date.now(), label, tone }]);
@@ -84,7 +92,12 @@ export default function StreamingAvatarTestPanel({
     let errorMessage: string | null = null;
     let externalSessionId: string | null = null;
 
+    let effective = settings;
     try {
+      push("Lecture de la configuration sauvegardée…");
+      effective = await loadStreamingAvatarSettingsFromDB();
+      push(`Fournisseur sauvegardé : ${effective.activeProvider}`, "ok");
+
       push("Création d'une session privée de test…");
       sessionId = await createPRD4Session(null, "max", {
         modalite_voix: "push_to_talk",
@@ -94,7 +107,7 @@ export default function StreamingAvatarTestPanel({
 
       const output = await createResponseOutput({
         mode: "streaming_avatar",
-        avatarSettings: settings,
+        avatarSettings: effective,
         callbacks: {
           onConnectionStateChange: (state) => push(`État connexion : ${state}`),
           onStreamReady: () => push("Flux vidéo prêt", "ok"),
@@ -105,7 +118,7 @@ export default function StreamingAvatarTestPanel({
       });
       outputRef.current = output;
 
-      push(`Connexion au fournisseur ${settings.activeProvider}…`);
+      push(`Connexion au fournisseur ${effective.activeProvider}…`);
       const connectStartedAt = performance.now();
       await output.prepare({ sessionId, signal: abort.signal });
       connectionMs = Math.round(performance.now() - connectStartedAt);
@@ -138,7 +151,7 @@ export default function StreamingAvatarTestPanel({
       await cleanup(sessionId);
       push("Session de test fermée");
       setSummary({
-        provider: settings.activeProvider,
+        provider: effective.activeProvider,
         finalMode,
         sessionId,
         externalSessionId,
@@ -167,7 +180,7 @@ export default function StreamingAvatarTestPanel({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex gap-2">
-          <Button onClick={run} disabled={running}>
+          <Button onClick={run} disabled={running || dirty}>
             {running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
             Tester l'avatar
           </Button>
@@ -176,6 +189,13 @@ export default function StreamingAvatarTestPanel({
             Interrompre
           </Button>
         </div>
+
+        {dirty && (
+          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-600">
+            Modifications non sauvegardées : le test utilise toujours la configuration enregistrée.
+            Sauvegarde d'abord pour tester le fournisseur choisi.
+          </p>
+        )}
 
         <video
           ref={videoRef}

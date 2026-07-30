@@ -1,5 +1,5 @@
 /** PRD4 — Écran 8 : Conversation avec Max (toggle-to-talk, fond Max plein écran) */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Mic, Square, PhoneOff, Loader2, VideoOff } from "lucide-react";
 import maxLarge from "@/assets/characters/max-large.jpg";
 import maxAvatar from "@/assets/characters/max.jpg";
@@ -83,40 +83,99 @@ const ConversationScreen = ({
     ? userSubtitle
     : lastUserText;
 
-  // Anti-flash : dès que le flux a rendu une image, on garde la vidéo affichée
-  // et on masque la photo, sauf perte réelle du flux (failed/disconnected).
+  // Anti-flash : on garde en permanence la dernière image du flux dans un canvas.
+  // Si le flux hoquette (waiting/stalled) ou se coupe, on fige cette image au lieu
+  // d'afficher un écran noir ou de rebasculer brutalement sur la photo.
   const [videoLive, setVideoLive] = useState(false);
+  const [hasFrozenFrame, setHasFrozenFrame] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
   const handleVideoLive = useCallback(() => setVideoLive(true), []);
+  const handleVideoStall = useCallback(() => setVideoLive(false), []);
+
   const streamLost =
     !streamingAvatarActive ||
     streamingAvatarState === "failed" ||
     streamingAvatarState === "disconnected" ||
     streamingAvatarState === "inactive";
+
   useEffect(() => {
     if (streamLost) setVideoLive(false);
   }, [streamLost]);
-  const videoVisible = streamingAvatarActive && videoLive && !streamLost;
 
+  useEffect(() => {
+    if (!streamingAvatarActive) {
+      setHasFrozenFrame(false);
+      return;
+    }
+    let raf = 0;
+    let last = 0;
+    const capture = (time: number) => {
+      raf = requestAnimationFrame(capture);
+      if (time - last < 150) return;
+      last = time;
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas || video.readyState < 2 || !video.videoWidth) return;
+      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      }
+      const context = canvas.getContext("2d");
+      if (!context) return;
+      try {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        setHasFrozenFrame(true);
+      } catch {
+        // Frame not drawable yet (tainted or not decoded) — on réessaie plus tard.
+      }
+    };
+    raf = requestAnimationFrame(capture);
+    return () => cancelAnimationFrame(raf);
+  }, [streamingAvatarActive]);
+
+  const videoVisible = streamingAvatarActive && videoLive && !streamLost;
+  const frozenVisible = streamingAvatarActive && hasFrozenFrame && !videoVisible;
+  const photoVisible = !videoVisible && !frozenVisible;
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
-      {/* Background photo (Max plein cadre) — masqué dès que la vidéo est visible */}
+      {/* Background photo (Max plein cadre) — masquée dès qu'une image vidéo existe */}
       <div
         className={cn(
-          "absolute inset-0 bg-cover bg-center transition-opacity duration-300",
-          videoVisible ? "opacity-0" : "opacity-100",
+          "absolute inset-0 bg-cover bg-center transition-opacity duration-500",
+          photoVisible ? "opacity-100" : "opacity-0",
         )}
         style={{ backgroundImage: `url(${maxLarge})` }}
         aria-hidden
       />
       {streamingAvatarActive && (
+        <canvas
+          ref={canvasRef}
+          className={cn(
+            "absolute inset-0 h-full w-full object-cover transition-opacity duration-300",
+            frozenVisible ? "opacity-100" : "opacity-0",
+          )}
+          aria-hidden
+        />
+      )}
+      {streamingAvatarActive && (
         <video
-          ref={(element) => attachAvatarMedia?.(element)}
+          ref={(element) => {
+            videoRef.current = element;
+            attachAvatarMedia?.(element);
+          }}
           autoPlay
           playsInline
           muted={false}
           onLoadedData={handleVideoLive}
           onPlaying={handleVideoLive}
+          onCanPlay={handleVideoLive}
+          onWaiting={handleVideoStall}
+          onStalled={handleVideoStall}
+          onSuspend={handleVideoStall}
+          onEmptied={handleVideoStall}
           className={cn(
             "absolute inset-0 h-full w-full object-cover transition-opacity duration-300",
             videoVisible ? "opacity-100" : "opacity-0",
@@ -124,6 +183,7 @@ const ConversationScreen = ({
           aria-label="Flux vidéo en direct de Max"
         />
       )}
+
 
       {/* Dark gradients to keep face area clear and bottom legible */}
       <div
