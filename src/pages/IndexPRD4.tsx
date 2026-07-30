@@ -646,16 +646,20 @@ const IndexPRD4 = () => {
     configuredSessionDurationRef.current = configuredDuration;
     setSessionDurationSeconds(configuredDuration);
 
-    // The provider was started when entering `calling_max`. At the end of the
-    // ringing window, give it only the configured grace period before falling
-    // back to local TTS for this whole session.
+    // The provider was started when entering `calling_max`. Do not let the
+    // shorter post-ringing grace period dispose a HeyGen session that is still
+    // legitimately connecting: the provider's connection deadline remains the
+    // authoritative minimum before falling back to local TTS.
     try {
       const preparation = callPreparationRef.current ?? prepareCall();
       callPreparationRef.current = preparation;
       await withTimeout(
         "streaming_avatar_after_rings",
         preparation,
-        avatarSettingsRef.current.fallbackTimeoutMs,
+        Math.max(
+          avatarSettingsRef.current.fallbackTimeoutMs,
+          avatarSettingsRef.current.connectionTimeoutMs,
+        ),
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
