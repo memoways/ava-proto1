@@ -608,7 +608,8 @@ const IndexPRD4 = () => {
         });
       }
     } catch (error) {
-      if (diagnosticTraceEnabled) diagnosticTraceEnabledRef.current = false;
+      // Le repli TTS ne doit pas désactiver la trace diagnostique : la session
+      // reste traçable, seul le rendu de sortie change.
       await activateTTSFallback(error instanceof Error ? error.message : String(error));
     }
   }, [
