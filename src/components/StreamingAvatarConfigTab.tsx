@@ -148,9 +148,12 @@ export default function StreamingAvatarConfigTab() {
           Sauvegarder
         </Button>
       </div>
+
+      <StreamingAvatarTestPanel settings={settings} />
     </div>
   );
 }
+
 
 function HeyGenFields({
   value,
