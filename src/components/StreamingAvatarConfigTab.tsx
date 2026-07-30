@@ -15,6 +15,8 @@ import {
   type StreamingAvatarProviderId,
   type StreamingAvatarSettings,
 } from "@/services/streamingAvatar";
+import StreamingAvatarTestPanel from "@/components/StreamingAvatarTestPanel";
+
 
 const providerCopy: Record<StreamingAvatarProviderId, { title: string; description: string }> = {
   heygen: {
@@ -148,9 +150,12 @@ export default function StreamingAvatarConfigTab() {
           Sauvegarder
         </Button>
       </div>
+
+      <StreamingAvatarTestPanel settings={settings} />
     </div>
   );
 }
+
 
 function HeyGenFields({
   value,
