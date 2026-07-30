@@ -25,6 +25,7 @@ import SessionsTab, { type SessionRow } from "@/components/admin/SessionsTab";
 import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
 import LLMUsageTab from "@/components/admin/LLMUsageTab";
 import VoiceUsageTab from "@/components/admin/VoiceUsageTab";
+import StreamingAvatarUsageTab from "@/components/admin/StreamingAvatarUsageTab";
 import VideosListTab from "@/components/admin/VideosListTab";
 import StreamingAvatarConfigTab from "@/components/StreamingAvatarConfigTab";
 import { Switch } from "@/components/ui/switch";
@@ -89,6 +90,7 @@ const TAB_GROUPS = [
       { id: "streaming-avatar", label: "Streaming Avatar Config" },
       { id: "usage", label: "Consommation LLM" },
       { id: "voice-usage", label: "Consommation Voix" },
+      { id: "avatar-usage", label: "Consommation Streaming Avatar" },
     ],
   },
 ];
@@ -510,6 +512,11 @@ export default function Admin() {
           {/* ==================== VOICE USAGE ==================== */}
           <TabsContent value="voice-usage">
             <VoiceUsageTab />
+          </TabsContent>
+
+          {/* ============ STREAMING AVATAR USAGE ============ */}
+          <TabsContent value="avatar-usage">
+            <StreamingAvatarUsageTab />
           </TabsContent>
 
           {/* ==================== NOTION SYNC ==================== */}
