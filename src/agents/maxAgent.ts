@@ -16,8 +16,11 @@ import {
 import {
   compileRichCharacterSections,
   renderRichSections,
+  richSectionCost,
   RICH_V2_CONVERSATION_CONTRACT,
+  RICH_V2_CORE_HEADER,
   RICH_V2_DYNAMIC_SECTION_CHARS,
+  RICH_V2_FALLBACK_SYSTEM_PROMPT,
   RICH_V2_LIMITS,
 } from "@/agents/maxRichPromptCompiler";
 
