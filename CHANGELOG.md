@@ -21,7 +21,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Les anciennes traces sans bloc `budget` restent lisibles.
 
 ### Tests
-- 17 nouveaux tests dédiés (compilateur `rich_v2`, agent, politique RAG par variante) ; 178 tests au vert et typecheck propre.
+- 17 nouveaux tests dédiés (compilateur `rich_v2`, agent, politique RAG par variante) ; 168 tests au vert et build de production validé.
 
 ## [0.48.2] - 2026-07-21 — Synthèse sémantique fiable et Laboratoire RAG fluide
 

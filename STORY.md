@@ -1578,7 +1578,7 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 - `rich_v2` branché dans `maxAgent` (source unique `character_prompts`, jamais `characters.system_prompt`), budgets 18k absolu / 12k noyau / 2,7k RAG (3 × 900), contrat conversationnel dédié.
 - RAG rendu variant-aware (`maxRagVariant.ts`) : souvenirs longs sans métadonnées techniques uniquement pour `rich_v2`.
 - Observabilité étendue : sous-parties, motifs d'omission, timeline retenue et profondeur ancrée dans la trace ; prévisualisation du noyau `rich_v2` dans l'éditeur de personnage.
-- Couverture de tests dédiée (compilateur, agent, RAG) — 178 tests au vert, typecheck propre.
+- Couverture de tests dédiée (compilateur, agent, RAG) — 168 tests au vert, build de production validé.
 
 **Reste :** faire tourner `rich_v2` en canary sur des sessions réelles et comparer qualité/latence face à `legacy` avant d'envisager un changement de défaut.
 
