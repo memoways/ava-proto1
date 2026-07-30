@@ -12,6 +12,11 @@ import {
   buildCharacterPromptSections,
 } from "@/services/characterPromptService";
 import { clearSystemPromptCache } from "@/agents/maxAgent";
+import {
+  compileRichCharacterSections,
+  renderRichSections,
+  RICH_V2_CONVERSATION_CONTRACT,
+} from "@/agents/maxRichPromptCompiler";
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
 import { supabase } from "@/integrations/supabase/client";
 import { getGameplaySettings } from "@/services/settingsService";
@@ -153,6 +158,7 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
 
   const preview = prompt ? buildCharacterPromptSections({ ...prompt, ...(draft as any) }) : "";
   const promptVariant = getGameplaySettings().MAX_PROMPT_VARIANT;
+  const richPreview = prompt ? compileRichCharacterSections({ ...prompt, ...(draft as any) }) : null;
 
   if (!resolvedId) {
     return <p className="text-sm text-muted-foreground">Personnage introuvable. Lance une sync Notion.</p>;
@@ -247,6 +253,43 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
           </div>
         ))}
       </div>
+
+      {/* Preview rich_v2 */}
+      <details className="border border-emerald-700/40 rounded-lg p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-emerald-300">
+          Prévisualiser le noyau statique <code>rich_v2</code>
+          {richPreview ? ` — ${richPreview.staticChars} caractères statiques` : ""}
+        </summary>
+        {richPreview && (
+          <div className="mt-3 space-y-2">
+            <ul className="text-xs text-muted-foreground space-y-1">
+              {richPreview.sections.map((section) => (
+                <li key={section.key}>
+                  <strong>{section.title}</strong> — source {section.originalChars} car., injecté {section.includedChars} car.,{" "}
+                  {section.subparts.filter((sub) => sub.included).length}/{section.subparts.length} sous-parties
+                  {section.subparts.filter((sub) => !sub.included).length
+                    ? ` · omis : ${section.subparts.filter((sub) => !sub.included).map((sub) => sub.label).join(" | ")}`
+                    : ""}
+                </li>
+              ))}
+            </ul>
+            {richPreview.depthSelection && (
+              <p className="text-xs text-emerald-300">
+                Profondeur ancrée : {richPreview.depthSelection.level} ({richPreview.depthSelection.reason}) · niveaux représentés :{" "}
+                {richPreview.depthSelection.levelsRepresented.join(", ")}
+              </p>
+            )}
+            {richPreview.timelineEvents.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Timeline retenue : {richPreview.timelineEvents.length} événements, aujourd’hui/hier en priorité.
+              </p>
+            )}
+            <ScrollArea className="h-72 border rounded p-3 bg-background/50">
+              <pre className="text-xs whitespace-pre-wrap">{renderRichSections(richPreview.sections)}\n\n{RICH_V2_CONVERSATION_CONTRACT}</pre>
+            </ScrollArea>
+          </div>
+        )}
+      </details>
 
       {/* Preview system prompt */}
       <details className="border rounded-lg p-3">
