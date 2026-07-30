@@ -27,8 +27,7 @@ serve(async (req) => {
     const url = new URL(req.url);
     if (url.searchParams.get("probe") === "tavus-catalog") {
       const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-      const isService = (bearer && bearer === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) ||
-        url.searchParams.get("t") === "tmp-catalog-9f3a71";
+      const isService = bearer && bearer === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
       if (!isService) {
         const auth = await requireAdmin(req, corsHeaders);
         if (!auth.ok) return auth.response!;
