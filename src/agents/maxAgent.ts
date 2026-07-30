@@ -531,7 +531,12 @@ export async function buildMaxSystemPrompt(
     };
   }
 
+  if (variant === "rich_v2") {
+    return buildRichMaxSystemPrompt(input, characterName, characterFields);
+  }
+
   const compiledFields = compileCharacterSections(characterFields);
+
   const budgetSections: NonNullable<MaxPromptAssemblyTrace["budget"]>["sections"] = [];
   const injectedSections: MaxPromptAssemblyTrace["injectedSections"] = [];
   let prompt = "";
