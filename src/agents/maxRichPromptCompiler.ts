@@ -127,6 +127,8 @@ function normalize(value: string): string {
 const EXPLICIT_LABEL = /^\s*(NOYAU|NUANCES|REP[ÈE]RES DE VOIX)\b[^\n]*/i;
 const BULLET_LINE = /^\s*(?:[-–—•*·]|\d+[.)])\s+\S/;
 const SUBHEADING_LINE = /^\s*(?:#{1,4}\s+\S.*|[A-ZÀ-ÖØ-Þ0-9«"][^\n]{0,70}\s*:)\s*$/;
+/** Sous-partie étiquetée en ligne : « Posture intérieure : ... ». */
+const INLINE_LABEL_LINE = /^\s*[A-ZÀ-ÖØ-Þ][^:\n]{2,60}\s:\s\S/;
 
 const LABEL_PRIORITY: Record<string, number> = {
   noyau: 0,
@@ -167,7 +169,7 @@ function splitBlockIntoUnits(block: string): string[] {
       current.push(line.trim());
       continue;
     }
-    if (SUBHEADING_LINE.test(line)) {
+    if (SUBHEADING_LINE.test(line) || INLINE_LABEL_LINE.test(line)) {
       flush();
       current.push(line.trim());
       continue;
