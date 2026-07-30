@@ -13,6 +13,13 @@ import {
   renderCompiledCharacterSections,
   truncateAtSentenceBoundary,
 } from "@/agents/maxPromptCompiler";
+import {
+  compileRichCharacterSections,
+  renderRichSections,
+  RICH_V2_CONVERSATION_CONTRACT,
+  RICH_V2_DYNAMIC_SECTION_CHARS,
+  RICH_V2_LIMITS,
+} from "@/agents/maxRichPromptCompiler";
 
 // Fallback minimal system prompt if DB fetch fails
 const FALLBACK_SYSTEM_PROMPT = `Tu es un personnage dans une expérience narrative interactive. Parle à la première personne, en français, de façon concise (1-2 phrases, 45 mots maximum). Utilise le CONTEXTE NARRATIF ci-dessous comme source de vérité.`;
@@ -689,6 +696,174 @@ export async function buildMaxSystemPrompt(
       systemToConversationRatio: conversationChars ? prompt.length / conversationChars : null,
       withinBudget: prompt.length <= MAX_SYSTEM_PROMPT_CHARS,
       sections: budgetSections,
+    },
+    finalSystemPrompt: prompt,
+  };
+}
+
+/**
+ * rich_v2 — assemblage riche et déterministe.
+ * `characters.system_prompt` n'est jamais lu ici : `character_prompts` est
+ * l'unique source éditoriale statique.
+ */
+async function buildRichMaxSystemPrompt(
+  input: MaxAgentInput,
+  characterName: string,
+  characterFields: Awaited<ReturnType<typeof loadCharacterPromptByName>>,
+): Promise<MaxPromptAssemblyTrace> {
+  const compiled = compileRichCharacterSections(characterFields, {
+    sessionSummary: input.sessionSummary,
+    turnIndex: input.temporalContext?.turnIndex,
+  });
+  const budgetSections: NonNullable<MaxPromptAssemblyTrace["budget"]>["sections"] = [];
+  const injectedSections: MaxPromptAssemblyTrace["injectedSections"] = [];
+
+  let prompt = "";
+  if (compiled.sections.length) {
+    prompt = "# FICHE PERSONNAGE (source éditoriale unique — Notion)\n";
+    compiled.sections.forEach((section, index) => {
+      if (!section.content) {
+        budgetSections.push({
+          key: section.key,
+          title: section.title,
+          chars: 0,
+          originalChars: section.originalChars,
+          included: false,
+          truncated: false,
+          omissionReason: section.subparts[0]?.omissionReason ?? "budget_statique_epuise",
+          priority: index + 1,
+          subpartsDetected: section.subpartsDetected,
+          subparts: section.subparts,
+        });
+        return;
+      }
+      const rendered = `\n\n## ${section.title}\n${section.content}`;
+      prompt += rendered;
+      budgetSections.push({
+        key: section.key,
+        title: section.title,
+        chars: rendered.length,
+        originalChars: section.originalChars,
+        included: true,
+        truncated: section.includedChars < section.originalChars,
+        priority: index + 1,
+        subpartsDetected: section.subpartsDetected,
+        subparts: section.subparts,
+      });
+    });
+    prompt += `\n\n${RICH_V2_CONVERSATION_CONTRACT}`;
+  } else {
+    prompt = `${FALLBACK_SYSTEM_PROMPT}\n\n${RICH_V2_CONVERSATION_CONTRACT}`;
+    budgetSections.push({
+      key: "character_fallback",
+      title: "Fallback local minimal",
+      chars: FALLBACK_SYSTEM_PROMPT.length,
+      originalChars: FALLBACK_SYSTEM_PROMPT.length,
+      included: true,
+      truncated: false,
+    });
+  }
+  budgetSections.push({
+    key: "technical_rules",
+    title: "Contrat de conversation",
+    chars: RICH_V2_CONVERSATION_CONTRACT.length + 2,
+    originalChars: RICH_V2_CONVERSATION_CONTRACT.length,
+    included: true,
+    truncated: false,
+  });
+  const staticChars = prompt.length;
+
+  const appendDynamicSection = (
+    key: keyof typeof RICH_V2_DYNAMIC_SECTION_CHARS,
+    title: string,
+    rawContent?: string,
+  ) => {
+    const original = rawContent?.trim() ?? "";
+    if (!original) {
+      budgetSections.push({ key, title, chars: 0, originalChars: 0, included: false, truncated: false, omissionReason: "section_vide" });
+      return;
+    }
+    const capped = truncateAtSentenceBoundary(original, RICH_V2_DYNAMIC_SECTION_CHARS[key]);
+    const prefix = `\n\n## ${title}\n`;
+    const remaining = RICH_V2_LIMITS.systemHardCapChars - prompt.length - prefix.length;
+    const content = truncateAtSentenceBoundary(capped, Math.max(0, remaining));
+    if (!content) {
+      budgetSections.push({ key, title, chars: 0, originalChars: original.length, included: false, truncated: false, omissionReason: "budget_systeme_epuise" });
+      return;
+    }
+    prompt += `${prefix}${content}`;
+    injectedSections.push({ key, title, content });
+    budgetSections.push({
+      key,
+      title,
+      chars: prefix.length + content.length,
+      originalChars: original.length,
+      included: true,
+      truncated: content.length < original.length,
+    });
+  };
+
+  appendDynamicSection("temporal_context", "ÉTAT DE L'APPEL", input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined);
+  appendDynamicSection("user_role", "RÔLE DE L'INTERLOCUTEUR", input.userRoleSummary);
+  appendDynamicSection("session_summary", "MÉMOIRE DE SESSION", input.sessionSummary);
+
+  const gmGuidance = input.gmGuidance?.guidance?.trim();
+  if (gmGuidance && isFallbackGmGuidance(gmGuidance)) {
+    budgetSections.push({
+      key: "gm_guidance",
+      title: "GUIDANCE GM",
+      chars: 0,
+      originalChars: gmGuidance.length,
+      included: false,
+      truncated: false,
+      omissionReason: "guidance_fallback_sans_information",
+    });
+  } else {
+    appendDynamicSection("gm_guidance", "GUIDANCE GM", gmGuidance && input.gmGuidance ? buildGmGuidanceBlock(input.gmGuidance) : undefined);
+  }
+
+  const guards = [
+    ...(input.knowledgeContext?.forbiddenTopics ?? []).map((value) => `Sujet interdit : ${value}`),
+    ...(input.knowledgeContext?.blockedAssertions ?? []).map((value) => `Assertion interdite : ${value}`),
+  ].join("\n");
+  appendDynamicSection("turn_guards", "GARDE-FOUS DU TOUR", guards || undefined);
+  appendDynamicSection("rag_context", "SOUVENIRS PERTINENTS", input.ragContext);
+  appendDynamicSection("post_video", "CONTEXTE POST-VIDÉO", input.postVideoContext);
+
+  const renderedFields = renderRichSections(compiled.sections);
+  const historyChars = input.conversationHistory.reduce((sum, message) => sum + message.content.length, 0);
+  const conversationChars = historyChars + input.userMessage.length;
+
+  return {
+    baseSystemPrompt: compiled.sections.length ? renderedFields : FALLBACK_SYSTEM_PROMPT,
+    baseSource: {
+      kind: compiled.sections.length ? "compiled" : "fallback",
+      characterId: characterFields?.character_id ?? null,
+      canonicalName: characterFields?.name ?? characterName,
+      updatedAt: characterFields?.updated_at ?? null,
+    },
+    characterPrompt: {
+      characterId: characterFields?.character_id ?? null,
+      canonicalName: characterFields?.name ?? null,
+      updatedAt: characterFields?.updated_at ?? null,
+      renderedSections: renderedFields,
+    },
+    technicalRules: RICH_V2_CONVERSATION_CONTRACT,
+    injectedSections,
+    budget: {
+      variant: "rich_v2",
+      limitChars: RICH_V2_LIMITS.systemHardCapChars,
+      staticLimitChars: RICH_V2_LIMITS.staticMaxChars,
+      staticChars,
+      totalSystemChars: prompt.length,
+      historyChars,
+      currentUserChars: input.userMessage.length,
+      totalMessageChars: prompt.length + conversationChars,
+      systemToConversationRatio: conversationChars ? prompt.length / conversationChars : null,
+      withinBudget: prompt.length <= RICH_V2_LIMITS.systemHardCapChars,
+      sections: budgetSections,
+      timelineEvents: compiled.timelineEvents,
+      ...(compiled.depthSelection ? { depthSelection: compiled.depthSelection } : {}),
     },
     finalSystemPrompt: prompt,
   };
