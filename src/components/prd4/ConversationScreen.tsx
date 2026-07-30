@@ -85,9 +85,12 @@ const ConversationScreen = ({
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
-      {/* Background photo (Max plein cadre) */}
+      {/* Background photo (Max plein cadre) — masqué dès que la vidéo est visible */}
       <div
-        className="absolute inset-0 bg-cover bg-center"
+        className={cn(
+          "absolute inset-0 bg-cover bg-center transition-opacity duration-300",
+          videoVisible ? "opacity-0" : "opacity-100",
+        )}
         style={{ backgroundImage: `url(${maxLarge})` }}
         aria-hidden
       />
@@ -96,16 +99,17 @@ const ConversationScreen = ({
           ref={(element) => attachAvatarMedia?.(element)}
           autoPlay
           playsInline
-          poster={maxLarge}
+          muted={false}
+          onLoadedData={handleVideoLive}
+          onPlaying={handleVideoLive}
           className={cn(
-            "absolute inset-0 h-full w-full object-cover transition-opacity duration-500",
-            streamingAvatarState === "ready" || streamingAvatarState === "speaking"
-              ? "opacity-100"
-              : "opacity-0",
+            "absolute inset-0 h-full w-full object-cover transition-opacity duration-300",
+            videoVisible ? "opacity-100" : "opacity-0",
           )}
           aria-label="Flux vidéo en direct de Max"
         />
       )}
+
       {/* Dark gradients to keep face area clear and bottom legible */}
       <div
         className="pointer-events-none absolute inset-0"
