@@ -83,6 +83,21 @@ const ConversationScreen = ({
     ? userSubtitle
     : lastUserText;
 
+  // Anti-flash : dès que le flux a rendu une image, on garde la vidéo affichée
+  // et on masque la photo, sauf perte réelle du flux (failed/disconnected).
+  const [videoLive, setVideoLive] = useState(false);
+  const handleVideoLive = useCallback(() => setVideoLive(true), []);
+  const streamLost =
+    !streamingAvatarActive ||
+    streamingAvatarState === "failed" ||
+    streamingAvatarState === "disconnected" ||
+    streamingAvatarState === "inactive";
+  useEffect(() => {
+    if (streamLost) setVideoLive(false);
+  }, [streamLost]);
+  const videoVisible = streamingAvatarActive && videoLive && !streamLost;
+
+
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
       {/* Background photo (Max plein cadre) — masqué dès que la vidéo est visible */}
