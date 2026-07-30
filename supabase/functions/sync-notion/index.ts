@@ -353,7 +353,29 @@ serve(async (req) => {
       const timeline = (promptFields.timeline || '').trim();
       const storyTail = pageContent.trim().slice(-4500);
       if (!OPENROUTER_API_KEY || (!timeline && !storyTail)) return '';
-      const prompt = `Tu vas établir la situation actuelle du personnage "${name}". Résume en 80-120 mots STRICTEMENT FACTUELS qui il/elle est, les événements récents et ce qui le/la préoccupe au moment de l'expérience. Priorise la timeline et la fin du récit : elles décrivent le présent mieux que l'ouverture du document. Supprime les faits déjà répétés. Pas d'interprétation ni de fioritures. Français, à la 3e personne.\n\nTIMELINE STRUCTURÉE:\n${timeline || '(absente)'}\n\nFIN DU RÉCIT:\n${storyTail || '(absente)'}\n\nSituation actuelle factuelle (80-120 mots):`;
+      const prompt = `Tu rédiges la SITUATION ACTUELLE du personnage "${name}", au moment exact où commence l'expérience (l'utilisateur va lui parler au téléphone maintenant).
+
+RÈGLES STRICTES D'ORDRE (impératives) :
+1. Commence par le PRÉSENT IMMÉDIAT : où il/elle se trouve maintenant, ce qu'il/elle est en train de faire, dans quel état.
+2. Puis les FAITS RÉCENTS : ce qui s'est passé aujourd'hui, puis hier, puis les jours précédents (du plus récent au plus ancien).
+3. Puis ce qui le/la PRÉOCCUPE et ce qu'il/elle cherche ou attend maintenant.
+4. EN DERNIER SEULEMENT, une seule phrase d'identité (âge, métier, proches).
+
+INTERDITS :
+- Ne JAMAIS ouvrir par une phrase biographique du type "X est un ... de N ans" ou "X, journaliste, ...".
+- Pas d'interprétation psychologique, pas de style littéraire, pas de spéculation.
+- Aucun fait absent des sources ci-dessous.
+
+FORME : 80-120 mots, français, 3e personne, présent de l'indicatif pour le présent immédiat, faits denses et vérifiables. Priorise la TIMELINE et la FIN DU RÉCIT : l'ouverture du document décrit le passé, pas le présent.
+
+TIMELINE STRUCTURÉE (source prioritaire du présent) :
+${timeline || '(absente)'}
+
+FIN DU RÉCIT :
+${storyTail || '(absente)'}
+
+Situation actuelle (présent d'abord, identité en dernier, 80-120 mots) :`;
+
       try {
         const r = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
           method: 'POST',

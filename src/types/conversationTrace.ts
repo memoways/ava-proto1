@@ -85,6 +85,7 @@ export interface MaxPromptAssemblyTrace {
       level: string;
       reason: string;
       levelsRepresented: string[];
+      preambleIncluded?: boolean;
     };
   };
 
