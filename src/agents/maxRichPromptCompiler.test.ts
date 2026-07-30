@@ -6,7 +6,12 @@ import {
   renderRichSections,
   splitDepthLevels,
   splitIntoSubparts,
+  splitTimelineEvents,
+  timelineEventPriority,
+  renderRichCore,
+  richSectionCost,
   RICH_V2_CONVERSATION_CONTRACT,
+  RICH_V2_CORE_HEADER,
   RICH_V2_LIMITS,
   RICH_V2_RAG,
 } from "./maxRichPromptCompiler";
@@ -14,6 +19,7 @@ import { maxRagFormatOptionsForVariant } from "@/services/maxRagVariant";
 import { formatMaxRAGContext, type RAGMatch } from "@/services/ragService";
 import { getSupportedSamplingParameters } from "@/services/llmModelCapabilities";
 import type { CharacterPrompt } from "@/services/characterPromptService";
+import { makeNotionMaxPrompt, NOTION_DEPTH, NOTION_JAMAIS, NOTION_TIMELINE } from "./__fixtures__/maxNotionFixture";
 
 const TIMELINE = [
   "Il y a environ trois mois, la pandémie de Protogyne se déclare.",
@@ -180,5 +186,66 @@ describe("rich_v2 — politique RAG", () => {
 describe("rich_v2 — garanties transverses", () => {
   it("ne transmet à GPT-5 mini que des paramètres réellement supportés", () => {
     expect(getSupportedSamplingParameters("openai/gpt-5-mini", 0.8, 0.95)).toEqual({});
+  });
+});
+
+describe("rich_v2 — fixture Notion réaliste", () => {
+  it("retient toujours l'événement daté aujourd'hui et l'événement daté hier", () => {
+    const compiled = compileTimeline(NOTION_TIMELINE, 700);
+    const joined = compiled.events.join("\n");
+    expect(joined).toMatch(/Aujourd'hui à Lausanne/);
+    expect(joined).toMatch(/Hier — jour 4/);
+    expect(compiled.preamble).toMatch(/référence unique/);
+  });
+
+  it("ne classe pas un événement « il y a cinq jours » comme récent à cause d'un « hier » interne", () => {
+    const cinqJours = splitTimelineEvents(NOTION_TIMELINE).events.find((event) => event.includes("Il y a cinq jours"))!;
+    expect(cinqJours).toMatch(/hier/);
+    expect(timelineEventPriority(cinqJours)).toBe(2);
+    const preambule = splitTimelineEvents(NOTION_TIMELINE).preamble;
+    expect(preambule).toMatch(/aujourd'hui/);
+    expect(splitTimelineEvents(NOTION_TIMELINE).events.every((event) => !event.includes("référence unique"))).toBe(true);
+  });
+
+  it("classe « vérité nue » au niveau 3 et non au bonus", () => {
+    const compiled = compileDepth(NOTION_DEPTH, 3_000, { sessionSummary: "Max reconnaît la vérité nue de son geste." });
+    expect(compiled.selection?.level).toBe("niveau_3");
+    const bonus = compileDepth(NOTION_DEPTH, 3_000, { sessionSummary: "Le joueur a atteint le niveau bonus." });
+    expect(bonus.selection?.level).toBe("bonus");
+  });
+
+  it("injecte et trace le préambule de progression", () => {
+    const compiled = compileDepth(NOTION_DEPTH, 3_000, {});
+    expect(compiled.content).toMatch(/La profondeur atteinte ne se perd pas/);
+    expect(compiled.selection?.preambleIncluded).toBe(true);
+    expect(compiled.reports.some((report) => report.label.startsWith("Invariant de progression") && report.included)).toBe(true);
+  });
+
+  it("représente les fonctions éditoriales du niveau ancré", () => {
+    const compiled = compileDepth(NOTION_DEPTH, 3_000, { sessionSummary: "Confiance élevée, il a fait un aveu." });
+    const anchored = compiled.selection!.anchorsIncluded!.filter((anchor) => anchor.startsWith("NIVEAU 3"));
+    for (const fn of ["posture intérieure", "matière révélable", "mécanisme de défense", "marqueurs de voix"]) {
+      expect(anchored.some((anchor) => anchor.includes(fn))).toBe(true);
+    }
+    for (const level of ["NIVEAU 1", "NIVEAU 2", "NIVEAU 3", "NIVEAU BONUS"]) {
+      expect(compiled.content).toContain(level);
+    }
+  });
+
+  it("segmente une liste Notion sans lignes vides en plusieurs sous-parties", () => {
+    const subparts = splitIntoSubparts(NOTION_JAMAIS);
+    expect(subparts.length).toBe(8);
+    expect(subparts.every((subpart) => subpart.content.startsWith("-"))).toBe(true);
+  });
+
+  it("fait correspondre exactement le budget tracé et le noyau rendu", () => {
+    const result = compileRichCharacterSections(makeNotionMaxPrompt(), { sessionSummary: "Confiance élevée, il a fait un aveu." });
+    const core = renderRichCore(result.sections);
+    const traced = RICH_V2_CORE_HEADER.length
+      + result.sections.filter((s) => s.content).reduce((sum, s) => sum + richSectionCost(s.title, s.content), 0)
+      + RICH_V2_CONVERSATION_CONTRACT.length + 2;
+    expect(traced).toBe(core.length);
+    expect(result.staticChars).toBe(core.length);
+    expect(result.staticChars).toBeLessThanOrEqual(RICH_V2_LIMITS.staticMaxChars);
   });
 });

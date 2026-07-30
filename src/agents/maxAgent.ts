@@ -16,8 +16,11 @@ import {
 import {
   compileRichCharacterSections,
   renderRichSections,
+  richSectionCost,
   RICH_V2_CONVERSATION_CONTRACT,
+  RICH_V2_CORE_HEADER,
   RICH_V2_DYNAMIC_SECTION_CHARS,
+  RICH_V2_FALLBACK_SYSTEM_PROMPT,
   RICH_V2_LIMITS,
 } from "@/agents/maxRichPromptCompiler";
 
@@ -720,7 +723,16 @@ async function buildRichMaxSystemPrompt(
 
   let prompt = "";
   if (compiled.sections.length) {
-    prompt = "# FICHE PERSONNAGE (source éditoriale unique — Notion)\n";
+    // Le noyau rendu est exactement : en-tête + sections + contrat.
+    prompt = RICH_V2_CORE_HEADER;
+    budgetSections.push({
+      key: "prompt_header",
+      title: "En-tête du noyau",
+      chars: RICH_V2_CORE_HEADER.length,
+      originalChars: RICH_V2_CORE_HEADER.length,
+      included: true,
+      truncated: false,
+    });
     compiled.sections.forEach((section, index) => {
       if (!section.content) {
         budgetSections.push({
@@ -737,12 +749,11 @@ async function buildRichMaxSystemPrompt(
         });
         return;
       }
-      const rendered = `\n\n## ${section.title}\n${section.content}`;
-      prompt += rendered;
+      prompt += `\n\n## ${section.title}\n${section.content}`;
       budgetSections.push({
         key: section.key,
         title: section.title,
-        chars: rendered.length,
+        chars: richSectionCost(section.title, section.content),
         originalChars: section.originalChars,
         included: true,
         truncated: section.includedChars < section.originalChars,
@@ -753,12 +764,12 @@ async function buildRichMaxSystemPrompt(
     });
     prompt += `\n\n${RICH_V2_CONVERSATION_CONTRACT}`;
   } else {
-    prompt = `${FALLBACK_SYSTEM_PROMPT}\n\n${RICH_V2_CONVERSATION_CONTRACT}`;
+    prompt = `${RICH_V2_FALLBACK_SYSTEM_PROMPT}\n\n${RICH_V2_CONVERSATION_CONTRACT}`;
     budgetSections.push({
       key: "character_fallback",
-      title: "Fallback local minimal",
-      chars: FALLBACK_SYSTEM_PROMPT.length,
-      originalChars: FALLBACK_SYSTEM_PROMPT.length,
+      title: "Fallback rich_v2 minimal",
+      chars: RICH_V2_FALLBACK_SYSTEM_PROMPT.length,
+      originalChars: RICH_V2_FALLBACK_SYSTEM_PROMPT.length,
       included: true,
       truncated: false,
     });
@@ -835,7 +846,7 @@ async function buildRichMaxSystemPrompt(
   const conversationChars = historyChars + input.userMessage.length;
 
   return {
-    baseSystemPrompt: compiled.sections.length ? renderedFields : FALLBACK_SYSTEM_PROMPT,
+    baseSystemPrompt: compiled.sections.length ? renderedFields : RICH_V2_FALLBACK_SYSTEM_PROMPT,
     baseSource: {
       kind: compiled.sections.length ? "compiled" : "fallback",
       characterId: characterFields?.character_id ?? null,

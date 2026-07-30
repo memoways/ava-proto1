@@ -49,6 +49,7 @@ import { callLLMWithUsage } from "@/services/openRouterLLM";
 import { loadCharacterPromptByName } from "@/services/characterPromptService";
 import { simulateMaxResponse } from "./maxAgent";
 import { RICH_V2_LIMITS } from "./maxRichPromptCompiler";
+import { makeNotionMaxPrompt } from "./__fixtures__/maxNotionFixture";
 
 const FIELDS = {
   character_id: "max-id",
@@ -117,6 +118,42 @@ describe("buildMaxSystemPrompt — variante rich_v2", () => {
     expect(budget.depthSelection?.levelsRepresented).toHaveLength(4);
     // Le présent est toujours injecté.
     expect(result.systemPrompt).toContain("Lausanne, aujourd'hui");
+  });
+
+  it("utilise un fallback rich_v2 sans contrat de longueur concurrent", async () => {
+    vi.mocked(loadCharacterPromptByName).mockResolvedValue(null as never);
+    const result = await simulateMaxResponse({
+      conversationHistory: [],
+      userMessage: "Vous êtes là ?",
+    }, { diagnosticTrace: true });
+
+    expect(result.systemPrompt).not.toMatch(/45 mots/);
+    expect(result.systemPrompt).toMatch(/FICHE PERSONNAGE INDISPONIBLE/);
+    expect(result.systemPrompt.match(/une à trois phrases/g)).toHaveLength(1);
+    expect(result.promptTrace!.baseSource.kind).toBe("fallback");
+  });
+
+  it("compile la fiche Notion complète sous les plafonds déclarés", async () => {
+    vi.mocked(loadCharacterPromptByName).mockResolvedValue(makeNotionMaxPrompt() as never);
+    const result = await simulateMaxResponse({
+      conversationHistory: [],
+      userMessage: "Racontez-moi hier.",
+      sessionSummary: "Max reconnaît la vérité nue de son geste.",
+    }, { diagnosticTrace: true });
+
+    const budget = result.promptTrace!.budget!;
+    expect(budget.staticChars).toBeLessThanOrEqual(RICH_V2_LIMITS.staticMaxChars);
+    expect(result.systemPrompt.length).toBeLessThanOrEqual(RICH_V2_LIMITS.systemHardCapChars);
+    const staticEnd = budget.sections.findIndex((s) => s.key === "technical_rules");
+    const traced = budget.sections
+      .slice(0, staticEnd + 1)
+      .filter((s) => s.included)
+      .reduce((sum, s) => sum + s.chars, 0);
+    expect(traced).toBe(budget.staticChars);
+    expect(budget.timelineEvents?.join("\n")).toMatch(/Aujourd'hui à Lausanne/);
+    expect(budget.timelineEvents?.join("\n")).toMatch(/Hier — jour 4/);
+    expect(budget.depthSelection?.level).toBe("niveau_3");
+    expect(budget.depthSelection?.preambleIncluded).toBe(true);
   });
 
   it("reste compatible avec les anciennes traces sans bloc budget", () => {
