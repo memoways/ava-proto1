@@ -30,8 +30,10 @@ interface TestSummary {
 
 export default function StreamingAvatarTestPanel({
   settings,
+  dirty = false,
 }: {
   settings: StreamingAvatarSettings;
+  dirty?: boolean;
 }) {
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState<TestLogEntry[]>([]);
@@ -39,6 +41,7 @@ export default function StreamingAvatarTestPanel({
   const videoRef = useRef<HTMLVideoElement>(null);
   const outputRef = useRef<ResponseOutput | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
 
   const push = useCallback((label: string, tone: TestLogEntry["tone"] = "info") => {
     setLogs((current) => [...current, { at: Date.now(), label, tone }]);
