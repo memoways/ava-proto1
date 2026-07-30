@@ -35,6 +35,9 @@ serve(async (req) => {
         .maybeSingle();
       const settings = asRecord((data as { value?: unknown } | null)?.value);
       const heygen = asRecord(settings.heygen);
+      const sandboxOverride = url.searchParams.get("sandbox");
+      if (sandboxOverride === "0") heygen.sandbox = false;
+      if (sandboxOverride === "1") heygen.sandbox = true;
       return json({ heygenStart: await probeHeyGenStart(heygen) });
     }
     if (url.searchParams.get("probe") === "1") {
