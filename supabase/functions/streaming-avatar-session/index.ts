@@ -34,6 +34,11 @@ serve(async (req) => {
           "X-API-KEY",
           Deno.env.get("LIVEAVATAR_API_KEY"),
         ),
+        heygenCore: await probeProvider(
+          "https://api.heygen.com/v2/avatars",
+          "X-Api-Key",
+          Deno.env.get("LIVEAVATAR_API_KEY"),
+        ),
         tavus: await probeProvider(
           "https://tavusapi.com/v2/replicas?limit=1",
           "x-api-key",
