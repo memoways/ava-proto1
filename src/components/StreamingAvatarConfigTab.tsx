@@ -208,11 +208,11 @@ function TavusFields({
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Tavus</CardTitle>
-        <CardDescription>La Persona ID doit être configurée en pipeline_mode « echo » dans Tavus. Elle porte la voix ; Ava fournit exclusivement le texte.</CardDescription>
+        <CardDescription>API v2 actuelle : « Replica » s'appelle désormais <strong>Face ID</strong> (GET /v2/faces) et « Persona » s'appelle <strong>PAL ID</strong> (GET /v2/pals, préfixe <code>p…</code>). Le PAL doit être en pipeline_mode « echo » : il porte la voix, Ava fournit exclusivement le texte.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 md:grid-cols-2">
-        <TextField label="Replica ID" value={value.replicaId} onChange={(replicaId) => patch({ replicaId })} />
-        <TextField label="Persona ID" value={value.personaId} onChange={(personaId) => patch({ personaId })} />
+        <TextField label="Face ID (ex-Replica ID)" value={value.replicaId} onChange={(replicaId) => patch({ replicaId })} />
+        <TextField label="PAL ID (ex-Persona ID)" value={value.personaId} onChange={(personaId) => patch({ personaId })} />
         <TextField label="Langue" value={value.language} onChange={(language) => patch({ language })} />
         <NumberField label="Durée maximale (s)" value={value.maxDurationSeconds} min={60} max={3600} onChange={(maxDurationSeconds) => patch({ maxDurationSeconds })} />
       </CardContent>

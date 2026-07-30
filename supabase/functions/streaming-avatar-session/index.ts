@@ -55,7 +55,7 @@ serve(async (req) => {
           Deno.env.get("LIVEAVATAR_API_KEY"),
         ),
         tavus: await probeProvider(
-          "https://tavusapi.com/v2/replicas?limit=1",
+          "https://tavusapi.com/v2/faces?limit=1",
           "x-api-key",
           Deno.env.get("TAVUS_API_KEY"),
         ),
