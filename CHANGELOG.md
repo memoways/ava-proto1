@@ -4,6 +4,25 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.49.0] - 2026-07-30 — Variante de prompt `rich_v2` pour Max
+
+### Ajouté
+- Nouvelle variante `MAX_PROMPT_VARIANT = "rich_v2"` (canary), à côté de `legacy` (défaut global inchangé) et `compact_v1`, sélectionnable dans **Admin → Game Master**.
+- Compilation déterministe depuis `character_prompts` uniquement : `rich_v2` ne lit jamais `characters.system_prompt`.
+- Découpe par sous-parties (`NOYAU`, `NUANCES`, `REPÈRES DE VOIX`, sinon paragraphes) : les nuances, contradictions psychologiques et repères de voix sont préservés au lieu d'être tronqués en milieu de phrase.
+- Timeline priorisée : aujourd'hui/hier d'abord, puis le séjour de cinq jours, puis les pivots anciens.
+- Profondeur : les quatre niveaux restent représentés, l'ancrage est choisi à partir du résumé de session (et non de l'avancement de l'appel).
+- Contrat conversationnel dédié : une à trois phrases (quatre courtes au maximum), pas de narration, pas de rejeu de l'ouverture, pas de question deux tours de suite.
+- Budgets `rich_v2` : plafond absolu 18 000 caractères, noyau statique 12 000, RAG 3 souvenirs × 900 caractères (2 700 max, sans métadonnées techniques).
+
+### Observabilité
+- La trace de tour expose désormais les sous-parties détectées/injectées, les motifs d'omission, les événements de timeline retenus et le niveau de profondeur ancré avec sa justification.
+- **Admin → Personnages** : prévisualisation du noyau statique `rich_v2` (caractères par section, sous-parties incluses/omises, timeline, profondeur), en plus des prévisualisations existantes.
+- Les anciennes traces sans bloc `budget` restent lisibles.
+
+### Tests
+- 17 nouveaux tests dédiés (compilateur `rich_v2`, agent, politique RAG par variante) ; 178 tests au vert et typecheck propre.
+
 ## [0.48.2] - 2026-07-21 — Synthèse sémantique fiable et Laboratoire RAG fluide
 
 ### Corrigé
