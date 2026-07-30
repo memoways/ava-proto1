@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
+import { requireAdmin } from "../_shared/adminAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,6 +24,28 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   if (req.method === "GET") {
+    const url = new URL(req.url);
+    if (url.searchParams.get("probe") === "1") {
+      const auth = await requireAdmin(req, corsHeaders);
+      if (!auth.ok) return auth.response!;
+      return json({
+        heygen: await probeProvider(
+          "https://api.liveavatar.com/v1/avatars",
+          "X-API-KEY",
+          Deno.env.get("LIVEAVATAR_API_KEY"),
+        ),
+        heygenCore: await probeProvider(
+          "https://api.heygen.com/v2/avatars",
+          "X-Api-Key",
+          Deno.env.get("LIVEAVATAR_API_KEY"),
+        ),
+        tavus: await probeProvider(
+          "https://tavusapi.com/v2/replicas?limit=1",
+          "x-api-key",
+          Deno.env.get("TAVUS_API_KEY"),
+        ),
+      });
+    }
     const denied = await enforceGameRequest(
       req,
       "streaming-avatar-status",
@@ -38,6 +61,7 @@ serve(async (req) => {
       },
     });
   }
+
 
   if (req.method !== "POST") return jsonError("Method not allowed", 405);
   const body = (await req.json().catch(() => null)) as AvatarRequest | null;
@@ -366,4 +390,28 @@ function json(body: unknown, status = 200): Response {
 
 function jsonError(message: string, status: number): Response {
   return json({ error: message }, status);
+}
+
+async function probeProvider(
+  url: string,
+  headerName: string,
+  apiKey: string | undefined,
+): Promise<{ configured: boolean; reachable: boolean; status?: number; error?: string }> {
+  if (!apiKey) return { configured: false, reachable: false, error: "missing secret" };
+  try {
+    const response = await fetch(url, { headers: { [headerName]: apiKey } });
+    const body = (await response.text()).slice(0, 200);
+    return {
+      configured: true,
+      reachable: response.ok,
+      status: response.status,
+      error: response.ok ? undefined : body,
+    };
+  } catch (error) {
+    return {
+      configured: true,
+      reachable: false,
+      error: error instanceof Error ? error.message.slice(0, 200) : "network error",
+    };
+  }
 }

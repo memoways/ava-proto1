@@ -85,9 +85,12 @@ export interface ResponseOutput {
 export class AvatarRenderError extends Error {
   readonly started: boolean;
 
-  constructor(message: string, started: boolean, options?: ErrorOptions) {
-    super(message, options);
+  constructor(message: string, started: boolean, options?: { cause?: unknown }) {
+    super(message);
     this.name = "AvatarRenderError";
     this.started = started;
+    if (options && "cause" in options) {
+      (this as { cause?: unknown }).cause = options.cause;
+    }
   }
 }
