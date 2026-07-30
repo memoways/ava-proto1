@@ -283,19 +283,30 @@ export function formatRAGContext(matches: RAGMatch[]): string {
  * PRD4 live formatter: metadata stays in the trace, while Max receives only
  * deduplicated narrative memories within the declared prompt budget.
  */
-export function formatMaxRAGContext(matches: RAGMatch[]): string {
+export interface MaxRAGFormatOptions {
+  /** Caractères max par souvenir (compact_v1 : 700 · rich_v2 : 900). */
+  itemChars?: number;
+  /** Budget total du bloc RAG (compact_v1 : 2 100 · rich_v2 : 2 700). */
+  totalChars?: number;
+  maxItems?: number;
+}
+
+export function formatMaxRAGContext(matches: RAGMatch[], options: MaxRAGFormatOptions = {}): string {
+  const itemChars = options.itemChars ?? MAX_MAX_RAG_ITEM_CHARS;
+  const totalChars = options.totalChars ?? MAX_MAX_RAG_CONTEXT_CHARS;
+  const maxItems = options.maxItems ?? MAX_MAX_RAG_ITEMS;
   const selected: string[] = [];
   for (const match of matches) {
     const clean = cleanMaxMemoryContent(match.content);
     if (!clean || selected.some((existing) => sharesConsecutiveWindow(existing, clean))) continue;
-    selected.push(compactAtSentenceBoundary(clean, MAX_MAX_RAG_ITEM_CHARS));
-    if (selected.length >= MAX_MAX_RAG_ITEMS) break;
+    selected.push(compactAtSentenceBoundary(clean, itemChars));
+    if (selected.length >= maxItems) break;
   }
 
   let output = "";
   for (let index = 0; index < selected.length; index += 1) {
     const prefix = output ? `\n\nSouvenir ${index + 1}\n` : `Souvenir ${index + 1}\n`;
-    const remaining = MAX_MAX_RAG_CONTEXT_CHARS - output.length - prefix.length;
+    const remaining = totalChars - output.length - prefix.length;
     if (remaining <= 0) break;
     const content = compactAtSentenceBoundary(selected[index], remaining);
     if (!content) break;

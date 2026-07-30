@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, Beaker, Copy, Download, History, RefreshCw, Search, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
+import { maxRagFormatOptionsForVariant } from "@/services/maxRagVariant";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -148,7 +149,10 @@ export default function RAGLabTab() {
       .map((id) => result.matches.find((match) => match.id === id) || candidateById.get(id))
       .filter((match): match is RAGMatch => Boolean(match));
   }, [candidateById, result, selectedIds]);
-  const formattedContext = useMemo(() => formatMaxRAGContext(selectedMatches), [selectedMatches]);
+  const formattedContext = useMemo(
+    () => formatMaxRAGContext(selectedMatches, maxRagFormatOptionsForVariant(live.MAX_PROMPT_VARIANT)),
+    [selectedMatches, live.MAX_PROMPT_VARIANT],
+  );
   const knowledgeContext = useMemo(() => buildKnowledgeContextFromRAG(selectedMatches), [selectedMatches]);
   const selectedFrequentQuestion = questionCorpus?.questions.find((item) => item.id === selectedFrequentQuestionId);
 

@@ -18,6 +18,7 @@ import {
 } from "@/services/ragService";
 import { resolveCharacterIdByName } from "@/services/characterPromptService";
 import { getGameplaySettings, getLLMSettings, isReasoningEnabledForModel } from "@/services/settingsService";
+import { maxRagFormatOptionsForVariant } from "@/services/maxRagVariant";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { selectRecentConversation, selectUnsummarizedConversation } from "@/services/conversationMemory";
 import { withTimeout } from "@/services/asyncUtils";
@@ -146,7 +147,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     const matches = ragDetailed.matches;
     ragError = ragDetailed.error || null;
     matchesCount = matches.length;
-    ragContext = formatMaxRAGContext(matches);
+    ragContext = formatMaxRAGContext(matches, maxRagFormatOptionsForVariant(gameplay?.MAX_PROMPT_VARIANT));
     knowledgeContext = buildKnowledgeContextFromRAG(matches);
   } catch (err) {
     console.warn("[PRD4 orchestrator] RAG failed (non-fatal):", err);

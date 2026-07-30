@@ -47,7 +47,7 @@ export interface MaxPromptAssemblyTrace {
   }>;
   /** Added in compact_v1; optional so archived traces remain readable. */
   budget?: {
-    variant: "legacy" | "compact_v1";
+    variant: "legacy" | "compact_v1" | "rich_v2";
     limitChars: number;
     staticLimitChars: number;
     staticChars: number;
@@ -65,8 +65,29 @@ export interface MaxPromptAssemblyTrace {
       included: boolean;
       truncated: boolean;
       omissionReason?: string;
+      /** rich_v2 — ordre de priorité d'injection du champ. */
+      priority?: number;
+      /** rich_v2 — nombre de sous-parties détectées dans le champ source. */
+      subpartsDetected?: number;
+      /** rich_v2 — détail des sous-parties incluses ou omises. */
+      subparts?: Array<{
+        label: string;
+        priority: number;
+        chars: number;
+        included: boolean;
+        omissionReason?: string;
+      }>;
     }>;
+    /** rich_v2 — événements de timeline effectivement injectés, dans l'ordre. */
+    timelineEvents?: string[];
+    /** rich_v2 — niveau de profondeur ancré et justification déterministe. */
+    depthSelection?: {
+      level: string;
+      reason: string;
+      levelsRepresented: string[];
+    };
   };
+
   finalSystemPrompt: string;
 }
 

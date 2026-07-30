@@ -81,6 +81,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     vi.mocked(resolveCharacterIdByName).mockResolvedValue("character-max");
     vi.mocked(queryRAGDetailed).mockResolvedValue({
       matches: [],
+      retrievalMatches: [],
       latencyMs: 1,
       embeddingProvider: "voyage",
       rerankUsed: true,
@@ -285,6 +286,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
         rerank_score: 0.91,
         character_id: "character-max",
       }],
+      retrievalMatches: [],
       latencyMs: 11,
       embeddingProvider: "voyage",
       rerankUsed: true,
