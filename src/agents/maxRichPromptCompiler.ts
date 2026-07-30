@@ -433,6 +433,13 @@ const DEPTH_FUNCTION_LABELS: Record<DepthAnchorFunction, string> = {
 /** Classe une sous-partie de niveau selon sa fonction éditoriale. */
 export function classifyDepthAnchor(text: string): DepthAnchorFunction {
   const value = text.toLocaleLowerCase("fr");
+  // Un intitulé explicite de sous-partie prime sur l'analyse par mots-clés.
+  const head = value.split(/[:\n]/)[0]?.slice(0, 60) ?? "";
+  if (/posture|état intérieur|etat interieur/.test(head)) return "posture_interieure";
+  if (/matière|matiere|révélable|revelable/.test(head)) return "matiere_revelable";
+  if (/défense|defense|esquive|protection/.test(head)) return "mecanisme_defense";
+  if (/voix|marqueur|ton\b|rythme/.test(head)) return "marqueurs_voix";
+  if (/formulation|ancrage|réplique|replique|exemple/.test(head)) return "formulations_ancrage";
   if (/[«"“]|formulation|réplique|replique|exemple|tu peux dire|phrases? types?|ancrage/.test(value)) return "formulations_ancrage";
   if (/voix|ton\b|rythme|débit|debit|silence|souffle|marqueur|phrases? (courtes|longues)/.test(value)) return "marqueurs_voix";
   if (/défense|defense|esquive|évite|evite|détourne|detourne|mécanisme|mecanisme|grille|protège|protege|justifi/.test(value)) return "mecanisme_defense";
