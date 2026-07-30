@@ -25,6 +25,18 @@ serve(async (req) => {
 
   if (req.method === "GET") {
     const url = new URL(req.url);
+    if (url.searchParams.get("probe") === "session") {
+      const auth = await requireAdmin(req, corsHeaders);
+      if (!auth.ok) return auth.response!;
+      const { data } = await callerClient(req)
+        .from("admin_settings")
+        .select("value")
+        .eq("key", "ava_streaming_avatar_settings")
+        .maybeSingle();
+      const settings = asRecord((data as { value?: unknown } | null)?.value);
+      const heygen = asRecord(settings.heygen);
+      return json({ heygenStart: await probeHeyGenStart(heygen) });
+    }
     if (url.searchParams.get("probe") === "1") {
       const auth = await requireAdmin(req, corsHeaders);
       if (!auth.ok) return auth.response!;
