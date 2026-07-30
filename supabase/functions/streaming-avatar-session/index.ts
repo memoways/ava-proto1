@@ -338,13 +338,61 @@ async function readUpstream(response: Response, fallback: string): Promise<Recor
     // Preserve only a short, non-secret upstream diagnostic.
   }
   if (!response.ok) {
+    console.error(
+      `[streaming-avatar-session] upstream ${response.status} ${fallback}: ${text.slice(0, 500)}`,
+    );
     const message =
       safeString(body.message) ||
       safeString(body.error) ||
       `${fallback} (${response.status})`;
-    throw new Error(message.slice(0, 300));
+    throw new Error(`${message.slice(0, 300)} [${response.status}]`);
   }
   return body;
+}
+
+async function probeHeyGenStart(
+  config: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const apiKey = Deno.env.get("LIVEAVATAR_API_KEY");
+  if (!apiKey) return { ok: false, error: "missing secret" };
+  const avatarId = safeId(config.avatarId);
+  const voiceId = safeId(config.voiceId);
+  const contextId = safeId(config.contextId, true);
+  if (!avatarId || !voiceId) {
+    return { ok: false, error: "avatarId/voiceId missing or invalid", avatarId, voiceId };
+  }
+  const avatarPersona: Record<string, string> = {
+    voice_id: voiceId,
+    language: safeLanguage(config.language, "fr"),
+  };
+  if (contextId) avatarPersona.context_id = contextId;
+  const requestBody = {
+    mode: "FULL",
+    avatar_id: avatarId,
+    avatar_persona: avatarPersona,
+    video_settings: {
+      quality: ["low", "medium", "high"].includes(String(config.quality))
+        ? config.quality
+        : "high",
+    },
+    is_sandbox: config.sandbox !== false,
+    interactivity_type: "PUSH_TO_TALK",
+  };
+  try {
+    const upstream = await fetch("https://api.liveavatar.com/v1/sessions/token", {
+      method: "POST",
+      headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    });
+    const text = (await upstream.text()).slice(0, 800);
+    return { ok: upstream.ok, status: upstream.status, body: text, request: requestBody };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message.slice(0, 200) : "network error",
+      request: requestBody,
+    };
+  }
 }
 
 function safeId(value: unknown, optional = false): string {
