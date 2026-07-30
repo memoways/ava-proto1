@@ -73,6 +73,21 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-07-30 — Streaming avatar : nomenclature Tavus, test privé, image figée et consommation 🔷
+
+**Intent.** Rendre le mode avatar vidéo réellement exploitable au quotidien : tester sans passer par le parcours public, ne jamais montrer autre chose que le fournisseur choisi, éviter les flashs noirs, et mesurer ce que ça consomme.
+
+**Nomenclature Tavus alignée sur l’API.** `replica_id` devient **Face ID** et `persona_id` devient **PAL ID** dans l’Edge Function `streaming-avatar-session` et dans l’admin, avec repli sur les anciens champs pour les configurations existantes. Le PAL doit rester en `pipeline_mode: "echo"` : Ava fournit le texte, Tavus ne fait que le rendre.
+
+**Test privé depuis l’admin.** Bouton **Tester l’avatar** dans **Technique → Streaming Avatar Config** : le panneau relit la configuration **sauvegardée en base** avant de lancer, affiche le fournisseur réellement utilisé dans le journal, et se bloque tant que des modifications ne sont pas enregistrées. Résumé en direct : connexion, première image, première parole, mode final (vidéo ou repli TTS), erreurs fournisseur.
+
+**Anti-flash et continuité d’image.** La dernière image reçue est capturée en continu dans un canvas ; sur `waiting`, `stalled`, `suspend` ou coupure, l’image est **figée** au lieu de passer au noir ou de rebasculer sur la photo de Max. La photo ne réapparaît que si aucune image vidéo n’a jamais été rendue.
+
+**Consommation Streaming Avatar.** Nouvel onglet **Technique → Consommation Streaming Avatar** : KPIs (sessions, replis TTS, minutes, coût estimé), cartes par fournisseur (HeyGen, Tavus, extensible) avec p50/p95 de connexion, première image et première parole, motifs de repli, et table des sessions récentes.
+
+**Leçon.** Un diagnostic qui écrit en base (forçage `tavus` par SQL) a fait diverger l’admin du comportement réel. Règle retenue : aucun forçage de fournisseur, la configuration sauvegardée est la seule source de vérité, y compris pour les tests.
+
+
 ### 2026-07-30 — Ava peut incarner Max en vidéo sans céder la conversation au fournisseur 🔷
 
 **Intent.** Tester des avatars vidéo temps réel sans transformer HeyGen ou Tavus en second agent conversationnel. Ava doit rester l’unique propriétaire du micro, du STT, du RAG, des règles, du LLM et du texte final. Le fournisseur reçoit seulement la réplique terminée et la rend en voix, lip-sync et vidéo.
