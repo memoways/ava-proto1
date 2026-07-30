@@ -1,5 +1,5 @@
 /** PRD4 — Écran 8 : Conversation avec Max (toggle-to-talk, fond Max plein écran) */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Mic, Square, PhoneOff, Loader2, VideoOff } from "lucide-react";
 import maxLarge from "@/assets/characters/max-large.jpg";
 import maxAvatar from "@/assets/characters/max.jpg";
