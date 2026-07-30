@@ -485,7 +485,7 @@ export function saveTTSSettings(settings: Partial<TTSSettings>): TTSSettings {
 // ===== Gameplay / Experience Settings =====
 
 export interface GameplaySettings {
-  MAX_PROMPT_VARIANT: "legacy" | "compact_v1";
+  MAX_PROMPT_VARIANT: "legacy" | "compact_v1" | "rich_v2";
   TRUST_THRESHOLD: number;
   TIMEOUT_SECONDS: number;
   MAX_INSULT_TOLERANCE: number;
@@ -502,8 +502,16 @@ export interface GameplaySettings {
 
 const GAMEPLAY_STORAGE_KEY = "ava_gameplay_settings";
 
+/** Le défaut global reste `legacy` tant que la canary rich_v2 n'est pas validée. */
+export function normalizeMaxPromptVariant(
+  value: unknown,
+  fallback: GameplaySettings["MAX_PROMPT_VARIANT"] = "legacy",
+): GameplaySettings["MAX_PROMPT_VARIANT"] {
+  return value === "compact_v1" || value === "rich_v2" || value === "legacy" ? value : fallback;
+}
+
 const gameplayDefaults: GameplaySettings = {
-  MAX_PROMPT_VARIANT: ((defaultSettings as any).MAX_PROMPT_VARIANT === "compact_v1" ? "compact_v1" : "legacy"),
+  MAX_PROMPT_VARIANT: normalizeMaxPromptVariant((defaultSettings as any).MAX_PROMPT_VARIANT, "legacy"),
   TRUST_THRESHOLD: defaultSettings.TRUST_THRESHOLD,
   TIMEOUT_SECONDS: defaultSettings.TIMEOUT_SECONDS,
   MAX_INSULT_TOLERANCE: defaultSettings.MAX_INSULT_TOLERANCE,
@@ -525,11 +533,7 @@ export function getGameplaySettings(): GameplaySettings {
       return {
         ...gameplayDefaults,
         ...parsed,
-        MAX_PROMPT_VARIANT: parsed.MAX_PROMPT_VARIANT === "compact_v1"
-          ? "compact_v1"
-          : parsed.MAX_PROMPT_VARIANT === "legacy"
-            ? "legacy"
-            : gameplayDefaults.MAX_PROMPT_VARIANT,
+        MAX_PROMPT_VARIANT: normalizeMaxPromptVariant(parsed.MAX_PROMPT_VARIANT, gameplayDefaults.MAX_PROMPT_VARIANT),
       };
     }
   } catch { /* ignore */ }
@@ -540,7 +544,7 @@ export async function loadGameplaySettingsFromDB(): Promise<GameplaySettings> {
   const loaded = await loadFromDB(GAMEPLAY_STORAGE_KEY, gameplayDefaults);
   return {
     ...loaded,
-    MAX_PROMPT_VARIANT: loaded.MAX_PROMPT_VARIANT === "compact_v1" ? "compact_v1" : "legacy",
+    MAX_PROMPT_VARIANT: normalizeMaxPromptVariant(loaded.MAX_PROMPT_VARIANT, "legacy"),
   };
 }
 
