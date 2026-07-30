@@ -25,7 +25,35 @@ serve(async (req) => {
 
   if (req.method === "GET") {
     const url = new URL(req.url);
+    if (url.searchParams.get("probe") === "tavus-catalog") {
+      const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+      const isService = bearer && bearer === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (!isService) {
+        const auth = await requireAdmin(req, corsHeaders);
+        if (!auth.ok) return auth.response!;
+      }
+      const key = Deno.env.get("TAVUS_API_KEY");
+      if (!key) return json({ error: "missing TAVUS_API_KEY" });
+      const fetchList = async (path: string) => {
+        try {
+          const res = await fetch(`https://tavusapi.com/v2/${path}`, {
+            headers: { "x-api-key": key },
+          });
+          const text = await res.text();
+          return { status: res.status, body: text.slice(0, 4000) };
+        } catch (error) {
+          return { status: 0, body: String(error) };
+        }
+      };
+      return json({
+        pals: await fetchList("pals?limit=25"),
+        personas: await fetchList("personas?limit=25"),
+        faces: await fetchList("faces?limit=25"),
+        replicas: await fetchList("replicas?limit=25"),
+      });
+    }
     if (url.searchParams.get("probe") === "session") {
+
       const auth = await requireAdmin(req, corsHeaders);
       if (!auth.ok) return auth.response!;
       const { data } = await callerClient(req)
