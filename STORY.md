@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-30 (streaming avatar HeyGen/Tavus piloté par Ava)
+> **Last Updated**: 2026-07-30 (streaming avatar : test privé, image figée, consommation)
 
 ---
 
