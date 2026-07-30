@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.51.0] - 2026-07-30 — Streaming Avatar : test privé, stabilité d’image et consommation
+
+### Ajouté
+- Bouton **Tester l’avatar** dans **Admin → Technique → Streaming Avatar Config** : session privée avec journal en direct (connexion, première image, première parole, mode final vidéo/TTS, erreurs).
+- Nouvel onglet **Technique → Consommation Streaming Avatar** : sessions, replis TTS, minutes et coût estimé, cartes par fournisseur (HeyGen, Tavus, extensible) avec p50/p95 connexion / première image / première parole, motifs de repli et sessions récentes.
+
+### Modifié
+- Nomenclature Tavus alignée sur l’API : `replica_id` → **Face ID**, `persona_id` → **PAL ID**, dans l’Edge Function `streaming-avatar-session` et l’admin, avec repli sur les anciens champs. Le PAL doit rester en `pipeline_mode: "echo"`.
+
+### Corrigé
+- Le fournisseur testé est toujours celui **sauvegardé en base** : le panneau de test relit la configuration persistée, l’affiche dans le journal et se bloque tant que des modifications ne sont pas enregistrées. Plus aucun forçage de fournisseur.
+- Anti-flash : la dernière image du flux est figée sur `waiting`/`stalled`/`suspend` ou coupure, au lieu d’un écran noir ou d’un retour sur la photo de Max. La photo ne revient que si aucune image vidéo n’a jamais été rendue.
+- Les traces de tour ne sont plus désactivées lors d’un repli TTS.
+
 ## [0.50.0] - 2026-07-30 — Streaming Avatar piloté par le texte Ava
 
 ### Ajouté
