@@ -2,6 +2,7 @@ import {
   AgentEventsEnum,
   LiveAvatarSession,
   SessionEvent,
+  SessionState,
   type AgentEvent,
 } from "@heygen/liveavatar-web-sdk";
 import { endAvatarSession, startAvatarSession } from "../api";
@@ -44,6 +45,7 @@ export class HeyGenStreamingAvatarOutput implements ResponseOutput {
   private _externalSessionId: string | null = null;
   private mediaElement: HTMLMediaElement | null = null;
   private streamReady = false;
+  private readyNotified = false;
   private disposed = false;
   private currentSpeech: PendingSpeech | null = null;
 
@@ -82,8 +84,13 @@ export class HeyGenStreamingAvatarOutput implements ResponseOutput {
     const session = new LiveAvatarSession(this.token, { voiceChat: false });
     this.session = session;
     this.bindEvents(session);
+    const connectionStartedAt = performance.now();
     await withDeadline(session.start(), this.connectionTimeoutMs, "HeyGen connection timed out");
-    await this.waitUntilStreamReady();
+    const remainingMs = Math.max(
+      1,
+      this.connectionTimeoutMs - (performance.now() - connectionStartedAt),
+    );
+    await this.waitUntilStreamReady(remainingMs);
     if (context.signal?.aborted) throw new DOMException("Avatar preparation aborted", "AbortError");
     this.callbacks.onConnectionStateChange?.("ready");
   }
@@ -92,7 +99,7 @@ export class HeyGenStreamingAvatarOutput implements ResponseOutput {
     text: string,
     context?: ResponseOutputTurnContext,
   ): Promise<ResponseOutputResult> {
-    if (!this.session || !this.streamReady) {
+    if (!this.session || !this.streamReady || this.session.state !== SessionState.CONNECTED) {
       throw new AvatarRenderError("HeyGen video stream is not ready", false);
     }
     const startedAt = performance.now();
@@ -149,12 +156,14 @@ export class HeyGenStreamingAvatarOutput implements ResponseOutput {
 
   attachMedia(element: HTMLMediaElement): void {
     this.mediaElement = element;
-    if (this.streamReady) this.session?.attach(element);
+    if (this.streamReady && this.session?.state === SessionState.CONNECTED) {
+      this.session.attach(element);
+    }
   }
 
   interrupt(): void {
     try {
-      this.session?.interrupt();
+      if (this.session?.state === SessionState.CONNECTED) this.session.interrupt();
     } catch {
       // Interruption is best effort during disconnect/cleanup.
     }
@@ -167,6 +176,8 @@ export class HeyGenStreamingAvatarOutput implements ResponseOutput {
   async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
+    this.streamReady = false;
+    this.readyNotified = false;
     this.interrupt();
     const session = this.session;
     this.session = null;
@@ -190,8 +201,18 @@ export class HeyGenStreamingAvatarOutput implements ResponseOutput {
     session.on(SessionEvent.SESSION_STREAM_READY, () => {
       if (this.disposed) return;
       this.streamReady = true;
-      if (this.mediaElement) session.attach(this.mediaElement);
-      this.callbacks.onStreamReady?.();
+      this.notifyReady(session);
+    });
+    session.on(SessionEvent.SESSION_STATE_CHANGED, (state) => {
+      if (this.disposed) return;
+      if (state === SessionState.CONNECTED) {
+        this.notifyReady(session);
+        return;
+      }
+      if (state === SessionState.DISCONNECTING || state === SessionState.DISCONNECTED) {
+        this.streamReady = false;
+        this.readyNotified = false;
+      }
     });
     session.on(SessionEvent.SESSION_DISCONNECTED, (reason) => {
       if (this.disposed) return;
@@ -265,7 +286,21 @@ export class HeyGenStreamingAvatarOutput implements ResponseOutput {
     };
   }
 
-  private async waitUntilStreamReady(): Promise<void> {
+  private notifyReady(session: LiveAvatarSession): void {
+    if (
+      this.disposed ||
+      this.readyNotified ||
+      !this.streamReady ||
+      session.state !== SessionState.CONNECTED
+    ) {
+      return;
+    }
+    this.readyNotified = true;
+    if (this.mediaElement) session.attach(this.mediaElement);
+    this.callbacks.onStreamReady?.();
+  }
+
+  private async waitUntilStreamReady(timeoutMs: number): Promise<void> {
     if (this.streamReady) return;
     await new Promise<void>((resolve, reject) => {
       const startedAt = performance.now();
@@ -278,7 +313,7 @@ export class HeyGenStreamingAvatarOutput implements ResponseOutput {
           reject(new Error("HeyGen session was disposed before the stream became ready"));
           return;
         }
-        if (performance.now() - startedAt >= this.connectionTimeoutMs) {
+        if (performance.now() - startedAt >= timeoutMs) {
           reject(new Error("HeyGen video stream timed out"));
           return;
         }
