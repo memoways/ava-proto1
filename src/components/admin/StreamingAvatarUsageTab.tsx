@@ -30,7 +30,6 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 interface SessionRow {
   id: string;
-  created_at: string | null;
   started_at: string | null;
   ended_at: string | null;
   duration_seconds: number | null;
@@ -76,9 +75,9 @@ export default function StreamingAvatarUsageTab() {
     const { data, error } = await supabase
       .from("sessions")
       .select(
-        "id, created_at, started_at, ended_at, duration_seconds, output_mode, streaming_avatar_provider, streaming_avatar_session_id, streaming_avatar_connect_ms, streaming_avatar_first_frame_ms, streaming_avatar_first_speech_ms, streaming_avatar_fallback_reason"
+        "id, started_at, ended_at, duration_seconds, output_mode, streaming_avatar_provider, streaming_avatar_session_id, streaming_avatar_connect_ms, streaming_avatar_first_frame_ms, streaming_avatar_first_speech_ms, streaming_avatar_fallback_reason"
       )
-      .order("created_at", { ascending: false })
+      .order("started_at", { ascending: false })
       .limit(1000);
     if (error) toast.error("Erreur chargement consommation avatar: " + error.message);
     else setRows((data as unknown as SessionRow[]) || []);
@@ -96,7 +95,7 @@ export default function StreamingAvatarUsageTab() {
   const filtered = useMemo(
     () =>
       rows.filter((r) => {
-        const ts = r.created_at ?? r.started_at;
+        const ts = r.started_at;
         if (!ts || new Date(ts) < periodStart) return false;
         return (
           Boolean(r.streaming_avatar_provider) ||
@@ -148,7 +147,7 @@ export default function StreamingAvatarUsageTab() {
         ratePerMinute: rate,
         costUsd: (seconds / 60) * rate,
         lastFallback: lastFallback
-          ? { when: lastFallback.created_at ?? lastFallback.started_at, reason: lastFallback.streaming_avatar_fallback_reason }
+          ? { when: lastFallback.started_at, reason: lastFallback.streaming_avatar_fallback_reason }
           : null,
       };
     });
@@ -295,7 +294,7 @@ export default function StreamingAvatarUsageTab() {
               <tbody>
                 {recentSessions.map((r) => (
                   <tr key={r.id} className="border-t">
-                    <td className="px-3 py-2 whitespace-nowrap">{fmtDate(r.created_at ?? r.started_at)}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{fmtDate(r.started_at)}</td>
                     <td className="px-3 py-2 font-mono">{r.streaming_avatar_provider ?? "—"}</td>
                     <td className="px-3 py-2">{r.output_mode ?? "—"}</td>
                     <td className="px-3 py-2 text-right font-mono">{fmtMs(r.streaming_avatar_connect_ms)}</td>
