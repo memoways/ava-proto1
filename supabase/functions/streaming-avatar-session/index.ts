@@ -386,3 +386,27 @@ function json(body: unknown, status = 200): Response {
 function jsonError(message: string, status: number): Response {
   return json({ error: message }, status);
 }
+
+async function probeProvider(
+  url: string,
+  headerName: string,
+  apiKey: string | undefined,
+): Promise<{ configured: boolean; reachable: boolean; status?: number; error?: string }> {
+  if (!apiKey) return { configured: false, reachable: false, error: "missing secret" };
+  try {
+    const response = await fetch(url, { headers: { [headerName]: apiKey } });
+    const body = (await response.text()).slice(0, 200);
+    return {
+      configured: true,
+      reachable: response.ok,
+      status: response.status,
+      error: response.ok ? undefined : body,
+    };
+  } catch (error) {
+    return {
+      configured: true,
+      reachable: false,
+      error: error instanceof Error ? error.message.slice(0, 200) : "network error",
+    };
+  }
+}
