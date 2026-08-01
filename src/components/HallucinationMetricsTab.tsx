@@ -146,7 +146,7 @@ export default function HallucinationMetricsTab() {
               .filter((m) => m.withTrace > 0)
               .slice(0, 30)
               .map((m) => (
-                <div key={m.sessionId} className="grid grid-cols-6 gap-2 rounded border p-2">
+                <div key={m.sessionId} className="grid grid-cols-3 tablet-lg:grid-cols-6 gap-2 rounded border p-2">
                   <span className="font-mono truncate col-span-2">{m.sessionId.slice(0, 8)}…</span>
                   <span>{m.startedAt ? new Date(m.startedAt).toLocaleString("fr-FR") : "—"}</span>
                   <span>tours: {m.withTrace}</span>
