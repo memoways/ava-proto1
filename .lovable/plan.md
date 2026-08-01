@@ -1,84 +1,57 @@
-# STT Config — Dictionnaire visible + réglages API par service
+# Rendre l'application confortable sur tablette
 
-## Contexte
+Objectif : usage impeccable sur tablette (portrait ~820×1180 et paysage ~1180×820), côté expérience publique **et** côté admin. Le smartphone n'est pas une cible, mais rien ne doit casser en dessous.
 
-Le dictionnaire custom existe déjà (section "Dictionnaire custom (mots-clés)" dans `STTConfigTab`, stocké dans `admin_settings.ava_stt_dictionary`) mais est peu visible : situé sous la grille des providers, sans indication par-provider de qui l'utilise. Aucun réglage API par provider n'est actuellement exposé — seul le provider actif est configurable.
+## État constaté
 
-## Objectif
+- Aucun débordement horizontal global sur `/` en portrait ni paysage (scrollWidth = viewport).
+- Les écrans publics (Accueil, Rôle, Conversation, Questionnaire) utilisent déjà `max-w-*` + points de rupture `md:` : ils tiennent sur tablette, restent à ajuster sur le confort (hauteur, zones tactiles, `min-h-screen` sur iPad Safari).
+- L'admin est la vraie zone à risque : construite pour un grand écran (`max-w-7xl`), avec des éléments qui ne se replient pas :
+  - `TabsList` des groupes « Mécanique » (8 onglets) et « Technique » (7 onglets) sur une seule ligne, sans défilement.
+  - Tableaux larges (Consommation LLM, Voix, Streaming Avatar, Latence & blocage) : présents en `overflow-x-auto` par endroits, absents ailleurs.
+  - Sélecteurs à largeur fixe (`w-[130px]`, `w-[200px]`, `w-[230px]`, `w-[190px]`) qui forcent des lignes de filtres trop longues.
+  - Grilles qui passent de 1 à 3-4 colonnes dès `md:` (768px) : sur tablette portrait cela donne des colonnes de 180px illisibles (Latence & blocage `lg:grid-cols-3`, RAG Lab `xl:grid-cols-4`, colonnes `md:grid-cols-[260px_1fr]`).
+  - `ScrollArea h-[70vh]` en portrait : hauteur correcte, mais colonne détail juxtaposée trop étroite.
 
-1. Rendre évident où éditer le dictionnaire et quels providers l'utilisent.
-2. Exposer, par provider, les réglages API pertinents.
+## Travail à faire
 
-## 1 — Visibilité du dictionnaire
+### 1. Socle
+- Ajouter un point de rupture explicite tablette dans la config Tailwind (`tablet: 820px` / `tablet-landscape: 1100px`) pour éviter d'empiler des `md:`/`lg:` ambigus.
+- Utiliser `min-h-[100svh]` en complément de `min-h-screen` sur les écrans plein écran (barre d'URL iPad Safari).
+- Zones tactiles : porter les boutons/onglets/déclencheurs de l'admin à 40px de haut minimum.
 
-- Sur chaque carte provider dans la grille : badge **"Dictionnaire ✓"** ou **"Dictionnaire ✗"** (couleur secondaire vs muted) + tooltip texte court expliquant la méthode utilisée (`keyterm` / `keyterms_prompt` / `prompt` / non supporté).
-- Ajouter un champ `supportsDictionary: boolean` + `dictionaryMethod?: string` dans `STTProviderDefinition` (`src/services/stt/registry.ts`).
-- Déplacer la section "Dictionnaire custom" **au-dessus** de la grille providers (position plus proéminente) et lui donner un titre h3 plus visible avec le nombre de termes et un lien d'ancre.
+### 2. Expérience publique (retouches ciblées, pas de refonte)
+- Conversation : garder la vidéo/photo en `object-cover` plein cadre, remonter le bloc sous-titres pour qu'il ne soit pas collé au bord en paysage, agrandir le bouton micro sur tablette.
+- Accueil / Rôle / Questionnaire : élargir les conteneurs sur tablette (`max-w-2xl` → `max-w-3xl` à partir de 820px), agrandir les cases à cocher et curseurs pour le doigt.
+- Sélection de personnages : 2 colonnes en portrait, 4 en paysage (aujourd'hui 4 dès 768px, donc vignettes serrées en portrait).
 
-## 2 — Réglages API par provider
+### 3. Admin
+- **Navigation** : rendre les deux barres (groupes et onglets) défilables horizontalement avec indicateur de bord, sans réduire la taille du texte. Sur portrait, un menu déroulant d'onglets en repli si la barre dépasse.
+- **Tableaux** : wrapper `overflow-x-auto` systématique + entêtes collantes ; largeur minimale pour éviter l'écrasement des colonnes.
+- **Filtres** : remplacer les largeurs fixes par `w-full sm:w-auto min-w-[...]` dans un conteneur `flex-wrap`.
+- **Grilles** : décaler les seuils — 1 colonne en portrait, 2 en paysage, 3-4 seulement à partir du desktop, pour les onglets Latence & blocage, RAG Lab, Traces Max, Métriques, Consommation (LLM / Voix / Avatar), STT/LLM/TTS/Streaming Avatar Config.
+- **Vues maître-détail** (Embeddings, Éditeur personnage, Laboratoire RAG, Sessions) : passage en pile verticale en portrait (liste puis détail), côte à côte en paysage.
+- **Zones de texte de prompts** : hauteur relative au viewport plutôt que fixe, pour rester utilisables en paysage.
 
-Nouvelle structure : `admin_settings.ava_stt_provider_settings` = `{ deepgram: {...}, assemblyai: {...}, openai_whisper: {...}, gradium: {...}, gamilab: {...} }`, chargée/sauvée via un nouveau service `src/services/stt/providerSettings.ts` (miroir de `tts/providerSettings.ts`).
+### 4. Vérification
+- Captures Playwright sur `/` et `/admin` (chaque groupe d'onglets) en 820×1180 et 1180×820, contrôle `scrollWidth == viewport` et absence de texte tronqué.
+- Rejouer `npm run test:quality` et la suite e2e existante (les contrats média Chromium/Firefox/WebKit ne doivent pas bouger).
 
-Réglages exposés (uniquement ceux réellement utilisés par le code existant + quelques knobs API standard) :
+## Risques et régressions possibles
 
-**Deepgram** (streaming WS)
-- `model` (nova-3, nova-2, nova-2-general) — défaut nova-3
-- `language` (fr-FR, en-US, multi) — défaut fr-FR
-- `smart_format` bool
-- `punctuate` bool
-- `interim_results` bool
-- `endpointing` ms (0-2000, défaut 300)
-- `utterance_end_ms` (1000-3000, défaut 1500)
-- `vad_events` bool
-
-**AssemblyAI** (v3 streaming)
-- `format_turns` bool
-- `min_end_of_turn_silence_when_confident` ms (200-2000)
-- `end_of_turn_confidence_threshold` (0.1-1.0)
-
-**OpenAI Whisper** (batch)
-- `model` (whisper-1, gpt-4o-transcribe, gpt-4o-mini-transcribe)
-- `language` (fr, en, auto)
-- `temperature` (0.0-1.0)
-
-**Gradium** (batch STT)
-- `language` (fr, en, auto)
-- + note "réglages STT limités"
-
-**Gamilab** — pas de réglages API exposés (aucun paramètre SDK à ce jour → section grisée "Aucun paramètre configurable").
-
-Chaque provider affiche ses réglages dans un bloc dépliable (`<details>`) sur sa carte, avec un bouton **"Sauver réglages"** par provider (pas un save global — évite d'écraser les autres).
-
-## 3 — Câblage runtime
-
-- `deepgramSTT.ts` : `buildDeepgramWebSocketUrl` accepte déjà `keyterms` — lui passer aussi `model`, `language`, `smart_format`, `punctuate`, `interim_results`, `endpointing`, `utterance_end_ms`, `vad_events` depuis les settings chargés.
-- `assemblyaiSTT.ts` : ajouter les 3 paramètres de turn detection à l'URL WS.
-- `openaiWhisperSTT.ts` + `proxy-stt-whisper` : forwarder `model`, `language`, `temperature` dans le FormData.
-- `gradiumSTT.ts` : passer `language` au proxy Gradium STT (si le proxy l'accepte — sinon ajouter).
-
-Aucune migration DB : réutilise `admin_settings` (clé `ava_stt_provider_settings`).
+| Risque | Détail | Mitigation |
+| --- | --- | --- |
+| Contrats anti-régression média | `docs/core_experience_regression_contract.md` fige le comportement du lecteur vidéo et de l'audio ; toucher au conteneur de `ConversationScreen` peut faire échouer les tests e2e | Ne modifier que les classes de mise en page hors chaîne `<video>`/hls.js, ne pas remonter/démonter l'élément vidéo, relancer `test:e2e` |
+| Anti-flash avatar | Le figeage d'image repose sur un canvas superposé à la vidéo ; changer les tailles/positions peut réintroduire des flashs | Conserver la superposition exacte (`absolute inset-0`, `object-cover`), tester avec le panneau « Tester l'avatar » |
+| Tests de composants existants | `ConversationScreen.streamingAvatar.test.tsx`, `LatencyOverlay.test.tsx`, `PipelineSchema.test.tsx`, `PipelineTraceTab.test.tsx` s'appuient sur la structure rendue | Éviter d'ajouter/supprimer des nœuds ; ne changer que les `className`. Corriger les tests si un wrapper est indispensable |
+| Régression desktop | Repousser les seuils de colonnes peut appauvrir l'affichage sur grand écran | Ajouter les nouveaux seuils **en plus** des `lg:`/`xl:` existants, jamais en remplacement |
+| Barres d'onglets défilables | Un onglet actif hors champ devient invisible | Défilement automatique vers l'onglet actif à la sélection |
+| Confort tactile vs densité | Agrandir les cibles allonge les pages admin denses | Agrandissement limité aux points de rupture tablette |
+| Aucun changement métier | Le pipeline STT/LLM/TTS, les Edge Functions, la base et les secrets ne sont pas touchés | Chantier strictement présentation (JSX/classes + config Tailwind) |
 
 ## Détails techniques
 
-```text
-src/services/stt/
-├── registry.ts                (+ supportsDictionary, dictionaryMethod)
-├── providerSettings.ts        (NEW — load/save/reset per-provider)
-├── providers/
-│   ├── assemblyaiSTT.ts       (edit — lire settings)
-│   ├── openaiWhisperSTT.ts    (edit — envoyer settings au proxy)
-│   └── gradiumSTT.ts          (edit — langue)
-├── deepgramSTT.ts             (edit — knobs URL WS)
-src/components/
-├── STTConfigTab.tsx           (refactor — dictionnaire en tête, badges, blocs réglages)
-└── stt/                       (NEW dossier)
-    └── ProviderSettingsPanel.tsx   (composant par-provider)
-supabase/functions/
-└── proxy-stt-whisper/index.ts (edit — accepter model/language/temperature)
-```
-
-## Hors scope
-
-- Réglages Gamilab (aucune API publique documentée pour le SDK)
-- Filler tokens Whisper avancés / autres modèles STT
-- Preview de transcription à chaud dans l'admin
+- Fichiers concernés côté socle : `tailwind.config.ts`, `src/index.css`.
+- Écrans publics : `src/components/prd4/*.tsx` (Welcome, RoleCapture, PostureCapture, Conversation, Questionnaire, CharacterSelect, RoleSummary, EndSession), `src/components/CharacterSelectScreen.tsx`, `src/components/SubtitleOverlay.tsx`.
+- Admin : `src/pages/Admin.tsx` (barres de navigation), `src/components/admin/*.tsx`, `src/components/{LatencyBlockingTab,LatencyTelemetryTab,RAGLabTab,PipelineTraceTab,HallucinationMetricsTab,AntiHallucinationValidatorTab,STTConfigTab,LLMConfigTab,TTSConfigTab,StreamingAvatarConfigTab,GameMasterConfigTab,CharacterEditorTab,VideoTriggersEditor}.tsx`.
+- Aucune migration SQL, aucun redéploiement d'Edge Function.
