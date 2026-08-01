@@ -65,7 +65,7 @@ const Radio = <T extends string>({
           key={opt.value}
           type="button"
           onClick={() => onChange(opt.value)}
-          className={`rounded-md border px-3 py-1.5 text-xs transition-all ${
+          className={`min-h-10 rounded-md border px-3 py-2 text-xs transition-all tablet:text-sm ${
             value === opt.value
               ? "border-primary bg-primary/10 text-primary"
               : "border-border text-muted-foreground hover:border-primary/50"
