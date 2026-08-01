@@ -1288,7 +1288,7 @@ function SegmentDetailSheet({
                     <span className="text-foreground">{selection.diagnostic.distribution}</span>
                   </div>
                   {selection.baseline && selection.baseline.n >= 2 && (
-                    <div className="grid grid-cols-4 gap-2 pt-2 border-t mt-2 text-[11px]">
+                    <div className="grid grid-cols-2 tablet-lg:grid-cols-4 gap-2 pt-2 border-t mt-2 text-[11px]">
                       <div>
                         <div className="text-muted-foreground">n</div>
                         <div className="font-mono">{selection.baseline.n}</div>
