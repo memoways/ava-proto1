@@ -151,7 +151,7 @@ export default function GameMasterConfigTab() {
               value={gameplay.MAX_PROMPT_VARIANT}
               onValueChange={(value: "legacy" | "compact_v1" | "rich_v2") => updateGameplay({ MAX_PROMPT_VARIANT: value })}
             >
-              <SelectTrigger className="w-[190px]">
+              <SelectTrigger className="w-full min-w-[190px] sm:w-auto">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
