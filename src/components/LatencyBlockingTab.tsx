@@ -1000,7 +1000,7 @@ function SegmentEvolutionChart({
           </div>
         </div>
         <Select value={selectedService} onValueChange={onServiceChange}>
-          <SelectTrigger className="h-8 text-xs w-[230px]">
+          <SelectTrigger className="h-9 text-xs w-full min-w-[230px] sm:w-auto">
             <SelectValue placeholder="Service" />
           </SelectTrigger>
           <SelectContent>
