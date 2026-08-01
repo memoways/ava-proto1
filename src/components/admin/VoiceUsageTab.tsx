@@ -159,7 +159,7 @@ export default function VoiceUsageTab() {
   return (
     <div className="space-y-6">
       {/* Header KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 tablet:grid-cols-3 tablet-lg:grid-cols-6 gap-3">
         <KPI label="Requêtes (période)" value={String(totalReqs)} />
         <KPI label="Erreurs" value={String(totalErrors)} tone={totalErrors > 0 ? "warn" : "ok"} />
         <KPI
