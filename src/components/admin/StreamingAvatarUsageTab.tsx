@@ -198,7 +198,7 @@ export default function StreamingAvatarUsageTab() {
 
       <div className="flex flex-wrap gap-3 items-center">
         <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-9 w-full min-w-[130px] text-xs sm:w-auto"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="24h">24 heures</SelectItem>
             <SelectItem value="7d">7 jours</SelectItem>
