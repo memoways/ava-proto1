@@ -330,7 +330,7 @@ export default function LatencyTelemetryTab() {
         ))}
       </div>
 
-      <ScrollArea className="h-[520px] border rounded">
+      <ScrollArea className="h-[60vh] max-h-[520px] min-h-[320px] border rounded">
         <div className="p-2 space-y-1">
           {turns.map((t) => {
             const total = serviceTurnTotal(t);

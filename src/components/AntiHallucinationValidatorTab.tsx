@@ -186,7 +186,8 @@ export default function AntiHallucinationValidatorTab() {
             id="validator-authorized-facts"
             value={settings.authorizedFacts}
             onChange={(event) => updateField("authorizedFacts", event.target.value)}
-            className="min-h-[220px] font-mono text-sm"
+            className="min-h-[220px] font-mono text-sm tablet-lg:min-h-[30vh]"
+
           />
         </div>
 
@@ -197,7 +198,7 @@ export default function AntiHallucinationValidatorTab() {
             id="validator-blocked-rules"
             value={settings.blockedAssertionRules}
             onChange={(event) => updateField("blockedAssertionRules", event.target.value)}
-            className="min-h-[220px] font-mono text-sm"
+            className="min-h-[220px] font-mono text-sm tablet-lg:min-h-[30vh]"
           />
         </div>
       </section>

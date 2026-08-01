@@ -316,7 +316,7 @@ export default function Admin() {
         </p>
 
         {/* ===== GROUP SELECTOR ===== */}
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="scroll-tabs -mx-4 mb-4 flex gap-2 px-4 tablet:mx-0 tablet:flex-wrap tablet:px-0">
           {TAB_GROUPS.map((group) => (
             <button
               key={group.id}
@@ -324,7 +324,7 @@ export default function Admin() {
                 setActiveGroup(group.id);
                 setActiveTab(group.tabs[0].id);
               }}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${
+              className={`shrink-0 whitespace-nowrap rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
                 activeGroup === group.id
                   ? "bg-primary/10 border-primary text-primary"
                   : "bg-muted/30 border-transparent text-muted-foreground hover:bg-muted/50"
@@ -334,6 +334,7 @@ export default function Admin() {
             </button>
           ))}
         </div>
+
 
         {/* ===== TABS WITHIN GROUP ===== */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -357,21 +358,33 @@ export default function Admin() {
             </div>
           )}
           {currentGroup && currentGroup.tabs.length > 1 && (
-            <TabsList className="mb-4">
-              {currentGroup.tabs.map((tab) => {
-                let count = "";
-                if (tab.id === "sessions") count = ` (${sessions.length})`;
-                if (tab.id === "questionnaires") count = ` (${sessions.filter(s => s.questionnaire_responses).length})`;
-                if (tab.id === "characters") count = ` (${characters.length})`;
-                if (tab.id === "embeddings") count = ` (${embeddings.length})`;
-                return (
-                  <TabsTrigger key={tab.id} value={tab.id}>
-                    {tab.label}{count}
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
+            <div className="scroll-tabs -mx-4 mb-4 px-4 tablet:mx-0 tablet:px-0">
+              <TabsList className="h-auto w-max justify-start p-1">
+                {currentGroup.tabs.map((tab) => {
+                  let count = "";
+                  if (tab.id === "sessions") count = ` (${sessions.length})`;
+                  if (tab.id === "questionnaires") count = ` (${sessions.filter(s => s.questionnaire_responses).length})`;
+                  if (tab.id === "characters") count = ` (${characters.length})`;
+                  if (tab.id === "embeddings") count = ` (${embeddings.length})`;
+                  return (
+                    <TabsTrigger
+                      key={tab.id}
+                      value={tab.id}
+                      ref={(node) => {
+                        if (node && tab.id === activeTab) {
+                          node.scrollIntoView({ block: "nearest", inline: "nearest" });
+                        }
+                      }}
+                      className="min-h-10 shrink-0 whitespace-nowrap"
+                    >
+                      {tab.label}{count}
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </div>
           )}
+
 
           {/* ==================== SESSIONS ==================== */}
           <TabsContent value="sessions">

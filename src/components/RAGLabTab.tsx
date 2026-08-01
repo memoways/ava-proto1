@@ -253,7 +253,7 @@ export default function RAGLabTab() {
           <CardDescription>Les chunks du personnage sélectionné et les chunks partagés sont les seuls documents éligibles.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-[260px_1fr]">
+          <div className="grid gap-4 tablet-lg:grid-cols-[260px_1fr]">
             <div className="space-y-2">
               <Label>Personnage</Label>
               <Select value={characterId} onValueChange={setCharacterId}>

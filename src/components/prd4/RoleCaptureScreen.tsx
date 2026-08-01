@@ -117,8 +117,9 @@ const RoleCaptureScreen = ({ onSubmit, onPTTError, submitting = false }: Props) 
   const canSubmit = transcript.trim().length >= MIN_CHARS && !recording && !finalizing && !submitting;
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10">
-      <div className="mx-auto w-full max-w-2xl space-y-7">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10 tablet:px-10">
+      <div className="mx-auto w-full max-w-2xl space-y-7 tablet:max-w-3xl">
+
         <header className="space-y-3 text-center">
           <h2 className="font-serif text-3xl font-light text-foreground md:text-4xl">
             À toi de jouer.

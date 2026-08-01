@@ -36,7 +36,7 @@ const CharacterSelectScreen = ({ onSelectMax, onLockedClick }: Props) => {
           À qui veux-tu parler&nbsp;?
         </h2>
 
-        <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:gap-6 tablet-lg:grid-cols-4">
           {CHARACTERS.map((c) => {
             const cardBase =
               "group relative flex flex-col items-center gap-3 rounded-lg border bg-card/60 p-4 transition-all duration-200";

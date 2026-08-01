@@ -236,8 +236,9 @@ const ConversationScreen = ({
       <div className="flex-1" />
 
       {/* Bottom: Max line, then user line (subtitle style — replaced each turn) */}
-      <section className="relative z-10 px-4 pb-6 md:px-8 md:pb-8">
-        <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-3">
+      <section className="relative z-10 px-4 pb-6 md:px-8 md:pb-8 tablet:pb-10">
+        <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-3 tablet:gap-4">
+
           {displayedMax && (
             <p className="text-center font-serif text-xl leading-snug text-foreground drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] md:text-2xl transition-opacity duration-200">
               {displayedMax}
@@ -267,7 +268,7 @@ const ConversationScreen = ({
             onClick={handleToggleTalk}
             disabled={disabled}
             className={cn(
-              "mt-1 flex items-center gap-3 rounded-full border-2 px-6 py-3 text-sm font-semibold uppercase tracking-wider backdrop-blur-md transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40",
+              "mt-1 flex min-h-12 items-center gap-3 rounded-full border-2 px-6 py-3 text-sm font-semibold uppercase tracking-wider backdrop-blur-md transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 tablet:min-h-14 tablet:px-8 tablet:text-base",
               recording
                 ? "border-destructive bg-destructive text-destructive-foreground shadow-[0_0_36px_-4px_hsl(var(--destructive)/0.8)] animate-pulse"
                 : "border-primary bg-primary text-primary-foreground hover:brightness-110",

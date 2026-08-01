@@ -40,9 +40,10 @@ const WelcomeScreen = ({
   }, []);
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10 text-center tablet:px-10">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[hsl(var(--fade-overlay))]" />
-      <div className="relative z-10 w-full max-w-2xl">
+      <div className="relative z-10 w-full max-w-2xl tablet:max-w-3xl">
+
         <div className="space-y-8">
           <h1 className="font-serif text-5xl font-light tracking-tight text-foreground md:text-7xl">
             Où est Ava&nbsp;?

@@ -41,7 +41,7 @@ const Slider = ({ label, value, onChange }: { label: string; value: number; onCh
       max={5}
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="w-full accent-primary"
+      className="h-6 w-full cursor-pointer accent-primary"
     />
   </div>
 );
@@ -65,7 +65,7 @@ const Radio = <T extends string>({
           key={opt.value}
           type="button"
           onClick={() => onChange(opt.value)}
-          className={`rounded-md border px-3 py-1.5 text-xs transition-all ${
+          className={`min-h-10 rounded-md border px-3 py-2 text-xs transition-all tablet:text-sm ${
             value === opt.value
               ? "border-primary bg-primary/10 text-primary"
               : "border-border text-muted-foreground hover:border-primary/50"
@@ -87,8 +87,9 @@ const QuestionnaireScreenPRD4 = ({ teaserSeen, onSubmit, onSkip, submitting }: P
     setA((prev) => ({ ...prev, [key]: value }));
 
   return (
-    <div className="min-h-screen bg-background px-6 py-10">
-      <div className="mx-auto max-w-xl space-y-8">
+    <div className="min-h-screen bg-background px-6 py-10 tablet:px-10">
+      <div className="mx-auto max-w-xl space-y-8 tablet:max-w-2xl">
+
         <header className="space-y-2 text-center">
           <p className="text-xs font-mono uppercase tracking-[0.3em] text-primary">Feedback</p>
           <h2 className="font-serif text-3xl text-foreground">Ton retour sur l'expérience</h2>

@@ -854,7 +854,7 @@ function ServiceComparisonPanel({
           </p>
         </div>
         <Select value={metric} onValueChange={(v) => onMetricChange(v as MetricMode)}>
-          <SelectTrigger className="h-8 text-xs w-[110px]">
+          <SelectTrigger className="h-9 text-xs w-full min-w-[110px] sm:w-auto">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1000,7 +1000,7 @@ function SegmentEvolutionChart({
           </div>
         </div>
         <Select value={selectedService} onValueChange={onServiceChange}>
-          <SelectTrigger className="h-8 text-xs w-[230px]">
+          <SelectTrigger className="h-9 text-xs w-full min-w-[230px] sm:w-auto">
             <SelectValue placeholder="Service" />
           </SelectTrigger>
           <SelectContent>
@@ -1288,7 +1288,7 @@ function SegmentDetailSheet({
                     <span className="text-foreground">{selection.diagnostic.distribution}</span>
                   </div>
                   {selection.baseline && selection.baseline.n >= 2 && (
-                    <div className="grid grid-cols-4 gap-2 pt-2 border-t mt-2 text-[11px]">
+                    <div className="grid grid-cols-2 tablet-lg:grid-cols-4 gap-2 pt-2 border-t mt-2 text-[11px]">
                       <div>
                         <div className="text-muted-foreground">n</div>
                         <div className="font-mono">{selection.baseline.n}</div>
@@ -1930,7 +1930,7 @@ export default function LatencyBlockingTab() {
                     value={minSeverity}
                     onValueChange={(v) => setMinSeverity(v as SeverityFilter)}
                   >
-                    <SelectTrigger className="h-8 text-xs w-[160px]">
+                    <SelectTrigger className="h-9 text-xs w-full min-w-[160px] sm:w-auto">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

@@ -159,7 +159,7 @@ export default function VoiceUsageTab() {
   return (
     <div className="space-y-6">
       {/* Header KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 tablet:grid-cols-3 tablet-lg:grid-cols-6 gap-3">
         <KPI label="Requêtes (période)" value={String(totalReqs)} />
         <KPI label="Erreurs" value={String(totalErrors)} tone={totalErrors > 0 ? "warn" : "ok"} />
         <KPI
@@ -187,7 +187,7 @@ export default function VoiceUsageTab() {
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
         <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-9 w-full min-w-[130px] text-xs sm:w-auto"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="24h">24 heures</SelectItem>
             <SelectItem value="7d">7 jours</SelectItem>

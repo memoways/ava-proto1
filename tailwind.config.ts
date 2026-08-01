@@ -12,6 +12,17 @@ export default {
         "2xl": "1400px",
       },
     },
+    screens: {
+      sm: "640px",
+      md: "768px",
+      /** Tablette portrait (iPad 10" ≈ 820px) */
+      tablet: "820px",
+      lg: "1024px",
+      /** Tablette paysage (iPad 10" ≈ 1180px) */
+      "tablet-lg": "1100px",
+      xl: "1280px",
+      "2xl": "1536px",
+    },
     extend: {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
