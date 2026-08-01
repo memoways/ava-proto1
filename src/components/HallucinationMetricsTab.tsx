@@ -107,7 +107,7 @@ export default function HallucinationMetricsTab() {
         </Button>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 tablet-lg:grid-cols-4">
         <SummaryCard label="Tours analysés" value={totals.withTrace} hint={`${totals.turns} entrées brutes`} />
         <SummaryCard label="Régénérations" value={`${totals.regen} (${regenRate}%)`} hint="Tours avec retry" />
         <SummaryCard label="Fallbacks" value={`${totals.fallback} (${fallbackRate}%)`} hint="Réponse de prudence" tone={fallbackRate > 10 ? "danger" : "ok"} />
