@@ -854,7 +854,7 @@ function ServiceComparisonPanel({
           </p>
         </div>
         <Select value={metric} onValueChange={(v) => onMetricChange(v as MetricMode)}>
-          <SelectTrigger className="h-8 text-xs w-[110px]">
+          <SelectTrigger className="h-9 text-xs w-full min-w-[110px] sm:w-auto">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
