@@ -73,7 +73,7 @@ const CharacterSelectScreen = ({ onSelect }: CharacterSelectScreenProps) => {
         </p>
       </div>
 
-      <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-5 max-w-4xl w-full animate-fade-in">
+      <div className="relative z-10 grid grid-cols-2 tablet-lg:grid-cols-4 gap-5 max-w-4xl w-full animate-fade-in">
         {CHARACTERS.map((c) => {
           const isHover = hovered === c.id;
           return (
