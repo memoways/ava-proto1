@@ -191,7 +191,7 @@ export default function PipelineTraceTab() {
           <CardTitle className="text-base">Session et tour</CardTitle>
           <CardDescription>Seules les sessions explicitement lancées en diagnostic sont proposées.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-[1fr_220px_auto]">
+        <CardContent className="grid gap-3 tablet-lg:grid-cols-[1fr_220px_auto]">
           <Select value={selectedSessionId} onValueChange={selectSession}>
             <SelectTrigger><SelectValue placeholder="Choisir une session tracée" /></SelectTrigger>
             <SelectContent>
