@@ -41,7 +41,7 @@ const Slider = ({ label, value, onChange }: { label: string; value: number; onCh
       max={5}
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="w-full accent-primary"
+      className="h-6 w-full cursor-pointer accent-primary"
     />
   </div>
 );
