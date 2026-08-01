@@ -236,8 +236,9 @@ const ConversationScreen = ({
       <div className="flex-1" />
 
       {/* Bottom: Max line, then user line (subtitle style — replaced each turn) */}
-      <section className="relative z-10 px-4 pb-6 md:px-8 md:pb-8">
-        <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-3">
+      <section className="relative z-10 px-4 pb-6 md:px-8 md:pb-8 tablet:pb-10">
+        <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-3 tablet:gap-4">
+
           {displayedMax && (
             <p className="text-center font-serif text-xl leading-snug text-foreground drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] md:text-2xl transition-opacity duration-200">
               {displayedMax}
