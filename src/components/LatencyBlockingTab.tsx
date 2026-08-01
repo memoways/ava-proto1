@@ -1930,7 +1930,7 @@ export default function LatencyBlockingTab() {
                     value={minSeverity}
                     onValueChange={(v) => setMinSeverity(v as SeverityFilter)}
                   >
-                    <SelectTrigger className="h-8 text-xs w-[160px]">
+                    <SelectTrigger className="h-9 text-xs w-full min-w-[160px] sm:w-auto">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
