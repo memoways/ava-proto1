@@ -172,7 +172,7 @@ export default function StreamingAvatarUsageTab() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 tablet:grid-cols-3 tablet-lg:grid-cols-6 gap-3">
         <KPI label="Sessions avatar" value={String(totalSessions)} />
         <KPI label="Replis TTS" value={String(totalFallbacks)} tone={totalFallbacks > 0 ? "warn" : "ok"} />
         <KPI
