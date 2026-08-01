@@ -87,8 +87,9 @@ const QuestionnaireScreenPRD4 = ({ teaserSeen, onSubmit, onSkip, submitting }: P
     setA((prev) => ({ ...prev, [key]: value }));
 
   return (
-    <div className="min-h-screen bg-background px-6 py-10">
-      <div className="mx-auto max-w-xl space-y-8">
+    <div className="min-h-screen bg-background px-6 py-10 tablet:px-10">
+      <div className="mx-auto max-w-xl space-y-8 tablet:max-w-2xl">
+
         <header className="space-y-2 text-center">
           <p className="text-xs font-mono uppercase tracking-[0.3em] text-primary">Feedback</p>
           <h2 className="font-serif text-3xl text-foreground">Ton retour sur l'expérience</h2>
