@@ -174,7 +174,7 @@ export default function LLMUsageTab() {
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 tablet-lg:grid-cols-5 gap-3">
         <KPICard label="Coût total (filtre)" value={fmtCost(totalCost)} />
         <KPICard label="Coût aujourd'hui" value={fmtCost(costToday)} />
         <KPICard label="Coût 30 jours" value={fmtCost(cost30d)} />
@@ -182,7 +182,7 @@ export default function LLMUsageTab() {
         <KPICard label="Tokens total" value={fmtTokens(totalTokensSum)} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 tablet-lg:grid-cols-4 gap-3">
         <KPICard label="Erreurs coût total" value={String(costErrors.length)} />
         <KPICard label="Erreurs aujourd'hui" value={String(errorsToday)} />
         <KPICard label="404 coût" value={String(errorCounts.not_found || 0)} />
@@ -192,7 +192,7 @@ export default function LLMUsageTab() {
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
         <Select value={filterPeriod} onValueChange={setFilterPeriod}>
-          <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-9 w-full min-w-[130px] text-xs sm:w-auto"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="today">Aujourd'hui</SelectItem>
             <SelectItem value="7d">7 jours</SelectItem>
@@ -201,26 +201,27 @@ export default function LLMUsageTab() {
           </SelectContent>
         </Select>
         <Select value={filterModel} onValueChange={setFilterModel}>
-          <SelectTrigger className="w-[200px] h-8 text-xs"><SelectValue placeholder="Modèle" /></SelectTrigger>
+          <SelectTrigger className="h-9 w-full min-w-[200px] text-xs sm:w-auto"><SelectValue placeholder="Modèle" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous les modèles</SelectItem>
             {uniqueModels.map(m => <SelectItem key={m} value={m}>{m.split("/").pop()}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterFeature} onValueChange={setFilterFeature}>
-          <SelectTrigger className="w-[150px] h-8 text-xs"><SelectValue placeholder="Feature" /></SelectTrigger>
+          <SelectTrigger className="h-9 w-full min-w-[150px] text-xs sm:w-auto"><SelectValue placeholder="Feature" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Toutes features</SelectItem>
             {uniqueFeatures.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="Statut" /></SelectTrigger>
+          <SelectTrigger className="h-9 w-full min-w-[130px] text-xs sm:w-auto"><SelectValue placeholder="Statut" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous statuts</SelectItem>
             {uniqueStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
+
         <Button size="sm" variant="outline" onClick={loadData} disabled={loading}>
           {loading ? "..." : "Rafraîchir"}
         </Button>
