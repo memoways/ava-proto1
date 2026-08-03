@@ -1993,7 +1993,11 @@ export default function LatencyBlockingTab() {
                     onHighlightSession={setHighlightedEvolutionSessionId}
                   />
                 </div>
+                <div className="mt-4">
+                  <LLMTokenCostPanel sessionIds={selectedAggregates.map((a) => a.session.id)} />
+                </div>
               </>
+
             ) : (
               <p className="text-sm text-muted-foreground py-8 text-center">
                 Aucune donnée à comparer. Coche des sessions dans la liste à gauche.
