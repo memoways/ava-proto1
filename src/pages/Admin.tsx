@@ -10,6 +10,7 @@ import { AVA_NOTION_DATABASES } from "@/services/ragService";
 import { clearSystemPromptCache } from "@/agents/maxAgent";
 import { hydrateAllSettings } from "@/services/settingsService";
 import LLMConfigTab from "@/components/LLMConfigTab";
+import RAGConfigTab from "@/components/RAGConfigTab";
 import TTSConfigTab from "@/components/TTSConfigTab";
 import STTConfigTab from "@/components/STTConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
@@ -85,6 +86,7 @@ const TAB_GROUPS = [
     label: "🔧 Technique",
     tabs: [
       { id: "stt", label: "STT Config" },
+      { id: "rag", label: "RAG Config" },
       { id: "llm", label: "LLM Config" },
       { id: "voice", label: "TTS Config" },
       { id: "streaming-avatar", label: "Streaming Avatar Config" },
@@ -499,6 +501,10 @@ export default function Admin() {
           </TabsContent>
 
           {/* ==================== LLM CONFIG ==================== */}
+          <TabsContent value="rag">
+            <RAGConfigTab />
+          </TabsContent>
+
           <TabsContent value="llm">
             <LLMConfigTab />
           </TabsContent>
