@@ -130,11 +130,13 @@ export async function processConversationTurn(
       }
 
       const qStart = performance.now();
-      const matches = await queryRAG(userMessage, recentMessages, gameplay.RAG_TOP_K, undefined, {
+      const matches = await queryRAG(userMessage, recentMessages, gameplay.RAG_TOP_K, gameplay.RAG_MATCH_THRESHOLD, {
         rewrittenQuery,
         rerank: gameplay.RAG_RERANK_ENABLED,
         retrieveK: gameplay.RAG_RETRIEVE_K,
         provider: gameplay.RAG_EMBEDDING_PROVIDER,
+        rerankModel: gameplay.RAG_RERANK_MODEL,
+        rerankTruncation: gameplay.RAG_RERANK_TRUNCATION,
       });
       subTimings.query_ms = Math.round(performance.now() - qStart);
       subTimings.matches_count = matches.length;
