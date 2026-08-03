@@ -128,6 +128,16 @@ export const OPENROUTER_MODELS: OpenRouterModel[] = [
     cons: ["Moins créatif que GPT-5", "Peut lisser les nuances émotionnelles"],
   },
   {
+    id: "openai/gpt-5.6-luna",
+    label: "GPT-5.6 Luna",
+    description: "Génération 5.6 rapide et très économique — idéal live et GM",
+    tier: "fast",
+    costInput: "$0.10",
+    costOutput: "$0.60",
+    pros: ["Le moins cher des OpenAI récents", "Latence très basse (raisonnement désactivable)", "Contexte 1M tokens", "Excellent en JSON structuré"],
+    cons: ["Ne supporte ni temperature ni top_p (ignorés)", "Moins nuancé que GPT-5 sur le roleplay long"],
+  },
+  {
     id: "openai/gpt-4o",
     label: "GPT-4o",
     description: "Polyvalent, référence stable — bonne baseline",
