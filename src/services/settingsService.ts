@@ -128,6 +128,16 @@ export const OPENROUTER_MODELS: OpenRouterModel[] = [
     cons: ["Moins créatif que GPT-5", "Peut lisser les nuances émotionnelles"],
   },
   {
+    id: "openai/gpt-5.6-luna",
+    label: "GPT-5.6 Luna",
+    description: "Génération 5.6 rapide et très économique — idéal live et GM",
+    tier: "fast",
+    costInput: "$0.10",
+    costOutput: "$0.60",
+    pros: ["Le moins cher des OpenAI récents", "Latence très basse (raisonnement désactivable)", "Contexte 1M tokens", "Excellent en JSON structuré"],
+    cons: ["Ne supporte ni temperature ni top_p (ignorés)", "Moins nuancé que GPT-5 sur le roleplay long"],
+  },
+  {
     id: "openai/gpt-4o",
     label: "GPT-4o",
     description: "Polyvalent, référence stable — bonne baseline",
@@ -496,6 +506,12 @@ export interface GameplaySettings {
   /** Legacy A/B pipeline only. PRD4 deliberately never performs an LLM query rewrite. */
   RAG_QUERY_REWRITE_ENABLED: boolean;
   RAG_EMBEDDING_PROVIDER: "voyage" | "openai";
+  /** Seuil cosine minimal appliqué par pgvector avant reranking. */
+  RAG_MATCH_THRESHOLD: number;
+  /** Reranker Voyage utilisé quand le rerank est actif. */
+  RAG_RERANK_MODEL: "rerank-2.5" | "rerank-2.5-lite";
+  /** Autorise Voyage à tronquer les documents trop longs envoyés au reranker. */
+  RAG_RERANK_TRUNCATION: boolean;
   RAG_SUMMARY_EVERY_N_TURNS: number;
   VIDEO_PLACEHOLDER_DURATION: number;
 }
@@ -521,6 +537,9 @@ const gameplayDefaults: GameplaySettings = {
   RAG_RERANK_ENABLED: (defaultSettings as any).RAG_RERANK_ENABLED ?? true,
   RAG_QUERY_REWRITE_ENABLED: (defaultSettings as any).RAG_QUERY_REWRITE_ENABLED ?? true,
   RAG_EMBEDDING_PROVIDER: ((defaultSettings as any).RAG_EMBEDDING_PROVIDER as "voyage" | "openai") ?? "voyage",
+  RAG_MATCH_THRESHOLD: (defaultSettings as any).RAG_MATCH_THRESHOLD ?? 0.3,
+  RAG_RERANK_MODEL: ((defaultSettings as any).RAG_RERANK_MODEL as "rerank-2.5" | "rerank-2.5-lite") ?? "rerank-2.5",
+  RAG_RERANK_TRUNCATION: (defaultSettings as any).RAG_RERANK_TRUNCATION ?? true,
   RAG_SUMMARY_EVERY_N_TURNS: (defaultSettings as any).RAG_SUMMARY_EVERY_N_TURNS ?? 4,
   VIDEO_PLACEHOLDER_DURATION: defaultSettings.VIDEO_PLACEHOLDER_DURATION,
 };
