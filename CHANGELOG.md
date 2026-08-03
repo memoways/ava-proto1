@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.52.0] - 2026-08-03 — RAG Config, GPT-5.6 Luna, tablette et résilience proxy STT
+
+### Ajouté
+- Nouvel onglet **Admin → Technique → RAG Config** (positionné avant **LLM Config**) : pipeline RAG étape par étape, réglages Voyage (provider d’embedding, modèle de reranking, troncature, seuil cosine, `retrieve_k`, `top_k`) et, pour chaque paramètre, explication des enjeux et compromis latence / recall / coût.
+- Modèle **GPT-5.6 Luna** (`openai/gpt-5.6-luna`) ajouté via OpenRouter dans `settingsService.ts`, `llmModelCapabilities.ts` et `supabase/functions/proxy-llm/payload.ts` : température et `top_p` automatiquement omis, reasoning forcé à `none` pour respecter les contraintes du modèle.
+- Paramètres RAG Voyage persistants dans `GameplaySettings` (`RAG_MATCH_THRESHOLD`, `RAG_RERANK_MODEL`, `RAG_RERANK_TRUNCATION`) et intégrés dans `prd4Orchestrator.ts`, `conversationOrchestrator.ts` et `src/config/settings.json`.
+
+### Modifié
+- Responsive tablette pour toute l’application : breakpoints `820px` et `1100px` dans `tailwind.config.ts`, utilisation de `100svh`, classes `.scroll-tabs`, grids adaptatives, onglets défilants et cibles tactiles plus grandes dans l’admin et l’expérience publique.
+- Les réglages RAG quittent **Game Master Config** pour vivre dans leur onglet dédié ; l’ancien onglet renvoie vers le nouveau.
+
+### Corrigé
+- Erreur `429 Rate limit exceeded` sur l’Edge Function `proxy-stt-config` : `src/services/stt/runtimeConfig.ts` met désormais la configuration en cache avec une seule promesse partagée entre tous les appelants et applique un back-off de 30 s en cas d’échec. Plus d’écran blanc, plus d’appels parallèles en cascade.
+
 ## [0.51.0] - 2026-07-30 — Streaming Avatar : test privé, stabilité d’image et consommation
 
 ### Ajouté

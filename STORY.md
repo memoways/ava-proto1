@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-07-30 (streaming avatar : test privé, image figée, consommation)
+> **Last Updated**: 2026-08-03 (RAG Config, GPT-5.6 Luna, responsive tablette, résilience proxy STT)
 
 ---
 
@@ -72,6 +72,21 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-03 — RAG Config, GPT-5.6 Luna, responsive tablette et résilience proxy STT 🔷
+
+**Intent.** Donner à l’administrateur un contrôle fin et documenté du RAG, élargir la palette de modèles OpenRouter, rendre l’application confortable sur tablette, et empêcher un rate-limit de l’Edge Function de configuration STT de provoquer un écran blanc.
+
+**RAG Config dédié.** L’ancien bloc RAG est sorti de **Game Master Config** pour devenir un onglet **Technique** à part entière, placé avant **LLM Config**. Un « Pipeline Explainer » décrit chaque étape (embedding, retrieval pgvector, reranking Voyage, injection dans le prompt). Chaque réglage expose non seulement sa valeur, mais la différence entre les extrêmes et le compromis (ex. : seuil cosine haut = précision mais moins de recall, `retrieve_k` grand = meilleur vivier mais plus de tokens et de latence). Les paramètres Voyage (`RAG_MATCH_THRESHOLD`, `RAG_RERANK_MODEL`, `RAG_RERANK_TRUNCATION`) sont désormais persistants dans `GameplaySettings` et consommés par les orchestrateurs de conversation.
+
+**GPT-5.6 Luna.** Le modèle `openai/gpt-5.6-luna` est intégré via OpenRouter. Pour rester compatible avec les exigences du modèle, le proxy supprime automatiquement `temperature` et `top_p` et envoie `reasoning: { effort: "none" }`. Il est disponible à la fois pour Max et pour le Game Master dans l’onglet **LLM Config**.
+
+**Responsive tablette.** L’application est repassée en revue pour une utilisation fluide sur tablette (paysage et portrait) : breakpoints `820px` et `1100px`, hauteurs en `100svh`, onglets d’admin scrollables, grids adaptatives, boutons et curseurs plus grands. Le smartphone n’est pas la cible, mais l’expérience publique et les écrans admin doivent rester lisibles et utilisables sans zoom ni débordement horizontal.
+
+**Résilience de `proxy-stt-config`.** La fonction était appelée en rafale par de multiples composants en parallèle et renvoyait un `429 Rate limit exceeded`, provoquant un écran blanc. `src/services/stt/runtimeConfig.ts` implémente désormais un cache partagé avec une seule promesse en vol, et un back-off de 30 s en cas d’échec. Les appelants suivants récupèrent la même réponse, sans multiplication des requêtes vers Lovable Cloud.
+
+**Fichiers.** `src/components/RAGConfigTab.tsx`, `src/pages/Admin.tsx`, `src/components/GameMasterConfigTab.tsx`, `src/services/settingsService.ts`, `src/services/llmModelCapabilities.ts`, `src/config/settings.json`, `src/services/stt/runtimeConfig.ts`, `tailwind.config.ts`, `src/index.css`, `supabase/functions/proxy-llm/payload.ts`.
+
 
 ### 2026-07-30 — Streaming avatar : nomenclature Tavus, test privé, image figée et consommation 🔷
 
