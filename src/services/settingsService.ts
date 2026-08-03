@@ -506,6 +506,12 @@ export interface GameplaySettings {
   /** Legacy A/B pipeline only. PRD4 deliberately never performs an LLM query rewrite. */
   RAG_QUERY_REWRITE_ENABLED: boolean;
   RAG_EMBEDDING_PROVIDER: "voyage" | "openai";
+  /** Seuil cosine minimal appliqué par pgvector avant reranking. */
+  RAG_MATCH_THRESHOLD: number;
+  /** Reranker Voyage utilisé quand le rerank est actif. */
+  RAG_RERANK_MODEL: "rerank-2.5" | "rerank-2.5-lite";
+  /** Autorise Voyage à tronquer les documents trop longs envoyés au reranker. */
+  RAG_RERANK_TRUNCATION: boolean;
   RAG_SUMMARY_EVERY_N_TURNS: number;
   VIDEO_PLACEHOLDER_DURATION: number;
 }
