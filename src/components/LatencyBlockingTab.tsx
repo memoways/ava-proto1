@@ -48,6 +48,7 @@ import {
   type SegmentServiceStats,
 } from "@/services/latencySegments";
 import { getConfiguredLatencyServices } from "@/services/latencyServiceMetadata";
+import LLMTokenCostPanel from "@/components/admin/LLMTokenCostPanel";
 
 interface SessionRow {
   id: string;
