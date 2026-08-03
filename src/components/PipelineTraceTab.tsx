@@ -241,6 +241,42 @@ export default function PipelineTraceTab() {
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Coût en tokens de la requête envoyée au LLM</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {trace.maxCall.diagnostic?.usage ? (
+                <div className="grid grid-cols-2 tablet:grid-cols-4 gap-2 text-xs">
+                  {[
+                    ["Tokens entrée (prompt final)", trace.maxCall.diagnostic.usage.prompt_tokens],
+                    ["Tokens sortie (réponse)", trace.maxCall.diagnostic.usage.completion_tokens],
+                    ["Tokens totaux", trace.maxCall.diagnostic.usage.total_tokens],
+                  ].map(([label, value]) => (
+                    <div key={String(label)} className="rounded-md border bg-muted/10 p-2">
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+                      <div className="font-mono text-sm">
+                        {typeof value === "number" ? value.toLocaleString("fr-CH") : "—"}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="rounded-md border bg-muted/10 p-2">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Modèle facturé</div>
+                    <div className="font-mono text-[11px] break-all">
+                      {trace.maxCall.diagnostic.returnedModel || trace.maxCall.requestedSettings?.model || "—"}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Aucun relevé de tokens pour ce tour (réponse de secours ou trace antérieure).
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+
+
           <Accordion type="multiple" defaultValue={["response", "rag", "payload"]} className="space-y-2">
             <AccordionItem value="prompt" className="rounded-lg border px-4">
               <AccordionTrigger>1. Prompt maître et prompt système final</AccordionTrigger>
