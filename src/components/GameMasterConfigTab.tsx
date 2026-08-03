@@ -262,132 +262,15 @@ export default function GameMasterConfigTab() {
           </p>
         </div>
 
-        {/* RAG — réglages fins (Voyage) */}
-        <div className="rounded-lg border border-border/60 p-4 space-y-5">
-          <div>
-            <h4 className="text-sm font-semibold">RAG — récupération et reranking</h4>
-            <p className="text-xs text-muted-foreground/70">
-              💡 Ces valeurs s'appliquent à l'expérience publique. Le laboratoire RAG permet de les tester sans les enregistrer.
-            </p>
-          </div>
-
-          {/* Provider d'embedding */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-muted-foreground">Fournisseur d'embedding</label>
-              <Select
-                value={gameplay.RAG_EMBEDDING_PROVIDER}
-                onValueChange={(v: "voyage" | "openai") => updateGameplay({ RAG_EMBEDDING_PROVIDER: v })}
-              >
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="voyage">Voyage · voyage-3 (reranking dispo)</SelectItem>
-                  <SelectItem value="openai">OpenAI · text-embedding-3-small</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground/60">Le reranking n'existe que côté Voyage.</p>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-muted-foreground">Modèle de reranking Voyage</label>
-              <Select
-                value={gameplay.RAG_RERANK_MODEL}
-                onValueChange={(v: "rerank-2.5" | "rerank-2.5-lite") => updateGameplay({ RAG_RERANK_MODEL: v })}
-              >
-                <SelectTrigger className="w-full" disabled={!gameplay.RAG_RERANK_ENABLED || gameplay.RAG_EMBEDDING_PROVIDER !== "voyage"}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="rerank-2.5">rerank-2.5 — qualité maximale</SelectItem>
-                  <SelectItem value="rerank-2.5-lite">rerank-2.5-lite — latence minimale</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground/60">lite ≈ 2× plus rapide, un peu moins précis.</p>
-            </div>
-          </div>
-
-          {/* Toggles */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex items-center justify-between gap-3 rounded-md border border-border/50 px-3 py-2 min-h-11">
-              <span className="text-sm text-muted-foreground">Reranking activé</span>
-              <input
-                type="checkbox"
-                className="h-5 w-5 accent-primary"
-                checked={gameplay.RAG_RERANK_ENABLED}
-                onChange={(e) => updateGameplay({ RAG_RERANK_ENABLED: e.target.checked })}
-              />
-            </label>
-            <label className="flex items-center justify-between gap-3 rounded-md border border-border/50 px-3 py-2 min-h-11">
-              <span className="text-sm text-muted-foreground">Troncature Voyage autorisée</span>
-              <input
-                type="checkbox"
-                className="h-5 w-5 accent-primary"
-                checked={gameplay.RAG_RERANK_TRUNCATION}
-                onChange={(e) => updateGameplay({ RAG_RERANK_TRUNCATION: e.target.checked })}
-              />
-            </label>
-          </div>
-          <p className="text-xs text-muted-foreground/60 -mt-2">
-            💡 Sans troncature, un chunk trop long fait échouer le rerank (repli sur les scores vectoriels seuls).
+        {/* RAG — déplacé dans Technique → RAG Config */}
+        <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+          <h4 className="text-sm font-semibold">RAG — récupération et reranking</h4>
+          <p className="mt-1 text-xs text-muted-foreground/70">
+            Ces réglages ont été déplacés dans <strong>Technique → RAG Config</strong>, avec la documentation
+            détaillée des compromis (rappel, latence, coût tokens).
           </p>
-
-          {/* Seuil cosine */}
-          <div>
-            <div className="flex justify-between mb-1">
-              <label className="text-sm font-medium text-muted-foreground">Seuil cosine minimal</label>
-              <span className="text-sm font-mono">{gameplay.RAG_MATCH_THRESHOLD.toFixed(2)}</span>
-            </div>
-            <Slider
-              value={[gameplay.RAG_MATCH_THRESHOLD]}
-              onValueChange={([v]) => updateGameplay({ RAG_MATCH_THRESHOLD: v })}
-              min={0}
-              max={0.8}
-              step={0.05}
-            />
-            <div className="flex justify-between text-xs text-muted-foreground mt-1">
-              <span>0.00 — Très permissif (bruit possible)</span>
-              <span>0.80 — Très strict (risque 0 résultat)</span>
-            </div>
-          </div>
-
-          {/* Vivier de candidats */}
-          <div>
-            <div className="flex justify-between mb-1">
-              <label className="text-sm font-medium text-muted-foreground">Vivier de candidats (retrieve_k)</label>
-              <span className="text-sm font-mono">{gameplay.RAG_RETRIEVE_K}</span>
-            </div>
-            <Slider
-              value={[gameplay.RAG_RETRIEVE_K]}
-              onValueChange={([v]) => updateGameplay({ RAG_RETRIEVE_K: v })}
-              min={Math.max(1, gameplay.RAG_TOP_K)}
-              max={60}
-              step={1}
-            />
-            <p className="text-xs text-muted-foreground/60 mt-1">
-              💡 Chunks récupérés avant reranking. Plus haut = meilleur rappel, latence Voyage légèrement supérieure.
-            </p>
-          </div>
-
-          {/* RAG Top K */}
-          <div>
-            <div className="flex justify-between mb-1">
-              <label className="text-sm font-medium text-muted-foreground">
-                RAG — Résultats finaux (Top K)
-              </label>
-              <span className="text-sm font-mono">{gameplay.RAG_TOP_K}</span>
-            </div>
-            <Slider
-              value={[gameplay.RAG_TOP_K]}
-              onValueChange={([v]) => updateGameplay({ RAG_TOP_K: v })}
-              min={1}
-              max={15}
-              step={1}
-            />
-            <p className="text-xs text-muted-foreground/60 mt-1">
-              💡 Plus de résultats = plus de contexte narratif pour Max, mais tokens plus élevés.
-            </p>
-          </div>
         </div>
+
 
 
         {/* Video Placeholder Duration */}
