@@ -57,7 +57,12 @@ export async function authenticatedFunctionFetch(
 
 /** Server-backed authorization check used before honoring privileged game modes. */
 export async function isCurrentUserAdmin(): Promise<boolean> {
-  const session = await ensureGameAuth();
+  // Diagnostic mode is an admin concern, independent from the public game's
+  // anonymous-auth feature flag. An admin session may therefore exist even
+  // when VITE_GAME_SECURITY_ENABLED is disabled.
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) return false;
+  const session = sessionData.session;
   if (!session?.user) return false;
   const { data, error } = await supabase
     .from("user_roles")
