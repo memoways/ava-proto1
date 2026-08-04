@@ -413,6 +413,9 @@ Situation actuelle (présent d'abord, identité en dernier, 80-120 mots) :`;
         property: 'État',
         status: { equals: 'En cours' },
       });
+      if (pages.length === 0) {
+        throw new Error('No character sheet with État = En cours was returned; synchronization stopped to protect existing data');
+      }
       const filtered = body.only_notion_id ? pages.filter((p) => p.id === body.only_notion_id) : pages;
 
       // A full database sync mirrors only active character sheets. If a sheet later
