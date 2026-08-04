@@ -44,6 +44,9 @@ function extractTitle(prop: any): string {
 function extractSelect(prop: any): string | null {
   return prop?.select?.name || null;
 }
+function extractStatus(prop: any): string | null {
+  return prop?.status?.name || extractSelect(prop);
+}
 function extractMultiSelect(prop: any): string[] {
   if (!prop?.multi_select) return [];
   return prop.multi_select.map((o: any) => o.name).filter(Boolean);
@@ -126,7 +129,7 @@ serve(async (req) => {
     const useVoyage = !!VOYAGE_API_KEY;
 
     // ---- Notion helpers ----
-    async function fetchNotionDatabase(databaseId: string): Promise<NotionPage[]> {
+    async function fetchNotionDatabase(databaseId: string, filter?: Record<string, unknown>): Promise<NotionPage[]> {
       const pages: NotionPage[] = [];
       let cursor: string | undefined;
       do {
@@ -137,7 +140,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
             'Notion-Version': '2022-06-28',
           },
-          body: JSON.stringify({ start_cursor: cursor, page_size: 100 }),
+          body: JSON.stringify({ start_cursor: cursor, page_size: 100, ...(filter ? { filter } : {}) }),
         });
         if (!res.ok) {
           const err = await res.text();
@@ -406,11 +409,29 @@ Situation actuelle (présent d'abord, identité en dernier, 80-120 mots) :`;
     const doRag = mode === "full" || mode === "rag_only";
     if (charactersDbId) {
       console.log(`[sync-notion] Syncing characters DB: ${charactersDbId} (mode=${mode})`);
-      const pages = await fetchNotionDatabase(charactersDbId);
+      const pages = await fetchNotionDatabase(charactersDbId, {
+        property: 'État',
+        status: { equals: 'En cours' },
+      });
       const filtered = body.only_notion_id ? pages.filter((p) => p.id === body.only_notion_id) : pages;
+
+      // A full database sync mirrors only active character sheets. If a sheet later
+      // leaves "En cours", remove its local character and cascade its prompts/RAG.
+      if (!body.only_notion_id) {
+        const activeNotionIds = pages.map((page) => page.id);
+        let staleQuery = supabase.from('characters').delete().not('notion_id', 'is', null);
+        if (activeNotionIds.length > 0) {
+          staleQuery = staleQuery.not('notion_id', 'in', `(${activeNotionIds.join(',')})`);
+        }
+        const { error: staleDeleteError } = await staleQuery;
+        if (staleDeleteError) {
+          throw new Error(`Unable to remove inactive characters: ${staleDeleteError.message}`);
+        }
+      }
 
       for (const page of filtered) {
       const props = page.properties;
+      if (extractStatus(props['État']) !== 'En cours') continue;
       const name = extractTitle(props['Nom du caractère']);
       if (!name) continue;
       if (name.trim().toLowerCase() === 'identité & présentation' || name.trim().toLowerCase() === 'identite & presentation') {
