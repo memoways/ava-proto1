@@ -55,7 +55,8 @@ export async function fetchConversationTurnTraceSummaries(
     .from("conversation_turn_traces")
     .select("id, session_id, turn_id, turn_index, schema_version, character_name, status, created_at, updated_at")
     .eq("session_id", sessionId)
-    .order("turn_index", { ascending: true });
+    .order("turn_index", { ascending: true })
+    .limit(200);
 
   if (error) throw new Error(error.message);
   return data || [];

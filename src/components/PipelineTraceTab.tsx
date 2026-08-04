@@ -32,7 +32,10 @@ function formatMs(value: number | null | undefined): string {
 }
 
 function JsonBlock({ value, label }: { value: unknown; label: string }) {
-  const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  const text = useMemo(
+    () => typeof value === "string" ? value : JSON.stringify(value, null, 2),
+    [value],
+  );
   const copy = async () => {
     await navigator.clipboard.writeText(text || "");
     toast.success(`${label} copié`);
@@ -71,6 +74,7 @@ export default function PipelineTraceTab() {
   const [selectedTrace, setSelectedTrace] = useState<ConversationTurnTraceRow | null>(null);
   const [loading, setLoading] = useState(false);
   const traceRequestId = useRef(0);
+  const traceCache = useRef(new Map<string, ConversationTurnTraceRow>());
   const selectedSessionId = searchParams.get("session") || "";
   const requestedTurn = Number(searchParams.get("turn") || 0);
 
@@ -106,6 +110,7 @@ export default function PipelineTraceTab() {
     }
     setLoading(true);
     setSelectedTrace(null);
+    traceCache.current.clear();
     try {
       setTraceSummaries(await fetchConversationTurnTraceSummaries(selectedSessionId));
     } catch (error) {
@@ -129,10 +134,20 @@ export default function PipelineTraceTab() {
       return;
     }
     const requestId = ++traceRequestId.current;
+    const cacheKey = `${selectedSessionId}:${selectedTurnIndex}`;
+    const cachedTrace = traceCache.current.get(cacheKey);
+    if (cachedTrace) {
+      setSelectedTrace(cachedTrace);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const row = await fetchConversationTurnTrace(selectedSessionId, selectedTurnIndex);
-      if (requestId === traceRequestId.current) setSelectedTrace(row);
+      if (requestId === traceRequestId.current) {
+        if (row) traceCache.current.set(cacheKey, row);
+        setSelectedTrace(row);
+      }
     } catch (error) {
       if (requestId === traceRequestId.current) {
         toast.error(`Chargement impossible : ${error instanceof Error ? error.message : String(error)}`);
