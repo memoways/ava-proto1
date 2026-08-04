@@ -19,10 +19,11 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 vi.mock("@/services/conversationTraceService", () => ({
-  fetchConversationTurnTraces: vi.fn(),
+  fetchConversationTurnTraceSummaries: vi.fn(),
+  fetchConversationTurnTrace: vi.fn(),
 }));
 
-import { fetchConversationTurnTraces } from "@/services/conversationTraceService";
+import { fetchConversationTurnTrace, fetchConversationTurnTraceSummaries } from "@/services/conversationTraceService";
 import PipelineTraceTab from "./PipelineTraceTab";
 
 const LONG_PROMPT = `PROMPT EXACT ${"x".repeat(2_000)}`;
@@ -56,7 +57,10 @@ function traceRow() {
 describe("PipelineTraceTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(fetchConversationTurnTraces).mockResolvedValue([traceRow()] as never);
+    const row = traceRow();
+    const { trace: _trace, ...summary } = row;
+    vi.mocked(fetchConversationTurnTraceSummaries).mockResolvedValue([summary] as never);
+    vi.mocked(fetchConversationTurnTrace).mockResolvedValue(row as never);
   });
 
   it("sélectionne le tour demandé et affiche les états causaux/non causaux", async () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchConversationTurnTraces } from "@/services/conversationTraceService";
+import {
+  fetchConversationTurnTrace,
+  fetchConversationTurnTraceSummaries,
+  type ConversationTurnTraceSummary,
+} from "@/services/conversationTraceService";
 import type { ConversationTurnTraceRow, ConversationTurnTraceV1 } from "@/types";
 import { CircleHelp, Copy, Download, ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -28,7 +32,10 @@ function formatMs(value: number | null | undefined): string {
 }
 
 function JsonBlock({ value, label }: { value: unknown; label: string }) {
-  const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  const text = useMemo(
+    () => typeof value === "string" ? value : JSON.stringify(value, null, 2),
+    [value],
+  );
   const copy = async () => {
     await navigator.clipboard.writeText(text || "");
     toast.success(`${label} copié`);
@@ -63,15 +70,19 @@ function Step({ label, duration, status = "complete" }: { label: string; duratio
 export default function PipelineTraceTab() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [sessions, setSessions] = useState<DiagnosticSession[]>([]);
-  const [traces, setTraces] = useState<ConversationTurnTraceRow[]>([]);
+  const [traceSummaries, setTraceSummaries] = useState<ConversationTurnTraceSummary[]>([]);
+  const [selectedTrace, setSelectedTrace] = useState<ConversationTurnTraceRow | null>(null);
   const [loading, setLoading] = useState(false);
+  const traceRequestId = useRef(0);
+  const traceCache = useRef(new Map<string, ConversationTurnTraceRow>());
   const selectedSessionId = searchParams.get("session") || "";
   const requestedTurn = Number(searchParams.get("turn") || 0);
 
-  const selectedTrace = useMemo(() => {
-    if (!traces.length) return null;
-    return traces.find((row) => row.turn_index === requestedTurn) || traces[traces.length - 1];
-  }, [requestedTurn, traces]);
+  const selectedTurnIndex = useMemo(() => {
+    if (!traceSummaries.length) return null;
+    return traceSummaries.find((row) => row.turn_index === requestedTurn)?.turn_index
+      ?? traceSummaries[traceSummaries.length - 1].turn_index;
+  }, [requestedTurn, traceSummaries]);
 
   const loadSessions = useCallback(async () => {
     const { data, error } = await supabase
@@ -83,20 +94,25 @@ export default function PipelineTraceTab() {
     if (error) throw new Error(error.message);
     setSessions(data || []);
     if (!selectedSessionId && data?.[0]) {
-      const next = new URLSearchParams(searchParams);
-      next.set("session", data[0].id);
-      setSearchParams(next, { replace: true });
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("session", data[0].id);
+        return next;
+      }, { replace: true });
     }
-  }, [searchParams, selectedSessionId, setSearchParams]);
+  }, [selectedSessionId, setSearchParams]);
 
-  const loadTraces = useCallback(async () => {
+  const loadTraceSummaries = useCallback(async () => {
     if (!selectedSessionId) {
-      setTraces([]);
+      setTraceSummaries([]);
+      setSelectedTrace(null);
       return;
     }
     setLoading(true);
+    setSelectedTrace(null);
+    traceCache.current.clear();
     try {
-      setTraces(await fetchConversationTurnTraces(selectedSessionId));
+      setTraceSummaries(await fetchConversationTurnTraceSummaries(selectedSessionId));
     } catch (error) {
       toast.error(`Chargement impossible : ${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -109,20 +125,57 @@ export default function PipelineTraceTab() {
   }, [loadSessions]);
 
   useEffect(() => {
-    void loadTraces();
-  }, [loadTraces]);
+    void loadTraceSummaries();
+  }, [loadTraceSummaries]);
+
+  const loadSelectedTrace = useCallback(async () => {
+    if (!selectedSessionId || selectedTurnIndex === null) {
+      setSelectedTrace(null);
+      return;
+    }
+    const requestId = ++traceRequestId.current;
+    const cacheKey = `${selectedSessionId}:${selectedTurnIndex}`;
+    const cachedTrace = traceCache.current.get(cacheKey);
+    if (cachedTrace) {
+      setSelectedTrace(cachedTrace);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const row = await fetchConversationTurnTrace(selectedSessionId, selectedTurnIndex);
+      if (requestId === traceRequestId.current) {
+        if (row) traceCache.current.set(cacheKey, row);
+        setSelectedTrace(row);
+      }
+    } catch (error) {
+      if (requestId === traceRequestId.current) {
+        toast.error(`Chargement impossible : ${error instanceof Error ? error.message : String(error)}`);
+      }
+    } finally {
+      if (requestId === traceRequestId.current) setLoading(false);
+    }
+  }, [selectedSessionId, selectedTurnIndex]);
+
+  useEffect(() => {
+    void loadSelectedTrace();
+  }, [loadSelectedTrace]);
 
   const selectSession = (sessionId: string) => {
-    const next = new URLSearchParams(searchParams);
-    next.set("session", sessionId);
-    next.delete("turn");
-    setSearchParams(next, { replace: true });
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("session", sessionId);
+      next.delete("turn");
+      return next;
+    }, { replace: true });
   };
 
   const selectTurn = (turn: string) => {
-    const next = new URLSearchParams(searchParams);
-    next.set("turn", turn);
-    setSearchParams(next, { replace: true });
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("turn", turn);
+      return next;
+    }, { replace: true });
   };
 
   const exportTrace = () => {
@@ -198,14 +251,14 @@ export default function PipelineTraceTab() {
               {sessions.map((session) => <SelectItem key={session.id} value={session.id}>{sessionLabel(session)}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={selectedTrace ? String(selectedTrace.turn_index) : ""} onValueChange={selectTurn} disabled={!traces.length}>
+          <Select value={selectedTurnIndex === null ? "" : String(selectedTurnIndex)} onValueChange={selectTurn} disabled={!traceSummaries.length}>
             <SelectTrigger><SelectValue placeholder="Choisir un tour" /></SelectTrigger>
             <SelectContent>
-              {traces.map((row) => <SelectItem key={row.id} value={String(row.turn_index)}>Tour {row.turn_index}</SelectItem>)}
+              {traceSummaries.map((row) => <SelectItem key={row.id} value={String(row.turn_index)}>Tour {row.turn_index}</SelectItem>)}
             </SelectContent>
           </Select>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => void loadTraces()} disabled={loading || !selectedSessionId}>
+            <Button variant="outline" onClick={() => void loadTraceSummaries()} disabled={loading || !selectedSessionId}>
               <RefreshCw className={`mr-1 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Rafraîchir
             </Button>
             <Button variant="outline" onClick={exportTrace} disabled={!selectedTrace}>
