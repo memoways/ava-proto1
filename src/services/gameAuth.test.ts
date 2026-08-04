@@ -5,14 +5,25 @@ const auth = vi.hoisted(() => ({
   signInAnonymously: vi.fn(),
 }));
 
+const roleQuery = vi.hoisted(() => ({
+  select: vi.fn(),
+  eqUser: vi.fn(),
+  eqRole: vi.fn(),
+  maybeSingle: vi.fn(),
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { auth },
+  supabase: {
+    auth,
+    from: vi.fn(() => ({ select: roleQuery.select })),
+  },
 }));
 
 import {
   authenticatedFunctionFetch,
   ensureGameAuth,
   isGameCaptchaEnabled,
+  isCurrentUserAdmin,
   resetGameAuthForTests,
 } from "./gameAuth";
 
@@ -30,6 +41,10 @@ describe("gameAuth", () => {
     resetGameAuthForTests();
     auth.getSession.mockReset();
     auth.signInAnonymously.mockReset();
+    roleQuery.select.mockReset().mockReturnValue({ eq: roleQuery.eqUser });
+    roleQuery.eqUser.mockReset().mockReturnValue({ eq: roleQuery.eqRole });
+    roleQuery.eqRole.mockReset().mockReturnValue({ maybeSingle: roleQuery.maybeSingle });
+    roleQuery.maybeSingle.mockReset();
     vi.unstubAllGlobals();
   });
 
@@ -98,5 +113,18 @@ describe("gameAuth", () => {
     const headers = fetchMock.mock.calls[0][1]?.headers as Headers;
     expect(headers.get("Authorization")).toBeNull();
     expect(headers.get("apikey")).toBeTruthy();
+  });
+
+  it("recognizes an authenticated admin even when public game security is disabled", async () => {
+    vi.stubEnv("VITE_GAME_SECURITY_ENABLED", "false");
+    auth.getSession.mockResolvedValue({ data: { session }, error: null });
+    roleQuery.maybeSingle.mockResolvedValue({ data: { role: "admin" }, error: null });
+
+    await expect(isCurrentUserAdmin()).resolves.toBe(true);
+
+    expect(auth.getSession).toHaveBeenCalledTimes(1);
+    expect(auth.signInAnonymously).not.toHaveBeenCalled();
+    expect(roleQuery.eqUser).toHaveBeenCalledWith("user_id", session.user.id);
+    expect(roleQuery.eqRole).toHaveBeenCalledWith("role", "admin");
   });
 });
