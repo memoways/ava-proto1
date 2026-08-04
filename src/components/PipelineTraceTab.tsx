@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
@@ -11,8 +11,19 @@ import {
   fetchConversationTurnTraceSummaries,
   type ConversationTurnTraceSummary,
 } from "@/services/conversationTraceService";
-import type { ConversationTurnTraceRow, ConversationTurnTraceV1 } from "@/types";
-import { CircleHelp, Copy, Download, ExternalLink, RefreshCw } from "lucide-react";
+import { materializeConversationTurnTrace } from "@/services/conversationTraceFormat";
+import {
+  discardConversationTraceOutboxRecord,
+  listConversationTraceOutboxRecords,
+  prewarmConversationTraceOutbox,
+  retryConversationTraceOutboxRecord,
+  subscribeConversationTraceOutbox,
+  type ConversationTraceOutboxRecord,
+} from "@/services/conversationTraceOutbox";
+import { getBrowserDiagnostics } from "@/services/browserCapabilities";
+import { getPassiveNetworkVerdict, getPassiveVoiceNetworkObservation } from "@/services/networkDiagnostics";
+import type { ConversationTurnTrace, ConversationTurnTraceRow, ConversationTurnTraceV1 } from "@/types";
+import { CircleHelp, Copy, Download, ExternalLink, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface DiagnosticSession {
@@ -55,6 +66,17 @@ function JsonBlock({ value, label }: { value: unknown; label: string }) {
   );
 }
 
+function MaterializedTraceSection({
+  trace,
+  children,
+}: {
+  trace: ConversationTurnTrace;
+  children: (materialized: ConversationTurnTraceV1) => ReactNode;
+}) {
+  const materialized = useMemo(() => materializeConversationTurnTrace(trace), [trace]);
+  return <>{children(materialized)}</>;
+}
+
 function Step({ label, duration, status = "complete" }: { label: string; duration?: number | null; status?: string }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2 text-sm">
@@ -72,6 +94,7 @@ export default function PipelineTraceTab() {
   const [sessions, setSessions] = useState<DiagnosticSession[]>([]);
   const [traceSummaries, setTraceSummaries] = useState<ConversationTurnTraceSummary[]>([]);
   const [selectedTrace, setSelectedTrace] = useState<ConversationTurnTraceRow | null>(null);
+  const [localRecords, setLocalRecords] = useState<ConversationTraceOutboxRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const traceRequestId = useRef(0);
   const traceCache = useRef(new Map<string, ConversationTurnTraceRow>());
@@ -112,7 +135,26 @@ export default function PipelineTraceTab() {
     setSelectedTrace(null);
     traceCache.current.clear();
     try {
-      setTraceSummaries(await fetchConversationTurnTraceSummaries(selectedSessionId));
+      const [remote, local] = await Promise.all([
+        fetchConversationTurnTraceSummaries(selectedSessionId),
+        listConversationTraceOutboxRecords(selectedSessionId),
+      ]);
+      setLocalRecords(local);
+      const remoteTurns = new Set(remote.map((row) => row.turn_index));
+      const pending = local
+        .filter((record) => !remoteTurns.has(record.turnIndex))
+        .map((record) => ({
+          id: `local:${record.key}`,
+          session_id: record.sessionId,
+          turn_id: record.trace.identity.turnId,
+          turn_index: record.turnIndex,
+          schema_version: record.trace.schemaVersion,
+          character_name: record.trace.identity.characterName,
+          status: record.status,
+          created_at: record.createdAt,
+          updated_at: record.updatedAt,
+        }));
+      setTraceSummaries([...remote, ...pending].sort((a, b) => a.turn_index - b.turn_index));
     } catch (error) {
       toast.error(`Chargement impossible : ${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -125,7 +167,8 @@ export default function PipelineTraceTab() {
   }, [loadSessions]);
 
   useEffect(() => {
-    void loadTraceSummaries();
+    void prewarmConversationTraceOutbox().then(() => loadTraceSummaries()).catch(() => {});
+    return subscribeConversationTraceOutbox(() => void loadTraceSummaries());
   }, [loadTraceSummaries]);
 
   const loadSelectedTrace = useCallback(async () => {
@@ -143,7 +186,25 @@ export default function PipelineTraceTab() {
     }
     setLoading(true);
     try {
-      const row = await fetchConversationTurnTrace(selectedSessionId, selectedTurnIndex);
+      let row = await fetchConversationTurnTrace(selectedSessionId, selectedTurnIndex);
+      if (!row) {
+        const local = (await listConversationTraceOutboxRecords(selectedSessionId))
+          .find((record) => record.turnIndex === selectedTurnIndex);
+        if (local) {
+          row = {
+            id: `local:${local.key}`,
+            session_id: local.sessionId,
+            turn_id: local.trace.identity.turnId,
+            turn_index: local.turnIndex,
+            schema_version: local.trace.schemaVersion,
+            character_name: local.trace.identity.characterName,
+            status: local.status,
+            trace: local.trace,
+            created_at: local.createdAt,
+            updated_at: local.updatedAt,
+          };
+        }
+      }
       if (requestId === traceRequestId.current) {
         if (row) traceCache.current.set(cacheKey, row);
         setSelectedTrace(row);
@@ -180,7 +241,8 @@ export default function PipelineTraceTab() {
 
   const exportTrace = () => {
     if (!selectedTrace) return;
-    const blob = new Blob([JSON.stringify(selectedTrace.trace, null, 2)], { type: "application/json" });
+    const materialized = materializeConversationTurnTrace(selectedTrace.trace);
+    const blob = new Blob([JSON.stringify(materialized, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -189,7 +251,15 @@ export default function PipelineTraceTab() {
     URL.revokeObjectURL(url);
   };
 
-  const trace: ConversationTurnTraceV1 | null = selectedTrace?.trace ?? null;
+  // Keep V2 compact while the accordions are closed. Exact large strings are
+  // only materialized inside the prompt/payload accordion content.
+  const trace = selectedTrace?.trace ?? null;
+  const localRecord = localRecords.find((record) => record.turnIndex === selectedTurnIndex) ?? null;
+  const rawTimings = selectedTrace?.trace.schemaVersion === 2 ? selectedTrace.trace.timings : null;
+  const networkVerdict = getPassiveNetworkVerdict(getBrowserDiagnostics(), {
+    bps: rawTimings?.traceUploadBps,
+    durationMs: rawTimings?.traceUploadMs,
+  }, getPassiveVoiceNetworkObservation());
 
   return (
     <div className="max-w-7xl space-y-6">
@@ -218,7 +288,7 @@ export default function PipelineTraceTab() {
           <ol className="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
             {[
               ["1", "Lancer", "Clique sur « Lancer une session tracée ». Le mode reste actif pendant toute cette session."],
-              ["2", "Converser", "Parle normalement avec Max. Chaque réponse générée est enregistrée avant son affichage et sa lecture."],
+              ["2", "Converser", "Parle normalement avec Max. La trace est mise en file locale avant diffusion, puis synchronisée hors du chemin vocal."],
               ["3", "Choisir le tour", "Reviens ici, rafraîchis, puis sélectionne la session et le tour à examiner."],
               ["4", "Analyser", "Ouvre les huit sections, copie un élément ou exporte le JSON complet pour le comparer."],
             ].map(([number, title, description]) => (
@@ -268,6 +338,34 @@ export default function PipelineTraceTab() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">État diagnostic et réseau</CardTitle>
+          <CardDescription>{networkVerdict.label}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center gap-2 text-sm">
+          <Badge variant={localRecord?.status === "error" ? "destructive" : "secondary"}>
+            {localRecord
+              ? localRecord.status === "pending" ? "En attente locale"
+                : localRecord.status === "syncing" ? "Synchronisation"
+                  : localRecord.status === "uploaded" ? "Enregistrée"
+                    : "Erreur"
+              : selectedTrace ? "Enregistrée" : "Aucune trace"}
+          </Badge>
+          {localRecord?.lastError ? <span className="text-xs text-destructive">{localRecord.lastError}</span> : null}
+          {localRecord ? (
+            <>
+              <Button size="sm" variant="outline" onClick={() => void retryConversationTraceOutboxRecord(localRecord.key)}>
+                <RefreshCw className="mr-1 h-3 w-3" /> Réessayer
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => void discardConversationTraceOutboxRecord(localRecord.key)}>
+                <Trash2 className="mr-1 h-3 w-3" /> Supprimer localement
+              </Button>
+            </>
+          ) : null}
+        </CardContent>
+      </Card>
+
       {!trace ? (
         <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Aucune trace disponible pour cette sélection.</CardContent></Card>
       ) : (
@@ -286,7 +384,7 @@ export default function PipelineTraceTab() {
               <Step label="RAG" duration={trace.timings.ragMs} status={trace.rag.error ? "error" : "complete"} />
               <Step label="Assemblage prompt" duration={trace.timings.promptBuildMs} status={trace.prompt ? "complete" : "error"} />
               <Step label="Max LLM" duration={trace.timings.maxClientMs} status={trace.maxCall.error ? "error" : "complete"} />
-              <Step label="Sauvegarde garantie" duration={trace.timings.traceWriteMs} />
+              <Step label="Mise en file locale" duration={trace.timings.traceWriteMs} status={localRecord?.status || "complete"} />
               <Step label="GM labels (parallèle)" duration={(trace.gm.labelPass as { latencyMs?: number }).latencyMs} status={String((trace.gm.labelPass as { status?: string }).status || "pending")} />
               <Step label="GM post-tour (pour la suite)" duration={(trace.gm.postTurn as { latencyMs?: number }).latencyMs} status={String((trace.gm.postTurn as { status?: string }).status || "pending")} />
               <Step label="Pipeline hors instrumentation" duration={trace.timings.pipelineUninstrumentedMs} />
@@ -330,16 +428,18 @@ export default function PipelineTraceTab() {
 
 
 
-          <Accordion type="multiple" defaultValue={["response", "rag", "payload"]} className="space-y-2">
+          <Accordion type="multiple" defaultValue={["response"]} className="space-y-2">
             <AccordionItem value="prompt" className="rounded-lg border px-4">
               <AccordionTrigger>1. Prompt maître et prompt système final</AccordionTrigger>
               <AccordionContent className="space-y-4">
-                <JsonBlock label="Provenance" value={trace.prompt ? { baseSource: trace.prompt.baseSource, characterPrompt: trace.prompt.characterPrompt } : null} />
-                <JsonBlock label="Budget du prompt" value={trace.prompt?.budget || "Trace antérieure sans rapport de budget"} />
-                <JsonBlock label="Prompt maître" value={trace.prompt?.baseSystemPrompt || null} />
-                <JsonBlock label="Sections personnage" value={trace.prompt?.characterPrompt.renderedSections || null} />
-                <JsonBlock label="Règles techniques" value={trace.prompt?.technicalRules || null} />
-                <JsonBlock label="Prompt système final" value={trace.prompt?.finalSystemPrompt || null} />
+                <MaterializedTraceSection trace={trace}>{(fullTrace) => <>
+                  <JsonBlock label="Provenance" value={fullTrace.prompt ? { baseSource: fullTrace.prompt.baseSource, characterPrompt: fullTrace.prompt.characterPrompt } : null} />
+                  <JsonBlock label="Budget du prompt" value={fullTrace.prompt?.budget || "Trace antérieure sans rapport de budget"} />
+                  <JsonBlock label="Prompt maître" value={fullTrace.prompt?.baseSystemPrompt || null} />
+                  <JsonBlock label="Sections personnage" value={fullTrace.prompt?.characterPrompt.renderedSections || null} />
+                  <JsonBlock label="Règles techniques" value={fullTrace.prompt?.technicalRules || null} />
+                  <JsonBlock label="Prompt système final" value={fullTrace.prompt?.finalSystemPrompt || null} />
+                </>}</MaterializedTraceSection>
               </AccordionContent>
             </AccordionItem>
 
@@ -369,9 +469,11 @@ export default function PipelineTraceTab() {
             <AccordionItem value="payload" className="rounded-lg border px-4">
               <AccordionTrigger>5. Payload final envoyé au LLM</AccordionTrigger>
               <AccordionContent className="space-y-4">
-                <JsonBlock label="Messages" value={trace.maxCall.messages} />
-                <JsonBlock label="Payload OpenRouter exact" value={trace.maxCall.diagnostic?.upstreamPayload || null} />
-                <JsonBlock label="Payload reçu par le proxy" value={trace.maxCall.diagnostic?.clientPayload || null} />
+                <MaterializedTraceSection trace={trace}>{(fullTrace) => <>
+                  <JsonBlock label="Messages" value={fullTrace.maxCall.messages} />
+                  <JsonBlock label="Payload OpenRouter exact" value={fullTrace.maxCall.diagnostic?.upstreamPayload || null} />
+                  <JsonBlock label="Payload reçu par le proxy" value={fullTrace.maxCall.diagnostic?.clientPayload || null} />
+                </>}</MaterializedTraceSection>
               </AccordionContent>
             </AccordionItem>
 

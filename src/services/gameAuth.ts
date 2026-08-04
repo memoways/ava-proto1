@@ -47,7 +47,11 @@ export async function authenticatedFunctionFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
 ): Promise<Response> {
-  const session = await ensureGameAuth();
+  const gameSession = await ensureGameAuth();
+  // Admin diagnostic mode can be enabled while public anonymous security is off.
+  // Preserve an already authenticated admin JWT for privileged Edge Functions.
+  const existing = gameSession ? null : await supabase.auth.getSession();
+  const session = gameSession ?? existing?.data?.session ?? null;
   const headers = new Headers(init.headers);
   headers.set("apikey", SUPABASE_PUBLISHABLE_KEY);
   if (session) headers.set("Authorization", `Bearer ${session.access_token}`);

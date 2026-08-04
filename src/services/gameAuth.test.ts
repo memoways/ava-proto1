@@ -104,12 +104,13 @@ describe("gameAuth", () => {
 
   it("keeps the Lovable preview compatible while Phase 1 is disabled", async () => {
     vi.stubEnv("VITE_GAME_SECURITY_ENABLED", "false");
+    auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await authenticatedFunctionFetch("https://example.test/functions/v1/proxy-stt");
 
-    expect(auth.getSession).not.toHaveBeenCalled();
+    expect(auth.getSession).toHaveBeenCalledOnce();
     const headers = fetchMock.mock.calls[0][1]?.headers as Headers;
     expect(headers.get("Authorization")).toBeNull();
     expect(headers.get("apikey")).toBeTruthy();

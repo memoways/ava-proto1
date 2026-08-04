@@ -20,6 +20,8 @@ interface NetworkFakeOptions {
   ttsSuccess?: boolean;
   maxResponse?: string;
   ttsBusyOnce?: boolean;
+  diagnosticAdmin?: boolean;
+  blockTraceUpload?: boolean;
 }
 
 function json(route: Route, body: unknown, status = 200) {
@@ -45,6 +47,10 @@ async function installNetworkFakes(
   let triggeredVideoLoads = 0;
   let ttsCallCount = 0;
   let posthogRequestCount = 0;
+  let traceUploadStarted = 0;
+  let traceUploadCompleted = 0;
+  let releaseTraceUpload: (() => void) | null = null;
+  const blockedTraceUpload = new Promise<void>((resolve) => { releaseTraceUpload = resolve; });
   const maxMessageCounts: number[] = [];
   const sessionUpdates: unknown[] = [];
 
@@ -265,6 +271,15 @@ async function installNetworkFakes(
         updated_at: new Date().toISOString(),
       }] : []);
     }
+    if (table === "user_roles") {
+      return json(route, options.diagnosticAdmin ? { role: "admin" } : null);
+    }
+    if (table === "conversation_turn_traces" && request.method() === "POST") {
+      traceUploadStarted += 1;
+      if (options.blockTraceUpload) await blockedTraceUpload;
+      traceUploadCompleted += 1;
+      return json(route, { id: "55555555-5555-4555-8555-555555555555" }, 201);
+    }
     if (table === "session_summaries") {
       return json(route, summaryLastTurn > 0 ? [{
         session_id: SESSION_ID,
@@ -396,6 +411,9 @@ async function installNetworkFakes(
     getSessionUpdates: () => sessionUpdates,
     getTtsCallCount: () => ttsCallCount,
     getPosthogRequestCount: () => posthogRequestCount,
+    getTraceUploadStarted: () => traceUploadStarted,
+    getTraceUploadCompleted: () => traceUploadCompleted,
+    releaseTraceUpload: () => releaseTraceUpload?.(),
   };
 }
 
@@ -554,6 +572,48 @@ test("une réponse vocale plus longue que le watchdog est lue jusqu'au bout", as
   expect(audioState?.paused).toBe(0);
   await expect(page.getByText("Le tour a pris trop de temps")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
+});
+
+test("diagnostic full garde la voix réactive pendant un upload de trace bloqué", async ({ page }) => {
+  const fakes = await installNetworkFakes(page, ["Pourquoi Ava est-elle partie ?"], {
+    diagnosticAdmin: true,
+    blockTraceUpload: true,
+    ttsSuccess: true,
+  });
+
+  await page.goto("/?diagnostic=full");
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await page.getByRole("button", { name: "Appeler Max" }).click();
+  await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
+
+  await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+  await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+
+  await expect(page.getByText("Réponse de Max pour le tour 1.")).toBeVisible({ timeout: 10_000 });
+  await expect.poll(fakes.getTraceUploadStarted, { timeout: 5_000 }).toBe(1);
+  expect(fakes.getTraceUploadCompleted()).toBe(0);
+  await expect.poll(async () => page.evaluate(() =>
+    (window as Window & { __e2eAudioState?: { ended: number } }).__e2eAudioState?.ended ?? 0,
+  )).toBeGreaterThanOrEqual(2);
+  await expect(page.getByText("Le tour a pris trop de temps")).toHaveCount(0);
+
+  const localCount = await page.evaluate(async () => {
+    const request = indexedDB.open("ava-diagnostic-traces", 1);
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    return new Promise<number>((resolve, reject) => {
+      const count = database.transaction("trace-outbox", "readonly").objectStore("trace-outbox").count();
+      count.onsuccess = () => resolve(count.result);
+      count.onerror = () => reject(count.error);
+    });
+  });
+  expect(localCount).toBe(1);
+
+  fakes.releaseTraceUpload();
+  await expect.poll(fakes.getTraceUploadCompleted, { timeout: 5_000 }).toBe(1);
 });
 
 test("un 429 system_busy ElevenLabs est rejoué une fois puis la voix démarre", async ({ page }) => {

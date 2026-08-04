@@ -15,9 +15,9 @@ vi.mock("@/services/ragService", () => ({
     blockedAssertions: [],
   })),
 }));
-vi.mock("@/services/conversationTraceService", () => ({
-  persistConversationTurnTrace: vi.fn(),
-  patchConversationTurnTrace: vi.fn(),
+vi.mock("@/services/conversationTraceOutbox", () => ({
+  enqueueConversationTurnTrace: vi.fn(),
+  patchQueuedConversationTurnTrace: vi.fn(),
 }));
 vi.mock("@/services/characterPromptService", () => ({ resolveCharacterIdByName: vi.fn() }));
 vi.mock("@/services/settingsService", () => ({
@@ -46,7 +46,8 @@ import { simulateMaxResponse } from "@/agents/maxAgent";
 import { evaluatePostTurnPRD4 } from "@/agents/gameMasterPRD4";
 import { labelUserTurnPRD4 } from "@/agents/gameMasterLabelPRD4";
 import { queryRAGDetailed } from "@/services/ragService";
-import { patchConversationTurnTrace, persistConversationTurnTrace } from "@/services/conversationTraceService";
+import { enqueueConversationTurnTrace, patchQueuedConversationTurnTrace } from "@/services/conversationTraceOutbox";
+import { materializeConversationTurnTrace } from "@/services/conversationTraceFormat";
 import { resolveCharacterIdByName } from "@/services/characterPromptService";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { processPRD4Turn } from "@/services/prd4Orchestrator";
@@ -116,8 +117,8 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     });
     vi.mocked(evaluatePostTurnPRD4).mockResolvedValue(postTurnResult);
     vi.mocked(summarizeSessionAsync).mockResolvedValue();
-    vi.mocked(persistConversationTurnTrace).mockResolvedValue({ id: "trace-1", writeLatencyMs: 3 });
-    vi.mocked(patchConversationTurnTrace).mockResolvedValue();
+    vi.mocked(enqueueConversationTurnTrace).mockResolvedValue({ durable: true, enqueueMs: 3 });
+    vi.mocked(patchQueuedConversationTurnTrace).mockResolvedValue();
   });
 
   afterEach(() => {
@@ -267,14 +268,14 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       timeElapsedSeconds: 5,
     });
 
-    expect(persistConversationTurnTrace).not.toHaveBeenCalled();
-    expect(patchConversationTurnTrace).not.toHaveBeenCalled();
+    expect(enqueueConversationTurnTrace).not.toHaveBeenCalled();
+    expect(patchQueuedConversationTurnTrace).not.toHaveBeenCalled();
     expect(vi.mocked(simulateMaxResponse).mock.calls[0][1]).toMatchObject({ diagnosticTrace: false });
     expect(result.traceId).toBeNull();
     await Promise.all([result.labelPromise, result.postTurnPromise]);
   });
 
-  it("persists the complete causal trace before returning a diagnostic response", async () => {
+  it("queues a compact exact trace locally before returning a diagnostic response", async () => {
     vi.mocked(queryRAGDetailed).mockResolvedValue({
       matches: [{
         id: "chunk-1",
@@ -353,34 +354,41 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       diagnosticTraceEnabled: true,
     });
 
-    expect(result.traceId).toBe("trace-1");
-    expect(persistConversationTurnTrace).toHaveBeenCalledOnce();
-    const trace = vi.mocked(persistConversationTurnTrace).mock.calls[0][0];
+    expect(result.traceId).toBeNull();
+    expect(enqueueConversationTurnTrace).toHaveBeenCalledOnce();
+    const compactTrace = vi.mocked(enqueueConversationTurnTrace).mock.calls[0][0];
+    expect(compactTrace.schemaVersion).toBe(2);
+    const trace = materializeConversationTurnTrace(compactTrace);
     expect(trace.identity).toMatchObject({ sessionId: "session-traced", turnId: "turn-stable-1", turnIndex: 1 });
     expect(trace.prompt?.finalSystemPrompt).toBe("SYSTEM EXACT");
     expect(trace.maxCall.messages[0].content).toBe(trace.prompt?.finalSystemPrompt);
-    expect(trace.maxCall.diagnostic?.upstreamPayload).toEqual({ model: "openai/gpt-4.1-mini", temperature: 0.7 });
+    expect(trace.maxCall.diagnostic?.upstreamPayload).toEqual({
+      model: "openai/gpt-4.1-mini",
+      temperature: 0.7,
+      messages: trace.maxCall.messages,
+    });
     expect(trace.rag.matches[0]).toMatchObject({ retrieval_similarity: 0.83, rerank_score: 0.91 });
     expect(trace.response).toMatchObject({ rawLlmResponse: "Elle habite à Lausanne.", deliveredResponse: "Elle habite à Lausanne.", source: "llm" });
-    expect(patchConversationTurnTrace).toHaveBeenCalledWith("session-traced", 1, ["timings"], expect.any(Object));
-
     await Promise.all([result.labelPromise, result.postTurnPromise]);
-    expect(patchConversationTurnTrace).toHaveBeenCalledWith("session-traced", 1, ["gm", "labelPass"], expect.objectContaining({ effect: "parallel_not_causal" }));
-    expect(patchConversationTurnTrace).toHaveBeenCalledWith("session-traced", 1, ["gm", "postTurn"], expect.objectContaining({ effect: "next_turn" }));
+    expect(patchQueuedConversationTurnTrace).toHaveBeenCalledWith("session-traced", 1, ["gm", "labelPass"], expect.objectContaining({ effect: "parallel_not_causal" }));
+    expect(patchQueuedConversationTurnTrace).toHaveBeenCalledWith("session-traced", 1, ["gm", "postTurn"], expect.objectContaining({ effect: "next_turn" }));
   });
 
-  it("refuses to release a diagnostic response when causal persistence fails", async () => {
-    vi.mocked(persistConversationTurnTrace).mockRejectedValue(new Error("database unavailable"));
+  it("releases Max even when durable local persistence is temporarily unavailable", async () => {
+    vi.mocked(enqueueConversationTurnTrace).mockResolvedValue({ durable: false, enqueueMs: 100 });
 
-    await expect(processPRD4Turn({
+    const result = await processPRD4Turn({
       sessionId: "session-traced",
       conversationHistory: [],
       userMessage: "Question sensible",
       userRole: null,
       timeElapsedSeconds: 10,
       diagnosticTraceEnabled: true,
-    })).rejects.toThrow("database unavailable");
-    expect(evaluatePostTurnPRD4).not.toHaveBeenCalled();
+    });
+
+    expect(result.maxResponse).toBe("Je vous écoute.");
+    expect(result.traceId).toBeNull();
+    expect(evaluatePostTurnPRD4).toHaveBeenCalledOnce();
   });
 
   it("keeps ordering and bounded context across thirty simulated 35-turn sessions", async () => {

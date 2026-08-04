@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
-import type { ConversationTurnTraceRow, ConversationTurnTraceV1 } from "@/types";
+import type { ConversationTurnTrace, ConversationTurnTraceRow } from "@/types";
 
 export type ConversationTurnTraceSummary = Omit<ConversationTurnTraceRow, "trace">;
 
@@ -9,10 +9,11 @@ function toJson(value: unknown): Json {
 }
 
 export async function persistConversationTurnTrace(
-  trace: ConversationTurnTraceV1,
+  trace: ConversationTurnTrace,
+  signal?: AbortSignal,
 ): Promise<{ id: string; writeLatencyMs: number }> {
   const startedAt = performance.now();
-  const { data, error } = await supabase
+  let query = supabase
     .from("conversation_turn_traces")
     .upsert({
       session_id: trace.identity.sessionId,
@@ -25,6 +26,8 @@ export async function persistConversationTurnTrace(
     }, { onConflict: "session_id,turn_index" })
     .select("id")
     .single();
+  if (signal) query = query.abortSignal(signal);
+  const { data, error } = await query;
 
   if (error) throw new Error(`Diagnostic trace persistence failed: ${error.message}`);
   return {
@@ -38,13 +41,16 @@ export async function patchConversationTurnTrace(
   turnIndex: number,
   path: string[],
   value: unknown,
+  signal?: AbortSignal,
 ): Promise<void> {
-  const { error } = await supabase.rpc("patch_conversation_turn_trace", {
+  let query = supabase.rpc("patch_conversation_turn_trace", {
     p_session_id: sessionId,
     p_turn_index: turnIndex,
     p_path: path,
     p_value: toJson(value),
   });
+  if (signal) query = query.abortSignal(signal);
+  const { error } = await query;
   if (error) throw new Error(`Diagnostic trace patch failed: ${error.message}`);
 }
 
@@ -77,6 +83,6 @@ export async function fetchConversationTurnTrace(
   if (!data) return null;
   return {
     ...data,
-    trace: data.trace as unknown as ConversationTurnTraceV1,
+    trace: data.trace as unknown as ConversationTurnTrace,
   };
 }

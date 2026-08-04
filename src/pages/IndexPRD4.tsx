@@ -102,7 +102,17 @@ import {
   getSessionMinimumClosureSeconds,
   normalizeSessionDurationSeconds,
   TURN_FIRST_AUDIO_DEADLINE_MS,
+  TURN_RESPONSE_DEADLINE_MS,
 } from "@/config/experienceRuntime";
+import {
+  pauseConversationTraceSync,
+  prewarmConversationTraceOutbox,
+  resumeConversationTraceSync,
+} from "@/services/conversationTraceOutbox";
+import {
+  getPassiveVoiceNetworkObservation,
+  recordPassiveVoiceNetworkObservation,
+} from "@/services/networkDiagnostics";
 
 const TEASER_VIDEO_URL = "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049";
 
@@ -163,6 +173,7 @@ const IndexPRD4 = () => {
   const isProcessingRef = useRef(false);
   const processingWatchdogRef = useRef<number | null>(null);
   const activeTurnControllerRef = useRef<AbortController | null>(null);
+  const activeOutputControllerRef = useRef<AbortController | null>(null);
   const activeTurnSequenceRef = useRef(0);
   const endedRef = useRef(false);
   const userRoleRef = useRef(state.userRoleProfile);
@@ -246,6 +257,8 @@ const IndexPRD4 = () => {
     activeTurnSequenceRef.current += 1;
     activeTurnControllerRef.current?.abort("experience-cleanup");
     activeTurnControllerRef.current = null;
+    activeOutputControllerRef.current?.abort("experience-cleanup");
+    activeOutputControllerRef.current = null;
     pttFinalizingRef.current = false;
     try { sttRef.current?.stop(); } catch { /* ignore */ }
     sttRef.current = null;
@@ -507,6 +520,9 @@ const IndexPRD4 = () => {
     if (diagnosticTraceRequestedRef.current) {
       diagnosticTraceEnabled = await isCurrentUserAdmin().catch(() => false);
       if (!diagnosticTraceEnabled) console.warn("[PRD4] diagnostic request ignored: admin role required");
+      else await prewarmConversationTraceOutbox().catch((error) => {
+        console.warn("[PRD4] diagnostic outbox prewarm failed", error);
+      });
     }
     diagnosticTraceEnabledRef.current = diagnosticTraceEnabled;
 
@@ -752,7 +768,10 @@ const IndexPRD4 = () => {
     async (userText: string) => {
       if (isProcessingRef.current || !userText.trim() || endedRef.current) return;
       isProcessingRef.current = true;
+      pauseConversationTraceSync();
       activeTurnControllerRef.current?.abort("superseded-turn");
+      activeOutputControllerRef.current?.abort("superseded-turn");
+      activeOutputControllerRef.current = null;
       const turnController = new AbortController();
       activeTurnControllerRef.current = turnController;
       const turnSequence = activeTurnSequenceRef.current + 1;
@@ -763,14 +782,13 @@ const IndexPRD4 = () => {
         !turnController.signal.aborted &&
         !endedRef.current;
 
-      // Watchdog d'amorçage : protège l'attente RAG/LLM/TTS, mais ne doit jamais
-      // imposer une durée maximale à une lecture audio qui progresse normalement.
+      // Watchdog de réponse : protège uniquement RAG/LLM. Le TTS recevra ensuite
+      // sa propre fenêtre complète, indépendante des écritures diagnostiques.
       if (processingWatchdogRef.current) window.clearTimeout(processingWatchdogRef.current);
       processingWatchdogRef.current = window.setTimeout(() => {
         if (!isCurrentTurn()) return;
         console.warn("[PRD4] turn watchdog fired — releasing processing lock");
         turnController.abort("turn-recovery-deadline");
-        try { responseOutputRef.current?.interrupt(); } catch { /* ignore */ }
         isProcessingRef.current = false;
         setAudioState("idle");
         toast({ title: "Le tour a pris trop de temps", description: "Tu peux reparler.", variant: "destructive" });
@@ -779,7 +797,7 @@ const IndexPRD4 = () => {
           turn_sequence: turnSequence,
           reason: "recovery_deadline",
         });
-      }, TURN_FIRST_AUDIO_DEADLINE_MS);
+      }, TURN_RESPONSE_DEADLINE_MS);
       setAudioState("max_thinking");
       setUserSubtitle(userText);
 
@@ -848,6 +866,11 @@ const IndexPRD4 = () => {
 
         if (!isCurrentTurn()) return;
 
+        if (processingWatchdogRef.current) {
+          window.clearTimeout(processingWatchdogRef.current);
+          processingWatchdogRef.current = null;
+        }
+
         const ttsStart = performance.now();
         const blocker =
           (result.timings.max_ms ?? 0) >= (result.timings.rag_ms ?? 0) ? "max_ms" : "rag_ms";
@@ -887,6 +910,32 @@ const IndexPRD4 = () => {
             })
           : null;
         let outputLatencySegmentDone = false;
+        const outputController = new AbortController();
+        activeOutputControllerRef.current = outputController;
+        const abortOutputFromTurn = () => outputController.abort(turnController.signal.reason);
+        turnController.signal.addEventListener("abort", abortOutputFromTurn, { once: true });
+        processingWatchdogRef.current = window.setTimeout(() => {
+          if (activeOutputControllerRef.current !== outputController || outputController.signal.aborted) return;
+          console.warn("[PRD4] TTS first-audio watchdog fired — cancelling output only");
+          outputController.abort("tts-first-audio-deadline");
+          try { responseOutputRef.current?.interrupt(); } catch { /* ignore */ }
+          setAudioState("idle");
+          toast({
+            title: "La voix prend trop de temps",
+            description: "La réponse de Max reste affichée. Tu peux continuer.",
+            variant: "destructive",
+          });
+          trackEvent("prd4_tts_first_audio_timeout", {
+            session_id: sessionIdRef.current,
+            turn_id: turnId,
+            turn_index: turnIndex,
+            deadline_ms: TURN_FIRST_AUDIO_DEADLINE_MS,
+          });
+          const observed = getPassiveVoiceNetworkObservation();
+          recordPassiveVoiceNetworkObservation({
+            firstAudioTimeouts: observed.firstAudioTimeouts + 1,
+          });
+        }, TURN_FIRST_AUDIO_DEADLINE_MS);
         const onPlaybackStart = () => {
           if (processingWatchdogRef.current) {
             window.clearTimeout(processingWatchdogRef.current);
@@ -895,13 +944,19 @@ const IndexPRD4 = () => {
           if (outputLatencySegmentDone) return;
           outputLatencySegmentDone = true;
           endLatencySegment(outputLatencySegmentId);
+          recordPassiveVoiceNetworkObservation({
+            firstAudioMs: Math.round(performance.now() - ttsStart),
+            firstAudioTimeouts: 0,
+          });
         };
         const outputResult = await renderResponseText(result.maxResponse, {
           turnId,
           turnIndex,
-          signal: turnController.signal,
+          signal: outputController.signal,
           onPlaybackStart,
         }).finally(() => {
+          turnController.signal.removeEventListener("abort", abortOutputFromTurn);
+          if (activeOutputControllerRef.current === outputController) activeOutputControllerRef.current = null;
           if (!outputLatencySegmentDone) endLatencySegment(outputLatencySegmentId);
         });
         if (processingWatchdogRef.current) {
@@ -909,6 +964,7 @@ const IndexPRD4 = () => {
           processingWatchdogRef.current = null;
         }
         if (!isCurrentTurn()) return;
+        resumeConversationTraceSync(true);
         const tts_ms =
           outputResult.firstPlaybackStartMs ||
           Math.round(performance.now() - ttsStart);
@@ -1200,6 +1256,7 @@ const IndexPRD4 = () => {
           }
           isProcessingRef.current = false;
           setAudioState("idle");
+          resumeConversationTraceSync(true);
         }
       }
     },
@@ -1261,6 +1318,10 @@ const IndexPRD4 = () => {
       },
     );
     await stt.start();
+    recordPassiveVoiceNetworkObservation({
+      sttConnected: true,
+      lastSttConnectedAt: Date.now(),
+    });
     stt.setManualMode(true); // toggle-to-talk: pas de silence auto-finalize
     sttRef.current = stt;
     return stt;
@@ -1278,14 +1339,19 @@ const IndexPRD4 = () => {
       }
       activeTurnControllerRef.current?.abort("stale-processing-lock");
       activeTurnControllerRef.current = null;
+      activeOutputControllerRef.current?.abort("stale-processing-lock");
+      activeOutputControllerRef.current = null;
       activeTurnSequenceRef.current += 1;
       isProcessingRef.current = false;
     }
     if (isProcessingRef.current) return;
     if (pttFinalizingRef.current) return;
+    pauseConversationTraceSync();
     // Le nouveau geste utilisateur invalide les analyses asynchrones du tour précédent.
     activeTurnControllerRef.current?.abort("new-user-turn");
     activeTurnControllerRef.current = null;
+    activeOutputControllerRef.current?.abort("new-user-turn");
+    activeOutputControllerRef.current = null;
     activeTurnSequenceRef.current += 1;
     let initialStream: Promise<MediaStream> | undefined;
     try {
@@ -1312,6 +1378,7 @@ const IndexPRD4 = () => {
       teardownSTT();
       incrementPttError();
       setAudioState("idle");
+      resumeConversationTraceSync(true);
       toast({ title: "Micro indisponible", description: "Réessaie dans un instant.", variant: "destructive" });
     }
   }, [
@@ -1452,6 +1519,8 @@ const IndexPRD4 = () => {
     pendingPostVideoContextRef.current = null;
     activeTurnControllerRef.current?.abort("experience-restart");
     activeTurnControllerRef.current = null;
+    activeOutputControllerRef.current?.abort("experience-restart");
+    activeOutputControllerRef.current = null;
     activeTurnSequenceRef.current += 1;
     setActiveVideo(null);
     callPreparationRef.current = null;

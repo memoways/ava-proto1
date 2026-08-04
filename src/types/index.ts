@@ -250,9 +250,13 @@ export interface ConversationPipelineTrace {
 
 export type {
   ConversationTurnTraceRow,
+  ConversationTurnTrace,
   ConversationTurnTraceV1,
+  ConversationTurnTraceV2,
   LLMCallDiagnosticTrace,
+  LLMCallDiagnosticTraceV2,
   MaxPromptAssemblyTrace,
+  TraceTextReference,
   TraceMessage,
 } from "./conversationTrace";
 

@@ -22,7 +22,8 @@ import { maxRagFormatOptionsForVariant } from "@/services/maxRagVariant";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { selectRecentConversation, selectUnsummarizedConversation } from "@/services/conversationMemory";
 import { withTimeout } from "@/services/asyncUtils";
-import { patchConversationTurnTrace, persistConversationTurnTrace } from "@/services/conversationTraceService";
+import { compactConversationTurnTrace } from "@/services/conversationTraceFormat";
+import { enqueueConversationTurnTrace, patchQueuedConversationTurnTrace } from "@/services/conversationTraceOutbox";
 import {
   RAG_DEGRADED_MODE_DEADLINE_MS,
   MAX_LLM_RESPONSE_DEADLINE_MS,
@@ -250,13 +251,13 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     }
   };
   // En diagnostic, le post-tour (qui prépare la suite et écrit son propre log)
-  // ne démarre qu'après la persistance causale garantie de la réponse.
+  // ne démarre qu'après la mise en file locale durable de la réponse.
   let rawPostTurnPromise = diagnosticTraceEnabled ? null : runPostTurn();
 
   const summaryEvery = gameplay?.RAG_SUMMARY_EVERY_N_TURNS ?? 4;
   const lastSummarizedTurn = summaryRecord?.last_turn ?? 0;
 
-  let traceId: string | null = null;
+  const traceId: string | null = null;
   let traceWriteMs = 0;
   if (diagnosticTraceEnabled) {
     if (!input.sessionId) {
@@ -354,12 +355,20 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       },
     };
 
-    const persisted = await persistConversationTurnTrace(trace);
-    traceId = persisted.id;
-    traceWriteMs = persisted.writeLatencyMs;
+    const compactTrace = compactConversationTurnTrace(trace);
+    const enqueueResult = await enqueueConversationTurnTrace(compactTrace).catch((error) => {
+      console.error("[PRD4 orchestrator] Diagnostic trace enqueue failed without blocking voice", error);
+      return { durable: false, enqueueMs: 0 };
+    });
+    traceWriteMs = enqueueResult.enqueueMs;
     trace.timings.traceWriteMs = traceWriteMs;
     trace.timings.observedTotalMs = Math.round(performance.now() - t0);
-    await patchConversationTurnTrace(input.sessionId, turnIndex, ["timings"], trace.timings);
+    compactTrace.timings.traceWriteMs = traceWriteMs;
+    compactTrace.timings.traceEnqueueMs = traceWriteMs;
+    compactTrace.timings.observedTotalMs = trace.timings.observedTotalMs;
+    void patchQueuedConversationTurnTrace(input.sessionId, turnIndex, ["timings"], compactTrace.timings).catch((error) => {
+      console.warn("[PRD4 orchestrator] Deferred diagnostic timing patch failed", error);
+    });
     rawPostTurnPromise = runPostTurn();
   }
 
@@ -367,7 +376,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
 
   const labelPromise = rawLabelPromise.then(async (result) => {
     if (diagnosticTraceEnabled && input.sessionId) {
-      await patchConversationTurnTrace(input.sessionId, turnIndex, ["gm", "labelPass"], {
+      await patchQueuedConversationTurnTrace(input.sessionId, turnIndex, ["gm", "labelPass"], {
         status: result.ok ? "complete" : "error",
         effect: "parallel_not_causal",
         latencyMs: result.latency_ms,
@@ -381,7 +390,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
 
   const postTurnPromise = rawPostTurnPromise.then(async (result) => {
     if (diagnosticTraceEnabled && input.sessionId) {
-      await patchConversationTurnTrace(input.sessionId, turnIndex, ["gm", "postTurn"], {
+      await patchQueuedConversationTurnTrace(input.sessionId, turnIndex, ["gm", "postTurn"], {
         status: result.diagnostic?.error ? "error" : "complete",
         effect: "next_turn",
         latencyMs: result.latency_ms ?? null,

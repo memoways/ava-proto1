@@ -22,6 +22,13 @@ vi.mock("@/services/conversationTraceService", () => ({
   fetchConversationTurnTraceSummaries: vi.fn(),
   fetchConversationTurnTrace: vi.fn(),
 }));
+vi.mock("@/services/conversationTraceOutbox", () => ({
+  prewarmConversationTraceOutbox: vi.fn().mockResolvedValue(undefined),
+  listConversationTraceOutboxRecords: vi.fn().mockResolvedValue([]),
+  subscribeConversationTraceOutbox: vi.fn(() => () => undefined),
+  retryConversationTraceOutboxRecord: vi.fn().mockResolvedValue(undefined),
+  discardConversationTraceOutboxRecord: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { fetchConversationTurnTrace, fetchConversationTurnTraceSummaries } from "@/services/conversationTraceService";
 import PipelineTraceTab from "./PipelineTraceTab";
@@ -76,6 +83,9 @@ describe("PipelineTraceTab", () => {
     expect(screen.getByText("GM labels (parallèle)")).toBeInTheDocument();
     expect(screen.getByText("GM post-tour (pour la suite)")).toBeInTheDocument();
     expect(screen.getAllByText("Réponse brute", { exact: false })).toHaveLength(2);
+    expect(fetchConversationTurnTraceSummaries).toHaveBeenCalledOnce();
+    expect(fetchConversationTurnTrace).toHaveBeenCalledOnce();
+    expect(screen.queryByText(LONG_PROMPT)).not.toBeInTheDocument();
   });
 
   it("affiche sans troncature un prompt système long", async () => {

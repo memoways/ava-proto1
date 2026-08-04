@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-03 (RAG Config, GPT-5.6 Luna, responsive tablette, résilience proxy STT)
+> **Last Updated**: 2026-08-04 (traces Max durables hors chemin vocal et diagnostic réseau passif)
 
 ---
 
@@ -72,6 +72,18 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-04 — Les traces Max quittent le chemin critique de la voix 🔷
+
+**Incident.** En `?diagnostic=full`, l’orchestrateur attendait l’upload d’un JSON très dupliqué puis un patch Supabase avant de lancer le TTS. Le watchdog de 15 secondes couvrait RAG, LLM, persistance et voix : sur une connexion à 0,58 Mbit/s montant, il annulait fréquemment l’audio alors que Deepgram et Max avaient correctement répondu.
+
+**Correction.** `ConversationTurnTraceV2` stocke chaque gros bloc une seule fois et garde l’ordre nécessaire à la reconstruction exacte du payload OpenRouter. Une outbox IndexedDB admin met la trace durablement en file en 100 ms maximum, fusionne Labels/GM, reprend après rechargement ou reconnexion et ne supprime l’élément qu’après confirmation distante. L’upsert reste idempotent par session et numéro de tour.
+
+**Priorité à la voix.** La génération Max, le délai de première voix et la synchronisation ont chacun leur contrôleur. Le TTS commence sans attendre Supabase ; son timeout ne touche ni le texte ni la trace. Un nouveau PTT suspend et annule l’upload en cours, qui sera repris plus tard.
+
+**Réseau.** Aucune sonde active n’est ajoutée. Les capacités exposées par le navigateur et les vrais uploads produisent deux verdicts indépendants. La connexion observée reste compatible avec la voix, mais lente pour les traces : **« Voix compatible — synchronisation des traces lente »**.
+
+**Activation.** La migration `20260804183715_allow_conversation_trace_v2.sql` et l’Edge Function `proxy-llm` doivent être validées et publiées uniquement dans Lovable/Lovable Cloud.
 
 ### 2026-08-03 — RAG Config, GPT-5.6 Luna, responsive tablette et résilience proxy STT 🔷
 

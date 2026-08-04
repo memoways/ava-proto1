@@ -25,6 +25,9 @@ Ce contrat transforme les incidents récurrents en invariants exécutables. La C
 
 - Le délai RAG dégradé ne peut plus réduire la fenêtre normale de Max à moins de huit secondes.
 - Un LLM qui répond en 3,5 secondes après un RAG bloqué doit être conservé ; le fallback ne doit pas accuser à tort la ligne ou le STT.
+- En mode diagnostic, aucune écriture Supabase de trace ne se trouve sur le chemin Max → première voix : seule la mise en file IndexedDB locale, bornée à 100 ms, précède la diffusion.
+- Génération Max, première voix et synchronisation des traces ont des contrôleurs distincts. Un timeout TTS conserve le texte et la trace ; un nouveau PTT annule uniquement la sortie et l’upload hors chemin critique concernés.
+- Le diagnostic réseau reste passif : aucune sonde de débit, aucun appel fournisseur supplémentaire.
 
 ## Gates
 

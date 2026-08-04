@@ -25,6 +25,21 @@ export interface LLMCallDiagnosticTrace {
   proxyLatencyMs: number | null;
 }
 
+export interface LLMCallDiagnosticTraceV2 extends Omit<LLMCallDiagnosticTrace, "clientPayload" | "upstreamPayload"> {
+  /** Payload fields excluding messages, which are stored once in maxCall.messages. */
+  clientPayload: Record<string, unknown>;
+  /** Exact OpenRouter fields excluding messages, reconstructed by the reader. */
+  upstreamPayload: Record<string, unknown>;
+  /** Preserves JSON.stringify property order for exact payload reconstruction. */
+  clientPayloadKeyOrder: string[];
+  /** Preserves JSON.stringify property order for exact payload reconstruction. */
+  upstreamPayloadKeyOrder: string[];
+}
+
+export interface TraceTextReference {
+  blobRef: string;
+}
+
 export interface MaxPromptAssemblyTrace {
   baseSystemPrompt: string;
   baseSource: {
@@ -201,6 +216,37 @@ export interface ConversationTurnTraceV1 {
   };
 }
 
+type PromptTraceV2 = Omit<MaxPromptAssemblyTrace, "baseSystemPrompt" | "characterPrompt" | "technicalRules" | "injectedSections" | "finalSystemPrompt"> & {
+  baseSystemPrompt: TraceTextReference;
+  characterPrompt: Omit<MaxPromptAssemblyTrace["characterPrompt"], "renderedSections"> & {
+    renderedSections: TraceTextReference;
+  };
+  technicalRules: TraceTextReference;
+  injectedSections: Array<Omit<MaxPromptAssemblyTrace["injectedSections"][number], "content"> & {
+    content: TraceTextReference;
+  }>;
+  finalSystemPrompt: TraceTextReference;
+};
+
+export interface ConversationTurnTraceV2 extends Omit<ConversationTurnTraceV1, "schemaVersion" | "prompt" | "maxCall" | "timings"> {
+  schemaVersion: 2;
+  /** Deduplicated exact strings. References are local to this trace. */
+  textBlobs: Record<string, string>;
+  prompt: PromptTraceV2 | null;
+  maxCall: Omit<ConversationTurnTraceV1["maxCall"], "messages" | "diagnostic"> & {
+    messages: Array<Omit<TraceMessage, "content"> & { content: TraceTextReference }>;
+    diagnostic: LLMCallDiagnosticTraceV2 | null;
+  };
+  timings: ConversationTurnTraceV1["timings"] & {
+    traceEnqueueMs: number | null;
+    traceUploadMs: number | null;
+    traceUploadBytes: number | null;
+    traceUploadBps: number | null;
+  };
+}
+
+export type ConversationTurnTrace = ConversationTurnTraceV1 | ConversationTurnTraceV2;
+
 export interface ConversationTurnTraceRow {
   id: string;
   session_id: string;
@@ -209,7 +255,7 @@ export interface ConversationTurnTraceRow {
   schema_version: number;
   character_name: string;
   status: string;
-  trace: ConversationTurnTraceV1;
+  trace: ConversationTurnTrace;
   created_at: string;
   updated_at: string;
 }

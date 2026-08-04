@@ -119,6 +119,9 @@ serve(async (req) => {
 
     // ===== STANDARD CHAT COMPLETION =====
     const { model, max_tokens, stream, upstreamBody } = buildOpenRouterPayload(body);
+    // Messages are already held by the authenticated diagnostic client. Returning
+    // them again in both payloads multiplies response and trace size for no gain.
+    const { messages: _upstreamMessages, ...upstreamTracePayload } = upstreamBody;
     const timeoutMs = clampTimeoutMs(body.timeout_ms, stream ? 18000 : 15000);
 
     // Guardrails against turning this endpoint into an open LLM proxy.
@@ -186,7 +189,6 @@ serve(async (req) => {
       console.error(`OpenRouter error [${response.status}]:`, errorText);
       const diagnostic = body.diagnostic_trace === true ? {
         clientPayload: {
-          messages: body.messages,
           stream,
           model: body.model,
           temperature: body.temperature,
@@ -195,7 +197,7 @@ serve(async (req) => {
           timeout_ms: body.timeout_ms,
           reasoning: body.reasoning === true,
         },
-        upstreamPayload: upstreamBody,
+        upstreamPayload: upstreamTracePayload,
         requestedModel: model,
         returnedModel: model,
         provider: null,
@@ -225,7 +227,6 @@ serve(async (req) => {
     if (body.diagnostic_trace === true) {
       data._ava_trace = {
         clientPayload: {
-          messages: body.messages,
           stream,
           model: body.model,
           temperature: body.temperature,
@@ -234,7 +235,7 @@ serve(async (req) => {
           timeout_ms: body.timeout_ms,
           reasoning: body.reasoning === true,
         },
-        upstreamPayload: upstreamBody,
+        upstreamPayload: upstreamTracePayload,
         requestedModel: model,
         returnedModel: typeof data.model === "string" && data.model ? data.model : model,
         provider: typeof data.provider === "string" ? data.provider : null,

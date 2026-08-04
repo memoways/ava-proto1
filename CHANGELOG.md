@@ -4,6 +4,19 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.52.1] - 2026-08-04 — Traces Max durables sans blocage de la voix
+
+### Corrigé
+- Le mode `?diagnostic=full` ne bloque plus la première voix sur un upsert Supabase : la trace est mise en file IndexedDB en 100 ms maximum, puis synchronisée après l’audio ou au retour en ligne.
+- Génération Max, première voix et upload des traces utilisent désormais des contrôleurs et délais indépendants. Un timeout TTS ne supprime plus la réponse ni sa trace, et un nouveau PTT suspend l’upload.
+- Le proxy LLM ne renvoie plus les messages déjà connus du client dans ses diagnostics.
+
+### Ajouté
+- Contrat `ConversationTurnTraceV2` compatible V1 : gros textes dédupliqués, payload OpenRouter reconstruisible exactement et migration Lovable Cloud autorisant les versions 1 et 2 dans la table existante.
+- Outbox administrateur avec reprise après rechargement, fusion Labels/GM, backoff, retry/suppression manuels et upsert idempotent par session/tour.
+- Verdicts réseau passifs séparés pour la voix et la synchronisation, fondés sur les capacités navigateur et les vrais uploads, sans speed test ni appel payant.
+- Panneau Traces Max avec états locaux, chargement différé des blocs lourds et export JSON matérialisé.
+
 ## [0.52.0] - 2026-08-03 — RAG Config, GPT-5.6 Luna, tablette et résilience proxy STT
 
 ### Ajouté
