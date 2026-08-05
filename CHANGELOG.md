@@ -18,6 +18,9 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - `sync-notion` batche les embeddings par personnage, utilise `overlap=0` avec Context 4 et conserve les anciens profils pour rollback.
 - Le client n’envoie plus de choix de fournisseur obsolète dans le payload RAG ; les traces conservent le fournisseur et les modèles réellement utilisés.
 
+### Corrigé
+- La régénération des questions fréquentes du Laboratoire RAG impose désormais un JSON Schema strict, active la réparation de réponse OpenRouter et retente une fois un résultat encore invalide. Une ponctuation JSON défectueuse de Gemini ne bloque plus durablement le cache du laboratoire.
+
 ## [0.52.1] - 2026-08-04 — Traces Max durables sans blocage de la voix
 
 ### Corrigé

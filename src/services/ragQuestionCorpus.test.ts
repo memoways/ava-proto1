@@ -3,6 +3,7 @@ import { isQuestionLike, parseRAGQuestionCorpus } from "./ragQuestionCorpus";
 import {
   groupExactQuestions,
   questionQuality,
+  structuredJsonOptions,
   type CorpusOccurrence,
 } from "../../supabase/functions/rag-question-corpus/core";
 
@@ -62,5 +63,22 @@ describe("corpus sémantique de questions du laboratoire RAG", () => {
     ]);
     expect(groups).toHaveLength(2);
     expect(groups[0].occurrences).toHaveLength(2);
+  });
+
+  it("impose un schéma JSON strict et active la réparation OpenRouter", () => {
+    const options = structuredJsonOptions("rag_question_test", {
+      type: "object",
+      properties: { items: { type: "array" } },
+      required: ["items"],
+    });
+
+    expect(options).toMatchObject({
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "rag_question_test", strict: true },
+      },
+      plugins: [{ id: "response-healing" }],
+      provider: { require_parameters: true },
+    });
   });
 });

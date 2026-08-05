@@ -8,6 +8,7 @@ import {
   normalizeCorpusQuestion,
   parseJsonObject,
   questionQuality,
+  structuredJsonOptions,
   type CorpusOccurrence,
   type ExactQuestionGroup,
 } from "./core.ts";
@@ -25,6 +26,51 @@ const ANALYSIS_BATCH_SIZE = 60;
 const MERGE_BATCH_SIZE = 80;
 const AUTO_REFRESH_AFTER_MS = 5 * 60_000;
 const STUCK_REFRESH_AFTER_MS = 5 * 60_000;
+const STRUCTURED_OUTPUT_ATTEMPTS = 2;
+
+const ANALYSIS_RESPONSE_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          source_id: { type: "string" },
+          keep: { type: "boolean" },
+          canonical_question: { type: "string" },
+          intent_key: { type: "string" },
+          theme: { type: "string" },
+        },
+        required: ["source_id", "keep", "canonical_question", "intent_key", "theme"],
+      },
+    },
+  },
+  required: ["items"],
+};
+
+const MERGE_RESPONSE_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    groups: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          question: { type: "string" },
+          source_ids: { type: "array", items: { type: "string" } },
+          theme: { type: "string" },
+        },
+        required: ["question", "source_ids", "theme"],
+      },
+    },
+  },
+  required: ["groups"],
+};
 
 interface SessionRow {
   id: string;
@@ -91,29 +137,45 @@ async function mapConcurrent<T, R>(items: T[], concurrency: number, work: (item:
   return results;
 }
 
-async function callJsonLLM(apiKey: string, system: string, payload: unknown, maxTokens: number): Promise<Record<string, unknown>> {
-  const response = await fetch(OPENROUTER_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://ava-prototype.lovable.app",
-      "X-Title": "AVA RAG question corpus",
-    },
-    body: JSON.stringify({
-      model: SYNTHESIS_MODEL,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: JSON.stringify(payload) },
-      ],
-      temperature: 0.05,
-      max_tokens: maxTokens,
-      response_format: { type: "json_object" },
-    }),
-  });
-  if (!response.ok) throw new Error(`Synthèse LLM ${response.status}: ${(await response.text()).slice(0, 300)}`);
-  const data = await response.json();
-  return parseJsonObject(String(data?.choices?.[0]?.message?.content || ""));
+async function callJsonLLM(
+  apiKey: string,
+  system: string,
+  payload: unknown,
+  maxTokens: number,
+  contract: { name: string; schema: Record<string, unknown> },
+): Promise<Record<string, unknown>> {
+  let lastParseError: unknown = null;
+  for (let attempt = 1; attempt <= STRUCTURED_OUTPUT_ATTEMPTS; attempt += 1) {
+    const response = await fetch(OPENROUTER_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://ava-prototype.lovable.app",
+        "X-Title": "AVA RAG question corpus",
+      },
+      body: JSON.stringify({
+        model: SYNTHESIS_MODEL,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: JSON.stringify(payload) },
+        ],
+        temperature: 0.05,
+        max_tokens: maxTokens,
+        ...structuredJsonOptions(contract.name, contract.schema),
+      }),
+    });
+    if (!response.ok) throw new Error(`Synthèse LLM ${response.status}: ${(await response.text()).slice(0, 300)}`);
+    const data = await response.json();
+    try {
+      return parseJsonObject(String(data?.choices?.[0]?.message?.content || ""));
+    } catch (error) {
+      lastParseError = error;
+      console.warn(`[rag-question-corpus] invalid ${contract.name} JSON (attempt ${attempt}/${STRUCTURED_OUTPUT_ATTEMPTS})`);
+    }
+  }
+  const detail = lastParseError instanceof Error ? lastParseError.message : String(lastParseError || "unknown parse error");
+  throw new Error(`Synthèse structurée invalide après ${STRUCTURED_OUTPUT_ATTEMPTS} tentatives : ${detail}`);
 }
 
 async function fetchAllRows<T>(buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
@@ -212,7 +274,7 @@ Retourne strictement {"items":[{"source_id":"...","keep":true,"canonical_questio
       occurrences: group.occurrences.length,
       epinglee: group.occurrences.some((item) => item.pinned),
     })),
-  }, 7_000);
+  }, 7_000, { name: "rag_question_analysis", schema: ANALYSIS_RESPONSE_SCHEMA });
   const rawItems = Array.isArray(response.items) ? response.items : [];
   const decisions = new Map<string, Record<string, unknown>>();
   rawItems.forEach((item) => {
@@ -277,7 +339,7 @@ Retourne strictement {"groups":[{"question":"... ?","source_ids":["..."],"theme"
       epinglee: candidate.occurrences.some((item) => item.pinned),
       theme: candidate.theme,
     })),
-  }, 6_000);
+  }, 6_000, { name: "rag_question_merge", schema: MERGE_RESPONSE_SCHEMA });
   const rawGroups = Array.isArray(response.groups) ? response.groups : [];
   const used = new Set<number>();
   const merged: SemanticCandidate[] = [];

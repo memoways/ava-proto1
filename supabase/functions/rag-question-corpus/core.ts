@@ -114,3 +114,15 @@ export function parseJsonObject(text: string): Record<string, unknown> {
     return JSON.parse(match[0]) as Record<string, unknown>;
   }
 }
+
+/** OpenRouter structured-output contract shared by every semantic corpus call. */
+export function structuredJsonOptions(name: string, schema: Record<string, unknown>) {
+  return {
+    response_format: {
+      type: "json_schema",
+      json_schema: { name, strict: true, schema },
+    },
+    plugins: [{ id: "response-healing" }],
+    provider: { require_parameters: true },
+  } as const;
+}
