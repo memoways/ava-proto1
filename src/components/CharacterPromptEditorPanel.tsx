@@ -20,6 +20,12 @@ import {
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
 import { supabase } from "@/integrations/supabase/client";
 import { getGameplaySettings } from "@/services/settingsService";
+import {
+  observeCharacterPrompt,
+  formatSyncDate,
+  type CharacterSyncReport,
+} from "@/services/characterSyncReport";
+
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
