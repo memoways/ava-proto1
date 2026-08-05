@@ -195,6 +195,8 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     vi.mocked(fetchConversationMemory).mockResolvedValue(structuredMemory);
     const matches = Array.from({ length: 6 }, (_, index) => ({
       id: `rag-${index + 1}`,
+      source_table: "storyworld",
+      source_id: `source-${index + 1}`,
       content: `souvenir-${index + 1}`,
       similarity: 0.9 - index * 0.01,
     }));
