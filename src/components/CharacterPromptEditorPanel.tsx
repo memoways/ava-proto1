@@ -233,6 +233,50 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
         </div>
       )}
 
+      {/* Dernier sync + diff */}
+      <div className="border rounded-lg p-4 space-y-2 bg-muted/10">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <Label className="text-sm font-semibold">Dernier sync Notion</Label>
+          <span className="text-xs text-muted-foreground">
+            {formatSyncDate(prompt.updated_at)}
+          </span>
+        </div>
+        {syncReport && syncReport.at === (prompt.updated_at || "") ? (
+          syncReport.changes.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Sync effectué, aucun changement de contenu détecté (versions comparées :{" "}
+              {formatSyncDate(syncReport.previousAt)} → {formatSyncDate(syncReport.at)}).
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Comparé à la version précédente vue ici ({formatSyncDate(syncReport.previousAt)}) ·
+                total {syncReport.totalBefore} → {syncReport.totalAfter} caractères (
+                {syncReport.totalAfter - syncReport.totalBefore >= 0 ? "+" : ""}
+                {syncReport.totalAfter - syncReport.totalBefore}).
+              </p>
+              <ul className="text-xs space-y-1">
+                {syncReport.changes.map((c) => (
+                  <li key={c.key} className="flex justify-between gap-3">
+                    <span>{c.label}</span>
+                    <span className={c.delta > 0 ? "text-emerald-400" : "text-amber-400"}>
+                      {c.before} → {c.after} car. ({c.delta > 0 ? "+" : ""}
+                      {c.delta})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Aucun diff disponible : la version actuelle sert de référence. Le prochain sync affichera
+            ici le détail des champs modifiés (nombre de caractères).
+          </p>
+        )}
+      </div>
+
+
       {/* Situation summary (read-only) */}
       <div className="space-y-2 border rounded-lg p-4 bg-muted/20">
         <div className="flex items-center justify-between">
