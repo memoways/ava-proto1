@@ -164,6 +164,10 @@ pas comme déploiement autonome. La migration, la publication, les modifications
 `rag_only` puis la comparaison aveugle doivent encore être exécutés dans cet ordre
 depuis Lovable/Lovable Cloud. Le runbook opérationnel est
 [`docs/optimized_v3_lovable_runbook.md`](docs/optimized_v3_lovable_runbook.md).
+Pour que Romed puisse relire puis auditer l'intervention éditoriale, la section 7
+de [`docs/plan_optimisation_payload_max.md`](docs/plan_optimisation_payload_max.md)
+documente désormais chaque changement prévu, sa raison, les invariants à préserver
+et les preuves à reporter après synchronisation.
 
 ### 2026-08-04 — Les traces Max quittent le chemin critique de la voix 🔷
 

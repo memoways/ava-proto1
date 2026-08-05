@@ -27,7 +27,9 @@ Toutes les opérations ci-dessous sont réalisées depuis Lovable/Lovable Cloud.
 2. Publier le code sans changer `MAX_PROMPT_VARIANT`.
 3. Modifier les propriétés de la fiche Notion Max avec les remplacements exacts
    de [`plan_optimisation_payload_max.md`](plan_optimisation_payload_max.md),
-   section 7.
+   section 7. La section 7.0 explique à Romed chaque changement et sa raison ;
+   compléter le journal d'application de la section 7.10 avec les preuves
+   effectives.
 4. Lancer une synchronisation `fields_only` pour Max.
 5. Contrôler que `situation_summary` contient Lausanne aujourd'hui, le retour du
    Jura hier, le fusil sur Emma puis Ava, Léo qui désarme Max, Mona au camp et la
@@ -86,7 +88,8 @@ intégralement, avant toute action :
 - `docs/plan_optimized_v3_payload_max.md` (plan approuvé et source de vérité) ;
 - `docs/optimized_v3_lovable_runbook.md` (ordre opérationnel obligatoire) ;
 - `docs/plan_optimisation_payload_max.md`, section 7 (remplacements éditoriaux
-  exacts de la fiche Notion Max) ;
+  exacts de la fiche Notion Max, registre explicatif pour Romed en 7.0 et journal
+  d'application en 7.10) ;
 - les entrées `optimized_v3` de `CHANGELOG.md` et `STORY.md`.
 
 Le code est déjà implémenté et validé localement : 232 tests, TypeScript, lint
@@ -206,6 +209,13 @@ Exécute les étapes suivantes dans cet ordre, sans en sauter :
     préféré ou équivalent à `rich_v2` en comparaison aveugle. Sinon, laisse le
     réglage global inchangé et documente précisément les écarts.
 
+12. Après les opérations réellement exécutées dans Notion et Lovable Cloud,
+    mets à jour le journal de la section 7.10 de
+    `docs/plan_optimisation_payload_max.md`. Ne marque aucune ligne comme faite
+    sans renseigner la date, l'auteur et une preuve : historique Notion, ID du
+    job `fields_only` ou `rag_only`, ou identifiant de session/trace canary.
+    Cette mise à jour est le compte rendu éditorial destiné à Romed.
+
 À la fin, fournis un compte rendu factuel avec :
 - commit `main` effectivement synchronisé ;
 - migration appliquée et objets de base vérifiés ;
@@ -217,6 +227,7 @@ Exécute les étapes suivantes dans cet ordre, sans en sauter :
 - comparaison `optimized_v3` contre `rich_v2` ;
 - valeur finale de `MAX_PROMPT_VARIANT` ;
 - éventuels blocages ou critères non atteints.
+- lignes de la section 7.10 effectivement complétées pour Romed.
 
 Si une opération nécessite un accès Notion ou une autorisation que tu n'as pas,
 n'invente pas son succès et ne contourne pas Lovable Cloud : arrête uniquement

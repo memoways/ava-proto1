@@ -15,6 +15,13 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   [`docs/plan_optimized_v3_payload_max.md`](docs/plan_optimized_v3_payload_max.md) :
   objectifs mesurés, ordre d'assemblage, budgets, règles de déduplication,
   mémoire, reprise, traçabilité, tests et séquence d'activation éditoriale.
+- Registre éditorial destiné à Romed dans la section 7 de
+  [`docs/plan_optimisation_payload_max.md`](docs/plan_optimisation_payload_max.md) :
+  matrice détaillée « problème actuel → changement prévu → raison → contenu à
+  préserver » pour chaque propriété Notion, plus journal d'application avec
+  auteur, date, historique Notion, identifiants de synchronisation et traces de
+  validation. Le registre indique explicitement que ces éditions restent à
+  appliquer dans Notion et ne sont pas réalisées par le commit de code.
 - Variante additive `optimized_v3`, sans modification de `legacy`, `compact_v1`
   ni `rich_v2`. Son compilateur global :
   - assemble un contrat conversationnel unique, le noyau de Max, la timeline, le

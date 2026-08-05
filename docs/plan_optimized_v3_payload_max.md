@@ -91,6 +91,11 @@ l'excuse.
 Appliquer les remplacements chirurgicaux déjà détaillés dans
 [`plan_optimisation_payload_max.md`](plan_optimisation_payload_max.md), section 7 :
 
+La section 7.0 de ce document constitue le registre éditorial destiné à Romed :
+elle présente, pour chaque zone, le problème, le changement prévu, sa raison et
+la matière qui doit rester intacte. La section 7.10 sert de preuve d'application
+après édition et synchronisation.
+
 - `Identité fondamentale` : une seule règle de longueur, alignée avec le runtime.
 - `Qui tu es` : préciser que les traits sombres sont des potentialités et non un
   ton permanent.

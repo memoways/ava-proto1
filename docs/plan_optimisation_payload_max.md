@@ -218,6 +218,58 @@ Le payload capturé montre que la plupart des corrections riches proposées dans
 `docs/proposition-fiche-max.md` ont déjà été appliquées. Il ne faut pas
 remplacer ces champs par les versions condensées de l’ancien plan.
 
+### 7.0 Registre éditorial pour Romed — ce qui change et pourquoi
+
+Cette section est la vue de référence destinée à Romed. Elle distingue :
+
+- **ce qui est prévu** dans la fiche Notion « Max Lorenzo » ;
+- **pourquoi** chaque intervention est nécessaire ;
+- **ce qui ne doit pas changer**, afin que l'optimisation du payload ne devienne
+  pas une réduction de la matière narrative ;
+- **ce qui a effectivement été appliqué**, à renseigner dans le journal de la
+  section 7.10 après l'intervention dans Notion et la synchronisation.
+
+Au 5 août 2026, les changements ci-dessous sont **approuvés et planifiés, mais
+pas encore appliqués dans Notion par ce commit GitHub**. Le code `optimized_v3`
+ne modifie aucun contenu Notion : il sélectionne et déduplique au runtime les
+textes qui auront été synchronisés.
+
+#### Intention éditoriale générale
+
+La fiche n'est pas réécrite ni raccourcie. Elle reste la réserve exhaustive de
+la personnalité, de la voix, du canon et des contradictions de Max. Les
+interventions prévues retirent seulement des contradictions de consigne ou des
+formulations qui provoquent un comportement indésirable : réponses trop longues,
+question finale automatique, ouverture rejouée, fermeture sur erreur STT,
+caricature permanente du côté sombre, impossibilité d'expliquer ses actes ou
+régression de la profondeur relationnelle.
+
+| Zone Notion | Problème actuel | Changement prévu | Pourquoi | Ce qui reste intact |
+|---|---|---|---|---|
+| `Identité fondamentale` | La longueur autorisée dans la fiche peut contredire le contrat runtime et produire des réponses irrégulières ou coupées. | Remplacer uniquement le paragraphe de longueur par la règle « une à trois phrases ; jusqu'à quatre phrases courtes pour un souvenir ». | Donner au modèle une seule consigne de longueur, compatible avec une conversation vocale et le temps de réponse attendu. | Identité, âge, métier, famille, Lausanne, pandémie et présent immédiat. |
+| `Qui tu es` | Les termes « fanatique », « dictateur moral », « hypocrite » et « justicier » peuvent être interprétés comme un ton permanent. | Ajouter que ces traits sombres sont des potentialités révélées par la crise, surtout visibles par la rationalisation, la rigidité et le contrôle. | Éviter une caricature agressive à chaque tour tout en conservant la contradiction centrale du personnage. | Arc père moderne → protecteur → contrôlant, masque public, voix, parcours, apparence et qualités revendiquées. |
+| `Ce que tu ne fais jamais` | Une fréquence technique des questions duplique le runtime ; l'analyse des causes peut facilement devenir une autojustification. | Garder l'intention d'une présence active, rendre la question rare et réellement utile, puis ajouter explicitement « expliquer n'est pas s'excuser ». | Empêcher la question automatique en fin de réponse et permettre à Max de comprendre son basculement sans effacer sa responsabilité. | Retenue progressive, omissions plutôt que mensonge frontal, mémoire de l'interlocuteur, timeline et capacité à assumer une nuance. |
+| `Qui t'appelle` | Une ouverture fixe concurrence le rôle dynamique injecté par la session et peut être rejouée. Une ambiguïté ou une erreur STT peut fermer trop vite la relation. | Donner priorité au bloc rôle, supprimer toute ouverture obligatoire, interdire son rejeu et réserver la fermeture aux attaques explicites répétées. | Faire répondre Max à la personne réellement présente, éviter les redémarrages de script et rendre le vocal robuste aux transcriptions imparfaites. | Confiance fatiguée, besoin d'un regard extérieur, connaissance progressive de l'interlocuteur et fermeture graduelle en cas d'hostilité réelle. |
+| `Dynamique de la conversation` | « Ne jamais parler en généralités » contredit la grille analytique de Max, liée à son métier et à son mécanisme de défense. | Autoriser l'analyse, mais obliger toute idée abstraite à revenir à un objet, un geste, une sensation ou un événement vécu. Présenter les questions exemples comme matière, pas comme scripts. | Conserver l'intelligence propre de Max sans produire de formules vagues ou de discours désincarnés. | Son moteur : mettre de l'ordre, savoir si ce qui a été brisé est réparable, rester relié à Emma, Mona, Léo, Ava et la police. |
+| `Sujets sensibles` | « Jamais en explications » empêche Max de chercher les causes de ses actes, alors que le projet vise une progression vers la responsabilité. | Remplacer l'introduction : commencer par les faits et sensations, puis expliquer si l'échange le permet, sans justification qui l'absout. | Distinguer une analyse lucide d'une excuse et éviter à la fois le mutisme et le plaidoyer automatique. | Fusil, Emma, Léo, Ava, Mona, morts, corps, tremblements et refus de compter. |
+| `Profondeur par niveau` | Les mêmes règles introductives sont répétées ; certaines citations contredisent l'interdiction de nommer des auteurs ; un sujet banal peut sembler réinitialiser la relation. | Ajouter une règle unique en tête, conserver les quatre niveaux et toute la matière de voix, rendre les références explicites seulement si l'interlocuteur ouvre ce terrain et affirmer que la profondeur atteinte persiste. | Permettre au compilateur de sélectionner des ancrages sans transformer les formulations en répliques à réciter, et maintenir l'évolution relationnelle sur plusieurs tours. | Quatre niveaux, masculinité, égalité, protection, contrôle, Emma, Léo, Ava, père, morts, Camus, Rilke et mécanismes de basculement. |
+| `Timeline` | La timeline du champ est cohérente, mais certaines ancres du corps RAG utilisent encore un décalage de deux jours. | Conserver la timeline longue comme canon : départ il y a cinq jours, quatre journées au chalet, retour hier. Corriger le corps RAG dans un second temps. | Donner une priorité factuelle unique et éviter que Max change de chronologie selon le souvenir remonté par le RAG. | Tous les pivots et détails : pandémie, camp de Mona, porte, thermos, inconnu, Anne, gentiane, hôtel, carnage et retour. |
+| `situation_summary` | Le résumé visible dans l'ancienne trace est obsolète et ne décrit pas le lendemain du carnage. | Ne pas l'éditer dans Notion. Le régénérer via `fields_only`, puis vérifier les faits obligatoires. | Ce champ est produit par Lovable Cloud : une édition manuelle serait écrasée et créerait une fausse source de vérité. | Le mécanisme de génération automatique et sa place prioritaire dans le présent de Max. |
+| Corps de page RAG | Certaines ancres temporelles contredisent la timeline ; le repas, les provocations d'Agotha et l'aveu nocturne à Emma peuvent manquer comme unité autonome. | Après validation des propriétés, corriger toutes les ancres sur cinq jours et garantir une section autonome sur cette soirée. Ne nommer les auteurs que si l'interlocuteur ouvre ce terrain. | Rendre les détails rares retrouvables sans introduire une seconde chronologie ni déclencher mécaniquement des références intellectuelles. | Le corps narratif exhaustif, les objets, gestes, souvenirs et détails rares. |
+
+#### Ce que cette intervention ne fait pas
+
+- Elle ne remplace pas la fiche riche par le prompt condensé historique.
+- Elle ne supprime ni un événement canonique, ni un trait, ni un niveau de
+  profondeur, ni une formulation de voix apportant une nuance distincte.
+- Elle ne modifie pas manuellement `situation_summary`.
+- Elle ne change pas le profil Voyage 4 et ne déclenche pas de ré-embedding pour
+  le seul changement de compilateur.
+- Elle ne bascule pas automatiquement le réglage global vers `optimized_v3`.
+
+Les sous-sections 7.1 à 7.9 donnent les textes exacts à ajouter ou remplacer et
+les invariants détaillés à préserver.
+
 ### 7.1 Identité fondamentale
 
 #### À conserver
@@ -528,6 +580,29 @@ fin du récit. Après `fields_only`, vérifier qu’elle contient au minimum :
 
 Si le résumé ne respecte pas ces faits, ne pas lancer la canary : corriger la
 génération ou la source avant de tester la conversation.
+
+### 7.10 Journal d'application et preuve de synchronisation
+
+Ce tableau doit être complété au moment où les changements sont réellement
+appliqués. Il permet à Romed de distinguer le contenu planifié du contenu publié
+et d'identifier la source d'une éventuelle différence dans une trace.
+
+| Étape | Statut au 5 août 2026 | Date / auteur | Preuve ou identifiant | Contrôle attendu |
+|---|---|---|---|---|
+| Relecture éditoriale par Romed | À valider | — | — | Accord sur les huit propriétés, la timeline canonique et les invariants à préserver. |
+| Édition des huit propriétés Notion | Non appliquée | — | Historique de page Notion à renseigner | Seuls les paragraphes décrits en 7.1–7.8 changent. |
+| Synchronisation `fields_only` Max | Non lancée pour ce plan | — | ID du job à renseigner | Huit propriétés synchronisées, aucun embedding touché. |
+| Contrôle de `situation_summary` | En attente | — | Copie ou trace à renseigner | Lausanne aujourd'hui, retour hier, fusil sur Emma puis Ava, Léo, Mona au camp, police muette. |
+| Canary `optimized_v3` avant corps RAG | En attente | — | Session/tours de trace à renseigner | Canon correct, contexte ≤ 11 000 caractères hors message courant, pas de répétition significative. |
+| Correction des ancres du corps RAG | Non appliquée | — | Historique de page Notion à renseigner | Départ J-5, quatre journées au chalet, retour J-1 partout. |
+| Section repas / Agotha / aveu à Emma | À vérifier puis créer ou corriger | — | Bloc Notion à renseigner | Section autonome retrouvable par le RAG. |
+| Synchronisation `rag_only` Max | Non lancée pour ce plan | — | ID du job à renseigner | Max uniquement, profil `voyage-4-realtime`, pas de rebuild global. |
+| Validation finale Romed | En attente | — | Nom/date à renseigner | Le sens, la voix, les nuances et les détails canoniques sont conservés. |
+
+Après chaque édition, conserver dans l'historique Notion un libellé explicite,
+par exemple `optimized_v3 — alignement longueur et voix`, plutôt qu'un intitulé
+générique. Après synchronisation, reporter ici l'identifiant du job et au moins
+une session de trace de référence.
 
 ## 8. Corps de la page Max et RAG
 
