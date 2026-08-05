@@ -260,6 +260,13 @@ export type {
   TraceMessage,
 } from "./conversationTrace";
 
+export type {
+  ConversationDepth,
+  ConversationMemoryDelta,
+  ConversationMemoryItem,
+  ConversationMemoryV1,
+} from "./conversationMemory";
+
 export interface QuestionnaireData {
   // 1 — Global
   experience_rating: number;
@@ -337,6 +344,10 @@ export interface PRD4PostTurnEvaluation {
   latency_ms?: number;
   model?: string;
   created_at?: string;
+  /** Delta mémoire produit dans le même appel GM, sans appel LLM supplémentaire. */
+  memory_delta?: import("./conversationMemory").ConversationMemoryDelta | null;
+  /** État persistant obtenu après fusion optimiste du delta. */
+  memory_after?: import("./conversationMemory").ConversationMemoryV1 | null;
 }
 
 // ============================================================================

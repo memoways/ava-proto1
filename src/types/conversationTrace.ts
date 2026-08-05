@@ -1,3 +1,4 @@
+import type { ConversationMemoryV1 } from "./conversationMemory";
 import type { ConversationMessage, MaxTurnKnowledgeContext } from "./index";
 
 export type TraceMessageRole = "system" | "user" | "assistant";
@@ -62,7 +63,7 @@ export interface MaxPromptAssemblyTrace {
   }>;
   /** Added in compact_v1; optional so archived traces remain readable. */
   budget?: {
-    variant: "legacy" | "compact_v1" | "rich_v2";
+    variant: "legacy" | "compact_v1" | "rich_v2" | "optimized_v3";
     limitChars: number;
     staticLimitChars: number;
     staticChars: number;
@@ -72,6 +73,12 @@ export interface MaxPromptAssemblyTrace {
     totalMessageChars: number;
     systemToConversationRatio: number | null;
     withinBudget: boolean;
+    /** optimized_v3 — plafond de tout le contexte généré hors message courant. */
+    contextLimitChars?: number;
+    /** optimized_v3 — dépassement causé uniquement par un message courant conservé intact. */
+    oversizedCurrentUser?: boolean;
+    /** optimized_v3 — caractères candidats retirés comme doublons. */
+    deduplicatedChars?: number;
     sections: Array<{
       key: string;
       title: string;
@@ -102,6 +109,28 @@ export interface MaxPromptAssemblyTrace {
       levelsRepresented: string[];
       preambleIncluded?: boolean;
     };
+    /** optimized_v3 — décisions unitaires de l'assembleur global. */
+    units?: Array<{
+      id: string;
+      source: "contract" | "static" | "runtime" | "memory" | "rag";
+      sourceKey: string;
+      chars: number;
+      score: number;
+      status: "selected" | "duplicate_static" | "duplicate_memory" | "lower_rank" | "budget" | "empty";
+      keptBy?: string;
+      originalChars?: number;
+      removedChars?: number;
+      reason?: "included" | "merged_new_sentences" | "duplicate" | "lower_rank" | "budget";
+    }>;
+    ragSelection?: Array<{
+      id: string;
+      rank: number;
+      chars: number;
+      status: "selected" | "duplicate_static" | "duplicate_memory" | "lower_rank" | "budget";
+      removedChars?: number;
+      reason?: "included" | "merged_new_sentences" | "duplicate" | "lower_rank" | "budget";
+    }>;
+    memoryLastTurn?: number;
   };
 
   finalSystemPrompt: string;
@@ -135,6 +164,9 @@ export interface ConversationTurnTraceV1 {
     };
     gmGuidance: string | null;
     gmTopicsCovered: string[];
+    /** optimized_v3 — état structuré lu avant le tour. */
+    structuredMemoryBefore?: ConversationMemoryV1 | null;
+    memoryLastTurn?: number;
   };
   rag: {
     request: {

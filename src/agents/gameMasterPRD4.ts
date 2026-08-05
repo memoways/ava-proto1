@@ -7,10 +7,11 @@
  * Persiste l'entrée dans `sessions.gm_post_turn_log` (jsonb append-only).
  */
 import { callLLMWithUsage, LLMProxyRequestError } from "@/services/openRouterLLM";
-import { supabase } from "@/integrations/supabase/client";
 import { getLLMSettings } from "@/services/settingsService";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
-import type { ConversationMessage, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, TraceMessage, UserRoleProfile } from "@/types";
+import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
+import { normalizeMemoryText } from "@/services/conversationMemoryV1";
+import type { ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, TraceMessage, UserRoleProfile } from "@/types";
 
 export interface PRD4PostTurnInput {
   sessionId: string | null;
@@ -18,6 +19,8 @@ export interface PRD4PostTurnInput {
   userMessage: string;
   maxResponse: string;
   userRole: UserRoleProfile | null;
+  /** État durable antérieur, notamment pour résoudre un fil par son id stable. */
+  conversationMemoryBefore?: ConversationMemoryV1 | null;
   /** GIFF — posture initiale exprimée par l'utilisateur avant l'appel. */
   userPostureRaw?: string | null;
   turnIndex: number;
@@ -53,6 +56,7 @@ const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
   notes: "Évaluation par défaut (LLM indisponible).",
   trigger_video_id: null,
   labels: { themes: [], topics: [], intentions: [] },
+  memory_delta: null,
 };
 
 const GM_POST_TURN_TIMEOUT_MS = 12000;
@@ -76,7 +80,18 @@ Tu retournes EXACTEMENT cet objet :
   "end_recommended": boolean,
   "moderation_flag": boolean,
   "notes": string,
-  "trigger_video_id": string | null // voir bloc VIDÉOS DISPONIBLES
+  "trigger_video_id": string | null, // voir bloc VIDÉOS DISPONIBLES
+  "memory_delta": {                 // Mémoire durable du DERNIER échange seulement. Ne rien inventer.
+    "interlocutor": { "name": string | null, "role": string | null, "traits": string[] },
+    "userFacts": string[],          // faits personnels explicitement confiés par l'utilisateur
+    "maxDisclosures": string[],     // faits ou aveux que Max a explicitement révélés dans sa réponse
+    "commitments": string[],        // promesses, décisions ou actions annoncées
+    "openThreads": string[],        // sujets précis encore ouverts
+    "resolvedThreadIds": string[],  // ids fournis dans une mémoire antérieure, sinon []
+    "topics": string[],
+    "relationship": { "depth": "surface" | "fissure" | "verite" | "bonus", "trust": "fragile" | "neutre" | "ouverte", "emotionalState": string | null },
+    "lastExchange": string          // une phrase factuelle, max 35 mots
+  }
 }
 
 Règles "labels" :
@@ -100,6 +115,13 @@ Règles "moderation_flag" :
 - Une critique des actes de Max, même dure, n'est pas une attaque contre l'expérience : flag=false.
 - flag=true seulement pour une insulte explicite ciblée, une menace, un contenu haineux ou un harcèlement sans ambiguïté.
 - Ne recommande jamais la fin sur une première formulation ambiguë. Une fin pour hostilité exige des attaques explicites répétées visibles dans l'historique.
+
+Règles "memory_delta" :
+- Résume uniquement des éléments explicitement présents dans le dernier échange ou le profil joueur.
+- N'ajoute aucun fait canonique appris ailleurs et aucune interprétation psychologique incertaine.
+- Utilise des listes vides et null quand rien de nouveau n'est établi.
+- Pour fermer un fil, recopie son id stable de MÉMOIRE AVANT LE TOUR dans resolvedThreadIds.
+- La profondeur ne redescend pas après un aveu ou une contradiction reconnue.
 
 Pas de markdown, pas de \`\`\`. Uniquement l'objet JSON.`;
 
@@ -152,12 +174,25 @@ function buildUserPrompt(input: PRD4PostTurnInput, videos: VideoTriggerRow[]): s
         .map((v) => `- id=${v.id} | titre="${v.title}" | type=${v.type} | priorité=${v.priority ?? "?"} | thèmes=[${(v.themes ?? []).join(", ") || "—"}]${v.description ? ` | description="${v.description.slice(0, 160)}"` : ""}`)
         .join("\n")
     : "(aucune)";
+  const memory = input.conversationMemoryBefore;
+  const memoryBefore = memory ? JSON.stringify({
+    interlocutor: memory.interlocutor,
+    openThreads: memory.openThreads,
+    commitments: memory.commitments,
+    topics: memory.topics.slice(-8),
+    relationship: memory.relationship,
+    lastExchange: memory.lastExchange,
+    lastTurn: memory.lastTurn,
+  }) : "(aucune mémoire structurée)";
 
   return `## PROFIL JOUEUR
 ${input.userRole?.summary_for_max || "(profil indisponible)"}
 
 ## POSTURE INITIALE DU JOUEUR (intention / question exprimée avant le début de l'appel — à garder en mémoire pour évaluer la cohérence de l'échange)
 ${input.userPostureRaw?.trim() || "(non renseignée)"}
+
+## MÉMOIRE AVANT LE TOUR
+${memoryBefore}
 
 ## TEMPS ÉCOULÉ
   ${Math.floor(input.timeElapsedSeconds / 60)}min ${input.timeElapsedSeconds % 60}s sur ~${Math.round(input.sessionDurationSeconds / 60)} min configurées — clôture naturelle autorisée après ${Math.floor(input.minimumClosureSeconds / 60)}min ${input.minimumClosureSeconds % 60}s — tour #${input.turnIndex}
@@ -176,6 +211,45 @@ UTILISATEUR (à labéliser) : ${input.userMessage}
 MAX : ${input.maxResponse}
 
 Retourne l'évaluation JSON. Extrais d'abord \`labels\` à partir du message UTILISATEUR uniquement (max 4 labels, vides si pas évident). Puis renseigne \`trigger_video_id\` si un de tes \`labels.themes\` recoupe les \`themes\` d'une vidéo disponible.`;
+}
+
+function cleanMemoryDelta(raw: unknown): ConversationMemoryDelta | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const cleanList = (candidate: unknown, max = 8): string[] => Array.isArray(candidate)
+    ? candidate.map((item) => normalizeMemoryText(item)).filter(Boolean).slice(0, max)
+    : [];
+  const interlocutor = value.interlocutor && typeof value.interlocutor === "object"
+    ? value.interlocutor as Record<string, unknown>
+    : {};
+  const relationship = value.relationship && typeof value.relationship === "object"
+    ? value.relationship as Record<string, unknown>
+    : {};
+  const depth = relationship.depth === "surface" || relationship.depth === "fissure" || relationship.depth === "verite" || relationship.depth === "bonus"
+    ? relationship.depth
+    : undefined;
+  const trust = relationship.trust === "fragile" || relationship.trust === "neutre" || relationship.trust === "ouverte"
+    ? relationship.trust
+    : undefined;
+  return {
+    interlocutor: {
+      name: normalizeMemoryText(interlocutor.name, 80) || null,
+      role: normalizeMemoryText(interlocutor.role, 160) || null,
+      traits: cleanList(interlocutor.traits, 4),
+    },
+    userFacts: cleanList(value.userFacts),
+    maxDisclosures: cleanList(value.maxDisclosures),
+    commitments: cleanList(value.commitments, 6),
+    openThreads: cleanList(value.openThreads, 6),
+    resolvedThreadIds: cleanList(value.resolvedThreadIds, 8),
+    topics: cleanList(value.topics, 6),
+    relationship: {
+      ...(depth ? { depth } : {}),
+      ...(trust ? { trust } : {}),
+      emotionalState: normalizeMemoryText(relationship.emotionalState, 160) || null,
+    },
+    lastExchange: normalizeMemoryText(value.lastExchange, 260) || null,
+  };
 }
 
 /**
@@ -205,7 +279,10 @@ export async function evaluatePostTurnPRD4(
       {
         model: llm.LLM_MODEL_GM,
         temperature: 0.2,
-        max_tokens: llm.LLM_MAX_TOKENS_GM ?? 600,
+        // Le réglage GM historique (souvent 180) suffit aux labels mais pas à
+        // l'évaluation + memory_delta. Ce plancher évite un JSON tronqué sans
+        // ajouter d'appel LLM.
+        max_tokens: Math.max(llm.LLM_MAX_TOKENS_GM ?? 0, 800),
         timeoutMs: GM_POST_TURN_TIMEOUT_MS,
         feature_key: "prd4_gm_post_turn",
         session_id: input.sessionId ?? undefined,
@@ -256,6 +333,7 @@ export async function evaluatePostTurnPRD4(
         notes: String(parsed.notes || ""),
         trigger_video_id: safeTrigger,
         labels,
+        memory_delta: cleanMemoryDelta((parsed as { memory_delta?: unknown }).memory_delta),
       };
     }
     model = callRes.model || model;
@@ -266,7 +344,7 @@ export async function evaluatePostTurnPRD4(
     llmTrace = err instanceof LLMProxyRequestError ? err.diagnosticTrace : llmTrace;
   }
 
-  const enriched: PRD4PostTurnEvaluation = {
+  let enriched: PRD4PostTurnEvaluation = {
     ...result,
     turn_index: input.turnIndex,
     latency_ms: Math.round(performance.now() - startedAt),
@@ -275,9 +353,17 @@ export async function evaluatePostTurnPRD4(
   };
 
   if (input.sessionId) {
-    void appendToGmPostTurnLog(input.sessionId, enriched).catch((err) => {
+    try {
+      const memoryAfter = await persistPostTurnMemory(
+        input.sessionId,
+        enriched,
+        enriched.memory_delta ?? null,
+        input.turnIndex,
+      );
+      enriched = { ...enriched, memory_after: memoryAfter };
+    } catch (err) {
       console.warn("[GM-PRD4] persist failed:", err);
-    });
+    }
   }
 
   return input.diagnosticTrace ? {
@@ -290,22 +376,4 @@ export async function evaluatePostTurnPRD4(
       error: diagnosticError,
     },
   } : enriched;
-}
-
-async function appendToGmPostTurnLog(sessionId: string, entry: PRD4PostTurnEvaluation): Promise<void> {
-  const { data, error } = await supabase
-    .from("sessions")
-    .select("gm_post_turn_log")
-    .eq("id", sessionId)
-    .maybeSingle();
-
-  if (error) throw error;
-  const current = Array.isArray(data?.gm_post_turn_log) ? (data!.gm_post_turn_log as unknown[]) : [];
-  const next = [...current, entry];
-
-  const { error: upErr } = await supabase
-    .from("sessions")
-    .update({ gm_post_turn_log: next as never })
-    .eq("id", sessionId);
-  if (upErr) throw upErr;
 }

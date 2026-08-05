@@ -110,6 +110,26 @@ export function useExperienceState() {
 
   const reset = useCallback(() => setState(initialState), []);
 
+  const restoreConversation = useCallback((restored: {
+    conversationLog: ConversationMessage[];
+    userRoleProfile: UserRoleProfile | null;
+    userPosture: UserPosture | null;
+    hasSeenFilm: FilmAnswer | null;
+    teaserSeen: boolean;
+  }) => {
+    setState({
+      ...initialState,
+      phase: "conversation_max",
+      hasSeenFilm: restored.hasSeenFilm,
+      teaserSeen: restored.teaserSeen,
+      userRoleProfile: restored.userRoleProfile,
+      userPosture: restored.userPosture,
+      conversationLog: restored.conversationLog,
+      turnCount: restored.conversationLog.filter((message) => message.role === "user").length,
+      audioState: "idle",
+    });
+  }, []);
+
   return {
     state,
     setPhase,
@@ -125,5 +145,6 @@ export function useExperienceState() {
     incrementPttError,
     endExperience,
     reset,
+    restoreConversation,
   };
 }

@@ -41,6 +41,9 @@ vi.mock("@/services/sessionMemoryService", () => ({
   fetchSessionSummary: vi.fn(),
   summarizeSessionAsync: vi.fn(),
 }));
+vi.mock("@/services/sessionConversationMemory", () => ({
+  fetchConversationMemory: vi.fn(),
+}));
 
 import { simulateMaxResponse } from "@/agents/maxAgent";
 import { evaluatePostTurnPRD4 } from "@/agents/gameMasterPRD4";
@@ -50,6 +53,8 @@ import { enqueueConversationTurnTrace, patchQueuedConversationTurnTrace } from "
 import { materializeConversationTurnTrace } from "@/services/conversationTraceFormat";
 import { resolveCharacterIdByName } from "@/services/characterPromptService";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
+import { fetchConversationMemory } from "@/services/sessionConversationMemory";
+import { getGameplaySettings } from "@/services/settingsService";
 import { processPRD4Turn } from "@/services/prd4Orchestrator";
 import { MAX_LLM_RESPONSE_DEADLINE_MS, TURN_RESPONSE_DEADLINE_MS } from "@/config/experienceRuntime";
 import type { ConversationMessage, PRD4PostTurnEvaluation } from "@/types";
@@ -107,6 +112,18 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       last_turn: 32,
       updated_at: new Date().toISOString(),
     });
+    vi.mocked(fetchConversationMemory).mockResolvedValue({
+      version: 1,
+      lastTurn: 0,
+      interlocutor: { name: null, role: null, traits: [] },
+      userFacts: [],
+      maxDisclosures: [],
+      commitments: [],
+      openThreads: [],
+      topics: [],
+      relationship: { depth: "surface", trust: "neutre", emotionalState: null, sourceTurn: 0 },
+      lastExchange: null,
+    });
     vi.mocked(simulateMaxResponse).mockResolvedValue({ response: "Je vous écoute.", systemPrompt: "system" });
     vi.mocked(labelUserTurnPRD4).mockResolvedValue({
       labels: { themes: [], topics: [], intentions: [] },
@@ -152,6 +169,72 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       minimumClosureSeconds: 744,
     });
     expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0].conversationHistory).toHaveLength(10);
+  });
+
+  it("injecte la mémoire structurée, étend les tours non résumés et récupère un vivier RAG", async () => {
+    vi.mocked(getGameplaySettings).mockReturnValue({
+      TIMEOUT_SECONDS: 930,
+      RAG_TOP_K: 3,
+      RAG_RERANK_ENABLED: true,
+      RAG_RETRIEVE_K: 15,
+      RAG_SUMMARY_EVERY_N_TURNS: 4,
+      MAX_PROMPT_VARIANT: "optimized_v3",
+    } as ReturnType<typeof getGameplaySettings>);
+    const structuredMemory = {
+      version: 1 as const,
+      lastTurn: 5,
+      interlocutor: { name: "Alice", role: "médecin", traits: [] },
+      userFacts: [],
+      maxDisclosures: [],
+      commitments: [],
+      openThreads: [],
+      topics: [],
+      relationship: { depth: "fissure" as const, trust: "ouverte" as const, emotionalState: null, sourceTurn: 5 },
+      lastExchange: "Alice a confronté Max.",
+    };
+    vi.mocked(fetchConversationMemory).mockResolvedValue(structuredMemory);
+    const matches = Array.from({ length: 6 }, (_, index) => ({
+      id: `rag-${index + 1}`,
+      content: `souvenir-${index + 1}`,
+      similarity: 0.9 - index * 0.01,
+    }));
+    vi.mocked(queryRAGDetailed).mockResolvedValue({
+      matches,
+      retrievalMatches: matches,
+      latencyMs: 1,
+      embeddingProvider: "voyage",
+      rerankUsed: true,
+      serverLatencyMs: 1,
+      searchInput: "question",
+      request: {
+        userMessage: "question-9",
+        recentContext: "",
+        rewrittenQuery: null,
+        matchCount: 6,
+        matchThreshold: 0.3,
+        characterId: "character-max",
+        rerankRequested: true,
+        retrieveK: 15,
+        rerankModel: "rerank-2.5",
+        rerankTruncation: true,
+      },
+    });
+
+    const history = makeConversation(8);
+    const result = await processPRD4Turn({
+      sessionId: "session-optimized",
+      conversationHistory: history,
+      userMessage: "question-9",
+      userRole: null,
+      timeElapsedSeconds: 300,
+    });
+    const maxInput = vi.mocked(simulateMaxResponse).mock.calls[0][0];
+    expect(vi.mocked(queryRAGDetailed).mock.calls[0][2]).toBe(6);
+    expect(maxInput.conversationMemory).toEqual(structuredMemory);
+    expect(maxInput.conversationHistory).toEqual(history.slice(-6));
+    expect(maxInput.ragCandidates).toHaveLength(6);
+    await result.postTurnPromise;
+    expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0].conversationMemoryBefore).toEqual(structuredMemory);
   });
 
   it("transmet le contexte temporel et la guidance GM à Max", async () => {

@@ -4,22 +4,108 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
-## [Non publié] — RAG Voyage 4, index versionnés et dashboard effectif
+## [Non publié] — RAG Voyage 4 et payload Max `optimized_v3`
 
 ### Ajouté
 - Profils d’embeddings partagés entre frontend et Edge Functions : Voyage 4 temps réel (`voyage-4-large` pour les documents, `voyage-4-lite` pour les questions), `voyage-context-4` canary, Voyage 3 et OpenAI legacy.
 - Migration Lovable Cloud avec métadonnées d’index et singleton `rag_index_state`; construction d’un profil parallèle et activation atomique uniquement après rebuild complet.
 - Dashboard **Configuration RAG** fondé sur l’état effectif : modèles, dimension, dtype, chunker, volumes, date de rebuild, p50/p95 et taux de tours sans résultat.
 - Document de conception [`docs/design/DESIGN-001-rag-voyage4-memoire-payload.md`](docs/design/DESIGN-001-rag-voyage4-memoire-payload.md), incluant la trajectoire vers une mémoire conversationnelle structurée et un payload LLM budgété.
+- Plan approuvé et sauvegardé dans
+  [`docs/plan_optimized_v3_payload_max.md`](docs/plan_optimized_v3_payload_max.md) :
+  objectifs mesurés, ordre d'assemblage, budgets, règles de déduplication,
+  mémoire, reprise, traçabilité, tests et séquence d'activation éditoriale.
+- Variante additive `optimized_v3`, sans modification de `legacy`, `compact_v1`
+  ni `rich_v2`. Son compilateur global :
+  - assemble un contrat conversationnel unique, le noyau de Max, la timeline, le
+    rôle, la mémoire, les éléments canoniques, le RAG complémentaire et
+    l'historique dans un ordre explicite ;
+  - borne le contexte généré à 11 000 caractères hors message utilisateur
+    courant, lequel reste toujours intact ;
+  - découpe les sources en unités sémantiques, les score selon la question, la
+    mémoire et les sujets GM, puis déduplique par inclusion normalisée et
+    similarité de shingles ;
+  - conserve la source factuelle prioritaire et uniquement les phrases nouvelles
+    des sources secondaires, sans réinjecter `characters.system_prompt`.
+- Politique RAG propre à `optimized_v3` : vivier de six candidats, trois souvenirs
+  injectés au maximum et 1 800 caractères au total. Les scores, identifiants et
+  marqueurs `Partie n/N` sont retirés du texte envoyé à Max ; chaque candidat est
+  néanmoins tracé avec son motif (`selected`, `duplicate_static`,
+  `duplicate_memory`, `lower_rank` ou `budget`).
+- Mémoire persistante `ConversationMemoryV1` produite par le GM post-tour existant,
+  sans appel LLM supplémentaire. Elle retient identité et rôle de
+  l'interlocuteur, faits confiés, révélations de Max, engagements, fils ouverts,
+  sujets, profondeur, confiance, état émotionnel et dernier échange.
+- Reducer mémoire déterministe avec identifiants stables, normalisation,
+  déduplication, limites par catégorie, résolution de fils et profondeur
+  relationnelle non régressive. La persistance utilise `memory_last_turn` comme
+  contrôle optimiste : un delta dupliqué, retardé ou désordonné ne peut pas
+  écraser un état plus récent.
+- Migration additive des sessions avec `conversation_memory`, `memory_last_turn`
+  et `resume_expires_at`, plus index partiel par propriétaire pour retrouver une
+  session non terminée et non expirée.
+- Reprise explicite depuis l'accueil : restauration du transcript, de la mémoire,
+  du rôle, de la posture, des triggers, de la guidance GM et du temps réellement
+  restant. La recherche et la reprise ne démarrent ni microphone, ni avatar, ni
+  audio, ni TTS, et ne rejouent pas l'ouverture.
+- Vue analytique légère des traces V2 : caractères système, historique, mémoire,
+  RAG et message courant ; budgets par section ; unités retenues, fusionnées ou
+  omises ; caractères répétitifs retirés ; cycle mémoire avant/delta/après ;
+  décisions RAG ; modèle demandé/retourné et tokens fournisseur. Le JSON exact
+  reste accessible à la demande et au téléchargement.
+- Runbook Lovable Cloud
+  [`docs/optimized_v3_lovable_runbook.md`](docs/optimized_v3_lovable_runbook.md),
+  relié au plan et ordonnant migration, publication, modifications Notion,
+  synchronisations `fields_only`/`rag_only`, canary et retour arrière.
 
 ### Modifié
 - `query-rag` utilise le profil actif serveur, aligne la requête du reranker sur la requête contextualisée du retrieval et applique une instruction de pertinence narrative.
 - Le reranker n’est plus couplé au fournisseur d’embedding ; `rerank-2.5-lite` devient le défaut live.
 - `sync-notion` batche les embeddings par personnage, utilise `overlap=0` avec Context 4 et conserve les anciens profils pour rollback.
 - Le client n’envoie plus de choix de fournisseur obsolète dans le payload RAG ; les traces conservent le fournisseur et les modèles réellement utilisés.
+- Le parcours PRD4 récupère un vivier RAG de six candidats pour `optimized_v3`, en injecte trois au maximum après déduplication, et conserve les variantes historiques inchangées.
+- L'accueil recherche une session reprenable avant de préparer la voix ; une reprise restaure l'état textuel et le temps restant sans activer microphone, avatar, audio ou TTS.
+- Le GM post-tour renvoie désormais un `memory_delta` structuré avec son analyse
+  habituelle. Le log GM et la nouvelle mémoire sont persistés ensemble ; les
+  variantes historiques continuent d'utiliser le résumé périodique existant.
+- Pour `optimized_v3`, deux échanges complets restent disponibles en brut ; si la
+  mémoire GM est en retard, l'historique s'étend temporairement jusqu'au dernier
+  tour non résumé.
+- L'admin **Game Master Config** expose `optimized_v3` comme option activable sans
+  changer automatiquement la variante globale.
 
 ### Corrigé
 - La régénération des questions fréquentes du Laboratoire RAG impose désormais un JSON Schema strict, active la réparation de réponse OpenRouter et retente une fois un résultat encore invalide. Une ponctuation JSON défectueuse de Gemini ne bloque plus durablement le cache du laboratoire.
+
+### Tests et validation locale
+
+- Tests du compilateur : déterminisme, plafond global, message courant intact,
+  exclusion de `characters.system_prompt`, présence des invariants de Max,
+  déduplication inter-sections, remplacement d'un candidat RAG dupliqué et
+  absence de métadonnées techniques injectées.
+- Tests mémoire et GM : création d'un delta à chaque tour, normalisation,
+  déduplication, protection contre les deltas désordonnés, maintien de la
+  profondeur et conservation du prénom/rôle.
+- Tests reprise et sécurité : calcul du temps restant sans consommer la marge
+  technique, bouton de reprise sans activation média, lecture limitée à une
+  session propriétaire, active et non expirée, et couverture RLS correspondante.
+- Compatibilité vérifiée avec les traces antérieures et les variantes de prompt
+  historiques. Suite complète de **232 tests**, vérification TypeScript, lint
+  ciblé et build de production validés localement.
+
+### Activation restante dans Lovable Cloud
+
+- Ce commit ne bascule pas la variante globale. La migration
+  `20260805143000_add_prd4_conversation_memory_resume.sql`, le build, la
+  publication et les synchronisations doivent être exécutés exclusivement dans
+  Lovable/Lovable Cloud.
+- Les propriétés Notion de Max doivent être corrigées avant `fields_only`, puis le
+  corps RAG avant `rag_only`, conformément au plan. Aucun détail canonique n'est
+  supprimé et aucun ré-embedding n'est requis pour le seul changement de
+  compilateur.
+- Le passage global à `optimized_v3` reste conditionné par les recettes
+  quantitative, qualitative et éditoriale, avec `rich_v2`, `compact_v1` et
+  `legacy` disponibles comme retours arrière.
 
 ## [0.52.1] - 2026-08-04 — Traces Max durables sans blocage de la voix
 

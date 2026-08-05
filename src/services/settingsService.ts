@@ -495,7 +495,7 @@ export function saveTTSSettings(settings: Partial<TTSSettings>): TTSSettings {
 // ===== Gameplay / Experience Settings =====
 
 export interface GameplaySettings {
-  MAX_PROMPT_VARIANT: "legacy" | "compact_v1" | "rich_v2";
+  MAX_PROMPT_VARIANT: "legacy" | "compact_v1" | "rich_v2" | "optimized_v3";
   TRUST_THRESHOLD: number;
   TIMEOUT_SECONDS: number;
   MAX_INSULT_TOLERANCE: number;
@@ -523,7 +523,7 @@ export function normalizeMaxPromptVariant(
   value: unknown,
   fallback: GameplaySettings["MAX_PROMPT_VARIANT"] = "legacy",
 ): GameplaySettings["MAX_PROMPT_VARIANT"] {
-  return value === "compact_v1" || value === "rich_v2" || value === "legacy" ? value : fallback;
+  return value === "compact_v1" || value === "rich_v2" || value === "optimized_v3" || value === "legacy" ? value : fallback;
 }
 
 const gameplayDefaults: GameplaySettings = {

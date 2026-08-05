@@ -14,6 +14,9 @@ interface Props {
   videoReady?: boolean;
   privacyPreferences: PrivacyPreferences | null;
   onPrivacyChange: (choice: Pick<PrivacyPreferences, "voiceAndStorageAcknowledged" | "analyticsAllowed">) => void;
+  resumeAvailable?: boolean;
+  resumeLoading?: boolean;
+  onResume?: () => Promise<void>;
 }
 
 const HCAPTCHA_SITE_KEY = import.meta.env.VITE_HCAPTCHA_SITE_KEY as string | undefined;
@@ -25,6 +28,9 @@ const WelcomeScreen = ({
   videoReady = true,
   privacyPreferences,
   onPrivacyChange,
+  resumeAvailable = false,
+  resumeLoading = false,
+  onResume,
 }: Props) => {
   const [captchaToken, setCaptchaToken] = useState<string | undefined>();
   const [starting, setStarting] = useState(false);
@@ -33,11 +39,13 @@ const WelcomeScreen = ({
   const voiceAcknowledged = !privacyNoticeEnabled || privacyPreferences?.voiceAndStorageAcknowledged === true;
   const analyticsAllowed = privacyPreferences?.analyticsAllowed === true;
 
-  // Pré-charge l'audio de la phrase d'ouverture dès l'arrivée sur l'accueil,
-  // pour qu'il soit prêt instantanément quand l'utilisateur entre en conversation.
+  // Ne prépare aucune sortie vocale tant qu'une reprise est recherchée ou
+  // disponible. Une reprise restaure uniquement l'état textuel avant un geste
+  // explicite ultérieur de l'utilisateur.
   useEffect(() => {
+    if (resumeLoading || resumeAvailable) return;
     void prefetchOpeningTTS().catch(() => { /* silent */ });
-  }, []);
+  }, [resumeAvailable, resumeLoading]);
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10 text-center tablet:px-10">
@@ -115,17 +123,33 @@ const WelcomeScreen = ({
                 setCaptchaToken(undefined);
               }
             }}
-            disabled={starting || !videoReady || !voiceAcknowledged || Boolean(HCAPTCHA_ENABLED && !captchaToken)}
+            disabled={starting || resumeLoading || !videoReady || !voiceAcknowledged || Boolean(HCAPTCHA_ENABLED && !captchaToken)}
             className="mt-6 min-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            {!videoReady
+            {resumeLoading
+              ? "Recherche d’un appel…"
+              : !videoReady
               ? "Préparation…"
               : starting
                 ? "Démarrage…"
                 : HCAPTCHA_ENABLED && !captchaToken
                   ? "Vérification…"
-                  : "Commencer"}
+                : "Commencer"}
           </Button>
+          {resumeAvailable && onResume ? (
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={async () => {
+                setStarting(true);
+                await onResume().finally(() => setStarting(false));
+              }}
+              disabled={starting || resumeLoading || !voiceAcknowledged}
+              className="min-w-[200px]"
+            >
+              {resumeLoading ? "Recherche…" : "Reprendre l’appel"}
+            </Button>
+          ) : null}
         </div>
       </div>
     </div>

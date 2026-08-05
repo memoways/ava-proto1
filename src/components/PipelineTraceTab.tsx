@@ -42,6 +42,17 @@ function formatMs(value: number | null | undefined): string {
   return typeof value === "number" ? `${value} ms` : "—";
 }
 
+function formatChars(value: number | null | undefined): string {
+  return typeof value === "number" ? `${value.toLocaleString("fr-CH")} car.` : "—";
+}
+
+function countMemoryItems(value: unknown): number {
+  if (!value || typeof value !== "object") return 0;
+  const memory = value as Record<string, unknown>;
+  return ["userFacts", "maxDisclosures", "commitments", "openThreads", "topics"]
+    .reduce((sum, key) => sum + (Array.isArray(memory[key]) ? memory[key].length : 0), 0);
+}
+
 function JsonBlock({ value, label }: { value: unknown; label: string }) {
   const text = useMemo(
     () => typeof value === "string" ? value : JSON.stringify(value, null, 2),
@@ -260,6 +271,23 @@ export default function PipelineTraceTab() {
     bps: rawTimings?.traceUploadBps,
     durationMs: rawTimings?.traceUploadMs,
   }, getPassiveVoiceNetworkObservation());
+  const promptBudget = trace?.prompt?.budget;
+  const unitStatusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const unit of promptBudget?.units ?? []) counts[unit.status] = (counts[unit.status] ?? 0) + 1;
+    return counts;
+  }, [promptBudget?.units]);
+  const ragStatusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const candidate of promptBudget?.ragSelection ?? []) counts[candidate.status] = (counts[candidate.status] ?? 0) + 1;
+    return counts;
+  }, [promptBudget?.ragSelection]);
+  const postTurnOutput = trace
+    ? (trace.gm.postTurn as { parsedOutput?: { memory_delta?: unknown; memory_after?: unknown } }).parsedOutput
+    : undefined;
+  const memoryBefore = trace?.memory.structuredMemoryBefore;
+  const memoryDelta = postTurnOutput?.memory_delta;
+  const memoryAfter = postTurnOutput?.memory_after;
 
   return (
     <div className="max-w-7xl space-y-6">
@@ -389,6 +417,95 @@ export default function PipelineTraceTab() {
               <Step label="GM post-tour (pour la suite)" duration={(trace.gm.postTurn as { latencyMs?: number }).latencyMs} status={String((trace.gm.postTurn as { status?: string }).status || "pending")} />
               <Step label="Pipeline hors instrumentation" duration={trace.timings.pipelineUninstrumentedMs} />
               <Step label="Pipeline causal total" duration={trace.timings.coreTotalMs} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Analyse compacte du payload</CardTitle>
+              <CardDescription>
+                Vue chargée sans reconstruire les gros blocs texte. Le JSON exact reste disponible dans les sections détaillées et au téléchargement.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {promptBudget ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2 text-xs tablet:grid-cols-3 xl:grid-cols-6">
+                    {[
+                      ["Variante", promptBudget.variant],
+                      ["Système", formatChars(promptBudget.totalSystemChars)],
+                      ["Historique", formatChars(promptBudget.historyChars)],
+                      ["Mémoire", formatChars(promptBudget.sections.find((section) => section.key === "conversation_memory")?.chars)],
+                      ["RAG", formatChars(promptBudget.sections.find((section) => section.key === "rag_context")?.chars)],
+                      ["Message courant", formatChars(promptBudget.currentUserChars)],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-md border bg-muted/10 p-2">
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+                        <div className="mt-1 font-mono text-sm">{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <Badge variant={promptBudget.withinBudget ? "secondary" : "destructive"}>
+                      {promptBudget.withinBudget ? "Contexte dans le budget" : "Budget dépassé"}
+                    </Badge>
+                    <Badge variant="outline">Total payload : {formatChars(promptBudget.totalMessageChars)}</Badge>
+                    {typeof promptBudget.contextLimitChars === "number" ? <Badge variant="outline">Plafond contexte : {formatChars(promptBudget.contextLimitChars)}</Badge> : null}
+                    {typeof promptBudget.deduplicatedChars === "number" ? <Badge variant="outline">Doublons retirés : {formatChars(promptBudget.deduplicatedChars)}</Badge> : null}
+                    {typeof promptBudget.memoryLastTurn === "number" ? <Badge variant="outline">Mémoire au tour {promptBudget.memoryLastTurn}</Badge> : null}
+                    {promptBudget.oversizedCurrentUser ? <Badge variant="destructive">Dépassement dû au message courant intact</Badge> : null}
+                  </div>
+                  <div className="grid gap-3 xl:grid-cols-2">
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Budget par section</p>
+                      {promptBudget.sections.map((section) => (
+                        <div key={section.key} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs">
+                          <span className="min-w-0 truncate">{section.title}</span>
+                          <span className="shrink-0 font-mono text-muted-foreground">
+                            {formatChars(section.chars)}{section.originalChars !== section.chars ? ` / ${formatChars(section.originalChars)}` : ""}
+                            {section.omissionReason ? ` · ${section.omissionReason}` : ""}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Décisions de sélection</p>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(unitStatusCounts).map(([status, count]) => <Badge key={status} variant="outline">{status}: {count}</Badge>)}
+                          {!Object.keys(unitStatusCounts).length ? <span className="text-xs text-muted-foreground">Trace antérieure sans décisions unitaires.</span> : null}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Candidats RAG</p>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(ragStatusCounts).map(([status, count]) => <Badge key={status} variant="outline">{status}: {count}</Badge>)}
+                          {!Object.keys(ragStatusCounts).length ? <span className="text-xs text-muted-foreground">Aucune décision RAG détaillée.</span> : null}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Cycle de mémoire du tour</p>
+                    <div className="grid gap-2 text-xs tablet:grid-cols-3">
+                      <div className="rounded-md border bg-muted/10 p-2">
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Avant</div>
+                        <div className="mt-1 font-mono">tour {memoryBefore?.lastTurn ?? 0} · {countMemoryItems(memoryBefore)} éléments</div>
+                      </div>
+                      <div className="rounded-md border bg-muted/10 p-2">
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Delta GM</div>
+                        <div className="mt-1 font-mono">{memoryDelta ? `${countMemoryItems(memoryDelta)} éléments proposés` : "en attente ou absent"}</div>
+                      </div>
+                      <div className="rounded-md border bg-muted/10 p-2">
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Après</div>
+                        <div className="mt-1 font-mono">{memoryAfter && typeof memoryAfter === "object" ? `tour ${String((memoryAfter as { lastTurn?: unknown }).lastTurn ?? "—")} · ${countMemoryItems(memoryAfter)} éléments` : "en attente ou absent"}</div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">Trace antérieure sans rapport de budget.</p>
+              )}
             </CardContent>
           </Card>
 

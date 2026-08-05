@@ -627,6 +627,7 @@ export type Database = {
           ava_start_variant: string | null
           branch: string | null
           conversation_log: Json | null
+          conversation_memory: Json
           diagnostic_trace_enabled: boolean
           duration_seconds: number | null
           ended_at: string | null
@@ -635,6 +636,7 @@ export type Database = {
           gm_post_turn_log: Json
           has_seen_film: string | null
           id: string
+          memory_last_turn: number
           modalite_voix: string | null
           name: string | null
           narrative_end: boolean | null
@@ -644,6 +646,7 @@ export type Database = {
           personnage_appele: string | null
           player_role: Json | null
           questionnaire_responses: Json | null
+          resume_expires_at: string | null
           started_at: string | null
           streaming_avatar_connect_ms: number | null
           streaming_avatar_fallback_reason: string | null
@@ -664,6 +667,7 @@ export type Database = {
           ava_start_variant?: string | null
           branch?: string | null
           conversation_log?: Json | null
+          conversation_memory?: Json
           diagnostic_trace_enabled?: boolean
           duration_seconds?: number | null
           ended_at?: string | null
@@ -672,6 +676,7 @@ export type Database = {
           gm_post_turn_log?: Json
           has_seen_film?: string | null
           id?: string
+          memory_last_turn?: number
           modalite_voix?: string | null
           name?: string | null
           narrative_end?: boolean | null
@@ -681,6 +686,7 @@ export type Database = {
           personnage_appele?: string | null
           player_role?: Json | null
           questionnaire_responses?: Json | null
+          resume_expires_at?: string | null
           started_at?: string | null
           streaming_avatar_connect_ms?: number | null
           streaming_avatar_fallback_reason?: string | null
@@ -701,6 +707,7 @@ export type Database = {
           ava_start_variant?: string | null
           branch?: string | null
           conversation_log?: Json | null
+          conversation_memory?: Json
           diagnostic_trace_enabled?: boolean
           duration_seconds?: number | null
           ended_at?: string | null
@@ -709,6 +716,7 @@ export type Database = {
           gm_post_turn_log?: Json
           has_seen_film?: string | null
           id?: string
+          memory_last_turn?: number
           modalite_voix?: string | null
           name?: string | null
           narrative_end?: boolean | null
@@ -718,6 +726,7 @@ export type Database = {
           personnage_appele?: string | null
           player_role?: Json | null
           questionnaire_responses?: Json | null
+          resume_expires_at?: string | null
           started_at?: string | null
           streaming_avatar_connect_ms?: number | null
           streaming_avatar_fallback_reason?: string | null

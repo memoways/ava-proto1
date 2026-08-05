@@ -85,12 +85,17 @@ describe("Phase 1 sessions RLS and provider quotas", () => {
       "../../supabase/migrations/20260721233000_rag_lab_semantic_question_cache.sql",
       import.meta.url,
     );
+    const conversationMemoryMigrationUrl = new URL(
+      "../../supabase/migrations/20260805143000_add_prd4_conversation_memory_resume.sql",
+      import.meta.url,
+    );
     await db.exec(await readFile(expandMigrationUrl, "utf8"));
     await db.exec(await readFile(enforceMigrationUrl, "utf8"));
     await db.exec(await readFile(diagnosticTraceMigrationUrl, "utf8"));
     await db.exec(await readFile(ragLabQuestionsMigrationUrl, "utf8"));
     await db.exec(await readFile(ragLabCorpusMigrationUrl, "utf8"));
-  });
+    await db.exec(await readFile(conversationMemoryMigrationUrl, "utf8"));
+  }, 30_000);
 
   afterEach(async () => {
     await db.close();
@@ -129,6 +134,34 @@ describe("Phase 1 sessions RLS and provider quotas", () => {
       [sessionId],
     );
     expect(foreignUpdate.affectedRows).toBe(0);
+  });
+
+  it("expose seulement au propriétaire une session Max active et non expirée", async () => {
+    await authenticate(db, USER_A);
+    const active = await db.query<{ id: string }>(
+      `insert into public.sessions (personnage_appele, resume_expires_at)
+       values ('max', now() + interval '20 minutes') returning id`,
+    );
+    await db.query(
+      `insert into public.sessions (personnage_appele, resume_expires_at)
+       values ('max', now() - interval '1 minute')`,
+    );
+    await db.query(
+      `insert into public.sessions (personnage_appele, resume_expires_at, ended_at)
+       values ('max', now() + interval '20 minutes', now())`,
+    );
+    const own = await db.query<{ id: string }>(
+      `select id from public.sessions
+       where ended_at is null and personnage_appele = 'max' and resume_expires_at > now()`,
+    );
+    expect(own.rows.map((row) => row.id)).toEqual([active.rows[0].id]);
+
+    await authenticate(db, USER_B);
+    const foreign = await db.query(
+      `select id from public.sessions
+       where ended_at is null and personnage_appele = 'max' and resume_expires_at > now()`,
+    );
+    expect(foreign.rows).toHaveLength(0);
   });
 
   it("prevents participants from changing protected administrative fields", async () => {

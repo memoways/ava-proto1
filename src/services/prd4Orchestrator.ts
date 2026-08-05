@@ -20,7 +20,8 @@ import { resolveCharacterIdByName } from "@/services/characterPromptService";
 import { getGameplaySettings, getLLMSettings, isReasoningEnabledForModel } from "@/services/settingsService";
 import { maxRagFormatOptionsForVariant } from "@/services/maxRagVariant";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
-import { selectRecentConversation, selectUnsummarizedConversation } from "@/services/conversationMemory";
+import { selectOptimizedConversation, selectRecentConversation, selectUnsummarizedConversation } from "@/services/conversationMemory";
+import { fetchConversationMemory } from "@/services/sessionConversationMemory";
 import { withTimeout } from "@/services/asyncUtils";
 import { compactConversationTurnTrace } from "@/services/conversationTraceFormat";
 import { enqueueConversationTurnTrace, patchQueuedConversationTurnTrace } from "@/services/conversationTraceOutbox";
@@ -95,10 +96,10 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const turnId = input.turnId || crypto.randomUUID();
   const responseDeadlineAt = t0 + TURN_RESPONSE_DEADLINE_MS;
   const turnIndex = input.conversationHistory.filter((m) => m.role === "user").length + 1;
-  const recentConversation = selectRecentConversation(input.conversationHistory);
   const gameplay = (() => {
     try { return getGameplaySettings(); } catch { return null; }
   })();
+  const recentConversation = selectRecentConversation(input.conversationHistory);
   const sessionDurationSeconds = normalizeSessionDurationSeconds(gameplay?.TIMEOUT_SECONDS);
   const minimumClosureSeconds = getSessionMinimumClosureSeconds(sessionDurationSeconds);
   let summaryFetchMs = 0;
@@ -113,6 +114,13 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       summaryFetchMs = Math.round(performance.now() - summaryStartedAt);
       return record;
     });
+  const memoryPromise = gameplay?.MAX_PROMPT_VARIANT === "optimized_v3" && input.sessionId
+    ? withTimeout(
+        "prd4_structured_memory_fetch",
+        fetchConversationMemory(input.sessionId),
+        SUMMARY_FETCH_DEADLINE_MS,
+      ).catch(() => null)
+    : Promise.resolve(null);
 
   // --- RAG (best-effort, non-bloquant en cas d'erreur) -----------------------
   const ragStart = performance.now();
@@ -132,7 +140,9 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       queryRAGDetailed(
         input.userMessage,
         recent,
-        gameplay?.RAG_TOP_K ?? 5,
+        gameplay?.MAX_PROMPT_VARIANT === "optimized_v3"
+          ? Math.max(6, gameplay?.RAG_TOP_K ?? 3)
+          : gameplay?.RAG_TOP_K ?? 5,
         gameplay?.RAG_MATCH_THRESHOLD,
         {
           characterId,
@@ -172,18 +182,28 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const maxStart = performance.now();
   input.onLatencySegment?.({ type: "start", segment: "LLM", service: "Max LLM" });
   const summaryRecord = await summaryPromise;
+  const structuredMemory = await memoryPromise;
+  const maxConversationHistory = gameplay?.MAX_PROMPT_VARIANT === "optimized_v3"
+    ? selectOptimizedConversation(input.conversationHistory, structuredMemory?.lastTurn ?? 0)
+    : recentConversation;
   const postureSummary = input.userPostureRaw?.trim()
     ? `L'utilisateur a démarré la conversation en exprimant ceci (à garder en mémoire tout au long de l'échange comme contexte de qui il est et de ce qu'il vient chercher) : « ${input.userPostureRaw.trim()} »`
     : undefined;
   const resolvedUserRoleSummary = input.userRole?.summary_for_max ?? postureSummary;
   const maxInput: MaxAgentInput = {
-    conversationHistory: recentConversation,
+    conversationHistory: maxConversationHistory,
     userMessage: input.userMessage,
     ragContext: ragContext || undefined,
     postVideoContext: input.postVideoContext,
     session_id: input.sessionId ?? undefined,
     knowledgeContext,
     sessionSummary: summaryRecord?.summary,
+    conversationMemory: structuredMemory,
+    ragCandidates: ragDetailed?.matches.map((match, index) => ({
+      id: match.id,
+      content: match.content,
+      rank: index + 1,
+    })),
     userRoleSummary: resolvedUserRoleSummary,
     temporalContext: {
       timeElapsedSeconds: input.timeElapsedSeconds,
@@ -231,6 +251,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         userMessage: input.userMessage,
         maxResponse,
         userRole: input.userRole,
+        conversationMemoryBefore: structuredMemory,
         userPostureRaw: input.userPostureRaw ?? null,
         turnIndex,
         timeElapsedSeconds: input.timeElapsedSeconds,
@@ -286,7 +307,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       input: { userMessage: input.userMessage },
       memory: {
         totalHistoryMessages: input.conversationHistory.length,
-        selectedHistory: recentConversation,
+        selectedHistory: maxConversationHistory,
         sessionSummary: summaryRecord?.summary ?? null,
         summaryLastTurn: lastSummarizedTurn,
         userRoleSummary: resolvedUserRoleSummary ?? null,
@@ -295,6 +316,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         temporalContext: maxInput.temporalContext!,
         gmGuidance: maxInput.gmGuidance?.guidance ?? null,
         gmTopicsCovered: maxInput.gmGuidance?.topicsCovered ?? [],
+        structuredMemoryBefore: structuredMemory,
+        memoryLastTurn: structuredMemory?.lastTurn ?? 0,
       },
       rag: {
         request: {
@@ -310,7 +333,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
           rerankRequested: ragDetailed?.request.rerankRequested ?? (gameplay?.RAG_RERANK_ENABLED ?? true),
         },
         matches: ragDetailed?.matches ?? [],
-        formattedContext: ragContext,
+        formattedContext: (maxResult?.promptTrace ?? maxFailureDiagnostic?.promptTrace)?.injectedSections
+          .find((section) => section.key === "rag_context")?.content ?? ragContext,
         knowledgeContext,
         embeddingProvider: ragDetailed?.embeddingProvider ?? null,
         embeddingProfile: ragDetailed?.embeddingProfile ?? null,
@@ -434,7 +458,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     ragMatches: matchesCount,
     memory: {
       totalMessages: input.conversationHistory.length,
-      recentMessages: recentConversation.length,
+      recentMessages: maxConversationHistory.length,
       summaryLastTurn: lastSummarizedTurn,
     },
     postTurnPromise,

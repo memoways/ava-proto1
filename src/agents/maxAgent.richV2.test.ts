@@ -47,6 +47,7 @@ vi.mock("@/services/characterPromptService", () => ({
 
 import { callLLMWithUsage } from "@/services/openRouterLLM";
 import { loadCharacterPromptByName } from "@/services/characterPromptService";
+import { getGameplaySettings } from "@/services/settingsService";
 import { simulateMaxResponse } from "./maxAgent";
 import { RICH_V2_LIMITS } from "./maxRichPromptCompiler";
 import { makeNotionMaxPrompt } from "./__fixtures__/maxNotionFixture";
@@ -159,5 +160,29 @@ describe("buildMaxSystemPrompt — variante rich_v2", () => {
   it("reste compatible avec les anciennes traces sans bloc budget", () => {
     const archived = { finalSystemPrompt: "ancien", injectedSections: [] } as unknown as { budget?: unknown };
     expect(archived.budget).toBeUndefined();
+  });
+
+  it("route optimized_v3 sans lire le prompt legacy et garde le message courant intact", async () => {
+    vi.mocked(getGameplaySettings).mockReturnValueOnce({ MAX_PROMPT_VARIANT: "optimized_v3" } as never);
+    vi.mocked(loadCharacterPromptByName).mockResolvedValue(makeNotionMaxPrompt() as never);
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({
+      content: "Je vous écoute.",
+      usage: { prompt_tokens: 100, completion_tokens: 6, total_tokens: 106 },
+      generationId: "gen-optimized",
+      model: "openai/gpt-4.1-mini",
+      latencyMs: 100,
+      diagnosticTrace: null,
+    } as never);
+    const currentMessage = `Pourquoi Emma ? ${"mot ".repeat(1_500)}`;
+
+    const result = await simulateMaxResponse({
+      conversationHistory: [{ role: "max", content: "Je vous écoute.", timestamp: 1 }],
+      userMessage: currentMessage,
+      ragCandidates: [{ id: "rag-1", rank: 1, content: "Le thermos était encore chaud au chalet." }],
+    }, { diagnosticTrace: true });
+
+    expect(result.promptTrace?.budget?.variant).toBe("optimized_v3");
+    expect(result.systemPrompt).not.toContain("PROMPT_LEGACY_A_NE_JAMAIS_LIRE");
+    expect(result.messages?.at(-1)).toEqual({ role: "user", content: currentMessage });
   });
 });

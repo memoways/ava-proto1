@@ -11,3 +11,12 @@
 - Avant toute action qui touche au build, aux variables d'environnement, aux migrations, aux Edge Functions ou à la publication, vérifier qu'elle cible bien Lovable / Lovable Cloud.
 
 Ces règles s'appliquent à toute personne, agent et outil intervenant sur ce dépôt.
+
+## Documentation des plans (obligatoire)
+
+- Tout plan produit ou approuvé pour ce dépôt doit être enregistré dans `docs/`
+  dans le même tour, avant ou au moment de son implémentation.
+- Utiliser un nom explicite de la forme `docs/plan_<sujet>.md`.
+- Si un plan existant couvre déjà le sujet, le mettre à jour plutôt que créer un
+  doublon.
+- Le compte rendu final doit contenir un lien direct vers le plan sauvegardé.

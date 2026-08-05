@@ -143,18 +143,19 @@ export default function GameMasterConfigTab() {
             <div>
               <label className="text-sm font-medium text-muted-foreground">Variante du prompt Max</label>
               <p className="text-xs text-muted-foreground/60 mt-1">
-                Compact v1 comprime fortement les champs Notion (7 000 caractères statiques). Rich v2 conserve la richesse éditoriale
-                par sélection de sous-parties (plafond 18 000, noyau statique 12 000). Le défaut global reste Legacy jusqu’à validation canary.
+                Optimized v3 ajoute un budget global, la mémoire persistante et la déduplication fiche/RAG. Rich v2 reste le témoin riche,
+                Compact v1 le témoin agressif et Legacy le rollback historique.
               </p>
             </div>
             <Select
               value={gameplay.MAX_PROMPT_VARIANT}
-              onValueChange={(value: "legacy" | "compact_v1" | "rich_v2") => updateGameplay({ MAX_PROMPT_VARIANT: value })}
+              onValueChange={(value: "legacy" | "compact_v1" | "rich_v2" | "optimized_v3") => updateGameplay({ MAX_PROMPT_VARIANT: value })}
             >
               <SelectTrigger className="w-full min-w-[190px] sm:w-auto">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="optimized_v3">Optimized v3 (canary)</SelectItem>
                 <SelectItem value="rich_v2">Rich v2 (canary)</SelectItem>
                 <SelectItem value="compact_v1">Compact v1</SelectItem>
                 <SelectItem value="legacy">Legacy (rollback)</SelectItem>

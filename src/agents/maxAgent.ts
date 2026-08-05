@@ -1,7 +1,7 @@
 import { callLLM, callLLMWithUsage, LLMProxyRequestError, streamLLM, type LLMUsage } from "@/services/openRouterLLM";
 import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "@/services/debugLogger";
-import type { ConversationMessage, LLMCallDiagnosticTrace, MaxConstraintCheckResult, MaxPromptAssemblyTrace, MaxTurnKnowledgeContext, TraceMessage } from "@/types";
+import type { ConversationMemoryV1, ConversationMessage, LLMCallDiagnosticTrace, MaxConstraintCheckResult, MaxPromptAssemblyTrace, MaxTurnKnowledgeContext, TraceMessage } from "@/types";
 import { getAntiHallucinationValidatorSettings, getGameplaySettings, getLLMSettings, isReasoningEnabledForModel } from "@/services/settingsService";
 import { buildCharacterPromptSections, loadCharacterPromptByName, clearCharacterPromptCache } from "@/services/characterPromptService";
 import {
@@ -23,6 +23,10 @@ import {
   RICH_V2_FALLBACK_SYSTEM_PROMPT,
   RICH_V2_LIMITS,
 } from "@/agents/maxRichPromptCompiler";
+import {
+  buildOptimizedPromptAssembly,
+  type OptimizedRagCandidate,
+} from "@/agents/maxOptimizedPromptCompiler";
 
 // Fallback minimal system prompt if DB fetch fails
 const FALLBACK_SYSTEM_PROMPT = `Tu es un personnage dans une expérience narrative interactive. Parle à la première personne, en français, de façon concise (1-2 phrases, 45 mots maximum). Utilise le CONTEXTE NARRATIF ci-dessous comme source de vérité.`;
@@ -136,6 +140,10 @@ export interface MaxAgentInput {
   knowledgeContext?: MaxTurnKnowledgeContext;
   /** Compressed bullet-point summary of earlier turns of the same session. */
   sessionSummary?: string;
+  /** optimized_v3 — mémoire structurée persistée sur la session. */
+  conversationMemory?: ConversationMemoryV1 | null;
+  /** optimized_v3 — vivier RAG avant déduplication globale. */
+  ragCandidates?: OptimizedRagCandidate[];
   /** PRD4 — résumé du rôle inventé par le joueur, injecté à chaque tour. */
   userRoleSummary?: string;
   /** PRD4 — repères temporels du tour (temps écoulé, tour, phase d'appel). */
@@ -543,6 +551,31 @@ export async function buildMaxSystemPrompt(
 
   if (variant === "rich_v2") {
     return buildRichMaxSystemPrompt(input, characterName, characterFields);
+  }
+
+  if (variant === "optimized_v3") {
+    const historyChars = input.conversationHistory.reduce((sum, message) => sum + message.content.length, 0);
+    const guards = [
+      ...(input.knowledgeContext?.forbiddenTopics ?? []).map((value) => `Sujet interdit : ${value}`),
+      ...(input.knowledgeContext?.blockedAssertions ?? []).map((value) => `Assertion interdite : ${value}`),
+    ].join("\n");
+    const rawGuidance = input.gmGuidance?.guidance?.trim();
+    const gmGuidance = rawGuidance && !isFallbackGmGuidance(rawGuidance) && input.gmGuidance
+      ? buildGmGuidanceBlock(input.gmGuidance)
+      : undefined;
+    return buildOptimizedPromptAssembly({
+      character: characterFields,
+      characterName,
+      userMessage: input.userMessage,
+      historyChars,
+      conversationMemory: input.conversationMemory,
+      userRole: input.userRoleSummary,
+      temporalContext: input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined,
+      gmGuidance,
+      guards: guards || undefined,
+      postVideoContext: input.postVideoContext,
+      ragCandidates: input.ragCandidates,
+    });
   }
 
   const compiledFields = compileCharacterSections(characterFields);

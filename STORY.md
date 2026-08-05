@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-05 (RAG Voyage 4 versionné et trajectoire mémoire/payload)
+> **Last Updated**: 2026-08-05 (payload Max `optimized_v3`, mémoire persistante et reprise)
 
 ---
 
@@ -72,6 +72,98 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-05 — Max reçoit un contexte plus léger sans perdre sa mémoire ni son canon 🔷
+
+**Le problème rendu visible par les traces.** La vue « Trace exacte des réponses
+de Max » a montré un payload proche de 40 000 caractères, dont 98 % dans le
+message système. La fiche structurée occupait à elle seule 27 799 caractères, le
+RAG 5 369 et l'ancien prompt 4 549. La variante `rich_v2` avait déjà retiré
+`characters.system_prompt` et ramené le système autour de 12 000 caractères, mais
+chaque source restait assemblée séparément : un même fait pouvait donc revenir
+dans la fiche, le RAG, le résumé et l'historique. Après un rechargement, Max ne
+disposait par ailleurs d'aucune mémoire structurée durable de la relation.
+
+**Décision produit et éditoriale.** La fiche Notion de Max conserve ses 28 728
+caractères éditoriaux et le corpus RAG reste exhaustif. L'optimisation ne supprime
+aucun détail canonique : elle décide, à chaque tour, quelle matière est utile à la
+question présente et garde les détails rares disponibles pour une demande
+ultérieure. Le plan complet, ses budgets, ses priorités factuelles et l'ordre de
+synchronisation sont désormais la référence dans
+[`docs/plan_optimized_v3_payload_max.md`](docs/plan_optimized_v3_payload_max.md).
+
+**Un compilateur global plutôt qu'un empilement de blocs.** `optimized_v3` est une
+quatrième variante additive. Il compose un contrat conversationnel unique, puis
+le présent, l'identité, la voix, la contradiction et le moteur de Max, le rôle de
+l'interlocuteur, le temps, la mémoire, les unités canoniques pertinentes, les
+souvenirs RAG complémentaires et enfin l'historique brut. Le contexte généré est
+borné à 11 000 caractères hors message courant ; la phrase de l'utilisateur n'est
+jamais coupée, même si elle provoque un dépassement explicitement tracé.
+
+La sélection travaille sur des paragraphes et des phrases, pas sur des coupes
+aveugles. Chaque unité reçoit un score calculé avec le message courant, les sujets
+mémorisés et les labels du GM précédent. L'inclusion normalisée et les shingles
+repèrent les répétitions ; la source prioritaire est gardée et seules les phrases
+réellement nouvelles d'une source secondaire survivent. La hiérarchie factuelle
+est explicite : timeline Notion, autres champs structurés, RAG, puis déclarations
+historiques de Max. La guidance du Game Master peut orienter la posture, jamais
+modifier un fait.
+
+**Un RAG complémentaire et remplaçable.** Le pipeline Voyage 4 récemment livré ne
+change pas : documents en `voyage-4-large`, questions en `voyage-4-lite`, 1 024
+dimensions et reranking actuel. L'orchestrateur demande cependant six candidats
+pour pouvoir écarter un doublon avec la fiche ou la mémoire et reprendre le
+suivant. Trois souvenirs et 1 800 caractères au maximum arrivent dans le prompt,
+sans score, ID ni marqueur `Partie n/N`. La trace conserve tous les candidats et
+explique leur sort : sélection, doublon statique, doublon mémoire, rang inférieur
+ou budget.
+
+**La mémoire devient un état métier.** Le résultat structuré du GM post-tour
+contient maintenant un `memory_delta`, sans second appel LLM. Il peut ajouter le
+prénom et le rôle de l'interlocuteur, des faits confiés, les révélations déjà
+faites par Max, les engagements, les fils ouverts ou résolus, les sujets abordés
+et l'évolution de la confiance, de l'émotion et de la profondeur. Un reducer
+déterministe nettoie les textes, fabrique des identifiants stables, déduplique,
+borne chaque catégorie et interdit à un échange banal de faire régresser la
+profondeur déjà atteinte.
+
+`memory_last_turn` sert de verrou optimiste : le log GM et la mémoire sont écrits
+ensemble, seulement si le numéro de tour lu est toujours courant. Une mise à jour
+retardée ou répétée ne peut donc pas écraser un souvenir plus récent. En attendant
+un GM en retard, le compilateur étend temporairement les deux derniers échanges
+bruts jusqu'au dernier tour non résumé. Les anciennes variantes gardent leur
+résumé périodique et leur comportement antérieur.
+
+**Reprendre un appel sans rejouer sa mise en scène.** Les sessions gagnent
+`conversation_memory`, `memory_last_turn` et `resume_expires_at`, calculé à partir
+de la durée configurée avec cinq minutes de marge technique. Au chargement,
+l'accueil ne cherche que la dernière session Max du propriétaire, non terminée
+et non expirée. « Reprendre l'appel » restaure transcript, rôle, posture,
+mémoire, triggers, guidance GM et temps réellement restant. Cette recherche ne
+prépare ni micro, ni avatar, ni audio, ni TTS ; la marge de persistance ne rallonge
+pas la conversation et aucune ouverture n'est rejouée.
+
+**Une trace lisible avant le JSON complet.** Le stockage V2 et ses `textBlobs`
+restent la preuve exacte. L'interface charge d'abord une synthèse : caractères par
+section, plafond et dépassement, budget utilisé ou omis, unités candidates,
+fusionnées et retenues, caractères répétitifs supprimés, mémoire avant/delta/après,
+décisions RAG, modèle demandé et retourné et tokens fournisseur. Le JSON intégral
+reste disponible à la demande et au téléchargement, mais ne surcharge plus
+l'ouverture du panneau.
+
+**Compatibilité et validation.** `legacy`, `compact_v1` et `rich_v2` restent
+disponibles ; le réglage global n'est pas modifié par le code. Les tests couvrent
+le budget, le canon, la déduplication, la relève d'un candidat RAG, la mémoire et
+les deltas désordonnés, la profondeur persistante, la reprise sans média, la
+propriété/expiration des sessions et les anciennes traces. La suite complète de
+232 tests, TypeScript, le lint ciblé et le build de production sont verts.
+
+**Dernier kilomètre Lovable.** Ce travail est livré comme code compatible Lovable,
+pas comme déploiement autonome. La migration, la publication, les modifications
+éditoriales Notion, `fields_only`, le canary, la correction du corps narratif,
+`rag_only` puis la comparaison aveugle doivent encore être exécutés dans cet ordre
+depuis Lovable/Lovable Cloud. Le runbook opérationnel est
+[`docs/optimized_v3_lovable_runbook.md`](docs/optimized_v3_lovable_runbook.md).
 
 ### 2026-08-04 — Les traces Max quittent le chemin critique de la voix 🔷
 

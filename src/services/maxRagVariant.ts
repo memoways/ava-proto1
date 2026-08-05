@@ -7,6 +7,9 @@ import { RICH_V2_RAG } from "@/agents/maxRichPromptCompiler";
  * seuls les souvenirs de 900 caractères (3 × 900 = 2 700) s'appliquent à `rich_v2`.
  */
 export function maxRagFormatOptionsForVariant(variant?: string | null): MaxRAGFormatOptions {
+  if (variant === "optimized_v3") {
+    return { maxItems: 3, itemChars: 700, totalChars: 1_800 };
+  }
   if (variant === "rich_v2") {
     return {
       maxItems: RICH_V2_RAG.maxItems,

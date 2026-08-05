@@ -113,6 +113,11 @@ import {
   getPassiveVoiceNetworkObservation,
   recordPassiveVoiceNetworkObservation,
 } from "@/services/networkDiagnostics";
+import {
+  fetchResumablePRD4Session,
+  type ResumablePRD4Session,
+} from "@/services/sessionConversationMemory";
+import { resolveResumeTimerWindow } from "@/services/resumeTimer";
 
 const TEASER_VIDEO_URL = "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049";
 
@@ -130,11 +135,14 @@ const IndexPRD4 = () => {
     endExperience,
     reset,
     setLastUserLabels,
+    restoreConversation,
   } = useExperienceState();
 
   const [userSubtitle, setUserSubtitle] = useState("");
   const [maxSubtitle, setMaxSubtitle] = useState("");
   const [summarizing, setSummarizing] = useState(false);
+  const [resumableSession, setResumableSession] = useState<ResumablePRD4Session | null>(null);
+  const [resumeLoading, setResumeLoading] = useState(true);
   const [privacyPreferences, setPrivacyPreferences] = useState<PrivacyPreferences | null>(() => getPrivacyPreferences());
   const initialSessionDuration = normalizeSessionDurationSeconds(getGameplaySettings().TIMEOUT_SECONDS);
   const [sessionDurationSeconds, setSessionDurationSeconds] = useState(initialSessionDuration);
@@ -250,6 +258,17 @@ const IndexPRD4 = () => {
         // handleStart affichera une erreur actionnable si le second essai échoue.
       });
     }
+  }, [privacyPreferences?.voiceAndStorageAcknowledged]);
+
+  useEffect(() => {
+    if (isPrivacyNoticeEnabled() && !privacyPreferences?.voiceAndStorageAcknowledged) return;
+    let cancelled = false;
+    setResumeLoading(true);
+    void fetchResumablePRD4Session()
+      .then((session) => { if (!cancelled) setResumableSession(session); })
+      .catch(() => { if (!cancelled) setResumableSession(null); })
+      .finally(() => { if (!cancelled) setResumeLoading(false); });
+    return () => { cancelled = true; };
   }, [privacyPreferences?.voiceAndStorageAcknowledged]);
 
   // ---- Helpers conversation -------------------------------------------------
@@ -534,6 +553,9 @@ const IndexPRD4 = () => {
         output_mode: outputSettings.mode,
         streaming_avatar_provider:
           outputSettings.mode === "streaming_avatar" ? avatarSettings.activeProvider : null,
+        resume_expires_at: new Date(
+          Date.now() + (configuredSessionDurationRef.current + 300) * 1_000,
+        ).toISOString(),
       },
     );
     sessionIdRef.current = sid;
@@ -643,6 +665,61 @@ const IndexPRD4 = () => {
       throw error;
     });
   }, [prepareCall, setPhase]);
+
+  const handleResumeCall = useCallback(async () => {
+    const session = resumableSession;
+    if (!session) return;
+    cleanupAudio();
+    const now = Date.now();
+    const timerWindow = resolveResumeTimerWindow(session.started_at, session.resume_expires_at, now);
+    if (!timerWindow) {
+      setResumableSession(null);
+      return;
+    }
+    const { configuredDurationSeconds, elapsedSeconds, remainingSeconds } = timerWindow;
+    const postureMode = session.user_posture_mode === "voice" || session.user_posture_mode === "surprise"
+      ? session.user_posture_mode
+      : null;
+    const posture: UserPosture | null = session.user_posture_raw && postureMode
+      ? { raw: session.user_posture_raw, mode: postureMode }
+      : null;
+    const latestGm = [...session.gm_post_turn_log]
+      .sort((a, b) => (b.turn_index ?? 0) - (a.turn_index ?? 0))[0];
+
+    sessionIdRef.current = session.id;
+    diagnosticTraceEnabledRef.current = session.diagnostic_trace_enabled;
+    conversationRef.current = session.conversation_log;
+    configuredSessionDurationRef.current = configuredDurationSeconds;
+    sessionDurationRef.current = Math.min(configuredDurationSeconds, elapsedSeconds);
+    triggeredVideoIdsRef.current = session.triggers_activated;
+    pendingGmGuidanceRef.current = latestGm?.next_turn_guidance?.trim() || null;
+    gmTopicsCoveredRef.current = latestGm?.topics_covered ?? [];
+    endedRef.current = false;
+    isProcessingRef.current = false;
+    setActiveVideo(null);
+    setSessionDurationSeconds(configuredDurationSeconds);
+    timer.reset(remainingSeconds);
+    timer.start();
+    restoreConversation({
+      conversationLog: session.conversation_log,
+      userRoleProfile: session.player_role,
+      userPosture: posture,
+      hasSeenFilm: session.has_seen_film === "vu" || session.has_seen_film === "pas_vu" || session.has_seen_film === "rappel"
+        ? session.has_seen_film
+        : null,
+      teaserSeen: session.teaser_shown === true,
+    });
+    const lastMax = [...session.conversation_log].reverse().find((message) => message.role === "max");
+    const lastUser = [...session.conversation_log].reverse().find((message) => message.role === "user");
+    setMaxSubtitle(lastMax?.content ?? "");
+    setUserSubtitle(lastUser?.content ?? "");
+    setResumableSession(null);
+    trackEvent("prd4_session_resumed", {
+      session_id: session.id,
+      remaining_seconds: remainingSeconds,
+      turns: session.conversation_log.filter((message) => message.role === "user").length,
+    });
+  }, [cleanupAudio, restoreConversation, resumableSession, timer]);
   const handleLockedClick = useCallback(
     (id: "emma" | "ava" | "leo") => trackEvent("prd4_character_locked_clicked", { character: id }),
     [],
@@ -1560,6 +1637,9 @@ const IndexPRD4 = () => {
           videoReady={teaserPlayerReady}
           privacyPreferences={privacyPreferences}
           onPrivacyChange={handlePrivacyChange}
+          resumeAvailable={Boolean(resumableSession)}
+          resumeLoading={resumeLoading}
+          onResume={handleResumeCall}
         />
       );
       break;
