@@ -216,34 +216,58 @@ export type Database = {
       embeddings: {
         Row: {
           character_id: string | null
+          chunk_count: number | null
+          chunk_index: number | null
+          chunking_strategy: string | null
           content: string
           created_at: string | null
           embedding: string | null
+          embedding_dimension: number | null
+          embedding_dtype: string | null
+          embedding_model: string | null
+          embedding_profile: string
           embedding_provider: string
           embedding_v: string | null
           id: string
+          indexed_at: string | null
           source_id: string
           source_table: string
         }
         Insert: {
           character_id?: string | null
+          chunk_count?: number | null
+          chunk_index?: number | null
+          chunking_strategy?: string | null
           content: string
           created_at?: string | null
           embedding?: string | null
+          embedding_dimension?: number | null
+          embedding_dtype?: string | null
+          embedding_model?: string | null
+          embedding_profile?: string
           embedding_provider?: string
           embedding_v?: string | null
           id?: string
+          indexed_at?: string | null
           source_id: string
           source_table: string
         }
         Update: {
           character_id?: string | null
+          chunk_count?: number | null
+          chunk_index?: number | null
+          chunking_strategy?: string | null
           content?: string
           created_at?: string | null
           embedding?: string | null
+          embedding_dimension?: number | null
+          embedding_dtype?: string | null
+          embedding_model?: string | null
+          embedding_profile?: string
           embedding_provider?: string
           embedding_v?: string | null
           id?: string
+          indexed_at?: string | null
           source_id?: string
           source_table?: string
         }
@@ -388,6 +412,63 @@ export type Database = {
           session_id?: string | null
           source?: string
           status_code?: number | null
+        }
+        Relationships: []
+      }
+      rag_index_state: {
+        Row: {
+          active_profile: string
+          chunk_overlap_chars: number
+          chunk_size_chars: number
+          chunking_strategy: string
+          dimension: number
+          document_model: string
+          dtype: string
+          endpoint: string
+          id: boolean
+          last_rebuild_at: string | null
+          previous_profile: string | null
+          provider: string
+          query_model: string
+          status: string
+          total_chunks: number
+          updated_at: string
+        }
+        Insert: {
+          active_profile: string
+          chunk_overlap_chars: number
+          chunk_size_chars: number
+          chunking_strategy: string
+          dimension: number
+          document_model: string
+          dtype: string
+          endpoint: string
+          id?: boolean
+          last_rebuild_at?: string | null
+          previous_profile?: string | null
+          provider: string
+          query_model: string
+          status?: string
+          total_chunks?: number
+          updated_at?: string
+        }
+        Update: {
+          active_profile?: string
+          chunk_overlap_chars?: number
+          chunk_size_chars?: number
+          chunking_strategy?: string
+          dimension?: number
+          document_model?: string
+          dtype?: string
+          endpoint?: string
+          id?: boolean
+          last_rebuild_at?: string | null
+          previous_profile?: string | null
+          provider?: string
+          query_model?: string
+          status?: string
+          total_chunks?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -885,6 +966,7 @@ export type Database = {
           match_count?: number
           match_threshold?: number
           p_character_id?: string
+          p_embedding_profile?: string
           query_embedding: string
         }
         Returns: {
@@ -901,6 +983,7 @@ export type Database = {
           match_count?: number
           match_threshold?: number
           p_character_id?: string
+          p_embedding_profile?: string
           query_embedding: string
         }
         Returns: {
