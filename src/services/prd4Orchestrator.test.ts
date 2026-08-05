@@ -299,7 +299,6 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
         matchCount: 5,
         matchThreshold: 0.3,
         characterId: "character-max",
-        provider: "voyage",
         rerankRequested: true,
         retrieveK: 15,
         rerankModel: "rerank-2.5",
