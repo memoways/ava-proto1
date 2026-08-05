@@ -83,6 +83,8 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
     ]);
     setPrompt(p);
     setDraft(p || {});
+    setSyncReport(p ? observeCharacterPrompt(id, p) : null);
+
     const legacy = legacyResult.data?.system_prompt || "";
     setLegacyPrompt(legacy);
     setSavedLegacyPrompt(legacy);
