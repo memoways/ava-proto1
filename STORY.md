@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-04 (traces Max durables hors chemin vocal et diagnostic réseau passif)
+> **Last Updated**: 2026-08-05 (RAG Voyage 4 versionné et trajectoire mémoire/payload)
 
 ---
 

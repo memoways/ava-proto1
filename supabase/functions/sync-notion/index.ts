@@ -1,6 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAdmin } from "../_shared/adminAuth.ts";
+import {
+  getRagEmbeddingProfile,
+  isRagEmbeddingProfileId,
+  LEGACY_OPENAI_PROFILE_ID,
+  LEGACY_VOYAGE_PROFILE_ID,
+  type RagEmbeddingProfile,
+  type RagEmbeddingProfileId,
+} from "../_shared/ragProfiles.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,6 +38,12 @@ interface SyncRequest {
    * - "rag_only"       : only re-embed page content (NO character_prompts touched)
    */
   mode?: "full" | "fields_only" | "rag_only";
+  /** Build embeddings in this versioned profile. Defaults to the active profile. */
+  rag_profile?: RagEmbeddingProfileId;
+  /** Atomically activate rag_profile after every requested character was indexed successfully. */
+  activate_profile?: boolean;
+  /** Activate an already-built non-empty profile without rebuilding it (admin rollback/canary switch). */
+  activate_existing_profile?: boolean;
 }
 
 // --- Notion property extractors ---
@@ -102,10 +116,8 @@ serve(async (req) => {
 
   const startedAt = Date.now();
   try {
+    const body: SyncRequest = await req.json().catch(() => ({}));
     const NOTION_API_KEY = Deno.env.get('NOTION_API_KEY');
-    if (!NOTION_API_KEY) throw new Error('NOTION_API_KEY is not configured');
-
-
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     const VOYAGE_API_KEY = Deno.env.get('VOYAGE_API_KEY');
     const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY');
@@ -114,19 +126,91 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const body: SyncRequest = await req.json().catch(() => ({}));
+    const mode: "full" | "fields_only" | "rag_only" = body.mode || "full";
+    const doFields = mode === "full" || mode === "fields_only";
+    const doRag = mode === "full" || mode === "rag_only";
     const charactersDbId = body.databases?.characters;
     const videosDbId = body.databases?.videos;
+    const { data: activeIndexState, error: activeIndexError } = await supabase
+      .from("rag_index_state")
+      .select("active_profile")
+      .eq("id", true)
+      .maybeSingle();
+    if (activeIndexError) {
+      console.warn("[sync-notion] rag_index_state unavailable, using legacy profile:", activeIndexError.message);
+      if ((charactersDbId && doRag) || body.activate_existing_profile) {
+        throw new Error("RAG profile migration is required before synchronizing embeddings (20260805120000_rag_embedding_profiles.sql)");
+      }
+    }
+    if (body.rag_profile && !isRagEmbeddingProfileId(body.rag_profile)) {
+      throw new Error(`Unknown RAG embedding profile: ${body.rag_profile}`);
+    }
+    const fallbackProfileId = VOYAGE_API_KEY ? LEGACY_VOYAGE_PROFILE_ID : LEGACY_OPENAI_PROFILE_ID;
+    const targetProfile = getRagEmbeddingProfile(body.rag_profile || activeIndexState?.active_profile, fallbackProfileId);
+
+    if (body.activate_existing_profile) {
+      const [{ count: existingCount, error: countError }, { data: latestEmbedding }] = await Promise.all([
+        supabase
+          .from('embeddings')
+          .select('id', { count: 'exact', head: true })
+          .eq('embedding_profile', targetProfile.id),
+        supabase
+          .from('embeddings')
+          .select('indexed_at')
+          .eq('embedding_profile', targetProfile.id)
+          .order('indexed_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      if (countError) throw new Error(`Unable to inspect ${targetProfile.id}: ${countError.message}`);
+      if (!existingCount) throw new Error(`Profile ${targetProfile.id} has no embeddings and cannot be activated`);
+      const { error: activationError } = await supabase.from('rag_index_state').upsert({
+        id: true,
+        active_profile: targetProfile.id,
+        previous_profile: activeIndexState?.active_profile && activeIndexState.active_profile !== targetProfile.id
+          ? activeIndexState.active_profile
+          : null,
+        provider: targetProfile.provider,
+        document_model: targetProfile.documentModel,
+        query_model: targetProfile.queryModel,
+        endpoint: targetProfile.endpoint,
+        dimension: targetProfile.dimension,
+        dtype: targetProfile.dtype,
+        chunking_strategy: targetProfile.chunkingStrategy,
+        chunk_size_chars: targetProfile.chunkSizeChars,
+        chunk_overlap_chars: targetProfile.chunkOverlapChars,
+        total_chunks: existingCount,
+        status: 'active',
+        last_rebuild_at: latestEmbedding?.indexed_at || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+      if (activationError) throw new Error(`RAG profile activation failed: ${activationError.message}`);
+      return new Response(JSON.stringify({
+        success: true,
+        rag_profile: targetProfile.id,
+        activated_profile: targetProfile.id,
+        profile_embeddings_in_db: existingCount,
+        characters_synced: 0,
+        activation_only: true,
+        latency_ms: Date.now() - startedAt,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     if (!charactersDbId && !videosDbId) {
       return new Response(JSON.stringify({ error: "databases.characters or databases.videos is required" }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    if (charactersDbId && !OPENAI_API_KEY && !VOYAGE_API_KEY) {
-      throw new Error('No embedding provider configured');
+    if (!NOTION_API_KEY) throw new Error('NOTION_API_KEY is not configured');
+    if (charactersDbId && targetProfile.provider === "voyage" && !VOYAGE_API_KEY) {
+      throw new Error(`VOYAGE_API_KEY is required to build ${targetProfile.id}`);
     }
-    const useVoyage = !!VOYAGE_API_KEY;
+    if (charactersDbId && targetProfile.provider === "openai" && !OPENAI_API_KEY) {
+      throw new Error(`OPENAI_API_KEY is required to build ${targetProfile.id}`);
+    }
+    if (body.activate_profile && body.only_notion_id) {
+      throw new Error("A RAG profile can only be activated after a complete corpus rebuild");
+    }
 
     // ---- Notion helpers ----
     async function fetchNotionDatabase(databaseId: string, filter?: Record<string, unknown>): Promise<NotionPage[]> {
@@ -211,18 +295,25 @@ serve(async (req) => {
       }
     }
 
-    // Global wipe (used by "Wipe & rebuild RAG" button)
+    // Profile-scoped wipe. Other profiles stay queryable until an explicit activation.
     let wipedAll = false;
+    let inPlaceProfileRefresh = false;
     if (body.wipe_all && charactersDbId) {
-      const { error: delErr } = await supabase
-        .from('embeddings')
-        .delete()
-        .not('id', 'is', null);
-      if (delErr) {
-        console.error('[sync-notion] Global wipe failed:', delErr);
+      if (activeIndexState?.active_profile === targetProfile.id) {
+        // Never empty the live corpus globally. The loop below replaces one character
+        // at a time, while profile migrations use an inactive parallel profile.
+        inPlaceProfileRefresh = true;
+        console.log(`[sync-notion] Safe in-place refresh for active profile ${targetProfile.id}`);
       } else {
+        const { error: delErr } = await supabase
+          .from('embeddings')
+          .delete()
+          .eq('embedding_profile', targetProfile.id);
+        if (delErr) {
+          throw new Error(`Unable to clear target profile ${targetProfile.id}: ${delErr.message}`);
+        }
         wipedAll = true;
-        console.log('[sync-notion] Global wipe: all embeddings deleted');
+        console.log(`[sync-notion] Profile wipe: ${targetProfile.id} embeddings deleted`);
       }
     }
 
@@ -268,32 +359,74 @@ serve(async (req) => {
       return blocks.join('\n\n');
     }
 
-    async function generateEmbedding(text: string): Promise<{ vector: number[]; provider: 'voyage' | 'openai'; dim: number }> {
-      const truncated = text.slice(0, 18000);
-      if (useVoyage) {
-        const r = await fetch(`${VOYAGE_API_URL}/embeddings`, {
+    async function generateEmbeddings(texts: string[], profile: RagEmbeddingProfile): Promise<number[][]> {
+      const inputs = texts.map((text) => text.slice(0, 18000));
+      if (profile.provider === "voyage") {
+        const r = await fetch(`${VOYAGE_API_URL}/${profile.endpoint}`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${VOYAGE_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: 'voyage-3', input: [truncated], input_type: 'document', output_dimension: 1024 }),
+          body: JSON.stringify(profile.endpoint === "contextualizedembeddings"
+            ? {
+                model: profile.documentModel,
+                inputs: [inputs],
+                input_type: 'document',
+                output_dimension: profile.dimension,
+                output_dtype: profile.dtype,
+              }
+            : {
+                model: profile.documentModel,
+                input: inputs,
+                input_type: 'document',
+                output_dimension: profile.dimension,
+                output_dtype: profile.dtype,
+              }),
         });
         if (!r.ok) throw new Error(`Voyage embeddings error [${r.status}]: ${await r.text()}`);
         const d = await r.json();
-        return { vector: d.data[0].embedding, provider: 'voyage', dim: 1024 };
+        const items = profile.endpoint === "contextualizedembeddings" ? d.data?.[0]?.data : d.data;
+        if (!Array.isArray(items) || items.length !== inputs.length) {
+          throw new Error(`Voyage ${profile.documentModel} returned ${items?.length ?? 0}/${inputs.length} embeddings`);
+        }
+        return [...items]
+          .sort((a, b) => a.index - b.index)
+          .map((item) => item.embedding);
       }
       const r = await fetch(`${OPENAI_API_URL}/embeddings`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'text-embedding-3-small', input: truncated }),
+        body: JSON.stringify({ model: profile.documentModel, input: inputs }),
       });
       if (!r.ok) throw new Error(`OpenAI Embeddings error [${r.status}]: ${await r.text()}`);
       const d = await r.json();
-      return { vector: d.data[0].embedding, provider: 'openai', dim: 1536 };
+      if (!Array.isArray(d.data) || d.data.length !== inputs.length) {
+        throw new Error(`OpenAI ${profile.documentModel} returned ${d.data?.length ?? 0}/${inputs.length} embeddings`);
+      }
+      return [...d.data]
+        .sort((a, b) => a.index - b.index)
+        .map((item) => item.embedding);
     }
 
-    function buildEmbeddingPayload(emb: { vector: number[]; provider: 'voyage' | 'openai' }, characterId: string) {
-      const base: Record<string, unknown> = { embedding_provider: emb.provider, character_id: characterId };
-      if (emb.provider === 'voyage') base.embedding_v = JSON.stringify(emb.vector);
-      else base.embedding = JSON.stringify(emb.vector);
+    function buildEmbeddingPayload(
+      vector: number[],
+      profile: RagEmbeddingProfile,
+      characterId: string,
+      chunkIndex: number,
+      chunkCount: number,
+    ) {
+      const base: Record<string, unknown> = {
+        embedding_provider: profile.provider,
+        embedding_profile: profile.id,
+        embedding_model: profile.documentModel,
+        embedding_dimension: profile.dimension,
+        embedding_dtype: profile.dtype,
+        chunking_strategy: profile.chunkingStrategy,
+        chunk_index: chunkIndex,
+        chunk_count: chunkCount,
+        indexed_at: new Date().toISOString(),
+        character_id: characterId,
+      };
+      if (profile.provider === 'voyage') base.embedding_v = JSON.stringify(vector);
+      else base.embedding = JSON.stringify(vector);
       return base;
     }
 
@@ -404,9 +537,7 @@ Situation actuelle (présent d'abord, identité en dernier, 80-120 mots) :`;
 
     // ========== SYNC CHARACTERS ==========
     const perCharacter: any[] = [];
-    const mode: "full" | "fields_only" | "rag_only" = body.mode || "full";
-    const doFields = mode === "full" || mode === "fields_only";
-    const doRag = mode === "full" || mode === "rag_only";
+    const characterSyncErrors: string[] = [];
     if (charactersDbId) {
       console.log(`[sync-notion] Syncing characters DB: ${charactersDbId} (mode=${mode})`);
       const pages = await fetchNotionDatabase(charactersDbId, {
@@ -466,6 +597,7 @@ Situation actuelle (présent d'abord, identité en dernier, 80-120 mots) :`;
         .single();
       if (charErr) {
         console.error(`[sync-notion] character upsert error for ${name}:`, charErr);
+        characterSyncErrors.push(`${name}: ${charErr.message}`);
         continue;
       }
 
@@ -493,28 +625,35 @@ Situation actuelle (présent d'abord, identité en dernier, 80-120 mots) :`;
       let chunksCreated = 0;
       if (doRag) {
         if (!wipedAll) {
-          await supabase
+          const { error: deleteEmbeddingError } = await supabase
             .from('embeddings')
             .delete()
             .eq('source_table', 'characters')
-            .eq('character_id', charRow.id);
+            .eq('character_id', charRow.id)
+            .eq('embedding_profile', targetProfile.id);
+          if (deleteEmbeddingError) {
+            throw new Error(`Unable to clear ${targetProfile.id} embeddings for ${name}: ${deleteEmbeddingError.message}`);
+          }
         }
 
         if (pageContent.trim().length >= 10) {
           const headerPrefix = `Personnage: ${name}${archetype ? ` | Archétype: ${archetype}` : ''}`;
-          const chunks = chunkText(pageContent);
-          for (let i = 0; i < chunks.length; i++) {
-            const chunkContent = `${headerPrefix} | Partie ${i + 1}/${chunks.length}\n${chunks[i]}`;
-            const emb = await generateEmbedding(chunkContent);
-            const payload = buildEmbeddingPayload(emb, charRow.id);
-            await supabase.from('embeddings').insert({
+          const chunks = chunkText(pageContent, targetProfile.chunkSizeChars, targetProfile.chunkOverlapChars);
+          const chunkContents = chunks.map((chunk, index) =>
+            `${headerPrefix} | Partie ${index + 1}/${chunks.length}\n${chunk}`
+          );
+          const vectors = await generateEmbeddings(chunkContents, targetProfile);
+          const records = chunkContents.map((chunkContent, index) => ({
               source_table: 'characters',
               source_id: charRow.id,
               content: chunkContent,
-              ...payload,
-            });
-            chunksCreated++;
+              ...buildEmbeddingPayload(vectors[index], targetProfile, charRow.id, index, chunks.length),
+            }));
+          const { error: insertEmbeddingError } = await supabase.from('embeddings').insert(records);
+          if (insertEmbeddingError) {
+            throw new Error(`Unable to insert ${targetProfile.id} embeddings for ${name}: ${insertEmbeddingError.message}`);
           }
+          chunksCreated = records.length;
         }
       }
 
@@ -534,6 +673,56 @@ Situation actuelle (présent d'abord, identité en dernier, 80-120 mots) :`;
       .from('embeddings')
       .select('id', { count: 'exact', head: true });
 
+    const { count: profileEmbeddingCount } = await supabase
+      .from('embeddings')
+      .select('id', { count: 'exact', head: true })
+      .eq('embedding_profile', targetProfile.id);
+
+    if (body.activate_profile && characterSyncErrors.length > 0) {
+      throw new Error(`RAG profile was built incompletely and was not activated: ${characterSyncErrors.join('; ')}`);
+    }
+    if (body.activate_profile && charactersDbId && doRag && perCharacter.length === 0) {
+      throw new Error('RAG profile was not activated because no character was indexed');
+    }
+
+    let activatedProfile: string | null = null;
+    if (body.activate_profile && charactersDbId && doRag) {
+      const { error: activateError } = await supabase
+        .from('rag_index_state')
+        .upsert({
+          id: true,
+          active_profile: targetProfile.id,
+          previous_profile: activeIndexState?.active_profile && activeIndexState.active_profile !== targetProfile.id
+            ? activeIndexState.active_profile
+            : null,
+          provider: targetProfile.provider,
+          document_model: targetProfile.documentModel,
+          query_model: targetProfile.queryModel,
+          endpoint: targetProfile.endpoint,
+          dimension: targetProfile.dimension,
+          dtype: targetProfile.dtype,
+          chunking_strategy: targetProfile.chunkingStrategy,
+          chunk_size_chars: targetProfile.chunkSizeChars,
+          chunk_overlap_chars: targetProfile.chunkOverlapChars,
+          total_chunks: profileEmbeddingCount || 0,
+          status: 'active',
+          last_rebuild_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
+      if (activateError) throw new Error(`RAG profile activation failed: ${activateError.message}`);
+      activatedProfile = targetProfile.id;
+      console.log(`[sync-notion] Activated RAG profile ${targetProfile.id} (${profileEmbeddingCount || 0} chunks)`);
+    } else if (activeIndexState?.active_profile === targetProfile.id && charactersDbId && doRag) {
+      await supabase
+        .from('rag_index_state')
+        .update({
+          total_chunks: profileEmbeddingCount || 0,
+          last_rebuild_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', true);
+    }
+
     return new Response(JSON.stringify({
       success: true,
       characters_synced: perCharacter.length,
@@ -541,7 +730,15 @@ Situation actuelle (présent d'abord, identité en dernier, 80-120 mots) :`;
       videos_synced: videosSynced,
       per_video: perVideo,
       wiped_all: wipedAll,
+      in_place_profile_refresh: inPlaceProfileRefresh,
       total_embeddings_in_db: totalEmb || 0,
+      profile_embeddings_in_db: profileEmbeddingCount || 0,
+      rag_profile: targetProfile.id,
+      document_embedding_model: targetProfile.documentModel,
+      query_embedding_model: targetProfile.queryModel,
+      embedding_dimension: targetProfile.dimension,
+      embedding_dtype: targetProfile.dtype,
+      activated_profile: activatedProfile,
       latency_ms: Date.now() - startedAt,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error: unknown) {

@@ -35,7 +35,7 @@ const STEPS: Step[] = [
     id: "rag-embed",
     label: "RAG — Embedding",
     role: "Vectorise la requête (1024 dims)",
-    provider: "Voyage voyage-3 (fallback OpenAI text-embedding-3-small)",
+    provider: "Profil serveur versionné (Voyage 4 temps réel recommandé)",
     color: "bg-muted text-foreground border-border",
   },
   {
@@ -49,7 +49,7 @@ const STEPS: Step[] = [
     id: "rag-rerank",
     label: "RAG — Rerank",
     role: "Re-classe les top-K par pertinence sémantique",
-    provider: "Voyage rerank-2.5",
+    provider: "Voyage rerank-2.5-lite / 2.5",
     color: "bg-muted text-foreground border-border",
   },
   {
@@ -103,7 +103,7 @@ const GLOSSARY: Array<{ term: string; def: string }> = [
   { term: "Max", def: "Personnage incarné. Génère la réponse vocale avec RAG, mémoire et éventuelle guidance GM du tour précédent." },
   { term: "RAG", def: "Retrieval Augmented Generation : récupère des chunks narratifs depuis Notion → Supabase (pgvector)." },
   { term: "Query rewrite", def: "Reformulation LLM de la requête pour lever les références contextuelles (ex : « et toi ? » → « Où habites-tu, Max ? »)." },
-  { term: "Voyage", def: "Fournisseur d'embeddings + rerank (voyage-3 · rerank-2.5). OpenAI reste en fallback si Voyage indisponible." },
+  { term: "Voyage", def: "Fournisseur d’embeddings et de reranking. Le profil actif fixe un espace vectoriel compatible ; aucun fallback ne peut interroger un index absent." },
   { term: "OpenRouter", def: "Passerelle LLM utilisée pour tout le pipeline conversationnel (Max, GM, validateur, résumé de rôle, résumés Notion)." },
   { term: "Lovable AI Gateway", def: "Passerelle LLM utilisée hors OpenRouter pour les tâches courtes : query rewrite + résumé de session." },
   { term: "Brief de tour", def: "Objet produit uniquement par le banc d'essai GM pré-tour ; non exécuté dans le PRD4 live." },
@@ -116,7 +116,7 @@ const GLOSSARY: Array<{ term: string; def: string }> = [
 const PROVIDER_SUMMARY = [
   { title: "LLM conversationnels", detail: "OpenRouter — Max, labels GM, GM post-tour et résumé de rôle. GM pré-tour et validateur : simulateur seulement." },
   { title: "LLM utilitaires", detail: "Lovable AI Gateway — query rewrite RAG + résumé de session post-jeu." },
-  { title: "Embeddings + rerank", detail: "Voyage AI (voyage-3 + rerank-2.5). OpenAI text-embedding-3-small en fallback si Voyage renvoie 0." },
+  { title: "Embeddings + rerank", detail: "Profil actif côté serveur (Voyage 4 temps réel recommandé) + rerank-2.5-lite ou rerank-2.5. Les anciens profils restent disponibles pour rollback explicite." },
   { title: "STT", detail: "Façade multi-providers (src/services/stt) — Deepgram par défaut, Whisper / AssemblyAI / Gradium / Gamilab sélectionnables." },
   { title: "TTS", detail: "Façade multi-providers (src/services/tts) — ElevenLabs par défaut, Hume / Inworld / Gradium sélectionnables." },
 ];

@@ -64,12 +64,11 @@ export default function RAGLabTab() {
   const [characterId, setCharacterId] = useState("");
   const [query, setQuery] = useState(PRESETS[0].query);
   const [recentContext, setRecentContext] = useState("");
-  const [provider, setProvider] = useState<"voyage" | "openai">(live.RAG_EMBEDDING_PROVIDER);
   const [matchCount, setMatchCount] = useState(live.RAG_TOP_K);
   const [retrieveK, setRetrieveK] = useState(live.RAG_RETRIEVE_K);
   const [threshold, setThreshold] = useState(0.3);
   const [rerank, setRerank] = useState(live.RAG_RERANK_ENABLED);
-  const [rerankModel, setRerankModel] = useState<RerankModel>("rerank-2.5");
+  const [rerankModel, setRerankModel] = useState<RerankModel>(live.RAG_RERANK_MODEL);
   const [rerankTruncation, setRerankTruncation] = useState(true);
   const [rewrite, setRewrite] = useState(false);
   const [running, setRunning] = useState(false);
@@ -194,7 +193,6 @@ export default function RAGLabTab() {
         safeThreshold,
         {
           characterId,
-          provider,
           rerank,
           retrieveK: safeRetrieveK,
           rewrittenQuery: rewritten || undefined,
@@ -359,15 +357,11 @@ export default function RAGLabTab() {
         <CardContent className="space-y-5">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-2">
-              <Label>Fournisseur d’embedding</Label>
-              <Select value={provider} onValueChange={(value: "voyage" | "openai") => setProvider(value)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="voyage">Voyage · voyage-3</SelectItem>
-                  <SelectItem value="openai">OpenAI · text-embedding-3-small</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">Live : {live.RAG_EMBEDDING_PROVIDER}</p>
+              <Label>Profil d’embedding effectif</Label>
+              <div className="flex h-10 items-center rounded-md border bg-muted/10 px-3 text-sm">
+                {result?.embeddingProfile || "Lu côté serveur à l’exécution"}
+              </div>
+              <p className="text-xs text-muted-foreground">Le Laboratoire interroge toujours l’index actif ; un modèle incompatible ne peut pas être simulé sans rebuild.</p>
             </div>
             <div className="space-y-2">
               <Label>Seuil cosine initial</Label>
@@ -376,7 +370,7 @@ export default function RAGLabTab() {
             </div>
             <div className="space-y-2">
               <Label>Vivier de candidats (retrieve_k)</Label>
-              <Input type="number" min="1" max="100" value={retrieveK} onChange={(event) => setRetrieveK(Number(event.target.value))} disabled={!rerank || provider !== "voyage"} />
+              <Input type="number" min="1" max="100" value={retrieveK} onChange={(event) => setRetrieveK(Number(event.target.value))} disabled={!rerank} />
               <p className="text-xs text-muted-foreground">Utilisé avant reranking · live : {live.RAG_RETRIEVE_K}</p>
             </div>
             <div className="space-y-2">
@@ -393,15 +387,15 @@ export default function RAGLabTab() {
             </div>
             <div className="flex items-start justify-between gap-3">
               <div><Label>Reranking Voyage</Label><p className="mt-1 text-xs text-muted-foreground">Reclasse le vivier après la recherche vectorielle.</p></div>
-              <Switch checked={rerank} onCheckedChange={setRerank} disabled={provider !== "voyage"} />
+              <Switch checked={rerank} onCheckedChange={setRerank} />
             </div>
             <div className="flex items-start justify-between gap-3">
               <div><Label>Troncature Voyage</Label><p className="mt-1 text-xs text-muted-foreground">Autorise Voyage à raccourcir une entrée trop longue.</p></div>
-              <Switch checked={rerankTruncation} onCheckedChange={setRerankTruncation} disabled={!rerank || provider !== "voyage"} />
+              <Switch checked={rerankTruncation} onCheckedChange={setRerankTruncation} disabled={!rerank} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label>Modèle de reranking</Label>
-              <Select value={rerankModel} onValueChange={(value: RerankModel) => setRerankModel(value)} disabled={!rerank || provider !== "voyage"}>
+              <Select value={rerankModel} onValueChange={(value: RerankModel) => setRerankModel(value)} disabled={!rerank}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="rerank-2.5">rerank-2.5 · qualité</SelectItem>
@@ -410,7 +404,7 @@ export default function RAGLabTab() {
               </Select>
             </div>
             <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-muted-foreground">
-              <strong className="text-foreground">Embedding verrouillé :</strong> les documents sont indexés en Voyage 1024 dimensions. Changer de modèle exige un rebuild complet des embeddings.
+              <strong className="text-foreground">Espace verrouillé :</strong> le profil actif est choisi côté serveur. Un changement de modèle passe par Configuration RAG et un rebuild parallèle complet.
             </div>
           </div>
 
@@ -447,7 +441,7 @@ export default function RAGLabTab() {
                 <div className="rounded-lg border p-3">
                   <Badge variant="outline">B · Retrieval</Badge>
                   <p className="mt-2 text-sm font-medium">{result.retrievalMatches.length} candidat(s)</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{result.embeddingProvider} · cosine ≥ {result.request.matchThreshold}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{result.embeddingProfile || result.embeddingProvider} · {result.queryEmbeddingModel || "modèle non exposé"} · cosine ≥ {result.request.matchThreshold}</p>
                 </div>
                 <ArrowDown className="mx-auto h-4 w-4 self-center lg:-rotate-90" />
                 <div className="rounded-lg border p-3">
@@ -470,7 +464,7 @@ export default function RAGLabTab() {
                 </div>
                 <div className="rounded-lg border bg-muted/10 p-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Requête utilisée par le reranker</p>
-                  <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-xs">{rewrittenQuery || query}</pre>
+                  <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-xs">{result.rerankQuery || "Reranking non appliqué"}</pre>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">Latence navigateur : {result.latencyMs} ms · serveur : {result.serverLatencyMs ?? "—"} ms · personnage : {character?.name}</p>

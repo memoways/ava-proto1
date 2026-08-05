@@ -20,6 +20,7 @@ vi.mock("@/services/settingsService", () => ({
     RAG_TOP_K: 5,
     RAG_RETRIEVE_K: 15,
     RAG_RERANK_ENABLED: true,
+    RAG_RERANK_MODEL: "rerank-2.5-lite",
   }),
 }));
 
@@ -79,8 +80,12 @@ describe("RAGLabTab", () => {
       latencyMs: 120,
       serverLatencyMs: 100,
       embeddingProvider: "voyage",
+      embeddingProfile: "voyage-4-realtime",
+      documentEmbeddingModel: "voyage-4-large",
+      queryEmbeddingModel: "voyage-4-lite",
       rerankUsed: true,
       rerankModel: "rerank-2.5",
+      rerankQuery: "Priorise les faits narratifs.\n\nOù habite Max ?",
       searchInput: "Où habite Max ?",
       request: {
         userMessage: "Où habite Max ?",
@@ -89,7 +94,6 @@ describe("RAGLabTab", () => {
         matchCount: 5,
         matchThreshold: 0.3,
         characterId: "max-id",
-        provider: "voyage",
         rerankRequested: true,
         retrieveK: 15,
         rerankModel: "rerank-2.5",
@@ -119,7 +123,7 @@ describe("RAGLabTab", () => {
       "",
       5,
       0.3,
-      expect.objectContaining({ characterId: "max-id", provider: "voyage", rerank: true, retrieveK: 15, includeRetrievalMatches: true }),
+      expect.objectContaining({ characterId: "max-id", rerank: true, retrieveK: 15, includeRetrievalMatches: true }),
     );
   });
 });

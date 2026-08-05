@@ -538,7 +538,7 @@ const gameplayDefaults: GameplaySettings = {
   RAG_QUERY_REWRITE_ENABLED: (defaultSettings as any).RAG_QUERY_REWRITE_ENABLED ?? true,
   RAG_EMBEDDING_PROVIDER: ((defaultSettings as any).RAG_EMBEDDING_PROVIDER as "voyage" | "openai") ?? "voyage",
   RAG_MATCH_THRESHOLD: (defaultSettings as any).RAG_MATCH_THRESHOLD ?? 0.3,
-  RAG_RERANK_MODEL: ((defaultSettings as any).RAG_RERANK_MODEL as "rerank-2.5" | "rerank-2.5-lite") ?? "rerank-2.5",
+  RAG_RERANK_MODEL: ((defaultSettings as any).RAG_RERANK_MODEL as "rerank-2.5" | "rerank-2.5-lite") ?? "rerank-2.5-lite",
   RAG_RERANK_TRUNCATION: (defaultSettings as any).RAG_RERANK_TRUNCATION ?? true,
   RAG_SUMMARY_EVERY_N_TURNS: (defaultSettings as any).RAG_SUMMARY_EVERY_N_TURNS ?? 4,
   VIDEO_PLACEHOLDER_DURATION: defaultSettings.VIDEO_PLACEHOLDER_DURATION,

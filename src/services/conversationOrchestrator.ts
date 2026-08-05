@@ -134,7 +134,6 @@ export async function processConversationTurn(
         rewrittenQuery,
         rerank: gameplay.RAG_RERANK_ENABLED,
         retrieveK: gameplay.RAG_RETRIEVE_K,
-        provider: gameplay.RAG_EMBEDDING_PROVIDER,
         rerankModel: gameplay.RAG_RERANK_MODEL,
         rerankTruncation: gameplay.RAG_RERANK_TRUNCATION,
       });

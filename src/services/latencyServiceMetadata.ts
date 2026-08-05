@@ -1,5 +1,5 @@
 import type { LatencySegmentKey, LatencyServiceInfo } from "@/services/latencySegments";
-import { getGameplaySettings, getLLMSettings, getTTSSettings } from "@/services/settingsService";
+import { getLLMSettings, getTTSSettings } from "@/services/settingsService";
 import { getSTTProvider, getSTTProviderDefinition } from "@/services/stt";
 import { getActiveProviderId, getGradiumSettings, getHumeSettings, getInworldSettings } from "@/services/tts/providerSettings";
 import { DEEPGRAM_DEFAULT_MODEL } from "../../supabase/functions/_shared/deepgramDefaults";
@@ -70,17 +70,12 @@ export function getConfiguredLLMServiceInfo(model?: string): LatencyServiceInfo 
 }
 
 export function getConfiguredRAGServiceInfo(): LatencyServiceInfo {
-  try {
-    const provider = getGameplaySettings().RAG_EMBEDDING_PROVIDER || "Unknown";
-    return {
-      serviceProvider: provider === "voyage" ? "Voyage" : provider === "openai" ? "OpenAI" : "Unknown",
-      serviceName: provider,
-      model: "Unknown",
-      endpointType: "rag",
-    };
-  } catch {
-    return { serviceProvider: "Unknown", serviceName: "Unknown", model: "Unknown", endpointType: "rag" };
-  }
+  return {
+    serviceProvider: "RAG",
+    serviceName: "versioned-profile",
+    model: "server-managed",
+    endpointType: "rag",
+  };
 }
 
 export function getConfiguredLatencyServices(): Partial<Record<LatencySegmentKey, LatencyServiceInfo>> {

@@ -162,7 +162,13 @@ export interface ConversationTurnTraceV1 {
     formattedContext: string;
     knowledgeContext: MaxTurnKnowledgeContext;
     embeddingProvider: string | null;
+    embeddingProfile?: string | null;
+    documentEmbeddingModel?: string | null;
+    queryEmbeddingModel?: string | null;
+    embeddingDimension?: number | null;
+    embeddingDtype?: string | null;
     rerankUsed: boolean;
+    rerankQuery?: string | null;
     error: string | null;
     serverLatencyMs: number | null;
   };

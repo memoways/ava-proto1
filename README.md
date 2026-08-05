@@ -14,6 +14,8 @@ Les développements réalisés depuis un autre environnement doivent rester comp
 
 La mise en public est bloquée par la [release gate](docs/public_release_gate.md). Un aperçu interne peut être utilisé pour le développement, mais aucun lien ne doit être diffusé à des testeurs externes avant validation des critères de sécurité, persistance et endurance.
 
+> **Mise à jour récente (2026-08-05) — RAG Voyage 4 versionné** : le profil temps réel recommandé indexe les documents avec `voyage-4-large` et les interroge avec `voyage-4-lite` dans leur espace vectoriel partagé. Les profils sont construits en parallèle puis activés atomiquement ; le dashboard RAG affiche l’index effectif, les modèles, le chunking, les volumes et les p50/p95 live. `voyage-context-4` est disponible en canary, sans overlap. Analyse, plan et trajectoire mémoire/payload : [`docs/design/DESIGN-001-rag-voyage4-memoire-payload.md`](docs/design/DESIGN-001-rag-voyage4-memoire-payload.md).
+
 > **Mise à jour récente (2026-07-30) — Streaming Avatar piloté par Ava** : l’output public peut rendre le texte final inchangé de Max avec le TTS local, HeyGen LiveAvatar ou Tavus. Les fournisseurs avatar ne participent ni au STT, ni au RAG, ni au raisonnement. L’activation reste en canary, avec TTS par défaut. Procédure Lovable Cloud : [`docs/streaming-avatar-lovable-setup.md`](docs/streaming-avatar-lovable-setup.md).
 
 > **Mise à jour récente (2026-07-21) — traces causales de Max** : les administrateurs peuvent lancer une session PRD4 explicitement tracée et inspecter chaque tour (mémoire, RAG et scores, prompt assemblé, payload OpenRouter exact, modèle, réponse et latences). La trace causale est enregistrée avant l’affichage et le TTS ; en cas d’échec d’écriture, le tour n’est pas diffusé et peut être rejoué. Détails : [`docs/max-causal-tracing.md`](docs/max-causal-tracing.md).
@@ -104,6 +106,7 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] Guide Game Master (`documents/guide_game_master_contenus_et_tests.md`) — prompts, variables, hypothèses, variantes à tester
 - [x] Banc d'essai complet d'inspection du pipeline Max (RAG → Knowledge → GM Pre → Max → Validator) avec chronologie, tokens, latences, contexte injecté décomposé, brief GM JSON, prompt système final, diagnostic validateur, export JSON et presets rapides
 - [x] Embeddings Voyage AI `voyage-3` (1024 dim) en double-stack avec OpenAI + reranker `rerank-2.5` appliqué après retrieval
+- [x] Profils RAG versionnés : Voyage 4 temps réel (`voyage-4-large` documents → `voyage-4-lite` questions), Context 4 canary et activation atomique après rebuild complet
 - [x] Filtrage strict par personnage (`character_id`) sur les chunks RAG (chunks scopés vs partagés)
 - [x] Indexes pgvector HNSW (m=16) — fix scoring quasi-nul sur petits datasets vs ivfflat
 - [x] Query rewriting LLM (`rewrite-query` edge function) — reformulation autonome avant RAG
@@ -141,10 +144,10 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 | LLM | OpenRouter API — Multi-modèles. Chemin live optimisé sur **Gemini 2.0 Flash** par défaut ; modèles plus lourds réservés aux tests/qualité depuis l'admin. |
 | STT | Deepgram (WebSocket streaming + VAD) avec sélection MIME `MediaRecorder` à l'exécution et timeouts token/micro/WebSocket |
 | TTS | **Multi-providers** via façade `src/services/tts/` — ElevenLabs (voix custom Max), **Inworld `inworld-tts-2`** (voix « Alain », streaming NDJSON), **Hume AI Octave**. Provider actif sélectionné dans Admin → TTS Config. Lecture audio robuste avec audio unlock et classification des erreurs navigateur. |
-| Embeddings | **Voyage AI `voyage-3` (1024 dim, défaut)** + OpenAI text-embedding-3-small (1536 dim, fallback) |
-| Reranker | **Voyage `rerank-2.5`** (toggle via `RAG_RERANK_ENABLED`) |
-| Données | Notion (source de vérité) → Supabase (miroir + embeddings double-stack) |
-| RAG | query-rag Edge Function + pgvector HNSW + filtrage `character_id` + query rewrite + session summary |
+| Embeddings | Profils versionnés : **Voyage `voyage-4-large` → `voyage-4-lite` (1024D recommandé)**, `voyage-context-4` canary, Voyage 3/OpenAI legacy explicites |
+| Reranker | **Voyage `rerank-2.5-lite`** par défaut live ; `rerank-2.5` pour les comparaisons qualité |
+| Données | Notion (source de vérité) → Supabase fourni par Lovable (miroir + index parallèles) |
+| RAG | query-rag Edge Function + pgvector HNSW + profil actif serveur + filtrage `character_id` + reranking contextualisé |
 
 ## 🧭 Avancement du plan Max / GM
 
@@ -177,34 +180,26 @@ npm run dev
 
 Ou directement via [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID).
 
-## 🧪 Protocole de test RAG v2 (banc d'essai Max)
+## 🧪 Protocole de test RAG versionné
 
-Prérequis : secret `VOYAGE_API_KEY` configuré dans Lovable Cloud, et données Notion synchronisées (`sync-notion` → `embedding_v` rempli).
+Prérequis : migration `20260805120000_rag_embedding_profiles.sql` appliquée via Lovable Cloud, secret `VOYAGE_API_KEY` configuré et données Notion accessibles.
 
-### 1. Activer les toggles (`src/config/settings.json`)
+### 1. Construire le profil
 
-```json
-{
-  "RAG_EMBEDDING_PROVIDER": "voyage",
-  "RAG_RERANK_ENABLED": true,
-  "RAG_QUERY_REWRITE_ENABLED": true,
-  "RAG_TOP_K": 5,
-  "RAG_RETRIEVE_K": 15
-}
-```
+Dans `/admin` → **🔎 Configuration RAG**, sélectionner **Voyage 4 · temps réel**, puis **Construire et activer**. Le profil courant reste actif jusqu’au succès complet.
 
 ### 2. Lancer le banc d'essai
 
-Aller sur `/admin` → onglet **Test de réponse Max**.
+Aller sur `/admin` → **Mécanique → Laboratoire RAG**.
 
 ### 3. Points de contrôle attendus
 
 | Étape | Contrôle | Détail |
 |---|---|---|
-| **0. Query rewrite** | Message ambigu (ex. *"Et toi ?"*) | Vérifier que la requête est réécrite en phrase autonome dans l'accordéon |
-| **1. RAG** | Provider badge | Doit afficher **voyage** (pas openai) |
+| **Index** | Profil actif | `voyage-4-realtime`, documents `voyage-4-large`, questions `voyage-4-lite` |
+| **1. RAG** | Profil et modèle | Doit afficher le profil actif réellement lu côté serveur |
 | **1. RAG** | `rerankUsed` | Badge présent si `RAG_RERANK_ENABLED=true` |
-| **1. RAG** | Par chunk | Vérifier `character_id` (scopé ou "shared"), `retrieval_similarity` (cosine brute), `rerank_score` (Voyage rerank-2.5) |
+| **1. RAG** | Par chunk | Vérifier `character_id` (scopé ou "shared"), `retrieval_similarity` (cosine brute), `rerank_score` (Voyage rerank 2.5) |
 | **4. Max** | Réponse | Doit s'appuyer sur les chunks rerankés, pas inventer hors contexte |
 | **5. Mémoire session** | Historique de 4+ tours | Après 4 tours utilisateur, un résumé est généré et réinjecté dans le prompt (visible dans le contexte final de Max sous *SOUVENIRS DE LA SESSION*) |
 

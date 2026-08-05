@@ -28,8 +28,6 @@ export interface RAGQueryOptions {
   matchThreshold?: number;
   /** Restrict character-scoped chunks to this character. Shared chunks (NULL) always remain visible. */
   characterId?: string | null;
-  /** Embedding+rerank provider override; falls back to backend default. */
-  provider?: "voyage" | "openai";
   /** Disable rerank explicitly. */
   rerank?: boolean;
   /** Override retrieve_k (top fetched before rerank). */
@@ -51,7 +49,25 @@ export interface RAGQueryOptions {
 async function callQueryRag(
   payload: Record<string, unknown>,
   options?: { signal?: AbortSignal; timeoutMs?: number },
-): Promise<{ matches: RAGMatch[]; retrieval_matches?: RAGMatch[]; query?: string; search_input?: string; embedding_provider?: string; rerank_used?: boolean; rerank_model?: string; rerank_error?: string; latency_ms?: number; error?: string; status?: number }> {
+): Promise<{
+  matches: RAGMatch[];
+  retrieval_matches?: RAGMatch[];
+  query?: string;
+  search_input?: string;
+  embedding_provider?: string;
+  embedding_profile?: string;
+  document_embedding_model?: string;
+  query_embedding_model?: string;
+  embedding_dimension?: number;
+  embedding_dtype?: string;
+  rerank_used?: boolean;
+  rerank_model?: string;
+  rerank_query?: string;
+  rerank_error?: string;
+  latency_ms?: number;
+  error?: string;
+  status?: number;
+}> {
   const timeout = createTimeoutSignal(options?.timeoutMs ?? 5000, options?.signal);
   const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/query-rag`, {
     method: "POST",
@@ -70,8 +86,14 @@ async function callQueryRag(
     query: data.query,
     search_input: data.search_input,
     embedding_provider: data.embedding_provider,
+    embedding_profile: data.embedding_profile,
+    document_embedding_model: data.document_embedding_model,
+    query_embedding_model: data.query_embedding_model,
+    embedding_dimension: data.embedding_dimension,
+    embedding_dtype: data.embedding_dtype,
     rerank_used: data.rerank_used,
     rerank_model: data.rerank_model,
+    rerank_query: data.rerank_query,
     rerank_error: data.rerank_error,
     latency_ms: data.latency_ms,
   };
@@ -99,7 +121,6 @@ export async function queryRAG(
       match_count: matchCount,
       match_threshold: matchThreshold,
       character_id: options.characterId ?? null,
-      provider: options.provider,
       rerank: options.rerank,
       retrieve_k: options.retrieveK,
       rerank_model: options.rerankModel,
@@ -124,8 +145,14 @@ export interface RAGQueryDetailed {
   retrievalMatches: RAGMatch[];
   latencyMs: number;
   embeddingProvider?: string;
+  embeddingProfile?: string;
+  documentEmbeddingModel?: string;
+  queryEmbeddingModel?: string;
+  embeddingDimension?: number;
+  embeddingDtype?: string;
   rerankUsed?: boolean;
   rerankModel?: string;
+  rerankQuery?: string;
   rerankError?: string;
   serverLatencyMs?: number;
   searchInput: string;
@@ -136,7 +163,6 @@ export interface RAGQueryDetailed {
     matchCount: number;
     matchThreshold: number;
     characterId: string | null;
-    provider: "voyage" | "openai" | null;
     rerankRequested: boolean;
     retrieveK: number;
     rerankModel: "rerank-2.5" | "rerank-2.5-lite";
@@ -162,7 +188,6 @@ export async function queryRAGDetailed(
       match_count: matchCount,
       match_threshold: matchThreshold,
       character_id: options.characterId ?? null,
-      provider: options.provider,
       rerank: options.rerank,
       retrieve_k: options.retrieveK,
       rerank_model: options.rerankModel,
@@ -174,8 +199,14 @@ export async function queryRAGDetailed(
       retrievalMatches: res.retrieval_matches?.length ? res.retrieval_matches : res.matches,
       latencyMs: Math.round(performance.now() - startedAt),
       embeddingProvider: res.embedding_provider,
+      embeddingProfile: res.embedding_profile,
+      documentEmbeddingModel: res.document_embedding_model,
+      queryEmbeddingModel: res.query_embedding_model,
+      embeddingDimension: res.embedding_dimension,
+      embeddingDtype: res.embedding_dtype,
       rerankUsed: res.rerank_used,
       rerankModel: res.rerank_model,
+      rerankQuery: res.rerank_query,
       rerankError: res.rerank_error,
       serverLatencyMs: res.latency_ms,
       searchInput: res.search_input || options.rewrittenQuery || [userMessage, recentContext ? `Contexte récent: ${recentContext}` : ""].filter(Boolean).join("\n\n"),
@@ -186,10 +217,9 @@ export async function queryRAGDetailed(
         matchCount,
         matchThreshold,
         characterId: options.characterId ?? null,
-        provider: options.provider ?? null,
         rerankRequested: options.rerank !== false,
         retrieveK: options.retrieveK ?? Math.max(matchCount, 15),
-        rerankModel: options.rerankModel ?? "rerank-2.5",
+        rerankModel: options.rerankModel ?? "rerank-2.5-lite",
         rerankTruncation: options.rerankTruncation !== false,
       },
       error: res.error,
@@ -207,10 +237,9 @@ export async function queryRAGDetailed(
         matchCount,
         matchThreshold,
         characterId: options.characterId ?? null,
-        provider: options.provider ?? null,
         rerankRequested: options.rerank !== false,
         retrieveK: options.retrieveK ?? Math.max(matchCount, 15),
-        rerankModel: options.rerankModel ?? "rerank-2.5",
+        rerankModel: options.rerankModel ?? "rerank-2.5-lite",
         rerankTruncation: options.rerankTruncation !== false,
       },
       error: err instanceof Error ? err.message : String(err),
@@ -223,8 +252,8 @@ export async function queryRAGDetailed(
 const MAX_RAG_CONTEXT_CHARS = 1200;
 const MAX_KNOWLEDGE_ITEM_CHARS = 900;
 export const MAX_MAX_RAG_ITEMS = 3;
-const MAX_MAX_RAG_ITEM_CHARS = 700;
-const MAX_MAX_RAG_CONTEXT_CHARS = 2_100;
+export const MAX_MAX_RAG_ITEM_CHARS = 700;
+export const MAX_MAX_RAG_CONTEXT_CHARS = 2_100;
 const RAG_OVERLAP_WINDOW_CHARS = 120;
 
 function compactText(text: string, maxChars: number): string {

@@ -245,7 +245,7 @@ export default function Admin() {
     const mode = opts.mode || "rag_only";
     try {
       const label = opts.wipeAll
-        ? "Wipe & rebuild RAG…"
+        ? "Rafraîchissement sécurisé du profil RAG actif…"
         : mode === "rag_only" ? "Sync RAG (pages Notion)…"
         : mode === "fields_only" ? "Sync champs personnages…"
         : "Sync complète (RAG + champs)…";
@@ -560,21 +560,23 @@ export default function Admin() {
                 <Button onClick={() => triggerSync({ mode: "full" })} disabled={syncing} size="lg" variant="outline">
                   {syncing ? "Sync en cours…" : "Sync complète (RAG + champs)"}
                 </Button>
-                <Button onClick={() => triggerSync({ wipeAll: true, mode: "full" })} disabled={syncing} size="lg" variant="destructive">
-                  {syncing ? "Sync en cours…" : "⚠️ Wipe & rebuild RAG"}
+                <Button onClick={() => triggerSync({ wipeAll: true, mode: "full" })} disabled={syncing} size="lg" variant="outline">
+                  {syncing ? "Sync en cours…" : "Rafraîchir le profil actif"}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
                 <strong>Sync RAG</strong> (par défaut) ne touche QUE les embeddings du corps des pages Notion — les champs éditoriaux des personnages restent intacts.
                 <br/><strong>Sync complète</strong> re-synchronise aussi les 8 champs éditoriaux + le résumé de situation (équivalent à un « Resync » par personnage pour tous d'un coup).
-                <br/><strong>Wipe & rebuild</strong> supprime tous les embeddings puis reconstruit depuis zéro — à utiliser après un changement de provider d'embeddings.
+                <br/><strong>Rafraîchir le profil actif</strong> remplace les vecteurs personnage par personnage, sans vider tout le corpus live. Pour changer de modèle, construire un profil parallèle dans <strong>Configuration RAG</strong>.
               </p>
 
               {syncReport && !syncReport.error && (
                 <div className="mt-6 space-y-4">
                   <div className="flex items-center gap-2 text-sm font-medium text-primary">
                     ✅ Sync terminé le {new Date(syncReport.synced_at).toLocaleString("fr-FR")}
-                    {syncReport.wiped_all && <span className="text-xs text-yellow-400">(wipe global)</span>}
+                    {syncReport.wiped_all && <span className="text-xs text-yellow-400">(profil reconstruit)</span>}
+                    {syncReport.in_place_profile_refresh && <span className="text-xs text-muted-foreground">(remplacement progressif)</span>}
+                    {syncReport.rag_profile && <span className="text-xs text-muted-foreground">{syncReport.rag_profile}</span>}
                   </div>
 
                   <div className="space-y-2">

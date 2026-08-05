@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Non publié] — RAG Voyage 4, index versionnés et dashboard effectif
+
+### Ajouté
+- Profils d’embeddings partagés entre frontend et Edge Functions : Voyage 4 temps réel (`voyage-4-large` pour les documents, `voyage-4-lite` pour les questions), `voyage-context-4` canary, Voyage 3 et OpenAI legacy.
+- Migration Lovable Cloud avec métadonnées d’index et singleton `rag_index_state`; construction d’un profil parallèle et activation atomique uniquement après rebuild complet.
+- Dashboard **Configuration RAG** fondé sur l’état effectif : modèles, dimension, dtype, chunker, volumes, date de rebuild, p50/p95 et taux de tours sans résultat.
+- Document de conception [`docs/design/DESIGN-001-rag-voyage4-memoire-payload.md`](docs/design/DESIGN-001-rag-voyage4-memoire-payload.md), incluant la trajectoire vers une mémoire conversationnelle structurée et un payload LLM budgété.
+
+### Modifié
+- `query-rag` utilise le profil actif serveur, aligne la requête du reranker sur la requête contextualisée du retrieval et applique une instruction de pertinence narrative.
+- Le reranker n’est plus couplé au fournisseur d’embedding ; `rerank-2.5-lite` devient le défaut live.
+- `sync-notion` batche les embeddings par personnage, utilise `overlap=0` avec Context 4 et conserve les anciens profils pour rollback.
+- Le client n’envoie plus de choix de fournisseur obsolète dans le payload RAG ; les traces conservent le fournisseur et les modèles réellement utilisés.
+
 ## [0.52.1] - 2026-08-04 — Traces Max durables sans blocage de la voix
 
 ### Corrigé
