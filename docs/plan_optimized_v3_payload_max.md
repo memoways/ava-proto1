@@ -246,3 +246,32 @@ Critères :
   [`optimized_v3_lovable_runbook.md`](optimized_v3_lovable_runbook.md).
 - Aucun basculement global vers `optimized_v3` ne doit précéder les validations
   quantitative, qualitative et éditoriale.
+
+## 7. Livraison Lovable Cloud — état au 5 août 2026 (fin de journée)
+
+- Code vérifié en place : compilateur `optimized_v3`, `ConversationMemoryV1`,
+  `memory_delta` sans appel LLM additionnel, persistance optimiste par tour,
+  reprise sans démarrage média, vue analytique des traces, tests verts.
+- Migration `20260805143000_add_prd4_conversation_memory_resume.sql` appliquée :
+  `conversation_memory`, `memory_last_turn`, `resume_expires_at`, contrainte de
+  non-négativité et index de reprise présents ; RLS toujours limitée au
+  propriétaire.
+- Admin expose `legacy`, `compact_v1`, `rich_v2` et `optimized_v3` ;
+  `MAX_PROMPT_VARIANT` global reste `legacy`.
+- Fiche Notion Max : les remplacements de la section 7 de
+  `plan_optimisation_payload_max.md` sont présents dans la fiche active et déjà
+  synchronisés (`character_prompts` mis à jour le 5 août 12:58). Divergence
+  restante assumée : `Identité fondamentale` conserve deux régimes de longueur
+  (1–3 phrases puis récit développé plafonné à quinze phrases), ajout éditorial
+  postérieur au plan ; à trancher éditorialement avant tout basculement global.
+- **Blocage étape 5 (gate canary)** : le `situation_summary` généré omet Mona
+  retenue dans un camp et contredit l'identité canonique (« quarantaine
+  d'années », « deux enfants » au lieu de 55 ans et trois enfants). La génération
+  a été corrigée dans `sync-notion` (injection de `identite_fondamentale` comme
+  source unique d'âge/métier/proches, obligation de couverture des faits, 90–130
+  mots) et la fonction redéployée. Il reste à relancer `fields_only` pour Max
+  depuis l'admin (authentification admin requise, indisponible côté agent) puis
+  à revalider les six faits avant toute session canary.
+- Étapes 6 à 11 non exécutées : elles dépendent du gate ci-dessus et de sessions
+  vocales réelles.
+
