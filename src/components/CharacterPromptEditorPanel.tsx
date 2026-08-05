@@ -50,6 +50,8 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
   const [legacyPrompt, setLegacyPrompt] = useState("");
   const [savedLegacyPrompt, setSavedLegacyPrompt] = useState("");
   const [savingLegacy, setSavingLegacy] = useState(false);
+  const [syncReport, setSyncReport] = useState<CharacterSyncReport | null>(null);
+
 
   // Resolve character id from name if necessary
   useEffect(() => {
