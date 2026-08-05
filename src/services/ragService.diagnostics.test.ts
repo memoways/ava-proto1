@@ -30,7 +30,6 @@ describe("queryRAGDetailed — requête réellement envoyée", () => {
 
     const result = await queryRAGDetailed("Où est Ava ?", "Max a parlé de Lausanne", 5, 0.3, {
       characterId: "max-id",
-      provider: "voyage",
       rerank: true,
       retrieveK: 15,
       rerankModel: "rerank-2.5-lite",

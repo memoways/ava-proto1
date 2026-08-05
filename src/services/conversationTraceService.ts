@@ -23,11 +23,11 @@ export async function persistConversationTurnTrace(
       character_name: trace.identity.characterName,
       status: trace.identity.status,
       trace: toJson(trace),
-    }, { onConflict: "session_id,turn_index" })
+    }, { onConflict: "session_id,turn_index" });
+  if (signal) query = query.abortSignal(signal);
+  const { data, error } = await query
     .select("id")
     .single();
-  if (signal) query = query.abortSignal(signal);
-  const { data, error } = await query;
 
   if (error) throw new Error(`Diagnostic trace persistence failed: ${error.message}`);
   return {

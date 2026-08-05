@@ -32,19 +32,23 @@ describe("RAG embedding profiles", () => {
 
 describe("RAG profile activation", () => {
   it("requests an atomic switch without rebuilding an existing profile", async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+    let requestInit: RequestInit | undefined;
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requestInit = init;
+      return new Response(JSON.stringify({
       success: true,
       rag_profile: "voyage-3-legacy",
       activated_profile: "voyage-3-legacy",
       profile_embeddings_in_db: 42,
       characters_synced: 0,
       latency_ms: 10,
-    }), { status: 200 }));
+      }), { status: 200 });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     await activateExistingRagProfile("voyage-3-legacy");
 
-    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+    expect(JSON.parse(String(requestInit?.body))).toEqual({
       rag_profile: "voyage-3-legacy",
       activate_existing_profile: true,
     });
