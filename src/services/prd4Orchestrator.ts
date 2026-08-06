@@ -355,7 +355,10 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         rerankUsed: ragDetailed?.rerankUsed ?? false,
         rerankQuery: ragDetailed?.rerankQuery ?? null,
         error: ragError,
+        ...(ragErrorKind ? { errorKind: ragErrorKind } : {}),
+        rerankError: ragDetailed?.rerankError ?? null,
         serverLatencyMs: ragDetailed?.serverLatencyMs ?? null,
+
       },
       prompt: maxResult?.promptTrace ?? maxFailureDiagnostic?.promptTrace ?? null,
       maxCall: {
