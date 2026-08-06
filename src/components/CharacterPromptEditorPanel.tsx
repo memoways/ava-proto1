@@ -1,3 +1,4 @@
+import { getCachedSession } from "@/services/gameAuth";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -21,7 +22,6 @@ import { AVA_NOTION_DATABASES } from "@/services/ragService";
 import { supabase } from "@/integrations/supabase/client";
 import { getGameplaySettings } from "@/services/settingsService";
 import {
-import { getCachedSession } from "@/services/gameAuth";
   observeCharacterPrompt,
   formatSyncDate,
   type CharacterSyncReport,

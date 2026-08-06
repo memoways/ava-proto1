@@ -1,3 +1,4 @@
+import { getCachedSession } from "@/services/gameAuth";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,7 +32,6 @@ import VideosListTab from "@/components/admin/VideosListTab";
 import StreamingAvatarConfigTab from "@/components/StreamingAvatarConfigTab";
 import { Switch } from "@/components/ui/switch";
 import {
-import { getCachedSession } from "@/services/gameAuth";
   getOutputSettings,
   loadOutputSettingsFromDB,
   saveOutputSettingsToDB,

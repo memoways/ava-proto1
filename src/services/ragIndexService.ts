@@ -1,8 +1,8 @@
+import { getCachedSession } from "@/services/gameAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
 import {
-import { getCachedSession } from "@/services/gameAuth";
   RAG_EMBEDDING_PROFILES,
   RAG_EMBEDDING_PROFILE_IDS,
   getRagEmbeddingProfile,

@@ -40,10 +40,12 @@ export function invalidateCachedSession(): void {
   cachedSessionAt = 0;
 }
 
-supabase.auth.onAuthStateChange((_event, session) => {
-  cachedSession = session ?? null;
-  cachedSessionAt = session ? Date.now() : 0;
-});
+if (typeof supabase.auth.onAuthStateChange === "function") {
+  supabase.auth.onAuthStateChange((_event, session) => {
+    cachedSession = session ?? null;
+    cachedSessionAt = session ? Date.now() : 0;
+  });
+}
 
 
 export function isGameSecurityEnabled(): boolean {
