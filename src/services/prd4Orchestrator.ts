@@ -132,6 +132,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   let matchesCount = 0;
   let ragDetailed: RAGQueryDetailed | null = null;
   let ragError: string | null = null;
+  let ragErrorKind: "rag_timeout" | "rag_http_error" | "rag_client_error" | "rerank_failed" | null = null;
   try {
     const recent = recentConversation.slice(-2).map((m) => m.content).join(" ");
     // Cloisonnement RAG : on ne récupère QUE les chunks du personnage courant
@@ -149,7 +150,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         {
           characterId,
           rerank: gameplay?.RAG_RERANK_ENABLED,
-          retrieveK: gameplay?.RAG_RETRIEVE_K,
+          retrieveK: gameplay?.RAG_RETRIEVE_K ?? RAG_DEFAULT_RETRIEVE_K,
           rerankModel: gameplay?.RAG_RERANK_MODEL,
           rerankTruncation: gameplay?.RAG_RERANK_TRUNCATION,
           signal: input.signal,
@@ -160,13 +161,20 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     );
     const matches = ragDetailed.matches;
     ragError = ragDetailed.error || null;
+    if (ragError) {
+      ragErrorKind = /^HTTP \d/.test(ragError) ? "rag_http_error" : "rag_client_error";
+    } else if (ragDetailed.rerankError) {
+      ragErrorKind = "rerank_failed";
+    }
     matchesCount = matches.length;
     ragContext = formatMaxRAGContext(matches, maxRagFormatOptionsForVariant(gameplay?.MAX_PROMPT_VARIANT));
     knowledgeContext = buildKnowledgeContextFromRAG(matches);
   } catch (err) {
     console.warn("[PRD4 orchestrator] RAG failed (non-fatal):", err);
     ragError = err instanceof Error ? err.message : String(err);
+    ragErrorKind = /timed out/i.test(ragError) ? "rag_timeout" : "rag_client_error";
   }
+
   const rag_ms = Math.round(performance.now() - ragStart);
   input.onLatencySegment?.({ type: "end", segment: "RAG", service: "RAG", durationMs: rag_ms });
 
