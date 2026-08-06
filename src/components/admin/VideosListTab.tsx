@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { listVideoTriggers, type VideoTriggerRow } from "@/services/videoTriggerService";
 import { supabase } from "@/integrations/supabase/client";
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
+import { getCachedSession } from "@/services/gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 
@@ -30,8 +31,8 @@ export default function VideosListTab() {
     setSyncing(true);
     toast.info("Sync Vidéos AVA…");
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
+      const cachedAuthSession = await getCachedSession();
+      const token = cachedAuthSession?.access_token;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
         method: "POST",
         headers: {

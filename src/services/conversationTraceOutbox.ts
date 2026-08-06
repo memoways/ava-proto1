@@ -3,6 +3,7 @@ import { conversationTracePayloadBytes } from "@/services/conversationTraceForma
 import { patchConversationTurnTrace, persistConversationTurnTrace } from "@/services/conversationTraceService";
 import { trackEvent } from "@/services/posthogService";
 import type { ConversationTurnTraceV2 } from "@/types";
+import { getCachedSession } from "@/services/gameAuth";
 
 const DATABASE_NAME = "ava-diagnostic-traces";
 const STORE_NAME = "trace-outbox";
@@ -113,8 +114,8 @@ class ConversationTraceOutbox {
   }
 
   async prewarm(): Promise<void> {
-    const { data } = await supabase.auth.getSession();
-    this.ownerUserId = data.session?.user.id ?? "";
+    const cachedAuthSession = await getCachedSession();
+    this.ownerUserId = cachedAuthSession?.user.id ?? "";
     try {
       const records = await this.storage.getAll();
       this.knownKeys.clear();

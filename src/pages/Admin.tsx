@@ -1,3 +1,4 @@
+import { getCachedSession } from "@/services/gameAuth";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -252,8 +253,8 @@ export default function Admin() {
       toast.info(label);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 180000);
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
+      const cachedAuthSession = await getCachedSession();
+      const token = cachedAuthSession?.access_token;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
         method: "POST",
         headers: {

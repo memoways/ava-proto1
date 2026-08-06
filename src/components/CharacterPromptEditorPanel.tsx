@@ -1,3 +1,4 @@
+import { getCachedSession } from "@/services/gameAuth";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -123,8 +124,8 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
       const notionId = (charRow as any)?.notion_id;
       if (!notionId) throw new Error("Personnage sans notion_id");
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
+      const cachedAuthSession = await getCachedSession();
+      const token = cachedAuthSession?.access_token;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
         method: "POST",
         headers: {

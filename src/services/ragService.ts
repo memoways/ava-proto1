@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { MaxTurnKnowledgeContext } from "@/types";
 import { authenticatedFunctionFetch } from "./gameAuth";
 import { createTimeoutSignal } from "./asyncUtils";
+import { getCachedSession } from "@/services/gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -399,8 +400,8 @@ export async function syncNotion(databases: Record<string, string> = AVA_NOTION_
   const startTime = Date.now();
   const debugId = debugLogger.logFetch("notion", "Sync Notion → Supabase", `${SUPABASE_URL}/functions/v1/sync-notion`, databases);
 
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData.session?.access_token;
+  const cachedAuthSession = await getCachedSession();
+  const token = cachedAuthSession?.access_token;
   const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
     method: 'POST',
     headers: {

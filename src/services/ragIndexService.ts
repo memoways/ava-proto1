@@ -1,3 +1,4 @@
+import { getCachedSession } from "@/services/gameAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
@@ -134,8 +135,8 @@ export async function activateExistingRagProfile(profileId: RagEmbeddingProfileI
 }
 
 async function callRagProfileAdminAction(body: Record<string, unknown>): Promise<RagProfileBuildResult> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData.session?.access_token;
+  const cachedAuthSession = await getCachedSession();
+  const token = cachedAuthSession?.access_token;
   const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
     method: "POST",
     headers: {
