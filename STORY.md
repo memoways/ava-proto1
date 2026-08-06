@@ -1738,7 +1738,20 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 
 **Reste :** faire tourner `rich_v2` en canary sur des sessions réelles et comparer qualité/latence face à `legacy` avant d'envisager un changement de défaut.
 
+### Session 2026-08-06 — Erreurs RAG lisibles et budget de payload maîtrisé
+
+**Livré :**
+- Diagnostic mesuré de la session tracée `b00b827b…` (tour 3) : le RAG n'échouait pas côté serveur, il était coupé par la garde client à 2 000 ms alors que Voyage répondait en 2 803 ms — ~33 % des tours concernés (p50 1 207 ms / p90 2 441 ms sur 94 tours).
+- Délai de dégradation RAG porté à 3 500 ms et `retrieveK` abaissé à 10 pour compenser (moins de documents à reranker).
+- Raisons d'erreur visibles dans **Traces Max** : infobulle + texte court sur chaque étape (RAG, prompt, Max LLM, file locale, GM labels, GM post-tour), avec traduction lisible des timeouts et des échecs HTTP `query-rag`.
+- Trace enrichie : `errorKind` (`rag_timeout` / `rag_http_error` / `rag_client_error` / `rerank_failed`) et `rerankError` pour séparer une coupure d'un vrai échec.
+- Budget `legacy` corrigé : fiche personnage tronquée à la frontière de phrase avec plafonds propres à la variante (20 000 statiques / 24 000 système) au lieu de 32 407 caractères bruts (~9 600 tokens d'entrée par tour), plus un indicateur « économie potentielle » dans l'UI.
+- Plan archivé dans [`docs/plan_traces_max_rag_budget.md`](docs/plan_traces_max_rag_budget.md). Tests : 46 au vert (traces + agents).
+
+**Reste :** comparer coût/qualité `legacy` tronqué vs `optimized_v3` sur sessions tracées avant tout changement de défaut ; envisager un proxy unique embeddings+rerank Voyage pour rapprocher le p90 du p50.
+
 ### Dernière session
+
 
 **Préconditions vérifiées au départ :**
 - [x] Build passait au démarrage
