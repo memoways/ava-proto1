@@ -21,6 +21,7 @@ import { AVA_NOTION_DATABASES } from "@/services/ragService";
 import { supabase } from "@/integrations/supabase/client";
 import { getGameplaySettings } from "@/services/settingsService";
 import {
+import { getCachedSession } from "@/services/gameAuth";
   observeCharacterPrompt,
   formatSyncDate,
   type CharacterSyncReport,
@@ -123,8 +124,8 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
       const notionId = (charRow as any)?.notion_id;
       if (!notionId) throw new Error("Personnage sans notion_id");
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
+      const cachedAuthSession = await getCachedSession();
+      const token = cachedAuthSession?.access_token;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
         method: "POST",
         headers: {

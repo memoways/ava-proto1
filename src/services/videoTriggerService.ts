@@ -3,6 +3,7 @@
  * write back to Notion via update-notion-video edge function.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedSession } from "@/services/gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 
@@ -65,8 +66,8 @@ export async function updateVideoTriggerOnNotion(
   notionId: string,
   patch: UpdateVideoTriggerPatch,
 ): Promise<void> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData.session?.access_token;
+  const cachedAuthSession = await getCachedSession();
+  const token = cachedAuthSession?.access_token;
   const res = await fetch(`${SUPABASE_URL}/functions/v1/update-notion-video`, {
     method: "POST",
     headers: {
