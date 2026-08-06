@@ -27,6 +27,8 @@ import { compactConversationTurnTrace } from "@/services/conversationTraceFormat
 import { enqueueConversationTurnTrace, patchQueuedConversationTurnTrace } from "@/services/conversationTraceOutbox";
 import {
   RAG_DEGRADED_MODE_DEADLINE_MS,
+  RAG_DEFAULT_RETRIEVE_K,
+
   MAX_LLM_RESPONSE_DEADLINE_MS,
   SUMMARY_FETCH_DEADLINE_MS,
   TURN_RESPONSE_DEADLINE_MS,
