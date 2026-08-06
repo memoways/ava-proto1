@@ -5,6 +5,47 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 let pendingGameAuth: Promise<Session> | null = null;
 
+// Every concurrent `supabase.auth.getSession()` competes for the same Web Lock
+// ("lock:sb-…-auth-token"). Admin panels fan out dozens of parallel calls, which
+// produced "Lock was not released within 5000ms" storms. A single shared,
+// short-lived read collapses them into one lock acquisition.
+const SESSION_CACHE_TTL_MS = 5_000;
+let cachedSession: Session | null = null;
+let cachedSessionAt = 0;
+let inflightSessionRead: Promise<Session | null> | null = null;
+
+/** Deduplicated, briefly cached read of the current Supabase session. */
+export async function getCachedSession(): Promise<Session | null> {
+  if (Date.now() - cachedSessionAt < SESSION_CACHE_TTL_MS) return cachedSession;
+  if (inflightSessionRead) return inflightSessionRead;
+
+  inflightSessionRead = (async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) return null;
+      cachedSession = data.session ?? null;
+      cachedSessionAt = Date.now();
+      return cachedSession;
+    } finally {
+      inflightSessionRead = null;
+    }
+  })();
+
+  return inflightSessionRead;
+}
+
+/** Drop the cached session (sign-in, sign-out, token refresh). */
+export function invalidateCachedSession(): void {
+  cachedSession = null;
+  cachedSessionAt = 0;
+}
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  cachedSession = session ?? null;
+  cachedSessionAt = session ? Date.now() : 0;
+});
+
+
 export function isGameSecurityEnabled(): boolean {
   return import.meta.env.VITE_GAME_SECURITY_ENABLED === "true";
 }
