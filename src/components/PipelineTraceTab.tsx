@@ -497,10 +497,25 @@ export default function PipelineTraceTab() {
                     ))}
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs">
-                    <Badge variant={promptBudget.withinBudget ? "secondary" : "destructive"}>
-                      {promptBudget.withinBudget ? "Contexte dans le budget" : "Budget dépassé"}
-                    </Badge>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-help">
+                          <Badge variant={promptBudget.withinBudget ? "secondary" : "destructive"}>
+                            {promptBudget.withinBudget ? "Contexte dans le budget" : "Budget dépassé"}
+                          </Badge>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm text-xs leading-relaxed">
+                        {`Prompt système ${formatChars(promptBudget.totalSystemChars)} pour un plafond de ${formatChars(promptBudget.limitChars)} (statique : ${formatChars(promptBudget.staticChars)} / ${formatChars(promptBudget.staticLimitChars)}). Variante ${promptBudget.variant}.`}
+                      </TooltipContent>
+                    </Tooltip>
                     <Badge variant="outline">Total payload : {formatChars(promptBudget.totalMessageChars)}</Badge>
+                    {!promptBudget.withinBudget ? (
+                      <Badge variant="outline">
+                        Économie potentielle : {formatChars(Math.max(0, promptBudget.totalSystemChars - promptBudget.limitChars))}
+                      </Badge>
+                    ) : null}
+
                     {typeof promptBudget.contextLimitChars === "number" ? <Badge variant="outline">Plafond contexte : {formatChars(promptBudget.contextLimitChars)}</Badge> : null}
                     {typeof promptBudget.deduplicatedChars === "number" ? <Badge variant="outline">Doublons retirés : {formatChars(promptBudget.deduplicatedChars)}</Badge> : null}
                     {typeof promptBudget.memoryLastTurn === "number" ? <Badge variant="outline">Mémoire au tour {promptBudget.memoryLastTurn}</Badge> : null}
