@@ -43,8 +43,16 @@ export const AUDIO_PLAYBACK_STALL_DEADLINE_MS = 15_000;
 /** Recent context sent as chat messages; older exchanges live in the compressed summary. */
 export const MAX_RECENT_CONVERSATION_MESSAGES = 10;
 
-/** A RAG miss is preferable to making the user wait for a stalled retrieval. */
-export const RAG_DEGRADED_MODE_DEADLINE_MS = 2_000;
+/**
+ * A RAG miss is preferable to making the user wait for a stalled retrieval,
+ * mais 2 000 ms coupait un tour sur trois (p90 mesuré : 2 441 ms) alors que la
+ * requête Voyage était encore en vol. 3 500 ms couvre le p90 observé.
+ */
+export const RAG_DEGRADED_MODE_DEADLINE_MS = 3_500;
+
+/** Nombre de chunks récupérés avant rerank : 16 poussait le RAG au-delà du délai. */
+export const RAG_DEFAULT_RETRIEVE_K = 10;
+
 
 /** Summary fetch is parallelized with RAG and must never dominate the live turn. */
 export const SUMMARY_FETCH_DEADLINE_MS = 600;
