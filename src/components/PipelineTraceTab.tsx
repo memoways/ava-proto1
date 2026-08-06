@@ -88,17 +88,60 @@ function MaterializedTraceSection({
   return <>{children(materialized)}</>;
 }
 
-function Step({ label, duration, status = "complete" }: { label: string; duration?: number | null; status?: string }) {
+/** Traduit un message technique brut en explication lisible pour l'admin. */
+function explainStepError(raw: string | null | undefined): string | null {
+  const message = raw?.trim();
+  if (!message) return null;
+  const timeout = message.match(/timed out after (\d+)\s*ms/i);
+  if (timeout) {
+    return `RAG interrompu après ${timeout[1]} ms (délai de dégradation) : la requête Voyage était encore en vol, le tour a continué sans contexte narratif. Message brut : ${message}`;
+  }
+  const http = message.match(/^HTTP (\d{3})/);
+  if (http) {
+    return `Échec serveur ${http[1]} sur query-rag : ${message}`;
+  }
+  return message;
+}
+
+function Step({
+  label,
+  duration,
+  status = "complete",
+  detail,
+}: {
+  label: string;
+  duration?: number | null;
+  status?: string;
+  detail?: string | null;
+}) {
+  const explanation = status === "error" || status === "pending" ? explainStepError(detail) : explainStepError(detail);
+  const badge = (
+    <Badge variant={status === "error" ? "destructive" : status === "pending" ? "outline" : "secondary"}>{status}</Badge>
+  );
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2 text-sm">
-      <span>{label}</span>
-      <div className="flex items-center gap-2">
-        <Badge variant={status === "error" ? "destructive" : status === "pending" ? "outline" : "secondary"}>{status}</Badge>
-        <span className="min-w-16 text-right font-mono text-xs text-muted-foreground">{formatMs(duration)}</span>
+    <div className="rounded-md border bg-muted/10 px-3 py-2 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <span>{label}</span>
+        <div className="flex items-center gap-2">
+          {explanation ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-help">{badge}</span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-sm text-xs leading-relaxed">{explanation}</TooltipContent>
+            </Tooltip>
+          ) : badge}
+          <span className="min-w-16 text-right font-mono text-xs text-muted-foreground">{formatMs(duration)}</span>
+        </div>
       </div>
+      {explanation ? (
+        // Sur tablette le survol n'est pas fiable : la raison reste lisible en clair.
+        <p className="mt-1 line-clamp-2 text-xs text-destructive">{explanation}</p>
+      ) : null}
     </div>
   );
 }
+
 
 export default function PipelineTraceTab() {
   const [searchParams, setSearchParams] = useSearchParams();
