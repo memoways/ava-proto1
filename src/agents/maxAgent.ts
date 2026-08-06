@@ -7,7 +7,10 @@ import { buildCharacterPromptSections, loadCharacterPromptByName, clearCharacter
 import {
   compileCharacterSections,
   isFallbackGmGuidance,
+  LEGACY_STATIC_PROMPT_CHARS,
+  LEGACY_SYSTEM_PROMPT_CHARS,
   MAX_DYNAMIC_SECTION_CHARS,
+
   MAX_STATIC_PROMPT_CHARS,
   MAX_SYSTEM_PROMPT_CHARS,
   renderCompiledCharacterSections,
