@@ -3,6 +3,16 @@ import type { CharacterPrompt } from "@/services/characterPromptService";
 export const MAX_SYSTEM_PROMPT_CHARS = 12_000;
 export const MAX_STATIC_PROMPT_CHARS = 7_000;
 
+/**
+ * Plafonds propres à la variante `legacy`, qui injecte la fiche personnage
+ * brute. Ils sont plus larges que `compact_v1` (la variante legacy assume un
+ * prompt riche) mais bornés : sans plafond, la fiche seule dépassait 32 000
+ * car., soit ~9 600 tokens d'entrée par tour.
+ */
+export const LEGACY_STATIC_PROMPT_CHARS = 20_000;
+export const LEGACY_SYSTEM_PROMPT_CHARS = 24_000;
+
+
 export const MAX_DYNAMIC_SECTION_CHARS = {
   user_role: 450,
   temporal_context: 260,
