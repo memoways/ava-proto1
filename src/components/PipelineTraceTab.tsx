@@ -454,12 +454,18 @@ export default function PipelineTraceTab() {
             </CardHeader>
             <CardContent className="grid gap-2 md:grid-cols-2">
               <Step label="Mémoire / résumé" duration={trace.timings.summaryFetchMs} />
-              <Step label="RAG" duration={trace.timings.ragMs} status={trace.rag.error ? "error" : "complete"} />
-              <Step label="Assemblage prompt" duration={trace.timings.promptBuildMs} status={trace.prompt ? "complete" : "error"} />
-              <Step label="Max LLM" duration={trace.timings.maxClientMs} status={trace.maxCall.error ? "error" : "complete"} />
-              <Step label="Mise en file locale" duration={trace.timings.traceWriteMs} status={localRecord?.status || "complete"} />
-              <Step label="GM labels (parallèle)" duration={(trace.gm.labelPass as { latencyMs?: number }).latencyMs} status={String((trace.gm.labelPass as { status?: string }).status || "pending")} />
-              <Step label="GM post-tour (pour la suite)" duration={(trace.gm.postTurn as { latencyMs?: number }).latencyMs} status={String((trace.gm.postTurn as { status?: string }).status || "pending")} />
+              <Step
+                label="RAG"
+                duration={trace.timings.ragMs}
+                status={trace.rag.error ? "error" : "complete"}
+                detail={trace.rag.error || trace.rag.rerankError || null}
+              />
+              <Step label="Assemblage prompt" duration={trace.timings.promptBuildMs} status={trace.prompt ? "complete" : "error"} detail={trace.prompt ? null : "Aucun prompt assemblé pour ce tour."} />
+              <Step label="Max LLM" duration={trace.timings.maxClientMs} status={trace.maxCall.error ? "error" : "complete"} detail={trace.maxCall.error} />
+              <Step label="Mise en file locale" duration={trace.timings.traceWriteMs} status={localRecord?.status || "complete"} detail={localRecord?.lastError ?? null} />
+              <Step label="GM labels (parallèle)" duration={(trace.gm.labelPass as { latencyMs?: number }).latencyMs} status={String((trace.gm.labelPass as { status?: string }).status || "pending")} detail={(trace.gm.labelPass as { error?: string | null }).error ?? null} />
+              <Step label="GM post-tour (pour la suite)" duration={(trace.gm.postTurn as { latencyMs?: number }).latencyMs} status={String((trace.gm.postTurn as { status?: string }).status || "pending")} detail={(trace.gm.postTurn as { error?: string | null }).error ?? null} />
+
               <Step label="Pipeline hors instrumentation" duration={trace.timings.pipelineUninstrumentedMs} />
               <Step label="Pipeline causal total" duration={trace.timings.coreTotalMs} />
             </CardContent>
