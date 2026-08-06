@@ -202,7 +202,12 @@ export interface ConversationTurnTraceV1 {
     rerankUsed: boolean;
     rerankQuery?: string | null;
     error: string | null;
+    /** Nature de l'échec RAG, pour distinguer une coupure d'un vrai échec serveur. */
+    errorKind?: "rag_timeout" | "rag_http_error" | "rag_client_error" | "rerank_failed";
+    /** Message du rerank Voyage lorsqu'il a échoué sans casser la récupération vectorielle. */
+    rerankError?: string | null;
     serverLatencyMs: number | null;
+
   };
   prompt: MaxPromptAssemblyTrace | null;
   maxCall: {

@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import type { MaxTurnKnowledgeContext } from "@/types";
 import { authenticatedFunctionFetch } from "./gameAuth";
 import { createTimeoutSignal } from "./asyncUtils";
+import { RAG_DEFAULT_RETRIEVE_K } from "@/config/experienceRuntime";
+
 import { getCachedSession } from "@/services/gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -219,7 +221,7 @@ export async function queryRAGDetailed(
         matchThreshold,
         characterId: options.characterId ?? null,
         rerankRequested: options.rerank !== false,
-        retrieveK: options.retrieveK ?? Math.max(matchCount, 15),
+        retrieveK: options.retrieveK ?? Math.max(matchCount, RAG_DEFAULT_RETRIEVE_K),
         rerankModel: options.rerankModel ?? "rerank-2.5-lite",
         rerankTruncation: options.rerankTruncation !== false,
       },
@@ -239,7 +241,7 @@ export async function queryRAGDetailed(
         matchThreshold,
         characterId: options.characterId ?? null,
         rerankRequested: options.rerank !== false,
-        retrieveK: options.retrieveK ?? Math.max(matchCount, 15),
+        retrieveK: options.retrieveK ?? Math.max(matchCount, RAG_DEFAULT_RETRIEVE_K),
         rerankModel: options.rerankModel ?? "rerank-2.5-lite",
         rerankTruncation: options.rerankTruncation !== false,
       },

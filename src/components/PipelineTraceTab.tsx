@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
 import { supabase } from "@/integrations/supabase/client";
 import {
   fetchConversationTurnTrace,
@@ -88,17 +90,60 @@ function MaterializedTraceSection({
   return <>{children(materialized)}</>;
 }
 
-function Step({ label, duration, status = "complete" }: { label: string; duration?: number | null; status?: string }) {
+/** Traduit un message technique brut en explication lisible pour l'admin. */
+function explainStepError(raw: string | null | undefined): string | null {
+  const message = raw?.trim();
+  if (!message) return null;
+  const timeout = message.match(/timed out after (\d+)\s*ms/i);
+  if (timeout) {
+    return `RAG interrompu après ${timeout[1]} ms (délai de dégradation) : la requête Voyage était encore en vol, le tour a continué sans contexte narratif. Message brut : ${message}`;
+  }
+  const http = message.match(/^HTTP (\d{3})/);
+  if (http) {
+    return `Échec serveur ${http[1]} sur query-rag : ${message}`;
+  }
+  return message;
+}
+
+function Step({
+  label,
+  duration,
+  status = "complete",
+  detail,
+}: {
+  label: string;
+  duration?: number | null;
+  status?: string;
+  detail?: string | null;
+}) {
+  const explanation = status === "error" || status === "pending" ? explainStepError(detail) : explainStepError(detail);
+  const badge = (
+    <Badge variant={status === "error" ? "destructive" : status === "pending" ? "outline" : "secondary"}>{status}</Badge>
+  );
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2 text-sm">
-      <span>{label}</span>
-      <div className="flex items-center gap-2">
-        <Badge variant={status === "error" ? "destructive" : status === "pending" ? "outline" : "secondary"}>{status}</Badge>
-        <span className="min-w-16 text-right font-mono text-xs text-muted-foreground">{formatMs(duration)}</span>
+    <div className="rounded-md border bg-muted/10 px-3 py-2 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <span>{label}</span>
+        <div className="flex items-center gap-2">
+          {explanation ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-help">{badge}</span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-sm text-xs leading-relaxed">{explanation}</TooltipContent>
+            </Tooltip>
+          ) : badge}
+          <span className="min-w-16 text-right font-mono text-xs text-muted-foreground">{formatMs(duration)}</span>
+        </div>
       </div>
+      {explanation ? (
+        // Sur tablette le survol n'est pas fiable : la raison reste lisible en clair.
+        <p className="mt-1 line-clamp-2 text-xs text-destructive">{explanation}</p>
+      ) : null}
     </div>
   );
 }
+
 
 export default function PipelineTraceTab() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -409,12 +454,18 @@ export default function PipelineTraceTab() {
             </CardHeader>
             <CardContent className="grid gap-2 md:grid-cols-2">
               <Step label="Mémoire / résumé" duration={trace.timings.summaryFetchMs} />
-              <Step label="RAG" duration={trace.timings.ragMs} status={trace.rag.error ? "error" : "complete"} />
-              <Step label="Assemblage prompt" duration={trace.timings.promptBuildMs} status={trace.prompt ? "complete" : "error"} />
-              <Step label="Max LLM" duration={trace.timings.maxClientMs} status={trace.maxCall.error ? "error" : "complete"} />
-              <Step label="Mise en file locale" duration={trace.timings.traceWriteMs} status={localRecord?.status || "complete"} />
-              <Step label="GM labels (parallèle)" duration={(trace.gm.labelPass as { latencyMs?: number }).latencyMs} status={String((trace.gm.labelPass as { status?: string }).status || "pending")} />
-              <Step label="GM post-tour (pour la suite)" duration={(trace.gm.postTurn as { latencyMs?: number }).latencyMs} status={String((trace.gm.postTurn as { status?: string }).status || "pending")} />
+              <Step
+                label="RAG"
+                duration={trace.timings.ragMs}
+                status={trace.rag.error ? "error" : "complete"}
+                detail={trace.rag.error || trace.rag.rerankError || null}
+              />
+              <Step label="Assemblage prompt" duration={trace.timings.promptBuildMs} status={trace.prompt ? "complete" : "error"} detail={trace.prompt ? null : "Aucun prompt assemblé pour ce tour."} />
+              <Step label="Max LLM" duration={trace.timings.maxClientMs} status={trace.maxCall.error ? "error" : "complete"} detail={trace.maxCall.error} />
+              <Step label="Mise en file locale" duration={trace.timings.traceWriteMs} status={localRecord?.status || "complete"} detail={localRecord?.lastError ?? null} />
+              <Step label="GM labels (parallèle)" duration={(trace.gm.labelPass as { latencyMs?: number }).latencyMs} status={String((trace.gm.labelPass as { status?: string }).status || "pending")} detail={(trace.gm.labelPass as { error?: string | null }).error ?? null} />
+              <Step label="GM post-tour (pour la suite)" duration={(trace.gm.postTurn as { latencyMs?: number }).latencyMs} status={String((trace.gm.postTurn as { status?: string }).status || "pending")} detail={(trace.gm.postTurn as { error?: string | null }).error ?? null} />
+
               <Step label="Pipeline hors instrumentation" duration={trace.timings.pipelineUninstrumentedMs} />
               <Step label="Pipeline causal total" duration={trace.timings.coreTotalMs} />
             </CardContent>
@@ -446,10 +497,25 @@ export default function PipelineTraceTab() {
                     ))}
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs">
-                    <Badge variant={promptBudget.withinBudget ? "secondary" : "destructive"}>
-                      {promptBudget.withinBudget ? "Contexte dans le budget" : "Budget dépassé"}
-                    </Badge>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-help">
+                          <Badge variant={promptBudget.withinBudget ? "secondary" : "destructive"}>
+                            {promptBudget.withinBudget ? "Contexte dans le budget" : "Budget dépassé"}
+                          </Badge>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm text-xs leading-relaxed">
+                        {`Prompt système ${formatChars(promptBudget.totalSystemChars)} pour un plafond de ${formatChars(promptBudget.limitChars)} (statique : ${formatChars(promptBudget.staticChars)} / ${formatChars(promptBudget.staticLimitChars)}). Variante ${promptBudget.variant}.`}
+                      </TooltipContent>
+                    </Tooltip>
                     <Badge variant="outline">Total payload : {formatChars(promptBudget.totalMessageChars)}</Badge>
+                    {!promptBudget.withinBudget ? (
+                      <Badge variant="outline">
+                        Économie potentielle : {formatChars(Math.max(0, promptBudget.totalSystemChars - promptBudget.limitChars))}
+                      </Badge>
+                    ) : null}
+
                     {typeof promptBudget.contextLimitChars === "number" ? <Badge variant="outline">Plafond contexte : {formatChars(promptBudget.contextLimitChars)}</Badge> : null}
                     {typeof promptBudget.deduplicatedChars === "number" ? <Badge variant="outline">Doublons retirés : {formatChars(promptBudget.deduplicatedChars)}</Badge> : null}
                     {typeof promptBudget.memoryLastTurn === "number" ? <Badge variant="outline">Mémoire au tour {promptBudget.memoryLastTurn}</Badge> : null}
