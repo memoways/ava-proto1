@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import type { MaxTurnKnowledgeContext } from "@/types";
 import { authenticatedFunctionFetch } from "./gameAuth";
 import { createTimeoutSignal } from "./asyncUtils";
+import { RAG_DEFAULT_RETRIEVE_K } from "@/config/experienceRuntime";
+
 import { getCachedSession } from "@/services/gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
