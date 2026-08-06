@@ -472,14 +472,42 @@ export async function buildMaxSystemPrompt(
       truncated: false,
     }];
     if (fieldsSections) {
-      const renderedFields = `\n\n# FICHE PERSONNAGE (source éditoriale — prioritaire sur toute règle générique)\n${fieldsSections}`;
-      prompt += renderedFields;
-      injectedSections.push({ key: "character_fields", title: "Fiche personnage", content: fieldsSections });
-      legacyBudgetSections.push({ key: "character_fields", title: "Fiche personnage", chars: renderedFields.length, originalChars: fieldsSections.length, included: true, truncated: false });
+      // La fiche complète (>32 000 car.) explosait le budget statique et le coût
+      // par tour : elle est bornée à la frontière de phrase la plus proche.
+      const fieldsHeader = `\n\n# FICHE PERSONNAGE (source éditoriale — prioritaire sur toute règle générique)\n`;
+      const available = LEGACY_STATIC_PROMPT_CHARS
+        - prompt.length
+        - fieldsHeader.length
+        - GAMEPLAY_RULES.length
+        - 1;
+      const keptFields = truncateAtSentenceBoundary(fieldsSections, Math.max(0, available));
+      if (keptFields) {
+        prompt += `${fieldsHeader}${keptFields}`;
+        injectedSections.push({ key: "character_fields", title: "Fiche personnage", content: keptFields });
+        legacyBudgetSections.push({
+          key: "character_fields",
+          title: "Fiche personnage",
+          chars: fieldsHeader.length + keptFields.length,
+          originalChars: fieldsSections.length,
+          included: true,
+          truncated: keptFields.length < fieldsSections.length,
+        });
+      } else {
+        legacyBudgetSections.push({
+          key: "character_fields",
+          title: "Fiche personnage",
+          chars: 0,
+          originalChars: fieldsSections.length,
+          included: false,
+          truncated: false,
+          omissionReason: "budget_statique_epuise",
+        });
+      }
     }
     prompt += `\n${GAMEPLAY_RULES}`;
     legacyBudgetSections.push({ key: "technical_rules", title: "Règles techniques legacy", chars: GAMEPLAY_RULES.length + 1, originalChars: GAMEPLAY_RULES.length, included: true, truncated: false });
     const legacyStaticChars = prompt.length;
+
 
     const legacySections: Array<[string, string, string | undefined]> = [
       ["user_role", "INTERLOCUTEUR (qui t'appelle)", input.userRoleSummary],
