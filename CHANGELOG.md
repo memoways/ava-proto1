@@ -4,7 +4,37 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.54.0] — 2026-08-06 — Erreurs RAG lisibles et budget de payload maîtrisé
+
+### Ajouté
+- Infobulles explicatives sur chaque étape de la chronologie dans **Traces Max** :
+  la raison exacte d'une erreur est affichée (coupure de délai RAG, échec HTTP
+  `query-rag`, échec de rerank, erreur Max LLM, erreur de mise en file), avec un
+  rappel en clair sous l'étape car le survol n'est pas fiable sur tablette.
+- Champs de trace `errorKind` (`rag_timeout`, `rag_http_error`,
+  `rag_client_error`, `rerank_failed`) et `rerankError` pour distinguer une
+  coupure côté client d'un vrai échec serveur dans les analyses.
+- Indicateur « Économie potentielle » et infobulle de budget (prompt système /
+  plafond / statique / variante) dans l'onglet Traces Max.
+- Plan sauvegardé dans
+  [`docs/plan_traces_max_rag_budget.md`](docs/plan_traces_max_rag_budget.md) :
+  diagnostic mesuré, changements appliqués et suites possibles.
+
+### Modifié
+- `RAG_DEGRADED_MODE_DEADLINE_MS` porté de 2 000 à **3 500 ms** : le délai
+  précédent coupait environ un tour sur trois (p90 mesuré 2 441 ms sur 94 tours)
+  alors que la requête Voyage était encore en vol.
+- `RAG_DEFAULT_RETRIEVE_K` abaissé à **10** (au lieu de 15/16) pour compenser
+  l'allongement du délai en réduisant le volume à reranker.
+- Variante `legacy` : la fiche personnage est désormais tronquée à la frontière
+  de phrase selon des plafonds propres à la variante
+  (`LEGACY_STATIC_PROMPT_CHARS = 20 000`, `LEGACY_SYSTEM_PROMPT_CHARS = 24 000`)
+  au lieu d'être injectée brute (32 407 caractères, ~9 600 tokens d'entrée par
+  tour). Le rapport de budget compare enfin aux bons plafonds et non à ceux de
+  `compact_v1`.
+
 ## [Non publié] — RAG Voyage 4 et payload Max `optimized_v3`
+
 
 ### Ajouté
 - Profils d’embeddings partagés entre frontend et Edge Functions : Voyage 4 temps réel (`voyage-4-large` pour les documents, `voyage-4-lite` pour les questions), `voyage-context-4` canary, Voyage 3 et OpenAI legacy.
