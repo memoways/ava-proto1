@@ -149,6 +149,67 @@ export async function updateCharacterRuntimeProfile(
   if (error) throw error;
 }
 
+export interface CharacterAutoReadiness {
+  characterId: string | null;
+  characterName: string | null;
+  hasPrompt: boolean;
+  ragChunks: number;
+}
+
+/**
+ * Resolves, per runtime profile, the facts that already live in the database:
+ * Notion character row, compiled prompt, and isolated RAG corpus size.
+ */
+export async function fetchCharacterAutoReadiness(
+  displayNames: string[],
+): Promise<Record<string, CharacterAutoReadiness>> {
+  const result: Record<string, CharacterAutoReadiness> = {};
+  for (const name of displayNames) {
+    result[name] = { characterId: null, characterName: null, hasPrompt: false, ragChunks: 0 };
+  }
+  const { data: characters, error } = await supabase.from("characters").select("id, name");
+  if (error) throw error;
+  const rows = (characters ?? []) as Array<{ id: string; name: string }>;
+
+  for (const name of displayNames) {
+    const needle = name.trim().toLowerCase();
+    const match = rows.find((row) => (row.name ?? "").toLowerCase().replace(/^[^a-z]*/, "").startsWith(needle));
+    if (!match) continue;
+    result[name].characterId = match.id;
+    result[name].characterName = match.name;
+
+    const [{ data: promptRow }, { count }] = await Promise.all([
+      supabase.from("character_prompts").select("character_id").eq("character_id", match.id).maybeSingle(),
+      supabase
+        .from("embeddings")
+        .select("id", { count: "exact", head: true })
+        .eq("character_id", match.id),
+    ]);
+    result[name].hasPrompt = Boolean(promptRow);
+    result[name].ragChunks = count ?? 0;
+  }
+  return result;
+}
+
+/** Uploads a portrait to the private admin bucket and returns a long-lived signed URL. */
+export async function uploadCharacterPortrait(
+  characterKey: string,
+  file: File,
+): Promise<string> {
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "png";
+  const path = `${characterKey}/${Date.now()}.${extension}`;
+  const { error: uploadError } = await supabase.storage
+    .from("character-portraits")
+    .upload(path, file, { upsert: true, contentType: file.type || undefined });
+  if (uploadError) throw uploadError;
+  const { data, error } = await supabase.storage
+    .from("character-portraits")
+    .createSignedUrl(path, 60 * 60 * 24 * 365);
+  if (error) throw error;
+  if (!data?.signedUrl) throw new Error("Lien du portrait indisponible");
+  return data.signedUrl;
+}
+
 const runtimeCache = new Map<string, PinnedDirectorRuntime>();
 
 export async function fetchPinnedDirectorRuntime(sessionId: string | null): Promise<PinnedDirectorRuntime> {
