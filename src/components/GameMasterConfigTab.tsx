@@ -324,13 +324,19 @@ export default function GameMasterConfigTab() {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-semibold">Durée de l’expérience</h3>
-            <p className="text-xs text-muted-foreground">Seul réglage gameplay actif conservé ici. La variante de prompt Max reste dans Technique avancée.</p>
+            <p className="text-xs text-muted-foreground">
+              C’est la durée maximale d’une session joueur, et le seul réglage de gameplay piloté depuis cet onglet.
+              Le choix du prompt de Max (variantes legacy / rich_v2 / optimized_v3) se règle ailleurs, dans Technique avancée → LLM Config.
+            </p>
           </div>
           <Button size="sm" onClick={() => void saveTimeout()} disabled={saving || gameplay.TIMEOUT_SECONDS === savedTimeout}>
             <Save className="mr-1 h-3.5 w-3.5" />Enregistrer
           </Button>
         </div>
-        <div className="flex justify-between text-sm"><span>TIMEOUT_SECONDS</span><span className="font-mono">{gameplay.TIMEOUT_SECONDS}s</span></div>
+        <div className="flex justify-between text-sm">
+          <span>Durée maximale de session</span>
+          <span className="font-mono">{formatDuration(gameplay.TIMEOUT_SECONDS)} min:sec ({gameplay.TIMEOUT_SECONDS}s)</span>
+        </div>
         <Slider
           value={[gameplay.TIMEOUT_SECONDS]}
           min={MIN_SESSION_DURATION_SECONDS}
