@@ -42,6 +42,7 @@ export class LocalTTSOutput implements ResponseOutput {
         turn_id: context?.turnId,
         turn_index: context?.turnIndex,
         voiceId: context?.voiceId,
+        providerId: context?.providerId,
       });
     }
     const result = await queue.drain().finally(() => {

@@ -28,6 +28,7 @@ import {
   type STTSession,
 } from "@/services/stt";
 import { OPENING_LINE } from "@/services/openingTTSCache";
+import type { TTSProviderId } from "@/services/tts/types";
 import { unlockAudioPlayback } from "@/services/audioPlayback";
 import {
   getGameplaySettings,
@@ -124,6 +125,10 @@ import type { ExperienceDirectorDecisionV1 } from "@/types";
 
 const TEASER_VIDEO_URL = "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049";
 
+function asTTSProviderId(value: string | null | undefined): TTSProviderId | null {
+  return value === "elevenlabs" || value === "inworld" || value === "hume" || value === "gradium" ? value : null;
+}
+
 const IndexPRD4 = () => {
   const {
     state,
@@ -195,6 +200,7 @@ const IndexPRD4 = () => {
   const turnLatenciesRef = useRef<number[]>([]);
   const sessionDurationRef = useRef<number>(0);
   const configuredSessionDurationRef = useRef<number>(initialSessionDuration);
+  const showQuestionnaireRef = useRef(getGameplaySettings().SHOW_QUESTIONNAIRE);
   const gameplaySettingsLoadRef = useRef<Promise<GameplaySettings> | null>(null);
   const triggeredVideoIdsRef = useRef<string[]>([]);
   const lastVideoTurnRef = useRef<number>(-Infinity);
@@ -205,6 +211,7 @@ const IndexPRD4 = () => {
   const gmTopicsCoveredRef = useRef<string[]>([]);
   const activeCharacterRef = useRef<"max" | "emma">("max");
   const activeVoiceIdRef = useRef<string | null>(null);
+  const activeTTSProviderIdRef = useRef<TTSProviderId | null>(null);
   const handoffCountRef = useRef(0);
   const handoffRecommendationRef = useRef<{ reason: string; proposalGuidance: string } | null>(null);
   const handoffConversationStartRef = useRef(0);
@@ -252,6 +259,7 @@ const IndexPRD4 = () => {
     void settingsPromise.then((settings) => {
       const duration = normalizeSessionDurationSeconds(settings.TIMEOUT_SECONDS);
       configuredSessionDurationRef.current = duration;
+      showQuestionnaireRef.current = settings.SHOW_QUESTIONNAIRE;
       setSessionDurationSeconds(duration);
     });
   }, []);
@@ -455,6 +463,7 @@ const IndexPRD4 = () => {
       signal?: AbortSignal;
       onPlaybackStart?: () => void;
       voiceId?: string;
+      providerId?: TTSProviderId;
     } = {},
   ): Promise<ResponseOutputResult> => {
     let output = responseOutputRef.current;
@@ -475,6 +484,7 @@ const IndexPRD4 = () => {
         signal: context.signal,
         onPlaybackStart: context.onPlaybackStart,
         voiceId: context.voiceId,
+        providerId: context.providerId,
       });
     } catch (error) {
       if (context.signal?.aborted) {
@@ -519,6 +529,8 @@ const IndexPRD4 = () => {
           turnIndex: context.turnIndex,
           signal: context.signal,
           onPlaybackStart: context.onPlaybackStart,
+          voiceId: context.voiceId,
+          providerId: context.providerId,
         });
       }
       return {
@@ -707,11 +719,11 @@ const IndexPRD4 = () => {
     triggeredVideoIdsRef.current = session.triggers_activated;
     activeCharacterRef.current = session.active_character;
     activeVoiceIdRef.current = null;
-    if (session.active_character === "emma") {
-      void getCharacterRuntimeReadiness("emma").then((profile) => {
+    activeTTSProviderIdRef.current = null;
+    void getCharacterRuntimeReadiness(session.active_character).then((profile) => {
         activeVoiceIdRef.current = profile?.ttsVoiceId ?? null;
+        activeTTSProviderIdRef.current = asTTSProviderId(profile?.ttsProvider);
       }).catch(() => {});
-    }
     handoffCountRef.current = session.handoff_count;
     handoffConversationStartRef.current = Math.max(0, session.conversation_log.findIndex((message) => message.role === "emma"));
     setSelectedCharacter(session.active_character);
@@ -762,6 +774,7 @@ const IndexPRD4 = () => {
     ).catch(() => getGameplaySettings());
     const configuredDuration = normalizeSessionDurationSeconds(gameplaySettings.TIMEOUT_SECONDS);
     configuredSessionDurationRef.current = configuredDuration;
+    showQuestionnaireRef.current = gameplaySettings.SHOW_QUESTIONNAIRE;
     setSessionDurationSeconds(configuredDuration);
 
     // The provider was started when entering `calling_max`. Do not let the
@@ -802,8 +815,10 @@ const IndexPRD4 = () => {
     triggeredVideoIdsRef.current = [];
     lastVideoTurnRef.current = -Infinity;
     pendingPostVideoContextRef.current = null;
+    const maxProfile = await getCharacterRuntimeReadiness("max").catch(() => null);
     activeCharacterRef.current = "max";
-    activeVoiceIdRef.current = null;
+    activeVoiceIdRef.current = maxProfile?.ttsVoiceId ?? null;
+    activeTTSProviderIdRef.current = asTTSProviderId(maxProfile?.ttsProvider);
     handoffCountRef.current = 0;
     handoffRecommendationRef.current = null;
     handoffConversationStartRef.current = 0;
@@ -824,7 +839,7 @@ const IndexPRD4 = () => {
     trackEvent("prd4_session_duration_loaded", { duration_seconds: configuredDuration });
 
     // Réplique d'ouverture de Max (scriptée pour amorcer)
-    const opening = OPENING_LINE;
+    const opening = maxProfile?.openingLine?.trim() || OPENING_LINE;
     setMaxSubtitle(opening);
     const openingMsg: ConversationMessage = { role: "max", content: opening, timestamp: Date.now() };
     conversationRef.current = [openingMsg];
@@ -839,6 +854,8 @@ const IndexPRD4 = () => {
       await renderResponseText(opening, {
         turnId: `${sessionIdRef.current ?? "local"}:opening`,
         turnIndex: 0,
+        voiceId: activeVoiceIdRef.current ?? undefined,
+        providerId: activeTTSProviderIdRef.current ?? undefined,
       });
     } catch (err) {
       console.warn("[PRD4] opening output failed:", err);
@@ -1071,6 +1088,7 @@ const IndexPRD4 = () => {
           signal: outputController.signal,
           onPlaybackStart,
           voiceId: activeVoiceIdRef.current ?? undefined,
+          providerId: activeTTSProviderIdRef.current ?? undefined,
         }).finally(() => {
           turnController.signal.removeEventListener("abort", abortOutputFromTurn);
           if (activeOutputControllerRef.current === outputController) activeOutputControllerRef.current = null;
@@ -1228,6 +1246,7 @@ const IndexPRD4 = () => {
           ]);
           if (!isCurrentTurn()) return;
           const settings = videoTriggerSettingsRef.current;
+          const directorConfig = ev.orchestration_config;
           const decision: ExperienceDirectorDecisionV1 = {
             labels: ev.labels ?? { themes: [], topics: [], intentions: [] },
             nextTurnGuidance: ev.next_turn_guidance || null,
@@ -1240,6 +1259,9 @@ const IndexPRD4 = () => {
             userTurn: turnIndex,
             handoffCount: handoffCountRef.current,
             handoffPending: Boolean(handoffOffer || handoffRecommendationRef.current),
+            handoffsEnabled: directorConfig?.editor.allowHandoffs ?? true,
+            minimumHandoffTurn: directorConfig?.minimumHandoffTurn ?? 4,
+            maximumHandoffsPerSession: directorConfig?.maximumHandoffsPerSession ?? 1,
             emmaReady: emma?.ready === true,
             playedVideoIds: triggeredVideoIdsRef.current,
             availableVideoIds: videos.filter((video) => Boolean(video.video_url)).map((video) => video.id),
@@ -1247,6 +1269,7 @@ const IndexPRD4 = () => {
             minimumVideoTurn: settings.ENABLED ? settings.MIN_TURNS_BEFORE_FIRST : Number.MAX_SAFE_INTEGER,
             minimumTurnsBetweenVideos: settings.MIN_TURNS_BETWEEN,
             maximumVideosPerSession: settings.MAX_PER_SESSION,
+            cinematicsEnabled: directorConfig?.editor.allowCinematics ?? true,
             resultIsCurrent: isCurrentTurn(),
           });
           const sid = sessionIdRef.current;
@@ -1557,6 +1580,7 @@ const IndexPRD4 = () => {
       handoffConversationStartRef.current = conversationRef.current.length;
       activeCharacterRef.current = "emma";
       activeVoiceIdRef.current = emma.ttsVoiceId;
+      activeTTSProviderIdRef.current = asTTSProviderId(emma.ttsProvider);
       handoffCountRef.current = 1;
       setSelectedCharacter("emma");
       setHandoffOffer(null);
@@ -1575,6 +1599,7 @@ const IndexPRD4 = () => {
         turnId: `${sid ?? "local"}:emma-opening`,
         turnIndex: conversationRef.current.filter((message) => message.role === "user").length,
         voiceId: emma.ttsVoiceId,
+        providerId: asTTSProviderId(emma.ttsProvider) ?? undefined,
       });
       setAudioState("idle");
       if (sid) {
@@ -1614,7 +1639,10 @@ const IndexPRD4 = () => {
   }, []);
 
   // ---- End / Questionnaire --------------------------------------------------
-  const handleEndContinue = useCallback(() => setPhase("questionnaire"), [setPhase]);
+  const handleEndContinue = useCallback(
+    () => setPhase(showQuestionnaireRef.current ? "questionnaire" : "thanks"),
+    [setPhase],
+  );
 
   const handleQuestionnaireSubmit = useCallback(
     async (answers: QuestionnairePRD4Answers) => {
@@ -1694,6 +1722,7 @@ const IndexPRD4 = () => {
     pendingPostVideoContextRef.current = null;
     activeCharacterRef.current = "max";
     activeVoiceIdRef.current = null;
+    activeTTSProviderIdRef.current = null;
     handoffCountRef.current = 0;
     handoffRecommendationRef.current = null;
     handoffConversationStartRef.current = 0;

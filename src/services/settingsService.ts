@@ -498,6 +498,8 @@ export interface GameplaySettings {
   MAX_PROMPT_VARIANT: "legacy" | "compact_v1" | "rich_v2" | "optimized_v3";
   TRUST_THRESHOLD: number;
   TIMEOUT_SECONDS: number;
+  /** Affiche le questionnaire PRD4 après l'écran de fin de session. */
+  SHOW_QUESTIONNAIRE: boolean;
   MAX_INSULT_TOLERANCE: number;
   MIN_QUESTIONS_BEFORE_GATE: number;
   RAG_TOP_K: number;
@@ -530,6 +532,7 @@ const gameplayDefaults: GameplaySettings = {
   MAX_PROMPT_VARIANT: normalizeMaxPromptVariant((defaultSettings as any).MAX_PROMPT_VARIANT, "legacy"),
   TRUST_THRESHOLD: defaultSettings.TRUST_THRESHOLD,
   TIMEOUT_SECONDS: defaultSettings.TIMEOUT_SECONDS,
+  SHOW_QUESTIONNAIRE: true,
   MAX_INSULT_TOLERANCE: defaultSettings.MAX_INSULT_TOLERANCE,
   MIN_QUESTIONS_BEFORE_GATE: defaultSettings.MIN_QUESTIONS_BEFORE_GATE,
   RAG_TOP_K: defaultSettings.RAG_TOP_K,

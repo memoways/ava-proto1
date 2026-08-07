@@ -7,8 +7,10 @@ export type DirectorBlockReason =
   | "action_already_pending"
   | "handoff_before_minimum_turn"
   | "handoff_limit_reached"
+  | "handoff_disabled"
   | "handoff_wrong_direction"
   | "target_not_ready"
+  | "cinematic_disabled"
   | "cinematic_unavailable"
   | "cinematic_already_played"
   | "cinematic_cooldown"
@@ -20,6 +22,9 @@ export interface DirectorGuardContext {
   userTurn: number;
   handoffCount: number;
   handoffPending: boolean;
+  handoffsEnabled: boolean;
+  minimumHandoffTurn: number;
+  maximumHandoffsPerSession: number;
   emmaReady: boolean;
   playedVideoIds: string[];
   availableVideoIds: string[];
@@ -27,6 +32,7 @@ export interface DirectorGuardContext {
   minimumVideoTurn: number;
   minimumTurnsBetweenVideos: number;
   maximumVideosPerSession: number;
+  cinematicsEnabled: boolean;
   resultIsCurrent: boolean;
 }
 
@@ -62,16 +68,18 @@ export function validateDirectorDecision(
   if (context.handoffPending) return blocked("action_already_pending");
 
   if (decision.action.type === "handoff") {
+    if (!context.handoffsEnabled || context.maximumHandoffsPerSession <= 0) return blocked("handoff_disabled");
     if (context.currentCharacter !== "max" || decision.action.targetCharacter !== "emma") {
       return blocked("handoff_wrong_direction");
     }
-    if (context.userTurn < 4) return blocked("handoff_before_minimum_turn");
-    if (context.handoffCount >= 1) return blocked("handoff_limit_reached");
+    if (context.userTurn < context.minimumHandoffTurn) return blocked("handoff_before_minimum_turn");
+    if (context.handoffCount >= context.maximumHandoffsPerSession) return blocked("handoff_limit_reached");
     if (!context.emmaReady) return blocked("target_not_ready");
     return accepted();
   }
 
   if (decision.action.type === "cinematic") {
+    if (!context.cinematicsEnabled) return blocked("cinematic_disabled");
     if (!context.availableVideoIds.includes(decision.action.videoId)) return blocked("cinematic_unavailable");
     if (context.playedVideoIds.includes(decision.action.videoId)) return blocked("cinematic_already_played");
     if (context.userTurn < context.minimumVideoTurn) return blocked("cinematic_cooldown");

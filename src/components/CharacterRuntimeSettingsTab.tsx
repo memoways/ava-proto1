@@ -61,6 +61,20 @@ function readiness(
         ? `${profile.tts_provider} · ${profile.tts_voice_id}`
         : "Renseigner le provider et le Voice ID (voir TTS Config)",
     },
+    {
+      label: "Tests qualitatifs",
+      ok: profile.qualitative_tests_validated,
+      hint: profile.qualitative_tests_validated
+        ? "Conversation de validation effectuée"
+        : "Tester le ton, l'ouverture et les réponses avant activation",
+    },
+    {
+      label: "Isolation des connaissances",
+      ok: profile.knowledge_isolation_validated,
+      hint: profile.knowledge_isolation_validated
+        ? "Absence de fuite entre personnages validée"
+        : "Vérifier que le personnage ne récupère pas les faits privés d'un autre corpus",
+    },
   ];
 }
 
@@ -92,7 +106,7 @@ export default function CharacterRuntimeSettingsTab() {
     }
   };
 
-  useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void load(); }, []);
 
   const patchProfile = (id: string, patch: Partial<CharacterRuntimeProfile>) => {
     setProfiles((current) => current.map((profile) => profile.id === id ? { ...profile, ...patch } : profile));
@@ -116,7 +130,6 @@ export default function CharacterRuntimeSettingsTab() {
     try {
       const auto = autoReadiness[profile.display_name];
       await updateCharacterRuntimeProfile(profile.id, {
-        enabled: profile.enabled,
         notion_character_id: auto?.characterId ?? profile.notion_character_id,
         opening_line: profile.opening_line,
         portrait_url: profile.portrait_url,
@@ -144,8 +157,8 @@ export default function CharacterRuntimeSettingsTab() {
         <div>
           <h2 className="text-lg font-semibold">🧑‍🤝‍🧑 Réglages personnages</h2>
           <p className="text-sm text-muted-foreground">
-            Les prérequis Fiche Notion, Prompt et Corpus RAG sont détectés automatiquement dans la base. Un personnage n’est
-            proposé au runtime que lorsque tout est vert.
+            Configurez ici le contenu, le portrait et la voix propres à chaque personnage. Leur activation pour une expérience
+            se règle maintenant dans « Orchestration ».
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw className="mr-1 h-3.5 w-3.5" />Actualiser</Button>
@@ -162,10 +175,16 @@ export default function CharacterRuntimeSettingsTab() {
           const auto = autoReadiness[profile.display_name];
           const checks = readiness(profile, auto);
           const blockers = checks.filter((check) => !check.ok);
-          const ready = profile.enabled && blockers.length === 0;
+          const ready = blockers.length === 0;
           return (
             <div key={profile.id} className="rounded border p-3">
-              <div className="flex items-center justify-between"><strong>{profile.display_name}</strong><Badge variant={ready ? "default" : "outline"}>{ready ? "prêt" : "incomplet"}</Badge></div>
+              <div className="flex items-center justify-between gap-2">
+                <strong>{profile.display_name}</strong>
+                <div className="flex gap-1">
+                  <Badge variant={profile.enabled ? "secondary" : "outline"}>{profile.enabled ? "actif" : "inactif"}</Badge>
+                  <Badge variant={ready ? "default" : "outline"}>{ready ? "configuré" : "incomplet"}</Badge>
+                </div>
+              </div>
               <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
                 {checks.map((check) => (
                   <span key={check.label} title={check.hint} className={check.ok ? "text-emerald-500" : "text-muted-foreground"}>
@@ -181,10 +200,6 @@ export default function CharacterRuntimeSettingsTab() {
                 </ul>
               )}
               <div className="mt-4 space-y-2 border-t pt-3">
-                <label className="flex items-center gap-2 text-xs font-medium">
-                  <Checkbox checked={profile.enabled} onCheckedChange={(checked) => patchProfile(profile.id, { enabled: checked === true })} />
-                  Personnage activable par le runtime
-                </label>
                 <Textarea value={profile.opening_line ?? ""} onChange={(event) => patchProfile(profile.id, { opening_line: event.target.value || null })} placeholder="Phrase d’ouverture" className="min-h-20" />
                 <div className="flex items-center gap-2">
                   {profile.portrait_url && (
@@ -223,8 +238,25 @@ export default function CharacterRuntimeSettingsTab() {
                   <Input value={profile.tts_voice_id ?? ""} onChange={(event) => patchProfile(profile.id, { tts_voice_id: event.target.value || null })} placeholder="Voice ID du personnage" />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Les autres réglages de voix (modèle, format, vitesse…) restent ceux de l’onglet TTS Config ; seul le Voice ID se définit par personnage.
+                  Le provider et le Voice ID sont appliqués à la voix de ce personnage. Les réglages propres au provider (modèle, format, vitesse…) restent dans TTS Config.
                 </p>
+
+                <div className="space-y-2 rounded bg-muted/40 p-3">
+                  <label className="flex items-start gap-2 text-xs">
+                    <Checkbox
+                      checked={profile.qualitative_tests_validated}
+                      onCheckedChange={(checked) => patchProfile(profile.id, { qualitative_tests_validated: checked === true })}
+                    />
+                    <span><strong>Tests qualitatifs validés.</strong> Confirme que la phrase d’ouverture, la voix, le ton et plusieurs réponses ont été vérifiés.</span>
+                  </label>
+                  <label className="flex items-start gap-2 text-xs">
+                    <Checkbox
+                      checked={profile.knowledge_isolation_validated}
+                      onCheckedChange={(checked) => patchProfile(profile.id, { knowledge_isolation_validated: checked === true })}
+                    />
+                    <span><strong>Isolation des connaissances validée.</strong> Confirme qu’aucun fait privé d’un autre personnage n’apparaît pendant les tests.</span>
+                  </label>
+                </div>
 
                 <Button size="sm" variant="outline" disabled={saving || uploadingPortrait === profile.id} onClick={() => void saveProfile(profile)}>
                   <Save className="mr-1 h-3.5 w-3.5" />{uploadingPortrait === profile.id ? "Téléversement…" : "Sauvegarder le profil"}

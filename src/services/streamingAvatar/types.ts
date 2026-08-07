@@ -49,6 +49,8 @@ export interface ResponseOutputTurnContext {
   onPlaybackStart?: () => void;
   /** Per-character TTS voice override; used by the Max→Emma V1 handoff. */
   voiceId?: string;
+  /** Per-character TTS provider override. */
+  providerId?: import("@/services/tts/types").TTSProviderId;
 }
 
 export interface ResponseOutputResult {

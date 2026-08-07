@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-07 (architecture et mécanique conversationnelle expliquées dans l’admin)
+> **Last Updated**: 2026-08-07 (orchestration globale et réglages GM réellement câblés)
 
 ---
 
@@ -72,6 +72,58 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-07 — Les réglages d’expérience cessent d’être décoratifs 🔷
+
+**Le problème derrière la réorganisation.** Les nouveaux panels clarifiaient la
+console, mais plusieurs contrôles restaient placés au mauvais niveau ou ne
+pilotaient pas encore le parcours. L’activation d’un personnage vivait dans sa
+fiche technique alors qu’elle relève d’une expérience donnée. Surtout, la phrase
+d’ouverture de Max était bien enregistrée dans Lovable Cloud mais le runtime
+continuait de prononcer une constante historique. Le provider et la voix du
+profil n’étaient pas non plus propagés sur tout le chemin TTS.
+
+**L’orchestration devient le contrat global.** Le panneau rassemble maintenant
+la durée, le questionnaire final et les personnages actifs. Max reste le point
+d’entrée obligatoire du prototype ; Emma peut être autorisée comme destination
+de handoff. Désactiver le questionnaire modifie réellement la machine d’état :
+l’écran de fin conduit directement aux remerciements. L’activation a disparu de
+la fiche personnage et une sauvegarde technique ne peut plus la modifier par
+effet de bord.
+
+**Le GM se règle avec des intentions compréhensibles.** Un éditeur structuré
+remplace la grande zone de texte comme interface principale. Posture du
+directeur, longueur de guidance, priorités multiples, handoffs, cinématiques,
+premier tour autorisé, timeout et consignes libres composent automatiquement le
+prompt final visible avant publication. Chaque contrôle explique son incidence
+et sépare ce qui influence probabilistiquement le LLM de ce que le runtime bloque
+de manière déterministe.
+
+**La configuration publiée arrive enfin jusqu’aux garde-fous.** Le résultat
+post-tour transporte la configuration de la version épinglée. Le moteur vérifie
+donc les autorisations, le tour minimum et le quota de handoffs au lieu de garder
+des valeurs codées en dur. Le timeout configuré borne aussi l’appel du directeur.
+Une session existante conserve toujours sa version ; les nouvelles sessions
+seules reçoivent la publication suivante.
+
+**Les profils personnages redeviennent fiables.** Max lit désormais sa phrase
+d’ouverture dans `character_runtime_profiles`, avec la phrase intégrée comme
+fallback explicite. Provider et Voice ID accompagnent chaque réplique et restent
+présents si l’avatar vidéo bascule vers le TTS. Les validations qualitatives et
+d’isolation, auparavant invisibles alors qu’elles bloquaient la readiness, sont
+maintenant éditables et expliquées.
+
+**Leçon.** Un réglage n’existe vraiment que si son chemin complet est lisible :
+contrôle admin, persistance, chargement de session, consommation runtime et test
+de non-régression. La console distingue désormais les choix globaux, les règles
+du directeur et les propriétés techniques d’un personnage sans prétendre qu’une
+simple consigne LLM offre la même garantie qu’un garde-fou déterministe.
+
+**Validation et livraison.** TypeScript, le build et 237 tests unitaires sont
+verts. Le plan et le prompt de finalisation dans Lovable sont conservés dans
+[`docs/plan_orchestration_experience_et_reglages_gm.md`](docs/plan_orchestration_experience_et_reglages_gm.md)
+et
+[`docs/interfaces/lovable-experience-orchestration-finalization.md`](docs/interfaces/lovable-experience-orchestration-finalization.md).
 
 ### 2026-08-07 — L’application rend enfin visible la mécanique qui la fait vivre 🔷
 

@@ -11,7 +11,7 @@ import { getLLMSettings } from "@/services/settingsService";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
 import { normalizeMemoryText } from "@/services/conversationMemoryV1";
-import type { ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, TraceMessage, UserRoleProfile } from "@/types";
+import type { ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, ExperienceDirectorConfig, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, TraceMessage, UserRoleProfile } from "@/types";
 
 export interface PRD4PostTurnInput {
   sessionId: string | null;
@@ -33,6 +33,7 @@ export interface PRD4PostTurnInput {
   diagnosticTrace?: boolean;
   systemPromptOverride?: string | null;
   orchestrationVersionId?: string | null;
+  orchestrationConfig?: ExperienceDirectorConfig | null;
   currentCharacter?: "max" | "emma";
   /** Admin draft tests set this to false so they cannot mutate live sessions. */
   persist?: boolean;
@@ -335,7 +336,7 @@ export async function evaluatePostTurnPRD4(
         // l'évaluation + memory_delta. Ce plancher évite un JSON tronqué sans
         // ajouter d'appel LLM.
         max_tokens: Math.max(llm.LLM_MAX_TOKENS_GM ?? 0, 800),
-        timeoutMs: GM_POST_TURN_TIMEOUT_MS,
+        timeoutMs: input.orchestrationConfig?.directorTimeoutMs ?? GM_POST_TURN_TIMEOUT_MS,
         feature_key: "prd4_gm_post_turn",
         session_id: input.sessionId ?? undefined,
         signal: input.signal,
@@ -405,6 +406,7 @@ export async function evaluatePostTurnPRD4(
     model,
     created_at: new Date().toISOString(),
     orchestration_version_id: input.orchestrationVersionId ?? null,
+    orchestration_config: input.orchestrationConfig ?? null,
   };
 
   if (input.sessionId && input.persist !== false) {

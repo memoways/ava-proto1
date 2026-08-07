@@ -4,6 +4,62 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.55.2] — 2026-08-07 — Orchestration globale et éditeur GM réellement câblés
+
+### Ajouté
+
+- L’orchestration de l’expérience regroupe désormais la durée, l’affichage
+  on/off du questionnaire final et les personnages actifs. Max reste le point
+  d’entrée obligatoire du prototype ; Emma peut être activée pour autoriser les
+  handoffs lorsque sa checklist est complète.
+- Nouvel éditeur structuré des réglages GM avec posture et longueur de guidance
+  en sélection simple, priorités en sélection multiple, switches handoff et
+  cinématiques, champs numériques pour le tour minimum et le timeout, consignes
+  libres et aperçu du prompt final généré.
+- Validations manuelles « tests qualitatifs » et « isolation des connaissances »
+  rendues visibles dans les réglages de chaque personnage, avec explication de
+  leur incidence sur sa disponibilité.
+- Plan et prompt avancé de finalisation Lovable mis à jour dans
+  [`docs/plan_orchestration_experience_et_reglages_gm.md`](docs/plan_orchestration_experience_et_reglages_gm.md)
+  et
+  [`docs/interfaces/lovable-experience-orchestration-finalization.md`](docs/interfaces/lovable-experience-orchestration-finalization.md).
+
+### Modifié
+
+- Le groupe **Expérience** utilise l’icône 🧭, distincte de celle du groupe
+  **Personnages**.
+- L’activation d’un personnage n’est plus modifiable depuis ses réglages
+  techniques : elle appartient exclusivement au panneau Orchestration et une
+  sauvegarde de profil ne peut plus l’écraser.
+- Le prompt GM publié transporte sa configuration versionnée jusqu’au résultat
+  post-tour. Le runtime applique déterministement l’autorisation des handoffs et
+  cinématiques, le premier tour de handoff, le maximum par session et le timeout
+  du directeur.
+- Le provider TTS et le Voice ID propres au personnage sont transmis à chaque
+  réplique, y compris lors d’un repli de l’avatar vidéo vers le TTS local.
+
+### Corrigé
+
+- La phrase d’ouverture de Max n’est plus imposée par la constante historique
+  « Hallo… à qui ai-je affaire ? ». Le runtime lit maintenant
+  `character_runtime_profiles.opening_line`, avec la constante intégrée comme
+  seul fallback si le profil est indisponible ou vide.
+- Désactiver le questionnaire conduit réellement de l’écran de fin aux
+  remerciements, sans afficher ni enregistrer un questionnaire vide.
+- Le provider de voix configuré par personnage n’est plus seulement un indicateur
+  de readiness : il est effectivement consommé par la file TTS.
+
+### Compatibilité et validation
+
+- Aucun nouveau schéma, secret, hébergeur, projet Supabase ou déploiement externe
+  n’est introduit. Les réglages supplémentaires utilisent les JSON existants
+  dans Lovable Cloud et restent compatibles avec les sessions déjà épinglées.
+- Vérification TypeScript réussie, build Vite réussi, `git diff --check` valide
+  et suite unitaire complète de **237 tests** réussie sur **60 fichiers**.
+- Le lint global conserve ses erreurs historiques `no-explicit-any` ; le lint
+  ciblé des nouveaux composants, du générateur de prompt et du runtime modifié
+  ne présente aucune nouvelle erreur.
+
 ## [0.55.1] — 2026-08-07 — Architecture de l’expérience expliquée dans l’admin
 
 ### Ajouté

@@ -1,11 +1,10 @@
 /** PRD4 — Écran 1 : Accueil */
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import HCaptcha from "@hcaptcha/react-hcaptcha";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { prefetchOpeningTTS } from "@/services/openingTTSCache";
 import { isPrivacyNoticeEnabled, type PrivacyPreferences } from "@/services/privacyConsent";
 
 interface Props {
@@ -38,14 +37,6 @@ const WelcomeScreen = ({
   const privacyNoticeEnabled = isPrivacyNoticeEnabled();
   const voiceAcknowledged = !privacyNoticeEnabled || privacyPreferences?.voiceAndStorageAcknowledged === true;
   const analyticsAllowed = privacyPreferences?.analyticsAllowed === true;
-
-  // Ne prépare aucune sortie vocale tant qu'une reprise est recherchée ou
-  // disponible. Une reprise restaure uniquement l'état textuel avant un geste
-  // explicite ultérieur de l'utilisateur.
-  useEffect(() => {
-    if (resumeLoading || resumeAvailable) return;
-    void prefetchOpeningTTS().catch(() => { /* silent */ });
-  }, [resumeAvailable, resumeLoading]);
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10 text-center tablet:px-10">

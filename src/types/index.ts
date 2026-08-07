@@ -353,6 +353,26 @@ export interface PRD4PostTurnEvaluation {
   /** Structured Experience Director action. The deterministic guard may replace it with none. */
   action?: DirectorAction;
   orchestration_version_id?: string | null;
+  /** Configuration publiée qui a produit cette décision, pour les garde-fous runtime. */
+  orchestration_config?: ExperienceDirectorConfig | null;
+}
+
+export interface ExperienceDirectorEditorConfig {
+  tone: "discreet" | "balanced" | "directive";
+  guidanceLength: "short" | "balanced" | "detailed";
+  priorities: Array<"narrative_continuity" | "player_engagement" | "safety" | "pace">;
+  allowHandoffs: boolean;
+  allowCinematics: boolean;
+  customInstructions: string;
+}
+
+export interface ExperienceDirectorConfig {
+  schemaVersion: 1;
+  minimumHandoffTurn: number;
+  maximumHandoffsPerSession: 0 | 1;
+  handoffTarget: "emma";
+  directorTimeoutMs: number;
+  editor: ExperienceDirectorEditorConfig;
 }
 
 export type DirectorAction =

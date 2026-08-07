@@ -1,4 +1,4 @@
-# Finalisation Lovable — Orchestration GM, PostHog et handoff Emma
+# Finalisation Lovable — Expérience, réglages GM, PostHog et handoff Emma
 
 > **Catégorie :** Interface externe et runbook d’activation
 >
@@ -6,12 +6,13 @@
 >
 > **Dernière mise à jour :** 7 août 2026
 >
-> **Statut :** Code prêt, activation Lovable Cloud à réaliser
+> **Statut :** Code 0.55.2 prêt, synchronisation et recette Lovable à réaliser
 
 ## Objectif
 
-Ce document explique comment finaliser dans Lovable la livraison décrite dans
-[`../plan_assainissement_mecanique_orchestration_gm.md`](../plan_assainissement_mecanique_orchestration_gm.md) :
+Ce document explique comment finaliser dans Lovable les livraisons décrites dans
+le [plan d’assainissement de l’orchestration GM](../plan_assainissement_mecanique_orchestration_gm.md)
+et le [plan d’orchestration globale et de réglages GM](../plan_orchestration_experience_et_reglages_gm.md) :
 
 - nouvelle navigation Expérience / Qualité / Technique avancée ;
 - orchestration GM versionnée ;
@@ -20,6 +21,9 @@ Ce document explique comment finaliser dans Lovable la livraison décrite dans
 - mémoire inter-personnages V2 ;
 - vraie vue Latences PostHog ;
 - comparaison avec la télémétrie interne et canary multi-source.
+- orchestration globale de la durée, du questionnaire et des personnages actifs ;
+- éditeur GM structuré générant le prompt publié et ses garde-fous runtime ;
+- prise en compte de l’ouverture, du provider et de la voix configurés pour Max.
 
 Le code est déjà implémenté et validé localement. Ce runbook ne demande pas à
 Lovable de réinventer l’architecture : il lui demande de synchroniser `main`,
@@ -224,7 +228,9 @@ Puis vérifier :
 
 Lancer le build Lovable. Dans l’aperçu interne administrateur, vérifier :
 
-- **Expérience** : Orchestration, Cinématiques ;
+- groupe **🧭 Expérience**, visuellement distinct de **🎭 Personnages** ;
+- **Expérience** : Orchestration, Réglages GM, Réglages personnages,
+  Cinématiques et Comment ça marche ;
 - **Qualité** : Latence & blocage, Latences PostHog, Laboratoire RAG, Traces Max ;
 - **Technique avancée** : STT, RAG, LLM, TTS, Streaming Avatar, Consommation
   LLM, Consommation Voix, Consommation Streaming Avatar ;
@@ -235,18 +241,32 @@ Lancer le build Lovable. Dans l’aperçu interne administrateur, vérifier :
 
 Ne pas publier en Production à cette étape.
 
-### 8. Configurer Orchestration et tester les versions
+### 8. Configurer l’expérience et tester les versions GM
 
 Dans **Expérience → Orchestration** :
 
-1. Vérifier la version baseline publiée.
-2. Démarrer une session A et noter son `orchestration_version_id`.
-3. Créer un brouillon dérivé.
-4. Tester le brouillon avec un message et une réponse de personnage.
-5. Vérifier qu’aucune session, mémoire ou événement live n’est créé par ce test.
-6. Publier le brouillon uniquement en environnement interne.
-7. Vérifier que la session A conserve l’ancienne version.
-8. Démarrer une session B et vérifier qu’elle épingle la nouvelle version.
+1. Vérifier la durée, le switch du questionnaire et la liste des personnages.
+2. Confirmer que Max est actif et non désactivable dans ce prototype.
+3. Laisser Emma inactive tant que sa checklist n’est pas complète.
+4. Démarrer une session avec questionnaire actif, terminer et vérifier son
+   affichage ; répéter avec le questionnaire inactif et vérifier le passage
+   direct aux remerciements sans enregistrement vide.
+
+Dans **Expérience → Réglages GM** :
+
+1. Vérifier la version baseline publiée et démarrer une session A en notant son
+   `orchestration_version_id`.
+2. Créer un brouillon dérivé et modifier au moins une sélection simple, une
+   priorité multiple, un switch, un nombre et une consigne libre.
+3. Vérifier que l’aperçu du prompt généré reflète exactement chaque choix.
+4. Tester le brouillon avec un message et une réponse de personnage ; aucune
+   session, mémoire ou événement live ne doit être créé.
+5. Publier le brouillon uniquement en environnement interne.
+6. Vérifier que la session A conserve l’ancienne version et qu’une session B
+   épingle la nouvelle.
+7. Vérifier qu’un handoff ou une cinématique désactivé est bloqué par le runtime,
+   même si le LLM recommande encore cette action.
+8. Vérifier le premier tour autorisé et le timeout configuré.
 9. Archiver un brouillon de test puis utiliser **Restaurer en brouillon** ; une
    archive ne doit jamais redevenir éditable directement.
 
@@ -254,18 +274,27 @@ Dans **Expérience → Orchestration** :
 
 Dans le profil runtime Emma :
 
-1. Laisser **Personnage activable par le runtime** décoché.
-2. Renseigner `characters.id` pour la fiche Emma synchronisée.
-3. Renseigner la phrase d’ouverture et l’URL de portrait.
-4. Renseigner le provider TTS actuellement actif dans Technique avancée et le
+1. Laisser Emma désactivée dans **Expérience → Orchestration**.
+2. Ouvrir **Expérience → Réglages personnages** et confirmer qu’aucune checkbox
+   d’activation n’y subsiste.
+3. Renseigner `characters.id` pour la fiche Emma synchronisée.
+4. Renseigner la phrase d’ouverture et l’URL de portrait.
+5. Renseigner le provider TTS actuellement actif dans Technique avancée et le
    Voice ID Emma compatible avec ce provider.
-5. Vérifier que la fiche personnage et son prompt sont réellement consommés
+6. Vérifier que la fiche personnage et son prompt sont réellement consommés
    quand `characterName = Emma`.
-6. Vérifier que le corpus RAG filtré par Emma est non vide et ne retourne aucun
+7. Vérifier que le corpus RAG filtré par Emma est non vide et ne retourne aucun
    chunk privé Max.
-7. Exécuter les tests qualitatifs et le scénario anti-fuite ci-dessous.
-8. Cocher chaque validation uniquement avec une preuve.
-9. Activer Emma seulement lorsque le badge devient **prêt**.
+8. Exécuter les tests qualitatifs et le scénario anti-fuite ci-dessous.
+9. Cocher les validations **Tests qualitatifs** et **Isolation des connaissances**
+   uniquement avec une preuve.
+10. Revenir dans Orchestration et activer Emma seulement lorsque le badge devient
+    **configuré** et que tous les prérequis de readiness sont verts.
+
+Pour Max, remplacer temporairement sa phrase d’ouverture par une valeur de test,
+ouvrir une nouvelle session et confirmer que cette valeur exacte est affichée et
+prononcée. Vérifier dans les traces que le provider et le Voice ID du profil ont
+été utilisés. Restaurer ensuite la phrase éditoriale validée.
 
 Scénario anti-fuite minimal :
 
@@ -384,8 +413,9 @@ laisser la version en aperçu/interne.
 
 Le rollback est fonctionnel, pas destructif :
 
-1. Désactiver Emma dans `character_runtime_profiles` pour empêcher tout nouveau
-   handoff.
+1. Désactiver Emma depuis le sélecteur de personnages du panel Orchestration
+   pour empêcher tout nouveau handoff ; vérifier ensuite la valeur persistée dans
+   `character_runtime_profiles`.
 2. Restaurer la version GM précédente en créant un brouillon depuis l’archive,
    le tester puis le publier. Les sessions en cours gardent leur version.
 3. Conserver les nouvelles tables et colonnes ; ne jamais tenter de les supprimer
@@ -396,133 +426,329 @@ Le rollback est fonctionnel, pas destructif :
 
 ## Prompt prêt à coller dans Lovable
 
+> **Configuration Prompt Factory**
+>
+> - Rôle : ingénieur full-stack senior Lovable/Lovable Cloud
+> - Domaine : expérience narrative voice-to-voice Ava / PRD4
+> - Format : Markdown structuré directement copiable dans Lovable
+> - Mode : avancé
+> - Résultat attendu : intégration du commit, preview interne, preuves de recette
+>   et demande d’approbation avant Production
+> - Qualité : rôle, contexte, contraintes, séquence, critères d’acceptation,
+>   erreurs et rollback explicités
+> - Taille indicative : environ 2 900 tokens
+
 ```text
-Finalise dans Lovable/Lovable Cloud la livraison « Orchestration GM, cinématiques,
-handoff Max→Emma, mémoire V2 et Latences PostHog » déjà implémentée dans le
-dernier commit de la branche GitHub `main` du dépôt `memoways/ava-proto1`.
+Tu es l’ingénieur full-stack senior responsable de finaliser dans Lovable et
+Lovable Cloud la livraison 0.55.2 « Orchestration globale et éditeur GM
+réellement câblés » du projet Ava / PRD4.
 
-Commence par synchroniser intégralement `main`, puis lis avant toute action :
-- `AGENTS.md` ;
-- `docs/plan_assainissement_mecanique_orchestration_gm.md` ;
-- `docs/interfaces/lovable-experience-orchestration-finalization.md` ;
-- l’entrée 0.55.0 de `CHANGELOG.md` ;
-- l’entrée du 7 août 2026 de `STORY.md`.
+## Mission
 
-Le code est déjà implémenté et validé localement : build réussi, lint ciblé sans
-erreur, 58 fichiers de tests et 233 tests réussis. Ne réécris pas l’architecture
-et ne remplace pas les services existants. Ne corrige que les erreurs réelles,
-reproductibles, qui empêchent l’application ou la recette dans Lovable.
+Synchronise le dernier commit de la branche GitHub `main` du dépôt
+`memoways/ava-proto1`, vérifie que Lovable contient exactement
+l’implémentation déjà réalisée et finalise uniquement les actions nécessaires
+dans Lovable/Lovable Cloud. Ne réécris pas les composants et ne recrée pas une
+architecture parallèle. Corrige seulement une erreur reproductible qui empêche
+le build ou un critère de recette ci-dessous.
 
-Contraintes absolues :
-- Lovable est l’unique chaîne de build, backend, migrations, Edge Functions,
-  secrets et publication ; n’utilise aucun Supabase ou hébergeur externe ;
-- aucune migration destructive, suppression de donnée ou nettoyage legacy dans
-  cette finalisation ;
-- conserve toutes les pages Technique avancée, notamment Streaming Avatar Config
-  et Consommation Streaming Avatar, ainsi que le switch Voix/Avatar ;
-- Validateur et Métriques hallu. restent accessibles 14 jours en legacy admin
-  journalisé ;
-- ne mets jamais une clé PostHog dans le code, le frontend, une variable `VITE_*`,
-  le chat ou les logs ; demande-moi de la saisir dans l’interface Secrets ;
-- n’active pas Emma avant que toute sa checklist soit prouvée ;
-- ne publie pas en Production sans mon approbation explicite.
+Le résultat attendu est une preview interne Lovable fonctionnelle, accompagnée
+de preuves. Tu ne dois pas publier en Production sans mon approbation explicite.
 
-Exécute dans cet ordre :
+## Sources de vérité à lire avant toute modification
 
-1. Confirme le SHA du commit `main` synchronisé et la présence des fichiers du
-   plan, de la migration `20260807120000_experience_orchestration_foundations.sql`
-   et de l’Edge Function `posthog-latency-stats`.
+Lis dans cet ordre :
 
-2. Capture en lecture seule la baseline Lovable Cloud : migrations appliquées,
-   schéma de `sessions`, tables/RLS d’orchestration existantes, Edge Functions et
-   erreurs récentes. Signale toute collision de schéma avant de muter la base.
+1. `AGENTS.md` ;
+2. `CHANGELOG.md`, entrée 0.55.2 ;
+3. `STORY.md`, entrée « Les réglages d’expérience cessent d’être décoratifs » ;
+4. `docs/plan_orchestration_experience_et_reglages_gm.md` ;
+5. `docs/interfaces/lovable-experience-orchestration-finalization.md` ;
+6. les diffs du dernier commit `main` dans :
+   - `src/components/GameMasterConfigTab.tsx` ;
+   - `src/components/GameMasterSettingsTab.tsx` ;
+   - `src/components/CharacterRuntimeSettingsTab.tsx` ;
+   - `src/pages/IndexPRD4.tsx` ;
+   - `src/services/experienceOrchestration.ts` ;
+   - `src/services/experienceDirector.ts` ;
+   - `src/services/gameMasterPromptBuilder.ts` ;
+   - `src/services/streamingAvatar/localTtsOutput.ts` ;
+   - `src/types/index.ts`.
 
-3. Applique exclusivement via Lovable Cloud la migration additive
-   `supabase/migrations/20260807120000_experience_orchestration_foundations.sql`.
-   Vérifie tables, colonnes, contraintes, indexes, policies et RPC. Confirme la
-   baseline GM publiée, les profils Max/Emma, l’append-only/idempotence de
-   `experience_events`, l’isolation propriétaire et l’épinglage immuable de la
-   version GM par session. Régénère ensuite les types Supabase via Lovable.
+Commence ton compte rendu par le SHA `main` réellement synchronisé et confirme
+que l’entrée 0.55.2 est visible. Si Lovable n’a pas encore ce commit, arrête les
+mutations, resynchronise GitHub puis recommence la vérification.
 
-4. Demande-moi de saisir dans Lovable Cloud → Secrets, sans afficher leurs
-   valeurs : `POSTHOG_PERSONAL_API_KEY` (clé dédiée au projet avec Query Read),
-   `POSTHOG_PROJECT_ID` et `POSTHOG_API_HOST=https://eu.posthog.com`.
+## État déjà implémenté à préserver
 
-5. Déploie `posthog-latency-stats` via Lovable Cloud. Conserve le contrôle
-   `requireAdmin` : sans JWT = 401, utilisateur non admin = 403, admin = réponse
-   PostHog ou erreur explicite. Vérifie que la clé et l’Authorization sont absents
-   du bundle et des logs, que le navigateur ne fournit aucune requête HogQL libre
-   et que le cache passe de MISS à HIT dans la minute.
+Le commit contient déjà :
 
-6. Lance le build Lovable et ouvre un aperçu interne. Vérifie la navigation
-   Expérience/Qualité/Technique avancée, les huit pages Technique, l’accès legacy
-   journalisé et le switch Voix/Avatar. Ne publie pas encore en Production.
+- l’icône 🧭 pour le groupe Expérience, distincte de 🎭 Personnages ;
+- un panneau Orchestration avec durée, questionnaire final on/off et personnages
+  actifs ;
+- Max obligatoire comme personnage d’entrée et Emma activable pour le handoff ;
+- le retrait de « Personnage activable par le runtime » des Réglages personnages ;
+- un éditeur GM structuré avec sélections simples, sélection multiple, switches,
+  nombres, texte libre et aperçu du prompt généré ;
+- une configuration GM versionnée transportée jusqu’aux garde-fous runtime ;
+- le blocage déterministe des handoffs/cinématiques désactivés, du handoff avant
+  le tour minimum et du quota de handoffs ;
+- le timeout GM configuré appliqué à l’appel post-tour ;
+- la phrase d’ouverture de Max lue depuis
+  `character_runtime_profiles.opening_line`, avec la constante intégrée comme
+  fallback uniquement ;
+- le provider et le Voice ID du personnage transmis à toutes ses répliques TTS,
+  y compris après un fallback avatar → TTS ;
+- les validations manuelles « Tests qualitatifs » et « Isolation des
+  connaissances » dans Réglages personnages ;
+- `SHOW_QUESTIONNAIRE` persisté dans le JSON de gameplay et consommé par la
+  machine d’état de fin.
 
-7. Dans Orchestration, vérifie la version baseline, crée et teste un brouillon
-   sans effet réel, publie-le uniquement en interne, puis prouve qu’une session
-   démarrée avant publication conserve son ancienne version et qu’une nouvelle
-   session épingle la nouvelle. Teste archive et restauration par brouillon.
+Aucune nouvelle migration n’est nécessaire pour 0.55.2 : les nouvelles valeurs
+utilisent `admin_settings.value` et
+`experience_orchestration_versions.config`, tous deux déjà en JSON, ainsi que
+le champ `enabled` existant de `character_runtime_profiles`. N’invente pas de
+migration si le schéma attendu est déjà présent.
 
-8. Prépare le profil Emma sans l’activer : utilise le `characters.id` interne de
-   sa fiche synchronisée, une phrase d’ouverture, un portrait, le provider TTS
-   actif et un Voice ID compatible. Vérifie prompt, corpus RAG Emma non vide,
-   tests qualitatifs et isolation des connaissances. Active Emma uniquement quand
-   toutes les preuves existent et que le badge est prêt.
+## Contraintes absolues
 
-9. Exécute les scénarios : Max seul ; handoff bloqué avant quatre tours ; handoff
-   accepté ; handoff refusé ; reprise avant et après choix ; Emma devenue
-   indisponible ; session longue. Vérifie une seule offre par session, même timer,
-   même session, TTS Emma et événements idempotents.
+- Lovable est l’unique chaîne de build et de publication.
+- Base, Auth, RLS, Edge Functions et secrets restent dans le Supabase fourni par
+  Lovable Cloud.
+- Ne configure ni Vercel, ni Netlify, ni projet Supabase externe, ni autre chaîne
+  CI/CD ou hébergeur.
+- N’exécute aucune migration destructive et ne supprime aucune donnée, table,
+  colonne, policy, RPC, session, télémétrie ou réglage legacy.
+- Ne modifie aucun secret et n’affiche jamais sa valeur.
+- Ne remplace pas le stockage JSON existant par de nouvelles tables pour cette
+  finalisation.
+- Ne change pas la variante de prompt Max, les réglages RAG, STT, Streaming
+  Avatar ou les providers globaux.
+- Ne prétends jamais qu’une opération Cloud a réussi sans preuve observable.
+- Ne publie pas en Production sans approbation explicite d’Ulrich.
 
-10. Exécute un test anti-fuite : confie à Max un secret privé non promu, accepte
-    Emma puis questionne-la. Elle ne doit ni connaître ni paraphraser le secret.
-    Vérifie la visibilité V2 en base et l’absence de transcript/résumé Max dans le
-    payload Emma.
+## Séquence d’exécution obligatoire
 
-11. Teste les cinématiques : média manquant bloqué, vidéo disponible après la fin
-    de la voix, bouton Passer, contexte post-vidéo, cooldown, quota, doublon et
-    priorité du handoff.
+### Phase 1 — Synchronisation et baseline en lecture seule
 
-12. Vérifie Latence & blocage sans modifier sa disposition : premier son séparé
-    du playback, données legacy ambiguës, segments PRD4 non exécutés, aucun zéro
-    synthétique, tours Max/Emma, provider/modèle/session/turn_id et drill-down.
+1. Synchronise GitHub `main` et rapporte son SHA.
+2. Vérifie les fichiers et comportements listés dans « État déjà implémenté ».
+3. Capture avant mutation :
+   - migrations déjà appliquées ;
+   - présence et colonnes de `character_runtime_profiles` ;
+   - version publiée de `experience_orchestration_versions` ;
+   - structure JSON actuelle de `admin_settings` pour
+     `ava_gameplay_settings`, sans exposer de secret ;
+   - erreurs récentes du build et des Edge Functions ;
+   - réglages actifs Voix TTS / Avatar vidéo.
+4. Si la migration
+   `20260807120000_experience_orchestration_foundations.sql` n’est pas appliquée,
+   suis d’abord le runbook du présent document. Si elle est déjà appliquée,
+   n’essaie pas de la rejouer à l’aveugle.
 
-13. Vérifie Latences PostHog sur 24 h, 7 j et 30 j : source, fraîcheur, période,
-    p50/p95, services, erreurs/fallbacks/blockers, providers, cinématiques et
-    handoffs. Compare sans fusion à Supabase et contrôle plusieurs `turn_id`.
-    Une absence de données ou une panne doit rester explicite. Le canary ne doit
-    décider que si sessions, tours, premier son, erreurs, persistance et coût sont
-    tous mesurés et que le budget par session est approuvé.
+### Phase 2 — Build Lovable sans réécriture
 
-14. Effectue une non-régression chargement/sauvegarde/rechargement pour STT, RAG,
-    LLM, TTS, Streaming Avatar et les trois pages de consommation. Teste Max en
-    Voix TTS puis Avatar vidéo ; le handoff Emma reste TTS sans changer la config
-    Streaming Avatar.
+1. Laisse Lovable compiler le commit tel quel.
+2. Si les types Supabase doivent être régénérés, accepte uniquement un diff de
+   typage mécanique compatible avec le schéma Lovable Cloud actuel.
+3. En cas d’erreur, fournis le fichier, la ligne et le message exact avant toute
+   correction.
+4. N’ajoute aucune dépendance pour remplacer les composants shadcn existants.
+5. Ouvre une preview interne ; ne publie pas en Production.
 
-15. Ne supprime rien après la recette. Démarre seulement la fenêtre d’observation
-    legacy de 14 jours. Avant toute Production, présente-moi un rapport factuel et
-    demande mon approbation explicite.
+### Phase 3 — Recette de l’orchestration globale
 
-À la fin, rends un compte rendu avec : SHA `main`, migration et objets vérifiés,
-version/déploiement Edge, noms des secrets présents, build/URL d’aperçu, IDs de
-sessions et traces, tests 401/403/200, résultats GM/vidéo/handoff/reprise/mémoire,
-parité PostHog/Supabase, non-régression Technique, canary et tous les blocages.
-N’invente jamais une opération Cloud réussie : si une permission ou une valeur
-manque, demande-la précisément puis poursuis toutes les vérifications
-indépendantes encore possibles.
+Dans Admin → 🧭 Expérience → Orchestration :
+
+1. Vérifie que la durée est chargée et sauvegardable.
+2. Active le questionnaire, démarre une nouvelle session, termine-la et confirme
+   l’affichage du questionnaire.
+3. Désactive le questionnaire, démarre une autre nouvelle session, termine-la et
+   confirme le passage direct de l’écran de fin aux remerciements.
+4. Vérifie qu’aucune réponse questionnaire vide n’est enregistrée dans ce second
+   scénario.
+5. Vérifie que Max est actif et non désactivable.
+6. Vérifie qu’Emma est activable ici et qu’aucun contrôle d’activation ne subsiste
+   dans Réglages personnages.
+7. Confirme qu’une sauvegarde du profil Emma ne réactive ni ne désactive Emma.
+
+Les réglages globaux sont lus au démarrage d’une nouvelle session. Ne considère
+pas comme un défaut qu’une session déjà ouverte conserve son état.
+
+### Phase 4 — Recette des profils personnages
+
+Dans Admin → 🧭 Expérience → Réglages personnages :
+
+1. Pour Max, note la phrase d’ouverture éditoriale actuelle.
+2. Remplace-la temporairement par une phrase de test unique, sauvegarde, puis
+   démarre une nouvelle session.
+3. Confirme que cette phrase exacte est affichée, ajoutée au transcript et
+   prononcée comme première réplique. L’ancienne constante « Hallo… à qui ai-je
+   affaire ? » ne doit apparaître que si le profil est absent, inaccessible ou
+   vide.
+4. Contrôle dans les traces TTS que le provider et le Voice ID du profil Max sont
+   utilisés pour l’ouverture puis pour une réponse normale.
+5. En mode Avatar vidéo, provoque seulement dans un environnement interne un
+   fallback contrôlé vers TTS et vérifie que le même provider et Voice ID sont
+   conservés.
+6. Restaure la phrase éditoriale initiale de Max.
+7. Pour Emma, vérifie la phrase, le portrait, le provider, le Voice ID, le prompt
+   et le corpus RAG.
+8. Coche « Tests qualitatifs » et « Isolation des connaissances » uniquement
+   après les scénarios correspondants.
+9. Active ensuite Emma depuis Orchestration, jamais depuis sa fiche.
+
+Si un provider ne reconnaît pas le Voice ID saisi, signale l’incompatibilité ;
+ne remplace pas silencieusement le provider global.
+
+### Phase 5 — Recette de l’éditeur GM
+
+Dans Admin → 🧭 Expérience → Réglages GM :
+
+1. Crée un brouillon depuis la version publiée.
+2. Modifie successivement :
+   - la posture du directeur ;
+   - la longueur de guidance ;
+   - au moins deux priorités de la sélection multiple ;
+   - le switch handoff ;
+   - le switch cinématiques ;
+   - le premier tour de handoff ;
+   - le timeout ;
+   - les instructions complémentaires.
+3. Après chaque catégorie, vérifie que l’aperçu du prompt généré reflète le choix
+   avec un texte compréhensible et sans supprimer le contrat JSON de base.
+4. Sauvegarde puis recharge : tous les contrôles et le prompt doivent être
+   identiques.
+5. Lance le test sans effet réel et confirme qu’il ne crée ni session, ni mémoire,
+   ni événement live.
+6. Publie uniquement dans l’environnement interne.
+7. Prouve qu’une session commencée avant publication garde son ancienne
+   `orchestration_version_id` et qu’une nouvelle session épingle la nouvelle.
+8. Désactive les handoffs, force un scénario où le LLM en recommande un et
+   confirme `handoff_disabled`.
+9. Désactive les cinématiques, force une recommandation et confirme
+   `cinematic_disabled`.
+10. Réactive le handoff avec un tour minimum de 6 : une recommandation au tour 5
+    doit être bloquée et une recommandation au tour 6 peut être acceptée si Emma
+    est prête.
+11. Vérifie qu’un timeout GM retourne une décision neutre sans bloquer la réponse
+    du personnage ni sa voix.
+12. Restaure ou republie la configuration interne souhaitée après les tests.
+
+Distingue dans le rapport :
+
+- contrôles déterministes : autorisations, tour minimum, quota et timeout ;
+- contrôles probabilistes injectés dans le prompt : posture, longueur, priorités
+  et instructions complémentaires.
+
+### Phase 6 — Non-régression du parcours existant
+
+Exécute au minimum :
+
+1. une session Max complète avec questionnaire ;
+2. une session Max complète sans questionnaire ;
+3. un handoff Max→Emma accepté ;
+4. un handoff refusé ;
+5. une reprise avant et après le handoff ;
+6. une cinématique jouée après la voix ;
+7. Max en Voix TTS ;
+8. Max en Avatar vidéo avec puis sans fallback ;
+9. le scénario anti-fuite mémoire Max→Emma décrit dans ce runbook ;
+10. un chargement/sauvegarde/rechargement des pages STT, RAG, LLM, TTS,
+    Streaming Avatar et consommations, sans changement de valeur.
+
+Confirme que les sessions historiques restent lisibles et que les nouveaux
+réglages n’altèrent pas une conversation déjà démarrée.
+
+## Critères d’acceptation
+
+La finalisation est acceptée uniquement si toutes les affirmations suivantes ont
+une preuve :
+
+- le SHA `main` synchronisé contient l’entrée 0.55.2 ;
+- le build Lovable est vert ;
+- 🧭 Expérience est distinct de 🎭 Personnages ;
+- le questionnaire on/off produit les deux parcours attendus ;
+- Max reste obligatoire et Emma s’active uniquement depuis Orchestration ;
+- la phrase d’ouverture test de Max est effectivement affichée et prononcée ;
+- provider et Voice ID du personnage apparaissent dans les traces TTS ;
+- l’éditeur GM restaure ses valeurs et génère le prompt attendu ;
+- les actions désactivées sont bloquées par une raison déterministe ;
+- une version GM publiée n’altère pas une session déjà épinglée ;
+- le test de brouillon n’écrit aucune donnée live ;
+- handoff, cinématique, reprise, mémoire privée et modes de sortie ne régressent
+  pas ;
+- aucune migration ou infrastructure externe n’a été créée ;
+- aucune donnée ou configuration historique n’a été supprimée ;
+- aucune publication Production n’a eu lieu sans autorisation.
+
+## Gestion des erreurs
+
+- Permission Lovable Cloud manquante : indique l’écran et l’autorisation
+  nécessaires, puis poursuis les vérifications indépendantes.
+- Schéma attendu absent : arrête les mutations et compare avec la migration
+  fondatrice ; ne crée pas une approximation.
+- Build rouge : fournis l’erreur exacte et propose le plus petit correctif
+  compatible avec le commit.
+- Test fonctionnel rouge : rapporte étapes, session, tour, valeur attendue,
+  valeur observée et trace associée.
+- Donnée de test modifiée : restaure sa valeur d’origine avant de conclure.
+- Secret ou provider indisponible : marque le scénario « bloqué », jamais
+  « réussi ».
+
+## Rollback
+
+Si la preview présente une régression :
+
+1. ne publie pas en Production ;
+2. restaure les réglages globaux précédents dans `admin_settings` ;
+3. republie une version GM issue du dernier archive stable ;
+4. désactive Emma depuis Orchestration ;
+5. conserve toutes les tables, colonnes et données ;
+6. reviens au commit `main` stable précédent uniquement via le workflow GitHub
+   et Lovable, jamais par une chaîne externe ;
+7. documente chaque valeur restaurée et vérifie une nouvelle session Max.
+
+## Compte rendu final obligatoire
+
+Réponds avec ces sections :
+
+1. **Version** — SHA GitHub et SHA/build Lovable.
+2. **Baseline** — migrations, schéma et réglages observés avant mutation.
+3. **Changements Lovable** — uniquement les actions réellement effectuées.
+4. **Build et preview** — résultat et URL interne.
+5. **Recette orchestration** — durée, questionnaire et activation personnages.
+6. **Recette profils** — ouverture Max, provider, voix et validations.
+7. **Recette GM** — contrôles, prompt généré, guards et versioning.
+8. **Non-régression** — handoff, cinématiques, reprise, mémoire et sorties.
+9. **Sécurité/compatibilité** — secrets, RLS, absence de migration externe ou
+   destructive.
+10. **Blocages** — permissions, données ou preuves manquantes.
+11. **Décision** — prêt ou non pour Production, sans publier.
+12. **Question d’approbation** — demande explicite à Ulrich avant Production.
+
+Pour chaque test, indique attendu, observé, preuve et verdict PASS/FAIL/BLOQUÉ.
+N’invente aucune preuve et ne transforme jamais un scénario bloqué en succès.
 ```
 
 ## Documentation liée
 
+- [Plan orchestration globale et réglages GM](../plan_orchestration_experience_et_reglages_gm.md)
 - [Plan approuvé et état d’implémentation](../plan_assainissement_mecanique_orchestration_gm.md)
+- [Changelog 0.55.2](../../CHANGELOG.md)
+- [Chronique produit](../../STORY.md)
 - [Audit observabilité PostHog historique](../posthog_latency_observability_audit.md)
 - [Activation `optimized_v3`](../optimized_v3_lovable_runbook.md)
 - [Déploiement Lovable sans interruption](../lovable_phase1_activation_runbook.md)
 
 ## Journal d'activation Lovable Cloud — 7 août 2026
 
+> Le tableau ci-dessous conserve la trace de l’activation précédente. Le lot
+> 0.55.2 décrit dans ce document reste à synchroniser et à recetter dans Lovable.
+
 | Élément | Résultat |
 |---|---|
+| Lot 0.55.2 | En attente de synchronisation du nouveau commit `main`, de preview et de recette selon le prompt ci-dessus |
 | Commit synchronisé | `e76d3551c85ce668915aa1421bea11e503016c9a` |
 | Baseline Cloud avant migration | 77 sessions conservées, 5 fiches personnages, aucune table ni colonne d'orchestration préexistante, `private.has_role` disponible |
 | Migration fondations | Appliquée par Lovable Cloud. Ajout obligatoire constaté : les tables du schéma `public` ne reçoivent aucun droit par défaut, des `GRANT` explicites (`authenticated`, `service_role`) ont été inclus, puis les droits `anon` révoqués |

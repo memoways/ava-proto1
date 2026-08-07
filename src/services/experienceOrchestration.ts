@@ -1,13 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ensureGameAuth } from "@/services/gameAuth";
+import type { ExperienceDirectorConfig } from "@/types";
 
-export interface ExperienceDirectorConfig {
-  schemaVersion: 1;
-  minimumHandoffTurn: number;
-  maximumHandoffsPerSession: 1;
-  handoffTarget: "emma";
-  directorTimeoutMs: number;
-}
+export type { ExperienceDirectorConfig } from "@/types";
 
 export interface ExperienceOrchestrationVersion {
   id: string;
@@ -53,7 +48,39 @@ export const DEFAULT_DIRECTOR_CONFIG: ExperienceDirectorConfig = {
   maximumHandoffsPerSession: 1,
   handoffTarget: "emma",
   directorTimeoutMs: 12_000,
+  editor: {
+    tone: "balanced",
+    guidanceLength: "balanced",
+    priorities: ["narrative_continuity", "player_engagement", "safety", "pace"],
+    allowHandoffs: true,
+    allowCinematics: true,
+    customInstructions: "",
+  },
 };
+
+export function normalizeDirectorConfig(value: Partial<ExperienceDirectorConfig> | null | undefined): ExperienceDirectorConfig {
+  const editor = value?.editor;
+  const priorities = editor?.priorities?.filter((priority) =>
+    priority === "narrative_continuity"
+    || priority === "player_engagement"
+    || priority === "safety"
+    || priority === "pace"
+  );
+  return {
+    ...DEFAULT_DIRECTOR_CONFIG,
+    ...value,
+    minimumHandoffTurn: Math.min(20, Math.max(1, Math.round(Number(value?.minimumHandoffTurn) || DEFAULT_DIRECTOR_CONFIG.minimumHandoffTurn))),
+    maximumHandoffsPerSession: value?.maximumHandoffsPerSession === 0 ? 0 : 1,
+    directorTimeoutMs: Math.min(30_000, Math.max(3_000, Math.round(Number(value?.directorTimeoutMs) || DEFAULT_DIRECTOR_CONFIG.directorTimeoutMs))),
+    handoffTarget: "emma",
+    editor: {
+      ...DEFAULT_DIRECTOR_CONFIG.editor,
+      ...editor,
+      priorities: priorities?.length ? priorities : DEFAULT_DIRECTOR_CONFIG.editor.priorities,
+      customInstructions: editor?.customInstructions?.trim() ?? "",
+    },
+  };
+}
 
 export async function listOrchestrationVersions(): Promise<ExperienceOrchestrationVersion[]> {
   const { data, error } = await supabase
@@ -75,7 +102,7 @@ export async function createOrchestrationDraft(input: {
     .insert({
       name: input.name.trim() || "Orchestration GM",
       prompt: input.prompt,
-      config: input.config ?? DEFAULT_DIRECTOR_CONFIG,
+      config: normalizeDirectorConfig(input.config),
       source_version_id: input.sourceVersionId ?? null,
       status: "draft",
     } as never)
@@ -91,7 +118,7 @@ export async function updateOrchestrationDraft(
 ): Promise<void> {
   const { error } = await supabase
     .from("experience_orchestration_versions" as never)
-    .update({ ...patch, updated_at: new Date().toISOString() } as never)
+    .update({ ...patch, config: normalizeDirectorConfig(patch.config), updated_at: new Date().toISOString() } as never)
     .eq("id", id)
     .eq("status", "draft");
   if (error) throw error;
@@ -130,7 +157,6 @@ export async function updateCharacterRuntimeProfile(
   id: string,
   patch: Pick<
     CharacterRuntimeProfile,
-    | "enabled"
     | "notion_character_id"
     | "opening_line"
     | "portrait_url"
@@ -145,6 +171,14 @@ export async function updateCharacterRuntimeProfile(
   const { error } = await supabase
     .from("character_runtime_profiles" as never)
     .update({ ...patch, updated_at: new Date().toISOString() } as never)
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateCharacterRuntimeActivation(id: string, enabled: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("character_runtime_profiles" as never)
+    .update({ enabled, updated_at: new Date().toISOString() } as never)
     .eq("id", id);
   if (error) throw error;
 }
@@ -239,7 +273,7 @@ export async function fetchPinnedDirectorRuntime(sessionId: string | null): Prom
     versionNumber: typeof row?.version_number === "number" ? row.version_number : null,
     prompt: typeof row?.prompt === "string" ? row.prompt : null,
     config: row?.config && typeof row.config === "object"
-      ? row.config as unknown as ExperienceDirectorConfig
+      ? normalizeDirectorConfig(row.config as Partial<ExperienceDirectorConfig>)
       : null,
   };
   runtimeCache.set(sessionId, runtime);

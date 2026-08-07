@@ -283,6 +283,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         diagnosticTrace: diagnosticTraceEnabled,
         systemPromptOverride: directorRuntime.prompt,
         orchestrationVersionId: directorRuntime.versionId,
+        orchestrationConfig: directorRuntime.config,
         currentCharacter: activeCharacter,
       });
     } finally {
