@@ -465,13 +465,21 @@ export default function Admin() {
             <QuestionnairesTab sessions={sessions} onRefresh={loadSessions} />
           </TabsContent>
 
-          {/* ==================== GAME MASTER ==================== */}
+          {/* ==================== EXPÉRIENCE ==================== */}
           <TabsContent value="architecture">
             <ExperienceArchitectureTab />
           </TabsContent>
 
           <TabsContent value="gamemaster">
             <GameMasterConfigTab />
+          </TabsContent>
+
+          <TabsContent value="gm-settings">
+            <GameMasterSettingsTab />
+          </TabsContent>
+
+          <TabsContent value="character-runtime">
+            <CharacterRuntimeSettingsTab />
           </TabsContent>
 
           <TabsContent value="video-triggers">
