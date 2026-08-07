@@ -25,7 +25,30 @@ const DEFAULT_RUNTIME_CONFIG: STTRuntimeConfig = {
 let cachedConfig: STTRuntimeConfig | null = null;
 let inFlight: Promise<STTRuntimeConfig> | null = null;
 let lastFailureAt = 0;
+let lastAttemptAt = 0;
 const FAILURE_BACKOFF_MS = 30_000;
+const MIN_ATTEMPT_INTERVAL_MS = 5_000;
+const CACHE_TTL_MS = 5 * 60_000;
+const STORAGE_KEY = "ava.stt.runtimeConfig";
+
+function readPersistedConfig(): STTRuntimeConfig | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { at: number; config: STTRuntimeConfig };
+    if (!parsed?.config || Date.now() - parsed.at > CACHE_TTL_MS) return null;
+    return parsed.config;
+  } catch {
+    return null;
+  }
+}
+
+function persistConfig(config: STTRuntimeConfig) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ at: Date.now(), config }));
+  } catch { /* storage indisponible */ }
+}
+
 
 async function fetchRuntimeConfig(): Promise<STTRuntimeConfig> {
   try {
