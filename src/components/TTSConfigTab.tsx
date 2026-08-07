@@ -218,6 +218,9 @@ export default function TTSConfigTab() {
         <p className="text-sm text-muted-foreground">
           Compare 3 services TTS. Le provider <strong>actif</strong> est utilisé dans le jeu ; les autres restent disponibles pour les tests.
         </p>
+        <p className="text-sm text-muted-foreground">
+          Les <strong>Voice ID</strong> ne se règlent plus ici : ils sont définis par personnage dans Expérience → Orchestration. Cet onglet ne garde que les réglages généraux (modèle, format, vitesse…).
+        </p>
       </div>
 
       {/* ===== Active provider selector ===== */}
@@ -377,13 +380,7 @@ export default function TTSConfigTab() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label className="space-y-1 text-sm">
-            <span className="font-medium text-muted-foreground">Voice ID</span>
-            <input value={iwSettings.voiceId}
-              onChange={(e) => updateIw({ voiceId: e.target.value })}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="Alain, Hades, Ashley, ..." />
-            <span className="block text-xs text-muted-foreground/60">Ex: Alain (FR), Hades, Ashley, Olivia... (voir docs Inworld)</span>
-          </label>
+
 
           <label className="space-y-1 text-sm">
             <span className="font-medium text-muted-foreground">Langue (BCP-47 ou AUTO)</span>
@@ -471,12 +468,7 @@ export default function TTSConfigTab() {
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label className="space-y-1 text-sm">
-            <span className="font-medium text-muted-foreground">Voice name</span>
-            <input value={huSettings.voiceName}
-              onChange={(e) => updateHu({ voiceName: e.target.value })}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="Male English Actor" />
-          </label>
+
 
           <label className="space-y-1 text-sm">
             <span className="font-medium text-muted-foreground">Provider de voix</span>
@@ -551,15 +543,7 @@ export default function TTSConfigTab() {
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label className="space-y-1 text-sm">
-            <span className="font-medium text-muted-foreground">Voice ID</span>
-            <input value={grSettings.voiceId}
-              onChange={(e) => updateGr({ voiceId: e.target.value })}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="b5ioHAR7JuHVLskk (Max)" />
-            <span className="block text-xs text-muted-foreground/60">
-              Défaut : <code>b5ioHAR7JuHVLskk</code> (Max) — voir <a href="https://docs.gradium.ai/guides/voices/all-voices" target="_blank" rel="noreferrer" className="underline">catalogue Gradium</a>
-            </span>
-          </label>
+
 
           <label className="space-y-1 text-sm">
             <span className="font-medium text-muted-foreground">Format audio</span>
