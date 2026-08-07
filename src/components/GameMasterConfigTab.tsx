@@ -471,9 +471,25 @@ export default function GameMasterConfigTab() {
                     <Input value={profile.portrait_url ?? ""} onChange={(event) => patchProfile(profile.id, { portrait_url: event.target.value || null })} placeholder="URL du portrait (renseignée par le téléversement)" />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <Input value={profile.tts_provider ?? ""} onChange={(event) => patchProfile(profile.id, { tts_provider: event.target.value || null })} placeholder="Provider TTS" />
-                    <Input value={profile.tts_voice_id ?? ""} onChange={(event) => patchProfile(profile.id, { tts_voice_id: event.target.value || null })} placeholder="Voice ID" />
+                    <Select
+                      value={profile.tts_provider ?? ""}
+                      onValueChange={(value) => patchProfile(profile.id, { tts_provider: value || null })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Provider TTS" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TTS_PROVIDER_LIST.map((provider) => (
+                          <SelectItem key={provider.id} value={provider.id}>{provider.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input value={profile.tts_voice_id ?? ""} onChange={(event) => patchProfile(profile.id, { tts_voice_id: event.target.value || null })} placeholder="Voice ID du personnage" />
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Les autres réglages de voix (modèle, format, vitesse…) restent ceux de l’onglet TTS Config ; seul le Voice ID se définit par personnage.
+                  </p>
+
                   <Button size="sm" variant="outline" disabled={saving || uploadingPortrait === profile.id} onClick={() => void saveProfile(profile)}>
                     <Save className="mr-1 h-3.5 w-3.5" />{uploadingPortrait === profile.id ? "Téléversement…" : "Sauvegarder le profil"}
                   </Button>
