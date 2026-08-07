@@ -398,44 +398,69 @@ export default function GameMasterConfigTab() {
       )}
 
       <section className="rounded-lg border p-4 space-y-3">
-        <div><h3 className="font-semibold">Disponibilité des personnages</h3><p className="text-xs text-muted-foreground">Emma ne peut être proposée que lorsque chaque prérequis est validé.</p></div>
+        <div>
+          <h3 className="font-semibold">Disponibilité des personnages</h3>
+          <p className="text-xs text-muted-foreground">
+            Les prérequis Fiche Notion, Prompt et Corpus RAG sont détectés automatiquement dans la base. Emma ne peut être proposée que lorsque tout est vert.
+          </p>
+        </div>
         <div className="grid gap-3 md:grid-cols-2">
           {profiles.map((profile) => {
-            const checks = readiness(profile);
-            const ready = profile.enabled && checks.every((check) => check.ok);
+            const auto = autoReadiness[profile.display_name];
+            const checks = readiness(profile, auto);
+            const blockers = checks.filter((check) => !check.ok);
+            const ready = profile.enabled && blockers.length === 0;
             return (
               <div key={profile.id} className="rounded border p-3">
                 <div className="flex items-center justify-between"><strong>{profile.display_name}</strong><Badge variant={ready ? "default" : "outline"}>{ready ? "prêt" : "incomplet"}</Badge></div>
                 <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
-                  {checks.map((check) => <span key={check.label} className={check.ok ? "text-emerald-500" : "text-muted-foreground"}>{check.ok ? "✓" : "○"} {check.label}</span>)}
+                  {checks.map((check) => (
+                    <span key={check.label} title={check.hint} className={check.ok ? "text-emerald-500" : "text-muted-foreground"}>
+                      {check.ok ? "✓" : "○"} {check.label}
+                    </span>
+                  ))}
                 </div>
+                {blockers.length > 0 && (
+                  <ul className="mt-2 space-y-1 rounded bg-muted/50 p-2 text-xs text-muted-foreground">
+                    {blockers.map((blocker) => (
+                      <li key={blocker.label}><span className="font-medium text-foreground">{blocker.label} :</span> {blocker.hint}</li>
+                    ))}
+                  </ul>
+                )}
                 <div className="mt-4 space-y-2 border-t pt-3">
                   <label className="flex items-center gap-2 text-xs font-medium">
                     <Checkbox checked={profile.enabled} onCheckedChange={(checked) => patchProfile(profile.id, { enabled: checked === true })} />
                     Personnage activable par le runtime
                   </label>
-                  <Input value={profile.notion_character_id ?? ""} onChange={(event) => patchProfile(profile.id, { notion_character_id: event.target.value.trim() || null })} placeholder="UUID de la fiche personnage Notion synchronisée" />
                   <Textarea value={profile.opening_line ?? ""} onChange={(event) => patchProfile(profile.id, { opening_line: event.target.value || null })} placeholder="Phrase d’ouverture" className="min-h-20" />
-                  <Input value={profile.portrait_url ?? ""} onChange={(event) => patchProfile(profile.id, { portrait_url: event.target.value || null })} placeholder="URL du portrait" />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      {profile.portrait_url && (
+                        <img src={profile.portrait_url} alt={`Portrait de ${profile.display_name}`} className="h-12 w-12 rounded object-cover" />
+                      )}
+                      <label className="flex-1">
+                        <span className="sr-only">Téléverser un portrait</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={uploadingPortrait === profile.id}
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            event.target.value = "";
+                            if (file) void uploadPortrait(profile, file);
+                          }}
+                          className="w-full text-xs file:mr-2 file:rounded file:border file:border-border file:bg-muted file:px-2 file:py-1 file:text-xs"
+                        />
+                      </label>
+                    </div>
+                    <Input value={profile.portrait_url ?? ""} onChange={(event) => patchProfile(profile.id, { portrait_url: event.target.value || null })} placeholder="URL du portrait (renseignée par le téléversement)" />
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <Input value={profile.tts_provider ?? ""} onChange={(event) => patchProfile(profile.id, { tts_provider: event.target.value || null })} placeholder="Provider TTS" />
                     <Input value={profile.tts_voice_id ?? ""} onChange={(event) => patchProfile(profile.id, { tts_voice_id: event.target.value || null })} placeholder="Voice ID" />
                   </div>
-                  <div className="grid gap-2 text-xs sm:grid-cols-2">
-                    {([
-                      ["prompt_validated", "Prompt validé"],
-                      ["rag_validated", "Corpus RAG isolé et non vide"],
-                      ["qualitative_tests_validated", "Tests qualitatifs validés"],
-                      ["knowledge_isolation_validated", "Absence de fuite Max→Emma validée"],
-                    ] as const).map(([key, label]) => (
-                      <label key={key} className="flex items-center gap-2">
-                        <Checkbox checked={profile[key]} onCheckedChange={(checked) => patchProfile(profile.id, { [key]: checked === true })} />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
-                  <Button size="sm" variant="outline" disabled={saving} onClick={() => void saveProfile(profile)}>
-                    <Save className="mr-1 h-3.5 w-3.5" />Sauvegarder le profil
+                  <Button size="sm" variant="outline" disabled={saving || uploadingPortrait === profile.id} onClick={() => void saveProfile(profile)}>
+                    <Save className="mr-1 h-3.5 w-3.5" />{uploadingPortrait === profile.id ? "Téléversement…" : "Sauvegarder le profil"}
                   </Button>
                 </div>
               </div>
