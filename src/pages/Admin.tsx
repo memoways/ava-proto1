@@ -15,6 +15,8 @@ import RAGConfigTab from "@/components/RAGConfigTab";
 import TTSConfigTab from "@/components/TTSConfigTab";
 import STTConfigTab from "@/components/STTConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
+import GameMasterSettingsTab from "@/components/GameMasterSettingsTab";
+import CharacterRuntimeSettingsTab from "@/components/CharacterRuntimeSettingsTab";
 import CharacterEditorTab from "@/components/CharacterEditorTab";
 import VideoTriggersEditor from "@/components/VideoTriggersEditor";
 import RAGLabTab from "@/components/RAGLabTab";
