@@ -30,6 +30,7 @@ import VoiceUsageTab from "@/components/admin/VoiceUsageTab";
 import StreamingAvatarUsageTab from "@/components/admin/StreamingAvatarUsageTab";
 import VideosListTab from "@/components/admin/VideosListTab";
 import StreamingAvatarConfigTab from "@/components/StreamingAvatarConfigTab";
+import ExperienceArchitectureTab from "@/components/ExperienceArchitectureTab";
 import { Switch } from "@/components/ui/switch";
 import { trackEvent } from "@/services/posthogService";
 import { LEGACY_GROUP, TAB_GROUPS } from "@/services/adminNavigation";
@@ -465,6 +466,10 @@ export default function Admin() {
           </TabsContent>
 
           {/* ==================== GAME MASTER ==================== */}
+          <TabsContent value="architecture">
+            <ExperienceArchitectureTab />
+          </TabsContent>
+
           <TabsContent value="gamemaster">
             <GameMasterConfigTab />
           </TabsContent>

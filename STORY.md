@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-07 (directeur d'expérience, cinématiques, handoff Emma et PostHog réel)
+> **Last Updated**: 2026-08-07 (architecture et mécanique conversationnelle expliquées dans l’admin)
 
 ---
 
@@ -72,6 +72,55 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-07 — L’application rend enfin visible la mécanique qui la fait vivre 🔷
+
+**Le problème.** Le pipeline PRD4 était documenté dans le code, les traces et
+plusieurs rapports techniques, mais il restait difficile d’en construire une
+vision mentale complète. Pour comprendre une réponse de Max, il fallait relier
+soi-même le parcours React, les façades voix, l’orchestrateur, Lovable Cloud,
+pgvector, les providers et le directeur post-tour. Cette dispersion entretenait
+aussi une confusion importante : ce qui doit finir avant la voix et ce qui peut
+préparer tranquillement le tour suivant semblaient appartenir à une seule chaîne.
+
+**Une carte du système, depuis le produit lui-même.** Le menu **Expérience**
+ouvre maintenant **Comment ça marche**. Un premier schéma organise
+l’application en quatre couches : interfaces, runtime navigateur, Lovable Cloud
+et services spécialisés. L’administrateur peut suivre le flux d’un tour vocal,
+du contenu/RAG ou du pilotage qualité ; les composants concernés s’éclairent et
+chaque bloc révèle ses responsabilités, ses échanges et ses repères exacts dans
+le dépôt. La carte assume explicitement la chaîne de livraison : Lovable compile
+et publie, tandis que Supabase, les Edge Functions et les secrets restent dans
+Lovable Cloud.
+
+**Un tour n’est pas une simple flèche STT→LLM→TTS.** Le second schéma déroule
+sept étapes autour d’une même question. Le chemin perçu par le joueur capture et
+finalise la voix, rassemble RAG et mémoire, fait répondre le personnage puis
+restitue exactement son texte en TTS ou avatar. Chaque étape expose ses entrées,
+son traitement, ses sorties, un exemple concret et son mode dégradé. La réponse
+reste donc compréhensible comme une transformation de données, pas comme une
+boîte noire magique.
+
+**La bifurcation décisive devient visible.** Dès que Max a produit son texte, la
+restitution vocale peut démarrer pendant que le directeur interprète le tour.
+Persistance, traces, résumé, labels, delta de mémoire, guidance et recommandation
+d’action vivent hors du chemin de la première voix. Les règles déterministes
+valident ensuite cinématique, handoff ou fin avant tout effet produit. Le schéma
+montre ainsi le contrat central de fluidité : le tour N est entendu sans attendre
+son analyse, et cette analyse influence le tour N+1 plutôt que de réécrire ce qui
+est déjà en train d’être joué.
+
+**Leçon.** Une architecture devient réellement gouvernable lorsqu’elle est
+visible au même endroit que ses réglages. La documentation interactive ne
+remplace ni les traces ni les plans techniques ; elle donne la carte qui permet
+de les lire correctement, avec un vocabulaire commun entre produit, éditorial et
+technique.
+
+**Validation.** La vue est responsive et entièrement actionnable au clavier,
+n’ajoute aucune dépendance et ne modifie aucun service live. Les interactions,
+la navigation admin, les 235 tests unitaires et le build de production sont
+validés localement. Le plan est conservé dans
+[`docs/plan_visualisation_architecture_experience.md`](docs/plan_visualisation_architecture_experience.md).
 
 ### 2026-08-07 — Le Game Master devient enfin directeur d'expérience 🔷
 

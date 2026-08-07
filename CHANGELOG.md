@@ -4,6 +4,34 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.55.1] — 2026-08-07 — Architecture de l’expérience expliquée dans l’admin
+
+### Ajouté
+
+- Nouveau panneau **Expérience → Comment ça marche**, accessible directement
+  par `/admin?tab=architecture`, pour comprendre la construction réelle du
+  prototype sans quitter le back-office.
+- Schéma interactif de l’architecture en quatre couches — interfaces, runtime
+  navigateur, Lovable Cloud et services spécialisés — avec trois flux
+  sélectionnables : tour vocal, contenu/RAG et pilotage/qualité.
+- Fiche détaillée pour chaque composant : responsabilités, échanges, services
+  utilisés et fichiers de référence dans le dépôt.
+- Schéma interactif d’un tour PRD4 en sept étapes, séparant clairement le chemin
+  critique voix (`STT → RAG/contexte → Max → sortie`) des traitements
+  asynchrones qui mémorisent, évaluent et préparent le tour suivant.
+- Explications pas à pas avec entrées, traitement, sorties, exemple fil rouge,
+  comportement dégradé et navigation clavier/précédent-suivant.
+- Plan d’implémentation et critères de validation dans
+  [`docs/plan_visualisation_architecture_experience.md`](docs/plan_visualisation_architecture_experience.md).
+
+### Compatibilité et validation
+
+- Aucun provider, secret, schéma de données, Edge Function ou réglage runtime
+  n’est modifié : la vue documente le pipeline PRD4 existant et reste compatible
+  avec la chaîne Lovable / Lovable Cloud.
+- Build de production réussi, lint ciblé sans erreur, `git diff --check` valide
+  et suite unitaire complète de **235 tests** réussie sur **59 fichiers**.
+
 ## [0.55.0] — 2026-08-07 — Orchestration GM, handoff Emma et observabilité PostHog réelle
 
 ### Ajouté
