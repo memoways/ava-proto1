@@ -551,15 +551,7 @@ export default function TTSConfigTab() {
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label className="space-y-1 text-sm">
-            <span className="font-medium text-muted-foreground">Voice ID</span>
-            <input value={grSettings.voiceId}
-              onChange={(e) => updateGr({ voiceId: e.target.value })}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="b5ioHAR7JuHVLskk (Max)" />
-            <span className="block text-xs text-muted-foreground/60">
-              Défaut : <code>b5ioHAR7JuHVLskk</code> (Max) — voir <a href="https://docs.gradium.ai/guides/voices/all-voices" target="_blank" rel="noreferrer" className="underline">catalogue Gradium</a>
-            </span>
-          </label>
+
 
           <label className="space-y-1 text-sm">
             <span className="font-medium text-muted-foreground">Format audio</span>
