@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_legacy_access_log: {
+        Row: {
+          accessed_at: string
+          id: string
+          tab: string
+          user_id: string
+        }
+        Insert: {
+          accessed_at?: string
+          id?: string
+          tab: string
+          user_id: string
+        }
+        Update: {
+          accessed_at?: string
+          id?: string
+          tab?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       admin_settings: {
         Row: {
           key: string
@@ -125,6 +146,71 @@ export type Database = {
             foreignKeyName: "character_prompts_character_id_fkey"
             columns: ["character_id"]
             isOneToOne: true
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      character_runtime_profiles: {
+        Row: {
+          character_key: string
+          created_at: string
+          display_name: string
+          enabled: boolean
+          id: string
+          knowledge_isolation_validated: boolean
+          metadata: Json
+          notion_character_id: string | null
+          opening_line: string | null
+          portrait_url: string | null
+          prompt_validated: boolean
+          qualitative_tests_validated: boolean
+          rag_validated: boolean
+          tts_provider: string | null
+          tts_voice_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          character_key: string
+          created_at?: string
+          display_name: string
+          enabled?: boolean
+          id?: string
+          knowledge_isolation_validated?: boolean
+          metadata?: Json
+          notion_character_id?: string | null
+          opening_line?: string | null
+          portrait_url?: string | null
+          prompt_validated?: boolean
+          qualitative_tests_validated?: boolean
+          rag_validated?: boolean
+          tts_provider?: string | null
+          tts_voice_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          character_key?: string
+          created_at?: string
+          display_name?: string
+          enabled?: boolean
+          id?: string
+          knowledge_isolation_validated?: boolean
+          metadata?: Json
+          notion_character_id?: string | null
+          opening_line?: string | null
+          portrait_url?: string | null
+          prompt_validated?: boolean
+          qualitative_tests_validated?: boolean
+          rag_validated?: boolean
+          tts_provider?: string | null
+          tts_voice_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_runtime_profiles_notion_character_id_fkey"
+            columns: ["notion_character_id"]
+            isOneToOne: false
             referencedRelation: "characters"
             referencedColumns: ["id"]
           },
@@ -277,6 +363,113 @@ export type Database = {
             columns: ["character_id"]
             isOneToOne: false
             referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experience_events: {
+        Row: {
+          character_key: string | null
+          created_at: string
+          event_key: string
+          event_type: string
+          id: string
+          orchestration_version_id: string | null
+          payload: Json
+          session_id: string
+          turn_id: string | null
+          turn_index: number | null
+        }
+        Insert: {
+          character_key?: string | null
+          created_at?: string
+          event_key: string
+          event_type: string
+          id?: string
+          orchestration_version_id?: string | null
+          payload?: Json
+          session_id: string
+          turn_id?: string | null
+          turn_index?: number | null
+        }
+        Update: {
+          character_key?: string | null
+          created_at?: string
+          event_key?: string
+          event_type?: string
+          id?: string
+          orchestration_version_id?: string | null
+          payload?: Json
+          session_id?: string
+          turn_id?: string | null
+          turn_index?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experience_events_orchestration_version_id_fkey"
+            columns: ["orchestration_version_id"]
+            isOneToOne: false
+            referencedRelation: "experience_orchestration_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experience_events_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experience_orchestration_versions: {
+        Row: {
+          archived_at: string | null
+          config: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          prompt: string
+          published_at: string | null
+          source_version_id: string | null
+          status: string
+          updated_at: string
+          version_number: number
+        }
+        Insert: {
+          archived_at?: string | null
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          prompt: string
+          published_at?: string | null
+          source_version_id?: string | null
+          status?: string
+          updated_at?: string
+          version_number?: number
+        }
+        Update: {
+          archived_at?: string | null
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          prompt?: string
+          published_at?: string | null
+          source_version_id?: string | null
+          status?: string
+          updated_at?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experience_orchestration_versions_source_version_id_fkey"
+            columns: ["source_version_id"]
+            isOneToOne: false
+            referencedRelation: "experience_orchestration_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -623,6 +816,7 @@ export type Database = {
       }
       sessions: {
         Row: {
+          active_character: string
           admin_note: string | null
           ava_start_variant: string | null
           branch: string | null
@@ -634,6 +828,7 @@ export type Database = {
           first_max_response_at: string | null
           game_over_reason: string | null
           gm_post_turn_log: Json
+          handoff_count: number
           has_seen_film: string | null
           id: string
           memory_last_turn: number
@@ -642,7 +837,9 @@ export type Database = {
           narrative_end: boolean | null
           onboarding_duration_ms: number | null
           onboarding_started_at: string | null
+          orchestration_version_id: string | null
           output_mode: string
+          pending_handoff: Json | null
           personnage_appele: string | null
           player_role: Json | null
           questionnaire_responses: Json | null
@@ -663,6 +860,7 @@ export type Database = {
           variante_onboarding: string | null
         }
         Insert: {
+          active_character?: string
           admin_note?: string | null
           ava_start_variant?: string | null
           branch?: string | null
@@ -674,6 +872,7 @@ export type Database = {
           first_max_response_at?: string | null
           game_over_reason?: string | null
           gm_post_turn_log?: Json
+          handoff_count?: number
           has_seen_film?: string | null
           id?: string
           memory_last_turn?: number
@@ -682,7 +881,9 @@ export type Database = {
           narrative_end?: boolean | null
           onboarding_duration_ms?: number | null
           onboarding_started_at?: string | null
+          orchestration_version_id?: string | null
           output_mode?: string
+          pending_handoff?: Json | null
           personnage_appele?: string | null
           player_role?: Json | null
           questionnaire_responses?: Json | null
@@ -703,6 +904,7 @@ export type Database = {
           variante_onboarding?: string | null
         }
         Update: {
+          active_character?: string
           admin_note?: string | null
           ava_start_variant?: string | null
           branch?: string | null
@@ -714,6 +916,7 @@ export type Database = {
           first_max_response_at?: string | null
           game_over_reason?: string | null
           gm_post_turn_log?: Json
+          handoff_count?: number
           has_seen_film?: string | null
           id?: string
           memory_last_turn?: number
@@ -722,7 +925,9 @@ export type Database = {
           narrative_end?: boolean | null
           onboarding_duration_ms?: number | null
           onboarding_started_at?: string | null
+          orchestration_version_id?: string | null
           output_mode?: string
+          pending_handoff?: Json | null
           personnage_appele?: string | null
           player_role?: Json | null
           questionnaire_responses?: Json | null
@@ -742,7 +947,15 @@ export type Database = {
           user_posture_raw?: string | null
           variante_onboarding?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sessions_orchestration_version_id_fkey"
+            columns: ["orchestration_version_id"]
+            isOneToOne: false
+            referencedRelation: "experience_orchestration_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       storyworld: {
         Row: {
@@ -956,6 +1169,26 @@ export type Database = {
         Args: { p_bucket: string; p_session_id?: string }
         Returns: Json
       }
+      get_character_runtime_readiness: {
+        Args: { p_character_key: string }
+        Returns: {
+          character_key: string
+          display_name: string
+          opening_line: string
+          ready: boolean
+          tts_provider: string
+          tts_voice_id: string
+        }[]
+      }
+      get_pinned_orchestration_runtime: {
+        Args: { p_session_id: string }
+        Returns: {
+          config: Json
+          prompt: string
+          version_id: string
+          version_number: number
+        }[]
+      }
       match_embeddings: {
         Args: {
           match_count?: number
@@ -1012,6 +1245,14 @@ export type Database = {
           p_value: Json
         }
         Returns: undefined
+      }
+      pin_current_orchestration_version: {
+        Args: { p_session_id: string }
+        Returns: string
+      }
+      publish_experience_orchestration_version: {
+        Args: { p_version_id: string }
+        Returns: string
       }
     }
     Enums: {
