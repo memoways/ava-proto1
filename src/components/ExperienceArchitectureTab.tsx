@@ -41,7 +41,7 @@ interface ArchitectureNode {
   eyebrow: string;
   summary: string;
   layer: ArchitectureLayerId;
-  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  icon: LucideIcon;
   flows: FlowId[];
   description: string;
   responsibilities: string[];
@@ -55,7 +55,7 @@ interface TurnStep {
   label: string;
   shortLabel: string;
   lane: "critical" | "background";
-  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  icon: LucideIcon;
   timing: string;
   promise: string;
   input: string[];
@@ -546,7 +546,7 @@ function DetailList({
 }: {
   title: string;
   items: string[];
-  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  icon: LucideIcon;
 }) {
   return (
     <div>
@@ -767,7 +767,7 @@ function TurnDetailColumn({
 }: {
   title: string;
   items: string[];
-  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  icon: LucideIcon;
 }) {
   return (
     <div>
