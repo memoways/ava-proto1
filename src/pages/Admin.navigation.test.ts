@@ -19,9 +19,11 @@ describe("Admin navigation invariants", () => {
 
   it("separates Expérience and Qualité without merging latency sources", () => {
     expect(TAB_GROUPS.find((group) => group.id === "experience")?.tabs.map((tab) => tab.id)).toEqual([
-      "architecture",
       "gamemaster",
+      "gm-settings",
+      "character-runtime",
       "video-triggers",
+      "architecture",
     ]);
     expect(TAB_GROUPS.find((group) => group.id === "quality")?.tabs.map((tab) => tab.id)).toEqual([
       "latency",
