@@ -100,8 +100,15 @@ export default function Admin() {
   const [editingChar, setEditingChar] = useState<CharacterRow | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
   const [savingChar, setSavingChar] = useState(false);
-  const [activeGroup, setActiveGroup] = useState("data");
-  const [activeTab, setActiveTab] = useState("sessions");
+  const initialLocation = useMemo(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    const groups = requested === "validator" || requested === "metrics" ? [...TAB_GROUPS, LEGACY_GROUP] : TAB_GROUPS;
+    const group = groups.find((candidate) => candidate.tabs.some((tab) => tab.id === requested));
+    return group && requested ? { group: group.id, tab: requested } : { group: "data", tab: "sessions" };
+  }, []);
+  const [activeGroup, setActiveGroup] = useState(initialLocation.group);
+  const [activeTab, setActiveTab] = useState(initialLocation.tab);
+  const appliedUrlTabRef = useRef<string | null>(initialLocation.tab);
   const [searchParams, setSearchParams] = useSearchParams();
   const [outputMode, setOutputMode] = useState<OutputMode>(() => getOutputSettings().mode);
   const legacyVisible = searchParams.get("legacy") === "1"
