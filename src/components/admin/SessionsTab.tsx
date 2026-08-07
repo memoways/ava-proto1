@@ -30,7 +30,7 @@ export interface SessionRow {
   branch: string | null;
   triggers_activated: string[] | null;
   conversation_log: AdminConversationMessage[] | null;
-  questionnaire_responses: Partial<QuestionnaireData> | null;
+  questionnaire_responses: (Partial<QuestionnaireData> & { suggestions?: string }) | null;
   name: string | null;
   admin_note: string | null;
   player_role?: { summary_for_user?: string; summary_for_max?: string } | null;
