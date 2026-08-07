@@ -1,5 +1,5 @@
 import { getCachedSession } from "@/services/gameAuth";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -100,8 +100,15 @@ export default function Admin() {
   const [editingChar, setEditingChar] = useState<CharacterRow | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
   const [savingChar, setSavingChar] = useState(false);
-  const [activeGroup, setActiveGroup] = useState("data");
-  const [activeTab, setActiveTab] = useState("sessions");
+  const initialLocation = useMemo(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    const groups = requested === "validator" || requested === "metrics" ? [...TAB_GROUPS, LEGACY_GROUP] : TAB_GROUPS;
+    const group = groups.find((candidate) => candidate.tabs.some((tab) => tab.id === requested));
+    return group && requested ? { group: group.id, tab: requested } : { group: "data", tab: "sessions" };
+  }, []);
+  const [activeGroup, setActiveGroup] = useState(initialLocation.group);
+  const [activeTab, setActiveTab] = useState(initialLocation.tab);
+  const appliedUrlTabRef = useRef<string | null>(initialLocation.tab);
   const [searchParams, setSearchParams] = useSearchParams();
   const [outputMode, setOutputMode] = useState<OutputMode>(() => getOutputSettings().mode);
   const legacyVisible = searchParams.get("legacy") === "1"
@@ -119,6 +126,7 @@ export default function Admin() {
     for (const group of availableGroups) {
       const found = group.tabs.find((t) => t.id === requested);
       if (found) {
+        appliedUrlTabRef.current = requested;
         setActiveGroup(group.id);
         setActiveTab(requested);
         if (group.id === "legacy") {
@@ -138,12 +146,16 @@ export default function Admin() {
 
   // Quand l'utilisateur change d'onglet manuellement, refléter dans l'URL (sans push history)
   useEffect(() => {
-    if (searchParams.get("tab") !== activeTab) {
-      const next = new URLSearchParams(searchParams);
-      next.set("tab", activeTab);
-      setSearchParams(next, { replace: true });
-    }
-  }, [activeTab, searchParams, setSearchParams]);
+    const urlTab = searchParams.get("tab");
+    if (urlTab === activeTab) return;
+    // Un onglet demandé par l'URL et pas encore appliqué a la priorité : ne pas l'écraser.
+    const requestedIsKnown = availableGroups.some((group) => group.tabs.some((tab) => tab.id === urlTab));
+    if (requestedIsKnown && appliedUrlTabRef.current !== urlTab) return;
+    appliedUrlTabRef.current = activeTab;
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", activeTab);
+    setSearchParams(next, { replace: true });
+  }, [activeTab, searchParams, setSearchParams, availableGroups]);
 
   useEffect(() => {
     hydrateAllSettings(); // Load all settings from DB into localStorage
