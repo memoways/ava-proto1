@@ -1272,11 +1272,12 @@ const IndexPRD4 = () => {
             pendingGmGuidanceRef.current = guarded.action.proposalGuidance;
             trackEvent("prd4_handoff_recommended", { session_id: sid, turn_id: turnId, turn_index: turnIndex });
           } else if (guarded.action.type === "cinematic") {
-            const video = videos.find((candidate) => candidate.id === guarded.action.videoId && candidate.video_url) ?? null;
+            const cinematic = guarded.action;
+            const video = videos.find((candidate) => candidate.id === cinematic.videoId && candidate.video_url) ?? null;
             if (video) {
               triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, video.id];
               lastVideoTurnRef.current = turnIndex;
-              trackEvent("prd4_video_recommended", { session_id: sid, turn_id: turnId, video_id: video.id, confidence: guarded.action.confidence });
+              trackEvent("prd4_video_recommended", { session_id: sid, turn_id: turnId, video_id: video.id, confidence: cinematic.confidence });
               trackEvent("prd4_video_triggered", { session_id: sid, turn_id: turnId, video_id: video.id, title: video.title, source: "experience_director" });
               setActiveVideo(video);
               if (sid) void appendExperienceEvent({
@@ -1287,7 +1288,7 @@ const IndexPRD4 = () => {
                 turnIndex,
                 character: activeCharacterRef.current,
                 orchestrationVersionId: ev.orchestration_version_id,
-                payload: { videoId: video.id, reason: guarded.action.reason, confidence: guarded.action.confidence },
+                payload: { videoId: video.id, reason: cinematic.reason, confidence: cinematic.confidence },
               });
             }
           } else if (guarded.action.type === "end") {

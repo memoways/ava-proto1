@@ -157,7 +157,7 @@ export default function Admin() {
       .select("*")
       .order("started_at", { ascending: false })
       .limit(50);
-    setSessions((data as SessionRow[]) || []);
+    setSessions((data as unknown as SessionRow[]) || []);
     setLoading(false);
   }
 

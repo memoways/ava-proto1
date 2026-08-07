@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity, ScanSearch, FlaskConical } from "lucide-react";
 import { Link } from "react-router-dom";
 import { isQuestionLike } from "@/services/ragQuestionCorpus";
+import type { QuestionnaireData } from "@/types";
 
 /** Onglet admin où corriger la cause racine selon le type de fallback GM. */
 const FALLBACK_TARGET_TAB: Record<string, { tab: string; label: string }> = {
@@ -29,7 +30,7 @@ export interface SessionRow {
   branch: string | null;
   triggers_activated: string[] | null;
   conversation_log: AdminConversationMessage[] | null;
-  questionnaire_responses: { experience_rating?: number; nps?: number } | null;
+  questionnaire_responses: (Partial<QuestionnaireData> & { suggestions?: string }) | null;
   name: string | null;
   admin_note: string | null;
   player_role?: { summary_for_user?: string; summary_for_max?: string } | null;
@@ -42,7 +43,14 @@ export interface SessionRow {
 interface AdminConversationMessage {
   role: "user" | "max" | "emma";
   content: string;
-  gmFallback?: { kind?: string; elapsed_ms?: number; timeout_ms?: number };
+  gmFallback?: {
+    kind?: string;
+    elapsed_ms?: number;
+    timeout_ms?: number;
+    reason?: string;
+    model?: string;
+    error_excerpt?: string;
+  };
   pipeline?: { blocker?: string };
   labels?: { themes?: string[]; topics?: string[]; intentions?: string[] };
 }

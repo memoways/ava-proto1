@@ -265,6 +265,8 @@ export type {
   ConversationMemoryDelta,
   ConversationMemoryItem,
   ConversationMemoryV1,
+  CharacterMemoryItemV2,
+  RuntimeCharacter,
 } from "./conversationMemory";
 
 export interface QuestionnaireData {

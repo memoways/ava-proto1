@@ -518,3 +518,18 @@ indépendantes encore possibles.
 - [Audit observabilité PostHog historique](../posthog_latency_observability_audit.md)
 - [Activation `optimized_v3`](../optimized_v3_lovable_runbook.md)
 - [Déploiement Lovable sans interruption](../lovable_phase1_activation_runbook.md)
+
+## Journal d'activation Lovable Cloud — 7 août 2026
+
+| Élément | Résultat |
+|---|---|
+| Commit synchronisé | `e76d3551c85ce668915aa1421bea11e503016c9a` |
+| Baseline Cloud avant migration | 77 sessions conservées, 5 fiches personnages, aucune table ni colonne d'orchestration préexistante, `private.has_role` disponible |
+| Migration fondations | Appliquée par Lovable Cloud. Ajout obligatoire constaté : les tables du schéma `public` ne reçoivent aucun droit par défaut, des `GRANT` explicites (`authenticated`, `service_role`) ont été inclus, puis les droits `anon` révoqués |
+| Contrôles post-migration | 1 seule version `published`, baseline `builtin://experience-director/v1` présente, profils `max:true` / `emma:false`, 4 colonnes ajoutées à `sessions`, 4 RPC créées, `experience_events` sans politique `UPDATE`/`DELETE`, 77 sessions intactes |
+| Types Supabase régénérés | Oui ; corrections strictement mécaniques de typage (`SessionRow`, exports mémoire V2, projection du label pass, narrowing action cinématique) |
+| Build et tests | Build vert, 59 fichiers / 244 tests réussis |
+| Edge Function | `posthog-latency-stats` déployée ; sans JWT → `401`, JWT invalide → `401` |
+| Secrets PostHog | **Manquants** : `POSTHOG_PERSONAL_API_KEY`, `POSTHOG_PROJECT_ID`, `POSTHOG_API_HOST` à saisir dans l'interface Secrets |
+| Emma | Volontairement désactivée ; checklist runtime non renseignée |
+| Publication Production | Non effectuée, en attente d'approbation explicite |
