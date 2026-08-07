@@ -126,6 +126,7 @@ export default function Admin() {
     for (const group of availableGroups) {
       const found = group.tabs.find((t) => t.id === requested);
       if (found) {
+        appliedUrlTabRef.current = requested;
         setActiveGroup(group.id);
         setActiveTab(requested);
         if (group.id === "legacy") {
@@ -145,12 +146,16 @@ export default function Admin() {
 
   // Quand l'utilisateur change d'onglet manuellement, refléter dans l'URL (sans push history)
   useEffect(() => {
-    if (searchParams.get("tab") !== activeTab) {
-      const next = new URLSearchParams(searchParams);
-      next.set("tab", activeTab);
-      setSearchParams(next, { replace: true });
-    }
-  }, [activeTab, searchParams, setSearchParams]);
+    const urlTab = searchParams.get("tab");
+    if (urlTab === activeTab) return;
+    // Un onglet demandé par l'URL et pas encore appliqué a la priorité : ne pas l'écraser.
+    const requestedIsKnown = availableGroups.some((group) => group.tabs.some((tab) => tab.id === urlTab));
+    if (requestedIsKnown && appliedUrlTabRef.current !== urlTab) return;
+    appliedUrlTabRef.current = activeTab;
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", activeTab);
+    setSearchParams(next, { replace: true });
+  }, [activeTab, searchParams, setSearchParams, availableGroups]);
 
   useEffect(() => {
     hydrateAllSettings(); // Load all settings from DB into localStorage
