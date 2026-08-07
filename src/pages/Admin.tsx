@@ -15,6 +15,8 @@ import RAGConfigTab from "@/components/RAGConfigTab";
 import TTSConfigTab from "@/components/TTSConfigTab";
 import STTConfigTab from "@/components/STTConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
+import GameMasterSettingsTab from "@/components/GameMasterSettingsTab";
+import CharacterRuntimeSettingsTab from "@/components/CharacterRuntimeSettingsTab";
 import CharacterEditorTab from "@/components/CharacterEditorTab";
 import VideoTriggersEditor from "@/components/VideoTriggersEditor";
 import RAGLabTab from "@/components/RAGLabTab";
@@ -465,13 +467,21 @@ export default function Admin() {
             <QuestionnairesTab sessions={sessions} onRefresh={loadSessions} />
           </TabsContent>
 
-          {/* ==================== GAME MASTER ==================== */}
+          {/* ==================== EXPÉRIENCE ==================== */}
           <TabsContent value="architecture">
             <ExperienceArchitectureTab />
           </TabsContent>
 
           <TabsContent value="gamemaster">
             <GameMasterConfigTab />
+          </TabsContent>
+
+          <TabsContent value="gm-settings">
+            <GameMasterSettingsTab />
+          </TabsContent>
+
+          <TabsContent value="character-runtime">
+            <CharacterRuntimeSettingsTab />
           </TabsContent>
 
           <TabsContent value="video-triggers">

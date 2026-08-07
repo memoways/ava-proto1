@@ -25,7 +25,7 @@ export interface ExperienceOrchestrationVersion {
 
 export interface CharacterRuntimeProfile {
   id: string;
-  character_key: "max" | "emma";
+  character_key: string;
   display_name: string;
   enabled: boolean;
   notion_character_id: string | null;
