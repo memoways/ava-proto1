@@ -112,6 +112,8 @@ export default function GameMasterConfigTab() {
   const [testExpected, setTestExpected] = useState("Une guidance prudente, sans action forcée.");
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const [autoReadiness, setAutoReadiness] = useState<Record<string, CharacterAutoReadiness>>({});
+  const [uploadingPortrait, setUploadingPortrait] = useState<string | null>(null);
 
   const selected = useMemo(
     () => versions.find((version) => version.id === selectedId) ?? null,
