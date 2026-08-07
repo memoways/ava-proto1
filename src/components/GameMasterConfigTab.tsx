@@ -450,28 +450,26 @@ export default function GameMasterConfigTab() {
                     Personnage activable par le runtime
                   </label>
                   <Textarea value={profile.opening_line ?? ""} onChange={(event) => patchProfile(profile.id, { opening_line: event.target.value || null })} placeholder="Phrase d’ouverture" className="min-h-20" />
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      {profile.portrait_url && (
-                        <img src={profile.portrait_url} alt={`Portrait de ${profile.display_name}`} className="h-12 w-12 rounded object-cover" />
-                      )}
-                      <label className="flex-1">
-                        <span className="sr-only">Téléverser un portrait</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          disabled={uploadingPortrait === profile.id}
-                          onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            event.target.value = "";
-                            if (file) void uploadPortrait(profile, file);
-                          }}
-                          className="w-full text-xs file:mr-2 file:rounded file:border file:border-border file:bg-muted file:px-2 file:py-1 file:text-xs"
-                        />
-                      </label>
-                    </div>
-                    <Input value={profile.portrait_url ?? ""} onChange={(event) => patchProfile(profile.id, { portrait_url: event.target.value || null })} placeholder="URL du portrait (renseignée par le téléversement)" />
+                  <div className="flex items-center gap-2">
+                    {profile.portrait_url && (
+                      <img src={profile.portrait_url} alt={`Portrait de ${profile.display_name}`} className="h-12 w-12 rounded object-cover" />
+                    )}
+                    <label className="inline-flex cursor-pointer items-center rounded border border-border bg-muted px-3 py-1.5 text-xs font-medium hover:bg-muted/80">
+                      {uploadingPortrait === profile.id ? "Téléversement…" : "Sélectionner portrait"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={uploadingPortrait === profile.id}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = "";
+                          if (file) void uploadPortrait(profile, file);
+                        }}
+                        className="hidden"
+                      />
+                    </label>
                   </div>
+
                   <div className="grid grid-cols-2 gap-2">
                     <Select
                       value={profile.tts_provider ?? ""}
