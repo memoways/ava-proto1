@@ -49,6 +49,7 @@ import {
 } from "@/services/latencySegments";
 import { getConfiguredLatencyServices } from "@/services/latencyServiceMetadata";
 import LLMTokenCostPanel from "@/components/admin/LLMTokenCostPanel";
+import { RAG_DEGRADED_MODE_DEADLINE_MS } from "@/config/experienceRuntime";
 
 interface SessionRow {
   id: string;
@@ -652,11 +653,14 @@ function LatencyVisualization({
             <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
               {availability.map((item) => (
                 <Badge key={item.key} variant={item.count > 0 ? "secondary" : "outline"} className="font-normal">
-                  {item.label}: {item.count}/{item.total || 0}
+                  {item.label}: {item.count > 0 ? `${item.count}/${item.total || 0}` : "non exécuté / non mesuré"}
                 </Badge>
               ))}
             </div>
           )}
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            PRD4 live n’exécute ni GM pré-tour ni validateur : leur absence est attendue, aucune durée zéro n’est synthétisée. Délai RAG dégradé effectif : {RAG_DEGRADED_MODE_DEADLINE_MS} ms.
+          </p>
         </div>
         <div className="flex items-center gap-5 text-xs">
           {isAggregate && (
@@ -1339,7 +1343,7 @@ function aggregate(session: SessionRow): SessionAggregate {
   const log = Array.isArray(session.conversation_log) ? session.conversation_log : [];
   const turns: TurnTiming[] = [];
   log.forEach((msg, i) => {
-    if (msg.role !== "max" || !msg.pipeline) return;
+    if (msg.role === "user" || !msg.pipeline) return;
     turns.push({
       ...msg.pipeline,
       index: i,
@@ -2102,13 +2106,15 @@ export default function LatencyBlockingTab() {
                         <div
                           key={i}
                           className={`text-sm rounded p-2 ${
-                            msg.role === "max"
+                            msg.role !== "user"
                               ? "bg-blue-500/10 border border-blue-500/20"
                               : "bg-emerald-500/10 border border-emerald-500/20"
                           }`}
                         >
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-2">
-                            <span className="font-semibold">{msg.role === "max" ? "Max" : "Utilisateur"}</span>
+                            <span className="font-semibold">
+                              {msg.role === "user" ? "Utilisateur" : msg.role === "emma" ? "Emma" : "Max"}
+                            </span>
                             {msg.pipeline && serviceLatencyTotal(msg.pipeline) > 0 && (
                               <span className="font-mono">latence {fmtMs(serviceLatencyTotal(msg.pipeline))}</span>
                             )}

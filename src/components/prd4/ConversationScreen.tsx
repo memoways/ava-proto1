@@ -1,11 +1,13 @@
 /** PRD4 — Écran 8 : Conversation avec Max (toggle-to-talk, fond Max plein écran) */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Mic, Square, PhoneOff, Loader2, VideoOff } from "lucide-react";
+import { Mic, Square, PhoneOff, Loader2, VideoOff, PhoneCall } from "lucide-react";
 import maxLarge from "@/assets/characters/max-large.jpg";
 import maxAvatar from "@/assets/characters/max.jpg";
+import emmaAvatar from "@/assets/characters/emma.jpg";
 import type { AudioState, ConversationMessage } from "@/types";
 import { cn } from "@/lib/utils";
 import type { StreamingAvatarConnectionState } from "@/services/streamingAvatar";
+import { Button } from "@/components/ui/button";
 
 interface Props {
   audioState: AudioState;
@@ -19,6 +21,11 @@ interface Props {
   streamingAvatarActive?: boolean;
   streamingAvatarState?: StreamingAvatarConnectionState;
   attachAvatarMedia?: (element: HTMLMediaElement | null) => void;
+  activeCharacter?: "max" | "emma";
+  handoffOffer?: { reason: string } | null;
+  handoffCalling?: boolean;
+  onAcceptHandoff?: () => void;
+  onRejectHandoff?: () => void;
 }
 
 const ConversationScreen = ({
@@ -33,8 +40,13 @@ const ConversationScreen = ({
   streamingAvatarActive = false,
   streamingAvatarState = "inactive",
   attachAvatarMedia,
+  activeCharacter = "max",
+  handoffOffer = null,
+  handoffCalling = false,
+  onAcceptHandoff,
+  onRejectHandoff,
 }: Props) => {
-  const disabled = audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "max_thinking" || audioState === "max_speaking";
+  const disabled = handoffCalling || Boolean(handoffOffer) || audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "max_thinking" || audioState === "max_speaking";
   const recording = audioState === "user_speaking";
 
   const handleToggleTalk = useCallback(() => {
@@ -63,7 +75,7 @@ const ConversationScreen = ({
     let us = "";
     for (let i = conversationLog.length - 1; i >= 0; i--) {
       const m = conversationLog[i];
-      if (!mx && m.role === "max") mx = m.content;
+      if (!mx && m.role !== "user") mx = m.content;
       else if (!us && m.role === "user") us = m.content;
       if (mx && us) break;
     }
@@ -138,6 +150,17 @@ const ConversationScreen = ({
   const videoVisible = streamingAvatarActive && videoLive && !streamLost;
   const frozenVisible = streamingAvatarActive && hasFrozenFrame && !videoVisible;
   const photoVisible = !videoVisible && !frozenVisible;
+  const displayName = activeCharacter === "emma" ? "Emma" : "Max";
+  const portrait = activeCharacter === "emma" ? emmaAvatar : maxAvatar;
+
+  if (handoffCalling) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-background text-center">
+        <div className="flex h-24 w-24 items-center justify-center rounded-full border bg-muted"><PhoneCall className="h-9 w-9 animate-pulse text-primary" /></div>
+        <div><h1 className="font-serif text-3xl">Appel d’Emma…</h1><p className="mt-2 text-sm text-muted-foreground">La session et le temps restant sont conservés · {sessionTimeRemaining}</p></div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
@@ -147,7 +170,7 @@ const ConversationScreen = ({
           "absolute inset-0 bg-cover bg-center transition-opacity duration-500",
           photoVisible ? "opacity-100" : "opacity-0",
         )}
-        style={{ backgroundImage: `url(${maxLarge})` }}
+        style={{ backgroundImage: `url(${activeCharacter === "emma" ? emmaAvatar : maxLarge})` }}
         aria-hidden
       />
       {streamingAvatarActive && (
@@ -198,9 +221,9 @@ const ConversationScreen = ({
       {/* HUD top */}
       <header className="relative z-10 flex items-start justify-between p-4 md:p-6">
         <div className="flex items-center gap-3 rounded-full border border-border/40 bg-background/60 px-3 py-2 backdrop-blur-md">
-          <img src={maxAvatar} alt="" className="h-8 w-8 rounded-full border border-border object-cover" />
+          <img src={portrait} alt="" className="h-8 w-8 rounded-full border border-border object-cover" />
           <div className="pr-2">
-            <p className="text-xs font-medium leading-none text-foreground">Max</p>
+            <p className="text-xs font-medium leading-none text-foreground">{displayName}</p>
             <p className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">en ligne</p>
           </div>
         </div>
@@ -253,14 +276,25 @@ const ConversationScreen = ({
             </p>
           )}
 
+          {handoffOffer && activeCharacter === "max" && (
+            <div className="w-full max-w-xl rounded-xl border border-primary/40 bg-background/90 p-4 text-center shadow-xl backdrop-blur-md">
+              <p className="font-medium">Max vous propose de parler avec Emma.</p>
+              <p className="mt-1 text-xs text-muted-foreground">{handoffOffer.reason}</p>
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                <Button onClick={onAcceptHandoff}>Appeler Emma</Button>
+                <Button variant="outline" onClick={onRejectHandoff}>Rester avec Max</Button>
+              </div>
+            </div>
+          )}
+
           {/* Status helper line */}
           <p className="min-h-[1.25rem] text-xs uppercase tracking-[0.18em] text-muted-foreground/80">
             {audioState === "idle" && "Clique pour parler"}
             {audioState === "mic_starting" && "Micro en cours d'ouverture…"}
             {audioState === "user_speaking" && "Enregistrement — clique pour envoyer"}
             {audioState === "user_finalizing" && "Finalisation de tout ce qui a été dit…"}
-            {audioState === "max_thinking" && "Max réfléchit…"}
-            {audioState === "max_speaking" && "Max répond…"}
+            {audioState === "max_thinking" && `${displayName} réfléchit…`}
+            {audioState === "max_speaking" && `${displayName} répond…`}
           </p>
 
           {/* Toggle Mic button — clear start/stop switch */}

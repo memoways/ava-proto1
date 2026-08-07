@@ -3,6 +3,8 @@ import type {
   ConversationMemoryDelta,
   ConversationMemoryItem,
   ConversationMemoryV1,
+  CharacterMemoryItemV2,
+  RuntimeCharacter,
 } from "@/types";
 
 const LIMITS = {
@@ -14,11 +16,12 @@ const LIMITS = {
   topics: 12,
   itemChars: 180,
   lastExchangeChars: 260,
+  characterItems: 32,
 };
 
 export function createEmptyConversationMemory(): ConversationMemoryV1 {
   return {
-    version: 1,
+    version: 2,
     lastTurn: 0,
     interlocutor: { name: null, role: null, traits: [] },
     userFacts: [],
@@ -33,7 +36,40 @@ export function createEmptyConversationMemory(): ConversationMemoryV1 {
       sourceTurn: 0,
     },
     lastExchange: null,
+    characterItems: [],
   };
+}
+
+function sanitizeCharacterItems(raw: unknown, fallbackTurn: number): CharacterMemoryItemV2[] {
+  if (!Array.isArray(raw)) return [];
+  const items: CharacterMemoryItemV2[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const candidate = entry as Partial<CharacterMemoryItemV2>;
+    const text = normalizeMemoryText(candidate.text);
+    if (!text) continue;
+    const sourceCharacter: RuntimeCharacter = candidate.sourceCharacter === "emma" ? "emma" : "max";
+    const visibility = candidate.visibility === "shared" ? "shared" : "private";
+    const requestedVisibleTo = Array.isArray(candidate.visibleTo)
+      ? candidate.visibleTo.filter((value): value is RuntimeCharacter => value === "max" || value === "emma")
+      : [];
+    const visibleTo = visibility === "shared"
+      ? (["max", "emma"] as RuntimeCharacter[])
+      : requestedVisibleTo.includes(sourceCharacter) ? [sourceCharacter] : [sourceCharacter];
+    const sourceTurn = Number.isFinite(Number(candidate.sourceTurn))
+      ? Math.max(0, Math.floor(Number(candidate.sourceTurn)))
+      : fallbackTurn;
+    items.push({
+      id: normalizeMemoryText(candidate.id, 80) || stableId(`character_${sourceCharacter}`, text),
+      text,
+      sourceTurn,
+      sourceCharacter,
+      visibility,
+      visibleTo,
+      provenance: candidate.provenance === "character" || candidate.provenance === "gm" ? candidate.provenance : "user",
+    });
+  }
+  return items.slice(-LIMITS.characterItems);
 }
 
 export function normalizeMemoryText(value: unknown, maxChars = LIMITS.itemChars): string {
@@ -126,7 +162,7 @@ export function normalizeConversationMemory(raw: unknown): ConversationMemoryV1 
     : createEmptyConversationMemory().relationship;
 
   return {
-    version: 1,
+    version: 2,
     lastTurn,
     interlocutor: {
       name: normalizeMemoryText(interlocutor.name, 80) || null,
@@ -147,6 +183,7 @@ export function normalizeConversationMemory(raw: unknown): ConversationMemoryV1 
         : lastTurn,
     },
     lastExchange: normalizeMemoryText(candidate.lastExchange, LIMITS.lastExchangeChars) || null,
+    characterItems: sanitizeCharacterItems(candidate.characterItems, lastTurn),
   };
 }
 
@@ -174,6 +211,7 @@ export function mergeConversationMemory(
   previousRaw: unknown,
   delta: ConversationMemoryDelta | null | undefined,
   turnIndex: number,
+  activeCharacter: RuntimeCharacter = "max",
 ): ConversationMemoryV1 {
   const previous = normalizeConversationMemory(previousRaw);
   if (!delta || turnIndex <= previous.lastTurn) return previous;
@@ -181,6 +219,24 @@ export function mergeConversationMemory(
   const interlocutorName = normalizeMemoryText(delta.interlocutor?.name, 80);
   const interlocutorRole = normalizeMemoryText(delta.interlocutor?.role, 160);
   const emotionalState = normalizeMemoryText(delta.relationship?.emotionalState, 160);
+  const explicitCharacterItems = (delta.characterItems ?? []).map((item) => ({
+    id: stableId(`character_${item.sourceCharacter ?? activeCharacter}`, item.text),
+    text: item.text,
+    sourceTurn: turnIndex,
+    sourceCharacter: item.sourceCharacter ?? activeCharacter,
+    visibility: item.visibility ?? "private",
+    visibleTo: item.visibility === "shared" ? ["max", "emma"] : item.visibleTo ?? [item.sourceCharacter ?? activeCharacter],
+    provenance: item.provenance ?? "gm",
+  }));
+  const privateUserFacts = (delta.userFacts ?? []).map((text) => ({
+    id: stableId(`character_${activeCharacter}`, text),
+    text,
+    sourceTurn: turnIndex,
+    sourceCharacter: activeCharacter,
+    visibility: "private" as const,
+    visibleTo: [activeCharacter],
+    provenance: "user" as const,
+  }));
 
   return normalizeConversationMemory({
     ...previous,
@@ -210,7 +266,39 @@ export function mergeConversationMemory(
       sourceTurn: turnIndex,
     },
     lastExchange: normalizeMemoryText(delta.lastExchange, LIMITS.lastExchangeChars) || previous.lastExchange,
+    characterItems: [
+      ...(previous.characterItems ?? []),
+      ...privateUserFacts,
+      ...explicitCharacterItems,
+    ],
   });
+}
+
+/**
+ * Produces the bounded memory visible to one character. V1 facts are treated as
+ * Max-private during migration; only identity/role and explicitly shared V2
+ * items cross the handoff boundary.
+ */
+export function filterConversationMemoryForCharacter(
+  memoryRaw: unknown,
+  character: RuntimeCharacter,
+): ConversationMemoryV1 {
+  const memory = normalizeConversationMemory(memoryRaw);
+  const visible = (memory.characterItems ?? []).filter((item) => item.visibleTo.includes(character));
+  if (character === "max") return { ...memory, characterItems: visible };
+  const asItems = (provenance: CharacterMemoryItemV2["provenance"]) => visible
+    .filter((item) => item.provenance === provenance || item.visibility === "shared")
+    .map((item) => ({ id: item.id, text: item.text, sourceTurn: item.sourceTurn }));
+  return {
+    ...memory,
+    userFacts: asItems("user"),
+    maxDisclosures: [],
+    commitments: asItems("gm"),
+    openThreads: asItems("gm"),
+    topics: memory.topics.filter((topic) => visible.some((item) => item.text === topic.text && item.visibility === "shared")),
+    characterItems: visible,
+    lastExchange: null,
+  };
 }
 
 export function formatConversationMemory(memoryRaw: unknown, maxChars = 1_200): string {

@@ -47,6 +47,8 @@ export interface ResponseOutputTurnContext {
   turnIndex?: number;
   signal?: AbortSignal;
   onPlaybackStart?: () => void;
+  /** Per-character TTS voice override; used by the Max→Emma V1 handoff. */
+  voiceId?: string;
 }
 
 export interface ResponseOutputResult {

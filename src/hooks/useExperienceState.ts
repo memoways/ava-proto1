@@ -116,12 +116,14 @@ export function useExperienceState() {
     userPosture: UserPosture | null;
     hasSeenFilm: FilmAnswer | null;
     teaserSeen: boolean;
+    selectedCharacter?: "max" | "emma";
   }) => {
     setState({
       ...initialState,
       phase: "conversation_max",
       hasSeenFilm: restored.hasSeenFilm,
       teaserSeen: restored.teaserSeen,
+      selectedCharacter: restored.selectedCharacter ?? "max",
       userRoleProfile: restored.userRoleProfile,
       userPosture: restored.userPosture,
       conversationLog: restored.conversationLog,

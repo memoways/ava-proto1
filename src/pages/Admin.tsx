@@ -1,5 +1,5 @@
 import { getCachedSession } from "@/services/gameAuth";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,6 +31,8 @@ import StreamingAvatarUsageTab from "@/components/admin/StreamingAvatarUsageTab"
 import VideosListTab from "@/components/admin/VideosListTab";
 import StreamingAvatarConfigTab from "@/components/StreamingAvatarConfigTab";
 import { Switch } from "@/components/ui/switch";
+import { trackEvent } from "@/services/posthogService";
+import { LEGACY_GROUP, TAB_GROUPS } from "@/services/adminNavigation";
 import {
   getOutputSettings,
   loadOutputSettingsFromDB,
@@ -40,63 +42,6 @@ import {
 
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-
-// Tab group definitions
-const TAB_GROUPS = [
-  {
-    id: "data",
-    label: "📊 Données",
-    tabs: [
-      { id: "sessions", label: "Sessions" },
-      { id: "questionnaires", label: "Questionnaires" },
-    ],
-  },
-  {
-    id: "content",
-    label: "📚 Contenu Notion",
-    tabs: [
-      { id: "sync", label: "Sync Notion" },
-      { id: "videos", label: "Vidéos" },
-      { id: "embeddings", label: "Embeddings" },
-    ],
-  },
-  {
-    id: "characters",
-    label: "🎭 Personnages",
-    tabs: [
-      { id: "character-editor", label: "Éditeur personnage" },
-    ],
-  },
-  {
-    id: "mechanics",
-    label: "🎮 Mécanique",
-    tabs: [
-      { id: "gamemaster", label: "Game Master" },
-      
-      { id: "video-triggers", label: "Triggers vidéo" },
-      { id: "validator", label: "Validateur" },
-      { id: "metrics", label: "Métriques hallu." },
-      { id: "latency", label: "Latence & blocage" },
-      { id: "latency-telemetry", label: "Latences (PostHog)" },
-      { id: "max-test", label: "Laboratoire RAG" },
-      { id: "pipeline", label: "Traces Max" },
-    ],
-  },
-  {
-    id: "tech",
-    label: "🔧 Technique",
-    tabs: [
-      { id: "stt", label: "STT Config" },
-      { id: "rag", label: "RAG Config" },
-      { id: "llm", label: "LLM Config" },
-      { id: "voice", label: "TTS Config" },
-      { id: "streaming-avatar", label: "Streaming Avatar Config" },
-      { id: "usage", label: "Consommation LLM" },
-      { id: "voice-usage", label: "Consommation Voix" },
-      { id: "avatar-usage", label: "Consommation Streaming Avatar" },
-    ],
-  },
-];
 
 // SessionRow is imported from SessionsTab
 
@@ -109,37 +54,84 @@ interface EmbeddingRow {
   has_embedding: boolean;
 }
 
+interface CharacterRow {
+  id: string;
+  name: string;
+  personality: string | null;
+  system_prompt: string | null;
+  updated_at: string | null;
+}
+
+interface SyncCharacterReport {
+  id: string;
+  name: string;
+  page_chars: number;
+  chunks_created: number;
+  prompt_fields_filled: number;
+  summary_chars: number;
+}
+
+interface SyncReport {
+  error?: string;
+  synced_at?: string;
+  mode?: string;
+  wiped_all?: boolean;
+  in_place_profile_refresh?: boolean;
+  rag_profile?: string;
+  characters_synced?: number;
+  total_embeddings_in_db?: number;
+  latency_ms?: number;
+  per_character?: SyncCharacterReport[];
+}
+
 export default function Admin() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [embeddings, setEmbeddings] = useState<EmbeddingRow[]>([]);
   // selectedSession moved to SessionsTab
   const [selectedEmbedding, setSelectedEmbedding] = useState<EmbeddingRow | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [syncReport, setSyncReport] = useState<any | null>(null);
+  const [syncReport, setSyncReport] = useState<SyncReport | null>(null);
   const [embFilter, setEmbFilter] = useState<string>("all");
   const [loading, setLoading] = useState(false);
-  const [characters, setCharacters] = useState<any[]>([]);
-  const [editingChar, setEditingChar] = useState<any | null>(null);
+  const [characters, setCharacters] = useState<CharacterRow[]>([]);
+  const [editingChar, setEditingChar] = useState<CharacterRow | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
   const [savingChar, setSavingChar] = useState(false);
   const [activeGroup, setActiveGroup] = useState("data");
   const [activeTab, setActiveTab] = useState("sessions");
   const [searchParams, setSearchParams] = useSearchParams();
   const [outputMode, setOutputMode] = useState<OutputMode>(() => getOutputSettings().mode);
+  const legacyVisible = searchParams.get("legacy") === "1"
+    || searchParams.get("tab") === "validator"
+    || searchParams.get("tab") === "metrics";
+  const availableGroups = useMemo(
+    () => legacyVisible ? [...TAB_GROUPS, LEGACY_GROUP] : TAB_GROUPS,
+    [legacyVisible],
+  );
 
   // Lire ?tab=... au montage et lors d'un changement d'URL (ex: lien depuis le tooltip GM fallback)
   useEffect(() => {
     const requested = searchParams.get("tab");
     if (!requested) return;
-    for (const group of TAB_GROUPS) {
+    for (const group of availableGroups) {
       const found = group.tabs.find((t) => t.id === requested);
       if (found) {
         setActiveGroup(group.id);
         setActiveTab(requested);
+        if (group.id === "legacy") {
+          trackEvent("admin_legacy_view_opened", { tab: requested });
+          void supabase.auth.getUser().then(({ data }) => {
+            if (!data.user) return;
+            void supabase.from("admin_legacy_access_log" as never).insert({
+              user_id: data.user.id,
+              tab: requested,
+            } as never);
+          });
+        }
         return;
       }
     }
-  }, [searchParams]);
+  }, [searchParams, availableGroups]);
 
   // Quand l'utilisateur change d'onglet manuellement, refléter dans l'URL (sans push history)
   useEffect(() => {
@@ -148,7 +140,7 @@ export default function Admin() {
       next.set("tab", activeTab);
       setSearchParams(next, { replace: true });
     }
-  }, [activeTab]);
+  }, [activeTab, searchParams, setSearchParams]);
 
   useEffect(() => {
     hydrateAllSettings(); // Load all settings from DB into localStorage
@@ -176,7 +168,7 @@ export default function Admin() {
       .order("created_at", { ascending: false })
       .limit(200);
     setEmbeddings(
-      (data || []).map((e: any) => ({ ...e, has_embedding: true }))
+      (data || []).map((e) => ({ ...e, has_embedding: true }))
     );
   }
 
@@ -273,13 +265,15 @@ export default function Admin() {
       });
       clearTimeout(timeoutId);
       if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
+      const data = await res.json() as Omit<SyncReport, "synced_at" | "mode">;
       setSyncReport({ ...data, synced_at: new Date().toISOString(), mode });
       clearSystemPromptCache();
       toast.success(`Sync OK (${mode}) : ${data.characters_synced} personnage(s), ${data.total_embeddings_in_db} embeddings total`);
       loadEmbeddings();
-    } catch (err: any) {
-      const msg = err.name === "AbortError" ? "Timeout (>180s)" : err.message;
+    } catch (err: unknown) {
+      const msg = err instanceof DOMException && err.name === "AbortError"
+        ? "Timeout (>180s)"
+        : err instanceof Error ? err.message : String(err);
       setSyncReport({ error: msg });
       toast.error(`Erreur sync : ${msg}`);
     }
@@ -296,7 +290,7 @@ export default function Admin() {
   const fmt = (d: string | null) =>
     d ? new Date(d).toLocaleString("fr-CH") : "—";
 
-  const currentGroup = TAB_GROUPS.find(g => g.id === activeGroup);
+  const currentGroup = availableGroups.find(g => g.id === activeGroup);
 
   const changeOutputMode = async (mode: OutputMode) => {
     const previous = outputMode;
@@ -320,7 +314,7 @@ export default function Admin() {
 
         {/* ===== GROUP SELECTOR ===== */}
         <div className="scroll-tabs -mx-4 mb-4 flex gap-2 px-4 tablet:mx-0 tablet:flex-wrap tablet:px-0">
-          {TAB_GROUPS.map((group) => (
+          {availableGroups.map((group) => (
             <button
               key={group.id}
               onClick={() => {
@@ -358,6 +352,11 @@ export default function Admin() {
                 />
                 <span className={outputMode === "streaming_avatar" ? "text-sm font-medium" : "text-sm text-muted-foreground"}>Avatar vidéo</span>
               </div>
+            </div>
+          )}
+          {activeGroup === "legacy" && (
+            <div className="mb-4 rounded-lg border border-amber-700/50 bg-amber-950/20 px-4 py-3 text-sm text-amber-100">
+              Accès legacy temporaire journalisé. Ces vues décrivent l’ancien validateur, absent du pipeline PRD4 live.
             </div>
           )}
           {currentGroup && currentGroup.tabs.length > 1 && (
@@ -581,7 +580,7 @@ export default function Admin() {
                   </div>
 
                   <div className="space-y-2">
-                    {(syncReport.per_character || []).map((c: any) => (
+                    {(syncReport.per_character || []).map((c) => (
                       <div key={c.id} className="border rounded-lg p-3">
                         <h4 className="font-semibold text-sm mb-1">🎭 {c.name}</h4>
                         <div className="grid grid-cols-2 gap-x-4 text-xs text-muted-foreground">

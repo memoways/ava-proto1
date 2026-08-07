@@ -315,6 +315,27 @@ export default function RAGConfigTab() {
       <section className="space-y-6 rounded-lg border p-4">
         <h3 className="text-base font-semibold">🎚️ Récupération et injection</h3>
 
+        <div className="rounded-lg border bg-muted/10 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <label className="text-sm font-medium">Variante du prompt Max</label>
+              <Doc>Réglage technique consommé par le compilateur Max et le formatage RAG. Il n’appartient plus à l’orchestration GM.</Doc>
+            </div>
+            <Select
+              value={gameplay.MAX_PROMPT_VARIANT}
+              onValueChange={(value: "legacy" | "compact_v1" | "rich_v2" | "optimized_v3") => update({ MAX_PROMPT_VARIANT: value })}
+            >
+              <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="optimized_v3">Optimized v3</SelectItem>
+                <SelectItem value="rich_v2">Rich v2</SelectItem>
+                <SelectItem value="compact_v1">Compact v1</SelectItem>
+                <SelectItem value="legacy">Legacy (rollback)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         <div>
           <div className="mb-1 flex justify-between"><label className="text-sm font-medium text-muted-foreground">Seuil cosine minimal</label><span className="font-mono text-sm">{gameplay.RAG_MATCH_THRESHOLD.toFixed(2)}</span></div>
           <Slider value={[gameplay.RAG_MATCH_THRESHOLD]} onValueChange={([value]) => update({ RAG_MATCH_THRESHOLD: value })} min={0} max={0.8} step={0.05} />
@@ -355,7 +376,7 @@ export default function RAGConfigTab() {
           max_memories_injected: Math.min(gameplay.RAG_TOP_K, effectiveMaxItems),
           rag_prompt_budget_chars: effectiveTotalChars,
         }, null, 2)}</pre>
-        <p className="mt-2 text-xs text-muted-foreground">Pour comparer les scores et les rangs sans changer le live, utiliser Mécanique → Laboratoire RAG.</p>
+        <p className="mt-2 text-xs text-muted-foreground">Pour comparer les scores et les rangs sans changer le live, utiliser Qualité → Laboratoire RAG.</p>
       </section>
     </div>
   );

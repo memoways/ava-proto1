@@ -28,15 +28,35 @@ export interface SessionRow {
   duration_seconds: number | null;
   branch: string | null;
   triggers_activated: string[] | null;
-  conversation_log: any;
-  questionnaire_responses: any;
+  conversation_log: AdminConversationMessage[] | null;
+  questionnaire_responses: { experience_rating?: number; nps?: number } | null;
   name: string | null;
   admin_note: string | null;
-  player_role?: any;
-  gm_post_turn_log?: any;
+  player_role?: { summary_for_user?: string; summary_for_max?: string } | null;
+  gm_post_turn_log?: GmPostTurnEntry[] | null;
   personnage_appele?: string | null;
   modalite_voix?: string | null;
   diagnostic_trace_enabled?: boolean;
+}
+
+interface AdminConversationMessage {
+  role: "user" | "max" | "emma";
+  content: string;
+  gmFallback?: { kind?: string; elapsed_ms?: number; timeout_ms?: number };
+  pipeline?: { blocker?: string };
+  labels?: { themes?: string[]; topics?: string[]; intentions?: string[] };
+}
+
+interface GmPostTurnEntry {
+  turn_index?: number;
+  engagement_delta?: number;
+  role_usage_quality?: string;
+  confusion_detected?: boolean;
+  end_recommended?: boolean;
+  moderation_flag?: boolean;
+  latency_ms?: number;
+  next_turn_guidance?: string;
+  topics_covered?: string[];
 }
 
 const fmt = (d: string | null) => d ? new Date(d).toLocaleString("fr-CH") : "—";
@@ -60,13 +80,13 @@ interface FallbackPoint {
 }
 
 /** Mini bar chart SVG : elapsed_ms vs timeout_ms sur les N derniers fallbacks GM. */
-function GmFallbackChart({ log }: { log: any[] }) {
+function GmFallbackChart({ log }: { log: AdminConversationMessage[] }) {
   // Construire la liste des fallbacks (uniquement messages Max avec gmFallback)
   let turnCount = 0;
   const points: FallbackPoint[] = [];
   for (let i = 0; i < log.length; i++) {
     const m = log[i];
-    if (m?.role !== "max") continue;
+    if (m?.role === "user") continue;
     turnCount += 1;
     const fb = m.gmFallback;
     if (!fb || typeof fb.elapsed_ms !== "number") continue;
@@ -526,7 +546,7 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
                 </p>
                 <ScrollArea className="h-48">
                   <div className="space-y-1.5">
-                    {selected.gm_post_turn_log.map((evalEntry: any, i: number) => (
+                    {selected.gm_post_turn_log.map((evalEntry, i) => (
                       <div
                         key={i}
                         className="text-[11px] border-l-2 border-primary/40 pl-2 py-1"
@@ -587,15 +607,15 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
               <ScrollArea className="h-60 border rounded p-2">
                 <TooltipProvider delayDuration={150}>
                   {Array.isArray(selected.conversation_log) &&
-                    selected.conversation_log.map((msg: any, i: number) => {
+                    selected.conversation_log.map((msg, i) => {
                       const fb = msg.gmFallback;
                       const blocker = msg.pipeline?.blocker;
                       const causalTurn = selected.conversation_log
                         .slice(0, i)
                         .filter((previous) => previous?.role === "user").length;
                       return (
-                        <div key={i} className={`mb-2 text-sm ${msg.role === "max" ? "text-blue-300" : "text-green-300"}`}>
-                          <span className="font-bold">{msg.role === "max" ? "Max" : "User"}:</span> {msg.content}
+                        <div key={i} className={`mb-2 text-sm ${msg.role === "user" ? "text-green-300" : msg.role === "emma" ? "text-fuchsia-300" : "text-blue-300"}`}>
+                          <span className="font-bold">{msg.role === "user" ? "User" : msg.role === "emma" ? "Emma" : "Max"}:</span> {msg.content}
                           {msg.role === "user" && typeof msg.content === "string" && isQuestionLike(msg.content) && (
                             <label className="mt-1.5 flex w-fit cursor-pointer items-center gap-2 rounded border border-border/70 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
                               <Checkbox
@@ -608,7 +628,7 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
                               <span>{pinnedStorageReady === false ? "Migration Laboratoire RAG requise" : "Envoyer question dans le laboratoire RAG"}</span>
                             </label>
                           )}
-                          {msg.role === "max" && selected.diagnostic_trace_enabled && causalTurn > 0 && (
+                          {msg.role !== "user" && selected.diagnostic_trace_enabled && causalTurn > 0 && (
                             <div className="mt-1">
                               <Link
                                 to={`/admin?tab=pipeline&session=${selected.id}&turn=${causalTurn}`}
@@ -637,7 +657,7 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
                               ))}
                             </div>
                           )}
-                          {msg.role === "max" && (fb || blocker) && (
+                          {msg.role !== "user" && (fb || blocker) && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {fb && (
                                 <Tooltip>

@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-05 (payload Max `optimized_v3`, mémoire persistante et reprise)
+> **Last Updated**: 2026-08-07 (directeur d'expérience, cinématiques, handoff Emma et PostHog réel)
 
 ---
 
@@ -72,6 +72,80 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-07 — Le Game Master devient enfin directeur d'expérience 🔷
+
+**Le problème.** Le groupe « Mécanique » mélangeait des réglages actifs, des
+écrans d'observabilité et deux outils anti-hallucination qui ne participaient
+plus au pipeline PRD4. Le Game Master visible dans l'admin donnait l'impression
+de piloter la conversation alors que plusieurs de ses seuils, modes et prompts
+appartenaient à l'ancien simulateur. En parallèle, la page appelée « Latences
+PostHog » relisait surtout les données internes : utile techniquement, mais
+trompeur pour décider d'une canary.
+
+**Une architecture lisible avant d'ajouter des fonctions.** Le back-office est
+désormais organisé selon l'intention : **Expérience** pour Orchestration et
+Cinématiques, **Qualité** pour les deux observabilités, le Laboratoire RAG et les
+Traces Max, **Technique avancée** pour la configuration et les coûts. Rien n'a
+été retiré de Technique : Streaming Avatar Config, ses consommations et le
+switch Voix/Avatar restent disponibles. Validateur et Métriques hallu. passent
+seulement derrière un accès legacy administrateur journalisé pendant la fenêtre
+d'observation.
+
+**Un directeur unique, jamais dans le chemin de la voix.** Les labels et le
+post-tour ne déclenchent plus deux appels LLM. Après la génération du texte du
+personnage, un seul appel GM produit les labels, la guidance du prochain tour,
+le delta de mémoire et au maximum une action. Max et le TTS n'attendent jamais
+ce résultat. Un moteur déterministe garde le dernier mot : une réponse tardive,
+un JSON invalide, une vidéo absente, un personnage incomplet ou une règle de
+rythme non respectée devient `none` sans conséquence pour le joueur.
+
+**Le comportement du GM devient gouvernable.** Les versions d'orchestration ont
+un cycle brouillon → test → publication → archive. Une session épingle sa
+version au démarrage, donc une publication ne change jamais une conversation en
+cours. Les brouillons peuvent être testés sans écrire de mémoire, d'événement ou
+de décision live. Les profils runtime Max et Emma rendent visibles et
+administrables les prérequis éditoriaux et techniques plutôt que de cacher une
+activation partielle.
+
+**Max peut maintenant passer le témoin à Emma.** Après quatre tours au minimum,
+et une seule fois par session, le directeur peut recommander Emma. La guidance
+est injectée au tour suivant pour que Max formule lui-même la proposition ; le
+joueur choisit ensuite **Appeler Emma** ou **Rester avec Max**. Une acceptation
+conserve la session, le rôle et le timer, affiche un appel générique puis ouvre
+Emma avec sa fiche, son RAG et sa voix TTS. Un refus clôt l'offre sans perturber
+la conversation avec Max.
+
+**La mémoire devient privée par défaut.** La V2 indique pour chaque élément son
+personnage source, sa provenance et qui peut le voir. Une confidence faite à
+Max reste chez Max ; seuls le rôle initial et les éléments explicitement promus
+peuvent traverser le handoff. Emma ne reçoit ni le transcript brut ni le résumé
+historique non cloisonné de Max. L'index global du tour est néanmoins conservé,
+afin que la mémoire et les traces ne repartent jamais artificiellement à zéro.
+
+**Les cinématiques restent de la mise en scène, pas une interruption.** Le GM
+recommande un identifiant vidéo et le moteur contrôle média, cooldown, doublons
+et quota. La lecture ne démarre qu'après la fin de la réplique vocale. Le lecteur
+Gumlet et le bouton Passer restent inchangés ; si un handoff et une vidéo se
+présentent au même moment, le passage de personnage est prioritaire.
+
+**PostHog redevient une vraie source indépendante.** Une Edge Function Lovable
+Cloud réservée aux administrateurs interroge l'API HogQL avec des requêtes
+prédéfinies et un secret serveur. La page affiche source, fraîcheur, période,
+p50/p95, erreurs, fallbacks, blockers, actions et providers. Les données internes
+restent dans une colonne séparée pour mesurer la persistance et les écarts par
+`turn_id`. Le canary ne tranche que lorsque toutes ses sources sont mesurées.
+
+**Leçon.** Une interface d'administration n'est pas une preuve que son réglage
+agit sur le runtime. Chaque contrôle doit avoir un consommateur identifié, chaque
+session doit garder la version qui l'a gouvernée et chaque mesure doit annoncer
+sa vraie source. Le nettoyage utile consiste d'abord à rendre ces contrats
+visibles, puis seulement à retirer le legacy après observation.
+
+**Activation restante.** La migration, les secrets PostHog, l'Edge Function et
+la recette doivent être finalisés exclusivement dans Lovable Cloud. Le guide et
+le prompt opérationnels sont dans
+[`docs/interfaces/lovable-experience-orchestration-finalization.md`](docs/interfaces/lovable-experience-orchestration-finalization.md).
 
 ### 2026-08-05 — Max reçoit un contexte plus léger sans perdre sa mémoire ni son canon 🔷
 

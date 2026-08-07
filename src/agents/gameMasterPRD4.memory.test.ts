@@ -75,6 +75,7 @@ describe("Game Master PRD4 — memory_delta", () => {
       expect.objectContaining({ turn_index: 1 }),
       expect.objectContaining({ topics: ["contrôle"] }),
       1,
+      "max",
     );
   });
 });

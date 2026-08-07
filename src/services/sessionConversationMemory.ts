@@ -5,6 +5,7 @@ import type {
   ConversationMemoryV1,
   ConversationMessage,
   PRD4PostTurnEvaluation,
+  RuntimeCharacter,
   UserRoleProfile,
 } from "@/types";
 import {
@@ -31,6 +32,10 @@ export interface ResumablePRD4Session {
   triggers_activated: string[];
   diagnostic_trace_enabled: boolean;
   gm_post_turn_log: PRD4PostTurnEvaluation[];
+  active_character: "max" | "emma";
+  orchestration_version_id: string | null;
+  pending_handoff: { reason: string; proposalGuidance: string } | null;
+  handoff_count: number;
 }
 
 export function clearConversationMemoryCache(sessionId?: string): void {
@@ -77,6 +82,7 @@ export async function persistPostTurnMemory(
   entry: PRD4PostTurnEvaluation,
   delta: ConversationMemoryDelta | null,
   turnIndex: number,
+  activeCharacter: RuntimeCharacter = "max",
 ): Promise<ConversationMemoryV1> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const { data, error } = await supabase
@@ -90,7 +96,7 @@ export async function persistPostTurnMemory(
     const currentLastTurn = data.memory_last_turn ?? 0;
     const currentMemory = normalizeConversationMemory(data.conversation_memory);
     const nextMemory = delta && turnIndex > currentLastTurn
-      ? mergeConversationMemory(currentMemory, delta, turnIndex)
+      ? mergeConversationMemory(currentMemory, delta, turnIndex, activeCharacter)
       : currentMemory;
     const nextLastTurn = delta && turnIndex > currentLastTurn ? turnIndex : currentLastTurn;
     const nextLog = appendPostTurnEntry(data.gm_post_turn_log, entry);
@@ -124,9 +130,8 @@ export async function fetchResumablePRD4Session(now = new Date()): Promise<Resum
   await ensureGameAuth();
   const { data, error } = await supabase
     .from("sessions")
-    .select("id, started_at, resume_expires_at, conversation_log, conversation_memory, memory_last_turn, player_role, user_posture_raw, user_posture_mode, has_seen_film, teaser_shown, triggers_activated, diagnostic_trace_enabled, gm_post_turn_log")
+    .select("id, started_at, resume_expires_at, conversation_log, conversation_memory, memory_last_turn, player_role, user_posture_raw, user_posture_mode, has_seen_film, teaser_shown, triggers_activated, diagnostic_trace_enabled, gm_post_turn_log, active_character, orchestration_version_id, pending_handoff, handoff_count")
     .is("ended_at", null)
-    .eq("personnage_appele", "max")
     .gt("resume_expires_at", now.toISOString())
     .order("started_at", { ascending: false })
     .limit(1)
@@ -159,5 +164,11 @@ export async function fetchResumablePRD4Session(now = new Date()): Promise<Resum
     gm_post_turn_log: Array.isArray(data.gm_post_turn_log)
       ? data.gm_post_turn_log as unknown as PRD4PostTurnEvaluation[]
       : [],
+    active_character: data.active_character === "emma" ? "emma" : "max",
+    orchestration_version_id: data.orchestration_version_id,
+    pending_handoff: data.pending_handoff && typeof data.pending_handoff === "object"
+      ? data.pending_handoff as unknown as { reason: string; proposalGuidance: string }
+      : null,
+    handoff_count: data.handoff_count ?? 0,
   };
 }

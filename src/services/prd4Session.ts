@@ -41,6 +41,14 @@ export async function createPRD4Session(
     throw error;
   }
   trackPersistence("create_session", true, data.id);
+  // Additive migration: older Lovable environments may not expose the RPC yet.
+  // Session creation remains available, while migrated environments pin the
+  // published GM version exactly once.
+  const { error: pinError } = await supabase.rpc(
+    "pin_current_orchestration_version" as never,
+    { p_session_id: data.id } as never,
+  );
+  if (pinError) console.warn("[PRD4 session] orchestration pin unavailable:", pinError.message);
   return data.id;
 }
 
@@ -100,6 +108,27 @@ export async function updatePRD4StreamingAvatar(
     .eq("id", sessionId);
   trackPersistence("update_streaming_avatar", !error, sessionId);
   if (error) console.warn("[PRD4 session] streaming avatar update failed:", error.message);
+}
+
+export async function updatePRD4ExperienceState(
+  sessionId: string,
+  payload: {
+    activeCharacter?: "max" | "emma";
+    pendingHandoff?: { reason: string; proposalGuidance: string } | null;
+    handoffCount?: number;
+  },
+): Promise<void> {
+  const update = {
+    ...(payload.activeCharacter ? { active_character: payload.activeCharacter, personnage_appele: payload.activeCharacter } : {}),
+    ...(payload.pendingHandoff !== undefined ? { pending_handoff: payload.pendingHandoff } : {}),
+    ...(payload.handoffCount !== undefined ? { handoff_count: payload.handoffCount } : {}),
+  };
+  const { error } = await supabase
+    .from("sessions" as never)
+    .update(update as never)
+    .eq("id", sessionId);
+  trackPersistence("update_experience_state", !error, sessionId);
+  if (error) throw error;
 }
 
 export async function endPRD4Session(

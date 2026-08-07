@@ -9,7 +9,7 @@
  */
 import { SimulateMaxResponseError, simulateMaxResponse, type MaxAgentInput, type SimulateMaxDiagnosticContext } from "@/agents/maxAgent";
 import { evaluatePostTurnPRD4 } from "@/agents/gameMasterPRD4";
-import { labelUserTurnPRD4, type PRD4LabelResult } from "@/agents/gameMasterLabelPRD4";
+import type { PRD4LabelResult } from "@/agents/gameMasterLabelPRD4";
 import {
   buildKnowledgeContextFromRAG,
   formatMaxRAGContext,
@@ -22,6 +22,8 @@ import { maxRagFormatOptionsForVariant } from "@/services/maxRagVariant";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { selectOptimizedConversation, selectRecentConversation, selectUnsummarizedConversation } from "@/services/conversationMemory";
 import { fetchConversationMemory } from "@/services/sessionConversationMemory";
+import { filterConversationMemoryForCharacter } from "@/services/conversationMemoryV1";
+import { fetchPinnedDirectorRuntime } from "@/services/experienceOrchestration";
 import { withTimeout } from "@/services/asyncUtils";
 import { compactConversationTurnTrace } from "@/services/conversationTraceFormat";
 import { enqueueConversationTurnTrace, patchQueuedConversationTurnTrace } from "@/services/conversationTraceOutbox";
@@ -43,7 +45,7 @@ export interface PRD4TurnInput {
   userMessage: string;
   userRole: UserRoleProfile | null;
   timeElapsedSeconds: number;
-  /** Personnage appelé (PRD4 : "max" toujours, autres grisés). */
+  /** Personnage actif. Max au démarrage, Emma seulement après un handoff validé. */
   characterName?: string;
   /** IDs de triggers vidéo déjà joués durant la session. */
   triggeredVideoIds?: string[];
@@ -60,6 +62,8 @@ export interface PRD4TurnInput {
   signal?: AbortSignal;
   /** Stable correlation ID shared with voice telemetry and diagnostic persistence. */
   turnId?: string;
+  /** Global user-turn index, preserved when a handoff uses an isolated history. */
+  turnIndex?: number;
   /** Exact trace mode, honored only for admin-owned diagnostic sessions. */
   diagnosticTraceEnabled?: boolean;
 }
@@ -97,7 +101,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const diagnosticTraceEnabled = input.diagnosticTraceEnabled === true;
   const turnId = input.turnId || crypto.randomUUID();
   const responseDeadlineAt = t0 + TURN_RESPONSE_DEADLINE_MS;
-  const turnIndex = input.conversationHistory.filter((m) => m.role === "user").length + 1;
+  const turnIndex = input.turnIndex
+    ?? input.conversationHistory.filter((m) => m.role === "user").length + 1;
   const gameplay = (() => {
     try { return getGameplaySettings(); } catch { return null; }
   })();
@@ -123,6 +128,12 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         SUMMARY_FETCH_DEADLINE_MS,
       ).catch(() => null)
     : Promise.resolve(null);
+  const directorRuntimePromise = fetchPinnedDirectorRuntime(input.sessionId).catch(() => ({
+    versionId: null,
+    versionNumber: null,
+    prompt: null,
+    config: null,
+  }));
 
   // --- RAG (best-effort, non-bloquant en cas d'erreur) -----------------------
   const ragStart = performance.now();
@@ -178,23 +189,20 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const rag_ms = Math.round(performance.now() - ragStart);
   input.onLatencySegment?.({ type: "end", segment: "RAG", service: "RAG", durationMs: rag_ms });
 
-  // --- GM Label Pass (parallèle à Max) ---------------------------------------
-  const rawLabelPromise: Promise<PRD4LabelResult> = labelUserTurnPRD4({
-    sessionId: input.sessionId,
-    userMessage: input.userMessage,
-    conversationHistory: recentConversation,
-    userPostureRaw: input.userPostureRaw ?? null,
-    signal: input.signal,
-    diagnosticTrace: diagnosticTraceEnabled,
-  });
-
   // --- Max --------------------------------------------------------------------
   const maxStart = performance.now();
   input.onLatencySegment?.({ type: "start", segment: "LLM", service: "Max LLM" });
   const summaryRecord = await summaryPromise;
   const structuredMemory = await memoryPromise;
+  const activeCharacter = input.characterName?.toLowerCase() === "emma" ? "emma" : "max";
+  const visibleStructuredMemory = structuredMemory
+    ? filterConversationMemoryForCharacter(structuredMemory, activeCharacter)
+    : null;
   const maxConversationHistory = gameplay?.MAX_PROMPT_VARIANT === "optimized_v3"
-    ? selectOptimizedConversation(input.conversationHistory, structuredMemory?.lastTurn ?? 0)
+    ? selectOptimizedConversation(
+        input.conversationHistory,
+        activeCharacter === "emma" ? 0 : structuredMemory?.lastTurn ?? 0,
+      )
     : recentConversation;
   const postureSummary = input.userPostureRaw?.trim()
     ? `L'utilisateur a démarré la conversation en exprimant ceci (à garder en mémoire tout au long de l'échange comme contexte de qui il est et de ce qu'il vient chercher) : « ${input.userPostureRaw.trim()} »`
@@ -207,8 +215,10 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     postVideoContext: input.postVideoContext,
     session_id: input.sessionId ?? undefined,
     knowledgeContext,
-    sessionSummary: summaryRecord?.summary,
-    conversationMemory: structuredMemory,
+    // Le résumé historique n'est pas encore cloisonné par personnage. Emma ne
+    // reçoit donc que son historique isolé et la mémoire V2 explicitement visible.
+    sessionSummary: activeCharacter === "emma" ? undefined : summaryRecord?.summary,
+    conversationMemory: visibleStructuredMemory,
     ragCandidates: ragDetailed?.matches.map((match, index) => ({
       id: match.id,
       content: match.content,
@@ -255,13 +265,14 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     const gmStart = performance.now();
     input.onLatencySegment?.({ type: "start", segment: "GM", service: "GM post-turn" });
     try {
+      const directorRuntime = await directorRuntimePromise;
       return await evaluatePostTurnPRD4({
         sessionId: input.sessionId,
         conversationHistory: recentConversation,
         userMessage: input.userMessage,
         maxResponse,
         userRole: input.userRole,
-        conversationMemoryBefore: structuredMemory,
+        conversationMemoryBefore: visibleStructuredMemory,
         userPostureRaw: input.userPostureRaw ?? null,
         turnIndex,
         timeElapsedSeconds: input.timeElapsedSeconds,
@@ -270,6 +281,9 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         triggeredVideoIds: input.triggeredVideoIds,
         signal: input.signal,
         diagnosticTrace: diagnosticTraceEnabled,
+        systemPromptOverride: directorRuntime.prompt,
+        orchestrationVersionId: directorRuntime.versionId,
+        currentCharacter: activeCharacter,
       });
     } finally {
       input.onLatencySegment?.({
@@ -326,8 +340,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         temporalContext: maxInput.temporalContext!,
         gmGuidance: maxInput.gmGuidance?.guidance ?? null,
         gmTopicsCovered: maxInput.gmGuidance?.topicsCovered ?? [],
-        structuredMemoryBefore: structuredMemory,
-        memoryLastTurn: structuredMemory?.lastTurn ?? 0,
+        structuredMemoryBefore: visibleStructuredMemory,
+        memoryLastTurn: visibleStructuredMemory?.lastTurn ?? 0,
       },
       rag: {
         request: {
@@ -380,7 +394,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         },
         preTurnPlanner: { status: "not_executed", reason: "disabled_in_prd4_live" },
         validator: { status: "not_executed", reason: "disabled_in_prd4_live" },
-        labelPass: { status: "pending", effect: "parallel_not_causal" },
+        labelPass: { status: "not_executed", reason: "consolidated_into_post_turn" },
         postTurn: { status: "pending", effect: "next_turn" },
       },
       timings: {
@@ -416,20 +430,6 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
 
   rawPostTurnPromise ??= runPostTurn();
 
-  const labelPromise = rawLabelPromise.then(async (result) => {
-    if (diagnosticTraceEnabled && input.sessionId) {
-      await patchQueuedConversationTurnTrace(input.sessionId, turnIndex, ["gm", "labelPass"], {
-        status: result.ok ? "complete" : "error",
-        effect: "parallel_not_causal",
-        latencyMs: result.latency_ms,
-        model: result.model,
-        labels: result.labels,
-        diagnostic: result.diagnostic ?? null,
-      });
-    }
-    return result;
-  });
-
   const postTurnPromise = rawPostTurnPromise.then(async (result) => {
     if (diagnosticTraceEnabled && input.sessionId) {
       await patchQueuedConversationTurnTrace(input.sessionId, turnIndex, ["gm", "postTurn"], {
@@ -444,6 +444,16 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     return result;
   });
 
+  // Backward-compatible projection for UI consumers. No second LLM call is
+  // made: labels and action now come from the single post-turn director call.
+  const labelPromise: Promise<PRD4LabelResult> = postTurnPromise.then((result) => ({
+    ok: !result.diagnostic?.error,
+    labels: result.labels ?? { themes: [], topics: [], intentions: [] },
+    latency_ms: result.latency_ms ?? 0,
+    model: result.model ?? "",
+    diagnostic: result.diagnostic,
+  }));
+
   if (
     input.sessionId &&
     summaryEvery > 0 &&
@@ -453,7 +463,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       [
         ...input.conversationHistory,
         { role: "user", content: input.userMessage, timestamp: Date.now() },
-        { role: "max", content: maxResponse, timestamp: Date.now() },
+        { role: activeCharacter, content: maxResponse, timestamp: Date.now() },
       ],
       lastSummarizedTurn,
     );

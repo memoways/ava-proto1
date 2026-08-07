@@ -5,10 +5,23 @@ export interface ConversationMemoryItem {
   supersedes?: string | null;
 }
 
+export type RuntimeCharacter = "max" | "emma";
+
+export interface CharacterMemoryItemV2 {
+  id: string;
+  text: string;
+  sourceTurn: number;
+  sourceCharacter: RuntimeCharacter;
+  visibility: "private" | "shared";
+  visibleTo: RuntimeCharacter[];
+  provenance: "user" | "character" | "gm";
+}
+
 export type ConversationDepth = "surface" | "fissure" | "verite" | "bonus";
 
 export interface ConversationMemoryV1 {
-  version: 1;
+  /** Version 2 keeps every V1 field and adds character-scoped memory. */
+  version: 1 | 2;
   lastTurn: number;
   interlocutor: {
     name: string | null;
@@ -27,6 +40,7 @@ export interface ConversationMemoryV1 {
     sourceTurn: number;
   };
   lastExchange: string | null;
+  characterItems?: CharacterMemoryItemV2[];
 }
 
 export interface ConversationMemoryDelta {
@@ -47,4 +61,11 @@ export interface ConversationMemoryDelta {
     emotionalState?: string | null;
   };
   lastExchange?: string | null;
+  characterItems?: Array<{
+    text: string;
+    sourceCharacter?: RuntimeCharacter;
+    visibility?: "private" | "shared";
+    visibleTo?: RuntimeCharacter[];
+    provenance?: "user" | "character" | "gm";
+  }>;
 }

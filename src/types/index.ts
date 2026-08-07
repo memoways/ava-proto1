@@ -119,7 +119,7 @@ export interface GameState {
 }
 
 export interface ConversationMessage {
-  role: "user" | "max";
+  role: "user" | "max" | "emma";
   content: string;
   timestamp: number;
   /** Anti-hallucination validation trace, only present on Max messages that went through the validator. */
@@ -348,6 +348,22 @@ export interface PRD4PostTurnEvaluation {
   memory_delta?: import("./conversationMemory").ConversationMemoryDelta | null;
   /** État persistant obtenu après fusion optimiste du delta. */
   memory_after?: import("./conversationMemory").ConversationMemoryV1 | null;
+  /** Structured Experience Director action. The deterministic guard may replace it with none. */
+  action?: DirectorAction;
+  orchestration_version_id?: string | null;
+}
+
+export type DirectorAction =
+  | { type: "none" }
+  | { type: "cinematic"; videoId: string; reason: string; confidence: number }
+  | { type: "handoff"; targetCharacter: "emma"; reason: string; proposalGuidance: string }
+  | { type: "end"; reason: string };
+
+export interface ExperienceDirectorDecisionV1 {
+  labels: PRD4TurnLabels;
+  nextTurnGuidance: string | null;
+  memoryDelta: import("./conversationMemory").ConversationMemoryDelta | null;
+  action: DirectorAction;
 }
 
 // ============================================================================

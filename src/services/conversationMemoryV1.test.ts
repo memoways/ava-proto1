@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createEmptyConversationMemory,
+  filterConversationMemoryForCharacter,
   formatConversationMemory,
   mergeConversationMemory,
   normalizeConversationMemory,
@@ -45,7 +46,7 @@ describe("ConversationMemoryV1", () => {
     const normalized = normalizeConversationMemory({ version: 99, lastTurn: -1, relationship: { depth: "wrong" } });
     const rendered = formatConversationMemory(normalized, 80);
 
-    expect(normalized.version).toBe(1);
+    expect(normalized.version).toBe(2);
     expect(normalized.lastTurn).toBe(0);
     expect(rendered.length).toBeLessThanOrEqual(80);
   });
@@ -83,5 +84,41 @@ describe("ConversationMemoryV1", () => {
       { role: "max" as const, content: "m".repeat(700), timestamp: 2 },
     ];
     expect(selectOptimizedConversation(conversation, 0)).toEqual([]);
+  });
+
+  it("ne transmet pas à Emma une confidence privée faite à Max", () => {
+    const memory = mergeConversationMemory(createEmptyConversationMemory(), {
+      userFacts: ["Alice confie à Max qu'elle a falsifié le dossier."],
+      lastExchange: "Alice demande à Max de garder le secret.",
+    }, 4, "max");
+
+    const emmaMemory = filterConversationMemoryForCharacter(memory, "emma");
+    const rendered = formatConversationMemory(emmaMemory);
+
+    expect(emmaMemory.userFacts).toEqual([]);
+    expect(emmaMemory.lastExchange).toBeNull();
+    expect(rendered).not.toContain("falsifié");
+    expect(rendered).not.toContain("garder le secret");
+  });
+
+  it("transmet uniquement les éléments explicitement promus en mémoire partagée", () => {
+    const memory = mergeConversationMemory(createEmptyConversationMemory(), {
+      characterItems: [{
+        text: "Le rôle initial d'Alice est médecin urgentiste.",
+        sourceCharacter: "max",
+        visibility: "shared",
+        visibleTo: ["max", "emma"],
+        provenance: "gm",
+      }],
+    }, 5, "max");
+
+    const emmaMemory = filterConversationMemoryForCharacter(memory, "emma");
+
+    expect(emmaMemory.characterItems).toHaveLength(1);
+    expect(emmaMemory.characterItems?.[0]).toMatchObject({
+      text: "Le rôle initial d'Alice est médecin urgentiste.",
+      visibility: "shared",
+      visibleTo: ["max", "emma"],
+    });
   });
 });

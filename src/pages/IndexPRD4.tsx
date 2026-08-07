@@ -17,6 +17,7 @@ import {
   endPRD4Session,
   updatePRD4Conversation,
   updatePRD4Onboarding,
+  updatePRD4ExperienceState,
   updatePRD4StreamingAvatar,
 } from "@/services/prd4Session";
 import {
@@ -84,7 +85,6 @@ import ThanksScreen from "@/components/ThanksScreen";
 import GumletVideoPlayer, { type GumletVideoPlayerHandle } from "@/components/GumletVideoPlayer";
 import { savePRD4Questionnaire, syncPRD4QuestionnaireToNotion } from "@/services/prd4Questionnaire";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
-import { pickVideoForLabels } from "@/services/videoTriggerMatcher";
 import {
   loadVideoTriggerSettingsFromDB,
   videoTriggerDefaults,
@@ -118,6 +118,9 @@ import {
   type ResumablePRD4Session,
 } from "@/services/sessionConversationMemory";
 import { resolveResumeTimerWindow } from "@/services/resumeTimer";
+import { getCharacterRuntimeReadiness } from "@/services/experienceOrchestration";
+import { appendExperienceEvent, validateDirectorDecision } from "@/services/experienceDirector";
+import type { ExperienceDirectorDecisionV1 } from "@/types";
 
 const TEASER_VIDEO_URL = "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049";
 
@@ -136,6 +139,7 @@ const IndexPRD4 = () => {
     reset,
     setLastUserLabels,
     restoreConversation,
+    setSelectedCharacter,
   } = useExperienceState();
 
   const [userSubtitle, setUserSubtitle] = useState("");
@@ -199,6 +203,13 @@ const IndexPRD4 = () => {
   // Boucle GM→Max : guidance produite par le post-tour N, consommée au tour N+1.
   const pendingGmGuidanceRef = useRef<string | null>(null);
   const gmTopicsCoveredRef = useRef<string[]>([]);
+  const activeCharacterRef = useRef<"max" | "emma">("max");
+  const activeVoiceIdRef = useRef<string | null>(null);
+  const handoffCountRef = useRef(0);
+  const handoffRecommendationRef = useRef<{ reason: string; proposalGuidance: string } | null>(null);
+  const handoffConversationStartRef = useRef(0);
+  const [handoffOffer, setHandoffOffer] = useState<{ reason: string; proposalGuidance: string } | null>(null);
+  const [handoffCalling, setHandoffCalling] = useState(false);
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
   const [teaserPlayerReady, setTeaserPlayerReady] = useState(false);
@@ -443,6 +454,7 @@ const IndexPRD4 = () => {
       turnIndex?: number;
       signal?: AbortSignal;
       onPlaybackStart?: () => void;
+      voiceId?: string;
     } = {},
   ): Promise<ResponseOutputResult> => {
     let output = responseOutputRef.current;
@@ -462,6 +474,7 @@ const IndexPRD4 = () => {
         turnIndex: context.turnIndex,
         signal: context.signal,
         onPlaybackStart: context.onPlaybackStart,
+        voiceId: context.voiceId,
       });
     } catch (error) {
       if (context.signal?.aborted) {
@@ -692,6 +705,17 @@ const IndexPRD4 = () => {
     configuredSessionDurationRef.current = configuredDurationSeconds;
     sessionDurationRef.current = Math.min(configuredDurationSeconds, elapsedSeconds);
     triggeredVideoIdsRef.current = session.triggers_activated;
+    activeCharacterRef.current = session.active_character;
+    activeVoiceIdRef.current = null;
+    if (session.active_character === "emma") {
+      void getCharacterRuntimeReadiness("emma").then((profile) => {
+        activeVoiceIdRef.current = profile?.ttsVoiceId ?? null;
+      }).catch(() => {});
+    }
+    handoffCountRef.current = session.handoff_count;
+    handoffConversationStartRef.current = Math.max(0, session.conversation_log.findIndex((message) => message.role === "emma"));
+    setSelectedCharacter(session.active_character);
+    setHandoffOffer(session.pending_handoff);
     pendingGmGuidanceRef.current = latestGm?.next_turn_guidance?.trim() || null;
     gmTopicsCoveredRef.current = latestGm?.topics_covered ?? [];
     endedRef.current = false;
@@ -708,8 +732,9 @@ const IndexPRD4 = () => {
         ? session.has_seen_film
         : null,
       teaserSeen: session.teaser_shown === true,
+      selectedCharacter: session.active_character,
     });
-    const lastMax = [...session.conversation_log].reverse().find((message) => message.role === "max");
+    const lastMax = [...session.conversation_log].reverse().find((message) => message.role !== "user");
     const lastUser = [...session.conversation_log].reverse().find((message) => message.role === "user");
     setMaxSubtitle(lastMax?.content ?? "");
     setUserSubtitle(lastUser?.content ?? "");
@@ -719,7 +744,7 @@ const IndexPRD4 = () => {
       remaining_seconds: remainingSeconds,
       turns: session.conversation_log.filter((message) => message.role === "user").length,
     });
-  }, [cleanupAudio, restoreConversation, resumableSession, timer]);
+  }, [cleanupAudio, restoreConversation, resumableSession, setSelectedCharacter, timer]);
   const handleLockedClick = useCallback(
     (id: "emma" | "ava" | "leo") => trackEvent("prd4_character_locked_clicked", { character: id }),
     [],
@@ -777,8 +802,16 @@ const IndexPRD4 = () => {
     triggeredVideoIdsRef.current = [];
     lastVideoTurnRef.current = -Infinity;
     pendingPostVideoContextRef.current = null;
+    activeCharacterRef.current = "max";
+    activeVoiceIdRef.current = null;
+    handoffCountRef.current = 0;
+    handoffRecommendationRef.current = null;
+    handoffConversationStartRef.current = 0;
+    setHandoffOffer(null);
+    setHandoffCalling(false);
     pendingGmGuidanceRef.current = null;
     gmTopicsCoveredRef.current = [];
+    setSelectedCharacter("max");
     setActiveVideo(null);
 
     // Recharge les règles de déclenchement vidéo (admin)
@@ -836,6 +869,7 @@ const IndexPRD4 = () => {
     renderResponseText,
     setAudioState,
     setPhase,
+    setSelectedCharacter,
     timer,
   ]);
 
@@ -923,14 +957,18 @@ const IndexPRD4 = () => {
         // Consommation one-shot : une guidance périmée ne doit pas survivre à son tour.
         const gmGuidance = pendingGmGuidanceRef.current;
         pendingGmGuidanceRef.current = null;
+        const handoffProposalForThisTurn = handoffRecommendationRef.current;
+        const priorConversation = activeCharacterRef.current === "emma"
+          ? conversationRef.current.slice(handoffConversationStartRef.current, -1)
+          : conversationRef.current.slice(0, -1);
         const result = await processPRD4Turn({
           sessionId: sessionIdRef.current,
-          conversationHistory: conversationRef.current.slice(0, -1),
+          conversationHistory: priorConversation,
           userMessage: userText,
           userRole: userRoleRef.current,
           userPostureRaw: userPostureRef.current?.raw ?? null,
           timeElapsedSeconds: elapsed,
-          characterName: "Max",
+          characterName: activeCharacterRef.current === "emma" ? "Emma" : "Max",
           triggeredVideoIds: triggeredVideoIdsRef.current,
           postVideoContext,
           gmGuidance,
@@ -938,6 +976,7 @@ const IndexPRD4 = () => {
           onLatencySegment: handleLatencySegment,
           signal: turnController.signal,
           turnId,
+          turnIndex,
           diagnosticTraceEnabled: diagnosticTraceEnabledRef.current,
         });
 
@@ -952,7 +991,7 @@ const IndexPRD4 = () => {
         const blocker =
           (result.timings.max_ms ?? 0) >= (result.timings.rag_ms ?? 0) ? "max_ms" : "rag_ms";
         const maxMsg: ConversationMessage = {
-          role: "max",
+          role: activeCharacterRef.current,
           content: result.maxResponse,
           timestamp: Date.now(),
           pipeline: {
@@ -1031,6 +1070,7 @@ const IndexPRD4 = () => {
           turnIndex,
           signal: outputController.signal,
           onPlaybackStart,
+          voiceId: activeVoiceIdRef.current ?? undefined,
         }).finally(() => {
           turnController.signal.removeEventListener("abort", abortOutputFromTurn);
           if (activeOutputControllerRef.current === outputController) activeOutputControllerRef.current = null;
@@ -1077,7 +1117,7 @@ const IndexPRD4 = () => {
           session_id: sessionIdRef.current,
           turn_id: turnId,
           turn_index: turnIndex,
-          character: "max",
+          character: activeCharacterRef.current,
           voice_modality: "push_to_talk",
           user_message_len: userText.length,
           max_response_len: result.maxResponse.length,
@@ -1118,93 +1158,30 @@ const IndexPRD4 = () => {
           void updatePRD4Conversation(sessionIdRef.current, conversationRef.current);
         }
 
-        // ---- Label pass (parallèle à Max) : labels + trigger vidéo déterministe
-        // Une seule vidéo par tour : on mémorise si quelque chose a été déclenché ici
-        // pour que le post-turn (garde-fou) ne re-déclenche pas.
-        let videoTriggeredThisTurn = false;
-        const labelHandling = result.labelPromise.then(async (lab) => {
-          if (!isCurrentTurn()) return;
-          const labels = lab.labels;
-          const total = (labels.themes?.length ?? 0) + (labels.topics?.length ?? 0) + (labels.intentions?.length ?? 0);
-
-          // Attache les labels au dernier message utilisateur (state + persistance).
-          if (total > 0) {
-            setLastUserLabels(labels);
-            const log = conversationRef.current;
-            for (let i = log.length - 1; i >= 0; i--) {
-              if (log[i].role === "user") {
-                log[i] = { ...log[i], labels };
-                break;
-              }
-            }
-            if (sessionIdRef.current) {
-              void updatePRD4Conversation(sessionIdRef.current, conversationRef.current);
-            }
+        // A handoff recommendation first guides a natural proposal by Max. The
+        // explicit choice only appears after that next spoken reply completed.
+        if (handoffProposalForThisTurn && activeCharacterRef.current === "max") {
+          handoffRecommendationRef.current = null;
+          setHandoffOffer(handoffProposalForThisTurn);
+          if (sessionIdRef.current) {
+            void updatePRD4ExperienceState(sessionIdRef.current, { pendingHandoff: handoffProposalForThisTurn });
+            void appendExperienceEvent({
+              sessionId: sessionIdRef.current,
+              eventKey: `handoff-proposed:${turnId}`,
+              eventType: "handoff_proposed",
+              turnId,
+              turnIndex,
+              character: "max",
+              payload: { reason: handoffProposalForThisTurn.reason },
+            });
           }
+          trackEvent("prd4_handoff_proposed", { session_id: sessionIdRef.current, turn_id: turnId, turn_index: turnIndex });
+        }
 
-          // Matcher déterministe (un seul thème commun suffit).
-          let pickedVideoId: string | null = null;
-          try {
-            const settings = videoTriggerSettingsRef.current;
-            const userTurnNumber = conversationRef.current.filter((m) => m.role === "user").length;
-            const labelsCount = (labels.themes?.length ?? 0) + (labels.topics?.length ?? 0) + (labels.intentions?.length ?? 0);
-            const gateReason = !settings.ENABLED
-              ? "disabled"
-              : userTurnNumber < settings.MIN_TURNS_BEFORE_FIRST
-                ? "before_first"
-                : (userTurnNumber - lastVideoTurnRef.current) < settings.MIN_TURNS_BETWEEN
-                  ? "too_soon"
-                  : (settings.MAX_PER_SESSION > 0 && triggeredVideoIdsRef.current.length >= settings.MAX_PER_SESSION)
-                    ? "max_reached"
-                    : labelsCount < settings.MIN_LABELS_REQUIRED
-                      ? "not_enough_labels"
-                      : null;
-            if (gateReason) {
-              trackEvent("prd4_video_gate_blocked", {
-                session_id: sessionIdRef.current,
-                reason: gateReason,
-                user_turn: userTurnNumber,
-              });
-            } else {
-              const videos = await getVideoTriggersCached();
-              const match = pickVideoForLabels(labels, videos, triggeredVideoIdsRef.current, userText);
-              if (match) {
-                pickedVideoId = match.row.id;
-                triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, match.row.id];
-                lastVideoTurnRef.current = userTurnNumber;
-                videoTriggeredThisTurn = true;
-                trackEvent("prd4_video_triggered", {
-                  session_id: sessionIdRef.current,
-                  video_id: match.row.id,
-                  title: match.row.title,
-                  source: match.source,
-                  matched_term: match.matchedTerm,
-                  matched_theme: match.matchedVideoTheme,
-                });
-                setActiveVideo(match.row);
-              }
-            }
-          } catch (err) {
-            console.warn("[PRD4] label-driven video trigger failed:", err);
-          }
-
-          trackEvent("prd4_gm_label", {
-            session_id: sessionIdRef.current,
-            ok: lab.ok,
-            latency_ms: lab.latency_ms,
-            model: lab.model,
-            n_themes: labels.themes?.length ?? 0,
-            n_topics: labels.topics?.length ?? 0,
-            n_intentions: labels.intentions?.length ?? 0,
-            trigger_video_id: pickedVideoId,
-          });
-        }).catch((err) => console.warn("[PRD4] label pass handling failed:", err));
-
-        // ---- GM post-turn : engagement, end_recommended + garde-fou vidéo
+        // ---- Directeur d'expérience unique : labels, mémoire, guidance et une
+        // action recommandée, toujours après le texte et la voix du personnage.
         void result.postTurnPromise.then(async (ev) => {
           if (!isCurrentTurn()) return;
-          // Boucle GM→Max : mémorise la guidance pour le tour suivant et cumule
-          // les sujets couverts (dédupliqués) sur la session.
           pendingGmGuidanceRef.current = ev.next_turn_guidance?.trim() || null;
           if (ev.topics_covered?.length) {
             const known = new Set(gmTopicsCoveredRef.current.map((t) => t.toLowerCase()));
@@ -1218,24 +1195,20 @@ const IndexPRD4 = () => {
           }
           trackEvent("prd4_gm_post_turn", {
             session_id: sessionIdRef.current,
+            turn_id: turnId,
             turn_index: ev.turn_index,
             engagement_delta: ev.engagement_delta,
             end_recommended: ev.end_recommended,
             trigger_video_id: ev.trigger_video_id ?? null,
             latency_ms: ev.latency_ms,
             labels: ev.labels ?? null,
+            action: ev.action ?? { type: "none" },
+            orchestration_version_id: ev.orchestration_version_id ?? null,
           });
-          // Fallback labels si le label pass a échoué et que le post-turn en a quand même produit.
           if (ev.labels) {
             const total = (ev.labels.themes?.length ?? 0) + (ev.labels.topics?.length ?? 0) + (ev.labels.intentions?.length ?? 0);
             const log = conversationRef.current;
-            const lastUserHasLabels = (() => {
-              for (let i = log.length - 1; i >= 0; i--) {
-                if (log[i].role === "user") return !!log[i].labels;
-              }
-              return false;
-            })();
-            if (total > 0 && !lastUserHasLabels) {
+            if (total > 0) {
               setLastUserLabels(ev.labels);
               for (let i = log.length - 1; i >= 0; i--) {
                 if (log[i].role === "user") {
@@ -1248,48 +1221,85 @@ const IndexPRD4 = () => {
               }
             }
           }
-          // Garde-fou vidéo : on attend le label pass d'abord pour éviter une double sélection.
-          await labelHandling;
-          if (!videoTriggeredThisTurn && ev.trigger_video_id && !triggeredVideoIdsRef.current.includes(ev.trigger_video_id)) {
-            const settings = videoTriggerSettingsRef.current;
-            const userTurnNumber = conversationRef.current.filter((m) => m.role === "user").length;
-            const blocked = !settings.ENABLED
-              || userTurnNumber < settings.MIN_TURNS_BEFORE_FIRST
-              || (userTurnNumber - lastVideoTurnRef.current) < settings.MIN_TURNS_BETWEEN
-              || (settings.MAX_PER_SESSION > 0 && triggeredVideoIdsRef.current.length >= settings.MAX_PER_SESSION);
-            if (blocked) {
-              trackEvent("prd4_video_gate_blocked", {
-                session_id: sessionIdRef.current,
-                reason: "post_turn_fallback_gate",
-                user_turn: userTurnNumber,
-              });
-            } else {
-              try {
-                const videos = await getVideoTriggersCached();
-                const row = videos.find((v) => v.id === ev.trigger_video_id) || null;
-                if (row?.video_url) {
-                  triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, row.id];
-                  lastVideoTurnRef.current = userTurnNumber;
-                  trackEvent("prd4_video_triggered", { session_id: sessionIdRef.current, video_id: row.id, title: row.title, source: "post_turn_fallback" });
-                  setActiveVideo(row);
-                }
-              } catch (err) {
-                console.warn("[PRD4] post-turn video trigger fallback failed:", err);
-              }
-            }
-          }
-          const minimumClosureSeconds = getSessionMinimumClosureSeconds(configuredSessionDurationRef.current);
-          if (ev.end_recommended && elapsed >= minimumClosureSeconds && !endedRef.current) {
-            endedRef.current = true;
-            void finalizeAndEnd("gm_end_recommended");
-          } else if (ev.end_recommended && elapsed < minimumClosureSeconds) {
-            trackEvent("prd4_early_end_blocked", {
-              session_id: sessionIdRef.current,
-              elapsed_seconds: elapsed,
-              minimum_closure_seconds: minimumClosureSeconds,
+
+          const [videos, emma] = await Promise.all([
+            getVideoTriggersCached(),
+            getCharacterRuntimeReadiness("emma").catch(() => null),
+          ]);
+          if (!isCurrentTurn()) return;
+          const settings = videoTriggerSettingsRef.current;
+          const decision: ExperienceDirectorDecisionV1 = {
+            labels: ev.labels ?? { themes: [], topics: [], intentions: [] },
+            nextTurnGuidance: ev.next_turn_guidance || null,
+            memoryDelta: ev.memory_delta ?? null,
+            action: ev.action ?? { type: "none" },
+          };
+          const guarded = validateDirectorDecision(decision, {
+            configPublished: Boolean(ev.orchestration_version_id),
+            currentCharacter: activeCharacterRef.current,
+            userTurn: turnIndex,
+            handoffCount: handoffCountRef.current,
+            handoffPending: Boolean(handoffOffer || handoffRecommendationRef.current),
+            emmaReady: emma?.ready === true,
+            playedVideoIds: triggeredVideoIdsRef.current,
+            availableVideoIds: videos.filter((video) => Boolean(video.video_url)).map((video) => video.id),
+            lastVideoTurn: Number.isFinite(lastVideoTurnRef.current) ? lastVideoTurnRef.current : null,
+            minimumVideoTurn: settings.ENABLED ? settings.MIN_TURNS_BEFORE_FIRST : Number.MAX_SAFE_INTEGER,
+            minimumTurnsBetweenVideos: settings.MIN_TURNS_BETWEEN,
+            maximumVideosPerSession: settings.MAX_PER_SESSION,
+            resultIsCurrent: isCurrentTurn(),
+          });
+          const sid = sessionIdRef.current;
+          if (!guarded.accepted && guarded.recommendedAction.type !== "none") {
+            trackEvent(`prd4_${guarded.recommendedAction.type}_blocked`, { session_id: sid, turn_id: turnId, reason: guarded.blockedReason });
+            if (sid) void appendExperienceEvent({
+              sessionId: sid,
+              eventKey: `director-blocked:${turnId}:${guarded.recommendedAction.type}`,
+              eventType: guarded.recommendedAction.type === "handoff" ? "handoff_blocked" : "cinematic_blocked",
+              turnId,
+              turnIndex,
+              character: activeCharacterRef.current,
+              orchestrationVersionId: ev.orchestration_version_id,
+              payload: { blockedReason: guarded.blockedReason, action: guarded.recommendedAction },
             });
           }
-        });
+
+          if (guarded.action.type === "handoff") {
+            handoffRecommendationRef.current = {
+              reason: guarded.action.reason,
+              proposalGuidance: guarded.action.proposalGuidance,
+            };
+            pendingGmGuidanceRef.current = guarded.action.proposalGuidance;
+            trackEvent("prd4_handoff_recommended", { session_id: sid, turn_id: turnId, turn_index: turnIndex });
+          } else if (guarded.action.type === "cinematic") {
+            const video = videos.find((candidate) => candidate.id === guarded.action.videoId && candidate.video_url) ?? null;
+            if (video) {
+              triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, video.id];
+              lastVideoTurnRef.current = turnIndex;
+              trackEvent("prd4_video_recommended", { session_id: sid, turn_id: turnId, video_id: video.id, confidence: guarded.action.confidence });
+              trackEvent("prd4_video_triggered", { session_id: sid, turn_id: turnId, video_id: video.id, title: video.title, source: "experience_director" });
+              setActiveVideo(video);
+              if (sid) void appendExperienceEvent({
+                sessionId: sid,
+                eventKey: `cinematic-played:${turnId}`,
+                eventType: "cinematic_played",
+                turnId,
+                turnIndex,
+                character: activeCharacterRef.current,
+                orchestrationVersionId: ev.orchestration_version_id,
+                payload: { videoId: video.id, reason: guarded.action.reason, confidence: guarded.action.confidence },
+              });
+            }
+          } else if (guarded.action.type === "end") {
+            const minimumClosureSeconds = getSessionMinimumClosureSeconds(configuredSessionDurationRef.current);
+            if (elapsed >= minimumClosureSeconds && !endedRef.current) {
+              endedRef.current = true;
+              void finalizeAndEnd("gm_end_recommended");
+            } else if (elapsed < minimumClosureSeconds) {
+              trackEvent("prd4_early_end_blocked", { session_id: sid, elapsed_seconds: elapsed, minimum_closure_seconds: minimumClosureSeconds });
+            }
+          }
+        }).catch((directorError) => console.warn("[PRD4] director result ignored:", directorError));
 
         trackEvent("prd4_turn_completed", {
           session_id: sessionIdRef.current,
@@ -1344,6 +1354,7 @@ const IndexPRD4 = () => {
       renderResponseText,
       endLatencySegment,
       finalizeAndEnd,
+      handoffOffer,
       latencyOverlayEnabled,
       setAudioState,
       setLastUserLabels,
@@ -1503,6 +1514,92 @@ const IndexPRD4 = () => {
     void finalizeAndEnd("user_hangup");
   }, [finalizeAndEnd]);
 
+  const handleRejectHandoff = useCallback(() => {
+    const offer = handoffOffer;
+    if (!offer) return;
+    setHandoffOffer(null);
+    handoffCountRef.current = 1;
+    const sid = sessionIdRef.current;
+    if (sid) {
+      void updatePRD4ExperienceState(sid, { pendingHandoff: null, handoffCount: 1 });
+      void appendExperienceEvent({
+        sessionId: sid,
+        eventKey: "handoff-refused:max-emma",
+        eventType: "handoff_refused",
+        character: "max",
+        payload: { reason: offer.reason },
+      });
+    }
+    trackEvent("prd4_handoff_refused", { session_id: sid, target_character: "emma" });
+  }, [handoffOffer]);
+
+  const handleAcceptHandoff = useCallback(async () => {
+    const offer = handoffOffer;
+    if (!offer || handoffCalling) return;
+    setHandoffCalling(true);
+    const sid = sessionIdRef.current;
+    trackEvent("prd4_handoff_accepted", { session_id: sid, target_character: "emma" });
+    if (sid) void appendExperienceEvent({
+      sessionId: sid,
+      eventKey: "handoff-accepted:max-emma",
+      eventType: "handoff_accepted",
+      character: "max",
+      payload: { reason: offer.reason },
+    });
+    try {
+      const emma = await getCharacterRuntimeReadiness("emma");
+      if (!emma?.ready || !emma.openingLine || !emma.ttsVoiceId) {
+        throw new Error("La checklist runtime d’Emma n’est plus complète.");
+      }
+      await activateTTSFallback("emma_handoff_tts_v1");
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 900));
+      handoffConversationStartRef.current = conversationRef.current.length;
+      activeCharacterRef.current = "emma";
+      activeVoiceIdRef.current = emma.ttsVoiceId;
+      handoffCountRef.current = 1;
+      setSelectedCharacter("emma");
+      setHandoffOffer(null);
+      if (sid) await updatePRD4ExperienceState(sid, {
+        activeCharacter: "emma",
+        pendingHandoff: null,
+        handoffCount: 1,
+      });
+      const opening: ConversationMessage = { role: "emma", content: emma.openingLine, timestamp: Date.now() };
+      conversationRef.current = [...conversationRef.current, opening];
+      addMessage(opening);
+      setMaxSubtitle(emma.openingLine);
+      setAudioState("max_speaking");
+      setHandoffCalling(false);
+      await renderResponseText(emma.openingLine, {
+        turnId: `${sid ?? "local"}:emma-opening`,
+        turnIndex: conversationRef.current.filter((message) => message.role === "user").length,
+        voiceId: emma.ttsVoiceId,
+      });
+      setAudioState("idle");
+      if (sid) {
+        void updatePRD4Conversation(sid, conversationRef.current);
+        void appendExperienceEvent({
+          sessionId: sid,
+          eventKey: "handoff-executed:max-emma",
+          eventType: "handoff_executed",
+          character: "emma",
+          payload: { timerPreserved: true, sessionPreserved: true },
+        });
+      }
+      trackEvent("prd4_handoff_executed", { session_id: sid, target_character: "emma" });
+    } catch (error) {
+      setHandoffCalling(false);
+      toast({ title: "Emma n’est pas disponible", description: error instanceof Error ? error.message : "Restez avec Max.", variant: "destructive" });
+      if (sid) void appendExperienceEvent({
+        sessionId: sid,
+        eventKey: "handoff-blocked-on-accept:max-emma",
+        eventType: "handoff_blocked",
+        character: "max",
+        payload: { blockedReason: error instanceof Error ? error.message : String(error) },
+      });
+    }
+  }, [activateTTSFallback, addMessage, handoffCalling, handoffOffer, renderResponseText, setAudioState, setSelectedCharacter]);
+
   // Cleanup au démontage
   useEffect(() => () => { cleanupAudio(); }, [cleanupAudio]);
   useEffect(() => {
@@ -1594,6 +1691,13 @@ const IndexPRD4 = () => {
     sessionDurationRef.current = 0;
     triggeredVideoIdsRef.current = [];
     pendingPostVideoContextRef.current = null;
+    activeCharacterRef.current = "max";
+    activeVoiceIdRef.current = null;
+    handoffCountRef.current = 0;
+    handoffRecommendationRef.current = null;
+    handoffConversationStartRef.current = 0;
+    setHandoffOffer(null);
+    setHandoffCalling(false);
     activeTurnControllerRef.current?.abort("experience-restart");
     activeTurnControllerRef.current = null;
     activeOutputControllerRef.current?.abort("experience-restart");
@@ -1612,6 +1716,13 @@ const IndexPRD4 = () => {
       session_id: sessionIdRef.current,
       video_id: activeVideo.id,
       skipped,
+    });
+    if (sessionIdRef.current) void appendExperienceEvent({
+      sessionId: sessionIdRef.current,
+      eventKey: `cinematic-${skipped ? "skipped" : "completed"}:${activeVideo.id}`,
+      eventType: skipped ? "cinematic_skipped" : "cinematic_completed",
+      character: activeCharacterRef.current,
+      payload: { videoId: activeVideo.id, skipped },
     });
     setActiveVideo(null);
   }, [activeVideo]);
@@ -1691,6 +1802,11 @@ const IndexPRD4 = () => {
               streamingAvatarActive={streamingAvatarActive}
               streamingAvatarState={streamingAvatarState}
               attachAvatarMedia={attachAvatarMedia}
+              activeCharacter={activeCharacterRef.current}
+              handoffOffer={handoffOffer}
+              handoffCalling={handoffCalling}
+              onAcceptHandoff={() => void handleAcceptHandoff()}
+              onRejectHandoff={handleRejectHandoff}
             />
           ) : null}
           <LatencyOverlay enabled={latencyOverlayEnabled} segments={latencySegments} currentTurn={latencyCurrentTurn} />

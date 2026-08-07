@@ -4,6 +4,94 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.55.0] — 2026-08-07 — Orchestration GM, handoff Emma et observabilité PostHog réelle
+
+### Ajouté
+
+- Nouvelle organisation du back-office : **Expérience** regroupe Orchestration et
+  Cinématiques ; **Qualité** regroupe Latence & blocage, Latences PostHog,
+  Laboratoire RAG et Traces Max ; **Technique avancée** conserve les huit pages
+  STT, RAG, LLM, TTS, Streaming Avatar et consommations.
+- Gouvernance du directeur d'expérience : versions brouillon, publiée et
+  archivée, test sans effet réel, publication explicite, restauration par
+  brouillon et version épinglée au démarrage de chaque session.
+- Contrat `ExperienceDirectorDecisionV1` consolidant labels, guidance, mémoire et
+  une seule action structurée (`none`, `cinematic`, `handoff`, `end`) dans
+  l'appel GM post-tour existant, hors du chemin personnage → voix.
+- Moteur déterministe de validation des actions : version publiée, résultat
+  courant, ressources disponibles, cooldowns, doublons, limite par session et
+  priorité du handoff.
+- Handoff Max→Emma V1 : proposition naturelle après quatre tours minimum,
+  boutons **Appeler Emma** / **Rester avec Max**, une seule offre par session,
+  écran d'appel, session et timer conservés, reprise persistée et voix Emma via
+  le chemin TTS.
+- Mémoire conversationnelle V2 rétrocompatible avec provenance, personnage
+  source, visibilité privée/partagée et liste explicite des personnages
+  autorisés. Les confidences Max restent privées ; Emma ne reçoit ni transcript
+  brut ni résumé historique non cloisonné de Max.
+- Profil runtime administrable pour Max et Emma : fiche synchronisée, ouverture,
+  portrait, provider/voix TTS et validations prompt, RAG, qualité et isolation.
+- Edge Function admin `posthog-latency-stats` : requêtes HogQL prédéfinies,
+  secret PostHog exclusivement serveur, filtres 24 h/7 j/30 j/personnalisé,
+  cache 60 secondes et erreurs d'authentification, quota ou disponibilité
+  explicites.
+- Comparaison PostHog/Supabase sans fusion des sources et canary multi-source
+  combinant performance, erreurs, persistance et coût par session.
+- Migration Lovable Cloud additive pour `experience_orchestration_versions`,
+  `character_runtime_profiles`, `experience_events`, journal des accès legacy,
+  état du handoff et version GM dans `sessions`.
+- Tutoriel et prompt de finalisation Lovable/PostHog dans
+  [`docs/interfaces/lovable-experience-orchestration-finalization.md`](docs/interfaces/lovable-experience-orchestration-finalization.md).
+
+### Modifié
+
+- La page Game Master devient **Expérience → Orchestration**. Seuls
+  `TIMEOUT_SECONDS`, les versions GM et les profils runtime y sont présentés
+  comme actifs ; `MAX_PROMPT_VARIANT` rejoint Technique avancée → RAG.
+- La page Triggers vidéo devient **Expérience → Cinématiques** et réunit le
+  catalogue Notion/Gumlet, les règles, la disponibilité média et l'historique
+  des recommandations/blocages.
+- **Latence & blocage** conserve sa disposition et ses interactions, accepte les
+  tours Emma et distingue fournisseur TTS, premier son, playback, données
+  historiques ambiguës et segments réellement non exécutés.
+- **Latences PostHog** ne présente plus les données Supabase comme si elles
+  venaient de PostHog. La source, la fraîcheur, la période et l'absence de données
+  sont toujours explicites.
+- Le label pass PRD4 est désormais une projection du GM post-tour : aucun second
+  appel LLM n'est exécuté.
+
+### Corrigé
+
+- Les deux tests de timeout RAG PRD4 utilisent la constante runtime réelle de
+  3 500 ms au lieu d'une valeur historique.
+- L'index global du tour reste stable après le passage à Emma, même si son
+  historique est volontairement isolé ; ses mises à jour mémoire ne sont plus
+  rejetées comme des deltas anciens.
+- Les tours Emma apparaissent dans les diagnostics de session et de latence au
+  lieu d'être ignorés ou étiquetés comme des messages utilisateur.
+- Une mesure interne absente ou une requête Supabase en échec n'est plus
+  transformée silencieusement en zéro dans la comparaison PostHog.
+
+### Compatibilité et sécurité
+
+- Validateur et Métriques hallu. restent disponibles pendant 14 jours via un
+  accès administrateur legacy explicite et journalisé ; aucune table, colonne,
+  migration ou donnée historique n'est supprimée.
+- Les non-administrateurs sont refusés par l'Edge Function PostHog. La clé
+  personnelle, le project ID et les requêtes ne sont jamais exposés au bundle.
+- Streaming Avatar Config, Consommation Streaming Avatar et le sélecteur
+  Voix TTS / Avatar vidéo restent disponibles et ne participent pas au handoff
+  Emma V1.
+
+### Tests et activation
+
+- Build de production réussi, lint ciblé sans erreur, `git diff --check` valide
+  et suite complète de **233 tests** réussie sur 58 fichiers.
+- L'activation reste à effectuer exclusivement dans Lovable Cloud : migration,
+  secrets PostHog, déploiement de l'Edge Function, configuration d'Emma et
+  recette interne. Aucune publication Production n'est autorisée sans validation
+  explicite.
+
 ## [0.54.0] — 2026-08-06 — Erreurs RAG lisibles et budget de payload maîtrisé
 
 ### Ajouté

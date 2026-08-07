@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -18,9 +19,17 @@ import {
   videoTriggerDefaults,
   type VideoTriggerSettings,
 } from "@/services/settingsService";
+import { supabase } from "@/integrations/supabase/client";
 
 const TYPE_OPTIONS = ["intro", "interlude", "mid_conversation"];
 const TRANSITION_OPTIONS = ["fade_black", "glitch", "screen_share"];
+
+interface CinematicEventRow {
+  id: string;
+  event_type: string;
+  created_at: string;
+  payload: { videoId?: string; reason?: string; blockedReason?: string } | null;
+}
 
 function VideoTriggerRulesPanel() {
   const [settings, setSettings] = useState<VideoTriggerSettings>(videoTriggerDefaults);
@@ -141,6 +150,7 @@ export default function VideoTriggersEditor() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Partial<VideoTriggerRow>>({});
   const [newTheme, setNewTheme] = useState("");
+  const [history, setHistory] = useState<CinematicEventRow[]>([]);
 
   const fetchTriggers = useCallback(async () => {
     setLoading(true);
@@ -155,6 +165,15 @@ export default function VideoTriggersEditor() {
   }, []);
 
   useEffect(() => { fetchTriggers(); }, [fetchTriggers]);
+  useEffect(() => {
+    void supabase
+      .from("experience_events" as never)
+      .select("id, event_type, created_at, payload")
+      .in("event_type", ["cinematic_recommended", "cinematic_played", "cinematic_skipped", "cinematic_blocked"])
+      .order("created_at", { ascending: false })
+      .limit(40)
+      .then(({ data }) => setHistory((data ?? []) as unknown as CinematicEventRow[]));
+  }, []);
 
   function startEdit(t: VideoTriggerRow) {
     setEditingId(t.id);
@@ -218,9 +237,9 @@ export default function VideoTriggersEditor() {
     <section className="border rounded-lg p-4 space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-semibold text-base mb-1">🎬 Triggers vidéo</h3>
+          <h3 className="font-semibold text-base mb-1">🎬 Catalogue et déclenchement des cinématiques</h3>
           <p className="text-xs text-muted-foreground">
-            Source : base Notion <span className="font-mono">🎬 Vidéos AVA</span>. Le Game Master choisit une vidéo selon les <em>thèmes</em> abordés dans la conversation. Édition d'un champ → <strong>Sauvegarder</strong> pousse la modification sur Notion.
+            Source éditoriale : Notion · média : Gumlet. Le GM recommande ; le moteur vérifie disponibilité, rythme et doublons avant lecture après la voix.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchTriggers}>
@@ -331,6 +350,7 @@ export default function VideoTriggersEditor() {
                 <span className="font-mono text-sm font-semibold">{t.title}</span>
                 <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{t.type}</span>
                 {t.priority != null && <span className="text-xs text-muted-foreground">P{t.priority}</span>}
+                <Badge variant={t.video_url ? "default" : "destructive"}>{t.video_url ? "média disponible" : "média absent"}</Badge>
                 {t.notion_id && (
                   <a
                     href={`https://www.notion.so/${t.notion_id.replace(/-/g, "")}`}
@@ -355,9 +375,19 @@ export default function VideoTriggersEditor() {
             {t.context && <p className="text-xs text-muted-foreground mt-2"><strong>Contexte :</strong> {t.context}</p>}
             {t.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2"><strong>Description :</strong> {t.description}</p>}
             {t.video_url && <p className="text-xs text-muted-foreground mt-1 truncate">🔗 {t.video_url}</p>}
+            <p className="mt-1 text-[11px] text-muted-foreground">Synchronisé : {t.updated_at ? new Date(t.updated_at).toLocaleString("fr-FR") : "date inconnue"}</p>
           </div>
         );
       })}
+    </section>
+    <section className="border rounded-lg p-4 space-y-3">
+      <div><h3 className="font-semibold text-base">Historique des décisions</h3><p className="text-xs text-muted-foreground">Recommandations, lectures, passages et blocages déterministes issus du journal append-only.</p></div>
+      {history.length === 0 ? <p className="text-sm text-muted-foreground">Aucun événement enregistré, ou migration Lovable en attente.</p> : history.map((event) => (
+        <div key={event.id} className="flex flex-wrap items-center justify-between gap-2 border-t pt-2 text-xs">
+          <span><Badge variant="outline">{event.event_type}</Badge> {event.payload?.videoId ?? "vidéo inconnue"}</span>
+          <span className="text-muted-foreground">{event.payload?.blockedReason || event.payload?.reason || "—"} · {new Date(event.created_at).toLocaleString("fr-FR")}</span>
+        </div>
+      ))}
     </section>
     </div>
   );

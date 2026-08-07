@@ -1,428 +1,212 @@
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ExternalLink, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   evaluateCanaryReadiness,
   INTERNAL_CANARY_THRESHOLDS,
   type CanaryCheckStatus,
 } from "@/services/releaseReadiness";
+import {
+  loadInternalLatencyComparison,
+  loadPosthogLatencyStats,
+  type InternalLatencyComparison,
+  type PercentileMetric,
+  type PosthogLatencyStats,
+  type PosthogPeriod,
+} from "@/services/posthogLatencyStats";
 
-interface TurnRow {
-  id: string;
-  created_at: string;
-  session_id: string | null;
-  turn_index: number | null;
-  t_rag_rewrite_ms: number | null;
-  t_rag_query_ms: number | null;
-  t_rag_total_ms: number | null;
-  t_knowledge_build_ms: number | null;
-  t_gm_pre_ms: number | null;
-  t_max_llm_ms: number | null;
-  t_validator_ms: number | null;
-  t_turn_total_ms: number | null;
-  rag_matches_count: number | null;
-  rag_top_similarity: number | null;
-  max_response_len: number | null;
-  user_message_len: number | null;
-  max_model: string | null;
-  had_fallback: boolean | null;
-}
-
-interface AudioRow {
-  id: string;
-  created_at: string;
-  session_id: string | null;
-  direction: string;
-  t_stt_ms: number | null;
-  t_tts_first_byte_ms: number | null;
-  t_tts_total_ms: number | null;
-  stt_text_len: number | null;
-  tts_text_len: number | null;
-  metadata_json: {
-    provider?: string;
-    model?: string;
-    mode?: string;
-    trigger?: string;
-  } | null;
-}
-
-interface VoiceTurnEventRow {
-  id: string;
-  created_at: string;
-  session_id: string | null;
-  turn_id: string;
-  turn_index: number | null;
-  severity: string | null;
-  blocker_step: string | null;
-  metadata_json: {
-    t_turn_response_ready_ms?: number;
-    t_turn_voice_ready_ms?: number;
-    t_turn_end_to_end_ms?: number;
-    browser_family?: string;
-    voice_modality?: string;
-    tts_provider?: string;
-    max_model?: string;
-  } | null;
-}
-
-interface VoiceErrorEventRow {
-  id: string;
-  created_at: string;
-  session_id: string | null;
-  turn_id: string | null;
-  component: string;
-  provider: string | null;
-  error_type: string;
-  error_message: string | null;
-  recoverable: boolean | null;
-  fallback_used: string | null;
-}
-
-const SEGMENTS: Array<{ key: keyof TurnRow; label: string; color: string }> = [
-  { key: "t_rag_rewrite_ms", label: "Query rewrite", color: "bg-indigo-500" },
-  { key: "t_rag_query_ms", label: "RAG query", color: "bg-blue-500" },
-  { key: "t_knowledge_build_ms", label: "Knowledge build", color: "bg-cyan-500" },
-  { key: "t_gm_pre_ms", label: "GM pre-turn", color: "bg-amber-500" },
-  { key: "t_max_llm_ms", label: "Max LLM", color: "bg-emerald-500" },
-  { key: "t_validator_ms", label: "Validator", color: "bg-rose-500" },
+const PERIODS: Array<{ key: PosthogPeriod; label: string }> = [
+  { key: "24h", label: "24 heures" },
+  { key: "7d", label: "7 jours" },
+  { key: "30d", label: "30 jours" },
+  { key: "custom", label: "Personnalisée" },
 ];
 
-function fmt(ms: number | null | undefined): string {
-  if (ms == null) return "—";
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(2)}s`;
+function fmtMs(value: number | null): string {
+  if (value == null) return "non mesuré";
+  return value < 1000 ? `${Math.round(value)} ms` : `${(value / 1000).toFixed(2)} s`;
 }
 
-function percentile(values: number[], p: number): number {
-  if (!values.length) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const idx = Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length));
-  return sorted[idx];
+function fmtRate(value: number | null): string {
+  return value == null ? "non mesuré" : `${(value * 100).toFixed(2)} %`;
 }
 
-function serviceTurnTotal(t: TurnRow): number {
-  return SEGMENTS.reduce((sum, s) => sum + (((t[s.key] as number | null) ?? 0) || 0), 0);
+function MetricCard({ label, metric, source = "PostHog" }: { label: string; metric: PercentileMetric; source?: string }) {
+  return (
+    <div className="rounded-lg border p-3">
+      <div className="flex items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{label}</span><Badge variant="outline" className="text-[10px]">{source}</Badge></div>
+      <p className="mt-2 font-mono text-sm">p50 {fmtMs(metric.p50)} · p95 {fmtMs(metric.p95)}</p>
+      <p className="mt-1 text-[11px] text-muted-foreground">{metric.measured} mesure(s)</p>
+    </div>
+  );
 }
 
-function providerLabel(row: AudioRow, fallback: string): string {
-  return row.metadata_json?.provider || fallback;
+function statusClass(status: CanaryCheckStatus): string {
+  if (status === "pass") return "border-emerald-600/50 text-emerald-400";
+  if (status === "fail") return "border-red-600/50 text-red-400";
+  return "border-amber-600/50 text-amber-300";
 }
 
 export default function LatencyTelemetryTab() {
-  const [turns, setTurns] = useState<TurnRow[]>([]);
-  const [audios, setAudios] = useState<AudioRow[]>([]);
-  const [voiceTurns, setVoiceTurns] = useState<VoiceTurnEventRow[]>([]);
-  const [voiceErrors, setVoiceErrors] = useState<VoiceErrorEventRow[]>([]);
+  const [period, setPeriod] = useState<PosthogPeriod>("24h");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [filters, setFilters] = useState({ character: "", model: "", stt: "", tts: "", browser: "" });
+  const [stats, setStats] = useState<PosthogLatencyStats | null>(null);
+  const [internal, setInternal] = useState<InternalLatencyComparison | null>(null);
   const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [costBudget, setCostBudget] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
-    const [t, a, vt, ve] = await Promise.all([
-      supabase
-        .from("turn_latencies" as never)
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(100),
-      supabase
-        .from("audio_latencies" as never)
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(200),
-      supabase
-        .from("voice_turn_events" as never)
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(100),
-      supabase
-        .from("voice_error_events" as never)
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(100),
-    ]);
-    if (t.data) setTurns(t.data as unknown as TurnRow[]);
-    if (a.data) setAudios(a.data as unknown as AudioRow[]);
-    if (vt.data) setVoiceTurns(vt.data as unknown as VoiceTurnEventRow[]);
-    if (ve.data) setVoiceErrors(ve.data as unknown as VoiceErrorEventRow[]);
-    setLoading(false);
-  };
+    setError(null);
+    try {
+      const posthog = await loadPosthogLatencyStats({
+        period,
+        ...(period === "custom" ? { from: from ? new Date(from).toISOString() : undefined, to: to ? new Date(to).toISOString() : undefined } : {}),
+        filters: Object.fromEntries(Object.entries(filters).filter(([, value]) => value.trim())),
+      });
+      setStats(posthog);
+      try {
+        setInternal(await loadInternalLatencyComparison(posthog));
+      } catch (comparisonError) {
+        console.warn("[Latency PostHog] internal comparison unavailable", comparisonError);
+        setInternal(null);
+      }
+    } catch (loadError) {
+      setStats(null);
+      setInternal(null);
+      setError(loadError instanceof Error ? loadError.message : String(loadError));
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, from, period, to]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const stats = useMemo(() => {
-    const totals = turns.map(serviceTurnTotal).filter((v) => v > 0);
-    return {
-      count: turns.length,
-      median: percentile(totals, 50),
-      p95: percentile(totals, 95),
-      fallbacks: turns.filter((t) => t.had_fallback).length,
-    };
-  }, [turns]);
+  const canary = useMemo(() => stats ? evaluateCanaryReadiness({
+    sessionCount: stats.totals.sessions,
+    turnCount: stats.totals.turns,
+    p95FirstSoundMs: stats.latency.firstSound.p95,
+    turnErrorRate: stats.totals.errorRate,
+    persistenceRate: internal?.persistenceRate ?? null,
+    costPerSessionUsd: internal?.costPerSessionUsd ?? null,
+  }, {
+    ...INTERNAL_CANARY_THRESHOLDS,
+    maximumCostPerSessionUsd: costBudget ? Number(costBudget) : null,
+  }) : null, [costBudget, internal, stats]);
 
-  const audioStats = useMemo(() => {
-    const stt = audios.filter((a) => a.direction === "in").map((a) => a.t_stt_ms ?? 0).filter((v) => v > 0);
-    const ttsFirstByte = audios.filter((a) => a.direction === "out").map((a) => a.t_tts_first_byte_ms ?? 0).filter((v) => v > 0);
-    const ttsTotal = audios.filter((a) => a.direction === "out").map((a) => a.t_tts_total_ms ?? 0).filter((v) => v > 0);
-    const sttByProvider = [...audios
-      .filter((a) => a.direction === "in" && (a.t_stt_ms ?? 0) > 0)
-      .reduce((map, row) => {
-        const provider = providerLabel(row, "Unknown");
-        map.set(provider, [...(map.get(provider) ?? []), row.t_stt_ms!]);
-        return map;
-      }, new Map<string, number[]>())]
-      .map(([provider, values]) => ({
-        provider,
-        count: values.length,
-        median: percentile(values, 50),
-        p95: percentile(values, 95),
-      }))
-      .sort((a, b) => a.provider.localeCompare(b.provider));
-    return {
-      stt_median: percentile(stt, 50),
-      stt_p95: percentile(stt, 95),
-      tts_fb_median: percentile(ttsFirstByte, 50),
-      tts_fb_p95: percentile(ttsFirstByte, 95),
-      tts_total_median: percentile(ttsTotal, 50),
-      tts_total_p95: percentile(ttsTotal, 95),
-      sttByProvider,
-    };
-  }, [audios]);
-
-  const maxTotal = Math.max(1, ...turns.map(serviceTurnTotal));
-  const voiceStats = useMemo(() => {
-    const blockers = voiceTurns.reduce<Record<string, number>>((acc, t) => {
-      const key = t.blocker_step || "unknown";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    return {
-      count: voiceTurns.length,
-      topBlocker: Object.entries(blockers).sort((a, b) => b[1] - a[1])[0]?.[0] || "—",
-      critical: voiceTurns.filter((t) => t.severity === "critical" || t.severity === "failed").length,
-    };
-  }, [voiceTurns]);
-
-  const canaryReadiness = useMemo(() => {
-    const firstSoundValues = voiceTurns
-      .map((turn) => turn.metadata_json?.t_turn_voice_ready_ms)
-      .filter((value): value is number => typeof value === "number" && value >= 0);
-    const failedTurns = voiceTurns.filter((turn) => turn.severity === "failed").length;
-    const sessionCount = new Set(voiceTurns.map((turn) => turn.session_id).filter(Boolean)).size;
-
-    return evaluateCanaryReadiness({
-      sessionCount,
-      turnCount: voiceTurns.length,
-      p95FirstSoundMs: firstSoundValues.length ? percentile(firstSoundValues, 95) : null,
-      turnErrorRate: voiceTurns.length ? failedTurns / voiceTurns.length : null,
-      // Ces deux mesures sont suivies dans PostHog et doivent rester bloquantes tant
-      // que le budget et la fenêtre de canary ne sont pas validés par le responsable.
-      persistenceRate: null,
-      costPerSessionUsd: null,
-    });
-  }, [voiceTurns]);
+  const comparison = stats && internal ? [
+    { label: "Tours", posthog: String(stats.totals.turns), internal: String(internal.turnCount) },
+    { label: "p50 texte prêt", posthog: fmtMs(stats.latency.responseReady.p50), internal: fmtMs(internal.p50ResponseReadyMs) },
+    { label: "p95 texte prêt", posthog: fmtMs(stats.latency.responseReady.p95), internal: fmtMs(internal.p95ResponseReadyMs) },
+    { label: "p50 premier son", posthog: fmtMs(stats.latency.firstSound.p50), internal: fmtMs(internal.p50FirstSoundMs) },
+    { label: "p95 premier son", posthog: fmtMs(stats.latency.firstSound.p95), internal: fmtMs(internal.p95FirstSoundMs) },
+  ] : [];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Latences pipeline</h2>
-          <p className="text-xs text-muted-foreground">
-            {stats.count} tours · latence service médiane {fmt(stats.median)} · p95 {fmt(stats.p95)} · {stats.fallbacks} fallback(s)
-          </p>
+          <div className="flex items-center gap-2"><h2 className="text-lg font-semibold">Latences PostHog</h2><Badge>PostHog</Badge></div>
+          <p className="text-xs text-muted-foreground">Mesures analytics distantes, séparées des mesures internes Supabase.</p>
         </div>
-        <Button size="sm" variant="outline" onClick={load} disabled={loading}>
-          {loading ? "Chargement…" : "Recharger"}
-        </Button>
+        <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}><RefreshCw className={`mr-1 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />{loading ? "Chargement…" : "Actualiser"}</Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-        <div className="rounded border p-2">
-          <div className="text-muted-foreground">STT service</div>
-          <div className="font-mono">méd {fmt(audioStats.stt_median)} · p95 {fmt(audioStats.stt_p95)}</div>
-          <div className="mt-1 space-y-0.5">
-            {audioStats.sttByProvider.length === 0 ? (
-              <div className="text-[11px] text-muted-foreground">Provider non disponible</div>
-            ) : audioStats.sttByProvider.map((row) => (
-              <div key={row.provider} className="text-[11px] text-muted-foreground">
-                {row.provider}: <span className="font-mono">{row.count} · méd {fmt(row.median)}</span>
-              </div>
-            ))}
-          </div>
+      <section className="rounded-lg border p-4 space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {PERIODS.map((item) => <Button key={item.key} size="sm" variant={period === item.key ? "default" : "outline"} onClick={() => setPeriod(item.key)}>{item.label}</Button>)}
         </div>
-        <div className="rounded border p-2">
-          <div className="text-muted-foreground">TTS premier octet</div>
-          <div className="font-mono">méd {fmt(audioStats.tts_fb_median)} · p95 {fmt(audioStats.tts_fb_p95)}</div>
+        {period === "custom" && <div className="grid gap-2 sm:grid-cols-2"><Input type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} aria-label="Début" /><Input type="datetime-local" value={to} onChange={(event) => setTo(event.target.value)} aria-label="Fin" /></div>}
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {Object.keys(filters).map((key) => <Input key={key} value={filters[key as keyof typeof filters]} onChange={(event) => setFilters((current) => ({ ...current, [key]: event.target.value }))} placeholder={key === "character" ? "Personnage" : key === "model" ? "Modèle Max" : key.toUpperCase()} aria-label={`Filtre ${key}`} />)}
         </div>
-        <div className="rounded border p-2">
-          <div className="text-muted-foreground">TTS génération totale</div>
-          <div className="font-mono">méd {fmt(audioStats.tts_total_median)} · p95 {fmt(audioStats.tts_total_p95)}</div>
-        </div>
-      </div>
+      </section>
 
-      <div className="border rounded p-3 space-y-3">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h3 className="text-sm font-semibold">Canary interne — décision de déploiement</h3>
-            <p className="text-xs text-muted-foreground">
-              Fenêtre locale des {voiceTurns.length} derniers tours voix. La gate publique reste fermée.
-            </p>
-          </div>
-          <Badge variant={canaryReadiness.decision === "rollback" ? "destructive" : "secondary"}>
-            {canaryReadiness.decision === "promote"
-              ? "PROMOUVOIR"
-              : canaryReadiness.decision === "rollback"
-                ? "ROLLBACK"
-                : "EN ATTENTE"}
-          </Badge>
-        </div>
-        <div className="grid md:grid-cols-2 gap-1.5 text-xs">
-          {canaryReadiness.checks.map((check) => (
-            <div key={check.key} className="flex items-center gap-2 rounded border px-2 py-1.5">
-              <CanaryStatus status={check.status} />
-              <span>{check.detail}</span>
-            </div>
-          ))}
-        </div>
-        <p className="text-[11px] text-muted-foreground">
-          Seuils codifiés : au moins {INTERNAL_CANARY_THRESHOLDS.minimumSessions} sessions et {INTERNAL_CANARY_THRESHOLDS.minimumTurns} tours,
-          p95 premier son ≤ {INTERNAL_CANARY_THRESHOLDS.maximumP95FirstSoundMs / 1000}s, erreurs ≤ {INTERNAL_CANARY_THRESHOLDS.maximumTurnErrorRate * 100}%
-          et persistance ≥ {INTERNAL_CANARY_THRESHOLDS.minimumPersistenceRate * 100}%. Le budget par session doit être approuvé avant toute promotion.
-        </p>
-      </div>
+      {error && (
+        <section className="rounded-lg border border-red-700/50 bg-red-950/20 p-4">
+          <h3 className="font-semibold text-red-300">PostHog indisponible</h3>
+          <p className="mt-1 text-sm text-red-200/80">{error}</p>
+          <p className="mt-2 text-xs text-muted-foreground">Aucune donnée Supabase n’est substituée silencieusement. Vérifiez le rôle admin, le secret Lovable, le quota et l’identifiant de projet.</p>
+        </section>
+      )}
 
-      <div className="border rounded p-3 space-y-3">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h3 className="text-sm font-semibold">Observabilité voix unifiée</h3>
-            <p className="text-xs text-muted-foreground">
-              {voiceStats.count} tour(s) · blocker service principal {voiceStats.topBlocker} · {voiceStats.critical} critique(s)/échec(s)
-            </p>
-          </div>
-          <MiniMetric label="Source" value="latences service uniquement" />
-        </div>
+      {stats && (
+        <>
+          <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-xs">
+            <div><Badge variant="outline">Source PostHog</Badge> fraîcheur {new Date(stats.freshAt).toLocaleString("fr-FR")}</div>
+            <div>Période interrogée : {new Date(stats.period.from).toLocaleString("fr-FR")} → {new Date(stats.period.to).toLocaleString("fr-FR")}</div>
+            <a href={stats.dashboardUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary">Dashboard PostHog <ExternalLink className="h-3 w-3" /></a>
+          </section>
 
-        {voiceErrors.length > 0 && (
-          <div className="space-y-1">
-            <div className="text-xs font-medium">Erreurs voix récentes</div>
-            <div className="grid gap-1">
-              {voiceErrors.slice(0, 5).map((e) => (
-                <div key={e.id} className="flex items-center gap-2 text-[11px] border rounded px-2 py-1">
-                  <Badge variant="destructive">{e.component}</Badge>
-                  <span className="font-mono">{e.error_type}</span>
-                  {e.provider ? <span className="text-muted-foreground">{e.provider}</span> : null}
-                  {e.fallback_used ? <span className="text-muted-foreground">fallback {e.fallback_used}</span> : null}
-                  <span className="truncate text-muted-foreground">{e.error_message || "—"}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="flex gap-3 text-xs flex-wrap">
-        {SEGMENTS.map((s) => (
-          <div key={String(s.key)} className="flex items-center gap-1.5">
-            <span className={`inline-block w-3 h-3 rounded ${s.color}`} />
-            <span>{s.label}</span>
-          </div>
-        ))}
-      </div>
-
-      <ScrollArea className="h-[60vh] max-h-[520px] min-h-[320px] border rounded">
-        <div className="p-2 space-y-1">
-          {turns.map((t) => {
-            const total = serviceTurnTotal(t);
-            const widthPct = (total / maxTotal) * 100;
-            const segments = SEGMENTS.map((s) => ({ ...s, value: (t[s.key] as number) ?? 0 }));
-            const sum = segments.reduce((acc, s) => acc + s.value, 0) || 1;
-            const isOpen = expanded === t.id;
-            return (
-              <div key={t.id} className="rounded border p-2 text-xs space-y-1.5">
-                <button
-                  className="w-full flex items-center justify-between text-left"
-                  onClick={() => setExpanded(isOpen ? null : t.id)}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-muted-foreground">
-                      {new Date(t.created_at).toLocaleTimeString()}
-                    </span>
-                    <Badge variant={total <= 2000 ? "default" : total <= 4000 ? "secondary" : "destructive"}>
-                      {fmt(total)}
-                    </Badge>
-                    {t.had_fallback ? <Badge variant="destructive">fallback</Badge> : null}
-                    <span className="text-muted-foreground">
-                      tour #{t.turn_index ?? "?"} · {t.rag_matches_count ?? 0} RAG · {t.max_response_len ?? 0}c
-                    </span>
-                  </div>
-                  <span className="text-muted-foreground">{isOpen ? "▼" : "▶"}</span>
-                </button>
-
-                <div
-                  className="h-3 rounded overflow-hidden flex bg-muted"
-                  style={{ width: `${Math.max(10, widthPct)}%` }}
-                >
-                  {segments.map((s) => (
-                    <div
-                      key={String(s.key)}
-                      className={s.color}
-                      style={{ width: `${(s.value / sum) * 100}%` }}
-                      title={`${s.label}: ${fmt(s.value)}`}
-                    />
-                  ))}
-                </div>
-
-                {isOpen && (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-1 pt-1 font-mono text-[11px]">
-                    {segments.map((s) => (
-                      <div key={String(s.key)} className="flex justify-between">
-                        <span className="text-muted-foreground">{s.label}</span>
-                        <span>{fmt(s.value)}</span>
-                      </div>
-                    ))}
-                    <div className="flex justify-between col-span-full pt-1 border-t">
-                      <span className="text-muted-foreground">Latence services</span>
-                      <span>{fmt(total)}</span>
-                    </div>
-                    {t.max_model && (
-                      <div className="col-span-full text-muted-foreground truncate">model: {t.max_model}</div>
-                    )}
-                    {t.session_id && (
-                      <div className="col-span-full text-muted-foreground truncate">session: {t.session_id}</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {turns.length === 0 && (
-            <p className="text-sm text-muted-foreground p-4 text-center">
-              Aucune mesure encore. Lance une conversation pour générer des données.
-            </p>
+          {!stats.hasData && (
+            <section className="rounded-lg border border-amber-700/40 bg-amber-950/10 p-5 text-sm text-amber-100">
+              PostHog a répondu correctement, mais aucun événement correspondant n’existe sur cette période. Il s’agit d’une absence de données, pas d’une mesure égale à zéro.
+            </section>
           )}
-        </div>
-      </ScrollArea>
 
-      <p className="text-[11px] text-muted-foreground">
-        Les mêmes événements (<code>turn_latency</code>, <code>audio_latency</code>) sont aussi envoyés à PostHog
-        en fire-and-forget. Tu peux y construire des Insights : médiane/p95 par jour, breakdown par modèle, funnel
-        STT → tour → TTS.
-      </p>
+          {stats.hasData && <>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Sessions / tours</p><p className="mt-2 text-xl font-semibold">{stats.totals.sessions} / {stats.totals.turns}</p></div>
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Erreurs</p><p className="mt-2 text-xl font-semibold">{stats.totals.errors} · {fmtRate(stats.totals.errorRate)}</p></div>
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Fallbacks</p><p className="mt-2 text-xl font-semibold">{stats.totals.fallbacks} · {fmtRate(stats.totals.fallbackRate)}</p></div>
+            <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Blocker dominant</p><p className="mt-2 text-xl font-semibold">{stats.blockers[0]?.key ?? "non mesuré"}</p></div>
+          </div>
+
+          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <MetricCard label="Texte du personnage prêt" metric={stats.latency.responseReady} />
+            <MetricCard label="Premier son" metric={stats.latency.firstSound} />
+            <MetricCard label="End-to-end" metric={stats.latency.endToEnd} />
+            <MetricCard label="STT" metric={stats.latency.stt} />
+            <MetricCard label="RAG" metric={stats.latency.rag} />
+            <MetricCard label="Max LLM" metric={stats.latency.max} />
+            <MetricCard label="TTS fournisseur" metric={stats.latency.tts} />
+            <MetricCard label="GM post-tour" metric={stats.latency.gmPost} />
+          </section>
+
+          <section className="grid gap-3 lg:grid-cols-2">
+            <div className="rounded-lg border p-4">
+              <h3 className="font-semibold">Actions d’expérience</h3>
+              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                <div><p className="text-muted-foreground">Cinématiques</p><p>recommandées {stats.actions.cinematics.recommended} · jouées {stats.actions.cinematics.played} · passées {stats.actions.cinematics.skipped}</p></div>
+                <div><p className="text-muted-foreground">Handoffs</p><p>proposés {stats.actions.handoffs.proposed} · acceptés {stats.actions.handoffs.accepted} · refusés {stats.actions.handoffs.refused} · exécutés {stats.actions.handoffs.executed} · bloqués {stats.actions.handoffs.blocked}</p></div>
+              </div>
+            </div>
+            <div className="rounded-lg border p-4">
+              <h3 className="font-semibold">Répartition</h3>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                {Object.entries(stats.providers).map(([key, values]) => <div key={key}><p className="font-medium">{key}</p><p className="text-muted-foreground">{values.length ? values.slice(0, 4).map((item) => `${item.key} (${item.count})`).join(" · ") : "non mesuré"}</p></div>)}
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-lg border p-4 space-y-3">
+            <div><h3 className="font-semibold">Comparaison sans fusion</h3><p className="text-xs text-muted-foreground">Chaque colonne conserve sa source. La parité utilise le même `turn_id`.</p></div>
+            {internal ? (
+              <>
+                <div className="grid grid-cols-3 gap-2 text-sm font-medium"><span>Mesure</span><span>PostHog</span><span>Supabase interne</span></div>
+                {comparison.map((row) => <div key={row.label} className="grid grid-cols-3 gap-2 border-t pt-2 text-sm"><span>{row.label}</span><span>{row.posthog}</span><span>{row.internal}</span></div>)}
+                <p className="text-xs text-muted-foreground">Absents de l’interne : {internal.missingInInternal} · uniquement internes : {internal.onlyInternal} · persistance : {fmtRate(internal.persistenceRate)}</p>
+              </>
+            ) : <p className="text-sm text-muted-foreground">Comparaison interne non disponible ; les statistiques PostHog restent valides et identifiées.</p>}
+          </section>
+
+          <section className="rounded-lg border p-4 space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div><h3 className="font-semibold">Canary interne — décision de déploiement</h3><p className="text-xs text-muted-foreground">Performance et erreurs : PostHog · persistance : Supabase · coût : consommations LLM/voix.</p></div>
+              <div className="w-56"><label className="text-xs text-muted-foreground">Budget maximum / session (USD)</label><Input type="number" min="0" step="0.001" value={costBudget} onChange={(event) => setCostBudget(event.target.value)} placeholder="à approuver" /></div>
+            </div>
+            {canary && <><Badge variant="outline">{canary.decision === "promote" ? "PROMOUVOIR" : canary.decision === "rollback" ? "REVENIR EN ARRIÈRE" : "DONNÉES MANQUANTES / ATTENTE"}</Badge><div className="grid gap-2 md:grid-cols-2">{canary.checks.map((check) => <div key={check.key} className={`rounded border p-2 text-xs ${statusClass(check.status)}`}>{check.detail}<span className="ml-1 opacity-70">({check.key === "persistenceRate" || check.key === "costPerSessionUsd" ? "Supabase" : "PostHog"})</span></div>)}</div></>}
+          </section>
+          </>}
+        </>
+      )}
+
+      {!loading && !error && !stats && <p className="rounded-lg border p-6 text-center text-sm text-muted-foreground">Aucune donnée PostHog pour cette période. Cela ne signifie pas zéro.</p>}
     </div>
   );
-}
-
-function MiniMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded border p-2 min-w-[150px]">
-      <div className="text-muted-foreground">{label}</div>
-      <div className="font-mono">{value}</div>
-    </div>
-  );
-}
-
-function CanaryStatus({ status }: { status: CanaryCheckStatus }) {
-  const label = status === "pass" ? "OK" : status === "fail" ? "ÉCHEC" : "ATTENTE";
-  return <Badge variant={status === "fail" ? "destructive" : "outline"}>{label}</Badge>;
 }

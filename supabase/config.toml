@@ -54,3 +54,6 @@ verify_jwt = false
 
 [functions.streaming-avatar-session]
 verify_jwt = false
+
+[functions.posthog-latency-stats]
+verify_jwt = false

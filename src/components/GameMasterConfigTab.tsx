@@ -1,382 +1,397 @@
-import { useState, useEffect } from "react";
-import CharacterPromptEditorPanel from "@/components/CharacterPromptEditorPanel";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Slider } from "@/components/ui/slider";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useEffect, useMemo, useState } from "react";
+import { Archive, Beaker, Copy, Play, RefreshCw, Save } from "lucide-react";
 import { toast } from "sonner";
-import { Save, RotateCcw } from "lucide-react";
-import { SPEECH_MODES } from "@/services/speechModes";
-import { MAX_SESSION_DURATION_SECONDS, MIN_SESSION_DURATION_SECONDS } from "@/config/experienceRuntime";
+import { evaluatePostTurnPRD4, EXPERIENCE_DIRECTOR_SYSTEM_PROMPT } from "@/agents/gameMasterPRD4";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Slider } from "@/components/ui/slider";
+import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
 import {
-  getGMPromptSettings,
-  saveGMPromptSettings,
-  saveGMPromptSettingsToDB,
-  loadGMPromptSettingsFromDB,
-  resetGMPromptSettings,
+  archiveOrchestrationVersion,
+  createOrchestrationDraft,
+  DEFAULT_DIRECTOR_CONFIG,
+  listCharacterRuntimeProfiles,
+  listOrchestrationVersions,
+  publishOrchestrationVersion,
+  updateOrchestrationDraft,
+  updateCharacterRuntimeProfile,
+  type CharacterRuntimeProfile,
+  type ExperienceOrchestrationVersion,
+} from "@/services/experienceOrchestration";
+import {
   getGameplaySettings,
+  loadGameplaySettingsFromDB,
   saveGameplaySettings,
   saveGameplaySettingsToDB,
-  loadGameplaySettingsFromDB,
-  resetGameplaySettings,
-  type GameMasterPromptSettings,
   type GameplaySettings,
 } from "@/services/settingsService";
+import {
+  MAX_SESSION_DURATION_SECONDS,
+  MIN_SESSION_DURATION_SECONDS,
+} from "@/config/experienceRuntime";
+
+interface SessionVersionRow { orchestration_version_id: string | null }
+
+function statusVariant(status: ExperienceOrchestrationVersion["status"]): "default" | "outline" | "secondary" {
+  if (status === "published") return "default";
+  if (status === "draft") return "outline";
+  return "secondary";
+}
+
+function readiness(profile: CharacterRuntimeProfile): Array<{ label: string; ok: boolean }> {
+  return [
+    { label: "Fiche Notion", ok: Boolean(profile.notion_character_id) },
+    { label: "Prompt validé", ok: profile.prompt_validated },
+    { label: "Corpus RAG isolé", ok: profile.rag_validated },
+    { label: "Portrait", ok: Boolean(profile.portrait_url) },
+    { label: "Phrase d’ouverture", ok: Boolean(profile.opening_line) },
+    { label: "Provider et voix TTS", ok: Boolean(profile.tts_provider && profile.tts_voice_id) },
+    { label: "Tests qualitatifs", ok: profile.qualitative_tests_validated },
+    { label: "Isolation des connaissances", ok: profile.knowledge_isolation_validated },
+  ];
+}
 
 export default function GameMasterConfigTab() {
-  const [gmPrompt, setGmPrompt] = useState<GameMasterPromptSettings>(getGMPromptSettings());
+  const [versions, setVersions] = useState<ExperienceOrchestrationVersion[]>([]);
+  const [profiles, setProfiles] = useState<CharacterRuntimeProfile[]>([]);
+  const [sessionsByVersion, setSessionsByVersion] = useState<Record<string, number>>({});
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [prompt, setPrompt] = useState("");
   const [gameplay, setGameplay] = useState<GameplaySettings>(getGameplaySettings());
-  const [savedGameplay, setSavedGameplay] = useState<GameplaySettings>(getGameplaySettings());
-  const [editPrompt, setEditPrompt] = useState(gmPrompt.systemPrompt);
-  const [editPreTurnPrompt, setEditPreTurnPrompt] = useState(gmPrompt.preTurnPlannerPrompt);
+  const [savedTimeout, setSavedTimeout] = useState(gameplay.TIMEOUT_SECONDS);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [testUser, setTestUser] = useState("Pourquoi Ava ne vous faisait-elle plus confiance ?");
+  const [testCharacter, setTestCharacter] = useState("Je ne suis pas certain d’avoir mérité sa confiance.");
+  const [testExpected, setTestExpected] = useState("Une guidance prudente, sans action forcée.");
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
 
-  useEffect(() => {
-    Promise.all([loadGMPromptSettingsFromDB(), loadGameplaySettingsFromDB()]).then(([gm, gp]) => {
-      setGmPrompt(gm);
-      setGameplay(gp);
-      setSavedGameplay(gp);
-      setEditPrompt(gm.systemPrompt);
-      setEditPreTurnPrompt(gm.preTurnPlannerPrompt);
-    });
-  }, []);
+  const selected = useMemo(
+    () => versions.find((version) => version.id === selectedId) ?? null,
+    [selectedId, versions],
+  );
 
-  const hasGameplayChanges = JSON.stringify(gameplay) !== JSON.stringify(savedGameplay);
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [nextVersions, nextProfiles, nextGameplay, sessions] = await Promise.all([
+        listOrchestrationVersions(),
+        listCharacterRuntimeProfiles(),
+        loadGameplaySettingsFromDB(),
+        supabase.from("sessions").select("orchestration_version_id"),
+      ]);
+      setVersions(nextVersions);
+      setProfiles(nextProfiles);
+      setGameplay(nextGameplay);
+      setSavedTimeout(nextGameplay.TIMEOUT_SECONDS);
+      const counts: Record<string, number> = {};
+      for (const row of (sessions.data ?? []) as unknown as SessionVersionRow[]) {
+        if (row.orchestration_version_id) counts[row.orchestration_version_id] = (counts[row.orchestration_version_id] ?? 0) + 1;
+      }
+      setSessionsByVersion(counts);
+      const current = nextVersions.find((version) => version.id === selectedId)
+        ?? nextVersions.find((version) => version.status === "published")
+        ?? nextVersions[0]
+        ?? null;
+      setSelectedId(current?.id ?? null);
+      setName(current?.name ?? "Orchestration GM");
+      setPrompt(current?.prompt?.startsWith("builtin://") ? EXPERIENCE_DIRECTOR_SYSTEM_PROMPT : current?.prompt ?? EXPERIENCE_DIRECTOR_SYSTEM_PROMPT);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  function updateGameplay(patch: Partial<GameplaySettings>) {
-    const updated = saveGameplaySettings(patch);
-    setGameplay(updated);
-  }
+  useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleSaveGameplay() {
+  const selectVersion = (version: ExperienceOrchestrationVersion) => {
+    setSelectedId(version.id);
+    setName(version.name);
+    setPrompt(version.prompt.startsWith("builtin://") ? EXPERIENCE_DIRECTOR_SYSTEM_PROMPT : version.prompt);
+    setTestResult(null);
+  };
+
+  const createDraft = async (source = selected) => {
     setSaving(true);
-    await saveGameplaySettingsToDB(gameplay);
-    setSavedGameplay(gameplay);
-    toast.success("Réglages de jeu sauvegardés ✓");
-    setSaving(false);
-  }
+    try {
+      const draft = await createOrchestrationDraft({
+        name: source ? `${source.name} — brouillon` : "Orchestration GM — brouillon",
+        prompt: source?.prompt?.startsWith("builtin://") ? EXPERIENCE_DIRECTOR_SYSTEM_PROMPT : source?.prompt || EXPERIENCE_DIRECTOR_SYSTEM_PROMPT,
+        config: source?.config || DEFAULT_DIRECTOR_CONFIG,
+        sourceVersionId: source?.id ?? null,
+      });
+      toast.success("Brouillon créé sans impact sur les sessions live");
+      await load();
+      selectVersion(draft);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Création impossible");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  async function savePrompt() {
-    const updated = saveGMPromptSettings({ systemPrompt: editPrompt, preTurnPlannerPrompt: editPreTurnPrompt });
-    setGmPrompt(updated);
-    await saveGMPromptSettingsToDB(updated);
-    toast.success("Prompt Game Master sauvegardé ✓");
-  }
+  const saveDraft = async () => {
+    if (!selected || selected.status !== "draft") return;
+    setSaving(true);
+    try {
+      await updateOrchestrationDraft(selected.id, { name, prompt, config: selected.config });
+      toast.success("Brouillon sauvegardé");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Sauvegarde impossible");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  function handleResetAll() {
-    const gm = resetGMPromptSettings();
-    const gp = resetGameplaySettings();
-    setGmPrompt(gm);
-    setGameplay(gp);
-    setSavedGameplay(gp);
-    setEditPrompt(gm.systemPrompt);
-    setEditPreTurnPrompt(gm.preTurnPlannerPrompt);
-    toast.success("Mécanique réinitialisée aux valeurs par défaut");
-  }
+  const publish = async () => {
+    if (!selected || selected.status === "published") return;
+    setSaving(true);
+    try {
+      await publishOrchestrationVersion(selected.id);
+      toast.success("Version publiée — les sessions en cours gardent leur version épinglée");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Publication impossible");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const archive = async () => {
+    if (!selected || selected.status === "published") return;
+    setSaving(true);
+    try {
+      await archiveOrchestrationVersion(selected.id);
+      toast.success("Version archivée");
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Archivage impossible");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const testDraft = async () => {
+    if (!selected || selected.status !== "draft") return;
+    setTesting(true);
+    setTestResult(null);
+    const result = await evaluatePostTurnPRD4({
+      sessionId: null,
+      conversationHistory: [],
+      userMessage: testUser,
+      maxResponse: testCharacter,
+      userRole: null,
+      turnIndex: 4,
+      timeElapsedSeconds: 240,
+      sessionDurationSeconds: gameplay.TIMEOUT_SECONDS,
+      minimumClosureSeconds: Math.floor(gameplay.TIMEOUT_SECONDS * 0.7),
+      systemPromptOverride: prompt,
+      persist: false,
+      diagnosticTrace: true,
+    });
+    setTestResult(JSON.stringify({
+      attendu: testExpected,
+      produit: {
+        labels: result.labels,
+        guidance: result.next_turn_guidance,
+        action: result.action,
+        error: result.diagnostic?.error ?? null,
+      },
+    }, null, 2));
+    setTesting(false);
+  };
+
+  const saveTimeout = async () => {
+    setSaving(true);
+    try {
+      const updated = saveGameplaySettings({ TIMEOUT_SECONDS: gameplay.TIMEOUT_SECONDS });
+      await saveGameplaySettingsToDB(updated);
+      setGameplay(updated);
+      setSavedTimeout(updated.TIMEOUT_SECONDS);
+      toast.success("Durée de session sauvegardée");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const patchProfile = (id: string, patch: Partial<CharacterRuntimeProfile>) => {
+    setProfiles((current) => current.map((profile) => profile.id === id ? { ...profile, ...patch } : profile));
+  };
+
+  const saveProfile = async (profile: CharacterRuntimeProfile) => {
+    setSaving(true);
+    try {
+      await updateCharacterRuntimeProfile(profile.id, {
+        enabled: profile.enabled,
+        notion_character_id: profile.notion_character_id,
+        opening_line: profile.opening_line,
+        portrait_url: profile.portrait_url,
+        tts_provider: profile.tts_provider,
+        tts_voice_id: profile.tts_voice_id,
+        prompt_validated: profile.prompt_validated,
+        rag_validated: profile.rag_validated,
+        qualitative_tests_validated: profile.qualitative_tests_validated,
+        knowledge_isolation_validated: profile.knowledge_isolation_validated,
+      });
+      toast.success(`Profil runtime ${profile.display_name} sauvegardé`);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Sauvegarde du profil impossible");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <p className="text-sm text-muted-foreground">Chargement de l’orchestration…</p>;
 
   return (
-    <div className="max-w-4xl space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">🎮 Mécanique de l'expérience</h2>
-          <p className="text-sm text-muted-foreground">
-            Règles du jeu, seuils, prompt du Game Master — tout ce qui pilote la progression de l'expérience.
-          </p>
+          <h2 className="text-lg font-semibold">🎭 Orchestration de l’expérience</h2>
+          <p className="text-sm text-muted-foreground">Un seul directeur post-tour, versionné et hors du chemin Max → voix.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleResetAll}>
-          Tout réinitialiser
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw className="mr-1 h-3.5 w-3.5" />Actualiser</Button>
+          <Button size="sm" onClick={() => void createDraft()} disabled={saving}><Copy className="mr-1 h-3.5 w-3.5" />Nouveau brouillon</Button>
+        </div>
       </div>
 
-      {/* ===== SPEECH MODES CATALOG ===== */}
-      <section className="border rounded-lg p-4 space-y-3">
-        <div>
-          <h3 className="font-semibold text-base mb-1">🎭 Catalogue des modes de parole</h3>
-          <p className="text-xs text-muted-foreground">
-            Le Game Master sélectionne un de ces modes dans le champ <code>response_mode</code> du brief de tour. Max l'exécute via les indices de style.
-          </p>
+      {loadError && (
+        <div className="rounded-lg border border-amber-700/50 bg-amber-950/20 p-4 text-sm text-amber-100">
+          Fondations Lovable non disponibles : {loadError}. Appliquer d’abord la migration additive depuis Lovable Cloud.
         </div>
-        <div className="grid gap-2 md:grid-cols-2">
-          {SPEECH_MODES.map((mode) => (
-            <div key={mode.id} className="rounded border p-3 space-y-1">
-              <div className="flex items-center justify-between">
-                <p className="font-semibold text-sm">{mode.label}</p>
-                <Badge variant="outline" className="font-mono text-[10px]">{mode.id}</Badge>
-              </div>
-              <p className="text-xs text-muted-foreground">{mode.description}</p>
-              <ul className="list-disc pl-4 text-xs">
-                {mode.styleHints.map((hint) => <li key={hint}>{hint}</li>)}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </section>
+      )}
 
-      {/* ===== GAMEPLAY SETTINGS ===== */}
-      <section className="border rounded-lg p-4 space-y-5">
+      <section className="rounded-lg border p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-base mb-1">⚙️ Réglages de jeu</h3>
-            <p className="text-xs text-muted-foreground">
-              Ces paramètres contrôlent la progression et les conditions de victoire/défaite.
-            </p>
+            <h3 className="font-semibold">Durée de l’expérience</h3>
+            <p className="text-xs text-muted-foreground">Seul réglage gameplay actif conservé ici. La variante de prompt Max reste dans Technique avancée.</p>
           </div>
-          <Button
-            size="sm"
-            onClick={handleSaveGameplay}
-            disabled={saving || !hasGameplayChanges}
-            className={hasGameplayChanges ? "bg-green-600 hover:bg-green-700" : ""}
-          >
-            <Save className="w-3 h-3 mr-1" /> {saving ? "Sauvegarde..." : "Sauvegarder"}
+          <Button size="sm" onClick={() => void saveTimeout()} disabled={saving || gameplay.TIMEOUT_SECONDS === savedTimeout}>
+            <Save className="mr-1 h-3.5 w-3.5" />Enregistrer
           </Button>
         </div>
-
-        {hasGameplayChanges && (
-          <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg px-4 py-2 text-sm text-yellow-300">
-            ⚠️ Modifications non sauvegardées — clique "Sauvegarder" pour persister en base de données.
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">Variante du prompt Max</label>
-              <p className="text-xs text-muted-foreground/60 mt-1">
-                Optimized v3 ajoute un budget global, la mémoire persistante et la déduplication fiche/RAG. Rich v2 reste le témoin riche,
-                Compact v1 le témoin agressif et Legacy le rollback historique.
-              </p>
-            </div>
-            <Select
-              value={gameplay.MAX_PROMPT_VARIANT}
-              onValueChange={(value: "legacy" | "compact_v1" | "rich_v2" | "optimized_v3") => updateGameplay({ MAX_PROMPT_VARIANT: value })}
-            >
-              <SelectTrigger className="w-full min-w-[190px] sm:w-auto">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="optimized_v3">Optimized v3 (canary)</SelectItem>
-                <SelectItem value="rich_v2">Rich v2 (canary)</SelectItem>
-                <SelectItem value="compact_v1">Compact v1</SelectItem>
-                <SelectItem value="legacy">Legacy (rollback)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {gameplay.MAX_PROMPT_VARIANT !== "legacy" && (
-            <div className="rounded border border-amber-700/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-200">
-              Le champ historique <code>characters.system_prompt</code> est <strong>legacy et non utilisé</strong> par cette variante ; il est conservé uniquement pour le rollback.
-              Le query rewrite RAG est également legacy et n’est pas exécuté dans le parcours PRD4.
-            </div>
-          )}
-        </div>
-
-        {/* Trust Threshold */}
-        <div>
-          <div className="flex justify-between mb-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              Seuil de confiance (Trust Threshold)
-            </label>
-            <span className="text-sm font-mono">{gameplay.TRUST_THRESHOLD}</span>
-          </div>
-          <Slider
-            value={[gameplay.TRUST_THRESHOLD]}
-            onValueChange={([v]) => updateGameplay({ TRUST_THRESHOLD: v })}
-            min={3}
-            max={20}
-            step={1}
-          />
-          <div className="flex justify-between text-xs text-muted-foreground mt-1">
-            <span>3 — Facile (gate rapide)</span>
-            <span>20 — Très exigeant</span>
-          </div>
-          <p className="text-xs text-muted-foreground/60 mt-1">
-            💡 Le joueur atteint la "gate" quand trust_level ≥ ce seuil. Chaque réponse sincère donne +1, évasive -1.
-          </p>
-        </div>
-
-        {/* Timeout */}
-        <div>
-          <div className="flex justify-between mb-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              Durée max de la session (secondes)
-            </label>
-            <span className="text-sm font-mono">{gameplay.TIMEOUT_SECONDS}s ({Math.floor(gameplay.TIMEOUT_SECONDS / 60)}min)</span>
-          </div>
-          <Slider
-            value={[gameplay.TIMEOUT_SECONDS]}
-            onValueChange={([v]) => updateGameplay({ TIMEOUT_SECONDS: v })}
-            min={MIN_SESSION_DURATION_SECONDS}
-            max={MAX_SESSION_DURATION_SECONDS}
-            step={30}
-          />
-          <div className="flex justify-between text-xs text-muted-foreground mt-1">
-            <span>2 min — Ultra court</span>
-            <span>30 min — Session longue</span>
-          </div>
-        </div>
-
-        {/* Insult Tolerance */}
-        <div>
-          <div className="flex justify-between mb-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              Tolérance aux insultes
-            </label>
-            <span className="text-sm font-mono">{gameplay.MAX_INSULT_TOLERANCE}</span>
-          </div>
-          <Slider
-            value={[gameplay.MAX_INSULT_TOLERANCE]}
-            onValueChange={([v]) => updateGameplay({ MAX_INSULT_TOLERANCE: v })}
-            min={0}
-            max={5}
-            step={1}
-          />
-          <div className="flex justify-between text-xs text-muted-foreground mt-1">
-            <span>0 — Aucune tolérance</span>
-            <span>5 — Très tolérant</span>
-          </div>
-          <p className="text-xs text-muted-foreground/60 mt-1">
-            💡 Nombre d'échanges inappropriés avant game_over. Le Game Master détecte les insultes et flags.
-          </p>
-        </div>
-
-        {/* Min Questions Before Gate */}
-        <div>
-          <div className="flex justify-between mb-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              Min. échanges avant gate
-            </label>
-            <span className="text-sm font-mono">{gameplay.MIN_QUESTIONS_BEFORE_GATE}</span>
-          </div>
-          <Slider
-            value={[gameplay.MIN_QUESTIONS_BEFORE_GATE]}
-            onValueChange={([v]) => updateGameplay({ MIN_QUESTIONS_BEFORE_GATE: v })}
-            min={3}
-            max={25}
-            step={1}
-          />
-          <div className="flex justify-between text-xs text-muted-foreground mt-1">
-            <span>3 — Passage rapide</span>
-            <span>25 — Conversation longue requise</span>
-          </div>
-          <p className="text-xs text-muted-foreground/60 mt-1">
-            💡 Même si le trust est suffisant, la gate ne s'ouvre pas avant ce nombre d'échanges minimum.
-          </p>
-        </div>
-
-        {/* RAG — déplacé dans Technique → RAG Config */}
-        <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-          <h4 className="text-sm font-semibold">RAG — récupération et reranking</h4>
-          <p className="mt-1 text-xs text-muted-foreground/70">
-            Ces réglages ont été déplacés dans <strong>Technique → RAG Config</strong>, avec la documentation
-            détaillée des compromis (rappel, latence, coût tokens).
-          </p>
-        </div>
-
-
-
-        {/* Video Placeholder Duration */}
-        <div>
-          <div className="flex justify-between mb-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              Durée placeholder vidéo (secondes)
-            </label>
-            <span className="text-sm font-mono">{gameplay.VIDEO_PLACEHOLDER_DURATION}s</span>
-          </div>
-          <Slider
-            value={[gameplay.VIDEO_PLACEHOLDER_DURATION]}
-            onValueChange={([v]) => updateGameplay({ VIDEO_PLACEHOLDER_DURATION: v })}
-            min={3}
-            max={30}
-            step={1}
-          />
-        </div>
-      </section>
-
-      {/* ===== GAME MASTER PROMPT ===== */}
-      <section className="border rounded-lg p-4 space-y-4">
-        <div>
-          <h3 className="font-semibold text-base mb-1">🧠 Prompt du Game Master</h3>
-          <p className="text-xs text-muted-foreground">
-            Ce prompt est envoyé au LLM du Game Master à chaque échange. Il analyse la conversation et retourne un JSON
-            avec trust_delta, triggers vidéo, game_over, etc.
-          </p>
-        </div>
-
-        <div className="bg-muted/20 border rounded-lg p-3 text-xs space-y-2">
-          <p className="font-semibold text-muted-foreground">📖 Comment ça marche :</p>
-          <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-            <li><strong>trust_delta</strong> : +1 (sincère), 0 (neutre), -1 (évasif) → ajouté au trust_level global</li>
-            <li><strong>trigger_video_id</strong> : ID d'un trigger vidéo si un thème clé est abordé</li>
-            <li><strong>game_over</strong> : true si insultes répétées ou abandon détecté</li>
-            <li><strong>gate_reached</strong> : true si trust ≥ seuil → passage à la phase suivante</li>
-            <li><strong>moderation_flag</strong> : true si contenu inapproprié détecté</li>
-          </ul>
-          <p className="text-muted-foreground mt-2">
-            Le Game Master reçoit aussi l'historique récent (6 derniers messages), le trust actuel, les triggers déjà activés et le temps écoulé.
-          </p>
-        </div>
-
-        <Textarea
-          value={editPrompt}
-          onChange={(e) => setEditPrompt(e.target.value)}
-          className="min-h-[40vh] font-mono text-sm"
-          placeholder="System prompt du Game Master..."
+        <div className="flex justify-between text-sm"><span>TIMEOUT_SECONDS</span><span className="font-mono">{gameplay.TIMEOUT_SECONDS}s</span></div>
+        <Slider
+          value={[gameplay.TIMEOUT_SECONDS]}
+          min={MIN_SESSION_DURATION_SECONDS}
+          max={MAX_SESSION_DURATION_SECONDS}
+          step={30}
+          onValueChange={([value]) => setGameplay((current) => ({ ...current, TIMEOUT_SECONDS: value }))}
         />
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground">Pré-turn planner du Game Master (simulateur)</p>
-          <p className="text-xs text-muted-foreground">
-            Ce prompt alimente le banc d’essai. Il n’est pas exécuté dans le pipeline PRD4 live.
-          </p>
-          <Textarea
-            value={editPreTurnPrompt}
-            onChange={(e) => setEditPreTurnPrompt(e.target.value)}
-            className="min-h-[28vh] font-mono text-sm"
-            placeholder="Prompt de planification pré-tour..."
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">{editPrompt.length + editPreTurnPrompt.length} caractères cumulés</span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setEditPrompt(gmPrompt.systemPrompt);
-                setEditPreTurnPrompt(gmPrompt.preTurnPlannerPrompt);
-              }}
-            >
-              Annuler
-            </Button>
-            <Button
-              size="sm"
-              onClick={savePrompt}
-              disabled={editPrompt === gmPrompt.systemPrompt}
-            >
-              Sauvegarder
-            </Button>
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+        <section className="rounded-lg border p-3 space-y-2">
+          <h3 className="font-semibold">Versions</h3>
+          {versions.length === 0 && <p className="text-xs text-muted-foreground">Aucune version. Créez le premier brouillon.</p>}
+          {versions.map((version) => (
+            <button key={version.id} onClick={() => selectVersion(version)} className={`w-full rounded border p-3 text-left ${version.id === selectedId ? "border-primary bg-primary/5" : "border-border"}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">v{version.version_number} · {version.name}</span>
+                <Badge variant={statusVariant(version.status)}>{version.status}</Badge>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{sessionsByVersion[version.id] ?? 0} session(s) épinglée(s)</p>
+            </button>
+          ))}
+        </section>
+
+        <section className="rounded-lg border p-4 space-y-4">
+          {!selected ? (
+            <Button onClick={() => void createDraft(null)}>Créer le premier brouillon</Button>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2"><h3 className="font-semibold">Version v{selected.version_number}</h3><Badge variant={statusVariant(selected.status)}>{selected.status}</Badge></div>
+                <div className="flex gap-2">
+                  {selected.status === "draft" && <Button size="sm" variant="outline" onClick={() => void saveDraft()} disabled={saving}><Save className="mr-1 h-3.5 w-3.5" />Sauvegarder</Button>}
+                  {selected.status === "draft" && <Button size="sm" onClick={() => void publish()} disabled={saving}><Play className="mr-1 h-3.5 w-3.5" />Publier</Button>}
+                  {selected.status === "draft" && <Button size="sm" variant="ghost" onClick={() => void archive()} disabled={saving}><Archive className="mr-1 h-3.5 w-3.5" />Archiver</Button>}
+                  {selected.status === "archived" && <Button size="sm" variant="outline" onClick={() => void createDraft(selected)} disabled={saving}><Copy className="mr-1 h-3.5 w-3.5" />Restaurer en brouillon</Button>}
+                </div>
+              </div>
+              <Input value={name} disabled={selected.status !== "draft"} onChange={(event) => setName(event.target.value)} aria-label="Nom de la version" />
+              <Textarea value={prompt} disabled={selected.status !== "draft"} onChange={(event) => setPrompt(event.target.value)} className="min-h-[320px] font-mono text-xs" aria-label="Prompt du directeur" />
+              <p className="text-xs text-muted-foreground">Une publication ne modifie jamais les sessions déjà démarrées. Restaurez une version archivée en créant un brouillon dérivé.</p>
+            </>
+          )}
+        </section>
+      </div>
+
+      {selected?.status === "draft" && (
+        <section className="rounded-lg border p-4 space-y-3">
+          <div className="flex items-center gap-2"><Beaker className="h-4 w-4" /><h3 className="font-semibold">Test sans effet réel</h3></div>
+          <p className="text-xs text-muted-foreground">Le test n’a pas de session et ne persiste ni mémoire, ni décision, ni événement.</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Textarea value={testUser} onChange={(event) => setTestUser(event.target.value)} placeholder="Message utilisateur" />
+            <Textarea value={testCharacter} onChange={(event) => setTestCharacter(event.target.value)} placeholder="Réponse de Max" />
           </div>
+          <Input value={testExpected} onChange={(event) => setTestExpected(event.target.value)} placeholder="Décision attendue" />
+          <Button variant="outline" onClick={() => void testDraft()} disabled={testing}>{testing ? "Test…" : "Comparer attendu / produit"}</Button>
+          {testResult && <pre className="max-h-80 overflow-auto rounded bg-muted p-3 text-xs whitespace-pre-wrap">{testResult}</pre>}
+        </section>
+      )}
+
+      <section className="rounded-lg border p-4 space-y-3">
+        <div><h3 className="font-semibold">Disponibilité des personnages</h3><p className="text-xs text-muted-foreground">Emma ne peut être proposée que lorsque chaque prérequis est validé.</p></div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {profiles.map((profile) => {
+            const checks = readiness(profile);
+            const ready = profile.enabled && checks.every((check) => check.ok);
+            return (
+              <div key={profile.id} className="rounded border p-3">
+                <div className="flex items-center justify-between"><strong>{profile.display_name}</strong><Badge variant={ready ? "default" : "outline"}>{ready ? "prêt" : "incomplet"}</Badge></div>
+                <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
+                  {checks.map((check) => <span key={check.label} className={check.ok ? "text-emerald-500" : "text-muted-foreground"}>{check.ok ? "✓" : "○"} {check.label}</span>)}
+                </div>
+                <div className="mt-4 space-y-2 border-t pt-3">
+                  <label className="flex items-center gap-2 text-xs font-medium">
+                    <Checkbox checked={profile.enabled} onCheckedChange={(checked) => patchProfile(profile.id, { enabled: checked === true })} />
+                    Personnage activable par le runtime
+                  </label>
+                  <Input value={profile.notion_character_id ?? ""} onChange={(event) => patchProfile(profile.id, { notion_character_id: event.target.value.trim() || null })} placeholder="UUID de la fiche personnage Notion synchronisée" />
+                  <Textarea value={profile.opening_line ?? ""} onChange={(event) => patchProfile(profile.id, { opening_line: event.target.value || null })} placeholder="Phrase d’ouverture" className="min-h-20" />
+                  <Input value={profile.portrait_url ?? ""} onChange={(event) => patchProfile(profile.id, { portrait_url: event.target.value || null })} placeholder="URL du portrait" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input value={profile.tts_provider ?? ""} onChange={(event) => patchProfile(profile.id, { tts_provider: event.target.value || null })} placeholder="Provider TTS" />
+                    <Input value={profile.tts_voice_id ?? ""} onChange={(event) => patchProfile(profile.id, { tts_voice_id: event.target.value || null })} placeholder="Voice ID" />
+                  </div>
+                  <div className="grid gap-2 text-xs sm:grid-cols-2">
+                    {([
+                      ["prompt_validated", "Prompt validé"],
+                      ["rag_validated", "Corpus RAG isolé et non vide"],
+                      ["qualitative_tests_validated", "Tests qualitatifs validés"],
+                      ["knowledge_isolation_validated", "Absence de fuite Max→Emma validée"],
+                    ] as const).map(([key, label]) => (
+                      <label key={key} className="flex items-center gap-2">
+                        <Checkbox checked={profile[key]} onCheckedChange={(checked) => patchProfile(profile.id, { [key]: checked === true })} />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                  <Button size="sm" variant="outline" disabled={saving} onClick={() => void saveProfile(profile)}>
+                    <Save className="mr-1 h-3.5 w-3.5" />Sauvegarder le profil
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
-      {/* ===== GAME MASTER CHARACTER FIELDS (synced from Notion) ===== */}
-      <section className="border rounded-lg p-4 space-y-4">
-        <div>
-          <h3 className="font-semibold text-base mb-1">🎭 Champs éditoriaux du Game Master</h3>
-          <p className="text-xs text-muted-foreground">
-            Champs synchronisés depuis Notion (Base Caractères AVA, personnage « Game Master ») et injectés dans le system prompt
-            du Game Master à chaque tour.
-          </p>
-        </div>
-        <CharacterPromptEditorPanel characterId={null} characterName="Game Master" hideHeader />
-      </section>
-
-
-      {/* Config Summary */}
-      <section className="border rounded-lg p-4 bg-muted/20">
-        <h3 className="font-semibold text-sm mb-2">📋 Config mécanique active</h3>
-        <pre className="text-xs font-mono whitespace-pre-wrap">
-{JSON.stringify({ gameplay, gmPromptLength: gmPrompt.systemPrompt.length, triggers: Object.keys(gmPrompt.triggers) }, null, 2)}
-        </pre>
+      <section className="rounded-lg border border-muted p-4 text-xs text-muted-foreground">
+        Les anciens seuils de confiance, tolérance aux insultes, gate, placeholder vidéo, modes de parole, prompt historique et GM pré-tour restent conservés en données legacy mais ne sont plus présentés comme actifs dans PRD4.
       </section>
     </div>
   );

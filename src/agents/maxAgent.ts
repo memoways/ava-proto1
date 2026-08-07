@@ -219,7 +219,7 @@ export async function callMaxAgent(
   // Add conversation history
   for (const msg of input.conversationHistory) {
     messages.push({
-      role: msg.role === "max" ? "assistant" : "user",
+      role: msg.role === "user" ? "user" : "assistant",
       content: msg.content,
     });
   }
@@ -289,7 +289,7 @@ export async function simulateMaxResponse(
   const messages: TraceMessage[] = [
     { role: "system", content: systemPrompt },
     ...input.conversationHistory.map((msg) => ({
-      role: msg.role === "max" ? "assistant" as const : "user" as const,
+      role: msg.role === "user" ? "user" as const : "assistant" as const,
       content: msg.content,
     })),
     { role: "user", content: input.userMessage },

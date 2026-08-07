@@ -11,7 +11,7 @@ import { getLLMSettings } from "@/services/settingsService";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
 import { normalizeMemoryText } from "@/services/conversationMemoryV1";
-import type { ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, TraceMessage, UserRoleProfile } from "@/types";
+import type { ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, TraceMessage, UserRoleProfile } from "@/types";
 
 export interface PRD4PostTurnInput {
   sessionId: string | null;
@@ -31,6 +31,11 @@ export interface PRD4PostTurnInput {
   triggeredVideoIds?: string[];
   signal?: AbortSignal;
   diagnosticTrace?: boolean;
+  systemPromptOverride?: string | null;
+  orchestrationVersionId?: string | null;
+  currentCharacter?: "max" | "emma";
+  /** Admin draft tests set this to false so they cannot mutate live sessions. */
+  persist?: boolean;
 }
 
 export type PRD4PostTurnDetailedResult = PRD4PostTurnEvaluation & {
@@ -57,11 +62,12 @@ const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
   trigger_video_id: null,
   labels: { themes: [], topics: [], intentions: [] },
   memory_delta: null,
+  action: { type: "none" },
 };
 
 const GM_POST_TURN_TIMEOUT_MS = 12000;
 
-const SYSTEM_PROMPT = `Tu es le Game Master d'une expérience narrative en temps réel dont la durée est configurée par l'administration, entre un joueur et Max (père d'Ava). Après chaque échange (1 message utilisateur + 1 réponse de Max), tu produis une évaluation structurée en JSON STRICT — aucun texte hors JSON.
+export const EXPERIENCE_DIRECTOR_SYSTEM_PROMPT = `Tu es le directeur d'expérience d'une expérience narrative en temps réel dont la durée est configurée par l'administration, entre un joueur et Max (père d'Ava), puis éventuellement Emma. Après chaque échange, tu produis une seule décision structurée en JSON STRICT — aucun texte hors JSON. Cet appel a lieu après le texte du personnage et ne doit jamais retarder sa voix.
 
 Tu retournes EXACTEMENT cet objet :
 {
@@ -81,6 +87,14 @@ Tu retournes EXACTEMENT cet objet :
   "moderation_flag": boolean,
   "notes": string,
   "trigger_video_id": string | null, // voir bloc VIDÉOS DISPONIBLES
+  "action": {                       // Une action maximum. Le moteur déterministe la validera.
+    "type": "none" | "cinematic" | "handoff" | "end",
+    "videoId"?: string,
+    "confidence"?: number,
+    "targetCharacter"?: "emma",
+    "proposalGuidance"?: string,
+    "reason"?: string
+  },
   "memory_delta": {                 // Mémoire durable du DERNIER échange seulement. Ne rien inventer.
     "interlocutor": { "name": string | null, "role": string | null, "traits": string[] },
     "userFacts": string[],          // faits personnels explicitement confiés par l'utilisateur
@@ -107,6 +121,14 @@ Règles "trigger_video_id" — PRIORITÉ HAUTE :
 - Plusieurs matchs : prends la priorité la plus haute (number le plus petit = plus prioritaire).
 - Jamais d'id déjà présent dans \`already_triggered\`.
 - Si \`labels.themes\` est vide, retourne null (pas de trigger sans label clair).
+
+Règles "action" :
+- Utilise {"type":"none"} par défaut.
+- Pour une cinématique, retourne videoId, reason et confidence 0..1 ; videoId doit appartenir aux vidéos disponibles.
+- Un handoff est uniquement Max vers Emma. Retourne reason et proposalGuidance afin que Max formule lui-même la proposition au tour suivant.
+- Ne suppose jamais qu'Emma ou une vidéo est disponible : le moteur déterministe vérifiera.
+- Ne recommande pas cinématique et handoff en même temps. Le handoff est prioritaire.
+- Pour une clôture, utilise end avec reason seulement lorsqu'une fin naturelle est justifiée.
 
 Règles "end_recommended" : respecte le seuil de clôture fourni dans le contexte. Après ce seuil, true seulement si la conversation a trouvé une clôture naturelle ou échoue durablement.
 
@@ -252,6 +274,32 @@ function cleanMemoryDelta(raw: unknown): ConversationMemoryDelta | null {
   };
 }
 
+function cleanDirectorAction(raw: unknown, fallbackVideoId: string | null, endRecommended: boolean): DirectorAction {
+  if (raw && typeof raw === "object") {
+    const value = raw as Record<string, unknown>;
+    if (value.type === "handoff" && value.targetCharacter === "emma") {
+      const reason = normalizeMemoryText(value.reason, 240);
+      const proposalGuidance = normalizeMemoryText(value.proposalGuidance, 300);
+      if (reason && proposalGuidance) return { type: "handoff", targetCharacter: "emma", reason, proposalGuidance };
+    }
+    if (value.type === "cinematic") {
+      const videoId = normalizeMemoryText(value.videoId, 100);
+      const reason = normalizeMemoryText(value.reason, 240);
+      const confidence = Math.max(0, Math.min(1, Number(value.confidence) || 0));
+      if (videoId && reason) return { type: "cinematic", videoId, reason, confidence };
+    }
+    if (value.type === "end") {
+      const reason = normalizeMemoryText(value.reason, 240);
+      if (reason) return { type: "end", reason };
+    }
+  }
+  if (fallbackVideoId) {
+    return { type: "cinematic", videoId: fallbackVideoId, reason: "Correspondance thématique GM", confidence: 0.5 };
+  }
+  if (endRecommended) return { type: "end", reason: "Clôture naturelle recommandée par le GM" };
+  return { type: "none" };
+}
+
 /**
  * Évalue le tour qui vient de se jouer. Toujours résout (jamais throw).
  */
@@ -264,8 +312,12 @@ export async function evaluatePostTurnPRD4(
   const videos = await getVideoTriggersCached();
   const validIds = new Set(videos.map((v) => v.id));
   const triggered = new Set(input.triggeredVideoIds ?? []);
+  const promptOverride = input.systemPromptOverride?.trim();
+  const effectiveSystemPrompt = promptOverride && !promptOverride.startsWith("builtin://")
+    ? promptOverride
+    : EXPERIENCE_DIRECTOR_SYSTEM_PROMPT;
   const messages: TraceMessage[] = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: effectiveSystemPrompt },
     { role: "user", content: buildUserPrompt(input, videos) },
   ];
   let llmTrace: LLMCallDiagnosticTrace | null = null;
@@ -320,6 +372,7 @@ export async function evaluatePostTurnPRD4(
       const topicsCovered = Array.isArray(parsed.topics_covered) && parsed.topics_covered.length
         ? parsed.topics_covered.slice(0, 6).map(String)
         : topics;
+      const endRecommended = Boolean(parsed.end_recommended);
       result = {
         engagement_delta: Number(parsed.engagement_delta ?? 0),
         confusion_detected: Boolean(parsed.confusion_detected),
@@ -328,12 +381,13 @@ export async function evaluatePostTurnPRD4(
         transition_recommended: Boolean(parsed.transition_recommended),
         cinematic_hint: parsed.cinematic_hint ? String(parsed.cinematic_hint) : null,
         next_turn_guidance: String(parsed.next_turn_guidance || DEFAULT_RESULT.next_turn_guidance),
-        end_recommended: Boolean(parsed.end_recommended),
+        end_recommended: endRecommended,
         moderation_flag: Boolean(parsed.moderation_flag),
         notes: String(parsed.notes || ""),
         trigger_video_id: safeTrigger,
         labels,
         memory_delta: cleanMemoryDelta((parsed as { memory_delta?: unknown }).memory_delta),
+        action: cleanDirectorAction((parsed as { action?: unknown }).action, safeTrigger, endRecommended),
       };
     }
     model = callRes.model || model;
@@ -350,15 +404,17 @@ export async function evaluatePostTurnPRD4(
     latency_ms: Math.round(performance.now() - startedAt),
     model,
     created_at: new Date().toISOString(),
+    orchestration_version_id: input.orchestrationVersionId ?? null,
   };
 
-  if (input.sessionId) {
+  if (input.sessionId && input.persist !== false) {
     try {
       const memoryAfter = await persistPostTurnMemory(
         input.sessionId,
         enriched,
         enriched.memory_delta ?? null,
         input.turnIndex,
+        input.currentCharacter ?? "max",
       );
       enriched = { ...enriched, memory_after: memoryAfter };
     } catch (err) {
