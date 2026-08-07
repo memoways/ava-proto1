@@ -471,12 +471,7 @@ export default function TTSConfigTab() {
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label className="space-y-1 text-sm">
-            <span className="font-medium text-muted-foreground">Voice name</span>
-            <input value={huSettings.voiceName}
-              onChange={(e) => updateHu({ voiceName: e.target.value })}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="Male English Actor" />
-          </label>
+
 
           <label className="space-y-1 text-sm">
             <span className="font-medium text-muted-foreground">Provider de voix</span>
