@@ -197,7 +197,8 @@ export async function getCharacterRuntimeReadiness(character: "max" | "emma"): P
     p_character_key: character,
   } as never);
   if (error) throw error;
-  const row = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : undefined;
+  const rows = (data ?? null) as unknown as Record<string, unknown>[] | null;
+  const row = Array.isArray(rows) ? rows[0] : undefined;
   if (!row) return null;
   return {
     characterKey: row.character_key === "emma" ? "emma" : "max",
