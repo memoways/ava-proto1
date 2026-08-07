@@ -41,16 +41,54 @@ function statusVariant(status: ExperienceOrchestrationVersion["status"]): "defau
   return "secondary";
 }
 
-function readiness(profile: CharacterRuntimeProfile): Array<{ label: string; ok: boolean }> {
+function formatDuration(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function readiness(
+  profile: CharacterRuntimeProfile,
+  auto: CharacterAutoReadiness | undefined,
+): Array<{ label: string; ok: boolean; hint: string }> {
+  const chunks = auto?.ragChunks ?? 0;
   return [
-    { label: "Fiche Notion", ok: Boolean(profile.notion_character_id) },
-    { label: "Prompt validé", ok: profile.prompt_validated },
-    { label: "Corpus RAG isolé", ok: profile.rag_validated },
-    { label: "Portrait", ok: Boolean(profile.portrait_url) },
-    { label: "Phrase d’ouverture", ok: Boolean(profile.opening_line) },
-    { label: "Provider et voix TTS", ok: Boolean(profile.tts_provider && profile.tts_voice_id) },
-    { label: "Tests qualitatifs", ok: profile.qualitative_tests_validated },
-    { label: "Isolation des connaissances", ok: profile.knowledge_isolation_validated },
+    {
+      label: "Fiche Notion",
+      ok: Boolean(auto?.characterId),
+      hint: auto?.characterId
+        ? `Fiche « ${auto.characterName} » synchronisée`
+        : "Aucune fiche « En cours » trouvée dans Contenu Notion → Sync Notion",
+    },
+    {
+      label: "Prompt compilé",
+      ok: Boolean(auto?.hasPrompt),
+      hint: auto?.hasPrompt
+        ? "Prompt présent dans Personnages"
+        : "Lancer une synchronisation Notion pour générer le prompt du personnage",
+    },
+    {
+      label: "Corpus RAG isolé",
+      ok: chunks > 0,
+      hint: chunks > 0 ? `${chunks} chunk(s) indexé(s)` : "Aucun chunk indexé pour ce personnage (onglet Embeddings)",
+    },
+    {
+      label: "Portrait",
+      ok: Boolean(profile.portrait_url),
+      hint: profile.portrait_url ? "Portrait défini" : "Téléverser un portrait ci-dessous",
+    },
+    {
+      label: "Phrase d’ouverture",
+      ok: Boolean(profile.opening_line),
+      hint: profile.opening_line ? "Phrase définie" : "Saisir la première réplique du personnage",
+    },
+    {
+      label: "Provider et voix TTS",
+      ok: Boolean(profile.tts_provider && profile.tts_voice_id),
+      hint: profile.tts_provider && profile.tts_voice_id
+        ? `${profile.tts_provider} · ${profile.tts_voice_id}`
+        : "Renseigner le provider et le Voice ID (voir TTS Config)",
+    },
   ];
 }
 
