@@ -446,13 +446,18 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
 
   // Backward-compatible projection for UI consumers. No second LLM call is
   // made: labels and action now come from the single post-turn director call.
-  const labelPromise: Promise<PRD4LabelResult> = postTurnPromise.then((result) => ({
-    ok: !result.diagnostic?.error,
-    labels: result.labels ?? { themes: [], topics: [], intentions: [] },
-    latency_ms: result.latency_ms ?? 0,
-    model: result.model ?? "",
-    diagnostic: result.diagnostic,
-  }));
+  const labelPromise: Promise<PRD4LabelResult> = postTurnPromise.then((result) => {
+    const labels = result.labels ?? { themes: [], topics: [], intentions: [] };
+    return {
+      ok: !result.diagnostic?.error,
+      labels,
+      latency_ms: result.latency_ms ?? 0,
+      model: result.model ?? "",
+      // The label pass is a projection of the post-turn call: expose its labels
+      // as the parsed output instead of the wider director evaluation.
+      diagnostic: result.diagnostic ? { ...result.diagnostic, parsedOutput: labels } : undefined,
+    };
+  });
 
   if (
     input.sessionId &&

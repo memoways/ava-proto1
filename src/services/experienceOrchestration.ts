@@ -171,7 +171,7 @@ export async function fetchPinnedDirectorRuntime(sessionId: string | null): Prom
     { p_session_id: sessionId } as never,
   );
   if (error) throw error;
-  const row = Array.isArray(data) ? data[0] as Record<string, unknown> | undefined : undefined;
+  const row = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : undefined;
   const runtime: PinnedDirectorRuntime = {
     versionId: typeof row?.version_id === "string" ? row.version_id : String(pinned),
     versionNumber: typeof row?.version_number === "number" ? row.version_number : null,
@@ -196,7 +196,7 @@ export async function getCharacterRuntimeReadiness(character: "max" | "emma"): P
     p_character_key: character,
   } as never);
   if (error) throw error;
-  const row = Array.isArray(data) ? data[0] as Record<string, unknown> | undefined : undefined;
+  const row = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : undefined;
   if (!row) return null;
   return {
     characterKey: row.character_key === "emma" ? "emma" : "max",
