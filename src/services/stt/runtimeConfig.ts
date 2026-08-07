@@ -25,7 +25,30 @@ const DEFAULT_RUNTIME_CONFIG: STTRuntimeConfig = {
 let cachedConfig: STTRuntimeConfig | null = null;
 let inFlight: Promise<STTRuntimeConfig> | null = null;
 let lastFailureAt = 0;
+let lastAttemptAt = 0;
 const FAILURE_BACKOFF_MS = 30_000;
+const MIN_ATTEMPT_INTERVAL_MS = 5_000;
+const CACHE_TTL_MS = 5 * 60_000;
+const STORAGE_KEY = "ava.stt.runtimeConfig";
+
+function readPersistedConfig(): STTRuntimeConfig | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { at: number; config: STTRuntimeConfig };
+    if (!parsed?.config || Date.now() - parsed.at > CACHE_TTL_MS) return null;
+    return parsed.config;
+  } catch {
+    return null;
+  }
+}
+
+function persistConfig(config: STTRuntimeConfig) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ at: Date.now(), config }));
+  } catch { /* storage indisponible */ }
+}
+
 
 async function fetchRuntimeConfig(): Promise<STTRuntimeConfig> {
   try {
@@ -47,6 +70,7 @@ async function fetchRuntimeConfig(): Promise<STTRuntimeConfig> {
       },
     };
     lastFailureAt = 0;
+    persistConfig(cachedConfig);
     return cachedConfig;
   } catch (err) {
     console.warn("[STT] Runtime config unavailable, using local defaults:", err);
@@ -60,9 +84,18 @@ export async function getSTTRuntimeConfig(): Promise<STTRuntimeConfig> {
   if (!SUPABASE_URL) return DEFAULT_RUNTIME_CONFIG;
   // Une seule requête en vol partagée par tous les appelants (évite les 429)
   if (inFlight) return inFlight;
+  // Cache persistant (survit aux remontages/reloads de la session)
+  const persisted = readPersistedConfig();
+  if (persisted) {
+    cachedConfig = persisted;
+    return cachedConfig;
+  }
   // Après un échec (ex: 429), on attend avant de retenter
   if (lastFailureAt && Date.now() - lastFailureAt < FAILURE_BACKOFF_MS) return DEFAULT_RUNTIME_CONFIG;
+  // Garde-fou anti-rafale même en cas de succès
+  if (lastAttemptAt && Date.now() - lastAttemptAt < MIN_ATTEMPT_INTERVAL_MS) return DEFAULT_RUNTIME_CONFIG;
 
+  lastAttemptAt = Date.now();
   inFlight = fetchRuntimeConfig().finally(() => {
     inFlight = null;
   });
@@ -73,7 +106,10 @@ export function resetSTTRuntimeConfigCache() {
   cachedConfig = null;
   inFlight = null;
   lastFailureAt = 0;
+  lastAttemptAt = 0;
+  try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* noop */ }
 }
+
 
 
 export async function getSTTProviderRuntimeStatuses(): Promise<Record<STTProviderId, STTProviderRuntimeStatus>> {
