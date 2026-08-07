@@ -377,13 +377,7 @@ export default function TTSConfigTab() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label className="space-y-1 text-sm">
-            <span className="font-medium text-muted-foreground">Voice ID</span>
-            <input value={iwSettings.voiceId}
-              onChange={(e) => updateIw({ voiceId: e.target.value })}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="Alain, Hades, Ashley, ..." />
-            <span className="block text-xs text-muted-foreground/60">Ex: Alain (FR), Hades, Ashley, Olivia... (voir docs Inworld)</span>
-          </label>
+
 
           <label className="space-y-1 text-sm">
             <span className="font-medium text-muted-foreground">Langue (BCP-47 ou AUTO)</span>
