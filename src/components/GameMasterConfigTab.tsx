@@ -132,6 +132,11 @@ export default function GameMasterConfigTab() {
       ]);
       setVersions(nextVersions);
       setProfiles(nextProfiles);
+      try {
+        setAutoReadiness(await fetchCharacterAutoReadiness(nextProfiles.map((profile) => profile.display_name)));
+      } catch {
+        setAutoReadiness({});
+      }
       setGameplay(nextGameplay);
       setSavedTimeout(nextGameplay.TIMEOUT_SECONDS);
       const counts: Record<string, number> = {};
