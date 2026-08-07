@@ -218,6 +218,9 @@ export default function TTSConfigTab() {
         <p className="text-sm text-muted-foreground">
           Compare 3 services TTS. Le provider <strong>actif</strong> est utilisé dans le jeu ; les autres restent disponibles pour les tests.
         </p>
+        <p className="text-sm text-muted-foreground">
+          Les <strong>Voice ID</strong> ne se règlent plus ici : ils sont définis par personnage dans Expérience → Orchestration. Cet onglet ne garde que les réglages généraux (modèle, format, vitesse…).
+        </p>
       </div>
 
       {/* ===== Active provider selector ===== */}
