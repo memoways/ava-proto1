@@ -275,18 +275,33 @@ export default function GameMasterConfigTab() {
     setProfiles((current) => current.map((profile) => profile.id === id ? { ...profile, ...patch } : profile));
   };
 
+  const uploadPortrait = async (profile: CharacterRuntimeProfile, file: File) => {
+    setUploadingPortrait(profile.id);
+    try {
+      const url = await uploadCharacterPortrait(profile.character_key, file);
+      patchProfile(profile.id, { portrait_url: url });
+      toast.success("Portrait téléversé, pensez à sauvegarder le profil");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Téléversement du portrait impossible");
+    } finally {
+      setUploadingPortrait(null);
+    }
+  };
+
   const saveProfile = async (profile: CharacterRuntimeProfile) => {
     setSaving(true);
     try {
+      const auto = autoReadiness[profile.display_name];
       await updateCharacterRuntimeProfile(profile.id, {
         enabled: profile.enabled,
-        notion_character_id: profile.notion_character_id,
+        // The Notion link is resolved automatically from the Personnages sync.
+        notion_character_id: auto?.characterId ?? profile.notion_character_id,
         opening_line: profile.opening_line,
         portrait_url: profile.portrait_url,
         tts_provider: profile.tts_provider,
         tts_voice_id: profile.tts_voice_id,
-        prompt_validated: profile.prompt_validated,
-        rag_validated: profile.rag_validated,
+        prompt_validated: Boolean(auto?.hasPrompt),
+        rag_validated: (auto?.ragChunks ?? 0) > 0,
         qualitative_tests_validated: profile.qualitative_tests_validated,
         knowledge_isolation_validated: profile.knowledge_isolation_validated,
       });
