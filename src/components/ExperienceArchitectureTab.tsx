@@ -1,4 +1,4 @@
-import { useMemo, useState, type ComponentType } from "react";
+import { useMemo, useState } from "react";
 import {
   Activity,
   ArrowDown,
