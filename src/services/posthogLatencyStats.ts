@@ -46,14 +46,19 @@ export interface InternalLatencyComparison {
   costPerSessionUsd: number | null;
 }
 
-interface VoiceTurnRow {
+interface TurnLatencyRow {
   session_id: string | null;
-  turn_id: string;
+  t_turn_total_ms: number | null;
+  t_max_first_token_ms: number | null;
   metadata_json: {
+    turn_id?: string;
     t_turn_voice_ready_ms?: number;
     t_turn_response_ready_ms?: number;
   } | null;
 }
+
+interface TraceRow { turn_id: string | null }
+
 
 interface UsageRow { session_id: string | null; cost_usd: number | string | null }
 interface AudioRow { session_id: string | null; tts_text_len: number | null; metadata_json: { provider?: string } | null }
