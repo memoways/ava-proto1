@@ -204,16 +204,12 @@ serve(async (req) => {
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return json(cached.value, 200, { "X-AVA-Cache": "HIT" });
 
+  const sqlString = (value: string) => `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
   const conditions = [
-    "timestamp >= {from:DateTime}",
-    "timestamp < {to:DateTime}",
-    "event IN {events:Array(String)}",
+    `timestamp >= toDateTime(${sqlString(range.from.toISOString())})`,
+    `timestamp < toDateTime(${sqlString(range.to.toISOString())})`,
+    `event IN (${EVENTS.map((event) => sqlString(event)).join(", ")})`,
   ];
-  const values: Record<string, unknown> = {
-    from: range.from.toISOString(),
-    to: range.to.toISOString(),
-    events: EVENTS,
-  };
   const filterProperties: Record<string, string> = {
     character: "character",
     model: "max_model",
@@ -222,8 +218,7 @@ serve(async (req) => {
     browser: "browser_family",
   };
   for (const [key, value] of Object.entries(filters)) {
-    conditions.push(`toString(properties.${filterProperties[key]}) = {filter_${key}:String}`);
-    values[`filter_${key}`] = value;
+    conditions.push(`toString(properties.${filterProperties[key]}) = ${sqlString(value)}`);
   }
 
   const query = `
@@ -251,7 +246,7 @@ serve(async (req) => {
         Authorization: `Bearer ${personalApiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ query: { kind: "HogQLQuery", query, values } }),
+      body: JSON.stringify({ query: { kind: "HogQLQuery", query } }),
     });
     const payload = await response.json().catch(() => null) as { results?: unknown[][]; error?: string; detail?: string } | null;
     if (!response.ok) {
