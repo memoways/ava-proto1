@@ -204,16 +204,19 @@ serve(async (req) => {
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return json(cached.value, 200, { "X-AVA-Cache": "HIT" });
 
+  const eventPlaceholders = EVENTS.map((_, index) => `{event_${index}:String}`);
   const conditions = [
     "timestamp >= {from:DateTime}",
     "timestamp < {to:DateTime}",
-    "event IN {events:Array(String)}",
+    `event IN (${eventPlaceholders.join(", ")})`,
   ];
   const values: Record<string, unknown> = {
     from: range.from.toISOString(),
     to: range.to.toISOString(),
-    events: EVENTS,
   };
+  EVENTS.forEach((event, index) => {
+    values[`event_${index}`] = event;
+  });
   const filterProperties: Record<string, string> = {
     character: "character",
     model: "max_model",
