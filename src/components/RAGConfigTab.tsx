@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Database, Gauge, Loader2, RefreshCw, Save } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Database, Gauge, Info, Loader2, RefreshCw, RotateCcw, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,20 +17,60 @@ import {
   RAG_EMBEDDING_PROFILES,
   type RagEmbeddingProfileId,
   type RagIndexDashboardData,
+  type RagMetricsPeriod,
 } from "@/services/ragIndexService";
 import {
   getGameplaySettings,
-  saveGameplaySettings,
   saveGameplaySettingsToDB,
   loadGameplaySettingsFromDB,
   type GameplaySettings,
 } from "@/services/settingsService";
+import { RAG_DEGRADED_MODE_DEADLINE_MS } from "@/config/experienceRuntime";
 
 const SELECTABLE_PROFILES: RagEmbeddingProfileId[] = [
   "voyage-4-realtime",
   "voyage-context-4-quality",
   "voyage-3-legacy",
   "openai-legacy",
+];
+
+const METRIC_PERIODS: Array<{ value: RagMetricsPeriod; label: string }> = [
+  { value: "24h", label: "24 h" },
+  { value: "7d", label: "7 jours" },
+  { value: "30d", label: "30 jours" },
+  { value: "all", label: "Tout" },
+];
+
+const PROMPT_VARIANTS: Array<{
+  value: GameplaySettings["MAX_PROMPT_VARIANT"];
+  label: string;
+  status: string;
+  description: string;
+}> = [
+  {
+    value: "legacy",
+    label: "Legacy",
+    status: "Live actuel · rollback",
+    description: "Comportement historique stable. À conserver comme retour arrière tant que la canary n’est pas validée.",
+  },
+  {
+    value: "optimized_v3",
+    label: "Optimized v3",
+    status: "Canary encadrée",
+    description: "Payload borné, mémoire structurée et déduplication globale. À activer d’abord sur une session diagnostique.",
+  },
+  {
+    value: "rich_v2",
+    label: "Rich v2",
+    status: "Comparaison qualité",
+    description: "Préserve davantage la richesse éditoriale de la fiche Notion, avec un budget de prompt plus élevé.",
+  },
+  {
+    value: "compact_v1",
+    label: "Compact v1",
+    status: "Témoin compact",
+    description: "Ancienne réduction du prompt statique. Utile comme témoin technique, mais moins riche pour le personnage.",
+  },
 ];
 
 function Doc({ children }: { children: React.ReactNode }) {
@@ -67,20 +107,29 @@ function formatDate(value: string | null | undefined): string {
   return new Date(value).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
 }
 
-export default function RAGConfigTab() {
-  const [gameplay, setGameplay] = useState<GameplaySettings>(getGameplaySettings());
-  const [saved, setSaved] = useState<GameplaySettings>(getGameplaySettings());
-  const [dashboard, setDashboard] = useState<RagIndexDashboardData | null>(null);
+interface RAGConfigTabProps {
+  initialDashboard?: RagIndexDashboardData;
+  initialGameplay?: GameplaySettings;
+  previewMode?: boolean;
+}
+
+export default function RAGConfigTab({ initialDashboard, initialGameplay, previewMode = false }: RAGConfigTabProps = {}) {
+  const initialSettings = initialGameplay ?? getGameplaySettings();
+  const [gameplay, setGameplay] = useState<GameplaySettings>(initialSettings);
+  const [saved, setSaved] = useState<GameplaySettings>(initialSettings);
+  const [dashboard, setDashboard] = useState<RagIndexDashboardData | null>(initialDashboard ?? null);
   const [targetProfile, setTargetProfile] = useState<RagEmbeddingProfileId>("voyage-4-realtime");
+  const [metricsPeriod, setMetricsPeriod] = useState<RagMetricsPeriod>("30d");
   const [saving, setSaving] = useState(false);
-  const [loadingDashboard, setLoadingDashboard] = useState(true);
+  const [loadingDashboard, setLoadingDashboard] = useState(!previewMode);
   const [buildingProfile, setBuildingProfile] = useState(false);
   const [activatingProfile, setActivatingProfile] = useState(false);
 
   const refreshDashboard = useCallback(async () => {
+    if (previewMode) return;
     setLoadingDashboard(true);
     try {
-      const data = await loadRagIndexDashboardData();
+      const data = await loadRagIndexDashboardData(metricsPeriod);
       setDashboard(data);
       if (data.state?.active_profile) setTargetProfile(data.state.active_profile);
     } catch (error) {
@@ -88,15 +137,16 @@ export default function RAGConfigTab() {
     } finally {
       setLoadingDashboard(false);
     }
-  }, []);
+  }, [metricsPeriod, previewMode]);
 
   useEffect(() => {
+    if (previewMode) return;
     void loadGameplaySettingsFromDB().then((settings) => {
       setGameplay(settings);
       setSaved(settings);
     });
     void refreshDashboard();
-  }, [refreshDashboard]);
+  }, [previewMode, refreshDashboard]);
 
   const hasChanges = JSON.stringify(gameplay) !== JSON.stringify(saved);
   const activeProfile = dashboard?.state
@@ -109,14 +159,14 @@ export default function RAGConfigTab() {
   const effectiveTotalChars = ragFormat.totalChars ?? MAX_MAX_RAG_CONTEXT_CHARS;
 
   function update(patch: Partial<GameplaySettings>) {
-    setGameplay(saveGameplaySettings(patch));
+    setGameplay((current) => ({ ...current, ...patch }));
   }
 
   async function handleSave() {
     setSaving(true);
     try {
-      await saveGameplaySettingsToDB(gameplay);
-      setSaved(gameplay);
+      if (!previewMode) await saveGameplaySettingsToDB(gameplay);
+      setSaved({ ...gameplay });
       toast.success("Réglages de récupération sauvegardés ✓");
     } finally {
       setSaving(false);
@@ -162,6 +212,18 @@ export default function RAGConfigTab() {
 
   const metrics = dashboard?.metrics;
 
+  const saveButton = (className = "") => (
+    <Button
+      size="sm"
+      onClick={handleSave}
+      disabled={saving || !hasChanges}
+      className={`${hasChanges ? "bg-green-600 hover:bg-green-700" : ""} ${className}`}
+    >
+      {saving ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1 h-3.5 w-3.5" />}
+      {saving ? "Enregistrement…" : "Enregistrer et activer les réglages"}
+    </Button>
+  );
+
   return (
     <div className="max-w-5xl space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -172,14 +234,13 @@ export default function RAGConfigTab() {
             conversationnelle et le payload LLM resteront des budgets séparés.
           </p>
         </div>
-        <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges} className={hasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
-          <Save className="mr-1 h-3 w-3" /> {saving ? "Sauvegarde…" : "Sauvegarder les réglages"}
-        </Button>
+        {saveButton()}
       </div>
 
       {hasChanges && (
         <div className="rounded-lg border border-yellow-700/50 bg-yellow-900/30 px-4 py-2 text-sm text-yellow-300">
-          Modifications de retrieval non sauvegardées. Le profil d’index est activé séparément après rebuild.
+          Modifications non enregistrées : elles n’affectent pas les prochains tours tant que vous ne les avez pas
+          activées. Le profil d’index reste, lui, activé séparément après rebuild.
         </div>
       )}
 
@@ -274,14 +335,41 @@ export default function RAGConfigTab() {
       </section>
 
       <section className="space-y-4 rounded-lg border p-4">
-        <h3 className="flex items-center gap-2 text-base font-semibold"><Gauge className="h-4 w-4" /> Résultats live observés</h3>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="flex items-center gap-2 text-base font-semibold"><Gauge className="h-4 w-4" /> Résultats live observés</h3>
+            <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
+              Mesures des recherches RAG exécutées pendant les vraies conversations, pas des tests fournisseur.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1" aria-label="Période des mesures RAG">
+            {METRIC_PERIODS.map((period) => (
+              <Button
+                key={period.value}
+                size="sm"
+                variant={metricsPeriod === period.value ? "default" : "outline"}
+                onClick={() => setMetricsPeriod(period.value)}
+                disabled={loadingDashboard}
+              >
+                {period.label}
+              </Button>
+            ))}
+          </div>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Metric label="Échantillon" value={`${metrics?.sampleSize || 0} tours`} detail={metrics?.lastMeasuredAt ? `dernier : ${formatDate(metrics.lastMeasuredAt)}` : "aucune mesure disponible"} />
+          <Metric label="Échantillon analysé" value={metrics?.sampleSize ? `${metrics.sampleSize} tours` : "Aucun tour"} detail={metrics?.lastMeasuredAt ? `dernier : ${formatDate(metrics.lastMeasuredAt)}` : "jouez une session pour créer des mesures"} />
           <Metric label="Latence RAG p50" value={metrics?.p50Ms != null ? `${metrics.p50Ms} ms` : "—"} detail="cible diagnostique : 250 ms" />
-          <Metric label="Latence RAG p95" value={metrics?.p95Ms != null ? `${metrics.p95Ms} ms` : "—"} detail="deadline live : 2 000 ms" />
+          <Metric label="Latence RAG p95" value={metrics?.p95Ms != null ? `${metrics.p95Ms} ms` : "—"} detail={`deadline live : ${RAG_DEGRADED_MODE_DEADLINE_MS.toLocaleString("fr-FR")} ms`} />
           <Metric label="Tours sans résultat" value={metrics?.missRate != null ? `${Math.round(metrics.missRate * 100)} %` : "—"} detail="questions avec 0 chunk final" />
         </div>
-        <Doc>Ces valeurs proviennent des événements de tours réellement joués. Elles remplacent les promesses génériques de latence fournisseur.</Doc>
+        <div className="flex gap-2 rounded-lg border border-sky-500/20 bg-sky-500/5 p-3 text-xs text-muted-foreground">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-400" />
+          <p>
+            Source : <code>voice_turn_events</code> dans Lovable Cloud, filtrée sur la période choisie. La p50 est la
+            latence médiane ; la p95 représente un tour lent parmi les 5 % les plus lents. « — » signifie non mesuré,
+            jamais une valeur égale à zéro.
+          </p>
+        </div>
       </section>
 
       <section className="space-y-5 rounded-lg border p-4">
@@ -299,12 +387,22 @@ export default function RAGConfigTab() {
             <Doc>Les deux modèles sont multilingues et suivent une instruction de pertinence. Le mode Lite est destiné aux usages sensibles à la latence ; le modèle complet reste utile pour les comparaisons du Laboratoire.</Doc>
           </div>
           <div className="grid gap-3">
-            <label className="flex min-h-11 items-center justify-between gap-3 rounded-md border px-3 py-2">
-              <span className="text-sm text-muted-foreground">Reranking activé</span>
+            <label className="flex min-h-16 items-center justify-between gap-4 rounded-md border px-3 py-3">
+              <span>
+                <span className="block text-sm font-medium">Reranking sémantique</span>
+                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                  Reclasse les candidats par rapport à la question. Désactivé, l’ordre cosine initial est conservé.
+                </span>
+              </span>
               <input type="checkbox" className="h-5 w-5 accent-primary" checked={gameplay.RAG_RERANK_ENABLED} onChange={(event) => update({ RAG_RERANK_ENABLED: event.target.checked })} />
             </label>
-            <label className="flex min-h-11 items-center justify-between gap-3 rounded-md border px-3 py-2">
-              <span className="text-sm text-muted-foreground">Troncature de sécurité</span>
+            <label className="flex min-h-16 items-center justify-between gap-4 rounded-md border px-3 py-3">
+              <span>
+                <span className="block text-sm font-medium">Troncature de sécurité Voyage</span>
+                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                  Ajuste les entrées trop longues à la limite du modèle. Désactivée, Voyage renvoie une erreur si une limite est dépassée.
+                </span>
+              </span>
               <input type="checkbox" className="h-5 w-5 accent-primary" checked={gameplay.RAG_RERANK_TRUNCATION} onChange={(event) => update({ RAG_RERANK_TRUNCATION: event.target.checked })} disabled={!gameplay.RAG_RERANK_ENABLED} />
             </label>
           </div>
@@ -315,24 +413,36 @@ export default function RAGConfigTab() {
       <section className="space-y-6 rounded-lg border p-4">
         <h3 className="text-base font-semibold">🎚️ Récupération et injection</h3>
 
-        <div className="rounded-lg border bg-muted/10 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <label className="text-sm font-medium">Variante du prompt Max</label>
-              <Doc>Réglage technique consommé par le compilateur Max et le formatage RAG. Il n’appartient plus à l’orchestration GM.</Doc>
-            </div>
-            <Select
-              value={gameplay.MAX_PROMPT_VARIANT}
-              onValueChange={(value: "legacy" | "compact_v1" | "rich_v2" | "optimized_v3") => update({ MAX_PROMPT_VARIANT: value })}
-            >
-              <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="optimized_v3">Optimized v3</SelectItem>
-                <SelectItem value="rich_v2">Rich v2</SelectItem>
-                <SelectItem value="compact_v1">Compact v1</SelectItem>
-                <SelectItem value="legacy">Legacy (rollback)</SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="space-y-3 rounded-lg border bg-muted/10 p-4">
+          <div>
+            <p className="text-sm font-medium">Variante du prompt Max</p>
+            <Doc>Ce choix modifie la construction du prompt, la mémoire utilisée et le budget RAG. Il prend effet au prochain tour après enregistrement.</Doc>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2" role="radiogroup" aria-label="Variante du prompt Max">
+            {PROMPT_VARIANTS.map((variant) => {
+              const selected = gameplay.MAX_PROMPT_VARIANT === variant.value;
+              const active = saved.MAX_PROMPT_VARIANT === variant.value;
+              const format = maxRagFormatOptionsForVariant(variant.value);
+              const totalChars = format.totalChars ?? MAX_MAX_RAG_CONTEXT_CHARS;
+              return (
+                <button
+                  key={variant.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => update({ MAX_PROMPT_VARIANT: variant.value })}
+                  className={`rounded-lg border p-3 text-left transition-colors ${selected ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "hover:bg-muted/30"}`}
+                >
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold">{variant.label}</span>
+                    <span className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{variant.status}</span>
+                    {active && <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-400">ACTIF</span>}
+                  </span>
+                  <span className="mt-2 block text-xs leading-relaxed text-muted-foreground">{variant.description}</span>
+                  <span className="mt-2 block font-mono text-[10px] text-muted-foreground/70">Budget RAG : {totalChars.toLocaleString("fr-FR")} caractères</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -360,6 +470,23 @@ export default function RAGConfigTab() {
           <Metric label="Souvenirs Max" value={`${Math.min(gameplay.RAG_TOP_K, effectiveMaxItems)} / ${effectiveMaxItems}`} detail="dédupliqués avant injection" />
           <Metric label="Budget par souvenir" value={`${effectiveItemChars} caractères`} detail={`variante ${gameplay.MAX_PROMPT_VARIANT}`} />
           <Metric label="Budget RAG total" value={`${effectiveTotalChars} caractères`} detail="séparé de la future mémoire de session" />
+        </div>
+
+        <div className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 ${hasChanges ? "border-emerald-500/40 bg-emerald-500/5" : "bg-muted/10"}`}>
+          <div>
+            <p className="text-sm font-medium">Activation des réglages de récupération</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {hasChanges ? "Votre brouillon n’affecte pas encore le live." : "Les réglages affichés sont ceux utilisés par les prochains tours."}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {hasChanges && (
+              <Button size="sm" variant="ghost" onClick={() => setGameplay({ ...saved })} disabled={saving}>
+                <RotateCcw className="mr-1 h-3.5 w-3.5" /> Annuler les modifications
+              </Button>
+            )}
+            {saveButton()}
+          </div>
         </div>
       </section>
 

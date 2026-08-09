@@ -18,6 +18,7 @@ debugLogger.init();
 
 const queryClient = new QueryClient();
 const LatencyTelemetryPreview = import.meta.env.DEV ? lazy(() => import("./dev/LatencyTelemetryPreview")) : null;
+const RAGConfigPreview = import.meta.env.DEV ? lazy(() => import("./dev/RAGConfigPreview")) : null;
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -31,6 +32,7 @@ const App = () => (
           <Route path="/confidentialite" element={<Privacy />} />
           <Route path="/admin" element={<AdminAuthGate><Admin /></AdminAuthGate>} />
           {LatencyTelemetryPreview && <Route path="/__preview/latency-telemetry" element={<Suspense fallback={null}><LatencyTelemetryPreview /></Suspense>} />}
+          {RAGConfigPreview && <Route path="/__preview/rag-config" element={<Suspense fallback={null}><RAGConfigPreview /></Suspense>} />}
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

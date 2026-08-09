@@ -7,6 +7,7 @@ vi.mock("@/services/ragService", () => ({ AVA_NOTION_DATABASES: { characters: "c
 
 import {
   activateExistingRagProfile,
+  getRagMetricsPeriodStart,
   RAG_EMBEDDING_PROFILES,
   summarizeRagRuntimeMetrics,
 } from "@/services/ragIndexService";
@@ -63,6 +64,21 @@ describe("summarizeRagRuntimeMetrics", () => {
       { t_rag_total_ms: 300, rag_matches_count: 2, created_at: "2026-08-05T10:00:00Z" },
       { t_rag_total_ms: 900, rag_matches_count: 0, created_at: "2026-08-05T09:00:00Z" },
     ]);
-    expect(metrics).toMatchObject({ sampleSize: 4, p50Ms: 200, p95Ms: 900, missRate: 0.5 });
+    expect(metrics).toMatchObject({
+      sampleSize: 4,
+      p50Ms: 200,
+      p95Ms: 900,
+      missRate: 0.5,
+      period: "all",
+      source: "voice_turn_events",
+    });
+  });
+
+  it("computes stable period boundaries for historical filters", () => {
+    const now = new Date("2026-08-09T12:00:00.000Z");
+    expect(getRagMetricsPeriodStart("24h", now)).toBe("2026-08-08T12:00:00.000Z");
+    expect(getRagMetricsPeriodStart("7d", now)).toBe("2026-08-02T12:00:00.000Z");
+    expect(getRagMetricsPeriodStart("30d", now)).toBe("2026-07-10T12:00:00.000Z");
+    expect(getRagMetricsPeriodStart("all", now)).toBeNull();
   });
 });

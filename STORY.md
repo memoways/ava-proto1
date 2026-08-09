@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-09 (dashboard PostHog interactif et diagnostic des tours lents)
+> **Last Updated**: 2026-08-09 (configuration RAG explicite et métriques historiques)
 
 ---
 
@@ -72,6 +72,62 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-09 — La configuration RAG explique enfin ce qu’elle active 🔷
+
+**Le problème.** La page exposait des réglages puissants comme des commandes
+techniques sans donner à l’administrateur les conséquences de ses choix. Les
+résultats live affichaient `0 tours` ou des tirets à partir d’un échantillon
+implicite des 200 derniers événements, sans période ni définition de p50/p95.
+Le reranking et la troncature étaient deux cases à cocher sans expliquer leur
+état désactivé. Enfin, la variante du prompt Max était un menu de quatre noms
+internes et toute modification écrivait immédiatement dans `localStorage`,
+avant même l’action de sauvegarde visible dans l’interface.
+
+**Les mesures deviennent historiques et interprétables.** Les événements
+`voice_turn_events` sont maintenant filtrables sur 24 heures, 7 jours, 30 jours
+ou tout l’historique, avec une limite de 5 000 tours par requête. L’échantillon,
+la p50, la p95 et le taux de zéro résultat affichent leur source et leur sens.
+Une absence de mesure devient « Aucun tour » ou `—`, jamais un faux zéro. La
+deadline affichée vient de la constante runtime réelle de 3 500 ms et ne peut
+plus dériver silencieusement du pipeline.
+
+**Les réglages redeviennent une décision explicite.** Sliders, switches et choix
+de variante restent dans un brouillon React local. Ils ne modifient les prochains
+tours qu’après **Enregistrer et activer les réglages** ; une action d’annulation
+restaure la configuration active. Le profil d’embedding conserve son propre flux
+de rebuild/activation afin de ne pas confondre changement d’espace vectoriel et
+réglage de récupération.
+
+**Les interrupteurs expliquent leur impact.** Couper le reranking conserve
+l’ordre de similarité cosine initial et rend le modèle Voyage ainsi que la
+troncature sans effet. La troncature précise son rôle : ramener une entrée trop
+longue dans la fenêtre de contexte du reranker ; si elle est coupée, Voyage
+renvoie une erreur lors d’un dépassement. Le modèle Lite reste identifié comme
+le choix temps réel, le modèle complet comme une comparaison qualité.
+
+**Le choix du prompt Max devient lisible.** `legacy`, `optimized_v3`, `rich_v2`
+et `compact_v1` sont présentés comme quatre cartes comparables. Chacune indique
+son niveau de maturité, son usage, son budget RAG et si elle est réellement
+active. `legacy` reste le live prudent et le rollback ; `optimized_v3` reste une
+canary encadrée conformément au runbook Lovable, sans bascule globale implicite.
+
+**Leçon.** Une console d’administration ne doit pas seulement exposer les
+paramètres du runtime : elle doit rendre visible le moment exact où ils prennent
+effet, les données qui justifient leur valeur et le risque associé aux options
+de rollback ou de canary. Sans ces trois informations, un contrôle techniquement
+fonctionnel reste une décision produit opaque.
+
+**Validation.** Les périodes, états brouillon/actif, dépendances entre switches,
+annulation et enregistrement ont été vérifiés dans le navigateur intégré sans
+erreur console. Le build, le lint ciblé, les **240 tests unitaires sur 61
+fichiers** et la QA visuelle sont validés. Le plan et les preuves sont conservés
+dans [`docs/plan_amelioration_page_configuration_rag.md`](docs/plan_amelioration_page_configuration_rag.md)
+et [`design-qa.md`](design-qa.md). Aucun déploiement parallèle n’a été créé : la
+publication reste confiée exclusivement à Lovable.
+
+**Temps de réalisation.** Environ 2 heures, analyse du screenshot, implémentation,
+tests, vérification navigateur et documentation inclus.
 
 ### 2026-08-09 — Les chiffres PostHog deviennent enfin une histoire lisible 🔷
 

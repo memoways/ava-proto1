@@ -4,6 +4,50 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.55.4] — 2026-08-09 — Configuration RAG explicite et métriques historiques
+
+### Ajouté
+
+- Filtres temporels `24 h`, `7 jours`, `30 jours` et `Tout` sur les résultats
+  RAG réellement observés dans `voice_turn_events`.
+- Explication intégrée de l’échantillon, des latences p50/p95, du taux de tours
+  sans résultat et de l’état « non mesuré », qui n’est plus présenté comme un
+  zéro ambigu.
+- Cartes comparatives pour `legacy`, `optimized_v3`, `rich_v2` et `compact_v1`,
+  avec maturité, usage, statut actif et budget RAG.
+- Route de prévisualisation disponible uniquement en développement sur
+  `/__preview/rag-config`, plan d’implémentation et comparaison visuelle dans
+  [`docs/plan_amelioration_page_configuration_rag.md`](docs/plan_amelioration_page_configuration_rag.md)
+  et [`design-qa.md`](design-qa.md).
+
+### Modifié
+
+- Les réglages de récupération restent désormais en brouillon dans le composant
+  tant que l’administrateur n’utilise pas **Enregistrer et activer les réglages**.
+  Les sliders, switches et variantes ne modifient donc plus immédiatement le
+  runtime via `localStorage`.
+- Une action d’annulation restaure la configuration active, tandis que les
+  boutons d’enregistrement en haut et en bas de la page rendent l’activation
+  explicite et accessible.
+- Le reranking explique maintenant qu’une désactivation conserve l’ordre cosine
+  initial. La troncature Voyage explique qu’une désactivation transforme un
+  dépassement de contexte en erreur et devient indisponible quand le reranking
+  est coupé.
+- La deadline RAG affichée est lue depuis la constante runtime effective, soit
+  **3 500 ms**, au lieu de conserver le texte obsolète de 2 000 ms.
+- La collecte des métriques n’est plus limitée implicitement aux 200 derniers
+  événements : elle applique la période choisie et peut analyser jusqu’à 5 000
+  tours par requête.
+
+### Compatibilité et validation
+
+- Aucun schéma, secret, projet Supabase, Edge Function, hébergeur ou pipeline
+  externe n’est ajouté. Les chiffres proviennent de Lovable Cloud et la chaîne
+  de build/publication reste exclusivement Lovable.
+- Build Vite réussi, lint ciblé sans erreur, `git diff --check` valide, suite
+  unitaire complète de **240 tests** réussie sur **61 fichiers** et QA navigateur
+  validée sans erreur console.
+
 ## [0.55.3] — 2026-08-09 — Dashboard PostHog interactif et diagnostic des tours lents
 
 ### Ajouté
@@ -21,7 +65,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   et exclue du bundle de production.
 - Plan d’implémentation et rapport de QA dans
   [`docs/plan_dashboard_posthog_interactif.md`](docs/plan_dashboard_posthog_interactif.md)
-  et [`design-qa.md`](design-qa.md).
+  et [`docs/design-qa-dashboard-posthog.md`](docs/design-qa-dashboard-posthog.md).
 
 ### Modifié
 

@@ -39,7 +39,12 @@ export interface RagRuntimeMetrics {
   p95Ms: number | null;
   missRate: number | null;
   lastMeasuredAt: string | null;
+  period: RagMetricsPeriod;
+  periodStart: string | null;
+  source: "voice_turn_events";
 }
+
+export type RagMetricsPeriod = "24h" | "7d" | "30d" | "all";
 
 export interface RagIndexDashboardData {
   state: RagIndexState | null;
@@ -60,7 +65,20 @@ function percentile(sortedValues: number[], ratio: number): number | null {
   return sortedValues[index];
 }
 
-export function summarizeRagRuntimeMetrics(rows: VoiceTurnMetricRow[]): RagRuntimeMetrics {
+export function getRagMetricsPeriodStart(
+  period: RagMetricsPeriod,
+  now = new Date(),
+): string | null {
+  if (period === "all") return null;
+  const hours = period === "24h" ? 24 : period === "7d" ? 24 * 7 : 24 * 30;
+  return new Date(now.getTime() - hours * 60 * 60 * 1_000).toISOString();
+}
+
+export function summarizeRagRuntimeMetrics(
+  rows: VoiceTurnMetricRow[],
+  period: RagMetricsPeriod = "all",
+  periodStart: string | null = null,
+): RagRuntimeMetrics {
   const measured = rows.filter((row) => typeof row.t_rag_total_ms === "number");
   const timings = measured.map((row) => row.t_rag_total_ms as number).sort((a, b) => a - b);
   const withMatchCount = rows.filter((row) => typeof row.rag_matches_count === "number");
@@ -71,20 +89,29 @@ export function summarizeRagRuntimeMetrics(rows: VoiceTurnMetricRow[]): RagRunti
     p95Ms: percentile(timings, 0.95),
     missRate: withMatchCount.length ? misses / withMatchCount.length : null,
     lastMeasuredAt: rows[0]?.created_at ?? null,
+    period,
+    periodStart,
+    source: "voice_turn_events",
   };
 }
 
-export async function loadRagIndexDashboardData(): Promise<RagIndexDashboardData> {
+export async function loadRagIndexDashboardData(
+  metricsPeriod: RagMetricsPeriod = "30d",
+): Promise<RagIndexDashboardData> {
   // The local generated Database type is refreshed by Lovable after applying the migration.
   // A generic client keeps this migration-compatible code typed in the meantime.
   const client = supabase as unknown as SupabaseClient;
+  const periodStart = getRagMetricsPeriodStart(metricsPeriod);
+  let telemetryQuery = client
+    .from("voice_turn_events")
+    .select("t_rag_total_ms, rag_matches_count, created_at")
+    .order("created_at", { ascending: false })
+    .limit(5_000);
+  if (periodStart) telemetryQuery = telemetryQuery.gte("created_at", periodStart);
+
   const [stateResult, telemetryResult, profileCountResults] = await Promise.all([
     client.from("rag_index_state").select("*").eq("id", true).maybeSingle(),
-    client
-      .from("voice_turn_events")
-      .select("t_rag_total_ms, rag_matches_count, created_at")
-      .order("created_at", { ascending: false })
-      .limit(200),
+    telemetryQuery,
     Promise.all(RAG_EMBEDDING_PROFILE_IDS.map(async (profileId) => {
       const result = await client
         .from("embeddings")
@@ -102,7 +129,11 @@ export async function loadRagIndexDashboardData(): Promise<RagIndexDashboardData
   return {
     state: stateResult.data as RagIndexState | null,
     profileCounts,
-    metrics: summarizeRagRuntimeMetrics((telemetryResult.data || []) as VoiceTurnMetricRow[]),
+    metrics: summarizeRagRuntimeMetrics(
+      (telemetryResult.data || []) as VoiceTurnMetricRow[],
+      metricsPeriod,
+      periodStart,
+    ),
     migrationMissing: Boolean(stateResult.error),
   };
 }
