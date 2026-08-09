@@ -204,19 +204,12 @@ serve(async (req) => {
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return json(cached.value, 200, { "X-AVA-Cache": "HIT" });
 
-  const eventPlaceholders = EVENTS.map((_, index) => `{event_${index}:String}`);
+  const sqlString = (value: string) => `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
   const conditions = [
-    "timestamp >= {from:DateTime}",
-    "timestamp < {to:DateTime}",
-    `event IN (${eventPlaceholders.join(", ")})`,
+    `timestamp >= toDateTime(${sqlString(range.from.toISOString())})`,
+    `timestamp < toDateTime(${sqlString(range.to.toISOString())})`,
+    `event IN (${EVENTS.map((event) => sqlString(event)).join(", ")})`,
   ];
-  const values: Record<string, unknown> = {
-    from: range.from.toISOString(),
-    to: range.to.toISOString(),
-  };
-  EVENTS.forEach((event, index) => {
-    values[`event_${index}`] = event;
-  });
   const filterProperties: Record<string, string> = {
     character: "character",
     model: "max_model",
@@ -225,8 +218,7 @@ serve(async (req) => {
     browser: "browser_family",
   };
   for (const [key, value] of Object.entries(filters)) {
-    conditions.push(`toString(properties.${filterProperties[key]}) = {filter_${key}:String}`);
-    values[`filter_${key}`] = value;
+    conditions.push(`toString(properties.${filterProperties[key]}) = ${sqlString(value)}`);
   }
 
   const query = `
