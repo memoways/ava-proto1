@@ -46,14 +46,19 @@ export interface InternalLatencyComparison {
   costPerSessionUsd: number | null;
 }
 
-interface VoiceTurnRow {
+interface TurnLatencyRow {
   session_id: string | null;
-  turn_id: string;
+  t_turn_total_ms: number | null;
+  t_max_first_token_ms: number | null;
   metadata_json: {
+    turn_id?: string;
     t_turn_voice_ready_ms?: number;
     t_turn_response_ready_ms?: number;
   } | null;
 }
+
+interface TraceRow { turn_id: string | null }
+
 
 interface UsageRow { session_id: string | null; cost_usd: number | string | null }
 interface AudioRow { session_id: string | null; tts_text_len: number | null; metadata_json: { provider?: string } | null }
@@ -84,24 +89,29 @@ export async function loadPosthogLatencyStats(input: {
 }
 
 export async function loadInternalLatencyComparison(posthog: PosthogLatencyStats): Promise<InternalLatencyComparison> {
-  const [voiceResult, usageResult, audioResult] = await Promise.all([
-    supabase.from("voice_turn_events" as never).select("session_id, turn_id, metadata_json").gte("created_at", posthog.period.from).lt("created_at", posthog.period.to),
+  const [voiceResult, usageResult, audioResult, traceResult] = await Promise.all([
+    supabase.from("turn_latencies" as never).select("session_id, t_turn_total_ms, t_max_first_token_ms, metadata_json").gte("created_at", posthog.period.from).lt("created_at", posthog.period.to),
     supabase.from("llm_usage" as never).select("session_id, cost_usd").gte("created_at", posthog.period.from).lt("created_at", posthog.period.to),
     supabase.from("audio_latencies" as never).select("session_id, tts_text_len, metadata_json").eq("direction", "out").gte("created_at", posthog.period.from).lt("created_at", posthog.period.to),
+    supabase.from("conversation_turn_traces" as never).select("turn_id").gte("created_at", posthog.period.from).lt("created_at", posthog.period.to),
   ]);
-  const queryError = voiceResult.error ?? usageResult.error ?? audioResult.error;
+  const queryError = voiceResult.error ?? usageResult.error ?? audioResult.error ?? traceResult.error;
   if (queryError) throw queryError;
-  const voice = (voiceResult.data ?? []) as unknown as VoiceTurnRow[];
+  const voice = (voiceResult.data ?? []) as unknown as TurnLatencyRow[];
   const usage = (usageResult.data ?? []) as unknown as UsageRow[];
   const audio = (audioResult.data ?? []) as unknown as AudioRow[];
-  const internalIds = new Set(voice.map((row) => row.turn_id).filter(Boolean));
+  const traces = (traceResult.data ?? []) as unknown as TraceRow[];
+  const internalIds = new Set(
+    [...voice.map((row) => row.metadata_json?.turn_id), ...traces.map((row) => row.turn_id)].filter((value): value is string => Boolean(value)),
+  );
   const posthogIds = new Set(posthog.turnIds);
   const persisted = [...posthogIds].filter((id) => internalIds.has(id)).length;
   const missingInInternal = [...posthogIds].filter((id) => !internalIds.has(id)).length;
   const onlyInternal = [...internalIds].filter((id) => !posthogIds.has(id)).length;
   const sessions = new Set(voice.map((row) => row.session_id).filter(Boolean));
-  const responseReady = voice.map((row) => row.metadata_json?.t_turn_response_ready_ms).filter((value): value is number => typeof value === "number");
-  const firstSound = voice.map((row) => row.metadata_json?.t_turn_voice_ready_ms).filter((value): value is number => typeof value === "number");
+  const responseReady = voice.map((row) => row.metadata_json?.t_turn_response_ready_ms ?? row.t_turn_total_ms).filter((value): value is number => typeof value === "number");
+  const firstSound = voice.map((row) => row.metadata_json?.t_turn_voice_ready_ms ?? row.t_max_first_token_ms).filter((value): value is number => typeof value === "number");
+
   const llmCost = usage.reduce((sum, row) => sum + (Number(row.cost_usd) || 0), 0);
   const voiceCost = audio.reduce((sum, row) => {
     const provider = row.metadata_json?.provider?.toLowerCase() ?? "";

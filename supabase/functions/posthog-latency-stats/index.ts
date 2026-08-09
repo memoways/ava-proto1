@@ -145,7 +145,7 @@ function aggregate(rows: EventRow[], range: { period: string; from: Date; to: Da
     hasData: rows.length > 0,
     freshAt: new Date().toISOString(),
     period: { key: range.period, from: range.from.toISOString(), to: range.to.toISOString() },
-    dashboardUrl: `${host}/project/${encodeURIComponent(projectId)}/events`,
+    dashboardUrl: `${host}/project/${encodeURIComponent(projectId)}/dashboard`,
     totals: {
       sessions: new Set(turns.map((row) => row.sessionId).filter(Boolean)).size,
       turns: turns.length,
