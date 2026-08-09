@@ -4,6 +4,53 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.55.3] — 2026-08-09 — Dashboard PostHog interactif et diagnostic des tours lents
+
+### Ajouté
+
+- Série temporelle PostHog permettant de comparer les p50 et p95 du texte prêt,
+  du premier son et de la latence end-to-end selon une granularité adaptée à la
+  période interrogée.
+- Top 25 des tours les plus lents avec heure, session, modèle, providers,
+  navigateur, blocker, statut et décomposition STT → RAG → Max LLM → TTS.
+- Visualisations interactives pour la décomposition des latences, les blockers,
+  les providers et les actions d’expérience, avec infobulles et sélecteurs de
+  métrique ou de dimension.
+- Route de démonstration disponible uniquement en développement sur
+  `/__preview/latency-telemetry`, alimentée par des données factices réalistes
+  et exclue du bundle de production.
+- Plan d’implémentation et rapport de QA dans
+  [`docs/plan_dashboard_posthog_interactif.md`](docs/plan_dashboard_posthog_interactif.md)
+  et [`design-qa.md`](design-qa.md).
+
+### Modifié
+
+- Les cinq filtres libres Personnage, Modèle Max, STT, TTS et Navigateur sont
+  remplacés par des menus déroulants alimentés par les valeurs réellement
+  observées dans PostHog. Les filtres actifs sont comptés, applicables
+  explicitement et réinitialisables.
+- Les indicateurs Sessions, Erreurs, Fallbacks et Blocker dominant utilisent une
+  hiérarchie visuelle et des états sémantiques au lieu d’une grille uniforme de
+  chiffres difficile à interpréter.
+- L’Edge Function `posthog-latency-stats` agrège désormais la chronologie et les
+  tours lents côté Lovable Cloud, sans exposer la Personal API Key au navigateur.
+- Le lien externe ouvre explicitement le dashboard du projet PostHog `137897` :
+  `https://eu.posthog.com/project/137897/dashboard`.
+
+### Compatibilité et validation
+
+- La séparation entre PostHog et les mesures internes Supabase, la comparaison
+  par `turn_id`, les états d’erreur/absence de données et la décision canary sont
+  conservés.
+- Aucun hébergeur, projet Supabase ou pipeline externe n’est introduit :
+  l’Edge Function reste destinée exclusivement à Lovable Cloud.
+- Build Vite réussi, lint ciblé sans erreur, `git diff --check` valide, suite
+  unitaire complète de **239 tests** réussie sur **61 fichiers** et QA visuelle
+  validée sans erreur console.
+- Le binaire Deno n’étant pas disponible localement, la compilation finale de
+  l’Edge Function reste à confirmer par la chaîne Lovable Cloud avant
+  publication.
+
 ## [0.55.2] — 2026-08-07 — Orchestration globale et éditeur GM réellement câblés
 
 ### Ajouté

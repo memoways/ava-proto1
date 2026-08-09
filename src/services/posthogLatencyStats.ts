@@ -8,6 +8,39 @@ export interface PercentileMetric {
   measured: number;
 }
 
+export interface PosthogTimelinePoint {
+  timestamp: string;
+  turns: number;
+  responseReadyP50: number | null;
+  responseReadyP95: number | null;
+  firstSoundP50: number | null;
+  firstSoundP95: number | null;
+  endToEndP50: number | null;
+  endToEndP95: number | null;
+}
+
+export interface PosthogSlowTurn {
+  turnId: string | null;
+  sessionId: string | null;
+  timestamp: string;
+  turnIndex: number | null;
+  character: string | null;
+  model: string | null;
+  stt: string | null;
+  tts: string | null;
+  browser: string | null;
+  responseReadyMs: number | null;
+  firstSoundMs: number | null;
+  endToEndMs: number | null;
+  sttMs: number | null;
+  ragMs: number | null;
+  maxMs: number | null;
+  ttsMs: number | null;
+  blocker: string | null;
+  severity: string | null;
+  fallback: boolean;
+}
+
 export interface PosthogLatencyStats {
   source: "PostHog";
   hasData: boolean;
@@ -29,6 +62,8 @@ export interface PosthogLatencyStats {
     cinematics: { recommended: number; played: number; skipped: number };
     handoffs: { proposed: number; accepted: number; refused: number; executed: number; blocked: number };
   };
+  timeline: PosthogTimelinePoint[];
+  slowestTurns: PosthogSlowTurn[];
   turnIds: string[];
 }
 

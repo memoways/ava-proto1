@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-07 (orchestration globale et réglages GM réellement câblés)
+> **Last Updated**: 2026-08-09 (dashboard PostHog interactif et diagnostic des tours lents)
 
 ---
 
@@ -72,6 +72,65 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-09 — Les chiffres PostHog deviennent enfin une histoire lisible 🔷
+
+**Le problème.** La première vue PostHog disait correctement combien de sessions,
+de tours, d’erreurs ou de fallbacks avaient été observés, mais elle demandait à
+l’administrateur de reconstruire mentalement ce qui s’était passé. Huit cartes
+p50/p95, des répartitions écrites en petits paragraphes et cinq champs libres ne
+permettaient ni de suivre une dégradation dans le temps, ni de remonter d’un p95
+anormal au tour qui l’avait produit. Les filtres acceptaient par ailleurs des
+valeurs impossibles à deviner ou à orthographier exactement.
+
+**Les filtres partent maintenant des données réelles.** Personnage, modèle Max,
+STT, TTS et navigateur sont devenus des menus déroulants alimentés par les
+valeurs observées. La période reste sélectionnable en 24 heures, 7 jours,
+30 jours ou dates personnalisées ; les filtres actifs sont visibles,
+réinitialisables et ne déclenchent la requête qu’au moment où l’administrateur
+les applique. L’absence de données, une erreur PostHog et un vrai zéro restent
+trois états distincts.
+
+**La latence retrouve sa dimension temporelle.** L’Edge Function Lovable Cloud
+regroupe les tours dans des tranches adaptées à la période et calcule p50/p95
+pour le texte prêt, le premier son et l’end-to-end. Le dashboard affiche ces
+séries avec infobulles et permet de changer la métrique sans nouvelle page. Une
+seconde visualisation compare toutes les étapes — STT, RAG, Max, TTS et GM — afin
+de voir immédiatement si le p95 s’écarte de la médiane.
+
+**Les causes deviennent explorables.** Blockers, modèles, providers, navigateurs,
+personnages et actions d’expérience ne sont plus enfouis dans des phrases. Des
+graphiques séparés rendent leurs volumes comparables et la dimension technique
+peut être changée à la volée. Les indicateurs de synthèse utilisent une couleur
+sémantique pour distinguer activité normale, récupération et échec, sans masquer
+la source ou la fraîcheur.
+
+**Chaque pic peut maintenant être ramené à un tour.** Les 25 tours les plus lents
+sont triés côté serveur puis exposés dans une table de diagnostic. Un clic ou la
+touche Entrée ouvre la décomposition STT → RAG → Max LLM → TTS, ainsi que le
+temps jusqu’au texte, au premier son et à la fin du tour. Les identifiants de
+session restent raccourcis à l’écran, tandis que modèle, navigateur, blocker,
+fallback et sévérité donnent le contexte nécessaire pour reproduire le cas.
+
+**La source reste gouvernée.** Le lien mène explicitement au dashboard du projet
+PostHog `137897`. La Personal API Key et la requête HogQL restent exclusivement
+dans l’Edge Function administrateur ; Supabase conserve sa colonne séparée pour
+la parité et la persistance par `turn_id`. Aucune chaîne de livraison parallèle
+n’est ajoutée : Lovable compile et publie, Lovable Cloud exécute l’agrégation.
+
+**Leçon.** Une mesure agrégée n’explique pas une expérience. Pour rendre
+l’observabilité actionnable, il faut pouvoir passer de la tendance au segment,
+du segment au provider, puis du provider au tour concret sans changer de source
+ni perdre le contexte. Le dashboard sert désormais ce parcours d’enquête au lieu
+de juxtaposer des statistiques.
+
+**Validation.** Les cinq sélecteurs, les changements de métrique et l’ouverture
+du détail d’un tour ont été vérifiés dans le navigateur. Le build, le lint ciblé,
+les 239 tests unitaires sur 61 fichiers et la QA visuelle sont validés sans erreur
+console. Le plan et la comparaison visuelle sont conservés dans
+[`docs/plan_dashboard_posthog_interactif.md`](docs/plan_dashboard_posthog_interactif.md)
+et [`design-qa.md`](design-qa.md). La compilation Deno finale reste confiée à
+Lovable Cloud, seul environnement de publication autorisé.
 
 ### 2026-08-07 — Les réglages d’expérience cessent d’être décoratifs 🔷
 

@@ -135,6 +135,65 @@ function actionCounts(rows: EventRow[]) {
   };
 }
 
+function timeline(turns: EventRow[], range: { from: Date; to: Date }) {
+  const durationMs = range.to.getTime() - range.from.getTime();
+  const bucketMs = durationMs <= 2 * 24 * 60 * 60_000
+    ? 60 * 60_000
+    : durationMs <= 14 * 24 * 60 * 60_000
+      ? 6 * 60 * 60_000
+      : durationMs <= 45 * 24 * 60 * 60_000
+        ? 24 * 60 * 60_000
+        : 3 * 24 * 60 * 60_000;
+  const buckets = new Map<number, EventRow[]>();
+  for (const turn of turns) {
+    const timestamp = new Date(turn.timestamp).getTime();
+    if (!Number.isFinite(timestamp)) continue;
+    const bucket = Math.floor(timestamp / bucketMs) * bucketMs;
+    const bucketRows = buckets.get(bucket);
+    if (bucketRows) bucketRows.push(turn);
+    else buckets.set(bucket, [turn]);
+  }
+  return [...buckets.entries()].sort(([left], [right]) => left - right).map(([timestamp, rows]) => ({
+    timestamp: new Date(timestamp).toISOString(),
+    turns: rows.length,
+    responseReadyP50: percentile(rows.map((row) => row.responseReadyMs), 50),
+    responseReadyP95: percentile(rows.map((row) => row.responseReadyMs), 95),
+    firstSoundP50: percentile(rows.map((row) => row.firstSoundMs), 50),
+    firstSoundP95: percentile(rows.map((row) => row.firstSoundMs), 95),
+    endToEndP50: percentile(rows.map((row) => row.endToEndMs), 50),
+    endToEndP95: percentile(rows.map((row) => row.endToEndMs), 95),
+  }));
+}
+
+function slowestTurns(turns: EventRow[]) {
+  const latencyScore = (row: EventRow) => row.endToEndMs ?? row.firstSoundMs ?? row.responseReadyMs ?? -1;
+  return [...turns]
+    .filter((row) => latencyScore(row) >= 0)
+    .sort((left, right) => latencyScore(right) - latencyScore(left))
+    .slice(0, 25)
+    .map((row) => ({
+      turnId: row.turnId,
+      sessionId: row.sessionId,
+      timestamp: row.timestamp,
+      turnIndex: row.turnIndex,
+      character: row.character,
+      model: row.model,
+      stt: row.stt,
+      tts: row.tts,
+      browser: row.browser,
+      responseReadyMs: row.responseReadyMs,
+      firstSoundMs: row.firstSoundMs,
+      endToEndMs: row.endToEndMs,
+      sttMs: row.sttMs,
+      ragMs: row.ragMs,
+      maxMs: row.maxMs,
+      ttsMs: row.ttsMs,
+      blocker: row.blocker,
+      severity: row.severity,
+      fallback: row.fallback,
+    }));
+}
+
 function aggregate(rows: EventRow[], range: { period: string; from: Date; to: Date }, projectId: string, host: string) {
   const turns = rows.filter((row) => row.event === "voice_turn_completed");
   const gmPostTurns = rows.filter((row) => row.event === "prd4_gm_post_turn");
@@ -173,6 +232,8 @@ function aggregate(rows: EventRow[], range: { period: string; from: Date; to: Da
       characters: counts(turns.map((row) => row.character)),
     },
     actions: actionCounts(rows),
+    timeline: timeline(turns, range),
+    slowestTurns: slowestTurns(turns),
     turnIds: turns.map((row) => row.turnId).filter(Boolean),
   };
 }
