@@ -246,7 +246,7 @@ serve(async (req) => {
         Authorization: `Bearer ${personalApiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ query: { kind: "HogQLQuery", query, values } }),
+      body: JSON.stringify({ query: { kind: "HogQLQuery", query } }),
     });
     const payload = await response.json().catch(() => null) as { results?: unknown[][]; error?: string; detail?: string } | null;
     if (!response.ok) {
