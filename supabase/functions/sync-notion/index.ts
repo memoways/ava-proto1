@@ -87,7 +87,12 @@ const PROMPT_FIELD_ALIASES: Record<string, string[]> = {
   ],
   dynamique_conversation: ["Dynamique de la conversation"],
   sujets_sensibles: ["Sujets sensibles"],
-  profondeur_par_niveau: ["Profondeur par niveau"],
+  profondeur_par_niveau: [
+    "Références intellectuelles",
+    "References intellectuelles",
+    "Profondeur par niveau",
+    "Profondeur par niveaux",
+  ],
   timeline: ["Timeline", "Chronologie", "Historique"],
 };
 
