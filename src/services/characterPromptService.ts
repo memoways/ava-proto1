@@ -26,7 +26,7 @@ export const CHARACTER_PROMPT_FIELDS: Array<{
   { key: "ce_que_tu_sais_utilisateur", label: "Qui t'appelle", hint: "Cadrage de la relation à l'interlocuteur (champ Notion : « Qui t'appelle »)." },
   { key: "dynamique_conversation", label: "Dynamique de la conversation", hint: "Comment la conversation se déroule, rythme, retenue." },
   { key: "sujets_sensibles", label: "Sujets sensibles", hint: "Sujets délicats et manière de les aborder ou esquiver." },
-  { key: "profondeur_par_niveau", label: "Profondeur par niveau", hint: "Ce qui peut être révélé / abordé selon le niveau de confiance." },
+  { key: "profondeur_par_niveau", label: "Références intellectuelles", hint: "Références culturelles et intellectuelles du personnage (champ Notion : « Références intellectuelles »)." },
   { key: "timeline", label: "Timeline", hint: "Chronologie / historique des événements marquants du personnage. Aide à situer sa mémoire par rapport au moment présent." },
 ];
 
