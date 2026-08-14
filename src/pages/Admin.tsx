@@ -65,9 +65,19 @@ interface CharacterRow {
   updated_at: string | null;
 }
 
+interface SyncMappingWarning {
+  character?: string;
+  field: string;
+  expected_notion_property: string;
+  accepted_aliases: string[];
+  reason: "property_missing" | "property_empty";
+  message: string;
+}
+
 interface SyncCharacterReport {
   id: string;
   name: string;
+  mapping_warnings?: SyncMappingWarning[];
   page_chars: number;
   chunks_created: number;
   prompt_fields_filled: number;
@@ -85,6 +95,8 @@ interface SyncReport {
   total_embeddings_in_db?: number;
   latency_ms?: number;
   per_character?: SyncCharacterReport[];
+  sync_errors?: string[];
+  mapping_warnings?: SyncMappingWarning[];
 }
 
 export default function Admin() {
@@ -283,7 +295,15 @@ export default function Admin() {
       const data = await res.json() as Omit<SyncReport, "synced_at" | "mode">;
       setSyncReport({ ...data, synced_at: new Date().toISOString(), mode });
       clearSystemPromptCache();
-      toast.success(`Sync OK (${mode}) : ${data.characters_synced} personnage(s), ${data.total_embeddings_in_db} embeddings total`);
+      const errorCount = data.sync_errors?.length || 0;
+      const warningCount = data.mapping_warnings?.length || 0;
+      if (errorCount > 0) {
+        toast.error(`Sync partiel (${mode}) : ${errorCount} erreur(s) — détails dans le rapport ci-dessous`);
+      } else if (warningCount > 0) {
+        toast.warning(`Sync OK (${mode}) avec ${warningCount} champ(s) Notion non mappé(s) — voir le rapport`);
+      } else {
+        toast.success(`Sync OK (${mode}) : ${data.characters_synced} personnage(s), ${data.total_embeddings_in_db} embeddings total`);
+      }
       loadEmbeddings();
     } catch (err: unknown) {
       const msg = err instanceof DOMException && err.name === "AbortError"
@@ -619,6 +639,33 @@ export default function Admin() {
                       </div>
                     ))}
                   </div>
+
+                  {(syncReport.sync_errors || []).length > 0 && (
+                    <div className="border border-destructive/40 rounded-lg p-3 bg-destructive/10 space-y-1">
+                      <p className="text-sm font-medium text-destructive">
+                        ⛔ {syncReport.sync_errors!.length} erreur(s) pendant la sync — les données concernées n'ont pas été mises à jour
+                      </p>
+                      <ul className="list-disc pl-5 text-xs text-destructive space-y-1">
+                        {syncReport.sync_errors!.map((e, i) => <li key={i}>{e}</li>)}
+                      </ul>
+                    </div>
+                  )}
+
+                  {(syncReport.mapping_warnings || []).length > 0 && (
+                    <div className="border border-yellow-500/40 rounded-lg p-3 bg-yellow-500/10 space-y-1">
+                      <p className="text-sm font-medium text-yellow-400">
+                        ⚠️ {syncReport.mapping_warnings!.length} champ(s) Notion non récupéré(s)
+                      </p>
+                      <ul className="list-disc pl-5 text-xs text-yellow-200/90 space-y-1">
+                        {syncReport.mapping_warnings!.map((w, i) => (
+                          <li key={`${w.character}-${w.field}-${i}`}>
+                            <strong>{w.character || "—"}</strong> · {w.expected_notion_property} :{" "}
+                            {w.reason === "property_missing" ? "propriété absente de Notion" : "propriété vide dans Notion"} — {w.message}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                   <div className="border rounded-lg p-3 bg-muted/30">
                     <p className="text-sm font-medium">

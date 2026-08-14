@@ -96,20 +96,47 @@ const PROMPT_FIELD_ALIASES: Record<string, string[]> = {
   timeline: ["Timeline", "Chronologie", "Historique"],
 };
 
-function extractPromptFields(props: Record<string, any>): Record<string, string> {
+interface MappingWarning {
+  field: string;
+  expected_notion_property: string;
+  accepted_aliases: string[];
+  reason: "property_missing" | "property_empty";
+  message: string;
+}
+
+function extractPromptFields(
+  props: Record<string, any>,
+  characterName: string,
+): { fields: Record<string, string>; warnings: MappingWarning[] } {
   const out: Record<string, string> = {};
+  const warnings: MappingWarning[] = [];
   for (const [col, aliases] of Object.entries(PROMPT_FIELD_ALIASES)) {
     let value = "";
+    let matchedAlias: string | null = null;
+    let aliasPresent = false;
     for (const alias of aliases) {
-      if (props[alias]) {
+      if (alias in props) {
+        aliasPresent = true;
         value = extractRichText(props[alias]).trim();
-        if (value) break;
+        if (value) { matchedAlias = alias; break; }
       }
     }
     out[col] = value;
+    if (!value) {
+      const reason = aliasPresent ? "property_empty" : "property_missing";
+      const expected = aliases[0];
+      const message = aliasPresent
+        ? `« ${expected} » existe dans Notion mais est vide pour ${characterName} : remplis le champ puis relance la sync.`
+        : `Aucune propriété Notion ne correspond à « ${expected} » pour ${characterName} : renomme la propriété dans « Base Caractères AVA » (alias acceptés : ${aliases.join(" / ")}) ou fais évoluer le mapping.`;
+      warnings.push({ field: col, expected_notion_property: expected, accepted_aliases: aliases, reason, message });
+      console.warn(`[sync-notion][mapping] ${characterName} · ${col} · ${reason} · ${message}`);
+    } else if (matchedAlias && matchedAlias !== aliases[0]) {
+      console.log(`[sync-notion][mapping] ${characterName} · ${col} mappé via alias de secours « ${matchedAlias} »`);
+    }
   }
-  return out;
+  return { fields: out, warnings };
 }
+
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -550,6 +577,7 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
     // ========== SYNC CHARACTERS ==========
     const perCharacter: any[] = [];
     const characterSyncErrors: string[] = [];
+    const mappingWarnings: (MappingWarning & { character: string })[] = [];
     if (charactersDbId) {
       console.log(`[sync-notion] Syncing characters DB: ${charactersDbId} (mode=${mode})`);
       const pages = await fetchNotionDatabase(charactersDbId, {
@@ -615,8 +643,11 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
 
       let filledCount = 0;
       let situationSummary = '';
+      let fieldWarnings: MappingWarning[] = [];
       if (doFields) {
-        const promptFields = extractPromptFields(props);
+        const { fields: promptFields, warnings } = extractPromptFields(props, name);
+        fieldWarnings = warnings;
+        mappingWarnings.push(...warnings.map((w) => ({ character: name, ...w })));
         filledCount = Object.values(promptFields).filter((v) => v && v.trim()).length;
         situationSummary = await generateSituationSummary(name, pageContent, promptFields);
 
@@ -631,8 +662,14 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
             },
             { onConflict: 'character_id' },
           );
-        if (promptErr) console.error(`[sync-notion] character_prompts upsert error for ${name}:`, promptErr);
+        if (promptErr) {
+          console.error(`[sync-notion] character_prompts upsert error for ${name}:`, promptErr);
+          characterSyncErrors.push(
+            `${name}: écriture des champs éditoriaux refusée (${promptErr.message}) — vérifie la table character_prompts puis relance la sync`,
+          );
+        }
       }
+
 
       let chunksCreated = 0;
       if (doRag) {
@@ -677,6 +714,7 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
         chunks_created: chunksCreated,
         summary_chars: situationSummary.length,
         prompt_fields_filled: filledCount,
+        mapping_warnings: fieldWarnings,
       });
       }
     }
@@ -738,6 +776,8 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
     return new Response(JSON.stringify({
       success: true,
       characters_synced: perCharacter.length,
+      sync_errors: characterSyncErrors,
+      mapping_warnings: mappingWarnings,
       per_character: perCharacter,
       videos_synced: videosSynced,
       per_video: perVideo,

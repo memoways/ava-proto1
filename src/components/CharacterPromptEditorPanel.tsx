@@ -52,6 +52,8 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
   const [savedLegacyPrompt, setSavedLegacyPrompt] = useState("");
   const [savingLegacy, setSavingLegacy] = useState(false);
   const [syncReport, setSyncReport] = useState<CharacterSyncReport | null>(null);
+  const [mappingWarnings, setMappingWarnings] = useState<string[]>([]);
+  const [syncErrors, setSyncErrors] = useState<string[]>([]);
 
 
   // Resolve character id from name if necessary
@@ -138,14 +140,31 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
           mode: "fields_only",
         }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const raw = await res.text();
+        let detail = raw;
+        try { detail = JSON.parse(raw).error || raw; } catch { /* texte brut */ }
+        throw new Error(detail);
+      }
       const data = await res.json();
       const item = data.per_character?.[0];
-      toast.success(`Champs éditoriaux resyncés : ${item?.prompt_fields_filled || 0}/8 champs, résumé ${item?.summary_chars || 0} chars (RAG inchangé)`);
+      const returnedErrors: string[] = data.sync_errors || [];
+      const warnings: { message: string }[] = item?.mapping_warnings || data.mapping_warnings || [];
+      setMappingWarnings(warnings.map((w) => w.message));
+      setSyncErrors(returnedErrors);
+      if (returnedErrors.length > 0) {
+        toast.error(`Resync partiel : ${returnedErrors[0]}`);
+      } else if (warnings.length > 0) {
+        toast.warning(`Resync OK mais ${warnings.length} champ(s) Notion non récupéré(s) — détails ci-dessous`);
+      } else {
+        toast.success(`Champs éditoriaux resyncés : ${item?.prompt_fields_filled || 0}/8 champs, résumé ${item?.summary_chars || 0} chars (RAG inchangé)`);
+      }
       clearSystemPromptCache();
       await loadActive(resolvedId);
     } catch (err: any) {
-      toast.error("Resync échoué : " + (err.message || err));
+      const detail = err?.message || String(err);
+      setSyncErrors([`Resync échoué : ${detail}. Vérifie la connexion Notion, tes droits admin, puis relance.`]);
+      toast.error("Resync échoué : " + detail);
     }
     setResyncing(false);
   }
@@ -225,6 +244,24 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
           <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges}>
             {saving ? "Sauvegarde…" : "Sauvegarder"}
           </Button>
+        </div>
+      )}
+
+      {syncErrors.length > 0 && (
+        <div className="rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive space-y-1">
+          <p className="font-medium">⛔ Le dernier resync Notion a échoué (données non mises à jour)</p>
+          <ul className="list-disc pl-4 space-y-0.5">
+            {syncErrors.map((e, i) => <li key={i}>{e}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {mappingWarnings.length > 0 && (
+        <div className="rounded border border-yellow-700/50 bg-yellow-900/30 px-3 py-2 text-xs text-yellow-300 space-y-1">
+          <p className="font-medium">⚠️ Champs Notion non récupérés au dernier resync</p>
+          <ul className="list-disc pl-4 space-y-0.5">
+            {mappingWarnings.map((m, i) => <li key={i}>{m}</li>)}
+          </ul>
         </div>
       )}
 
