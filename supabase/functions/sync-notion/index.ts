@@ -642,8 +642,11 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
 
       let filledCount = 0;
       let situationSummary = '';
+      let fieldWarnings: MappingWarning[] = [];
       if (doFields) {
-        const promptFields = extractPromptFields(props);
+        const { fields: promptFields, warnings } = extractPromptFields(props, name);
+        fieldWarnings = warnings;
+        mappingWarnings.push(...warnings.map((w) => ({ character: name, ...w })));
         filledCount = Object.values(promptFields).filter((v) => v && v.trim()).length;
         situationSummary = await generateSituationSummary(name, pageContent, promptFields);
 
@@ -658,8 +661,14 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
             },
             { onConflict: 'character_id' },
           );
-        if (promptErr) console.error(`[sync-notion] character_prompts upsert error for ${name}:`, promptErr);
+        if (promptErr) {
+          console.error(`[sync-notion] character_prompts upsert error for ${name}:`, promptErr);
+          characterSyncErrors.push(
+            `${name}: écriture des champs éditoriaux refusée (${promptErr.message}) — vérifie la table character_prompts puis relance la sync`,
+          );
+        }
       }
+
 
       let chunksCreated = 0;
       if (doRag) {
