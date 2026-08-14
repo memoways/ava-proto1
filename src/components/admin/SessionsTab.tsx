@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity, ScanSearch, FlaskConical } from "lucide-react";
 import { Link } from "react-router-dom";
 import { isQuestionLike } from "@/services/ragQuestionCorpus";
+import { adminTabPath } from "@/services/adminNavigation";
 import type { QuestionnaireData } from "@/types";
 
 /** Onglet admin où corriger la cause racine selon le type de fallback GM. */
@@ -233,10 +234,12 @@ function GmFallbackChart({ log }: { log: AdminConversationMessage[] }) {
 
 interface Props {
   sessions: SessionRow[];
+  selectedSessionId: string | null;
+  onSelectSession: (sessionId: string | null) => void;
   onRefresh: () => void;
 }
 
-export default function SessionsTab({ sessions, onRefresh }: Props) {
+export default function SessionsTab({ sessions, selectedSessionId, onSelectSession, onRefresh }: Props) {
   const [selected, setSelected] = useState<SessionRow | null>(null);
   const [editingName, setEditingName] = useState<string | null>(null);
   const [nameInput, setNameInput] = useState("");
@@ -246,6 +249,15 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
   const [pinnedMessageIndexes, setPinnedMessageIndexes] = useState<Set<number>>(new Set());
   const [pinningMessageIndexes, setPinningMessageIndexes] = useState<Set<number>>(new Set());
   const [pinnedStorageReady, setPinnedStorageReady] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!selectedSessionId) {
+      setSelected(null);
+      return;
+    }
+    const session = sessions.find((candidate) => candidate.id === selectedSessionId);
+    if (session) setSelected(session);
+  }, [selectedSessionId, sessions]);
 
   useEffect(() => {
     if (!selected) {
@@ -313,7 +325,7 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
       toast.error("Erreur suppression: " + error.message);
     } else {
       toast.success("Session supprimée");
-      if (selected?.id === id) setSelected(null);
+      if (selected?.id === id) onSelectSession(null);
       onRefresh();
     }
     setDeleting(null);
@@ -357,7 +369,10 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
               className={`relative group w-full text-left p-3 border-b hover:bg-accent/50 transition-colors cursor-pointer ${
                 selected?.id === s.id ? "bg-accent" : ""
               }`}
-              onClick={() => setSelected(s)}
+              onClick={() => {
+                setSelected(s);
+                onSelectSession(s.id);
+              }}
             >
               <div className="flex justify-between items-start">
                 <div>
@@ -391,7 +406,7 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
               {/* Action buttons on hover */}
               <div className="absolute right-2 top-2 hidden group-hover:flex gap-1">
                 <Link
-                  to={`/admin?tab=latency&session=${s.id}`}
+                  to={`${adminTabPath("latency")}?session=${encodeURIComponent(s.id)}`}
                   onClick={(e) => e.stopPropagation()}
                   className="p-1 rounded bg-muted/80 hover:bg-muted text-muted-foreground"
                   title="Voir latences & blocages"
@@ -471,13 +486,13 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
               </h2>
               <div className="flex items-center gap-2">
                 {selected.diagnostic_trace_enabled && (
-                  <Link to={`/admin?tab=pipeline&session=${selected.id}`}>
+                  <Link to={`${adminTabPath("pipeline")}?session=${encodeURIComponent(selected.id)}`}>
                     <Button size="sm" variant="outline">
                       <ScanSearch className="mr-1 h-3 w-3" /> Analyser les tours
                     </Button>
                   </Link>
                 )}
-                <Link to={`/admin?tab=latency&session=${selected.id}`}>
+                <Link to={`${adminTabPath("latency")}?session=${encodeURIComponent(selected.id)}`}>
                   <Button size="sm" variant="outline">
                     <Activity className="w-3 h-3 mr-1" /> Voir latences
                   </Button>
@@ -639,7 +654,7 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
                           {msg.role !== "user" && selected.diagnostic_trace_enabled && causalTurn > 0 && (
                             <div className="mt-1">
                               <Link
-                                to={`/admin?tab=pipeline&session=${selected.id}&turn=${causalTurn}`}
+                                to={`${adminTabPath("pipeline")}?session=${encodeURIComponent(selected.id)}&turn=${causalTurn}`}
                                 className="inline-flex items-center gap-1 text-[11px] font-medium text-violet-300 hover:underline"
                               >
                                 <ScanSearch className="h-3 w-3" /> Analyser ce tour
@@ -722,7 +737,7 @@ export default function SessionsTab({ sessions, onRefresh }: Props) {
                                       {FALLBACK_TARGET_TAB[fb.kind] && (
                                         <div className="pt-1.5 border-t border-border">
                                           <Link
-                                            to={`/admin?tab=${FALLBACK_TARGET_TAB[fb.kind].tab}`}
+                                            to={adminTabPath(FALLBACK_TARGET_TAB[fb.kind].tab)}
                                             className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
                                           >
                                             <ExternalLink className="h-3 w-3" />

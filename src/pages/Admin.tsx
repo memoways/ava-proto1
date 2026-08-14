@@ -1,6 +1,6 @@
 import { getCachedSession } from "@/services/gameAuth";
-import { useState, useEffect, useMemo, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,15 @@ import StreamingAvatarConfigTab from "@/components/StreamingAvatarConfigTab";
 import ExperienceArchitectureTab from "@/components/ExperienceArchitectureTab";
 import { Switch } from "@/components/ui/switch";
 import { trackEvent } from "@/services/posthogService";
-import { LEGACY_GROUP, TAB_GROUPS } from "@/services/adminNavigation";
+import {
+  DEFAULT_ADMIN_TAB,
+  LEGACY_GROUP,
+  TAB_GROUPS,
+  adminSessionPath,
+  adminTabPath,
+  findAdminTab,
+  resolveAdminPath,
+} from "@/services/adminNavigation";
 import {
   getOutputSettings,
   loadOutputSettingsFromDB,
@@ -112,81 +120,90 @@ export default function Admin() {
   const [editingChar, setEditingChar] = useState<CharacterRow | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
   const [savingChar, setSavingChar] = useState(false);
-  const initialLocation = useMemo(() => {
-    const requested = new URLSearchParams(window.location.search).get("tab");
-    const groups = requested === "validator" || requested === "metrics" ? [...TAB_GROUPS, LEGACY_GROUP] : TAB_GROUPS;
-    const group = groups.find((candidate) => candidate.tabs.some((tab) => tab.id === requested));
-    return group && requested ? { group: group.id, tab: requested } : { group: "data", tab: "sessions" };
-  }, []);
-  const [activeGroup, setActiveGroup] = useState(initialLocation.group);
-  const [activeTab, setActiveTab] = useState(initialLocation.tab);
-  const appliedUrlTabRef = useRef<string | null>(initialLocation.tab);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const pathLocation = useMemo(() => resolveAdminPath(location.pathname), [location.pathname]);
+  const legacyTab = searchParams.get("tab");
+  const requestedLocation = legacyTab ? findAdminTab(legacyTab) : null;
+  const defaultLocation = findAdminTab(DEFAULT_ADMIN_TAB)!;
+  const activeGroup = requestedLocation?.group.id ?? pathLocation?.group ?? defaultLocation.group.id;
+  const activeTab = requestedLocation?.tab.id ?? pathLocation?.tab ?? defaultLocation.tab.id;
+  const selectedSessionId = activeTab === "sessions" ? pathLocation?.sessionId ?? null : null;
   const [outputMode, setOutputMode] = useState<OutputMode>(() => getOutputSettings().mode);
   const legacyVisible = searchParams.get("legacy") === "1"
-    || searchParams.get("tab") === "validator"
-    || searchParams.get("tab") === "metrics";
+    || activeGroup === "legacy";
   const availableGroups = useMemo(
     () => legacyVisible ? [...TAB_GROUPS, LEGACY_GROUP] : TAB_GROUPS,
     [legacyVisible],
   );
 
-  // Lire ?tab=... au montage et lors d'un changement d'URL (ex: lien depuis le tooltip GM fallback)
+  // Canonicaliser les anciennes URL ?tab=... et les chemins admin incomplets/inconnus.
   useEffect(() => {
-    const requested = searchParams.get("tab");
-    if (!requested) return;
-    for (const group of availableGroups) {
-      const found = group.tabs.find((t) => t.id === requested);
-      if (found) {
-        appliedUrlTabRef.current = requested;
-        setActiveGroup(group.id);
-        setActiveTab(requested);
-        if (group.id === "legacy") {
-          trackEvent("admin_legacy_view_opened", { tab: requested });
-          void supabase.auth.getUser().then(({ data }) => {
-            if (!data.user) return;
-            void supabase.from("admin_legacy_access_log" as never).insert({
-              user_id: data.user.id,
-              tab: requested,
-            } as never);
-          });
-        }
-        return;
-      }
+    if (requestedLocation) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("tab");
+      navigate({ pathname: adminTabPath(requestedLocation.tab.id), search: nextParams.toString() }, { replace: true });
+      return;
     }
-  }, [searchParams, availableGroups]);
+    if (legacyTab) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("tab");
+      navigate({
+        pathname: pathLocation ? location.pathname : adminTabPath(DEFAULT_ADMIN_TAB),
+        search: nextParams.toString(),
+      }, { replace: true });
+      return;
+    }
+    if (!pathLocation) {
+      navigate({ pathname: adminTabPath(DEFAULT_ADMIN_TAB), search: searchParams.toString() }, { replace: true });
+    }
+  }, [legacyTab, location.pathname, navigate, pathLocation, requestedLocation, searchParams]);
 
-  // Quand l'utilisateur change d'onglet manuellement, refléter dans l'URL (sans push history)
   useEffect(() => {
-    const urlTab = searchParams.get("tab");
-    if (urlTab === activeTab) return;
-    // Un onglet demandé par l'URL et pas encore appliqué a la priorité : ne pas l'écraser.
-    const requestedIsKnown = availableGroups.some((group) => group.tabs.some((tab) => tab.id === urlTab));
-    if (requestedIsKnown && appliedUrlTabRef.current !== urlTab) return;
-    appliedUrlTabRef.current = activeTab;
-    const next = new URLSearchParams(searchParams);
-    next.set("tab", activeTab);
-    setSearchParams(next, { replace: true });
-  }, [activeTab, searchParams, setSearchParams, availableGroups]);
+    if (activeGroup !== "legacy") return;
+    trackEvent("admin_legacy_view_opened", { tab: activeTab });
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) return;
+      void supabase.from("admin_legacy_access_log" as never).insert({
+        user_id: data.user.id,
+        tab: activeTab,
+      } as never);
+    });
+  }, [activeGroup, activeTab]);
 
-  useEffect(() => {
-    hydrateAllSettings(); // Load all settings from DB into localStorage
-    void loadOutputSettingsFromDB().then((settings) => setOutputMode(settings.mode));
-    loadSessions();
-    loadEmbeddings();
-    loadCharacters();
-  }, []);
+  const navigateToTab = (tabId: string) => navigate(adminTabPath(tabId));
 
-  async function loadSessions() {
+  const loadSessions = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
       .from("sessions")
       .select("*")
       .order("started_at", { ascending: false })
       .limit(50);
-    setSessions((data as unknown as SessionRow[]) || []);
+    const recentSessions = (data as unknown as SessionRow[]) || [];
+    if (selectedSessionId && !recentSessions.some((session) => session.id === selectedSessionId)) {
+      const { data: requestedSession } = await supabase
+        .from("sessions")
+        .select("*")
+        .eq("id", selectedSessionId)
+        .maybeSingle();
+      if (requestedSession) recentSessions.push(requestedSession as unknown as SessionRow);
+    }
+    setSessions(recentSessions);
     setLoading(false);
-  }
+  }, [selectedSessionId]);
+
+  useEffect(() => {
+    hydrateAllSettings(); // Load all settings from DB into localStorage
+    void loadOutputSettingsFromDB().then((settings) => setOutputMode(settings.mode));
+    loadEmbeddings();
+    loadCharacters();
+  }, []);
+
+  useEffect(() => {
+    void loadSessions();
+  }, [loadSessions]);
 
   async function loadEmbeddings() {
     const { data } = await supabase
@@ -353,8 +370,7 @@ export default function Admin() {
             <button
               key={group.id}
               onClick={() => {
-                setActiveGroup(group.id);
-                setActiveTab(group.tabs[0].id);
+                navigateToTab(group.tabs[0].id);
               }}
               className={`shrink-0 whitespace-nowrap rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
                 activeGroup === group.id
@@ -369,7 +385,7 @@ export default function Admin() {
 
 
         {/* ===== TABS WITHIN GROUP ===== */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={navigateToTab} className="w-full">
           {activeGroup === "tech" && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/20 px-4 py-3">
               <div>
@@ -425,7 +441,12 @@ export default function Admin() {
 
           {/* ==================== SESSIONS ==================== */}
           <TabsContent value="sessions">
-            <SessionsTab sessions={sessions} onRefresh={loadSessions} />
+            <SessionsTab
+              sessions={sessions}
+              selectedSessionId={selectedSessionId}
+              onSelectSession={(sessionId) => navigate(sessionId ? adminSessionPath(sessionId) : adminTabPath("sessions"))}
+              onRefresh={loadSessions}
+            />
           </TabsContent>
 
           {/* ==================== EMBEDDINGS ==================== */}

@@ -30,7 +30,7 @@ const App = () => (
           <Route path="/" element={<IndexPRD4 />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/confidentialite" element={<Privacy />} />
-          <Route path="/admin" element={<AdminAuthGate><Admin /></AdminAuthGate>} />
+          <Route path="/admin/*" element={<AdminAuthGate><Admin /></AdminAuthGate>} />
           {LatencyTelemetryPreview && <Route path="/__preview/latency-telemetry" element={<Suspense fallback={null}><LatencyTelemetryPreview /></Suspense>} />}
           {RAGConfigPreview && <Route path="/__preview/rag-config" element={<Suspense fallback={null}><RAGConfigPreview /></Suspense>} />}
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

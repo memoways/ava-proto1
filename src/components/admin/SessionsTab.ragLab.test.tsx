@@ -45,7 +45,16 @@ describe("SessionsTab — envoi vers le laboratoire RAG", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("permet d’épingler une question utilisateur depuis l’historique", async () => {
-    render(<MemoryRouter><SessionsTab sessions={[session]} onRefresh={vi.fn()} /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <SessionsTab
+          sessions={[session]}
+          selectedSessionId={null}
+          onSelectSession={vi.fn()}
+          onRefresh={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
     fireEvent.click(screen.getByText("Session test"));
 
     const checkbox = await screen.findByRole("checkbox", { name: "Envoyer question dans le laboratoire RAG" });
