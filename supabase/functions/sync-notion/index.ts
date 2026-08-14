@@ -96,20 +96,47 @@ const PROMPT_FIELD_ALIASES: Record<string, string[]> = {
   timeline: ["Timeline", "Chronologie", "Historique"],
 };
 
-function extractPromptFields(props: Record<string, any>): Record<string, string> {
+interface MappingWarning {
+  field: string;
+  expected_notion_property: string;
+  accepted_aliases: string[];
+  reason: "property_missing" | "property_empty";
+  message: string;
+}
+
+function extractPromptFields(
+  props: Record<string, any>,
+  characterName: string,
+): { fields: Record<string, string>; warnings: MappingWarning[] } {
   const out: Record<string, string> = {};
+  const warnings: MappingWarning[] = [];
   for (const [col, aliases] of Object.entries(PROMPT_FIELD_ALIASES)) {
     let value = "";
+    let matchedAlias: string | null = null;
+    let aliasPresent = false;
     for (const alias of aliases) {
-      if (props[alias]) {
+      if (alias in props) {
+        aliasPresent = true;
         value = extractRichText(props[alias]).trim();
-        if (value) break;
+        if (value) { matchedAlias = alias; break; }
       }
     }
     out[col] = value;
+    if (!value) {
+      const reason = aliasPresent ? "property_empty" : "property_missing";
+      const expected = aliases[0];
+      const message = aliasPresent
+        ? `« ${expected} » existe dans Notion mais est vide pour ${characterName} : remplis le champ puis relance la sync.`
+        : `Aucune propriété Notion ne correspond à « ${expected} » pour ${characterName} : renomme la propriété dans « Base Caractères AVA » (alias acceptés : ${aliases.join(" / ")}) ou fais évoluer le mapping.`;
+      warnings.push({ field: col, expected_notion_property: expected, accepted_aliases: aliases, reason, message });
+      console.warn(`[sync-notion][mapping] ${characterName} · ${col} · ${reason} · ${message}`);
+    } else if (matchedAlias && matchedAlias !== aliases[0]) {
+      console.log(`[sync-notion][mapping] ${characterName} · ${col} mappé via alias de secours « ${matchedAlias} »`);
+    }
   }
-  return out;
+  return { fields: out, warnings };
 }
+
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
