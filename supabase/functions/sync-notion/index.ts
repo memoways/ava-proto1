@@ -577,6 +577,7 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
     // ========== SYNC CHARACTERS ==========
     const perCharacter: any[] = [];
     const characterSyncErrors: string[] = [];
+    const mappingWarnings: (MappingWarning & { character: string })[] = [];
     if (charactersDbId) {
       console.log(`[sync-notion] Syncing characters DB: ${charactersDbId} (mode=${mode})`);
       const pages = await fetchNotionDatabase(charactersDbId, {
@@ -713,6 +714,7 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
         chunks_created: chunksCreated,
         summary_chars: situationSummary.length,
         prompt_fields_filled: filledCount,
+        mapping_warnings: fieldWarnings,
       });
       }
     }
@@ -774,6 +776,8 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
     return new Response(JSON.stringify({
       success: true,
       characters_synced: perCharacter.length,
+      sync_errors: characterSyncErrors,
+      mapping_warnings: mappingWarnings,
       per_character: perCharacter,
       videos_synced: videosSynced,
       per_video: perVideo,
