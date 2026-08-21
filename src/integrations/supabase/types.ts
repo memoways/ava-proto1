@@ -54,7 +54,15 @@ export type Database = {
           updated_at?: string
           value?: Json
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "admin_settings_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "environments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       admin_users: {
         Row: {
@@ -75,7 +83,15 @@ export type Database = {
           display_name?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "admin_users_default_environment_id_fkey"
+            columns: ["default_environment_id"]
+            isOneToOne: false
+            referencedRelation: "environments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audio_latencies: {
         Row: {
@@ -126,7 +142,15 @@ export type Database = {
           tts_text_len?: number | null
           turn_index?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "audio_latencies_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "environments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       character_prompts: {
         Row: {
@@ -180,6 +204,13 @@ export type Database = {
             columns: ["character_id"]
             isOneToOne: false
             referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_prompts_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "environments"
             referencedColumns: ["id"]
           },
         ]
@@ -243,6 +274,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "character_runtime_profiles_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "environments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "character_runtime_profiles_notion_character_id_fkey"
             columns: ["notion_character_id"]
@@ -403,6 +441,27 @@ export type Database = {
           },
         ]
       }
+      environments: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          label: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          type?: string
+        }
+        Relationships: []
+      }
       experience_events: {
         Row: {
           character_key: string | null
@@ -505,6 +564,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "experience_orchestration_versions_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "environments"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "experience_orchestration_versions_source_version_id_fkey"
             columns: ["source_version_id"]
             isOneToOne: false
@@ -512,27 +578,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      environments: {
-        Row: {
-          created_at: string
-          id: string
-          label: string
-          type: string
-        }
-        Insert: {
-          created_at?: string
-          id: string
-          label: string
-          type: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          label?: string
-          type?: string
-        }
-        Relationships: []
       }
       gameplay_steps: {
         Row: {
@@ -881,9 +926,9 @@ export type Database = {
           ava_start_variant: string | null
           branch: string | null
           campaign_id: string | null
+          context_type: string
           conversation_log: Json | null
           conversation_memory: Json
-          context_type: string
           diagnostic_trace_enabled: boolean
           duration_seconds: number | null
           ended_at: string | null
@@ -930,9 +975,9 @@ export type Database = {
           ava_start_variant?: string | null
           branch?: string | null
           campaign_id?: string | null
+          context_type?: string
           conversation_log?: Json | null
           conversation_memory?: Json
-          context_type?: string
           diagnostic_trace_enabled?: boolean
           duration_seconds?: number | null
           ended_at?: string | null
@@ -979,9 +1024,9 @@ export type Database = {
           ava_start_variant?: string | null
           branch?: string | null
           campaign_id?: string | null
+          context_type?: string
           conversation_log?: Json | null
           conversation_memory?: Json
-          context_type?: string
           diagnostic_trace_enabled?: boolean
           duration_seconds?: number | null
           ended_at?: string | null
@@ -1023,6 +1068,13 @@ export type Database = {
           variante_onboarding?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "sessions_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "environments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sessions_orchestration_version_id_fkey"
             columns: ["orchestration_version_id"]
@@ -1153,7 +1205,15 @@ export type Database = {
           validator_model?: string | null
           voice_modality?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "turn_latencies_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "environments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

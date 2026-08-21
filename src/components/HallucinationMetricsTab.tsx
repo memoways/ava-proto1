@@ -28,11 +28,12 @@ const LOCAL_TRACE_KEY = "ava_pipeline_last_trace";
 function extractTraces(log: Json | null): ConversationValidationTrace[] {
   if (!Array.isArray(log)) return [];
   const traces: ConversationValidationTrace[] = [];
-  for (const entry of log) {
-    if (!entry || typeof entry !== "object") continue;
+  for (const rawEntry of log) {
+    if (!rawEntry || typeof rawEntry !== "object" || Array.isArray(rawEntry)) continue;
+    const entry = rawEntry as Record<string, Json>;
     if (entry.role && entry.role !== "max") continue;
     if (entry.validation && typeof entry.validation === "object") {
-      traces.push(entry.validation as ConversationValidationTrace);
+      traces.push(entry.validation as unknown as ConversationValidationTrace);
     }
   }
   return traces;
