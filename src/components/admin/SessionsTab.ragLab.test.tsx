@@ -39,6 +39,11 @@ const session: SessionRow = {
   name: "Session test",
   admin_note: null,
   personnage_appele: "Max",
+  environment_id: "prod",
+  context_type: "public",
+  campaign_id: null,
+  tester_label: null,
+  started_by_user_id: null,
 };
 
 describe("SessionsTab — envoi vers le laboratoire RAG", () => {
