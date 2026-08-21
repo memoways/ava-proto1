@@ -52,7 +52,13 @@ describe("posthogService", () => {
     expect(mocks.capture).toHaveBeenCalledWith("$pageview", expect.objectContaining({
       $current_url: expect.any(String),
     }));
-    expect(mocks.capture).toHaveBeenCalledWith("voice_turn_completed", { session_id: "session-test" });
+    expect(mocks.capture).toHaveBeenCalledWith("voice_turn_completed", expect.objectContaining({
+      session_id: "session-test",
+      environment: "prod",
+      context_type: "public",
+      campaign: null,
+      started_by: "public",
+    }));
   });
 
   it("keeps redacted technical errors while removing free text", async () => {
@@ -66,11 +72,13 @@ describe("posthogService", () => {
       nested: { transcript: "contenu dicté", latency_ms: 120 },
     });
 
-    expect(mocks.capture).toHaveBeenCalledWith("voice_error", {
+    expect(mocks.capture).toHaveBeenCalledWith("voice_error", expect.objectContaining({
       provider: "Deepgram",
       error_message: "Request failed with Bearer [REDACTED]",
       nested: { latency_ms: 120 },
-    });
+      environment: "prod",
+      context_type: "public",
+    }));
   });
 
   it("queues early telemetry until the asynchronously loaded SDK is ready", async () => {
@@ -81,7 +89,11 @@ describe("posthogService", () => {
     identifyUser("session-early", { variant: "prd4" });
 
     await vi.waitFor(() => {
-      expect(mocks.capture).toHaveBeenCalledWith("prd4_phase_changed", { phase: "welcome" });
+      expect(mocks.capture).toHaveBeenCalledWith("prd4_phase_changed", expect.objectContaining({
+        phase: "welcome",
+        environment: "prod",
+        context_type: "public",
+      }));
       expect(mocks.identify).toHaveBeenCalledWith("session-early", { variant: "prd4" });
     });
   });

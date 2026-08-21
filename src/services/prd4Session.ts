@@ -7,6 +7,7 @@ import type { ConversationMessage, UserRoleProfile } from "@/types";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { ensureGameAuth } from "@/services/gameAuth";
 import { trackEvent } from "@/services/posthogService";
+import { getRuntimeContext } from "@/services/environmentContext";
 
 type SessionInsert = Database["public"]["Tables"]["sessions"]["Insert"];
 
@@ -24,12 +25,18 @@ export async function createPRD4Session(
   extra?: SessionInsert,
 ): Promise<string> {
   await ensureGameAuth();
+  const runtime = getRuntimeContext();
   const session: SessionInsert = {
     started_at: new Date().toISOString(),
     personnage_appele: character,
     player_role: (userRole as unknown as Json) ?? null,
     modalite_voix: "push_to_talk",
     ...extra,
+    environment_id: runtime.environmentId,
+    context_type: runtime.contextType,
+    campaign_id: runtime.campaignId,
+    tester_label: runtime.testerLabel,
+    started_by_user_id: runtime.startedByUserId,
   };
   const { data, error } = await supabase
     .from("sessions")

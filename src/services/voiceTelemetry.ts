@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/services/posthogService";
 import type { BrowserDiagnostics } from "@/services/browserCapabilities";
 import type { OnboardingVariant, VoiceModality } from "@/types";
+import { getRuntimeContext } from "@/services/environmentContext";
 
 export type VoiceBlockerStep =
   | "stt"
@@ -265,6 +266,7 @@ export function buildVoiceTurnCompletedPayload(input: VoiceTurnCompletedInput): 
 }
 
 export function recordVoiceTurnCompleted(payload: VoiceTurnCompletedPayload): void {
+  const runtime = getRuntimeContext();
   safe(() => trackEvent("voice_turn_completed", payload as unknown as Record<string, unknown>));
   safe(() => recordAvaLatencyEvents(payload));
   safe(() => {
@@ -278,6 +280,8 @@ export function recordVoiceTurnCompleted(payload: VoiceTurnCompletedPayload): vo
         event_name: "voice_turn_completed",
         severity: payload.severity,
         blocker_step: payload.blocker_step,
+        environment_id: runtime.environmentId,
+        context_type: runtime.contextType,
         metadata_json: payload,
       } as never)
       .then(({ error }) => {
@@ -399,6 +403,7 @@ function recordAvaLatencyEvents(payload: VoiceTurnCompletedPayload): void {
 }
 
 export function recordVoiceError(record: VoiceErrorRecord): void {
+  const runtime = getRuntimeContext();
   const browser = detectBrowserFamily(record.browser?.userAgent);
   const payload = {
     ...record,
@@ -423,6 +428,8 @@ export function recordVoiceError(record: VoiceErrorRecord): void {
         error_message: record.error_message?.slice(0, 500) ?? null,
         recoverable: record.recoverable ?? true,
         fallback_used: record.fallback_used ?? null,
+        environment_id: runtime.environmentId,
+        context_type: runtime.contextType,
         metadata_json: payload,
       } as never)
       .then(({ error }) => {

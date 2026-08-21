@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { loadEnvironmentSetting, readEnvironmentStorage, saveEnvironmentSetting } from "@/services/environmentContext";
 import type {
   OutputSettings,
   StreamingAvatarProviderId,
@@ -32,7 +32,7 @@ export const streamingAvatarDefaults: StreamingAvatarSettings = {
 
 function readLocal<T>(key: string, defaults: T): T {
   try {
-    const stored = localStorage.getItem(key);
+    const stored = readEnvironmentStorage(key);
     if (stored) return { ...defaults, ...JSON.parse(stored) };
   } catch {
     // Keep safe defaults when local storage is unavailable or malformed.
@@ -41,32 +41,11 @@ function readLocal<T>(key: string, defaults: T): T {
 }
 
 async function loadSetting<T>(key: string, defaults: T): Promise<T> {
-  try {
-    const { data, error } = await supabase
-      .from("admin_settings" as never)
-      .select("value")
-      .eq("key", key)
-      .maybeSingle();
-    if (!error && data) {
-      const value = { ...defaults, ...((data as { value: T }).value ?? {}) };
-      localStorage.setItem(key, JSON.stringify(value));
-      return value;
-    }
-  } catch (error) {
-    console.warn(`[StreamingAvatar settings] load ${key} failed`, error);
-  }
-  return readLocal(key, defaults);
+  return loadEnvironmentSetting(key, defaults);
 }
 
 async function saveSetting<T>(key: string, value: T): Promise<void> {
-  localStorage.setItem(key, JSON.stringify(value));
-  const { error } = await supabase
-    .from("admin_settings" as never)
-    .upsert(
-      { key, value, updated_at: new Date().toISOString() } as never,
-      { onConflict: "key" },
-    );
-  if (error) throw error;
+  await saveEnvironmentSetting(key, value);
 }
 
 function normalizeProvider(value: unknown): StreamingAvatarProviderId {

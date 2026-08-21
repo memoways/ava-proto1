@@ -57,3 +57,6 @@ verify_jwt = false
 
 [functions.posthog-latency-stats]
 verify_jwt = false
+
+[functions.verify-public-access]
+verify_jwt = false

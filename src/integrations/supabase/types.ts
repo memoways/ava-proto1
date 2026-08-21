@@ -37,26 +37,52 @@ export type Database = {
       }
       admin_settings: {
         Row: {
+          environment_id: string
           key: string
           updated_at: string
           value: Json
         }
         Insert: {
+          environment_id?: string
           key: string
           updated_at?: string
           value?: Json
         }
         Update: {
+          environment_id?: string
           key?: string
           updated_at?: string
           value?: Json
         }
         Relationships: []
       }
-      audio_latencies: {
+      admin_users: {
         Row: {
           created_at: string
+          default_environment_id: string
+          display_name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_environment_id: string
+          display_name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          default_environment_id?: string
+          display_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      audio_latencies: {
+        Row: {
+          context_type: string
+          created_at: string
           direction: string
+          environment_id: string
           id: string
           metadata_json: Json | null
           session_id: string | null
@@ -69,8 +95,10 @@ export type Database = {
           turn_index: number | null
         }
         Insert: {
+          context_type?: string
           created_at?: string
           direction: string
+          environment_id?: string
           id?: string
           metadata_json?: Json | null
           session_id?: string | null
@@ -83,8 +111,10 @@ export type Database = {
           turn_index?: number | null
         }
         Update: {
+          context_type?: string
           created_at?: string
           direction?: string
+          environment_id?: string
           id?: string
           metadata_json?: Json | null
           session_id?: string | null
@@ -105,6 +135,7 @@ export type Database = {
           character_id: string
           created_at: string
           dynamique_conversation: string
+          environment_id: string
           identite_fondamentale: string
           profondeur_par_niveau: string
           qui_tu_es: string
@@ -119,6 +150,7 @@ export type Database = {
           character_id: string
           created_at?: string
           dynamique_conversation?: string
+          environment_id?: string
           identite_fondamentale?: string
           profondeur_par_niveau?: string
           qui_tu_es?: string
@@ -133,6 +165,7 @@ export type Database = {
           character_id?: string
           created_at?: string
           dynamique_conversation?: string
+          environment_id?: string
           identite_fondamentale?: string
           profondeur_par_niveau?: string
           qui_tu_es?: string
@@ -145,7 +178,7 @@ export type Database = {
           {
             foreignKeyName: "character_prompts_character_id_fkey"
             columns: ["character_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "characters"
             referencedColumns: ["id"]
           },
@@ -157,6 +190,7 @@ export type Database = {
           created_at: string
           display_name: string
           enabled: boolean
+          environment_id: string
           id: string
           knowledge_isolation_validated: boolean
           metadata: Json
@@ -175,6 +209,7 @@ export type Database = {
           created_at?: string
           display_name: string
           enabled?: boolean
+          environment_id?: string
           id?: string
           knowledge_isolation_validated?: boolean
           metadata?: Json
@@ -193,6 +228,7 @@ export type Database = {
           created_at?: string
           display_name?: string
           enabled?: boolean
+          environment_id?: string
           id?: string
           knowledge_isolation_validated?: boolean
           metadata?: Json
@@ -427,6 +463,7 @@ export type Database = {
           config: Json
           created_at: string
           created_by: string | null
+          environment_id: string
           id: string
           name: string
           prompt: string
@@ -441,6 +478,7 @@ export type Database = {
           config?: Json
           created_at?: string
           created_by?: string | null
+          environment_id?: string
           id?: string
           name?: string
           prompt: string
@@ -455,6 +493,7 @@ export type Database = {
           config?: Json
           created_at?: string
           created_by?: string | null
+          environment_id?: string
           id?: string
           name?: string
           prompt?: string
@@ -473,6 +512,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      environments: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          label: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          type?: string
+        }
+        Relationships: []
       }
       gameplay_steps: {
         Row: {
@@ -820,11 +880,14 @@ export type Database = {
           admin_note: string | null
           ava_start_variant: string | null
           branch: string | null
+          campaign_id: string | null
           conversation_log: Json | null
           conversation_memory: Json
+          context_type: string
           diagnostic_trace_enabled: boolean
           duration_seconds: number | null
           ended_at: string | null
+          environment_id: string
           first_max_response_at: string | null
           game_over_reason: string | null
           gm_post_turn_log: Json
@@ -845,6 +908,7 @@ export type Database = {
           questionnaire_responses: Json | null
           resume_expires_at: string | null
           started_at: string | null
+          started_by_user_id: string | null
           streaming_avatar_connect_ms: number | null
           streaming_avatar_fallback_reason: string | null
           streaming_avatar_first_frame_ms: number | null
@@ -852,6 +916,7 @@ export type Database = {
           streaming_avatar_provider: string | null
           streaming_avatar_session_id: string | null
           teaser_shown: boolean | null
+          tester_label: string | null
           triggers_activated: string[] | null
           trust_level: number | null
           user_id: string | null
@@ -864,11 +929,14 @@ export type Database = {
           admin_note?: string | null
           ava_start_variant?: string | null
           branch?: string | null
+          campaign_id?: string | null
           conversation_log?: Json | null
           conversation_memory?: Json
+          context_type?: string
           diagnostic_trace_enabled?: boolean
           duration_seconds?: number | null
           ended_at?: string | null
+          environment_id?: string
           first_max_response_at?: string | null
           game_over_reason?: string | null
           gm_post_turn_log?: Json
@@ -889,6 +957,7 @@ export type Database = {
           questionnaire_responses?: Json | null
           resume_expires_at?: string | null
           started_at?: string | null
+          started_by_user_id?: string | null
           streaming_avatar_connect_ms?: number | null
           streaming_avatar_fallback_reason?: string | null
           streaming_avatar_first_frame_ms?: number | null
@@ -896,6 +965,7 @@ export type Database = {
           streaming_avatar_provider?: string | null
           streaming_avatar_session_id?: string | null
           teaser_shown?: boolean | null
+          tester_label?: string | null
           triggers_activated?: string[] | null
           trust_level?: number | null
           user_id?: string | null
@@ -908,11 +978,14 @@ export type Database = {
           admin_note?: string | null
           ava_start_variant?: string | null
           branch?: string | null
+          campaign_id?: string | null
           conversation_log?: Json | null
           conversation_memory?: Json
+          context_type?: string
           diagnostic_trace_enabled?: boolean
           duration_seconds?: number | null
           ended_at?: string | null
+          environment_id?: string
           first_max_response_at?: string | null
           game_over_reason?: string | null
           gm_post_turn_log?: Json
@@ -933,6 +1006,7 @@ export type Database = {
           questionnaire_responses?: Json | null
           resume_expires_at?: string | null
           started_at?: string | null
+          started_by_user_id?: string | null
           streaming_avatar_connect_ms?: number | null
           streaming_avatar_fallback_reason?: string | null
           streaming_avatar_first_frame_ms?: number | null
@@ -940,6 +1014,7 @@ export type Database = {
           streaming_avatar_provider?: string | null
           streaming_avatar_session_id?: string | null
           teaser_shown?: boolean | null
+          tester_label?: string | null
           triggers_activated?: string[] | null
           trust_level?: number | null
           user_id?: string | null
@@ -990,7 +1065,9 @@ export type Database = {
       turn_latencies: {
         Row: {
           character: string | null
+          context_type: string
           created_at: string
+          environment_id: string
           gm_model: string | null
           had_fallback: boolean | null
           id: string
@@ -1018,7 +1095,9 @@ export type Database = {
         }
         Insert: {
           character?: string | null
+          context_type?: string
           created_at?: string
+          environment_id?: string
           gm_model?: string | null
           had_fallback?: boolean | null
           id?: string
@@ -1046,7 +1125,9 @@ export type Database = {
         }
         Update: {
           character?: string | null
+          context_type?: string
           created_at?: string
+          environment_id?: string
           gm_model?: string | null
           had_fallback?: boolean | null
           id?: string
@@ -1171,6 +1252,17 @@ export type Database = {
       }
       get_character_runtime_readiness: {
         Args: { p_character_key: string }
+        Returns: {
+          character_key: string
+          display_name: string
+          opening_line: string
+          ready: boolean
+          tts_provider: string
+          tts_voice_id: string
+        }[]
+      }
+      get_character_runtime_readiness_for_environment: {
+        Args: { p_character_key: string; p_environment_id: string }
         Returns: {
           character_key: string
           display_name: string

@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ensureGameAuth } from "@/services/gameAuth";
 import type { ExperienceDirectorConfig } from "@/types";
+import { getActiveEnvironment } from "@/services/environmentContext";
 
 export type { ExperienceDirectorConfig } from "@/types";
 
@@ -16,6 +17,7 @@ export interface ExperienceOrchestrationVersion {
   archived_at: string | null;
   created_at: string;
   updated_at: string;
+  environment_id: string;
 }
 
 export interface CharacterRuntimeProfile {
@@ -33,6 +35,7 @@ export interface CharacterRuntimeProfile {
   qualitative_tests_validated: boolean;
   knowledge_isolation_validated: boolean;
   updated_at: string;
+  environment_id: string;
 }
 
 export interface PinnedDirectorRuntime {
@@ -86,6 +89,7 @@ export async function listOrchestrationVersions(): Promise<ExperienceOrchestrati
   const { data, error } = await supabase
     .from("experience_orchestration_versions" as never)
     .select("*")
+    .eq("environment_id", getActiveEnvironment())
     .order("version_number", { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as ExperienceOrchestrationVersion[];
@@ -105,6 +109,7 @@ export async function createOrchestrationDraft(input: {
       config: normalizeDirectorConfig(input.config),
       source_version_id: input.sourceVersionId ?? null,
       status: "draft",
+      environment_id: getActiveEnvironment(),
     } as never)
     .select("*")
     .single();
@@ -148,6 +153,7 @@ export async function listCharacterRuntimeProfiles(): Promise<CharacterRuntimePr
   const { data, error } = await supabase
     .from("character_runtime_profiles" as never)
     .select("*")
+    .eq("environment_id", getActiveEnvironment())
     .order("character_key");
   if (error) throw error;
   return (data ?? []) as unknown as CharacterRuntimeProfile[];
@@ -213,7 +219,12 @@ export async function fetchCharacterAutoReadiness(
     result[name].characterName = match.name;
 
     const [{ data: promptRow }, { count }] = await Promise.all([
-      supabase.from("character_prompts").select("character_id").eq("character_id", match.id).maybeSingle(),
+      supabase.from("character_prompts")
+        .select("character_id")
+        .eq("character_id", match.id)
+        .in("environment_id", getActiveEnvironment() === "prod" ? ["prod"] : [getActiveEnvironment(), "prod"])
+        .limit(1)
+        .maybeSingle(),
       supabase
         .from("embeddings")
         .select("id", { count: "exact", head: true })
@@ -288,8 +299,9 @@ export async function getCharacterRuntimeReadiness(character: "max" | "emma"): P
   ttsProvider: string | null;
   ttsVoiceId: string | null;
 } | null> {
-  const { data, error } = await supabase.rpc("get_character_runtime_readiness" as never, {
+  const { data, error } = await supabase.rpc("get_character_runtime_readiness_for_environment" as never, {
     p_character_key: character,
+    p_environment_id: getActiveEnvironment(),
   } as never);
   if (error) throw error;
   const rows = (data ?? null) as unknown as Record<string, unknown>[] | null;

@@ -9,9 +9,10 @@
  * Read-only — n'impacte pas le pipeline temps réel.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { listStreamingAvatarProviders } from "@/services/streamingAvatar/registry";
@@ -40,6 +41,7 @@ interface SessionRow {
   streaming_avatar_first_frame_ms: number | null;
   streaming_avatar_first_speech_ms: number | null;
   streaming_avatar_fallback_reason: string | null;
+  context_type: string;
 }
 
 const fmtMs = (v: number | null | undefined) => (v == null ? "—" : `${Math.round(v)} ms`);
@@ -67,22 +69,25 @@ export default function StreamingAvatarUsageTab() {
   const [rows, setRows] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [period, setPeriod] = useState("7d");
+  const [includeSandbox, setIncludeSandbox] = useState(false);
 
-  useEffect(() => { loadData(); }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from("sessions")
       .select(
-        "id, started_at, ended_at, duration_seconds, output_mode, streaming_avatar_provider, streaming_avatar_session_id, streaming_avatar_connect_ms, streaming_avatar_first_frame_ms, streaming_avatar_first_speech_ms, streaming_avatar_fallback_reason"
+        "id, started_at, ended_at, duration_seconds, output_mode, streaming_avatar_provider, streaming_avatar_session_id, streaming_avatar_connect_ms, streaming_avatar_first_frame_ms, streaming_avatar_first_speech_ms, streaming_avatar_fallback_reason, context_type"
       )
       .order("started_at", { ascending: false })
       .limit(1000);
+    if (!includeSandbox) query = query.neq("context_type", "sandbox");
+    const { data, error } = await query;
     if (error) toast.error("Erreur chargement consommation avatar: " + error.message);
     else setRows((data as unknown as SessionRow[]) || []);
     setLoading(false);
-  }
+  }, [includeSandbox]);
+
+  useEffect(() => { void loadData(); }, [loadData]);
 
   const periodStart = useMemo(() => {
     const now = Date.now();
@@ -164,12 +169,17 @@ export default function StreamingAvatarUsageTab() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">Consommation Streaming Avatar</h2>
-        <p className="text-sm text-muted-foreground">
-          Métriques des services vidéo temps réel (HeyGen, Tavus, et futurs fournisseurs) : connexion,
-          première image, première parole, replis TTS et coût estimé.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Consommation Streaming Avatar</h2>
+          <p className="text-sm text-muted-foreground">
+            Métriques des services vidéo temps réel (HeyGen, Tavus, et futurs fournisseurs) : connexion,
+            première image, première parole, replis TTS et coût estimé.
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Switch checked={includeSandbox} onCheckedChange={setIncludeSandbox} /> Inclure les sandboxes
+        </label>
       </div>
 
       <div className="grid grid-cols-2 tablet:grid-cols-3 tablet-lg:grid-cols-6 gap-3">

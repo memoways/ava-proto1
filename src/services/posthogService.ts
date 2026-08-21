@@ -1,3 +1,5 @@
+import { getRuntimeContext } from "@/services/environmentContext";
+
 const POSTHOG_KEY = "phc_x9m2HnIiFcKH9kFDH5qujx10qEG2ENylEicki7sPyZr";
 const POSTHOG_HOST = "https://eu.i.posthog.com";
 
@@ -130,7 +132,14 @@ export function disablePostHog() {
 
 export function trackEvent(event: string, properties?: Record<string, unknown>) {
   if (!analyticsRequested) return;
-  const sanitized = sanitizeAnalyticsProperties(properties);
+  const runtime = getRuntimeContext();
+  const sanitized = sanitizeAnalyticsProperties({
+    ...properties,
+    environment: runtime.environmentId,
+    context_type: runtime.contextType,
+    campaign: runtime.campaignId,
+    started_by: runtime.startedBy,
+  });
   if (!initialized || !analyticsEnabled || !posthog) {
     enqueue({ kind: "capture", event, properties: sanitized });
     return;

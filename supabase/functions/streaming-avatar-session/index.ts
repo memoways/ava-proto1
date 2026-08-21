@@ -60,6 +60,7 @@ serve(async (req) => {
         .from("admin_settings")
         .select("value")
         .eq("key", "ava_streaming_avatar_settings")
+        .eq("environment_id", "prod")
         .maybeSingle();
       const settings = asRecord((data as { value?: unknown } | null)?.value);
       const heygen = asRecord(settings.heygen);

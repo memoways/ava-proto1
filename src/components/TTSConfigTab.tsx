@@ -4,6 +4,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { writeEnvironmentStorage } from "@/services/environmentContext";
 import { Save, RotateCcw, CheckCircle2, HelpCircle } from "lucide-react";
 import { generateSpeech, playAudioBlob, tryCreateStreamingPlayback } from "@/services/tts";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
@@ -128,14 +129,14 @@ export default function TTSConfigTab() {
   // ElevenLabs helpers
   function updateEl(patch: Partial<TTSSettings>) {
     const current = { ...elSettings, ...patch };
-    localStorage.setItem("ava_tts_settings", JSON.stringify(current));
+    writeEnvironmentStorage("ava_tts_settings", JSON.stringify(current));
     setElSettings(current);
   }
   function applyElPreset(key: string) {
     const preset = TTS_PRESETS[key];
     if (!preset) return;
     const updated = { ...elSettings, ...preset.settings };
-    localStorage.setItem("ava_tts_settings", JSON.stringify(updated));
+    writeEnvironmentStorage("ava_tts_settings", JSON.stringify(updated));
     setElSettings(updated);
     toast.success(`Preset "${preset.label}" appliqué — sauvegarde nécessaire`);
   }
@@ -155,7 +156,7 @@ export default function TTSConfigTab() {
   // Inworld helpers
   function updateIw(patch: Partial<InworldSettings>) {
     const current = { ...iwSettings, ...patch };
-    localStorage.setItem("ava_tts_settings_inworld", JSON.stringify(current));
+    writeEnvironmentStorage("ava_tts_settings_inworld", JSON.stringify(current));
     setIwSettings(current);
   }
   async function saveIw() {
@@ -174,7 +175,7 @@ export default function TTSConfigTab() {
   // Hume helpers
   function updateHu(patch: Partial<HumeSettings>) {
     const current = { ...huSettings, ...patch };
-    localStorage.setItem("ava_tts_settings_hume", JSON.stringify(current));
+    writeEnvironmentStorage("ava_tts_settings_hume", JSON.stringify(current));
     setHuSettings(current);
   }
   async function saveHu() {
@@ -193,7 +194,7 @@ export default function TTSConfigTab() {
   // Gradium helpers
   function updateGr(patch: Partial<GradiumSettings>) {
     const current = { ...grSettings, ...patch };
-    localStorage.setItem("ava_tts_settings_gradium", JSON.stringify(current));
+    writeEnvironmentStorage("ava_tts_settings_gradium", JSON.stringify(current));
     setGrSettings(current);
   }
   async function saveGr() {

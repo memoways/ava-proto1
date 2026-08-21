@@ -32,8 +32,15 @@ import VoiceUsageTab from "@/components/admin/VoiceUsageTab";
 import StreamingAvatarUsageTab from "@/components/admin/StreamingAvatarUsageTab";
 import VideosListTab from "@/components/admin/VideosListTab";
 import StreamingAvatarConfigTab from "@/components/StreamingAvatarConfigTab";
+import AlertsTab from "@/components/admin/AlertsTab";
 import ExperienceArchitectureTab from "@/components/ExperienceArchitectureTab";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ExternalLink, ShieldCheck } from "lucide-react";
+import { useAdminEnvironment } from "@/contexts/AdminEnvironmentContext";
+import { ENVIRONMENTS, type EnvironmentId } from "@/services/environmentContext";
 import { trackEvent } from "@/services/posthogService";
 import {
   DEFAULT_ADMIN_TAB,
@@ -108,6 +115,7 @@ interface SyncReport {
 }
 
 export default function Admin() {
+  const { profile, environmentId, selectEnvironment } = useAdminEnvironment();
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [embeddings, setEmbeddings] = useState<EmbeddingRow[]>([]);
   // selectedSession moved to SessionsTab
@@ -176,19 +184,28 @@ export default function Admin() {
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("sessions")
-      .select("*")
-      .order("started_at", { ascending: false })
-      .limit(50);
-    const recentSessions = (data as unknown as SessionRow[]) || [];
+    const [{ data }, { data: members }] = await Promise.all([
+      supabase.from("sessions").select("*").order("started_at", { ascending: false }).limit(50),
+      supabase.from("admin_users" as never).select("user_id,display_name"),
+    ]);
+    const memberNames = new Map(
+      ((members ?? []) as Array<{ user_id: string; display_name: string }>)
+        .map((member) => [member.user_id, member.display_name]),
+    );
+    const withAccount = (session: SessionRow): SessionRow => ({
+      ...session,
+      account_display_name: session.started_by_user_id
+        ? memberNames.get(session.started_by_user_id) ?? "membre"
+        : "public",
+    });
+    const recentSessions = ((data as unknown as SessionRow[]) || []).map(withAccount);
     if (selectedSessionId && !recentSessions.some((session) => session.id === selectedSessionId)) {
       const { data: requestedSession } = await supabase
         .from("sessions")
         .select("*")
         .eq("id", selectedSessionId)
         .maybeSingle();
-      if (requestedSession) recentSessions.push(requestedSession as unknown as SessionRow);
+      if (requestedSession) recentSessions.push(withAccount(requestedSession as unknown as SessionRow));
     }
     setSessions(recentSessions);
     setLoading(false);
@@ -359,10 +376,43 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-bold mb-1">🔧 Admin — Où est Ava ?</h1>
-        <p className="text-muted-foreground text-sm mb-4">
-          Pilotage complet de l'expérience narrative
-        </p>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-4 pr-44">
+          <div>
+            <h1 className="text-2xl font-bold mb-1">🔧 Admin — Où est Ava ?</h1>
+            <p className="text-muted-foreground text-sm">
+              Pilotage complet de l'expérience narrative · {profile.display_name}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={environmentId} onValueChange={(value) => selectEnvironment(value as EnvironmentId)}>
+              <SelectTrigger className="w-[210px]" aria-label="Environnement actif">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ENVIRONMENTS.map((environment) => (
+                  <SelectItem key={environment.id} value={environment.id}>
+                    {environment.type === "production" ? "Production" : `Sandbox — ${environment.label}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" asChild>
+              <a href={`/?env=${encodeURIComponent(environmentId)}`} target="_blank" rel="noreferrer">
+                Tester l'expérience <ExternalLink className="ml-2 h-4 w-4" />
+              </a>
+            </Button>
+          </div>
+        </div>
+
+        {environmentId === "prod" ? (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-slate-500/40 bg-slate-500/10 px-4 py-2 text-sm font-semibold tracking-wide">
+            <ShieldCheck className="h-4 w-4" /> PRODUCTION
+          </div>
+        ) : (
+          <div className="mb-4 rounded-lg border border-fuchsia-400/50 bg-fuchsia-500/15 px-4 py-2 text-sm font-bold tracking-wide text-fuchsia-100">
+            SANDBOX — {ENVIRONMENTS.find((environment) => environment.id === environmentId)?.label.toUpperCase()}
+          </div>
+        )}
 
         {/* ===== GROUP SELECTOR ===== */}
         <div className="scroll-tabs -mx-4 mb-4 flex gap-2 px-4 tablet:mx-0 tablet:flex-wrap tablet:px-0">
@@ -387,7 +437,8 @@ export default function Admin() {
         {/* ===== TABS WITHIN GROUP ===== */}
         <Tabs value={activeTab} onValueChange={navigateToTab} className="w-full">
           {activeGroup === "tech" && (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/20 px-4 py-3">
+            <div className="mb-4 space-y-4 rounded-lg border bg-muted/20 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold">Output de Max</p>
                 <p className="text-xs text-muted-foreground">
@@ -403,6 +454,8 @@ export default function Admin() {
                 />
                 <span className={outputMode === "streaming_avatar" ? "text-sm font-medium" : "text-sm text-muted-foreground"}>Avatar vidéo</span>
               </div>
+              </div>
+              {environmentId === "prod" ? <PublicPasswordSetting /> : null}
             </div>
           )}
           {activeGroup === "legacy" && (
@@ -556,6 +609,9 @@ export default function Admin() {
           <TabsContent value="latency">
             <LatencyBlockingTab />
           </TabsContent>
+          <TabsContent value="alerts">
+            <AlertsTab />
+          </TabsContent>
           <TabsContent value="latency-telemetry">
             <LatencyTelemetryTab />
           </TabsContent>
@@ -708,6 +764,58 @@ export default function Admin() {
           </TabsContent>
 
         </Tabs>
+      </div>
+    </div>
+  );
+}
+
+function PublicPasswordSetting() {
+  const [password, setPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (password.length < 8) {
+      toast.error("Utilisez au moins 8 caractères pour le mot de passe public.");
+      return;
+    }
+    setSaving(true);
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
+    const sha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const { error } = await supabase
+      .from("admin_settings" as never)
+      .upsert({
+        key: "public_access.password",
+        environment_id: "prod",
+        value: { sha256 },
+        updated_at: new Date().toISOString(),
+      } as never, { onConflict: "key,environment_id" });
+    setSaving(false);
+    if (error) {
+      toast.error(`Mot de passe non enregistré : ${error.message}`);
+      return;
+    }
+    setPassword("");
+    toast.success("Mot de passe public mis à jour pour les nouvelles visites.");
+  };
+
+  return (
+    <div className="border-t pt-4">
+      <Label htmlFor="public-access-password">Mot de passe d'accès public (global)</Label>
+      <p className="mb-2 text-xs text-muted-foreground">
+        La valeur actuelle n'est jamais relue dans le navigateur. Saisissez une nouvelle valeur pour la remplacer.
+      </p>
+      <div className="flex max-w-lg gap-2">
+        <Input
+          id="public-access-password"
+          type="password"
+          autoComplete="new-password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          placeholder="Nouveau mot de passe"
+        />
+        <Button onClick={() => void save()} disabled={saving || !password}>
+          {saving ? "Enregistrement…" : "Mettre à jour"}
+        </Button>
       </div>
     </div>
   );

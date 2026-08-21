@@ -8,8 +8,8 @@
  * `localStorage` for zero-flash reads.
  */
 
-import { supabase } from "@/integrations/supabase/client";
 import type { STTProviderId } from "./types";
+import { loadEnvironmentSetting, readEnvironmentStorage, saveEnvironmentSetting, writeEnvironmentStorage } from "@/services/environmentContext";
 
 // ---------------- Types ----------------
 
@@ -106,7 +106,7 @@ function merge(input: unknown): STTProviderSettingsMap {
 export function getAllSTTProviderSettings(): STTProviderSettingsMap {
   if (cached) return cached;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = readEnvironmentStorage(STORAGE_KEY);
     if (raw) {
       cached = merge(JSON.parse(raw));
       return cached;
@@ -124,16 +124,8 @@ export async function loadSTTProviderSettingsFromDB(): Promise<STTProviderSettin
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {
     try {
-      const { data, error } = await supabase
-        .from("admin_settings" as never)
-        .select("value")
-        .eq("key", STORAGE_KEY)
-        .maybeSingle();
-      if (!error && data) {
-        cached = merge((data as { value: unknown }).value);
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cached)); } catch { /* ignore */ }
-        return cached;
-      }
+      cached = merge(await loadEnvironmentSetting(STORAGE_KEY, DEFAULT_STT_PROVIDER_SETTINGS));
+      return cached;
     } catch (err) {
       console.warn("[STT ProviderSettings] DB load failed:", err);
     }
@@ -152,15 +144,9 @@ export async function saveSTTProviderSettings<K extends STTProviderId>(
     [providerId]: { ...current[providerId], ...patch } as STTProviderSettingsMap[K],
   };
   cached = next;
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  try { writeEnvironmentStorage(STORAGE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
   try {
-    const { error } = await supabase
-      .from("admin_settings" as never)
-      .upsert(
-        { key: STORAGE_KEY, value: next as unknown, updated_at: new Date().toISOString() } as never,
-        { onConflict: "key" },
-      );
-    if (error) console.error("[STT ProviderSettings] DB save failed:", error.message);
+    await saveEnvironmentSetting(STORAGE_KEY, next);
   } catch (err) {
     console.error("[STT ProviderSettings] DB save exception:", err);
   }

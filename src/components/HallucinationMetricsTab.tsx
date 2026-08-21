@@ -1,14 +1,16 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import type { ConversationValidationTrace } from "@/types";
 
 interface SessionRow {
   id: string;
   started_at: string | null;
-  conversation_log: any;
+  conversation_log: Json | null;
 }
 
 interface SessionMetric {
@@ -23,7 +25,7 @@ interface SessionMetric {
 
 const LOCAL_TRACE_KEY = "ava_pipeline_last_trace";
 
-function extractTraces(log: any): ConversationValidationTrace[] {
+function extractTraces(log: Json | null): ConversationValidationTrace[] {
   if (!Array.isArray(log)) return [];
   const traces: ConversationValidationTrace[] = [];
   for (const entry of log) {
@@ -56,14 +58,17 @@ export default function HallucinationMetricsTab() {
   const [metrics, setMetrics] = useState<SessionMetric[]>([]);
   const [lastTrace, setLastTrace] = useState<ConversationValidationTrace | null>(null);
   const [loading, setLoading] = useState(false);
+  const [includeSandbox, setIncludeSandbox] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    let query = supabase
       .from("sessions")
       .select("id, started_at, conversation_log")
       .order("started_at", { ascending: false })
       .limit(50);
+    if (!includeSandbox) query = query.neq("context_type", "sandbox");
+    const { data } = await query;
     setMetrics((data || []).map((row) => buildMetric(row as SessionRow)));
     try {
       const raw = localStorage.getItem(LOCAL_TRACE_KEY);
@@ -75,11 +80,11 @@ export default function HallucinationMetricsTab() {
       setLastTrace(null);
     }
     setLoading(false);
-  }
+  }, [includeSandbox]);
 
   useEffect(() => {
-    load();
-  }, []);
+    void load();
+  }, [load]);
 
   const totals = metrics.reduce(
     (acc, m) => ({
@@ -95,16 +100,21 @@ export default function HallucinationMetricsTab() {
 
   return (
     <div className="max-w-6xl space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">📈 Métriques anti-hallucination</h2>
           <p className="text-sm text-muted-foreground">
             Mesure des régénérations et fallbacks du validateur sur les 50 dernières sessions.
           </p>
         </div>
-        <Button onClick={load} disabled={loading} variant="outline" size="sm">
-          {loading ? "Chargement…" : "Rafraîchir"}
-        </Button>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Switch checked={includeSandbox} onCheckedChange={setIncludeSandbox} /> Inclure les sandboxes
+          </label>
+          <Button onClick={() => void load()} disabled={loading} variant="outline" size="sm">
+            {loading ? "Chargement…" : "Rafraîchir"}
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 grid-cols-2 tablet-lg:grid-cols-4">

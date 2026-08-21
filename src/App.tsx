@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import IndexPRD4 from "./pages/IndexPRD4";
 import Admin from "./pages/Admin";
 import AdminAuthGate from "./components/AdminAuthGate";
+import PublicAccessGate from "./components/PublicAccessGate";
 import Auth from "./pages/Auth";
 import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
@@ -27,7 +28,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<IndexPRD4 />} />
+          <Route path="/" element={<PublicAccessGate><IndexPRD4 /></PublicAccessGate>} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/confidentialite" element={<Privacy />} />
           <Route path="/admin/*" element={<AdminAuthGate><Admin /></AdminAuthGate>} />

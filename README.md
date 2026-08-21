@@ -14,6 +14,8 @@ Les développements réalisés depuis un autre environnement doivent rester comp
 
 La mise en public est bloquée par la [release gate](docs/public_release_gate.md). Un aperçu interne peut être utilisé pour le développement, mais aucun lien ne doit être diffusé à des testeurs externes avant validation des critères de sécurité, persistance et endurance.
 
+> **Mise à jour récente (2026-08-21) — environnements de réglages et accès nominatifs** : le runtime public reste verrouillé sur `prod`, tandis que les membres authentifiés disposent de trois sandboxes isolées. Le portail public est vérifié côté Lovable Cloud et les sessions sont attribuées par compte, environnement, contexte et campagne. Plan d'activation et checklist : [`docs/plan_environnements_sandbox_auth.md`](docs/plan_environnements_sandbox_auth.md).
+
 > **Mise à jour récente (2026-08-05) — RAG Voyage 4 versionné** : le profil temps réel recommandé indexe les documents avec `voyage-4-large` et les interroge avec `voyage-4-lite` dans leur espace vectoriel partagé. Les profils sont construits en parallèle puis activés atomiquement ; le dashboard RAG affiche l’index effectif, les modèles, le chunking, les volumes et les p50/p95 live. `voyage-context-4` est disponible en canary, sans overlap. Analyse, plan et trajectoire mémoire/payload : [`docs/design/DESIGN-001-rag-voyage4-memoire-payload.md`](docs/design/DESIGN-001-rag-voyage4-memoire-payload.md).
 
 > **Mise à jour récente (2026-07-30) — Streaming Avatar piloté par Ava** : l’output public peut rendre le texte final inchangé de Max avec le TTS local, HeyGen LiveAvatar ou Tavus. Les fournisseurs avatar ne participent ni au STT, ni au RAG, ni au raisonnement. L’activation reste en canary, avec TTS par défaut. Procédure Lovable Cloud : [`docs/streaming-avatar-lovable-setup.md`](docs/streaming-avatar-lovable-setup.md).
@@ -94,7 +96,7 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] Pipeline PRD4 parallélisé (labels GM en parallèle de Max, GM post-tour destiné au tour suivant)
 - [x] Validateur du simulateur en mode fail-open (timeout 4s + résilience aux JSON malformés)
 - [x] Panneau admin "Latence & blocage" : timings par étape (RAG/GM/Max/validateur/TTS) + détection du point de blocage
-- [x] Accès `/admin` protégé par mot de passe (anti-accès accidentel)
+- [x] Accès `/admin` protégé par Supabase Auth et comptes nominatifs `admin_users`
 - [x] Visualisation comparative multi-sessions des latences réelles (barres empilées par session)
 - [x] Détail par tour dépliable depuis chaque barre de session, avec marqueur de cible 2 s commun
 - [x] Indicateur de dispersion par session (bracket min–max + écart-type σ sur le total des tours)
@@ -112,7 +114,7 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] Query rewriting LLM (`rewrite-query` edge function) — reformulation autonome avant RAG
 - [x] Mémoire de session compressée (`summarize-session` + table `session_summaries`) injectée dans le prompt Max
 - [x] Affichage banc d'essai : étape Query rewrite, badge provider d'embedding, par chunk `character_id`/`rerank_score`/retrieval brut
-- [x] **TTS multi-providers** : façade `src/services/tts/` + providers ElevenLabs / Inworld (`inworld-tts-2`, voix « Alain », streaming NDJSON) / Hume AI Octave, sélection d'un provider actif global depuis Admin → TTS Config
+- [x] **TTS multi-providers** : façade `src/services/tts/` + providers ElevenLabs / Inworld (`inworld-tts-2`, voix « Alain », streaming NDJSON) / Hume AI Octave, sélection d'un provider par environnement depuis Admin → TTS Config
 - [x] **Dashboard « Consommation Voix »** : compteurs, taux de succès, latences p50/p95 (first-byte + total), codes HTTP et erreurs récentes par provider
 - [x] **Robustesse voix multi-navigateurs** : sélection MIME STT à l'exécution, timeouts critiques, audio unlock, erreurs TTS/STT trackées et état conversationnel récupérable
 - [x] **Preset voix basse latence** : réglage `realtime_conversation` pour tests voice-to-voice rapides (`eleven_turbo_v2_5`, MP3 64 kbps, `optimizeStreamingLatency=1`)

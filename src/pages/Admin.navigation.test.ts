@@ -32,6 +32,7 @@ describe("Admin navigation invariants", () => {
       "architecture",
     ]);
     expect(TAB_GROUPS.find((group) => group.id === "quality")?.tabs.map((tab) => tab.id)).toEqual([
+      "alerts",
       "latency",
       "latency-telemetry",
       "max-test",

@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { getAdminUserProfile } from "@/services/environmentContext";
 
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
@@ -107,13 +108,7 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
   // when VITE_GAME_SECURITY_ENABLED is disabled.
   const session = await getCachedSession();
   if (!session?.user) return false;
-  const { data, error } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", session.user.id)
-    .eq("role", "admin")
-    .maybeSingle();
-  return !error && data?.role === "admin";
+  return (await getAdminUserProfile(session.user)) !== null;
 }
 
 /** Test-only reset for deterministic auth lifecycle specs. */

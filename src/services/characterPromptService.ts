@@ -1,4 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { getActiveEnvironment, type EnvironmentId } from "@/services/environmentContext";
 
 export interface CharacterPrompt {
   character_id: string;
@@ -42,8 +44,16 @@ const EMPTY: Omit<CharacterPrompt, "character_id" | "name" | "updated_at"> = {
   situation_summary: "",
 };
 
+type CharacterPromptRow = Database["public"]["Tables"]["character_prompts"]["Row"] & {
+  characters?: { name?: string | null } | null;
+};
+
 const byIdCache = new Map<string, CharacterPrompt>();
 const byNameCache = new Map<string, CharacterPrompt>();
+
+function environmentCacheKey(value: string, environmentId = getActiveEnvironment()): string {
+  return `${environmentId}:${value}`;
+}
 
 export function clearCharacterPromptCache(characterId?: string) {
   if (!characterId) {
@@ -51,20 +61,28 @@ export function clearCharacterPromptCache(characterId?: string) {
     byNameCache.clear();
     return;
   }
-  const existing = byIdCache.get(characterId);
-  byIdCache.delete(characterId);
-  if (existing?.name) byNameCache.delete(existing.name);
+  for (const environmentId of ["prod", "sandbox-ulrich", "sandbox-romed", "sandbox-benoit"] as EnvironmentId[]) {
+    const key = environmentCacheKey(characterId, environmentId);
+    const existing = byIdCache.get(key);
+    byIdCache.delete(key);
+    if (existing?.name) byNameCache.delete(environmentCacheKey(existing.name, environmentId));
+  }
 }
 
 export async function loadCharacterPrompt(characterId: string): Promise<CharacterPrompt | null> {
-  if (byIdCache.has(characterId)) return byIdCache.get(characterId)!;
+  const environmentId = getActiveEnvironment();
+  const cacheKey = environmentCacheKey(characterId, environmentId);
+  if (byIdCache.has(cacheKey)) return byIdCache.get(cacheKey)!;
   const { data, error } = await supabase
-    .from("character_prompts" as any)
+    .from("character_prompts")
     .select("*, characters!inner(name)")
     .eq("character_id", characterId)
-    .maybeSingle();
-  if (error || !data) return null;
-  const row = data as any;
+    .in("environment_id", environmentId === "prod" ? ["prod"] : [environmentId, "prod"]);
+  if (error || !data?.length) return null;
+  const rows = data as unknown as CharacterPromptRow[];
+  const row = rows.find((candidate) => candidate.environment_id === environmentId)
+    ?? rows.find((candidate) => candidate.environment_id === "prod");
+  if (!row) return null;
   const prompt: CharacterPrompt = {
     character_id: row.character_id,
     name: row.characters?.name,
@@ -79,8 +97,8 @@ export async function loadCharacterPrompt(characterId: string): Promise<Characte
     situation_summary: row.situation_summary || "",
     updated_at: row.updated_at,
   };
-  byIdCache.set(characterId, prompt);
-  if (prompt.name) byNameCache.set(prompt.name, prompt);
+  byIdCache.set(cacheKey, prompt);
+  if (prompt.name) byNameCache.set(environmentCacheKey(prompt.name, environmentId), prompt);
   return prompt;
 }
 
@@ -108,11 +126,12 @@ async function findCharacterRowByName(name: string): Promise<{ id: string; name:
 }
 
 export async function loadCharacterPromptByName(name: string): Promise<CharacterPrompt | null> {
-  if (byNameCache.has(name)) return byNameCache.get(name)!;
+  const cacheKey = environmentCacheKey(name);
+  if (byNameCache.has(cacheKey)) return byNameCache.get(cacheKey)!;
   const charRow = await findCharacterRowByName(name);
   if (!charRow) return null;
   const prompt = await loadCharacterPrompt(charRow.id);
-  if (prompt) byNameCache.set(name, prompt);
+  if (prompt) byNameCache.set(cacheKey, prompt);
   return prompt;
 }
 
@@ -138,10 +157,10 @@ export async function saveCharacterPrompt(
   characterId: string,
   partial: Partial<Omit<CharacterPrompt, "character_id" | "name" | "updated_at">>,
 ): Promise<void> {
-  const payload = { character_id: characterId, ...partial };
+  const payload = { character_id: characterId, environment_id: getActiveEnvironment(), ...partial };
   const { error } = await supabase
-    .from("character_prompts" as any)
-    .upsert(payload as any, { onConflict: "character_id" });
+    .from("character_prompts")
+    .upsert(payload, { onConflict: "character_id,environment_id" });
   if (error) throw new Error(error.message);
   clearCharacterPromptCache(characterId);
 }
@@ -161,11 +180,16 @@ export async function listCharactersWithPrompts(): Promise<CharacterListEntry[]>
     .order("name");
   if (!chars) return [];
   const { data: prompts } = await supabase
-    .from("character_prompts" as any)
-    .select("*");
-  const byId = new Map<string, any>();
-  (prompts || []).forEach((p: any) => byId.set(p.character_id, p));
-  return chars.map((c: any) => {
+    .from("character_prompts")
+    .select("*")
+    .in("environment_id", getActiveEnvironment() === "prod" ? ["prod"] : [getActiveEnvironment(), "prod"]);
+  const activeEnvironment = getActiveEnvironment();
+  const promptRows = (prompts ?? []) as CharacterPromptRow[];
+  const byId = new Map<string, CharacterPromptRow>();
+  promptRows
+    .sort((left, right) => Number(left.environment_id === activeEnvironment) - Number(right.environment_id === activeEnvironment))
+    .forEach((prompt) => byId.set(prompt.character_id, prompt));
+  return chars.map((c) => {
     const p = byId.get(c.id);
     const len = p
       ? [p.identite_fondamentale, p.qui_tu_es, p.ce_que_tu_ne_fais_jamais, p.ce_que_tu_sais_utilisateur, p.dynamique_conversation, p.sujets_sensibles, p.profondeur_par_niveau, p.timeline]

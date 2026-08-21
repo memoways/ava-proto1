@@ -3,7 +3,13 @@
  * Stored in admin_settings + localStorage with the same pattern as other settings.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import {
+  deleteEnvironmentSetting,
+  loadEnvironmentSetting,
+  readEnvironmentStorage,
+  removeEnvironmentStorage,
+  saveEnvironmentSetting,
+} from "@/services/environmentContext";
 
 // ---------------- Inworld ----------------
 
@@ -36,7 +42,7 @@ const inworldDefaults: InworldSettings = {
 
 export function getInworldSettings(): InworldSettings {
   try {
-    const stored = localStorage.getItem(INWORLD_KEY);
+    const stored = readEnvironmentStorage(INWORLD_KEY);
     if (stored) return { ...inworldDefaults, ...JSON.parse(stored) };
   } catch { /* ignore */ }
   return { ...inworldDefaults };
@@ -51,8 +57,8 @@ export async function saveInworldSettingsToDB(settings: InworldSettings): Promis
 }
 
 export function resetInworldSettings(): InworldSettings {
-  localStorage.removeItem(INWORLD_KEY);
-  supabase.from("admin_settings" as never).delete().eq("key", INWORLD_KEY).then(() => {});
+  removeEnvironmentStorage(INWORLD_KEY);
+  void deleteEnvironmentSetting(INWORLD_KEY).catch(() => {});
   return { ...inworldDefaults };
 }
 
@@ -79,7 +85,7 @@ const humeDefaults: HumeSettings = {
 
 export function getHumeSettings(): HumeSettings {
   try {
-    const stored = localStorage.getItem(HUME_KEY);
+    const stored = readEnvironmentStorage(HUME_KEY);
     if (stored) return { ...humeDefaults, ...JSON.parse(stored) };
   } catch { /* ignore */ }
   return { ...humeDefaults };
@@ -94,8 +100,8 @@ export async function saveHumeSettingsToDB(settings: HumeSettings): Promise<void
 }
 
 export function resetHumeSettings(): HumeSettings {
-  localStorage.removeItem(HUME_KEY);
-  supabase.from("admin_settings" as never).delete().eq("key", HUME_KEY).then(() => {});
+  removeEnvironmentStorage(HUME_KEY);
+  void deleteEnvironmentSetting(HUME_KEY).catch(() => {});
   return { ...humeDefaults };
 }
 
@@ -178,7 +184,7 @@ function migrateGradium(s: GradiumSettings): GradiumSettings {
 
 export function getGradiumSettings(): GradiumSettings {
   try {
-    const stored = localStorage.getItem(GRADIUM_KEY);
+    const stored = readEnvironmentStorage(GRADIUM_KEY);
     if (stored) return migrateGradium({ ...gradiumDefaults, ...JSON.parse(stored) });
   } catch { /* ignore */ }
   return { ...gradiumDefaults };
@@ -194,8 +200,8 @@ export async function saveGradiumSettingsToDB(settings: GradiumSettings): Promis
 }
 
 export function resetGradiumSettings(): GradiumSettings {
-  localStorage.removeItem(GRADIUM_KEY);
-  supabase.from("admin_settings" as never).delete().eq("key", GRADIUM_KEY).then(() => {});
+  removeEnvironmentStorage(GRADIUM_KEY);
+  void deleteEnvironmentSetting(GRADIUM_KEY).catch(() => {});
   return { ...gradiumDefaults };
 }
 
@@ -210,7 +216,7 @@ const VALID_PROVIDERS: TTSProviderId[] = ["elevenlabs", "inworld", "hume", "grad
 
 export function getActiveProviderId(): TTSProviderId {
   try {
-    const stored = localStorage.getItem(ACTIVE_KEY);
+    const stored = readEnvironmentStorage(ACTIVE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as { provider?: TTSProviderId };
       if (parsed?.provider && VALID_PROVIDERS.includes(parsed.provider)) {
@@ -233,34 +239,12 @@ export async function setActiveProvider(provider: TTSProviderId): Promise<void> 
 // ---------------- shared helpers (mirror of settingsService internals) ----------------
 
 async function loadFromDB<T>(key: string, defaults: T): Promise<T> {
-  try {
-    const { data, error } = await supabase
-      .from("admin_settings" as never)
-      .select("value")
-      .eq("key", key)
-      .maybeSingle();
-    if (!error && data) {
-      const dbValue = (data as { value: T }).value;
-      localStorage.setItem(key, JSON.stringify(dbValue));
-      return { ...defaults, ...dbValue };
-    }
-  } catch (err) {
-    console.warn(`[ttsProviderSettings] DB load failed for ${key}:`, err);
-  }
-  try {
-    const stored = localStorage.getItem(key);
-    if (stored) return { ...defaults, ...JSON.parse(stored) };
-  } catch { /* ignore */ }
-  return { ...defaults };
+  return loadEnvironmentSetting(key, defaults);
 }
 
 async function saveToDB<T>(key: string, value: T): Promise<void> {
-  localStorage.setItem(key, JSON.stringify(value));
   try {
-    const { error } = await supabase
-      .from("admin_settings" as never)
-      .upsert({ key, value, updated_at: new Date().toISOString() } as never, { onConflict: "key" });
-    if (error) console.error(`[ttsProviderSettings] DB save failed for ${key}:`, error.message);
+    await saveEnvironmentSetting(key, value);
   } catch (err) {
     console.error(`[ttsProviderSettings] DB save exception for ${key}:`, err);
   }
