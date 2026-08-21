@@ -515,6 +515,9 @@ test("le teaser démarre automatiquement avec le son puis Passer coupe tout", as
 });
 
 test("une cinématique HLS démarre automatiquement puis Passer coupe son média", async ({ page }) => {
+  // WebKit on the shared CI runner can spend most of the default 30 s budget
+  // bootstrapping HLS; keep actionability checks enabled with a realistic cap.
+  test.setTimeout(60_000);
   const transcripts = [
     "Parle-moi de Max.",
     "Que sais-tu au sujet d'Ava ?",
