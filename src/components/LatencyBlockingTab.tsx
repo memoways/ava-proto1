@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Info, MessageSquare } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -18,6 +18,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -58,6 +59,7 @@ interface SessionRow {
   ended_at: string | null;
   conversation_log: ConversationMessage[] | null;
   game_over_reason: string | null;
+  context_type: string;
 }
 
 function sessionLabel(s: SessionRow): string {
@@ -1499,6 +1501,7 @@ export default function LatencyBlockingTab() {
     tts_ms: "all",
   });
   const [highlightedEvolutionSessionId, setHighlightedEvolutionSessionId] = useState<string | null>(null);
+  const [includeSandbox, setIncludeSandbox] = useState(false);
 
   function handleFocus(id: string) {
     setFocusId(id);
@@ -1534,21 +1537,23 @@ export default function LatencyBlockingTab() {
   const [blockerFilter, setBlockerFilter] = useState<BlockerFilter>("all");
   const [hasInitialized, setHasInitialized] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from("sessions")
-      .select("id, name, started_at, ended_at, conversation_log, game_over_reason")
+      .select("id, name, started_at, ended_at, conversation_log, game_over_reason, context_type")
       .order("started_at", { ascending: false })
       .limit(50);
+    if (!includeSandbox) query = query.neq("context_type", "sandbox");
+    const { data, error } = await query;
     if (error) console.error(error);
     setSessions(((data as unknown) as SessionRow[]) || []);
     setLoading(false);
-  }
+  }, [includeSandbox]);
 
   useEffect(() => {
-    load();
-  }, []);
+    void load();
+  }, [load]);
 
   // Sync focus from URL ?session=<id> (deep link from Sessions tab)
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1711,6 +1716,9 @@ export default function LatencyBlockingTab() {
         <Button size="sm" variant="outline" onClick={load} disabled={loading}>
           {loading ? "Chargement..." : "Rafraîchir"}
         </Button>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Switch checked={includeSandbox} onCheckedChange={setIncludeSandbox} /> Inclure les sandboxes
+        </label>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

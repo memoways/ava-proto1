@@ -8,7 +8,6 @@ const auth = vi.hoisted(() => ({
 const roleQuery = vi.hoisted(() => ({
   select: vi.fn(),
   eqUser: vi.fn(),
-  eqRole: vi.fn(),
   maybeSingle: vi.fn(),
 }));
 
@@ -42,8 +41,7 @@ describe("gameAuth", () => {
     auth.getSession.mockReset();
     auth.signInAnonymously.mockReset();
     roleQuery.select.mockReset().mockReturnValue({ eq: roleQuery.eqUser });
-    roleQuery.eqUser.mockReset().mockReturnValue({ eq: roleQuery.eqRole });
-    roleQuery.eqRole.mockReset().mockReturnValue({ maybeSingle: roleQuery.maybeSingle });
+    roleQuery.eqUser.mockReset().mockReturnValue({ maybeSingle: roleQuery.maybeSingle });
     roleQuery.maybeSingle.mockReset();
     vi.unstubAllGlobals();
   });
@@ -119,13 +117,15 @@ describe("gameAuth", () => {
   it("recognizes an authenticated admin even when public game security is disabled", async () => {
     vi.stubEnv("VITE_GAME_SECURITY_ENABLED", "false");
     auth.getSession.mockResolvedValue({ data: { session }, error: null });
-    roleQuery.maybeSingle.mockResolvedValue({ data: { role: "admin" }, error: null });
+    roleQuery.maybeSingle.mockResolvedValue({
+      data: { user_id: session.user.id, display_name: "Admin", default_environment_id: "prod" },
+      error: null,
+    });
 
     await expect(isCurrentUserAdmin()).resolves.toBe(true);
 
     expect(auth.getSession).toHaveBeenCalledTimes(1);
     expect(auth.signInAnonymously).not.toHaveBeenCalled();
     expect(roleQuery.eqUser).toHaveBeenCalledWith("user_id", session.user.id);
-    expect(roleQuery.eqRole).toHaveBeenCalledWith("role", "admin");
   });
 });

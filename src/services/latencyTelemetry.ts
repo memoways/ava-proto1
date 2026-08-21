@@ -11,6 +11,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/services/posthogService";
+import { getRuntimeContext } from "@/services/environmentContext";
 
 let enabled = true;
 
@@ -90,7 +91,13 @@ export function createTurnTimer(initial?: Partial<TurnLatencyRecord>) {
       safe(() => {
         // DB column is `metadata_json` — rename before insert to avoid schema cache errors.
         const { metadata, ...rest } = record;
-        const row = { ...rest, metadata_json: metadata ?? {} };
+        const runtime = getRuntimeContext();
+        const row = {
+          ...rest,
+          environment_id: runtime.environmentId,
+          context_type: runtime.contextType,
+          metadata_json: metadata ?? {},
+        };
         void supabase.from("turn_latencies" as never).insert(row as never).then(({ error }) => {
           if (error) console.warn("[latencyTelemetry] insert turn_latencies", error.message);
         });
@@ -108,7 +115,13 @@ export function recordAudioLatency(record: AudioLatencyRecord) {
   safe(() => trackEvent("audio_latency", record as unknown as Record<string, unknown>));
   safe(() => {
     const { metadata, ...rest } = record;
-    const row = { ...rest, metadata_json: metadata ?? {} };
+    const runtime = getRuntimeContext();
+    const row = {
+      ...rest,
+      environment_id: runtime.environmentId,
+      context_type: runtime.contextType,
+      metadata_json: metadata ?? {},
+    };
     void supabase.from("audio_latencies" as never).insert(row as never).then(({ error }) => {
       if (error) console.warn("[latencyTelemetry] insert audio_latencies", error.message);
     });

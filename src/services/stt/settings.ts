@@ -1,5 +1,12 @@
-import { supabase } from "@/integrations/supabase/client";
 import type { STTProviderId, STTSettings } from "./types";
+import {
+  deleteEnvironmentSetting,
+  loadEnvironmentSetting,
+  readEnvironmentStorage,
+  removeEnvironmentStorage,
+  saveEnvironmentSetting,
+  writeEnvironmentStorage,
+} from "@/services/environmentContext";
 
 export const STT_STORAGE_KEY = "ava_stt_settings";
 
@@ -33,7 +40,7 @@ function normalizeSTTSettings(settings: Partial<STTSettings> | null | undefined)
 export function getSTTSettings(): STTSettings {
   if (cachedSTTSettings) return { ...cachedSTTSettings };
   try {
-    const stored = localStorage.getItem(STT_STORAGE_KEY);
+    const stored = readEnvironmentStorage(STT_STORAGE_KEY);
     if (stored) {
       cachedSTTSettings = normalizeSTTSettings(JSON.parse(stored));
       return { ...cachedSTTSettings };
@@ -50,7 +57,7 @@ export function getSTTProvider(): STTProviderId {
 
 export function saveSTTSettingsLocal(settings: Partial<STTSettings>): STTSettings {
   const updated = normalizeSTTSettings({ ...getSTTSettings(), ...settings });
-  localStorage.setItem(STT_STORAGE_KEY, JSON.stringify(updated));
+  writeEnvironmentStorage(STT_STORAGE_KEY, JSON.stringify(updated));
   cachedSTTSettings = updated;
   return updated;
 }
@@ -65,46 +72,26 @@ export async function loadSTTSettingsFromDB(): Promise<STTSettings> {
 }
 
 async function loadSTTSettingsFromDBUncached(): Promise<STTSettings> {
-  try {
-    const { data, error } = await supabase
-      .from("admin_settings" as any)
-      .select("value")
-      .eq("key", STT_STORAGE_KEY)
-      .maybeSingle();
-
-    if (!error && data) {
-      const loaded = normalizeSTTSettings((data as any).value);
-      localStorage.setItem(STT_STORAGE_KEY, JSON.stringify(loaded));
-      cachedSTTSettings = loaded;
-      return loaded;
-    }
-  } catch (err) {
-    console.warn("[STT Settings] DB load failed:", err);
-  }
-  cachedSTTSettings = getSTTSettings();
+  const loaded = normalizeSTTSettings(await loadEnvironmentSetting(STT_STORAGE_KEY, DEFAULT_STT_SETTINGS));
+  cachedSTTSettings = loaded;
   return { ...cachedSTTSettings };
 }
 
 export async function saveSTTSettingsToDB(settings: STTSettings): Promise<void> {
   const normalized = normalizeSTTSettings(settings);
-  localStorage.setItem(STT_STORAGE_KEY, JSON.stringify(normalized));
+  writeEnvironmentStorage(STT_STORAGE_KEY, JSON.stringify(normalized));
   cachedSTTSettings = normalized;
   try {
-    const { error } = await supabase
-      .from("admin_settings" as any)
-      .upsert({ key: STT_STORAGE_KEY, value: normalized, updated_at: new Date().toISOString() } as any, { onConflict: "key" });
-    if (error) {
-      console.error("[STT Settings] DB save failed:", error.message);
-    }
+    await saveEnvironmentSetting(STT_STORAGE_KEY, normalized);
   } catch (err) {
     console.error("[STT Settings] DB save exception:", err);
   }
 }
 
 export function resetSTTSettings(): STTSettings {
-  localStorage.removeItem(STT_STORAGE_KEY);
+  removeEnvironmentStorage(STT_STORAGE_KEY);
   cachedSTTSettings = { ...DEFAULT_STT_SETTINGS };
-  supabase.from("admin_settings" as any).delete().eq("key", STT_STORAGE_KEY).then(() => {});
+  void deleteEnvironmentSetting(STT_STORAGE_KEY).catch(() => {});
   return { ...DEFAULT_STT_SETTINGS };
 }
 

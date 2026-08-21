@@ -3,6 +3,7 @@ import { debugLogger } from "./debugLogger";
 import type { Json } from "@/integrations/supabase/types";
 import type { ConversationMessage, QuestionnaireData } from "@/types";
 import { authenticatedFunctionFetch, ensureGameAuth } from "./gameAuth";
+import { getRuntimeContext } from "./environmentContext";
 
 export interface SessionRecord {
   id: string;
@@ -20,10 +21,19 @@ export interface SessionRecord {
 /** Create a new session row and return its ID */
 export async function createSession(branch = "male"): Promise<string> {
   await ensureGameAuth();
+  const runtime = getRuntimeContext();
   debugLogger.log({ service: "session", level: "info", direction: "out", label: "Create session", detail: `branch=${branch}` });
   const { data, error } = await supabase
     .from("sessions")
-    .insert({ branch, started_at: new Date().toISOString() })
+    .insert({
+      branch,
+      started_at: new Date().toISOString(),
+      environment_id: runtime.environmentId,
+      context_type: runtime.contextType,
+      campaign_id: runtime.campaignId,
+      tester_label: runtime.testerLabel,
+      started_by_user_id: runtime.startedByUserId,
+    })
     .select("id")
     .single();
 

@@ -4,6 +4,8 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { AdminEnvironmentProvider } from "@/contexts/AdminEnvironmentContext";
+import { getAdminUserProfile, type AdminUserProfile } from "@/services/environmentContext";
 
 interface Props {
   children: React.ReactNode;
@@ -12,26 +14,16 @@ interface Props {
 export default function AdminAuthGate({ children }: Props) {
   const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [profile, setProfile] = useState<AdminUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
 
-    const checkRole = async (uid: string) => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", uid)
-        .eq("role", "admin")
-        .maybeSingle();
+    const checkRole = async (currentSession: Session) => {
+      const nextProfile = await getAdminUserProfile(currentSession.user);
       if (!mounted) return;
-      if (error) {
-        console.error("[AdminAuthGate] role check failed", error);
-        setIsAdmin(false);
-      } else {
-        setIsAdmin(!!data);
-      }
+      setProfile(nextProfile);
       setLoading(false);
     };
 
@@ -40,9 +32,9 @@ export default function AdminAuthGate({ children }: Props) {
       setSession(newSession);
       if (newSession?.user) {
         // Defer to avoid deadlock
-        setTimeout(() => checkRole(newSession.user.id), 0);
+        setTimeout(() => void checkRole(newSession), 0);
       } else {
-        setIsAdmin(false);
+        setProfile(null);
         setLoading(false);
       }
     });
@@ -51,7 +43,7 @@ export default function AdminAuthGate({ children }: Props) {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       if (data.session?.user) {
-        checkRole(data.session.user.id);
+        void checkRole(data.session);
       } else {
         setLoading(false);
       }
@@ -93,7 +85,7 @@ export default function AdminAuthGate({ children }: Props) {
     );
   }
 
-  if (!isAdmin) {
+  if (!profile) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="w-full max-w-md space-y-4 rounded-lg border border-border bg-card p-6 shadow-lg text-center">
@@ -121,7 +113,7 @@ export default function AdminAuthGate({ children }: Props) {
       >
         Déconnexion ({session.user.email})
       </Button>
-      {children}
+      <AdminEnvironmentProvider profile={profile}>{children}</AdminEnvironmentProvider>
     </div>
   );
 }

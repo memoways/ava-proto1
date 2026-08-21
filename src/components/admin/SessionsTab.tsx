@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,6 +12,7 @@ import { Link } from "react-router-dom";
 import { isQuestionLike } from "@/services/ragQuestionCorpus";
 import { adminTabPath } from "@/services/adminNavigation";
 import type { QuestionnaireData } from "@/types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 /** Onglet admin où corriger la cause racine selon le type de fallback GM. */
 const FALLBACK_TARGET_TAB: Record<string, { tab: string; label: string }> = {
@@ -39,6 +40,12 @@ export interface SessionRow {
   personnage_appele?: string | null;
   modalite_voix?: string | null;
   diagnostic_trace_enabled?: boolean;
+  environment_id: string;
+  context_type: "public" | "user_test" | "sandbox" | "internal";
+  campaign_id: string | null;
+  tester_label: string | null;
+  started_by_user_id: string | null;
+  account_display_name?: string;
 }
 
 interface AdminConversationMessage {
@@ -249,6 +256,18 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
   const [pinnedMessageIndexes, setPinnedMessageIndexes] = useState<Set<number>>(new Set());
   const [pinningMessageIndexes, setPinningMessageIndexes] = useState<Set<number>>(new Set());
   const [pinnedStorageReady, setPinnedStorageReady] = useState<boolean | null>(null);
+  const [environmentFilter, setEnvironmentFilter] = useState("all");
+  const [contextFilter, setContextFilter] = useState("all");
+  const [campaignFilter, setCampaignFilter] = useState("all");
+  const campaigns = useMemo(
+    () => [...new Set(sessions.map((session) => session.campaign_id).filter((value): value is string => Boolean(value)))],
+    [sessions],
+  );
+  const visibleSessions = useMemo(() => sessions.filter((session) => (
+    (environmentFilter === "all" || session.environment_id === environmentFilter)
+    && (contextFilter === "all" || session.context_type === contextFilter)
+    && (campaignFilter === "all" || session.campaign_id === campaignFilter)
+  )), [campaignFilter, contextFilter, environmentFilter, sessions]);
 
   useEffect(() => {
     if (!selectedSessionId) {
@@ -362,8 +381,37 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
           <h2 className="text-lg font-semibold">Sessions récentes</h2>
           <Button size="sm" variant="outline" onClick={onRefresh}>Rafraîchir</Button>
         </div>
+        <div className="mb-3 grid gap-2 sm:grid-cols-3">
+          <Select value={environmentFilter} onValueChange={setEnvironmentFilter}>
+            <SelectTrigger aria-label="Filtrer par environnement"><SelectValue placeholder="Environnement" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les environnements</SelectItem>
+              <SelectItem value="prod">Production</SelectItem>
+              <SelectItem value="sandbox-ulrich">Sandbox — Ulrich</SelectItem>
+              <SelectItem value="sandbox-romed">Sandbox — Romed</SelectItem>
+              <SelectItem value="sandbox-benoit">Sandbox — Benoît</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={contextFilter} onValueChange={setContextFilter}>
+            <SelectTrigger aria-label="Filtrer par contexte"><SelectValue placeholder="Contexte" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les contextes</SelectItem>
+              <SelectItem value="public">Public</SelectItem>
+              <SelectItem value="user_test">Test utilisateur</SelectItem>
+              <SelectItem value="sandbox">Sandbox</SelectItem>
+              <SelectItem value="internal">Interne</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={campaignFilter} onValueChange={setCampaignFilter}>
+            <SelectTrigger aria-label="Filtrer par campagne"><SelectValue placeholder="Campagne" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Toutes les campagnes</SelectItem>
+              {campaigns.map((campaign) => <SelectItem key={campaign} value={campaign}>{campaign}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
         <ScrollArea className="h-[70vh] border rounded-lg">
-          {sessions.map((s) => (
+          {visibleSessions.map((s) => (
             <div
               key={s.id}
               className={`relative group w-full text-left p-3 border-b hover:bg-accent/50 transition-colors cursor-pointer ${
@@ -382,6 +430,12 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                     <span className="text-xs font-mono text-muted-foreground">{s.id.slice(0, 8)}</span>
                   )}
                   <p className="text-xs text-muted-foreground">{fmt(s.started_at)}</p>
+                  <p className="mt-1 text-xs"><span className="text-muted-foreground">Compte :</span> {s.account_display_name ?? "public"}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {s.environment_id} · {s.context_type}
+                    {s.campaign_id ? ` · ${s.campaign_id}` : ""}
+                    {s.tester_label ? ` · ${s.tester_label}` : ""}
+                  </p>
                 </div>
                 <div className="text-right text-xs flex items-center gap-2">
                   <span className={`inline-block px-2 py-0.5 rounded-full ${
@@ -471,7 +525,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
               )}
             </div>
           ))}
-          {sessions.length === 0 && (
+          {visibleSessions.length === 0 && (
             <p className="p-4 text-muted-foreground text-sm">Aucune session</p>
           )}
         </ScrollArea>
@@ -519,6 +573,11 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
               <Stat label="Durée" value={`${selected.duration_seconds ?? "—"}s`} />
               <Stat label="Branch" value={selected.branch || "—"} />
               <Stat label="Raison fin" value={selected.game_over_reason || "—"} />
+              <Stat label="Compte" value={selected.account_display_name ?? "public"} />
+              <Stat label="Environnement" value={selected.environment_id} />
+              <Stat label="Contexte" value={selected.context_type} />
+              <Stat label="Campagne" value={selected.campaign_id || "—"} />
+              <Stat label="Testeur" value={selected.tester_label || "—"} />
             </div>
 
             {selected.triggers_activated?.length ? (

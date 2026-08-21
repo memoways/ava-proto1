@@ -28,6 +28,7 @@ interface RequestBody {
   from?: string;
   to?: string;
   filters?: Record<string, string>;
+  include_sandbox?: boolean;
 }
 
 interface EventRow {
@@ -261,7 +262,8 @@ serve(async (req) => {
     return json({ error: error instanceof Error ? error.message : "Requête invalide", code: "invalid_request" }, 400);
   }
   const filters = safeFilters(body.filters);
-  const cacheKey = JSON.stringify({ period: range.period, from: range.from.toISOString(), to: range.to.toISOString(), filters });
+  const includeSandbox = body.include_sandbox === true;
+  const cacheKey = JSON.stringify({ period: range.period, from: range.from.toISOString(), to: range.to.toISOString(), filters, includeSandbox });
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return json(cached.value, 200, { "X-AVA-Cache": "HIT" });
 
@@ -271,6 +273,9 @@ serve(async (req) => {
     `timestamp < toDateTime(${sqlString(range.to.toISOString())})`,
     `event IN (${EVENTS.map((event) => sqlString(event)).join(", ")})`,
   ];
+  if (!includeSandbox) {
+    conditions.push(`coalesce(toString(properties.context_type), 'public') != 'sandbox'`);
+  }
   const filterProperties: Record<string, string> = {
     character: "character",
     model: "max_model",

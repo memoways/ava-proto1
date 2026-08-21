@@ -656,11 +656,12 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
           .upsert(
             {
               character_id: charRow.id,
+              environment_id: 'prod',
               ...promptFields,
               situation_summary: situationSummary,
               updated_at: new Date().toISOString(),
             },
-            { onConflict: 'character_id' },
+            { onConflict: 'character_id,environment_id' },
           );
         if (promptErr) {
           console.error(`[sync-notion] character_prompts upsert error for ${name}:`, promptErr);

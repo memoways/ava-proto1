@@ -116,6 +116,7 @@ export async function loadPosthogLatencyStats(input: {
   from?: string;
   to?: string;
   filters?: Record<string, string>;
+  include_sandbox?: boolean;
 }): Promise<PosthogLatencyStats> {
   const { data, error } = await supabase.functions.invoke("posthog-latency-stats", { body: input });
   if (error) throw new Error(error.message);

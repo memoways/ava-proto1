@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   evaluateCanaryReadiness,
   INTERNAL_CANARY_THRESHOLDS,
@@ -191,6 +192,7 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
   const [timelineMetric, setTimelineMetric] = useState<TimelineMetric>("endToEnd");
   const [providerDimension, setProviderDimension] = useState<ProviderKey>("models");
   const [selectedSlowTurn, setSelectedSlowTurn] = useState<PosthogSlowTurn | null>(null);
+  const [includeSandbox, setIncludeSandbox] = useState(false);
 
   const load = useCallback(async (requestedFilters: FilterState = filters) => {
     if (initialStats) {
@@ -206,6 +208,7 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
         period,
         ...(period === "custom" ? { from: from ? new Date(from).toISOString() : undefined, to: to ? new Date(to).toISOString() : undefined } : {}),
         filters: Object.fromEntries(Object.entries(requestedFilters).filter(([, value]) => value.trim())),
+        include_sandbox: includeSandbox,
       });
       setStats(posthog);
       setFilterOptions((current) => mergeFilterOptions(current, posthog));
@@ -223,7 +226,7 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
     } finally {
       setLoading(false);
     }
-  }, [filters, from, initialStats, period, to]);
+  }, [filters, from, includeSandbox, initialStats, period, to]);
 
   useEffect(() => {
     if (initialStats) {
@@ -231,7 +234,7 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
       return;
     }
     void load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [includeSandbox]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canary = useMemo(() => stats ? evaluateCanaryReadiness({
     sessionCount: stats.totals.sessions,
@@ -298,6 +301,9 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
           <p className="text-xs text-muted-foreground">Diagnostic des parcours voix à partir des mesures analytics distantes.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Switch checked={includeSandbox} onCheckedChange={setIncludeSandbox} /> Inclure les sandboxes
+          </label>
           <Button size="sm" variant="outline" asChild>
             <a href={POSTHOG_DASHBOARD_URL} target="_blank" rel="noreferrer">Ouvrir dans PostHog <ExternalLink className="ml-1 h-3.5 w-3.5" /></a>
           </Button>

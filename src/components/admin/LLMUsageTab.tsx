@@ -1,6 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
@@ -19,7 +21,7 @@ interface UsageRow {
   generation_id: string | null;
   cost_usd: number;
   status: string;
-  metadata_json: any;
+  metadata_json: Json | null;
   error_message: string | null;
 }
 
@@ -32,7 +34,7 @@ interface CostErrorRow {
   status_code: number | null;
   error_message: string | null;
   source: string;
-  metadata_json: any;
+  metadata_json: Json | null;
 }
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))", "#6366f1", "#f59e0b", "#10b981"];
@@ -49,35 +51,42 @@ export default function LLMUsageTab() {
   const [filterFeature, setFilterFeature] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPeriod, setFilterPeriod] = useState("30d");
+  const [includeSandbox, setIncludeSandbox] = useState(false);
 
-  useEffect(() => { loadData(); }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
-    const [{ data, error }, { data: errorData, error: costErrorLoadError }] = await Promise.all([
+    const [{ data, error }, { data: errorData, error: costErrorLoadError }, sessionResult] = await Promise.all([
       supabase
-        .from("llm_usage" as any)
+        .from("llm_usage")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1000),
       supabase
-        .from("openrouter_cost_error_logs" as any)
+        .from("openrouter_cost_error_logs")
         .select("*")
         .order("occurred_at", { ascending: false })
         .limit(500),
+      includeSandbox
+        ? Promise.resolve({ data: null })
+        : supabase.from("sessions").select("id").neq("context_type", "sandbox").limit(5000),
     ]);
+    const allowedSessionIds = sessionResult.data
+      ? new Set(sessionResult.data.map((session) => session.id))
+      : null;
     if (error) {
       toast.error("Erreur chargement consommation: " + error.message);
     } else {
-      setRows((data as any[]) || []);
+      setRows(((data as UsageRow[]) || []).filter((row) => !allowedSessionIds || !row.session_id || allowedSessionIds.has(row.session_id)));
     }
     if (costErrorLoadError) {
       toast.error("Erreur chargement journal coûts: " + costErrorLoadError.message);
     } else {
-      setCostErrors((errorData as any[]) || []);
+      setCostErrors(((errorData as CostErrorRow[]) || []).filter((row) => !allowedSessionIds || !row.session_id || allowedSessionIds.has(row.session_id)));
     }
     setLoading(false);
-  }
+  }, [includeSandbox]);
+
+  useEffect(() => { void loadData(); }, [loadData]);
 
   async function retryAllFailedCosts() {
     const failed = rows.filter(r => r.status === "cost_fetch_failed" && r.generation_id);
@@ -122,7 +131,11 @@ export default function LLMUsageTab() {
   const uniqueModels = [...new Set(rows.map(r => r.model))];
   const uniqueFeatures = [...new Set(rows.map(r => r.feature_key))];
   const uniqueStatuses = [...new Set(rows.map(r => r.status))];
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayStart = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return start;
+  }, []);
   const errorCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     costErrors.forEach((row) => {
@@ -130,7 +143,10 @@ export default function LLMUsageTab() {
     });
     return counts;
   }, [costErrors]);
-  const errorsToday = useMemo(() => costErrors.filter((row) => new Date(row.occurred_at) >= todayStart).length, [costErrors]);
+  const errorsToday = useMemo(
+    () => costErrors.filter((row) => new Date(row.occurred_at) >= todayStart).length,
+    [costErrors, todayStart],
+  );
   const uniqueErrorTypes = Object.entries(errorCounts)
     .sort((a, b) => b[1] - a[1])
     .map(([type, count]) => ({ type, count }));
@@ -173,6 +189,11 @@ export default function LLMUsageTab() {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Switch checked={includeSandbox} onCheckedChange={setIncludeSandbox} /> Inclure les sandboxes
+        </label>
+      </div>
       {/* KPI Cards */}
       <div className="grid grid-cols-2 tablet-lg:grid-cols-5 gap-3">
         <KPICard label="Coût total (filtre)" value={fmtCost(totalCost)} />

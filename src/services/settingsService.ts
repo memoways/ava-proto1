@@ -1,5 +1,12 @@
 import defaultSettings from "@/config/settings.json";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  deleteEnvironmentSetting,
+  loadEnvironmentSetting,
+  readEnvironmentStorage,
+  removeEnvironmentStorage,
+  saveEnvironmentSetting,
+  writeEnvironmentStorage,
+} from "@/services/environmentContext";
 
 // ===== DB Persistence Layer =====
 
@@ -8,45 +15,15 @@ import { supabase } from "@/integrations/supabase/client";
  * Falls back to localStorage then defaults.
  */
 async function loadFromDB<T>(key: string, defaults: T): Promise<T> {
-  try {
-    const { data, error } = await supabase
-      .from("admin_settings" as any)
-      .select("value")
-      .eq("key", key)
-      .maybeSingle();
-    if (!error && data) {
-      const dbValue = (data as any).value as T;
-      // Also sync to localStorage for fast reads
-      localStorage.setItem(key, JSON.stringify(dbValue));
-      return { ...defaults, ...dbValue };
-    }
-  } catch (err) {
-    console.warn(`[Settings] DB load failed for ${key}:`, err);
-  }
-  // Fallback to localStorage
-  try {
-    const stored = localStorage.getItem(key);
-    if (stored) return { ...defaults, ...JSON.parse(stored) };
-  } catch { /* ignore */ }
-  return { ...defaults };
+  return loadEnvironmentSetting(key, defaults);
 }
 
 /**
  * Save a settings object to both localStorage (immediate) and DB (persistent).
  */
 async function saveToDB<T>(key: string, value: T): Promise<void> {
-  // Immediate localStorage write
-  localStorage.setItem(key, JSON.stringify(value));
-  // Persistent DB write
   try {
-    const { error } = await supabase
-      .from("admin_settings" as any)
-      .upsert({ key, value, updated_at: new Date().toISOString() } as any, { onConflict: "key" });
-    if (error) {
-      console.error(`[Settings] DB save failed for ${key}:`, error.message);
-    } else {
-      console.log(`[Settings] Saved ${key} to DB`);
-    }
+    await saveEnvironmentSetting(key, value);
   } catch (err) {
     console.error(`[Settings] DB save exception for ${key}:`, err);
   }
@@ -317,12 +294,12 @@ function normalizeLLMSettings(settings: LLMSettings): LLMSettings {
 /** Synchronous read from localStorage (fast, for use during LLM calls) */
 export function getLLMSettings(): LLMSettings {
   try {
-    const stored = localStorage.getItem(LLM_STORAGE_KEY);
+    const stored = readEnvironmentStorage(LLM_STORAGE_KEY);
     if (stored) {
       const merged = { ...llmDefaults, ...JSON.parse(stored) };
       const normalized = normalizeLLMSettings(merged);
       if (JSON.stringify(merged) !== JSON.stringify(normalized)) {
-        localStorage.setItem(LLM_STORAGE_KEY, JSON.stringify(normalized));
+        writeEnvironmentStorage(LLM_STORAGE_KEY, JSON.stringify(normalized));
       }
       return normalized;
     }
@@ -349,14 +326,14 @@ export async function saveLLMSettingsToDB(settings: LLMSettings): Promise<void> 
 export function saveLLMSettingsLocal(settings: Partial<LLMSettings>): LLMSettings {
   const current = getLLMSettings();
   const updated = normalizeLLMSettings({ ...current, ...settings });
-  localStorage.setItem(LLM_STORAGE_KEY, JSON.stringify(updated));
+  writeEnvironmentStorage(LLM_STORAGE_KEY, JSON.stringify(updated));
   return updated;
 }
 
 export function resetLLMSettings(): LLMSettings {
-  localStorage.removeItem(LLM_STORAGE_KEY);
+  removeEnvironmentStorage(LLM_STORAGE_KEY);
   // Also clear from DB
-  supabase.from("admin_settings" as any).delete().eq("key", LLM_STORAGE_KEY).then(() => {});
+  void deleteEnvironmentSetting(LLM_STORAGE_KEY).catch(() => {});
   return { ...llmDefaults };
 }
 
@@ -457,7 +434,7 @@ export const TTS_PRESETS: Record<string, { label: string; description: string; s
 /** Synchronous read from localStorage */
 export function getTTSSettings(): TTSSettings {
   try {
-    const stored = localStorage.getItem(TTS_STORAGE_KEY);
+    const stored = readEnvironmentStorage(TTS_STORAGE_KEY);
     if (stored) return { ...ttsDefaults, ...JSON.parse(stored) };
   } catch { /* ignore */ }
   return { ...ttsDefaults };
@@ -477,13 +454,13 @@ export async function saveTTSSettingsToDB(settings: TTSSettings): Promise<void> 
 export function saveTTSSettingsLocal(settings: Partial<TTSSettings>): TTSSettings {
   const current = getTTSSettings();
   const updated = { ...current, ...settings };
-  localStorage.setItem(TTS_STORAGE_KEY, JSON.stringify(updated));
+  writeEnvironmentStorage(TTS_STORAGE_KEY, JSON.stringify(updated));
   return updated;
 }
 
 export function resetTTSSettings(): TTSSettings {
-  localStorage.removeItem(TTS_STORAGE_KEY);
-  supabase.from("admin_settings" as any).delete().eq("key", TTS_STORAGE_KEY).then(() => {});
+  removeEnvironmentStorage(TTS_STORAGE_KEY);
+  void deleteEnvironmentSetting(TTS_STORAGE_KEY).catch(() => {});
   return { ...ttsDefaults };
 }
 
@@ -529,27 +506,27 @@ export function normalizeMaxPromptVariant(
 }
 
 const gameplayDefaults: GameplaySettings = {
-  MAX_PROMPT_VARIANT: normalizeMaxPromptVariant((defaultSettings as any).MAX_PROMPT_VARIANT, "legacy"),
+  MAX_PROMPT_VARIANT: normalizeMaxPromptVariant(defaultSettings.MAX_PROMPT_VARIANT, "legacy"),
   TRUST_THRESHOLD: defaultSettings.TRUST_THRESHOLD,
   TIMEOUT_SECONDS: defaultSettings.TIMEOUT_SECONDS,
   SHOW_QUESTIONNAIRE: true,
   MAX_INSULT_TOLERANCE: defaultSettings.MAX_INSULT_TOLERANCE,
   MIN_QUESTIONS_BEFORE_GATE: defaultSettings.MIN_QUESTIONS_BEFORE_GATE,
   RAG_TOP_K: defaultSettings.RAG_TOP_K,
-  RAG_RETRIEVE_K: (defaultSettings as any).RAG_RETRIEVE_K ?? 15,
-  RAG_RERANK_ENABLED: (defaultSettings as any).RAG_RERANK_ENABLED ?? true,
-  RAG_QUERY_REWRITE_ENABLED: (defaultSettings as any).RAG_QUERY_REWRITE_ENABLED ?? true,
-  RAG_EMBEDDING_PROVIDER: ((defaultSettings as any).RAG_EMBEDDING_PROVIDER as "voyage" | "openai") ?? "voyage",
-  RAG_MATCH_THRESHOLD: (defaultSettings as any).RAG_MATCH_THRESHOLD ?? 0.3,
-  RAG_RERANK_MODEL: ((defaultSettings as any).RAG_RERANK_MODEL as "rerank-2.5" | "rerank-2.5-lite") ?? "rerank-2.5-lite",
-  RAG_RERANK_TRUNCATION: (defaultSettings as any).RAG_RERANK_TRUNCATION ?? true,
-  RAG_SUMMARY_EVERY_N_TURNS: (defaultSettings as any).RAG_SUMMARY_EVERY_N_TURNS ?? 4,
+  RAG_RETRIEVE_K: defaultSettings.RAG_RETRIEVE_K ?? 15,
+  RAG_RERANK_ENABLED: defaultSettings.RAG_RERANK_ENABLED ?? true,
+  RAG_QUERY_REWRITE_ENABLED: defaultSettings.RAG_QUERY_REWRITE_ENABLED ?? true,
+  RAG_EMBEDDING_PROVIDER: defaultSettings.RAG_EMBEDDING_PROVIDER === "openai" ? "openai" : "voyage",
+  RAG_MATCH_THRESHOLD: defaultSettings.RAG_MATCH_THRESHOLD ?? 0.3,
+  RAG_RERANK_MODEL: defaultSettings.RAG_RERANK_MODEL === "rerank-2.5" ? "rerank-2.5" : "rerank-2.5-lite",
+  RAG_RERANK_TRUNCATION: defaultSettings.RAG_RERANK_TRUNCATION ?? true,
+  RAG_SUMMARY_EVERY_N_TURNS: defaultSettings.RAG_SUMMARY_EVERY_N_TURNS ?? 4,
   VIDEO_PLACEHOLDER_DURATION: defaultSettings.VIDEO_PLACEHOLDER_DURATION,
 };
 
 export function getGameplaySettings(): GameplaySettings {
   try {
-    const stored = localStorage.getItem(GAMEPLAY_STORAGE_KEY);
+    const stored = readEnvironmentStorage(GAMEPLAY_STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
       return {
@@ -577,13 +554,13 @@ export async function saveGameplaySettingsToDB(settings: GameplaySettings): Prom
 export function saveGameplaySettings(settings: Partial<GameplaySettings>): GameplaySettings {
   const current = getGameplaySettings();
   const updated = { ...current, ...settings };
-  localStorage.setItem(GAMEPLAY_STORAGE_KEY, JSON.stringify(updated));
+  writeEnvironmentStorage(GAMEPLAY_STORAGE_KEY, JSON.stringify(updated));
   return updated;
 }
 
 export function resetGameplaySettings(): GameplaySettings {
-  localStorage.removeItem(GAMEPLAY_STORAGE_KEY);
-  supabase.from("admin_settings" as any).delete().eq("key", GAMEPLAY_STORAGE_KEY).then(() => {});
+  removeEnvironmentStorage(GAMEPLAY_STORAGE_KEY);
+  void deleteEnvironmentSetting(GAMEPLAY_STORAGE_KEY).catch(() => {});
   return { ...gameplayDefaults };
 }
 
@@ -614,7 +591,7 @@ export const videoTriggerDefaults: VideoTriggerSettings = {
 
 export function getVideoTriggerSettings(): VideoTriggerSettings {
   try {
-    const stored = localStorage.getItem(VIDEO_TRIGGER_STORAGE_KEY);
+    const stored = readEnvironmentStorage(VIDEO_TRIGGER_STORAGE_KEY);
     if (stored) return { ...videoTriggerDefaults, ...JSON.parse(stored) };
   } catch { /* ignore */ }
   return { ...videoTriggerDefaults };
@@ -629,8 +606,8 @@ export async function saveVideoTriggerSettingsToDB(settings: VideoTriggerSetting
 }
 
 export function resetVideoTriggerSettings(): VideoTriggerSettings {
-  localStorage.removeItem(VIDEO_TRIGGER_STORAGE_KEY);
-  supabase.from("admin_settings" as any).delete().eq("key", VIDEO_TRIGGER_STORAGE_KEY).then(() => {});
+  removeEnvironmentStorage(VIDEO_TRIGGER_STORAGE_KEY);
+  void deleteEnvironmentSetting(VIDEO_TRIGGER_STORAGE_KEY).catch(() => {});
   return { ...videoTriggerDefaults };
 }
 
@@ -721,7 +698,7 @@ const gmPromptDefaults: GameMasterPromptSettings = {
 
 export function getGMPromptSettings(): GameMasterPromptSettings {
   try {
-    const stored = localStorage.getItem(GM_PROMPT_STORAGE_KEY);
+    const stored = readEnvironmentStorage(GM_PROMPT_STORAGE_KEY);
     if (stored) return { ...gmPromptDefaults, ...JSON.parse(stored) };
   } catch { /* ignore */ }
   return { ...gmPromptDefaults };
@@ -738,13 +715,13 @@ export async function saveGMPromptSettingsToDB(settings: GameMasterPromptSetting
 export function saveGMPromptSettings(settings: Partial<GameMasterPromptSettings>): GameMasterPromptSettings {
   const current = getGMPromptSettings();
   const updated = { ...current, ...settings };
-  localStorage.setItem(GM_PROMPT_STORAGE_KEY, JSON.stringify(updated));
+  writeEnvironmentStorage(GM_PROMPT_STORAGE_KEY, JSON.stringify(updated));
   return updated;
 }
 
 export function resetGMPromptSettings(): GameMasterPromptSettings {
-  localStorage.removeItem(GM_PROMPT_STORAGE_KEY);
-  supabase.from("admin_settings" as any).delete().eq("key", GM_PROMPT_STORAGE_KEY).then(() => {});
+  removeEnvironmentStorage(GM_PROMPT_STORAGE_KEY);
+  void deleteEnvironmentSetting(GM_PROMPT_STORAGE_KEY).catch(() => {});
   return { ...gmPromptDefaults };
 }
 
@@ -778,7 +755,7 @@ const maxPromptControlDefaults: MaxPromptControlSettings = {
 
 export function getMaxPromptControlSettings(): MaxPromptControlSettings {
   try {
-    const stored = localStorage.getItem(MAX_PROMPT_CONTROL_STORAGE_KEY);
+    const stored = readEnvironmentStorage(MAX_PROMPT_CONTROL_STORAGE_KEY);
     if (stored) return { ...maxPromptControlDefaults, ...JSON.parse(stored) };
   } catch { /* ignore */ }
   return { ...maxPromptControlDefaults };
@@ -795,13 +772,13 @@ export async function saveMaxPromptControlSettingsToDB(settings: MaxPromptContro
 export function saveMaxPromptControlSettings(settings: Partial<MaxPromptControlSettings>): MaxPromptControlSettings {
   const current = getMaxPromptControlSettings();
   const updated = { ...current, ...settings };
-  localStorage.setItem(MAX_PROMPT_CONTROL_STORAGE_KEY, JSON.stringify(updated));
+  writeEnvironmentStorage(MAX_PROMPT_CONTROL_STORAGE_KEY, JSON.stringify(updated));
   return updated;
 }
 
 export function resetMaxPromptControlSettings(): MaxPromptControlSettings {
-  localStorage.removeItem(MAX_PROMPT_CONTROL_STORAGE_KEY);
-  supabase.from("admin_settings" as any).delete().eq("key", MAX_PROMPT_CONTROL_STORAGE_KEY).then(() => {});
+  removeEnvironmentStorage(MAX_PROMPT_CONTROL_STORAGE_KEY);
+  void deleteEnvironmentSetting(MAX_PROMPT_CONTROL_STORAGE_KEY).catch(() => {});
   return { ...maxPromptControlDefaults };
 }
 
@@ -835,7 +812,7 @@ Bloquer toute formulation qui laisse entendre que Max sait plus que ce que le co
 
 export function getAntiHallucinationValidatorSettings(): AntiHallucinationValidatorSettings {
   try {
-    const stored = localStorage.getItem(ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY);
+    const stored = readEnvironmentStorage(ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY);
     if (stored) return { ...antiHallucinationValidatorDefaults, ...JSON.parse(stored) };
   } catch { /* ignore */ }
   return { ...antiHallucinationValidatorDefaults };
@@ -852,13 +829,13 @@ export async function saveAntiHallucinationValidatorSettingsToDB(settings: AntiH
 export function saveAntiHallucinationValidatorSettings(settings: Partial<AntiHallucinationValidatorSettings>): AntiHallucinationValidatorSettings {
   const current = getAntiHallucinationValidatorSettings();
   const updated = { ...current, ...settings };
-  localStorage.setItem(ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY, JSON.stringify(updated));
+  writeEnvironmentStorage(ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY, JSON.stringify(updated));
   return updated;
 }
 
 export function resetAntiHallucinationValidatorSettings(): AntiHallucinationValidatorSettings {
-  localStorage.removeItem(ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY);
-  supabase.from("admin_settings" as any).delete().eq("key", ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY).then(() => {});
+  removeEnvironmentStorage(ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY);
+  void deleteEnvironmentSetting(ANTI_HALLUCINATION_VALIDATOR_STORAGE_KEY).catch(() => {});
   return { ...antiHallucinationValidatorDefaults };
 }
 

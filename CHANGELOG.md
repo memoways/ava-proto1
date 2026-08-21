@@ -4,6 +4,32 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.26.0] — 2026-08-21 — Environnements isolés et accès nominatifs
+
+### Ajouté
+
+- Quatre contextes de réglages (`prod` et trois sandboxes) avec résolution
+  sandbox → production → défaut codé et stockage navigateur cloisonné.
+- Authentification admin nominative via Supabase Auth et `admin_users`, sélecteur
+  d'environnement persistant, signalétique production/sandbox et lancement de
+  l'expérience dans le contexte actif.
+- Portail public cinématique protégé par un mot de passe vérifié côté Lovable
+  Cloud, sans exposition de sa valeur au navigateur.
+- Attribution des sessions par environnement, contexte, campagne, testeur et
+  compte membre, avec filtres back-office et dimensions PostHog correspondantes.
+- Onglet Alertes interne et exclusion par défaut des sessions sandbox dans les
+  vues de consommation et de latence.
+
+### Sécurité et compatibilité
+
+- Migration additive/idempotente, politiques RLS conservant les écritures du
+  parcours public et migration inverse documentée.
+- Aucun nouvel appel réseau n'est ajouté au hot path voix : les réglages sont
+  toujours hydratés au bootstrap puis lus depuis le cache runtime.
+- Livraison exclusivement via Lovable/Lovable Cloud. Le plan, l'audit de
+  non-régression et la checklist de preview sont documentés dans
+  [`docs/plan_environnements_sandbox_auth.md`](docs/plan_environnements_sandbox_auth.md).
+
 ## [0.55.4] — 2026-08-09 — Configuration RAG explicite et métriques historiques
 
 ### Ajouté

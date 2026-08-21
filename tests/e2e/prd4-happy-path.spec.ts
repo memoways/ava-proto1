@@ -40,6 +40,7 @@ async function installNetworkFakes(
 ) {
   let maxTurnCount = 0;
   let labelCallCount = 0;
+  let gmPostTurnCount = 0;
   let ragCallCount = 0;
   let summaryCallCount = 0;
   let summaryLastTurn = 0;
@@ -62,6 +63,9 @@ async function installNetworkFakes(
       __e2eNativeVideoState?: { playing: boolean; playCount: number; pauseCount: number };
     };
     const testWindow = window as E2ETestWindow;
+    // These scenarios exercise the PRD4 flow after a successful public gate.
+    // Keep the production gate enabled while reproducing its tab-scoped unlock.
+    sessionStorage.setItem("ava:public-access:unlocked", "1");
     testWindow.__e2eNativeVideoState = { playing: false, playCount: 0, pauseCount: 0 };
     Object.defineProperty(HTMLMediaElement.prototype, "play", {
       configurable: true,
@@ -82,7 +86,7 @@ async function installNetworkFakes(
         }
       },
     });
-    localStorage.setItem("ava_gameplay_settings", JSON.stringify({ RAG_SUMMARY_EVERY_N_TURNS: 4 }));
+    localStorage.setItem("ava:prod:ava_gameplay_settings", JSON.stringify({ RAG_SUMMARY_EVERY_N_TURNS: 4 }));
     // PostHog intentionally filters HeadlessChrome as a bot. Use a regular
     // browser UA so this E2E can attest that real-user telemetry reaches the
     // network without weakening the production bot filter.
@@ -242,8 +246,11 @@ async function installNetworkFakes(
       id: ANONYMOUS_USER_ID,
       aud: "authenticated",
       role: "authenticated",
-      is_anonymous: true,
-      app_metadata: { provider: "anonymous", providers: ["anonymous"] },
+      email: options.diagnosticAdmin ? "info@memoways.com" : undefined,
+      is_anonymous: options.diagnosticAdmin !== true,
+      app_metadata: options.diagnosticAdmin
+        ? { provider: "email", providers: ["email"] }
+        : { provider: "anonymous", providers: ["anonymous"] },
       user_metadata: {},
       identities: [],
       created_at: new Date().toISOString(),
@@ -255,6 +262,31 @@ async function installNetworkFakes(
     const url = new URL(request.url());
     const table = url.pathname.split("/").pop();
 
+    if (table === "pin_current_orchestration_version") {
+      return json(route, "66666666-6666-4666-8666-666666666666");
+    }
+    if (table === "get_pinned_orchestration_runtime") {
+      return json(route, [{
+        version_id: "66666666-6666-4666-8666-666666666666",
+        version_number: 1,
+        prompt: "builtin://experience-director-v1",
+        config: {
+          schemaVersion: 1,
+          minimumHandoffTurn: 4,
+          maximumHandoffsPerSession: 1,
+          handoffTarget: "emma",
+          directorTimeoutMs: 12_000,
+          editor: {
+            tone: "balanced",
+            guidanceLength: "balanced",
+            priorities: ["narrative_continuity", "player_engagement", "safety", "pace"],
+            allowHandoffs: true,
+            allowCinematics: true,
+            customInstructions: "",
+          },
+        },
+      }]);
+    }
     if (table === "video_triggers") {
       return json(route, options.triggerVideoAtLabel ? [{
         id: "44444444-4444-4444-8444-444444444444",
@@ -271,8 +303,12 @@ async function installNetworkFakes(
         updated_at: new Date().toISOString(),
       }] : []);
     }
-    if (table === "user_roles") {
-      return json(route, options.diagnosticAdmin ? { role: "admin" } : null);
+    if (table === "admin_users") {
+      return json(route, options.diagnosticAdmin ? {
+        user_id: ANONYMOUS_USER_ID,
+        display_name: "Production",
+        default_environment_id: "prod",
+      } : null);
     }
     if (table === "conversation_turn_traces" && request.method() === "POST") {
       traceUploadStarted += 1;
@@ -290,9 +326,9 @@ async function installNetworkFakes(
     }
     if (table === "admin_settings") {
       if (url.searchParams.get("key") === "eq.ava_gameplay_settings") {
-        return json(route, { value: { TIMEOUT_SECONDS: 930 } });
+        return json(route, [{ environment_id: "prod", value: { TIMEOUT_SECONDS: 930 } }]);
       }
-      return json(route, null);
+      return json(route, []);
     }
     if (table === "character_prompts") {
       return json(route, []);
@@ -360,8 +396,12 @@ async function installNetworkFakes(
             : { themes: [], topics: [], intentions: [] },
         );
       } else if (system.includes("Game Master") || system.includes("end_recommended")) {
+        gmPostTurnCount += 1;
+        const triggerVideo = gmPostTurnCount === options.triggerVideoAtLabel;
         content = JSON.stringify({
-          labels: { themes: [], topics: [], intentions: [] },
+          labels: triggerVideo
+            ? { themes: ["famille"], topics: [], intentions: ["question"] }
+            : { themes: [], topics: [], intentions: [] },
           engagement_delta: 0,
           confusion_detected: false,
           role_usage_quality: "medium",
@@ -372,7 +412,15 @@ async function installNetworkFakes(
           end_recommended: false,
           moderation_flag: false,
           notes: "e2e",
-          trigger_video_id: null,
+          trigger_video_id: triggerVideo ? "44444444-4444-4444-8444-444444444444" : null,
+          action: triggerVideo
+            ? {
+                type: "cinematic",
+                videoId: "44444444-4444-4444-8444-444444444444",
+                reason: "souvenir familial",
+                confidence: 0.95,
+              }
+            : { type: "none" },
         });
       } else {
         maxTurnCount += 1;
@@ -467,6 +515,9 @@ test("le teaser démarre automatiquement avec le son puis Passer coupe tout", as
 });
 
 test("une cinématique HLS démarre automatiquement puis Passer coupe son média", async ({ page }) => {
+  // WebKit on the shared CI runner can spend most of the default 30 s budget
+  // bootstrapping HLS; keep actionability checks enabled with a realistic cap.
+  test.setTimeout(60_000);
   const transcripts = [
     "Parle-moi de Max.",
     "Que sais-tu au sujet d'Ava ?",
@@ -483,7 +534,9 @@ test("une cinématique HLS démarre automatiquement puis Passer coupe son média
   for (let turn = 1; turn <= 3; turn += 1) {
     await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
     await expect(page.getByText(transcripts[turn - 1], { exact: false })).toBeVisible();
-    await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+    const stopRecording = page.getByRole("button", { name: "Arrêter l'enregistrement" });
+    await expect(stopRecording).toBeEnabled();
+    await stopRecording.press("Enter");
     if (turn < 3) {
       await expect(page.getByText(`Réponse de Max pour le tour ${turn}.`)).toBeVisible({ timeout: 10_000 });
       await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();

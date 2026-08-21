@@ -11,7 +11,7 @@
  * key `ava_stt_dictionary`. Client-only read; nothing here is secret.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import { loadEnvironmentSetting, readEnvironmentStorage, saveEnvironmentSetting, writeEnvironmentStorage } from "@/services/environmentContext";
 
 export const STT_DICTIONARY_KEY = "ava_stt_dictionary";
 /** Deepgram Nova-3 keyterm cap. AssemblyAI is stricter but we soft-cap the same. */
@@ -62,7 +62,7 @@ function normalize(input: unknown): STTDictionary {
 export function getDictionaryTerms(): string[] {
   if (cached) return [...cached.terms];
   try {
-    const stored = localStorage.getItem(STT_DICTIONARY_KEY);
+    const stored = readEnvironmentStorage(STT_DICTIONARY_KEY);
     if (stored) {
       cached = normalize(JSON.parse(stored));
       return [...cached.terms];
@@ -85,17 +85,9 @@ export async function loadDictionaryFromDB(): Promise<STTDictionary> {
 
 async function loadDictionaryUncached(): Promise<STTDictionary> {
   try {
-    const { data, error } = await supabase
-      .from("admin_settings" as never)
-      .select("value")
-      .eq("key", STT_DICTIONARY_KEY)
-      .maybeSingle();
-    if (!error && data) {
-      const loaded = normalize((data as { value: unknown }).value);
-      localStorage.setItem(STT_DICTIONARY_KEY, JSON.stringify(loaded));
-      cached = loaded;
-      return { terms: [...loaded.terms] };
-    }
+    const loaded = normalize(await loadEnvironmentSetting(STT_DICTIONARY_KEY, { terms: DEFAULT_STT_DICTIONARY_TERMS }));
+    cached = loaded;
+    return { terms: [...loaded.terms] };
   } catch (err) {
     console.warn("[STT Dictionary] DB load failed:", err);
   }
@@ -106,16 +98,10 @@ async function loadDictionaryUncached(): Promise<STTDictionary> {
 
 export async function saveDictionaryToDB(dict: STTDictionary): Promise<STTDictionary> {
   const normalized = normalize(dict);
-  localStorage.setItem(STT_DICTIONARY_KEY, JSON.stringify(normalized));
+  writeEnvironmentStorage(STT_DICTIONARY_KEY, JSON.stringify(normalized));
   cached = normalized;
   try {
-    const { error } = await supabase
-      .from("admin_settings" as never)
-      .upsert(
-        { key: STT_DICTIONARY_KEY, value: normalized, updated_at: new Date().toISOString() } as never,
-        { onConflict: "key" },
-      );
-    if (error) console.error("[STT Dictionary] DB save failed:", error.message);
+    await saveEnvironmentSetting(STT_DICTIONARY_KEY, normalized);
   } catch (err) {
     console.error("[STT Dictionary] DB save exception:", err);
   }

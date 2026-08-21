@@ -8,9 +8,10 @@
  * Read-only — n'impacte pas le pipeline voix.
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
@@ -63,21 +64,24 @@ export default function VoiceUsageTab() {
   const [rows, setRows] = useState<AudioRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [period, setPeriod] = useState("7d");
+  const [includeSandbox, setIncludeSandbox] = useState(false);
 
-  useEffect(() => { loadData(); }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from("audio_latencies" as never)
       .select("*")
       .eq("direction", "out")
       .order("created_at", { ascending: false })
       .limit(1000);
+    if (!includeSandbox) query = query.neq("context_type", "sandbox");
+    const { data, error } = await query;
     if (error) toast.error("Erreur chargement consommation voix: " + error.message);
     else setRows((data as unknown as AudioRow[]) || []);
     setLoading(false);
-  }
+  }, [includeSandbox]);
+
+  useEffect(() => { void loadData(); }, [loadData]);
 
   const periodStart = useMemo(() => {
     const now = Date.now();
@@ -158,6 +162,11 @@ export default function VoiceUsageTab() {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Switch checked={includeSandbox} onCheckedChange={setIncludeSandbox} /> Inclure les sandboxes
+        </label>
+      </div>
       {/* Header KPIs */}
       <div className="grid grid-cols-2 tablet:grid-cols-3 tablet-lg:grid-cols-6 gap-3">
         <KPI label="Requêtes (période)" value={String(totalReqs)} />
