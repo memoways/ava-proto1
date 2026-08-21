@@ -40,7 +40,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ExternalLink, ShieldCheck } from "lucide-react";
 import { useAdminEnvironment } from "@/contexts/AdminEnvironmentContext";
-import { ENVIRONMENTS, type EnvironmentId } from "@/services/environmentContext";
+import { ENVIRONMENTS, canSwitchEnvironments, type EnvironmentId } from "@/services/environmentContext";
 import { trackEvent } from "@/services/posthogService";
 import {
   DEFAULT_ADMIN_TAB,
