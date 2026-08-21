@@ -40,7 +40,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ExternalLink, ShieldCheck } from "lucide-react";
 import { useAdminEnvironment } from "@/contexts/AdminEnvironmentContext";
-import { ENVIRONMENTS, type EnvironmentId } from "@/services/environmentContext";
+import { ENVIRONMENTS, canSwitchEnvironments, type EnvironmentId } from "@/services/environmentContext";
 import { trackEvent } from "@/services/posthogService";
 import {
   DEFAULT_ADMIN_TAB,
@@ -384,18 +384,21 @@ export default function Admin() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={environmentId} onValueChange={(value) => selectEnvironment(value as EnvironmentId)}>
-              <SelectTrigger className="w-[210px]" aria-label="Environnement actif">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ENVIRONMENTS.map((environment) => (
-                  <SelectItem key={environment.id} value={environment.id}>
-                    {environment.type === "production" ? "Production" : `Sandbox — ${environment.label}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {canSwitchEnvironments(profile) ? (
+              <Select value={environmentId} onValueChange={(value) => selectEnvironment(value as EnvironmentId)}>
+                <SelectTrigger className="w-[210px]" aria-label="Environnement actif">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ENVIRONMENTS.map((environment) => (
+                    <SelectItem key={environment.id} value={environment.id}>
+                      {environment.type === "production" ? "Production" : `Sandbox — ${environment.label}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+
             <Button variant="outline" asChild>
               <a href={`/?env=${encodeURIComponent(environmentId)}`} target="_blank" rel="noreferrer">
                 Tester l'expérience <ExternalLink className="ml-2 h-4 w-4" />

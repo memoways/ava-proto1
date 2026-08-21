@@ -28,7 +28,16 @@ export interface AdminUserProfile {
   user_id: string;
   display_name: string;
   default_environment_id: EnvironmentId;
+  email: string | null;
 }
+
+// Only this account may switch between settings environments.
+export const ENVIRONMENT_SWITCH_EMAIL = "ulrich.fischer@memoways.com";
+
+export function canSwitchEnvironments(profile: AdminUserProfile | null): boolean {
+  return (profile?.email ?? "").trim().toLowerCase() === ENVIRONMENT_SWITCH_EMAIL;
+}
+
 
 export interface RuntimeContext {
   environmentId: EnvironmentId;
@@ -205,7 +214,9 @@ export async function getAdminUserProfile(user: User | null): Promise<AdminUserP
     user_id: row.user_id,
     display_name: row.display_name,
     default_environment_id: normalizeEnvironment(row.default_environment_id),
+    email: user.email ?? null,
   };
+
 }
 
 export function deriveContextType(input: {
