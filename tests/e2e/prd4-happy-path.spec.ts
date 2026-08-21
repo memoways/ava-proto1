@@ -534,7 +534,9 @@ test("une cinématique HLS démarre automatiquement puis Passer coupe son média
   for (let turn = 1; turn <= 3; turn += 1) {
     await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
     await expect(page.getByText(transcripts[turn - 1], { exact: false })).toBeVisible();
-    await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+    const stopRecording = page.getByRole("button", { name: "Arrêter l'enregistrement" });
+    await expect(stopRecording).toBeEnabled();
+    await stopRecording.press("Enter");
     if (turn < 3) {
       await expect(page.getByText(`Réponse de Max pour le tour ${turn}.`)).toBeVisible({ timeout: 10_000 });
       await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
