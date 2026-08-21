@@ -271,19 +271,38 @@ serve(async (req) => {
 
     // ========== SYNC VIDEOS (independent path) ==========
     let videosSynced = 0;
+    let videosSkipped = 0;
     const perVideo: any[] = [];
+    const videoSyncErrors: Array<{ title: string; error: string }> = [];
+    const videoSkippedDetails: Array<{ title: string; reason: string }> = [];
     if (videosDbId) {
       console.log('[sync-notion] Syncing videos DB:', videosDbId);
       // Purge legacy fakes that never had a notion_id
       await supabase.from('video_triggers').delete().is('notion_id', null);
 
-      const videoPages = await fetchNotionDatabase(videosDbId);
+      // Only videos flagged "En ligne" in Notion are exposed to the app.
+      let videoPages: NotionPage[] = [];
+      try {
+        videoPages = await fetchNotionDatabase(videosDbId, {
+          property: 'État',
+          status: { equals: 'En ligne' },
+        });
+      } catch (filterError) {
+        console.warn('[sync-notion] État status filter failed, falling back to client-side filter:', filterError);
+        videoPages = await fetchNotionDatabase(videosDbId);
+      }
       const seenNotionIds: string[] = [];
 
       for (const page of videoPages) {
         const props = page.properties;
         const title = extractTitle(props['Titre de la vidéo']) || extractTitle(props['Titre']) || '';
         if (!title.trim()) continue;
+        const etat = extractStatus(props['État']) || extractStatus(props['Etat']);
+        if (etat !== 'En ligne') {
+          videosSkipped++;
+          videoSkippedDetails.push({ title, reason: `État = ${etat || 'non défini'}` });
+          continue;
+        }
         const context = extractRichText(props['Contexte']);
         const description = extractRichText(props['Description']);
         const priority = extractNumber(props['Priorité']) ?? extractNumber(props['Priorite']) ?? 1;
@@ -310,6 +329,7 @@ serve(async (req) => {
           .upsert(record, { onConflict: 'notion_id' });
         if (vErr) {
           console.error(`[sync-notion] video upsert error for ${title}:`, vErr);
+          videoSyncErrors.push({ title, error: vErr.message });
           continue;
         }
         seenNotionIds.push(page.id);
@@ -317,7 +337,7 @@ serve(async (req) => {
         perVideo.push({ title, themes, priority, type, has_url: !!videoUrl });
       }
 
-      // Optional: prune rows whose Notion page disappeared
+      // Prune rows whose Notion page disappeared or is no longer "En ligne"
       if (seenNotionIds.length) {
         await supabase
           .from('video_triggers')
@@ -326,6 +346,7 @@ serve(async (req) => {
           .not('notion_id', 'in', `(${seenNotionIds.map((id) => `"${id}"`).join(',')})`);
       }
     }
+
 
     // Profile-scoped wipe. Other profiles stay queryable until an explicit activation.
     let wipedAll = false;
