@@ -59,6 +59,19 @@ manuelle des quatre comptes, la désactivation du sign-up public, l'application
 de la migration, la publication de la fonction et la checklist d'acceptation
 doivent être effectuées dans la preview Lovable avant toute publication.
 
+### État Lovable Cloud — 2026-08-21 (préparation v0.26.0, non publiée)
+
+- Migration `20260821120000_settings_environments_admin_users.sql` : appliquée.
+- 4 environnements créés (`prod`, `sandbox-ulrich`, `sandbox-romed`, `sandbox-benoit`),
+  13 réglages historiques conservés en `prod`, 87 sessions historiques en `prod`,
+  4 profils personnages par environnement, 1 version GM publiée par environnement.
+- Edge Functions publiées : `verify-public-access`, `posthog-latency-stats`,
+  `streaming-avatar-session`, `sync-notion`.
+- Auth : inscription publique désactivée, authentification anonyme conservée.
+- Restant à faire par l'équipe : créer les comptes `info@memoways.com` et
+  `benoitperrincreate@gmail.com` (mots de passe définis dans l'interface Auth),
+  puis enregistrer le mot de passe public prod depuis Admin → Technique.
+
 ### Ordre d'activation dans Lovable Cloud
 
 1. Créer manuellement les quatre comptes Auth avec les adresses prévues dans la
