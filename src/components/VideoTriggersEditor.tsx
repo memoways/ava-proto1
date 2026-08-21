@@ -20,6 +20,16 @@ import {
   type VideoTriggerSettings,
 } from "@/services/settingsService";
 import { supabase } from "@/integrations/supabase/client";
+import { AVA_NOTION_DATABASES } from "@/services/ragService";
+import { getCachedSession } from "@/services/gameAuth";
+import {
+  appendVideoSyncRun,
+  diffTitles,
+  loadVideoSyncHistory,
+  type VideoSyncRunSummary,
+} from "@/services/videoSyncHistory";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 
 const TYPE_OPTIONS = ["intro", "interlude", "mid_conversation"];
 const TRANSITION_OPTIONS = ["fade_black", "glitch", "screen_share"];
@@ -30,6 +40,7 @@ interface CinematicEventRow {
   created_at: string;
   payload: { videoId?: string; reason?: string; blockedReason?: string } | null;
 }
+
 
 function VideoTriggerRulesPanel() {
   const [settings, setSettings] = useState<VideoTriggerSettings>(videoTriggerDefaults);
