@@ -54,10 +54,10 @@ sans ajouter d'appel réseau dans le pipeline voix après le bootstrap.
 ## Validation Lovable
 
 La migration et la nouvelle Edge Function sont destinées exclusivement au projet
-Lovable Cloud lié à ce dépôt. La création manuelle des quatre comptes, la
-désactivation du sign-up public, l'application de la migration, la publication
-de la fonction et la checklist d'acceptation doivent être effectuées dans la
-preview Lovable avant fusion.
+Lovable Cloud lié à ce dépôt. Après le squash merge sur `main`, la création
+manuelle des quatre comptes, la désactivation du sign-up public, l'application
+de la migration, la publication de la fonction et la checklist d'acceptation
+doivent être effectuées dans la preview Lovable avant toute publication.
 
 ### Ordre d'activation dans Lovable Cloud
 
@@ -70,13 +70,16 @@ preview Lovable avant fusion.
 4. Depuis Admin → Technique en contexte Production, enregistrer le premier mot
    de passe public. Seule son empreinte SHA-256 est stockée.
 5. Exécuter les dix scénarios d'acceptation sur la preview Lovable, sur mobile et
-   desktop, puis vérifier les deux domaines de production avant fusion.
+   desktop, puis vérifier les deux domaines de production avant publication.
 
 ### Résultats automatisés locaux
 
 - `npm test` : 64 fichiers, 263 tests réussis, dont migration rejouée deux fois
   et tests RLS existants.
 - `npm run build` : réussi avec Vite 5.4.19.
+- `npm run test:e2e` : 11 scénarios Playwright réussis sur Chromium, Firefox et
+  WebKit; le fixture reproduit le portail public déverrouillé, le contexte prod,
+  un compte membre autorisé et une orchestration publiée.
 - ESLint ciblé sur les nouveaux fichiers et les modules runtime refactorisés :
   aucune erreur ni avertissement.
 - `npm run lint` global : reste rouge sur des erreurs historiques hors périmètre
