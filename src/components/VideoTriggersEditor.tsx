@@ -154,7 +154,127 @@ function VideoTriggerRulesPanel() {
   );
 }
 
+function NotionVideoSyncPanel({ onSynced }: { onSynced: () => Promise<void> | void }) {
+  const [history, setHistory] = useState<VideoSyncRunSummary[]>([]);
+  const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => {
+    loadVideoSyncHistory().then(setHistory).catch(() => setHistory([]));
+  }, []);
+
+  async function runSync() {
+    setSyncing(true);
+    try {
+      const session = await getCachedSession();
+      const token = session?.access_token;
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-notion`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ databases: { videos: AVA_NOTION_DATABASES.videos } }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+
+      const titles: string[] = (data.per_video ?? []).map((v: { title: string }) => v.title);
+      const { added, removed } = diffTitles(titles, history[0]);
+      const run: VideoSyncRunSummary = {
+        at: new Date().toISOString(),
+        synced: data.videos_synced ?? 0,
+        skipped: data.videos_skipped ?? 0,
+        titles,
+        added,
+        removed,
+        missingMedia: (data.per_video ?? []).filter((v: { has_url?: boolean }) => !v.has_url).length,
+        errors: (data.video_sync_errors ?? []).map(
+          (e: { title: string; error: string }) => `${e.title} : ${e.error}`,
+        ),
+        latencyMs: data.latency_ms ?? 0,
+      };
+      setHistory(await appendVideoSyncRun(run, history));
+      toast.success(`Sync Notion : ${run.synced} vidéo(s) « En ligne », ${run.skipped} ignorée(s)`);
+      await onSynced();
+    } catch (err) {
+      toast.error("Erreur sync Notion : " + (err as Error).message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  const last = history[0];
+
+  return (
+    <section className="border rounded-lg p-4 space-y-3 bg-muted/5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-semibold text-base">Synchronisation Notion</h3>
+          <p className="text-xs text-muted-foreground">
+            Importe la base « 🎬 Vidéos AVA ». Seules les vidéos dont l'<strong>État</strong> est
+            {" "}<em>En ligne</em> sont publiées dans l'application ; les autres sont retirées.
+          </p>
+        </div>
+        <Button size="sm" onClick={runSync} disabled={syncing}>
+          <RefreshCw className={`h-3 w-3 mr-1 ${syncing ? "animate-spin" : ""}`} />
+          {syncing ? "Synchronisation…" : "Synchroniser avec Notion"}
+        </Button>
+      </div>
+
+      {last ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div className="border rounded p-2">
+            <div className="text-[10px] uppercase text-muted-foreground">Dernier sync</div>
+            <div>{new Date(last.at).toLocaleString("fr-FR")}</div>
+          </div>
+          <div className="border rounded p-2">
+            <div className="text-[10px] uppercase text-muted-foreground">Vidéos en ligne</div>
+            <div>{last.synced}</div>
+          </div>
+          <div className="border rounded p-2">
+            <div className="text-[10px] uppercase text-muted-foreground">Ignorées (État ≠ En ligne)</div>
+            <div>{last.skipped}</div>
+          </div>
+          <div className="border rounded p-2">
+            <div className="text-[10px] uppercase text-muted-foreground">Média absent</div>
+            <div>{last.missingMedia}</div>
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">Aucun sync enregistré dans cet environnement.</p>
+      )}
+
+      {history.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-xs font-medium text-muted-foreground">3 derniers syncs</div>
+          {history.map((run) => (
+            <div key={run.at} className="border-t pt-2 text-xs space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{new Date(run.at).toLocaleString("fr-FR")}</Badge>
+                <span>{run.synced} en ligne · {run.skipped} ignorée(s) · {Math.round(run.latencyMs / 100) / 10}s</span>
+              </div>
+              {run.added.length > 0 && (
+                <p className="text-muted-foreground">+ Ajoutées : {run.added.join(", ")}</p>
+              )}
+              {run.removed.length > 0 && (
+                <p className="text-muted-foreground">− Retirées : {run.removed.join(", ")}</p>
+              )}
+              {run.added.length === 0 && run.removed.length === 0 && (
+                <p className="text-muted-foreground/70 italic">Aucun changement de catalogue</p>
+              )}
+              {run.errors.length > 0 && (
+                <p className="text-destructive">Erreurs : {run.errors.join(" · ")}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function VideoTriggersEditor() {
+
   const [triggers, setTriggers] = useState<VideoTriggerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
