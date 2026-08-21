@@ -45,3 +45,17 @@ Toute modification effectuée hors de Lovable doit rester compatible avec Lovabl
 - Le canon du personnage vit dans **Notion** (tables `characters`/`character_prompts`), pas dans le repo — vérifier la fiche avant de modifier les prompts hardcodés
 - Les défauts de prompts dans `settingsService.ts` sont surchargés par `admin_settings`/localStorage : modifier un défaut n'a d'effet qu'après reset de la clé concernée dans l'admin
 - Voir STORY.md §Dernière session pour l'état courant exact
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs are tracked in GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The default five-role triage vocabulary is used. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Domain documentation uses a single-context layout. See `docs/agents/domain.md`.
