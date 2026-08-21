@@ -802,6 +802,10 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
       mapping_warnings: mappingWarnings,
       per_character: perCharacter,
       videos_synced: videosSynced,
+      videos_skipped: videosSkipped,
+      video_sync_errors: videoSyncErrors,
+      video_skipped_details: videoSkippedDetails,
+
       per_video: perVideo,
       wiped_all: wipedAll,
       in_place_profile_refresh: inPlaceProfileRefresh,
