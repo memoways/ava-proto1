@@ -364,7 +364,9 @@ export default function VideoTriggersEditor() {
 
   return (
     <div className="space-y-4">
+    <NotionVideoSyncPanel onSynced={fetchTriggers} />
     <VideoTriggerRulesPanel />
+
     <section className="border rounded-lg p-4 space-y-3">
       <div className="flex items-center justify-between">
         <div>
