@@ -214,7 +214,9 @@ export async function getAdminUserProfile(user: User | null): Promise<AdminUserP
     user_id: row.user_id,
     display_name: row.display_name,
     default_environment_id: normalizeEnvironment(row.default_environment_id),
+    email: user.email ?? null,
   };
+
 }
 
 export function deriveContextType(input: {
