@@ -51,6 +51,8 @@ export interface ResponseOutputTurnContext {
   voiceId?: string;
   /** Per-character TTS provider override. */
   providerId?: import("@/services/tts/types").TTSProviderId;
+  /** Active character key so Gradium (and later providers) can apply per-character tuning. */
+  characterKey?: string;
 }
 
 export interface ResponseOutputResult {

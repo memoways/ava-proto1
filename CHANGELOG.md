@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.28.0] — 2026-08-25 — Réglages Gradium TTS par personnage
+
+### Ajouté
+
+- Sélecteur Max / Emma dans Admin → Technique avancée → TTS Config → Gradium.
+- Réglages fins Gradium distincts par personnage (temp, similarité, vitesse,
+  rewrite, pronunciation), testables en REST et en streaming avec la Voice ID
+  Orchestration du personnage choisi.
+- Le runtime transmet `characterKey` à Gradium pour appliquer ces réglages
+  pendant l’appel.
+
+### Conservé
+
+- Voice ID et provider TTS restent dans Expérience → Réglages personnages.
+- Format audio et streaming WebSocket restent globaux. Aucune migration BDD.
+
+Plan : [`docs/plan_gradium_tts_par_personnage.md`](docs/plan_gradium_tts_par_personnage.md).
+
 ## [0.27.2] — 2026-08-25 — Emma joignable dès qu’elle est activée
 
 ### Corrigé

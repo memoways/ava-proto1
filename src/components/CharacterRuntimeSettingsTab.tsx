@@ -238,7 +238,7 @@ export default function CharacterRuntimeSettingsTab() {
                   <Input value={profile.tts_voice_id ?? ""} onChange={(event) => patchProfile(profile.id, { tts_voice_id: event.target.value || null })} placeholder="Voice ID du personnage" />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Le provider et le Voice ID sont appliqués à la voix de ce personnage. Les réglages propres au provider (modèle, format, vitesse…) restent dans TTS Config.
+                  Le provider et le Voice ID sont appliqués à la voix de ce personnage. Les réglages fins Gradium (temp, similarité, vitesse…) se règlent par personnage dans TTS Config.
                 </p>
 
                 <div className="space-y-2 rounded bg-muted/40 p-3">

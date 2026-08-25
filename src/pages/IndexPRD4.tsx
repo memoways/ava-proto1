@@ -479,6 +479,7 @@ const IndexPRD4 = () => {
       onPlaybackStart?: () => void;
       voiceId?: string;
       providerId?: TTSProviderId;
+      characterKey?: string;
     } = {},
   ): Promise<ResponseOutputResult> => {
     let output = responseOutputRef.current;
@@ -500,6 +501,7 @@ const IndexPRD4 = () => {
         onPlaybackStart: context.onPlaybackStart,
         voiceId: context.voiceId,
         providerId: context.providerId,
+        characterKey: context.characterKey ?? activeCharacterRef.current,
       });
     } catch (error) {
       if (context.signal?.aborted) {
@@ -546,6 +548,7 @@ const IndexPRD4 = () => {
           onPlaybackStart: context.onPlaybackStart,
           voiceId: context.voiceId,
           providerId: context.providerId,
+          characterKey: context.characterKey ?? activeCharacterRef.current,
         });
       }
       return {
@@ -881,6 +884,7 @@ const IndexPRD4 = () => {
         turnIndex: 0,
         voiceId: activeVoiceIdRef.current ?? undefined,
         providerId: activeTTSProviderIdRef.current ?? undefined,
+        characterKey: startingCharacter,
       });
     } catch (err) {
       console.warn("[PRD4] opening output failed:", err);
@@ -1123,6 +1127,7 @@ const IndexPRD4 = () => {
           onPlaybackStart,
           voiceId: activeVoiceIdRef.current ?? undefined,
           providerId: activeTTSProviderIdRef.current ?? undefined,
+          characterKey: activeCharacterRef.current,
         }).finally(() => {
           turnController.signal.removeEventListener("abort", abortOutputFromTurn);
           if (activeOutputControllerRef.current === outputController) activeOutputControllerRef.current = null;
@@ -1651,6 +1656,7 @@ const IndexPRD4 = () => {
           turnIndex: conversationRef.current.filter((message) => message.role === "user").length,
           voiceId: profile?.ttsVoiceId ?? undefined,
           providerId: asTTSProviderId(profile?.ttsProvider) ?? undefined,
+          characterKey: target,
         });
       } else {
         setHandoffCalling(false);

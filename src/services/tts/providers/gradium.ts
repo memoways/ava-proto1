@@ -7,7 +7,7 @@
  */
 
 import type { TTSProvider, TTSGenerateContext, TTSGenerateResult, TTSStreamPlaybackHandle, TTSStreamGenerationStats } from "@/services/tts/types";
-import { getGradiumSettings, type GradiumSettings } from "@/services/tts/providerSettings";
+import { resolveGradiumSettings, type GradiumSettings } from "@/services/tts/providerSettings";
 import { debugLogger } from "@/services/debugLogger";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
 import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
@@ -49,7 +49,7 @@ export const gradiumProvider: TTSProvider = {
   description: "TTS Gradium (WebSocket streaming + REST fallback). Voix naturelles, 237 voix.",
 
   async generate(text: string, ctx?: TTSGenerateContext): Promise<TTSGenerateResult> {
-    const s = getGradiumSettings();
+    const s = resolveGradiumSettings(ctx?.characterKey);
     const preparedText = prepareTextForTTS(text);
     const voiceId = ctx?.voiceId || s.voiceId;
 
@@ -104,7 +104,7 @@ export const gradiumProvider: TTSProvider = {
   },
 
   createStreamingPlayback(text: string, ctx?: TTSGenerateContext): TTSStreamPlaybackHandle | null {
-    const s = getGradiumSettings();
+    const s = resolveGradiumSettings(ctx?.characterKey);
     if (!s.streamingEnabled || !isStreamingSupported()) return null;
     return createStreamingHandleWithFallback(this, text, s, ctx);
   },
