@@ -107,7 +107,29 @@ export function resetHumeSettings(): HumeSettings {
 
 // ---------------- Gradium ----------------
 
-export interface GradiumSettings {
+/** Voice-shaping params that can differ per character. Transport stays global. */
+export interface GradiumVoiceTuning {
+  /** Sampling temperature (0.0–1.4). 0 = deterministic. */
+  temp: number;
+  /** Voice similarity (1.0–4.0). Higher = closer to target voice. */
+  cfgCoef: number;
+  /** Speech speed padding bonus (-4.0 to 4.0). Negative = faster, positive = slower. */
+  paddingBonus: number;
+  /** Text rewriting rules — usually a language code like "fr", "en". */
+  rewriteRules: string;
+  /** Optional pronunciation dictionary id, applied per request. */
+  pronunciationId: string;
+}
+
+export const GRADIUM_VOICE_TUNING_DEFAULTS: GradiumVoiceTuning = {
+  temp: 0.7,
+  cfgCoef: 2.0,
+  paddingBonus: 0.0,
+  rewriteRules: "fr",
+  pronunciationId: "",
+};
+
+export interface GradiumSettings extends GradiumVoiceTuning {
   voiceId: string;
   outputFormat:
     | "wav"
@@ -122,20 +144,12 @@ export interface GradiumSettings {
     | "pcm_24000"
     | "pcm_44100"
     | "pcm_48000";
-  /** Sampling temperature (0.0–1.4). 0 = deterministic. */
-  temp: number;
-  /** Voice similarity (1.0–4.0). Higher = closer to target voice. */
-  cfgCoef: number;
-  /** Speech speed padding bonus (-4.0 to 4.0). Negative = faster, positive = slower. */
-  paddingBonus: number;
-  /** Text rewriting rules — usually a language code like "fr", "en". */
-  rewriteRules: string;
-  /** Optional pronunciation dictionary id, applied per request. */
-  pronunciationId: string;
   /** WebSocket streaming (progressive playback). Falls back to REST on failure. */
   streamingEnabled: boolean;
   /** Raw PCM format requested over the WebSocket ("pcm_48000" is Gradium's native rate). */
   streamingFormat: "pcm_24000" | "pcm_48000";
+  /** Per-character voice-shaping overrides. Missing key → top-level defaults. */
+  byCharacter: Record<string, Partial<GradiumVoiceTuning>>;
   /** Bumped when defaults change so migrateGradium can upgrade stored values once. */
   settingsVersion?: number;
 }
@@ -153,13 +167,10 @@ const GRADIUM_KEY = "ava_tts_settings_gradium";
 const gradiumDefaults: GradiumSettings = {
   voiceId: "b5ioHAR7JuHVLskk",
   outputFormat: "opus",
-  temp: 0.7,
-  cfgCoef: 2.0,
-  paddingBonus: 0.0,
-  rewriteRules: "fr",
-  pronunciationId: "",
+  ...GRADIUM_VOICE_TUNING_DEFAULTS,
   streamingEnabled: true,
   streamingFormat: "pcm_24000",
+  byCharacter: {},
   settingsVersion: 2,
 };
 
@@ -179,15 +190,70 @@ function migrateGradium(s: GradiumSettings): GradiumSettings {
       settingsVersion: 2,
     };
   }
+  if (!next.byCharacter || typeof next.byCharacter !== "object" || Array.isArray(next.byCharacter)) {
+    next = { ...next, byCharacter: {} };
+  }
   return next;
+}
+
+function readTuningField<K extends keyof GradiumVoiceTuning>(
+  override: Partial<GradiumVoiceTuning> | undefined,
+  key: K,
+  fallback: GradiumVoiceTuning[K],
+): GradiumVoiceTuning[K] {
+  const value = override?.[key];
+  return value === undefined ? fallback : value;
+}
+
+export function getGradiumVoiceTuning(
+  settings: GradiumSettings,
+  characterKey?: string | null,
+): GradiumVoiceTuning {
+  const override = characterKey ? settings.byCharacter?.[characterKey] : undefined;
+  return {
+    temp: readTuningField(override, "temp", settings.temp),
+    cfgCoef: readTuningField(override, "cfgCoef", settings.cfgCoef),
+    paddingBonus: readTuningField(override, "paddingBonus", settings.paddingBonus),
+    rewriteRules: readTuningField(override, "rewriteRules", settings.rewriteRules),
+    pronunciationId: readTuningField(override, "pronunciationId", settings.pronunciationId),
+  };
+}
+
+/** Merge global Gradium settings with the optional per-character voice-shaping override. */
+export function resolveGradiumSettings(characterKey?: string | null): GradiumSettings {
+  const settings = getGradiumSettings();
+  if (!characterKey) return settings;
+  return { ...settings, ...getGradiumVoiceTuning(settings, characterKey) };
+}
+
+export function patchGradiumCharacterTuning(
+  settings: GradiumSettings,
+  characterKey: string,
+  patch: Partial<GradiumVoiceTuning>,
+): GradiumSettings {
+  const nextTuning = { ...getGradiumVoiceTuning(settings, characterKey), ...patch };
+  return {
+    ...settings,
+    byCharacter: {
+      ...settings.byCharacter,
+      [characterKey]: nextTuning,
+    },
+  };
 }
 
 export function getGradiumSettings(): GradiumSettings {
   try {
     const stored = readEnvironmentStorage(GRADIUM_KEY);
-    if (stored) return migrateGradium({ ...gradiumDefaults, ...JSON.parse(stored) });
+    if (stored) {
+      const parsed = JSON.parse(stored) as Partial<GradiumSettings>;
+      return migrateGradium({
+        ...gradiumDefaults,
+        ...parsed,
+        byCharacter: { ...(parsed.byCharacter ?? {}) },
+      });
+    }
   } catch { /* ignore */ }
-  return { ...gradiumDefaults };
+  return { ...gradiumDefaults, byCharacter: {} };
 }
 
 export async function loadGradiumSettingsFromDB(): Promise<GradiumSettings> {
@@ -202,7 +268,7 @@ export async function saveGradiumSettingsToDB(settings: GradiumSettings): Promis
 export function resetGradiumSettings(): GradiumSettings {
   removeEnvironmentStorage(GRADIUM_KEY);
   void deleteEnvironmentSetting(GRADIUM_KEY).catch(() => {});
-  return { ...gradiumDefaults };
+  return { ...gradiumDefaults, byCharacter: {} };
 }
 
 // ---------------- Active provider selection ----------------

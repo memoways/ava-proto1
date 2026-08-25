@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-25 (Emma joignable dès activation Orchestration)
+> **Last Updated**: 2026-08-25 (Gradium TTS par personnage)
 
 ---
 
@@ -72,6 +72,19 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-25 — Réglages Gradium TTS par personnage 🔹
+
+**Le problème.** Max et Emma partagent désormais la même session, mais Gradium
+n’avait qu’un seul jeu de réglages fins (temp, similarité, vitesse, rewrite).
+On ne pouvait pas affiner Emma sans changer Max, ni tester la voix du
+personnage choisi dans TTS Config.
+
+**Correctif.** Admin → Technique avancée → TTS Config : sélecteur Max / Emma
+dans le panneau Gradium, réglages fins distincts, tests REST et streaming
+branchés sur la Voice ID Orchestration du personnage. Le runtime transmet
+`characterKey` à Gradium. Format et streaming restent globaux. Plan :
+[`docs/plan_gradium_tts_par_personnage.md`](docs/plan_gradium_tts_par_personnage.md).
 
 ### 2026-08-25 — Emma joignable dès qu’elle est activée 🔹
 
@@ -2125,18 +2138,21 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 
 ### Dernière session
 
+**2026-08-25 — Gradium TTS par personnage**
+
+Admin TTS Config : sélecteur Max / Emma dans Gradium, réglages fins et tests
+par personnage. Runtime : `characterKey` transmis à la génération Gradium.
+Plan : [`docs/plan_gradium_tts_par_personnage.md`](docs/plan_gradium_tts_par_personnage.md).
 
 **Préconditions vérifiées au départ :**
 - [x] Build passait au démarrage
-- [x] Branche `feat/emma-conversation-switch` dédiée
+- [x] Branche `feat/gradium-tts-per-character` dédiée
 - [x] STORY.md lu et contexte compris
-- [x] Open Windows revues
 
 **Postconditions au départ :**
-- [x] Typecheck et lint ciblé passent
-- [x] 259 tests unitaires au vert
+- [x] Tests Gradium + TTS Config au vert
 - [x] STORY.md mis à jour
-- [x] Open Windows mis à jour
+- [x] Plan enregistré dans docs/
 
 ---
 

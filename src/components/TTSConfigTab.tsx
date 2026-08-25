@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -24,13 +24,16 @@ import {
   getGradiumSettings,
   loadGradiumSettingsFromDB,
   saveGradiumSettingsToDB,
-  resetGradiumSettings,
+  getGradiumVoiceTuning,
+  patchGradiumCharacterTuning,
+  GRADIUM_VOICE_TUNING_DEFAULTS,
   INWORLD_MODELS,
   GRADIUM_OUTPUT_FORMATS,
 
   type InworldSettings,
   type HumeSettings,
   type GradiumSettings,
+  type GradiumVoiceTuning,
 } from "@/services/tts/providerSettings";
 import {
   getTTSSettings,
@@ -41,8 +44,22 @@ import {
   TTS_PRESETS,
   type TTSSettings,
 } from "@/services/settingsService";
+import { listCharacterRuntimeProfiles } from "@/services/experienceOrchestration";
 
 const TEST_PHRASE = "Écoute, je ne sais pas qui tu es... mais si tu sais quelque chose sur Ava, il faut me le dire maintenant. Je n'ai plus beaucoup de temps.";
+const GRADIUM_CHARACTER_ORDER = ["max", "emma"];
+
+type GradiumCharacterOption = {
+  character_key: string;
+  display_name: string;
+  tts_voice_id: string | null;
+  tts_provider: string | null;
+};
+
+const FALLBACK_GRADIUM_CHARACTERS: GradiumCharacterOption[] = [
+  { character_key: "max", display_name: "Max", tts_voice_id: null, tts_provider: null },
+  { character_key: "emma", display_name: "Emma", tts_voice_id: null, tts_provider: null },
+];
 
 export default function TTSConfigTab() {
   const [activeProvider, setActiveProviderState] = useState<TTSProviderId>(getActiveProviderId());
@@ -66,6 +83,10 @@ export default function TTSConfigTab() {
   const [grSettings, setGrSettings] = useState<GradiumSettings>(getGradiumSettings());
   const [grSaved, setGrSaved] = useState<GradiumSettings>(getGradiumSettings());
   const [savingGr, setSavingGr] = useState(false);
+  const [grCharacters, setGrCharacters] = useState<GradiumCharacterOption[]>(FALLBACK_GRADIUM_CHARACTERS);
+  const [grCharacterKey, setGrCharacterKey] = useState("max");
+  const grCharacterKeyRef = useRef(grCharacterKey);
+  grCharacterKeyRef.current = grCharacterKey;
 
   // Test
   const [testing, setTesting] = useState<TTSProviderId | null>(null);
@@ -77,6 +98,20 @@ export default function TTSConfigTab() {
     loadInworldSettingsFromDB().then((s) => { setIwSettings(s); setIwSaved(s); });
     loadHumeSettingsFromDB().then((s) => { setHuSettings(s); setHuSaved(s); });
     loadGradiumSettingsFromDB().then((s) => { setGrSettings(s); setGrSaved(s); });
+    listCharacterRuntimeProfiles()
+      .then((profiles) => {
+        const options = profiles
+          .filter((profile) => GRADIUM_CHARACTER_ORDER.includes(profile.character_key))
+          .sort((a, b) => GRADIUM_CHARACTER_ORDER.indexOf(a.character_key) - GRADIUM_CHARACTER_ORDER.indexOf(b.character_key))
+          .map((profile) => ({
+            character_key: profile.character_key,
+            display_name: profile.display_name,
+            tts_voice_id: profile.tts_voice_id,
+            tts_provider: profile.tts_provider,
+          }));
+        if (options.length > 0) setGrCharacters(options);
+      })
+      .catch(() => { /* keep Max / Emma fallback */ });
   }, []);
 
   const elHasChanges = JSON.stringify(elSettings) !== JSON.stringify(elSaved);
@@ -104,10 +139,30 @@ export default function TTSConfigTab() {
     }
   }, []);
 
-  const testGradiumStreaming = useCallback(async () => {
+  const testGradium = useCallback(async (mode: "rest" | "stream") => {
+    const character = grCharacters.find((option) => option.character_key === grCharacterKeyRef.current) ?? grCharacters[0];
+    const opts = {
+      providerId: "gradium" as const,
+      characterKey: character?.character_key,
+      voiceId: character?.tts_voice_id ?? undefined,
+    };
+    if (mode === "rest") {
+      setTesting("gradium");
+      try {
+        const blob = await generateSpeech(TEST_PHRASE, opts);
+        await playAudioBlob(blob);
+        toast.success(`Test REST ${character?.display_name ?? "Gradium"} terminé`);
+      } catch (err) {
+        console.error("TTS test error (gradium):", err);
+        toast.error(`Erreur test REST: ${err instanceof Error ? err.message.slice(0, 120) : "inconnu"}`);
+      } finally {
+        setTesting(null);
+      }
+      return;
+    }
     setTestingStream(true);
     try {
-      const handle = tryCreateStreamingPlayback(TEST_PHRASE, { providerId: "gradium" });
+      const handle = tryCreateStreamingPlayback(TEST_PHRASE, opts);
       if (!handle) {
         toast.error("Streaming indisponible (désactivé ou non supporté par ce navigateur)");
         return;
@@ -117,14 +172,14 @@ export default function TTSConfigTab() {
       await handle.started;
       const firstAudioMs = Math.round(performance.now() - t0);
       await handle.finished;
-      toast.success(`Test streaming terminé — premier son en ${firstAudioMs}ms`);
+      toast.success(`Test streaming ${character?.display_name ?? ""} — premier son en ${firstAudioMs}ms`);
     } catch (err) {
       console.error("TTS streaming test error (gradium):", err);
       toast.error(`Erreur test streaming: ${err instanceof Error ? err.message.slice(0, 120) : "inconnu"}`);
     } finally {
       setTestingStream(false);
     }
-  }, []);
+  }, [grCharacters]);
 
   // ElevenLabs helpers
   function updateEl(patch: Partial<TTSSettings>) {
@@ -192,8 +247,17 @@ export default function TTSConfigTab() {
   }
 
   // Gradium helpers
+  const grCharacter = grCharacters.find((option) => option.character_key === grCharacterKey) ?? grCharacters[0];
+  const grTuning = getGradiumVoiceTuning(grSettings, grCharacter?.character_key);
+
   function updateGr(patch: Partial<GradiumSettings>) {
     const current = { ...grSettings, ...patch };
+    writeEnvironmentStorage("ava_tts_settings_gradium", JSON.stringify(current));
+    setGrSettings(current);
+  }
+  function updateGrTuning(patch: Partial<GradiumVoiceTuning>) {
+    if (!grCharacter) return;
+    const current = patchGradiumCharacterTuning(grSettings, grCharacter.character_key, patch);
     writeEnvironmentStorage("ava_tts_settings_gradium", JSON.stringify(current));
     setGrSettings(current);
   }
@@ -205,9 +269,11 @@ export default function TTSConfigTab() {
     setSavingGr(false);
   }
   function resetGr() {
-    const d = resetGradiumSettings();
-    setGrSettings(d); setGrSaved(d);
-    toast.success("Gradium réinitialisé");
+    if (!grCharacter) return;
+    const current = patchGradiumCharacterTuning(grSettings, grCharacter.character_key, GRADIUM_VOICE_TUNING_DEFAULTS);
+    writeEnvironmentStorage("ava_tts_settings_gradium", JSON.stringify(current));
+    setGrSettings(current);
+    toast.success(`Gradium ${grCharacter.display_name} réinitialisé`);
   }
 
 
@@ -220,7 +286,7 @@ export default function TTSConfigTab() {
           Compare 3 services TTS. Le provider <strong>actif</strong> est utilisé dans le jeu ; les autres restent disponibles pour les tests.
         </p>
         <p className="text-sm text-muted-foreground">
-          Les <strong>Voice ID</strong> ne se règlent plus ici : ils sont définis par personnage dans Expérience → Orchestration. Cet onglet ne garde que les réglages généraux (modèle, format, vitesse…).
+          Les <strong>Voice ID</strong> se règlent par personnage dans Expérience → Orchestration. Gradium a des réglages fins distincts par personnage dans le panneau ci-dessous.
         </p>
       </div>
 
@@ -520,14 +586,14 @@ export default function TTSConfigTab() {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-base">🎙️ Gradium TTS</h3>
-            <p className="text-xs text-muted-foreground">Streaming WebSocket (fallback REST) — 237 voix</p>
+            <p className="text-xs text-muted-foreground">Streaming WebSocket (fallback REST) — réglages fins par personnage</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetGr}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
-            <Button size="sm" onClick={() => testProvider("gradium")} disabled={testing === "gradium"}>
+            <Button size="sm" onClick={() => void testGradium("rest")} disabled={testing === "gradium"}>
               {testing === "gradium" ? "..." : "🔊 Tester REST"}
             </Button>
-            <Button size="sm" onClick={testGradiumStreaming} disabled={testingStream}>
+            <Button size="sm" onClick={() => void testGradium("stream")} disabled={testingStream}>
               {testingStream ? "..." : "🔊 Tester streaming"}
             </Button>
             <Button size="sm" onClick={saveGr} disabled={savingGr || !grHasChanges}
@@ -543,11 +609,82 @@ export default function TTSConfigTab() {
           </div>
         )}
 
+        <div>
+          <p className="text-xs font-medium mb-2">Personnage</p>
+          <div className="grid grid-cols-2 gap-2">
+            {grCharacters.map((character) => {
+              const selected = character.character_key === grCharacter?.character_key;
+              return (
+                <button
+                  key={character.character_key}
+                  type="button"
+                  aria-label={`Réglages Gradium ${character.display_name}`}
+                  aria-pressed={selected}
+                  onClick={() => {
+                    grCharacterKeyRef.current = character.character_key;
+                    setGrCharacterKey(character.character_key);
+                  }}
+                  className={`text-left p-3 border rounded-lg transition-colors ${
+                    selected ? "bg-primary/10 border-primary" : "hover:bg-accent/50"
+                  }`}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-sm">{character.display_name}</span>
+                    {selected && <CheckCircle2 className="w-4 h-4 text-primary" />}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {character.tts_provider ? `${character.tts_provider}` : "Provider non renseigné"}
+                    {character.tts_voice_id ? ` · ${character.tts_voice_id}` : " · Voice ID manquant"}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Les tests REST et streaming utilisent la Voice ID Orchestration de {grCharacter?.display_name ?? "ce personnage"} et les réglages affichés ici.
+          </p>
+        </div>
+
+        <div className="rounded-md border p-3 space-y-4">
+          <p className="text-xs font-medium">Réglages fins — {grCharacter?.display_name ?? "personnage"}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <SliderRow label="Temperature (temp)" value={grTuning.temp} min={0} max={1.4} step={0.05}
+              onChange={(v) => updateGrTuning({ temp: v })}
+              tooltip="Variabilité créative de la génération. 0 = déterministe (même texte → même audio) ; 1.4 = très expressif et variable."
+              minLabel="Déterministe" maxLabel="Très créatif" />
+            <SliderRow label="Voice similarity (cfg_coef)" value={grTuning.cfgCoef} min={1} max={4} step={0.05}
+              onChange={(v) => updateGrTuning({ cfgCoef: v })}
+              tooltip="Rapprochement avec la voix cible. 1 = voix générique, moins ressemblante ; 4 = reproduction très fidèle du timbre cible."
+              minLabel="Générique" maxLabel="Très fidèle" />
+          </div>
+
+          <SliderRow label="Vitesse (padding_bonus)" value={grTuning.paddingBonus} min={-4} max={4} step={0.1}
+            onChange={(v) => updateGrTuning({ paddingBonus: v })}
+            tooltip="Ajuste la vitesse de lecture en ajoutant ou retirant du silence. Négatif = plus rapide, positif = plus lent."
+            minLabel="-4 rapide" maxLabel="+4 lent" />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-muted-foreground">Rewrite rules</span>
+              <input value={grTuning.rewriteRules}
+                onChange={(e) => updateGrTuning({ rewriteRules: e.target.value })}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="fr" />
+              <span className="block text-xs text-muted-foreground/60">Code langue (fr, en, de, es, pt) ou règles custom. Vide = désactivé.</span>
+            </label>
+
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-muted-foreground">Pronunciation ID</span>
+              <input value={grTuning.pronunciationId}
+                onChange={(e) => updateGrTuning({ pronunciationId: e.target.value })}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="(optionnel)" />
+              <span className="block text-xs text-muted-foreground/60">Dictionnaire de prononciations Gradium, appliqué par requête.</span>
+            </label>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-
-
           <label className="space-y-1 text-sm">
-            <span className="font-medium text-muted-foreground">Format audio</span>
+            <span className="font-medium text-muted-foreground">Format audio (commun)</span>
             <select value={grSettings.outputFormat}
               onChange={(e) => updateGr({ outputFormat: e.target.value as GradiumSettings["outputFormat"] })}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm">
@@ -563,7 +700,7 @@ export default function TTSConfigTab() {
           <label className="flex items-center justify-between gap-3 text-sm sm:col-span-1">
             <div>
               <span className="font-medium">Streaming WebSocket</span>
-              <span className="block text-xs text-muted-foreground/60">Lecture progressive : la voix démarre dès les premiers chunks audio. Fallback REST automatique en cas d'échec.</span>
+              <span className="block text-xs text-muted-foreground/60">Lecture progressive : la voix démarre dès les premiers chunks audio. Fallback REST automatique en cas d'échec. Commun à tous les personnages.</span>
             </div>
             <Switch checked={grSettings.streamingEnabled}
               onCheckedChange={(v) => updateGr({ streamingEnabled: v })} />
@@ -579,40 +716,6 @@ export default function TTSConfigTab() {
               <option value="pcm_48000">pcm_48000 (natif Gradium)</option>
             </select>
             <span className="block text-xs text-muted-foreground/60">PCM brut envoyé sur le WebSocket. 24 kHz = moitié moins de données ; 48 kHz = qualité native.</span>
-          </label>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <SliderRow label="Temperature (temp)" value={grSettings.temp} min={0} max={1.4} step={0.05}
-            onChange={(v) => updateGr({ temp: v })}
-            tooltip="Variabilité créative de la génération. 0 = déterministe (même texte → même audio) ; 1.4 = très expressif et variable."
-            minLabel="Déterministe" maxLabel="Très créatif" />
-          <SliderRow label="Voice similarity (cfg_coef)" value={grSettings.cfgCoef} min={1} max={4} step={0.05}
-            onChange={(v) => updateGr({ cfgCoef: v })}
-            tooltip="Rapprochement avec la voix cible. 1 = voix générique, moins ressemblante ; 4 = reproduction très fidèle du timbre cible."
-            minLabel="Générique" maxLabel="Très fidèle" />
-        </div>
-
-        <SliderRow label="Vitesse (padding_bonus)" value={grSettings.paddingBonus} min={-4} max={4} step={0.1}
-          onChange={(v) => updateGr({ paddingBonus: v })}
-          tooltip="Ajuste la vitesse de lecture en ajoutant ou retirant du silence. Négatif = plus rapide, positif = plus lent."
-          minLabel="-4 rapide" maxLabel="+4 lent" />
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label className="space-y-1 text-sm">
-            <span className="font-medium text-muted-foreground">Rewrite rules</span>
-            <input value={grSettings.rewriteRules}
-              onChange={(e) => updateGr({ rewriteRules: e.target.value })}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="fr" />
-            <span className="block text-xs text-muted-foreground/60">Code langue (fr, en, de, es, pt) ou règles custom. Vide = désactivé.</span>
-          </label>
-
-          <label className="space-y-1 text-sm">
-            <span className="font-medium text-muted-foreground">Pronunciation ID</span>
-            <input value={grSettings.pronunciationId}
-              onChange={(e) => updateGr({ pronunciationId: e.target.value })}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="(optionnel)" />
-            <span className="block text-xs text-muted-foreground/60">Dictionnaire de prononciations Gradium, appliqué par requête.</span>
           </label>
         </div>
 
