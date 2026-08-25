@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -10,11 +10,12 @@ import {
   saveLLMSettingsToDB,
   loadLLMSettingsFromDB,
   resetLLMSettings,
-  OPENROUTER_MODELS,
+  listLlmConfigModels,
   getLastLLMValidationIssues,
   getLLMValidationErrorMessage,
   isSupportedOpenRouterModel,
   type LLMSettings,
+  type OpenRouterModel,
 } from "@/services/settingsService";
 
 const TIER_META: Record<string, { icon: typeof Zap; label: string; className: string }> = {
@@ -32,7 +33,7 @@ function ModelCard({
   onToggle,
   onToggleReasoning,
 }: {
-  model: (typeof OPENROUTER_MODELS)[number];
+  model: OpenRouterModel;
   active: boolean;
   expanded: boolean;
   reasoningEnabled: boolean;
@@ -158,7 +159,7 @@ export default function LLMConfigTab() {
     toast.success("Paramètres LLM réinitialisés");
   }
 
-  const isPresetModel = (id: string) => OPENROUTER_MODELS.some((m) => m.id === id);
+  const catalog = listLlmConfigModels();
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -193,7 +194,7 @@ export default function LLMConfigTab() {
         <div>
           <label className="text-sm font-medium text-muted-foreground mb-2 block">Modèle</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {OPENROUTER_MODELS.map((m) => (
+            {catalog.map((m) => (
               <ModelCard
                 key={m.id}
                 model={m}
@@ -298,7 +299,7 @@ export default function LLMConfigTab() {
         <div>
           <label className="text-sm font-medium text-muted-foreground mb-2 block">Modèle</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {OPENROUTER_MODELS.map((m) => (
+            {catalog.map((m) => (
               <ModelCard
                 key={m.id}
                 model={m}

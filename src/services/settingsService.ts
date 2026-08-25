@@ -61,7 +61,7 @@ export interface OpenRouterModel {
   cons: string[];
 }
 
-// Liste maintenue : 12 modèles récents, adaptés au voice-to-voice temps réel (Max) ou à l'analyse JSON (GM).
+// Catalogue unique : LLM Config (Max + GM) et Qualité → LLM as judge.
 // Prix indicatifs OpenRouter (USD / 1M tokens) — vérifier openrouter.ai/models pour la valeur exacte.
 export const OPENROUTER_MODELS: OpenRouterModel[] = [
   {
@@ -195,6 +195,11 @@ export const OPENROUTER_MODELS: OpenRouterModel[] = [
     cons: ["Moins créatif que Claude/GPT-5", "Latence ~800ms"],
   },
 ];
+
+/** Same list as Technique → LLM Config. Never fork a second catalog for eval. */
+export function listLlmConfigModels(): OpenRouterModel[] {
+  return OPENROUTER_MODELS;
+}
 
 const llmDefaults: LLMSettings = {
   LLM_MODEL: defaultSettings.LLM_MODEL,

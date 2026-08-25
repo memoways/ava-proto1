@@ -12,6 +12,8 @@
 - Cible : texte d’or + grille (must include / must not / ton / longueur).
 - Runner : pipeline texte réel (RAG live → brief GM → Max → validateur).
 - Leviers V1 : modèle Max, sampling, RAG. GM, validateur et prompt figés.
+- Catalogue Max = **le même** que Technique → LLM Config (`listLlmConfigModels` /
+  `OPENROUTER_MODELS`). Qualité ne tient pas de liste parallèle.
 - Design : un facteur à la fois (OFAT), 3 passages par couple question × config.
 - Corpus : rédigé dans Notion par l’équipe ; l’app sync et exécute.
 

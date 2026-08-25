@@ -49,5 +49,9 @@ describe("EvalJudgeTab", () => {
     expect(screen.getAllByText("Must include").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Lancer" })).toBeTruthy();
     expect(screen.getByText(/configs ×/)).toBeTruthy();
+    expect(screen.getAllByText("Gemini 2.5 Flash").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Claude Sonnet 4").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Mistral Large 2411").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Même liste que LLM Config/)).toBeTruthy();
   });
 });

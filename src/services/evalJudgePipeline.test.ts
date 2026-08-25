@@ -6,6 +6,7 @@ import {
   clampScore,
   defaultOfatSelection,
   estimateEvalRun,
+  listEvalMaxModels,
   listEvalWorkItems,
   parseJudgeResponse,
   parseUsdPerMillion,
@@ -16,6 +17,7 @@ import {
   type EvalLiveSnapshot,
   type EvalTurnConfig,
 } from "./evalJudgePipeline";
+import { listLlmConfigModels } from "./settingsService";
 
 const live: EvalLiveSnapshot = {
   model: "google/gemini-2.5-flash",
@@ -80,10 +82,20 @@ describe("OFAT configs", () => {
   it("defaults extra models and RAG variants away from live", () => {
     const selection = defaultOfatSelection(live);
     expect(selection.extraModels).not.toContain(live.model);
+    expect(selection.extraModels).toHaveLength(2);
     expect(selection.samplingTemps).toContain(0);
     expect(selection.samplingTemps).not.toContain(0.8);
     expect(selection.ragVariants.some((variant) => variant.key === "conservative")).toBe(true);
     expect(selection.ragVariants.some((variant) => variant.key === "generous")).toBe(true);
+  });
+
+  it("offers every LLM Config catalog model except the live Max model", () => {
+    const catalog = listLlmConfigModels();
+    const selectable = listEvalMaxModels(live.model);
+    expect(selectable.map((model) => model.id).sort()).toEqual(
+      catalog.filter((model) => model.id !== live.model).map((model) => model.id).sort(),
+    );
+    expect(selectable).toHaveLength(catalog.length - 1);
   });
 });
 
