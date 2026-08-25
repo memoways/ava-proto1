@@ -273,8 +273,9 @@ async function installNetworkFakes(
         config: {
           schemaVersion: 1,
           minimumHandoffTurn: 4,
-          maximumHandoffsPerSession: 1,
-          handoffTarget: "emma",
+          maximumHandoffsPerSession: 8,
+          minimumTurnsBetweenHandoffs: 2,
+          handoffTarget: "either",
           directorTimeoutMs: 12_000,
           editor: {
             tone: "balanced",
@@ -283,6 +284,7 @@ async function installNetworkFakes(
             allowHandoffs: true,
             allowCinematics: true,
             customInstructions: "",
+            handoffRules: [],
           },
         },
       }]);

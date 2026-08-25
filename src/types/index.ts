@@ -122,6 +122,8 @@ export interface ConversationMessage {
   role: "user" | "max" | "emma";
   content: string;
   timestamp: number;
+  /** Character whose isolated conversation this turn belongs to. */
+  spokenWith?: "max" | "emma";
   /** Anti-hallucination validation trace, only present on Max messages that went through the validator. */
   validation?: ConversationValidationTrace;
   /** Per-step latency timings (ms) and last blocker, only on Max messages. */
@@ -266,6 +268,7 @@ export type {
   ConversationMemoryItem,
   ConversationMemoryV1,
   CharacterMemoryItemV2,
+  CharacterScopedMemory,
   RuntimeCharacter,
 } from "./conversationMemory";
 
@@ -352,9 +355,20 @@ export interface PRD4PostTurnEvaluation {
   memory_after?: import("./conversationMemory").ConversationMemoryV1 | null;
   /** Structured Experience Director action. The deterministic guard may replace it with none. */
   action?: DirectorAction;
+  /** Present when the player asked to switch character during this turn. */
+  player_switch_request?: {
+    targetCharacter: "max" | "emma";
+    stance: "accept" | "object" | "defer";
+  } | null;
   orchestration_version_id?: string | null;
   /** Configuration publiée qui a produit cette décision, pour les garde-fous runtime. */
   orchestration_config?: ExperienceDirectorConfig | null;
+}
+
+export interface HandoffTopicRule {
+  targetCharacter: "max" | "emma";
+  themes: string[];
+  topics: string[];
 }
 
 export interface ExperienceDirectorEditorConfig {
@@ -364,13 +378,15 @@ export interface ExperienceDirectorEditorConfig {
   allowHandoffs: boolean;
   allowCinematics: boolean;
   customInstructions: string;
+  handoffRules: HandoffTopicRule[];
 }
 
 export interface ExperienceDirectorConfig {
   schemaVersion: 1;
   minimumHandoffTurn: number;
-  maximumHandoffsPerSession: 0 | 1;
-  handoffTarget: "emma";
+  maximumHandoffsPerSession: number;
+  minimumTurnsBetweenHandoffs: number;
+  handoffTarget: "either";
   directorTimeoutMs: number;
   editor: ExperienceDirectorEditorConfig;
 }
@@ -378,7 +394,7 @@ export interface ExperienceDirectorConfig {
 export type DirectorAction =
   | { type: "none" }
   | { type: "cinematic"; videoId: string; reason: string; confidence: number }
-  | { type: "handoff"; targetCharacter: "emma"; reason: string; proposalGuidance: string }
+  | { type: "handoff"; targetCharacter: "max" | "emma"; reason: string; proposalGuidance: string }
   | { type: "end"; reason: string };
 
 export interface ExperienceDirectorDecisionV1 {

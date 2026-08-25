@@ -41,6 +41,18 @@ export interface ConversationMemoryV1 {
   };
   lastExchange: string | null;
   characterItems?: CharacterMemoryItemV2[];
+  /** Conversation facts private to one character. Interlocutor identity stays global. */
+  characterStates?: Partial<Record<RuntimeCharacter, CharacterScopedMemory>>;
+}
+
+export interface CharacterScopedMemory {
+  userFacts: ConversationMemoryItem[];
+  characterDisclosures: ConversationMemoryItem[];
+  commitments: ConversationMemoryItem[];
+  openThreads: ConversationMemoryItem[];
+  topics: ConversationMemoryItem[];
+  relationship: ConversationMemoryV1["relationship"];
+  lastExchange: string | null;
 }
 
 export interface ConversationMemoryDelta {

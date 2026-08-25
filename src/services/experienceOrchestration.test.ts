@@ -5,8 +5,8 @@ describe("normalizeDirectorConfig", () => {
   it("clamps numeric values and resets constrained fields", () => {
     const result = normalizeDirectorConfig({
       minimumHandoffTurn: 99,
-      maximumHandoffsPerSession: 7 as 0 | 1,
-      handoffTarget: "max" as "emma",
+      maximumHandoffsPerSession: 7,
+      handoffTarget: "emma" as never,
       directorTimeoutMs: 100,
       editor: {
         ...DEFAULT_DIRECTOR_CONFIG.editor,
@@ -15,8 +15,9 @@ describe("normalizeDirectorConfig", () => {
     });
 
     expect(result.minimumHandoffTurn).toBe(20);
-    expect(result.maximumHandoffsPerSession).toBe(1);
-    expect(result.handoffTarget).toBe("emma");
+    expect(result.maximumHandoffsPerSession).toBe(7);
+    expect(result.handoffTarget).toBe("either");
+    expect(result.minimumTurnsBetweenHandoffs).toBe(2);
     expect(result.directorTimeoutMs).toBe(3_000);
     expect(result.editor.customInstructions).toBe("Keep the answer short.");
   });

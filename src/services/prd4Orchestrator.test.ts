@@ -160,6 +160,8 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     expect(vi.mocked(summarizeSessionAsync).mock.calls[0][1]).toHaveLength(8);
     expect(vi.mocked(summarizeSessionAsync).mock.calls[0][1][0].content).toBe("question-33");
     expect(vi.mocked(summarizeSessionAsync).mock.calls[0][1].at(-1)?.content).toBe("Je vous écoute.");
+    expect(vi.mocked(summarizeSessionAsync).mock.calls[0][3]).toBe("max");
+    expect(fetchSessionSummary).toHaveBeenCalledWith("session-soak", "max");
     await result.labelPromise;
     await result.postTurnPromise;
     expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0]).toMatchObject({
@@ -191,6 +193,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       relationship: { depth: "fissure" as const, trust: "ouverte" as const, emotionalState: null, sourceTurn: 5 },
       lastExchange: "Alice a confronté Max.",
       characterItems: [],
+      characterStates: {},
     };
     vi.mocked(fetchConversationMemory).mockResolvedValue(structuredMemory);
     const matches = Array.from({ length: 6 }, (_, index) => ({
@@ -273,7 +276,15 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       RAG_SUMMARY_EVERY_N_TURNS: 4,
       MAX_PROMPT_VARIANT: "optimized_v3",
     } as ReturnType<typeof getGameplaySettings>);
-    vi.mocked(resolveCharacterIdByName).mockResolvedValue("character-emma");
+    vi.mocked(fetchSessionSummary).mockImplementation(async (_sessionId, character) => {
+      if (character === "emma") return null;
+      return {
+        session_id: "session-handoff",
+        summary: "- L'utilisateur cherche Ava.",
+        last_turn: 5,
+        updated_at: new Date().toISOString(),
+      };
+    });
     vi.mocked(fetchConversationMemory).mockResolvedValue({
       version: 2,
       lastTurn: 5,
@@ -309,9 +320,13 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     expect(resolveCharacterIdByName).toHaveBeenCalledWith("Emma");
     expect(emmaInput.temporalContext?.turnIndex).toBe(6);
     expect(emmaInput.conversationHistory).toEqual(emmaHistory);
+    expect(fetchSessionSummary).toHaveBeenCalledWith("session-handoff", "emma");
     expect(emmaInput.sessionSummary).toBeUndefined();
-    expect(emmaInput.conversationMemory?.userFacts.map((item) => item.text)).toEqual(["Alice est médecin"]);
+    expect(emmaInput.conversationMemory?.userFacts).toEqual([]);
+    expect(emmaInput.conversationMemory?.interlocutor).toMatchObject({ name: "Alice", role: "médecin" });
     expect(emmaInput.conversationMemory?.lastExchange).toBeNull();
+    expect(vi.mocked(summarizeSessionAsync).mock.calls[0]?.[1].some((message) => message.content.includes("Secret confié à Max"))).toBeFalsy();
+    expect(vi.mocked(summarizeSessionAsync).mock.calls[0]?.[3]).toBe("emma");
     await result.postTurnPromise;
     expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0]).toMatchObject({
       turnIndex: 6,

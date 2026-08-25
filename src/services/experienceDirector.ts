@@ -1,5 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { DirectorAction, ExperienceDirectorDecisionV1 } from "@/types";
+import type {
+  DirectorAction,
+  ExperienceDirectorConfig,
+  ExperienceDirectorDecisionV1,
+  HandoffTopicRule,
+  PRD4TurnLabels,
+} from "@/types";
+import { characterDisplayName } from "@/services/characterConversation";
 
 export type DirectorBlockReason =
   | "invalid_configuration"
@@ -8,7 +15,8 @@ export type DirectorBlockReason =
   | "handoff_before_minimum_turn"
   | "handoff_limit_reached"
   | "handoff_disabled"
-  | "handoff_wrong_direction"
+  | "handoff_same_character"
+  | "handoff_cooldown"
   | "target_not_ready"
   | "cinematic_disabled"
   | "cinematic_unavailable"
@@ -22,10 +30,12 @@ export interface DirectorGuardContext {
   userTurn: number;
   handoffCount: number;
   handoffPending: boolean;
+  lastHandoffTurn: number | null;
   handoffsEnabled: boolean;
   minimumHandoffTurn: number;
   maximumHandoffsPerSession: number;
-  emmaReady: boolean;
+  minimumTurnsBetweenHandoffs: number;
+  targetReady: boolean;
   playedVideoIds: string[];
   availableVideoIds: string[];
   lastVideoTurn: number | null;
@@ -43,6 +53,38 @@ export interface GuardedDirectorDecision extends ExperienceDirectorDecisionV1 {
 }
 
 const NONE: DirectorAction = { type: "none" };
+
+function labelsMatchRule(labels: PRD4TurnLabels, rule: HandoffTopicRule): boolean {
+  const themes = new Set((labels.themes ?? []).map((value) => value.trim().toLowerCase()));
+  const topics = new Set((labels.topics ?? []).map((value) => value.trim().toLowerCase()));
+  return rule.themes.some((theme) => themes.has(theme)) || rule.topics.some((topic) => topics.has(topic));
+}
+
+export function matchHandoffTopicRules(
+  labels: PRD4TurnLabels,
+  rules: HandoffTopicRule[] | undefined,
+  currentCharacter: "max" | "emma",
+): "max" | "emma" | null {
+  for (const rule of rules ?? []) {
+    if (rule.targetCharacter === currentCharacter) continue;
+    if (labelsMatchRule(labels, rule)) return rule.targetCharacter;
+  }
+  return null;
+}
+
+export function handoffActionFromRule(
+  targetCharacter: "max" | "emma",
+  labels: PRD4TurnLabels,
+): DirectorAction {
+  const target = characterDisplayName(targetCharacter);
+  const hint = [...labels.themes, ...labels.topics].filter(Boolean).slice(0, 3).join(", ");
+  return {
+    type: "handoff",
+    targetCharacter,
+    reason: hint ? `${target} est plus à même de parler de : ${hint}.` : `${target} peut éclairer ce sujet.`,
+    proposalGuidance: `Propose naturellement au joueur de parler avec ${target}, sans le forcer.`,
+  };
+}
 
 export function validateDirectorDecision(
   decision: ExperienceDirectorDecisionV1,
@@ -69,12 +111,14 @@ export function validateDirectorDecision(
 
   if (decision.action.type === "handoff") {
     if (!context.handoffsEnabled || context.maximumHandoffsPerSession <= 0) return blocked("handoff_disabled");
-    if (context.currentCharacter !== "max" || decision.action.targetCharacter !== "emma") {
-      return blocked("handoff_wrong_direction");
-    }
+    if (decision.action.targetCharacter === context.currentCharacter) return blocked("handoff_same_character");
     if (context.userTurn < context.minimumHandoffTurn) return blocked("handoff_before_minimum_turn");
     if (context.handoffCount >= context.maximumHandoffsPerSession) return blocked("handoff_limit_reached");
-    if (!context.emmaReady) return blocked("target_not_ready");
+    if (
+      context.lastHandoffTurn != null
+      && context.userTurn - context.lastHandoffTurn < context.minimumTurnsBetweenHandoffs
+    ) return blocked("handoff_cooldown");
+    if (!context.targetReady) return blocked("target_not_ready");
     return accepted();
   }
 
@@ -95,6 +139,17 @@ export function validateDirectorDecision(
   }
 
   return accepted();
+}
+
+export function applyTopicHandoffFallback(
+  decision: ExperienceDirectorDecisionV1,
+  config: ExperienceDirectorConfig | null | undefined,
+  currentCharacter: "max" | "emma",
+): ExperienceDirectorDecisionV1 {
+  if (decision.action.type !== "none") return decision;
+  const target = matchHandoffTopicRules(decision.labels, config?.editor.handoffRules, currentCharacter);
+  if (!target) return decision;
+  return { ...decision, action: handoffActionFromRule(target, decision.labels) };
 }
 
 export async function appendExperienceEvent(input: {
@@ -119,6 +174,5 @@ export async function appendExperienceEvent(input: {
       orchestration_version_id: input.orchestrationVersionId ?? null,
       payload: input.payload ?? {},
     } as never);
-  // Idempotency collisions are expected on retries and require no mutation.
-  if (error && error.code !== "23505") throw error;
+  if (error) console.warn("[experience_events] append failed:", error.message);
 }

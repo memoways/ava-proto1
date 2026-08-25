@@ -8,6 +8,7 @@ import type { AudioState, ConversationMessage } from "@/types";
 import { cn } from "@/lib/utils";
 import type { StreamingAvatarConnectionState } from "@/services/streamingAvatar";
 import { Button } from "@/components/ui/button";
+import { sliceConversationForCharacter } from "@/services/characterConversation";
 
 interface Props {
   audioState: AudioState;
@@ -22,8 +23,9 @@ interface Props {
   streamingAvatarState?: StreamingAvatarConnectionState;
   attachAvatarMedia?: (element: HTMLMediaElement | null) => void;
   activeCharacter?: "max" | "emma";
-  handoffOffer?: { reason: string } | null;
+  handoffOffer?: { reason: string; targetCharacter?: "max" | "emma" } | null;
   handoffCalling?: boolean;
+  handoffCallingTarget?: "max" | "emma";
   onAcceptHandoff?: () => void;
   onRejectHandoff?: () => void;
 }
@@ -43,6 +45,7 @@ const ConversationScreen = ({
   activeCharacter = "max",
   handoffOffer = null,
   handoffCalling = false,
+  handoffCallingTarget = "emma",
   onAcceptHandoff,
   onRejectHandoff,
 }: Props) => {
@@ -68,19 +71,20 @@ const ConversationScreen = ({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleToggleTalk]);
 
-  // Derive the last Max and last user message from the conversation log so
-  // they persist on screen between turns (until replaced on the next turn).
+  // Derive the last character/user lines from THIS character's slice only so
+  // a return to Max never flashes Emma's last line (and the reverse).
   const { lastMaxText, lastUserText } = useMemo(() => {
+    const visibleLog = sliceConversationForCharacter(conversationLog, activeCharacter);
     let mx = "";
     let us = "";
-    for (let i = conversationLog.length - 1; i >= 0; i--) {
-      const m = conversationLog[i];
+    for (let i = visibleLog.length - 1; i >= 0; i--) {
+      const m = visibleLog[i];
       if (!mx && m.role !== "user") mx = m.content;
       else if (!us && m.role === "user") us = m.content;
       if (mx && us) break;
     }
     return { lastMaxText: mx, lastUserText: us };
-  }, [conversationLog]);
+  }, [activeCharacter, conversationLog]);
 
   // While Max is generating, show the streaming maxSubtitle; otherwise fallback
   // to the last assistant message from the log.
@@ -152,12 +156,15 @@ const ConversationScreen = ({
   const photoVisible = !videoVisible && !frozenVisible;
   const displayName = activeCharacter === "emma" ? "Emma" : "Max";
   const portrait = activeCharacter === "emma" ? emmaAvatar : maxAvatar;
+  const offerTarget = handoffOffer?.targetCharacter === "max" ? "max" : "emma";
+  const offerTargetName = offerTarget === "max" ? "Max" : "Emma";
+  const callingName = (handoffCallingTarget === "max" ? "Max" : "Emma");
 
   if (handoffCalling) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-background text-center">
         <div className="flex h-24 w-24 items-center justify-center rounded-full border bg-muted"><PhoneCall className="h-9 w-9 animate-pulse text-primary" /></div>
-        <div><h1 className="font-serif text-3xl">Appel d’Emma…</h1><p className="mt-2 text-sm text-muted-foreground">La session et le temps restant sont conservés · {sessionTimeRemaining}</p></div>
+        <div><h1 className="font-serif text-3xl">{callingName === "Emma" ? "Appel d’Emma…" : "Appel de Max…"}</h1><p className="mt-2 text-sm text-muted-foreground">La session et le temps restant sont conservés · {sessionTimeRemaining}</p></div>
       </div>
     );
   }
@@ -276,13 +283,13 @@ const ConversationScreen = ({
             </p>
           )}
 
-          {handoffOffer && activeCharacter === "max" && (
+          {handoffOffer && (
             <div className="w-full max-w-xl rounded-xl border border-primary/40 bg-background/90 p-4 text-center shadow-xl backdrop-blur-md">
-              <p className="font-medium">Max vous propose de parler avec Emma.</p>
+              <p className="font-medium">{displayName} vous propose de parler avec {offerTargetName}.</p>
               <p className="mt-1 text-xs text-muted-foreground">{handoffOffer.reason}</p>
               <div className="mt-3 flex flex-wrap justify-center gap-2">
-                <Button onClick={onAcceptHandoff}>Appeler Emma</Button>
-                <Button variant="outline" onClick={onRejectHandoff}>Rester avec Max</Button>
+                <Button onClick={onAcceptHandoff}>Appeler {offerTargetName}</Button>
+                <Button variant="outline" onClick={onRejectHandoff}>Rester avec {displayName}</Button>
               </div>
             </div>
           )}

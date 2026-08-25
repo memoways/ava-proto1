@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "./debugLogger";
-import type { ConversationMessage } from "@/types";
+import type { ConversationMessage, RuntimeCharacter } from "@/types";
 import { authenticatedFunctionFetch } from "./gameAuth";
 import { createTimeoutSignal } from "./asyncUtils";
 
@@ -22,16 +22,27 @@ export interface SessionSummaryRecord {
 // rechargement de page (historique en mémoire), donc ce cache suffit au live.
 const summaryCache = new Map<string, SessionSummaryRecord>();
 
+function summaryCacheKey(sessionId: string, character?: RuntimeCharacter): string {
+  return character ? `${sessionId}::${character}` : sessionId;
+}
+
 /** Test/admin helper — vide le cache mémoire des résumés. */
 export function clearSessionSummaryCache(): void {
   summaryCache.clear();
 }
 
 /** Fetch the latest compressed summary for a session (null if none). */
-export async function fetchSessionSummary(sessionId: string | undefined): Promise<SessionSummaryRecord | null> {
+export async function fetchSessionSummary(
+  sessionId: string | undefined,
+  character?: RuntimeCharacter,
+): Promise<SessionSummaryRecord | null> {
   if (!sessionId) return null;
-  const cached = summaryCache.get(sessionId);
+  const cacheKey = summaryCacheKey(sessionId, character);
+  const cached = summaryCache.get(cacheKey);
   if (cached) return cached;
+  // A character-scoped live cache must not fall back to the global DB row:
+  // that summary is not isolated and would leak the other conversation.
+  if (character) return null;
   try {
     // Fallback BDD : ne renvoie une ligne que pour un utilisateur admin
     // (RLS admin-only) — utile au banc d'essai, silencieusement vide en live.
@@ -45,7 +56,7 @@ export async function fetchSessionSummary(sessionId: string | undefined): Promis
       return null;
     }
     const record = (data as SessionSummaryRecord | null) ?? null;
-    if (record) summaryCache.set(sessionId, record);
+    if (record) summaryCache.set(cacheKey, record);
     return record;
   } catch (err) {
     console.warn("[SessionMemory] fetch exception", err);
@@ -58,6 +69,7 @@ export async function summarizeSessionAsync(
   sessionId: string,
   conversation: ConversationMessage[],
   turnCount: number,
+  character?: RuntimeCharacter,
 ): Promise<void> {
   if (!sessionId || !conversation.length) return;
   const startTime = Date.now();
@@ -82,7 +94,7 @@ export async function summarizeSessionAsync(
     const data = await r.json();
     const summary = typeof data?.summary === "string" ? data.summary.trim() : "";
     if (summary) {
-      summaryCache.set(sessionId, {
+      summaryCache.set(summaryCacheKey(sessionId, character), {
         session_id: sessionId,
         summary,
         last_turn: Number.isFinite(Number(data?.last_turn)) ? Number(data.last_turn) : turnCount,

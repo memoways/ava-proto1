@@ -332,18 +332,18 @@ export default function GameMasterSettingsTab() {
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="flex items-center justify-between gap-3 rounded border p-3">
                     <div>
-                      <p className="text-sm font-medium">Handoff vers Emma</p>
-                      <p className="text-xs text-muted-foreground">Off bloque toute proposition, même si le LLM en produit une.</p>
+                      <p className="text-sm font-medium">Suggestions de passage Max ↔ Emma</p>
+                      <p className="text-xs text-muted-foreground">Off bloque les propositions du GM. Une demande explicite du joueur reste possible.</p>
                     </div>
                     <Switch
                       checked={config.editor.allowHandoffs && config.maximumHandoffsPerSession > 0}
                       disabled={selected.status !== "draft"}
                       onCheckedChange={(checked) => setConfig((current) => normalizeDirectorConfig({
                         ...current,
-                        maximumHandoffsPerSession: checked ? 1 : 0,
+                        maximumHandoffsPerSession: checked ? Math.max(current.maximumHandoffsPerSession, 8) : 0,
                         editor: { ...current.editor, allowHandoffs: checked },
                       }))}
-                      aria-label="Autoriser les handoffs vers Emma"
+                      aria-label="Autoriser les suggestions de passage entre personnages"
                     />
                   </div>
                   <div className="flex items-center justify-between gap-3 rounded border p-3">
@@ -360,9 +360,9 @@ export default function GameMasterSettingsTab() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="minimum-handoff-turn">Premier tour autorisé pour le handoff</Label>
+                    <Label htmlFor="minimum-handoff-turn">Premier tour autorisé (GM)</Label>
                     <Input
                       id="minimum-handoff-turn"
                       type="number"
@@ -372,7 +372,33 @@ export default function GameMasterSettingsTab() {
                       disabled={selected.status !== "draft" || !config.editor.allowHandoffs}
                       onChange={(event) => patchConfig({ minimumHandoffTurn: Number(event.target.value) })}
                     />
-                    <p className="text-xs text-muted-foreground">Avant ce tour, toute recommandation de handoff est rejetée par le runtime.</p>
+                    <p className="text-xs text-muted-foreground">Ne s’applique pas à une demande explicite du joueur.</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="max-handoffs">Passages max par session</Label>
+                    <Input
+                      id="max-handoffs"
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={config.maximumHandoffsPerSession}
+                      disabled={selected.status !== "draft" || !config.editor.allowHandoffs}
+                      onChange={(event) => patchConfig({ maximumHandoffsPerSession: Number(event.target.value) })}
+                    />
+                    <p className="text-xs text-muted-foreground">Allers-retours inclus. 0 désactive les suggestions GM.</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="handoff-cooldown">Pause entre deux suggestions</Label>
+                    <Input
+                      id="handoff-cooldown"
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={config.minimumTurnsBetweenHandoffs}
+                      disabled={selected.status !== "draft" || !config.editor.allowHandoffs}
+                      onChange={(event) => patchConfig({ minimumTurnsBetweenHandoffs: Number(event.target.value) })}
+                    />
+                    <p className="text-xs text-muted-foreground">Nombre de tours utilisateur minimum après un passage.</p>
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="director-timeout">Timeout du directeur (ms)</Label>
@@ -388,6 +414,87 @@ export default function GameMasterSettingsTab() {
                     />
                     <p className="text-xs text-muted-foreground">Un timeout conserve la conversation et produit une décision neutre.</p>
                   </div>
+                </div>
+
+                <div className="space-y-2 rounded border p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium">Règles thématiques de suggestion</p>
+                      <p className="text-xs text-muted-foreground">Si un thème ou un sujet du tour recoupe une règle, le GM propose l’autre personnage. Jamais de bascule forcée.</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={selected.status !== "draft" || !config.editor.allowHandoffs}
+                      onClick={() => patchEditor({
+                        handoffRules: [
+                          ...config.editor.handoffRules,
+                          { targetCharacter: "emma", themes: ["famille"], topics: [] },
+                        ],
+                      })}
+                    >
+                      Ajouter
+                    </Button>
+                  </div>
+                  {config.editor.handoffRules.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Aucune règle. Le LLM peut quand même proposer un passage.</p>
+                  ) : config.editor.handoffRules.map((rule, index) => (
+                    <div key={`${rule.targetCharacter}-${index}`} className="grid gap-2 rounded bg-muted/40 p-2 md:grid-cols-[8rem_1fr_1fr_auto]">
+                      <Select
+                        value={rule.targetCharacter}
+                        disabled={selected.status !== "draft"}
+                        onValueChange={(value) => patchEditor({
+                          handoffRules: config.editor.handoffRules.map((candidate, candidateIndex) =>
+                            candidateIndex === index
+                              ? { ...candidate, targetCharacter: value === "max" ? "max" : "emma" }
+                              : candidate
+                          ),
+                        })}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="emma">Vers Emma</SelectItem>
+                          <SelectItem value="max">Vers Max</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        value={rule.themes.join(", ")}
+                        disabled={selected.status !== "draft"}
+                        placeholder="thèmes, séparés par des virgules"
+                        onChange={(event) => patchEditor({
+                          handoffRules: config.editor.handoffRules.map((candidate, candidateIndex) =>
+                            candidateIndex === index
+                              ? { ...candidate, themes: event.target.value.split(",").map((item) => item.trim()).filter(Boolean) }
+                              : candidate
+                          ),
+                        })}
+                      />
+                      <Input
+                        value={rule.topics.join(", ")}
+                        disabled={selected.status !== "draft"}
+                        placeholder="sujets, séparés par des virgules"
+                        onChange={(event) => patchEditor({
+                          handoffRules: config.editor.handoffRules.map((candidate, candidateIndex) =>
+                            candidateIndex === index
+                              ? { ...candidate, topics: event.target.value.split(",").map((item) => item.trim()).filter(Boolean) }
+                              : candidate
+                          ),
+                        })}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={selected.status !== "draft"}
+                        onClick={() => patchEditor({
+                          handoffRules: config.editor.handoffRules.filter((_, candidateIndex) => candidateIndex !== index),
+                        })}
+                      >
+                        Retirer
+                      </Button>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="space-y-1.5">

@@ -47,9 +47,7 @@ export default function GameMasterConfigTab() {
       const supportedProfiles = nextProfiles.filter(
         (profile) => profile.character_key === "max" || profile.character_key === "emma",
       );
-      const sortedProfiles = supportedProfiles.map((profile) =>
-        profile.character_key === "max" ? { ...profile, enabled: true } : profile
-      ).sort(
+      const sortedProfiles = supportedProfiles.sort(
         (a, b) => CHARACTER_ORDER.indexOf(a.character_key) - CHARACTER_ORDER.indexOf(b.character_key),
       );
       setGameplay(nextGameplay);
@@ -169,7 +167,7 @@ export default function GameMasterConfigTab() {
             <div>
               <h3 className="font-semibold">Personnages actifs</h3>
               <p className="text-xs text-muted-foreground">
-                Max ouvre obligatoirement l’appel dans ce prototype. Activer Emma autorise le GM à proposer un handoff si sa checklist est complète.
+                Max et Emma peuvent ouvrir l’appel si leur checklist runtime est complète. Activer Emma les rend disponibles au sélecteur et comme destination de passage.
               </p>
             </div>
           </div>
@@ -179,27 +177,25 @@ export default function GameMasterConfigTab() {
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
-          {profiles.map((profile) => {
-            const required = profile.character_key === "max";
-            return (
+          {profiles.map((profile) => (
               <div key={profile.id} className="flex items-center justify-between gap-4 rounded-md border p-3">
                 <div>
                   <p className="text-sm font-medium">{profile.display_name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {required ? "Personnage d’entrée obligatoire" : "Disponible pour un handoff orchestré"}
+                    {profile.character_key === "max"
+                      ? "Disponible à l’entrée et comme retour de conversation"
+                      : "Disponible à l’entrée et comme destination de passage"}
                   </p>
                 </div>
                 <Switch
-                  checked={required || profile.enabled}
-                  disabled={required}
+                  checked={profile.enabled}
                   onCheckedChange={(checked) => setProfiles((current) => current.map((candidate) =>
                     candidate.id === profile.id ? { ...candidate, enabled: checked } : candidate
                   ))}
                   aria-label={`${profile.display_name} actif dans l’expérience`}
                 />
               </div>
-            );
-          })}
+            ))}
         </div>
       </section>
 

@@ -120,8 +120,20 @@ import {
 } from "@/services/sessionConversationMemory";
 import { resolveResumeTimerWindow } from "@/services/resumeTimer";
 import { getCharacterRuntimeReadiness } from "@/services/experienceOrchestration";
-import { appendExperienceEvent, validateDirectorDecision } from "@/services/experienceDirector";
-import type { ExperienceDirectorDecisionV1 } from "@/types";
+import { appendExperienceEvent, applyTopicHandoffFallback, validateDirectorDecision } from "@/services/experienceDirector";
+import type { ExperienceDirectorDecisionV1, RuntimeCharacter } from "@/types";
+import {
+  buildSwitchRequestGuidance,
+  characterDisplayName,
+  detectPlayerSwitchRequest,
+  hasSpokenWithCharacter,
+  inferCharacterSwitchStance,
+  lastHandoffUserTurn,
+  parseHandoffOffer,
+  sliceConversationForCharacter,
+  tagSpokenWith,
+  type CharacterHandoffOffer,
+} from "@/services/characterConversation";
 
 const TEASER_VIDEO_URL = "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049";
 
@@ -209,14 +221,17 @@ const IndexPRD4 = () => {
   // Boucle GM→Max : guidance produite par le post-tour N, consommée au tour N+1.
   const pendingGmGuidanceRef = useRef<string | null>(null);
   const gmTopicsCoveredRef = useRef<string[]>([]);
-  const activeCharacterRef = useRef<"max" | "emma">("max");
+  const activeCharacterRef = useRef<RuntimeCharacter>("max");
+  const startingCharacterRef = useRef<RuntimeCharacter>("max");
   const activeVoiceIdRef = useRef<string | null>(null);
   const activeTTSProviderIdRef = useRef<TTSProviderId | null>(null);
   const handoffCountRef = useRef(0);
-  const handoffRecommendationRef = useRef<{ reason: string; proposalGuidance: string } | null>(null);
-  const handoffConversationStartRef = useRef(0);
-  const [handoffOffer, setHandoffOffer] = useState<{ reason: string; proposalGuidance: string } | null>(null);
+  const handoffRecommendationRef = useRef<CharacterHandoffOffer | null>(null);
+  const pendingPlayerSwitchRef = useRef<RuntimeCharacter | null>(null);
+  const switchToCharacterRef = useRef<((target: RuntimeCharacter, source: "player" | "gm") => Promise<void>) | null>(null);
+  const [handoffOffer, setHandoffOffer] = useState<CharacterHandoffOffer | null>(null);
   const [handoffCalling, setHandoffCalling] = useState(false);
+  const [handoffCallingTarget, setHandoffCallingTarget] = useState<RuntimeCharacter>("emma");
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
   const [teaserPlayerReady, setTeaserPlayerReady] = useState(false);
@@ -570,9 +585,10 @@ const IndexPRD4 = () => {
     }
     diagnosticTraceEnabledRef.current = diagnosticTraceEnabled;
 
+    const startingCharacter = startingCharacterRef.current;
     const sid = await createPRD4Session(
       state.userRoleProfile,
-      "max",
+      startingCharacter,
       {
         diagnostic_trace_enabled: diagnosticTraceEnabled,
         output_mode: outputSettings.mode,
@@ -581,12 +597,14 @@ const IndexPRD4 = () => {
         resume_expires_at: new Date(
           Date.now() + (configuredSessionDurationRef.current + 300) * 1_000,
         ).toISOString(),
-      },
+        active_character: startingCharacter,
+      } as never,
     );
     sessionIdRef.current = sid;
-    identifyUser(sid, { experience: "prd4", character: "max" });
+    identifyUser(sid, { experience: "prd4", character: startingCharacter });
     trackEvent("prd4_session_started", {
       session_id: sid,
+      character: startingCharacter,
       diagnostic_trace_enabled: diagnosticTraceEnabled,
       output_mode: outputSettings.mode,
       streaming_avatar_provider:
@@ -683,13 +701,16 @@ const IndexPRD4 = () => {
     state.userRoleProfile,
   ]);
 
-  const handleSelectMax = useCallback(() => {
+  const handleSelectCharacter = useCallback((character: RuntimeCharacter) => {
+    startingCharacterRef.current = character;
+    activeCharacterRef.current = character;
+    setSelectedCharacter(character);
     setPhase("calling_max");
     callPreparationRef.current = prepareCall().catch((error) => {
       console.error("[PRD4] call preparation failed", error);
       throw error;
     });
-  }, [prepareCall, setPhase]);
+  }, [prepareCall, setPhase, setSelectedCharacter]);
 
   const handleResumeCall = useCallback(async () => {
     const session = resumableSession;
@@ -725,9 +746,9 @@ const IndexPRD4 = () => {
         activeTTSProviderIdRef.current = asTTSProviderId(profile?.ttsProvider);
       }).catch(() => {});
     handoffCountRef.current = session.handoff_count;
-    handoffConversationStartRef.current = Math.max(0, session.conversation_log.findIndex((message) => message.role === "emma"));
+    startingCharacterRef.current = session.active_character;
     setSelectedCharacter(session.active_character);
-    setHandoffOffer(session.pending_handoff);
+    setHandoffOffer(parseHandoffOffer(session.pending_handoff, session.active_character === "emma" ? "max" : "emma"));
     pendingGmGuidanceRef.current = latestGm?.next_turn_guidance?.trim() || null;
     gmTopicsCoveredRef.current = latestGm?.topics_covered ?? [];
     endedRef.current = false;
@@ -815,18 +836,19 @@ const IndexPRD4 = () => {
     triggeredVideoIdsRef.current = [];
     lastVideoTurnRef.current = -Infinity;
     pendingPostVideoContextRef.current = null;
-    const maxProfile = await getCharacterRuntimeReadiness("max").catch(() => null);
-    activeCharacterRef.current = "max";
-    activeVoiceIdRef.current = maxProfile?.ttsVoiceId ?? null;
-    activeTTSProviderIdRef.current = asTTSProviderId(maxProfile?.ttsProvider);
+    const startingCharacter = startingCharacterRef.current;
+    const profile = await getCharacterRuntimeReadiness(startingCharacter).catch(() => null);
+    activeCharacterRef.current = startingCharacter;
+    activeVoiceIdRef.current = profile?.ttsVoiceId ?? null;
+    activeTTSProviderIdRef.current = asTTSProviderId(profile?.ttsProvider);
     handoffCountRef.current = 0;
     handoffRecommendationRef.current = null;
-    handoffConversationStartRef.current = 0;
+    pendingPlayerSwitchRef.current = null;
     setHandoffOffer(null);
     setHandoffCalling(false);
     pendingGmGuidanceRef.current = null;
     gmTopicsCoveredRef.current = [];
-    setSelectedCharacter("max");
+    setSelectedCharacter(startingCharacter);
     setActiveVideo(null);
 
     // Recharge les règles de déclenchement vidéo (admin)
@@ -839,9 +861,12 @@ const IndexPRD4 = () => {
     trackEvent("prd4_session_duration_loaded", { duration_seconds: configuredDuration });
 
     // Réplique d'ouverture de Max (scriptée pour amorcer)
-    const opening = maxProfile?.openingLine?.trim() || OPENING_LINE;
+    const opening = profile?.openingLine?.trim() || (startingCharacter === "max" ? OPENING_LINE : "Allô ?");
     setMaxSubtitle(opening);
-    const openingMsg: ConversationMessage = { role: "max", content: opening, timestamp: Date.now() };
+    const openingMsg: ConversationMessage = tagSpokenWith(
+      { role: startingCharacter, content: opening, timestamp: Date.now() },
+      startingCharacter,
+    );
     conversationRef.current = [openingMsg];
     addMessage(openingMsg);
     setAudioState(
@@ -929,7 +954,10 @@ const IndexPRD4 = () => {
       setAudioState("max_thinking");
       setUserSubtitle(userText);
 
-      const userMsg: ConversationMessage = { role: "user", content: userText, timestamp: Date.now() };
+      const userMsg: ConversationMessage = tagSpokenWith(
+        { role: "user", content: userText, timestamp: Date.now() },
+        activeCharacterRef.current,
+      );
       conversationRef.current = [...conversationRef.current, userMsg];
       addMessage(userMsg);
 
@@ -972,12 +1000,18 @@ const IndexPRD4 = () => {
         const postVideoContext = pendingPostVideoContextRef.current ?? undefined;
         pendingPostVideoContextRef.current = null;
         // Consommation one-shot : une guidance périmée ne doit pas survivre à son tour.
-        const gmGuidance = pendingGmGuidanceRef.current;
+        const requestedSwitch = detectPlayerSwitchRequest(userText, activeCharacterRef.current);
+        pendingPlayerSwitchRef.current = requestedSwitch;
+        const switchGuidance = requestedSwitch
+          ? buildSwitchRequestGuidance(activeCharacterRef.current, requestedSwitch)
+          : null;
+        const gmGuidance = [pendingGmGuidanceRef.current, switchGuidance].filter(Boolean).join(" ") || null;
         pendingGmGuidanceRef.current = null;
         const handoffProposalForThisTurn = handoffRecommendationRef.current;
-        const priorConversation = activeCharacterRef.current === "emma"
-          ? conversationRef.current.slice(handoffConversationStartRef.current, -1)
-          : conversationRef.current.slice(0, -1);
+        const priorConversation = sliceConversationForCharacter(
+          conversationRef.current.slice(0, -1),
+          activeCharacterRef.current,
+        );
         const result = await processPRD4Turn({
           sessionId: sessionIdRef.current,
           conversationHistory: priorConversation,
@@ -1007,7 +1041,7 @@ const IndexPRD4 = () => {
         const ttsStart = performance.now();
         const blocker =
           (result.timings.max_ms ?? 0) >= (result.timings.rag_ms ?? 0) ? "max_ms" : "rag_ms";
-        const maxMsg: ConversationMessage = {
+        const maxMsg: ConversationMessage = tagSpokenWith({
           role: activeCharacterRef.current,
           content: result.maxResponse,
           timestamp: Date.now(),
@@ -1021,7 +1055,7 @@ const IndexPRD4 = () => {
               max_ms: getConfiguredLLMServiceInfo(llmSettings?.LLM_MODEL),
             },
           },
-        };
+        }, activeCharacterRef.current);
         conversationRef.current = [...conversationRef.current, maxMsg];
         addMessage(maxMsg);
         setMaxSubtitle(result.maxResponse);
@@ -1178,7 +1212,7 @@ const IndexPRD4 = () => {
 
         // A handoff recommendation first guides a natural proposal by Max. The
         // explicit choice only appears after that next spoken reply completed.
-        if (handoffProposalForThisTurn && activeCharacterRef.current === "max") {
+        if (handoffProposalForThisTurn && handoffProposalForThisTurn.targetCharacter !== activeCharacterRef.current) {
           handoffRecommendationRef.current = null;
           setHandoffOffer(handoffProposalForThisTurn);
           if (sessionIdRef.current) {
@@ -1189,11 +1223,26 @@ const IndexPRD4 = () => {
               eventType: "handoff_proposed",
               turnId,
               turnIndex,
-              character: "max",
-              payload: { reason: handoffProposalForThisTurn.reason },
+              character: activeCharacterRef.current,
+              payload: { reason: handoffProposalForThisTurn.reason, targetCharacter: handoffProposalForThisTurn.targetCharacter },
             });
           }
-          trackEvent("prd4_handoff_proposed", { session_id: sessionIdRef.current, turn_id: turnId, turn_index: turnIndex });
+          trackEvent("prd4_handoff_proposed", {
+            session_id: sessionIdRef.current,
+            turn_id: turnId,
+            turn_index: turnIndex,
+            target_character: handoffProposalForThisTurn.targetCharacter,
+          });
+        }
+
+        if (requestedSwitch) {
+          const stance = inferCharacterSwitchStance(result.maxResponse);
+          if (stance === "accept") {
+            pendingPlayerSwitchRef.current = null;
+            void switchToCharacterRef.current?.(requestedSwitch, "player");
+          } else if (stance === "object") {
+            pendingPlayerSwitchRef.current = null;
+          }
         }
 
         // ---- Directeur d'expérience unique : labels, mémoire, guidance et une
@@ -1240,29 +1289,45 @@ const IndexPRD4 = () => {
             }
           }
 
-          const [videos, emma] = await Promise.all([
+          const [videos, maxProfile, emmaProfile] = await Promise.all([
             getVideoTriggersCached(),
+            getCharacterRuntimeReadiness("max").catch(() => null),
             getCharacterRuntimeReadiness("emma").catch(() => null),
           ]);
           if (!isCurrentTurn()) return;
           const settings = videoTriggerSettingsRef.current;
           const directorConfig = ev.orchestration_config;
-          const decision: ExperienceDirectorDecisionV1 = {
+          const pendingPlayerTarget = requestedSwitch && pendingPlayerSwitchRef.current === requestedSwitch
+            ? requestedSwitch
+            : null;
+          if (pendingPlayerTarget) {
+            const stance = ev.player_switch_request?.targetCharacter === pendingPlayerTarget
+              ? ev.player_switch_request.stance
+              : "defer";
+            pendingPlayerSwitchRef.current = null;
+            if (stance === "accept") {
+              void switchToCharacterRef.current?.(pendingPlayerTarget, "player");
+            }
+          }
+          const decision: ExperienceDirectorDecisionV1 = applyTopicHandoffFallback({
             labels: ev.labels ?? { themes: [], topics: [], intentions: [] },
             nextTurnGuidance: ev.next_turn_guidance || null,
             memoryDelta: ev.memory_delta ?? null,
-            action: ev.action ?? { type: "none" },
-          };
+            action: requestedSwitch ? { type: "none" } : (ev.action ?? { type: "none" }),
+          }, directorConfig, activeCharacterRef.current);
+          const targetCharacter = decision.action.type === "handoff" ? decision.action.targetCharacter : "emma";
           const guarded = validateDirectorDecision(decision, {
             configPublished: Boolean(ev.orchestration_version_id),
             currentCharacter: activeCharacterRef.current,
             userTurn: turnIndex,
             handoffCount: handoffCountRef.current,
             handoffPending: Boolean(handoffOffer || handoffRecommendationRef.current),
+            lastHandoffTurn: lastHandoffUserTurn(conversationRef.current),
             handoffsEnabled: directorConfig?.editor.allowHandoffs ?? true,
             minimumHandoffTurn: directorConfig?.minimumHandoffTurn ?? 4,
-            maximumHandoffsPerSession: directorConfig?.maximumHandoffsPerSession ?? 1,
-            emmaReady: emma?.ready === true,
+            maximumHandoffsPerSession: directorConfig?.maximumHandoffsPerSession ?? 8,
+            minimumTurnsBetweenHandoffs: directorConfig?.minimumTurnsBetweenHandoffs ?? 2,
+            targetReady: (targetCharacter === "emma" ? emmaProfile : maxProfile)?.ready === true,
             playedVideoIds: triggeredVideoIdsRef.current,
             availableVideoIds: videos.filter((video) => Boolean(video.video_url)).map((video) => video.id),
             lastVideoTurn: Number.isFinite(lastVideoTurnRef.current) ? lastVideoTurnRef.current : null,
@@ -1291,6 +1356,7 @@ const IndexPRD4 = () => {
             handoffRecommendationRef.current = {
               reason: guarded.action.reason,
               proposalGuidance: guarded.action.proposalGuidance,
+              targetCharacter: guarded.action.targetCharacter,
             };
             pendingGmGuidanceRef.current = guarded.action.proposalGuidance;
             trackEvent("prd4_handoff_recommended", { session_id: sid, turn_id: turnId, turn_index: turnIndex });
@@ -1538,93 +1604,111 @@ const IndexPRD4 = () => {
     void finalizeAndEnd("user_hangup");
   }, [finalizeAndEnd]);
 
-  const handleRejectHandoff = useCallback(() => {
-    const offer = handoffOffer;
-    if (!offer) return;
-    setHandoffOffer(null);
-    handoffCountRef.current = 1;
-    const sid = sessionIdRef.current;
-    if (sid) {
-      void updatePRD4ExperienceState(sid, { pendingHandoff: null, handoffCount: 1 });
-      void appendExperienceEvent({
-        sessionId: sid,
-        eventKey: "handoff-refused:max-emma",
-        eventType: "handoff_refused",
-        character: "max",
-        payload: { reason: offer.reason },
-      });
-    }
-    trackEvent("prd4_handoff_refused", { session_id: sid, target_character: "emma" });
-  }, [handoffOffer]);
-
-  const handleAcceptHandoff = useCallback(async () => {
-    const offer = handoffOffer;
-    if (!offer || handoffCalling) return;
+  const switchToCharacter = useCallback(async (target: RuntimeCharacter, source: "player" | "gm") => {
+    if (handoffCalling || activeCharacterRef.current === target) return;
+    const from = activeCharacterRef.current;
+    setHandoffCallingTarget(target);
     setHandoffCalling(true);
     const sid = sessionIdRef.current;
-    trackEvent("prd4_handoff_accepted", { session_id: sid, target_character: "emma" });
+    const targetName = characterDisplayName(target);
+    trackEvent("prd4_handoff_accepted", { session_id: sid, target_character: target, source });
     if (sid) void appendExperienceEvent({
       sessionId: sid,
-      eventKey: "handoff-accepted:max-emma",
+      eventKey: `handoff-accepted:${from}-${target}`,
       eventType: "handoff_accepted",
-      character: "max",
-      payload: { reason: offer.reason },
+      character: from,
+      payload: { reason: source, targetCharacter: target },
     });
     try {
-      const emma = await getCharacterRuntimeReadiness("emma");
-      if (!emma?.ready || !emma.openingLine || !emma.ttsVoiceId) {
-        throw new Error("La checklist runtime d’Emma n’est plus complète.");
+      const profile = await getCharacterRuntimeReadiness(target);
+      if (!profile?.ready || !profile.ttsVoiceId) {
+        throw new Error(`La checklist runtime de ${targetName} n’est plus complète.`);
       }
-      await activateTTSFallback("emma_handoff_tts_v1");
+      if (target === "emma") await activateTTSFallback("emma_handoff_tts_v1");
       await new Promise<void>((resolve) => window.setTimeout(resolve, 900));
-      handoffConversationStartRef.current = conversationRef.current.length;
-      activeCharacterRef.current = "emma";
-      activeVoiceIdRef.current = emma.ttsVoiceId;
-      activeTTSProviderIdRef.current = asTTSProviderId(emma.ttsProvider);
-      handoffCountRef.current = 1;
-      setSelectedCharacter("emma");
+      const firstContact = !hasSpokenWithCharacter(conversationRef.current, target);
+      activeCharacterRef.current = target;
+      activeVoiceIdRef.current = profile.ttsVoiceId;
+      activeTTSProviderIdRef.current = asTTSProviderId(profile.ttsProvider);
+      handoffCountRef.current += 1;
+      setSelectedCharacter(target);
       setHandoffOffer(null);
       if (sid) await updatePRD4ExperienceState(sid, {
-        activeCharacter: "emma",
+        activeCharacter: target,
         pendingHandoff: null,
-        handoffCount: 1,
+        handoffCount: handoffCountRef.current,
       });
-      const opening: ConversationMessage = { role: "emma", content: emma.openingLine, timestamp: Date.now() };
-      conversationRef.current = [...conversationRef.current, opening];
-      addMessage(opening);
-      setMaxSubtitle(emma.openingLine);
-      setAudioState("max_speaking");
-      setHandoffCalling(false);
-      await renderResponseText(emma.openingLine, {
-        turnId: `${sid ?? "local"}:emma-opening`,
-        turnIndex: conversationRef.current.filter((message) => message.role === "user").length,
-        voiceId: emma.ttsVoiceId,
-        providerId: asTTSProviderId(emma.ttsProvider) ?? undefined,
-      });
+      if (firstContact) {
+        const openingLine = profile.openingLine?.trim() || (target === "max" ? OPENING_LINE : "Allô ?");
+        const opening = tagSpokenWith({ role: target, content: openingLine, timestamp: Date.now() }, target);
+        conversationRef.current = [...conversationRef.current, opening];
+        addMessage(opening);
+        setMaxSubtitle(openingLine);
+        setAudioState("max_speaking");
+        setHandoffCalling(false);
+        await renderResponseText(openingLine, {
+          turnId: `${sid ?? "local"}:${target}-opening`,
+          turnIndex: conversationRef.current.filter((message) => message.role === "user").length,
+          voiceId: profile.ttsVoiceId,
+          providerId: asTTSProviderId(profile.ttsProvider) ?? undefined,
+        });
+      } else {
+        setHandoffCalling(false);
+      }
       setAudioState("idle");
       if (sid) {
         void updatePRD4Conversation(sid, conversationRef.current);
         void appendExperienceEvent({
           sessionId: sid,
-          eventKey: "handoff-executed:max-emma",
+          eventKey: `handoff-executed:${from}-${target}`,
           eventType: "handoff_executed",
-          character: "emma",
-          payload: { timerPreserved: true, sessionPreserved: true },
+          character: target,
+          payload: { timerPreserved: true, sessionPreserved: true, firstContact, source },
         });
       }
-      trackEvent("prd4_handoff_executed", { session_id: sid, target_character: "emma" });
+      trackEvent("prd4_handoff_executed", { session_id: sid, target_character: target, first_contact: firstContact, source });
     } catch (error) {
       setHandoffCalling(false);
-      toast({ title: "Emma n’est pas disponible", description: error instanceof Error ? error.message : "Restez avec Max.", variant: "destructive" });
+      toast({
+        title: `${targetName} n’est pas disponible`,
+        description: error instanceof Error ? error.message : `Restez avec ${characterDisplayName(from)}.`,
+        variant: "destructive",
+      });
       if (sid) void appendExperienceEvent({
         sessionId: sid,
-        eventKey: "handoff-blocked-on-accept:max-emma",
+        eventKey: `handoff-blocked-on-accept:${from}-${target}`,
         eventType: "handoff_blocked",
-        character: "max",
+        character: from,
         payload: { blockedReason: error instanceof Error ? error.message : String(error) },
       });
     }
-  }, [activateTTSFallback, addMessage, handoffCalling, handoffOffer, renderResponseText, setAudioState, setSelectedCharacter]);
+  }, [activateTTSFallback, addMessage, handoffCalling, renderResponseText, setAudioState, setSelectedCharacter]);
+
+  switchToCharacterRef.current = switchToCharacter;
+
+  const handleRejectHandoff = useCallback(() => {
+    const offer = handoffOffer;
+    if (!offer) return;
+    setHandoffOffer(null);
+    const sid = sessionIdRef.current;
+    if (sid) {
+      void updatePRD4ExperienceState(sid, { pendingHandoff: null, handoffCount: handoffCountRef.current });
+      void appendExperienceEvent({
+        sessionId: sid,
+        eventKey: `handoff-refused:${activeCharacterRef.current}-${offer.targetCharacter}`,
+        eventType: "handoff_refused",
+        character: activeCharacterRef.current,
+        payload: { reason: offer.reason, targetCharacter: offer.targetCharacter },
+      });
+    }
+    trackEvent("prd4_handoff_refused", { session_id: sid, target_character: offer.targetCharacter });
+  }, [handoffOffer]);
+
+  const handleAcceptHandoff = useCallback(async () => {
+    const offer = handoffOffer;
+    if (!offer) return;
+    await switchToCharacter(offer.targetCharacter, "gm");
+  }, [handoffOffer, switchToCharacter]);
 
   // Cleanup au démontage
   useEffect(() => () => { cleanupAudio(); }, [cleanupAudio]);
@@ -1725,7 +1809,8 @@ const IndexPRD4 = () => {
     activeTTSProviderIdRef.current = null;
     handoffCountRef.current = 0;
     handoffRecommendationRef.current = null;
-    handoffConversationStartRef.current = 0;
+    pendingPlayerSwitchRef.current = null;
+    startingCharacterRef.current = "max";
     setHandoffOffer(null);
     setHandoffCalling(false);
     activeTurnControllerRef.current?.abort("experience-restart");
@@ -1811,10 +1896,10 @@ const IndexPRD4 = () => {
       ) : null;
       break;
     case "character_select":
-      screen = <CharacterSelectScreen onSelectMax={handleSelectMax} onLockedClick={handleLockedClick} />;
+      screen = <CharacterSelectScreen onSelect={handleSelectCharacter} onLockedClick={handleLockedClick} />;
       break;
     case "calling_max":
-      screen = <CallingMaxScreen onAnswered={handleAnswered} />;
+      screen = <CallingMaxScreen character={startingCharacterRef.current} onAnswered={handleAnswered} />;
       break;
     case "conversation_max":
       screen = (
@@ -1832,9 +1917,10 @@ const IndexPRD4 = () => {
               streamingAvatarActive={streamingAvatarActive}
               streamingAvatarState={streamingAvatarState}
               attachAvatarMedia={attachAvatarMedia}
-              activeCharacter={activeCharacterRef.current}
+              activeCharacter={state.selectedCharacter === "emma" ? "emma" : "max"}
               handoffOffer={handoffOffer}
               handoffCalling={handoffCalling}
+              handoffCallingTarget={handoffCallingTarget}
               onAcceptHandoff={() => void handleAcceptHandoff()}
               onRejectHandoff={handleRejectHandoff}
             />

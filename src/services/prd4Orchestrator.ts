@@ -45,7 +45,7 @@ export interface PRD4TurnInput {
   userMessage: string;
   userRole: UserRoleProfile | null;
   timeElapsedSeconds: number;
-  /** Personnage actif. Max au démarrage, Emma seulement après un handoff validé. */
+  /** Personnage actif (Max ou Emma), y compris dès le sélecteur. */
   characterName?: string;
   /** IDs de triggers vidéo déjà joués durant la session. */
   triggeredVideoIds?: string[];
@@ -109,12 +109,13 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const recentConversation = selectRecentConversation(input.conversationHistory);
   const sessionDurationSeconds = normalizeSessionDurationSeconds(gameplay?.TIMEOUT_SECONDS);
   const minimumClosureSeconds = getSessionMinimumClosureSeconds(sessionDurationSeconds);
+  const activeCharacter = input.characterName?.toLowerCase() === "emma" ? "emma" : "max";
   let summaryFetchMs = 0;
   const summaryStartedAt = performance.now();
   const summaryPromise = (input.sessionId
     ? withTimeout(
         "prd4_summary_fetch",
-        fetchSessionSummary(input.sessionId),
+        fetchSessionSummary(input.sessionId, activeCharacter),
         SUMMARY_FETCH_DEADLINE_MS,
       ).catch(() => null)
     : Promise.resolve(null)).then((record) => {
@@ -194,14 +195,15 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   input.onLatencySegment?.({ type: "start", segment: "LLM", service: "Max LLM" });
   const summaryRecord = await summaryPromise;
   const structuredMemory = await memoryPromise;
-  const activeCharacter = input.characterName?.toLowerCase() === "emma" ? "emma" : "max";
   const visibleStructuredMemory = structuredMemory
     ? filterConversationMemoryForCharacter(structuredMemory, activeCharacter)
     : null;
+  const sliceUserTurns = input.conversationHistory.filter((message) => message.role === "user").length;
+  const memoryLastTurn = structuredMemory?.lastTurn ?? 0;
   const maxConversationHistory = gameplay?.MAX_PROMPT_VARIANT === "optimized_v3"
     ? selectOptimizedConversation(
         input.conversationHistory,
-        activeCharacter === "emma" ? 0 : structuredMemory?.lastTurn ?? 0,
+        activeCharacter === "max" && memoryLastTurn < sliceUserTurns ? memoryLastTurn : 0,
       )
     : recentConversation;
   const postureSummary = input.userPostureRaw?.trim()
@@ -215,9 +217,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     postVideoContext: input.postVideoContext,
     session_id: input.sessionId ?? undefined,
     knowledgeContext,
-    // Le résumé historique n'est pas encore cloisonné par personnage. Emma ne
-    // reçoit donc que son historique isolé et la mémoire V2 explicitement visible.
-    sessionSummary: activeCharacter === "emma" ? undefined : summaryRecord?.summary,
+    // Résumé lu depuis le cache mémoire scoped au personnage (jamais le log global).
+    sessionSummary: summaryRecord?.summary,
     conversationMemory: visibleStructuredMemory,
     ragCandidates: ragDetailed?.matches.map((match, index) => ({
       id: match.id,
@@ -473,7 +474,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       ],
       lastSummarizedTurn,
     );
-    void summarizeSessionAsync(input.sessionId, pendingSummary, turnIndex);
+    void summarizeSessionAsync(input.sessionId, pendingSummary, turnIndex, activeCharacter);
   }
 
   return {
