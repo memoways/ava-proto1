@@ -5,6 +5,7 @@
 
 import type { TTSProvider, TTSGenerateContext, TTSGenerateResult } from "@/services/tts/types";
 import { getHumeSettings } from "@/services/tts/providerSettings";
+import { composeHumeDescription } from "@/services/tts/performanceIntent";
 import { debugLogger } from "@/services/debugLogger";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
 import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
@@ -22,13 +23,15 @@ export const humeProvider: TTSProvider = {
     const preparedText = prepareTextForTTS(text);
     const voiceName = ctx?.voiceId || s.voiceName;
 
+    const description = composeHumeDescription(s.description, ctx?.performance);
     const body = {
       text: preparedText,
       voiceName,
       voiceProvider: s.voiceProvider,
-      description: s.description || undefined,
+      description,
       format: s.format,
       languageCode: s.languageCode,
+      ...(ctx?.performance?.speedHint ? { speed: ctx.performance.speedHint } : {}),
     };
 
     const startTime = Date.now();

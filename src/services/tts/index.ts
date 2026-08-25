@@ -126,6 +126,9 @@ export async function generateSpeech(text: string, opts?: TTSOptions): Promise<B
         retry_count: retryCount,
         stitched_previous: !!opts?.previousText,
         stitched_next: !!opts?.nextText,
+        performance_emotion: opts?.performance?.emotion ?? null,
+        performance_intensity: opts?.performance?.intensity ?? null,
+        performance_source: opts?.performance?.source ?? null,
       },
     });
     return blob;
@@ -185,6 +188,8 @@ export function tryCreateStreamingPlayback(text: string, opts?: TTSOptions): TTS
           status_code: stats.statusCode ?? 200,
           error_type: "ok",
           transport: stats.transport,
+          performance_emotion: opts?.performance?.emotion ?? null,
+          performance_source: opts?.performance?.source ?? null,
         },
       });
     },

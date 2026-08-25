@@ -66,6 +66,8 @@ describe("TTSConfigTab Gradium character selector", () => {
     }
     vi.stubGlobal("ResizeObserver", ResizeObserverMock);
     localStorage.clear();
+    vi.mocked(generateSpeech).mockClear();
+    vi.mocked(playAudioBlob).mockClear();
     vi.mocked(generateSpeech).mockResolvedValue(new Blob(["audio"]));
     vi.mocked(playAudioBlob).mockResolvedValue({ status: "played" } as never);
   });
@@ -85,6 +87,19 @@ describe("TTSConfigTab Gradium character selector", () => {
       expect.objectContaining({
         providerId: "gradium",
         characterKey: "emma",
+        performance: expect.objectContaining({ emotion: "tense", source: "manual" }),
+      }),
+    ));
+  });
+
+  it("sends the selected audition emotion on a provider test", async () => {
+    render(<TTSConfigTab />);
+    screen.getByRole("button", { name: "Colère" }).click();
+    screen.getByRole("button", { name: /Tester REST/ }).click();
+    await waitFor(() => expect(generateSpeech).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        performance: expect.objectContaining({ emotion: "angry", source: "manual" }),
       }),
     ));
   });

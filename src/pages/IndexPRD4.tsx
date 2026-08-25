@@ -29,6 +29,7 @@ import {
 } from "@/services/stt";
 import { OPENING_LINE } from "@/services/openingTTSCache";
 import type { TTSProviderId } from "@/services/tts/types";
+import { derivePerformanceIntent, logPerformanceIntent } from "@/services/tts/performanceIntent";
 import { unlockAudioPlayback } from "@/services/audioPlayback";
 import {
   getGameplaySettings,
@@ -138,7 +139,7 @@ import {
 const TEASER_VIDEO_URL = "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049";
 
 function asTTSProviderId(value: string | null | undefined): TTSProviderId | null {
-  return value === "elevenlabs" || value === "inworld" || value === "hume" || value === "gradium" ? value : null;
+  return value === "elevenlabs" || value === "inworld" || value === "hume" || value === "gradium" || value === "cartesia" ? value : null;
 }
 
 const IndexPRD4 = () => {
@@ -220,6 +221,7 @@ const IndexPRD4 = () => {
   const pendingPostVideoContextRef = useRef<string | null>(null);
   // Boucle GM→Max : guidance produite par le post-tour N, consommée au tour N+1.
   const pendingGmGuidanceRef = useRef<string | null>(null);
+  const pendingEmotionalStateRef = useRef<string | null>(null);
   const gmTopicsCoveredRef = useRef<string[]>([]);
   const activeCharacterRef = useRef<RuntimeCharacter>("max");
   const startingCharacterRef = useRef<RuntimeCharacter>("max");
@@ -480,6 +482,7 @@ const IndexPRD4 = () => {
       voiceId?: string;
       providerId?: TTSProviderId;
       characterKey?: string;
+      userMessage?: string | null;
     } = {},
   ): Promise<ResponseOutputResult> => {
     let output = responseOutputRef.current;
@@ -491,18 +494,37 @@ const IndexPRD4 = () => {
     if (output.mode === "streaming_avatar" && context.turnId) {
       expectedAvatarTextRef.current.set(context.turnId, text);
     }
+    const characterKey = context.characterKey ?? activeCharacterRef.current;
+    const performance = derivePerformanceIntent({
+      text,
+      characterKey,
+      previousEmotionalState: pendingEmotionalStateRef.current,
+      userMessage: context.userMessage,
+    });
+    logPerformanceIntent(performance, { turnId: context.turnId, characterKey });
+    trackEvent("prd4_tts_performance", {
+      session_id: sessionIdRef.current,
+      turn_id: context.turnId,
+      turn_index: context.turnIndex,
+      character: characterKey,
+      emotion: performance.emotion,
+      intensity: performance.intensity,
+      source: performance.source,
+    });
+    const turnContext = {
+      sessionId: sessionIdRef.current ?? undefined,
+      turnId: context.turnId,
+      turnIndex: context.turnIndex,
+      signal: context.signal,
+      onPlaybackStart: context.onPlaybackStart,
+      voiceId: context.voiceId,
+      providerId: context.providerId,
+      characterKey,
+      performance,
+    };
     try {
       if (output.mode === "tts") setAudioState("max_speaking");
-      return await output.renderText(text, {
-        sessionId: sessionIdRef.current ?? undefined,
-        turnId: context.turnId,
-        turnIndex: context.turnIndex,
-        signal: context.signal,
-        onPlaybackStart: context.onPlaybackStart,
-        voiceId: context.voiceId,
-        providerId: context.providerId,
-        characterKey: context.characterKey ?? activeCharacterRef.current,
-      });
+      return await output.renderText(text, turnContext);
     } catch (error) {
       if (context.signal?.aborted) {
         return {
@@ -540,16 +562,7 @@ const IndexPRD4 = () => {
       const fallback = await activateTTSFallback(message);
       if (!started) {
         setAudioState("max_speaking");
-        return fallback.renderText(text, {
-          sessionId: sessionIdRef.current ?? undefined,
-          turnId: context.turnId,
-          turnIndex: context.turnIndex,
-          signal: context.signal,
-          onPlaybackStart: context.onPlaybackStart,
-          voiceId: context.voiceId,
-          providerId: context.providerId,
-          characterKey: context.characterKey ?? activeCharacterRef.current,
-        });
+        return fallback.renderText(text, turnContext);
       }
       return {
         status: "failed",
@@ -753,6 +766,7 @@ const IndexPRD4 = () => {
     setSelectedCharacter(session.active_character);
     setHandoffOffer(parseHandoffOffer(session.pending_handoff, session.active_character === "emma" ? "max" : "emma"));
     pendingGmGuidanceRef.current = latestGm?.next_turn_guidance?.trim() || null;
+    pendingEmotionalStateRef.current = null;
     gmTopicsCoveredRef.current = latestGm?.topics_covered ?? [];
     endedRef.current = false;
     isProcessingRef.current = false;
@@ -850,6 +864,7 @@ const IndexPRD4 = () => {
     setHandoffOffer(null);
     setHandoffCalling(false);
     pendingGmGuidanceRef.current = null;
+    pendingEmotionalStateRef.current = null;
     gmTopicsCoveredRef.current = [];
     setSelectedCharacter(startingCharacter);
     setActiveVideo(null);
@@ -1128,6 +1143,7 @@ const IndexPRD4 = () => {
           voiceId: activeVoiceIdRef.current ?? undefined,
           providerId: activeTTSProviderIdRef.current ?? undefined,
           characterKey: activeCharacterRef.current,
+          userMessage: userText,
         }).finally(() => {
           turnController.signal.removeEventListener("abort", abortOutputFromTurn);
           if (activeOutputControllerRef.current === outputController) activeOutputControllerRef.current = null;
@@ -1255,6 +1271,8 @@ const IndexPRD4 = () => {
         void result.postTurnPromise.then(async (ev) => {
           if (!isCurrentTurn()) return;
           pendingGmGuidanceRef.current = ev.next_turn_guidance?.trim() || null;
+          pendingEmotionalStateRef.current = ev.memory_after?.relationship.emotionalState
+            ?? pendingEmotionalStateRef.current;
           if (ev.topics_covered?.length) {
             const known = new Set(gmTopicsCoveredRef.current.map((t) => t.toLowerCase()));
             for (const topic of ev.topics_covered) {
@@ -1810,6 +1828,8 @@ const IndexPRD4 = () => {
     sessionDurationRef.current = 0;
     triggeredVideoIdsRef.current = [];
     pendingPostVideoContextRef.current = null;
+    pendingGmGuidanceRef.current = null;
+    pendingEmotionalStateRef.current = null;
     activeCharacterRef.current = "max";
     activeVoiceIdRef.current = null;
     activeTTSProviderIdRef.current = null;

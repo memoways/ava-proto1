@@ -8,6 +8,8 @@
 
 import type { TTSProvider, TTSGenerateContext, TTSGenerateResult, TTSStreamPlaybackHandle, TTSStreamGenerationStats } from "@/services/tts/types";
 import { resolveGradiumSettings, type GradiumSettings } from "@/services/tts/providerSettings";
+import { applyGradiumPerformance } from "@/services/tts/performanceIntent";
+import type { PerformanceIntent } from "@/services/tts/performanceIntent";
 import { debugLogger } from "@/services/debugLogger";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
 import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
@@ -17,11 +19,15 @@ import { createGradiumStreamSession, isStreamingSupported } from "@/services/tts
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
-function buildJsonConfig(s: GradiumSettings): Record<string, number | string> {
+function buildJsonConfig(s: GradiumSettings, performance?: PerformanceIntent | null): Record<string, number | string> {
+  const tuned = applyGradiumPerformance(
+    { temp: s.temp, paddingBonus: s.paddingBonus },
+    performance,
+  );
   const jsonConfig: Record<string, number | string> = {
-    temp: s.temp,
+    temp: tuned.temp,
     cfg_coef: s.cfgCoef,
-    padding_bonus: s.paddingBonus,
+    padding_bonus: tuned.paddingBonus,
   };
   if (s.rewriteRules.trim()) jsonConfig.rewrite_rules = s.rewriteRules.trim();
   if (s.pronunciationId.trim()) jsonConfig.pronunciation_id = s.pronunciationId.trim();
@@ -57,7 +63,7 @@ export const gradiumProvider: TTSProvider = {
       text: preparedText,
       voiceId,
       outputFormat: resolveRestFormat(s.outputFormat),
-      jsonConfig: buildJsonConfig(s),
+      jsonConfig: buildJsonConfig(s, ctx?.performance),
     };
 
     const startTime = Date.now();
@@ -129,7 +135,7 @@ function createStreamingHandleWithFallback(
   const session = createGradiumStreamSession(preparedText, {
     voiceId: ctx?.voiceId || s.voiceId,
     format: s.streamingFormat,
-    jsonConfig: buildJsonConfig(s),
+    jsonConfig: buildJsonConfig(s, ctx?.performance),
     signal: ctx?.signal,
   });
 

@@ -29,11 +29,17 @@ import {
   GRADIUM_VOICE_TUNING_DEFAULTS,
   INWORLD_MODELS,
   GRADIUM_OUTPUT_FORMATS,
+  getCartesiaSettings,
+  loadCartesiaSettingsFromDB,
+  saveCartesiaSettingsToDB,
+  resetCartesiaSettings,
+  CARTESIA_MODELS,
 
   type InworldSettings,
   type HumeSettings,
   type GradiumSettings,
   type GradiumVoiceTuning,
+  type CartesiaSettings,
 } from "@/services/tts/providerSettings";
 import {
   getTTSSettings,
@@ -45,9 +51,26 @@ import {
   type TTSSettings,
 } from "@/services/settingsService";
 import { listCharacterRuntimeProfiles } from "@/services/experienceOrchestration";
+import {
+  CANONICAL_EMOTIONS,
+  intentFromManualEmotion,
+  type CanonicalEmotion,
+} from "@/services/tts/performanceIntent";
 
 const TEST_PHRASE = "Écoute, je ne sais pas qui tu es... mais si tu sais quelque chose sur Ava, il faut me le dire maintenant. Je n'ai plus beaucoup de temps.";
 const GRADIUM_CHARACTER_ORDER = ["max", "emma"];
+const AUDITION_EMOTION_LABELS: Record<CanonicalEmotion, string> = {
+  neutral: "Neutre",
+  tense: "Tendu",
+  angry: "Colère",
+  sad: "Tristesse",
+  scared: "Peur",
+  fragile: "Fragile",
+  warm: "Chaleureux",
+  accusatory: "Accusateur",
+  sarcastic: "Sarcasme",
+  urgent: "Urgent",
+};
 
 type GradiumCharacterOption = {
   character_key: string;
@@ -88,9 +111,17 @@ export default function TTSConfigTab() {
   const grCharacterKeyRef = useRef(grCharacterKey);
   grCharacterKeyRef.current = grCharacterKey;
 
+  // Cartesia settings
+  const [caSettings, setCaSettings] = useState<CartesiaSettings>(getCartesiaSettings());
+  const [caSaved, setCaSaved] = useState<CartesiaSettings>(getCartesiaSettings());
+  const [savingCa, setSavingCa] = useState(false);
+
   // Test
   const [testing, setTesting] = useState<TTSProviderId | null>(null);
   const [testingStream, setTestingStream] = useState(false);
+  const [auditionEmotion, setAuditionEmotion] = useState<CanonicalEmotion>("tense");
+  const auditionEmotionRef = useRef(auditionEmotion);
+  auditionEmotionRef.current = auditionEmotion;
 
   useEffect(() => {
     loadActiveProviderFromDB().then(setActiveProviderState);
@@ -98,6 +129,7 @@ export default function TTSConfigTab() {
     loadInworldSettingsFromDB().then((s) => { setIwSettings(s); setIwSaved(s); });
     loadHumeSettingsFromDB().then((s) => { setHuSettings(s); setHuSaved(s); });
     loadGradiumSettingsFromDB().then((s) => { setGrSettings(s); setGrSaved(s); });
+    loadCartesiaSettingsFromDB().then((s) => { setCaSettings(s); setCaSaved(s); });
     listCharacterRuntimeProfiles()
       .then((profiles) => {
         const options = profiles
@@ -118,6 +150,7 @@ export default function TTSConfigTab() {
   const iwHasChanges = JSON.stringify(iwSettings) !== JSON.stringify(iwSaved);
   const huHasChanges = JSON.stringify(huSettings) !== JSON.stringify(huSaved);
   const grHasChanges = JSON.stringify(grSettings) !== JSON.stringify(grSaved);
+  const caHasChanges = JSON.stringify(caSettings) !== JSON.stringify(caSaved);
 
   async function handleActivate(id: TTSProviderId) {
     setActiveProviderState(id);
@@ -128,9 +161,12 @@ export default function TTSConfigTab() {
   const testProvider = useCallback(async (id: TTSProviderId) => {
     setTesting(id);
     try {
-      const blob = await generateSpeech(TEST_PHRASE, { providerId: id });
+      const blob = await generateSpeech(TEST_PHRASE, {
+        providerId: id,
+        performance: intentFromManualEmotion(auditionEmotionRef.current, 1),
+      });
       await playAudioBlob(blob);
-      toast.success(`Test ${id} terminé`);
+      toast.success(`Test ${id} · ${AUDITION_EMOTION_LABELS[auditionEmotionRef.current]}`);
     } catch (err) {
       console.error(`TTS test error (${id}):`, err);
       toast.error(`Erreur test ${id}: ${err instanceof Error ? err.message.slice(0, 120) : "inconnu"}`);
@@ -145,6 +181,7 @@ export default function TTSConfigTab() {
       providerId: "gradium" as const,
       characterKey: character?.character_key,
       voiceId: character?.tts_voice_id ?? undefined,
+      performance: intentFromManualEmotion(auditionEmotionRef.current, 1),
     };
     if (mode === "rest") {
       setTesting("gradium");
@@ -276,6 +313,25 @@ export default function TTSConfigTab() {
     toast.success(`Gradium ${grCharacter.display_name} réinitialisé`);
   }
 
+  function updateCa(patch: Partial<CartesiaSettings>) {
+    const current = { ...caSettings, ...patch };
+    writeEnvironmentStorage("ava_tts_settings_cartesia", JSON.stringify(current));
+    setCaSettings(current);
+  }
+  async function saveCa() {
+    setSavingCa(true);
+    await saveCartesiaSettingsToDB(caSettings);
+    setCaSaved(caSettings);
+    toast.success("Cartesia sauvegardé ✓");
+    setSavingCa(false);
+  }
+  function resetCa() {
+    const d = resetCartesiaSettings();
+    setCaSettings(d);
+    setCaSaved(d);
+    toast.success("Cartesia réinitialisé");
+  }
+
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -283,7 +339,7 @@ export default function TTSConfigTab() {
       <div>
         <h2 className="text-lg font-semibold">TTS Config — Multi-providers</h2>
         <p className="text-sm text-muted-foreground">
-          Compare 3 services TTS. Le provider <strong>actif</strong> est utilisé dans le jeu ; les autres restent disponibles pour les tests.
+          Compare les services TTS. Le provider <strong>actif</strong> est utilisé dans le jeu ; les autres restent disponibles pour les tests. Chaque test envoie une <strong>intention de jeu</strong> (émotion) au provider.
         </p>
         <p className="text-sm text-muted-foreground">
           Les <strong>Voice ID</strong> se règlent par personnage dans Expérience → Orchestration. Gradium a des réglages fins distincts par personnage dans le panneau ci-dessous.
@@ -312,6 +368,30 @@ export default function TTSConfigTab() {
               </button>
             );
           })}
+        </div>
+      </section>
+
+      <section className="border rounded-lg p-4 space-y-2">
+        <h3 className="font-semibold text-sm">Intention de jeu (audition)</h3>
+        <p className="text-xs text-muted-foreground">
+          Appliquée à tous les boutons Tester. En jeu, l'émotion est dérivée de la réplique (plus le personnage et la mémoire GM).
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {CANONICAL_EMOTIONS.map((emotion) => (
+            <button
+              key={emotion}
+              type="button"
+              onClick={() => {
+                auditionEmotionRef.current = emotion;
+                setAuditionEmotion(emotion);
+              }}
+              className={`px-2 py-1.5 border rounded text-xs ${
+                auditionEmotion === emotion ? "bg-primary/10 border-primary" : "hover:bg-accent/50"
+              }`}
+            >
+              {AUDITION_EMOTION_LABELS[emotion]}
+            </button>
+          ))}
         </div>
       </section>
 
@@ -719,6 +799,66 @@ export default function TTSConfigTab() {
           </label>
         </div>
 
+      </section>
+
+      {/* ===== Cartesia panel ===== */}
+      <section className="border rounded-lg p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-base">🎙️ Cartesia Sonic</h3>
+            <p className="text-xs text-muted-foreground">
+              Volume et vitesse par tour. Les tags d'émotion Cartesia ne s'appliquent qu'en anglais — en FR ils sont omis.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={resetCa}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
+            <Button size="sm" onClick={() => testProvider("cartesia")} disabled={testing === "cartesia"}>
+              {testing === "cartesia" ? "..." : "🔊 Tester"}
+            </Button>
+            <Button size="sm" onClick={saveCa} disabled={savingCa || !caHasChanges}
+              className={caHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
+              <Save className="w-3 h-3 mr-1" />{savingCa ? "..." : "Sauver"}
+            </Button>
+          </div>
+        </div>
+
+        {caHasChanges && (
+          <div className="bg-yellow-900/30 border border-yellow-700/50 rounded px-3 py-1 text-xs text-yellow-300">
+            ⚠️ Modifications Cartesia non sauvegardées
+          </div>
+        )}
+
+        <div>
+          <p className="text-xs font-medium mb-2">Modèle</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {CARTESIA_MODELS.map((m) => (
+              <button key={m.id} onClick={() => updateCa({ modelId: m.id })}
+                className={`text-left p-2 border rounded text-xs ${
+                  caSettings.modelId === m.id ? "bg-primary/10 border-primary" : "hover:bg-accent/50"
+                }`}>
+                <span className="font-medium">{m.label}</span>
+                <p className="text-muted-foreground mt-0.5">{m.description}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-muted-foreground">Voice ID (défaut admin)</span>
+            <input value={caSettings.voiceId}
+              onChange={(e) => updateCa({ voiceId: e.target.value.trim() })}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
+            <span className="block text-xs text-muted-foreground/60">Surchargé par le Voice ID Orchestration du personnage en jeu.</span>
+          </label>
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-muted-foreground">Langue</span>
+            <input value={caSettings.language}
+              onChange={(e) => updateCa({ language: e.target.value.trim().toLowerCase() || "fr" })}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="fr" />
+            <span className="block text-xs text-muted-foreground/60">Mettre `en` pour tester les tags émotion. Secret Lovable : CARTESIA_API_KEY.</span>
+          </label>
+        </div>
       </section>
     </div>
   </TooltipProvider>

@@ -8,6 +8,7 @@ import { elevenLabsProvider } from "@/services/tts/providers/elevenlabs";
 import { inworldProvider } from "@/services/tts/providers/inworld";
 import { humeProvider } from "@/services/tts/providers/hume";
 import { gradiumProvider } from "@/services/tts/providers/gradium";
+import { cartesiaProvider } from "@/services/tts/providers/cartesia";
 import { getActiveProviderId } from "@/services/tts/providerSettings";
 
 export const TTS_PROVIDERS: Record<TTSProviderId, TTSProvider> = {
@@ -15,6 +16,7 @@ export const TTS_PROVIDERS: Record<TTSProviderId, TTSProvider> = {
   inworld: inworldProvider,
   hume: humeProvider,
   gradium: gradiumProvider,
+  cartesia: cartesiaProvider,
 };
 
 export const TTS_PROVIDER_LIST: TTSProvider[] = [
@@ -22,6 +24,7 @@ export const TTS_PROVIDER_LIST: TTSProvider[] = [
   inworldProvider,
   humeProvider,
   gradiumProvider,
+  cartesiaProvider,
 ];
 
 export function getActiveProvider(): TTSProvider {

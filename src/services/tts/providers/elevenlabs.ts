@@ -10,6 +10,7 @@ import type {
   TTSProviderRequestError,
 } from "@/services/tts/types";
 import { getTTSSettings } from "@/services/settingsService";
+import { applyElevenLabsPerformance } from "@/services/tts/performanceIntent";
 import { debugLogger } from "@/services/debugLogger";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
 import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
@@ -54,15 +55,19 @@ export const elevenLabsProvider: TTSProvider = {
 
   async generate(text: string, ctx?: TTSGenerateContext): Promise<TTSGenerateResult> {
     const tts = getTTSSettings();
-    const preparedText = prepareTextForTTS(text);
+    const shaped = applyElevenLabsPerformance(
+      { style: tts.style, stability: tts.stability, speed: tts.speed, modelId: tts.modelId },
+      prepareTextForTTS(text),
+      ctx?.performance,
+    );
 
     const body = {
-      text: preparedText,
+      text: shaped.text,
       modelId: tts.modelId,
-      stability: tts.stability,
+      stability: shaped.stability,
       similarityBoost: tts.similarityBoost,
-      style: tts.style,
-      speed: tts.speed,
+      style: shaped.style,
+      speed: shaped.speed,
       useSpeakerBoost: tts.useSpeakerBoost,
       outputFormat: tts.outputFormat,
       optimizeStreamingLatency: tts.optimizeStreamingLatency,
@@ -76,7 +81,7 @@ export const elevenLabsProvider: TTSProvider = {
 
     const startTime = Date.now();
     const tRequest = performance.now();
-    const debugId = debugLogger.logFetch("tts", `TTS-EL "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts`, body);
+    const debugId = debugLogger.logFetch("tts", `TTS-EL "${shaped.text.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts`, body);
     const timeout = createTimeoutSignal(12000, ctx?.signal);
 
     const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-tts`, {

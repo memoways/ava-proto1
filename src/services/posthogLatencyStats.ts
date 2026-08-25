@@ -103,6 +103,7 @@ const VOICE_COST_PER_1K: Record<string, number> = {
   hume: 0.20,
   inworld: 0.005,
   gradium: 0.15,
+  cartesia: 0.15,
 };
 
 function percentile(values: number[], p: number): number | null {

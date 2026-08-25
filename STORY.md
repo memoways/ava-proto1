@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-25 (Gradium TTS par personnage)
+> **Last Updated**: 2026-08-25 (Pilotage émotionnel TTS)
 
 ---
 
@@ -72,6 +72,21 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-25 — Pilotage émotionnel TTS 🔹
+
+**Le problème.** Les avatars lisaient correctement mais à plat : les réglages
+TTS (style ElevenLabs, description Hume, delivery Inworld, temp Gradium)
+étaient globaux, et le brief GM `emotional_state` n'est plus sur le hot path
+live.
+
+**Ce qui change.** Chaque tour dérive un `PerformanceIntent` depuis le texte
+dit, le personnage et la mémoire émotionnelle GM du tour N−1, puis le mappe
+vers les vrais paramètres par requête de chaque provider. Cartesia est branché
+pour speed/volume (émotion nommée seulement en anglais). Audition dans
+TTS Config.
+
+Plan : [`docs/plan_tts_pilotage_emotionnel.md`](docs/plan_tts_pilotage_emotionnel.md).
 
 ### 2026-08-25 — Réglages Gradium TTS par personnage 🔹
 
