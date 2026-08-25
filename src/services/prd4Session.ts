@@ -3,7 +3,7 @@
  * Réutilise la table `sessions` existante.
  */
 import { supabase } from "@/integrations/supabase/client";
-import type { ConversationMessage, UserRoleProfile } from "@/types";
+import type { ConversationMessage, RuntimeCharacter, UserRoleProfile } from "@/types";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { ensureGameAuth } from "@/services/gameAuth";
 import { trackEvent } from "@/services/posthogService";
@@ -121,7 +121,7 @@ export async function updatePRD4ExperienceState(
   sessionId: string,
   payload: {
     activeCharacter?: "max" | "emma";
-    pendingHandoff?: { reason: string; proposalGuidance: string } | null;
+    pendingHandoff?: { reason: string; proposalGuidance: string; targetCharacter?: RuntimeCharacter } | null;
     handoffCount?: number;
   },
 ): Promise<void> {

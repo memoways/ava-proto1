@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-09 (configuration RAG explicite et métriques historiques)
+> **Last Updated**: 2026-08-25 (Emma au départ et passage Max ↔ Emma)
 
 ---
 
@@ -72,6 +72,57 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-25 — Emma peut ouvrir l’appel, et Max n’est plus un aller sans retour 🔷
+
+**Le problème.** Le sélecteur promettait quatre visages et n’en ouvrait qu’un.
+Emma restait grisée même lorsque son profil runtime était prêt. Une fois
+l’appel lancé, le Game Master ne pouvait proposer qu’un unique passage Max →
+Emma, jamais l’inverse, et jamais parce que le joueur le demandait. La mémoire
+s’appuyait sur un curseur « début Emma » : un retour vers Max aurait mélangé
+les deux conversations, et le résumé de session global aurait tout raconté
+à celui qui n’était pas au bout du fil.
+
+**Deux portes d’entrée, un seul contrat.** Max et Emma apparaissent au
+sélecteur dès que leur checklist runtime est complète (`enabled` + voix +
+ouverture). Ava et Léo restent verrouillés. L’écran d’appel reprend le
+portrait et le nom du personnage choisi. La phrase d’ouverture ne se dit
+qu’au premier contact ; un retour reprend **sa** conversation, sans
+réouverture.
+
+**Deux façons de changer, jamais forcées.** Si le joueur demande à parler à
+l’autre, le personnage en ligne répond in character : il peut accepter,
+objecter ou hésiter. Un accept déclenche l’appel. Une objection laisse le
+fil inchangé ; une insistance relance le même contrat. Si le GM juge le
+passage utile, il fait **proposer** le changement au tour suivant, puis le
+joueur confirme par les boutons **Appeler X / Rester avec Y**. Le quota
+unique `0 | 1` devient un plafond plus haut (défaut 8) plus un cooldown
+entre deux suggestions. Des règles thèmes/topics, éditables dans
+Orchestration, peuvent aussi pointer vers Max ou Emma.
+
+**Chaque conversation reste privée.** Chaque message du log porte
+`spokenWith`. Le LLM, les sous-titres et le résumé ne voient que la tranche
+du personnage actif. La mémoire V2 vit dans `characterStates` : nom et rôle
+du joueur restent partagés, les confidences de conversation ne passent
+plus. Un résumé n’est plus jamais calculé sur le log global ; le cache
+client le range par personnage.
+
+**Leçon.** Isoler « Emma après Max » par un index dans le transcript ne
+tient pas un aller-retour. Le bon modèle est une tranche par locuteur,
+écrite au moment du tour, relue au moment du prompt — et un directeur qui
+suggère sans jamais raccrocher lui-même.
+
+**Validation.** 259 tests unitaires (65 fichiers), typecheck et lint ciblé
+au vert. Recette écran : sélecteur Max/Emma, offre bidirectionnelle et
+sous-titres sans fuite. Le parcours vocal live (demande, objection,
+suggestion GM, retour) reste à jouer sur Lovable une fois Emma `enabled+ready`
+et la version d’orchestration **republiee** (les configs déjà publiées
+conservent l’ancien plafond d’un seul handoff). Plan :
+[`docs/plan_emma_conversation_switch.md`](docs/plan_emma_conversation_switch.md).
+Publication exclusive Lovable / Lovable Cloud.
+
+**Temps de réalisation.** Environ une session d’implémentation, tests et
+documentation inclus.
 
 ### 2026-08-09 — La configuration RAG explique enfin ce qu’elle active 🔷
 
@@ -2001,6 +2052,7 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 | 2026-07-13 | Site Lovable visible par toute personne possédant l'URL | Moyen | Repasser en privé/interne ou assumer explicitement cette visibilité avant diffusion |
 | 2026-07-13 | Tenue réelle de 15 minutes et P50/P95 non encore mesurés | Haut | Phase 2 : soak multi-provider, mémoire, reprise réseau et budget de latence |
 | 2026-07-13 | Purge 30 jours et headers Lovable non encore attestés | Haut avant tests externes | Tester sur branche, planifier le Job et vérifier les headers de l'URL servie |
+| 2026-08-25 | Les versions d’orchestration déjà publiées conservent `maximumHandoffsPerSession: 1` jusqu’à republication | Moyen | Republier un brouillon GM après review ; le défaut code est 8 + cooldown |
 
 ---
 
@@ -2040,18 +2092,30 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 
 **Reste :** comparer coût/qualité `legacy` tronqué vs `optimized_v3` sur sessions tracées avant tout changement de défaut ; envisager un proxy unique embeddings+rerank Voyage pour rapprocher le p90 du p50.
 
+### Session 2026-08-25 — Emma au départ et passage Max ↔ Emma
+
+**Livré :**
+- Sélecteur alimenté par les profils runtime : Max et Emma cliquables si `enabled+ready` ; Ava et Léo restent verrouillés.
+- Écran d’appel générique (portrait + nom) et ouverture selon le personnage choisi.
+- Isolation réelle : `spokenWith` sur le log, mémoire privée par personnage, résumé de session scoped au cache client, tests anti-fuite aller-retour.
+- Demande joueur : détection, réplique in character (accept / object / defer), switch bidirectionnel, reprise sans réouverture.
+- Suggestion GM bidirectionnelle, confirmation joueur, cooldown, règles thèmes/topics dans l’éditeur d’orchestration.
+- Plan : [`docs/plan_emma_conversation_switch.md`](docs/plan_emma_conversation_switch.md).
+
+**Reste :** recette vocale live sur Lovable (Emma ready + orchestration republiee) ; Ava et Léo hors périmètre.
+
 ### Dernière session
 
 
 **Préconditions vérifiées au départ :**
 - [x] Build passait au démarrage
-- [x] Aucune branche ouverte non terminée
+- [x] Branche `feat/emma-conversation-switch` dédiée
 - [x] STORY.md lu et contexte compris
 - [x] Open Windows revues
 
 **Postconditions au départ :**
-- [x] Build passe
-- [x] Tout commité et pushé
+- [x] Typecheck et lint ciblé passent
+- [x] 259 tests unitaires au vert
 - [x] STORY.md mis à jour
 - [x] Open Windows mis à jour
 

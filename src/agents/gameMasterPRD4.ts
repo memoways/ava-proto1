@@ -64,11 +64,12 @@ const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
   labels: { themes: [], topics: [], intentions: [] },
   memory_delta: null,
   action: { type: "none" },
+  player_switch_request: null,
 };
 
 const GM_POST_TURN_TIMEOUT_MS = 12000;
 
-export const EXPERIENCE_DIRECTOR_SYSTEM_PROMPT = `Tu es le directeur d'expérience d'une expérience narrative en temps réel dont la durée est configurée par l'administration, entre un joueur et Max (père d'Ava), puis éventuellement Emma. Après chaque échange, tu produis une seule décision structurée en JSON STRICT — aucun texte hors JSON. Cet appel a lieu après le texte du personnage et ne doit jamais retarder sa voix.
+export const EXPERIENCE_DIRECTOR_SYSTEM_PROMPT = `Tu es le directeur d'expérience d'une expérience narrative en temps réel dont la durée est configurée par l'administration, entre un joueur et Max (père d'Ava) ou Emma. Après chaque échange, tu produis une seule décision structurée en JSON STRICT — aucun texte hors JSON. Cet appel a lieu après le texte du personnage et ne doit jamais retarder sa voix.
 
 Tu retournes EXACTEMENT cet objet :
 {
@@ -92,9 +93,13 @@ Tu retournes EXACTEMENT cet objet :
     "type": "none" | "cinematic" | "handoff" | "end",
     "videoId"?: string,
     "confidence"?: number,
-    "targetCharacter"?: "emma",
+    "targetCharacter"?: "max" | "emma",
     "proposalGuidance"?: string,
     "reason"?: string
+  },
+  "player_switch_request": {         // Si le joueur a demandé à changer de personnage dans CE tour.
+    "targetCharacter": "max" | "emma" | null,
+    "stance": "accept" | "object" | "defer" | null
   },
   "memory_delta": {                 // Mémoire durable du DERNIER échange seulement. Ne rien inventer.
     "interlocutor": { "name": string | null, "role": string | null, "traits": string[] },
@@ -126,9 +131,10 @@ Règles "trigger_video_id" — PRIORITÉ HAUTE :
 Règles "action" :
 - Utilise {"type":"none"} par défaut.
 - Pour une cinématique, retourne videoId, reason et confidence 0..1 ; videoId doit appartenir aux vidéos disponibles.
-- Un handoff est uniquement Max vers Emma. Retourne reason et proposalGuidance afin que Max formule lui-même la proposition au tour suivant.
-- Ne suppose jamais qu'Emma ou une vidéo est disponible : le moteur déterministe vérifiera.
+- Un handoff est une SUGGESTION bidirectionnelle (Max↔Emma). Retourne reason et proposalGuidance afin que le personnage actuel propose lui-même le changement au tour suivant. Ne force jamais le joueur.
+- Ne suppose jamais que l'autre personnage ou une vidéo est disponible : le moteur déterministe vérifiera.
 - Ne recommande pas cinématique et handoff en même temps. Le handoff est prioritaire.
+- player_switch_request : renseigne-le seulement si le joueur a demandé explicitement à parler à l'autre personnage. stance=accept si le personnage actuel accepte, object s'il refuse, defer s'il hésite.
 - Pour une clôture, utilise end avec reason seulement lorsqu'une fin naturelle est justifiée.
 
 Règles "end_recommended" : respecte le seuil de clôture fourni dans le contexte. Après ce seuil, true seulement si la conversation a trouvé une clôture naturelle ou échoue durablement.
@@ -188,7 +194,7 @@ function jsonObjectCandidates(text: string): string[] {
 
 function buildUserPrompt(input: PRD4PostTurnInput, videos: VideoTriggerRow[]): string {
   const recent = input.conversationHistory.slice(-6).map((m) =>
-    `${m.role === "user" ? "UTILISATEUR" : "MAX"}: ${m.content}`
+    `${m.role === "user" ? "UTILISATEUR" : (m.role === "emma" ? "EMMA" : "MAX")}: ${m.content}`
   ).join("\n");
 
   const triggered = input.triggeredVideoIds ?? [];
@@ -231,7 +237,7 @@ ${recent || "(aucun)"}
 
 ## DERNIER ÉCHANGE (à évaluer)
 UTILISATEUR (à labéliser) : ${input.userMessage}
-MAX : ${input.maxResponse}
+${input.currentCharacter === "emma" ? "EMMA" : "MAX"} : ${input.maxResponse}
 
 Retourne l'évaluation JSON. Extrais d'abord \`labels\` à partir du message UTILISATEUR uniquement (max 4 labels, vides si pas évident). Puis renseigne \`trigger_video_id\` si un de tes \`labels.themes\` recoupe les \`themes\` d'une vidéo disponible.`;
 }
@@ -278,10 +284,12 @@ function cleanMemoryDelta(raw: unknown): ConversationMemoryDelta | null {
 function cleanDirectorAction(raw: unknown, fallbackVideoId: string | null, endRecommended: boolean): DirectorAction {
   if (raw && typeof raw === "object") {
     const value = raw as Record<string, unknown>;
-    if (value.type === "handoff" && value.targetCharacter === "emma") {
+    if (value.type === "handoff" && (value.targetCharacter === "emma" || value.targetCharacter === "max")) {
       const reason = normalizeMemoryText(value.reason, 240);
       const proposalGuidance = normalizeMemoryText(value.proposalGuidance, 300);
-      if (reason && proposalGuidance) return { type: "handoff", targetCharacter: "emma", reason, proposalGuidance };
+      if (reason && proposalGuidance) {
+        return { type: "handoff", targetCharacter: value.targetCharacter, reason, proposalGuidance };
+      }
     }
     if (value.type === "cinematic") {
       const videoId = normalizeMemoryText(value.videoId, 100);
@@ -299,6 +307,19 @@ function cleanDirectorAction(raw: unknown, fallbackVideoId: string | null, endRe
   }
   if (endRecommended) return { type: "end", reason: "Clôture naturelle recommandée par le GM" };
   return { type: "none" };
+}
+
+function cleanPlayerSwitchRequest(raw: unknown): PRD4PostTurnEvaluation["player_switch_request"] {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const targetCharacter = value.targetCharacter === "max" || value.targetCharacter === "emma"
+    ? value.targetCharacter
+    : null;
+  const stance = value.stance === "accept" || value.stance === "object" || value.stance === "defer"
+    ? value.stance
+    : null;
+  if (!targetCharacter || !stance) return null;
+  return { targetCharacter, stance };
 }
 
 /**
@@ -389,6 +410,7 @@ export async function evaluatePostTurnPRD4(
         labels,
         memory_delta: cleanMemoryDelta((parsed as { memory_delta?: unknown }).memory_delta),
         action: cleanDirectorAction((parsed as { action?: unknown }).action, safeTrigger, endRecommended),
+        player_switch_request: cleanPlayerSwitchRequest((parsed as { player_switch_request?: unknown }).player_switch_request),
       };
     }
     model = callRes.model || model;

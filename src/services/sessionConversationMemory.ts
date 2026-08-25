@@ -13,6 +13,7 @@ import {
   mergeConversationMemory,
   normalizeConversationMemory,
 } from "@/services/conversationMemoryV1";
+import { parseHandoffOffer, type CharacterHandoffOffer } from "@/services/characterConversation";
 import { ensureGameAuth } from "@/services/gameAuth";
 
 const memoryCache = new Map<string, ConversationMemoryV1>();
@@ -34,7 +35,7 @@ export interface ResumablePRD4Session {
   gm_post_turn_log: PRD4PostTurnEvaluation[];
   active_character: "max" | "emma";
   orchestration_version_id: string | null;
-  pending_handoff: { reason: string; proposalGuidance: string } | null;
+  pending_handoff: CharacterHandoffOffer | null;
   handoff_count: number;
 }
 
@@ -166,9 +167,7 @@ export async function fetchResumablePRD4Session(now = new Date()): Promise<Resum
       : [],
     active_character: data.active_character === "emma" ? "emma" : "max",
     orchestration_version_id: data.orchestration_version_id,
-    pending_handoff: data.pending_handoff && typeof data.pending_handoff === "object"
-      ? data.pending_handoff as unknown as { reason: string; proposalGuidance: string }
-      : null,
+    pending_handoff: parseHandoffOffer(data.pending_handoff),
     handoff_count: data.handoff_count ?? 0,
   };
 }

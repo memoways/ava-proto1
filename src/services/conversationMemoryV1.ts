@@ -4,6 +4,7 @@ import type {
   ConversationMemoryItem,
   ConversationMemoryV1,
   CharacterMemoryItemV2,
+  CharacterScopedMemory,
   RuntimeCharacter,
 } from "@/types";
 
@@ -37,6 +38,24 @@ export function createEmptyConversationMemory(): ConversationMemoryV1 {
     },
     lastExchange: null,
     characterItems: [],
+    characterStates: {},
+  };
+}
+
+function emptyCharacterState(sourceTurn = 0): CharacterScopedMemory {
+  return {
+    userFacts: [],
+    characterDisclosures: [],
+    commitments: [],
+    openThreads: [],
+    topics: [],
+    relationship: {
+      depth: "surface",
+      trust: "neutre",
+      emotionalState: null,
+      sourceTurn,
+    },
+    lastExchange: null,
   };
 }
 
@@ -49,13 +68,8 @@ function sanitizeCharacterItems(raw: unknown, fallbackTurn: number): CharacterMe
     const text = normalizeMemoryText(candidate.text);
     if (!text) continue;
     const sourceCharacter: RuntimeCharacter = candidate.sourceCharacter === "emma" ? "emma" : "max";
-    const visibility = candidate.visibility === "shared" ? "shared" : "private";
-    const requestedVisibleTo = Array.isArray(candidate.visibleTo)
-      ? candidate.visibleTo.filter((value): value is RuntimeCharacter => value === "max" || value === "emma")
-      : [];
-    const visibleTo = visibility === "shared"
-      ? (["max", "emma"] as RuntimeCharacter[])
-      : requestedVisibleTo.includes(sourceCharacter) ? [sourceCharacter] : [sourceCharacter];
+    const visibility = "private" as const;
+    const visibleTo: RuntimeCharacter[] = [sourceCharacter];
     const sourceTurn = Number.isFinite(Number(candidate.sourceTurn))
       ? Math.max(0, Math.floor(Number(candidate.sourceTurn)))
       : fallbackTurn;
@@ -184,7 +198,41 @@ export function normalizeConversationMemory(raw: unknown): ConversationMemoryV1 
     },
     lastExchange: normalizeMemoryText(candidate.lastExchange, LIMITS.lastExchangeChars) || null,
     characterItems: sanitizeCharacterItems(candidate.characterItems, lastTurn),
+    characterStates: sanitizeCharacterStates(candidate.characterStates, lastTurn),
   };
+}
+
+function sanitizeCharacterStates(
+  raw: unknown,
+  fallbackTurn: number,
+): Partial<Record<RuntimeCharacter, CharacterScopedMemory>> {
+  if (!raw || typeof raw !== "object") return {};
+  const candidate = raw as Partial<Record<RuntimeCharacter, Partial<CharacterScopedMemory>>>;
+  const result: Partial<Record<RuntimeCharacter, CharacterScopedMemory>> = {};
+  for (const character of ["max", "emma"] as RuntimeCharacter[]) {
+    const state = candidate[character];
+    if (!state || typeof state !== "object") continue;
+    const relationship = state.relationship && typeof state.relationship === "object"
+      ? state.relationship
+      : emptyCharacterState().relationship;
+    result[character] = {
+      userFacts: sanitizeItems(state.userFacts, `${character}_user`, LIMITS.userFacts, fallbackTurn),
+      characterDisclosures: sanitizeItems(state.characterDisclosures, `${character}_disclosure`, LIMITS.maxDisclosures, fallbackTurn),
+      commitments: sanitizeItems(state.commitments, `${character}_commitment`, LIMITS.commitments, fallbackTurn),
+      openThreads: sanitizeItems(state.openThreads, `${character}_thread`, LIMITS.openThreads, fallbackTurn),
+      topics: sanitizeItems(state.topics, `${character}_topic`, LIMITS.topics, fallbackTurn),
+      relationship: {
+        depth: isDepth(relationship.depth) ? relationship.depth : "surface",
+        trust: relationship.trust === "fragile" || relationship.trust === "ouverte" ? relationship.trust : "neutre",
+        emotionalState: normalizeMemoryText(relationship.emotionalState, 160) || null,
+        sourceTurn: Number.isFinite(Number(relationship.sourceTurn))
+          ? Math.max(0, Math.floor(Number(relationship.sourceTurn)))
+          : fallbackTurn,
+      },
+      lastExchange: normalizeMemoryText(state.lastExchange, LIMITS.lastExchangeChars) || null,
+    };
+  }
+  return result;
 }
 
 function appendStrings(
@@ -224,8 +272,8 @@ export function mergeConversationMemory(
     text: item.text,
     sourceTurn: turnIndex,
     sourceCharacter: item.sourceCharacter ?? activeCharacter,
-    visibility: item.visibility ?? "private",
-    visibleTo: item.visibility === "shared" ? ["max", "emma"] : item.visibleTo ?? [item.sourceCharacter ?? activeCharacter],
+    visibility: "private" as const,
+    visibleTo: [item.sourceCharacter ?? activeCharacter] as RuntimeCharacter[],
     provenance: item.provenance ?? "gm",
   }));
   const privateUserFacts = (delta.userFacts ?? []).map((text) => ({
@@ -238,6 +286,74 @@ export function mergeConversationMemory(
     provenance: "user" as const,
   }));
 
+  const mergedForActive = {
+    userFacts: appendStrings(
+      previous.characterStates?.[activeCharacter]?.userFacts
+        ?? (activeCharacter === "max" ? previous.userFacts : []),
+      delta.userFacts,
+      `${activeCharacter}_user`,
+      turnIndex,
+      LIMITS.userFacts,
+    ),
+    characterDisclosures: appendStrings(
+      previous.characterStates?.[activeCharacter]?.characterDisclosures
+        ?? (activeCharacter === "max" ? previous.maxDisclosures : []),
+      delta.maxDisclosures,
+      `${activeCharacter}_disclosure`,
+      turnIndex,
+      LIMITS.maxDisclosures,
+    ),
+    commitments: appendStrings(
+      previous.characterStates?.[activeCharacter]?.commitments
+        ?? (activeCharacter === "max" ? previous.commitments : []),
+      delta.commitments,
+      `${activeCharacter}_commitment`,
+      turnIndex,
+      LIMITS.commitments,
+    ),
+    openThreads: appendStrings(
+      (previous.characterStates?.[activeCharacter]?.openThreads
+        ?? (activeCharacter === "max" ? previous.openThreads : [])).filter((item) => !resolved.has(item.id)),
+      delta.openThreads,
+      `${activeCharacter}_thread`,
+      turnIndex,
+      LIMITS.openThreads,
+    ),
+    topics: appendStrings(
+      previous.characterStates?.[activeCharacter]?.topics
+        ?? (activeCharacter === "max" ? previous.topics : []),
+      delta.topics,
+      `${activeCharacter}_topic`,
+      turnIndex,
+      LIMITS.topics,
+    ),
+    relationship: {
+      depth: persistentDepth(
+        previous.characterStates?.[activeCharacter]?.relationship.depth
+          ?? (activeCharacter === "max" ? previous.relationship.depth : "surface"),
+        delta.relationship?.depth,
+      ),
+      trust: delta.relationship?.trust === "fragile" || delta.relationship?.trust === "neutre" || delta.relationship?.trust === "ouverte"
+        ? delta.relationship.trust
+        : previous.characterStates?.[activeCharacter]?.relationship.trust
+          ?? (activeCharacter === "max" ? previous.relationship.trust : "neutre"),
+      emotionalState: emotionalState
+        || previous.characterStates?.[activeCharacter]?.relationship.emotionalState
+        || (activeCharacter === "max" ? previous.relationship.emotionalState : null),
+      sourceTurn: turnIndex,
+    },
+    lastExchange: normalizeMemoryText(delta.lastExchange, LIMITS.lastExchangeChars)
+      || previous.characterStates?.[activeCharacter]?.lastExchange
+      || (activeCharacter === "max" ? previous.lastExchange : null),
+  } satisfies CharacterScopedMemory;
+
+  const nextCharacterStates: Partial<Record<RuntimeCharacter, CharacterScopedMemory>> = {
+    ...previous.characterStates,
+    [activeCharacter]: mergedForActive,
+  };
+
+  const writeLegacyMaxFields = activeCharacter === "max";
+
   return normalizeConversationMemory({
     ...previous,
     lastTurn: turnIndex,
@@ -246,31 +362,19 @@ export function mergeConversationMemory(
       role: interlocutorRole || previous.interlocutor.role,
       traits: appendStrings(previous.interlocutor.traits, delta.interlocutor?.traits, "trait", turnIndex, LIMITS.traits),
     },
-    userFacts: appendStrings(previous.userFacts, delta.userFacts, "user", turnIndex, LIMITS.userFacts),
-    maxDisclosures: appendStrings(previous.maxDisclosures, delta.maxDisclosures, "max", turnIndex, LIMITS.maxDisclosures),
-    commitments: appendStrings(previous.commitments, delta.commitments, "commitment", turnIndex, LIMITS.commitments),
-    openThreads: appendStrings(
-      previous.openThreads.filter((item) => !resolved.has(item.id)),
-      delta.openThreads,
-      "thread",
-      turnIndex,
-      LIMITS.openThreads,
-    ),
-    topics: appendStrings(previous.topics, delta.topics, "topic", turnIndex, LIMITS.topics),
-    relationship: {
-      depth: persistentDepth(previous.relationship.depth, delta.relationship?.depth),
-      trust: delta.relationship?.trust === "fragile" || delta.relationship?.trust === "neutre" || delta.relationship?.trust === "ouverte"
-        ? delta.relationship.trust
-        : previous.relationship.trust,
-      emotionalState: emotionalState || previous.relationship.emotionalState,
-      sourceTurn: turnIndex,
-    },
-    lastExchange: normalizeMemoryText(delta.lastExchange, LIMITS.lastExchangeChars) || previous.lastExchange,
+    userFacts: writeLegacyMaxFields ? mergedForActive.userFacts : previous.userFacts,
+    maxDisclosures: writeLegacyMaxFields ? mergedForActive.characterDisclosures : previous.maxDisclosures,
+    commitments: writeLegacyMaxFields ? mergedForActive.commitments : previous.commitments,
+    openThreads: writeLegacyMaxFields ? mergedForActive.openThreads : previous.openThreads,
+    topics: writeLegacyMaxFields ? mergedForActive.topics : previous.topics,
+    relationship: writeLegacyMaxFields ? mergedForActive.relationship : previous.relationship,
+    lastExchange: writeLegacyMaxFields ? mergedForActive.lastExchange : previous.lastExchange,
     characterItems: [
       ...(previous.characterItems ?? []),
       ...privateUserFacts,
       ...explicitCharacterItems,
     ],
+    characterStates: nextCharacterStates,
   });
 }
 
@@ -284,20 +388,37 @@ export function filterConversationMemoryForCharacter(
   character: RuntimeCharacter,
 ): ConversationMemoryV1 {
   const memory = normalizeConversationMemory(memoryRaw);
-  const visible = (memory.characterItems ?? []).filter((item) => item.visibleTo.includes(character));
-  if (character === "max") return { ...memory, characterItems: visible };
-  const asItems = (provenance: CharacterMemoryItemV2["provenance"]) => visible
-    .filter((item) => item.provenance === provenance || item.visibility === "shared")
-    .map((item) => ({ id: item.id, text: item.text, sourceTurn: item.sourceTurn }));
+  const scoped = memory.characterStates?.[character];
+  const visibleItems = (memory.characterItems ?? []).filter((item) => item.sourceCharacter === character);
+  const asItems = (items: ConversationMemoryItem[]) => items;
+  if (character === "emma") {
+    return {
+      ...memory,
+      userFacts: scoped ? asItems(scoped.userFacts) : [],
+      maxDisclosures: scoped ? asItems(scoped.characterDisclosures) : [],
+      commitments: scoped ? asItems(scoped.commitments) : [],
+      openThreads: scoped ? asItems(scoped.openThreads) : [],
+      topics: scoped ? asItems(scoped.topics) : [],
+      relationship: scoped?.relationship ?? emptyCharacterState().relationship,
+      lastExchange: scoped?.lastExchange ?? null,
+      characterItems: visibleItems,
+      interlocutor: {
+        name: memory.interlocutor.name,
+        role: memory.interlocutor.role,
+        traits: [],
+      },
+    };
+  }
   return {
     ...memory,
-    userFacts: asItems("user"),
-    maxDisclosures: [],
-    commitments: asItems("gm"),
-    openThreads: asItems("gm"),
-    topics: memory.topics.filter((topic) => visible.some((item) => item.text === topic.text && item.visibility === "shared")),
-    characterItems: visible,
-    lastExchange: null,
+    userFacts: scoped ? asItems(scoped.userFacts) : memory.userFacts,
+    maxDisclosures: scoped ? asItems(scoped.characterDisclosures) : memory.maxDisclosures,
+    commitments: scoped ? asItems(scoped.commitments) : memory.commitments,
+    openThreads: scoped ? asItems(scoped.openThreads) : memory.openThreads,
+    topics: scoped ? asItems(scoped.topics) : memory.topics,
+    relationship: scoped?.relationship ?? memory.relationship,
+    lastExchange: scoped?.lastExchange ?? memory.lastExchange,
+    characterItems: visibleItems,
   };
 }
 

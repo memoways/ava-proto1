@@ -4,6 +4,40 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.27.0] — 2026-08-25 — Emma au départ et passage Max ↔ Emma
+
+### Ajouté
+
+- Max et Emma peuvent ouvrir l’appel depuis le sélecteur dès que leur profil
+  runtime est `enabled` et prêt. Ava et Léo restent indisponibles.
+- Demande explicite du joueur pour parler à l’autre personnage : le locuteur
+  en ligne accepte, objecte ou hésite in character. Un accept lance l’appel ;
+  un retour vers un personnage déjà contacté reprend sa conversation, sans
+  phrase d’ouverture.
+- Suggestions de passage bidirectionnelles du Game Master, avec confirmation
+  joueur, cooldown, plafond de session et règles thèmes/topics éditables dans
+  Orchestration.
+- Isolation stricte : chaque message est tagué `spokenWith`, la mémoire V2 est
+  privée par personnage, le résumé de session est caché par personnage et
+  n’est plus calculé sur le log global.
+
+### Modifié
+
+- L’écran d’appel affiche le portrait et le nom du personnage appelé.
+- Le quota unique Max → Emma (`0 | 1`) est remplacé par un plafond plus élevé
+  (défaut 8) et une pause minimale entre deux suggestions GM.
+- Admin Orchestration : Emma n’est plus seulement une destination de handoff ;
+  Max n’est plus l’entrée obligatoire.
+
+### Compatibilité et validation
+
+- Aucune migration destructive, aucun hébergeur ni projet Supabase hors
+  Lovable. Le log JSON de session et la mémoire V2 suffisent.
+- Les versions d’orchestration déjà publiées conservent l’ancien plafond
+  d’un handoff jusqu’à republication.
+- 259 tests unitaires, typecheck et lint ciblé validés. Plan :
+  [`docs/plan_emma_conversation_switch.md`](docs/plan_emma_conversation_switch.md).
+
 ## [0.26.0] — 2026-08-21 — Environnements isolés et accès nominatifs
 
 ### Ajouté

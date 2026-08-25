@@ -1,32 +1,56 @@
-/** PRD4 — Écran 6 : Choix du protagoniste (Max actif, autres grisés) */
-import { useState } from "react";
+/** PRD4 — Choix du protagoniste (Max toujours, Emma si ready). */
+import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import maxImg from "@/assets/characters/max.jpg";
 import emmaImg from "@/assets/characters/emma.jpg";
 import avaImg from "@/assets/characters/ava.jpg";
 import leoImg from "@/assets/characters/leo.jpg";
+import { getCharacterRuntimeReadiness } from "@/services/experienceOrchestration";
 
 type CharId = "max" | "emma" | "ava" | "leo";
 
 interface Props {
-  onSelectMax: () => void;
+  onSelect: (id: "max" | "emma") => void;
   onLockedClick?: (id: Exclude<CharId, "max">) => void;
 }
 
-const CHARACTERS: { id: CharId; name: string; img: string; active: boolean }[] = [
-  { id: "max", name: "Max", img: maxImg, active: true },
-  { id: "emma", name: "Emma", img: emmaImg, active: false },
-  { id: "ava", name: "Ava", img: avaImg, active: false },
-  { id: "leo", name: "Léo", img: leoImg, active: false },
+const CHARACTERS: { id: CharId; name: string; img: string }[] = [
+  { id: "max", name: "Max", img: maxImg },
+  { id: "emma", name: "Emma", img: emmaImg },
+  { id: "ava", name: "Ava", img: avaImg },
+  { id: "leo", name: "Léo", img: leoImg },
 ];
 
-const CharacterSelectScreen = ({ onSelectMax, onLockedClick }: Props) => {
+const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
   const [lockedDialog, setLockedDialog] = useState(false);
+  const [maxReady, setMaxReady] = useState(true);
+  const [emmaReady, setEmmaReady] = useState(false);
 
-  const handleLocked = (id: Exclude<CharId, "max">) => {
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([
+      getCharacterRuntimeReadiness("max"),
+      getCharacterRuntimeReadiness("emma"),
+    ])
+      .then(([maxProfile, emmaProfile]) => {
+        if (cancelled) return;
+        setMaxReady(maxProfile?.ready !== false);
+        setEmmaReady(emmaProfile?.ready === true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setMaxReady(true);
+        setEmmaReady(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const isActive = (id: CharId) => (id === "max" && maxReady) || (id === "emma" && emmaReady);
+
+  const handleLocked = (id: CharId) => {
     setLockedDialog(true);
-    onLockedClick?.(id);
+    if (id !== "max") onLockedClick?.(id);
   };
 
   return (
@@ -40,11 +64,11 @@ const CharacterSelectScreen = ({ onSelectMax, onLockedClick }: Props) => {
           {CHARACTERS.map((c) => {
             const cardBase =
               "group relative flex flex-col items-center gap-3 rounded-lg border bg-card/60 p-4 transition-all duration-200";
-            if (c.active) {
+            if (isActive(c.id)) {
               return (
                 <button
                   key={c.id}
-                  onClick={onSelectMax}
+                  onClick={() => onSelect(c.id as "max" | "emma")}
                   className={`${cardBase} border-primary/50 hover:-translate-y-1 hover:border-primary hover:bg-card hover:shadow-lg hover:shadow-primary/10`}
                   aria-label={`Appeler ${c.name}`}
                 >
@@ -65,7 +89,7 @@ const CharacterSelectScreen = ({ onSelectMax, onLockedClick }: Props) => {
             return (
               <button
                 key={c.id}
-                onClick={() => handleLocked(c.id as Exclude<CharId, "max">)}
+                onClick={() => handleLocked(c.id)}
                 className={`${cardBase} cursor-not-allowed border-border opacity-50 grayscale hover:opacity-70`}
                 aria-label={`${c.name} indisponible`}
               >
@@ -97,7 +121,7 @@ const CharacterSelectScreen = ({ onSelectMax, onLockedClick }: Props) => {
               prototype.
               <br />
               <br />
-              Pour l'instant, tu peux appeler Max.
+              Pour l'instant, tu peux appeler {[maxReady && "Max", emmaReady && "Emma"].filter(Boolean).join(" ou ") || "personne — la checklist runtime n'est pas complète"}.
             </DialogDescription>
           </DialogHeader>
         </DialogContent>

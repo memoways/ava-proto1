@@ -100,6 +100,31 @@ describe("sessionMemoryService — cache mémoire des résumés", () => {
     expect(other).toBeNull();
   });
 
+  it("isole les résumés Max et Emma d'une même session", async () => {
+    vi.mocked(authenticatedFunctionFetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ summary: "- Conversation avec Max.", last_turn: 4 }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ summary: "- Conversation avec Emma.", last_turn: 6 }),
+      } as unknown as Response);
+
+    await summarizeSessionAsync(SESSION_ID, conversation, 4, "max");
+    await summarizeSessionAsync(SESSION_ID, [
+      { role: "emma", content: "Oui ?", timestamp: 3 },
+      { role: "user", content: "Bonjour Emma", timestamp: 4 },
+    ], 6, "emma");
+
+    const maxRecord = await fetchSessionSummary(SESSION_ID, "max");
+    const emmaRecord = await fetchSessionSummary(SESSION_ID, "emma");
+
+    expect(maxRecord?.summary).toBe("- Conversation avec Max.");
+    expect(emmaRecord?.summary).toBe("- Conversation avec Emma.");
+    expect(maybeSingle).not.toHaveBeenCalled();
+  });
+
   it("met en cache une lecture BDD réussie (contexte admin/banc d'essai)", async () => {
     maybeSingle.mockResolvedValue({
       data: { session_id: SESSION_ID, summary: "- Depuis la BDD.", last_turn: 12, updated_at: "2026-07-16T00:00:00Z" },

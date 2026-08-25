@@ -101,10 +101,10 @@ describe("ConversationMemoryV1", () => {
     expect(rendered).not.toContain("garder le secret");
   });
 
-  it("transmet uniquement les éléments explicitement promus en mémoire partagée", () => {
+  it("ignore une promotion partagée : une confidence de conversation reste privée", () => {
     const memory = mergeConversationMemory(createEmptyConversationMemory(), {
       characterItems: [{
-        text: "Le rôle initial d'Alice est médecin urgentiste.",
+        text: "Alice a menti à Max sur le dossier.",
         sourceCharacter: "max",
         visibility: "shared",
         visibleTo: ["max", "emma"],
@@ -114,11 +114,31 @@ describe("ConversationMemoryV1", () => {
 
     const emmaMemory = filterConversationMemoryForCharacter(memory, "emma");
 
-    expect(emmaMemory.characterItems).toHaveLength(1);
-    expect(emmaMemory.characterItems?.[0]).toMatchObject({
-      text: "Le rôle initial d'Alice est médecin urgentiste.",
-      visibility: "shared",
-      visibleTo: ["max", "emma"],
-    });
+    expect(emmaMemory.characterItems).toEqual([]);
+    expect(formatConversationMemory(emmaMemory)).not.toContain("menti");
+  });
+
+  it("rend à Max sa propre mémoire après un passage par Emma", () => {
+    const afterMax = mergeConversationMemory(createEmptyConversationMemory(), {
+      interlocutor: { name: "Alice", role: "médecin" },
+      userFacts: ["Alice cherche Ava avec Max"],
+      lastExchange: "Alice promet de revenir vers Max.",
+    }, 2, "max");
+    const afterEmma = mergeConversationMemory(afterMax, {
+      userFacts: ["Alice dit à Emma qu'elle a vu Léo"],
+      lastExchange: "Emma refuse d'en dire plus.",
+    }, 6, "emma");
+
+    const maxMemory = filterConversationMemoryForCharacter(afterEmma, "max");
+    const emmaMemory = filterConversationMemoryForCharacter(afterEmma, "emma");
+
+    expect(maxMemory.interlocutor).toMatchObject({ name: "Alice", role: "médecin" });
+    expect(maxMemory.userFacts.map((item) => item.text)).toEqual(["Alice cherche Ava avec Max"]);
+    expect(maxMemory.lastExchange).toContain("revenir vers Max");
+    expect(emmaMemory.interlocutor).toMatchObject({ name: "Alice", role: "médecin" });
+    expect(emmaMemory.userFacts.map((item) => item.text)).toEqual(["Alice dit à Emma qu'elle a vu Léo"]);
+    expect(emmaMemory.lastExchange).toContain("refuse d'en dire plus");
+    expect(formatConversationMemory(maxMemory)).not.toContain("Léo");
+    expect(formatConversationMemory(emmaMemory)).not.toContain("Ava avec Max");
   });
 });

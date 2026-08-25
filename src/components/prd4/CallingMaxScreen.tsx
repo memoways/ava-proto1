@@ -1,10 +1,12 @@
-/** PRD4 — Écran 7 : Appel Max (sonnerie + animation visio) */
+/** PRD4 — Écran d'appel (sonnerie + animation visio) */
 import { useEffect, useRef, useState } from "react";
 import { Phone } from "lucide-react";
 import maxImg from "@/assets/characters/max.jpg";
+import emmaImg from "@/assets/characters/emma.jpg";
 
 interface Props {
   onAnswered: () => void;
+  character?: "max" | "emma";
 }
 
 const RING_MS = 1500;
@@ -54,10 +56,12 @@ function useRingtone(active: boolean, rings: number, intervalMs: number) {
   }, [active, rings, intervalMs]);
 }
 
-const CallingMaxScreen = ({ onAnswered }: Props) => {
+const CallingMaxScreen = ({ onAnswered, character = "max" }: Props) => {
   const [ring, setRing] = useState(1);
   const [pickingUp, setPickingUp] = useState(false);
   useRingtone(true, RINGS, RING_MS);
+  const displayName = character === "emma" ? "Emma" : "Max";
+  const portrait = character === "emma" ? emmaImg : maxImg;
 
   useEffect(() => {
     const intervals: number[] = [];
@@ -90,8 +94,8 @@ const CallingMaxScreen = ({ onAnswered }: Props) => {
             style={{ animationDuration: "1.6s", animationDelay: "0.8s" }}
           />
           <img
-            src={maxImg}
-            alt="Max"
+            src={portrait}
+            alt={displayName}
             className={`relative h-full w-full rounded-full border-2 border-primary/60 object-cover transition-transform duration-300 ${
               pickingUp ? "scale-105" : "scale-100"
             }`}
@@ -100,11 +104,11 @@ const CallingMaxScreen = ({ onAnswered }: Props) => {
 
         <div className="space-y-2">
           <p className="font-serif text-2xl font-light text-foreground">
-            {pickingUp ? "Max décroche…" : "Appel en cours…"}
+            {pickingUp ? `${displayName} décroche…` : "Appel en cours…"}
           </p>
           <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <Phone className="h-4 w-4" />
-            Max
+            {displayName}
             <span className="ml-2 tabular-nums text-xs text-muted-foreground/70">
               {ring}/{RINGS}
             </span>

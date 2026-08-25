@@ -48,8 +48,9 @@ export interface PinnedDirectorRuntime {
 export const DEFAULT_DIRECTOR_CONFIG: ExperienceDirectorConfig = {
   schemaVersion: 1,
   minimumHandoffTurn: 4,
-  maximumHandoffsPerSession: 1,
-  handoffTarget: "emma",
+  maximumHandoffsPerSession: 8,
+  minimumTurnsBetweenHandoffs: 2,
+  handoffTarget: "either",
   directorTimeoutMs: 12_000,
   editor: {
     tone: "balanced",
@@ -58,8 +59,25 @@ export const DEFAULT_DIRECTOR_CONFIG: ExperienceDirectorConfig = {
     allowHandoffs: true,
     allowCinematics: true,
     customInstructions: "",
+    handoffRules: [],
   },
 };
+
+function sanitizeHandoffRules(raw: unknown): ExperienceDirectorConfig["editor"]["handoffRules"] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const value = entry as { targetCharacter?: unknown; themes?: unknown; topics?: unknown };
+    const targetCharacter: "max" | "emma" | null = value.targetCharacter === "max" || value.targetCharacter === "emma"
+      ? value.targetCharacter
+      : null;
+    if (!targetCharacter) return [];
+    const themes = Array.isArray(value.themes) ? value.themes.map((item) => String(item).trim().toLowerCase()).filter(Boolean).slice(0, 8) : [];
+    const topics = Array.isArray(value.topics) ? value.topics.map((item) => String(item).trim().toLowerCase()).filter(Boolean).slice(0, 8) : [];
+    if (!themes.length && !topics.length) return [];
+    return [{ targetCharacter, themes, topics }];
+  }).slice(0, 12);
+}
 
 export function normalizeDirectorConfig(value: Partial<ExperienceDirectorConfig> | null | undefined): ExperienceDirectorConfig {
   const editor = value?.editor;
@@ -69,18 +87,23 @@ export function normalizeDirectorConfig(value: Partial<ExperienceDirectorConfig>
     || priority === "safety"
     || priority === "pace"
   );
+  const rawMaxHandoffs = Number(value?.maximumHandoffsPerSession);
   return {
     ...DEFAULT_DIRECTOR_CONFIG,
     ...value,
     minimumHandoffTurn: Math.min(20, Math.max(1, Math.round(Number(value?.minimumHandoffTurn) || DEFAULT_DIRECTOR_CONFIG.minimumHandoffTurn))),
-    maximumHandoffsPerSession: value?.maximumHandoffsPerSession === 0 ? 0 : 1,
+    maximumHandoffsPerSession: Number.isFinite(rawMaxHandoffs)
+      ? Math.min(20, Math.max(0, Math.round(rawMaxHandoffs)))
+      : DEFAULT_DIRECTOR_CONFIG.maximumHandoffsPerSession,
+    minimumTurnsBetweenHandoffs: Math.min(10, Math.max(1, Math.round(Number(value?.minimumTurnsBetweenHandoffs) || DEFAULT_DIRECTOR_CONFIG.minimumTurnsBetweenHandoffs))),
     directorTimeoutMs: Math.min(30_000, Math.max(3_000, Math.round(Number(value?.directorTimeoutMs) || DEFAULT_DIRECTOR_CONFIG.directorTimeoutMs))),
-    handoffTarget: "emma",
+    handoffTarget: "either",
     editor: {
       ...DEFAULT_DIRECTOR_CONFIG.editor,
       ...editor,
       priorities: priorities?.length ? priorities : DEFAULT_DIRECTOR_CONFIG.editor.priorities,
       customInstructions: editor?.customInstructions?.trim() ?? "",
+      handoffRules: sanitizeHandoffRules(editor?.handoffRules ?? DEFAULT_DIRECTOR_CONFIG.editor.handoffRules),
     },
   };
 }
