@@ -14,6 +14,12 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 Plan : [`docs/plan_textes_blanc_lisibilite.md`](docs/plan_textes_blanc_lisibilite.md).
 
+### Docs
+
+- Catch-up `CHANGELOG` / `STORY` : rollup session 2026-08-25 (Emma → TTS
+  émotionnel → lisibilité) et entrées manquantes 0.26.1–0.26.3 (URLs admin,
+  switch d’environnement, sync Cinématiques).
+
 ## [0.29.2] — 2026-08-25 — Inworld : collision `performance.now`
 
 ### Corrigé
@@ -130,6 +136,34 @@ Plan : [`docs/plan_gradium_tts_par_personnage.md`](docs/plan_gradium_tts_par_per
   d’un handoff jusqu’à republication.
 - 259 tests unitaires, typecheck et lint ciblé validés. Plan :
   [`docs/plan_emma_conversation_switch.md`](docs/plan_emma_conversation_switch.md).
+
+## [0.26.3] — 2026-08-21 — Sync Cinématiques Notion + historique
+
+### Ajouté
+
+- Expérience → Cinématiques : synchronisation Notion → app avec filtre
+  `État = En ligne`, compteurs (sync / ignorées / sans média), et historique
+  des 3 derniers runs (ajouts / retraits de titres) côté réglages d’environnement.
+- `sync-notion` remonte `video_sync_errors` pour les échecs par titre.
+
+## [0.26.2] — 2026-08-21 — Switch d’environnement réservé
+
+### Sécurité
+
+- Le sélecteur sandbox / production n’est plus exposé à tout compte admin :
+  seul le compte allowlisté (`ENVIRONMENT_SWITCH_EMAIL`) peut changer de
+  contexte de réglages.
+
+## [0.26.1] — 2026-08-14 — URL lisibles au back-office
+
+### Ajouté
+
+- Chemins canoniques `/admin/<rubrique>/<page>` et
+  `/admin/donnees/sessions/<id>` ; les anciens `?tab=` sont redirigés.
+- Navigation centralisée dans `adminNavigation` ; détail de session ouvrable
+  par URL directe.
+
+Plan : [`docs/plan_urls_admin.md`](docs/plan_urls_admin.md).
 
 ## [0.26.0] — 2026-08-21 — Environnements isolés et accès nominatifs
 

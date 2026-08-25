@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-25 (textes blanc pur)
+> **Last Updated**: 2026-08-25 (catch-up docs Emma → TTS → lisibilité)
 
 ---
 
@@ -208,6 +208,30 @@ Publication exclusive Lovable / Lovable Cloud.
 
 **Temps de réalisation.** Environ une session d’implémentation, tests et
 documentation inclus.
+
+### 2026-08-21 — Sync Cinématiques Notion + historique 🔹
+
+**Le problème.** Resync des vidéos depuis Notion ne montrait pas ce qui avait
+changé (ajouts / retraits), ni quelles lignes étaient ignorées hors « En ligne ».
+
+**Correctif.** Panneau Cinématiques : sync filtrée `État = En ligne`, compteurs,
+historique des 3 derniers runs, erreurs par titre via `video_sync_errors`.
+
+### 2026-08-21 — Switch d’environnement réservé 🔹
+
+**Le problème.** Tout admin pouvait basculer sandbox ↔ production et écrire
+dans le mauvais contexte de réglages.
+
+**Correctif.** Sélecteur d’environnement visible uniquement pour le compte
+allowlisté (`ENVIRONMENT_SWITCH_EMAIL`).
+
+### 2026-08-14 — URL lisibles au back-office 🔹
+
+**Le problème.** Les onglets admin ne s’ouvraient que via `?tab=` opaque ;
+impossible de partager un lien vers une page ou une session précise.
+
+**Correctif.** Chemins `/admin/<rubrique>/<page>` et sessions en path segment ;
+compat legacy `?tab=`. Plan : [`docs/plan_urls_admin.md`](docs/plan_urls_admin.md).
 
 ### 2026-08-09 — La configuration RAG explique enfin ce qu’elle active 🔷
 
@@ -2138,6 +2162,7 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 | 2026-07-13 | Tenue réelle de 15 minutes et P50/P95 non encore mesurés | Haut | Phase 2 : soak multi-provider, mémoire, reprise réseau et budget de latence |
 | 2026-07-13 | Purge 30 jours et headers Lovable non encore attestés | Haut avant tests externes | Tester sur branche, planifier le Job et vérifier les headers de l'URL servie |
 | 2026-08-25 | Les versions d’orchestration déjà publiées conservent `maximumHandoffsPerSession: 1` jusqu’à republication | Moyen | Republier un brouillon GM après review ; le défaut code est 8 + cooldown |
+| 2026-08-25 | Edge Function `proxy-tts-cartesia` non déployée sur Lovable Cloud → Tester Cartesia = `Failed to fetch` | Moyen | Déployer la fonction + secret `CARTESIA_API_KEY` via Lovable, puis retester |
 
 ---
 
@@ -2185,28 +2210,41 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 - Isolation réelle : `spokenWith` sur le log, mémoire privée par personnage, résumé de session scoped au cache client, tests anti-fuite aller-retour.
 - Demande joueur : détection, réplique in character (accept / object / defer), switch bidirectionnel, reprise sans réouverture.
 - Suggestion GM bidirectionnelle, confirmation joueur, cooldown, règles thèmes/topics dans l’éditeur d’orchestration.
+- Correctifs immédiat : Max toujours joignable sans checklist complète ; Emma joignable dès le switch Orchestration (`enabled`), avec replis d’ouverture / TTS.
 - Plan : [`docs/plan_emma_conversation_switch.md`](docs/plan_emma_conversation_switch.md).
 
 **Reste :** recette vocale live sur Lovable (Emma ready + orchestration republiee) ; Ava et Léo hors périmètre.
 
+### Session 2026-08-25 — Pilotage émotionnel TTS, Gradium par personnage, lisibilité
+
+**Livré :**
+- Réglages fins Gradium distincts Max / Emma dans TTS Config ; `characterKey` au runtime ([`docs/plan_gradium_tts_par_personnage.md`](docs/plan_gradium_tts_par_personnage.md)).
+- `PerformanceIntent` par tour (lexique FR + mémoire GM N−1) mappé vers Hume / Inworld / ElevenLabs / Gradium / Cartesia ([`docs/plan_tts_pilotage_emotionnel.md`](docs/plan_tts_pilotage_emotionnel.md)).
+- Audition admin : labels d’utilisabilité, boutons Écouter Hume / Inworld, intensité 2 ; fix collision Inworld `performance.now` → `actingPatch`.
+- Bannière si le provider **actif en jeu** ne rend pas l’intention audible.
+- Textes back-office + expérience en blanc pur `#FFFFFF` ([`docs/plan_textes_blanc_lisibilite.md`](docs/plan_textes_blanc_lisibilite.md)).
+- PRs `#11`–`#18` squash-mergées sur `main`.
+
+**Reste :** déployer `proxy-tts-cartesia` + secret sur Lovable Cloud ; recette vocale live intention (Hume/Inworld en jeu) et Gradium Max/Emma.
+
 ### Dernière session
 
-**2026-08-25 — Inworld `performance.now` + audit TTS**
+**2026-08-25 — Catch-up docs + vague Emma → TTS → lisibilité**
 
-Régression Inworld (variable `performance` qui masquait Timing). Bannière
-provider actif vs audition. Cartesia toujours bloqué tant que Lovable n'a
-pas déployé `proxy-tts-cartesia`.
-Plan : [`docs/plan_tts_pilotage_emotionnel.md`](docs/plan_tts_pilotage_emotionnel.md).
+Les Feature Chronicle / CHANGELOG 0.27.0–0.29.3 étaient déjà écrits au fil des
+PRs, mais « Dernière session » était restée sur le seul fix Inworld. Catch-up
+documentaire : rollup session TTS/Gradium/lisibilité, entrées manquantes
+0.26.1–0.26.3 (URLs admin, switch d’environnement allowlisté, sync Cinématiques
++ historique), Open Window Cartesia.
 
-**Préconditions vérifiées au départ :**
-- [x] Build passait au démarrage
-- [x] Branche `feat/gradium-tts-per-character` dédiée
-- [x] STORY.md lu et contexte compris
+**Préconditions :**
+- [x] `main` à jour après `#18` (textes blanc pur)
+- [x] STORY / CHANGELOG lus ; écarts repérés (Dernière session + Lovable Aug 14/21)
 
-**Postconditions au départ :**
-- [x] Tests Gradium + TTS Config au vert
-- [x] STORY.md mis à jour
-- [x] Plan enregistré dans docs/
+**Postconditions :**
+- [x] CHANGELOG 0.26.1–0.26.3 + note Docs sous 0.29.3
+- [x] STORY Feature Chronicle + sessions + Open Windows alignés
+- [x] Branche docs shippée sur `main`
 
 ---
 
