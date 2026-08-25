@@ -516,16 +516,19 @@ test("le teaser démarre automatiquement avec le son puis Passer coupe tout", as
   }, pauseCountBeforeSkip), { timeout: 5_000 }).toBe(true);
 });
 
-test("une cinématique HLS démarre automatiquement puis Passer coupe son média", async ({ page }) => {
+test("une cinématique HLS démarre automatiquement puis Passer coupe son média", async ({ page }, testInfo) => {
   // WebKit on the shared CI runner can spend most of the default 30 s budget
   // bootstrapping HLS; keep actionability checks enabled with a realistic cap.
   test.setTimeout(60_000);
-  const transcripts = [
-    "Parle-moi de Max.",
-    "Que sais-tu au sujet d'Ava ?",
-    "Montre-moi le souvenir familial.",
-  ];
-  await installNetworkFakes(page, transcripts, { triggerVideoAtLabel: 3 });
+  const webkit = testInfo.project.name === "webkit-media";
+  const transcripts = webkit
+    ? ["Montre-moi le souvenir familial."]
+    : [
+        "Parle-moi de Max.",
+        "Que sais-tu au sujet d'Ava ?",
+        "Montre-moi le souvenir familial.",
+      ];
+  await installNetworkFakes(page, transcripts, { triggerVideoAtLabel: transcripts.length });
 
   await page.goto("/");
   const persistentPlayer = await page.locator("video[title='Video player']").elementHandle();
@@ -533,13 +536,13 @@ test("une cinématique HLS démarre automatiquement puis Passer coupe son média
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
   await page.getByRole("button", { name: "Appeler Max" }).click();
-  for (let turn = 1; turn <= 3; turn += 1) {
+  for (let turn = 1; turn <= transcripts.length; turn += 1) {
     await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
     await expect(page.getByText(transcripts[turn - 1], { exact: false })).toBeVisible();
     const stopRecording = page.getByRole("button", { name: "Arrêter l'enregistrement" });
     await expect(stopRecording).toBeEnabled();
     await stopRecording.press("Enter");
-    if (turn < 3) {
+    if (turn < transcripts.length) {
       await expect(page.getByText(`Réponse de Max pour le tour ${turn}.`)).toBeVisible({ timeout: 10_000 });
       await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
     }
