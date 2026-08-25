@@ -46,3 +46,27 @@ Pour entendre une différence : **Écouter Hume** ou **Écouter Inworld**.
 Cartesia `Failed to fetch` : la fonction `proxy-tts-cartesia` n'est pas encore
 déployée sur Lovable (sync GitHub), CORS, ou réseau. Le client affiche ce cas
 explicitement.
+
+## Audit 2026-08-25 (toasts admin)
+
+Régressions après le pilotage émotionnel — **pas** un conflit de secrets
+entre providers (clés séparées : `ava_tts_settings_*`).
+
+1. **Inworld `performance.now is not a function`** — régression réelle.
+   `applyInworldPerformance(...)` était stocké dans une variable locale
+   `performance`, qui masquait l'API `performance.now()`. Corrigé :
+   `actingPatch`. Même piège évité dans `IndexPRD4` (`intent`).
+   Hume / ElevenLabs / Gradium / Cartesia n'avaient pas cette collision.
+2. **Cartesia Failed to fetch** — pas une collision de réglages. La fonction
+   `proxy-tts-cartesia` n'est pas sur Lovable Cloud tant que le projet n'a pas
+   tiré `main`. Les autres proxies TTS ne sont pas concernés.
+3. **Gradium actif + audition Hume/Inworld** — confusion, pas un bug :
+   l'appel live utilise le provider **actif**, où l'intention est quasi
+   inaudible. Bannière dans TTS Config si le provider actif n'est pas
+   Hume/Inworld. L'audition force `providerId`.
+4. **ElevenLabs / Cartesia FR** — comportement API : sliders trop faibles ;
+   tags Cartesia omis en `fr`.
+5. **Réglages admin vs intent** — Inworld `deliveryMode` BALANCED est
+   surchargé en `CREATIVE` si intensité ≥ 2 (audition admin = 2). Hume
+   concatène description admin + `actingNl` (tronqué à 100 car.). Gradium
+   additionne `temp` à la valeur personnage. Pas d'écrasement croisé.

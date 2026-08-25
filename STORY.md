@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-25 (Audition TTS : où l'intention s'entend)
+> **Last Updated**: 2026-08-25 (Inworld `performance.now`)
 
 ---
 
@@ -72,6 +72,18 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-25 — Inworld cassé par collision `performance` 🔹
+
+**Le problème.** Écouter / Tester Inworld toaste `performance.now is not a
+function`. Cartesia reste `Failed to fetch`. Gradium actif en jeu rend
+l'intention quasi inaudible même si Hume sonne en audition.
+
+**Correctif.** Variable Inworld renommée (`actingPatch`). Bannière si le
+provider actif n'est pas Hume/Inworld. Cartesia : toujours un déploiement
+Lovable de `proxy-tts-cartesia`.
+
+Plan : [`docs/plan_tts_pilotage_emotionnel.md`](docs/plan_tts_pilotage_emotionnel.md).
 
 ### 2026-08-25 — Audition TTS : où l'intention s'entend 🔹
 
@@ -2167,10 +2179,11 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 
 ### Dernière session
 
-**2026-08-25 — Audition TTS : où l'intention s'entend**
+**2026-08-25 — Inworld `performance.now` + audit TTS**
 
-TTS Config : matrice d'utilisabilité de l'intention (Hume/Inworld audibles),
-boutons Écouter Hume / Inworld, Cartesia `Failed to fetch` clarifié.
+Régression Inworld (variable `performance` qui masquait Timing). Bannière
+provider actif vs audition. Cartesia toujours bloqué tant que Lovable n'a
+pas déployé `proxy-tts-cartesia`.
 Plan : [`docs/plan_tts_pilotage_emotionnel.md`](docs/plan_tts_pilotage_emotionnel.md).
 
 **Préconditions vérifiées au départ :**

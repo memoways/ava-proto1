@@ -4,6 +4,18 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.29.2] — 2026-08-25 — Inworld : collision `performance.now`
+
+### Corrigé
+
+- Tester / Écouter Inworld plantait (`performance.now is not a function`) :
+  la variable d'intention masquait l'API Timing. Hume n'était pas affecté.
+- TTS Config prévient quand le provider **actif en jeu** (ex. Gradium) ne
+  peut pas rendre l'intention audible — l'audition Hume/Inworld ne change
+  pas la voix de l'appel.
+
+Plan : [`docs/plan_tts_pilotage_emotionnel.md`](docs/plan_tts_pilotage_emotionnel.md).
+
 ## [0.29.1] — 2026-08-25 — Audition TTS : où l'intention s'entend
 
 ### Corrigé

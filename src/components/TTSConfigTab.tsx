@@ -393,6 +393,13 @@ export default function TTSConfigTab() {
             );
           })}
         </div>
+        {PROVIDER_ACTING_SUPPORT[activeProvider].usability !== "audible" && (
+          <p className="text-xs text-amber-300/90 mt-3">
+            En jeu, {TTS_PROVIDER_LIST.find((p) => p.id === activeProvider)?.label} est actif :
+            l'intention y est {PROVIDER_ACTING_SUPPORT[activeProvider].labelFr.toLowerCase()}.
+            Hume et Inworld ci-dessous servent à l'audition, pas à l'appel.
+          </p>
+        )}
       </section>
 
       <section className="border rounded-lg p-4 space-y-3">

@@ -22,7 +22,7 @@ export const inworldProvider: TTSProvider = {
     const s = getInworldSettings();
     const preparedText = prepareTextForTTS(text);
     const voiceId = ctx?.voiceId || s.voiceId;
-    const performance = applyInworldPerformance(
+    const actingPatch = applyInworldPerformance(
       { deliveryMode: s.deliveryMode, speakingRate: s.speakingRate },
       ctx?.performance,
     );
@@ -31,12 +31,12 @@ export const inworldProvider: TTSProvider = {
       text: preparedText,
       voiceId,
       modelId: s.modelId,
-      deliveryMode: performance.deliveryMode ?? s.deliveryMode,
+      deliveryMode: actingPatch.deliveryMode ?? s.deliveryMode,
       language: s.language,
-      speakingRate: performance.speakingRate ?? s.speakingRate,
+      speakingRate: actingPatch.speakingRate ?? s.speakingRate,
       temperature: s.temperature,
       stream: false,
-      ...(performance.instruction ? { instruction: performance.instruction } : {}),
+      ...(actingPatch.instruction ? { instruction: actingPatch.instruction } : {}),
     };
 
     const startTime = Date.now();
