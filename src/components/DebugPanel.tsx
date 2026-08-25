@@ -10,7 +10,7 @@ const SERVICE_COLORS: Record<DebugService, string> = {
   notion: "bg-orange-500/20 text-orange-300 border-orange-500/30",
   session: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
   gm: "bg-red-500/20 text-red-300 border-red-500/30",
-  other: "bg-gray-500/20 text-gray-300 border-gray-500/30",
+  other: "bg-gray-500/20 text-foreground border-gray-500/30",
 };
 
 const LEVEL_INDICATORS: Record<DebugLogLevel, string> = {

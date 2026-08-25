@@ -7,22 +7,22 @@
 @layer base {
   :root {
     --background: 220 20% 4%;
-    --foreground: 220 10% 92%;
+    --foreground: 0 0% 100%;
 
     --card: 220 18% 7%;
-    --card-foreground: 220 10% 92%;
+    --card-foreground: 0 0% 100%;
 
     --popover: 220 18% 7%;
-    --popover-foreground: 220 10% 92%;
+    --popover-foreground: 0 0% 100%;
 
     --primary: 0 72% 51%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 14% 12%;
-    --secondary-foreground: 220 10% 75%;
+    --secondary-foreground: 0 0% 100%;
 
     --muted: 220 14% 14%;
-    --muted-foreground: 220 10% 50%;
+    --muted-foreground: 0 0% 100%;
 
     --accent: 35 90% 55%;
     --accent-foreground: 0 0% 100%;
@@ -41,16 +41,16 @@
     --cinema-blue: 210 80% 45%;
     --trust-color: 160 70% 45%;
     --timer-warning: 35 90% 55%;
-    --subtitle-user: 220 10% 55%;
-    --subtitle-max: 220 10% 95%;
+    --subtitle-user: 0 0% 100%;
+    --subtitle-max: 0 0% 100%;
     --fade-overlay: 220 20% 2%;
 
     --sidebar-background: 220 18% 7%;
-    --sidebar-foreground: 220 10% 92%;
+    --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 0 72% 51%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 220 14% 12%;
-    --sidebar-accent-foreground: 220 10% 92%;
+    --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 220 14% 16%;
     --sidebar-ring: 0 72% 51%;
   }
@@ -63,9 +63,30 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
+  /* Placeholders stay fully white: browsers and placeholder:text-* otherwise dim them. */
+  input::placeholder,
+  textarea::placeholder {
+    color: #ffffff !important;
+    opacity: 1 !important;
+  }
 }
 
 @layer utilities {
+  /*
+    Tailwind alpha variants (text-muted-foreground/80, text-white/60, …) would
+    re-grey copy even after tokens are #fff. Force readable pure white; hover
+    / semantic colors (text-primary, text-amber-*, …) keep higher specificity.
+  */
+  [class*="text-muted-foreground"],
+  [class*="text-foreground/"],
+  [class*="text-white/"],
+  [class*="text-card-foreground"],
+  [class*="text-popover-foreground"],
+  [class*="text-secondary-foreground"],
+  [class*="text-sidebar-foreground"] {
+    color: #ffffff;
+  }
+
   /* Hauteur plein écran fiable sur tablette (barre d'URL Safari/iPad) */
   @supports (min-height: 100svh) {
     .min-h-screen {
