@@ -14,6 +14,8 @@ Les développements réalisés depuis un autre environnement doivent rester comp
 
 La mise en public est bloquée par la [release gate](docs/public_release_gate.md). Un aperçu interne peut être utilisé pour le développement, mais aucun lien ne doit être diffusé à des testeurs externes avant validation des critères de sécurité, persistance et endurance.
 
+> **Mise à jour récente (2026-08-25) — Emma, TTS émotionnel, LLM as judge** : le joueur peut démarrer avec Emma et basculer Max ↔ Emma sans fuite de mémoire ; chaque tour dérive une intention de jeu TTS (`PerformanceIntent`) mappée vers Hume / Inworld / ElevenLabs / Gradium / Cartesia, avec réglages Gradium distincts par personnage ; l’admin Qualité lance un banc d’essai texte **LLM as judge** (corpus Notion, OFAT modèle / sampling / RAG, classement vs live). Détails : `CHANGELOG.md` 0.27–0.30, `STORY.md`, [`docs/plan_emma_conversation_switch.md`](docs/plan_emma_conversation_switch.md), [`docs/plan_tts_pilotage_emotionnel.md`](docs/plan_tts_pilotage_emotionnel.md), [`docs/plan_llm_as_judge.md`](docs/plan_llm_as_judge.md).
+
 > **Mise à jour récente (2026-08-21) — environnements de réglages et accès nominatifs** : le runtime public reste verrouillé sur `prod`, tandis que les membres authentifiés disposent de trois sandboxes isolées. Le portail public est vérifié côté Lovable Cloud et les sessions sont attribuées par compte, environnement, contexte et campagne. Plan d'activation et checklist : [`docs/plan_environnements_sandbox_auth.md`](docs/plan_environnements_sandbox_auth.md).
 
 > **Mise à jour récente (2026-08-05) — RAG Voyage 4 versionné** : le profil temps réel recommandé indexe les documents avec `voyage-4-large` et les interroge avec `voyage-4-lite` dans leur espace vectoriel partagé. Les profils sont construits en parallèle puis activés atomiquement ; le dashboard RAG affiche l’index effectif, les modèles, le chunking, les volumes et les p50/p95 live. `voyage-context-4` est disponible en canary, sans overlap. Analyse, plan et trajectoire mémoire/payload : [`docs/design/DESIGN-001-rag-voyage4-memoire-payload.md`](docs/design/DESIGN-001-rag-voyage4-memoire-payload.md).
@@ -114,7 +116,7 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] Query rewriting LLM (`rewrite-query` edge function) — reformulation autonome avant RAG
 - [x] Mémoire de session compressée (`summarize-session` + table `session_summaries`) injectée dans le prompt Max
 - [x] Affichage banc d'essai : étape Query rewrite, badge provider d'embedding, par chunk `character_id`/`rerank_score`/retrieval brut
-- [x] **TTS multi-providers** : façade `src/services/tts/` + providers ElevenLabs / Inworld (`inworld-tts-2`, voix « Alain », streaming NDJSON) / Hume AI Octave, sélection d'un provider par environnement depuis Admin → TTS Config
+- [x] **TTS multi-providers** : façade `src/services/tts/` + ElevenLabs / Inworld / Hume / Gradium / Cartesia ; sélection d'un provider par environnement depuis Admin → TTS Config ; intention de jeu par tour
 - [x] **Dashboard « Consommation Voix »** : compteurs, taux de succès, latences p50/p95 (first-byte + total), codes HTTP et erreurs récentes par provider
 - [x] **Robustesse voix multi-navigateurs** : sélection MIME STT à l'exécution, timeouts critiques, audio unlock, erreurs TTS/STT trackées et état conversationnel récupérable
 - [x] **Preset voix basse latence** : réglage `realtime_conversation` pour tests voice-to-voice rapides (`eleven_turbo_v2_5`, MP3 64 kbps, `optimizeStreamingLatency=1`)
@@ -124,12 +126,16 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] **PRD4 — Rôle joueur libre** : capture push-to-talk + edge function `summarize-role` (Gemini 2.5 Flash) qui produit un `UserRoleProfile` JSON (`summary_for_user`, `summary_for_max`, `relationship_to_family`, `age`, `gender`, `proximity_level`, `intent`), persistance `sessions.player_role`
 - [x] **PRD4 — Max contextualisé par le rôle** : résumé `summary_for_max` injecté en tête du system prompt de Max avant la persona
 - [x] **PRD4 — GM post-turn async** : agent `gameMasterPRD4.ts` évalue chaque tour (engagement_delta, role_usage_quality, confusion, topics, end_recommended, next_turn_guidance), persistance append-only dans `sessions.gm_post_turn_log`, GM pré-tour retiré du chemin temps réel
-- [x] **PRD4 — 4 personnages dont 3 grisés** : grille 2×2, Max actif coloré, Emma/Ava/Léo grisés + cadenas + dialog d'indisponibilité, écran `CallingMaxScreen` (sonneries ~3 s) avant la conversation
+- [x] **PRD4 — Grille personnages** : grille 2×2 (Max, Emma, Ava, Léo) ; à l’origine Max seul actif, Emma/Ava/Léo grisés ; écran d’appel avec sonneries ~3 s
+- [x] **Emma joignable + switch Max ↔ Emma** : démarrage avec Max ou Emma dès qu’Orchestration les active ; demande joueur ou suggestion GM ; mémoire / résumé / sous-titres isolés par personnage (`spokenWith`) ; Ava et Léo restent verrouillés. Plan : [`docs/plan_emma_conversation_switch.md`](docs/plan_emma_conversation_switch.md)
+- [x] **Gradium TTS par personnage** : réglages fins distincts Max / Emma dans TTS Config ; le runtime envoie `characterKey`. Plan : [`docs/plan_gradium_tts_par_personnage.md`](docs/plan_gradium_tts_par_personnage.md)
+- [x] **Pilotage émotionnel TTS** : `PerformanceIntent` par tour (lexique FR + mémoire GM N−1) mappé vers Hume, Inworld, ElevenLabs, Gradium et Cartesia ; audition admin + labels d’utilisabilité. Plan : [`docs/plan_tts_pilotage_emotionnel.md`](docs/plan_tts_pilotage_emotionnel.md)
+- [x] **Lisibilité** : textes back-office et expérience en blanc pur `#FFFFFF`. Plan : [`docs/plan_textes_blanc_lisibilite.md`](docs/plan_textes_blanc_lisibilite.md)
 - [x] **PRD4 — Nouveau questionnaire (10 questions)** : film vu, teaser utile, clarté création rôle, justesse résumé, clarté/frustration PTT, Max reconnaît rôle, Max crédible, envie autres personnages, prochain personnage souhaité, durée ressentie, feedback ouvert + email + 2 opt-ins ; métriques techniques calculées automatiquement
 - [x] **PRD4 — Sync Notion avec noms exacts (accents)** : `sync-questionnaire` détecte `version: "prd4"` et écrit dans les propriétés Notion accentuées (`PRD4 Rôle création clarté`, `PRD4 Résumé personnage justesse`, `PRD4 Max reconnaît rôle`, `PRD4 Personnage souhaité prochain`, `PRD4 Durée ressentie`, `PRD4 Rôle JSON`, `PRD4 Être tenu au courant`, `PRD4 Contact feedback détaillé`…), filtrage côté serveur des propriétés absentes via `fetchDatabaseProperties()` (`skipped_props` logué)
 - [x] **PRD4 — Back-office enrichi** : `SessionsTab` admin affiche le rôle joueur (résumés + JSON repliable) et une timeline `gm_post_turn_log` compacte (engagement, role usage, confusion, end, modération, latence ms, sujets, next_turn_guidance)
 - [x] **PRD4 — Nettoyage legacy** : suppression de `OnboardingAScreen`, `OnboardingBScreen`, `ABChoiceScreen`, `OnboardingScreen`, `GateScreen`, `pages/Index.tsx` et de la route `/legacy`
-- [x] **LLM as judge (lot 1)** : onglet Qualité `/admin/qualite/llm-as-judge`, corpus Notion, OFAT texte-only (modèle / sampling / RAG), juge LLM, classement vs live. Continuité d'expérience = lot 2.
+- [x] **LLM as judge (lot 1)** : onglet Qualité `/admin/qualite/llm-as-judge`, sync corpus Notion (or + grille), OFAT texte-only (modèle Max / sampling / RAG, catalogue partagé avec LLM Config), juge LLM à température 0, classement Δ vs live ; tables `eval_*` + Edge Function `sync-eval-items`. Continuité d'expérience = lot 2. Plan : [`docs/plan_llm_as_judge.md`](docs/plan_llm_as_judge.md)
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
 - [ ] Politique de vérité à 4 niveaux (certain / probable / inconnu / interdit)
 - [ ] Bible factuelle éditable et gestion explicite des sujets verrouillés/déverrouillés
@@ -141,12 +147,12 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 |-----------|-------------|
 | Frontend | React + Vite + Tailwind + TypeScript (Lovable) |
 | Backend | Lovable Cloud (Supabase Postgres + pgvector) |
-| Edge Functions | proxy-llm, proxy-stt, proxy-tts, **proxy-tts-inworld**, **proxy-tts-hume**, sync-notion, **sync-eval-items**, query-rag, sync-questionnaire, rewrite-query, summarize-session |
+| Edge Functions | proxy-llm, proxy-stt, proxy-tts, **proxy-tts-inworld**, **proxy-tts-hume**, **proxy-tts-cartesia**, sync-notion, **sync-eval-items**, query-rag, sync-questionnaire, rewrite-query, summarize-session |
 | Video | Gumlet (hébergement + embed player) |
 | Cost Tracking | OpenRouter generation API (tokens + USD per call) |
-| LLM | OpenRouter API — Multi-modèles. Chemin live optimisé sur **Gemini 2.0 Flash** par défaut ; modèles plus lourds réservés aux tests/qualité depuis l'admin. |
+| LLM | OpenRouter API — Multi-modèles. Chemin live optimisé sur **Gemini 2.0 Flash** par défaut ; modèles plus lourds réservés aux tests/qualité depuis l'admin (dont banc **LLM as judge**). |
 | STT | Deepgram (WebSocket streaming + VAD) avec sélection MIME `MediaRecorder` à l'exécution et timeouts token/micro/WebSocket |
-| TTS | **Multi-providers** via façade `src/services/tts/` — ElevenLabs (voix custom Max), **Inworld `inworld-tts-2`** (voix « Alain », streaming NDJSON), **Hume AI Octave**. Provider actif sélectionné dans Admin → TTS Config. Lecture audio robuste avec audio unlock et classification des erreurs navigateur. |
+| TTS | **Multi-providers** via façade `src/services/tts/` — ElevenLabs, **Inworld**, **Hume**, **Gradium**, **Cartesia** ; intention de jeu par tour (`PerformanceIntent`) ; Gradium réglable Max/Emma séparément. Provider actif dans Admin → TTS Config. |
 | Embeddings | Profils versionnés : **Voyage `voyage-4-large` → `voyage-4-lite` (1024D recommandé)**, `voyage-context-4` canary, Voyage 3/OpenAI legacy explicites |
 | Reranker | **Voyage `rerank-2.5-lite`** par défaut live ; `rerank-2.5` pour les comparaisons qualité |
 | Données | Notion (source de vérité) → Supabase fourni par Lovable (miroir + index parallèles) |
@@ -239,13 +245,13 @@ Saisir un historique avec un message ambigu (antécédent manquant) et vérifier
 
 - **Secrets requis** (dans Lovable Cloud) : `OPENROUTER_API_KEY`, `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, `OPENAI_API_KEY`, `NOTION_API_KEY`, **`VOYAGE_API_KEY`**
 - Desktop only, Chrome recommandé
-- Pas d'authentification — session locale
+- Expérience joueur : identité anonyme Lovable Cloud ; admin : comptes nominatifs (`admin_users`) + sandboxes de réglages (`prod` verrouillé pour le public)
 - Vidéos servies via Gumlet (intro fonctionnelle, triggers en cours de configuration)
-- Sync Notion : 4 characters + 38 storyworld synchronisés, 42 embeddings générés
-- **Admin** : `/admin` pour gérer sessions, prompts, config LLM/voix, suivi des coûts LLM, sync Notion détaillée
-- **Admin** : `/admin` inclut désormais des onglets de contrôle du prompt de Max, de test éditorial et de trace pipeline Max/GM
-- Les réglages admin sont persistés en base (survivent au rechargement et changement de navigateur)
+- Sync Notion : Characters, Storyworld, Gameplay, Vidéos / Cinématiques + corpus **LLM as judge**
+- **Admin** : `/admin/<rubrique>/<page>` — sessions, prompts, LLM/voix, Qualité (dont LLM as judge), sync Notion, latences
+- Les réglages admin sont persistés en base (survivent au rechargement et changement de navigateur) ; overrides du banc d’essai restent en mémoire seulement
 - Le tracking de coûts OpenRouter est tolérant aux délais d'indexation et aux `generation_id` temporairement introuvables
+- Open Window : déployer `proxy-tts-cartesia` + secret `CARTESIA_API_KEY` sur Lovable Cloud pour que Tester Cartesia fonctionne
 
 ---
 

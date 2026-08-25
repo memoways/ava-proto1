@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-25 (LLM as judge tours isolés)
+> **Last Updated**: 2026-08-25 (catch-up README + LLM as judge)
 
 ---
 
@@ -2243,24 +2243,42 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 
 **Reste :** déployer `proxy-tts-cartesia` + secret sur Lovable Cloud ; recette vocale live intention (Hume/Inworld en jeu) et Gradium Max/Emma.
 
+### Session 2026-08-25 — LLM as judge (tours isolés)
+
+**Livré :**
+- Onglet Qualité `/admin/qualite/llm-as-judge` : sync Notion → `eval_items`,
+  runs OFAT texte-only (RAG → GM → Max → validateur), juge LLM temp. 0,
+  classement Δ vs live ; pause / reprise ; `feature_key` `llm_as_judge`.
+- Catalogue Max = même source que LLM Config (`listLlmConfigModels`) — pas
+  de liste parallèle dans Qualité.
+- Base Notion Storygami Home câblée par défaut
+  (`746db7ce482d410ca45bb35f316c89a9`) ; surcharge admin possible.
+- Tables `eval_items` / `eval_runs` / `eval_results` + Edge Function
+  `sync-eval-items` ; Admin lazy-load pour ne pas alourdir le bundle public.
+- Plan : [`docs/plan_llm_as_judge.md`](docs/plan_llm_as_judge.md). PRs `#20`–`#21`.
+
+**Reste :** rédiger les ~15 questions du corpus dans Notion ; lot 2 =
+continuité d’expérience (mémoire entre tours).
+
 ### Dernière session
 
-**2026-08-25 — Catch-up docs + vague Emma → TTS → lisibilité**
+**2026-08-25 — Catch-up README / STORY après LLM as judge**
 
-Les Feature Chronicle / CHANGELOG 0.27.0–0.29.3 étaient déjà écrits au fil des
-PRs, mais « Dernière session » était restée sur le seul fix Inworld. Catch-up
-documentaire : rollup session TTS/Gradium/lisibilité, entrées manquantes
-0.26.1–0.26.3 (URLs admin, switch d’environnement allowlisté, sync Cinématiques
-+ historique), Open Window Cartesia.
+CHANGELOG 0.27–0.30 et Feature Chronicle couvraient déjà la vague Emma →
+TTS → lisibilité → LLM as judge, mais le README restait sur les bannières
+mai–août 21 (Emma encore « grisée », TTS sans Gradium/Cartesia/intention,
+pas de récit Qualité). « Dernière session » s’arrêtait au catch-up docs
+`#19`.
 
 **Préconditions :**
-- [x] `main` à jour après `#18` (textes blanc pur)
-- [x] STORY / CHANGELOG lus ; écarts repérés (Dernière session + Lovable Aug 14/21)
+- [x] `main` à `2654f16` (catalogue LLM Config dans le juge, `#21`)
+- [x] Écart README vs CHANGELOG / STORY repéré
 
 **Postconditions :**
-- [x] CHANGELOG 0.26.1–0.26.3 + note Docs sous 0.29.3
-- [x] STORY Feature Chronicle + sessions + Open Windows alignés
-- [x] Branche docs shippée sur `main`
+- [x] README : bannière 2026-08-25, livrables Emma / Gradium / TTS émotionnel /
+  lisibilité / LLM as judge, stack TTS et notes admin à jour
+- [x] STORY : session LLM as judge + Dernière session alignée
+- [x] CHANGELOG 0.30.0 : note Docs de ce catch-up
 
 ---
 
