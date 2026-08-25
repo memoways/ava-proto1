@@ -1,6 +1,6 @@
 # Plan — LLM as judge, tours isolés (lot 1)
 
-> Statut : en cours d’implémentation
+> Statut : lot 1 implémenté — base Notion créée
 > Objectif : banc d’essai texte (sans STT/TTS) dans Qualité, pour classer
 > l’effet du **modèle Max**, de l’**échantillonnage** et du **RAG** sur la
 > qualité d’une réponse, jugée par un LLM contre une cible Notion
@@ -25,13 +25,17 @@
 
 ## Base Notion
 
-Colonnes : Question (title), Reponse visee, Must include, Must not, Ton
-(select), Longueur max (number = phrases), Categorie (select), Actif
-(checkbox), Personnage (select, V1 = Max), Ordre (number), Notes juge.
+URL : [AVA LLM-as-judge — corpus Max](https://app.notion.com/p/gamilab-prov/746db7ce482d410ca45bb35f316c89a9?v=169e0f6c94324bd8870c37e656b1802a)
+ID : `746db7ce482d410ca45bb35f316c89a9` (espace gamilab-prov, page Storygami Home).
+Intégration AVA partagée sur la base (secret Lovable `NOTION_API_KEY`).
 
-L’ID de la base se colle dans l’onglet Qualité (persisté en
-`admin_settings.ava_eval_notion_database_id`) et/ou dans
-`AVA_NOTION_DATABASES.eval_items`.
+Colonnes : Question (title), Reponse visee, Must include, Must not, Ton
+(select : retenu / ouvert / defle / factuel), Longueur max (number = phrases),
+Categorie (select : factuel / piege / emotion / lore), Actif (checkbox),
+Personnage (select, V1 = Max), Ordre (number), Notes juge.
+
+L’ID est dans `AVA_NOTION_DATABASES.eval_items`. Surcharge possible dans
+Qualité (`admin_settings.ava_eval_notion_database_id`).
 
 ## Hors périmètre lot 1
 

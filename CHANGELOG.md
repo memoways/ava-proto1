@@ -16,6 +16,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   question × config. Pause / reprise. `feature_key` `llm_as_judge`.
 - Tables Lovable Cloud `eval_items` / `eval_runs` / `eval_results` (RLS
   admin, aucune lecture anon). Edge Function `sync-eval-items`.
+- Base Notion corpus : `746db7ce482d410ca45bb35f316c89a9` (Storygami Home).
 
 Plan : [`docs/plan_llm_as_judge.md`](docs/plan_llm_as_judge.md).
 

@@ -393,8 +393,8 @@ export function buildKnowledgeContextFromRAG(matches: RAGMatch[]): MaxTurnKnowle
 export const AVA_NOTION_DATABASES = {
   characters: '30362322e59580bbb7b8dd49d516b341',
   videos: '478685a5b31e45b5bc534bcf905b9124',
-  /** Base Notion des items LLM-as-judge. Peut rester vide : l’ID se colle dans Qualité. */
-  eval_items: '',
+  /** Base Notion des items LLM-as-judge (Storygami Home). */
+  eval_items: '746db7ce482d410ca45bb35f316c89a9',
 };
 
 /**

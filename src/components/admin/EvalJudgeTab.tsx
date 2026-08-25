@@ -308,7 +308,8 @@ export default function EvalJudgeTab() {
         <CardHeader>
           <CardTitle className="text-base">Corpus Notion</CardTitle>
           <CardDescription>
-            Crée une database avec ces colonnes, puis colle l’ID. La sync ne crée pas d’embeddings.
+            Crée une database avec ces colonnes. L’ID Storygami Home est déjà
+            branché ; tu peux le surcharger ici. La sync ne crée pas d’embeddings.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

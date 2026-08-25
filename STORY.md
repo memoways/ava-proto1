@@ -82,6 +82,10 @@ de leviers pour tout explorer à la main.
 pipeline RAG → GM → Max → validateur sans voix, juge LLM, OFAT sur modèle /
 sampling / RAG, 3 passages, classement Δ vs live.
 
+Corpus : [AVA LLM-as-judge — corpus Max](https://app.notion.com/p/gamilab-prov/746db7ce482d410ca45bb35f316c89a9?v=169e0f6c94324bd8870c37e656b1802a)
+(`746db7ce482d410ca45bb35f316c89a9`). L’intégration AVA est partagée sur la
+base. Les ~15 questions restent à rédiger dans Notion.
+
 Plan : [`docs/plan_llm_as_judge.md`](docs/plan_llm_as_judge.md).
 
 ### 2026-08-25 — Textes en blanc pur 🔹
