@@ -22,6 +22,13 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 Plan : [`docs/plan_llm_as_judge.md`](docs/plan_llm_as_judge.md).
 
+### Docs
+
+- Catch-up `README` / `STORY` : bannière et livrables de la vague août 2026
+  (Emma → TTS émotionnel → lisibilité → LLM as judge), session « Dernière
+  session » alignée sur le lot 1 Qualité, stack TTS à jour (Gradium,
+  Cartesia, `PerformanceIntent`).
+
 ## [0.29.3] — 2026-08-25 — Textes en blanc pur
 
 ### Changé
