@@ -277,9 +277,23 @@ export class SimulateMaxResponseError extends Error {
   }
 }
 
+export type MaxLlmOverrides = {
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+};
+
 export async function simulateMaxResponse(
   input: MaxAgentInput,
-  opts?: { characterName?: string; featureKey?: string; timeoutMs?: number; signal?: AbortSignal; diagnosticTrace?: boolean },
+  opts?: {
+    characterName?: string;
+    featureKey?: string;
+    timeoutMs?: number;
+    signal?: AbortSignal;
+    diagnosticTrace?: boolean;
+    llmOverrides?: MaxLlmOverrides;
+  },
 ): Promise<SimulateMaxResult> {
   const characterName = opts?.characterName || "Max";
   const promptBuildStartedAt = performance.now();
@@ -296,22 +310,26 @@ export async function simulateMaxResponse(
   ];
 
   const llm = getLLMSettings();
-  const reasoning = isReasoningEnabledForModel(llm.LLM_MODEL, llm);
+  const model = opts?.llmOverrides?.model ?? llm.LLM_MODEL;
+  const temperature = opts?.llmOverrides?.temperature ?? llm.LLM_TEMPERATURE;
+  const maxTokens = opts?.llmOverrides?.maxTokens ?? llm.LLM_MAX_TOKENS;
+  const topP = opts?.llmOverrides?.topP ?? llm.LLM_TOP_P;
+  const reasoning = isReasoningEnabledForModel(model, llm);
   const requestedSettings = {
-    model: llm.LLM_MODEL,
-    temperature: llm.LLM_TEMPERATURE,
-    maxTokens: llm.LLM_MAX_TOKENS,
-    topP: llm.LLM_TOP_P,
+    model,
+    temperature,
+    maxTokens,
+    topP,
     reasoning,
     timeoutMs: opts?.timeoutMs ?? null,
   };
   let result: Awaited<ReturnType<typeof callLLMWithUsage>>;
   try {
     result = await callLLMWithUsage(messages, {
-      model: llm.LLM_MODEL,
-      temperature: llm.LLM_TEMPERATURE,
-      max_tokens: llm.LLM_MAX_TOKENS,
-      top_p: llm.LLM_TOP_P,
+      model,
+      temperature,
+      max_tokens: maxTokens,
+      top_p: topP,
       timeoutMs: opts?.timeoutMs,
       signal: opts?.signal,
       feature_key: opts?.featureKey || "max_prompt_test",
@@ -412,6 +430,7 @@ export async function validateMaxResponseDetailed(input: {
   response: string;
   ragContext?: string;
   knowledgeContext?: MaxTurnKnowledgeContext;
+  featureKey?: string;
 }): Promise<ValidateMaxDetailed> {
   const llm = getLLMSettings();
   const validatorPrompt = buildValidatorPrompt(input);
@@ -419,7 +438,7 @@ export async function validateMaxResponseDetailed(input: {
     model: llm.LLM_MODEL_GM,
     temperature: 0.1,
     max_tokens: 350,
-    feature_key: "max_prompt_validation",
+    feature_key: input.featureKey || "max_prompt_validation",
   });
   let result: MaxConstraintCheckResult;
   try {

@@ -156,4 +156,27 @@ describe("assemblage traçable du prompt de Max", () => {
     expect(result.promptTrace?.budget?.sections.reduce((sum, section) => sum + section.chars, 0)).toBe(result.systemPrompt.length);
     expect(vi.mocked(callLLMWithUsage).mock.calls[0][0]).toEqual(result.messages);
   });
+
+  it("passes in-memory LLM overrides without reading a mutated live model", async () => {
+    vi.mocked(loadCharacterPromptByName).mockResolvedValue(null);
+    vi.mocked(callLLMWithUsage).mockResolvedValue({
+      content: "Lausanne.",
+      usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 },
+      generationId: "generation-2",
+      model: "openai/gpt-5-mini",
+      latencyMs: 80,
+      diagnosticTrace: null,
+    });
+    await simulateMaxResponse(
+      { conversationHistory: [], userMessage: "Où habites-tu ?" },
+      { llmOverrides: { model: "openai/gpt-5-mini", temperature: 0, maxTokens: 80, topP: 0.5 }, featureKey: "llm_as_judge" },
+    );
+    expect(vi.mocked(callLLMWithUsage).mock.calls.at(-1)?.[1]).toMatchObject({
+      model: "openai/gpt-5-mini",
+      temperature: 0,
+      max_tokens: 80,
+      top_p: 0.5,
+      feature_key: "llm_as_judge",
+    });
+  });
 });

@@ -129,6 +129,7 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] **PRD4 — Sync Notion avec noms exacts (accents)** : `sync-questionnaire` détecte `version: "prd4"` et écrit dans les propriétés Notion accentuées (`PRD4 Rôle création clarté`, `PRD4 Résumé personnage justesse`, `PRD4 Max reconnaît rôle`, `PRD4 Personnage souhaité prochain`, `PRD4 Durée ressentie`, `PRD4 Rôle JSON`, `PRD4 Être tenu au courant`, `PRD4 Contact feedback détaillé`…), filtrage côté serveur des propriétés absentes via `fetchDatabaseProperties()` (`skipped_props` logué)
 - [x] **PRD4 — Back-office enrichi** : `SessionsTab` admin affiche le rôle joueur (résumés + JSON repliable) et une timeline `gm_post_turn_log` compacte (engagement, role usage, confusion, end, modération, latence ms, sujets, next_turn_guidance)
 - [x] **PRD4 — Nettoyage legacy** : suppression de `OnboardingAScreen`, `OnboardingBScreen`, `ABChoiceScreen`, `OnboardingScreen`, `GateScreen`, `pages/Index.tsx` et de la route `/legacy`
+- [x] **LLM as judge (lot 1)** : onglet Qualité `/admin/qualite/llm-as-judge`, corpus Notion, OFAT texte-only (modèle / sampling / RAG), juge LLM, classement vs live. Continuité d'expérience = lot 2.
 - [ ] Video triggers dynamiques (depuis DB au lieu de hardcodés)
 - [ ] Politique de vérité à 4 niveaux (certain / probable / inconnu / interdit)
 - [ ] Bible factuelle éditable et gestion explicite des sujets verrouillés/déverrouillés
@@ -140,7 +141,7 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 |-----------|-------------|
 | Frontend | React + Vite + Tailwind + TypeScript (Lovable) |
 | Backend | Lovable Cloud (Supabase Postgres + pgvector) |
-| Edge Functions | proxy-llm, proxy-stt, proxy-tts, **proxy-tts-inworld**, **proxy-tts-hume**, sync-notion, query-rag, sync-questionnaire, rewrite-query, summarize-session |
+| Edge Functions | proxy-llm, proxy-stt, proxy-tts, **proxy-tts-inworld**, **proxy-tts-hume**, sync-notion, **sync-eval-items**, query-rag, sync-questionnaire, rewrite-query, summarize-session |
 | Video | Gumlet (hébergement + embed player) |
 | Cost Tracking | OpenRouter generation API (tokens + USD per call) |
 | LLM | OpenRouter API — Multi-modèles. Chemin live optimisé sur **Gemini 2.0 Flash** par défaut ; modèles plus lourds réservés aux tests/qualité depuis l'admin. |

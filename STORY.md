@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-25 (catch-up docs Emma → TTS → lisibilité)
+> **Last Updated**: 2026-08-25 (LLM as judge tours isolés)
 
 ---
 
@@ -72,6 +72,21 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-25 — LLM as judge, tours isolés 🔹
+
+**Le problème.** Tester les réglages Max coûte STT + LLM + TTS, et il y a trop
+de leviers pour tout explorer à la main.
+
+**Correctif.** Banc d'essai texte dans Qualité : corpus Notion (or + grille),
+pipeline RAG → GM → Max → validateur sans voix, juge LLM, OFAT sur modèle /
+sampling / RAG, 3 passages, classement Δ vs live.
+
+Corpus : [AVA LLM-as-judge — corpus Max](https://app.notion.com/p/gamilab-prov/746db7ce482d410ca45bb35f316c89a9?v=169e0f6c94324bd8870c37e656b1802a)
+(`746db7ce482d410ca45bb35f316c89a9`). L’intégration AVA est partagée sur la
+base. Les ~15 questions restent à rédiger dans Notion.
+
+Plan : [`docs/plan_llm_as_judge.md`](docs/plan_llm_as_judge.md).
 
 ### 2026-08-25 — Textes en blanc pur 🔹
 

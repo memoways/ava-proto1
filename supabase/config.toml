@@ -43,6 +43,9 @@ verify_jwt = false
 [functions.sync-notion]
 verify_jwt = false
 
+[functions.sync-eval-items]
+verify_jwt = false
+
 [functions.query-rag]
 verify_jwt = false
 
