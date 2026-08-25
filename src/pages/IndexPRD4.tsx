@@ -495,21 +495,21 @@ const IndexPRD4 = () => {
       expectedAvatarTextRef.current.set(context.turnId, text);
     }
     const characterKey = context.characterKey ?? activeCharacterRef.current;
-    const performance = derivePerformanceIntent({
+    const intent = derivePerformanceIntent({
       text,
       characterKey,
       previousEmotionalState: pendingEmotionalStateRef.current,
       userMessage: context.userMessage,
     });
-    logPerformanceIntent(performance, { turnId: context.turnId, characterKey });
+    logPerformanceIntent(intent, { turnId: context.turnId, characterKey });
     trackEvent("prd4_tts_performance", {
       session_id: sessionIdRef.current,
       turn_id: context.turnId,
       turn_index: context.turnIndex,
       character: characterKey,
-      emotion: performance.emotion,
-      intensity: performance.intensity,
-      source: performance.source,
+      emotion: intent.emotion,
+      intensity: intent.intensity,
+      source: intent.source,
     });
     const turnContext = {
       sessionId: sessionIdRef.current ?? undefined,
@@ -520,7 +520,7 @@ const IndexPRD4 = () => {
       voiceId: context.voiceId,
       providerId: context.providerId,
       characterKey,
-      performance,
+      performance: intent,
     };
     try {
       if (output.mode === "tts") setAudioState("max_speaking");

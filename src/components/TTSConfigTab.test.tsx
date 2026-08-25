@@ -119,6 +119,11 @@ describe("TTSConfigTab Gradium character selector", () => {
     expect(screen.getAllByText(/Volume \/ vitesse en FR/).length).toBeGreaterThanOrEqual(1);
   });
 
+  it("warns when the in-game provider cannot perform acting audibly", () => {
+    render(<TTSConfigTab />);
+    expect(screen.getByText(/En jeu,.*l'intention y est/)).toBeInTheDocument();
+  });
+
   it("plays Hume when Écouter Hume is clicked with the selected emotion", async () => {
     render(<TTSConfigTab />);
     screen.getByRole("button", { name: "Colère" }).click();
