@@ -20,6 +20,20 @@ describe("CharacterSelectScreen", () => {
     }));
   });
 
+  it("keeps Max callable even when his runtime checklist is incomplete", async () => {
+    vi.mocked(getCharacterRuntimeReadiness).mockImplementation(async (characterKey) => ({
+      characterKey,
+      displayName: characterKey === "emma" ? "Emma" : "Max",
+      ready: false,
+      openingLine: null,
+      ttsProvider: null,
+      ttsVoiceId: null,
+    }));
+    render(<CharacterSelectScreen onSelect={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Appeler Max" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Emma indisponible" })).toBeInTheDocument();
+  });
+
   it("keeps Emma locked until her runtime profile is ready", async () => {
     render(<CharacterSelectScreen onSelect={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Appeler Max" })).toBeEnabled();
