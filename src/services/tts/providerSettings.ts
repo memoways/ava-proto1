@@ -202,7 +202,7 @@ function readTuningField<K extends keyof GradiumVoiceTuning>(
   fallback: GradiumVoiceTuning[K],
 ): GradiumVoiceTuning[K] {
   const value = override?.[key];
-  return value === undefined ? fallback : value;
+  return (value === undefined ? fallback : value) as GradiumVoiceTuning[K];
 }
 
 export function getGradiumVoiceTuning(
