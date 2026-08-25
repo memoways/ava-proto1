@@ -4,6 +4,16 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.29.3] — 2026-08-25 — Textes en blanc pur
+
+### Changé
+
+- Tous les textes (back-office et expérience joueur) passent en blanc pur
+  `#FFFFFF` : tokens de thème + variantes d’opacité qui regrisissaient les
+  descriptions. Les couleurs sémantiques (alertes, primary) restent.
+
+Plan : [`docs/plan_textes_blanc_lisibilite.md`](docs/plan_textes_blanc_lisibilite.md).
+
 ## [0.29.2] — 2026-08-25 — Inworld : collision `performance.now`
 
 ### Corrigé

@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-25 (Inworld `performance.now`)
+> **Last Updated**: 2026-08-25 (textes blanc pur)
 
 ---
 
@@ -72,6 +72,18 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-25 — Textes en blanc pur 🔹
+
+**Le problème.** Descriptions et consignes (admin TTS Config, accueil joueur,
+etc.) étaient en gris `--muted-foreground` / opacités Tailwind : peu lisibles
+sur fond noir.
+
+**Correctif.** Tokens de texte à `#FFFFFF`. Utilitaire CSS pour que les
+classes à alpha (`/80`, `text-white/60`…) ne regrisaille pas le copy. Alertes
+et primary inchangés.
+
+Plan : [`docs/plan_textes_blanc_lisibilite.md`](docs/plan_textes_blanc_lisibilite.md).
 
 ### 2026-08-25 — Inworld cassé par collision `performance` 🔹
 
