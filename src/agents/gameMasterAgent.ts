@@ -250,7 +250,10 @@ export interface PlanGameMasterDetailed {
 }
 
 /** Detailed pre-turn planner for diagnostics: no hard timeout, returns tokens + raw prompts. */
-export async function planGameMasterTurnDetailed(input: GameMasterPreTurnInput): Promise<PlanGameMasterDetailed> {
+export async function planGameMasterTurnDetailed(
+  input: GameMasterPreTurnInput,
+  opts?: { featureKey?: string },
+): Promise<PlanGameMasterDetailed> {
   const systemPrompt = getGameMasterPreTurnPrompt();
   const userPrompt = buildPreTurnContextMessage(input);
   const llm = getLLMSettings();
@@ -265,7 +268,7 @@ export async function planGameMasterTurnDetailed(input: GameMasterPreTurnInput):
         model: llm.LLM_MODEL_GM,
         temperature: 0.2,
         max_tokens: llm.LLM_MAX_TOKENS_GM ?? 180,
-        feature_key: "max_prompt_test_gm_pre",
+        feature_key: opts?.featureKey || "max_prompt_test_gm_pre",
       },
     );
     const jsonMatch = callRes.content.match(/\{[\s\S]*\}/);

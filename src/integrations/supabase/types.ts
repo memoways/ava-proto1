@@ -462,6 +462,195 @@ export type Database = {
         }
         Relationships: []
       }
+      eval_items: {
+        Row: {
+          active: boolean
+          category: string | null
+          character_name: string
+          created_at: string
+          gold_answer: string
+          id: string
+          judge_notes: string
+          max_length: number | null
+          must_include: string
+          must_not: string
+          notion_page_id: string
+          question: string
+          sort_order: number
+          synced_at: string
+          tone: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category?: string | null
+          character_name?: string
+          created_at?: string
+          gold_answer?: string
+          id?: string
+          judge_notes?: string
+          max_length?: number | null
+          must_include?: string
+          must_not?: string
+          notion_page_id: string
+          question: string
+          sort_order?: number
+          synced_at?: string
+          tone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string | null
+          character_name?: string
+          created_at?: string
+          gold_answer?: string
+          id?: string
+          judge_notes?: string
+          max_length?: number | null
+          must_include?: string
+          must_not?: string
+          notion_page_id?: string
+          question?: string
+          sort_order?: number
+          synced_at?: string
+          tone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      eval_results: {
+        Row: {
+          config_label: string
+          created_at: string
+          error_message: string | null
+          factor: string
+          gm_brief: Json | null
+          id: string
+          item_id: string
+          judge_json: Json | null
+          latencies: Json | null
+          max_response: string | null
+          overall_score: number | null
+          rag_matches: Json | null
+          repeat_index: number
+          run_id: string
+          tokens: Json | null
+          validator: Json | null
+        }
+        Insert: {
+          config_label: string
+          created_at?: string
+          error_message?: string | null
+          factor: string
+          gm_brief?: Json | null
+          id?: string
+          item_id: string
+          judge_json?: Json | null
+          latencies?: Json | null
+          max_response?: string | null
+          overall_score?: number | null
+          rag_matches?: Json | null
+          repeat_index: number
+          run_id: string
+          tokens?: Json | null
+          validator?: Json | null
+        }
+        Update: {
+          config_label?: string
+          created_at?: string
+          error_message?: string | null
+          factor?: string
+          gm_brief?: Json | null
+          id?: string
+          item_id?: string
+          judge_json?: Json | null
+          latencies?: Json | null
+          max_response?: string | null
+          overall_score?: number | null
+          rag_matches?: Json | null
+          repeat_index?: number
+          run_id?: string
+          tokens?: Json | null
+          validator?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eval_results_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "eval_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eval_results_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "eval_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eval_runs: {
+        Row: {
+          actual_cost_usd: number | null
+          baseline: Json
+          created_at: string
+          created_by: string | null
+          current_index: number
+          error_message: string | null
+          estimated_cost_usd: number | null
+          estimated_turns: number | null
+          finished_at: string | null
+          id: string
+          judge_model: string
+          ofat_config: Json
+          repeats: number
+          started_at: string | null
+          status: string
+          total_turns: number
+          updated_at: string
+        }
+        Insert: {
+          actual_cost_usd?: number | null
+          baseline?: Json
+          created_at?: string
+          created_by?: string | null
+          current_index?: number
+          error_message?: string | null
+          estimated_cost_usd?: number | null
+          estimated_turns?: number | null
+          finished_at?: string | null
+          id?: string
+          judge_model: string
+          ofat_config?: Json
+          repeats?: number
+          started_at?: string | null
+          status?: string
+          total_turns?: number
+          updated_at?: string
+        }
+        Update: {
+          actual_cost_usd?: number | null
+          baseline?: Json
+          created_at?: string
+          created_by?: string | null
+          current_index?: number
+          error_message?: string | null
+          estimated_cost_usd?: number | null
+          estimated_turns?: number | null
+          finished_at?: string | null
+          id?: string
+          judge_model?: string
+          ofat_config?: Json
+          repeats?: number
+          started_at?: string | null
+          status?: string
+          total_turns?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       experience_events: {
         Row: {
           character_key: string | null

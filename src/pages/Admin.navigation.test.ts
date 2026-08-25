@@ -36,6 +36,7 @@ describe("Admin navigation invariants", () => {
       "latency",
       "latency-telemetry",
       "max-test",
+      "eval-judge",
       "pipeline",
     ]);
   });
@@ -54,6 +55,7 @@ describe("Admin navigation invariants", () => {
     expect(adminTabPath("sessions")).toBe("/admin/donnees/sessions");
     expect(adminTabPath("llm")).toBe("/admin/technique/configuration-llm");
     expect(adminTabPath("latency")).toBe("/admin/qualite/latence-et-blocages");
+    expect(adminTabPath("eval-judge")).toBe("/admin/qualite/llm-as-judge");
   });
 
   it("resolves canonical pages and session detail URLs", () => {

@@ -20,6 +20,7 @@ import CharacterRuntimeSettingsTab from "@/components/CharacterRuntimeSettingsTa
 import CharacterEditorTab from "@/components/CharacterEditorTab";
 import VideoTriggersEditor from "@/components/VideoTriggersEditor";
 import RAGLabTab from "@/components/RAGLabTab";
+import EvalJudgeTab from "@/components/admin/EvalJudgeTab";
 import PipelineTraceTab from "@/components/PipelineTraceTab";
 import AntiHallucinationValidatorTab from "@/components/AntiHallucinationValidatorTab";
 import HallucinationMetricsTab from "@/components/HallucinationMetricsTab";
@@ -621,6 +622,10 @@ export default function Admin() {
 
           <TabsContent value="max-test">
             <RAGLabTab />
+          </TabsContent>
+
+          <TabsContent value="eval-judge">
+            <EvalJudgeTab />
           </TabsContent>
 
           <TabsContent value="pipeline">
