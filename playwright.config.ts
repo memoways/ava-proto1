@@ -40,6 +40,8 @@ export default defineConfig({
     {
       name: "webkit-media",
       grep: /teaser démarre|cinématique HLS/,
+      // WebKit HLS on the shared runner sometimes closes the page mid-turn.
+      retries: process.env.CI ? 1 : 0,
       use: { ...devices["Desktop Safari"] },
     },
   ],
