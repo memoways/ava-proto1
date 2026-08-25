@@ -4,6 +4,21 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.29.1] — 2026-08-25 — Audition TTS : où l'intention s'entend
+
+### Corrigé
+
+- TTS Config indique pour chaque provider si l'intention de jeu est audible
+  (Hume / Inworld), faible (ElevenLabs sauf v3, Gradium) ou limitée au
+  volume/vitesse en français (Cartesia).
+- Les puces d'émotion ne jouent plus « rien » en silence : texte d'aide +
+  boutons **Écouter Hume** / **Écouter Inworld**. Intensité d'audition portée
+  à 2 pour que l'acting NL se distingue.
+- Cartesia : CORS aligné, voix `{ mode: "id" }`, erreur claire si
+  `proxy-tts-cartesia` est injoignable (`Failed to fetch`).
+
+Plan : [`docs/plan_tts_pilotage_emotionnel.md`](docs/plan_tts_pilotage_emotionnel.md).
+
 ## [0.29.0] — 2026-08-25 — Pilotage émotionnel TTS
 
 ### Ajouté

@@ -37,12 +37,24 @@ export const cartesiaProvider: TTSProvider = {
     const debugId = debugLogger.logFetch("tts", `TTS-CA "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts-cartesia`, body);
     const timeout = createTimeoutSignal(12000, ctx?.signal);
 
-    const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-tts-cartesia`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: timeout.signal,
-    }).finally(timeout.cancel);
+    let response: Response;
+    try {
+      response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-tts-cartesia`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: timeout.signal,
+      });
+    } catch (err) {
+      if (err instanceof TypeError && /failed to fetch/i.test(err.message)) {
+        throw new Error(
+          "proxy-tts-cartesia injoignable (Failed to fetch). Fonction pas encore déployée sur Lovable, ou réseau.",
+        );
+      }
+      throw err;
+    } finally {
+      timeout.cancel();
+    }
     const tFirstByte = performance.now();
 
     if (!response.ok) {

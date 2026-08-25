@@ -29,3 +29,20 @@ les paramètres par tour des APIs TTS — pas seulement une bonne diction à pla
 ## Secret Cartesia
 
 Edge function `proxy-tts-cartesia` lit `CARTESIA_API_KEY` (Lovable Cloud).
+
+## Audition admin (TTS Config)
+
+Les puces d'émotion **sélectionnent** une intention ; elles ne jouent pas l'audio.
+Pour entendre une différence : **Écouter Hume** ou **Écouter Inworld**.
+
+| Provider | Intention utilisable ? | Ce qui est envoyé |
+|---|---|---|
+| Hume | Oui, audible | `description` NL (baseline admin + `actingNl`) + `speed` |
+| Inworld | Oui, audible | `instruction` + `deliveryMode=CREATIVE` si intensité ≥ 2 |
+| ElevenLabs | Faible (sauf `eleven_v3`) | offsets style/stability/speed ; tags `[angry]` seulement en v3 |
+| Gradium | Très faible | `temp` / `padding_bonus` — pas d'émotion nommée |
+| Cartesia | Volume/vitesse en FR | `generation_config.speed/volume` ; `emotion` **omis si langue ≠ en** |
+
+Cartesia `Failed to fetch` : la fonction `proxy-tts-cartesia` n'est pas encore
+déployée sur Lovable (sync GitHub), CORS, ou réseau. Le client affiche ce cas
+explicitement.

@@ -99,7 +99,35 @@ describe("TTSConfigTab Gradium character selector", () => {
     await waitFor(() => expect(generateSpeech).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
-        performance: expect.objectContaining({ emotion: "angry", source: "manual" }),
+        performance: expect.objectContaining({ emotion: "angry", source: "manual", intensity: 2 }),
+      }),
+    ));
+  });
+
+  it("does not play audio when an audition chip is clicked", async () => {
+    render(<TTSConfigTab />);
+    screen.getByRole("button", { name: "Colère" }).click();
+    expect(generateSpeech).not.toHaveBeenCalled();
+  });
+
+  it("lists which providers can actually perform the acting intent", () => {
+    render(<TTSConfigTab />);
+    expect(screen.getByText("Où l'intention est réellement utilisée")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Écouter Hume/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Écouter Inworld/ })).toBeInTheDocument();
+    expect(screen.getAllByText(/Oui — audible/).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/Volume \/ vitesse en FR/).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("plays Hume when Écouter Hume is clicked with the selected emotion", async () => {
+    render(<TTSConfigTab />);
+    screen.getByRole("button", { name: "Colère" }).click();
+    screen.getByRole("button", { name: /Écouter Hume/ }).click();
+    await waitFor(() => expect(generateSpeech).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        providerId: "hume",
+        performance: expect.objectContaining({ emotion: "angry", intensity: 2 }),
       }),
     ));
   });

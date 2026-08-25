@@ -7,6 +7,7 @@ import {
   composeHumeDescription,
   derivePerformanceIntent,
   intentFromManualEmotion,
+  PROVIDER_ACTING_SUPPORT,
 } from "./performanceIntent";
 
 describe("derivePerformanceIntent", () => {
@@ -127,5 +128,15 @@ describe("provider adapters", () => {
     expect(fr.speed).toBeGreaterThan(1);
     const en = applyCartesiaGenerationConfig(angry, "en");
     expect(en.emotion).toBe("angry");
+  });
+});
+
+describe("PROVIDER_ACTING_SUPPORT", () => {
+  it("marks Hume and Inworld as the audible acting surfaces", () => {
+    expect(PROVIDER_ACTING_SUPPORT.hume.usability).toBe("audible");
+    expect(PROVIDER_ACTING_SUPPORT.inworld.usability).toBe("audible");
+    expect(PROVIDER_ACTING_SUPPORT.elevenlabs.usability).toBe("weak");
+    expect(PROVIDER_ACTING_SUPPORT.gradium.usability).toBe("speed_only");
+    expect(PROVIDER_ACTING_SUPPORT.cartesia.usability).toBe("en_emotion_only");
   });
 });
