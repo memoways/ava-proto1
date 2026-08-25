@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-25 (Emma au départ et passage Max ↔ Emma)
+> **Last Updated**: 2026-08-25 (sélecteur : Max toujours joignable)
 
 ---
 
@@ -72,6 +72,17 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-25 — Max reste joignable si la checklist runtime est incomplète 🔹
+
+**Le problème.** Après l’activation d’Emma dans Orchestration, le sélecteur
+affichait les quatre visages en « Bientôt », y compris Max : le ready SQL
+exige ouverture, voix, portrait et quatre validations, souvent fausses en
+sandbox.
+
+**Correctif.** Max ouvre toujours l’appel (replis d’ouverture / TTS déjà en
+place). Emma n’apparaît que si `get_character_runtime_readiness` renvoie
+`ready`. Orchestration le dit maintenant explicitement.
 
 ### 2026-08-25 — Emma peut ouvrir l’appel, et Max n’est plus un aller sans retour 🔷
 

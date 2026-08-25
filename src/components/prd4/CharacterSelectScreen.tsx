@@ -24,33 +24,28 @@ const CHARACTERS: { id: CharId; name: string; img: string }[] = [
 
 const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
   const [lockedDialog, setLockedDialog] = useState(false);
-  const [maxReady, setMaxReady] = useState(true);
   const [emmaReady, setEmmaReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([
-      getCharacterRuntimeReadiness("max"),
-      getCharacterRuntimeReadiness("emma"),
-    ])
-      .then(([maxProfile, emmaProfile]) => {
-        if (cancelled) return;
-        setMaxReady(maxProfile?.ready !== false);
-        setEmmaReady(emmaProfile?.ready === true);
+    void getCharacterRuntimeReadiness("emma")
+      .then((profile) => {
+        if (!cancelled) setEmmaReady(profile?.ready === true);
       })
       .catch(() => {
-        if (cancelled) return;
-        setMaxReady(true);
-        setEmmaReady(false);
+        if (!cancelled) setEmmaReady(false);
       });
     return () => { cancelled = true; };
   }, []);
 
-  const isActive = (id: CharId) => (id === "max" && maxReady) || (id === "emma" && emmaReady);
+  // Max always opens the call (code fallbacks for opening line / TTS). Emma
+  // only if the sandbox/prod runtime checklist is complete — enabling her in
+  // Orchestration is not enough on its own.
+  const isActive = (id: CharId) => id === "max" || (id === "emma" && emmaReady);
 
-  const handleLocked = (id: CharId) => {
+  const handleLocked = (id: Exclude<CharId, "max">) => {
     setLockedDialog(true);
-    if (id !== "max") onLockedClick?.(id);
+    onLockedClick?.(id);
   };
 
   return (
@@ -89,7 +84,7 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
             return (
               <button
                 key={c.id}
-                onClick={() => handleLocked(c.id)}
+                onClick={() => handleLocked(c.id as Exclude<CharId, "max">)}
                 className={`${cardBase} cursor-not-allowed border-border opacity-50 grayscale hover:opacity-70`}
                 aria-label={`${c.name} indisponible`}
               >
@@ -121,7 +116,7 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
               prototype.
               <br />
               <br />
-              Pour l'instant, tu peux appeler {[maxReady && "Max", emmaReady && "Emma"].filter(Boolean).join(" ou ") || "personne — la checklist runtime n'est pas complète"}.
+              Pour l'instant, tu peux appeler Max{emmaReady ? " ou Emma" : ""}.
             </DialogDescription>
           </DialogHeader>
         </DialogContent>

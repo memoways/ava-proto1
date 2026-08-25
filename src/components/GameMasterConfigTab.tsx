@@ -167,7 +167,7 @@ export default function GameMasterConfigTab() {
             <div>
               <h3 className="font-semibold">Personnages actifs</h3>
               <p className="text-xs text-muted-foreground">
-                Max et Emma peuvent ouvrir l’appel si leur checklist runtime est complète. Activer Emma les rend disponibles au sélecteur et comme destination de passage.
+                Max et Emma peuvent ouvrir l’appel si leur checklist runtime est complète. Activer Emma ne suffit pas : le badge « configuré » dans Réglages personnages est aussi requis pour le sélecteur.
               </p>
             </div>
           </div>

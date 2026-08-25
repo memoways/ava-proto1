@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.27.1] — 2026-08-25 — Max reste joignable si la checklist runtime est incomplète
+
+### Corrigé
+
+- Le sélecteur ne verrouille plus Max (ni tout le plateau) lorsque le profil
+  runtime sandbox/prod n’a pas encore le badge « configuré ». Emma reste
+  conditionnée à ce badge ; Ava et Léo restent verrouillés.
+
 ## [0.27.0] — 2026-08-25 — Emma au départ et passage Max ↔ Emma
 
 ### Ajouté
