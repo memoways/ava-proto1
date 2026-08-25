@@ -167,7 +167,7 @@ export default function GameMasterConfigTab() {
             <div>
               <h3 className="font-semibold">Personnages actifs</h3>
               <p className="text-xs text-muted-foreground">
-                Max et Emma peuvent ouvrir l’appel si leur checklist runtime est complète. Activer Emma ne suffit pas : le badge « configuré » dans Réglages personnages est aussi requis pour le sélecteur.
+                Max et Emma ouvrent l’appel dès qu’ils sont activés ici. La checklist de Réglages personnages affine voix et ouverture, elle ne verrouille plus le sélecteur.
               </p>
             </div>
           </div>

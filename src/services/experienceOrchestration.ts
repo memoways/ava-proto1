@@ -317,6 +317,7 @@ export async function fetchPinnedDirectorRuntime(sessionId: string | null): Prom
 export async function getCharacterRuntimeReadiness(character: "max" | "emma"): Promise<{
   characterKey: "max" | "emma";
   displayName: string;
+  enabled: boolean;
   ready: boolean;
   openingLine: string | null;
   ttsProvider: string | null;
@@ -333,6 +334,9 @@ export async function getCharacterRuntimeReadiness(character: "max" | "emma"): P
   return {
     characterKey: row.character_key === "emma" ? "emma" : "max",
     displayName: typeof row.display_name === "string" ? row.display_name : character,
+    // Older RPC rows omit `enabled`; treat that as on so Orchestration can
+    // actually offer Emma before the full qualitative checklist is ticked.
+    enabled: row.enabled !== false,
     ready: row.ready === true,
     openingLine: typeof row.opening_line === "string" ? row.opening_line : null,
     ttsProvider: typeof row.tts_provider === "string" ? row.tts_provider : null,

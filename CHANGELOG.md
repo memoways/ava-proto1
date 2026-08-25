@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.27.2] — 2026-08-25 — Emma joignable dès qu’elle est activée
+
+### Corrigé
+
+- Le sélecteur offre Emma dès qu’Orchestration l’active, sans attendre le
+  badge « configuré » (voix, ouverture, validations qualitatives).
+- Un passage vers Emma n’exige plus cette checklist : repli d’ouverture
+  « Allô ? » et TTS par défaut si la voix n’est pas encore renseignée.
+
 ## [0.27.1] — 2026-08-25 — Max reste joignable si la checklist runtime est incomplète
 
 ### Corrigé

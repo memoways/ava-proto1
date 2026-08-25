@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-25 (sélecteur : Max toujours joignable)
+> **Last Updated**: 2026-08-25 (Emma joignable dès activation Orchestration)
 
 ---
 
@@ -73,6 +73,15 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-08-25 — Emma joignable dès qu’elle est activée 🔹
+
+**Le problème.** Activer Emma dans Orchestration ne la déverrouillait pas :
+`ready` SQL exige encore voix, portrait, prompt, RAG et deux validations
+manuelles, presque jamais cochées en sandbox.
+
+**Correctif.** Le sélecteur suit le switch Orchestration (`enabled`), pas la
+checklist. Ouverture et TTS ont un repli. Ava et Léo restent verrouillés.
+
 ### 2026-08-25 — Max reste joignable si la checklist runtime est incomplète 🔹
 
 **Le problème.** Après l’activation d’Emma dans Orchestration, le sélecteur
@@ -81,8 +90,7 @@ exige ouverture, voix, portrait et quatre validations, souvent fausses en
 sandbox.
 
 **Correctif.** Max ouvre toujours l’appel (replis d’ouverture / TTS déjà en
-place). Emma n’apparaît que si `get_character_runtime_readiness` renvoie
-`ready`. Orchestration le dit maintenant explicitement.
+place). Emma a d’abord resté derrière `ready` — corrigé juste après.
 
 ### 2026-08-25 — Emma peut ouvrir l’appel, et Max n’est plus un aller sans retour 🔷
 
