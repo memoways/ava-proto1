@@ -9,7 +9,7 @@ import {
   queryRAGDetailed,
 } from "@/services/ragService";
 import { maxRagFormatOptionsForVariant } from "@/services/maxRagVariant";
-import { getGameplaySettings, getLLMSettings, OPENROUTER_MODELS } from "@/services/settingsService";
+import { getGameplaySettings, getLLMSettings, listLlmConfigModels } from "@/services/settingsService";
 
 export const EVAL_FEATURE_KEY = "llm_as_judge";
 export const EVAL_REPEATS = 3;
@@ -113,10 +113,13 @@ export function snapshotLiveSettings(): EvalLiveSnapshot {
   };
 }
 
+export function listEvalMaxModels(liveModel: string) {
+  return listLlmConfigModels().filter((model) => model.id !== liveModel);
+}
+
 export function defaultOfatSelection(live: EvalLiveSnapshot): OfatSelection {
-  const extraModels = OPENROUTER_MODELS
+  const extraModels = listEvalMaxModels(live.model)
     .map((model) => model.id)
-    .filter((id) => id !== live.model)
     .slice(0, 2);
   const samplingTemps = [0, 0.8].filter((temp) => Math.abs(temp - live.temperature) > 0.05);
   const conservativeK = Math.max(1, live.ragTopK - 2);
@@ -185,7 +188,7 @@ export function estimateEvalRun(
   }
   let estimatedCostUsd = 0;
   for (const [modelId, callCount] of byModel) {
-    const catalog = OPENROUTER_MODELS.find((model) => model.id === modelId);
+    const catalog = listLlmConfigModels().find((model) => model.id === modelId);
     const inUsd = parseUsdPerMillion(catalog?.costInput ?? "$1");
     const outUsd = parseUsdPerMillion(catalog?.costOutput ?? "$3");
     estimatedCostUsd += (callCount * TOKENS_IN_PER_CALL * inUsd) / 1_000_000;

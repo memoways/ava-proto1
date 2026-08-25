@@ -14,6 +14,8 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   delta vs la config live.
 - Leviers V1 : modèle Max, échantillonnage, RAG. Trois passages par couple
   question × config. Pause / reprise. `feature_key` `llm_as_judge`.
+- Catalogue de modèles partagé avec LLM Config : cases à cocher pour tous les
+  Max du panel, référence live toujours incluse.
 - Tables Lovable Cloud `eval_items` / `eval_runs` / `eval_results` (RLS
   admin, aucune lecture anon). Edge Function `sync-eval-items`.
 - Base Notion corpus : `746db7ce482d410ca45bb35f316c89a9` (Storygami Home).

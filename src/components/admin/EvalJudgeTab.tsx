@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { OPENROUTER_MODELS } from "@/services/settingsService";
+import { listLlmConfigModels } from "@/services/settingsService";
 import {
   EVAL_DEFAULT_JUDGE_MODEL,
   EVAL_NOTION_COLUMNS,
@@ -19,6 +19,7 @@ import {
   defaultOfatSelection,
   estimateEvalRun,
   judgeIsolatedEvalTurn,
+  listEvalMaxModels,
   listEvalWorkItems,
   rankConfigs,
   resultWorkKey,
@@ -65,8 +66,8 @@ export default function EvalJudgeTab() {
   const [running, setRunning] = useState(false);
   const [progressLabel, setProgressLabel] = useState("");
   const [judgeModel, setJudgeModel] = useState(EVAL_DEFAULT_JUDGE_MODEL);
-  const [modelA, setModelA] = useState("");
-  const [modelB, setModelB] = useState("");
+  const [extraModels, setExtraModels] = useState<string[]>([]);
+  const extraModelsReady = useRef(false);
   const [tempZero, setTempZero] = useState(true);
   const [tempHigh, setTempHigh] = useState(true);
   const [ragConservative, setRagConservative] = useState(true);
@@ -76,15 +77,20 @@ export default function EvalJudgeTab() {
   const pauseRef = useRef(false);
 
   const live = useMemo(() => snapshotLiveSettings(), []);
+  const catalog = useMemo(() => listLlmConfigModels(), []);
+  const evalMaxModels = useMemo(() => listEvalMaxModels(live.model), [live.model]);
+  const liveCatalogModel = catalog.find((model) => model.id === live.model);
   const ofatDefaults = useMemo(() => defaultOfatSelection(live), [live]);
 
   useEffect(() => {
-    if (!modelA && ofatDefaults.extraModels[0]) setModelA(ofatDefaults.extraModels[0]);
-    if (!modelB && ofatDefaults.extraModels[1]) setModelB(ofatDefaults.extraModels[1]);
-  }, [modelA, modelB, ofatDefaults.extraModels]);
+    if (extraModelsReady.current) return;
+    if (ofatDefaults.extraModels.length === 0) return;
+    setExtraModels(ofatDefaults.extraModels);
+    extraModelsReady.current = true;
+  }, [ofatDefaults.extraModels]);
 
   const selection: OfatSelection = useMemo(() => ({
-    extraModels: [modelA, modelB].filter(Boolean),
+    extraModels,
     samplingTemps: [
       ...(tempZero ? [0] : []),
       ...(tempHigh ? [0.8] : []),
@@ -93,7 +99,7 @@ export default function EvalJudgeTab() {
       ...(ragConservative ? ofatDefaults.ragVariants.filter((variant) => variant.key === "conservative") : []),
       ...(ragGenerous ? ofatDefaults.ragVariants.filter((variant) => variant.key === "generous") : []),
     ],
-  }), [modelA, modelB, ofatDefaults.ragVariants, ragConservative, ragGenerous, tempHigh, tempZero]);
+  }), [extraModels, ofatDefaults.ragVariants, ragConservative, ragGenerous, tempHigh, tempZero]);
 
   const configs = useMemo(() => buildOfatConfigs(live, selection), [live, selection]);
   const activeItems = useMemo(() => items.filter((item) => item.active), [items]);
@@ -363,39 +369,53 @@ export default function EvalJudgeTab() {
         <CardHeader>
           <CardTitle className="text-base">Leviers OFAT</CardTitle>
           <CardDescription>
-            Référence = réglages live ({live.model}, temp {live.temperature}, RAG k={live.ragTopK}). Un facteur à la fois.
+            Référence = réglages live ({liveCatalogModel?.label ?? live.model}, temp {live.temperature}, RAG k={live.ragTopK}). Un facteur à la fois.
+            Les modèles sont le catalogue de Technique → LLM Config.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2">
-            <div>
-              <Label>Modèle A</Label>
-              <Select value={modelA} onValueChange={setModelA}>
-                <SelectTrigger><SelectValue placeholder="Modèle" /></SelectTrigger>
-                <SelectContent>
-                  {OPENROUTER_MODELS.filter((model) => model.id !== live.model).map((model) => (
-                    <SelectItem key={model.id} value={model.id}>{model.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Modèle B</Label>
-              <Select value={modelB} onValueChange={setModelB}>
-                <SelectTrigger><SelectValue placeholder="Modèle" /></SelectTrigger>
-                <SelectContent>
-                  {OPENROUTER_MODELS.filter((model) => model.id !== live.model && model.id !== modelA).map((model) => (
-                    <SelectItem key={model.id} value={model.id}>{model.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="space-y-2">
+            <Label>Modèles Max à comparer</Label>
+            <p className="text-xs text-muted-foreground">
+              Même liste que LLM Config. La référence live est toujours dans le run. Coche les autres modèles Max à tester.
+            </p>
+            <label className="flex items-start gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+              <Checkbox checked disabled className="mt-0.5" />
+              <span>
+                <span className="font-medium">{liveCatalogModel?.label ?? live.model}</span>
+                <span className="text-muted-foreground"> — référence live</span>
+              </span>
+            </label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {evalMaxModels.map((model) => {
+                const checked = extraModels.includes(model.id);
+                return (
+                  <label key={model.id} className="flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
+                    <Checkbox
+                      checked={checked}
+                      className="mt-0.5"
+                      onCheckedChange={(value) => {
+                        const on = value === true;
+                        setExtraModels((current) => {
+                          if (on) return current.includes(model.id) ? current : [...current, model.id];
+                          return current.filter((id) => id !== model.id);
+                        });
+                      }}
+                    />
+                    <span>
+                      <span className="font-medium">{model.label}</span>
+                      <span className="block font-mono text-[11px] text-muted-foreground">{model.id}</span>
+                    </span>
+                  </label>
+                );
+              })}
             </div>
             <div>
               <Label>Modèle juge (température 0)</Label>
               <Select value={judgeModel} onValueChange={setJudgeModel}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {OPENROUTER_MODELS.map((model) => (
+                  {catalog.map((model) => (
                     <SelectItem key={model.id} value={model.id}>{model.label}</SelectItem>
                   ))}
                 </SelectContent>
