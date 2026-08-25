@@ -1,7 +1,7 @@
 import type { LatencySegmentKey, LatencyServiceInfo } from "@/services/latencySegments";
 import { getLLMSettings, getTTSSettings } from "@/services/settingsService";
 import { getSTTProvider, getSTTProviderDefinition } from "@/services/stt";
-import { getActiveProviderId, getGradiumSettings, getHumeSettings, getInworldSettings } from "@/services/tts/providerSettings";
+import { getActiveProviderId, getCartesiaSettings, getGradiumSettings, getHumeSettings, getInworldSettings } from "@/services/tts/providerSettings";
 import { DEEPGRAM_DEFAULT_MODEL } from "../../supabase/functions/_shared/deepgramDefaults";
 
 export function getConfiguredTTSServiceInfo(): LatencyServiceInfo {
@@ -32,6 +32,15 @@ export function getConfiguredTTSServiceInfo(): LatencyServiceInfo {
         serviceName: "gradium",
         model: settings.voiceId || "gradium-tts",
         mode: "streaming",
+      };
+    }
+    if (provider === "cartesia") {
+      const settings = getCartesiaSettings();
+      return {
+        serviceProvider: "Cartesia",
+        serviceName: "cartesia",
+        model: settings.modelId,
+        mode: settings.language,
       };
     }
     return {

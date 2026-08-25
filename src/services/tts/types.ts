@@ -12,7 +12,7 @@
  *   4. Optionally add a proxy edge function under supabase/functions/proxy-tts-<name>/
  */
 
-export type TTSProviderId = "elevenlabs" | "inworld" | "hume" | "gradium";
+export type TTSProviderId = "elevenlabs" | "inworld" | "hume" | "gradium" | "cartesia";
 
 /** Stitching context — most providers ignore it, ElevenLabs uses it for prosody continuity. */
 export interface TTSGenerateContext {
@@ -24,6 +24,8 @@ export interface TTSGenerateContext {
   voiceId?: string;
   /** Active character key (max, emma, …) so providers can apply per-character tuning. */
   characterKey?: string;
+  /** Per-turn acting intent, mapped by each provider to its own API knobs. */
+  performance?: import("./performanceIntent").PerformanceIntent;
   /** Observability context propagated to PostHog/Supabase telemetry. */
   session_id?: string | null;
   turn_id?: string | null;

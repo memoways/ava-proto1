@@ -18,6 +18,9 @@ verify_jwt = false
 [functions.proxy-tts-gradium]
 verify_jwt = false
 
+[functions.proxy-tts-cartesia]
+verify_jwt = false
+
 [functions.proxy-stt-gradium]
 verify_jwt = false
 

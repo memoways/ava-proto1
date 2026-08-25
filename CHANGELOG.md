@@ -4,6 +4,27 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.29.0] — 2026-08-25 — Pilotage émotionnel TTS
+
+### Ajouté
+
+- Intent de jeu `PerformanceIntent` dérivé de la réplique (lexique FR), du
+  personnage et de la mémoire GM du tour précédent — sans LLM supplémentaire.
+- Mapping par tour vers Hume (`description` + `speed`), Inworld (`instruction`),
+  ElevenLabs (style/vitesse, tags v3 si le modèle est `eleven_v3`) et Gradium
+  (`temp` / `padding_bonus`).
+- Provider Cartesia Sonic 3.5 (`proxy-tts-cartesia`, secret `CARTESIA_API_KEY`) :
+  volume et vitesse par tour ; tags d'émotion omis en français.
+- Audition d'émotion dans Admin → TTS Config (même phrase, colère / tristesse /
+  peur / calme, etc.).
+
+### Conservé
+
+- Deepgram reste STT uniquement. Eleven v3 n'est pas le modèle par défaut.
+- Pas de migration BDD.
+
+Plan : [`docs/plan_tts_pilotage_emotionnel.md`](docs/plan_tts_pilotage_emotionnel.md).
+
 ## [0.28.0] — 2026-08-25 — Réglages Gradium TTS par personnage
 
 ### Ajouté

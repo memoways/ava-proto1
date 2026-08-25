@@ -271,6 +271,50 @@ export function resetGradiumSettings(): GradiumSettings {
   return { ...gradiumDefaults, byCharacter: {} };
 }
 
+// ---------------- Cartesia Sonic ----------------
+
+export interface CartesiaSettings {
+  voiceId: string;
+  modelId: "sonic-3.5" | "sonic-3" | "sonic-latest";
+  language: string;
+}
+
+const CARTESIA_KEY = "ava_tts_settings_cartesia";
+
+const cartesiaDefaults: CartesiaSettings = {
+  voiceId: "0834f3df-e650-4766-a20c-5a93a43aa6e3",
+  modelId: "sonic-3.5",
+  language: "fr",
+};
+
+export const CARTESIA_MODELS: Array<{ id: CartesiaSettings["modelId"]; label: string; description: string }> = [
+  { id: "sonic-3.5", label: "Sonic 3.5", description: "Dernier modèle — speed / volume / émotion (émotion EN seulement)" },
+  { id: "sonic-3", label: "Sonic 3", description: "Génération précédente" },
+  { id: "sonic-latest", label: "Sonic latest", description: "Pointe toujours vers le snapshot stable le plus récent" },
+];
+
+export function getCartesiaSettings(): CartesiaSettings {
+  try {
+    const stored = readEnvironmentStorage(CARTESIA_KEY);
+    if (stored) return { ...cartesiaDefaults, ...JSON.parse(stored) };
+  } catch { /* ignore */ }
+  return { ...cartesiaDefaults };
+}
+
+export async function loadCartesiaSettingsFromDB(): Promise<CartesiaSettings> {
+  return loadFromDB(CARTESIA_KEY, cartesiaDefaults);
+}
+
+export async function saveCartesiaSettingsToDB(settings: CartesiaSettings): Promise<void> {
+  await saveToDB(CARTESIA_KEY, settings);
+}
+
+export function resetCartesiaSettings(): CartesiaSettings {
+  removeEnvironmentStorage(CARTESIA_KEY);
+  void deleteEnvironmentSetting(CARTESIA_KEY).catch(() => {});
+  return { ...cartesiaDefaults };
+}
+
 // ---------------- Active provider selection ----------------
 
 import type { TTSProviderId } from "@/services/tts/types";
@@ -278,7 +322,7 @@ import type { TTSProviderId } from "@/services/tts/types";
 const ACTIVE_KEY = "ava_tts_active_provider";
 const DEFAULT_PROVIDER: TTSProviderId = "elevenlabs";
 
-const VALID_PROVIDERS: TTSProviderId[] = ["elevenlabs", "inworld", "hume", "gradium"];
+const VALID_PROVIDERS: TTSProviderId[] = ["elevenlabs", "inworld", "hume", "gradium", "cartesia"];
 
 export function getActiveProviderId(): TTSProviderId {
   try {

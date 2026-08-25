@@ -21,6 +21,7 @@ interface ReqBody {
   language?: string;
   speakingRate?: number;
   stream?: boolean;
+  instruction?: string;
 }
 
 serve(async (req) => {
@@ -65,6 +66,7 @@ serve(async (req) => {
         streamPayload.delivery_mode = deliveryMode;
         streamPayload.language = language;
       }
+      if (body.instruction?.trim()) streamPayload.instruction = body.instruction.trim();
 
       const response = await fetch("https://api.inworld.ai/tts/v1/voice:stream", {
         method: "POST",
@@ -131,6 +133,7 @@ serve(async (req) => {
       payload.deliveryMode = deliveryMode;
       payload.language = language;
     }
+    if (body.instruction?.trim()) payload.instruction = body.instruction.trim();
 
     const response = await fetch("https://api.inworld.ai/tts/v1/voice", {
       method: "POST",

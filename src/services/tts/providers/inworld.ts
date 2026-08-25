@@ -5,6 +5,7 @@
 
 import type { TTSProvider, TTSGenerateContext, TTSGenerateResult } from "@/services/tts/types";
 import { getInworldSettings } from "@/services/tts/providerSettings";
+import { applyInworldPerformance } from "@/services/tts/performanceIntent";
 import { debugLogger } from "@/services/debugLogger";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
 import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
@@ -21,16 +22,21 @@ export const inworldProvider: TTSProvider = {
     const s = getInworldSettings();
     const preparedText = prepareTextForTTS(text);
     const voiceId = ctx?.voiceId || s.voiceId;
+    const performance = applyInworldPerformance(
+      { deliveryMode: s.deliveryMode, speakingRate: s.speakingRate },
+      ctx?.performance,
+    );
 
     const body = {
       text: preparedText,
       voiceId,
       modelId: s.modelId,
-      deliveryMode: s.deliveryMode,
+      deliveryMode: performance.deliveryMode ?? s.deliveryMode,
       language: s.language,
-      speakingRate: s.speakingRate,
+      speakingRate: performance.speakingRate ?? s.speakingRate,
       temperature: s.temperature,
       stream: false,
+      ...(performance.instruction ? { instruction: performance.instruction } : {}),
     };
 
     const startTime = Date.now();

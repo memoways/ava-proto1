@@ -53,6 +53,8 @@ export interface ResponseOutputTurnContext {
   providerId?: import("@/services/tts/types").TTSProviderId;
   /** Active character key so Gradium (and later providers) can apply per-character tuning. */
   characterKey?: string;
+  /** Per-turn acting intent forwarded to the TTS queue. */
+  performance?: import("@/services/tts/performanceIntent").PerformanceIntent;
 }
 
 export interface ResponseOutputResult {

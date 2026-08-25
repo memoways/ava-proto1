@@ -15,6 +15,7 @@ interface ReqBody {
   description?: string;
   format?: "mp3" | "wav" | "pcm";
   languageCode?: string;
+  speed?: number;
 }
 
 serve(async (req) => {
@@ -38,6 +39,7 @@ serve(async (req) => {
       voice: { name: voiceName, provider: voiceProvider },
     };
     if (body.description) utterance.description = body.description;
+    if (typeof body.speed === "number") utterance.speed = body.speed;
 
     const payload = {
       utterances: [utterance],
