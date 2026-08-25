@@ -6,6 +6,8 @@
  * v3 tags, Gradium temp/padding, Cartesia generation_config.
  */
 
+import type { TTSProviderId } from "./types";
+
 export type CanonicalEmotion =
   | "neutral"
   | "tense"
@@ -51,6 +53,45 @@ export const CANONICAL_EMOTIONS: CanonicalEmotion[] = [
   "sarcastic",
   "urgent",
 ];
+
+/** How much a provider can actually perform the canonical acting intent. */
+export type ActingUsability = "audible" | "weak" | "speed_only" | "en_emotion_only";
+
+export interface ProviderActingSupport {
+  usability: ActingUsability;
+  /** Short badge in Admin → TTS Config. */
+  labelFr: string;
+  /** One-line explanation under the badge / in the audition matrix. */
+  detailFr: string;
+}
+
+export const PROVIDER_ACTING_SUPPORT: Record<TTSProviderId, ProviderActingSupport> = {
+  hume: {
+    usability: "audible",
+    labelFr: "Oui — audible",
+    detailFr: "Description d'acting envoyée à chaque tour. C'est ici que les puces d'intention se font entendre.",
+  },
+  inworld: {
+    usability: "audible",
+    labelFr: "Oui — audible",
+    detailFr: "Instruction d'acting envoyée à chaque tour (modèle TTS-2).",
+  },
+  elevenlabs: {
+    usability: "weak",
+    labelFr: "Faible",
+    detailFr: "Sliders style / stabilité / vitesse. Tags [angry] uniquement si le modèle est eleven_v3.",
+  },
+  gradium: {
+    usability: "speed_only",
+    labelFr: "Très faible",
+    detailFr: "Température et rythme seulement — pas d'émotion nommée.",
+  },
+  cartesia: {
+    usability: "en_emotion_only",
+    labelFr: "Volume / vitesse en FR",
+    detailFr: "Speed et volume à chaque tour. Émotion nommée Cartesia uniquement si Langue = en.",
+  },
+};
 
 const ACTING_NL: Record<CanonicalEmotion, string> = {
   neutral: "neutral, conversational",

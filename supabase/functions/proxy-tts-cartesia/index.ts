@@ -5,7 +5,9 @@ import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 interface ReqBody {
@@ -48,7 +50,7 @@ serve(async (req) => {
     const payload: Record<string, unknown> = {
       model_id: modelId,
       transcript: body.text,
-      voice: { id: voiceId },
+      voice: { mode: "id", id: voiceId },
       language,
       output_format: {
         container: "mp3",
@@ -66,6 +68,7 @@ serve(async (req) => {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
+        "X-API-Key": apiKey,
         "Cartesia-Version": "2026-08-14",
         "Content-Type": "application/json",
       },

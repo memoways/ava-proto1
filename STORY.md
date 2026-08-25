@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-25 (Pilotage émotionnel TTS)
+> **Last Updated**: 2026-08-25 (Audition TTS : où l'intention s'entend)
 
 ---
 
@@ -72,6 +72,20 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-08-25 — Audition TTS : où l'intention s'entend 🔹
+
+**Le problème.** Les puces d'intention (Neutre, Colère, …) ne jouaient pas
+l'audio, et Cartesia / ElevenLabs / Gradium n'ont presque pas d'effet audible
+en français. Tester Cartesia renvoyait `Failed to fetch`.
+
+**Correctif.** TTS Config dit clairement où l'acting est utilisable (Hume et
+Inworld = oui ; ElevenLabs faible sauf v3 ; Gradium rythme ; Cartesia
+volume/vitesse, émotion nommée seulement si Langue = en). Boutons Écouter
+Hume / Inworld. Cartesia : CORS, format voix, message d'erreur si la fonction
+n'est pas déployée.
+
+Plan : [`docs/plan_tts_pilotage_emotionnel.md`](docs/plan_tts_pilotage_emotionnel.md).
 
 ### 2026-08-25 — Pilotage émotionnel TTS 🔹
 
@@ -2153,11 +2167,11 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 
 ### Dernière session
 
-**2026-08-25 — Gradium TTS par personnage**
+**2026-08-25 — Audition TTS : où l'intention s'entend**
 
-Admin TTS Config : sélecteur Max / Emma dans Gradium, réglages fins et tests
-par personnage. Runtime : `characterKey` transmis à la génération Gradium.
-Plan : [`docs/plan_gradium_tts_par_personnage.md`](docs/plan_gradium_tts_par_personnage.md).
+TTS Config : matrice d'utilisabilité de l'intention (Hume/Inworld audibles),
+boutons Écouter Hume / Inworld, Cartesia `Failed to fetch` clarifié.
+Plan : [`docs/plan_tts_pilotage_emotionnel.md`](docs/plan_tts_pilotage_emotionnel.md).
 
 **Préconditions vérifiées au départ :**
 - [x] Build passait au démarrage

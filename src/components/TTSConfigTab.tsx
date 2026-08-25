@@ -53,11 +53,14 @@ import {
 import { listCharacterRuntimeProfiles } from "@/services/experienceOrchestration";
 import {
   CANONICAL_EMOTIONS,
+  PROVIDER_ACTING_SUPPORT,
   intentFromManualEmotion,
   type CanonicalEmotion,
 } from "@/services/tts/performanceIntent";
 
 const TEST_PHRASE = "Écoute, je ne sais pas qui tu es... mais si tu sais quelque chose sur Ava, il faut me le dire maintenant. Je n'ai plus beaucoup de temps.";
+/** Intensity 2 so Hume / Inworld acting instructions are actually audible in admin tests. */
+const AUDITION_INTENSITY = 2 as const;
 const GRADIUM_CHARACTER_ORDER = ["max", "emma"];
 const AUDITION_EMOTION_LABELS: Record<CanonicalEmotion, string> = {
   neutral: "Neutre",
@@ -71,6 +74,27 @@ const AUDITION_EMOTION_LABELS: Record<CanonicalEmotion, string> = {
   sarcastic: "Sarcasme",
   urgent: "Urgent",
 };
+
+function ActingNote({
+  providerId,
+  detail,
+}: {
+  providerId: TTSProviderId;
+  detail?: string;
+}) {
+  const support = PROVIDER_ACTING_SUPPORT[providerId];
+  const tone =
+    support.usability === "audible"
+      ? "text-emerald-400/90"
+      : support.usability === "weak"
+        ? "text-amber-400/90"
+        : "text-muted-foreground";
+  return (
+    <p className={`text-xs mt-1 ${tone}`}>
+      Intention : {support.labelFr}. {detail ?? support.detailFr}
+    </p>
+  );
+}
 
 type GradiumCharacterOption = {
   character_key: string;
@@ -163,7 +187,7 @@ export default function TTSConfigTab() {
     try {
       const blob = await generateSpeech(TEST_PHRASE, {
         providerId: id,
-        performance: intentFromManualEmotion(auditionEmotionRef.current, 1),
+        performance: intentFromManualEmotion(auditionEmotionRef.current, AUDITION_INTENSITY),
       });
       await playAudioBlob(blob);
       toast.success(`Test ${id} · ${AUDITION_EMOTION_LABELS[auditionEmotionRef.current]}`);
@@ -181,7 +205,7 @@ export default function TTSConfigTab() {
       providerId: "gradium" as const,
       characterKey: character?.character_key,
       voiceId: character?.tts_voice_id ?? undefined,
-      performance: intentFromManualEmotion(auditionEmotionRef.current, 1),
+      performance: intentFromManualEmotion(auditionEmotionRef.current, AUDITION_INTENSITY),
     };
     if (mode === "rest") {
       setTesting("gradium");
@@ -339,7 +363,7 @@ export default function TTSConfigTab() {
       <div>
         <h2 className="text-lg font-semibold">TTS Config — Multi-providers</h2>
         <p className="text-sm text-muted-foreground">
-          Compare les services TTS. Le provider <strong>actif</strong> est utilisé dans le jeu ; les autres restent disponibles pour les tests. Chaque test envoie une <strong>intention de jeu</strong> (émotion) au provider.
+          Compare les services TTS. Le provider <strong>actif</strong> est utilisé dans le jeu ; les autres restent disponibles pour les tests. Les puces d'intention ne jouent pas l'audio : clique <strong>Écouter Hume</strong> ou <strong>Écouter Inworld</strong> (seuls ces deux services rendent l'acting vraiment audible).
         </p>
         <p className="text-sm text-muted-foreground">
           Les <strong>Voice ID</strong> se règlent par personnage dans Expérience → Orchestration. Gradium a des réglages fins distincts par personnage dans le panneau ci-dessous.
@@ -371,10 +395,10 @@ export default function TTSConfigTab() {
         </div>
       </section>
 
-      <section className="border rounded-lg p-4 space-y-2">
+      <section className="border rounded-lg p-4 space-y-3">
         <h3 className="font-semibold text-sm">Intention de jeu (audition)</h3>
         <p className="text-xs text-muted-foreground">
-          Appliquée à tous les boutons Tester. En jeu, l'émotion est dérivée de la réplique (plus le personnage et la mémoire GM).
+          Les puces <strong>sélectionnent</strong> une émotion — elles ne jouent rien. Tous les boutons Tester (et Écouter ci-dessous) envoient cette intention. En jeu, l'émotion est dérivée de la réplique (plus le personnage et la mémoire GM).
         </p>
         <div className="flex flex-wrap gap-2">
           {CANONICAL_EMOTIONS.map((emotion) => (
@@ -393,6 +417,29 @@ export default function TTSConfigTab() {
             </button>
           ))}
         </div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => testProvider("hume")} disabled={testing !== null}>
+            {testing === "hume" ? "..." : "🔊 Écouter Hume"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => testProvider("inworld")} disabled={testing !== null}>
+            {testing === "inworld" ? "..." : "🔊 Écouter Inworld"}
+          </Button>
+        </div>
+        <div className="rounded-md border bg-accent/20 p-3 space-y-1.5">
+          <p className="text-xs font-medium">Où l'intention est réellement utilisée</p>
+          <ul className="text-xs text-muted-foreground space-y-1">
+            {TTS_PROVIDER_LIST.map((provider) => {
+              const support = PROVIDER_ACTING_SUPPORT[provider.id];
+              return (
+                <li key={provider.id}>
+                  <span className="font-medium text-foreground">{provider.label}</span>
+                  {" — "}
+                  {support.labelFr}. {support.detailFr}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </section>
 
       {/* ===== ElevenLabs panel ===== */}
@@ -401,6 +448,14 @@ export default function TTSConfigTab() {
           <div>
             <h3 className="font-semibold text-base">🎙️ ElevenLabs</h3>
             <p className="text-xs text-muted-foreground">Réglages voix, presets, diction</p>
+            <ActingNote
+              providerId="elevenlabs"
+              detail={
+                elSettings.modelId === "eleven_v3"
+                  ? "Tags [angry] actifs (modèle eleven_v3) + sliders."
+                  : PROVIDER_ACTING_SUPPORT.elevenlabs.detailFr
+              }
+            />
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetEl}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
@@ -492,6 +547,7 @@ export default function TTSConfigTab() {
           <div>
             <h3 className="font-semibold text-base">🎙️ Inworld TTS</h3>
             <p className="text-xs text-muted-foreground">Modèles inworld-tts-1 / -max, voix multilingue</p>
+            <ActingNote providerId="inworld" />
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetIw}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
@@ -595,6 +651,7 @@ export default function TTSConfigTab() {
           <div>
             <h3 className="font-semibold text-base">🎙️ Hume AI Octave</h3>
             <p className="text-xs text-muted-foreground">Très expressif, contrôle via description prosodique</p>
+            <ActingNote providerId="hume" />
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetHu}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
@@ -667,6 +724,7 @@ export default function TTSConfigTab() {
           <div>
             <h3 className="font-semibold text-base">🎙️ Gradium TTS</h3>
             <p className="text-xs text-muted-foreground">Streaming WebSocket (fallback REST) — réglages fins par personnage</p>
+            <ActingNote providerId="gradium" />
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetGr}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
@@ -809,6 +867,15 @@ export default function TTSConfigTab() {
             <p className="text-xs text-muted-foreground">
               Volume et vitesse par tour. Les tags d'émotion Cartesia ne s'appliquent qu'en anglais — en FR ils sont omis.
             </p>
+            <ActingNote
+              providerId="cartesia"
+              detail={
+                caSettings.language.trim().toLowerCase() === "en"
+                || caSettings.language.trim().toLowerCase().startsWith("en-")
+                  ? "Langue = en : speed, volume et émotion nommée sont envoyés."
+                  : PROVIDER_ACTING_SUPPORT.cartesia.detailFr
+              }
+            />
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetCa}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
