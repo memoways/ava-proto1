@@ -1327,7 +1327,7 @@ const IndexPRD4 = () => {
             minimumHandoffTurn: directorConfig?.minimumHandoffTurn ?? 4,
             maximumHandoffsPerSession: directorConfig?.maximumHandoffsPerSession ?? 8,
             minimumTurnsBetweenHandoffs: directorConfig?.minimumTurnsBetweenHandoffs ?? 2,
-            targetReady: (targetCharacter === "emma" ? emmaProfile : maxProfile)?.ready === true,
+            targetReady: (targetCharacter === "emma" ? emmaProfile : maxProfile)?.enabled !== false,
             playedVideoIds: triggeredVideoIdsRef.current,
             availableVideoIds: videos.filter((video) => Boolean(video.video_url)).map((video) => video.id),
             lastVideoTurn: Number.isFinite(lastVideoTurnRef.current) ? lastVideoTurnRef.current : null,
@@ -1620,16 +1620,16 @@ const IndexPRD4 = () => {
       payload: { reason: source, targetCharacter: target },
     });
     try {
-      const profile = await getCharacterRuntimeReadiness(target);
-      if (!profile?.ready || !profile.ttsVoiceId) {
-        throw new Error(`La checklist runtime de ${targetName} n’est plus complète.`);
+      const profile = await getCharacterRuntimeReadiness(target).catch(() => null);
+      if (profile?.enabled === false) {
+        throw new Error(`${targetName} n’est pas activée dans Orchestration.`);
       }
       if (target === "emma") await activateTTSFallback("emma_handoff_tts_v1");
       await new Promise<void>((resolve) => window.setTimeout(resolve, 900));
       const firstContact = !hasSpokenWithCharacter(conversationRef.current, target);
       activeCharacterRef.current = target;
-      activeVoiceIdRef.current = profile.ttsVoiceId;
-      activeTTSProviderIdRef.current = asTTSProviderId(profile.ttsProvider);
+      activeVoiceIdRef.current = profile?.ttsVoiceId ?? null;
+      activeTTSProviderIdRef.current = asTTSProviderId(profile?.ttsProvider);
       handoffCountRef.current += 1;
       setSelectedCharacter(target);
       setHandoffOffer(null);
@@ -1639,7 +1639,7 @@ const IndexPRD4 = () => {
         handoffCount: handoffCountRef.current,
       });
       if (firstContact) {
-        const openingLine = profile.openingLine?.trim() || (target === "max" ? OPENING_LINE : "Allô ?");
+        const openingLine = profile?.openingLine?.trim() || (target === "max" ? OPENING_LINE : "Allô ?");
         const opening = tagSpokenWith({ role: target, content: openingLine, timestamp: Date.now() }, target);
         conversationRef.current = [...conversationRef.current, opening];
         addMessage(opening);
@@ -1649,8 +1649,8 @@ const IndexPRD4 = () => {
         await renderResponseText(openingLine, {
           turnId: `${sid ?? "local"}:${target}-opening`,
           turnIndex: conversationRef.current.filter((message) => message.role === "user").length,
-          voiceId: profile.ttsVoiceId,
-          providerId: asTTSProviderId(profile.ttsProvider) ?? undefined,
+          voiceId: profile?.ttsVoiceId ?? undefined,
+          providerId: asTTSProviderId(profile?.ttsProvider) ?? undefined,
         });
       } else {
         setHandoffCalling(false);

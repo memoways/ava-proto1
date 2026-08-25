@@ -13,47 +13,40 @@ describe("CharacterSelectScreen", () => {
     vi.mocked(getCharacterRuntimeReadiness).mockImplementation(async (characterKey) => ({
       characterKey,
       displayName: characterKey === "emma" ? "Emma" : "Max",
-      ready: characterKey === "max",
-      openingLine: null,
-      ttsProvider: null,
-      ttsVoiceId: null,
-    }));
-  });
-
-  it("keeps Max callable even when his runtime checklist is incomplete", async () => {
-    vi.mocked(getCharacterRuntimeReadiness).mockImplementation(async (characterKey) => ({
-      characterKey,
-      displayName: characterKey === "emma" ? "Emma" : "Max",
+      enabled: true,
       ready: false,
       openingLine: null,
       ttsProvider: null,
       ttsVoiceId: null,
     }));
-    render(<CharacterSelectScreen onSelect={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "Appeler Max" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Emma indisponible" })).toBeInTheDocument();
   });
 
-  it("keeps Emma locked until her runtime profile is ready", async () => {
+  it("offers Max and Emma even when the runtime checklist is incomplete", () => {
     render(<CharacterSelectScreen onSelect={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Appeler Max" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Emma indisponible" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Appeler Emma" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Ava indisponible" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Léo indisponible" })).toBeInTheDocument();
   });
 
-  it("lets the player start with Emma when she is ready", async () => {
+  it("hides Emma only when Orchestration has disabled her", async () => {
+    vi.mocked(getCharacterRuntimeReadiness).mockResolvedValue({
+      characterKey: "emma",
+      displayName: "Emma",
+      enabled: false,
+      ready: false,
+      openingLine: null,
+      ttsProvider: null,
+      ttsVoiceId: null,
+    });
+    render(<CharacterSelectScreen onSelect={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Emma indisponible" })).toBeInTheDocument());
+  });
+
+  it("starts with Emma when the player picks her", () => {
     const onSelect = vi.fn();
-    vi.mocked(getCharacterRuntimeReadiness).mockImplementation(async (characterKey) => ({
-      characterKey,
-      displayName: characterKey === "emma" ? "Emma" : "Max",
-      ready: true,
-      openingLine: characterKey === "emma" ? "Allô ?" : "Oui ?",
-      ttsProvider: "elevenlabs",
-      ttsVoiceId: "voice",
-    }));
     render(<CharacterSelectScreen onSelect={onSelect} />);
-    const emma = await screen.findByRole("button", { name: "Appeler Emma" });
-    emma.click();
+    screen.getByRole("button", { name: "Appeler Emma" }).click();
     expect(onSelect).toHaveBeenCalledWith("emma");
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Emma indisponible" })).not.toBeInTheDocument());
   });
 });

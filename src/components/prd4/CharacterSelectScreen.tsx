@@ -1,4 +1,4 @@
-/** PRD4 — Choix du protagoniste (Max toujours, Emma si ready). */
+/** PRD4 — Choix du protagoniste (Max et Emma ; Ava/Léo verrouillés). */
 import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -24,24 +24,21 @@ const CHARACTERS: { id: CharId; name: string; img: string }[] = [
 
 const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
   const [lockedDialog, setLockedDialog] = useState(false);
-  const [emmaReady, setEmmaReady] = useState(false);
+  const [emmaOn, setEmmaOn] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     void getCharacterRuntimeReadiness("emma")
       .then((profile) => {
-        if (!cancelled) setEmmaReady(profile?.ready === true);
+        if (!cancelled && profile?.enabled === false) setEmmaOn(false);
       })
       .catch(() => {
-        if (!cancelled) setEmmaReady(false);
+        // Keep Emma offered: the public path may not see the runtime RPC.
       });
     return () => { cancelled = true; };
   }, []);
 
-  // Max always opens the call (code fallbacks for opening line / TTS). Emma
-  // only if the sandbox/prod runtime checklist is complete — enabling her in
-  // Orchestration is not enough on its own.
-  const isActive = (id: CharId) => id === "max" || (id === "emma" && emmaReady);
+  const isActive = (id: CharId) => id === "max" || (id === "emma" && emmaOn);
 
   const handleLocked = (id: Exclude<CharId, "max">) => {
     setLockedDialog(true);
@@ -116,7 +113,7 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
               prototype.
               <br />
               <br />
-              Pour l'instant, tu peux appeler Max{emmaReady ? " ou Emma" : ""}.
+              Pour l'instant, tu peux appeler Max{emmaOn ? " ou Emma" : ""}.
             </DialogDescription>
           </DialogHeader>
         </DialogContent>
