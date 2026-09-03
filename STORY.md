@@ -2284,7 +2284,31 @@ continuité d’expérience (mémoire entre tours).
 
 ### Dernière session
 
-**2026-08-25 — Catch-up README / STORY après LLM as judge**
+**2026-09-03 — LLM as judge : banc d'essai lisible, pilotable, exploitable**
+
+L'onglet Qualité affichait un mode d'emploi de création de base et un
+classement brut : impossible de voir l'état du corpus Notion, de comprendre
+le scoring, ou d'en tirer une décision. Le chantier n'était donc pas de
+construire la pipeline (déjà là) mais de la rendre lisible.
+
+**Préconditions :**
+- [x] Pipeline `evalJudgePipeline.ts` fonctionnelle (RAG → GM → Max →
+  validateur → juge, OFAT, 3 passages)
+- [x] Base Notion `746db7ce…` partagée, mais quasi vide (1 ligne)
+- [x] Aucun run jamais exécuté
+
+**Postconditions :**
+- [x] `evalJudgeScoring.ts` : `auditEvalCorpus`, `weightedScore`,
+  `analyseEvalResults`, poids et seuils par défaut
+- [x] Quatre panneaux `evalJudge/` (Corpus, Leviers, Grille, Résultats)
+  intégrés dans `EvalJudgeTab.tsx`
+- [x] Poids persistés par environnement (`ava_eval_score_weights`)
+- [x] Recommandations sans appel LLM + export JSON
+- [x] Plan lot 2 documenté, CHANGELOG 0.31.0, tests verts
+- [ ] Corpus Notion à rédiger par l'équipe (≥ 5 questions complètes) pour
+  débloquer le premier run
+
+**Session précédente — 2026-08-25 — Catch-up README / STORY après LLM as judge**
 
 CHANGELOG 0.27–0.30 et Feature Chronicle couvraient déjà la vague Emma →
 TTS → lisibilité → LLM as judge, mais le README restait sur les bannières
