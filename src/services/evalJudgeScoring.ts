@@ -167,7 +167,7 @@ export function auditEvalCorpus(items: EvalItem[]): CorpusAudit {
     }
     if (!item.must_include.trim()) {
       messages.push("Aucun « Must include » : le juge ne peut pas vérifier les faits attendus.");
-      level = level === "error" ? "error" : "error";
+      level = "error";
     }
     if (!item.must_not.trim()) {
       messages.push("Aucun « Must not » : les interdits ne seront pas contrôlés.");
