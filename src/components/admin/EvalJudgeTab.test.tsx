@@ -13,6 +13,15 @@ vi.mock("@/services/evalJudgeStore", () => ({
   insertEvalResult: vi.fn(),
 }));
 
+vi.mock("@/services/evalJudgeScoring", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/evalJudgeScoring")>();
+  return {
+    ...actual,
+    loadScoreWeights: vi.fn(async () => actual.DEFAULT_SCORE_WEIGHTS),
+    saveScoreWeights: vi.fn(),
+  };
+});
+
 vi.mock("@/services/settingsService", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services/settingsService")>();
   return {
@@ -42,16 +51,19 @@ describe("EvalJudgeTab", () => {
     vi.clearAllMocks();
   });
 
-  it("shows the Notion schema and OFAT launch controls", async () => {
+  it("renders the four guided steps", async () => {
     render(<EvalJudgeTab />);
     expect(await screen.findByRole("heading", { name: /LLM as judge/i })).toBeTruthy();
-    expect(screen.getAllByText("Reponse visee").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Must include").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "Lancer" })).toBeTruthy();
-    expect(screen.getByText(/configs ×/)).toBeTruthy();
-    expect(screen.getAllByText("Gemini 2.5 Flash").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Claude Sonnet 4").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Mistral Large 2411").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Même liste que LLM Config/)).toBeTruthy();
+    expect(screen.getByText(/Étape 2 —/)).toBeTruthy();
+    expect(screen.getByText(/Étape 3 —/)).toBeTruthy();
+    expect(screen.getByText(/Étape 4 —/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Lancer le test/ })).toBeTruthy();
+  });
+
+  it("blocks the run while the Notion corpus is empty", async () => {
+    render(<EvalJudgeTab />);
+    const button = await screen.findByRole("button", { name: /Lancer le test/ });
+    expect(button).toHaveProperty("disabled", true);
+    expect(screen.getAllByText(/Aucune question active/).length).toBeGreaterThan(0);
   });
 });

@@ -2,8 +2,10 @@
 
 ## En cours
 
-- Vérifier le mécanisme sandbox et documenter ce qui est partagé vs isolé.
-- Ajouter une page admin « Mon compte / Mode d'emploi sandbox » vulgarisée.
+- Rédiger le corpus de questions dans la base Notion « AVA LLM-as-judge »
+  (min. 5 lignes complètes, idéalement les 4 catégories) puis lancer un
+  premier test dans Qualité → LLM as judge.
+
 
 ## À court terme
 
