@@ -8,6 +8,13 @@ import {
 } from "@/services/adminNavigation";
 
 describe("Admin navigation invariants", () => {
+  it("exposes the account / sandbox guide group first", () => {
+    const account = TAB_GROUPS[0];
+    expect(account?.id).toBe("account");
+    expect(account?.path).toBe("mon-compte");
+    expect(account?.tabs.map((tab) => tab.id)).toEqual(["sandbox-guide"]);
+  });
+
   it("keeps every protected Technique avancée page visible", () => {
     const technique = TAB_GROUPS.find((group) => group.id === "tech");
     expect(technique?.label).toContain("Technique avancée");
@@ -56,9 +63,15 @@ describe("Admin navigation invariants", () => {
     expect(adminTabPath("llm")).toBe("/admin/technique/configuration-llm");
     expect(adminTabPath("latency")).toBe("/admin/qualite/latence-et-blocages");
     expect(adminTabPath("eval-judge")).toBe("/admin/qualite/llm-as-judge");
+    expect(adminTabPath("sandbox-guide")).toBe("/admin/mon-compte/mode-emploi");
   });
 
   it("resolves canonical pages and session detail URLs", () => {
+    expect(resolveAdminPath("/admin/mon-compte/mode-emploi")).toEqual({
+      group: "account",
+      tab: "sandbox-guide",
+      sessionId: null,
+    });
     expect(resolveAdminPath("/admin/experience/reglages-game-master")).toEqual({
       group: "experience",
       tab: "gm-settings",

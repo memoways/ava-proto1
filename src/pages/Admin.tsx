@@ -34,6 +34,7 @@ import StreamingAvatarUsageTab from "@/components/admin/StreamingAvatarUsageTab"
 import VideosListTab from "@/components/admin/VideosListTab";
 import StreamingAvatarConfigTab from "@/components/StreamingAvatarConfigTab";
 import AlertsTab from "@/components/admin/AlertsTab";
+import SandboxGuideTab from "@/components/admin/SandboxGuideTab";
 import ExperienceArchitectureTab from "@/components/ExperienceArchitectureTab";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -495,6 +496,11 @@ export default function Admin() {
             </div>
           )}
 
+
+          {/* ==================== ACCOUNT / SANDBOX GUIDE ==================== */}
+          <TabsContent value="sandbox-guide">
+            <SandboxGuideTab />
+          </TabsContent>
 
           {/* ==================== SESSIONS ==================== */}
           <TabsContent value="sessions">
