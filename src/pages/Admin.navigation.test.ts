@@ -63,6 +63,7 @@ describe("Admin navigation invariants", () => {
     expect(adminTabPath("llm")).toBe("/admin/technique/configuration-llm");
     expect(adminTabPath("latency")).toBe("/admin/qualite/latence-et-blocages");
     expect(adminTabPath("eval-judge")).toBe("/admin/qualite/llm-as-judge");
+    expect(adminTabPath("sandbox-guide")).toBe("/admin/mon-compte/mode-emploi");
   });
 
   it("resolves canonical pages and session detail URLs", () => {
