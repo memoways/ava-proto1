@@ -497,6 +497,11 @@ export default function Admin() {
           )}
 
 
+          {/* ==================== ACCOUNT / SANDBOX GUIDE ==================== */}
+          <TabsContent value="sandbox-guide">
+            <SandboxGuideTab />
+          </TabsContent>
+
           {/* ==================== SESSIONS ==================== */}
           <TabsContent value="sessions">
             <SessionsTab
