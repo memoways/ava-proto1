@@ -1,19 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, Pause, Play, RefreshCw, Scale } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { listLlmConfigModels } from "@/services/settingsService";
 import {
   EVAL_DEFAULT_JUDGE_MODEL,
-  EVAL_NOTION_COLUMNS,
   EVAL_REPEATS,
   buildOfatConfigs,
   defaultOfatSelection,
@@ -21,18 +13,23 @@ import {
   judgeIsolatedEvalTurn,
   listEvalMaxModels,
   listEvalWorkItems,
-  rankConfigs,
   resultWorkKey,
   runIsolatedEvalTurn,
   snapshotLiveSettings,
-  strongestFactor,
   type EvalItem,
   type EvalResult,
   type EvalRun,
   type EvalTurnConfig,
   type OfatSelection,
-  type RankedConfig,
 } from "@/services/evalJudgePipeline";
+import {
+  DEFAULT_SCORE_WEIGHTS,
+  analyseEvalResults,
+  auditEvalCorpus,
+  loadScoreWeights,
+  saveScoreWeights,
+  type EvalScoreWeights,
+} from "@/services/evalJudgeScoring";
 import {
   createEvalRun,
   fetchEvalItems,
@@ -44,16 +41,10 @@ import {
   saveEvalNotionDatabaseId,
   syncEvalItemsFromNotion,
 } from "@/services/evalJudgeStore";
-
-function formatUsd(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return `$${value.toFixed(3)}`;
-}
-
-function latencyFrom(row: EvalResult): { total_ms?: number } | null {
-  const latencies = row.latencies as { total_ms?: number } | null;
-  return latencies && typeof latencies === "object" ? latencies : null;
-}
+import EvalCorpusPanel from "./evalJudge/EvalCorpusPanel";
+import EvalLeversPanel, { type LeverToggles } from "./evalJudge/EvalLeversPanel";
+import EvalResultsPanel from "./evalJudge/EvalResultsPanel";
+import EvalScoringPanel from "./evalJudge/EvalScoringPanel";
 
 export default function EvalJudgeTab() {
   const [notionId, setNotionId] = useState("");
@@ -64,15 +55,19 @@ export default function EvalJudgeTab() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [running, setRunning] = useState(false);
+  const [savingWeights, setSavingWeights] = useState(false);
   const [progressLabel, setProgressLabel] = useState("");
   const [judgeModel, setJudgeModel] = useState(EVAL_DEFAULT_JUDGE_MODEL);
   const [extraModels, setExtraModels] = useState<string[]>([]);
   const extraModelsReady = useRef(false);
-  const [tempZero, setTempZero] = useState(true);
-  const [tempHigh, setTempHigh] = useState(true);
-  const [ragConservative, setRagConservative] = useState(true);
-  const [ragGenerous, setRagGenerous] = useState(true);
-  const [drill, setDrill] = useState<{ label: string; rows: EvalResult[] } | null>(null);
+  const [weights, setWeights] = useState<EvalScoreWeights>({ ...DEFAULT_SCORE_WEIGHTS });
+  const [toggles, setToggles] = useState<LeverToggles>({
+    tempZero: true,
+    tempHigh: true,
+    ragConservative: true,
+    ragGenerous: true,
+  });
+  const [drillLabel, setDrillLabel] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const pauseRef = useRef(false);
 
@@ -92,43 +87,58 @@ export default function EvalJudgeTab() {
   const selection: OfatSelection = useMemo(() => ({
     extraModels,
     samplingTemps: [
-      ...(tempZero ? [0] : []),
-      ...(tempHigh ? [0.8] : []),
+      ...(toggles.tempZero ? [0] : []),
+      ...(toggles.tempHigh ? [0.8] : []),
     ],
     ragVariants: [
-      ...(ragConservative ? ofatDefaults.ragVariants.filter((variant) => variant.key === "conservative") : []),
-      ...(ragGenerous ? ofatDefaults.ragVariants.filter((variant) => variant.key === "generous") : []),
+      ...(toggles.ragConservative ? ofatDefaults.ragVariants.filter((variant) => variant.key === "conservative") : []),
+      ...(toggles.ragGenerous ? ofatDefaults.ragVariants.filter((variant) => variant.key === "generous") : []),
     ],
-  }), [extraModels, ofatDefaults.ragVariants, ragConservative, ragGenerous, tempHigh, tempZero]);
+  }), [extraModels, ofatDefaults.ragVariants, toggles]);
 
   const configs = useMemo(() => buildOfatConfigs(live, selection), [live, selection]);
-  const activeItems = useMemo(() => items.filter((item) => item.active), [items]);
+  const audit = useMemo(() => auditEvalCorpus(items), [items]);
+  const activeItems = useMemo(
+    () => {
+      const usable = new Set(
+        audit.issues.filter((issue) => issue.level !== "error").map((issue) => issue.itemId),
+      );
+      return items.filter((item) => item.active && usable.has(item.id));
+    },
+    [audit.issues, items],
+  );
   const estimate = useMemo(
     () => estimateEvalRun(activeItems.length, configs, EVAL_REPEATS),
     [activeItems.length, configs],
   );
-  const ranked: RankedConfig[] = useMemo(
-    () => rankConfigs(results.map((row) => ({
-      config_label: row.config_label,
-      factor: row.factor,
-      overall_score: row.overall_score,
-      latencies: latencyFrom(row),
-    }))),
-    [results],
+  const runConfigs = useMemo(() => {
+    const stored = (activeRun?.ofat_config as { configs?: EvalTurnConfig[] } | null)?.configs;
+    return stored?.length ? stored : configs;
+  }, [activeRun, configs]);
+  const analysis = useMemo(
+    () => analyseEvalResults({ results, items, configs: runConfigs, weights }),
+    [items, results, runConfigs, weights],
   );
-  const factorWinner = useMemo(() => strongestFactor(ranked), [ranked]);
+  const lastSyncAt = useMemo(
+    () => items.reduce<string | null>((latest, item) => (
+      !latest || item.synced_at > latest ? item.synced_at : latest
+    ), null),
+    [items],
+  );
 
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [id, nextItems, nextRuns] = await Promise.all([
+      const [id, nextItems, nextRuns, storedWeights] = await Promise.all([
         loadEvalNotionDatabaseId(),
         fetchEvalItems(),
         fetchEvalRuns(),
+        loadScoreWeights(),
       ]);
       setNotionId(id);
       setItems(nextItems);
       setRuns(nextRuns);
+      setWeights(storedWeights);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     } finally {
@@ -149,16 +159,28 @@ export default function EvalJudgeTab() {
     }
   }
 
+  async function handleSaveWeights() {
+    setSavingWeights(true);
+    try {
+      await saveScoreWeights(weights);
+      toast.success("Poids enregistrés pour cet environnement");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSavingWeights(false);
+    }
+  }
+
   async function handleSync() {
     if (!notionId.trim()) {
-      toast.error("Colle l’ID de la base Notion avant de synchroniser");
+      toast.error("Colle l’ID de la base Notion avant d’importer");
       return;
     }
     setSyncing(true);
     try {
       await saveEvalNotionDatabaseId(notionId);
       const report = await syncEvalItemsFromNotion(notionId);
-      toast.success(`${report.items_upserted} item(s) synchronisé(s)`);
+      toast.success(`${report.items_upserted} question(s) importée(s)`);
       await reload();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
@@ -176,14 +198,14 @@ export default function EvalJudgeTab() {
     }
   }
 
-  async function executeRun(run: EvalRun, runConfigs: EvalTurnConfig[], existing: EvalResult[]) {
+  async function executeRun(run: EvalRun, nextConfigs: EvalTurnConfig[], existing: EvalResult[]) {
     const controller = new AbortController();
     abortRef.current = controller;
     pauseRef.current = false;
     setRunning(true);
     await patchEvalRun(run.id, { status: "running", started_at: run.started_at ?? new Date().toISOString() });
     const done = new Set(existing.map(resultWorkKey));
-    const queue = listEvalWorkItems(runConfigs, activeItems, run.repeats, done);
+    const queue = listEvalWorkItems(nextConfigs, activeItems, run.repeats, done);
     let completed = existing.length;
     const acc = [...existing];
     try {
@@ -191,7 +213,7 @@ export default function EvalJudgeTab() {
         if (pauseRef.current) {
           await patchEvalRun(run.id, { status: "paused", current_index: completed });
           setActiveRun({ ...run, status: "paused", current_index: completed });
-          toast.message("Run en pause");
+          toast.message("Test en pause");
           return;
         }
         if (controller.signal.aborted) return;
@@ -219,13 +241,13 @@ export default function EvalJudgeTab() {
         finished_at: new Date().toISOString(),
       });
       setActiveRun({ ...run, status: "done", current_index: completed });
-      toast.success("Run terminé");
+      toast.success("Test terminé");
       await reload();
     } catch (error) {
       if (pauseRef.current || (error instanceof DOMException && error.name === "AbortError")) {
         await patchEvalRun(run.id, { status: "paused", current_index: completed });
         setActiveRun({ ...run, status: "paused", current_index: completed });
-        toast.message("Run en pause");
+        toast.message("Test en pause");
         return;
       }
       const message = error instanceof Error ? error.message : String(error);
@@ -240,19 +262,19 @@ export default function EvalJudgeTab() {
   }
 
   async function handleStart() {
-    if (activeItems.length === 0) {
-      toast.error("Aucun item actif. Synchronise Notion d’abord.");
+    if (!audit.readyToRun || activeItems.length === 0) {
+      toast.error(audit.blockers[0] ?? "Corpus insuffisant");
       return;
     }
     const currentLive = snapshotLiveSettings();
     const currentConfigs = buildOfatConfigs(currentLive, selection);
     const currentEstimate = estimateEvalRun(activeItems.length, currentConfigs, EVAL_REPEATS);
-    if (!window.confirm(`Lancer ${currentEstimate.turns} tours (~${currentEstimate.llmCalls} appels LLM, ~${formatUsd(currentEstimate.estimatedCostUsd)}) ?`)) {
+    if (!window.confirm(`Lancer ${currentEstimate.turns} tours (~${currentEstimate.llmCalls} appels LLM, ~$${currentEstimate.estimatedCostUsd.toFixed(3)}) ?`)) {
       return;
     }
     try {
       const run = await createEvalRun({
-        baseline: currentLive,
+        baseline: { ...currentLive, scoreWeights: weights } as typeof currentLive,
         configs: currentConfigs,
         judgeModel,
         repeats: EVAL_REPEATS,
@@ -269,11 +291,11 @@ export default function EvalJudgeTab() {
 
   async function handleResume(run: EvalRun) {
     const stored = (run.ofat_config as { configs?: EvalTurnConfig[] } | null)?.configs;
-    const runConfigs = stored?.length ? stored : configs;
+    const nextConfigs = stored?.length ? stored : configs;
     const existing = await fetchEvalResults(run.id);
     setResults(existing);
     setActiveRun(run);
-    await executeRun(run, runConfigs, existing);
+    await executeRun(run, nextConfigs, existing);
   }
 
   function handlePause() {
@@ -282,7 +304,9 @@ export default function EvalJudgeTab() {
   }
 
   function exportRun() {
-    const blob = new Blob([JSON.stringify({ run: activeRun, results, ranked }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ run: activeRun, weights, results, analysis }, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -299,10 +323,10 @@ export default function EvalJudgeTab() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">LLM as judge — tours isolés</h2>
-          <p className="text-sm text-muted-foreground max-w-3xl">
-            Pipeline texte réel (RAG → GM → Max → validateur), sans voix. OFAT sur modèle, sampling et RAG.
-            Trois passages par question. Le juge compare à la cible Notion (or + grille).
+          <h2 className="text-lg font-semibold">LLM as judge — banc d’essai des réponses de Max</h2>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Quatre étapes : vérifier le corpus Notion, choisir ce qu’on compare, régler la grille de notation, lire les
+            résultats et les recommandations. Chaque question est jouée trois fois, sans mémoire entre les questions.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => void reload()} disabled={loading}>
@@ -310,249 +334,60 @@ export default function EvalJudgeTab() {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Corpus Notion</CardTitle>
-          <CardDescription>
-            Crée une database avec ces colonnes. L’ID Storygami Home est déjà
-            branché ; tu peux le surcharger ici. La sync ne crée pas d’embeddings.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {EVAL_NOTION_COLUMNS.map((column) => (
-              <Badge key={column.name} variant="outline">{column.name}</Badge>
-            ))}
-          </div>
-          <ul className="text-xs text-muted-foreground space-y-1">
-            {EVAL_NOTION_COLUMNS.map((column) => (
-              <li key={column.name}><span className="font-medium text-foreground">{column.name}</span> ({column.type}) — {column.note}</li>
-            ))}
-          </ul>
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-[260px] flex-1">
-              <Label htmlFor="eval-notion-id">ID de la base Notion</Label>
-              <Input id="eval-notion-id" value={notionId} onChange={(event) => setNotionId(event.target.value)} placeholder="32 caractères hex" />
-            </div>
-            <Button variant="outline" onClick={() => void handleSaveNotionId()}>Enregistrer l’ID</Button>
-            <Button onClick={() => void handleSync()} disabled={syncing}>
-              {syncing ? "Sync…" : "Synchroniser"}
-            </Button>
-          </div>
-          <p className="text-sm">{activeItems.length} item(s) actif(s) / {items.length} synchronisé(s).</p>
-          {items.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ordre</TableHead>
-                  <TableHead>Question</TableHead>
-                  <TableHead>Catégorie</TableHead>
-                  <TableHead>Actif</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>{item.sort_order}</TableCell>
-                    <TableCell className="max-w-md truncate">{item.question}</TableCell>
-                    <TableCell>{item.category || "—"}</TableCell>
-                    <TableCell>{item.active ? "oui" : "non"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : null}
-        </CardContent>
-      </Card>
+      <EvalCorpusPanel
+        notionId={notionId}
+        onNotionIdChange={setNotionId}
+        onSaveNotionId={() => void handleSaveNotionId()}
+        onSync={() => void handleSync()}
+        syncing={syncing}
+        items={items}
+        audit={audit}
+        lastSyncAt={lastSyncAt}
+      />
+
+      <EvalLeversPanel
+        live={live}
+        liveModelLabel={liveCatalogModel?.label ?? live.model}
+        catalog={catalog}
+        evalModels={evalMaxModels}
+        extraModels={extraModels}
+        onExtraModelsChange={setExtraModels}
+        judgeModel={judgeModel}
+        onJudgeModelChange={setJudgeModel}
+        toggles={toggles}
+        onTogglesChange={setToggles}
+        estimate={estimate}
+        onStart={() => void handleStart()}
+        onPause={handlePause}
+        onResume={() => activeRun && void handleResume(activeRun)}
+        running={running}
+        canResume={Boolean(activeRun && (activeRun.status === "paused" || activeRun.status === "failed"))}
+        blocked={!audit.readyToRun}
+        blockedReason={audit.blockers[0] ?? null}
+        progress={progress}
+        progressLabel={progressLabel || `${results.length}/${activeRun?.total_turns ?? 0}`}
+      />
+
+      <EvalScoringPanel
+        weights={weights}
+        onChange={setWeights}
+        onSave={() => void handleSaveWeights()}
+        saving={savingWeights}
+      />
+
+      <EvalResultsPanel
+        analysis={analysis}
+        results={results}
+        items={items}
+        onExport={exportRun}
+        canExport={Boolean(activeRun)}
+        drillLabel={drillLabel}
+        onDrill={setDrillLabel}
+      />
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Leviers OFAT</CardTitle>
-          <CardDescription>
-            Référence = réglages live ({liveCatalogModel?.label ?? live.model}, temp {live.temperature}, RAG k={live.ragTopK}). Un facteur à la fois.
-            Les modèles sont le catalogue de Technique → LLM Config.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Modèles Max à comparer</Label>
-            <p className="text-xs text-muted-foreground">
-              Même liste que LLM Config. La référence live est toujours dans le run. Coche les autres modèles Max à tester.
-            </p>
-            <label className="flex items-start gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-              <Checkbox checked disabled className="mt-0.5" />
-              <span>
-                <span className="font-medium">{liveCatalogModel?.label ?? live.model}</span>
-                <span className="text-muted-foreground"> — référence live</span>
-              </span>
-            </label>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {evalMaxModels.map((model) => {
-                const checked = extraModels.includes(model.id);
-                return (
-                  <label key={model.id} className="flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
-                    <Checkbox
-                      checked={checked}
-                      className="mt-0.5"
-                      onCheckedChange={(value) => {
-                        const on = value === true;
-                        setExtraModels((current) => {
-                          if (on) return current.includes(model.id) ? current : [...current, model.id];
-                          return current.filter((id) => id !== model.id);
-                        });
-                      }}
-                    />
-                    <span>
-                      <span className="font-medium">{model.label}</span>
-                      <span className="block font-mono text-[11px] text-muted-foreground">{model.id}</span>
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-            <div>
-              <Label>Modèle juge (température 0)</Label>
-              <Select value={judgeModel} onValueChange={setJudgeModel}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {catalog.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>{model.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-6">
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={tempZero} onCheckedChange={(value) => setTempZero(value === true)} />
-              Sampling temp 0
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={tempHigh} onCheckedChange={(value) => setTempHigh(value === true)} />
-              Sampling temp 0.8
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={ragConservative} onCheckedChange={(value) => setRagConservative(value === true)} />
-              RAG conservateur
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={ragGenerous} onCheckedChange={(value) => setRagGenerous(value === true)} />
-              RAG généreux
-            </label>
-          </div>
-          <p className="text-sm">
-            {estimate.configs} configs × {estimate.items} questions × {estimate.repeats} = <strong>{estimate.turns} tours</strong>
-            {" "}(~{estimate.llmCalls} appels LLM, {formatUsd(estimate.estimatedCostUsd)}).
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => void handleStart()} disabled={running}>
-              <Play className="mr-2 h-4 w-4" /> Lancer
-            </Button>
-            {running ? (
-              <Button variant="outline" onClick={handlePause}>
-                <Pause className="mr-2 h-4 w-4" /> Pause
-              </Button>
-            ) : null}
-            {activeRun && (activeRun.status === "paused" || activeRun.status === "failed") && !running ? (
-              <Button variant="secondary" onClick={() => void handleResume(activeRun)}>Reprendre</Button>
-            ) : null}
-          </div>
-          {running || progressLabel ? (
-            <div className="space-y-2">
-              <Progress value={progress} />
-              <p className="text-xs text-muted-foreground">{progressLabel || `${results.length}/${activeRun?.total_turns ?? 0}`}</p>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <div>
-            <CardTitle className="text-base">Classement</CardTitle>
-            <CardDescription>
-              {factorWinner
-                ? `Levier le plus fort : ${factorWinner.factor} (Δ moyen ${factorWinner.absDelta})`
-                : "Lance un run pour comparer les deltas vs la référence live."}
-            </CardDescription>
-          </div>
-          <Button variant="outline" size="sm" onClick={exportRun} disabled={!activeRun}>
-            <Download className="mr-2 h-4 w-4" /> Export JSON
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {ranked.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Pas encore de scores.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Config</TableHead>
-                  <TableHead>Facteur</TableHead>
-                  <TableHead>Moyenne</TableHead>
-                  <TableHead>±</TableHead>
-                  <TableHead>Δ vs live</TableHead>
-                  <TableHead>Latence méd.</TableHead>
-                  <TableHead>n</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ranked.map((row) => (
-                  <TableRow
-                    key={row.label}
-                    className="cursor-pointer"
-                    onClick={() => setDrill({
-                      label: row.label,
-                      rows: results.filter((result) => result.config_label === row.label),
-                    })}
-                  >
-                    <TableCell>{row.label}</TableCell>
-                    <TableCell>{row.factor}</TableCell>
-                    <TableCell>{row.mean.toFixed(2)}</TableCell>
-                    <TableCell>{row.stddev.toFixed(2)}</TableCell>
-                    <TableCell className={row.delta > 0 ? "text-emerald-400" : row.delta < 0 ? "text-red-400" : ""}>
-                      {row.delta > 0 ? "+" : ""}{row.delta.toFixed(2)}
-                    </TableCell>
-                    <TableCell>{row.medianLatencyMs == null ? "—" : `${Math.round(row.medianLatencyMs)} ms`}</TableCell>
-                    <TableCell>{row.n}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {drill ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Scale className="h-4 w-4" /> {drill.label}
-            </CardTitle>
-            <CardDescription>Trois passages par question. Clique une autre ligne pour changer.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {drill.rows.map((row) => {
-              const item = items.find((candidate) => candidate.id === row.item_id);
-              const judge = row.judge_json as { rationale?: string; overall?: number } | null;
-              return (
-                <div key={row.id} className="border-b pb-3 text-sm">
-                  <p className="font-medium">{item?.question ?? row.item_id} · passage {row.repeat_index}</p>
-                  <p className="whitespace-pre-wrap mt-1">{row.max_response || "—"}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    overall {row.overall_score ?? "—"} — {judge?.rationale || row.error_message || ""}
-                  </p>
-                </div>
-              );
-            })}
-            <Button variant="ghost" size="sm" onClick={() => setDrill(null)}>Fermer</Button>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Runs précédents</CardTitle>
+          <CardTitle className="text-base">Tests précédents</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {runs.map((run) => (
@@ -567,7 +402,7 @@ export default function EvalJudgeTab() {
               ) : null}
             </div>
           ))}
-          {runs.length === 0 ? <p className="text-sm text-muted-foreground">Aucun run.</p> : null}
+          {runs.length === 0 ? <p className="text-sm text-muted-foreground">Aucun test lancé pour l’instant.</p> : null}
         </CardContent>
       </Card>
     </div>
