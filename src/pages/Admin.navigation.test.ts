@@ -8,6 +8,13 @@ import {
 } from "@/services/adminNavigation";
 
 describe("Admin navigation invariants", () => {
+  it("exposes the account / sandbox guide group first", () => {
+    const account = TAB_GROUPS[0];
+    expect(account?.id).toBe("account");
+    expect(account?.path).toBe("mon-compte");
+    expect(account?.tabs.map((tab) => tab.id)).toEqual(["sandbox-guide"]);
+  });
+
   it("keeps every protected Technique avancée page visible", () => {
     const technique = TAB_GROUPS.find((group) => group.id === "tech");
     expect(technique?.label).toContain("Technique avancée");
