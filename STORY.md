@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-08-25 (catch-up README + LLM as judge)
+> **Last Updated**: 2026-09-03 (LLM as judge — banc d'essai lisible et pilotable)
 
 ---
 
@@ -72,6 +72,28 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-09-03 — LLM as judge : banc d'essai lisible et pilotable 🔷
+
+**Le problème.** La pipeline existait (RAG → GM → Max → validateur → juge,
+OFAT, 3 passages) mais l'onglet était cryptique : aucun état de santé du
+corpus Notion, aucune explication du scoring, aucune analyse. Zéro run lancé,
+une seule ligne dans la base Notion.
+
+**Correctif.** Quatre étapes guidées : **Corpus** (santé de la base Notion,
+ce qui manque ligne par ligne, verrou sous 5 questions complètes) →
+**Leviers** (modèles Max du catalogue LLM Config, température, RAG, modèle
+juge, estimation coût / durée, pause-reprise) → **Grille** (6 critères
+pondérables, persistés par environnement) → **Résultats** (classement avec
+Δ vs config actuelle, stabilité entre passages, points faibles par critère et
+catégorie, recommandations calculées sans appel LLM avec la page où appliquer
+le changement, drill-down, export JSON).
+
+Moteur : `src/services/evalJudgeScoring.ts`. Hors périmètre respecté : aucun
+prompt Max / GM / validateur ni STT/TTS touché. Reste à faire : rédiger le
+corpus dans Notion pour débloquer le premier run.
+
+Plan : [`docs/plan_llm_as_judge.md`](docs/plan_llm_as_judge.md).
 
 ### 2026-08-25 — LLM as judge, tours isolés 🔹
 

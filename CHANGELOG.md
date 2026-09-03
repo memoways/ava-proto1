@@ -4,6 +4,41 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [0.31.0] — 2026-09-03 — LLM as judge : banc d'essai lisible et pilotable
+
+### Ajouté
+
+- Onglet **Qualité → LLM as judge** reconstruit en quatre étapes explicites :
+  1. **Corpus Notion** (`EvalCorpusPanel`) — lien direct vers la base, bouton
+     Synchroniser, date du dernier import, compteurs importées / actives /
+     complètes, répartition par catégorie, tableau ligne par ligne avec ce qui
+     manque. Lancement verrouillé sous 5 questions complètes
+     (`EVAL_MIN_ITEMS`).
+  2. **Leviers** (`EvalLeversPanel`) — rappel des réglages réellement utilisés
+     et de la page où les changer, choix des modèles Max (catalogue LLM
+     Config), variantes température et RAG en cases à cocher, modèle juge,
+     estimation tours / appels / coût / durée, lancement, pause, reprise.
+  3. **Grille de notation** (`EvalScoringPanel`) — six critères pondérables
+     (0-5, pas de 0.5) : must_not 3, character_voice 2.5, must_include 2,
+     tone 1.5, gold_fidelity 1, length 1. Persistés par environnement
+     (`ava_eval_score_weights`).
+  4. **Résultats** (`EvalResultsPanel`) — classement des configurations (note
+     pondérée, écart entre les 3 passages, Δ vs config actuelle, latence
+     médiane, coût, marquage « instable » > 1.5 d'écart-type), points faibles
+     par critère et par catégorie, recommandations calculées **sans appel
+     LLM** (bruit 0.15, écart significatif 0.3) avec la page où appliquer le
+     changement, drill-down par question, export JSON.
+- Moteur d'audit et d'analyse `src/services/evalJudgeScoring.ts` :
+  `auditEvalCorpus`, `weightedScore`, `analyseEvalResults`, poids par défaut
+  et seuils de bruit.
+
+### Inchangé (hors périmètre)
+
+- Prompts Max / Game Master / validateur, STT/TTS, sessions scriptées et
+  rédaction du corpus (équipe, dans Notion).
+
+Plan : [`docs/plan_llm_as_judge.md`](docs/plan_llm_as_judge.md).
+
 ## [0.30.0] — 2026-08-25 — LLM as judge (tours isolés)
 
 ### Ajouté
