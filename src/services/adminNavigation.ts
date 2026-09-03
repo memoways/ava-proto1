@@ -52,7 +52,7 @@ export function resolveAdminPath(pathname: string): AdminLocation | null {
   const segments = pathname.split("/").filter(Boolean);
   if (segments[0] !== "admin" || segments.length < 3) return null;
   const group = [...TAB_GROUPS, LEGACY_GROUP].find((candidate) => candidate.path === segments[1]);
-  const tab = group?.tabs.find((candidate) => candidate.tabPath === segments[2]);
+  const tab = group?.tabs.find((candidate) => candidate.path === segments[2]);
   if (!group || !tab) return null;
 
   let sessionId: string | null = null;
