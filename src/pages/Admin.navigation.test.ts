@@ -67,6 +67,11 @@ describe("Admin navigation invariants", () => {
   });
 
   it("resolves canonical pages and session detail URLs", () => {
+    expect(resolveAdminPath("/admin/mon-compte/mode-emploi")).toEqual({
+      group: "account",
+      tab: "sandbox-guide",
+      sessionId: null,
+    });
     expect(resolveAdminPath("/admin/experience/reglages-game-master")).toEqual({
       group: "experience",
       tab: "gm-settings",
