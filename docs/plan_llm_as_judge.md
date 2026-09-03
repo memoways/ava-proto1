@@ -43,3 +43,37 @@ Qualité (`admin_settings.ava_eval_notion_database_id`).
 
 Session scriptée, variantes de system prompt / GM / validateur, STT/TTS,
 grille cartésienne, rédaction des 15 questions par l’agent.
+
+## Lot 2 — Banc d'essai lisible et pilotable (implémenté)
+
+Objectif : rendre la pipeline compréhensible et exploitable, sans changer les
+prompts Max / GM / validateur.
+
+Onglet `Qualité → LLM as judge` en quatre étapes :
+
+1. **Corpus Notion** (`EvalCorpusPanel`) — lien direct vers la base, bouton
+   Synchroniser, date du dernier import, compteurs importées / actives /
+   complètes, répartition par catégorie, tableau ligne par ligne avec l'état
+   (complète / incomplète / inutilisable) et le détail de ce qui manque.
+   Le lancement est verrouillé sous 5 questions complètes (`EVAL_MIN_ITEMS`).
+2. **Leviers** (`EvalLeversPanel`) — rappel des réglages réellement utilisés et
+   de la page où les changer, choix des modèles Max comparés (même catalogue que
+   LLM Config), variantes température et RAG en cases à cocher explicites,
+   modèle juge, estimation tours / appels / coût / durée, lancement, pause,
+   reprise.
+3. **Grille de notation** (`EvalScoringPanel`) — six critères pondérables
+   (0-5, pas de 0.5), poids par défaut : must_not 3, character_voice 2.5,
+   must_include 2, tone 1.5, gold_fidelity 1, length 1. Persistés par
+   environnement (`ava_eval_score_weights`).
+4. **Résultats** (`EvalResultsPanel`) — classement des configurations avec note
+   pondérée, écart entre les 3 passages, Δ vs configuration actuelle, latence
+   médiane, coût, marquage « instable » au-delà de 1.5 d'écart-type ; points
+   faibles par critère et par catégorie ; recommandations calculées sans appel
+   LLM (seuil de bruit 0.15, écart significatif 0.3) avec la page où appliquer
+   le changement ; drill-down par question ; export JSON.
+
+Moteur : `src/services/evalJudgeScoring.ts` (`auditEvalCorpus`,
+`weightedScore`, `analyseEvalResults`, poids par défaut et seuils).
+
+Hors périmètre lot 2 : rédaction du corpus (équipe), sessions scriptées,
+variantes de prompt, STT/TTS.
