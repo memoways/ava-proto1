@@ -6,6 +6,7 @@ export interface AdminTabGroup {
 }
 
 export const TAB_GROUPS: AdminTabGroup[] = [
+  { id: "account", path: "mon-compte", label: "👤 Mon compte", tabs: [{ id: "sandbox-guide", path: "mode-emploi", label: "Mode d'emploi" }] },
   { id: "data", path: "donnees", label: "📊 Données", tabs: [{ id: "sessions", path: "sessions", label: "Sessions" }, { id: "questionnaires", path: "questionnaires", label: "Questionnaires" }] },
   { id: "content", path: "contenu", label: "📚 Contenu Notion", tabs: [{ id: "sync", path: "synchronisation-notion", label: "Sync Notion" }, { id: "videos", path: "videos", label: "Vidéos" }, { id: "embeddings", path: "embeddings", label: "Embeddings" }] },
   { id: "characters", path: "personnages", label: "🎭 Personnages", tabs: [{ id: "character-editor", path: "editeur", label: "Éditeur personnage" }] },
@@ -51,7 +52,7 @@ export function resolveAdminPath(pathname: string): AdminLocation | null {
   const segments = pathname.split("/").filter(Boolean);
   if (segments[0] !== "admin" || segments.length < 3) return null;
   const group = [...TAB_GROUPS, LEGACY_GROUP].find((candidate) => candidate.path === segments[1]);
-  const tab = group?.tabs.find((candidate) => candidate.path === segments[2]);
+  const tab = group?.tabs.find((candidate) => candidate.tabPath === segments[2]);
   if (!group || !tab) return null;
 
   let sessionId: string | null = null;
