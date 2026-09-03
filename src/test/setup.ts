@@ -15,3 +15,11 @@ if (typeof window !== "undefined") {
     }),
   });
 }
+
+if (!(globalThis as { ResizeObserver?: unknown }).ResizeObserver) {
+  (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
