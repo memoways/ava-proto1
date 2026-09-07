@@ -1505,7 +1505,6 @@ export type Database = {
           character_key: string
           display_name: string
           opening_line: string
-          portrait_url: string
           ready: boolean
           tts_provider: string
           tts_voice_id: string
@@ -1517,7 +1516,6 @@ export type Database = {
           character_key: string
           display_name: string
           opening_line: string
-          portrait_url: string
           ready: boolean
           tts_provider: string
           tts_voice_id: string
