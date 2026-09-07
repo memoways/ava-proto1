@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   type CharacterListEntry,
@@ -17,9 +17,7 @@ export default function CharacterEditorTab() {
   const [list, setList] = useState<CharacterListEntry[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  useEffect(() => { void refreshList(); }, []);
-
-  async function refreshList() {
+  const refreshList = useCallback(async () => {
     const entries = await listCharactersWithPrompts();
     const cleaned = entries
       .filter((e) => !HIDDEN_NAMES.has(e.name.trim().toLowerCase()))
@@ -31,11 +29,13 @@ export default function CharacterEditorTab() {
         return a.name.localeCompare(b.name);
       });
     setList(cleaned);
-    if (!activeId && cleaned.length > 0) {
+    if (cleaned.length > 0) {
       const max = cleaned.find((e) => e.name.toLowerCase().startsWith("max")) || cleaned[0];
-      setActiveId(max.character_id);
+      setActiveId((current) => current ?? max.character_id);
     }
-  }
+  }, []);
+
+  useEffect(() => { void refreshList(); }, [refreshList]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">

@@ -19,14 +19,14 @@ describe("WelcomeScreen — reprise", () => {
   it("ne prépare aucune voix pendant la recherche ou lorsqu'une reprise existe", async () => {
     const onResume = vi.fn().mockResolvedValue(undefined);
     const view = render(
-      <MemoryRouter>
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <WelcomeScreen {...baseProps} resumeLoading resumeAvailable={false} onResume={onResume} />
       </MemoryRouter>,
     );
     expect(prefetchOpeningTTS).not.toHaveBeenCalled();
 
     view.rerender(
-      <MemoryRouter>
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <WelcomeScreen {...baseProps} resumeLoading={false} resumeAvailable onResume={onResume} />
       </MemoryRouter>,
     );

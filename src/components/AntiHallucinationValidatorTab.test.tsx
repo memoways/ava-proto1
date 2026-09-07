@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
+import type { AntiHallucinationValidatorSettings } from "@/services/settingsService";
 
 vi.mock("@/services/settingsService", () => {
   const defaults = {
@@ -10,7 +11,7 @@ vi.mock("@/services/settingsService", () => {
   return {
     getAntiHallucinationValidatorSettings: () => ({ ...defaults }),
     loadAntiHallucinationValidatorSettingsFromDB: async () => ({ ...defaults }),
-    saveAntiHallucinationValidatorSettings: (patch: any) => ({ ...defaults, ...patch }),
+    saveAntiHallucinationValidatorSettings: (patch: Partial<AntiHallucinationValidatorSettings>) => ({ ...defaults, ...patch }),
     saveAntiHallucinationValidatorSettingsToDB: async () => {},
     resetAntiHallucinationValidatorSettings: () => ({ ...defaults }),
   };
@@ -35,8 +36,10 @@ beforeEach(() => {
 });
 
 describe("AntiHallucinationValidatorTab", () => {
-  it("renders PreviewColumn and MiniList helpers with merged data", () => {
-    render(<AntiHallucinationValidatorTab />);
+  it("renders PreviewColumn and MiniList helpers with merged data", async () => {
+    await act(async () => {
+      render(<AntiHallucinationValidatorTab />);
+    });
 
     // PreviewColumn titles
     expect(screen.getByText("Faits autorisés (fusion)")).toBeInTheDocument();

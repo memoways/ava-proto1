@@ -72,7 +72,10 @@ describe("PipelineTraceTab", () => {
 
   it("sélectionne le tour demandé et affiche les états causaux/non causaux", async () => {
     render(
-      <MemoryRouter initialEntries={["/admin?tab=pipeline&session=session-1&turn=1"]}>
+      <MemoryRouter
+        initialEntries={["/admin?tab=pipeline&session=session-1&turn=1"]}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <PipelineTraceTab />
       </MemoryRouter>,
     );
@@ -90,7 +93,10 @@ describe("PipelineTraceTab", () => {
 
   it("affiche sans troncature un prompt système long", async () => {
     render(
-      <MemoryRouter initialEntries={["/admin?tab=pipeline&session=session-1&turn=1"]}>
+      <MemoryRouter
+        initialEntries={["/admin?tab=pipeline&session=session-1&turn=1"]}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <PipelineTraceTab />
       </MemoryRouter>,
     );

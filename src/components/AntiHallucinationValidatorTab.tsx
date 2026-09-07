@@ -97,7 +97,10 @@ export default function AntiHallucinationValidatorTab() {
     };
   }, [settings, trace]);
 
-  function updateField(key: keyof AntiHallucinationValidatorSettings, value: string) {
+  function updateField<K extends keyof AntiHallucinationValidatorSettings>(
+    key: K,
+    value: AntiHallucinationValidatorSettings[K],
+  ) {
     const updated = saveAntiHallucinationValidatorSettings({ [key]: value });
     setSettings(updated);
   }
@@ -143,7 +146,7 @@ export default function AntiHallucinationValidatorTab() {
         <select
           id="validator-mode"
           value={settings.mode}
-          onChange={(e) => updateField("mode" as any, e.target.value as any)}
+          onChange={(e) => updateField("mode", e.target.value as AntiHallucinationValidatorSettings["mode"])}
           className="bg-muted/30 border rounded px-3 py-2 text-sm"
         >
           <option value="off">off — aucun appel validateur (défaut, zéro latence)</option>

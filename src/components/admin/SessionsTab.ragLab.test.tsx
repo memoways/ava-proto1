@@ -51,7 +51,7 @@ describe("SessionsTab — envoi vers le laboratoire RAG", () => {
 
   it("permet d’épingler une question utilisateur depuis l’historique", async () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <SessionsTab
           sessions={[session]}
           selectedSessionId={null}

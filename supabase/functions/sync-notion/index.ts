@@ -20,9 +20,58 @@ const OPENAI_API_URL = "https://api.openai.com/v1";
 const VOYAGE_API_URL = "https://api.voyageai.com/v1";
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1";
 
+interface NotionRichTextItem {
+  plain_text?: string;
+}
+
+interface NotionNamedOption {
+  name?: string;
+}
+
+interface NotionProperty {
+  rich_text?: NotionRichTextItem[];
+  title?: NotionRichTextItem[];
+  select?: NotionNamedOption | null;
+  status?: NotionNamedOption | null;
+  multi_select?: NotionNamedOption[];
+  number?: number | null;
+  url?: string | null;
+}
+
 interface NotionPage {
   id: string;
-  properties: Record<string, any>;
+  properties: Record<string, NotionProperty>;
+}
+
+interface NotionBlock {
+  id: string;
+  type: string;
+  has_children?: boolean;
+  [key: string]: unknown;
+}
+
+interface NotionBlockData {
+  rich_text?: NotionRichTextItem[];
+  checked?: boolean;
+}
+
+interface VideoSyncResult {
+  title: string;
+  themes: string[];
+  priority: number;
+  type: string;
+  has_url: boolean;
+}
+
+interface CharacterSyncResult {
+  name: string;
+  id: string;
+  mode: "full" | "fields_only" | "rag_only";
+  page_chars: number;
+  chunks_created: number;
+  summary_chars: number;
+  prompt_fields_filled: number;
+  mapping_warnings: MappingWarning[];
 }
 
 interface SyncRequest {
@@ -47,28 +96,30 @@ interface SyncRequest {
 }
 
 // --- Notion property extractors ---
-function extractRichText(prop: any): string {
+function extractRichText(prop?: NotionProperty): string {
   if (!prop?.rich_text) return '';
-  return prop.rich_text.map((t: any) => t.plain_text).join('');
+  return prop.rich_text.map((t) => t.plain_text || '').join('');
 }
-function extractTitle(prop: any): string {
+function extractTitle(prop?: NotionProperty): string {
   if (!prop?.title) return '';
-  return prop.title.map((t: any) => t.plain_text).join('');
+  return prop.title.map((t) => t.plain_text || '').join('');
 }
-function extractSelect(prop: any): string | null {
+function extractSelect(prop?: NotionProperty): string | null {
   return prop?.select?.name || null;
 }
-function extractStatus(prop: any): string | null {
+function extractStatus(prop?: NotionProperty): string | null {
   return prop?.status?.name || extractSelect(prop);
 }
-function extractMultiSelect(prop: any): string[] {
+function extractMultiSelect(prop?: NotionProperty): string[] {
   if (!prop?.multi_select) return [];
-  return prop.multi_select.map((o: any) => o.name).filter(Boolean);
+  return prop.multi_select
+    .map((option) => option.name)
+    .filter((name): name is string => Boolean(name));
 }
-function extractNumber(prop: any): number | null {
+function extractNumber(prop?: NotionProperty): number | null {
   return typeof prop?.number === "number" ? prop.number : null;
 }
-function extractUrl(prop: any): string | null {
+function extractUrl(prop?: NotionProperty): string | null {
   return prop?.url || null;
 }
 
@@ -105,7 +156,7 @@ interface MappingWarning {
 }
 
 function extractPromptFields(
-  props: Record<string, any>,
+  props: Record<string, NotionProperty>,
   characterName: string,
 ): { fields: Record<string, string>; warnings: MappingWarning[] } {
   const out: Record<string, string> = {};
@@ -272,7 +323,7 @@ serve(async (req) => {
     // ========== SYNC VIDEOS (independent path) ==========
     let videosSynced = 0;
     let videosSkipped = 0;
-    const perVideo: any[] = [];
+    const perVideo: VideoSyncResult[] = [];
     const videoSyncErrors: Array<{ title: string; error: string }> = [];
     const videoSkippedDetails: Array<{ title: string; reason: string }> = [];
     if (videosDbId) {
@@ -370,12 +421,12 @@ serve(async (req) => {
       }
     }
 
-    function extractBlockText(block: any): string {
+    function extractBlockText(block: NotionBlock): string {
       const type = block.type;
-      const blockData = block[type];
+      const blockData = block[type] as NotionBlockData | undefined;
       if (!blockData) return '';
       if (blockData.rich_text) {
-        const text = blockData.rich_text.map((t: any) => t.plain_text).join('');
+        const text = blockData.rich_text.map((item) => item.plain_text || '').join('');
         if (type.startsWith('heading_')) return `\n## ${text}`;
         if (type === 'bulleted_list_item' || type === 'numbered_list_item') return `- ${text}`;
         if (type === 'to_do') return `- [${blockData.checked ? 'x' : ' '}] ${text}`;
@@ -596,7 +647,7 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
     }
 
     // ========== SYNC CHARACTERS ==========
-    const perCharacter: any[] = [];
+    const perCharacter: CharacterSyncResult[] = [];
     const characterSyncErrors: string[] = [];
     const mappingWarnings: (MappingWarning & { character: string })[] = [];
     if (charactersDbId) {

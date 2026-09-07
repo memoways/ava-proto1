@@ -11,11 +11,14 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { authenticatedFunctionFetch } from "./gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const COST_ERROR_LOG_STORAGE_KEY = "ava_openrouter_cost_error_logs";
 const COST_FETCH_TIMEOUT_MS = 10000;
+
+type JsonObject = { [key: string]: Json | undefined };
 
 export interface CostErrorLogEntry {
   session_id?: string | null;
@@ -24,7 +27,7 @@ export interface CostErrorLogEntry {
   status_code?: number | null;
   error_message?: string | null;
   source?: string;
-  metadata_json?: Record<string, unknown>;
+  metadata_json?: JsonObject;
   occurred_at?: string;
 }
 
@@ -39,7 +42,7 @@ export interface UsageLogEntry {
   generation_id?: string | null;
   cost_usd?: number;
   status?: string;
-  metadata_json?: Record<string, unknown>;
+  metadata_json?: JsonObject;
   error_message?: string | null;
 }
 
@@ -77,8 +80,8 @@ export async function logCostFetchError(entry: CostErrorLogEntry): Promise<void>
 
   try {
     const { error } = await supabase
-      .from("openrouter_cost_error_logs" as any)
-      .insert(normalizedEntry as any);
+      .from("openrouter_cost_error_logs")
+      .insert(normalizedEntry);
 
     if (error) {
       console.error("[LLM Tracker] Cost error DB insert failed:", error.message);
@@ -103,7 +106,7 @@ function getCostErrorType(status?: number, err?: unknown): CostErrorLogEntry["er
 export async function logLLMUsage(entry: UsageLogEntry): Promise<string | null> {
   try {
     const { data, error } = await supabase
-      .from("llm_usage" as any)
+      .from("llm_usage")
       .insert({
         session_id: entry.session_id || null,
         feature_key: entry.feature_key,
@@ -117,7 +120,7 @@ export async function logLLMUsage(entry: UsageLogEntry): Promise<string | null> 
         status: entry.status || "pending",
         metadata_json: entry.metadata_json || {},
         error_message: entry.error_message || null,
-      } as any)
+      })
       .select("id")
       .single();
 
@@ -125,7 +128,7 @@ export async function logLLMUsage(entry: UsageLogEntry): Promise<string | null> 
       console.error("[LLM Tracker] Insert error:", error.message);
       return null;
     }
-    return (data as any)?.id || null;
+    return data?.id || null;
   } catch (err) {
     console.error("[LLM Tracker] Exception:", err);
     return null;
@@ -141,8 +144,8 @@ export async function updateLLMUsage(
 ): Promise<void> {
   try {
     const { error } = await supabase
-      .from("llm_usage" as any)
-      .update(updates as any)
+      .from("llm_usage")
+      .update(updates)
       .eq("id", id);
 
     if (error) {
@@ -159,7 +162,7 @@ export async function updateLLMUsage(
  */
 export async function fetchGenerationCost(
   generationId: string,
-  context?: { session_id?: string | null; source?: string; metadata_json?: Record<string, unknown> }
+  context?: { session_id?: string | null; source?: string; metadata_json?: JsonObject }
 ): Promise<{
   available?: boolean;
   cost_usd: number;
@@ -181,9 +184,20 @@ export async function fetchGenerationCost(
     });
     clearTimeout(timeoutId);
     const rawText = await res.text();
-    let payload: any = null;
+    let payload: {
+      available?: boolean;
+      cost_usd?: number;
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+      error_type?: CostErrorLogEntry["error_type"];
+      status_code?: number;
+      details?: string;
+      error?: string;
+      retryable?: boolean;
+    } | null = null;
     try {
-      payload = rawText ? JSON.parse(rawText) : null;
+      payload = rawText ? JSON.parse(rawText) as typeof payload : null;
     } catch {
       payload = null;
     }
@@ -236,7 +250,13 @@ export async function fetchGenerationCost(
       return null;
     }
 
-    const data = payload;
+    const data = {
+      available: payload?.available,
+      cost_usd: payload?.cost_usd ?? 0,
+      prompt_tokens: payload?.prompt_tokens ?? 0,
+      completion_tokens: payload?.completion_tokens ?? 0,
+      total_tokens: payload?.total_tokens ?? 0,
+    };
     console.log(`[LLM Tracker] Cost data for ${generationId}:`, data);
     return data;
   } catch (err) {
@@ -270,7 +290,7 @@ export async function trackLLMCall(params: {
   generation_id?: string | null;
   status?: string;
   error_message?: string | null;
-  metadata?: Record<string, unknown>;
+  metadata?: JsonObject;
 }): Promise<void> {
   const logId = await logLLMUsage({
     session_id: params.session_id,

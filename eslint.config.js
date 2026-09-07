@@ -23,4 +23,11 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
+  {
+    files: ["src/components/ui/**/*.{ts,tsx}"],
+    rules: {
+      // shadcn/ui intentionally co-locates variants and hooks with components.
+      "react-refresh/only-export-components": "off",
+    },
+  },
 );

@@ -46,7 +46,7 @@ const SliderField = ({ label, value, onChange, min = 1, max = 5, labels }: { lab
   </div>
 );
 
-const RadioField = ({ label, options, value, onChange }: { label: string; options: { value: string; label: string }[]; value: string; onChange: (v: string) => void }) => (
+const RadioField = <T extends string>({ label, options, value, onChange }: { label: string; options: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) => (
   <div className="space-y-2">
     <p className="text-sm text-foreground">{label}</p>
     <div className="flex flex-wrap gap-2">
@@ -132,7 +132,7 @@ const QuestionnaireScreen = ({ onSubmit, variant, voiceModality }: Questionnaire
 
           {block.id === "gm" && (<>
             <SliderField label="Le cadrage était-il clair ?" value={data.gm_clarity} onChange={(v) => update("gm_clarity", v)} labels={["Confus", "Très clair"]} />
-            <RadioField label="Avez-vous compris votre rôle dans l'expérience ?" value={data.gm_role_understood} onChange={(v) => update("gm_role_understood", v as any)} options={[{ value: "oui", label: "Oui" }, { value: "non", label: "Non" }, { value: "partiellement", label: "Partiellement" }]} />
+            <RadioField label="Avez-vous compris votre rôle dans l'expérience ?" value={data.gm_role_understood} onChange={(v) => update("gm_role_understood", v)} options={[{ value: "oui", label: "Oui" }, { value: "non", label: "Non" }, { value: "partiellement", label: "Partiellement" }]} />
             <SliderField label="L'introduction était-elle immersive ?" value={data.gm_immersion_intro} onChange={(v) => update("gm_immersion_intro", v)} labels={["Pas du tout", "Très"]} />
           </>)}
 
@@ -157,13 +157,13 @@ const QuestionnaireScreen = ({ onSubmit, variant, voiceModality }: Questionnaire
             <SliderField label="Confort de la modalité (micro ouvert / PTT)" value={data.voice_modality_comfort} onChange={(v) => update("voice_modality_comfort", v)} labels={["Inconfortable", "Très confortable"]} />
             {voiceModality === "push_to_talk" && (<>
               <SliderField label="Le bouton Push-to-Talk était-il clair ?" value={data.ptt_button_clear ?? 3} onChange={(v) => update("ptt_button_clear", v)} labels={["Confus", "Intuitif"]} />
-              <RadioField label="Problèmes de relâchement du bouton ?" value={data.ptt_release_issues ?? "aucun"} onChange={(v) => update("ptt_release_issues", v as any)} options={[{ value: "aucun", label: "Aucun" }, { value: "parfois", label: "Parfois" }, { value: "souvent", label: "Souvent" }]} />
+              <RadioField label="Problèmes de relâchement du bouton ?" value={data.ptt_release_issues ?? "aucun"} onChange={(v) => update("ptt_release_issues", v)} options={[{ value: "aucun", label: "Aucun" }, { value: "parfois", label: "Parfois" }, { value: "souvent", label: "Souvent" }]} />
             </>)}
           </>)}
 
           {block.id === "latency" && (<>
-            <RadioField label="Comment avez-vous perçu le temps de réponse ?" value={data.latency_perceived} onChange={(v) => update("latency_perceived", v as any)} options={[{ value: "fluide", label: "Fluide" }, { value: "acceptable", label: "Acceptable" }, { value: "genante", label: "Gênante" }]} />
-            <RadioField label="La latence vous a-t-elle gêné·e ?" value={data.mechanic_latency} onChange={(v) => update("mechanic_latency", v as any)} options={[{ value: "pas_du_tout", label: "Pas du tout" }, { value: "un_peu", label: "Un peu" }, { value: "beaucoup", label: "Beaucoup" }]} />
+            <RadioField label="Comment avez-vous perçu le temps de réponse ?" value={data.latency_perceived} onChange={(v) => update("latency_perceived", v)} options={[{ value: "fluide", label: "Fluide" }, { value: "acceptable", label: "Acceptable" }, { value: "genante", label: "Gênante" }]} />
+            <RadioField label="La latence vous a-t-elle gêné·e ?" value={data.mechanic_latency} onChange={(v) => update("mechanic_latency", v)} options={[{ value: "pas_du_tout", label: "Pas du tout" }, { value: "un_peu", label: "Un peu" }, { value: "beaucoup", label: "Beaucoup" }]} />
             <TextInput label="Y a-t-il eu des moments où c'était pire ? (optionnel)" placeholder="Ex: au milieu, au début…" value={data.latency_moments ?? ""} onChange={(v) => update("latency_moments", v)} />
           </>)}
 
@@ -171,7 +171,7 @@ const QuestionnaireScreen = ({ onSubmit, variant, voiceModality }: Questionnaire
             <SliderField label='Vous êtes-vous senti·e "dans l&#39;histoire" ?' value={data.immersion_story} onChange={(v) => update("immersion_story", v)} labels={["Pas du tout", "Complètement"]} />
             <SliderField label="La conversation avec Max était-elle naturelle ?" value={data.immersion_natural} onChange={(v) => update("immersion_natural", v)} labels={["Artificielle", "Naturelle"]} />
             <SliderField label="Max vous écoutait-il vraiment ?" value={data.mechanic_listening} onChange={(v) => update("mechanic_listening", v)} labels={["Pas du tout", "Parfaitement"]} />
-            <RadioField label="Avez-vous compris ce qu'on attendait de vous ?" value={data.narration_understood} onChange={(v) => update("narration_understood", v as any)} options={[{ value: "oui", label: "Oui" }, { value: "non", label: "Non" }, { value: "partiellement", label: "Partiellement" }]} />
+            <RadioField label="Avez-vous compris ce qu'on attendait de vous ?" value={data.narration_understood} onChange={(v) => update("narration_understood", v)} options={[{ value: "oui", label: "Oui" }, { value: "non", label: "Non" }, { value: "partiellement", label: "Partiellement" }]} />
             <SliderField label="Envie de continuer / d'en savoir plus ?" value={data.narration_continue} onChange={(v) => update("narration_continue", v)} labels={["Aucune", "Très forte"]} />
             <div className="space-y-1">
               <label className="text-sm text-foreground">Qu'améliorer en priorité ?</label>
@@ -180,7 +180,7 @@ const QuestionnaireScreen = ({ onSubmit, variant, voiceModality }: Questionnaire
           </>)}
 
           {block.id === "value" && (<>
-            <RadioField label="Prêt·e à payer pour une version complète ?" value={data.value_pay} onChange={(v) => update("value_pay", v as any)} options={[{ value: "oui", label: "Oui" }, { value: "non", label: "Non" }, { value: "peut_etre", label: "Peut-être" }]} />
+            <RadioField label="Prêt·e à payer pour une version complète ?" value={data.value_pay} onChange={(v) => update("value_pay", v)} options={[{ value: "oui", label: "Oui" }, { value: "non", label: "Non" }, { value: "peut_etre", label: "Peut-être" }]} />
             <RadioField label="Fourchette de prix" value={data.value_price} onChange={(v) => update("value_price", v)} options={[{ value: "0-5", label: "0–5€" }, { value: "5-15", label: "5–15€" }, { value: "15-30", label: "15–30€" }, { value: "30+", label: "30€+" }]} />
             <RadioField label="Format préféré" value={data.value_format} onChange={(v) => update("value_format", v)} options={[{ value: "web", label: "Web" }, { value: "mobile", label: "Mobile" }, { value: "vr", label: "VR" }, { value: "autre", label: "Autre" }]} />
           </>)}

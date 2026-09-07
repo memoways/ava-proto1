@@ -23,8 +23,8 @@ interface Snapshot {
   fields: Record<string, number>;
 }
 
-const TRACKED: Array<{ key: string; label: string }> = [
-  ...CHARACTER_PROMPT_FIELDS.map((f) => ({ key: f.key as string, label: f.label })),
+const TRACKED: Array<{ key: keyof CharacterPrompt; label: string }> = [
+  ...CHARACTER_PROMPT_FIELDS.map((f) => ({ key: f.key, label: f.label })),
   { key: "situation_summary", label: "Situation actuelle (résumé)" },
 ];
 
@@ -51,7 +51,8 @@ function writeJSON(key: string, value: unknown) {
 function measure(prompt: CharacterPrompt): Snapshot {
   const fields: Record<string, number> = {};
   TRACKED.forEach(({ key }) => {
-    fields[key] = ((prompt as any)[key] as string | undefined)?.length ?? 0;
+    const value = prompt[key];
+    fields[key] = typeof value === "string" ? value.length : 0;
   });
   return { at: prompt.updated_at || "", fields };
 }

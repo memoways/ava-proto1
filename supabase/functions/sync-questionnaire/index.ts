@@ -36,10 +36,102 @@ function textProp(value: string | undefined | null) {
   return value ? { rich_text: [{ text: { content: String(value).slice(0, 1900) } }] } : null;
 }
 
-function buildLegacyProps(payload: any) {
-  const { sessionId, questionnaire: q, trustLevel, durationSeconds, gameOverReason, variant, voiceModality } = payload;
-  const props: Record<string, any> = {};
-  const set = (k: string, v: any) => { if (v != null) props[k] = v; };
+interface LegacyQuestionnairePayload {
+  experience_rating?: number;
+  experience_word?: string;
+  nps?: number;
+  gm_clarity?: number;
+  gm_role_understood?: string;
+  gm_immersion_intro?: number;
+  a_cocreation_engaged?: number;
+  a_cocreation_natural?: number;
+  a_cocreation_freeform?: string;
+  b_narrator_immersive?: number;
+  b_narrator_freeform?: string;
+  voice_naturalness?: number;
+  voice_gm_naturalness?: number;
+  voice_modality_comfort?: number;
+  ptt_button_clear?: number;
+  ptt_release_issues?: string;
+  latency_perceived?: string;
+  latency_moments?: string;
+  mechanic_latency?: string;
+  immersion_story?: number;
+  immersion_natural?: number;
+  mechanic_listening?: number;
+  narration_understood?: string;
+  narration_continue?: number;
+  open_feedback?: string;
+  value_pay?: string;
+  value_price?: string;
+  value_format?: string;
+  contact_name?: string;
+  contact_email?: string;
+  opt_in_feedback?: boolean;
+  opt_in_updates?: boolean;
+}
+
+interface PRD4AnswersPayload {
+  q1_film_seen?: string;
+  q2_teaser_helpful?: number | null;
+  q3_role_clarity?: number;
+  q4_role_summary_accuracy?: number;
+  q5_ptt_clarity?: number;
+  q5b_ptt_frustration?: number;
+  q6_max_used_role?: number;
+  q7_max_credible?: number;
+  q8_want_other_characters?: number;
+  q8b_next_character_wanted?: string;
+  q9_duration_feeling?: string;
+  q10_open_feedback?: string;
+  contact_email?: string;
+  opt_in_updates?: boolean;
+  opt_in_feedback?: boolean;
+  latency_perceived?: string;
+  latency_moments?: string;
+  moment_marquant?: string;
+  feedback_libre?: string;
+  ptt_comment?: string;
+}
+
+interface PRD4TechnicalPayload {
+  submitted_at?: string;
+  teaser_seen?: boolean;
+  teaser_skipped?: boolean;
+  role_profile?: unknown;
+  active_character?: string;
+  duration_seconds?: number;
+  turn_count?: number;
+  avg_latency_ms?: number | null;
+  max_latency_ms?: number | null;
+  ptt_errors?: number;
+  user_speech_seconds?: number;
+  max_speech_seconds?: number;
+  transcript_available?: boolean;
+}
+
+interface QuestionnairePayload extends LegacyQuestionnairePayload {
+  version?: string;
+  answers?: PRD4AnswersPayload;
+  technical?: PRD4TechnicalPayload;
+}
+
+interface SyncQuestionnairePayload {
+  sessionId?: string;
+  questionnaire?: QuestionnairePayload;
+  trustLevel?: number;
+  durationSeconds?: number;
+  gameOverReason?: string | null;
+  variant?: string | null;
+  voiceModality?: string | null;
+}
+
+type NotionProperties = Record<string, unknown>;
+
+function buildLegacyProps(payload: SyncQuestionnairePayload): NotionProperties {
+  const { sessionId, questionnaire: q = {}, trustLevel, durationSeconds, gameOverReason, variant, voiceModality } = payload;
+  const props: NotionProperties = {};
+  const set = (key: string, value: unknown) => { if (value != null) props[key] = value; };
 
   props["Nom"] = { title: [{ text: { content: `Session ${sessionId?.slice(0, 8) || "unknown"}` } }] };
   set("Session ID", textProp(sessionId));
@@ -103,12 +195,12 @@ const PRD4_CHARACTER_MAP: Record<string, string> = {
   aucun: "Aucun",
 };
 
-function buildPRD4Props(payload: any) {
+function buildPRD4Props(payload: SyncQuestionnairePayload): NotionProperties {
   const { sessionId, questionnaire } = payload;
-  const a = questionnaire.answers || {};
-  const t = questionnaire.technical || {};
-  const props: Record<string, any> = {};
-  const set = (k: string, v: any) => { if (v != null) props[k] = v; };
+  const a = questionnaire?.answers || {};
+  const t = questionnaire?.technical || {};
+  const props: NotionProperties = {};
+  const set = (key: string, value: unknown) => { if (value != null) props[key] = value; };
 
   // Méta
   props["Nom"] = { title: [{ text: { content: `PRD4 ${sessionId?.slice(0, 8) || "session"}` } }] };
@@ -197,7 +289,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
   try {
-    const payload = await req.json();
+    const payload = await req.json() as SyncQuestionnairePayload;
     const sessionId = typeof payload?.sessionId === "string" ? payload.sessionId : null;
     const denied = await enforceGameRequest(req, "sync-questionnaire", corsHeaders, sessionId);
     if (denied) return denied;
@@ -207,7 +299,7 @@ serve(async (req) => {
     // Filtre : ne garde que les propriétés qui existent dans la base Notion.
     const existing = await fetchDatabaseProperties();
     let props = allProps;
-    let skipped: string[] = [];
+    const skipped: string[] = [];
     if (existing.size > 0) {
       props = {};
       for (const [k, v] of Object.entries(allProps)) {

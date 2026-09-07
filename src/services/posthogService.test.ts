@@ -12,6 +12,17 @@ vi.mock("posthog-js", () => ({
   default: mocks,
 }));
 
+vi.mock("@/services/environmentContext", () => ({
+  getRuntimeContext: () => ({
+    environmentId: "prod",
+    contextType: "public",
+    campaignId: null,
+    testerLabel: null,
+    startedByUserId: null,
+    startedBy: "public",
+  }),
+}));
+
 describe("posthogService", () => {
   beforeEach(() => {
     vi.resetModules();

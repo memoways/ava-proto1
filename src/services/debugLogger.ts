@@ -77,7 +77,7 @@ class DebugLoggerClass {
   }
 
   /** Helper for outgoing fetch calls */
-  logFetch(service: DebugService, label: string, url: string, body?: any): string {
+  logFetch(service: DebugService, label: string, url: string, body?: unknown): string {
     let payload: string | undefined;
     if (body) {
       try {

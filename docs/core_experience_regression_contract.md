@@ -34,5 +34,6 @@ Ce contrat transforme les incidents récurrents en invariants exécutables. La C
 - `npm run test:regression` : contrats critiques STT, audio, vidéo et orchestration.
 - `npm run test:unit` : suite unitaire sans dépendance distante.
 - `npm run build` : compilation de production.
-- `npm run test:e2e` : six parcours Chromium (multi-tours, transcription, TTS, vidéo intercalée) plus les deux contrats média rejoués sous Firefox et WebKit ; Chromium/Firefox exigent explicitement le moteur `hls.js` et une source `blob:`.
+- `npm run test:e2e` : neuf parcours Chromium (barrière publique, confidentialité, multi-tours, transcription, TTS et vidéo intercalée), deux contrats média rejoués sous Firefox et un sous WebKit ; Chromium/Firefox exigent explicitement le moteur `hls.js` et une source `blob:`.
+- `PLAYWRIGHT_BASE_URL="https://<preview-lovable>" npm run test:e2e:preview` : rejoue les mêmes contrats contre le frontend réellement compilé dans une preview Lovable isolée, sans démarrer Vite localement. La suite déterministe simule les fournisseurs et n'écrit aucune donnée distante.
 - `npm run test:quality` : gate locale avant commit/push.

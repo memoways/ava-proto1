@@ -41,6 +41,22 @@ interface Props {
   hideHeader?: boolean;
 }
 
+type EditableCharacterPrompt = Omit<CharacterPrompt, "character_id" | "name" | "updated_at">;
+
+interface SyncNotionResponse {
+  per_character?: Array<{
+    mapping_warnings?: Array<{ message: string }>;
+    prompt_fields_filled?: number;
+    summary_chars?: number;
+  }>;
+  mapping_warnings?: Array<{ message: string }>;
+  sync_errors?: string[];
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export default function CharacterPromptEditorPanel({ characterId, characterName, titlePrefix, hideHeader }: Props) {
   const [resolvedId, setResolvedId] = useState<string | null>(characterId);
   const [prompt, setPrompt] = useState<CharacterPrompt | null>(null);
@@ -69,7 +85,7 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
         .select("id")
         .eq("name", characterName)
         .maybeSingle();
-      setResolvedId((data as any)?.id || null);
+      setResolvedId(data?.id || null);
     })();
   }, [characterId, characterName]);
 
@@ -95,21 +111,21 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
   }
 
   const hasChanges = prompt && CHARACTER_PROMPT_FIELDS.some(
-    (f) => (draft as any)[f.key] !== (prompt as any)[f.key],
+    (f) => draft[f.key] !== prompt[f.key],
   );
 
   async function handleSave() {
     if (!resolvedId) return;
     setSaving(true);
     try {
-      const partial: any = {};
-      CHARACTER_PROMPT_FIELDS.forEach((f) => { partial[f.key] = (draft as any)[f.key] || ""; });
+      const partial: Partial<EditableCharacterPrompt> = {};
+      CHARACTER_PROMPT_FIELDS.forEach((f) => { partial[f.key] = draft[f.key] || ""; });
       await saveCharacterPrompt(resolvedId, partial);
       clearSystemPromptCache();
       toast.success("Champs éditoriaux sauvegardés ✓");
       await loadActive(resolvedId);
-    } catch (err: any) {
-      toast.error("Erreur sauvegarde: " + (err.message || err));
+    } catch (error: unknown) {
+      toast.error("Erreur sauvegarde: " + errorMessage(error));
     }
     setSaving(false);
   }
@@ -123,7 +139,7 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
         .select("notion_id")
         .eq("id", resolvedId)
         .maybeSingle();
-      const notionId = (charRow as any)?.notion_id;
+      const notionId = charRow?.notion_id;
       if (!notionId) throw new Error("Personnage sans notion_id");
 
       const cachedAuthSession = await getCachedSession();
@@ -143,10 +159,13 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
       if (!res.ok) {
         const raw = await res.text();
         let detail = raw;
-        try { detail = JSON.parse(raw).error || raw; } catch { /* texte brut */ }
+        try {
+          const parsed = JSON.parse(raw) as { error?: unknown };
+          detail = typeof parsed.error === "string" ? parsed.error : raw;
+        } catch { /* texte brut */ }
         throw new Error(detail);
       }
-      const data = await res.json();
+      const data = await res.json() as SyncNotionResponse;
       const item = data.per_character?.[0];
       const returnedErrors: string[] = data.sync_errors || [];
       const warnings: { message: string }[] = item?.mapping_warnings || data.mapping_warnings || [];
@@ -161,8 +180,8 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
       }
       clearSystemPromptCache();
       await loadActive(resolvedId);
-    } catch (err: any) {
-      const detail = err?.message || String(err);
+    } catch (error: unknown) {
+      const detail = errorMessage(error);
       setSyncErrors([`Resync échoué : ${detail}. Vérifie la connexion Notion, tes droits admin, puis relance.`]);
       toast.error("Resync échoué : " + detail);
     }
@@ -186,9 +205,9 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
   }
 
 
-  const preview = prompt ? buildCharacterPromptSections({ ...prompt, ...(draft as any) }) : "";
+  const preview = prompt ? buildCharacterPromptSections({ ...prompt, ...draft }) : "";
   const promptVariant = getGameplaySettings().MAX_PROMPT_VARIANT;
-  const richPreview = prompt ? compileRichCharacterSections({ ...prompt, ...(draft as any) }) : null;
+  const richPreview = prompt ? compileRichCharacterSections({ ...prompt, ...draft }) : null;
 
   if (!resolvedId) {
     return <p className="text-sm text-muted-foreground">Personnage introuvable. Lance une sync Notion.</p>;
@@ -338,7 +357,7 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
             <p className="text-xs text-muted-foreground">{f.hint}</p>
             <Textarea
               id={`${resolvedId}-${f.key}`}
-              value={(draft as any)[f.key] || ""}
+              value={draft[f.key] || ""}
               onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))}
               className="min-h-[100px] font-mono text-sm"
             />

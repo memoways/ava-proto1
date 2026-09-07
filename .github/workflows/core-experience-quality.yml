@@ -19,3 +19,11 @@ jobs:
       - run: npm run test:quality
       - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run test:e2e
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failure-${{ github.run_id }}
+          path: output/playwright/
+          if-no-files-found: ignore
+          retention-days: 7

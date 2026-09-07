@@ -1,8 +1,34 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { from: vi.fn() },
+vi.mock("@/services/tts/providerSettings", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/tts/providerSettings")>();
+  return {
+    ...actual,
+    loadActiveProviderFromDB: vi.fn(async () => actual.getActiveProviderId()),
+    loadInworldSettingsFromDB: vi.fn(async () => actual.getInworldSettings()),
+    loadHumeSettingsFromDB: vi.fn(async () => actual.getHumeSettings()),
+    loadGradiumSettingsFromDB: vi.fn(async () => actual.getGradiumSettings()),
+    loadCartesiaSettingsFromDB: vi.fn(async () => actual.getCartesiaSettings()),
+  };
+});
+
+vi.mock("@/services/settingsService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/settingsService")>();
+  return {
+    ...actual,
+    loadTTSSettingsFromDB: vi.fn(async () => actual.getTTSSettings()),
+  };
+});
+
+// Tooltip positioning is outside this test's scope and schedules asynchronous
+// Popper updates that would otherwise obscure actionable test diagnostics.
+vi.mock("@/components/ui/tooltip", () => ({
+  TooltipProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Tooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
+  TooltipTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  TooltipContent: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
 vi.mock("@/services/experienceOrchestration", () => ({
@@ -57,7 +83,16 @@ vi.mock("sonner", () => ({
 import { generateSpeech, playAudioBlob } from "@/services/tts";
 import TTSConfigTab from "./TTSConfigTab";
 
-describe("TTSConfigTab Gradium character selector", () => {
+async function renderTTSConfigTab() {
+  await act(async () => {
+    render(<TTSConfigTab />);
+  });
+}
+
+// The complete unit suite runs many jsdom files concurrently. These rendering
+// assertions remain deterministic but can be CPU-starved beyond Vitest's 5 s
+// default, while the panel is intentionally rendered as a real integration.
+describe("TTSConfigTab Gradium character selector", { timeout: 15_000 }, () => {
   beforeEach(() => {
     class ResizeObserverMock {
       observe() {}
@@ -72,16 +107,16 @@ describe("TTSConfigTab Gradium character selector", () => {
     vi.mocked(playAudioBlob).mockResolvedValue({ status: "played" } as never);
   });
 
-  it("lists Max and Emma in the Gradium panel", () => {
-    render(<TTSConfigTab />);
+  it("lists Max and Emma in the Gradium panel", async () => {
+    await renderTTSConfigTab();
     expect(screen.getByRole("button", { name: "Réglages Gradium Max" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Réglages Gradium Emma" })).toBeInTheDocument();
   });
 
   it("tests Gradium with the selected character voice", async () => {
-    render(<TTSConfigTab />);
-    screen.getByRole("button", { name: "Réglages Gradium Emma" }).click();
-    screen.getByRole("button", { name: /Tester REST/ }).click();
+    await renderTTSConfigTab();
+    fireEvent.click(screen.getByRole("button", { name: "Réglages Gradium Emma" }));
+    fireEvent.click(screen.getByRole("button", { name: /Tester REST/ }));
     await waitFor(() => expect(generateSpeech).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
@@ -93,9 +128,9 @@ describe("TTSConfigTab Gradium character selector", () => {
   });
 
   it("sends the selected audition emotion on a provider test", async () => {
-    render(<TTSConfigTab />);
-    screen.getByRole("button", { name: "Colère" }).click();
-    screen.getByRole("button", { name: /Tester REST/ }).click();
+    await renderTTSConfigTab();
+    fireEvent.click(screen.getByRole("button", { name: "Colère" }));
+    fireEvent.click(screen.getByRole("button", { name: /Tester REST/ }));
     await waitFor(() => expect(generateSpeech).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
@@ -105,13 +140,13 @@ describe("TTSConfigTab Gradium character selector", () => {
   });
 
   it("does not play audio when an audition chip is clicked", async () => {
-    render(<TTSConfigTab />);
-    screen.getByRole("button", { name: "Colère" }).click();
+    await renderTTSConfigTab();
+    fireEvent.click(screen.getByRole("button", { name: "Colère" }));
     expect(generateSpeech).not.toHaveBeenCalled();
   });
 
-  it("lists which providers can actually perform the acting intent", () => {
-    render(<TTSConfigTab />);
+  it("lists which providers can actually perform the acting intent", async () => {
+    await renderTTSConfigTab();
     expect(screen.getByText("Où l'intention est réellement utilisée")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Écouter Hume/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Écouter Inworld/ })).toBeInTheDocument();
@@ -119,15 +154,15 @@ describe("TTSConfigTab Gradium character selector", () => {
     expect(screen.getAllByText(/Volume \/ vitesse en FR/).length).toBeGreaterThanOrEqual(1);
   });
 
-  it("warns when the in-game provider cannot perform acting audibly", () => {
-    render(<TTSConfigTab />);
+  it("warns when the in-game provider cannot perform acting audibly", async () => {
+    await renderTTSConfigTab();
     expect(screen.getByText(/En jeu,.*l'intention y est/)).toBeInTheDocument();
   });
 
   it("plays Hume when Écouter Hume is clicked with the selected emotion", async () => {
-    render(<TTSConfigTab />);
-    screen.getByRole("button", { name: "Colère" }).click();
-    screen.getByRole("button", { name: /Écouter Hume/ }).click();
+    await renderTTSConfigTab();
+    fireEvent.click(screen.getByRole("button", { name: "Colère" }));
+    fireEvent.click(screen.getByRole("button", { name: /Écouter Hume/ }));
     await waitFor(() => expect(generateSpeech).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
