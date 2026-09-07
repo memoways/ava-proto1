@@ -51,4 +51,18 @@ describe("ConversationScreen", () => {
     expect(screen.getByRole("button", { name: "Appeler Max" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rester avec Emma" })).toBeInTheDocument();
   });
+
+  it("uses the portrait runtime of the active character", () => {
+    render(
+      <ConversationScreen
+        {...baseProps}
+        activeCharacter="emma"
+        portraitUrl="https://portraits.example/emma-runtime.jpg"
+        conversationLog={[]}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "Portrait d’Emma" }))
+      .toHaveAttribute("src", "https://portraits.example/emma-runtime.jpg");
+  });
 });

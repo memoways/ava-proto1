@@ -16,13 +16,15 @@ describe("CharacterSelectScreen", () => {
       enabled: true,
       ready: false,
       openingLine: null,
+      portraitUrl: characterKey === "emma" ? "https://portraits.example/emma-runtime.jpg" : "https://portraits.example/max-runtime.jpg",
       ttsProvider: null,
       ttsVoiceId: null,
     }));
   });
 
-  it("offers Max and Emma even when the runtime checklist is incomplete", () => {
+  it("offers Max and Emma even when the runtime checklist is incomplete", async () => {
     render(<CharacterSelectScreen onSelect={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole("img", { name: "Portrait d’Emma" })).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Appeler Max" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Appeler Emma" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Ava indisponible" })).toBeInTheDocument();
@@ -36,6 +38,7 @@ describe("CharacterSelectScreen", () => {
       enabled: false,
       ready: false,
       openingLine: null,
+      portraitUrl: null,
       ttsProvider: null,
       ttsVoiceId: null,
     });
@@ -43,10 +46,18 @@ describe("CharacterSelectScreen", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Emma indisponible" })).toBeInTheDocument());
   });
 
-  it("starts with Emma when the player picks her", () => {
+  it("starts with Emma when the player picks her", async () => {
     const onSelect = vi.fn();
     render(<CharacterSelectScreen onSelect={onSelect} />);
+    await waitFor(() => expect(screen.getByRole("img", { name: "Portrait d’Emma" })).toBeInTheDocument());
     screen.getByRole("button", { name: "Appeler Emma" }).click();
     expect(onSelect).toHaveBeenCalledWith("emma");
+  });
+
+  it("uses the runtime portrait configured for Emma", async () => {
+    render(<CharacterSelectScreen onSelect={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByRole("img", { name: "Portrait d’Emma" }))
+      .toHaveAttribute("src", "https://portraits.example/emma-runtime.jpg"));
   });
 });

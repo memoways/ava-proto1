@@ -237,6 +237,7 @@ const IndexPRD4 = () => {
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
   const [teaserPlayerReady, setTeaserPlayerReady] = useState(false);
+  const [activePortraitUrl, setActivePortraitUrl] = useState<string | null>(null);
   // Chrono onboarding (mesure du time-to-first-Max-response)
   const onboardingStartedAtRef = useRef<number | null>(null);
   const firstMaxResponseAtRef = useRef<number | null>(null);
@@ -760,6 +761,7 @@ const IndexPRD4 = () => {
     void getCharacterRuntimeReadiness(session.active_character).then((profile) => {
         activeVoiceIdRef.current = profile?.ttsVoiceId ?? null;
         activeTTSProviderIdRef.current = asTTSProviderId(profile?.ttsProvider);
+        setActivePortraitUrl(profile?.portraitUrl ?? null);
       }).catch(() => {});
     handoffCountRef.current = session.handoff_count;
     startingCharacterRef.current = session.active_character;
@@ -858,6 +860,7 @@ const IndexPRD4 = () => {
     activeCharacterRef.current = startingCharacter;
     activeVoiceIdRef.current = profile?.ttsVoiceId ?? null;
     activeTTSProviderIdRef.current = asTTSProviderId(profile?.ttsProvider);
+    setActivePortraitUrl(profile?.portraitUrl ?? null);
     handoffCountRef.current = 0;
     handoffRecommendationRef.current = null;
     pendingPlayerSwitchRef.current = null;
@@ -1653,6 +1656,7 @@ const IndexPRD4 = () => {
       activeCharacterRef.current = target;
       activeVoiceIdRef.current = profile?.ttsVoiceId ?? null;
       activeTTSProviderIdRef.current = asTTSProviderId(profile?.ttsProvider);
+      setActivePortraitUrl(profile?.portraitUrl ?? null);
       handoffCountRef.current += 1;
       setSelectedCharacter(target);
       setHandoffOffer(null);
@@ -1944,6 +1948,7 @@ const IndexPRD4 = () => {
               streamingAvatarState={streamingAvatarState}
               attachAvatarMedia={attachAvatarMedia}
               activeCharacter={state.selectedCharacter === "emma" ? "emma" : "max"}
+              portraitUrl={activePortraitUrl}
               handoffOffer={handoffOffer}
               handoffCalling={handoffCalling}
               handoffCallingTarget={handoffCallingTarget}

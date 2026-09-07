@@ -320,6 +320,7 @@ export async function getCharacterRuntimeReadiness(character: "max" | "emma"): P
   enabled: boolean;
   ready: boolean;
   openingLine: string | null;
+  portraitUrl: string | null;
   ttsProvider: string | null;
   ttsVoiceId: string | null;
 } | null> {
@@ -339,6 +340,7 @@ export async function getCharacterRuntimeReadiness(character: "max" | "emma"): P
     enabled: row.enabled !== false,
     ready: row.ready === true,
     openingLine: typeof row.opening_line === "string" ? row.opening_line : null,
+    portraitUrl: typeof row.portrait_url === "string" ? row.portrait_url : null,
     ttsProvider: typeof row.tts_provider === "string" ? row.tts_provider : null,
     ttsVoiceId: typeof row.tts_voice_id === "string" ? row.tts_voice_id : null,
   };

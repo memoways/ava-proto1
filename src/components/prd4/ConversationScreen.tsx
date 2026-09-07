@@ -23,6 +23,7 @@ interface Props {
   streamingAvatarState?: StreamingAvatarConnectionState;
   attachAvatarMedia?: (element: HTMLMediaElement | null) => void;
   activeCharacter?: "max" | "emma";
+  portraitUrl?: string | null;
   handoffOffer?: { reason: string; targetCharacter?: "max" | "emma" } | null;
   handoffCalling?: boolean;
   handoffCallingTarget?: "max" | "emma";
@@ -43,6 +44,7 @@ const ConversationScreen = ({
   streamingAvatarState = "inactive",
   attachAvatarMedia,
   activeCharacter = "max",
+  portraitUrl = null,
   handoffOffer = null,
   handoffCalling = false,
   handoffCallingTarget = "emma",
@@ -155,7 +157,8 @@ const ConversationScreen = ({
   const frozenVisible = streamingAvatarActive && hasFrozenFrame && !videoVisible;
   const photoVisible = !videoVisible && !frozenVisible;
   const displayName = activeCharacter === "emma" ? "Emma" : "Max";
-  const portrait = activeCharacter === "emma" ? emmaAvatar : maxAvatar;
+  const portrait = portraitUrl ?? (activeCharacter === "emma" ? emmaAvatar : maxAvatar);
+  const backgroundPortrait = portraitUrl ?? (activeCharacter === "emma" ? emmaAvatar : maxLarge);
   const offerTarget = handoffOffer?.targetCharacter === "max" ? "max" : "emma";
   const offerTargetName = offerTarget === "max" ? "Max" : "Emma";
   const callingName = (handoffCallingTarget === "max" ? "Max" : "Emma");
@@ -177,7 +180,7 @@ const ConversationScreen = ({
           "absolute inset-0 bg-cover bg-center transition-opacity duration-500",
           photoVisible ? "opacity-100" : "opacity-0",
         )}
-        style={{ backgroundImage: `url(${activeCharacter === "emma" ? emmaAvatar : maxLarge})` }}
+        style={{ backgroundImage: `url(${backgroundPortrait})` }}
         aria-hidden
       />
       {streamingAvatarActive && (
@@ -228,7 +231,7 @@ const ConversationScreen = ({
       {/* HUD top */}
       <header className="relative z-10 flex items-start justify-between p-4 md:p-6">
         <div className="flex items-center gap-3 rounded-full border border-border/40 bg-background/60 px-3 py-2 backdrop-blur-md">
-          <img src={portrait} alt="" className="h-8 w-8 rounded-full border border-border object-cover" />
+          <img src={portrait} alt={`Portrait d’${displayName}`} className="h-8 w-8 rounded-full border border-border object-cover" />
           <div className="pr-2">
             <p className="text-xs font-medium leading-none text-foreground">{displayName}</p>
             <p className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">en ligne</p>

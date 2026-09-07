@@ -22,18 +22,31 @@ const CHARACTERS: { id: CharId; name: string; img: string }[] = [
   { id: "leo", name: "Léo", img: leoImg },
 ];
 
+function portraitAlt(name: string): string {
+  return name === "Emma" || name === "Ava" ? `Portrait d’${name}` : `Portrait de ${name}`;
+}
+
 const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
   const [lockedDialog, setLockedDialog] = useState(false);
   const [emmaOn, setEmmaOn] = useState(true);
+  const [runtimePortraits, setRuntimePortraits] = useState<Partial<Record<"max" | "emma", string>>>({});
 
   useEffect(() => {
     let cancelled = false;
-    void getCharacterRuntimeReadiness("emma")
-      .then((profile) => {
-        if (!cancelled && profile?.enabled === false) setEmmaOn(false);
+    void Promise.all([
+      getCharacterRuntimeReadiness("max"),
+      getCharacterRuntimeReadiness("emma"),
+    ])
+      .then(([maxProfile, emmaProfile]) => {
+        if (cancelled) return;
+        if (emmaProfile?.enabled === false) setEmmaOn(false);
+        setRuntimePortraits({
+          ...(maxProfile?.portraitUrl ? { max: maxProfile.portraitUrl } : {}),
+          ...(emmaProfile?.portraitUrl ? { emma: emmaProfile.portraitUrl } : {}),
+        });
       })
       .catch(() => {
-        // Keep Emma offered: the public path may not see the runtime RPC.
+        // Keep bundled portraits and Emma available if runtime access is unavailable.
       });
     return () => { cancelled = true; };
   }, []);
@@ -54,6 +67,8 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
 
         <div className="grid grid-cols-2 gap-4 sm:gap-6 tablet-lg:grid-cols-4">
           {CHARACTERS.map((c) => {
+            const runtimePortrait = c.id === "max" || c.id === "emma" ? runtimePortraits[c.id] : undefined;
+            const portrait = runtimePortrait ?? c.img;
             const cardBase =
               "group relative flex flex-col items-center gap-3 rounded-lg border bg-card/60 p-4 transition-all duration-200";
             if (isActive(c.id)) {
@@ -65,7 +80,7 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
                   aria-label={`Appeler ${c.name}`}
                 >
                   <div className="relative">
-                    <img src={c.img} alt="" className="h-28 w-28 rounded-md object-cover" />
+                    <img src={portrait} alt={portraitAlt(c.name)} className="h-28 w-28 rounded-md object-cover" />
                     <span className="absolute -right-1 -top-1 flex h-3 w-3">
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
                       <span className="relative inline-flex h-3 w-3 rounded-full bg-primary" />
@@ -86,7 +101,7 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
                 aria-label={`${c.name} indisponible`}
               >
                 <div className="relative">
-                  <img src={c.img} alt="" className="h-28 w-28 rounded-md object-cover" />
+                  <img src={portrait} alt={portraitAlt(c.name)} className="h-28 w-28 rounded-md object-cover" />
                   <div className="absolute inset-0 flex items-center justify-center rounded-md bg-background/50 backdrop-blur-[1px]">
                     <Lock className="h-6 w-6 text-muted-foreground" />
                   </div>
