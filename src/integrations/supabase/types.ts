@@ -462,89 +462,6 @@ export type Database = {
         }
         Relationships: []
       }
-      external_test_access_grants: {
-        Row: {
-          anonymous_user_id: string
-          created_at: string
-          expires_at: string
-          invitation_id: string
-        }
-        Insert: {
-          anonymous_user_id: string
-          created_at?: string
-          expires_at: string
-          invitation_id: string
-        }
-        Update: {
-          anonymous_user_id?: string
-          created_at?: string
-          expires_at?: string
-          invitation_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "external_test_access_grants_invitation_id_fkey"
-            columns: ["invitation_id"]
-            isOneToOne: true
-            referencedRelation: "external_test_invitations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      external_test_invitations: {
-        Row: {
-          code_hash: string
-          created_at: string
-          created_by_user_id: string
-          environment_id: string
-          expires_at: string
-          id: string
-          redeemed_at: string | null
-          redeemed_by_user_id: string | null
-          revoked_at: string | null
-          tester_label: string
-        }
-        Insert: {
-          code_hash: string
-          created_at?: string
-          created_by_user_id: string
-          environment_id: string
-          expires_at?: string
-          id?: string
-          redeemed_at?: string | null
-          redeemed_by_user_id?: string | null
-          revoked_at?: string | null
-          tester_label: string
-        }
-        Update: {
-          code_hash?: string
-          created_at?: string
-          created_by_user_id?: string
-          environment_id?: string
-          expires_at?: string
-          id?: string
-          redeemed_at?: string | null
-          redeemed_by_user_id?: string | null
-          revoked_at?: string | null
-          tester_label?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "external_test_invitations_created_by_user_id_fkey"
-            columns: ["created_by_user_id"]
-            isOneToOne: false
-            referencedRelation: "admin_users"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "external_test_invitations_environment_id_fkey"
-            columns: ["environment_id"]
-            isOneToOne: false
-            referencedRelation: "environments"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       eval_items: {
         Row: {
           active: boolean
@@ -847,6 +764,89 @@ export type Database = {
             columns: ["source_version_id"]
             isOneToOne: false
             referencedRelation: "experience_orchestration_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_test_access_grants: {
+        Row: {
+          anonymous_user_id: string
+          created_at: string
+          expires_at: string
+          invitation_id: string
+        }
+        Insert: {
+          anonymous_user_id: string
+          created_at?: string
+          expires_at: string
+          invitation_id: string
+        }
+        Update: {
+          anonymous_user_id?: string
+          created_at?: string
+          expires_at?: string
+          invitation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_test_access_grants_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: true
+            referencedRelation: "external_test_invitations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_test_invitations: {
+        Row: {
+          code_hash: string
+          created_at: string
+          created_by_user_id: string
+          environment_id: string
+          expires_at: string
+          id: string
+          redeemed_at: string | null
+          redeemed_by_user_id: string | null
+          revoked_at: string | null
+          tester_label: string
+        }
+        Insert: {
+          code_hash: string
+          created_at?: string
+          created_by_user_id: string
+          environment_id: string
+          expires_at?: string
+          id?: string
+          redeemed_at?: string | null
+          redeemed_by_user_id?: string | null
+          revoked_at?: string | null
+          tester_label: string
+        }
+        Update: {
+          code_hash?: string
+          created_at?: string
+          created_by_user_id?: string
+          environment_id?: string
+          expires_at?: string
+          id?: string
+          redeemed_at?: string | null
+          redeemed_by_user_id?: string | null
+          revoked_at?: string | null
+          tester_label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_test_invitations_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "admin_users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "external_test_invitations_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "environments"
             referencedColumns: ["id"]
           },
         ]
@@ -1689,6 +1689,20 @@ export type Database = {
       publish_experience_orchestration_version: {
         Args: { p_version_id: string }
         Returns: string
+      }
+      redeem_external_test_invitation: {
+        Args: {
+          p_anonymous_user_id: string
+          p_code_hash: string
+          p_invitation_id: string
+        }
+        Returns: {
+          access_expires_at: string
+          creator_display_name: string
+          environment_id: string
+          invitation_id: string
+          tester_label: string
+        }[]
       }
     }
     Enums: {
