@@ -6,6 +6,46 @@ Livrer la version 0.26.0 avec un contexte `prod` immuable pour les visiteurs
 publics et trois contextes sandbox sélectionnables par les membres authentifiés,
 sans ajouter d'appel réseau dans le pipeline voix après le bootstrap.
 
+## Extension — invitations externes uniques pour les sandboxes
+
+Permettre à Benoît, Romed et Ulrich de créer depuis « Mon compte » une
+invitation nominative donnant à un testeur externe un accès temporaire aux
+réglages de la sandbox active, sans jamais accepter un environnement provenant
+directement de l'URL.
+
+- L'invitation appartient à son créateur, cible uniquement une sandbox et
+  expire après 7 jours si elle n'est pas utilisée.
+- Le lien contient un identifiant opaque et le mot de passe est transmis
+  séparément. Le mot de passe aléatoire est affiché une seule fois et seule son
+  empreinte est conservée.
+- La première validation lie l'invitation à une identité Auth anonyme unique.
+  Cette identité peut lancer plusieurs sessions pendant 4 heures ; un autre
+  navigateur ne peut pas réutiliser le mot de passe.
+- Les lectures sandbox sont autorisées par RLS uniquement pour cette identité
+  et conservent le repli sandbox → Production. Une révocation empêche toute
+  nouvelle session sans interrompre une session déjà créée.
+- Chaque session externe porte `context_type = user_test`, l'invitation et le
+  libellé du testeur ; `started_by_user_id` est imposé côté serveur avec le
+  compte qui a créé l'invitation.
+- « Tester moi-même » conserve le parcours actuel. « Inviter un testeur » ouvre
+  la gestion des invitations créées par le compte connecté.
+
+### Mise en œuvre retenue
+
+1. Ajouter une migration Lovable Cloud additive pour les invitations, les
+   grants temporaires, le lien de session, le rate limiting et les politiques
+   RLS de lecture runtime.
+2. Ajouter les Edge Functions `manage-test-invitations` (list/create/revoke,
+   admin) et `redeem-test-invitation` (status/redeem, identité anonyme).
+3. Ajouter `/test/:invitationId`, configurer le runtime uniquement depuis le
+   contexte signé renvoyé par la fonction, puis laisser la base imposer à
+   nouveau cette attribution lors de l'insertion de session.
+4. Ajouter l'onglet « Invitations de test », les deux actions distinctes et les
+   informations d'invitation dans l'historique de sessions et PostHog.
+5. Couvrir l'activation unique, la fenêtre de 4 heures, l'expiration, la
+   révocation, l'isolation RLS et la non-régression Production par des tests
+   unitaires, d'intégration et Playwright.
+
 ## Périmètre d'implémentation
 
 1. Ajouter une migration Lovable Cloud additive et idempotente pour les quatre
@@ -86,6 +126,34 @@ doivent être effectuées dans la preview Lovable avant toute publication.
    desktop, puis vérifier les deux domaines de production avant publication.
 
 ### Résultats automatisés locaux
+
+#### Extension invitations externes — 2026-09-10
+
+- Implémentation locale terminée : migration additive, deux Edge Functions,
+  barrière `/test/:invitationId`, gestion dans « Mon compte », traçage des
+  sessions et enrichissement PostHog.
+- `npm test` : 75 fichiers et 320 tests réussis.
+- Tests d'intégration migration/RLS : 16 scénarios réussis, migration et
+  activation unique rejouées sur une base PostgreSQL de test.
+- Playwright ciblé `public-surface.spec.ts` : 3 scénarios Chromium réussis,
+  dont activation et reprise après rechargement.
+- `npm run typecheck`, build, contrôle syntaxique des Edge Functions, ESLint
+  ciblé et `git diff --check` : réussis.
+- Le lint global reste bloqué uniquement par l'erreur historique
+  `previewAuthStorage.ts:38` (`prefer-const`), hors fichiers modifiés.
+- État de livraison : code local uniquement. La migration et les Edge
+  Functions ne sont pas encore appliquées ou publiées dans la preview Lovable.
+
+#### Activation de l'extension dans Lovable Preview
+
+1. Appliquer `20260910121943_external_test_invitations.sql` dans le projet
+   Lovable Cloud lié à ce dépôt.
+2. Publier `manage-test-invitations` et `redeem-test-invitation` depuis la
+   chaîne Lovable, sans ajouter de secret externe.
+3. Exécuter les contrôles de sécurité de la base après migration, puis créer
+   une invitation depuis le compte Benoît et l'activer dans une fenêtre privée.
+4. Vérifier dans l'historique que le testeur, la sandbox et Benoît sont bien
+   attribués avant toute publication Production.
 
 - `npm test` : 64 fichiers, 263 tests réussis, dont migration rejouée deux fois
   et tests RLS existants.

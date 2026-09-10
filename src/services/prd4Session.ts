@@ -36,6 +36,7 @@ export async function createPRD4Session(
     context_type: runtime.contextType,
     campaign_id: runtime.campaignId,
     tester_label: runtime.testerLabel,
+    test_invitation_id: runtime.testInvitationId,
     started_by_user_id: runtime.startedByUserId,
   };
   const { data, error } = await supabase

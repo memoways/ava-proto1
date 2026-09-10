@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
 
 const PROD_USER = "11111111-1111-4111-8111-111111111111";
+const TESTER_USER = "22222222-2222-4222-8222-222222222222";
+const SECOND_TESTER_USER = "33333333-3333-4333-8333-333333333333";
 
 describe("v0.26 environments migration", () => {
   let db: PGlite;
@@ -15,8 +17,8 @@ describe("v0.26 environments migration", () => {
       create role authenticated;
       create role service_role;
       create schema auth;
-      create table auth.users (id uuid primary key, email text);
-      insert into auth.users values ('${PROD_USER}', 'info@memoways.com');
+      create table auth.users (id uuid primary key, email text, is_anonymous boolean not null default false);
+      insert into auth.users (id, email) values ('${PROD_USER}', 'info@memoways.com');
       create function auth.uid() returns uuid language sql stable
         as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
       create function auth.jwt() returns jsonb language sql stable
@@ -121,6 +123,13 @@ describe("v0.26 environments migration", () => {
     const migration = await readFile(migrationUrl, "utf8");
     await db.exec(migration);
     await db.exec(migration);
+    const invitationsMigrationUrl = new URL(
+      "../../supabase/migrations/20260910121943_external_test_invitations.sql",
+      import.meta.url,
+    );
+    const invitationsMigration = await readFile(invitationsMigrationUrl, "utf8");
+    await db.exec(invitationsMigration);
+    await db.exec(invitationsMigration);
   }, 30_000);
 
   afterEach(async () => db.close());
@@ -226,5 +235,103 @@ describe("v0.26 environments migration", () => {
       "select environment_id from public.character_prompts order by environment_id",
     );
     expect(visiblePrompts.rows).toEqual([{ environment_id: "prod" }]);
+  });
+
+  it("binds one anonymous browser to a sandbox invitation and attributes its sessions", async () => {
+    await db.exec(`
+      update public.admin_users
+      set display_name = 'Ulrich', default_environment_id = 'sandbox-ulrich'
+      where user_id = '${PROD_USER}';
+      insert into auth.users (id, email, is_anonymous) values
+        ('${TESTER_USER}', null, true),
+        ('${SECOND_TESTER_USER}', null, true);
+      insert into public.admin_settings (key, value, environment_id) values
+        ('ava_test_invitation_setting', '{"source":"sandbox-benoit"}', 'sandbox-benoit'),
+        ('ava_test_other_setting', '{"source":"sandbox-romed"}', 'sandbox-romed');
+      insert into public.external_test_invitations (
+        id, environment_id, created_by_user_id, tester_label, code_hash
+      ) values (
+        '44444444-4444-4444-8444-444444444444', 'sandbox-benoit', '${PROD_USER}',
+        'Camille', repeat('a', 64)
+      );
+    `);
+
+    const redeemed = await db.query<{
+      invitation_id: string;
+      environment_id: string;
+      tester_label: string;
+      creator_display_name: string;
+    }>(`
+      select invitation_id, environment_id, tester_label, creator_display_name
+      from public.redeem_external_test_invitation(
+        '44444444-4444-4444-8444-444444444444', repeat('a', 64), '${TESTER_USER}'
+      )
+    `);
+    expect(redeemed.rows[0]).toEqual({
+      invitation_id: "44444444-4444-4444-8444-444444444444",
+      environment_id: "sandbox-benoit",
+      tester_label: "Camille",
+      creator_display_name: "Ulrich",
+    });
+
+    const secondRedemption = await db.query(`
+      select * from public.redeem_external_test_invitation(
+        '44444444-4444-4444-8444-444444444444', repeat('a', 64), '${SECOND_TESTER_USER}'
+      )
+    `);
+    expect(secondRedemption.rows).toHaveLength(0);
+
+    await db.exec(`
+      select set_config('request.jwt.claim.sub', '${TESTER_USER}', false);
+      select set_config(
+        'request.jwt.claims',
+        '{"sub":"${TESTER_USER}","is_anonymous":true}',
+        false
+      );
+      set role authenticated;
+    `);
+    const visibleSettings = await db.query<{ environment_id: string }>(`
+      select environment_id from public.admin_settings
+      where key like 'ava_test_%'
+      order by environment_id
+    `);
+    expect(visibleSettings.rows).toEqual([{ environment_id: "sandbox-benoit" }]);
+    await expect(db.query("select * from public.external_test_invitations"))
+      .rejects.toThrow(/permission denied/i);
+    await db.exec("reset role");
+
+    const attributed = await db.query<{
+      environment_id: string;
+      context_type: string;
+      tester_label: string;
+      started_by_user_id: string;
+      test_invitation_id: string;
+    }>(`
+      insert into public.sessions (test_invitation_id, environment_id, started_by_user_id, tester_label)
+      values (
+        '44444444-4444-4444-8444-444444444444',
+        'sandbox-romed',
+        '${SECOND_TESTER_USER}',
+        'Falsifié'
+      )
+      returning environment_id, context_type, tester_label, started_by_user_id, test_invitation_id
+    `);
+    expect(attributed.rows[0]).toEqual({
+      environment_id: "sandbox-benoit",
+      context_type: "user_test",
+      tester_label: "Camille",
+      started_by_user_id: PROD_USER,
+      test_invitation_id: "44444444-4444-4444-8444-444444444444",
+    });
+
+    await db.exec(`
+      update public.external_test_invitations
+      set revoked_at = now()
+      where id = '44444444-4444-4444-8444-444444444444'
+    `);
+    await expect(db.exec(`
+      insert into public.sessions (test_invitation_id)
+      values ('44444444-4444-4444-8444-444444444444')
+    `)).rejects.toThrow("active external test invitation required");
   });
 });

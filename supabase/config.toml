@@ -66,3 +66,9 @@ verify_jwt = false
 
 [functions.verify-public-access]
 verify_jwt = false
+
+[functions.manage-test-invitations]
+verify_jwt = false
+
+[functions.redeem-test-invitation]
+verify_jwt = false

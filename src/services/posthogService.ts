@@ -138,6 +138,8 @@ export function trackEvent(event: string, properties?: Record<string, unknown>) 
     environment: runtime.environmentId,
     context_type: runtime.contextType,
     campaign: runtime.campaignId,
+    test_invitation_id: runtime.testInvitationId,
+    tester_label: runtime.testerLabel,
     started_by: runtime.startedBy,
   });
   if (!initialized || !analyticsEnabled || !posthog) {

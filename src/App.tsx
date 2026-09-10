@@ -3,10 +3,11 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
 import IndexPRD4 from "./pages/IndexPRD4";
 import AdminAuthGate from "./components/AdminAuthGate";
 import PublicAccessGate from "./components/PublicAccessGate";
+import ExternalTestAccessGate from "./components/ExternalTestAccessGate";
 import Auth from "./pages/Auth";
 import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
@@ -21,6 +22,11 @@ const Admin = lazy(() => import("./pages/Admin"));
 const LatencyTelemetryPreview = import.meta.env.DEV ? lazy(() => import("./dev/LatencyTelemetryPreview")) : null;
 const RAGConfigPreview = import.meta.env.DEV ? lazy(() => import("./dev/RAGConfigPreview")) : null;
 
+function ExternalTestRoute() {
+  const { invitationId = "" } = useParams();
+  return <ExternalTestAccessGate invitationId={invitationId}><IndexPRD4 /></ExternalTestAccessGate>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -29,6 +35,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<PublicAccessGate><IndexPRD4 /></PublicAccessGate>} />
+          <Route path="/test/:invitationId" element={<ExternalTestRoute />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/confidentialite" element={<Privacy />} />
           <Route

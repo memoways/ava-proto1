@@ -44,6 +44,7 @@ export interface SessionRow {
   context_type: "public" | "user_test" | "sandbox" | "internal";
   campaign_id: string | null;
   tester_label: string | null;
+  test_invitation_id: string | null;
   started_by_user_id: string | null;
   account_display_name?: string;
 }
@@ -432,7 +433,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                   <p className="text-xs text-muted-foreground">{fmt(s.started_at)}</p>
                   <p className="mt-1 text-xs"><span className="text-muted-foreground">Compte :</span> {s.account_display_name ?? "public"}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {s.environment_id} · {s.context_type}
+                    {s.environment_id} · {s.test_invitation_id ? "test externe" : s.context_type}
                     {s.campaign_id ? ` · ${s.campaign_id}` : ""}
                     {s.tester_label ? ` · ${s.tester_label}` : ""}
                   </p>
@@ -578,6 +579,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
               <Stat label="Contexte" value={selected.context_type} />
               <Stat label="Campagne" value={selected.campaign_id || "—"} />
               <Stat label="Testeur" value={selected.tester_label || "—"} />
+              <Stat label="Invitation" value={selected.test_invitation_id?.slice(0, 8) || "—"} />
             </div>
 
             {selected.triggers_activated?.length ? (

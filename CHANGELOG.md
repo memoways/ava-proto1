@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Non publié] — Invitations uniques de test sandbox
+
+### Ajouté
+
+- Gestion des invitations externes depuis **Mon compte → Invitations de test** :
+  libellé testeur, lien sans secret, mot de passe affiché une seule fois,
+  révocation et suivi de l'état.
+- Parcours public `/test/:invitationId` lié à une identité anonyme unique pour
+  quatre heures, avec attribution serveur des sessions au compte créateur.
+- Isolation Lovable Cloud par migration, RLS et deux Edge Functions, sans
+  modifier la barrière Production existante.
+
+Plan : [`docs/plan_environnements_sandbox_auth.md`](docs/plan_environnements_sandbox_auth.md).
+
 ## [0.31.0] — 2026-09-03 — LLM as judge : banc d'essai lisible et pilotable
 
 ### Ajouté

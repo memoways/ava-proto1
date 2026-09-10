@@ -12,7 +12,7 @@ describe("Admin navigation invariants", () => {
     const account = TAB_GROUPS[0];
     expect(account?.id).toBe("account");
     expect(account?.path).toBe("mon-compte");
-    expect(account?.tabs.map((tab) => tab.id)).toEqual(["sandbox-guide"]);
+    expect(account?.tabs.map((tab) => tab.id)).toEqual(["sandbox-guide", "test-invitations"]);
   });
 
   it("keeps every protected Technique avancée page visible", () => {
@@ -64,12 +64,18 @@ describe("Admin navigation invariants", () => {
     expect(adminTabPath("latency")).toBe("/admin/qualite/latence-et-blocages");
     expect(adminTabPath("eval-judge")).toBe("/admin/qualite/llm-as-judge");
     expect(adminTabPath("sandbox-guide")).toBe("/admin/mon-compte/mode-emploi");
+    expect(adminTabPath("test-invitations")).toBe("/admin/mon-compte/invitations-de-test");
   });
 
   it("resolves canonical pages and session detail URLs", () => {
     expect(resolveAdminPath("/admin/mon-compte/mode-emploi")).toEqual({
       group: "account",
       tab: "sandbox-guide",
+      sessionId: null,
+    });
+    expect(resolveAdminPath("/admin/mon-compte/invitations-de-test")).toEqual({
+      group: "account",
+      tab: "test-invitations",
       sessionId: null,
     });
     expect(resolveAdminPath("/admin/experience/reglages-game-master")).toEqual({

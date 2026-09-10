@@ -3,13 +3,16 @@ import { canSwitchEnvironments, ENVIRONMENTS } from "@/services/environmentConte
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ExternalLink, UserCog, BookOpen, FlaskConical, Globe, Lock, RefreshCw, Coins } from "lucide-react";
+import { ExternalLink, UserCog, BookOpen, FlaskConical, Globe, Lock, RefreshCw, Coins, UserPlus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { adminTabPath } from "@/services/adminNavigation";
 
 export default function SandboxGuideTab() {
   const { profile, environmentId } = useAdminEnvironment();
   const environmentLabel = ENVIRONMENTS.find((env) => env.id === environmentId)?.label ?? environmentId;
   const isProduction = environmentId === "prod";
   const canSwitch = canSwitchEnvironments(profile);
+  const navigate = useNavigate();
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -23,11 +26,16 @@ export default function SandboxGuideTab() {
             </span>
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <a href={`/?env=${encodeURIComponent(environmentId)}`} target="_blank" rel="noreferrer">
-            Tester l'expérience <ExternalLink className="ml-2 h-4 w-4" />
-          </a>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <a href={`/?env=${encodeURIComponent(environmentId)}`} target="_blank" rel="noreferrer">
+              Tester moi-même <ExternalLink className="ml-2 h-4 w-4" />
+            </a>
+          </Button>
+          <Button variant="outline" onClick={() => navigate(adminTabPath("test-invitations"))}>
+            Inviter un testeur <UserPlus className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <Alert className="border-fuchsia-400/50 bg-fuchsia-500/10 text-fuchsia-100">
@@ -138,12 +146,16 @@ export default function SandboxGuideTab() {
             <strong>Expérience</strong>.
           </p>
           <p>
-            3. Clique sur <strong>« Tester l'expérience »</strong> pour lancer le jeu avec tes
+            3. Clique sur <strong>« Tester moi-même »</strong> pour lancer le jeu avec tes
             réglages. N'ouvre pas simplement l'URL publique : elle reste toujours en Production.
           </p>
           <p>
             4. Tes sessions de test apparaissent dans l'onglet <strong>Sessions</strong>, filtrées
             avec leur environnement et leur contexte.
+          </p>
+          <p>
+            Pour confier le test à une personne externe, utilise <strong>« Inviter un testeur »</strong> :
+            le lien et le mot de passe unique sont transmis séparément.
           </p>
         </CardContent>
       </Card>

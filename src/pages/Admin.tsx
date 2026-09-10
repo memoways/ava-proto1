@@ -35,12 +35,13 @@ import VideosListTab from "@/components/admin/VideosListTab";
 import StreamingAvatarConfigTab from "@/components/StreamingAvatarConfigTab";
 import AlertsTab from "@/components/admin/AlertsTab";
 import SandboxGuideTab from "@/components/admin/SandboxGuideTab";
+import TestInvitationsTab from "@/components/admin/TestInvitationsTab";
 import ExperienceArchitectureTab from "@/components/ExperienceArchitectureTab";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ExternalLink, ShieldCheck } from "lucide-react";
+import { ExternalLink, ShieldCheck, UserPlus } from "lucide-react";
 import { useAdminEnvironment } from "@/contexts/AdminEnvironmentContext";
 import { ENVIRONMENTS, canSwitchEnvironments, type EnvironmentId } from "@/services/environmentContext";
 import { trackEvent } from "@/services/posthogService";
@@ -403,8 +404,11 @@ export default function Admin() {
 
             <Button variant="outline" asChild>
               <a href={`/?env=${encodeURIComponent(environmentId)}`} target="_blank" rel="noreferrer">
-                Tester l'expérience <ExternalLink className="ml-2 h-4 w-4" />
+                Tester moi-même <ExternalLink className="ml-2 h-4 w-4" />
               </a>
+            </Button>
+            <Button variant="outline" onClick={() => navigateToTab("test-invitations")}>
+              Inviter un testeur <UserPlus className="ml-2 h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -500,6 +504,10 @@ export default function Admin() {
           {/* ==================== ACCOUNT / SANDBOX GUIDE ==================== */}
           <TabsContent value="sandbox-guide">
             <SandboxGuideTab />
+          </TabsContent>
+
+          <TabsContent value="test-invitations">
+            <TestInvitationsTab />
           </TabsContent>
 
           {/* ==================== SESSIONS ==================== */}

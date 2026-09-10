@@ -18,6 +18,7 @@ vi.mock("@/services/environmentContext", () => ({
     contextType: "public",
     campaignId: null,
     testerLabel: null,
+    testInvitationId: null,
     startedByUserId: null,
     startedBy: "public",
   }),
@@ -68,6 +69,8 @@ describe("posthogService", () => {
       environment: "prod",
       context_type: "public",
       campaign: null,
+      test_invitation_id: null,
+      tester_label: null,
       started_by: "public",
     }));
   });

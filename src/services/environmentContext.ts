@@ -44,8 +44,17 @@ export interface RuntimeContext {
   contextType: SessionContextType;
   campaignId: string | null;
   testerLabel: string | null;
+  testInvitationId: string | null;
   startedByUserId: string | null;
   startedBy: string;
+}
+
+export interface ExternalTestAccessContext {
+  invitationId: string;
+  environmentId: EnvironmentId;
+  testerLabel: string;
+  creatorDisplayName: string;
+  accessExpiresAt: string;
 }
 
 const ACTIVE_ENVIRONMENT_KEY = "ava:admin:active-environment";
@@ -58,6 +67,7 @@ let runtimeContext: RuntimeContext = {
   contextType: "public",
   campaignId: null,
   testerLabel: null,
+  testInvitationId: null,
   startedByUserId: null,
   startedBy: "public",
 };
@@ -244,8 +254,25 @@ export function configureRuntimeContext(input: {
     contextType: deriveContextType({ isMember, environmentId, campaignId }),
     campaignId,
     testerLabel,
+    testInvitationId: null,
     startedByUserId: input.profile?.user_id ?? null,
     startedBy: input.profile?.display_name ?? "public",
+  };
+  return { ...runtimeContext };
+}
+
+export function configureExternalTestRuntime(access: ExternalTestAccessContext): RuntimeContext {
+  const environmentId = normalizeEnvironment(access.environmentId);
+  if (environmentId === "prod") throw new Error("External test invitations require a sandbox");
+  activeEnvironment = environmentId;
+  runtimeContext = {
+    environmentId,
+    contextType: "user_test",
+    campaignId: null,
+    testerLabel: access.testerLabel.trim().slice(0, 80),
+    testInvitationId: access.invitationId,
+    startedByUserId: null,
+    startedBy: access.creatorDisplayName.trim() || "membre",
   };
   return { ...runtimeContext };
 }

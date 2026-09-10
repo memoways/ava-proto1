@@ -43,6 +43,7 @@ const session: SessionRow = {
   context_type: "public",
   campaign_id: null,
   tester_label: null,
+  test_invitation_id: null,
   started_by_user_id: null,
 };
 

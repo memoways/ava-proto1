@@ -85,6 +85,19 @@ export async function ensureGameAuth(captchaToken?: string): Promise<Session | n
   }
 }
 
+/** External invitation access always requires a stable anonymous identity. */
+export async function ensureAnonymousTestAuth(): Promise<Session> {
+  const existing = await getCachedSession();
+  if (existing) {
+    if (existing.user.is_anonymous === true) return existing;
+    throw new Error("A permanent account cannot redeem an external test invitation");
+  }
+  const { data, error } = await supabase.auth.signInAnonymously();
+  if (error) throw error;
+  if (!data.session) throw new Error("Anonymous test authentication returned no session");
+  return data.session;
+}
+
 /** Fetch an Edge Function with the current short-lived user JWT. */
 export async function authenticatedFunctionFetch(
   input: RequestInfo | URL,

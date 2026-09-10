@@ -5,6 +5,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import {
+  configureExternalTestRuntime,
   configureRuntimeContext,
   deriveContextType,
   getPersistedAdminEnvironment,
@@ -53,6 +54,29 @@ describe("environment settings context", () => {
   it("locks non-members to prod even when a sandbox is requested", () => {
     expect(configureRuntimeContext({ profile: null, requestedEnvironment: "sandbox-benoit" }))
       .toMatchObject({ environmentId: "prod", contextType: "public" });
+  });
+
+  it("accepts a sandbox only from server-verified external test access", () => {
+    expect(configureExternalTestRuntime({
+      invitationId: "11111111-1111-4111-8111-111111111111",
+      environmentId: "sandbox-benoit",
+      testerLabel: "Camille",
+      creatorDisplayName: "Benoît",
+      accessExpiresAt: "2026-09-10T16:00:00.000Z",
+    })).toMatchObject({
+      environmentId: "sandbox-benoit",
+      contextType: "user_test",
+      testerLabel: "Camille",
+      testInvitationId: "11111111-1111-4111-8111-111111111111",
+      startedBy: "Benoît",
+    });
+    expect(() => configureExternalTestRuntime({
+      invitationId: "22222222-2222-4222-8222-222222222222",
+      environmentId: "prod",
+      testerLabel: "Camille",
+      creatorDisplayName: "Benoît",
+      accessExpiresAt: "2026-09-10T16:00:00.000Z",
+    })).toThrow("require a sandbox");
   });
 
   it("resolves requested environment, then prod, then hardcoded defaults", () => {

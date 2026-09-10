@@ -2,6 +2,16 @@
 -- Run only in Lovable Cloud after exporting sandbox rows for audit.
 BEGIN;
 
+-- Extension 20260910121943_external_test_invitations.sql.
+DROP POLICY IF EXISTS "External testers read invitation runtime settings" ON public.admin_settings;
+DROP POLICY IF EXISTS "External testers read invitation character prompts" ON public.character_prompts;
+DROP FUNCTION IF EXISTS public.redeem_external_test_invitation(uuid, text, uuid);
+DROP FUNCTION IF EXISTS public.get_character_runtime_readiness_for_environment(text, text);
+DROP FUNCTION IF EXISTS private.current_external_test_access();
+ALTER TABLE public.sessions DROP COLUMN IF EXISTS test_invitation_id;
+DROP TABLE IF EXISTS public.external_test_access_grants;
+DROP TABLE IF EXISTS public.external_test_invitations;
+
 DO $$
 DECLARE
   table_name text;
@@ -106,4 +116,6 @@ COMMIT;
 
 -- Finally re-apply the RLS and RPC definitions from
 -- 20260712154557_a4a91994-526a-4a72-acb4-5a38461b22bb.sql and
--- 20260807120000_experience_orchestration_foundations.sql in Lovable Cloud.
+-- 20260807120000_experience_orchestration_foundations.sql, the rate limits from
+-- 20260730160000_streaming_avatar_output.sql and the portrait-returning runtime
+-- RPC from 20260907160000_expose_runtime_character_portrait.sql in Lovable Cloud.
