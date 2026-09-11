@@ -1166,7 +1166,6 @@ export type Database = {
       }
       session_summaries: {
         Row: {
-          character_key: string | null
           created_at: string
           id: string
           last_turn: number
@@ -1175,7 +1174,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          character_key?: string | null
           created_at?: string
           id?: string
           last_turn?: number
@@ -1184,7 +1182,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          character_key?: string | null
           created_at?: string
           id?: string
           last_turn?: number
@@ -1610,15 +1607,10 @@ export type Database = {
       get_character_runtime_readiness_for_environment: {
         Args: { p_character_key: string; p_environment_id: string }
         Returns: {
-          character_id: string
           character_key: string
           display_name: string
-          enabled: boolean
-          environment_id: string
-          notion_page_id: string
           opening_line: string
           portrait_url: string
-          prompt_updated_at: string
           ready: boolean
           tts_provider: string
           tts_voice_id: string
@@ -1680,14 +1672,6 @@ export type Database = {
           source_id: string
           source_table: string
         }[]
-      }
-      replace_character_embeddings: {
-        Args: {
-          p_character_id: string
-          p_embedding_profile: string
-          p_records: Json
-        }
-        Returns: number
       }
       patch_conversation_turn_trace: {
         Args: {
