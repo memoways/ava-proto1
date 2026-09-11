@@ -86,8 +86,11 @@ export function extractNotionBlockText(block: NotionContentBlock): { text: strin
   else if (block.type === "quote" && text) text = `> ${text}`;
   else if (block.type === "callout" && text) text = `📌 ${text}`;
   else if (block.type === "divider") text = "---";
+  // A known text block whose rich_text array is present but empty is an
+  // intentionally blank line in Notion, not an unreadable block.
+  const isKnownTextBlock = Array.isArray(data.rich_text);
   const unread = block.type === "unsupported"
-    || (!text && !block.has_children && !CONTAINER_OR_NON_TEXT_TYPES.has(block.type));
+    || (!text && !isKnownTextBlock && !block.has_children && !CONTAINER_OR_NON_TEXT_TYPES.has(block.type));
   return { text, unread };
 }
 
