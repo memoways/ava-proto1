@@ -1681,14 +1681,6 @@ export type Database = {
           source_table: string
         }[]
       }
-      replace_character_embeddings: {
-        Args: {
-          p_character_id: string
-          p_embedding_profile: string
-          p_records: Json
-        }
-        Returns: number
-      }
       patch_conversation_turn_trace: {
         Args: {
           p_path: string[]
@@ -1719,6 +1711,14 @@ export type Database = {
           invitation_id: string
           tester_label: string
         }[]
+      }
+      replace_character_embeddings: {
+        Args: {
+          p_character_id: string
+          p_embedding_profile: string
+          p_records: Json
+        }
+        Returns: number
       }
     }
     Enums: {
