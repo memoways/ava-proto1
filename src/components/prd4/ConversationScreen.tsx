@@ -4,6 +4,7 @@ import { Mic, Square, PhoneOff, Loader2, VideoOff, PhoneCall } from "lucide-reac
 import maxLarge from "@/assets/characters/max-large.jpg";
 import maxAvatar from "@/assets/characters/max.jpg";
 import emmaAvatar from "@/assets/characters/emma.jpg";
+import { displayNameForCharacter } from "@/services/characterRegistry";
 import type { AudioState, ConversationMessage } from "@/types";
 import { cn } from "@/lib/utils";
 import type { StreamingAvatarConnectionState } from "@/services/streamingAvatar";
@@ -22,7 +23,7 @@ interface Props {
   streamingAvatarActive?: boolean;
   streamingAvatarState?: StreamingAvatarConnectionState;
   attachAvatarMedia?: (element: HTMLMediaElement | null) => void;
-  activeCharacter?: "max" | "emma";
+  activeCharacter: "max" | "emma";
   portraitUrl?: string | null;
   handoffOffer?: { reason: string; targetCharacter?: "max" | "emma" } | null;
   handoffCalling?: boolean;
@@ -43,7 +44,7 @@ const ConversationScreen = ({
   streamingAvatarActive = false,
   streamingAvatarState = "inactive",
   attachAvatarMedia,
-  activeCharacter = "max",
+  activeCharacter,
   portraitUrl = null,
   handoffOffer = null,
   handoffCalling = false,
@@ -156,12 +157,12 @@ const ConversationScreen = ({
   const videoVisible = streamingAvatarActive && videoLive && !streamLost;
   const frozenVisible = streamingAvatarActive && hasFrozenFrame && !videoVisible;
   const photoVisible = !videoVisible && !frozenVisible;
-  const displayName = activeCharacter === "emma" ? "Emma" : "Max";
+  const displayName = displayNameForCharacter(activeCharacter);
   const portrait = portraitUrl ?? (activeCharacter === "emma" ? emmaAvatar : maxAvatar);
   const backgroundPortrait = portraitUrl ?? (activeCharacter === "emma" ? emmaAvatar : maxLarge);
   const offerTarget = handoffOffer?.targetCharacter === "max" ? "max" : "emma";
-  const offerTargetName = offerTarget === "max" ? "Max" : "Emma";
-  const callingName = (handoffCallingTarget === "max" ? "Max" : "Emma");
+  const offerTargetName = displayNameForCharacter(offerTarget);
+  const callingName = displayNameForCharacter(handoffCallingTarget ?? "emma");
 
   if (handoffCalling) {
     return (

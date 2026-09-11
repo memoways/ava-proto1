@@ -43,6 +43,18 @@ describe("voiceTelemetry", () => {
     });
   });
 
+  it("does not classify the asynchronous post-turn GM as player wait", () => {
+    expect(pickVoiceTurnBlocker({
+      t_max_llm_ms: 500,
+      t_tts_total_ms: 300,
+      t_gm_post_ms: 10_000,
+    })).toEqual({
+      blocker_step: "unknown",
+      blocker_reason: "within_budget",
+      severity: "ok",
+    });
+  });
+
   it("builds an aggregate voice turn payload with computed totals and browser metadata", () => {
     const payload = buildVoiceTurnCompletedPayload({
       session_id: "session-1",
@@ -61,6 +73,7 @@ describe("voiceTelemetry", () => {
         t_tts_total_ms: 500,
         t_audio_playback_total_ms: 2200,
         t_gm_post_ms: 250,
+        t_turn_voice_ready_ms: 1850,
       },
       models: { max_model: "google/gemini-2.0-flash-001" },
       tts: { provider: "elevenlabs", segments_count: 2, segments_played: 2, segments_failed: 0 },
@@ -69,10 +82,26 @@ describe("voiceTelemetry", () => {
 
     expect(payload.t_turn_response_ready_ms).toBe(1350);
     expect(payload.t_turn_voice_ready_ms).toBe(1850);
-    expect(payload.t_turn_end_to_end_ms).toBe(4300);
+    expect(payload.t_turn_end_to_end_ms).toBe(4050);
     expect(payload.browser_family).toBe("Chromium");
     expect(payload.blocker_step).toBe("unknown");
     expect(payload.severity).toBe("ok");
+    expect(payload.first_sound_status).toBe("measured");
+  });
+
+  it("does not synthesize a first sound from TTS or response-ready timings", () => {
+    const payload = buildVoiceTurnCompletedPayload({
+      turn_id: "session-1:3",
+      turn_index: 3,
+      character: "emma",
+      timings: {
+        t_turn_response_ready_ms: 900,
+        t_tts_total_ms: 400,
+      },
+    });
+
+    expect(payload.t_turn_voice_ready_ms).toBeUndefined();
+    expect(payload.first_sound_status).toBe("not_measured");
   });
 
   it("sends completed voice turns to PostHog and internal storage", () => {
@@ -81,7 +110,7 @@ describe("voiceTelemetry", () => {
       turn_id: "session-1:1",
       turn_index: 1,
       character: "max",
-      timings: { t_stt_total_ms: 120, t_max_llm_ms: 800, t_tts_total_ms: 280, t_turn_end_to_end_ms: 1200 },
+      timings: { t_stt_total_ms: 120, t_max_llm_ms: 800, t_tts_total_ms: 280, t_turn_voice_ready_ms: 1200, t_turn_end_to_end_ms: 1200 },
       models: { max_model: "openai/gpt-4o-mini" },
       stt: { provider: "Deepgram", model: "nova-2", mode: "realtime" },
       tts: { provider: "inworld", model: "inworld-tts-2" },
@@ -108,7 +137,7 @@ describe("voiceTelemetry", () => {
       turn_index: 1,
       correlation_id: "session-1:1",
       segment_key: "max_ms",
-      segment_label: "Max LLM",
+      segment_label: "Personnage LLM",
       duration_ms: 800,
       provider: "OpenRouter",
       model: "openai/gpt-4o-mini",

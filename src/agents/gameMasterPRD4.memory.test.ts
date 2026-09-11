@@ -14,6 +14,20 @@ import { callLLMWithUsage } from "@/services/openRouterLLM";
 import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
 import { evaluatePostTurnPRD4 } from "./gameMasterPRD4";
 import { createEmptyConversationMemory, mergeConversationMemory } from "@/services/conversationMemoryV1";
+import type { CharacterRelationshipPolicy } from "@/types";
+
+const relationshipPolicy: CharacterRelationshipPolicy = {
+  schemaVersion: 1,
+  characterKey: "max",
+  version: "policy-v1",
+  callDrive: "Comprendre pourquoi cette personne appelle.",
+  openingSignals: ["franchise"],
+  closingSignals: ["insistance"],
+  sensitiveTopics: [],
+  resistanceStyle: "Répondre partiellement.",
+  initiativeStyle: "Reprendre un fil précis.",
+  source: "notion",
+};
 
 describe("Game Master PRD4 — memory_delta", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -52,7 +66,7 @@ describe("Game Master PRD4 — memory_delta", () => {
       generationId: null,
       diagnosticTrace: null,
     } as never);
-    const memoryAfter = mergeConversationMemory(createEmptyConversationMemory(), delta as never, 1);
+    const memoryAfter = mergeConversationMemory(createEmptyConversationMemory(), delta as never, 1, "max");
     vi.mocked(persistPostTurnMemory).mockResolvedValue(memoryAfter);
 
     const result = await evaluatePostTurnPRD4({
@@ -61,6 +75,7 @@ describe("Game Master PRD4 — memory_delta", () => {
       userMessage: "Je m'appelle Alice, je suis médecin. Tu contrôles Emma.",
       maxResponse: "Oui. J'ai décidé à sa place.",
       userRole: null,
+      currentCharacter: "max",
       turnIndex: 1,
       timeElapsedSeconds: 30,
       sessionDurationSeconds: 900,
@@ -78,4 +93,61 @@ describe("Game Master PRD4 — memory_delta", () => {
       "max",
     );
   });
+
+  it("transmet les métadonnées du tour courant et accepte une progression valide", async () => {
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({
+      content: JSON.stringify({
+        labels: { themes: [], topics: [], intentions: ["empathie"] },
+        engagement_delta: 1,
+        confusion_detected: false,
+        role_usage_quality: "medium",
+        topics_covered: [],
+        transition_recommended: false,
+        cinematic_hint: null,
+        next_turn_guidance: "Garder cette ouverture mesurée.",
+        end_recommended: false,
+        moderation_flag: false,
+        notes: "",
+        trigger_video_id: null,
+        memory_delta: {
+          relationship: {
+            tier: "link",
+            topicOpenness: {},
+            justification: "L'interlocuteur a répondu avec franchise.",
+            evidence: ["honesty"],
+            sourceTurn: 4,
+            characterKey: "max",
+            policyVersion: "policy-v1",
+          },
+        },
+      }),
+      model: "openai/gpt-4.1-mini",
+      latencyMs: 10,
+      usage: null,
+      generationId: null,
+      diagnosticTrace: null,
+    } as never);
+
+    const result = await evaluatePostTurnPRD4({
+      sessionId: null,
+      conversationHistory: [],
+      conversationMemoryBefore: createEmptyConversationMemory(),
+      userMessage: "Je vais être franc avec toi.",
+      maxResponse: "Je t'écoute.",
+      userRole: null,
+      currentCharacter: "max",
+      relationshipPolicy,
+      turnIndex: 4,
+      timeElapsedSeconds: 90,
+      sessionDurationSeconds: 900,
+      minimumClosureSeconds: 600,
+      diagnosticTrace: true,
+    });
+
+    expect(result.relationship_transition).toMatchObject({ accepted: true, next: { tier: "link", sourceTurn: 4 } });
+    expect(result.diagnostic?.messages[1].content).toContain(
+      '"sourceTurn":4,"characterKey":"max","policyVersion":"policy-v1"',
+    );
+  });
+
 });

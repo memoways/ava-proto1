@@ -15,12 +15,13 @@ export const OPTIMIZED_V3_LIMITS = {
   ragChars: 1_800,
   ragItemChars: 700,
   ragItems: 3,
+  relationshipChars: 1_400,
 };
 
 export const OPTIMIZED_V3_CONVERSATION_CONTRACT = `# CONTRAT DE CONVERSATION
 - Parle à la première personne, en français oral, sans narration ni commentaire méta.
-- Réponds d'abord à la demande présente. Une à trois phrases parlées suffisent généralement ; un souvenir précis peut aller jusqu'à quatre phrases courtes. Aucun monologue.
-- Une question en retour est rare et utile. N'en pose jamais deux tours de suite et ne remplis jamais une fin de réponse avec une question réflexe.
+- Réagis à la demande présente selon la relation : réponds, nuance, retiens, conteste ou questionne. Une à trois phrases parlées suffisent généralement ; un souvenir précis peut aller jusqu'à quatre phrases courtes. Aucun monologue.
+- Une question en retour doit servir ton besoin propre ; ne remplis jamais une fin de réponse avec une question réflexe ou répétitive.
 - Ne rejoue aucune ouverture. Utilise le prénom, le rôle et les faits déjà confiés sans les redemander.
 - Interprète charitablement ambiguïtés, humour et erreurs de transcription. Une fermeture exige des attaques explicites répétées.
 - Distingue comprendre d'excuser : une explication n'efface jamais ta responsabilité.
@@ -68,6 +69,7 @@ export interface OptimizedPromptInput {
   userRole?: string;
   temporalContext?: string;
   gmGuidance?: string;
+  relationshipDirective?: string;
   guards?: string;
   postVideoContext?: string;
   ragCandidates?: OptimizedRagCandidate[];
@@ -78,7 +80,7 @@ const FIELD_SPECS: Array<{
   key: keyof Pick<CharacterPrompt,
     "situation_summary" | "identite_fondamentale" | "qui_tu_es" | "dynamique_conversation" |
     "ce_que_tu_ne_fais_jamais" | "ce_que_tu_sais_utilisateur" | "timeline" |
-    "sujets_sensibles" | "profondeur_par_niveau">;
+    "sujets_sensibles" | "profondeur_par_niveau" | "politique_relationnelle" | "references_intellectuelles">;
   title: string;
   baseScore: number;
   group: "core" | "canon";
@@ -93,6 +95,8 @@ const FIELD_SPECS: Array<{
   { key: "timeline", title: "TIMELINE CANONIQUE PERTINENTE", baseScore: 700, group: "canon", required: true },
   { key: "sujets_sensibles", title: "SUJETS SENSIBLES PERTINENTS", baseScore: 360, group: "canon" },
   { key: "profondeur_par_niveau", title: "PROFONDEUR ACTIVE", baseScore: 420, group: "canon" },
+  { key: "politique_relationnelle", title: "POLITIQUE RELATIONNELLE", baseScore: 740, group: "core" },
+  { key: "references_intellectuelles", title: "RÉFÉRENCES INTELLECTUELLES", baseScore: 260, group: "canon" },
 ];
 
 function normalizeForComparison(value: string): string {
@@ -416,6 +420,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   };
 
   append("character_core", `NOYAU DE ${canonicalName.toLocaleUpperCase("fr")}`, core, OPTIMIZED_V3_LIMITS.staticChars, "static");
+  append("relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective, OPTIMIZED_V3_LIMITS.relationshipChars, "runtime");
   const runtime = [input.userRole ? `Interlocuteur : ${input.userRole}` : "", input.temporalContext || "", input.gmGuidance ? `Orientation de jeu : ${input.gmGuidance}` : "", input.guards || ""]
     .filter(Boolean).join("\n");
   append("runtime_context", "ÉTAT DU TOUR", runtime, OPTIMIZED_V3_LIMITS.runtimeChars, "runtime");

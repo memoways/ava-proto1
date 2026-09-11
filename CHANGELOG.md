@@ -6,6 +6,45 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Non publié]
 
+### Relations crédibles, GM renforcé et multipersonnage natif
+
+- Ajout d'une politique relationnelle versionnée par personnage, de trois
+  paliers cachés (`contact`, `link`, `trust`) et d'une ouverture par
+  sujet. La directive du tour est calculée localement et injectée dans toutes
+  les variantes de prompt, sans appel IA bloquant supplémentaire.
+- Le GM post-tour reçoit désormais la politique, l'état courant, la directive
+  appliquée et la réplique diffusée. Ses propositions sont validées avant
+  persistance ; erreurs, doublons, résultats périmés et changements appliqués au
+  mauvais personnage conservent le dernier état valide.
+- La mémoire V3 sépare les faits déjà confiés de la disposition actuelle à
+  parler et conserve un état relationnel par personnage lors d'un changement ou
+  d'une reprise de session.
+- Registre multipersonnage commun pour le runtime et les tests : Max et Emma
+  sont actifs à égalité, Ava et Léo restent indisponibles, et une identité
+  absente ou inconnue ne revient plus silencieusement vers Max.
+- Le choix et l'appel affichent le cadre de rencontre provenant de la fiche
+  runtime. Le champ Notion de politique relationnelle est séparé des références
+  intellectuelles et visible sous forme compilée dans l'administration.
+- Le banc LLM as judge rejoue le graphe public et accepte qu'une retenue
+  appropriée constitue une bonne réponse.
+
+### Mesures AVA internes et réactivité
+
+- Les mesures internes AVA deviennent la source principale du diagnostic ;
+  PostHog reste la source de tendance. Les deux vues se rapprochent par
+  `session_id` / `turn_id` et affichent couverture, écarts et filtres communs.
+  La vue AVA reste disponible lorsque PostHog est absent ou en échec.
+- Correction de la perte du TTS dans les agrégations synthétiques : la
+  reproduction à 3,2 s affiche désormais 3,7 s lorsque le premier son TTS vaut
+  1 s. Toutes les moyennes utilisent des segments de même sémantique.
+- Mesure explicite entre validation PTT et premier son effectivement joué,
+  avec origine et statut. Le premier token LLM n'est plus utilisé comme repli
+  audio.
+- Le GM post-tour reste mesuré pour diagnostic mais est exclu du temps
+  d'attente, de la barre du joueur et du choix du blocage.
+
+Plan : [`docs/plan_orchestration_experience_et_reglages_gm.md`](docs/plan_orchestration_experience_et_reglages_gm.md).
+
 ### Corrigé
 
 - Verrouillage de l'identité Emma/Max dans les quatre variantes de prompt à

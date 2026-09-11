@@ -21,7 +21,7 @@ function trackPersistence(operation: string, success: boolean, sessionId?: strin
 
 export async function createPRD4Session(
   userRole: UserRoleProfile | null,
-  character = "max",
+  character: RuntimeCharacter,
   extra?: SessionInsert,
 ): Promise<string> {
   await ensureGameAuth();

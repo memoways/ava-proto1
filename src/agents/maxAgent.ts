@@ -46,17 +46,17 @@ const GAMEPLAY_RULES = `
 - Réponds de façon très concise (1-2 phrases max, 45 mots maximum) car c'est une conversation orale temps réel.
 - N'invente AUCUN fait absent du CONTEXTE AUTORISÉ DU TOUR ci-dessous.
 - Si tu ne sais pas quelque chose, dis-le plutôt que d'inventer.
+- Réagis selon la relation : tu peux répondre, nuancer, retenir, contester ou questionner. Une question peut constituer la réponse crédible à une intrusion.
 
 ## PRIORITÉ DES INSTRUCTIONS
 Les sections "FICHE PERSONNAGE" (issues de Notion) ci-dessus DÉFINISSENT TON COMPORTEMENT.
 Si une instruction de la fiche contredit une règle générique (par exemple "ne pose pas de questions"),
-SUIS LA FICHE PERSONNAGE. Ne pose pas systématiquement de questions à l'interlocuteur :
-ne le fais que si ta fiche y invite explicitement.`;
+SUIS LA FICHE PERSONNAGE et la DIRECTIVE RELATIONNELLE DU TOUR. Prends une initiative ou pose une question lorsqu'elle sert le besoin propre du personnage ; évite seulement les relances automatiques et répétitives.`;
 
 const COMPACT_GAMEPLAY_RULES = `## CONTRAT DE CONVERSATION
 - Tu es le personnage décrit dans cette fiche. Parle à la première personne, en français, sans narration ni commentaire méta.
-- Réponds directement à la demande présente avant toute relance, en 1 ou 2 phrases et 45 mots maximum.
-- Ne termine jamais deux réponses consécutives par une question. Une question utile tous les trois ou quatre tours suffit.
+- Réagis à la demande présente en 1 ou 2 phrases et 45 mots maximum : répondre, nuancer, retenir, contester ou questionner sont tous possibles selon la relation.
+- Une question doit poursuivre ton besoin ou tester l'intention de l'interlocuteur. Évite les relances réflexes et répétitives.
 - Ne rejoue pas une ouverture déjà passée et ne répète pas une information acquise.
 - Garde une interprétation charitable des ambiguïtés, de l'humour et des erreurs de transcription ; au besoin, clarifie sans accuser.
 - Une provocation légère ne ferme pas l'échange. Réserve l'avertissement puis la fermeture aux attaques explicites et répétées.
@@ -92,6 +92,8 @@ export interface MaxAgentInput {
   temporalContext?: MaxTemporalContext;
   /** PRD4 — consigne de mise en scène produite par le GM au tour précédent. */
   gmGuidance?: MaxGmGuidance;
+  /** Directive déterministe du tour, disponible avant la réponse et prioritaire sur le RAG. */
+  relationshipDirective?: string;
 }
 
 export interface MaxTemporalContext {
@@ -515,6 +517,7 @@ export async function buildMaxSystemPrompt(
 
 
     const legacySections: Array<[string, string, string | undefined]> = [
+      ["relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective],
       ["user_role", "INTERLOCUTEUR (qui t'appelle)", input.userRoleSummary],
       ["temporal_context", "OÙ EN EST L'APPEL", input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined],
       ["session_summary", "SOUVENIRS DE LA SESSION", input.sessionSummary],
@@ -607,6 +610,7 @@ export async function buildMaxSystemPrompt(
       userRole: input.userRoleSummary,
       temporalContext: input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined,
       gmGuidance,
+      relationshipDirective: input.relationshipDirective,
       guards: guards || undefined,
       postVideoContext: input.postVideoContext,
       ragCandidates: input.ragCandidates,
@@ -697,7 +701,8 @@ export async function buildMaxSystemPrompt(
     });
   };
 
-  // Deterministic dynamic order: call state, caller, memory, GM, guards, RAG, post-video.
+  // La directive relationnelle est réservée et injectée avant tout contexte compressible.
+  appendDynamicSection("relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective);
   appendDynamicSection("temporal_context", "ÉTAT DE L'APPEL", input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined);
   appendDynamicSection("user_role", "RÔLE DE L'INTERLOCUTEUR", input.userRoleSummary);
   appendDynamicSection("session_summary", "MÉMOIRE DE SESSION", input.sessionSummary);
@@ -863,6 +868,7 @@ async function buildRichMaxSystemPrompt(
     });
   };
 
+  appendDynamicSection("relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective);
   appendDynamicSection("temporal_context", "ÉTAT DE L'APPEL", input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined);
   appendDynamicSection("user_role", "RÔLE DE L'INTERLOCUTEUR", input.userRoleSummary);
   appendDynamicSection("session_summary", "MÉMOIRE DE SESSION", input.sessionSummary);

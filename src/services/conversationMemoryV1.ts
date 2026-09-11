@@ -7,6 +7,10 @@ import type {
   CharacterScopedMemory,
   RuntimeCharacter,
 } from "@/types";
+import {
+  createInitialRelationshipState,
+  normalizeRelationshipState,
+} from "@/services/relationshipEngine";
 
 const LIMITS = {
   traits: 8,
@@ -21,8 +25,9 @@ const LIMITS = {
 };
 
 export function createEmptyConversationMemory(): ConversationMemoryV1 {
+  const relationshipState = createInitialRelationshipState("max", "unversioned");
   return {
-    version: 2,
+    version: 3,
     lastTurn: 0,
     interlocutor: { name: null, role: null, traits: [] },
     userFacts: [],
@@ -35,6 +40,7 @@ export function createEmptyConversationMemory(): ConversationMemoryV1 {
       trust: "neutre",
       emotionalState: null,
       sourceTurn: 0,
+      ...relationshipState,
     },
     lastExchange: null,
     characterItems: [],
@@ -42,7 +48,12 @@ export function createEmptyConversationMemory(): ConversationMemoryV1 {
   };
 }
 
-function emptyCharacterState(sourceTurn = 0): CharacterScopedMemory {
+function emptyCharacterState(
+  character: RuntimeCharacter,
+  sourceTurn = 0,
+  policyVersion = "unversioned",
+): CharacterScopedMemory {
+  const relationshipState = createInitialRelationshipState(character, policyVersion);
   return {
     userFacts: [],
     characterDisclosures: [],
@@ -53,6 +64,7 @@ function emptyCharacterState(sourceTurn = 0): CharacterScopedMemory {
       depth: "surface",
       trust: "neutre",
       emotionalState: null,
+      ...relationshipState,
       sourceTurn,
     },
     lastExchange: null,
@@ -67,7 +79,8 @@ function sanitizeCharacterItems(raw: unknown, fallbackTurn: number): CharacterMe
     const candidate = entry as Partial<CharacterMemoryItemV2>;
     const text = normalizeMemoryText(candidate.text);
     if (!text) continue;
-    const sourceCharacter: RuntimeCharacter = candidate.sourceCharacter === "emma" ? "emma" : "max";
+    if (candidate.sourceCharacter !== "max" && candidate.sourceCharacter !== "emma") continue;
+    const sourceCharacter: RuntimeCharacter = candidate.sourceCharacter;
     const visibility = "private" as const;
     const visibleTo: RuntimeCharacter[] = [sourceCharacter];
     const sourceTurn = Number.isFinite(Number(candidate.sourceTurn))
@@ -176,7 +189,7 @@ export function normalizeConversationMemory(raw: unknown): ConversationMemoryV1 
     : createEmptyConversationMemory().relationship;
 
   return {
-    version: 2,
+    version: 3,
     lastTurn,
     interlocutor: {
       name: normalizeMemoryText(interlocutor.name, 80) || null,
@@ -192,9 +205,7 @@ export function normalizeConversationMemory(raw: unknown): ConversationMemoryV1 
       depth: isDepth(relationship.depth) ? relationship.depth : "surface",
       trust: relationship.trust === "fragile" || relationship.trust === "ouverte" ? relationship.trust : "neutre",
       emotionalState: normalizeMemoryText(relationship.emotionalState, 160) || null,
-      sourceTurn: Number.isFinite(Number(relationship.sourceTurn))
-        ? Math.max(0, Math.floor(Number(relationship.sourceTurn)))
-        : lastTurn,
+      ...normalizeRelationshipState(relationship, "max", "unversioned"),
     },
     lastExchange: normalizeMemoryText(candidate.lastExchange, LIMITS.lastExchangeChars) || null,
     characterItems: sanitizeCharacterItems(candidate.characterItems, lastTurn),
@@ -214,7 +225,12 @@ function sanitizeCharacterStates(
     if (!state || typeof state !== "object") continue;
     const relationship = state.relationship && typeof state.relationship === "object"
       ? state.relationship
-      : emptyCharacterState().relationship;
+      : emptyCharacterState(character).relationship;
+    const normalizedRelationship = normalizeRelationshipState(
+      relationship,
+      character,
+      typeof relationship.policyVersion === "string" ? relationship.policyVersion : "unversioned",
+    );
     result[character] = {
       userFacts: sanitizeItems(state.userFacts, `${character}_user`, LIMITS.userFacts, fallbackTurn),
       characterDisclosures: sanitizeItems(state.characterDisclosures, `${character}_disclosure`, LIMITS.maxDisclosures, fallbackTurn),
@@ -225,9 +241,7 @@ function sanitizeCharacterStates(
         depth: isDepth(relationship.depth) ? relationship.depth : "surface",
         trust: relationship.trust === "fragile" || relationship.trust === "ouverte" ? relationship.trust : "neutre",
         emotionalState: normalizeMemoryText(relationship.emotionalState, 160) || null,
-        sourceTurn: Number.isFinite(Number(relationship.sourceTurn))
-          ? Math.max(0, Math.floor(Number(relationship.sourceTurn)))
-          : fallbackTurn,
+        ...normalizedRelationship,
       },
       lastExchange: normalizeMemoryText(state.lastExchange, LIMITS.lastExchangeChars) || null,
     };
@@ -259,7 +273,7 @@ export function mergeConversationMemory(
   previousRaw: unknown,
   delta: ConversationMemoryDelta | null | undefined,
   turnIndex: number,
-  activeCharacter: RuntimeCharacter = "max",
+  activeCharacter: RuntimeCharacter,
 ): ConversationMemoryV1 {
   const previous = normalizeConversationMemory(previousRaw);
   if (!delta || turnIndex <= previous.lastTurn) return previous;
@@ -267,6 +281,29 @@ export function mergeConversationMemory(
   const interlocutorName = normalizeMemoryText(delta.interlocutor?.name, 80);
   const interlocutorRole = normalizeMemoryText(delta.interlocutor?.role, 160);
   const emotionalState = normalizeMemoryText(delta.relationship?.emotionalState, 160);
+  const previousRelationship = previous.characterStates?.[activeCharacter]?.relationship
+    ?? (activeCharacter === "max" ? previous.relationship : emptyCharacterState(activeCharacter).relationship);
+  const candidateTier = delta.relationship?.tier === "contact"
+    || delta.relationship?.tier === "link"
+    || delta.relationship?.tier === "trust"
+    ? delta.relationship.tier
+    : previousRelationship.tier;
+  const candidateTopicOpenness = delta.relationship?.topicOpenness && typeof delta.relationship.topicOpenness === "object"
+    ? Object.fromEntries(Object.entries(delta.relationship.topicOpenness).filter(([, value]) => value === "closed" || value === "partial" || value === "open"))
+    : {};
+  const candidateEvidence = (delta.relationship?.evidence ?? []).filter((value) =>
+    value === "precise_listening"
+    || value === "honesty"
+    || value === "boundary_respected"
+    || value === "relevant_confrontation"
+    || value === "repair"
+    || value === "reciprocal_disclosure"
+    || value === "boundary_pressure"
+    || value === "contradiction"
+    || value === "hostility"
+    || value === "politeness"
+    || value === "character_disclosure"
+  );
   const explicitCharacterItems = (delta.characterItems ?? []).map((item) => ({
     id: stableId(`character_${activeCharacter}`, item.text),
     text: item.text,
@@ -337,12 +374,24 @@ export function mergeConversationMemory(
       ),
       trust: delta.relationship?.trust === "fragile" || delta.relationship?.trust === "neutre" || delta.relationship?.trust === "ouverte"
         ? delta.relationship.trust
-        : previous.characterStates?.[activeCharacter]?.relationship.trust
-          ?? (activeCharacter === "max" ? previous.relationship.trust : "neutre"),
+        : candidateTier === "trust"
+          ? "ouverte"
+          : candidateTier === "contact" && previousRelationship.trust === "fragile"
+            ? "fragile"
+            : "neutre",
       emotionalState: emotionalState
-        || previous.characterStates?.[activeCharacter]?.relationship.emotionalState
-        || (activeCharacter === "max" ? previous.relationship.emotionalState : null),
-      sourceTurn: turnIndex,
+        || previousRelationship.emotionalState,
+      sourceTurn: Number.isFinite(Number(delta.relationship?.sourceTurn))
+        ? Math.max(previousRelationship.sourceTurn, Math.floor(Number(delta.relationship?.sourceTurn)))
+        : turnIndex,
+      tier: candidateTier,
+      topicOpenness: { ...previousRelationship.topicOpenness, ...candidateTopicOpenness },
+      justification: normalizeMemoryText(delta.relationship?.justification, 280)
+        || previousRelationship.justification,
+      evidence: candidateEvidence.length ? candidateEvidence : previousRelationship.evidence,
+      characterKey: activeCharacter,
+      policyVersion: normalizeMemoryText(delta.relationship?.policyVersion, 120)
+        || previousRelationship.policyVersion,
     },
     lastExchange: normalizeMemoryText(delta.lastExchange, LIMITS.lastExchangeChars)
       || previous.characterStates?.[activeCharacter]?.lastExchange
@@ -401,7 +450,7 @@ export function filterConversationMemoryForCharacter(
       commitments: scoped ? asItems(scoped.commitments) : [],
       openThreads: scoped ? asItems(scoped.openThreads) : [],
       topics: scoped ? asItems(scoped.topics) : [],
-      relationship: scoped?.relationship ?? emptyCharacterState().relationship,
+      relationship: scoped?.relationship ?? emptyCharacterState(character).relationship,
       lastExchange: scoped?.lastExchange ?? null,
       characterItems: visibleItems,
       interlocutor: {

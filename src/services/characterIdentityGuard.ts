@@ -1,4 +1,5 @@
 import type { RuntimeCharacter } from "@/types";
+import { AVA_CHARACTER_REGISTRY, displayNameForCharacter } from "@/services/characterRegistry";
 
 export interface CharacterExecutionContext {
   characterKey: RuntimeCharacter;
@@ -53,7 +54,7 @@ export function assertCharacterExecutionContext(
   if (!context.promptUpdatedAt.trim() || Number.isNaN(Date.parse(context.promptUpdatedAt))) {
     throw new Error("Character execution context has an invalid prompt version");
   }
-  const expectedFirstName = context.characterKey === "emma" ? "emma" : "max";
+  const expectedFirstName = context.characterKey.toLocaleLowerCase("fr");
   if (context.displayName.trim().toLocaleLowerCase("fr").split(/\s+/)[0] !== expectedFirstName) {
     throw new Error("Character execution context identity is inconsistent");
   }
@@ -97,11 +98,10 @@ function explicitlyClaimsIdentity(value: string, otherFirstName: string, activeF
 }
 
 export function responseClaimsForeignIdentity(response: string, character: RuntimeCharacter): boolean {
-  return explicitlyClaimsIdentity(
-    response,
-    character === "emma" ? "Max" : "Emma",
-    character === "emma" ? "Emma" : "Max",
-  );
+  const activeName = displayNameForCharacter(character);
+  return AVA_CHARACTER_REGISTRY.entries
+    .filter((entry) => entry.availability === "active" && entry.key !== character)
+    .some((entry) => explicitlyClaimsIdentity(response, entry.displayName, activeName));
 }
 
 export function guardCharacterResponse(
@@ -109,7 +109,7 @@ export function guardCharacterResponse(
   context: CharacterExecutionContext,
 ): CharacterResponseGuardResult {
   assertCharacterExecutionContext(context);
-  const activeFirstName = context.characterKey === "emma" ? "Emma" : "Max";
+  const activeFirstName = context.displayName.trim().split(/\s+/)[0] || displayNameForCharacter(context.characterKey);
   if (!responseClaimsForeignIdentity(response, context.characterKey)) {
     return { blocked: false, response, reason: null };
   }

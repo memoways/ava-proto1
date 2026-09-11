@@ -28,6 +28,13 @@ import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMe
 import { selectOptimizedConversation, selectRecentConversation, selectUnsummarizedConversation } from "@/services/conversationMemory";
 import { fetchConversationMemory } from "@/services/sessionConversationMemory";
 import { filterConversationMemoryForCharacter } from "@/services/conversationMemoryV1";
+import { loadCharacterPrompt } from "@/services/characterPromptService";
+import {
+  buildTurnRelationshipDirective,
+  compileCharacterRelationshipPolicy,
+  createInitialRelationshipState,
+  normalizeRelationshipState,
+} from "@/services/relationshipEngine";
 import { fetchPinnedDirectorRuntime } from "@/services/experienceOrchestration";
 import { withTimeout } from "@/services/asyncUtils";
 import { compactConversationTurnTrace } from "@/services/conversationTraceFormat";
@@ -71,6 +78,22 @@ export interface PRD4TurnInput {
   turnIndex?: number;
   /** Exact trace mode, honored only for admin-owned diagnostic sessions. */
   diagnosticTraceEnabled?: boolean;
+  /** Test-only values; the public PRD4 execution graph remains unchanged. */
+  evaluationOverrides?: {
+    featureKey?: string;
+    ragTopK?: number;
+    ragThreshold?: number;
+    ragRetrieveK?: number;
+    ragRerank?: boolean;
+    ragRerankModel?: "rerank-2.5" | "rerank-2.5-lite";
+    ragRerankTruncation?: boolean;
+    llm?: {
+      model: string;
+      temperature: number;
+      maxTokens: number;
+      topP: number;
+    };
+  };
 }
 
 export interface PRD4TurnResult {
@@ -112,6 +135,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const gameplay = (() => {
     try { return getGameplaySettings(); } catch { return null; }
   })();
+  const evaluationOverrides = input.evaluationOverrides;
   const recentConversation = selectRecentConversation(input.conversationHistory);
   const sessionDurationSeconds = normalizeSessionDurationSeconds(gameplay?.TIMEOUT_SECONDS);
   const minimumClosureSeconds = getSessionMinimumClosureSeconds(sessionDurationSeconds);
@@ -128,13 +152,16 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       summaryFetchMs = Math.round(performance.now() - summaryStartedAt);
       return record;
     });
-  const memoryPromise = gameplay?.MAX_PROMPT_VARIANT === "optimized_v3" && input.sessionId
+  const memoryPromise = input.sessionId
     ? withTimeout(
         "prd4_structured_memory_fetch",
         fetchConversationMemory(input.sessionId),
         SUMMARY_FETCH_DEADLINE_MS,
       ).catch(() => null)
     : Promise.resolve(null);
+  // Démarre avec la mémoire et le RAG. simulateMaxResponse relira la même fiche
+  // depuis le cache : aucune requête supplémentaire n'est ajoutée en série.
+  const characterPromptPromise = loadCharacterPrompt(input.characterContext.characterId);
   const directorRuntimePromise = fetchPinnedDirectorRuntime(input.sessionId).catch(() => ({
     versionId: null,
     versionNumber: null,
@@ -158,17 +185,17 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       queryRAGDetailed(
         input.userMessage,
         recent,
-        gameplay?.MAX_PROMPT_VARIANT === "optimized_v3"
+        evaluationOverrides?.ragTopK ?? (gameplay?.MAX_PROMPT_VARIANT === "optimized_v3"
           ? Math.max(6, gameplay?.RAG_TOP_K ?? 3)
-          : gameplay?.RAG_TOP_K ?? 5,
-        gameplay?.RAG_MATCH_THRESHOLD,
+          : gameplay?.RAG_TOP_K ?? 5),
+        evaluationOverrides?.ragThreshold ?? gameplay?.RAG_MATCH_THRESHOLD,
         {
           characterId: input.characterContext.characterId,
           characterContext: input.characterContext,
-          rerank: gameplay?.RAG_RERANK_ENABLED,
-          retrieveK: gameplay?.RAG_RETRIEVE_K ?? RAG_DEFAULT_RETRIEVE_K,
-          rerankModel: gameplay?.RAG_RERANK_MODEL,
-          rerankTruncation: gameplay?.RAG_RERANK_TRUNCATION,
+          rerank: evaluationOverrides?.ragRerank ?? gameplay?.RAG_RERANK_ENABLED,
+          retrieveK: evaluationOverrides?.ragRetrieveK ?? gameplay?.RAG_RETRIEVE_K ?? RAG_DEFAULT_RETRIEVE_K,
+          rerankModel: evaluationOverrides?.ragRerankModel ?? gameplay?.RAG_RERANK_MODEL,
+          rerankTruncation: evaluationOverrides?.ragRerankTruncation ?? gameplay?.RAG_RERANK_TRUNCATION,
           signal: input.signal,
           timeoutMs: RAG_DEGRADED_MODE_DEADLINE_MS,
         },
@@ -196,12 +223,23 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
 
   // --- Max --------------------------------------------------------------------
   const maxStart = performance.now();
-  input.onLatencySegment?.({ type: "start", segment: "LLM", service: "Max LLM" });
+  input.onLatencySegment?.({ type: "start", segment: "LLM", service: "Personnage LLM" });
   const summaryRecord = await summaryPromise;
   const structuredMemory = await memoryPromise;
+  const characterPrompt = await characterPromptPromise;
+  if (!characterPrompt) throw new Error(`Fiche personnage absente pour ${input.characterContext.displayName}`);
   const visibleStructuredMemory = structuredMemory
     ? filterConversationMemoryForCharacter(structuredMemory, activeCharacter)
     : null;
+  const relationshipPolicy = compileCharacterRelationshipPolicy(characterPrompt, activeCharacter);
+  const relationshipState = visibleStructuredMemory
+    ? normalizeRelationshipState(visibleStructuredMemory.relationship, activeCharacter, relationshipPolicy.version)
+    : createInitialRelationshipState(activeCharacter, relationshipPolicy.version);
+  const relationshipDirective = buildTurnRelationshipDirective({
+    policy: relationshipPolicy,
+    state: relationshipState,
+    userMessage: input.userMessage,
+  });
   const sliceUserTurns = input.conversationHistory.filter((message) => message.role === "user").length;
   const memoryLastTurn = structuredMemory?.lastTurn ?? 0;
   const maxConversationHistory = gameplay?.MAX_PROMPT_VARIANT === "optimized_v3"
@@ -238,6 +276,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     gmGuidance: input.gmGuidance?.trim()
       ? { guidance: input.gmGuidance, topicsCovered: input.gmTopicsCovered }
       : undefined,
+    relationshipDirective: relationshipDirective.prompt,
   };
   let maxResponse = "";
   let max_ms = 0;
@@ -251,10 +290,11 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     maxResult = await simulateMaxResponse(maxInput, {
       characterName: input.characterContext.displayName,
       characterContext: input.characterContext,
-      featureKey: "prd4_chat",
+      featureKey: evaluationOverrides?.featureKey ?? "prd4_chat",
       timeoutMs: Math.min(MAX_LLM_RESPONSE_DEADLINE_MS, remainingMs),
       signal: input.signal,
       diagnosticTrace: diagnosticTraceEnabled,
+      llmOverrides: evaluationOverrides?.llm,
     });
     identityGuard = guardCharacterResponse(maxResult.response, input.characterContext);
     maxResponse = identityGuard.response;
@@ -265,7 +305,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     maxResponse = MAX_FALLBACK_RESPONSE;
   } finally {
     max_ms = Math.round(performance.now() - maxStart);
-    input.onLatencySegment?.({ type: "end", segment: "LLM", service: "Max LLM", durationMs: max_ms });
+    input.onLatencySegment?.({ type: "end", segment: "LLM", service: "Personnage LLM", durationMs: max_ms });
   }
 
   // --- GM post-turn (void) ---------------------------------------------------
@@ -294,6 +334,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         orchestrationConfig: directorRuntime.config,
         currentCharacter: activeCharacter,
         characterContext: input.characterContext,
+        relationshipPolicy,
+        turnRelationshipDirective: relationshipDirective,
       });
     } finally {
       input.onLatencySegment?.({

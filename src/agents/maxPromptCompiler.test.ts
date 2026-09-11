@@ -19,6 +19,8 @@ function makePrompt(overrides: Partial<CharacterPrompt> = {}): CharacterPrompt {
     dynamique_conversation: "Répondre directement.",
     sujets_sensibles: "Emma et Mona.",
     profondeur_par_niveau: "NIVEAU 1\nPosture analytique.\nNIVEAU 2\nPremière fissure.",
+    politique_relationnelle: "Moteur\nComprendre l'appel.\n\nRésistance\nRépondre partiellement.",
+    references_intellectuelles: "Journalisme scientifique.",
     ...overrides,
   };
 }
@@ -35,6 +37,8 @@ describe("maxPromptCompiler", () => {
       "ce_que_tu_sais_utilisateur",
       "dynamique_conversation",
       "profondeur_par_niveau",
+      "politique_relationnelle",
+      "references_intellectuelles",
     ]);
   });
 

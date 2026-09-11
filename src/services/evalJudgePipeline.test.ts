@@ -100,7 +100,7 @@ describe("OFAT configs", () => {
 });
 
 describe("cost estimate", () => {
-  it("multiplies items × configs × repeats × 4 LLM calls", () => {
+  it("multiplies items × configs × repeats × 3 LLM calls", () => {
     const configs = buildOfatConfigs(live, {
       extraModels: ["openai/gpt-5-mini"],
       samplingTemps: [0],
@@ -109,7 +109,7 @@ describe("cost estimate", () => {
     const estimate = estimateEvalRun(15, configs, EVAL_REPEATS);
     expect(configs).toHaveLength(4);
     expect(estimate.turns).toBe(15 * 4 * 3);
-    expect(estimate.llmCalls).toBe(estimate.turns * 4);
+    expect(estimate.llmCalls).toBe(estimate.turns * 3);
     expect(estimate.estimatedCostUsd).toBeGreaterThan(0);
     expect(parseUsdPerMillion("$0.30")).toBe(0.3);
   });
@@ -129,6 +129,7 @@ describe("judge JSON", () => {
     const prompt = buildJudgePrompt(item("1", "Où habites-tu ?"), "J'habite à Lausanne.");
     expect(prompt).toContain("MUST INCLUDE");
     expect(prompt).toContain("Ne récompense PAS le copier-coller");
+    expect(prompt).toContain("Une retenue");
     expect(prompt).toContain("J'habite à Lausanne.");
   });
 });

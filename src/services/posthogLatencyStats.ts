@@ -68,9 +68,14 @@ export interface PosthogLatencyStats {
 }
 
 export interface InternalLatencyComparison {
-  source: "Supabase interne";
+  source: "AVA interne";
   turnCount: number;
   sessionCount: number;
+  measuredFirstSound: number;
+  unmeasuredFirstSound: number;
+  firstSoundCoverageRate: number | null;
+  errorCount: number;
+  errorRate: number | null;
   p50FirstSoundMs: number | null;
   p95FirstSoundMs: number | null;
   p50ResponseReadyMs: number | null;
@@ -79,14 +84,29 @@ export interface InternalLatencyComparison {
   missingInInternal: number;
   onlyInternal: number;
   costPerSessionUsd: number | null;
+  providers: PosthogLatencyStats["providers"];
 }
 
 interface TurnLatencyRow {
   session_id: string | null;
-  t_turn_total_ms: number | null;
-  t_max_first_token_ms: number | null;
   metadata_json: {
     turn_id?: string;
+  } | null;
+}
+
+export interface VoiceEventRow {
+  session_id: string | null;
+  turn_id: string | null;
+  context_type: string | null;
+  severity?: string | null;
+  metadata_json: {
+    character?: string;
+    max_model?: string;
+    stt_provider?: string;
+    tts_provider?: string;
+    browser_family?: string;
+    first_sound_status?: "measured" | "failed" | "not_measured";
+    had_error?: boolean;
     t_turn_voice_ready_ms?: number;
     t_turn_response_ready_ms?: number;
   } | null;
@@ -112,6 +132,17 @@ function percentile(values: number[], p: number): number | null {
   return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1))];
 }
 
+function countDimension(values: Array<string | null | undefined>): Array<{ key: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const raw of values) {
+    const key = raw?.trim();
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([key, count]) => ({ key, count }))
+    .sort((left, right) => right.count - left.count || left.key.localeCompare(right.key));
+}
+
 export async function loadPosthogLatencyStats(input: {
   period: PosthogPeriod;
   from?: string;
@@ -125,50 +156,112 @@ export async function loadPosthogLatencyStats(input: {
   return data as PosthogLatencyStats;
 }
 
-export async function loadInternalLatencyComparison(posthog: PosthogLatencyStats): Promise<InternalLatencyComparison> {
-  const [voiceResult, usageResult, audioResult, traceResult] = await Promise.all([
-    supabase.from("turn_latencies" as never).select("session_id, t_turn_total_ms, t_max_first_token_ms, metadata_json").gte("created_at", posthog.period.from).lt("created_at", posthog.period.to),
+export async function loadInternalLatencyComparison(
+  posthog: Pick<PosthogLatencyStats, "period" | "turnIds">,
+  options: { filters?: Record<string, string>; includeSandbox?: boolean } = {},
+): Promise<InternalLatencyComparison> {
+  const [voiceResult, legacyTurnResult, usageResult, audioResult, traceResult] = await Promise.all([
+    supabase.from("voice_turn_events" as never).select("session_id, turn_id, context_type, severity, metadata_json").gte("created_at", posthog.period.from).lt("created_at", posthog.period.to),
+    supabase.from("turn_latencies" as never).select("session_id, metadata_json").gte("created_at", posthog.period.from).lt("created_at", posthog.period.to),
     supabase.from("llm_usage" as never).select("session_id, cost_usd").gte("created_at", posthog.period.from).lt("created_at", posthog.period.to),
     supabase.from("audio_latencies" as never).select("session_id, tts_text_len, metadata_json").eq("direction", "out").gte("created_at", posthog.period.from).lt("created_at", posthog.period.to),
     supabase.from("conversation_turn_traces" as never).select("turn_id").gte("created_at", posthog.period.from).lt("created_at", posthog.period.to),
   ]);
-  const queryError = voiceResult.error ?? usageResult.error ?? audioResult.error ?? traceResult.error;
-  if (queryError) throw queryError;
-  const voice = (voiceResult.data ?? []) as unknown as TurnLatencyRow[];
-  const usage = (usageResult.data ?? []) as unknown as UsageRow[];
-  const audio = (audioResult.data ?? []) as unknown as AudioRow[];
-  const traces = (traceResult.data ?? []) as unknown as TraceRow[];
-  const internalIds = new Set(
-    [...voice.map((row) => row.metadata_json?.turn_id), ...traces.map((row) => row.turn_id)].filter((value): value is string => Boolean(value)),
-  );
+  // La mesure voix AVA est la source principale. Les tables historiques,
+  // coûts et traces enrichissent la comparaison mais ne doivent pas rendre la
+  // mesure interne indisponible si l'une d'elles manque ou échoue.
+  if (voiceResult.error) throw voiceResult.error;
+  const allVoice = (voiceResult.data ?? []) as unknown as VoiceEventRow[];
+  const legacyTurns = (legacyTurnResult.error ? [] : legacyTurnResult.data ?? []) as unknown as TurnLatencyRow[];
+  const usage = (usageResult.error ? [] : usageResult.data ?? []) as unknown as UsageRow[];
+  const audio = (audioResult.error ? [] : audioResult.data ?? []) as unknown as AudioRow[];
+  const traces = (traceResult.error ? [] : traceResult.data ?? []) as unknown as TraceRow[];
+  const voiceInEnvironment = allVoice.filter((row) => options.includeSandbox || row.context_type !== "sandbox");
+  const providers: PosthogLatencyStats["providers"] = {
+    characters: countDimension(voiceInEnvironment.map((row) => row.metadata_json?.character)),
+    models: countDimension(voiceInEnvironment.map((row) => row.metadata_json?.max_model)),
+    stt: countDimension(voiceInEnvironment.map((row) => row.metadata_json?.stt_provider)),
+    tts: countDimension(voiceInEnvironment.map((row) => row.metadata_json?.tts_provider)),
+    browsers: countDimension(voiceInEnvironment.map((row) => row.metadata_json?.browser_family)),
+  };
+  const voice = voiceInEnvironment.filter((row) => {
+    const metadata = row.metadata_json ?? {};
+    const dimensions: Record<string, string | undefined> = {
+      character: metadata.character,
+      model: metadata.max_model,
+      stt: metadata.stt_provider,
+      tts: metadata.tts_provider,
+      browser: metadata.browser_family,
+    };
+    return Object.entries(options.filters ?? {}).every(([key, expected]) => !expected || dimensions[key] === expected);
+  });
+  const voiceIds = voice.map((row) => row.turn_id).filter((value): value is string => Boolean(value));
+  const selectedSessions = new Set(voice.map((row) => row.session_id).filter((value): value is string => Boolean(value)));
+  const internalIds = new Set([
+    ...voiceIds,
+    ...legacyTurns
+      .filter((row) => posthog.turnIds.includes(row.metadata_json?.turn_id ?? ""))
+      .map((row) => row.metadata_json?.turn_id),
+    ...traces
+      .filter((row) => posthog.turnIds.includes(row.turn_id ?? ""))
+      .map((row) => row.turn_id),
+  ].filter((value): value is string => Boolean(value)));
   const posthogIds = new Set(posthog.turnIds);
   const persisted = [...posthogIds].filter((id) => internalIds.has(id)).length;
   const missingInInternal = [...posthogIds].filter((id) => !internalIds.has(id)).length;
   const onlyInternal = [...internalIds].filter((id) => !posthogIds.has(id)).length;
   const sessions = new Set(voice.map((row) => row.session_id).filter(Boolean));
-  const responseReady = voice.map((row) => row.metadata_json?.t_turn_response_ready_ms ?? row.t_turn_total_ms).filter((value): value is number => typeof value === "number");
-  const firstSound = voice.map((row) => row.metadata_json?.t_turn_voice_ready_ms ?? row.t_max_first_token_ms).filter((value): value is number => typeof value === "number");
+  const metrics = summarizeInternalVoiceMetrics(voice);
+  const errorCount = voice.filter((row) => row.severity === "failed" || row.metadata_json?.had_error === true).length;
 
-  const llmCost = usage.reduce((sum, row) => sum + (Number(row.cost_usd) || 0), 0);
-  const voiceCost = audio.reduce((sum, row) => {
+  const hasFilters = Object.values(options.filters ?? {}).some(Boolean);
+  const scopedUsage = selectedSessions.size
+    ? usage.filter((row) => row.session_id && selectedSessions.has(row.session_id))
+    : hasFilters ? [] : usage;
+  const scopedAudio = selectedSessions.size
+    ? audio.filter((row) => row.session_id && selectedSessions.has(row.session_id))
+    : hasFilters ? [] : audio;
+  const scopedLlmCost = scopedUsage.reduce((sum, row) => sum + (Number(row.cost_usd) || 0), 0);
+  const scopedVoiceCost = scopedAudio.reduce((sum, row) => {
     const provider = row.metadata_json?.provider?.toLowerCase() ?? "";
     return sum + ((row.tts_text_len ?? 0) / 1000) * (VOICE_COST_PER_1K[provider] ?? 0);
   }, 0);
   const costSessions = new Set([
-    ...usage.map((row) => row.session_id),
-    ...audio.map((row) => row.session_id),
+    ...scopedUsage.map((row) => row.session_id),
+    ...scopedAudio.map((row) => row.session_id),
   ].filter((value): value is string => Boolean(value)));
   return {
-    source: "Supabase interne",
+    source: "AVA interne",
     turnCount: voice.length,
     sessionCount: sessions.size,
-    p50FirstSoundMs: percentile(firstSound, 50),
-    p95FirstSoundMs: percentile(firstSound, 95),
-    p50ResponseReadyMs: percentile(responseReady, 50),
-    p95ResponseReadyMs: percentile(responseReady, 95),
+    measuredFirstSound: metrics.firstSound.length,
+    unmeasuredFirstSound: voice.length - metrics.firstSound.length,
+    firstSoundCoverageRate: voice.length ? metrics.firstSound.length / voice.length : null,
+    errorCount,
+    errorRate: voice.length ? errorCount / voice.length : null,
+    p50FirstSoundMs: percentile(metrics.firstSound, 50),
+    p95FirstSoundMs: percentile(metrics.firstSound, 95),
+    p50ResponseReadyMs: percentile(metrics.responseReady, 50),
+    p95ResponseReadyMs: percentile(metrics.responseReady, 95),
     persistenceRate: posthogIds.size ? persisted / posthogIds.size : null,
     missingInInternal,
     onlyInternal,
-    costPerSessionUsd: costSessions.size ? (llmCost + voiceCost) / costSessions.size : null,
+    costPerSessionUsd: costSessions.size ? (scopedLlmCost + scopedVoiceCost) / costSessions.size : null,
+    providers,
+  };
+}
+
+export function summarizeInternalVoiceMetrics(rows: VoiceEventRow[]): {
+  firstSound: number[];
+  responseReady: number[];
+} {
+  return {
+    firstSound: rows
+      .filter((row) => row.metadata_json?.first_sound_status === "measured")
+      .map((row) => row.metadata_json?.t_turn_voice_ready_ms)
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0),
+    responseReady: rows
+      .map((row) => row.metadata_json?.t_turn_response_ready_ms)
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0),
   };
 }

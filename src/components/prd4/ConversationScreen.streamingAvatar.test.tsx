@@ -17,6 +17,7 @@ const baseProps = {
   onPTTPress: vi.fn(),
   onPTTRelease: vi.fn(),
   onHangUp: vi.fn(),
+  activeCharacter: "max" as const,
 };
 
 describe("ConversationScreen streaming avatar", () => {

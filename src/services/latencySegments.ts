@@ -76,12 +76,21 @@ export const LATENCY_SEGMENT_LABELS: Record<LatencySegmentKey, string> = {
   stt_ms: "STT",
   rag_ms: "RAG",
   gm_pre_ms: "GM pre-turn",
-  max_ms: "Max LLM",
+  max_ms: "Personnage LLM",
   validator_ms: "Validateur",
   tts_ms: "TTS",
-  gm_post_ms: "GM post-turn",
+  gm_post_ms: "GM post-tour (hors attente)",
   total_ms: "Total",
 };
+
+export const PLAYER_WAIT_SEGMENT_KEYS: LatencySegmentKey[] = [
+  "stt_ms",
+  "rag_ms",
+  "gm_pre_ms",
+  "max_ms",
+  "validator_ms",
+  "tts_ms",
+];
 
 const PIPELINE_KEYS: LatencySegmentKey[] = [
   "stt_ms",
@@ -105,6 +114,49 @@ export function getPipelineServiceLatency(
       : pipeline[key];
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
   return value;
+}
+
+/**
+ * Returns the wait seen by the player. A total with an explicit measurement
+ * origin wins; legacy rows fall back to the available service segments.
+ * Background GM time is deliberately excluded in both cases.
+ */
+export function getPlayerWaitLatencyTotal(pipeline: ConversationPipelineTimings): number {
+  if (pipeline.latency_origin && pipeline.first_sound_status && pipeline.first_sound_status !== "measured") {
+    return 0;
+  }
+  if (
+    pipeline.latency_origin
+    && typeof pipeline.total_ms === "number"
+    && Number.isFinite(pipeline.total_ms)
+    && pipeline.total_ms > 0
+  ) {
+    return pipeline.total_ms;
+  }
+  return PLAYER_WAIT_SEGMENT_KEYS.reduce(
+    (total, key) => total + (getPipelineServiceLatency(pipeline, key) ?? 0),
+    0,
+  );
+}
+
+/** Keeps semantic aliases intact when aggregate rows are synthesized. */
+export function assignPipelineLatency(
+  pipeline: ConversationPipelineTimings,
+  key: LatencySegmentKey,
+  value: number,
+): void {
+  if (!Number.isFinite(value) || value <= 0) return;
+  if (key === "tts_ms") {
+    pipeline.tts_ms = value;
+    pipeline.tts_first_playback_ms = value;
+    return;
+  }
+  if (key === "stt_ms") {
+    pipeline.stt_ms = value;
+    pipeline.stt_service_ms = value;
+    return;
+  }
+  pipeline[key] = value;
 }
 
 export function hasLegacyAmbiguousTtsLatency(pipeline: ConversationPipelineTimings): boolean {

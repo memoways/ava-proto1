@@ -1,5 +1,6 @@
 import type { ConversationMessage, RuntimeCharacter } from "@/types";
 import { responseClaimsForeignIdentity } from "@/services/characterIdentityGuard";
+import { displayNameForCharacter } from "@/services/characterRegistry";
 
 export type CharacterSwitchStance = "accept" | "object" | "defer";
 
@@ -22,11 +23,11 @@ export function otherCharacter(character: RuntimeCharacter): RuntimeCharacter {
 }
 
 export function characterDisplayName(character: RuntimeCharacter): string {
-  return character === "emma" ? "Emma" : "Max";
+  return displayNameForCharacter(character);
 }
 
-export function asRuntimeCharacter(value: unknown, fallback: RuntimeCharacter = "max"): RuntimeCharacter {
-  return value === "emma" ? "emma" : value === "max" ? "max" : fallback;
+export function asRuntimeCharacter(value: unknown): RuntimeCharacter | null {
+  return value === "emma" || value === "max" ? value : null;
 }
 
 export function tagSpokenWith(
@@ -39,8 +40,8 @@ export function tagSpokenWith(
 export function inferSpokenWith(
   messages: ConversationMessage[],
   index: number,
-  fallback: RuntimeCharacter = "max",
-): RuntimeCharacter {
+  fallback?: RuntimeCharacter,
+): RuntimeCharacter | null {
   const current = messages[index];
   if (current?.spokenWith === "max" || current?.spokenWith === "emma") return current.spokenWith;
   if (current?.role === "max" || current?.role === "emma") return current.role;
@@ -54,7 +55,7 @@ export function inferSpokenWith(
     if (previous.spokenWith === "max" || previous.spokenWith === "emma") return previous.spokenWith;
     if (previous.role === "max" || previous.role === "emma") return previous.role;
   }
-  return fallback;
+  return fallback ?? null;
 }
 
 export function sliceConversationForCharacter(
@@ -62,7 +63,7 @@ export function sliceConversationForCharacter(
   character: RuntimeCharacter,
 ): ConversationMessage[] {
   return messages.filter((message, index) => {
-    if (inferSpokenWith(messages, index, character) !== character) return false;
+    if (inferSpokenWith(messages, index) !== character) return false;
     if (message.role !== "user" && responseClaimsForeignIdentity(message.content, character)) return false;
     return true;
   });
@@ -82,6 +83,7 @@ export function lastHandoffUserTurn(messages: ConversationMessage[]): number | n
   messages.forEach((message, index) => {
     if (message.role === "user") userTurns += 1;
     const spokenWith = inferSpokenWith(messages, index);
+    if (!spokenWith) return;
     if (previous && spokenWith !== previous) lastChangeAt = userTurns;
     previous = spokenWith;
   });
@@ -146,6 +148,6 @@ export function parseHandoffOffer(raw: unknown, fallbackTarget: RuntimeCharacter
   return {
     reason,
     proposalGuidance: proposalGuidance || `Propose de parler à ${characterDisplayName(fallbackTarget)}.`,
-    targetCharacter: asRuntimeCharacter(value.targetCharacter, fallbackTarget),
+    targetCharacter: asRuntimeCharacter(value.targetCharacter) ?? fallbackTarget,
   };
 }

@@ -31,6 +31,11 @@ describe("derivePerformanceIntent", () => {
     expect(intent.delivery).toBe("measured");
   });
 
+  it("does not silently apply Max's acting baseline when identity is missing", () => {
+    const intent = derivePerformanceIntent({ text: "Bonjour. Je vous écoute." });
+    expect(intent.emotion).toBe("neutral");
+  });
+
   it("detects anger from French lexicon", () => {
     const intent = derivePerformanceIntent({
       text: "Ça suffit ! J'en ai marre, dégage de ma vue.",

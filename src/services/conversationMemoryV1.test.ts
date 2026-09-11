@@ -16,8 +16,8 @@ describe("ConversationMemoryV1", () => {
       openThreads: ["Réparer avec Emma"],
       relationship: { depth: "fissure", trust: "ouverte", emotionalState: "tendue" },
       lastExchange: "Alice confronte Max à son contrôle.",
-    }, 1);
-    const duplicate = mergeConversationMemory(first, { userFacts: ["Elle a une sœur"] }, 1);
+    }, 1, "max");
+    const duplicate = mergeConversationMemory(first, { userFacts: ["Elle a une sœur"] }, 1, "max");
 
     expect(first.userFacts).toHaveLength(1);
     expect(first.interlocutor.name).toBe("Alice");
@@ -29,14 +29,14 @@ describe("ConversationMemoryV1", () => {
     const deep = mergeConversationMemory(createEmptyConversationMemory(), {
       relationship: { depth: "verite", trust: "ouverte" },
       maxDisclosures: ["Max reconnaît avoir levé le fusil sur Emma"],
-    }, 5);
+    }, 5, "max");
     const banal = mergeConversationMemory(deep, {
       relationship: { depth: "surface", emotionalState: "plus calme" },
       topics: ["météo"],
-    }, 6);
+    }, 6, "max");
     const delayed = mergeConversationMemory(banal, {
       userFacts: ["Ce delta du tour quatre arrive en retard"],
-    }, 4);
+    }, 4, "max");
 
     expect(banal.relationship.depth).toBe("verite");
     expect(delayed).toEqual(banal);
@@ -46,7 +46,7 @@ describe("ConversationMemoryV1", () => {
     const normalized = normalizeConversationMemory({ version: 99, lastTurn: -1, relationship: { depth: "wrong" } });
     const rendered = formatConversationMemory(normalized, 80);
 
-    expect(normalized.version).toBe(2);
+    expect(normalized.version).toBe(3);
     expect(normalized.lastTurn).toBe(0);
     expect(rendered.length).toBeLessThanOrEqual(80);
   });
@@ -58,7 +58,7 @@ describe("ConversationMemoryV1", () => {
       userFacts: facts,
       relationship: { depth: "verite", trust: "ouverte" },
       lastExchange: "Alice demande à Max d'assumer ce qu'il a fait.",
-    }, 7);
+    }, 7, "max");
     const rendered = formatConversationMemory(memory, 420);
 
     expect(rendered.length).toBeLessThanOrEqual(420);

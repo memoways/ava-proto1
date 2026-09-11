@@ -54,7 +54,7 @@ const PERIODS: Array<{ key: PosthogPeriod; label: string }> = [
 
 const FILTER_CONFIG = [
   { key: "character", label: "Personnage", providerKey: "characters" },
-  { key: "model", label: "Modèle Max", providerKey: "models" },
+  { key: "model", label: "Modèle personnage", providerKey: "models" },
   { key: "stt", label: "STT", providerKey: "stt" },
   { key: "tts", label: "TTS", providerKey: "tts" },
   { key: "browser", label: "Navigateur", providerKey: "browsers" },
@@ -75,9 +75,9 @@ const LATENCY_STAGES = [
   { key: "endToEnd", label: "End-to-end" },
   { key: "stt", label: "STT" },
   { key: "rag", label: "RAG" },
-  { key: "max", label: "Max LLM" },
+  { key: "max", label: "Personnage LLM" },
   { key: "tts", label: "TTS fournisseur" },
-  { key: "gmPost", label: "GM post-tour" },
+  { key: "gmPost", label: "GM post-tour (hors attente)" },
 ] as const;
 
 const CHART_COLORS = [
@@ -89,7 +89,7 @@ const CHART_COLORS = [
 ];
 
 const PROVIDER_LABELS: Record<ProviderKey, string> = {
-  models: "Modèles Max",
+  models: "Modèles personnage",
   stt: "Providers STT",
   tts: "Providers TTS",
   browsers: "Navigateurs",
@@ -105,6 +105,17 @@ function fmtRate(value: number | null): string {
   return value == null ? "non mesuré" : `${(value * 100).toFixed(2)} %`;
 }
 
+function localPeriodRange(period: PosthogPeriod, from: string, to: string): PosthogLatencyStats["period"] | null {
+  const end = period === "custom" ? new Date(to) : new Date();
+  const start = period === "custom" ? new Date(from) : new Date(end);
+  if (!Number.isFinite(end.getTime()) || !Number.isFinite(start.getTime())) return null;
+  if (period === "24h") start.setHours(start.getHours() - 24);
+  if (period === "7d") start.setDate(start.getDate() - 7);
+  if (period === "30d") start.setDate(start.getDate() - 30);
+  if (start >= end) return null;
+  return { key: period, from: start.toISOString(), to: end.toISOString() };
+}
+
 function shortId(value: string | null): string {
   if (!value) return "—";
   return value.length > 10 ? `${value.slice(0, 6)}…${value.slice(-4)}` : value;
@@ -116,10 +127,13 @@ function statusClass(status: CanaryCheckStatus): string {
   return "border-amber-600/50 text-amber-300";
 }
 
-function mergeFilterOptions(current: FilterOptions, stats: PosthogLatencyStats): FilterOptions {
+function mergeFilterOptions(
+  current: FilterOptions,
+  providers: PosthogLatencyStats["providers"],
+): FilterOptions {
   const next = { ...current };
   for (const config of FILTER_CONFIG) {
-    const incoming = stats.providers[config.providerKey].map((item) => item.key);
+    const incoming = providers[config.providerKey].map((item) => item.key);
     next[config.key] = [...new Set([...current[config.key], ...incoming])].sort((left, right) => left.localeCompare(right));
   }
   return next;
@@ -195,52 +209,67 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
   const [includeSandbox, setIncludeSandbox] = useState(false);
 
   const load = useCallback(async (requestedFilters: FilterState = filters) => {
-    if (initialStats) {
-      setStats(initialStats);
-      setFilterOptions((current) => mergeFilterOptions(current, initialStats));
-      setSelectedSlowTurn(null);
-      return;
-    }
     setLoading(true);
     setError(null);
-    try {
-      const posthog = await loadPosthogLatencyStats({
+    const requestedDimensions = Object.fromEntries(Object.entries(requestedFilters).filter(([, value]) => value.trim()));
+    let posthog: PosthogLatencyStats | null = initialStats ?? null;
+    if (!posthog) {
+      try {
+        posthog = await loadPosthogLatencyStats({
         period,
         ...(period === "custom" ? { from: from ? new Date(from).toISOString() : undefined, to: to ? new Date(to).toISOString() : undefined } : {}),
-        filters: Object.fromEntries(Object.entries(requestedFilters).filter(([, value]) => value.trim())),
+        filters: requestedDimensions,
         include_sandbox: includeSandbox,
       });
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : String(loadError));
+      }
+    }
+    if (posthog) {
       setStats(posthog);
-      setFilterOptions((current) => mergeFilterOptions(current, posthog));
+      setFilterOptions((current) => mergeFilterOptions(current, posthog.providers));
       setSelectedSlowTurn(null);
+    } else {
+      setStats(null);
+    }
+    const fallbackPeriod = localPeriodRange(period, from, to);
+    const internalScope = posthog
+      ? { period: posthog.period, turnIds: posthog.turnIds }
+      : fallbackPeriod
+        ? { period: fallbackPeriod, turnIds: [] }
+        : null;
+    if (internalScope) {
       try {
-        setInternal(await loadInternalLatencyComparison(posthog));
+        const internalResult = await loadInternalLatencyComparison(internalScope, {
+          filters: requestedDimensions,
+          includeSandbox,
+        });
+        setInternal(internalResult);
+        setFilterOptions((current) => mergeFilterOptions(current, internalResult.providers));
       } catch (comparisonError) {
-        console.warn("[Latency PostHog] internal comparison unavailable", comparisonError);
+        console.warn("[Latency AVA] internal measurements unavailable", comparisonError);
         setInternal(null);
       }
-    } catch (loadError) {
-      setStats(null);
+    } else {
       setInternal(null);
-      setError(loadError instanceof Error ? loadError.message : String(loadError));
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   }, [filters, from, includeSandbox, initialStats, period, to]);
 
   useEffect(() => {
     if (initialStats) {
-      setFilterOptions((current) => mergeFilterOptions(current, initialStats));
+      setFilterOptions((current) => mergeFilterOptions(current, initialStats.providers));
+      void load();
       return;
     }
     void load();
   }, [includeSandbox]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const canary = useMemo(() => stats ? evaluateCanaryReadiness({
-    sessionCount: stats.totals.sessions,
-    turnCount: stats.totals.turns,
-    p95FirstSoundMs: stats.latency.firstSound.p95,
-    turnErrorRate: stats.totals.errorRate,
+  const canary = useMemo(() => (stats || internal) ? evaluateCanaryReadiness({
+    sessionCount: internal ? internal.sessionCount : stats?.totals.sessions ?? 0,
+    turnCount: internal ? internal.turnCount : stats?.totals.turns ?? 0,
+    p95FirstSoundMs: internal ? internal.p95FirstSoundMs : stats?.latency.firstSound.p95 ?? null,
+    turnErrorRate: internal ? internal.errorRate : stats?.totals.errorRate ?? null,
     persistenceRate: internal?.persistenceRate ?? null,
     costPerSessionUsd: internal?.costPerSessionUsd ?? null,
   }, {
@@ -250,6 +279,7 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
 
   const comparison = stats && internal ? [
     { label: "Tours", posthog: String(stats.totals.turns), internal: String(internal.turnCount) },
+    { label: "Taux d’erreur", posthog: fmtRate(stats.totals.errorRate), internal: fmtRate(internal.errorRate) },
     { label: "p50 texte prêt", posthog: fmtMs(stats.latency.responseReady.p50), internal: fmtMs(internal.p50ResponseReadyMs) },
     { label: "p95 texte prêt", posthog: fmtMs(stats.latency.responseReady.p95), internal: fmtMs(internal.p95ResponseReadyMs) },
     { label: "p50 premier son", posthog: fmtMs(stats.latency.firstSound.p50), internal: fmtMs(internal.p50FirstSoundMs) },
@@ -297,8 +327,8 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2"><h2 className="text-lg font-semibold">Latences PostHog</h2><Badge>PostHog</Badge></div>
-          <p className="text-xs text-muted-foreground">Diagnostic des parcours voix à partir des mesures analytics distantes.</p>
+          <div className="flex items-center gap-2"><h2 className="text-lg font-semibold">Latences AVA interne &amp; PostHog</h2><Badge>Deux sources</Badge></div>
+          <p className="text-xs text-muted-foreground">AVA interne porte le diagnostic par tour ; PostHog complète avec les tendances agrégées.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -335,7 +365,7 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
           ))}
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-          <p className="text-xs text-muted-foreground">Les choix proviennent des valeurs réellement observées dans PostHog.</p>
+          <p className="text-xs text-muted-foreground">Les choix proviennent des valeurs réellement observées dans AVA et PostHog.</p>
           <div className="flex gap-2">
             <Button size="sm" variant="ghost" onClick={resetFilters} disabled={!activeFilterCount || loading}><FilterX className="mr-1 h-3.5 w-3.5" />Réinitialiser</Button>
             <Button size="sm" onClick={() => void load()} disabled={loading}>Appliquer les filtres</Button>
@@ -347,7 +377,27 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
         <section className="rounded-xl border border-red-700/50 bg-red-950/20 p-4">
           <h3 className="flex items-center gap-2 font-semibold text-red-300"><AlertTriangle className="h-4 w-4" />PostHog indisponible</h3>
           <p className="mt-1 text-sm text-red-200/80">{error}</p>
-          <p className="mt-2 text-xs text-muted-foreground">Aucune donnée Supabase n’est substituée silencieusement. Vérifiez le rôle admin, le secret Lovable, le quota et l’identifiant de projet.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Les mesures AVA internes restent affichées lorsqu’elles sont accessibles. Vérifiez le rôle admin, le secret Lovable, le quota et l’identifiant de projet PostHog.</p>
+        </section>
+      )}
+
+      {internal && (
+        <section className="space-y-3 rounded-xl border border-primary/35 bg-card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div><h3 className="font-semibold">AVA interne — source principale</h3><p className="text-xs text-muted-foreground">Mesures persistées par session et par tour, conservées même si PostHog est absent.</p></div>
+            <Badge>AVA interne</Badge>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryCard label="Sessions / tours" value={`${internal.sessionCount} / ${internal.turnCount}`} detail="périmètre interne filtré" icon={Activity} />
+            <SummaryCard label="Premier son p50 / p95" value={`${fmtMs(internal.p50FirstSoundMs)} / ${fmtMs(internal.p95FirstSoundMs)}`} detail="cibles ≤ 2 s / ≤ 4 s" icon={Timer} tone={(internal.p95FirstSoundMs ?? 0) > 4000 ? "danger" : "neutral"} />
+            <SummaryCard label="Couverture premier son" value={fmtRate(internal.firstSoundCoverageRate)} detail={`${internal.measuredFirstSound} mesuré(s) · ${internal.unmeasuredFirstSound} non mesuré(s)`} icon={GitBranch} tone={internal.unmeasuredFirstSound ? "warning" : "neutral"} />
+            <SummaryCard label="Erreurs internes" value={fmtRate(internal.errorRate)} detail={`${internal.errorCount} tour(s) en échec`} icon={AlertTriangle} tone={internal.errorCount ? "danger" : "neutral"} />
+          </div>
+          <div className="flex flex-wrap items-end justify-between gap-3 border-t pt-3">
+            <div><h4 className="text-sm font-semibold">Canary interne — décision de publication</h4><p className="text-xs text-muted-foreground">Premier son, erreurs et persistance viennent d’AVA ; PostHog complète la tendance.</p></div>
+            <div className="w-56"><label className="text-xs text-muted-foreground">Budget maximum / session (USD)</label><Input type="number" min="0" step="0.001" value={costBudget} onChange={(event) => setCostBudget(event.target.value)} placeholder="à approuver" /></div>
+          </div>
+          {canary && <><Badge variant="outline">{canary.decision === "promote" ? "PROMOUVOIR" : canary.decision === "rollback" ? "REVENIR EN ARRIÈRE" : "DONNÉES MANQUANTES / ATTENTE"}</Badge><div className="grid gap-2 md:grid-cols-2">{canary.checks.map((check) => <div key={check.key} className={`rounded border p-2 text-xs ${statusClass(check.status)}`}>{check.detail}<span className="ml-1 opacity-70">({check.key === "costPerSessionUsd" ? "coûts internes" : "AVA interne"})</span></div>)}</div></>}
         </section>
       )}
 
@@ -520,7 +570,7 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
                     {[
-                      ["STT", selectedSlowTurn.sttMs], ["RAG", selectedSlowTurn.ragMs], ["Max LLM", selectedSlowTurn.maxMs], ["TTS", selectedSlowTurn.ttsMs],
+                      ["STT", selectedSlowTurn.sttMs], ["RAG", selectedSlowTurn.ragMs], ["Personnage LLM", selectedSlowTurn.maxMs], ["TTS", selectedSlowTurn.ttsMs],
                       ["Texte prêt", selectedSlowTurn.responseReadyMs], ["Premier son", selectedSlowTurn.firstSoundMs], ["End-to-end", selectedSlowTurn.endToEndMs],
                     ].map(([label, value]) => <div key={String(label)} className="rounded-lg border bg-background p-3"><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-1 font-mono text-sm font-semibold">{fmtMs(value as number | null)}</p></div>)}
                   </div>
@@ -532,20 +582,13 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
               <div><h3 className="font-semibold">Comparaison sans fusion</h3><p className="text-xs text-muted-foreground">Chaque colonne conserve sa source. La parité utilise le même `turn_id`.</p></div>
               {internal ? (
                 <>
-                  <div className="grid grid-cols-3 gap-2 text-sm font-medium"><span>Mesure</span><span>PostHog</span><span>Supabase interne</span></div>
+                  <div className="grid grid-cols-3 gap-2 text-sm font-medium"><span>Mesure</span><span>PostHog</span><span>AVA interne</span></div>
                   {comparison.map((row) => <div key={row.label} className="grid grid-cols-3 gap-2 border-t pt-2 text-sm"><span>{row.label}</span><span>{row.posthog}</span><span>{row.internal}</span></div>)}
-                  <p className="text-xs text-muted-foreground">Absents de l’interne : {internal.missingInInternal} · uniquement internes : {internal.onlyInternal} · persistance : {fmtRate(internal.persistenceRate)}</p>
+                  <p className="text-xs text-muted-foreground">Couverture premier son réel : {internal.measuredFirstSound}/{internal.turnCount} ({fmtRate(internal.firstSoundCoverageRate)}) · non mesurés : {internal.unmeasuredFirstSound} · absents de l’interne : {internal.missingInInternal} · uniquement internes : {internal.onlyInternal} · persistance : {fmtRate(internal.persistenceRate)}</p>
                 </>
               ) : <p className="text-sm text-muted-foreground">Comparaison interne non disponible ; les statistiques PostHog restent valides et identifiées.</p>}
             </section>
 
-            <section className="rounded-xl border bg-card p-4 space-y-3">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div><h3 className="font-semibold">Canary interne — décision de déploiement</h3><p className="text-xs text-muted-foreground">Performance et erreurs : PostHog · persistance : Supabase · coût : consommations LLM/voix.</p></div>
-                <div className="w-56"><label className="text-xs text-muted-foreground">Budget maximum / session (USD)</label><Input type="number" min="0" step="0.001" value={costBudget} onChange={(event) => setCostBudget(event.target.value)} placeholder="à approuver" /></div>
-              </div>
-              {canary && <><Badge variant="outline">{canary.decision === "promote" ? "PROMOUVOIR" : canary.decision === "rollback" ? "REVENIR EN ARRIÈRE" : "DONNÉES MANQUANTES / ATTENTE"}</Badge><div className="grid gap-2 md:grid-cols-2">{canary.checks.map((check) => <div key={check.key} className={`rounded border p-2 text-xs ${statusClass(check.status)}`}>{check.detail}<span className="ml-1 opacity-70">({check.key === "persistenceRate" || check.key === "costPerSessionUsd" ? "Supabase" : "PostHog"})</span></div>)}</div></>}
-            </section>
           </>}
         </>
       )}

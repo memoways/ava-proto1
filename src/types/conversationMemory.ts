@@ -19,9 +19,25 @@ export interface CharacterMemoryItemV2 {
 
 export type ConversationDepth = "surface" | "fissure" | "verite" | "bonus";
 
+export interface ConversationRelationshipState {
+  /** Legacy disclosure depth retained for compatibility and factual recall. */
+  depth: ConversationDepth;
+  /** Legacy trust label retained for existing sessions and admin views. */
+  trust: "fragile" | "neutre" | "ouverte";
+  emotionalState: string | null;
+  sourceTurn: number;
+  /** Reversible relational disposition used by the live conversation engine. */
+  tier: RelationshipTier;
+  topicOpenness: Record<string, TopicOpenness>;
+  justification: string;
+  evidence: RelationshipEvidence[];
+  characterKey: string;
+  policyVersion: string;
+}
+
 export interface ConversationMemoryV1 {
-  /** Version 2 keeps every V1 field and adds character-scoped memory. */
-  version: 1 | 2;
+  /** Version 3 keeps V1/V2 compatibility and adds a validated relationship state. */
+  version: 1 | 2 | 3;
   lastTurn: number;
   interlocutor: {
     name: string | null;
@@ -33,12 +49,7 @@ export interface ConversationMemoryV1 {
   commitments: ConversationMemoryItem[];
   openThreads: ConversationMemoryItem[];
   topics: ConversationMemoryItem[];
-  relationship: {
-    depth: ConversationDepth;
-    trust: "fragile" | "neutre" | "ouverte";
-    emotionalState: string | null;
-    sourceTurn: number;
-  };
+  relationship: ConversationRelationshipState;
   lastExchange: string | null;
   characterItems?: CharacterMemoryItemV2[];
   /** Conversation facts private to one character. Interlocutor identity stays global. */
@@ -71,6 +82,13 @@ export interface ConversationMemoryDelta {
     depth?: ConversationDepth;
     trust?: "fragile" | "neutre" | "ouverte";
     emotionalState?: string | null;
+    tier?: RelationshipTier;
+    topicOpenness?: Record<string, TopicOpenness>;
+    justification?: string;
+    evidence?: RelationshipEvidence[];
+    characterKey?: string;
+    policyVersion?: string;
+    sourceTurn?: number;
   };
   lastExchange?: string | null;
   characterItems?: Array<{
@@ -81,3 +99,8 @@ export interface ConversationMemoryDelta {
     provenance?: "user" | "character" | "gm";
   }>;
 }
+import type {
+  RelationshipEvidence,
+  RelationshipTier,
+  TopicOpenness,
+} from "./relationship";

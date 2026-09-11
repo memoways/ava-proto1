@@ -3,6 +3,9 @@ import {
   buildLatencySegmentsFromPipeline,
   computeSegmentServiceEvolution,
   computeSegmentServiceStats,
+  assignPipelineLatency,
+  getPipelineServiceLatency,
+  getPlayerWaitLatencyTotal,
   percentile,
 } from "@/services/latencySegments";
 
@@ -11,6 +14,40 @@ describe("latencySegments", () => {
     expect(percentile([100, 200, 300, 400], 0.5)).toBe(250);
     expect(percentile([100, 200, 300, 400], 0.95)).toBeCloseTo(385);
     expect(percentile([], 0.5)).toBe(0);
+  });
+
+  it("preserves TTS in synthesized aggregates and excludes background GM from player wait", () => {
+    const aggregate = {};
+    assignPipelineLatency(aggregate, "rag_ms", 500);
+    assignPipelineLatency(aggregate, "max_ms", 2200);
+    assignPipelineLatency(aggregate, "tts_ms", 1000);
+    assignPipelineLatency(aggregate, "gm_post_ms", 900);
+
+    expect(getPipelineServiceLatency(aggregate, "tts_ms")).toBe(1000);
+    expect(getPlayerWaitLatencyTotal(aggregate)).toBe(3700);
+  });
+
+  it("uses the directly measured first-sound total when available", () => {
+    expect(getPlayerWaitLatencyTotal({
+      total_ms: 1850,
+      rag_ms: 500,
+      max_ms: 1200,
+      tts_ms: 600,
+      tts_first_playback_ms: 600,
+      gm_post_ms: 2000,
+      latency_origin: "ptt_finalized",
+    })).toBe(1850);
+  });
+
+  it("does not trust a legacy synthetic total that may include background work", () => {
+    expect(getPlayerWaitLatencyTotal({
+      total_ms: 4400,
+      rag_ms: 500,
+      max_ms: 2200,
+      tts_ms: 1000,
+      tts_first_playback_ms: 1000,
+      gm_post_ms: 700,
+    })).toBe(3700);
   });
 
   it("enriches missing provider and model as Unknown", () => {

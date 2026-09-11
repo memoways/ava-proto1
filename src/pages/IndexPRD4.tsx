@@ -121,7 +121,7 @@ import {
   type ResumablePRD4Session,
 } from "@/services/sessionConversationMemory";
 import { resolveResumeTimerWindow } from "@/services/resumeTimer";
-import { getCharacterRuntimeReadiness } from "@/services/experienceOrchestration";
+import { getCharacterRuntimeReadiness, type CharacterRuntimeReadiness } from "@/services/experienceOrchestration";
 import {
   guardCharacterResponse,
   responseClaimsForeignIdentity,
@@ -202,6 +202,9 @@ const IndexPRD4 = () => {
     useState<StreamingAvatarConnectionState>("inactive");
   const sttLatencySegmentRef = useRef<string | null>(null);
   const pttFinalizingRef = useRef(false);
+  const turnInputReadyAtRef = useRef<number | null>(null);
+  const turnLatencyOriginRef = useRef<"ptt_finalized" | "transcript_final">("transcript_final");
+  const selectedEncounterFrameRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const diagnosticTraceRequestedRef = useRef(
     new URLSearchParams(window.location.search).get("diagnostic") === "full",
@@ -727,10 +730,11 @@ const IndexPRD4 = () => {
     state.userRoleProfile,
   ]);
 
-  const handleSelectCharacter = useCallback((character: RuntimeCharacter) => {
+  const handleSelectCharacter = useCallback((character: RuntimeCharacter, profile: CharacterRuntimeReadiness | null) => {
     startingCharacterRef.current = character;
     activeCharacterRef.current = character;
     activeCharacterContextRef.current = null;
+    selectedEncounterFrameRef.current = profile?.situationSummary ?? null;
     setSelectedCharacter(character);
     setPhase("calling_max");
     callPreparationRef.current = prepareCall().catch((error) => {
@@ -976,6 +980,10 @@ const IndexPRD4 = () => {
     async (userText: string) => {
       if (isProcessingRef.current || !userText.trim() || endedRef.current) return;
       isProcessingRef.current = true;
+      const inputReadyAt = turnInputReadyAtRef.current ?? performance.now();
+      const latencyOrigin = turnInputReadyAtRef.current ? turnLatencyOriginRef.current : "transcript_final";
+      turnInputReadyAtRef.current = null;
+      turnLatencyOriginRef.current = "transcript_final";
       pauseConversationTraceSync();
       activeTurnControllerRef.current?.abort("superseded-turn");
       activeOutputControllerRef.current?.abort("superseded-turn");
@@ -1098,6 +1106,7 @@ const IndexPRD4 = () => {
         }
 
         const ttsStart = performance.now();
+        const responseReadyMs = Math.max(0, Math.round(ttsStart - inputReadyAt));
         const blocker =
           (result.timings.max_ms ?? 0) >= (result.timings.rag_ms ?? 0) ? "max_ms" : "rag_ms";
         const maxMsg: ConversationMessage = tagSpokenWith({
@@ -1107,7 +1116,9 @@ const IndexPRD4 = () => {
           pipeline: {
             rag_ms: result.timings.rag_ms,
             max_ms: result.timings.max_ms,
-            total_ms: result.timings.total_ms,
+            total_ms: responseReadyMs,
+            latency_origin: latencyOrigin,
+            first_sound_status: "not_measured",
             blocker,
             segmentServices: {
               rag_ms: ragService,
@@ -1136,6 +1147,7 @@ const IndexPRD4 = () => {
             })
           : null;
         let outputLatencySegmentDone = false;
+        let firstPlaybackAt: number | null = null;
         const outputController = new AbortController();
         activeOutputControllerRef.current = outputController;
         const abortOutputFromTurn = () => outputController.abort(turnController.signal.reason);
@@ -1163,6 +1175,7 @@ const IndexPRD4 = () => {
           });
         }, TURN_FIRST_AUDIO_DEADLINE_MS);
         const onPlaybackStart = () => {
+          firstPlaybackAt ??= performance.now();
           if (processingWatchdogRef.current) {
             window.clearTimeout(processingWatchdogRef.current);
             processingWatchdogRef.current = null;
@@ -1195,18 +1208,24 @@ const IndexPRD4 = () => {
         }
         if (!isCurrentTurn()) return;
         resumeConversationTraceSync(true);
-        const tts_ms =
-          outputResult.firstPlaybackStartMs ||
-          Math.round(performance.now() - ttsStart);
+        const tts_ms = firstPlaybackAt == null ? undefined : Math.max(0, Math.round(firstPlaybackAt - ttsStart));
+        const voiceReadyMs = firstPlaybackAt == null ? undefined : Math.max(0, Math.round(firstPlaybackAt - inputReadyAt));
         if (maxMsg.pipeline) {
-          maxMsg.pipeline.tts_ms = tts_ms;
-          maxMsg.pipeline.tts_first_playback_ms = tts_ms;
-          maxMsg.pipeline.total_ms = (maxMsg.pipeline.total_ms ?? 0) + tts_ms;
+          if (tts_ms != null && tts_ms > 0) {
+            maxMsg.pipeline.tts_ms = tts_ms;
+            maxMsg.pipeline.tts_first_playback_ms = tts_ms;
+          }
+          maxMsg.pipeline.total_ms = voiceReadyMs ?? responseReadyMs;
+          maxMsg.pipeline.first_sound_status = voiceReadyMs != null
+            ? "measured"
+            : outputResult.status === "failed"
+              ? "failed"
+              : "not_measured";
           maxMsg.pipeline.segmentServices = {
             ...(maxMsg.pipeline.segmentServices || {}),
             tts_ms: ttsService,
           };
-          if (tts_ms > (maxMsg.pipeline.max_ms ?? 0) && tts_ms > (maxMsg.pipeline.rag_ms ?? 0)) {
+          if ((tts_ms ?? 0) > (maxMsg.pipeline.max_ms ?? 0) && (tts_ms ?? 0) > (maxMsg.pipeline.rag_ms ?? 0)) {
             maxMsg.pipeline.blocker = "tts_ms";
           }
         }
@@ -1240,8 +1259,8 @@ const IndexPRD4 = () => {
             t_max_llm_ms: result.timings.max_ms,
             t_tts_total_ms: tts_ms,
             t_audio_playback_total_ms: outputResult.playbackTotalMs,
-            t_turn_response_ready_ms: result.timings.total_ms,
-            t_turn_voice_ready_ms: (result.timings.total_ms ?? 0) + tts_ms,
+            t_turn_response_ready_ms: responseReadyMs,
+            t_turn_voice_ready_ms: voiceReadyMs,
           },
           models: {
             max_model: llmSettings?.LLM_MODEL,
@@ -1260,6 +1279,8 @@ const IndexPRD4 = () => {
             model: sttTelemetry?.model,
             mode: "realtime",
           },
+          stt_trigger: "ptt_flush",
+          latency_origin: latencyOrigin,
           had_error: outputResult.status === "failed",
           error_type: outputResult.status === "failed"
             ? (outputAtStart?.mode === "streaming_avatar" ? "streaming_avatar" : "tts")
@@ -1327,6 +1348,7 @@ const IndexPRD4 = () => {
             session_id: sessionIdRef.current,
             turn_id: turnId,
             turn_index: ev.turn_index,
+            character: ev.character_key,
             engagement_delta: ev.engagement_delta,
             end_recommended: ev.end_recommended,
             trigger_video_id: ev.trigger_video_id ?? null,
@@ -1334,6 +1356,7 @@ const IndexPRD4 = () => {
             labels: ev.labels ?? null,
             action: ev.action ?? { type: "none" },
             orchestration_version_id: ev.orchestration_version_id ?? null,
+            execution_status: ev.execution_status ?? "executed",
           });
           if (ev.labels) {
             const total = (ev.labels.themes?.length ?? 0) + (ev.labels.topics?.length ?? 0) + (ev.labels.intentions?.length ?? 0);
@@ -1460,8 +1483,8 @@ const IndexPRD4 = () => {
           rag_matches: result.ragMatches,
           trace_id: result.traceId,
         });
-        if (typeof result.timings?.total_ms === "number") {
-          turnLatenciesRef.current.push(result.timings.total_ms);
+        if (maxMsg.pipeline?.first_sound_status === "measured" && typeof maxMsg.pipeline.total_ms === "number") {
+          turnLatenciesRef.current.push(maxMsg.pipeline.total_ms);
         }
 
       } catch (err) {
@@ -1642,6 +1665,8 @@ const IndexPRD4 = () => {
       return;
     }
     pttFinalizingRef.current = true;
+    turnInputReadyAtRef.current = performance.now();
+    turnLatencyOriginRef.current = "ptt_finalized";
     setAudioState("user_finalizing");
     try {
       // Every provider resolves only after its audio tail and latest transcript
@@ -1653,6 +1678,8 @@ const IndexPRD4 = () => {
         endLatencySegment(sttLatencySegmentRef.current);
         sttLatencySegmentRef.current = null;
         if (!isProcessingRef.current) {
+          turnInputReadyAtRef.current = null;
+          turnLatencyOriginRef.current = "transcript_final";
           setAudioState("idle");
           setUserSubtitle("");
           teardownSTT();
@@ -1978,7 +2005,7 @@ const IndexPRD4 = () => {
       screen = <CharacterSelectScreen onSelect={handleSelectCharacter} onLockedClick={handleLockedClick} />;
       break;
     case "calling_max":
-      screen = <CallingMaxScreen character={startingCharacterRef.current} onAnswered={handleAnswered} />;
+      screen = <CallingMaxScreen character={startingCharacterRef.current} situation={selectedEncounterFrameRef.current} onAnswered={handleAnswered} />;
       break;
     case "conversation_max":
       screen = (
@@ -1996,7 +2023,7 @@ const IndexPRD4 = () => {
               streamingAvatarActive={streamingAvatarActive}
               streamingAvatarState={streamingAvatarState}
               attachAvatarMedia={attachAvatarMedia}
-              activeCharacter={state.selectedCharacter === "emma" ? "emma" : "max"}
+              activeCharacter={state.selectedCharacter}
               portraitUrl={activePortraitUrl}
               handoffOffer={handoffOffer}
               handoffCalling={handoffCalling}

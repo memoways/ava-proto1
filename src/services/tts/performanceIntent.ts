@@ -255,9 +255,10 @@ function speedFor(
 }
 
 function characterBaseline(characterKey?: string | null): { emotion: CanonicalEmotion; delivery?: PerformanceDelivery } {
-  const key = (characterKey || "max").toLowerCase();
+  const key = characterKey?.trim().toLowerCase();
   if (key === "emma") return { emotion: "warm", delivery: "measured" };
-  return { emotion: "tense", delivery: "cutting" };
+  if (key === "max") return { emotion: "tense", delivery: "cutting" };
+  return { emotion: "neutral" };
 }
 
 function scoreLexicon(folded: string): { emotion: CanonicalEmotion; score: number } | null {

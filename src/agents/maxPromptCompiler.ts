@@ -14,6 +14,7 @@ export const LEGACY_SYSTEM_PROMPT_CHARS = 24_000;
 
 
 export const MAX_DYNAMIC_SECTION_CHARS = {
+  relationship_directive: 1_400,
   user_role: 450,
   temporal_context: 260,
   session_summary: 900,
@@ -43,6 +44,8 @@ const CHARACTER_FIELD_SPECS: Array<{
     | "dynamique_conversation"
     | "sujets_sensibles"
     | "profondeur_par_niveau"
+    | "politique_relationnelle"
+    | "references_intellectuelles"
   >;
   title: string;
   maxChars: number;
@@ -58,6 +61,8 @@ const CHARACTER_FIELD_SPECS: Array<{
   { key: "dynamique_conversation", title: "MOTEUR DE CONVERSATION", maxChars: 650 },
   { key: "sujets_sensibles", title: "SUJETS SENSIBLES", maxChars: 450 },
   { key: "profondeur_par_niveau", title: "PROGRESSION RELATIONNELLE", maxChars: 700 },
+  { key: "politique_relationnelle", title: "POLITIQUE RELATIONNELLE", maxChars: 900 },
+  { key: "references_intellectuelles", title: "RÉFÉRENCES INTELLECTUELLES", maxChars: 500 },
 ];
 
 export function normalizePromptText(value: string): string {

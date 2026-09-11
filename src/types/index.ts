@@ -70,7 +70,7 @@ export interface ExperienceState {
   teaserSkipped: boolean;
   userRoleProfile: UserRoleProfile | null;
   userPosture: UserPosture | null;
-  selectedCharacter: "max" | "emma" | "ava" | "leo";
+  selectedCharacter: "max" | "emma";
   conversationLog: ConversationMessage[];
   turnCount: number;
   pttErrors: number;
@@ -154,7 +154,13 @@ export interface ConversationPipelineTimings {
   /** Explicit TTS service latency for new sessions. Old `tts_ms` values may include full audio playback. */
   tts_first_playback_ms?: number;
   gm_post_ms?: number;
+  /** GM post-tour runs after playback and never contributes to player wait. */
+  gm_post_status?: "executed" | "failed" | "invalid" | "not_measured";
   total_ms?: number;
+  /** Event used as the start of the user-perceived wait. */
+  latency_origin?: "ptt_finalized" | "transcript_final" | "text_submitted" | "legacy_service_sum";
+  /** Whether a real playback callback was observed for the first sound. */
+  first_sound_status?: "measured" | "failed" | "not_measured";
   /** Step name flagged as the bottleneck/blocker for this turn, or null if all steps OK. */
   blocker?: string | null;
   /** Optional non-sensitive service metadata per latency segment. */
@@ -267,10 +273,23 @@ export type {
   ConversationMemoryDelta,
   ConversationMemoryItem,
   ConversationMemoryV1,
+  ConversationRelationshipState,
   CharacterMemoryItemV2,
   CharacterScopedMemory,
   RuntimeCharacter,
 } from "./conversationMemory";
+
+export type {
+  CharacterRelationshipPolicy,
+  RelationshipEvidence,
+  RelationshipState,
+  RelationshipStateProposal,
+  RelationshipTier,
+  RelationshipTopicRule,
+  RelationshipTransitionAudit,
+  TopicOpenness,
+  TurnRelationshipDirective,
+} from "./relationship";
 
 export interface QuestionnaireData {
   // 1 — Global
@@ -349,12 +368,16 @@ export interface PRD4PostTurnEvaluation {
   latency_ms?: number;
   model?: string;
   created_at?: string;
+  /** Distinguishes a valid GM result from a parse failure or runtime failure. */
+  execution_status?: "executed" | "invalid" | "failed";
   /** Personnage du tour, attribué par le runtime et jamais par le modèle. */
   character_key?: import("./conversationMemory").RuntimeCharacter;
   /** Delta mémoire produit dans le même appel GM, sans appel LLM supplémentaire. */
   memory_delta?: import("./conversationMemory").ConversationMemoryDelta | null;
   /** État persistant obtenu après fusion optimiste du delta. */
   memory_after?: import("./conversationMemory").ConversationMemoryV1 | null;
+  /** Décision relationnelle acceptée ou refusée par le moteur déterministe. */
+  relationship_transition?: import("./relationship").RelationshipTransitionAudit | null;
   /** Structured Experience Director action. The deterministic guard may replace it with none. */
   action?: DirectorAction;
   /** Present when the player asked to switch character during this turn. */

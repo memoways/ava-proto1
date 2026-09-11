@@ -45,6 +45,24 @@ vi.mock("@/services/sessionMemoryService", () => ({
 vi.mock("@/services/sessionConversationMemory", () => ({
   fetchConversationMemory: vi.fn(),
 }));
+vi.mock("@/services/characterPromptService", () => ({
+  loadCharacterPrompt: vi.fn(async (characterId: string) => ({
+    character_id: characterId,
+    name: characterId === "22222222-2222-4222-8222-222222222222" ? "Emma Munz" : "Max Lorenzo",
+    identite_fondamentale: "Identité de test attribuée.",
+    qui_tu_es: "Voix de test.",
+    ce_que_tu_ne_fais_jamais: "Ne jamais changer d'identité.",
+    ce_que_tu_sais_utilisateur: "Un inconnu appelle.",
+    dynamique_conversation: "Comprendre l'intention de l'appel.",
+    sujets_sensibles: "Le fusil :: confiance :: après une relation construite",
+    profondeur_par_niveau: "Contact, lien, confiance.",
+    politique_relationnelle: "Moteur\nComprendre l'appel.\n\nRésistance\nRépondre partiellement.",
+    references_intellectuelles: "",
+    timeline: "Aujourd'hui.",
+    situation_summary: "Lausanne, aujourd'hui.",
+    updated_at: "2026-09-11T00:00:00Z",
+  })),
+}));
 
 import { simulateMaxResponse } from "@/agents/maxAgent";
 import { evaluatePostTurnPRD4 } from "@/agents/gameMasterPRD4";
@@ -145,7 +163,18 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       commitments: [],
       openThreads: [],
       topics: [],
-      relationship: { depth: "surface", trust: "neutre", emotionalState: null, sourceTurn: 0 },
+      relationship: {
+        depth: "surface",
+        trust: "neutre",
+        emotionalState: null,
+        tier: "contact",
+        topicOpenness: {},
+        justification: "Premier contact",
+        evidence: [],
+        characterKey: "max",
+        policyVersion: "unversioned",
+        sourceTurn: 0,
+      },
       lastExchange: null,
     });
     vi.mocked(simulateMaxResponse).mockResolvedValue({ response: "Je vous écoute.", systemPrompt: "system" });
@@ -209,7 +238,18 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       commitments: [],
       openThreads: [],
       topics: [],
-      relationship: { depth: "fissure" as const, trust: "ouverte" as const, emotionalState: null, sourceTurn: 5 },
+      relationship: {
+        depth: "fissure" as const,
+        trust: "ouverte" as const,
+        emotionalState: null,
+        tier: "trust" as const,
+        topicOpenness: {},
+        justification: "Relation déjà ouverte",
+        evidence: ["honesty" as const],
+        characterKey: "max",
+        policyVersion: "unversioned",
+        sourceTurn: 5,
+      },
       lastExchange: "Alice a confronté Max.",
       characterItems: [],
       characterStates: {},
@@ -254,11 +294,12 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     });
     const maxInput = vi.mocked(simulateMaxResponse).mock.calls[0][0];
     expect(vi.mocked(queryRAGDetailed).mock.calls[0][2]).toBe(6);
-    expect(maxInput.conversationMemory).toEqual(structuredMemory);
+    expect(maxInput.conversationMemory).toMatchObject({ ...structuredMemory, version: 3 });
     expect(maxInput.conversationHistory).toEqual(history.slice(-6));
     expect(maxInput.ragCandidates).toHaveLength(6);
     await result.postTurnPromise;
-    expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0].conversationMemoryBefore).toEqual(structuredMemory);
+    expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0].conversationMemoryBefore)
+      .toMatchObject({ ...structuredMemory, version: 3 });
   });
 
   it("transmet le contexte temporel et la guidance GM à Max", async () => {
@@ -314,7 +355,18 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       commitments: [],
       openThreads: [],
       topics: [],
-      relationship: { depth: "fissure", trust: "ouverte", emotionalState: null, sourceTurn: 5 },
+      relationship: {
+        depth: "fissure",
+        trust: "ouverte",
+        emotionalState: null,
+        tier: "trust",
+        topicOpenness: {},
+        justification: "Relation privée avec Max",
+        evidence: ["honesty"],
+        characterKey: "max",
+        policyVersion: "unversioned",
+        sourceTurn: 5,
+      },
       lastExchange: "Échange privé avec Max",
       characterItems: [
         { id: "secret", text: "Secret confié à Max", sourceTurn: 3, sourceCharacter: "max", visibility: "private", visibleTo: ["max"], provenance: "user" },

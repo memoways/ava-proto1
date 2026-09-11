@@ -13,7 +13,7 @@ import {
   mergeConversationMemory,
   normalizeConversationMemory,
 } from "@/services/conversationMemoryV1";
-import { parseHandoffOffer, type CharacterHandoffOffer } from "@/services/characterConversation";
+import { asRuntimeCharacter, parseHandoffOffer, type CharacterHandoffOffer } from "@/services/characterConversation";
 import { ensureGameAuth } from "@/services/gameAuth";
 
 const memoryCache = new Map<string, ConversationMemoryV1>();
@@ -93,7 +93,7 @@ export async function persistPostTurnMemory(
   entry: PRD4PostTurnEvaluation,
   delta: ConversationMemoryDelta | null,
   turnIndex: number,
-  activeCharacter: RuntimeCharacter = "max",
+  activeCharacter: RuntimeCharacter,
 ): Promise<ConversationMemoryV1> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const { data, error } = await supabase
@@ -158,6 +158,11 @@ export async function fetchResumablePRD4Session(now = new Date()): Promise<Resum
   if (!conversation.length) return null;
   const memory = normalizeConversationMemory(data.conversation_memory);
   memoryCache.set(data.id, memory);
+  const activeCharacter = asRuntimeCharacter(data.active_character);
+  if (!activeCharacter) {
+    console.warn("[PRD4 resume] session has no valid active character; resume refused");
+    return null;
+  }
   return {
     id: data.id,
     started_at: data.started_at,
@@ -175,7 +180,7 @@ export async function fetchResumablePRD4Session(now = new Date()): Promise<Resum
     gm_post_turn_log: Array.isArray(data.gm_post_turn_log)
       ? data.gm_post_turn_log as unknown as PRD4PostTurnEvaluation[]
       : [],
-    active_character: data.active_character === "emma" ? "emma" : "max",
+    active_character: activeCharacter,
     orchestration_version_id: data.orchestration_version_id,
     pending_handoff: parseHandoffOffer(data.pending_handoff),
     handoff_count: data.handoff_count ?? 0,

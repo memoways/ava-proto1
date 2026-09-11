@@ -23,6 +23,7 @@ describe("CharacterSelectScreen", () => {
       portraitUrl: characterKey === "emma" ? "https://portraits.example/emma-runtime.jpg" : "https://portraits.example/max-runtime.jpg",
       ttsProvider: null,
       ttsVoiceId: null,
+      situationSummary: null,
     }));
   });
 
@@ -49,6 +50,7 @@ describe("CharacterSelectScreen", () => {
       portraitUrl: null,
       ttsProvider: null,
       ttsVoiceId: null,
+      situationSummary: null,
     });
     render(<CharacterSelectScreen onSelect={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole("button", { name: "Emma indisponible" })).toBeInTheDocument());
@@ -59,7 +61,7 @@ describe("CharacterSelectScreen", () => {
     render(<CharacterSelectScreen onSelect={onSelect} />);
     await waitFor(() => expect(screen.getByRole("img", { name: "Portrait d’Emma" })).toBeInTheDocument());
     screen.getByRole("button", { name: "Appeler Emma" }).click();
-    expect(onSelect).toHaveBeenCalledWith("emma");
+    expect(onSelect).toHaveBeenCalledWith("emma", expect.objectContaining({ characterKey: "emma" }));
   });
 
   it("uses the runtime portrait configured for Emma", async () => {

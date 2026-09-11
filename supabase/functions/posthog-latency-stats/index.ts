@@ -44,6 +44,7 @@ interface EventRow {
   browser: string | null;
   responseReadyMs: number | null;
   firstSoundMs: number | null;
+  firstSoundStatus: string | null;
   endToEndMs: number | null;
   sttMs: number | null;
   ragMs: number | null;
@@ -294,7 +295,7 @@ serve(async (req) => {
       properties.character, properties.max_model, properties.stt_provider,
       properties.tts_provider, properties.browser_family,
       properties.t_turn_response_ready_ms, properties.t_turn_voice_ready_ms,
-      properties.t_turn_end_to_end_ms, properties.t_stt_total_ms,
+      properties.first_sound_status, properties.t_turn_end_to_end_ms, properties.t_stt_total_ms,
       properties.t_rag_total_ms, properties.t_max_llm_ms,
       properties.t_tts_total_ms, coalesce(properties.t_gm_post_ms, properties.latency_ms),
       properties.blocker_step, properties.severity,
@@ -325,10 +326,13 @@ serve(async (req) => {
       turnIndex: numberOrNull(row[4]), character: row[5] == null ? null : String(row[5]),
       model: row[6] == null ? null : String(row[6]), stt: row[7] == null ? null : String(row[7]),
       tts: row[8] == null ? null : String(row[8]), browser: row[9] == null ? null : String(row[9]),
-      responseReadyMs: numberOrNull(row[10]), firstSoundMs: numberOrNull(row[11]), endToEndMs: numberOrNull(row[12]),
-      sttMs: numberOrNull(row[13]), ragMs: numberOrNull(row[14]), maxMs: numberOrNull(row[15]),
-      ttsMs: numberOrNull(row[16]), gmMs: numberOrNull(row[17]), blocker: row[18] == null ? null : String(row[18]),
-      severity: row[19] == null ? null : String(row[19]), fallback: row[20] === true || row[20] === 1,
+      responseReadyMs: numberOrNull(row[10]),
+      firstSoundMs: row[12] === "measured" ? numberOrNull(row[11]) : null,
+      firstSoundStatus: row[12] == null ? null : String(row[12]),
+      endToEndMs: numberOrNull(row[13]),
+      sttMs: numberOrNull(row[14]), ragMs: numberOrNull(row[15]), maxMs: numberOrNull(row[16]),
+      ttsMs: numberOrNull(row[17]), gmMs: numberOrNull(row[18]), blocker: row[19] == null ? null : String(row[19]),
+      severity: row[20] == null ? null : String(row[20]), fallback: row[21] === true || row[21] === 1,
     }));
     const result = aggregate(rows, range, projectId, host);
     cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, value: result });

@@ -1,17 +1,10 @@
 import type { Database } from "@/integrations/supabase/types";
-import { planGameMasterTurnDetailed } from "@/agents/gameMasterAgent";
-import { simulateMaxResponse, validateMaxResponseDetailed } from "@/agents/maxAgent";
 import { callLLMWithUsage } from "@/services/openRouterLLM";
-import {
-  buildKnowledgeContextFromRAG,
-  formatMaxRAGContext,
-  queryRAGDetailed,
-} from "@/services/ragService";
-import { maxRagFormatOptionsForVariant } from "@/services/maxRagVariant";
 import { getGameplaySettings, getLLMSettings, listLlmConfigModels } from "@/services/settingsService";
 import { getCharacterRuntimeReadiness } from "@/services/experienceOrchestration";
 import { toCharacterExecutionContext } from "@/services/characterIdentityGuard";
 import type { RuntimeCharacter } from "@/types";
+import { processPRD4Turn } from "@/services/prd4Orchestrator";
 
 export const EVAL_FEATURE_KEY = "llm_as_judge";
 export const EVAL_REPEATS = 3;
@@ -27,7 +20,7 @@ export const EVAL_NOTION_COLUMNS = [
   { name: "Longueur max", type: "Number", note: "Nombre de phrases visé" },
   { name: "Categorie", type: "Select", note: "factuel / piege / emotion / lore" },
   { name: "Actif", type: "Checkbox", note: "Inclus dans les runs" },
-  { name: "Personnage", type: "Select", note: "V1 = Max" },
+  { name: "Personnage", type: "Select", note: "Max ou Emma, obligatoire" },
   { name: "Ordre", type: "Number", note: "Tri d'affichage" },
   { name: "Notes juge", type: "Rich text", note: "Consignes extra pour le juge" },
 ] as const;
@@ -93,7 +86,7 @@ export interface EvalCostEstimate {
   estimatedCostUsd: number;
 }
 
-const LLM_CALLS_PER_TURN = 4;
+const LLM_CALLS_PER_TURN = 3;
 const TOKENS_IN_PER_CALL = 1_800;
 const TOKENS_OUT_PER_CALL = 180;
 
@@ -239,10 +232,11 @@ export function parseJudgeResponse(raw: string): EvalJudgeScore {
 }
 
 export function buildJudgePrompt(item: Pick<EvalItem, "question" | "gold_answer" | "must_include" | "must_not" | "tone" | "max_length" | "judge_notes" | "character_name">, response: string): string {
-  const characterName = item.character_name?.trim() || "Max";
+  const characterName = item.character_name?.trim() || "le personnage attribué";
   return `Tu es un juge strict pour l'expérience narrative « Où est Ava ? ».
 Évalue la réponse de ${characterName} au regard de la cible de ce personnage.
 Ne récompense PAS le copier-coller du texte d'or : la grille prime.
+Une retenue, une réponse partielle, un déplacement du sujet ou une question sur l'intention peuvent être une excellente réponse lorsque la relation ne permet pas encore une confidence. Ne pénalise pas un fait intime non livré si le ton, MUST NOT ou les notes demandent cette retenue. Une connaissance factuelle n'est jamais, à elle seule, une permission de confidence.
 
 ## QUESTION JOUEUR
 ${item.question}
@@ -386,8 +380,10 @@ export async function runIsolatedEvalTurn(
   config: EvalTurnConfig,
   opts?: { signal?: AbortSignal },
 ): Promise<IsolatedEvalTurnTrace> {
-  const startedAt = performance.now();
-  const characterName = item.character_name || "Max";
+  const characterName = item.character_name?.trim();
+  if (!characterName) {
+    throw new Error("No character is attributed to this evaluation item");
+  }
   const characterKey: RuntimeCharacter | null = /^emma(?:\s|$)/i.test(characterName)
     ? "emma"
     : /^max(?:\s|$)/i.test(characterName)
@@ -398,96 +394,49 @@ export async function runIsolatedEvalTurn(
   if (!runtime?.ready || !characterContext) {
     throw new Error(`No exact attributed character context for isolated evaluation: ${characterName}`);
   }
-  const characterId = characterContext.characterId;
-  const gameplay = getGameplaySettings();
-
-  const ragStarted = performance.now();
-  const rag = await queryRAGDetailed(item.question, undefined, config.ragTopK, config.ragThreshold, {
-    characterId,
+  const turn = await processPRD4Turn({
+    sessionId: null,
+    conversationHistory: [],
+    userMessage: item.question,
+    userRole: null,
+    timeElapsedSeconds: 0,
     characterContext,
-    rerank: config.ragRerank,
-    retrieveK: Math.max(config.ragRetrieveK, config.ragTopK),
-    rerankModel: config.ragRerankModel,
-    rerankTruncation: config.ragRerankTruncation,
     signal: opts?.signal,
-    timeoutMs: 20_000,
-  });
-  const rag_ms = Math.round(performance.now() - ragStarted);
-  const knowledgeContext = buildKnowledgeContextFromRAG(rag.matches);
-  const ragContext = formatMaxRAGContext(rag.matches, maxRagFormatOptionsForVariant(gameplay.MAX_PROMPT_VARIANT));
-
-  const gmStarted = performance.now();
-  const gm = await planGameMasterTurnDetailed(
-    {
-      conversationHistory: [],
-      userMessage: item.question,
-      currentTrustLevel: 0,
-      triggeredIds: [],
-      timeElapsedSeconds: 0,
-      knowledgeContext,
-      characterName,
-      characterContext,
-    },
-    { featureKey: EVAL_FEATURE_KEY },
-  );
-  const gm_ms = Math.round(performance.now() - gmStarted);
-
-  const maxStarted = performance.now();
-  const max = await simulateMaxResponse(
-    {
-      conversationHistory: [],
-      userMessage: item.question,
-      ragContext,
-      knowledgeContext,
-    },
-    {
-      characterName,
-      characterContext,
+    turnIndex: 1,
+    evaluationOverrides: {
       featureKey: EVAL_FEATURE_KEY,
-      timeoutMs: 25_000,
-      signal: opts?.signal,
-      llmOverrides: {
+      ragTopK: config.ragTopK,
+      ragThreshold: config.ragThreshold,
+      ragRetrieveK: Math.max(config.ragRetrieveK, config.ragTopK),
+      ragRerank: config.ragRerank,
+      ragRerankModel: config.ragRerankModel,
+      ragRerankTruncation: config.ragRerankTruncation,
+      llm: {
         model: config.model,
         temperature: config.temperature,
         maxTokens: config.maxTokens,
         topP: config.topP,
       },
     },
-  );
-  const max_ms = Math.round(performance.now() - maxStarted);
-
-  const validatorStarted = performance.now();
-  const validator = await validateMaxResponseDetailed({
-    userMessage: item.question,
-    response: max.response,
-    ragContext,
-    knowledgeContext,
-    featureKey: EVAL_FEATURE_KEY,
   });
-  const validator_ms = Math.round(performance.now() - validatorStarted);
+  const gm = await turn.postTurnPromise;
 
   return {
-    maxResponse: max.response,
-    ragMatches: rag.matches.map((match) => ({
-      id: match.id,
-      similarity: match.similarity,
-      content: match.content.slice(0, 280),
-    })),
-    gmBrief: gm.brief,
-    validator: validator.result,
+    maxResponse: turn.maxResponse,
+    ragMatches: { count: turn.ragMatches },
+    gmBrief: gm,
+    validator: { status: "not_executed", reason: "disabled_in_prd4_public" },
     latencies: {
-      rag_ms,
-      gm_ms,
-      max_ms,
-      validator_ms,
-      total_ms: Math.round(performance.now() - startedAt),
+      rag_ms: turn.timings.rag_ms,
+      gm_ms: gm.latency_ms ?? 0,
+      max_ms: turn.timings.max_ms,
+      validator_ms: 0,
+      total_ms: turn.timings.total_ms,
     },
-    tokens: {
-      gm: gm.usage ?? null,
-      max: max.usage ?? null,
-      validator: validator.usage ?? null,
-    },
-    error: rag.error || gm.error,
+    tokens: {},
+    error: gm.execution_status && gm.execution_status !== "executed"
+      ? `GM ${gm.execution_status}`
+      : undefined,
   };
 }
 

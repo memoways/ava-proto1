@@ -21,6 +21,7 @@ import {
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
 import { supabase } from "@/integrations/supabase/client";
 import { getGameplaySettings } from "@/services/settingsService";
+import { compileCharacterRelationshipPolicy } from "@/services/relationshipEngine";
 import {
   observeCharacterPrompt,
   formatSyncDate,
@@ -176,7 +177,7 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
       } else if (warnings.length > 0) {
         toast.warning(`Resync OK mais ${warnings.length} champ(s) Notion non récupéré(s) — détails ci-dessous`);
       } else {
-        toast.success(`Champs éditoriaux resyncés : ${item?.prompt_fields_filled || 0}/8 champs, résumé ${item?.summary_chars || 0} chars (RAG inchangé)`);
+        toast.success(`Champs éditoriaux resyncés : ${item?.prompt_fields_filled || 0}/${CHARACTER_PROMPT_FIELDS.length} champs, résumé ${item?.summary_chars || 0} chars (RAG inchangé)`);
       }
       clearSystemPromptCache();
       await loadActive(resolvedId);
@@ -208,6 +209,9 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
   const preview = prompt ? buildCharacterPromptSections({ ...prompt, ...draft }) : "";
   const promptVariant = getGameplaySettings().MAX_PROMPT_VARIANT;
   const richPreview = prompt ? compileRichCharacterSections({ ...prompt, ...draft }) : null;
+  const relationshipPreview = prompt
+    ? compileCharacterRelationshipPolicy({ ...prompt, ...draft }, prompt.name?.split(/\s+/)[0]?.toLocaleLowerCase("fr") || "character")
+    : null;
 
   if (!resolvedId) {
     return <p className="text-sm text-muted-foreground">Personnage introuvable. Lance une sync Notion.</p>;
@@ -342,14 +346,33 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
         </div>
         <p className="text-xs text-muted-foreground">
           Généré automatiquement à partir du corps de la page Notion lors du sync.
-          Max reçoit ce texte dans son noyau factuel à chaque tour.
+          Le personnage reçoit ce texte dans son noyau factuel à chaque tour.
         </p>
         <ScrollArea className="h-32 border rounded p-3 bg-background/50">
           <pre className="text-xs whitespace-pre-wrap">{prompt.situation_summary || "(vide — relance un sync)"}</pre>
         </ScrollArea>
       </div>
 
-      {/* 8 champs éditoriaux + situation actuelle = 9 champs structurés */}
+      {relationshipPreview && (
+        <div className="space-y-2 border rounded-lg p-4 bg-muted/20">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Label className="text-sm font-semibold">Politique relationnelle compilée</Label>
+            <span className="text-xs text-muted-foreground">
+              source {relationshipPreview.source === "notion" ? "Notion" : "compatibilité"} · version {relationshipPreview.version}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {relationshipPreview.sensitiveTopics.length} condition(s) de sujet · {relationshipPreview.openingSignals.length} signe(s) d’ouverture · {relationshipPreview.closingSignals.length} signe(s) de fermeture.
+          </p>
+          {relationshipPreview.source !== "notion" && (
+            <p className="text-xs text-amber-400">
+              Le champ « Politique relationnelle » est vide : le runtime utilise temporairement les champs historiques compilés.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Champs éditoriaux synchronisés + situation actuelle */}
       <div className="space-y-5 border rounded-lg p-4">
         {CHARACTER_PROMPT_FIELDS.map((f) => (
           <div key={f.key} className="space-y-2">

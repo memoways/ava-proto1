@@ -65,4 +65,13 @@ describe("characterConversation", () => {
     expect(inferCharacterSwitchStance("Pas maintenant. Reste avec moi.")).toBe("object");
     expect(inferCharacterSwitchStance("Je ne sais pas trop.")).toBe("defer");
   });
+
+  it("n'attribue pas silencieusement un ancien message sans identité", () => {
+    const unattributed = [{ role: "assistant", content: "Allô ?", timestamp: 1 }] as unknown as ConversationMessage[];
+
+    expect(sliceConversationForCharacter(unattributed, "max")).toEqual([]);
+    expect(sliceConversationForCharacter(unattributed, "emma")).toEqual([]);
+    expect(hasSpokenWithCharacter(unattributed, "max")).toBe(false);
+    expect(hasSpokenWithCharacter(unattributed, "emma")).toBe(false);
+  });
 });

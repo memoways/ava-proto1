@@ -61,6 +61,8 @@ function makePrompt(overrides: Partial<CharacterPrompt> = {}): CharacterPrompt {
     dynamique_conversation: "Mettre de l'ordre en racontant.\n\nRevenir de l'abstrait vers les urgences concrètes.",
     sujets_sensibles: "Le fusil.\n\nEmma, Léo, Ava, Mona.\n\nLes morts, les corps, les tremblements.",
     profondeur_par_niveau: DEPTH,
+    politique_relationnelle: "Moteur\nComprendre l'appel.\n\nRésistance\nRépondre partiellement.",
+    references_intellectuelles: "Journalisme scientifique et histoire des crises.",
     ...overrides,
   };
 }
@@ -117,6 +119,8 @@ describe("maxRichPromptCompiler — rich_v2", () => {
       "sujets_sensibles",
       "timeline",
       "profondeur_par_niveau",
+      "politique_relationnelle",
+      "references_intellectuelles",
     ]);
     expect(result.staticChars).toBeLessThanOrEqual(RICH_V2_LIMITS.staticMaxChars);
     expect(result.timelineEvents.join(" ")).toMatch(/Aujourd'hui/);
@@ -150,7 +154,7 @@ describe("maxRichPromptCompiler — rich_v2", () => {
     expect(RICH_V2_CONVERSATION_CONTRACT).toContain("une à trois phrases");
     expect(RICH_V2_CONVERSATION_CONTRACT).toContain("quatre phrases courtes");
     expect(RICH_V2_CONVERSATION_CONTRACT).not.toMatch(/45 mots/);
-    expect(RICH_V2_CONVERSATION_CONTRACT).toMatch(/jamais deux tours de suite/);
+    expect(RICH_V2_CONVERSATION_CONTRACT).toMatch(/évite les relances réflexes et répétitives/);
   });
 });
 

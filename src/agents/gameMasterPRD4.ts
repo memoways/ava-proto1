@@ -11,8 +11,13 @@ import { getLLMSettings } from "@/services/settingsService";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
 import { normalizeMemoryText } from "@/services/conversationMemoryV1";
-import type { ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, ExperienceDirectorConfig, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, TraceMessage, UserRoleProfile } from "@/types";
+import type { CharacterRelationshipPolicy, ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, ExperienceDirectorConfig, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, RelationshipStateProposal, RuntimeCharacter, TraceMessage, TurnRelationshipDirective, UserRoleProfile } from "@/types";
 import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
+import {
+  normalizeRelationshipState,
+  relationshipStateToProposal,
+  validateRelationshipTransition,
+} from "@/services/relationshipEngine";
 
 export interface PRD4PostTurnInput {
   sessionId: string | null;
@@ -35,8 +40,10 @@ export interface PRD4PostTurnInput {
   systemPromptOverride?: string | null;
   orchestrationVersionId?: string | null;
   orchestrationConfig?: ExperienceDirectorConfig | null;
-  currentCharacter?: "max" | "emma";
+  currentCharacter: RuntimeCharacter;
   characterContext?: CharacterExecutionContext;
+  relationshipPolicy?: CharacterRelationshipPolicy;
+  turnRelationshipDirective?: TurnRelationshipDirective;
   /** Admin draft tests set this to false so they cannot mutate live sessions. */
   persist?: boolean;
 }
@@ -71,7 +78,7 @@ const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
 
 const GM_POST_TURN_TIMEOUT_MS = 12000;
 
-export const EXPERIENCE_DIRECTOR_SYSTEM_PROMPT = `Tu es le directeur d'expérience d'une expérience narrative en temps réel dont la durée est configurée par l'administration, entre un joueur et le personnage actif explicitement attribué dans le contexte (Max ou Emma). Après chaque échange, tu produis une seule décision structurée en JSON STRICT — aucun texte hors JSON. Cet appel a lieu après le texte du personnage et ne doit jamais retarder sa voix.
+export const EXPERIENCE_DIRECTOR_SYSTEM_PROMPT = `Tu es le directeur d'expérience d'une expérience narrative en temps réel dont la durée est configurée par l'administration, entre un joueur et le personnage actif explicitement attribué dans le contexte. Après chaque échange, tu produis une seule décision structurée en JSON STRICT — aucun texte hors JSON. Cet appel a lieu après le texte du personnage et ne doit jamais retarder sa voix.
 
 Tu retournes EXACTEMENT cet objet :
 {
@@ -111,7 +118,18 @@ Tu retournes EXACTEMENT cet objet :
     "openThreads": string[],        // sujets précis encore ouverts
     "resolvedThreadIds": string[],  // ids fournis dans une mémoire antérieure, sinon []
     "topics": string[],
-    "relationship": { "depth": "surface" | "fissure" | "verite" | "bonus", "trust": "fragile" | "neutre" | "ouverte", "emotionalState": string | null },
+    "relationship": {
+      "depth": "surface" | "fissure" | "verite" | "bonus",
+      "trust": "fragile" | "neutre" | "ouverte",
+      "emotionalState": string | null,
+      "tier": "contact" | "link" | "trust",
+      "topicOpenness": { "topic-id": "closed" | "partial" | "open" },
+      "justification": string,
+      "evidence": ("precise_listening" | "honesty" | "boundary_respected" | "relevant_confrontation" | "repair" | "reciprocal_disclosure" | "boundary_pressure" | "contradiction" | "hostility" | "politeness" | "character_disclosure")[],
+      "sourceTurn": number,
+      "characterKey": string,
+      "policyVersion": string
+    },
     "lastExchange": string          // une phrase factuelle, max 35 mots
   }
 }
@@ -152,7 +170,11 @@ Règles "memory_delta" :
 - N'ajoute aucun fait canonique appris ailleurs et aucune interprétation psychologique incertaine.
 - Utilise des listes vides et null quand rien de nouveau n'est établi.
 - Pour fermer un fil, recopie son id stable de MÉMOIRE AVANT LE TOUR dans resolvedThreadIds.
-- La profondeur ne redescend pas après un aveu ou une contradiction reconnue.
+- Les faits et confidences déjà prononcés restent en mémoire même si la disposition relationnelle recule.
+- Une simple politesse, le nombre de tours ou une confidence produite par le personnage ne prouvent jamais une confiance gagnée.
+- Le palier peut monter ou descendre d'un cran au maximum. Appuie chaque changement sur un evidence précis du dernier échange.
+- Recopie exactement sourceTurn, characterKey et policyVersion fournis dans MÉTADONNÉES DE PROPOSITION. Le moteur rejettera toute autre valeur.
+- topicOpenness ne contient que les ids présents dans la politique relationnelle. Connaître un fait du récit n'ouvre pas automatiquement son intimité.
 
 Pas de markdown, pas de \`\`\`. Uniquement l'objet JSON.`;
 
@@ -218,7 +240,22 @@ function buildUserPrompt(input: PRD4PostTurnInput, videos: VideoTriggerRow[]): s
 
   const characterAttribution = input.characterContext
     ? `${input.characterContext.displayName} | character_id=${input.characterContext.characterId} | notion_page_id=${input.characterContext.notionPageId} | environment=${input.characterContext.environmentId} | prompt_version=${input.characterContext.promptUpdatedAt}`
-    : (input.currentCharacter === "emma" ? "Emma" : "Max");
+    : input.currentCharacter;
+  const relationshipPolicy = input.relationshipPolicy
+    ? JSON.stringify({
+        characterKey: input.relationshipPolicy.characterKey,
+        version: input.relationshipPolicy.version,
+        callDrive: input.relationshipPolicy.callDrive,
+        openingSignals: input.relationshipPolicy.openingSignals,
+        closingSignals: input.relationshipPolicy.closingSignals,
+        sensitiveTopics: input.relationshipPolicy.sensitiveTopics,
+        resistanceStyle: input.relationshipPolicy.resistanceStyle,
+        initiativeStyle: input.relationshipPolicy.initiativeStyle,
+      })
+    : "(politique indisponible : ne propose aucun changement relationnel)";
+  const relationshipState = input.relationshipPolicy
+    ? normalizeRelationshipState(memory?.relationship, input.currentCharacter, input.relationshipPolicy.version)
+    : null;
 
   return `## PERSONNAGE ACTIF — ATTRIBUTION IMMUABLE
 ${characterAttribution}
@@ -231,6 +268,22 @@ ${input.userPostureRaw?.trim() || "(non renseignée)"}
 
 ## MÉMOIRE AVANT LE TOUR
 ${memoryBefore}
+
+## POLITIQUE RELATIONNELLE DU PERSONNAGE
+${relationshipPolicy}
+
+## ÉTAT RELATIONNEL AVANT LE TOUR
+${relationshipState ? JSON.stringify(relationshipState) : "(indisponible)"}
+
+## MÉTADONNÉES DE PROPOSITION — À RECOPIER EXACTEMENT
+${input.relationshipPolicy ? JSON.stringify({
+    sourceTurn: input.turnIndex,
+    characterKey: input.currentCharacter,
+    policyVersion: input.relationshipPolicy.version,
+  }) : "(indisponible : ne propose aucun changement relationnel)"}
+
+## DIRECTIVE EFFECTIVEMENT UTILISÉE POUR LA RÉPONSE DIFFUSÉE
+${input.turnRelationshipDirective?.prompt || "(indisponible)"}
 
 ## TEMPS ÉCOULÉ
   ${Math.floor(input.timeElapsedSeconds / 60)}min ${input.timeElapsedSeconds % 60}s sur ~${Math.round(input.sessionDurationSeconds / 60)} min configurées — clôture naturelle autorisée après ${Math.floor(input.minimumClosureSeconds / 60)}min ${input.minimumClosureSeconds % 60}s — tour #${input.turnIndex}
@@ -246,7 +299,7 @@ ${recent || "(aucun)"}
 
 ## DERNIER ÉCHANGE (à évaluer)
 UTILISATEUR (à labéliser) : ${input.userMessage}
-${input.currentCharacter === "emma" ? "EMMA" : "MAX"} : ${input.maxResponse}
+${characterAttribution} : ${input.maxResponse}
 
 Retourne l'évaluation JSON. Extrais d'abord \`labels\` à partir du message UTILISATEUR uniquement (max 4 labels, vides si pas évident). Puis renseigne \`trigger_video_id\` si un de tes \`labels.themes\` recoupe les \`themes\` d'une vidéo disponible.`;
 }
@@ -269,6 +322,16 @@ function cleanMemoryDelta(raw: unknown): ConversationMemoryDelta | null {
   const trust = relationship.trust === "fragile" || relationship.trust === "neutre" || relationship.trust === "ouverte"
     ? relationship.trust
     : undefined;
+  const tier = relationship.tier === "contact" || relationship.tier === "link" || relationship.tier === "trust"
+    ? relationship.tier
+    : undefined;
+  const topicOpenness = relationship.topicOpenness && typeof relationship.topicOpenness === "object"
+    ? Object.fromEntries(Object.entries(relationship.topicOpenness as Record<string, unknown>)
+        .filter((entry): entry is [string, "closed" | "partial" | "open"] => entry[1] === "closed" || entry[1] === "partial" || entry[1] === "open"))
+    : undefined;
+  const evidence = Array.isArray(relationship.evidence)
+    ? relationship.evidence.map(String).slice(0, 6) as NonNullable<RelationshipStateProposal["evidence"]>
+    : undefined;
   return {
     interlocutor: {
       name: normalizeMemoryText(interlocutor.name, 80) || null,
@@ -285,6 +348,13 @@ function cleanMemoryDelta(raw: unknown): ConversationMemoryDelta | null {
       ...(depth ? { depth } : {}),
       ...(trust ? { trust } : {}),
       emotionalState: normalizeMemoryText(relationship.emotionalState, 160) || null,
+      ...(tier ? { tier } : {}),
+      ...(topicOpenness ? { topicOpenness } : {}),
+      justification: normalizeMemoryText(relationship.justification, 280),
+      ...(evidence ? { evidence } : {}),
+      sourceTurn: Number.isFinite(Number(relationship.sourceTurn)) ? Math.floor(Number(relationship.sourceTurn)) : undefined,
+      characterKey: normalizeMemoryText(relationship.characterKey, 80),
+      policyVersion: normalizeMemoryText(relationship.policyVersion, 100),
     },
     lastExchange: normalizeMemoryText(value.lastExchange, 260) || null,
   };
@@ -354,6 +424,7 @@ export async function evaluatePostTurnPRD4(
   let llmTrace: LLMCallDiagnosticTrace | null = null;
   let rawResponse: string | null = null;
   let diagnosticError: string | null = null;
+  let executionStatus: NonNullable<PRD4PostTurnEvaluation["execution_status"]> = "executed";
   try {
     const llm = getLLMSettings();
     model = llm.LLM_MODEL_GM;
@@ -365,7 +436,7 @@ export async function evaluatePostTurnPRD4(
         // Le réglage GM historique (souvent 180) suffit aux labels mais pas à
         // l'évaluation + memory_delta. Ce plancher évite un JSON tronqué sans
         // ajouter d'appel LLM.
-        max_tokens: Math.max(llm.LLM_MAX_TOKENS_GM ?? 0, 800),
+        max_tokens: Math.max(llm.LLM_MAX_TOKENS_GM ?? 0, 950),
         timeoutMs: input.orchestrationConfig?.directorTimeoutMs ?? GM_POST_TURN_TIMEOUT_MS,
         feature_key: "prd4_gm_post_turn",
         session_id: input.sessionId ?? undefined,
@@ -380,6 +451,7 @@ export async function evaluatePostTurnPRD4(
       console.warn("[GM-PRD4] no JSON in response:", callRes.content.slice(0, 200));
       result = { ...DEFAULT_RESULT, notes: "Réponse LLM non parsable (fallback)." };
       diagnosticError = "Réponse JSON non parsable";
+      executionStatus = "invalid";
     } else {
       const rawTrigger = parsed.trigger_video_id ? String(parsed.trigger_video_id) : null;
       const safeTrigger = rawTrigger && validIds.has(rawTrigger) && !triggered.has(rawTrigger) ? rawTrigger : null;
@@ -427,16 +499,45 @@ export async function evaluatePostTurnPRD4(
     console.error("[GM-PRD4] error:", err);
     result = { ...DEFAULT_RESULT, notes: `Erreur LLM: ${(err as Error).message?.slice(0, 100) || "inconnue"}` };
     diagnosticError = err instanceof Error ? err.message : String(err);
+    executionStatus = "failed";
     llmTrace = err instanceof LLMProxyRequestError ? err.diagnosticTrace : llmTrace;
+  }
+
+  if (input.relationshipPolicy && result.memory_delta?.relationship) {
+    const previous = normalizeRelationshipState(
+      input.conversationMemoryBefore?.relationship,
+      input.currentCharacter,
+      input.relationshipPolicy.version,
+    );
+    const transition = validateRelationshipTransition({
+      previous,
+      proposal: result.memory_delta.relationship,
+      policy: input.relationshipPolicy,
+      characterKey: input.currentCharacter,
+      turnIndex: input.turnIndex,
+    });
+    if (!transition.accepted) executionStatus = "invalid";
+    result = {
+      ...result,
+      relationship_transition: transition,
+      memory_delta: {
+        ...result.memory_delta,
+        relationship: {
+          ...result.memory_delta.relationship,
+          ...relationshipStateToProposal(transition.next),
+        },
+      },
+    };
   }
 
   let enriched: PRD4PostTurnEvaluation = {
     ...result,
-    character_key: input.currentCharacter ?? input.characterContext?.characterKey ?? "max",
+    character_key: input.currentCharacter,
     turn_index: input.turnIndex,
     latency_ms: Math.round(performance.now() - startedAt),
     model,
     created_at: new Date().toISOString(),
+    execution_status: executionStatus,
     orchestration_version_id: input.orchestrationVersionId ?? null,
     orchestration_config: input.orchestrationConfig ?? null,
   };
@@ -448,7 +549,7 @@ export async function evaluatePostTurnPRD4(
         enriched,
         enriched.memory_delta ?? null,
         input.turnIndex,
-        input.currentCharacter ?? "max",
+        input.currentCharacter,
       );
       enriched = { ...enriched, memory_after: memoryAfter };
     } catch (err) {

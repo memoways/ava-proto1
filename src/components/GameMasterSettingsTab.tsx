@@ -28,7 +28,7 @@ import {
   GM_TONE_OPTIONS,
 } from "@/services/gameMasterPromptBuilder";
 import { getGameplaySettings, loadGameplaySettingsFromDB, type GameplaySettings } from "@/services/settingsService";
-import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig } from "@/types";
+import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig, RuntimeCharacter } from "@/types";
 
 interface SessionVersionRow { orchestration_version_id: string | null }
 
@@ -50,6 +50,7 @@ export default function GameMasterSettingsTab() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [testUser, setTestUser] = useState("Pourquoi Ava ne vous faisait-elle plus confiance ?");
   const [testCharacter, setTestCharacter] = useState("Je ne suis pas certain d’avoir mérité sa confiance.");
+  const [testCharacterKey, setTestCharacterKey] = useState<RuntimeCharacter>("max");
   const [testExpected, setTestExpected] = useState("Une guidance prudente, sans action forcée.");
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
@@ -174,6 +175,7 @@ export default function GameMasterSettingsTab() {
       userMessage: testUser,
       maxResponse: testCharacter,
       userRole: null,
+      currentCharacter: testCharacterKey,
       turnIndex: 4,
       timeElapsedSeconds: 240,
       sessionDurationSeconds: gameplay.TIMEOUT_SECONDS,
@@ -220,7 +222,7 @@ export default function GameMasterSettingsTab() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">🎬 Réglages GM</h2>
-          <p className="text-sm text-muted-foreground">Un seul directeur post-tour, versionné et hors du chemin Max → voix.</p>
+          <p className="text-sm text-muted-foreground">Un seul directeur post-tour, versionné et hors du chemin personnage → voix.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw className="mr-1 h-3.5 w-3.5" />Actualiser</Button>
@@ -522,7 +524,7 @@ export default function GameMasterSettingsTab() {
                   aria-label="Prompt généré du directeur"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Variables runtime ajoutées à chaque tour : profil et posture joueur, mémoire, temps écoulé, historique récent, dernier échange, vidéos disponibles et déjà jouées.
+                  Variables runtime ajoutées à chaque tour : personnage attribué, profil et posture joueur, mémoire, politique et état relationnels, directive appliquée, temps écoulé, historique récent, dernier échange, vidéos disponibles et déjà jouées.
                 </p>
               </div>
               <p className="text-xs text-muted-foreground">Une publication ne modifie jamais les sessions déjà démarrées. Restaurez une version archivée en créant un brouillon dérivé.</p>
@@ -535,9 +537,16 @@ export default function GameMasterSettingsTab() {
         <section className="rounded-lg border p-4 space-y-3">
           <div className="flex items-center gap-2"><Beaker className="h-4 w-4" /><h3 className="font-semibold">Test sans effet réel</h3></div>
           <p className="text-xs text-muted-foreground">Le test n’a pas de session et ne persiste ni mémoire, ni décision, ni événement.</p>
+          <Select value={testCharacterKey} onValueChange={(value) => setTestCharacterKey(value as RuntimeCharacter)}>
+            <SelectTrigger className="w-48" aria-label="Personnage testé"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="max">Max</SelectItem>
+              <SelectItem value="emma">Emma</SelectItem>
+            </SelectContent>
+          </Select>
           <div className="grid gap-3 md:grid-cols-2">
             <Textarea value={testUser} onChange={(event) => setTestUser(event.target.value)} placeholder="Message utilisateur" />
-            <Textarea value={testCharacter} onChange={(event) => setTestCharacter(event.target.value)} placeholder="Réponse de Max" />
+            <Textarea value={testCharacter} onChange={(event) => setTestCharacter(event.target.value)} placeholder="Réponse du personnage" />
           </div>
           <Input value={testExpected} onChange={(event) => setTestExpected(event.target.value)} placeholder="Décision attendue" />
           <Button variant="outline" onClick={() => void testDraft()} disabled={testing}>{testing ? "Test…" : "Comparer attendu / produit"}</Button>

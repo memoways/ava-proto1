@@ -327,6 +327,7 @@ export interface CharacterRuntimeReadiness {
   portraitUrl: string | null;
   ttsProvider: string | null;
   ttsVoiceId: string | null;
+  situationSummary: string | null;
 }
 
 export async function getCharacterRuntimeReadiness(character: "max" | "emma"): Promise<CharacterRuntimeReadiness | null> {
@@ -338,8 +339,9 @@ export async function getCharacterRuntimeReadiness(character: "max" | "emma"): P
   const rows = (data ?? null) as unknown as Record<string, unknown>[] | null;
   const row = Array.isArray(rows) ? rows[0] : undefined;
   if (!row) return null;
+  if (row.character_key !== character) throw new Error("Runtime character attribution mismatch");
   return {
-    characterKey: row.character_key === "emma" ? "emma" : "max",
+    characterKey: character,
     displayName: typeof row.display_name === "string" ? row.display_name : character,
     // Older RPC rows omit `enabled`; treat that as on so Orchestration can
     // actually offer Emma before the full qualitative checklist is ticked.
@@ -353,6 +355,7 @@ export async function getCharacterRuntimeReadiness(character: "max" | "emma"): P
     portraitUrl: typeof row.portrait_url === "string" ? row.portrait_url : null,
     ttsProvider: typeof row.tts_provider === "string" ? row.tts_provider : null,
     ttsVoiceId: typeof row.tts_voice_id === "string" ? row.tts_voice_id : null,
+    situationSummary: typeof row.situation_summary === "string" ? row.situation_summary : null,
   };
 }
 

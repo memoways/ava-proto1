@@ -3,10 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { Phone } from "lucide-react";
 import maxImg from "@/assets/characters/max.jpg";
 import emmaImg from "@/assets/characters/emma.jpg";
+import { displayNameForCharacter } from "@/services/characterRegistry";
 
 interface Props {
   onAnswered: () => void;
-  character?: "max" | "emma";
+  character: "max" | "emma";
+  situation?: string | null;
 }
 
 const RING_MS = 1500;
@@ -56,11 +58,19 @@ function useRingtone(active: boolean, rings: number, intervalMs: number) {
   }, [active, rings, intervalMs]);
 }
 
-const CallingMaxScreen = ({ onAnswered, character = "max" }: Props) => {
+function encounterFrame(value: string | null | undefined, maxChars = 260): string {
+  const clean = value?.replace(/\s+/g, " ").trim() ?? "";
+  if (clean.length <= maxChars) return clean;
+  const candidate = clean.slice(0, maxChars - 1).trimEnd();
+  const sentenceEnd = Math.max(candidate.lastIndexOf(". "), candidate.lastIndexOf("? "), candidate.lastIndexOf("! "));
+  return `${(sentenceEnd > maxChars * 0.45 ? candidate.slice(0, sentenceEnd + 1) : candidate).trim()}…`;
+}
+
+const CallingMaxScreen = ({ onAnswered, character, situation }: Props) => {
   const [ring, setRing] = useState(1);
   const [pickingUp, setPickingUp] = useState(false);
   useRingtone(true, RINGS, RING_MS);
-  const displayName = character === "emma" ? "Emma" : "Max";
+  const displayName = displayNameForCharacter(character);
   const portrait = character === "emma" ? emmaImg : maxImg;
 
   useEffect(() => {
@@ -116,6 +126,11 @@ const CallingMaxScreen = ({ onAnswered, character = "max" }: Props) => {
         </div>
 
         <p className="mx-auto max-w-md text-xs text-muted-foreground/80">
+          {encounterFrame(situation) && (
+            <span className="mb-3 block text-sm leading-relaxed text-foreground/75">
+              {encounterFrame(situation)}
+            </span>
+          )}
           Quand ce sera à toi de parler, clique sur le bouton micro
           (ou appuie sur la barre&nbsp;Espace). Clique à nouveau pour envoyer.
         </p>

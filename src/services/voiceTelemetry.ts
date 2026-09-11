@@ -71,6 +71,7 @@ export interface VoiceTurnCompletedInput {
   browser?: Partial<BrowserDiagnostics>;
   audio_unlocked?: boolean;
   stt_trigger?: "silence" | "ptt_flush" | "manual" | "unknown";
+  latency_origin?: "ptt_finalized" | "transcript_final" | "text_submitted";
   had_fallback?: boolean;
   had_error?: boolean;
   error_type?: string | null;
@@ -98,6 +99,7 @@ export type VoiceTurnCompletedPayload = VoiceTurnCompletedInput &
     blocker_step: VoiceBlockerStep;
     blocker_reason: string;
     severity: VoiceSeverity;
+    first_sound_status: "measured" | "failed" | "not_measured";
   };
 
 export interface VoiceErrorRecord {
@@ -179,7 +181,6 @@ export function pickVoiceTurnBlocker(timings: VoiceTurnTimings, hadError = false
     { step: "max_llm", value: timings.t_max_llm_ms },
     { step: "validator", value: timings.t_validator_ms },
     { step: "tts_generation", value: timings.t_tts_total_ms },
-    { step: "gm_post", value: timings.t_gm_post_ms },
   ];
 
   let worst: { step: VoiceBlockerStep; ratio: number } | null = null;
@@ -218,13 +219,12 @@ export function buildVoiceTurnCompletedPayload(input: VoiceTurnCompletedInput): 
       (timings.t_max_llm_ms ?? 0) +
       (timings.t_validator_ms ?? 0),
   );
-  const voiceReady = firstNumber(
-    timings.t_turn_voice_ready_ms,
-    responseReady == null ? undefined : responseReady + (timings.t_tts_total_ms ?? 0),
-  );
+  // The first sound is valid only when the playback layer observed its actual
+  // start. TTS completion and the first LLM token are different measurements.
+  const voiceReady = firstNumber(timings.t_turn_voice_ready_ms);
   const endToEnd = firstNumber(
     timings.t_turn_end_to_end_ms,
-    voiceReady == null ? undefined : voiceReady + (timings.t_audio_playback_total_ms ?? 0) + (timings.t_gm_post_ms ?? 0),
+    voiceReady == null ? undefined : voiceReady + (timings.t_audio_playback_total_ms ?? 0),
   );
   const browser = detectBrowserFamily(input.browser?.userAgent);
   const blocker = pickVoiceTurnBlocker(
@@ -262,6 +262,11 @@ export function buildVoiceTurnCompletedPayload(input: VoiceTurnCompletedInput): 
     blocker_step: blocker.blocker_step,
     blocker_reason: blocker.blocker_reason,
     severity: blocker.severity,
+    first_sound_status: voiceReady != null
+      ? "measured"
+      : input.had_error
+        ? "failed"
+        : "not_measured",
   };
 }
 
@@ -329,7 +334,7 @@ function recordAvaLatencyEvents(payload: VoiceTurnCompletedPayload): void {
     },
     {
       key: "max_ms",
-      label: "Max LLM",
+      label: "Personnage LLM",
       duration: payload.t_max_llm_ms,
       provider: "OpenRouter",
       serviceName: "openrouter",
@@ -356,7 +361,7 @@ function recordAvaLatencyEvents(payload: VoiceTurnCompletedPayload): void {
     },
     {
       key: "gm_post_ms",
-      label: "GM post-turn",
+      label: "GM post-tour (hors attente)",
       duration: payload.t_gm_post_ms,
       provider: "OpenRouter",
       serviceName: "openrouter",
@@ -369,7 +374,9 @@ function recordAvaLatencyEvents(payload: VoiceTurnCompletedPayload): void {
     session_id: payload.session_id ?? null,
     turn_index: payload.turn_index,
     correlation_id: payload.turn_id,
-    total_latency_ms: payload.t_turn_voice_ready_ms ?? payload.t_turn_response_ready_ms ?? null,
+    total_latency_ms: payload.t_turn_voice_ready_ms ?? null,
+    response_ready_ms: payload.t_turn_response_ready_ms ?? null,
+    first_sound_status: payload.first_sound_status,
     blocked,
     blockage_reason: blockageReason,
     segment_count: segments.length,

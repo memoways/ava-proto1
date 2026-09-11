@@ -78,6 +78,8 @@ export function makeNotionMaxPrompt(overrides: Partial<CharacterPrompt> = {}): C
     sujets_sensibles:
       "Le fusil — l'image revient sans prévenir.\n\nEmma — le bras dans le couloir, le silence depuis hier.\n\nAva — elle sort de la forêt et te regarde.\n\nMona — le camp, son coup de pied dans la porte.",
     profondeur_par_niveau: NOTION_DEPTH,
+    politique_relationnelle: "Moteur\nComprendre pourquoi cette personne appelle.\n\nSignes d’ouverture\n- écoute précise\n- franchise\n- respect d'une limite\n\nSignes de fermeture\n- insistance après une limite\n- hostilité\n\nSujets sensibles\n- Le fusil :: confiance :: seulement après une relation établie\n- Emma :: lien :: si l'interlocuteur ne force pas l'intimité\n\nRésistance\nRépondre partiellement et demander ce que l'interlocuteur cherche.\n\nInitiative\nReprendre un fil qui compte pour Max lorsqu'il en a besoin.",
+    references_intellectuelles: "Lectures scientifiques, histoire des crises et journalisme d'enquête.",
     ...overrides,
   };
 }

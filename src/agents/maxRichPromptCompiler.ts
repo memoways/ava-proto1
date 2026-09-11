@@ -25,6 +25,7 @@ export const RICH_V2_LIMITS = {
 } as const;
 
 export const RICH_V2_DYNAMIC_SECTION_CHARS = {
+  relationship_directive: 1_400,
   user_role: 450,
   temporal_context: 260,
   session_summary: 1_200,
@@ -46,10 +47,10 @@ export const RICH_V2_CORE_HEADER = "# FICHE PERSONNAGE (source éditoriale uniqu
 
 export const RICH_V2_CONVERSATION_CONTRACT = `## CONTRAT DE CONVERSATION
 - Tu es ce personnage. Tu parles à la première personne, en français, sans narration ni méta-commentaire.
-- Tu réponds d'abord directement à ce qui vient d'être dit, avant toute éventuelle relance.
+- Tu réagis à ce qui vient d'être dit selon la relation : répondre, nuancer, retenir, contester ou questionner sont tous possibles.
 - Tu parles le plus souvent en une à trois phrases. Un souvenir précis peut aller jusqu'à quatre phrases courtes. Jamais de monologue.
 - Tu ne rejoues jamais une ouverture déjà passée et tu ne redemandes pas ce qui t'a déjà été donné (prénom, rôle, raison de l'appel).
-- Une question en retour est rare et doit réellement obliger l'interlocuteur à se positionner ; jamais deux tours de suite.
+- Une question en retour doit servir ton besoin ou obliger l'interlocuteur à se positionner ; évite les relances réflexes et répétitives.
 - Une ambiguïté, un humour maladroit ou une erreur de transcription s'interprètent charitablement : tu réponds au sens le plus plausible.
 - Seules des attaques explicites et répétées peuvent te faire devenir bref, avertir, puis mettre fin à l'appel.
 - Tu peux analyser les causes de tes actes, mais une explication n'est jamais une excuse.
@@ -649,6 +650,8 @@ const RICH_FIELD_SPECS: RichFieldSpec[] = [
   { key: "sujets_sensibles", title: "SUJETS SENSIBLES", order: 7, maxChars: 1_200, reservedChars: 450, boost: ["emma", "ava", "léo", "mona", "fusil"] },
   { key: "timeline", title: "CHRONOLOGIE", order: 8, maxChars: 1_800, reservedChars: 800 },
   { key: "profondeur_par_niveau", title: "PROGRESSION DE PROFONDEUR", order: 9, maxChars: 2_600, reservedChars: 1_100 },
+  { key: "politique_relationnelle", title: "POLITIQUE RELATIONNELLE", order: 10, maxChars: 1_400, reservedChars: 450 },
+  { key: "references_intellectuelles", title: "RÉFÉRENCES INTELLECTUELLES", order: 11, maxChars: 900, reservedChars: 250 },
 ];
 
 function compileGenericField(

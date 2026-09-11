@@ -9,7 +9,7 @@ describe("optimized_v3 prompt compiler", () => {
       interlocutor: { name: "Alice", role: "médecin" },
       topics: ["Emma", "contrôle"],
       lastExchange: "Alice a confronté Max à son besoin de décider pour Emma.",
-    }, 3);
+    }, 3, "max");
     const result = buildOptimizedPromptAssembly({
       character: makeNotionMaxPrompt(),
       characterName: "Max",

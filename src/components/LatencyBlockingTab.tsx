@@ -34,13 +34,15 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import type { ConversationMessage, ConversationPipelineTimings } from "@/types";
+import type { ConversationMessage, ConversationPipelineTimings, PRD4PostTurnEvaluation } from "@/types";
 import {
   buildLatencySegmentsFromPipeline,
   computeSegmentServiceEvolution,
   computeSegmentServiceStats,
   hasLegacyAmbiguousGamilabSttLatency,
   getPipelineServiceLatency,
+  getPlayerWaitLatencyTotal,
+  assignPipelineLatency,
   hasLegacyAmbiguousTtsLatency,
   resolveLatencyServiceInfo,
   type LatencySegmentKey,
@@ -48,6 +50,7 @@ import {
   type SegmentServiceEvolutionPoint,
   type SegmentServiceStats,
 } from "@/services/latencySegments";
+import { displayNameForCharacter } from "@/services/characterRegistry";
 import { getConfiguredLatencyServices } from "@/services/latencyServiceMetadata";
 import LLMTokenCostPanel from "@/components/admin/LLMTokenCostPanel";
 import { RAG_DEGRADED_MODE_DEADLINE_MS } from "@/config/experienceRuntime";
@@ -60,6 +63,8 @@ interface SessionRow {
   conversation_log: ConversationMessage[] | null;
   game_over_reason: string | null;
   context_type: string;
+  active_character: string | null;
+  gm_post_turn_log: PRD4PostTurnEvaluation[] | null;
 }
 
 function sessionLabel(s: SessionRow): string {
@@ -71,6 +76,8 @@ interface TurnTiming extends ConversationPipelineTimings {
   sessionId: string;
   timestamp: number;
   preview: string;
+  character: string;
+  gmPostStatus: NonNullable<ConversationPipelineTimings["gm_post_status"]>;
 }
 
 interface SessionAggregate {
@@ -90,11 +97,12 @@ const STEP_LABELS: Array<{ key: NumericTimingKey; label: string; color: string }
   { key: "stt_ms", label: "STT", color: "bg-slate-500" },
   { key: "rag_ms", label: "RAG", color: "bg-sky-500" },
   { key: "gm_pre_ms", label: "GM pre-turn", color: "bg-violet-500" },
-  { key: "max_ms", label: "Max LLM", color: "bg-emerald-500" },
+  { key: "max_ms", label: "Personnage LLM", color: "bg-emerald-500" },
   { key: "validator_ms", label: "Validateur", color: "bg-amber-500" },
   { key: "tts_ms", label: "TTS", color: "bg-rose-500" },
-  { key: "gm_post_ms", label: "GM post-turn", color: "bg-fuchsia-500" },
+  { key: "gm_post_ms", label: "GM post-tour (hors attente)", color: "bg-fuchsia-500" },
 ];
+const PLAYER_WAIT_STEPS = STEP_LABELS.filter((step) => step.key !== "gm_post_ms");
 
 function fmtMs(v?: number): string {
   if (v == null || !Number.isFinite(v)) return "—";
@@ -107,14 +115,14 @@ function serviceLatency(values: ConversationPipelineTimings, key: NumericTimingK
 }
 
 function serviceLatencyTotal(values: ConversationPipelineTimings): number {
-  return STEP_LABELS.reduce((acc, { key }) => acc + (serviceLatency(values, key) ?? 0), 0);
+  return getPlayerWaitLatencyTotal(values);
 }
 
 function serviceBlocker(values: ConversationPipelineTimings): string | null {
   const persisted = values.blocker as NumericTimingKey | undefined;
-  if (persisted && (serviceLatency(values, persisted) ?? 0) > 0) return persisted;
+  if (persisted && persisted !== "gm_post_ms" && (serviceLatency(values, persisted) ?? 0) > 0) return persisted;
   let worst: { key: NumericTimingKey; value: number } | null = null;
-  for (const { key } of STEP_LABELS) {
+  for (const { key } of STEP_LABELS.filter((step) => step.key !== "gm_post_ms")) {
     const value = serviceLatency(values, key) ?? 0;
     if (value <= 0) continue;
     if (!worst || value > worst.value) worst = { key, value };
@@ -134,6 +142,7 @@ const STEP_HEX: Record<NumericTimingKey, string> = {
 };
 
 const TARGET_MS = 2000;
+const TARGET_P95_MS = 4000;
 
 // ============================================================================
 // Analyse factuelle des causes de latence par étape
@@ -178,8 +187,8 @@ const STEP_HYPOTHESES: Record<NumericTimingKey, string[]> = {
     "Lancer le pre-turn en parallèle du début du STT final",
   ],
   max_ms: [
-    "Activer le streaming token-par-token côté Max LLM",
-    "Modèle plus rapide pour Max si la persona le permet",
+    "Activer le streaming du LLM personnage lorsque la première phrase est contrôlée",
+    "Modèle plus rapide pour le personnage si sa persona le permet",
     "Raccourcir le system prompt et le contexte injecté",
   ],
   validator_ms: [
@@ -408,7 +417,7 @@ function StackedRow({
       </div>
       <div className="relative h-6 w-full bg-muted/40 rounded overflow-hidden">
         <div className="absolute inset-0 flex">
-          {STEP_LABELS.map(({ key, label: stepLabel }) => {
+          {PLAYER_WAIT_STEPS.map(({ key, label: stepLabel }) => {
             const v = serviceLatency(values, key) ?? 0;
             if (v <= 0) return null;
             const pct = (v / denom) * 100;
@@ -599,7 +608,14 @@ function LatencyVisualization({
     return Math.max(m, t, dispMax, turnsMax);
   }, 0);
   const scaleMax = Math.max(perSessionMax, avgTotal, TARGET_MS) * 1.05;
-  const onTarget = avgTotal > 0 && avgTotal <= TARGET_MS;
+  const waitValues = perSessionRows
+    .flatMap((row) => row.turns ?? [])
+    .map(serviceLatencyTotal)
+    .filter((value) => value > 0)
+    .sort((left, right) => left - right);
+  const p50Wait = waitValues.length ? percentile(waitValues, 0.5) : 0;
+  const p95Wait = waitValues.length ? percentile(waitValues, 0.95) : 0;
+  const onTarget = p50Wait > 0 && p50Wait <= TARGET_MS && p95Wait <= TARGET_P95_MS;
   const isAggregate = perSessionRows.length > 1;
   const legacyAmbiguousTtsCount = perSessionRows
     .flatMap((r) => r.turns ?? [])
@@ -614,6 +630,10 @@ function LatencyVisualization({
       label,
       count: turns.filter((t) => (serviceLatency(t, key) ?? 0) > 0).length,
       total: turns.length,
+      failed: key === "gm_post_ms"
+        ? turns.filter((turn) => turn.gmPostStatus === "failed" || turn.gmPostStatus === "invalid").length
+        : 0,
+      emptyLabel: key === "gm_pre_ms" || key === "validator_ms" ? "non exécuté" : "non mesuré",
     }));
   }, [perSessionRows]);
 
@@ -634,8 +654,8 @@ function LatencyVisualization({
           <h3 className="text-sm font-semibold">Latence réelle &amp; répartition</h3>
           <p className="text-xs text-muted-foreground">
             {isAggregate
-              ? "Moyenne réelle par session, mesurée à partir des latences de service."
-              : "Moyenne réelle des latences de service de la session."}{" "}
+              ? "Délai réel jusqu’au premier son, avec détail des services par session."
+              : "Délai réel jusqu’au premier son, avec détail des services de la session."}{" "}
             La durée de parole utilisateur et la durée de lecture audio TTS sont exclues. Clique sur ▸ pour voir le détail par tour.
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground/80 flex items-center gap-1">
@@ -655,7 +675,7 @@ function LatencyVisualization({
             <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
               {availability.map((item) => (
                 <Badge key={item.key} variant={item.count > 0 ? "secondary" : "outline"} className="font-normal">
-                  {item.label}: {item.count > 0 ? `${item.count}/${item.total || 0}` : "non exécuté / non mesuré"}
+                  {item.label}: {item.count > 0 ? `${item.count}/${item.total || 0}${item.failed ? ` · ${item.failed} échec(s)` : ""}` : item.emptyLabel}
                 </Badge>
               ))}
             </div>
@@ -667,8 +687,8 @@ function LatencyVisualization({
         <div className="flex items-center gap-5 text-xs">
           {isAggregate && (
             <div>
-              <div className="text-muted-foreground">Moyenne globale</div>
-              <div className="font-mono font-bold text-base">{fmtMs(avgTotal)}</div>
+              <div className="text-muted-foreground">Premier son réel</div>
+              <div className="font-mono font-bold text-base">p50 {p50Wait ? fmtMs(p50Wait) : "non mesuré"} · p95 {p95Wait ? fmtMs(p95Wait) : "non mesuré"}</div>
             </div>
           )}
           <div
@@ -678,7 +698,7 @@ function LatencyVisualization({
                 : "bg-destructive/15 text-destructive"
             }`}
           >
-            {onTarget ? `✓ Cible <${TARGET_MS / 1000}s` : `✗ Au-dessus de ${TARGET_MS / 1000}s`}
+            {onTarget ? "✓ p50 ≤ 2 s · p95 ≤ 4 s" : "✗ cible p50/p95 non tenue"}
           </div>
         </div>
       </div>
@@ -769,7 +789,7 @@ function LatencyVisualization({
 
       {/* Legend */}
       <div className="mt-4 pt-3 border-t flex flex-wrap gap-x-4 gap-y-2 text-xs">
-        {STEP_LABELS.map(({ key, label }) => (
+        {PLAYER_WAIT_STEPS.map(({ key, label }) => (
           <div key={key} className="flex items-center gap-1.5">
             <span
               className="inline-block w-3 h-3 rounded-sm"
@@ -789,7 +809,7 @@ function LatencyVisualization({
         <div className="mt-4">
           <div className="text-xs text-muted-foreground mb-1">Répartition relative (moyenne)</div>
           <div className="flex h-3 w-full rounded overflow-hidden">
-            {STEP_LABELS.map(({ key, label }) => {
+            {PLAYER_WAIT_STEPS.map(({ key, label }) => {
               const v = serviceLatency(avg, key) ?? 0;
               if (v <= 0) return null;
               const pct = (v / avgTotal) * 100;
@@ -803,7 +823,7 @@ function LatencyVisualization({
             })}
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-[11px]">
-            {STEP_LABELS.map(({ key, label }) => {
+            {PLAYER_WAIT_STEPS.map(({ key, label }) => {
               const v = serviceLatency(avg, key) ?? 0;
               if (v <= 0) return null;
               const pct = (v / avgTotal) * 100;
@@ -1162,7 +1182,7 @@ function LatencyEvolutionPanel({
       <div>
         <h3 className="text-sm font-semibold">Évolution temporelle par service</h3>
         <p className="text-xs text-muted-foreground">
-          Compare STT, Max LLM et TTS dans le temps. Les services peuvent être superposés ou inspectés indépendamment.
+          Compare STT, LLM personnage et TTS dans le temps. Les services peuvent être superposés ou inspectés indépendamment.
         </p>
         {hasUnknown && (
           <p className="mt-1 text-[11px] text-muted-foreground">
@@ -1341,17 +1361,35 @@ function SegmentDetailSheet({
   );
 }
 
-function aggregate(session: SessionRow): SessionAggregate {
+function aggregate(session: SessionRow, characterFilter: CharacterFilter = "all"): SessionAggregate {
   const log = Array.isArray(session.conversation_log) ? session.conversation_log : [];
+  const gmLog = Array.isArray(session.gm_post_turn_log) ? session.gm_post_turn_log : [];
   const turns: TurnTiming[] = [];
-  log.forEach((msg, i) => {
-    if (msg.role === "user" || !msg.pipeline) return;
+  let turnIndex = 0;
+  log.forEach((msg) => {
+    if (msg.role === "user") {
+      turnIndex += 1;
+      return;
+    }
+    if (!msg.pipeline || turnIndex === 0) return;
+    const character = msg.spokenWith ?? msg.role;
+    if (characterFilter !== "all" && character !== characterFilter) return;
+    const gmEntry = [...gmLog].reverse().find((entry) =>
+      entry.turn_index === turnIndex && entry.character_key === character,
+    );
+    const gmStatus = gmEntry?.execution_status ?? (gmEntry ? "executed" : "not_measured");
     turns.push({
       ...msg.pipeline,
-      index: i,
+      ...(typeof gmEntry?.latency_ms === "number" && gmEntry.latency_ms > 0
+        ? { gm_post_ms: gmEntry.latency_ms }
+        : {}),
+      gm_post_status: gmStatus,
+      index: turnIndex,
       sessionId: session.id,
       timestamp: msg.timestamp,
       preview: msg.content.slice(0, 80),
+      character,
+      gmPostStatus: gmStatus,
     });
   });
 
@@ -1388,8 +1426,8 @@ function aggregate(session: SessionRow): SessionAggregate {
   const avg: ConversationPipelineTimings = {};
   const max: ConversationPipelineTimings = {};
   for (const key of Object.keys(sums)) {
-    (avg as Record<string, number>)[key] = sums[key] / counts[key];
-    (max as Record<string, number>)[key] = maxes[key];
+    assignPipelineLatency(avg, key as LatencySegmentKey, sums[key] / counts[key]);
+    assignPipelineLatency(max, key as LatencySegmentKey, maxes[key]);
   }
 
   const topBlocker = Object.entries(blockerCounter).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
@@ -1442,8 +1480,8 @@ function aggregateMany(aggs: SessionAggregate[]): ComparisonAggregate | null {
   const avg: ConversationPipelineTimings = {};
   const max: ConversationPipelineTimings = {};
   for (const k of Object.keys(sums)) {
-    (avg as Record<string, number>)[k] = sums[k].sum / sums[k].count;
-    (max as Record<string, number>)[k] = sums[k].max;
+    assignPipelineLatency(avg, k as LatencySegmentKey, sums[k].sum / sums[k].count);
+    assignPipelineLatency(max, k as LatencySegmentKey, sums[k].max);
   }
   return {
     turnCount: allTurns.length,
@@ -1458,13 +1496,14 @@ function aggregateMany(aggs: SessionAggregate[]): ComparisonAggregate | null {
 
 type PeriodPreset = "all" | "24h" | "7d" | "30d" | "custom";
 type BlockerFilter = "all" | "with" | "without";
+type CharacterFilter = "all" | "max" | "emma";
 type SeverityFilter = "all" | "high" | "critical";
 type MetricMode = "p50" | "p95";
 type SegmentEvolutionKey = "stt_ms" | "max_ms" | "tts_ms";
 
 const EVOLUTION_SEGMENTS: Array<{ key: SegmentEvolutionKey; label: string; color: string }> = [
   { key: "stt_ms", label: "STT", color: STEP_HEX.stt_ms },
-  { key: "max_ms", label: "Max LLM", color: STEP_HEX.max_ms },
+  { key: "max_ms", label: "Personnage LLM", color: STEP_HEX.max_ms },
   { key: "tts_ms", label: "TTS", color: STEP_HEX.tts_ms },
 ];
 
@@ -1535,13 +1574,14 @@ export default function LatencyBlockingTab() {
   const [customTo, setCustomTo] = useState<string>("");
   const [minTurns, setMinTurns] = useState<number>(0);
   const [blockerFilter, setBlockerFilter] = useState<BlockerFilter>("all");
+  const [characterFilter, setCharacterFilter] = useState<CharacterFilter>("all");
   const [hasInitialized, setHasInitialized] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     let query = supabase
       .from("sessions")
-      .select("id, name, started_at, ended_at, conversation_log, game_over_reason, context_type")
+      .select("id, name, started_at, ended_at, conversation_log, game_over_reason, context_type, active_character, gm_post_turn_log")
       .order("started_at", { ascending: false })
       .limit(50);
     if (!includeSandbox) query = query.neq("context_type", "sandbox");
@@ -1580,7 +1620,10 @@ export default function LatencyBlockingTab() {
 
   const configuredLatencyServices = useMemo(() => getConfiguredLatencyServices(), []);
 
-  const aggregates = useMemo(() => sessions.map(aggregate).filter((a) => a.turnCount > 0), [sessions]);
+  const aggregates = useMemo(
+    () => sessions.map((session) => aggregate(session, characterFilter)).filter((a) => a.turnCount > 0),
+    [characterFilter, sessions],
+  );
 
   // Apply filters
   const filteredAggregates = useMemo(() => {
@@ -1697,11 +1740,12 @@ export default function LatencyBlockingTab() {
     setCustomTo("");
     setMinTurns(0);
     setBlockerFilter("all");
+    setCharacterFilter("all");
   }
   const allSelected =
     filteredAggregates.length > 0 && selectedIds.size === filteredAggregates.length;
   const filtersActive =
-    period !== "all" || minTurns > 0 || blockerFilter !== "all" || !!customFrom || !!customTo;
+    period !== "all" || minTurns > 0 || blockerFilter !== "all" || characterFilter !== "all" || !!customFrom || !!customTo;
   const hiddenCount = aggregates.length - filteredAggregates.length;
 
   return (
@@ -1778,6 +1822,18 @@ export default function LatencyBlockingTab() {
                 </div>
               </div>
 
+              <div>
+                <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Personnage</label>
+                <Select value={characterFilter} onValueChange={(value) => setCharacterFilter(value as CharacterFilter)}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous</SelectItem>
+                    <SelectItem value="max">Max</SelectItem>
+                    <SelectItem value="emma">Emma</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {period === "custom" && (
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -1803,7 +1859,7 @@ export default function LatencyBlockingTab() {
 
               <div>
                 <label className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                  Min. tours Max
+                  Min. tours personnage
                 </label>
                 <Input
                   type="number"
@@ -1930,7 +1986,7 @@ export default function LatencyBlockingTab() {
                 </h3>
                 <p className="text-xs text-muted-foreground">
                   {comparison
-                    ? `Agrégé sur ${comparison.turnCount} tour(s) Max.`
+                    ? `Agrégé sur ${comparison.turnCount} tour(s) personnage.`
                     : "Coche au moins une session dans la liste."}
                 </p>
               </div>
@@ -2025,7 +2081,7 @@ export default function LatencyBlockingTab() {
                   <h3 className="text-sm font-semibold">{sessionLabel(focused.session)}</h3>
                   <p className="text-[10px] font-mono text-muted-foreground/70">{focused.session.id}</p>
                   <p className="text-xs text-muted-foreground">
-                    {focused.turnCount} tour(s) Max • Game over&nbsp;: {focused.session.game_over_reason || "—"}
+                    {focused.turnCount} tour(s) personnage • Game over&nbsp;: {focused.session.game_over_reason || "—"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -2079,7 +2135,13 @@ export default function LatencyBlockingTab() {
                             <td className="p-2 font-mono">{t.index}</td>
                             {STEP_LABELS.map(({ key }) => (
                               <td key={key} className="p-2 text-right font-mono">
-                                {fmtMs(serviceLatency(t, key))}
+                                {key === "gm_post_ms" && !serviceLatency(t, key)
+                                  ? t.gmPostStatus === "failed"
+                                    ? "échec"
+                                    : t.gmPostStatus === "invalid"
+                                      ? "invalide"
+                                      : "non mesuré"
+                                  : fmtMs(serviceLatency(t, key))}
                               </td>
                             ))}
                             <td className="p-2 text-right font-mono font-semibold">{fmtMs(serviceLatencyTotal(t))}</td>
@@ -2121,7 +2183,7 @@ export default function LatencyBlockingTab() {
                         >
                           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-2">
                             <span className="font-semibold">
-                              {msg.role === "user" ? "Utilisateur" : msg.role === "emma" ? "Emma" : "Max"}
+                              {msg.role === "user" ? "Utilisateur" : displayNameForCharacter(msg.spokenWith ?? msg.role)}
                             </span>
                             {msg.pipeline && serviceLatencyTotal(msg.pipeline) > 0 && (
                               <span className="font-mono">latence {fmtMs(serviceLatencyTotal(msg.pipeline))}</span>

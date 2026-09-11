@@ -14,6 +14,8 @@ Les développements réalisés depuis un autre environnement doivent rester comp
 
 La mise en public est bloquée par la [release gate](docs/public_release_gate.md). Un aperçu interne peut être utilisé pour le développement, mais aucun lien ne doit être diffusé à des testeurs externes avant validation des critères de sécurité, persistance et endurance.
 
+> **Mise à jour récente (2026-09-11) — relations crédibles, GM et mesures AVA** : chaque personnage suit une politique relationnelle versionnée avec trois paliers cachés, résistance et initiative propres à son caractère. Le GM post-tour propose les évolutions sans ralentir la réponse ; un moteur déterministe contrôle puis mémorise l'état séparément pour chaque personnage. Les mesures internes AVA sont la source principale du diagnostic de réactivité, rapprochées de PostHog par session et par tour. Plan et état de validation : [`docs/plan_orchestration_experience_et_reglages_gm.md`](docs/plan_orchestration_experience_et_reglages_gm.md).
+
 > **Mise à jour récente (2026-08-25) — Emma, TTS émotionnel, LLM as judge** : le joueur peut démarrer avec Emma et basculer Max ↔ Emma sans fuite de mémoire ; chaque tour dérive une intention de jeu TTS (`PerformanceIntent`) mappée vers Hume / Inworld / ElevenLabs / Gradium / Cartesia, avec réglages Gradium distincts par personnage ; l’admin Qualité lance un banc d’essai texte **LLM as judge** (corpus Notion, OFAT modèle / sampling / RAG, classement vs live). Détails : `CHANGELOG.md` 0.27–0.30, `STORY.md`, [`docs/plan_emma_conversation_switch.md`](docs/plan_emma_conversation_switch.md), [`docs/plan_tts_pilotage_emotionnel.md`](docs/plan_tts_pilotage_emotionnel.md), [`docs/plan_llm_as_judge.md`](docs/plan_llm_as_judge.md).
 
 > **Mise à jour récente (2026-08-21) — environnements de réglages et accès nominatifs** : le runtime public reste verrouillé sur `prod`, tandis que les membres authentifiés disposent de trois sandboxes isolées. Le portail public est vérifié côté Lovable Cloud et les sessions sont attribuées par compte, environnement, contexte et campagne. Plan d'activation et checklist : [`docs/plan_environnements_sandbox_auth.md`](docs/plan_environnements_sandbox_auth.md).
@@ -42,7 +44,7 @@ La mise en public est bloquée par la [release gate](docs/public_release_gate.md
 
 ## En une phrase
 
-Expérience narrative interactive voice-to-voice avec Max, un personnage fictif piloté par IA, dans l'univers de "Où est Ava ?".
+Expérience narrative interactive voice-to-voice avec plusieurs personnages fictifs pilotés par IA, dans l'univers de "Où est Ava ?".
 
 ## 📋 Source de vérité
 
@@ -52,7 +54,7 @@ Expérience narrative interactive voice-to-voice avec Max, un personnage fictif 
 
 ## 🎯 Objectif projet
 
-Valider le pipeline technique complet d'une conversation voice-to-voice avec un personnage IA : STT (Deepgram) → LLM (OpenRouter/multi-modèles) → TTS (ElevenLabs), orchestré par un Game Master autonome qui gère la confiance, les triggers vidéo et le game over, enrichi par un pipeline RAG connecté à Notion.
+Valider le pipeline complet d'une conversation voice-to-voice multipersonnage : STT (Deepgram) → LLM (OpenRouter/multi-modèles) → TTS multi-providers, orchestré par un Game Master post-tour qui gère une relation progressive, les triggers vidéo et le game over, enrichi par un pipeline RAG connecté à Notion.
 
 Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mieux séparer l'identité de Max, les connaissances autorisées, les contraintes de révélation et la supervision éditoriale du Game Master.
 

@@ -6,21 +6,22 @@ import maxImg from "@/assets/characters/max.jpg";
 import emmaImg from "@/assets/characters/emma.jpg";
 import avaImg from "@/assets/characters/ava.jpg";
 import leoImg from "@/assets/characters/leo.jpg";
-import { getCharacterRuntimeReadiness } from "@/services/experienceOrchestration";
+import { getCharacterRuntimeReadiness, type CharacterRuntimeReadiness } from "@/services/experienceOrchestration";
+import { AVA_CHARACTER_REGISTRY } from "@/services/characterRegistry";
 
 type CharId = "max" | "emma" | "ava" | "leo";
 
 interface Props {
-  onSelect: (id: "max" | "emma") => void;
+  onSelect: (id: "max" | "emma", profile: CharacterRuntimeReadiness | null) => void;
   onLockedClick?: (id: Exclude<CharId, "max">) => void;
 }
 
-const CHARACTERS: { id: CharId; name: string; img: string }[] = [
-  { id: "max", name: "Max", img: maxImg },
-  { id: "emma", name: "Emma", img: emmaImg },
-  { id: "ava", name: "Ava", img: avaImg },
-  { id: "leo", name: "Léo", img: leoImg },
-];
+const CHARACTER_IMAGES: Record<CharId, string> = { max: maxImg, emma: emmaImg, ava: avaImg, leo: leoImg };
+const CHARACTERS = AVA_CHARACTER_REGISTRY.entries.map((entry) => ({
+  id: entry.key as CharId,
+  name: entry.displayName,
+  img: CHARACTER_IMAGES[entry.key as CharId],
+}));
 
 function portraitAlt(name: string): string {
   return name === "Emma" || name === "Ava" ? `Portrait d’${name}` : `Portrait de ${name}`;
@@ -30,6 +31,7 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
   const [lockedDialog, setLockedDialog] = useState(false);
   const [emmaOn, setEmmaOn] = useState(true);
   const [runtimePortraits, setRuntimePortraits] = useState<Partial<Record<"max" | "emma", string>>>({});
+  const [runtimeProfiles, setRuntimeProfiles] = useState<Partial<Record<"max" | "emma", CharacterRuntimeReadiness | null>>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +46,7 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
           ...(maxProfile?.portraitUrl ? { max: maxProfile.portraitUrl } : {}),
           ...(emmaProfile?.portraitUrl ? { emma: emmaProfile.portraitUrl } : {}),
         });
+        setRuntimeProfiles({ max: maxProfile, emma: emmaProfile });
       })
       .catch(() => {
         // Keep bundled portraits and Emma available if runtime access is unavailable.
@@ -75,7 +78,7 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
               return (
                 <button
                   key={c.id}
-                  onClick={() => onSelect(c.id as "max" | "emma")}
+                  onClick={() => onSelect(c.id as "max" | "emma", runtimeProfiles[c.id as "max" | "emma"] ?? null)}
                   className={`${cardBase} border-primary/50 hover:-translate-y-1 hover:border-primary hover:bg-card hover:shadow-lg hover:shadow-primary/10`}
                   aria-label={`Appeler ${c.name}`}
                 >
@@ -89,6 +92,11 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
                   <div>
                     <p className="font-medium text-foreground">{c.name}</p>
                     <p className="text-xs text-primary">Disponible</p>
+                    {runtimeProfiles[c.id as "max" | "emma"]?.situationSummary && (
+                      <p className="mt-2 line-clamp-3 text-left text-[11px] leading-relaxed text-muted-foreground">
+                        {runtimeProfiles[c.id as "max" | "emma"]?.situationSummary}
+                      </p>
+                    )}
                   </div>
                 </button>
               );
