@@ -43,6 +43,54 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Le GM post-tour reste mesuré pour diagnostic mais est exclu du temps
   d'attente, de la barre du joueur et du choix du blocage.
 
+### Activé dans Lovable Cloud
+
+- Migration relationnelle appliquée sur le projet Lovable Cloud
+  `iralfqlslqndgvexixis`. Les champs `politique_relationnelle` et
+  `references_intellectuelles` sont disponibles dans `character_prompts`, et
+  le contrôle de préparation runtime expose désormais `situation_summary` aux
+  comptes authentifiés.
+- Fonctions `sync-notion` et `posthog-latency-stats` publiées depuis Lovable
+  Cloud, sans modification de leurs garde-fous ni ajout d'appel IA dans le
+  chemin critique.
+- Le lot relationnel a été vérifié dans Lovable sur 6 fichiers et 26 tests
+  ciblés : moteur relationnel, migration, mémoire GM, orchestrateur PRD4 et
+  agrégations de latence internes.
+- Les 44 avertissements de sécurité remontés par Lovable sont antérieurs à ce
+  lot. Aucune règle d'accès existante n'a été modifiée dans ce chantier.
+
+### Organisation éditoriale et séquence de livraison
+
+- La propriété Notion **Politique relationnelle** existe désormais dans la
+  base Caractères AVA. Les fiches actives Max Lorenzo et Emma Munz doivent
+  encore recevoir leurs règles propres : moteur de l'appel, signes
+  d'ouverture et de fermeture, sujets sensibles et conditions, résistance et
+  initiative.
+- Le chantier Notion est organisé sous une tâche maîtresse avec un chemin
+  critique explicite : rédaction et validation par Romed, synchronisation et
+  publication sandbox déléguables à Lovable/Codex, puis recette humaine et
+  calibration Max/Emma avec les mesures AVA internes comme référence.
+- Une tâche éditoriale prioritaire est assignée à Romed et documente le format
+  exact attendu, les différences Max/Emma, les conflits à vérifier et les
+  critères de validation. Une tâche technique séparée reste bloquée jusqu'à
+  cette validation.
+
+### En attente avant la recette
+
+- Ne pas lancer la synchronisation tant que les politiques de Max et Emma ne
+  sont pas rédigées et relues. Le texte actuel « confiance dès le début, sans
+  réserve » de Max doit être arbitré pour distinguer acceptation de l'appel et
+  accès à son intimité.
+- Contrôler lors de la prochaine synchronisation le renommage éditorial déjà
+  effectué dans Notion : le contenu de l'ancien champ « Profondeur par niveau »
+  se trouve dans « Références intellectuelles ». Il doit alimenter
+  `references_intellectuelles` sans conversion automatique et laisser
+  `profondeur_par_niveau` vide.
+- Publier ensuite une version GM identifiable en sandbox, effectuer les tests
+  conversationnels Max/Emma, puis lancer la campagne d'au moins 100 tours par
+  personnage. Aucune publication Production n'est encore effectuée pour ce
+  lot.
+
 Plan : [`docs/plan_orchestration_experience_et_reglages_gm.md`](docs/plan_orchestration_experience_et_reglages_gm.md).
 
 ### Corrigé
@@ -79,9 +127,11 @@ Plan : [`docs/plan_orchestration_experience_et_reglages_gm.md`](docs/plan_orches
 
 ### À finaliser dans Lovable
 
-- Corriger dans la page Notion d'Emma la référence copiée à Max dans le
-  préambule, puis lancer la reconstruction complète du RAG depuis la base
-  personnages. Le corpus actif a été conservé dans l'intervalle.
+- La référence copiée à Max dans le préambule Notion d'Emma est corrigée et la
+  fiche active commence bien par « Tu es Emma Munz ». La reconstruction
+  complète du RAG reste différée jusqu'à la synchronisation contrôlée des
+  politiques relationnelles Max/Emma ; le corpus actif est conservé dans
+  l'intervalle.
 - Valider les tests qualitatifs Max et Emma ainsi que l'isolation des
   connaissances d'Emma dans les réglages de production ; l'indicateur de
   disponibilité reste donc à `false` pour les deux personnages.

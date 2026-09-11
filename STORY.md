@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-09-11 (Emma/Max — identité et RAG cloisonnés dans Lovable Cloud)
+> **Last Updated**: 2026-09-11 (relations crédibles — socle Lovable prêt, politiques Max/Emma à rédiger)
 
 ---
 
@@ -73,6 +73,67 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-09-11 — Une relation se gagne : le Game Master devient directeur de l'ouverture 🔷
+
+**Le problème.** Les personnages répondaient trop facilement comme des
+assistants appliqués. Une demande de biographie ou une question intime pouvait
+produire immédiatement un récit complet, indépendamment de la relation, du
+sujet et du caractère. Cette disponibilité constante affaiblissait la
+crédibilité : Max et Emma savaient des choses, mais le système ne distinguait
+pas encore clairement ce qu'ils savaient de ce qu'ils accepteraient de confier.
+Les outils de test et certains contrats restaient aussi centrés sur Max, alors
+que l'expérience devait devenir multipersonnage.
+
+**L'expérience recherchée.** Le joueur rencontre d'abord une personne, pas une
+base de données. La relation évolue selon trois paliers invisibles — prise de
+contact, lien établi, confiance — et selon l'ouverture propre à chaque sujet.
+Elle progresse par des signes crédibles comme l'écoute, la franchise, la
+précision, le respect d'une limite ou une confrontation pertinente. Elle peut
+reculer et se réparer. Une résistance garde toujours une prise : fait
+accessible, réponse partielle, déplacement du sujet ou question sur
+l'intention. Aucun compteur n'est montré et aucune confidence n'est garantie.
+
+**Le nouveau contrat.** Chaque personnage possède une politique relationnelle
+versionnée. Avant la réponse, AVA calcule localement une directive courte qui
+autorise le personnage à répondre, nuancer, retenir, contester ou questionner.
+Après le tour, le Game Master reçoit le profil comportemental, l'état
+relationnel, les limites utiles et la réplique réellement diffusée. Il prépare
+le tour suivant en arrière-plan ; un validateur déterministe refuse les
+décisions périmées, dupliquées, appliquées au mauvais personnage ou fondées sur
+une confession prématurée. Aucun appel IA supplémentaire ne ralentit la
+réponse du joueur.
+
+La mémoire sépare désormais les faits déjà établis de la disposition actuelle
+à parler et conserve un état par personnage. Max et Emma utilisent le même
+registre, les mêmes contrats et les mêmes outils d'évaluation. Ava et Léo
+restent indisponibles tant que leur contenu n'est pas prêt. Le banc LLM as judge
+rejoue la mécanique publique et peut considérer une retenue appropriée comme
+une bonne réponse.
+
+**Mesurer sans masquer.** Les mesures internes AVA deviennent la référence du
+diagnostic par session et par tour ; PostHog complète les tendances. Le TTS est
+réintégré correctement dans les agrégations, le premier son correspond au son
+réellement joué et le GM en arrière-plan n'est plus additionné à l'attente du
+joueur. La cible reste une médiane inférieure ou égale à 2 secondes et un p95
+inférieur ou égal à 4 secondes, sans délai artificiel pour simuler la retenue.
+
+**Livraison et responsabilité éditoriale.** La migration est appliquée sur le
+projet Lovable Cloud `iralfqlslqndgvexixis`, et `sync-notion` ainsi que
+`posthog-latency-stats` sont publiées. La propriété **Politique relationnelle**
+existe dans la base Notion Caractères AVA, mais les champs Max et Emma sont
+encore vides. Romed doit maintenant écrire et valider leurs six sections ;
+Lovable ou Codex pourra ensuite synchroniser et publier une version GM en
+sandbox. Romed et Benoît pourront alors conduire la recette qualitative, avec
+les mesures techniques préparées par les outils AVA.
+
+Le chantier est organisé dans Notion par ordre de dépendance :
+[tâche maîtresse Game Master](https://app.notion.com/p/fd65f37db8bc473e92189da38527894c),
+[rédaction des politiques par Romed](https://app.notion.com/p/3d862322e5958197bebed8e1aed5e66e),
+[synchronisation et publication sandbox](https://app.notion.com/p/3d862322e59581c7a4b3d6138dd7f2a9),
+puis [calibration Max/Emma](https://app.notion.com/p/3d862322e59581b5b845d0bcd4d3a8fd).
+
+Plan : [`docs/plan_orchestration_experience_et_reglages_gm.md`](docs/plan_orchestration_experience_et_reglages_gm.md).
+
 ### 2026-09-11 — Emma ne peut plus se prendre pour Max 🔷
 
 **Le problème.** Emma pouvait répondre « je suis Max » ou saluer l'utilisateur
@@ -107,12 +168,12 @@ atomique a aussi été vérifié : un essai invalide a laissé les 244 extraits
 inchangés. Les deux phrases des captures sont bloquées sans validation LLM
 supplémentaire, tandis que les mentions et citations légitimes de Max passent.
 
-**État restant.** La page publique d'Emma contient encore, dans son préambule,
-une référence copiée à Max. Le corpus actif a donc été conservé et la
-reconstruction complète n'a pas été lancée. Après correction de cette phrase dans
-Notion, il faudra relancer la synchronisation complète de la base personnages dans
-Lovable. Les validations qualitatives Max/Emma et l'isolation des connaissances
-d'Emma doivent aussi être cochées dans les réglages de production ; la disponibilité
+**État restant.** La référence copiée à Max dans le préambule d'Emma est
+corrigée : la fiche active commence bien par « Tu es Emma Munz ». Le corpus
+actif est conservé et la reconstruction complète n'est pas encore lancée ; elle
+sera intégrée à la synchronisation contrôlée des politiques relationnelles
+Max/Emma. Les validations qualitatives et l'isolation des connaissances d'Emma
+doivent aussi être cochées dans les réglages de production ; la disponibilité
 reste à `false` pour les deux personnages jusque-là.
 
 Sources éditoriales : [Emma Munz](https://gamilab-prov.notion.site/Emma-Munz-881122c973c943409daed13b3113b00e),
@@ -2330,7 +2391,32 @@ continuité d’expérience (mémoire entre tours).
 
 ### Dernière session
 
-**2026-09-03 — LLM as judge : banc d'essai lisible, pilotable, exploitable**
+**2026-09-11 — Relations crédibles, GM renforcé et séquence éditoriale**
+
+**Avant :** les personnages pouvaient livrer leur biographie et leurs sujets
+intimes dès les premiers échanges. La mémoire connaissait déjà confiance et
+profondeur, mais aucune politique commune ne reliait caractère, sujet,
+résistance et évolution de la relation. Les métriques internes sous-estimaient
+aussi certaines moyennes en perdant le TTS.
+
+**Livré :** moteur relationnel à trois paliers invisibles, ouverture par sujet,
+mémoire par personnage, directive locale avant réponse, GM post-tour enrichi et
+validation déterministe. Max et Emma utilisent le même moteur. Les mesures AVA
+internes ont été corrigées et séparées des tendances PostHog. Migration et
+fonctions appliquées dans Lovable Cloud ; validations locales complètes et 26
+tests ciblés Lovable réussis.
+
+**Organisation :** le champ Notion nécessaire a été créé. Une tâche prioritaire
+et détaillée est assignée à Romed pour rédiger les politiques Max/Emma. La
+synchronisation et la publication sandbox constituent une tâche technique
+séparée et bloquée. La calibration humaine vient ensuite, avant les travaux de
+triggers, de suspense et de cinématiques.
+
+**Reste :** rédaction et validation éditoriale, synchronisation contrôlée,
+publication d'une version GM en sandbox, tests conversationnels et campagne de
+100 tours par personnage. Production inchangée.
+
+**Session précédente — 2026-09-03 — LLM as judge : banc d'essai lisible, pilotable, exploitable**
 
 L'onglet Qualité affichait un mode d'emploi de création de base et un
 classement brut : impossible de voir l'état du corpus Notion, de comprendre
