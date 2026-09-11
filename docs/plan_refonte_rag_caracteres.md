@@ -454,15 +454,38 @@ Les tests ajoutés couvrent :
   erreurs intermédiaires Notion ;
 - les contraintes SQL d'attribution et le remplacement transactionnel du corpus.
 
-La migration `20260911080000_lock_character_identity_and_rag.sql` et les Edge
-Functions modifiées doivent être appliquées exclusivement par Lovable / Lovable
-Cloud. Le connecteur Supabase n'a actuellement pas accès au projet
-`iralfqlslqndgvexixis` : l'état déployé, le nouveau corpus et les traces en ligne
-ne peuvent donc pas encore être certifiés.
+### État de livraison Lovable Cloud — 11 septembre 2026
 
-La fiche Notion d'Emma a été relue depuis sa page publique. L'édition exacte du
-préambule a été tentée, mais le connecteur courant est relié à l'espace « Ulrich »
-et non à « gamilab-prov » ; Notion a refusé l'écriture. Après reconnexion au bon
-espace, remplacer uniquement « pour que Max puisse toujours situer » par « pour
-que tu puisses toujours situer », puis lancer une synchronisation complète dans
-Lovable Cloud.
+Projet ciblé : `iralfqlslqndgvexixis` (Lovable Cloud, unique chaîne de livraison).
+
+- Migration `20260911080000_lock_character_identity_and_rag.sql` **appliquée**.
+  Objets vérifiés : `session_summaries.character_key`, index unique
+  `session_summaries_session_character_key`, `match_embeddings_voyage`,
+  `match_embeddings_scoped`, `replace_character_embeddings`,
+  `get_character_runtime_readiness_for_environment`.
+- Edge Functions **publiées** : `query-rag`, `summarize-session`, `sync-notion`
+  (avec `_shared/notionPageContent.ts`). Les réglages `verify_jwt = false` et les
+  gardes `enforceGameRequest` / `requireAdmin` sont inchangés.
+- Profil RAG actif : `voyage-4-realtime` (Voyage, 1024, actif).
+  Chunks actifs : Emma 8, Max 99. Tous les chunks personnage respectent
+  `source_table='characters'`, `source_id = character_id`, `character_id` non nul.
+- Provenance vérifiée avec et sans reranking : aucune fuite croisée.
+  `query-rag` refuse un `character_id` absent ou invalide (HTTP 400).
+- 36 anciens résumés `character_key IS NULL` conservés pour diagnostic ; deux
+  résumés distincts (max / emma) peuvent coexister pour une même session.
+- Un appel invalide à `replace_character_embeddings` échoue sans modifier le
+  nombre d'extraits (244 avant et après).
+- Contrôle déterministe d'identité vérifié par tests : les deux phrases
+  d'inversion sont bloquées avant sous-titre, voix, avatar et mémoire, sans
+  second appel LLM ; les mentions et citations légitimes de Max restent permises.
+
+**Synchronisation Notion/RAG en attente de la correction Notion.** Le préambule
+de la page Emma contient encore « pour que Max puisse toujours situer
+l'événement dans le temps ». Le corpus actif est donc conservé intact et aucune
+reconstruction n'a été lancée. Après correction en « pour que tu puisses toujours
+situer », lancer la reconstruction complète des personnages depuis Lovable Cloud
+(base `30362322e59580bbb7b8dd49d516b341`, `mode: "full"`, `wipe_all: true`).
+
+**Readiness encore incomplète** : dans les réglages personnages (prod), les cases
+« tests qualitatifs validés » (Max et Emma) et « isolation des connaissances
+validée » (Emma) ne sont pas cochées, donc `ready = false` pour les deux.
