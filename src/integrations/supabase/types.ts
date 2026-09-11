@@ -161,8 +161,10 @@ export type Database = {
           dynamique_conversation: string
           environment_id: string
           identite_fondamentale: string
+          politique_relationnelle: string
           profondeur_par_niveau: string
           qui_tu_es: string
+          references_intellectuelles: string
           situation_summary: string
           sujets_sensibles: string
           timeline: string
@@ -176,8 +178,10 @@ export type Database = {
           dynamique_conversation?: string
           environment_id?: string
           identite_fondamentale?: string
+          politique_relationnelle?: string
           profondeur_par_niveau?: string
           qui_tu_es?: string
+          references_intellectuelles?: string
           situation_summary?: string
           sujets_sensibles?: string
           timeline?: string
@@ -191,8 +195,10 @@ export type Database = {
           dynamique_conversation?: string
           environment_id?: string
           identite_fondamentale?: string
+          politique_relationnelle?: string
           profondeur_par_niveau?: string
           qui_tu_es?: string
+          references_intellectuelles?: string
           situation_summary?: string
           sujets_sensibles?: string
           timeline?: string
@@ -1620,6 +1626,7 @@ export type Database = {
           portrait_url: string
           prompt_updated_at: string
           ready: boolean
+          situation_summary: string
           tts_provider: string
           tts_voice_id: string
         }[]
