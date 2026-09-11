@@ -1626,9 +1626,9 @@ export type Database = {
           portrait_url: string
           prompt_updated_at: string
           ready: boolean
+          situation_summary: string
           tts_provider: string
           tts_voice_id: string
-          situation_summary: string
         }[]
       }
       get_pinned_orchestration_runtime: {
