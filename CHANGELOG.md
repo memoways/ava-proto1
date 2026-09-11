@@ -19,6 +19,33 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   revendications explicites d'une autre identité, sans appel LLM supplémentaire.
 - Synchronisation Notion récursive et paginée, lecture des tableaux, signalement
   des blocs non lus et remplacement transactionnel du corpus par personnage.
+- Les blocs textuels Notion dont le contenu `rich_text` est volontairement vide
+  sont désormais traités comme des lignes vides, sans bloquer la synchronisation.
+
+### Déployé et vérifié dans Lovable Cloud
+
+- Migration d'isolation appliquée au projet Lovable Cloud
+  `iralfqlslqndgvexixis` ; fonctions `query-rag`, `summarize-session` et
+  `sync-notion` publiées avec leurs contrôles d'accès existants.
+- Profil RAG actif `voyage-4-realtime` vérifié avec 8 extraits Emma et 99 extraits
+  Max. Chaque extrait actif est rattaché à son personnage et à sa page source.
+- Recherche testée avec et sans reclassement : aucune fuite croisée, et toute
+  requête sans identifiant de personnage valide est refusée avant la recherche.
+- Les deux auto-identifications erronées visibles dans les captures sont bloquées
+  avant sous-titre, voix, avatar et mémoire, sans second appel LLM. Les mentions
+  et citations légitimes de Max par Emma restent autorisées.
+- Le remplacement atomique du corpus conserve l'ancien contenu en cas d'erreur.
+  Les 36 anciens résumés sans personnage restent disponibles pour diagnostic,
+  mais ne sont plus injectés dans une conversation active.
+
+### À finaliser dans Lovable
+
+- Corriger dans la page Notion d'Emma la référence copiée à Max dans le
+  préambule, puis lancer la reconstruction complète du RAG depuis la base
+  personnages. Le corpus actif a été conservé dans l'intervalle.
+- Valider les tests qualitatifs Max et Emma ainsi que l'isolation des
+  connaissances d'Emma dans les réglages de production ; l'indicateur de
+  disponibilité reste donc à `false` pour les deux personnages.
 
 Plan : [`docs/plan_refonte_rag_caracteres.md`](docs/plan_refonte_rag_caracteres.md#10-audit-et-verrouillage-didentité-emmamax--11-septembre-2026).
 

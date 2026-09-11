@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-09-03 (LLM as judge — banc d'essai lisible et pilotable)
+> **Last Updated**: 2026-09-11 (Emma/Max — identité et RAG cloisonnés dans Lovable Cloud)
 
 ---
 
@@ -72,6 +72,52 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-09-11 — Emma ne peut plus se prendre pour Max 🔷
+
+**Le problème.** Emma pouvait répondre « je suis Max » ou saluer l'utilisateur
+comme si elle parlait à Emma. L'audit a trouvé trois chemins de contamination :
+une variante de prompt imposait encore l'identité de Max, le RAG acceptait des
+extraits sans propriétaire ou une recherche globale en l'absence d'identifiant,
+et les résumés de session utilisaient le locuteur « MAX » sans cloisonnement par
+personnage.
+
+**Correctif.** Chaque tour porte désormais un contexte personnage unique et
+immuable, résolu depuis la fiche et son identifiant Notion exact. Les quatre
+variantes de prompt utilisent la fiche éditoriale du personnage, le RAG exige le
+même personnage, la même page source et le profil d'index actif, et les résumés,
+mémoires, guidances et reprises sont séparés par personnage. Une fiche absente ou
+incohérente bloque la génération. Un contrôle déterministe intercepte toute
+auto-identification explicite comme un autre personnage avant le sous-titre, la
+voix, l'avatar et la mémoire, puis fournit une courte réponse correcte sans nouvel
+appel LLM. Emma peut toujours parler de Max à partir de sa propre fiche.
+
+La synchronisation Notion lit maintenant toutes les pages, sous-pages et tables,
+signale les blocs réellement illisibles et prépare le nouveau corpus avant son
+remplacement atomique. Une ligne textuelle Notion vide est reconnue comme telle
+et ne provoque plus un faux échec de lecture.
+
+**Livraison Lovable Cloud.** La migration d'isolation et les fonctions
+`query-rag`, `summarize-session` et `sync-notion` sont publiées sur le projet
+`iralfqlslqndgvexixis`. Le profil actif `voyage-4-realtime` contient 8 extraits
+Emma et 99 extraits Max, tous attribués à leur personnage et à leur page source.
+Les recherches avec et sans reclassement ne présentent aucune fuite croisée ; les
+requêtes sans personnage valide échouent avant la recherche. Le remplacement
+atomique a aussi été vérifié : un essai invalide a laissé les 244 extraits
+inchangés. Les deux phrases des captures sont bloquées sans validation LLM
+supplémentaire, tandis que les mentions et citations légitimes de Max passent.
+
+**État restant.** La page publique d'Emma contient encore, dans son préambule,
+une référence copiée à Max. Le corpus actif a donc été conservé et la
+reconstruction complète n'a pas été lancée. Après correction de cette phrase dans
+Notion, il faudra relancer la synchronisation complète de la base personnages dans
+Lovable. Les validations qualitatives Max/Emma et l'isolation des connaissances
+d'Emma doivent aussi être cochées dans les réglages de production ; la disponibilité
+reste à `false` pour les deux personnages jusque-là.
+
+Sources éditoriales : [Emma Munz](https://gamilab-prov.notion.site/Emma-Munz-881122c973c943409daed13b3113b00e),
+[Max Lorenzo](https://gamilab-prov.notion.site/Max-Lorenzo-30362322e5958011ad7bffb1ed6772bc).
+Plan : [`docs/plan_refonte_rag_caracteres.md`](docs/plan_refonte_rag_caracteres.md#10-audit-et-verrouillage-didentité-emmamax--11-septembre-2026).
 
 ### 2026-09-03 — LLM as judge : banc d'essai lisible et pilotable 🔷
 
