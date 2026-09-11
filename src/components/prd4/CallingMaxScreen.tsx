@@ -9,6 +9,7 @@ interface Props {
   onAnswered: () => void;
   character: "max" | "emma";
   situation?: string | null;
+  portraitUrl?: string | null;
 }
 
 const RING_MS = 1500;
@@ -66,12 +67,12 @@ function encounterFrame(value: string | null | undefined, maxChars = 260): strin
   return `${(sentenceEnd > maxChars * 0.45 ? candidate.slice(0, sentenceEnd + 1) : candidate).trim()}…`;
 }
 
-const CallingMaxScreen = ({ onAnswered, character, situation }: Props) => {
+const CallingMaxScreen = ({ onAnswered, character, situation, portraitUrl }: Props) => {
   const [ring, setRing] = useState(1);
   const [pickingUp, setPickingUp] = useState(false);
   useRingtone(true, RINGS, RING_MS);
   const displayName = displayNameForCharacter(character);
-  const portrait = character === "emma" ? emmaImg : maxImg;
+  const portrait = portraitUrl ?? (character === "emma" ? emmaImg : maxImg);
 
   useEffect(() => {
     const intervals: number[] = [];

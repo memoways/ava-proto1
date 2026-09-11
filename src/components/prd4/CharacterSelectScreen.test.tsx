@@ -70,4 +70,27 @@ describe("CharacterSelectScreen", () => {
     await waitFor(() => expect(screen.getByRole("img", { name: "Portrait d’Emma" }))
       .toHaveAttribute("src", "https://portraits.example/emma-runtime.jpg"));
   });
+
+  it("keeps the selection cards focused on availability", async () => {
+    vi.mocked(getCharacterRuntimeReadiness).mockImplementation(async (characterKey) => ({
+      characterKey,
+      displayName: characterKey === "emma" ? "Emma" : "Max",
+      enabled: true,
+      ready: true,
+      characterId: null,
+      notionPageId: null,
+      environmentId: null,
+      promptUpdatedAt: null,
+      openingLine: null,
+      portraitUrl: null,
+      ttsProvider: null,
+      ttsVoiceId: null,
+      situationSummary: "Emma est dans l'appartement de Lausanne.",
+    }));
+    render(<CharacterSelectScreen onSelect={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Appeler Emma" })).toBeInTheDocument());
+    expect(screen.getAllByText("Disponible")).toHaveLength(2);
+    expect(screen.queryByText("Emma est dans l'appartement de Lausanne.")).not.toBeInTheDocument();
+  });
 });

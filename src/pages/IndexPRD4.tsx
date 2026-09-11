@@ -735,6 +735,7 @@ const IndexPRD4 = () => {
     activeCharacterRef.current = character;
     activeCharacterContextRef.current = null;
     selectedEncounterFrameRef.current = profile?.situationSummary ?? null;
+    setActivePortraitUrl(profile?.portraitUrl ?? null);
     setSelectedCharacter(character);
     setPhase("calling_max");
     callPreparationRef.current = prepareCall().catch((error) => {
@@ -2005,7 +2006,7 @@ const IndexPRD4 = () => {
       screen = <CharacterSelectScreen onSelect={handleSelectCharacter} onLockedClick={handleLockedClick} />;
       break;
     case "calling_max":
-      screen = <CallingMaxScreen character={startingCharacterRef.current} situation={selectedEncounterFrameRef.current} onAnswered={handleAnswered} />;
+      screen = <CallingMaxScreen character={startingCharacterRef.current} situation={selectedEncounterFrameRef.current} portraitUrl={activePortraitUrl} onAnswered={handleAnswered} />;
       break;
     case "conversation_max":
       screen = (

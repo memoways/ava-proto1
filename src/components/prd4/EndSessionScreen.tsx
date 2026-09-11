@@ -20,9 +20,6 @@ const EndSessionScreen = ({ onContinue, autoContinueAfterMs }: Props) => {
         <p className="font-serif text-xl text-foreground/90">
           La communication se coupe.
         </p>
-        <p className="font-serif text-lg italic text-muted-foreground">
-          Max reste silencieux un instant.
-        </p>
         <p className="text-sm text-muted-foreground/80">
           L'expérience s'arrête ici pour cette version du prototype.
         </p>

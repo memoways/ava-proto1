@@ -92,11 +92,6 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
                   <div>
                     <p className="font-medium text-foreground">{c.name}</p>
                     <p className="text-xs text-primary">Disponible</p>
-                    {runtimeProfiles[c.id as "max" | "emma"]?.situationSummary && (
-                      <p className="mt-2 line-clamp-3 text-left text-[11px] leading-relaxed text-muted-foreground">
-                        {runtimeProfiles[c.id as "max" | "emma"]?.situationSummary}
-                      </p>
-                    )}
                   </div>
                 </button>
               );
