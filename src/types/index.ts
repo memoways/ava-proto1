@@ -328,7 +328,7 @@ export interface Settings {
   DEEPGRAM_LANGUAGE: string;
 }
 
-/** PRD4 — évaluation post-tour produite par le Game Master après chaque réponse de Max. */
+/** PRD4 — évaluation post-tour produite après chaque réponse du personnage actif. */
 export interface PRD4PostTurnEvaluation {
   engagement_delta: number;
   confusion_detected: boolean;
@@ -340,7 +340,7 @@ export interface PRD4PostTurnEvaluation {
   end_recommended: boolean;
   moderation_flag: boolean;
   notes: string;
-  /** ID du trigger vidéo à jouer après la réponse de Max (null si aucun). */
+  /** ID du trigger vidéo à jouer après la réponse du personnage (null si aucun). */
   trigger_video_id?: string | null;
   /** Labels conversationnels extraits du message utilisateur (max 4 total). */
   labels?: PRD4TurnLabels | null;
@@ -349,6 +349,8 @@ export interface PRD4PostTurnEvaluation {
   latency_ms?: number;
   model?: string;
   created_at?: string;
+  /** Personnage du tour, attribué par le runtime et jamais par le modèle. */
+  character_key?: import("./conversationMemory").RuntimeCharacter;
   /** Delta mémoire produit dans le même appel GM, sans appel LLM supplémentaire. */
   memory_delta?: import("./conversationMemory").ConversationMemoryDelta | null;
   /** État persistant obtenu après fusion optimiste du delta. */

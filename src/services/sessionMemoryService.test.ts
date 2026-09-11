@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const maybeSingle = vi.fn();
+const secondEq = vi.fn(() => ({ maybeSingle }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: vi.fn(() => ({
       select: vi.fn(() => ({
-        eq: vi.fn(() => ({ maybeSingle })),
+        eq: vi.fn(() => ({ eq: secondEq })),
       })),
     })),
   },
@@ -41,7 +42,7 @@ describe("sessionMemoryService — cache mémoire des résumés", () => {
   });
 
   it("retourne null quand la BDD ne renvoie rien (joueur anonyme, RLS)", async () => {
-    const record = await fetchSessionSummary(SESSION_ID);
+    const record = await fetchSessionSummary(SESSION_ID, "max");
     expect(record).toBeNull();
     expect(maybeSingle).toHaveBeenCalledOnce();
   });
@@ -52,8 +53,8 @@ describe("sessionMemoryService — cache mémoire des résumés", () => {
       json: async () => ({ summary: "- L'utilisateur dit s'appeler Léa.", last_turn: 4 }),
     } as unknown as Response);
 
-    await summarizeSessionAsync(SESSION_ID, conversation, 4);
-    const record = await fetchSessionSummary(SESSION_ID);
+    await summarizeSessionAsync(SESSION_ID, conversation, 4, "max");
+    const record = await fetchSessionSummary(SESSION_ID, "max");
 
     expect(record).toMatchObject({
       session_id: SESSION_ID,
@@ -69,8 +70,8 @@ describe("sessionMemoryService — cache mémoire des résumés", () => {
       json: async () => ({ summary: "- Résumé sans last_turn." }),
     } as unknown as Response);
 
-    await summarizeSessionAsync(SESSION_ID, conversation, 8);
-    const record = await fetchSessionSummary(SESSION_ID);
+    await summarizeSessionAsync(SESSION_ID, conversation, 8, "max");
+    const record = await fetchSessionSummary(SESSION_ID, "max");
 
     expect(record?.last_turn).toBe(8);
   });
@@ -82,8 +83,8 @@ describe("sessionMemoryService — cache mémoire des résumés", () => {
       text: async () => "llm_502",
     } as unknown as Response);
 
-    await summarizeSessionAsync(SESSION_ID, conversation, 4);
-    const record = await fetchSessionSummary(SESSION_ID);
+    await summarizeSessionAsync(SESSION_ID, conversation, 4, "max");
+    const record = await fetchSessionSummary(SESSION_ID, "max");
 
     expect(record).toBeNull();
   });
@@ -94,8 +95,8 @@ describe("sessionMemoryService — cache mémoire des résumés", () => {
       json: async () => ({ summary: "- Session A.", last_turn: 4 }),
     } as unknown as Response);
 
-    await summarizeSessionAsync(SESSION_ID, conversation, 4);
-    const other = await fetchSessionSummary("22222222-2222-4222-8222-222222222222");
+    await summarizeSessionAsync(SESSION_ID, conversation, 4, "max");
+    const other = await fetchSessionSummary("22222222-2222-4222-8222-222222222222", "max");
 
     expect(other).toBeNull();
   });
@@ -127,15 +128,26 @@ describe("sessionMemoryService — cache mémoire des résumés", () => {
 
   it("met en cache une lecture BDD réussie (contexte admin/banc d'essai)", async () => {
     maybeSingle.mockResolvedValue({
-      data: { session_id: SESSION_ID, summary: "- Depuis la BDD.", last_turn: 12, updated_at: "2026-07-16T00:00:00Z" },
+      data: { session_id: SESSION_ID, character_key: "max", summary: "- Depuis la BDD.", last_turn: 12, updated_at: "2026-07-16T00:00:00Z" },
       error: null,
     });
 
-    const first = await fetchSessionSummary(SESSION_ID);
-    const second = await fetchSessionSummary(SESSION_ID);
+    const first = await fetchSessionSummary(SESSION_ID, "max");
+    const second = await fetchSessionSummary(SESSION_ID, "max");
 
     expect(first?.summary).toBe("- Depuis la BDD.");
     expect(second?.summary).toBe("- Depuis la BDD.");
     expect(maybeSingle).toHaveBeenCalledOnce();
+  });
+
+  it("transmet le personnage au contrat de résumé", async () => {
+    vi.mocked(authenticatedFunctionFetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ summary: "- Emma répond.", last_turn: 2 }),
+    } as unknown as Response);
+
+    await summarizeSessionAsync(SESSION_ID, conversation, 2, "emma");
+    const init = vi.mocked(authenticatedFunctionFetch).mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(String(init.body))).toMatchObject({ character_key: "emma" });
   });
 });

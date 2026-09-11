@@ -4,9 +4,27 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
-## [Non publié] — Invitations uniques de test sandbox
+## [Non publié]
+
+### Corrigé
+
+- Verrouillage de l'identité Emma/Max dans les quatre variantes de prompt à
+  partir d'un contexte d'exécution exact et versionné. Une fiche absente ou
+  incohérente bloque désormais la génération.
+- Isolation stricte du RAG par personnage, page source et profil actif, avec
+  contrôle de provenance avant reclassement puis avant injection.
+- Résumés séparés par `(session_id, character_key)`, reprise filtrée et
+  annulation des résultats obsolètes lors d'un changement de personnage.
+- Contrôle déterministe avant affichage, voix, avatar et mémorisation des
+  revendications explicites d'une autre identité, sans appel LLM supplémentaire.
+- Synchronisation Notion récursive et paginée, lecture des tableaux, signalement
+  des blocs non lus et remplacement transactionnel du corpus par personnage.
+
+Plan : [`docs/plan_refonte_rag_caracteres.md`](docs/plan_refonte_rag_caracteres.md#10-audit-et-verrouillage-didentité-emmamax--11-septembre-2026).
 
 ### Ajouté
+
+#### Invitations uniques de test sandbox
 
 - Gestion des invitations externes depuis **Mon compte → Invitations de test** :
   libellé testeur, lien sans secret, mot de passe affiché une seule fois,

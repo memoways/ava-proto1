@@ -1,7 +1,7 @@
 /**
  * PRD4 — Évaluateur post-tour du Game Master.
  *
- * Appelé en void après chaque réponse de Max (n'est jamais sur le chemin
+ * Appelé en void après chaque réponse du personnage (n'est jamais sur le chemin
  * critique du TTS). Retourne le schéma PRD4 §10.3 + un éventuel `trigger_video_id`
  * choisi parmi les vidéos disponibles (table `video_triggers`).
  * Persiste l'entrée dans `sessions.gm_post_turn_log` (jsonb append-only).
@@ -12,6 +12,7 @@ import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTr
 import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
 import { normalizeMemoryText } from "@/services/conversationMemoryV1";
 import type { ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, ExperienceDirectorConfig, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, TraceMessage, UserRoleProfile } from "@/types";
+import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
 
 export interface PRD4PostTurnInput {
   sessionId: string | null;
@@ -35,6 +36,7 @@ export interface PRD4PostTurnInput {
   orchestrationVersionId?: string | null;
   orchestrationConfig?: ExperienceDirectorConfig | null;
   currentCharacter?: "max" | "emma";
+  characterContext?: CharacterExecutionContext;
   /** Admin draft tests set this to false so they cannot mutate live sessions. */
   persist?: boolean;
 }
@@ -69,7 +71,7 @@ const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
 
 const GM_POST_TURN_TIMEOUT_MS = 12000;
 
-export const EXPERIENCE_DIRECTOR_SYSTEM_PROMPT = `Tu es le directeur d'expérience d'une expérience narrative en temps réel dont la durée est configurée par l'administration, entre un joueur et Max (père d'Ava) ou Emma. Après chaque échange, tu produis une seule décision structurée en JSON STRICT — aucun texte hors JSON. Cet appel a lieu après le texte du personnage et ne doit jamais retarder sa voix.
+export const EXPERIENCE_DIRECTOR_SYSTEM_PROMPT = `Tu es le directeur d'expérience d'une expérience narrative en temps réel dont la durée est configurée par l'administration, entre un joueur et le personnage actif explicitement attribué dans le contexte (Max ou Emma). Après chaque échange, tu produis une seule décision structurée en JSON STRICT — aucun texte hors JSON. Cet appel a lieu après le texte du personnage et ne doit jamais retarder sa voix.
 
 Tu retournes EXACTEMENT cet objet :
 {
@@ -79,12 +81,12 @@ Tu retournes EXACTEMENT cet objet :
     "intentions": string[]          // Intention de l'utilisateur (1-2 mots). Ex: "question", "défi", "empathie", "doute", "provocation". Vide si pas claire.
   },
   "engagement_delta": number,       // -2..+2 — qualité de l'échange pour le joueur
-  "confusion_detected": boolean,    // true si le joueur semble perdu ou Max contradictoire
+  "confusion_detected": boolean,    // true si le joueur semble perdu ou le personnage actif contradictoire
   "role_usage_quality": "low" | "medium" | "high" | "unknown",
   "topics_covered": string[],       // duplicate compacté de labels.topics (rétro-compat)
   "transition_recommended": boolean,
   "cinematic_hint": string | null,
-  "next_turn_guidance": string,     // 1 phrase concise pour guider Max au prochain tour
+  "next_turn_guidance": string,     // 1 phrase concise pour guider le même personnage au prochain tour
   "end_recommended": boolean,
   "moderation_flag": boolean,
   "notes": string,
@@ -104,7 +106,7 @@ Tu retournes EXACTEMENT cet objet :
   "memory_delta": {                 // Mémoire durable du DERNIER échange seulement. Ne rien inventer.
     "interlocutor": { "name": string | null, "role": string | null, "traits": string[] },
     "userFacts": string[],          // faits personnels explicitement confiés par l'utilisateur
-    "maxDisclosures": string[],     // faits ou aveux que Max a explicitement révélés dans sa réponse
+    "maxDisclosures": string[],     // nom de clé historique : faits ou aveux explicitement révélés par le personnage actif
     "commitments": string[],        // promesses, décisions ou actions annoncées
     "openThreads": string[],        // sujets précis encore ouverts
     "resolvedThreadIds": string[],  // ids fournis dans une mémoire antérieure, sinon []
@@ -131,7 +133,7 @@ Règles "trigger_video_id" — PRIORITÉ HAUTE :
 Règles "action" :
 - Utilise {"type":"none"} par défaut.
 - Pour une cinématique, retourne videoId, reason et confidence 0..1 ; videoId doit appartenir aux vidéos disponibles.
-- Un handoff est une SUGGESTION bidirectionnelle (Max↔Emma). Retourne reason et proposalGuidance afin que le personnage actuel propose lui-même le changement au tour suivant. Ne force jamais le joueur.
+- Un handoff est une SUGGESTION bidirectionnelle (Max↔Emma). Retourne reason et proposalGuidance afin que le personnage actif propose lui-même le changement au tour suivant. Ne force jamais le joueur.
 - Ne suppose jamais que l'autre personnage ou une vidéo est disponible : le moteur déterministe vérifiera.
 - Ne recommande pas cinématique et handoff en même temps. Le handoff est prioritaire.
 - player_switch_request : renseigne-le seulement si le joueur a demandé explicitement à parler à l'autre personnage. stance=accept si le personnage actuel accepte, object s'il refuse, defer s'il hésite.
@@ -141,7 +143,7 @@ Règles "end_recommended" : respecte le seuil de clôture fourni dans le context
 
 Règles "moderation_flag" :
 - Interprète charitablement les erreurs de transcription, mots déformés, humour ambigu et provocations légères : flag=false.
-- Une critique des actes de Max, même dure, n'est pas une attaque contre l'expérience : flag=false.
+- Une critique des actes du personnage actif, même dure, n'est pas une attaque contre l'expérience : flag=false.
 - flag=true seulement pour une insulte explicite ciblée, une menace, un contenu haineux ou un harcèlement sans ambiguïté.
 - Ne recommande jamais la fin sur une première formulation ambiguë. Une fin pour hostilité exige des attaques explicites répétées visibles dans l'historique.
 
@@ -214,7 +216,14 @@ function buildUserPrompt(input: PRD4PostTurnInput, videos: VideoTriggerRow[]): s
     lastTurn: memory.lastTurn,
   }) : "(aucune mémoire structurée)";
 
-  return `## PROFIL JOUEUR
+  const characterAttribution = input.characterContext
+    ? `${input.characterContext.displayName} | character_id=${input.characterContext.characterId} | notion_page_id=${input.characterContext.notionPageId} | environment=${input.characterContext.environmentId} | prompt_version=${input.characterContext.promptUpdatedAt}`
+    : (input.currentCharacter === "emma" ? "Emma" : "Max");
+
+  return `## PERSONNAGE ACTIF — ATTRIBUTION IMMUABLE
+${characterAttribution}
+
+## PROFIL JOUEUR
 ${input.userRole?.summary_for_max || "(profil indisponible)"}
 
 ## POSTURE INITIALE DU JOUEUR (intention / question exprimée avant le début de l'appel — à garder en mémoire pour évaluer la cohérence de l'échange)
@@ -423,6 +432,7 @@ export async function evaluatePostTurnPRD4(
 
   let enriched: PRD4PostTurnEvaluation = {
     ...result,
+    character_key: input.currentCharacter ?? input.characterContext?.characterKey ?? "max",
     turn_index: input.turnIndex,
     latency_ms: Math.round(performance.now() - startedAt),
     model,

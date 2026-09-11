@@ -2,7 +2,12 @@ import { callLLM, callLLMWithUsage, type LLMUsage } from "@/services/openRouterL
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMessage, GameMasterResponse, GameMasterTurnBrief, MaxTurnKnowledgeContext } from "@/types";
 import { getLLMSettings, getGMPromptSettings, getGameplaySettings } from "@/services/settingsService";
-import { loadCharacterPromptByName } from "@/services/characterPromptService";
+import { loadCharacterPrompt, loadCharacterPromptByName } from "@/services/characterPromptService";
+import {
+  assertCharacterExecutionContext,
+  buildCharacterIdentityInvariant,
+  type CharacterExecutionContext,
+} from "@/services/characterIdentityGuard";
 import { queryRAG } from "@/services/ragService";
 import { getVideoTriggersCached } from "@/services/videoTriggerService";
 
@@ -18,21 +23,50 @@ function getGameMasterPreTurnPrompt(): string {
   return getGMPromptSettings().preTurnPlannerPrompt;
 }
 
-async function getCharacterContextBlock(characterName?: string): Promise<{ system: string; characterId: string | null }> {
-  if (!characterName) return { system: "", characterId: null };
-  const prompt = await loadCharacterPromptByName(characterName);
-  if (!prompt) return { system: "", characterId: null };
-  let block = "";
+async function getCharacterContextBlock(
+  characterName?: string,
+  characterContext?: CharacterExecutionContext,
+): Promise<{ system: string; characterId: string | null }> {
+  if (characterContext) assertCharacterExecutionContext(characterContext);
+  const resolvedCharacterName = characterContext?.displayName || characterName;
+  if (!resolvedCharacterName) return { system: "", characterId: null };
+  const prompt = characterContext
+    ? await loadCharacterPrompt(characterContext.characterId)
+    : await loadCharacterPromptByName(resolvedCharacterName);
+  if (!prompt) {
+    if (characterContext) {
+      throw new Error(`Game Master character sheet unavailable for ${characterContext.displayName}`);
+    }
+    return { system: "", characterId: null };
+  }
+  if (characterContext) {
+    const promptFirstName = (prompt.name || "").trim().split(/\s+/)[0]?.toLocaleLowerCase("fr");
+    if (
+      prompt.character_id !== characterContext.characterId
+      || promptFirstName !== characterContext.characterKey
+      || (prompt.updated_at && prompt.updated_at !== characterContext.promptUpdatedAt)
+    ) {
+      throw new Error(`Game Master character attribution mismatch for ${characterContext.displayName}`);
+    }
+  }
+  let block = characterContext
+    ? `\n\n${buildCharacterIdentityInvariant(characterContext)}`
+    : "";
   if (prompt.situation_summary?.trim()) {
-    block = `\n\n## SITUATION ACTUELLE DU PERSONNAGE (${characterName})\n${prompt.situation_summary.trim()}`;
+    block += `\n\n## SITUATION ACTUELLE DU PERSONNAGE (${resolvedCharacterName})\n${prompt.situation_summary.trim()}`;
   }
   return { system: block, characterId: prompt.character_id };
 }
 
-async function getCharacterRagExtracts(characterId: string | null, userMessage: string, recentContext?: string): Promise<string> {
+async function getCharacterRagExtracts(
+  characterId: string | null,
+  userMessage: string,
+  recentContext?: string,
+  characterContext?: CharacterExecutionContext,
+): Promise<string> {
   if (!characterId) return "";
   try {
-    const matches = await queryRAG(userMessage, recentContext, 2, 0.2, { characterId });
+    const matches = await queryRAG(userMessage, recentContext, 2, 0.2, { characterId, characterContext });
     if (!matches.length) return "";
     return `\n\n## EXTRAITS NARRATIFS PERTINENTS (RAG, scopé personnage)\n${matches
       .map((m, i) => `[${i + 1}] ${m.content.slice(0, 400)}`)
@@ -51,6 +85,7 @@ export interface GameMasterInput {
   timeElapsedSeconds: number;
   /** Active character name (Max / Ava / …). Enables injection of situation_summary + scoped RAG. */
   characterName?: string;
+  characterContext?: CharacterExecutionContext;
 }
 
 export interface GameMasterPreTurnInput {
@@ -62,6 +97,7 @@ export interface GameMasterPreTurnInput {
   knowledgeContext?: MaxTurnKnowledgeContext;
   /** Active character name (Max / Ava / …). */
   characterName?: string;
+  characterContext?: CharacterExecutionContext;
 }
 
 const DEFAULT_TURN_BRIEF: GameMasterTurnBrief = {
@@ -93,8 +129,8 @@ const DEFAULT_RESPONSE: GameMasterResponse = {
  */
 export async function callGameMaster(input: GameMasterInput): Promise<GameMasterResponse> {
   const contextMessage = buildContextMessage(input);
-  const { system: charBlock, characterId } = await getCharacterContextBlock(input.characterName);
-  const ragExtracts = await getCharacterRagExtracts(characterId, input.userMessage, contextMessage.slice(0, 600));
+  const { system: charBlock, characterId } = await getCharacterContextBlock(input.characterName, input.characterContext);
+  const ragExtracts = await getCharacterRagExtracts(characterId, input.userMessage, contextMessage.slice(0, 600), input.characterContext);
 
   // Inject available video triggers from Supabase (synced from Notion "Vidéos AVA").
   const videos = await getVideoTriggersCached();
@@ -152,14 +188,14 @@ export async function callGameMaster(input: GameMasterInput): Promise<GameMaster
 /**
  * Timeout dur sur le GM pre-turn : si le LLM dépasse cette durée,
  * on retourne immédiatement le brief par défaut pour ne pas bloquer
- * la réponse de Max et le TTS (cf. panneau admin "Latence & blocage").
+ * la réponse du personnage et le TTS (cf. panneau admin "Latence & blocage").
  */
 const GM_PRETURN_TIMEOUT_MS = 4000;
 
 export async function planGameMasterTurn(input: GameMasterPreTurnInput): Promise<GameMasterTurnBrief> {
   const contextMessage = buildPreTurnContextMessage(input);
-  const { system: charBlock, characterId } = await getCharacterContextBlock(input.characterName);
-  const ragExtracts = await getCharacterRagExtracts(characterId, input.userMessage, contextMessage.slice(0, 600));
+  const { system: charBlock, characterId } = await getCharacterContextBlock(input.characterName, input.characterContext);
+  const ragExtracts = await getCharacterRagExtracts(characterId, input.userMessage, contextMessage.slice(0, 600), input.characterContext);
   const messages: Array<{ role: "system" | "user"; content: string }> = [
     { role: "system", content: getGameMasterPreTurnPrompt() + charBlock },
     { role: "user", content: contextMessage + ragExtracts },
@@ -254,7 +290,8 @@ export async function planGameMasterTurnDetailed(
   input: GameMasterPreTurnInput,
   opts?: { featureKey?: string },
 ): Promise<PlanGameMasterDetailed> {
-  const systemPrompt = getGameMasterPreTurnPrompt();
+  const { system: characterBlock } = await getCharacterContextBlock(input.characterName, input.characterContext);
+  const systemPrompt = getGameMasterPreTurnPrompt() + characterBlock;
   const userPrompt = buildPreTurnContextMessage(input);
   const llm = getLLMSettings();
   const startedAt = performance.now();
@@ -324,9 +361,10 @@ export async function planGameMasterTurnDetailed(
 }
 
 function buildContextMessage(input: GameMasterInput): string {
+  const speakerName = input.characterContext?.displayName || input.characterName || "PERSONNAGE";
   const recentHistory = input.conversationHistory.slice(-6); // Last 6 messages
   const historyText = recentHistory
-    .map((m) => `${m.role === "user" ? "UTILISATEUR" : "MAX"}: ${m.content}`)
+    .map((m) => `${m.role === "user" ? "UTILISATEUR" : speakerName.toLocaleUpperCase("fr")}: ${m.content}`)
     .join("\n");
 
   const gameplay = getGameplaySettings();
@@ -340,15 +378,16 @@ ${historyText}
 
 ## DERNIER ÉCHANGE
 UTILISATEUR: ${input.userMessage}
-MAX: ${input.maxResponse}
+${speakerName.toLocaleUpperCase("fr")}: ${input.maxResponse}
 
 Analyse cet échange et retourne ton évaluation JSON.`;
 }
 
 function buildPreTurnContextMessage(input: GameMasterPreTurnInput): string {
+  const speakerName = input.characterContext?.displayName || input.characterName || "le personnage";
   const recentHistory = input.conversationHistory.slice(-6);
   const historyText = recentHistory
-    .map((m) => `${m.role === "user" ? "UTILISATEUR" : "MAX"}: ${m.content}`)
+    .map((m) => `${m.role === "user" ? "UTILISATEUR" : speakerName.toLocaleUpperCase("fr")}: ${m.content}`)
     .join("\n");
 
   const gameplay = getGameplaySettings();
@@ -370,5 +409,5 @@ ${input.userMessage}
 - forbidden_topics: ${(input.knowledgeContext?.forbiddenTopics || []).join(" | ") || "aucun"}
 - blocked_assertions: ${(input.knowledgeContext?.blockedAssertions || []).join(" | ") || "aucune"}
 
-Produis le brief JSON du prochain tour de Max.`;
+Produis le brief JSON du prochain tour de ${speakerName}.`;
 }

@@ -4,7 +4,7 @@
  * Différences vs `processConversationTurn` (legacy A/B) :
  *  - Pas de GM pré-tour LLM (rapport coût/bénéfice trop faible en live).
  *  - Pas de validateur anti-hallucination (gardé pour le banc d'essai).
- *  - Injecte le `summary_for_max` du profil joueur dans le system prompt de Max.
+ *  - Injecte le `summary_for_max` historique du profil joueur dans le prompt du personnage actif.
  *  - Fire-and-forget : évaluation PRD4 post-tour (jamais bloquante pour le TTS).
  */
 import { SimulateMaxResponseError, simulateMaxResponse, type MaxAgentInput, type SimulateMaxDiagnosticContext } from "@/agents/maxAgent";
@@ -16,7 +16,12 @@ import {
   queryRAGDetailed,
   type RAGQueryDetailed,
 } from "@/services/ragService";
-import { resolveCharacterIdByName } from "@/services/characterPromptService";
+import {
+  assertCharacterExecutionContext,
+  guardCharacterResponse,
+  type CharacterExecutionContext,
+  type CharacterResponseGuardResult,
+} from "@/services/characterIdentityGuard";
 import { getGameplaySettings, getLLMSettings, isReasoningEnabledForModel } from "@/services/settingsService";
 import { maxRagFormatOptionsForVariant } from "@/services/maxRagVariant";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
@@ -45,8 +50,8 @@ export interface PRD4TurnInput {
   userMessage: string;
   userRole: UserRoleProfile | null;
   timeElapsedSeconds: number;
-  /** Personnage actif (Max ou Emma), y compris dès le sélecteur. */
-  characterName?: string;
+  /** Attribution immuable du personnage, résolue avant le tour. */
+  characterContext: CharacterExecutionContext;
   /** IDs de triggers vidéo déjà joués durant la session. */
   triggeredVideoIds?: string[];
   /** Contexte injecté dans Max suite à la vidéo précédente. */
@@ -84,7 +89,7 @@ export interface PRD4TurnResult {
   };
   /** Promesse résolue quand le GM post-turn a fini (à attendre en arrière-plan). */
   postTurnPromise: Promise<PRD4PostTurnEvaluation>;
-  /** Label pass lancé en parallèle de Max (résout en général avant la fin du TTS). */
+  /** Label pass lancé en parallèle du personnage (résout en général avant la fin du TTS). */
   labelPromise: Promise<PRD4LabelResult>;
   traceId: string | null;
 }
@@ -97,6 +102,7 @@ const MAX_FALLBACK_RESPONSE =
   "Je vous entends, mais la ligne accroche. Répétez juste l'essentiel, s'il vous plaît.";
 
 export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnResult> {
+  assertCharacterExecutionContext(input.characterContext);
   const t0 = performance.now();
   const diagnosticTraceEnabled = input.diagnosticTraceEnabled === true;
   const turnId = input.turnId || crypto.randomUUID();
@@ -109,7 +115,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const recentConversation = selectRecentConversation(input.conversationHistory);
   const sessionDurationSeconds = normalizeSessionDurationSeconds(gameplay?.TIMEOUT_SECONDS);
   const minimumClosureSeconds = getSessionMinimumClosureSeconds(sessionDurationSeconds);
-  const activeCharacter = input.characterName?.toLowerCase() === "emma" ? "emma" : "max";
+  const activeCharacter = input.characterContext.characterKey;
   let summaryFetchMs = 0;
   const summaryStartedAt = performance.now();
   const summaryPromise = (input.sessionId
@@ -147,9 +153,6 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   let ragErrorKind: "rag_timeout" | "rag_http_error" | "rag_client_error" | "rerank_failed" | null = null;
   try {
     const recent = recentConversation.slice(-2).map((m) => m.content).join(" ");
-    // Cloisonnement RAG : on ne récupère QUE les chunks du personnage courant
-    // (les chunks shared/storyworld avec character_id NULL restent visibles).
-    const characterId = await resolveCharacterIdByName(input.characterName || "Max");
     ragDetailed = await withTimeout(
       "prd4_rag",
       queryRAGDetailed(
@@ -160,7 +163,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
           : gameplay?.RAG_TOP_K ?? 5,
         gameplay?.RAG_MATCH_THRESHOLD,
         {
-          characterId,
+          characterId: input.characterContext.characterId,
+          characterContext: input.characterContext,
           rerank: gameplay?.RAG_RERANK_ENABLED,
           retrieveK: gameplay?.RAG_RETRIEVE_K ?? RAG_DEFAULT_RETRIEVE_K,
           rerankModel: gameplay?.RAG_RERANK_MODEL,
@@ -240,17 +244,20 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   let maxResult: Awaited<ReturnType<typeof simulateMaxResponse>> | null = null;
   let maxFailureDiagnostic: SimulateMaxDiagnosticContext | null = null;
   let maxError: string | null = null;
+  let identityGuard: CharacterResponseGuardResult = { blocked: false, response: "", reason: null };
   try {
     const remainingMs = Math.floor(responseDeadlineAt - performance.now());
     if (remainingMs < 250) throw new Error("PRD4 response deadline exhausted after RAG");
     maxResult = await simulateMaxResponse(maxInput, {
-      characterName: input.characterName || "Max",
+      characterName: input.characterContext.displayName,
+      characterContext: input.characterContext,
       featureKey: "prd4_chat",
       timeoutMs: Math.min(MAX_LLM_RESPONSE_DEADLINE_MS, remainingMs),
       signal: input.signal,
       diagnosticTrace: diagnosticTraceEnabled,
     });
-    maxResponse = maxResult.response;
+    identityGuard = guardCharacterResponse(maxResult.response, input.characterContext);
+    maxResponse = identityGuard.response;
   } catch (err) {
     console.warn("[PRD4 orchestrator] Max LLM failed (fallback response):", err);
     maxError = err instanceof Error ? err.message : String(err);
@@ -286,6 +293,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         orchestrationVersionId: directorRuntime.versionId,
         orchestrationConfig: directorRuntime.config,
         currentCharacter: activeCharacter,
+        characterContext: input.characterContext,
       });
     } finally {
       input.onLatencySegment?.({
@@ -326,7 +334,12 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         sessionId: input.sessionId,
         turnId,
         turnIndex,
-        characterName: input.characterName || "Max",
+        characterName: input.characterContext.displayName,
+        characterKey: input.characterContext.characterKey,
+        characterId: input.characterContext.characterId,
+        notionPageId: input.characterContext.notionPageId,
+        environmentId: input.characterContext.environmentId,
+        promptUpdatedAt: input.characterContext.promptUpdatedAt,
         createdAt: new Date().toISOString(),
         status: "causal_complete",
       },
@@ -386,7 +399,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       response: {
         rawLlmResponse: maxResult?.response ?? null,
         deliveredResponse: maxResponse,
-        source: maxResult ? "llm" : "fallback",
+        source: identityGuard.blocked ? "identity_guard" : maxResult ? "llm" : "fallback",
+        identityGuardReason: identityGuard.reason,
       },
       gm: {
         causalGuidance: {
@@ -474,7 +488,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       ],
       lastSummarizedTurn,
     );
-    void summarizeSessionAsync(input.sessionId, pendingSummary, turnIndex, activeCharacter);
+    void summarizeSessionAsync(input.sessionId, pendingSummary, turnIndex, input.characterContext);
   }
 
   return {

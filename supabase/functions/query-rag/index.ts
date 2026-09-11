@@ -3,8 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 import {
   getRagEmbeddingProfile,
-  LEGACY_OPENAI_PROFILE_ID,
-  LEGACY_VOYAGE_PROFILE_ID,
+  isRagEmbeddingProfileId,
   type RagEmbeddingProfile,
 } from "../_shared/ragProfiles.ts";
 
@@ -22,7 +21,8 @@ interface RAGRequest {
   recent_context?: string;
   match_count?: number;
   match_threshold?: number;
-  character_id?: string | null;
+  character_id?: string;
+  character_context?: Record<string, unknown>;
   rerank?: boolean;
   retrieve_k?: number;
   rerank_model?: "rerank-2.5" | "rerank-2.5-lite";
@@ -80,6 +80,7 @@ async function embedVoyageQuery(text: string, apiKey: string, profile: RagEmbedd
 }
 
 const AVA_RERANK_INSTRUCTION = "Priorise les passages qui contiennent des faits narratifs explicites sur le personnage actif et qui répondent directement à la question. Écarte les ressemblances de vocabulaire sans réponse factuelle.";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function buildRerankQuery(searchInput: string): string {
   return `${AVA_RERANK_INSTRUCTION}\n\nQuestion et contexte de conversation :\n${searchInput}`;
@@ -123,30 +124,46 @@ serve(async (req) => {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    const characterId = typeof body.character_id === "string" && UUID.test(body.character_id)
+      ? body.character_id
+      : null;
+    if (!characterId) {
+      return new Response(JSON.stringify({ error: "A valid character_id is required" }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (body.character_context && (
+      body.character_context.characterId !== characterId
+      || !body.character_context.notionPageId
+      || !body.character_context.environmentId
+      || !body.character_context.promptUpdatedAt
+    )) {
+      return new Response(JSON.stringify({ error: "character_context attribution mismatch" }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Combine recent context for better semantic match (only when no rewritten query was supplied)
     const searchInput = body.recent_context && !body.query
       ? `${userQuery}\n\nContexte récent: ${body.recent_context}`
       : userQuery;
 
-    const fallbackProfileId = !VOYAGE_API_KEY && !!OPENAI_API_KEY
-      ? LEGACY_OPENAI_PROFILE_ID
-      : LEGACY_VOYAGE_PROFILE_ID;
     const { data: indexState, error: indexStateError } = await supabase
       .from("rag_index_state")
       .select("active_profile")
       .eq("id", true)
       .maybeSingle();
     if (indexStateError) {
-      console.warn("[query-rag] rag_index_state unavailable, using legacy profile:", indexStateError.message);
+      throw new Error(`Active RAG profile unavailable: ${indexStateError.message}`);
     }
-    const versionedIndexAvailable = !indexStateError && Boolean(indexState?.active_profile);
-    const profile = getRagEmbeddingProfile(indexState?.active_profile, fallbackProfileId);
+    if (!isRagEmbeddingProfileId(indexState?.active_profile)) {
+      throw new Error("Active RAG profile is missing or invalid");
+    }
+    const profile = getRagEmbeddingProfile(indexState.active_profile);
     const provider: "voyage" | "openai" = profile.provider;
     const matchCount = body.match_count ?? 5;
     const retrieveK = Math.max(matchCount, body.retrieve_k ?? 15);
     const matchThreshold = body.match_threshold ?? 0.3;
-    const characterId = body.character_id || null;
     const useRerank = body.rerank !== false && !!VOYAGE_API_KEY;
     const rerankModel = body.rerank_model === "rerank-2.5" ? "rerank-2.5" : "rerank-2.5-lite";
     const rerankTruncation = body.rerank_truncation !== false;
@@ -163,7 +180,7 @@ serve(async (req) => {
         match_count: useRerank ? retrieveK : matchCount,
         match_threshold: matchThreshold,
         p_character_id: characterId,
-        ...(versionedIndexAvailable ? { p_embedding_profile: profile.id } : {}),
+        p_embedding_profile: profile.id,
       });
       if (error) throw new Error(`pgvector(voyage) error: ${error.message}`);
       matches = data || [];
@@ -175,11 +192,32 @@ serve(async (req) => {
         match_count: useRerank ? retrieveK : matchCount,
         match_threshold: matchThreshold,
         p_character_id: characterId,
-        ...(versionedIndexAvailable ? { p_embedding_profile: profile.id } : {}),
+        p_embedding_profile: profile.id,
       });
       if (error) throw new Error(`pgvector(openai) error: ${error.message}`);
       matches = data || [];
     }
+
+    // Defense in depth: provenance is verified before reranking and therefore
+    // before any text can be returned for prompt injection.
+    const rejectedMatches = matches.filter((match) =>
+      match.character_id !== characterId
+      || match.source_table !== "characters"
+      || match.source_id !== characterId
+    );
+    if (rejectedMatches.length) {
+      console.error("[query-rag] rejected mismatched provenance", rejectedMatches.map((match) => ({
+        id: match.id,
+        source_table: match.source_table,
+        source_id: match.source_id,
+        character_id: match.character_id,
+      })));
+    }
+    matches = matches.filter((match) =>
+      match.character_id === characterId
+      && match.source_table === "characters"
+      && match.source_id === characterId
+    );
 
     // 2. Optional rerank with Voyage rerank-2.5
     const retrievalMatches = matches.map((match, index) => ({
@@ -212,7 +250,7 @@ serve(async (req) => {
       matches = matches.slice(0, matchCount);
     }
 
-    console.log(`[query-rag] Provider=${providerUsed} rerank=${rerankUsed} matches=${matches.length} char=${characterId ? characterId.slice(0, 8) : "all"}`);
+    console.log(`[query-rag] Provider=${providerUsed} profile=${profile.id} rerank=${rerankUsed} matches=${matches.length} char=${characterId.slice(0, 8)}`);
 
     return new Response(JSON.stringify({
       matches,

@@ -1,7 +1,7 @@
 import type { CharacterPrompt } from "@/services/characterPromptService";
 
 /**
- * rich_v2 — compilation déterministe de la fiche Notion de Max.
+ * rich_v2 — compilation déterministe de la fiche Notion du personnage actif.
  *
  * Principes (docs/plan_optimisation_payload_max.md §9) :
  * - `character_prompts` est l'unique source éditoriale statique ;
@@ -55,14 +55,6 @@ export const RICH_V2_CONVERSATION_CONTRACT = `## CONTRAT DE CONVERSATION
 - Tu peux analyser les causes de tes actes, mais une explication n'est jamais une excuse.
 - Le présent, la mémoire de session, les souvenirs pertinents et l'historique de l'appel sont tes seules sources factuelles ; en cas d'incertitude, tu le dis.
 - Tes lectures et ta pensée font partie de toi : tu ne cites un auteur ou une référence que si l'interlocuteur ouvre ce terrain.`;
-
-/**
- * Fallback minimal propre à `rich_v2` : aucune règle de longueur concurrente,
- * le contrat conversationnel reste la seule source de cadrage.
- */
-export const RICH_V2_FALLBACK_SYSTEM_PROMPT = `# FICHE PERSONNAGE INDISPONIBLE
-Tu es le personnage appelé par l'interlocuteur. Sa fiche éditoriale n'a pas pu être chargée : tu t'appuies uniquement sur la mémoire de session, les souvenirs remontés et l'historique de l'appel.
-Tu n'inventes ni faits, ni dates, ni noms : ce que tu ignores, tu le dis simplement.`;
 
 export interface RichSubpart {
   label: string;

@@ -118,6 +118,26 @@ describe("ConversationMemoryV1", () => {
     expect(formatConversationMemory(emmaMemory)).not.toContain("menti");
   });
 
+  it("attribue une mémoire au personnage du tour malgré l'identifiant proposé par le modèle", () => {
+    const memory = mergeConversationMemory(createEmptyConversationMemory(), {
+      characterItems: [{
+        text: "Emma a confié cette information pendant son tour.",
+        sourceCharacter: "max",
+        visibility: "shared",
+        visibleTo: ["max"],
+        provenance: "gm",
+      }],
+    }, 6, "emma");
+
+    expect(memory.characterItems[0]).toMatchObject({
+      sourceCharacter: "emma",
+      visibility: "private",
+      visibleTo: ["emma"],
+    });
+    expect(filterConversationMemoryForCharacter(memory, "max").characterItems).toEqual([]);
+    expect(filterConversationMemoryForCharacter(memory, "emma").characterItems).toHaveLength(1);
+  });
+
   it("rend à Max sa propre mémoire après un passage par Emma", () => {
     const afterMax = mergeConversationMemory(createEmptyConversationMemory(), {
       interlocutor: { name: "Alice", role: "médecin" },

@@ -1,9 +1,13 @@
 import { callLLM, callLLMWithUsage, LLMProxyRequestError, streamLLM, type LLMUsage } from "@/services/openRouterLLM";
-import { supabase } from "@/integrations/supabase/client";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMemoryV1, ConversationMessage, LLMCallDiagnosticTrace, MaxConstraintCheckResult, MaxPromptAssemblyTrace, MaxTurnKnowledgeContext, TraceMessage } from "@/types";
 import { getAntiHallucinationValidatorSettings, getGameplaySettings, getLLMSettings, isReasoningEnabledForModel } from "@/services/settingsService";
-import { buildCharacterPromptSections, loadCharacterPromptByName, clearCharacterPromptCache } from "@/services/characterPromptService";
+import { buildCharacterPromptSections, loadCharacterPrompt, loadCharacterPromptByName, clearCharacterPromptCache } from "@/services/characterPromptService";
+import {
+  assertCharacterExecutionContext,
+  buildCharacterIdentityInvariant,
+  type CharacterExecutionContext,
+} from "@/services/characterIdentityGuard";
 import {
   compileCharacterSections,
   isFallbackGmGuidance,
@@ -23,16 +27,12 @@ import {
   RICH_V2_CONVERSATION_CONTRACT,
   RICH_V2_CORE_HEADER,
   RICH_V2_DYNAMIC_SECTION_CHARS,
-  RICH_V2_FALLBACK_SYSTEM_PROMPT,
   RICH_V2_LIMITS,
 } from "@/agents/maxRichPromptCompiler";
 import {
   buildOptimizedPromptAssembly,
   type OptimizedRagCandidate,
 } from "@/agents/maxOptimizedPromptCompiler";
-
-// Fallback minimal system prompt if DB fetch fails
-const FALLBACK_SYSTEM_PROMPT = `Tu es un personnage dans une expérience narrative interactive. Parle à la première personne, en français, de façon concise (1-2 phrases, 45 mots maximum). Utilise le CONTEXTE NARRATIF ci-dessous comme source de vérité.`;
 
 // Gameplay rules — always appended regardless of character.
 // IMPORTANT: ces règles sont des INVARIANTS TECHNIQUES uniquement.
@@ -63,74 +63,13 @@ const COMPACT_GAMEPLAY_RULES = `## CONTRAT DE CONVERSATION
 - La fiche, la mémoire de session, les souvenirs pertinents et l'historique récent sont tes seules sources factuelles. En cas d'incertitude, dis-le.
 - Le joueur conduit librement la conversation ; garde néanmoins ton drive, ta voix et ta progression relationnelle.`;
 
-interface CharacterSystemPromptSource {
-  content: string;
-  kind: "database" | "fallback";
-  characterId: string | null;
-  canonicalName: string;
-  updatedAt: string | null;
-}
-
-const cachedSystemPrompts: Record<string, CharacterSystemPromptSource> = {};
-let systemPromptPromise: Promise<CharacterSystemPromptSource> | null = null;
-
-async function getCharacterSystemPrompt(name = "Max"): Promise<CharacterSystemPromptSource> {
-  if (cachedSystemPrompts[name]) return cachedSystemPrompts[name];
-
-  try {
-    // Cascade lookup: exact, "Name %", "Name%" — DB stocke "Max Lorenzo" mais l'app passe "Max".
-    const selectCharacter = () => supabase.from("characters").select("id, system_prompt, name, updated_at");
-    let { data } = await selectCharacter().ilike("name", name).maybeSingle();
-    if (!data) ({ data } = await selectCharacter().ilike("name", `${name} %`).limit(1).maybeSingle());
-    if (!data) ({ data } = await selectCharacter().ilike("name", `${name}%`).limit(1).maybeSingle());
-
-    if (!data?.system_prompt) {
-      console.warn(`[MaxAgent] Could not fetch system_prompt for "${name}" (DB has no match or empty system_prompt), using fallback`);
-      return {
-        content: FALLBACK_SYSTEM_PROMPT,
-        kind: "fallback",
-        characterId: data?.id ?? null,
-        canonicalName: data?.name ?? name,
-        updatedAt: data?.updated_at ?? null,
-      };
-    }
-
-    const source: CharacterSystemPromptSource = {
-      content: data.system_prompt,
-      kind: "database",
-      characterId: data.id,
-      canonicalName: data.name,
-      updatedAt: data.updated_at,
-    };
-    cachedSystemPrompts[name] = source;
-    cachedSystemPrompts[data.name] = source;
-    console.log(`[MaxAgent] Loaded system_prompt for "${name}" → "${data.name}" (${data.system_prompt.length} chars)`);
-    return source;
-  } catch (err) {
-    console.error("[MaxAgent] DB error:", err);
-    return {
-      content: FALLBACK_SYSTEM_PROMPT,
-      kind: "fallback",
-      characterId: null,
-      canonicalName: name,
-      updatedAt: null,
-    };
-  }
-}
-
 /** Preload system prompt into cache (call early, e.g. during intro video) */
 export function preloadSystemPrompt(): void {
-  if (cachedSystemPrompts["Max"] || systemPromptPromise) return;
-  console.log("[MaxAgent] Preloading system prompt...");
-  systemPromptPromise = getCharacterSystemPrompt().then(p => {
-    systemPromptPromise = null;
-    return p;
-  });
+  void loadCharacterPromptByName("Max");
 }
 
 /** Clear cached prompt (call after editing in admin) */
 export function clearSystemPromptCache() {
-  for (const k of Object.keys(cachedSystemPrompts)) delete cachedSystemPrompts[k];
   clearCharacterPromptCache();
 }
 
@@ -288,6 +227,7 @@ export async function simulateMaxResponse(
   input: MaxAgentInput,
   opts?: {
     characterName?: string;
+    characterContext?: CharacterExecutionContext;
     featureKey?: string;
     timeoutMs?: number;
     signal?: AbortSignal;
@@ -295,9 +235,9 @@ export async function simulateMaxResponse(
     llmOverrides?: MaxLlmOverrides;
   },
 ): Promise<SimulateMaxResult> {
-  const characterName = opts?.characterName || "Max";
+  const characterName = opts?.characterContext?.displayName || opts?.characterName || "Max";
   const promptBuildStartedAt = performance.now();
-  const promptTrace = await buildMaxSystemPrompt(input, characterName);
+  const promptTrace = await buildMaxSystemPrompt(input, characterName, opts?.characterContext);
   const promptBuildLatencyMs = Math.round(performance.now() - promptBuildStartedAt);
   const systemPrompt = promptTrace.finalSystemPrompt;
   const messages: TraceMessage[] = [
@@ -373,13 +313,13 @@ function buildValidatorPrompt(input: {
   knowledgeContext?: MaxTurnKnowledgeContext;
 }): string {
   const validatorSettings = getAntiHallucinationValidatorSettings();
-  return `Tu es un validateur éditorial strict. Tu dois vérifier si la réponse de Max respecte les contraintes suivantes.
+  return `Tu es un validateur éditorial strict. Tu dois vérifier si la réponse du personnage actif respecte les contraintes suivantes.
 
 ## RÈGLES À FAIRE RESPECTER
-- Max ne doit affirmer aucun fait absent du contexte autorisé.
-- Max ne doit jamais transformer une hypothèse en certitude.
-- Max doit respecter les sujets interdits et assertions bloquées.
-- Si l'information manque, Max doit exprimer le doute plutôt qu'inventer.
+- Le personnage actif ne doit affirmer aucun fait absent du contexte autorisé.
+- Le personnage actif ne doit jamais transformer une hypothèse en certitude.
+- Le personnage actif doit respecter les sujets interdits et assertions bloquées.
+- Si l'information manque, le personnage actif doit exprimer le doute plutôt qu'inventer.
 
 ## BASE GLOBALE DES FAITS AUTORISÉS
 ${validatorSettings.authorizedFacts}
@@ -405,7 +345,7 @@ ${input.ragContext || "aucun"}
 ## MESSAGE UTILISATEUR
 ${input.userMessage}
 
-## RÉPONSE DE MAX À ÉVALUER
+## RÉPONSE DU PERSONNAGE À ÉVALUER
 ${input.response}
 
 Retourne UNIQUEMENT un JSON valide avec cette structure:
@@ -474,25 +414,68 @@ function formatKnowledgeList(title: string, values?: string[]): string {
 export async function buildMaxSystemPrompt(
   input: MaxAgentInput,
   characterName: string = "Max",
+  characterContext?: CharacterExecutionContext,
 ): Promise<MaxPromptAssemblyTrace> {
   const variant = (() => {
     try { return getGameplaySettings().MAX_PROMPT_VARIANT; } catch { return "legacy" as const; }
   })();
-  const characterFields = await loadCharacterPromptByName(characterName);
+  if (characterContext) assertCharacterExecutionContext(characterContext);
+  const characterFields = characterContext
+    ? await loadCharacterPrompt(characterContext.characterId)
+    : await loadCharacterPromptByName(characterName);
+  if (!characterFields) throw new Error(`Fiche personnage absente pour ${characterName} : génération interdite`);
+  const canonicalName = characterFields.name?.trim() || characterName.trim();
+  const requiredFields = [
+    characterFields.situation_summary,
+    characterFields.identite_fondamentale,
+    characterFields.qui_tu_es,
+    characterFields.dynamique_conversation,
+    characterFields.ce_que_tu_ne_fais_jamais,
+    characterFields.timeline,
+  ];
+  if (requiredFields.some((value) => !value?.trim())) {
+    throw new Error(`Fiche personnage incohérente pour ${canonicalName} : champs essentiels absents`);
+  }
+  if (characterContext) {
+    const promptFirstName = canonicalName.split(/\s+/)[0].toLocaleLowerCase("fr");
+    if (
+      characterFields.character_id !== characterContext.characterId
+      || promptFirstName !== characterContext.characterKey
+      || (characterFields.updated_at && characterFields.updated_at !== characterContext.promptUpdatedAt)
+    ) {
+      throw new Error(`Fiche personnage incohérente pour ${characterContext.displayName} : attribution ou version incorrecte`);
+    }
+  }
+  const identityInvariant = characterContext
+    ? buildCharacterIdentityInvariant(characterContext)
+    : `# IDENTITÉ ACTIVE — INVARIANT PRIORITAIRE NON TRONQUABLE\n- Tu es ${canonicalName}. Tu ne te présentes jamais comme un autre personnage.`;
 
   if (variant === "legacy") {
-    const characterPrompt = await getCharacterSystemPrompt(characterName);
     const fieldsSections = buildCharacterPromptSections(characterFields);
     const injectedSections: MaxPromptAssemblyTrace["injectedSections"] = [];
-    let prompt = characterPrompt.content;
+    let prompt = identityInvariant;
     const legacyBudgetSections: NonNullable<MaxPromptAssemblyTrace["budget"]>["sections"] = [{
-      key: "legacy_system_prompt",
-      title: "characters.system_prompt",
-      chars: characterPrompt.content.length,
-      originalChars: characterPrompt.content.length,
+      key: "identity_invariant",
+      title: "Identité active",
+      chars: identityInvariant.length,
+      originalChars: identityInvariant.length,
       included: true,
       truncated: false,
     }];
+    // The editorial prohibitions are part of the non-negotiable static core.
+    // They are placed before the complete legacy sheet so an oversized optional
+    // field can never evict them from the prompt budget.
+    const essentialRules = truncateAtSentenceBoundary(characterFields.ce_que_tu_ne_fais_jamais, 2_500);
+    const essentialHeader = `\n\n## INTERDITS DU PERSONNAGE (source Notion — non tronquables par les sections facultatives)\n`;
+    prompt += `${essentialHeader}${essentialRules}`;
+    legacyBudgetSections.push({
+      key: "character_invariants",
+      title: "Interdits du personnage",
+      chars: essentialHeader.length + essentialRules.length,
+      originalChars: characterFields.ce_que_tu_ne_fais_jamais.length,
+      included: true,
+      truncated: essentialRules.length < characterFields.ce_que_tu_ne_fais_jamais.length,
+    });
     if (fieldsSections) {
       // La fiche complète (>32 000 car.) explosait le budget statique et le coût
       // par tour : elle est bornée à la frontière de phrase la plus proche.
@@ -567,12 +550,12 @@ export async function buildMaxSystemPrompt(
 
     const conversationChars = input.conversationHistory.reduce((sum, message) => sum + message.content.length, 0) + input.userMessage.length;
     return {
-      baseSystemPrompt: characterPrompt.content,
+      baseSystemPrompt: fieldsSections,
       baseSource: {
-        kind: characterPrompt.kind,
-        characterId: characterPrompt.characterId,
-        canonicalName: characterPrompt.canonicalName,
-        updatedAt: characterPrompt.updatedAt,
+        kind: "compiled",
+        characterId: characterFields.character_id,
+        canonicalName,
+        updatedAt: characterFields.updated_at ?? null,
       },
       characterPrompt: {
         characterId: characterFields?.character_id ?? null,
@@ -601,7 +584,7 @@ export async function buildMaxSystemPrompt(
   }
 
   if (variant === "rich_v2") {
-    return buildRichMaxSystemPrompt(input, characterName, characterFields);
+    return buildRichMaxSystemPrompt(input, canonicalName, characterFields, identityInvariant);
   }
 
   if (variant === "optimized_v3") {
@@ -616,7 +599,8 @@ export async function buildMaxSystemPrompt(
       : undefined;
     return buildOptimizedPromptAssembly({
       character: characterFields,
-      characterName,
+      characterName: canonicalName,
+      identityInvariant,
       userMessage: input.userMessage,
       historyChars,
       conversationMemory: input.conversationMemory,
@@ -636,7 +620,7 @@ export async function buildMaxSystemPrompt(
   let prompt = "";
 
   if (compiledFields.length) {
-    prompt = "# NOYAU PERSONNAGE\n";
+    prompt = `${identityInvariant}\n\n# NOYAU DE ${canonicalName.toLocaleUpperCase("fr")}\n`;
     budgetSections.push({
       key: "prompt_header",
       title: "En-tête du noyau",
@@ -675,17 +659,7 @@ export async function buildMaxSystemPrompt(
       });
     }
     prompt += `\n\n${COMPACT_GAMEPLAY_RULES}`;
-  } else {
-    prompt = `${FALLBACK_SYSTEM_PROMPT}\n\n${COMPACT_GAMEPLAY_RULES}`;
-    budgetSections.push({
-      key: "character_fallback",
-      title: "Fallback local minimal",
-      chars: FALLBACK_SYSTEM_PROMPT.length,
-      originalChars: FALLBACK_SYSTEM_PROMPT.length,
-      included: true,
-      truncated: false,
-    });
-  }
+  } else throw new Error(`Fiche personnage incohérente pour ${canonicalName} : aucun noyau compilable`);
   budgetSections.push({
     key: "technical_rules",
     title: "Contrat de conversation",
@@ -756,12 +730,12 @@ export async function buildMaxSystemPrompt(
   const conversationChars = historyChars + input.userMessage.length;
 
   return {
-    baseSystemPrompt: compiledFields.length ? renderedFields : FALLBACK_SYSTEM_PROMPT,
+    baseSystemPrompt: renderedFields,
     baseSource: {
-      kind: compiledFields.length ? "compiled" : "fallback",
-      characterId: characterFields?.character_id ?? null,
-      canonicalName: characterFields?.name ?? characterName,
-      updatedAt: characterFields?.updated_at ?? null,
+      kind: "compiled",
+      characterId: characterFields.character_id,
+      canonicalName,
+      updatedAt: characterFields.updated_at ?? null,
     },
     characterPrompt: {
       characterId: characterFields?.character_id ?? null,
@@ -796,7 +770,8 @@ export async function buildMaxSystemPrompt(
 async function buildRichMaxSystemPrompt(
   input: MaxAgentInput,
   characterName: string,
-  characterFields: Awaited<ReturnType<typeof loadCharacterPromptByName>>,
+  characterFields: NonNullable<Awaited<ReturnType<typeof loadCharacterPromptByName>>>,
+  identityInvariant: string,
 ): Promise<MaxPromptAssemblyTrace> {
   const compiled = compileRichCharacterSections(characterFields, {
     sessionSummary: input.sessionSummary,
@@ -808,12 +783,12 @@ async function buildRichMaxSystemPrompt(
   let prompt = "";
   if (compiled.sections.length) {
     // Le noyau rendu est exactement : en-tête + sections + contrat.
-    prompt = RICH_V2_CORE_HEADER;
+    prompt = `${identityInvariant}\n\n${RICH_V2_CORE_HEADER}`;
     budgetSections.push({
       key: "prompt_header",
       title: "En-tête du noyau",
-      chars: RICH_V2_CORE_HEADER.length,
-      originalChars: RICH_V2_CORE_HEADER.length,
+      chars: prompt.length,
+      originalChars: prompt.length,
       included: true,
       truncated: false,
     });
@@ -847,17 +822,7 @@ async function buildRichMaxSystemPrompt(
       });
     });
     prompt += `\n\n${RICH_V2_CONVERSATION_CONTRACT}`;
-  } else {
-    prompt = `${RICH_V2_FALLBACK_SYSTEM_PROMPT}\n\n${RICH_V2_CONVERSATION_CONTRACT}`;
-    budgetSections.push({
-      key: "character_fallback",
-      title: "Fallback rich_v2 minimal",
-      chars: RICH_V2_FALLBACK_SYSTEM_PROMPT.length,
-      originalChars: RICH_V2_FALLBACK_SYSTEM_PROMPT.length,
-      included: true,
-      truncated: false,
-    });
-  }
+  } else throw new Error(`Fiche personnage incohérente pour ${characterName} : aucun noyau riche compilable`);
   budgetSections.push({
     key: "technical_rules",
     title: "Contrat de conversation",
@@ -930,12 +895,12 @@ async function buildRichMaxSystemPrompt(
   const conversationChars = historyChars + input.userMessage.length;
 
   return {
-    baseSystemPrompt: compiled.sections.length ? renderedFields : RICH_V2_FALLBACK_SYSTEM_PROMPT,
+    baseSystemPrompt: renderedFields,
     baseSource: {
-      kind: compiled.sections.length ? "compiled" : "fallback",
-      characterId: characterFields?.character_id ?? null,
-      canonicalName: characterFields?.name ?? characterName,
-      updatedAt: characterFields?.updated_at ?? null,
+      kind: "compiled",
+      characterId: characterFields.character_id,
+      canonicalName: characterFields.name ?? characterName,
+      updatedAt: characterFields.updated_at ?? null,
     },
     characterPrompt: {
       characterId: characterFields?.character_id ?? null,

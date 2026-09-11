@@ -38,6 +38,21 @@ describe("characterConversation", () => {
     expect(lastHandoffUserTurn(log)).toBe(3);
   });
 
+  it("écarte d'une reprise une ancienne réponse qui inverse explicitement l'identité", () => {
+    const contaminated = [
+      ...log,
+      tagSpokenWith({ role: "emma", content: "Non, je suis Max, ton compagnon.", timestamp: 9 }, "emma"),
+      tagSpokenWith({ role: "emma", content: "Max m'a parlé de la montagne.", timestamp: 10 }, "emma"),
+    ];
+
+    expect(sliceConversationForCharacter(contaminated, "emma").map((message) => message.content)).toContain(
+      "Max m'a parlé de la montagne.",
+    );
+    expect(sliceConversationForCharacter(contaminated, "emma").map((message) => message.content)).not.toContain(
+      "Non, je suis Max, ton compagnon.",
+    );
+  });
+
   it("détecte une demande explicite et ignore une simple mention", () => {
     expect(detectPlayerSwitchRequest("Je voudrais parler à Emma", "max")).toBe("emma");
     expect(detectPlayerSwitchRequest("Passe-moi Max s'il te plaît", "emma")).toBe("max");

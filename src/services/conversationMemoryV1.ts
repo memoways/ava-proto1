@@ -268,12 +268,14 @@ export function mergeConversationMemory(
   const interlocutorRole = normalizeMemoryText(delta.interlocutor?.role, 160);
   const emotionalState = normalizeMemoryText(delta.relationship?.emotionalState, 160);
   const explicitCharacterItems = (delta.characterItems ?? []).map((item) => ({
-    id: stableId(`character_${item.sourceCharacter ?? activeCharacter}`, item.text),
+    id: stableId(`character_${activeCharacter}`, item.text),
     text: item.text,
     sourceTurn: turnIndex,
-    sourceCharacter: item.sourceCharacter ?? activeCharacter,
+    // The server-owned turn context is authoritative. A model-proposed source
+    // character or visibility can never reassign memory to another avatar.
+    sourceCharacter: activeCharacter,
     visibility: "private" as const,
-    visibleTo: [item.sourceCharacter ?? activeCharacter] as RuntimeCharacter[],
+    visibleTo: [activeCharacter] as RuntimeCharacter[],
     provenance: item.provenance ?? "gm",
   }));
   const privateUserFacts = (delta.userFacts ?? []).map((text) => ({
@@ -422,7 +424,7 @@ export function filterConversationMemoryForCharacter(
   };
 }
 
-export function formatConversationMemory(memoryRaw: unknown, maxChars = 1_200): string {
+export function formatConversationMemory(memoryRaw: unknown, maxChars = 1_200, characterName = "le personnage"): string {
   const memory = normalizeConversationMemory(memoryRaw);
   if (memory.lastTurn === 0 && !memory.interlocutor.name && !memory.interlocutor.role) return "";
   const lines: string[] = [];
@@ -455,7 +457,7 @@ export function formatConversationMemory(memoryRaw: unknown, maxChars = 1_200): 
   tryItems("Fils ouverts", memory.openThreads);
   tryItems("Ce qu'il a montré", memory.interlocutor.traits);
   tryItems("Faits confiés", memory.userFacts);
-  tryItems("Déjà révélé par Max", memory.maxDisclosures);
+  tryItems(`Déjà révélé par ${characterName}`, memory.maxDisclosures);
   tryItems("Décisions ou promesses", memory.commitments);
   tryItems("Déjà abordé", memory.topics, ", ");
   return lines.join("\n");

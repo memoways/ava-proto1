@@ -1,7 +1,6 @@
 import type { Database } from "@/integrations/supabase/types";
 import { planGameMasterTurnDetailed } from "@/agents/gameMasterAgent";
 import { simulateMaxResponse, validateMaxResponseDetailed } from "@/agents/maxAgent";
-import { resolveCharacterIdByName } from "@/services/characterPromptService";
 import { callLLMWithUsage } from "@/services/openRouterLLM";
 import {
   buildKnowledgeContextFromRAG,
@@ -10,6 +9,9 @@ import {
 } from "@/services/ragService";
 import { maxRagFormatOptionsForVariant } from "@/services/maxRagVariant";
 import { getGameplaySettings, getLLMSettings, listLlmConfigModels } from "@/services/settingsService";
+import { getCharacterRuntimeReadiness } from "@/services/experienceOrchestration";
+import { toCharacterExecutionContext } from "@/services/characterIdentityGuard";
+import type { RuntimeCharacter } from "@/types";
 
 export const EVAL_FEATURE_KEY = "llm_as_judge";
 export const EVAL_REPEATS = 3;
@@ -236,9 +238,10 @@ export function parseJudgeResponse(raw: string): EvalJudgeScore {
   };
 }
 
-export function buildJudgePrompt(item: Pick<EvalItem, "question" | "gold_answer" | "must_include" | "must_not" | "tone" | "max_length" | "judge_notes">, response: string): string {
+export function buildJudgePrompt(item: Pick<EvalItem, "question" | "gold_answer" | "must_include" | "must_not" | "tone" | "max_length" | "judge_notes" | "character_name">, response: string): string {
+  const characterName = item.character_name?.trim() || "Max";
   return `Tu es un juge strict pour l'expérience narrative « Où est Ava ? ».
-Évalue la réponse de Max (père d'Ava, Lausanne) au regard de la cible.
+Évalue la réponse de ${characterName} au regard de la cible de ce personnage.
 Ne récompense PAS le copier-coller du texte d'or : la grille prime.
 
 ## QUESTION JOUEUR
@@ -262,7 +265,7 @@ ${item.max_length != null ? `${item.max_length} phrase(s)` : "1-2 phrases orales
 ## NOTES
 ${item.judge_notes || "(aucune)"}
 
-## RÉPONSE DE MAX
+## RÉPONSE DE ${characterName.toLocaleUpperCase("fr")}
 ${response}
 
 Retourne UNIQUEMENT un JSON :
@@ -385,12 +388,23 @@ export async function runIsolatedEvalTurn(
 ): Promise<IsolatedEvalTurnTrace> {
   const startedAt = performance.now();
   const characterName = item.character_name || "Max";
-  const characterId = await resolveCharacterIdByName(characterName);
+  const characterKey: RuntimeCharacter | null = /^emma(?:\s|$)/i.test(characterName)
+    ? "emma"
+    : /^max(?:\s|$)/i.test(characterName)
+      ? "max"
+      : null;
+  const runtime = characterKey ? await getCharacterRuntimeReadiness(characterKey) : null;
+  const characterContext = toCharacterExecutionContext(runtime);
+  if (!runtime?.ready || !characterContext) {
+    throw new Error(`No exact attributed character context for isolated evaluation: ${characterName}`);
+  }
+  const characterId = characterContext.characterId;
   const gameplay = getGameplaySettings();
 
   const ragStarted = performance.now();
   const rag = await queryRAGDetailed(item.question, undefined, config.ragTopK, config.ragThreshold, {
     characterId,
+    characterContext,
     rerank: config.ragRerank,
     retrieveK: Math.max(config.ragRetrieveK, config.ragTopK),
     rerankModel: config.ragRerankModel,
@@ -412,6 +426,7 @@ export async function runIsolatedEvalTurn(
       timeElapsedSeconds: 0,
       knowledgeContext,
       characterName,
+      characterContext,
     },
     { featureKey: EVAL_FEATURE_KEY },
   );
@@ -427,6 +442,7 @@ export async function runIsolatedEvalTurn(
     },
     {
       characterName,
+      characterContext,
       featureKey: EVAL_FEATURE_KEY,
       timeoutMs: 25_000,
       signal: opts?.signal,

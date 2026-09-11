@@ -121,17 +121,14 @@ describe("buildMaxSystemPrompt — variante rich_v2", () => {
     expect(result.systemPrompt).toContain("Lausanne, aujourd'hui");
   });
 
-  it("utilise un fallback rich_v2 sans contrat de longueur concurrent", async () => {
+  it("refuse rich_v2 si la fiche attribuée est absente", async () => {
+    const callsBefore = vi.mocked(callLLMWithUsage).mock.calls.length;
     vi.mocked(loadCharacterPromptByName).mockResolvedValue(null as never);
-    const result = await simulateMaxResponse({
+    await expect(simulateMaxResponse({
       conversationHistory: [],
       userMessage: "Vous êtes là ?",
-    }, { diagnosticTrace: true });
-
-    expect(result.systemPrompt).not.toMatch(/45 mots/);
-    expect(result.systemPrompt).toMatch(/FICHE PERSONNAGE INDISPONIBLE/);
-    expect(result.systemPrompt.match(/une à trois phrases/g)).toHaveLength(1);
-    expect(result.promptTrace!.baseSource.kind).toBe("fallback");
+    }, { diagnosticTrace: true })).rejects.toThrow(/fiche personnage absente/i);
+    expect(vi.mocked(callLLMWithUsage).mock.calls).toHaveLength(callsBefore);
   });
 
   it("compile la fiche Notion complète sous les plafonds déclarés", async () => {

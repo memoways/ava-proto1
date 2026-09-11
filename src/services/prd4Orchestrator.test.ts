@@ -21,7 +21,6 @@ vi.mock("@/services/conversationTraceOutbox", () => ({
   enqueueConversationTurnTrace: vi.fn(),
   patchQueuedConversationTurnTrace: vi.fn(),
 }));
-vi.mock("@/services/characterPromptService", () => ({ resolveCharacterIdByName: vi.fn() }));
 vi.mock("@/services/settingsService", () => ({
   getGameplaySettings: vi.fn(() => ({
     TIMEOUT_SECONDS: 930,
@@ -52,17 +51,37 @@ import { evaluatePostTurnPRD4 } from "@/agents/gameMasterPRD4";
 import { queryRAGDetailed } from "@/services/ragService";
 import { enqueueConversationTurnTrace, patchQueuedConversationTurnTrace } from "@/services/conversationTraceOutbox";
 import { materializeConversationTurnTrace } from "@/services/conversationTraceFormat";
-import { resolveCharacterIdByName } from "@/services/characterPromptService";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { fetchConversationMemory } from "@/services/sessionConversationMemory";
 import { getGameplaySettings } from "@/services/settingsService";
-import { processPRD4Turn } from "@/services/prd4Orchestrator";
+import { processPRD4Turn as processPRD4TurnImpl, type PRD4TurnInput } from "@/services/prd4Orchestrator";
 import {
   MAX_LLM_RESPONSE_DEADLINE_MS,
   RAG_DEGRADED_MODE_DEADLINE_MS,
   TURN_RESPONSE_DEADLINE_MS,
 } from "@/config/experienceRuntime";
 import type { ConversationMessage, PRD4PostTurnEvaluation } from "@/types";
+
+const MAX_CONTEXT = {
+  characterKey: "max" as const,
+  displayName: "Max Lorenzo",
+  characterId: "11111111-1111-4111-8111-111111111111",
+  notionPageId: "30362322e5958011ad7bffb1ed6772bc",
+  environmentId: "prod",
+  promptUpdatedAt: "2026-08-21T00:00:00.000Z",
+};
+const EMMA_CONTEXT = {
+  characterKey: "emma" as const,
+  displayName: "Emma Munz",
+  characterId: "22222222-2222-4222-8222-222222222222",
+  notionPageId: "881122c973c943409daed13b3113b00e",
+  environmentId: "prod",
+  promptUpdatedAt: "2026-08-21T00:00:00.000Z",
+};
+
+function processPRD4Turn(input: Omit<PRD4TurnInput, "characterContext"> & Partial<Pick<PRD4TurnInput, "characterContext">>) {
+  return processPRD4TurnImpl({ ...input, characterContext: input.characterContext ?? MAX_CONTEXT });
+}
 
 function makeConversation(turns: number): ConversationMessage[] {
   return Array.from({ length: turns }, (_, index) => index + 1).flatMap((turn) => [
@@ -89,7 +108,6 @@ const postTurnResult: PRD4PostTurnEvaluation = {
 describe("processPRD4Turn — Phase 2 endurance", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(resolveCharacterIdByName).mockResolvedValue("character-max");
     vi.mocked(queryRAGDetailed).mockResolvedValue({
       matches: [],
       retrievalMatches: [],
@@ -104,7 +122,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
         rewrittenQuery: null,
         matchCount: 5,
         matchThreshold: 0.3,
-        characterId: "character-max",
+        characterId: MAX_CONTEXT.characterId,
         rerankRequested: true,
         retrieveK: 15,
         rerankModel: "rerank-2.5",
@@ -113,6 +131,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     });
     vi.mocked(fetchSessionSummary).mockResolvedValue({
       session_id: "session-soak",
+      character_key: "max",
       summary: "- L'utilisateur cherche Ava.",
       last_turn: 32,
       updated_at: new Date().toISOString(),
@@ -160,7 +179,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     expect(vi.mocked(summarizeSessionAsync).mock.calls[0][1]).toHaveLength(8);
     expect(vi.mocked(summarizeSessionAsync).mock.calls[0][1][0].content).toBe("question-33");
     expect(vi.mocked(summarizeSessionAsync).mock.calls[0][1].at(-1)?.content).toBe("Je vous écoute.");
-    expect(vi.mocked(summarizeSessionAsync).mock.calls[0][3]).toBe("max");
+    expect(vi.mocked(summarizeSessionAsync).mock.calls[0][3]).toMatchObject({ characterKey: "max" });
     expect(fetchSessionSummary).toHaveBeenCalledWith("session-soak", "max");
     await result.labelPromise;
     await result.postTurnPromise;
@@ -217,7 +236,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
         rewrittenQuery: null,
         matchCount: 6,
         matchThreshold: 0.3,
-        characterId: "character-max",
+        characterId: MAX_CONTEXT.characterId,
         rerankRequested: true,
         retrieveK: 15,
         rerankModel: "rerank-2.5",
@@ -280,6 +299,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       if (character === "emma") return null;
       return {
         session_id: "session-handoff",
+        character_key: "max",
         summary: "- L'utilisateur cherche Ava.",
         last_turn: 5,
         updated_at: new Date().toISOString(),
@@ -311,13 +331,19 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       conversationHistory: emmaHistory,
       userMessage: "Que savez-vous de la situation ?",
       userRole: null,
-      characterName: "Emma",
+      characterContext: EMMA_CONTEXT,
       turnIndex: 6,
       timeElapsedSeconds: 400,
     });
     const emmaInput = vi.mocked(simulateMaxResponse).mock.calls[0][0];
 
-    expect(resolveCharacterIdByName).toHaveBeenCalledWith("Emma");
+    expect(queryRAGDetailed).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(Number),
+      undefined,
+      expect.objectContaining({ characterId: EMMA_CONTEXT.characterId }),
+    );
     expect(emmaInput.temporalContext?.turnIndex).toBe(6);
     expect(emmaInput.conversationHistory).toEqual(emmaHistory);
     expect(fetchSessionSummary).toHaveBeenCalledWith("session-handoff", "emma");
@@ -326,12 +352,32 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     expect(emmaInput.conversationMemory?.interlocutor).toMatchObject({ name: "Alice", role: "médecin" });
     expect(emmaInput.conversationMemory?.lastExchange).toBeNull();
     expect(vi.mocked(summarizeSessionAsync).mock.calls[0]?.[1].some((message) => message.content.includes("Secret confié à Max"))).toBeFalsy();
-    expect(vi.mocked(summarizeSessionAsync).mock.calls[0]?.[3]).toBe("emma");
+    expect(vi.mocked(summarizeSessionAsync).mock.calls[0]?.[3]).toMatchObject({ characterKey: "emma" });
     await result.postTurnPromise;
     expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0]).toMatchObject({
       turnIndex: 6,
       currentCharacter: "emma",
     });
+  });
+
+  it.each([
+    "Non, je suis Max, ton compagnon. On est rentrés de la montagne hier.",
+    "Ah, salut Emma. C'est Max. Ça va ?",
+  ])("bloque l'inversion des captures avant diffusion et sans second appel LLM", async (unsafeResponse) => {
+    vi.mocked(simulateMaxResponse).mockResolvedValue({ response: unsafeResponse, systemPrompt: "system" });
+    const result = await processPRD4Turn({
+      sessionId: "session-emma",
+      conversationHistory: [],
+      userMessage: "Qui es-tu ?",
+      userRole: null,
+      characterContext: EMMA_CONTEXT,
+      turnIndex: 1,
+      timeElapsedSeconds: 10,
+    });
+
+    expect(result.maxResponse).toBe("C’est bien Emma. Reprenons.");
+    expect(simulateMaxResponse).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0].maxResponse).toBe(result.maxResponse);
   });
 
   it("n'attache pas de guidance GM quand elle est vide", async () => {
@@ -352,6 +398,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
   it("skips summarization when the cached summary is recent enough", async () => {
     vi.mocked(fetchSessionSummary).mockResolvedValue({
       session_id: "session-soak",
+      character_key: "max",
       summary: "- L'utilisateur cherche Ava.",
       last_turn: 34,
       updated_at: new Date().toISOString(),
@@ -441,7 +488,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
         similarity: 0.91,
         retrieval_similarity: 0.83,
         rerank_score: 0.91,
-        character_id: "character-max",
+        character_id: MAX_CONTEXT.characterId,
       }],
       retrievalMatches: [],
       latencyMs: 11,
@@ -455,7 +502,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
         rewrittenQuery: null,
         matchCount: 5,
         matchThreshold: 0.3,
-        characterId: "character-max",
+        characterId: MAX_CONTEXT.characterId,
         rerankRequested: true,
         retrieveK: 15,
         rerankModel: "rerank-2.5",
@@ -467,8 +514,8 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       systemPrompt: "SYSTEM EXACT",
       promptTrace: {
         baseSystemPrompt: "BASE",
-        baseSource: { kind: "database", characterId: "character-max", canonicalName: "Max", updatedAt: "2026-07-21" },
-        characterPrompt: { characterId: "character-max", canonicalName: "Max", updatedAt: "2026-07-21", renderedSections: "FICHE" },
+        baseSource: { kind: "database", characterId: MAX_CONTEXT.characterId, canonicalName: "Max", updatedAt: "2026-07-21" },
+        characterPrompt: { characterId: MAX_CONTEXT.characterId, canonicalName: "Max", updatedAt: "2026-07-21", renderedSections: "FICHE" },
         technicalRules: "RULES",
         injectedSections: [],
         finalSystemPrompt: "SYSTEM EXACT",
@@ -514,7 +561,16 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     const compactTrace = vi.mocked(enqueueConversationTurnTrace).mock.calls[0][0];
     expect(compactTrace.schemaVersion).toBe(2);
     const trace = materializeConversationTurnTrace(compactTrace);
-    expect(trace.identity).toMatchObject({ sessionId: "session-traced", turnId: "turn-stable-1", turnIndex: 1 });
+    expect(trace.identity).toMatchObject({
+      sessionId: "session-traced",
+      turnId: "turn-stable-1",
+      turnIndex: 1,
+      characterKey: "max",
+      characterId: MAX_CONTEXT.characterId,
+      notionPageId: MAX_CONTEXT.notionPageId,
+      environmentId: MAX_CONTEXT.environmentId,
+      promptUpdatedAt: MAX_CONTEXT.promptUpdatedAt,
+    });
     expect(trace.prompt?.finalSystemPrompt).toBe("SYSTEM EXACT");
     expect(trace.maxCall.messages[0].content).toBe(trace.prompt?.finalSystemPrompt);
     expect(trace.maxCall.diagnostic?.upstreamPayload).toEqual({

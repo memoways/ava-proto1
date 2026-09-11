@@ -158,7 +158,20 @@ describe("assemblage traçable du prompt de Max", () => {
   });
 
   it("passes in-memory LLM overrides without reading a mutated live model", async () => {
-    vi.mocked(loadCharacterPromptByName).mockResolvedValue(null);
+    vi.mocked(loadCharacterPromptByName).mockResolvedValue({
+      character_id: "max-id",
+      name: "Max Lorenzo",
+      updated_at: "2026-07-21T00:00:00Z",
+      situation_summary: "Max attend à Lausanne.",
+      timeline: "Hier, la famille est rentrée.",
+      identite_fondamentale: "Père et journaliste.",
+      qui_tu_es: "Posé mais sous tension.",
+      ce_que_tu_ne_fais_jamais: "Ne pas inventer.",
+      ce_que_tu_sais_utilisateur: "Un inconnu appelle.",
+      dynamique_conversation: "Répondre directement.",
+      sujets_sensibles: "Emma et Mona.",
+      profondeur_par_niveau: "NIVEAU 1\nAnalytique.",
+    } as never);
     vi.mocked(callLLMWithUsage).mockResolvedValue({
       content: "Lausanne.",
       usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 },

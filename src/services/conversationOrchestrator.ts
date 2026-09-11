@@ -7,6 +7,7 @@ import type { ConversationMessage, ConversationPipelineTimings, ConversationPipe
 import { getAntiHallucinationValidatorSettings, getGameplaySettings, getLLMSettings } from "@/services/settingsService";
 import { createTurnTimer } from "@/services/latencyTelemetry";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
+import { getCharacterRuntimeReadiness } from "@/services/experienceOrchestration";
 
 function rowToTrigger(row: VideoTriggerRow): VideoTrigger {
   return {
@@ -105,7 +106,7 @@ export async function processConversationTurn(
   const gameplay = getGameplaySettings();
 
   // Kick off session summary fetch in parallel — does not block RAG.
-  const summaryPromise = sessionId ? fetchSessionSummary(sessionId) : Promise.resolve(null);
+  const summaryPromise = sessionId ? fetchSessionSummary(sessionId, "max") : Promise.resolve(null);
 
   const ragStart = performance.now();
   const ragPromise = !finalRagContext ? (async () => {
@@ -130,7 +131,10 @@ export async function processConversationTurn(
       }
 
       const qStart = performance.now();
+      const runtimeProfile = await getCharacterRuntimeReadiness("max");
+      if (!runtimeProfile?.characterId) throw new Error("Max runtime character attribution is unavailable");
       const matches = await queryRAG(userMessage, recentMessages, gameplay.RAG_TOP_K, gameplay.RAG_MATCH_THRESHOLD, {
+        characterId: runtimeProfile.characterId,
         rewrittenQuery,
         rerank: gameplay.RAG_RERANK_ENABLED,
         retrieveK: gameplay.RAG_RETRIEVE_K,
@@ -274,7 +278,7 @@ export async function processConversationTurn(
         { role: "max", content: validatedTurn.response, timestamp: Date.now() },
       ];
       // Fire and forget — never block the turn.
-      summarizeSessionAsync(sessionId, fullHistory, userTurns).catch(() => {});
+      summarizeSessionAsync(sessionId, fullHistory, userTurns, "max").catch(() => {});
     }
   }
 

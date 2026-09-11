@@ -117,10 +117,17 @@ import {
 } from "@/services/networkDiagnostics";
 import {
   fetchResumablePRD4Session,
+  latestPostTurnForCharacter,
   type ResumablePRD4Session,
 } from "@/services/sessionConversationMemory";
 import { resolveResumeTimerWindow } from "@/services/resumeTimer";
 import { getCharacterRuntimeReadiness } from "@/services/experienceOrchestration";
+import {
+  guardCharacterResponse,
+  responseClaimsForeignIdentity,
+  toCharacterExecutionContext,
+  type CharacterExecutionContext,
+} from "@/services/characterIdentityGuard";
 import { appendExperienceEvent, applyTopicHandoffFallback, validateDirectorDecision } from "@/services/experienceDirector";
 import type { ExperienceDirectorDecisionV1, RuntimeCharacter } from "@/types";
 import {
@@ -128,6 +135,7 @@ import {
   characterDisplayName,
   detectPlayerSwitchRequest,
   hasSpokenWithCharacter,
+  inferSpokenWith,
   inferCharacterSwitchStance,
   lastHandoffUserTurn,
   parseHandoffOffer,
@@ -224,6 +232,7 @@ const IndexPRD4 = () => {
   const pendingEmotionalStateRef = useRef<string | null>(null);
   const gmTopicsCoveredRef = useRef<string[]>([]);
   const activeCharacterRef = useRef<RuntimeCharacter>("max");
+  const activeCharacterContextRef = useRef<CharacterExecutionContext | null>(null);
   const startingCharacterRef = useRef<RuntimeCharacter>("max");
   const activeVoiceIdRef = useRef<string | null>(null);
   const activeTTSProviderIdRef = useRef<TTSProviderId | null>(null);
@@ -543,7 +552,7 @@ const IndexPRD4 = () => {
         const ttsError = error instanceof Error ? error : new Error(String(error));
         toast({
           title: "Voix temporairement indisponible",
-          description: "La réponse de Max reste affichée. Tu peux continuer la conversation.",
+          description: "La réponse du personnage reste affichée. Tu peux continuer la conversation.",
           variant: "destructive",
         });
         return {
@@ -721,6 +730,7 @@ const IndexPRD4 = () => {
   const handleSelectCharacter = useCallback((character: RuntimeCharacter) => {
     startingCharacterRef.current = character;
     activeCharacterRef.current = character;
+    activeCharacterContextRef.current = null;
     setSelectedCharacter(character);
     setPhase("calling_max");
     callPreparationRef.current = prepareCall().catch((error) => {
@@ -740,29 +750,39 @@ const IndexPRD4 = () => {
       return;
     }
     const { configuredDurationSeconds, elapsedSeconds, remainingSeconds } = timerWindow;
+    const profile = await getCharacterRuntimeReadiness(session.active_character).catch(() => null);
+    const characterContext = toCharacterExecutionContext(profile);
+    if (!profile?.ready || !characterContext) {
+      toast({
+        title: "Personnage indisponible",
+        description: "Sa fiche ou son attribution n’est pas complète. La reprise a été arrêtée pour protéger son identité.",
+        variant: "destructive",
+      });
+      return;
+    }
     const postureMode = session.user_posture_mode === "voice" || session.user_posture_mode === "surprise"
       ? session.user_posture_mode
       : null;
     const posture: UserPosture | null = session.user_posture_raw && postureMode
       ? { raw: session.user_posture_raw, mode: postureMode }
       : null;
-    const latestGm = [...session.gm_post_turn_log]
-      .sort((a, b) => (b.turn_index ?? 0) - (a.turn_index ?? 0))[0];
+    const latestGm = latestPostTurnForCharacter(session.gm_post_turn_log, session.active_character);
 
+    const safeConversationLog = session.conversation_log.filter((message, index, messages) =>
+      message.role === "user"
+      || !responseClaimsForeignIdentity(message.content, inferSpokenWith(messages, index, session.active_character))
+    );
     sessionIdRef.current = session.id;
     diagnosticTraceEnabledRef.current = session.diagnostic_trace_enabled;
-    conversationRef.current = session.conversation_log;
+    conversationRef.current = safeConversationLog;
     configuredSessionDurationRef.current = configuredDurationSeconds;
     sessionDurationRef.current = Math.min(configuredDurationSeconds, elapsedSeconds);
     triggeredVideoIdsRef.current = session.triggers_activated;
     activeCharacterRef.current = session.active_character;
-    activeVoiceIdRef.current = null;
-    activeTTSProviderIdRef.current = null;
-    void getCharacterRuntimeReadiness(session.active_character).then((profile) => {
-        activeVoiceIdRef.current = profile?.ttsVoiceId ?? null;
-        activeTTSProviderIdRef.current = asTTSProviderId(profile?.ttsProvider);
-        setActivePortraitUrl(profile?.portraitUrl ?? null);
-      }).catch(() => {});
+    activeCharacterContextRef.current = characterContext;
+    activeVoiceIdRef.current = profile.ttsVoiceId;
+    activeTTSProviderIdRef.current = asTTSProviderId(profile.ttsProvider);
+    setActivePortraitUrl(profile.portraitUrl);
     handoffCountRef.current = session.handoff_count;
     startingCharacterRef.current = session.active_character;
     setSelectedCharacter(session.active_character);
@@ -777,7 +797,7 @@ const IndexPRD4 = () => {
     timer.reset(remainingSeconds);
     timer.start();
     restoreConversation({
-      conversationLog: session.conversation_log,
+      conversationLog: safeConversationLog,
       userRoleProfile: session.player_role,
       userPosture: posture,
       hasSeenFilm: session.has_seen_film === "vu" || session.has_seen_film === "pas_vu" || session.has_seen_film === "rappel"
@@ -786,15 +806,16 @@ const IndexPRD4 = () => {
       teaserSeen: session.teaser_shown === true,
       selectedCharacter: session.active_character,
     });
-    const lastMax = [...session.conversation_log].reverse().find((message) => message.role !== "user");
-    const lastUser = [...session.conversation_log].reverse().find((message) => message.role === "user");
-    setMaxSubtitle(lastMax?.content ?? "");
+    const activeConversationLog = sliceConversationForCharacter(safeConversationLog, session.active_character);
+    const lastCharacterReply = [...activeConversationLog].reverse().find((message) => message.role !== "user");
+    const lastUser = [...activeConversationLog].reverse().find((message) => message.role === "user");
+    setMaxSubtitle(lastCharacterReply?.content ?? "");
     setUserSubtitle(lastUser?.content ?? "");
     setResumableSession(null);
     trackEvent("prd4_session_resumed", {
       session_id: session.id,
       remaining_seconds: remainingSeconds,
-      turns: session.conversation_log.filter((message) => message.role === "user").length,
+      turns: safeConversationLog.filter((message) => message.role === "user").length,
     });
   }, [cleanupAudio, restoreConversation, resumableSession, setSelectedCharacter, timer]);
   const handleLockedClick = useCallback(
@@ -857,7 +878,18 @@ const IndexPRD4 = () => {
     pendingPostVideoContextRef.current = null;
     const startingCharacter = startingCharacterRef.current;
     const profile = await getCharacterRuntimeReadiness(startingCharacter).catch(() => null);
+    const characterContext = toCharacterExecutionContext(profile);
+    if (!profile?.ready || !characterContext) {
+      toast({
+        title: "Personnage indisponible",
+        description: "Sa fiche ou son attribution n’est pas complète. Aucun dialogue ne sera généré.",
+        variant: "destructive",
+      });
+      setPhase("calling_max");
+      return;
+    }
     activeCharacterRef.current = startingCharacter;
+    activeCharacterContextRef.current = characterContext;
     activeVoiceIdRef.current = profile?.ttsVoiceId ?? null;
     activeTTSProviderIdRef.current = asTTSProviderId(profile?.ttsProvider);
     setActivePortraitUrl(profile?.portraitUrl ?? null);
@@ -881,8 +913,9 @@ const IndexPRD4 = () => {
     timer.start();
     trackEvent("prd4_session_duration_loaded", { duration_seconds: configuredDuration });
 
-    // Réplique d'ouverture de Max (scriptée pour amorcer)
-    const opening = profile?.openingLine?.trim() || (startingCharacter === "max" ? OPENING_LINE : "Allô ?");
+    // Réplique d'ouverture du personnage actif (scriptée pour amorcer)
+    const rawOpening = profile?.openingLine?.trim() || (startingCharacter === "max" ? OPENING_LINE : "Allô ?");
+    const opening = guardCharacterResponse(rawOpening, characterContext).response;
     setMaxSubtitle(opening);
     const openingMsg: ConversationMessage = tagSpokenWith(
       { role: startingCharacter, content: opening, timestamp: Date.now() },
@@ -1019,6 +1052,10 @@ const IndexPRD4 = () => {
         : undefined;
 
       try {
+        const turnCharacterContext = activeCharacterContextRef.current;
+        if (!turnCharacterContext || turnCharacterContext.characterKey !== activeCharacterRef.current) {
+          throw new Error("Character context is missing or obsolete; generation blocked");
+        }
         const postVideoContext = pendingPostVideoContextRef.current ?? undefined;
         pendingPostVideoContextRef.current = null;
         // Consommation one-shot : une guidance périmée ne doit pas survivre à son tour.
@@ -1041,7 +1078,7 @@ const IndexPRD4 = () => {
           userRole: userRoleRef.current,
           userPostureRaw: userPostureRef.current?.raw ?? null,
           timeElapsedSeconds: elapsed,
-          characterName: activeCharacterRef.current === "emma" ? "Emma" : "Max",
+          characterContext: turnCharacterContext,
           triggeredVideoIds: triggeredVideoIdsRef.current,
           postVideoContext,
           gmGuidance,
@@ -1111,7 +1148,7 @@ const IndexPRD4 = () => {
           setAudioState("idle");
           toast({
             title: "La voix prend trop de temps",
-            description: "La réponse de Max reste affichée. Tu peux continuer.",
+            description: "La réponse du personnage reste affichée. Tu peux continuer.",
             variant: "destructive",
           });
           trackEvent("prd4_tts_first_audio_timeout", {
@@ -1448,7 +1485,7 @@ const IndexPRD4 = () => {
         }
         toast({
           title: diagnosticFailure ? "Trace diagnostique non enregistrée" : "Erreur dans la conversation",
-          description: diagnosticFailure ? "La réponse de Max n’a pas été diffusée. Tu peux rejouer le tour après avoir vérifié la base." : "Réessaie.",
+          description: diagnosticFailure ? "La réponse du personnage n’a pas été diffusée. Tu peux rejouer le tour après avoir vérifié la base." : "Réessaie.",
           variant: "destructive",
         });
       } finally {
@@ -1633,6 +1670,9 @@ const IndexPRD4 = () => {
   const switchToCharacter = useCallback(async (target: RuntimeCharacter, source: "player" | "gm") => {
     if (handoffCalling || activeCharacterRef.current === target) return;
     const from = activeCharacterRef.current;
+    activeTurnControllerRef.current?.abort("character-switch");
+    activeOutputControllerRef.current?.abort("character-switch");
+    activeTurnSequenceRef.current += 1;
     setHandoffCallingTarget(target);
     setHandoffCalling(true);
     const sid = sessionIdRef.current;
@@ -1647,13 +1687,20 @@ const IndexPRD4 = () => {
     });
     try {
       const profile = await getCharacterRuntimeReadiness(target).catch(() => null);
-      if (profile?.enabled === false) {
-        throw new Error(`${targetName} n’est pas activée dans Orchestration.`);
+      const characterContext = toCharacterExecutionContext(profile);
+      if (!profile?.enabled || !profile.ready || !characterContext) {
+        throw new Error(`${targetName} n’a pas de fiche et d’attribution validées dans Orchestration.`);
       }
       if (target === "emma") await activateTTSFallback("emma_handoff_tts_v1");
       await new Promise<void>((resolve) => window.setTimeout(resolve, 900));
       const firstContact = !hasSpokenWithCharacter(conversationRef.current, target);
+      pendingGmGuidanceRef.current = null;
+      pendingEmotionalStateRef.current = null;
+      pendingPostVideoContextRef.current = null;
+      gmTopicsCoveredRef.current = [];
+      handoffRecommendationRef.current = null;
       activeCharacterRef.current = target;
+      activeCharacterContextRef.current = characterContext;
       activeVoiceIdRef.current = profile?.ttsVoiceId ?? null;
       activeTTSProviderIdRef.current = asTTSProviderId(profile?.ttsProvider);
       setActivePortraitUrl(profile?.portraitUrl ?? null);
@@ -1666,7 +1713,8 @@ const IndexPRD4 = () => {
         handoffCount: handoffCountRef.current,
       });
       if (firstContact) {
-        const openingLine = profile?.openingLine?.trim() || (target === "max" ? OPENING_LINE : "Allô ?");
+        const rawOpeningLine = profile?.openingLine?.trim() || (target === "max" ? OPENING_LINE : "Allô ?");
+        const openingLine = guardCharacterResponse(rawOpeningLine, characterContext).response;
         const opening = tagSpokenWith({ role: target, content: openingLine, timestamp: Date.now() }, target);
         conversationRef.current = [...conversationRef.current, opening];
         addMessage(opening);
@@ -1835,6 +1883,7 @@ const IndexPRD4 = () => {
     pendingGmGuidanceRef.current = null;
     pendingEmotionalStateRef.current = null;
     activeCharacterRef.current = "max";
+    activeCharacterContextRef.current = null;
     activeVoiceIdRef.current = null;
     activeTTSProviderIdRef.current = null;
     handoffCountRef.current = 0;

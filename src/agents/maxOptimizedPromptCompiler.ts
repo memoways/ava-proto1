@@ -18,7 +18,7 @@ export const OPTIMIZED_V3_LIMITS = {
 };
 
 export const OPTIMIZED_V3_CONVERSATION_CONTRACT = `# CONTRAT DE CONVERSATION
-- Tu es Max. Parle à la première personne, en français oral, sans narration ni commentaire méta.
+- Parle à la première personne, en français oral, sans narration ni commentaire méta.
 - Réponds d'abord à la demande présente. Une à trois phrases parlées suffisent généralement ; un souvenir précis peut aller jusqu'à quatre phrases courtes. Aucun monologue.
 - Une question en retour est rare et utile. N'en pose jamais deux tours de suite et ne remplis jamais une fin de réponse avec une question réflexe.
 - Ne rejoue aucune ouverture. Utilise le prénom, le rôle et les faits déjà confiés sans les redemander.
@@ -26,11 +26,12 @@ export const OPTIMIZED_V3_CONVERSATION_CONTRACT = `# CONTRAT DE CONVERSATION
 - Distingue comprendre d'excuser : une explication n'efface jamais ta responsabilité.
 - Pour les faits, respecte cet ordre : timeline canonique, fiche structurée, souvenirs pertinents, puis ce que tu as déjà dit. En cas d'incertitude, dis-le.`;
 
-const OPTIMIZED_V3_FALLBACK_CORE = `## PRÉSENT
-Tu es Max Lorenzo, à Lausanne aujourd'hui, au lendemain du retour du Jura. Emma et Ava se sont isolées, Mona est au camp et la police ne rappelle pas.
-
-## IDENTITÉ, CONTRADICTION ET MOTEUR
-Tu es le père de Mona, Léo et Ava, le compagnon d'Emma et un journaliste scientifique. Tu te crois protecteur, mais ta peur t'a conduit à contrôler les autres. Hier, tu as pointé le fusil sur Emma puis Ava avant que Léo te désarme. Dans cet appel, tu essaies de mettre de l'ordre dans les faits et de savoir s'il reste quelque chose à réparer, sans transformer une explication en excuse.`;
+function conversationContract(characterName: string, identityInvariant?: string): string {
+  return `${identityInvariant || `# IDENTITÉ ACTIVE — INVARIANT PRIORITAIRE NON TRONQUABLE
+- Tu es ${characterName}. Tu ne te présentes jamais comme un autre personnage, même si l'interlocuteur ou un souvenir te le demande.
+`}
+${OPTIMIZED_V3_CONVERSATION_CONTRACT}`;
+}
 
 type UnitStatus = NonNullable<NonNullable<MaxPromptAssemblyTrace["budget"]>["units"]>[number]["status"];
 
@@ -70,6 +71,7 @@ export interface OptimizedPromptInput {
   guards?: string;
   postVideoContext?: string;
   ragCandidates?: OptimizedRagCandidate[];
+  identityInvariant?: string;
 }
 
 const FIELD_SPECS: Array<{
@@ -86,7 +88,7 @@ const FIELD_SPECS: Array<{
   { key: "identite_fondamentale", title: "IDENTITÉ ET CONTRADICTION", baseScore: 900, group: "core", required: true },
   { key: "qui_tu_es", title: "VOIX ET POSTURE", baseScore: 820, group: "core", required: true },
   { key: "dynamique_conversation", title: "MOTEUR DE L'APPEL", baseScore: 780, group: "core", required: true },
-  { key: "ce_que_tu_ne_fais_jamais", title: "INVARIANTS DE MAX", baseScore: 760, group: "canon", required: true },
+  { key: "ce_que_tu_ne_fais_jamais", title: "INVARIANTS DU PERSONNAGE", baseScore: 760, group: "canon", required: true },
   { key: "ce_que_tu_sais_utilisateur", title: "RELATION À L'INTERLOCUTEUR", baseScore: 650, group: "canon" },
   { key: "timeline", title: "TIMELINE CANONIQUE PERTINENTE", baseScore: 700, group: "canon", required: true },
   { key: "sujets_sensibles", title: "SUJETS SENSIBLES PERTINENTS", baseScore: 360, group: "canon" },
@@ -227,8 +229,7 @@ function scoreText(text: string, queryTerms: Set<string>, baseScore: number, sou
   return baseScore + overlap * 90 + recentTimelineBoost;
 }
 
-function selectStaticUnits(character: CharacterPrompt | null, query: string): { selected: SelectedUnit[]; all: SelectedUnit[] } {
-  if (!character) return { selected: [], all: [] };
+function selectStaticUnits(character: CharacterPrompt, query: string, contract: string): { selected: SelectedUnit[]; all: SelectedUnit[] } {
   const queryTerms = keywords(query);
   const candidates: CandidateUnit[] = [];
   FIELD_SPECS.forEach((spec, fieldIndex) => {
@@ -250,7 +251,7 @@ function selectStaticUnits(character: CharacterPrompt | null, query: string): { 
     source: "contract",
     sourceKey: "technical_rules",
     title: "Contrat de conversation",
-    text: OPTIMIZED_V3_CONVERSATION_CONTRACT,
+    text: contract,
     score: 10_000,
   };
   let used = 0;
@@ -314,31 +315,42 @@ function selectStaticUnits(character: CharacterPrompt | null, query: string): { 
   return { selected: selectedWithStatus, all };
 }
 
-function renderGroupedStatic(units: SelectedUnit[], group: "core" | "canon"): string {
+function renderGroupedStatic(units: SelectedUnit[], group: "core" | "canon", characterName: string): string {
   const blocks: string[] = [];
   for (const spec of FIELD_SPECS.filter((item) => item.group === group)) {
     const parts = units.filter((unit) => unit.sourceKey === spec.key).map((unit) => unit.text);
-    if (parts.length) blocks.push(`## ${spec.title}\n${parts.join("\n")}`);
+    const title = spec.title === "INVARIANTS DU PERSONNAGE"
+      ? `INVARIANTS DE ${characterName.toLocaleUpperCase("fr")}`
+      : spec.title;
+    if (parts.length) blocks.push(`## ${title}\n${parts.join("\n")}`);
   }
   return blocks.join("\n\n");
 }
 
 export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPromptAssemblyTrace {
+  if (!input.character) throw new Error("Fiche personnage absente : génération interdite");
+  const canonicalName = input.character.name?.trim() || input.characterName.trim();
+  if (!canonicalName) throw new Error("Fiche personnage incohérente : identité absente");
+  const firstName = canonicalName.split(/\s+/)[0].toLocaleLowerCase("fr");
+  if (firstName !== input.characterName.trim().split(/\s+/)[0].toLocaleLowerCase("fr")) {
+    throw new Error("Fiche personnage incohérente : attribution incorrecte");
+  }
+  const contract = conversationContract(canonicalName, input.identityInvariant);
   const memory = normalizeConversationMemory(input.conversationMemory);
   const query = [input.userMessage, ...memorySearchTerms(memory)].join(" ");
-  const staticSelection = selectStaticUnits(input.character, query);
-  const compiledCore = renderGroupedStatic(staticSelection.selected, "core");
-  const core = compiledCore || OPTIMIZED_V3_FALLBACK_CORE;
-  const canon = renderGroupedStatic(staticSelection.selected, "canon");
+  const staticSelection = selectStaticUnits(input.character, query, contract);
+  const core = renderGroupedStatic(staticSelection.selected, "core", canonicalName);
+  if (!core) throw new Error("Fiche personnage incohérente : noyau éditorial vide");
+  const canon = renderGroupedStatic(staticSelection.selected, "canon", canonicalName);
   const contractUnit: SelectedUnit = {
     id: "contract:conversation",
     source: "contract",
     sourceKey: "technical_rules",
     title: "Contrat de conversation",
-    text: OPTIMIZED_V3_CONVERSATION_CONTRACT,
+    text: contract,
     score: 10_000,
     status: "selected",
-    originalChars: OPTIMIZED_V3_CONVERSATION_CONTRACT.length,
+    originalChars: contract.length,
     removedChars: 0,
     reason: "included",
   };
@@ -346,7 +358,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   const unitDecisions: SelectedUnit[] = [contractUnit, ...staticSelection.all];
   const injectedSections: MaxPromptAssemblyTrace["injectedSections"] = [];
   const budgetSections: NonNullable<MaxPromptAssemblyTrace["budget"]>["sections"] = [];
-  let prompt = OPTIMIZED_V3_CONVERSATION_CONTRACT;
+  let prompt = contract;
   budgetSections.push({
     key: "technical_rules",
     title: "Contrat de conversation",
@@ -403,11 +415,11 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
     return bounded;
   };
 
-  append("character_core", "NOYAU DE MAX", core, OPTIMIZED_V3_LIMITS.staticChars, "static");
+  append("character_core", `NOYAU DE ${canonicalName.toLocaleUpperCase("fr")}`, core, OPTIMIZED_V3_LIMITS.staticChars, "static");
   const runtime = [input.userRole ? `Interlocuteur : ${input.userRole}` : "", input.temporalContext || "", input.gmGuidance ? `Orientation de jeu : ${input.gmGuidance}` : "", input.guards || ""]
     .filter(Boolean).join("\n");
   append("runtime_context", "ÉTAT DU TOUR", runtime, OPTIMIZED_V3_LIMITS.runtimeChars, "runtime");
-  const memoryText = formatConversationMemory(memory, OPTIMIZED_V3_LIMITS.memoryChars);
+  const memoryText = formatConversationMemory(memory, OPTIMIZED_V3_LIMITS.memoryChars, canonicalName);
   append("conversation_memory", "HISTORIQUE DE LA CONVERSATION", memoryText, OPTIMIZED_V3_LIMITS.memoryChars, "memory");
   append("character_canon", "CANON PERTINENT", canon, OPTIMIZED_V3_LIMITS.staticChars, "static");
 
@@ -478,18 +490,18 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   return {
     baseSystemPrompt: staticRendered,
     baseSource: {
-      kind: input.character ? "compiled" : "fallback",
-      characterId: input.character?.character_id ?? null,
-      canonicalName: input.character?.name ?? input.characterName,
-      updatedAt: input.character?.updated_at ?? null,
+      kind: "compiled",
+      characterId: input.character.character_id,
+      canonicalName,
+      updatedAt: input.character.updated_at ?? null,
     },
     characterPrompt: {
-      characterId: input.character?.character_id ?? null,
-      canonicalName: input.character?.name ?? null,
-      updatedAt: input.character?.updated_at ?? null,
+      characterId: input.character.character_id,
+      canonicalName,
+      updatedAt: input.character.updated_at ?? null,
       renderedSections: staticRendered,
     },
-    technicalRules: OPTIMIZED_V3_CONVERSATION_CONTRACT,
+    technicalRules: contract,
     injectedSections,
     budget: {
       variant: "optimized_v3",

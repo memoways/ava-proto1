@@ -314,16 +314,22 @@ export async function fetchPinnedDirectorRuntime(sessionId: string | null): Prom
   return runtime;
 }
 
-export async function getCharacterRuntimeReadiness(character: "max" | "emma"): Promise<{
+export interface CharacterRuntimeReadiness {
   characterKey: "max" | "emma";
   displayName: string;
   enabled: boolean;
   ready: boolean;
+  characterId: string | null;
+  notionPageId: string | null;
+  environmentId: string | null;
+  promptUpdatedAt: string | null;
   openingLine: string | null;
   portraitUrl: string | null;
   ttsProvider: string | null;
   ttsVoiceId: string | null;
-} | null> {
+}
+
+export async function getCharacterRuntimeReadiness(character: "max" | "emma"): Promise<CharacterRuntimeReadiness | null> {
   const { data, error } = await supabase.rpc("get_character_runtime_readiness_for_environment" as never, {
     p_character_key: character,
     p_environment_id: getActiveEnvironment(),
@@ -339,6 +345,10 @@ export async function getCharacterRuntimeReadiness(character: "max" | "emma"): P
     // actually offer Emma before the full qualitative checklist is ticked.
     enabled: row.enabled !== false,
     ready: row.ready === true,
+    characterId: typeof row.character_id === "string" ? row.character_id : null,
+    notionPageId: typeof row.notion_page_id === "string" ? row.notion_page_id : null,
+    environmentId: typeof row.environment_id === "string" ? row.environment_id : null,
+    promptUpdatedAt: typeof row.prompt_updated_at === "string" ? row.prompt_updated_at : null,
     openingLine: typeof row.opening_line === "string" ? row.opening_line : null,
     portraitUrl: typeof row.portrait_url === "string" ? row.portrait_url : null,
     ttsProvider: typeof row.tts_provider === "string" ? row.tts_provider : null,

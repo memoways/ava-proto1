@@ -31,7 +31,7 @@ describe("optimized_v3 prompt compiler", () => {
     expect(result.budget?.staticChars).toBeLessThanOrEqual(OPTIMIZED_V3_LIMITS.staticChars);
     expect((result.budget?.totalSystemChars ?? 0) + 900).toBeLessThanOrEqual(OPTIMIZED_V3_LIMITS.generatedContextChars);
     expect(result.finalSystemPrompt).toContain("# CONTRAT DE CONVERSATION");
-    expect(result.finalSystemPrompt).toMatch(/# NOYAU DE MAX\n## /);
+    expect(result.finalSystemPrompt).toMatch(/# NOYAU DE MAX LORENZO\n## /);
     expect(result.finalSystemPrompt).toContain("HISTORIQUE DE LA CONVERSATION");
     expect(result.finalSystemPrompt).toContain("Dans le couloir");
     expect(result.budget?.ragSelection?.find((item) => item.id === "duplicate")?.status).toBe("duplicate_static");
@@ -57,17 +57,36 @@ describe("optimized_v3 prompt compiler", () => {
     expect(result.budget?.oversizedCurrentUser).toBe(true);
   });
 
-  it("conserve le présent, la contradiction et le moteur même sans fiche disponible", () => {
-    const result = buildOptimizedPromptAssembly({
+  it("refuse de générer sans fiche plutôt que d'utiliser la biographie de Max", () => {
+    expect(() => buildOptimizedPromptAssembly({
       character: null,
-      characterName: "Max",
+      characterName: "Emma",
       userMessage: "Vous êtes là ?",
+      historyChars: 0,
+    })).toThrow(/fiche personnage/i);
+  });
+
+  it("compile Emma sans lui injecter l'identité de Max", () => {
+    const character = {
+      ...makeNotionMaxPrompt(),
+      character_id: "22222222-2222-4222-8222-222222222222",
+      name: "Emma Munz",
+      situation_summary: "Emma est chez elle à Lausanne.",
+      identite_fondamentale: "Tu es Emma Munz, cinéaste et mère d'Ava.",
+      qui_tu_es: "Tu parles avec la voix d'Emma.",
+      dynamique_conversation: "Emma veut comprendre ce qui s'est passé.",
+      timeline: "Aujourd'hui, Emma répond à cet appel.",
+      ce_que_tu_ne_fais_jamais: "Tu ne prétends jamais être une autre personne.",
+    };
+    const result = buildOptimizedPromptAssembly({
+      character,
+      characterName: "Emma Munz",
+      userMessage: "Qui es-tu ?",
       historyChars: 0,
     });
 
-    expect(result.baseSource.kind).toBe("fallback");
-    expect(result.finalSystemPrompt).toMatch(/Lausanne aujourd'hui/);
-    expect(result.finalSystemPrompt).toMatch(/protecteur.*contrôler/s);
-    expect(result.finalSystemPrompt).toMatch(/mettre de l'ordre/);
+    expect(result.finalSystemPrompt).toContain("Tu es Emma Munz");
+    expect(result.finalSystemPrompt).not.toMatch(/Tu es Max(?:\s|[.,])/);
+    expect(result.finalSystemPrompt).not.toContain("# NOYAU DE MAX");
   });
 });

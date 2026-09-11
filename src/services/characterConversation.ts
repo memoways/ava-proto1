@@ -1,4 +1,5 @@
 import type { ConversationMessage, RuntimeCharacter } from "@/types";
+import { responseClaimsForeignIdentity } from "@/services/characterIdentityGuard";
 
 export type CharacterSwitchStance = "accept" | "object" | "defer";
 
@@ -60,7 +61,11 @@ export function sliceConversationForCharacter(
   messages: ConversationMessage[],
   character: RuntimeCharacter,
 ): ConversationMessage[] {
-  return messages.filter((_, index) => inferSpokenWith(messages, index, character) === character);
+  return messages.filter((message, index) => {
+    if (inferSpokenWith(messages, index, character) !== character) return false;
+    if (message.role !== "user" && responseClaimsForeignIdentity(message.content, character)) return false;
+    return true;
+  });
 }
 
 export function hasSpokenWithCharacter(

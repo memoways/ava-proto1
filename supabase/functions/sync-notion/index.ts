@@ -9,6 +9,11 @@ import {
   type RagEmbeddingProfile,
   type RagEmbeddingProfileId,
 } from "../_shared/ragProfiles.ts";
+import {
+  collectNotionPageContent,
+  loadPaginatedNotionChildren,
+  type NotionContentBlock,
+} from "../_shared/notionPageContent.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -43,18 +48,6 @@ interface NotionPage {
   properties: Record<string, NotionProperty>;
 }
 
-interface NotionBlock {
-  id: string;
-  type: string;
-  has_children?: boolean;
-  [key: string]: unknown;
-}
-
-interface NotionBlockData {
-  rich_text?: NotionRichTextItem[];
-  checked?: boolean;
-}
-
 interface VideoSyncResult {
   title: string;
   themes: string[];
@@ -72,6 +65,7 @@ interface CharacterSyncResult {
   summary_chars: number;
   prompt_fields_filled: number;
   mapping_warnings: MappingWarning[];
+  content_warnings: Array<{ id: string; type: string }>;
 }
 
 interface SyncRequest {
@@ -399,68 +393,30 @@ serve(async (req) => {
     }
 
 
-    // Profile-scoped wipe. Other profiles stay queryable until an explicit activation.
-    let wipedAll = false;
+    // Character corpora are replaced transactionally below. A wipe request no
+    // longer creates an empty interval or destroys the previous usable corpus.
+    const wipedAll = false;
     let inPlaceProfileRefresh = false;
     if (body.wipe_all && charactersDbId) {
-      if (activeIndexState?.active_profile === targetProfile.id) {
-        // Never empty the live corpus globally. The loop below replaces one character
-        // at a time, while profile migrations use an inactive parallel profile.
-        inPlaceProfileRefresh = true;
-        console.log(`[sync-notion] Safe in-place refresh for active profile ${targetProfile.id}`);
-      } else {
-        const { error: delErr } = await supabase
-          .from('embeddings')
-          .delete()
-          .eq('embedding_profile', targetProfile.id);
-        if (delErr) {
-          throw new Error(`Unable to clear target profile ${targetProfile.id}: ${delErr.message}`);
-        }
-        wipedAll = true;
-        console.log(`[sync-notion] Profile wipe: ${targetProfile.id} embeddings deleted`);
-      }
+      inPlaceProfileRefresh = true;
+      console.log(`[sync-notion] Transactional character refresh for profile ${targetProfile.id}`);
     }
 
-    function extractBlockText(block: NotionBlock): string {
-      const type = block.type;
-      const blockData = block[type] as NotionBlockData | undefined;
-      if (!blockData) return '';
-      if (blockData.rich_text) {
-        const text = blockData.rich_text.map((item) => item.plain_text || '').join('');
-        if (type.startsWith('heading_')) return `\n## ${text}`;
-        if (type === 'bulleted_list_item' || type === 'numbered_list_item') return `- ${text}`;
-        if (type === 'to_do') return `- [${blockData.checked ? 'x' : ' '}] ${text}`;
-        if (type === 'quote') return `> ${text}`;
-        if (type === 'callout') return `📌 ${text}`;
-        if (type === 'toggle') return `${text}`;
-        return text;
-      }
-      if (type === 'divider') return '---';
-      return '';
-    }
-
-    async function fetchPageContent(pageId: string, depth = 0): Promise<string> {
-      if (depth > 5) return '';
-      const blocks: string[] = [];
-      let cursor: string | undefined;
-      do {
+    async function fetchNotionChildren(pageId: string): Promise<NotionContentBlock[]> {
+      return loadPaginatedNotionChildren(pageId, async (_blockId, cursor) => {
         const url = `${NOTION_API_URL}/blocks/${pageId}/children?page_size=100${cursor ? `&start_cursor=${cursor}` : ''}`;
         const res = await fetch(url, {
           headers: { 'Authorization': `Bearer ${NOTION_API_KEY}`, 'Notion-Version': '2022-06-28' },
         });
-        if (!res.ok) break;
-        const data = await res.json();
-        for (const block of data.results) {
-          const text = extractBlockText(block);
-          if (text.trim()) blocks.push(text);
-          if (block.has_children) {
-            const childContent = await fetchPageContent(block.id, depth + 1);
-            if (childContent.trim()) blocks.push(childContent);
-          }
+        if (!res.ok) {
+          throw new Error(`Notion block API error [${res.status}] for ${pageId}: ${await res.text()}`);
         }
-        cursor = data.has_more ? data.next_cursor : undefined;
-      } while (cursor);
-      return blocks.join('\n\n');
+        return await res.json();
+      });
+    }
+
+    async function fetchPageContent(pageId: string) {
+      return collectNotionPageContent(pageId, fetchNotionChildren);
     }
 
     async function generateEmbeddings(texts: string[], profile: RagEmbeddingProfile): Promise<number[][]> {
@@ -660,20 +616,7 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
         throw new Error('No character sheet with État = En cours was returned; synchronization stopped to protect existing data');
       }
       const filtered = body.only_notion_id ? pages.filter((p) => p.id === body.only_notion_id) : pages;
-
-      // A full database sync mirrors only active character sheets. If a sheet later
-      // leaves "En cours", remove its local character and cascade its prompts/RAG.
-      if (!body.only_notion_id) {
-        const activeNotionIds = pages.map((page) => page.id);
-        let staleQuery = supabase.from('characters').delete().not('notion_id', 'is', null);
-        if (activeNotionIds.length > 0) {
-          staleQuery = staleQuery.not('notion_id', 'in', `(${activeNotionIds.join(',')})`);
-        }
-        const { error: staleDeleteError } = await staleQuery;
-        if (staleDeleteError) {
-          throw new Error(`Unable to remove inactive characters: ${staleDeleteError.message}`);
-        }
-      }
+      const activeNotionIds = pages.map((page) => page.id);
 
       for (const page of filtered) {
       const props = page.properties;
@@ -686,7 +629,13 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
       }
 
       // Page content is only needed when we touch RAG or generate summary (fields mode includes summary).
-      const pageContent = (doRag || doFields) ? await fetchPageContent(page.id) : '';
+      const pageResult = (doRag || doFields)
+        ? await fetchPageContent(page.id)
+        : { content: "", unreadBlocks: [] };
+      if (pageResult.unreadBlocks.length) {
+        throw new Error(`Unread Notion blocks for ${name}: ${pageResult.unreadBlocks.map((block) => `${block.type}:${block.id}`).join(", ")}`);
+      }
+      const pageContent = pageResult.content;
       const resume = extractRichText(props['Résumé']);
       const archetype = extractSelect(props['Archétype narratif']) || '';
       const mbti = extractSelect(props['Type MBTI']) || '';
@@ -746,19 +695,10 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
 
       let chunksCreated = 0;
       if (doRag) {
-        if (!wipedAll) {
-          const { error: deleteEmbeddingError } = await supabase
-            .from('embeddings')
-            .delete()
-            .eq('source_table', 'characters')
-            .eq('character_id', charRow.id)
-            .eq('embedding_profile', targetProfile.id);
-          if (deleteEmbeddingError) {
-            throw new Error(`Unable to clear ${targetProfile.id} embeddings for ${name}: ${deleteEmbeddingError.message}`);
-          }
+        if (pageContent.trim().length < 10) {
+          throw new Error(`Notion page body is empty for ${name}; previous RAG corpus was preserved`);
         }
-
-        if (pageContent.trim().length >= 10) {
+        {
           const headerPrefix = `Personnage: ${name}${archetype ? ` | Archétype: ${archetype}` : ''}`;
           const chunks = chunkText(pageContent, targetProfile.chunkSizeChars, targetProfile.chunkOverlapChars);
           const chunkContents = chunks.map((chunk, index) =>
@@ -771,11 +711,18 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
               content: chunkContent,
               ...buildEmbeddingPayload(vectors[index], targetProfile, charRow.id, index, chunks.length),
             }));
-          const { error: insertEmbeddingError } = await supabase.from('embeddings').insert(records);
-          if (insertEmbeddingError) {
-            throw new Error(`Unable to insert ${targetProfile.id} embeddings for ${name}: ${insertEmbeddingError.message}`);
+          const { data: replacedCount, error: replaceEmbeddingError } = await supabase.rpc(
+            "replace_character_embeddings",
+            {
+              p_character_id: charRow.id,
+              p_embedding_profile: targetProfile.id,
+              p_records: records,
+            },
+          );
+          if (replaceEmbeddingError) {
+            throw new Error(`Unable to replace ${targetProfile.id} embeddings for ${name}: ${replaceEmbeddingError.message}`);
           }
-          chunksCreated = records.length;
+          chunksCreated = Number(replacedCount || 0);
         }
       }
 
@@ -788,7 +735,20 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
         summary_chars: situationSummary.length,
         prompt_fields_filled: filledCount,
         mapping_warnings: fieldWarnings,
+        content_warnings: pageResult.unreadBlocks,
       });
+      }
+
+      // Remove inactive sheets only after every active page has been read and
+      // rebuilt successfully. A pagination, parsing or embedding error exits
+      // before this cleanup and therefore cannot delete an unrelated corpus.
+      if (!body.only_notion_id && characterSyncErrors.length === 0) {
+        let staleQuery = supabase.from('characters').delete().not('notion_id', 'is', null);
+        staleQuery = staleQuery.not('notion_id', 'in', `(${activeNotionIds.join(',')})`);
+        const { error: staleDeleteError } = await staleQuery;
+        if (staleDeleteError) {
+          throw new Error(`Unable to remove inactive characters: ${staleDeleteError.message}`);
+        }
       }
     }
 

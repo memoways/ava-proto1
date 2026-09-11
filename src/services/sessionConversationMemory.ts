@@ -74,6 +74,16 @@ function appendPostTurnEntry(current: unknown, entry: PRD4PostTurnEvaluation): P
   return [...entries, entry].slice(-80);
 }
 
+/** Excludes legacy/global and foreign-character director results from live resume state. */
+export function latestPostTurnForCharacter(
+  entries: PRD4PostTurnEvaluation[],
+  character: RuntimeCharacter,
+): PRD4PostTurnEvaluation | null {
+  return [...entries]
+    .filter((entry) => entry.character_key === character)
+    .sort((left, right) => (right.turn_index ?? 0) - (left.turn_index ?? 0))[0] ?? null;
+}
+
 /**
  * Persiste le log GM et la mémoire dans une seule mise à jour filtrée par
  * `memory_last_turn`. En cas de course, relit puis rejoue la fusion une fois.

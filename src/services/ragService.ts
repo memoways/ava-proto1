@@ -4,6 +4,7 @@ import type { MaxTurnKnowledgeContext } from "@/types";
 import { authenticatedFunctionFetch } from "./gameAuth";
 import { createTimeoutSignal } from "./asyncUtils";
 import { RAG_DEFAULT_RETRIEVE_K } from "@/config/experienceRuntime";
+import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
 
 import { getCachedSession } from "@/services/gameAuth";
 
@@ -29,8 +30,9 @@ export interface RAGQueryOptions {
   recentContext?: string;
   matchCount?: number;
   matchThreshold?: number;
-  /** Restrict character-scoped chunks to this character. Shared chunks (NULL) always remain visible. */
-  characterId?: string | null;
+  /** Required owner of every retrieved chunk. */
+  characterId: string;
+  characterContext?: CharacterExecutionContext;
   /** Disable rerank explicitly. */
   rerank?: boolean;
   /** Override retrieve_k (top fetched before rerank). */
@@ -47,6 +49,23 @@ export interface RAGQueryOptions {
   signal?: AbortSignal;
   /** Hard client deadline; callers should fall back to an empty RAG result. */
   timeoutMs?: number;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function requireCharacterId(characterId: string | null | undefined): string {
+  if (!characterId || !UUID.test(characterId)) {
+    throw new Error("RAG characterId is required and must be a UUID");
+  }
+  return characterId;
+}
+
+function keepOwnedCharacterMatches(matches: RAGMatch[], characterId: string): RAGMatch[] {
+  return matches.filter((match) =>
+    match.character_id === characterId
+    && match.source_table === "characters"
+    && match.source_id === characterId
+  );
 }
 
 async function callQueryRag(
@@ -108,11 +127,12 @@ async function callQueryRag(
  */
 export async function queryRAG(
   userMessage: string,
-  recentContext?: string,
-  matchCount = 5,
-  matchThreshold = 0.3,
-  options: Omit<RAGQueryOptions, "recentContext" | "matchCount" | "matchThreshold"> = {},
+  recentContext: string | undefined,
+  matchCount: number,
+  matchThreshold: number | undefined,
+  options: Omit<RAGQueryOptions, "recentContext" | "matchCount" | "matchThreshold">,
 ): Promise<RAGMatch[]> {
+  const characterId = requireCharacterId(options.characterId);
   const startTime = Date.now();
   const debugId = debugLogger.logFetch("rag", `RAG query (top ${matchCount}${options.characterId ? `, char=${options.characterId.slice(0, 8)}` : ""})`, `${SUPABASE_URL}/functions/v1/query-rag`, { user_message: userMessage.slice(0, 200) });
 
@@ -123,7 +143,8 @@ export async function queryRAG(
       recent_context: recentContext,
       match_count: matchCount,
       match_threshold: matchThreshold,
-      character_id: options.characterId ?? null,
+      character_id: characterId,
+      character_context: options.characterContext,
       rerank: options.rerank,
       retrieve_k: options.retrieveK,
       rerank_model: options.rerankModel,
@@ -135,7 +156,7 @@ export async function queryRAG(
       return [];
     }
     debugLogger.logResponse(debugId, "rag", `RAG → ${res.matches.length} matches (${res.embedding_provider}${res.rerank_used ? "+rerank" : ""})`, 200, startTime, res.matches.map((m) => `${m.source_table}: ${m.content.slice(0, 80)}… (sim ${m.similarity.toFixed(2)})`).join("\n"));
-    return res.matches;
+    return keepOwnedCharacterMatches(res.matches, characterId);
   } catch (error) {
     debugLogger.logError("rag", "RAG query failed", error);
     return [];
@@ -165,7 +186,7 @@ export interface RAGQueryDetailed {
     rewrittenQuery: string | null;
     matchCount: number;
     matchThreshold: number;
-    characterId: string | null;
+    characterId: string;
     rerankRequested: boolean;
     retrieveK: number;
     rerankModel: "rerank-2.5" | "rerank-2.5-lite";
@@ -177,11 +198,12 @@ export interface RAGQueryDetailed {
 /** Detailed RAG query for diagnostics: returns latency + provider + error if any. */
 export async function queryRAGDetailed(
   userMessage: string,
-  recentContext?: string,
-  matchCount = 5,
-  matchThreshold = 0.3,
-  options: Omit<RAGQueryOptions, "recentContext" | "matchCount" | "matchThreshold"> = {},
+  recentContext: string | undefined,
+  matchCount: number,
+  matchThreshold: number | undefined,
+  options: Omit<RAGQueryOptions, "recentContext" | "matchCount" | "matchThreshold">,
 ): Promise<RAGQueryDetailed> {
+  const characterId = requireCharacterId(options.characterId);
   const startedAt = performance.now();
   try {
     const res = await callQueryRag({
@@ -190,16 +212,20 @@ export async function queryRAGDetailed(
       recent_context: recentContext,
       match_count: matchCount,
       match_threshold: matchThreshold,
-      character_id: options.characterId ?? null,
+      character_id: characterId,
+      character_context: options.characterContext,
       rerank: options.rerank,
       retrieve_k: options.retrieveK,
       rerank_model: options.rerankModel,
       rerank_truncation: options.rerankTruncation,
       include_retrieval_matches: options.includeRetrievalMatches,
     }, { signal: options.signal, timeoutMs: options.timeoutMs });
+    const matches = keepOwnedCharacterMatches(res.matches, characterId);
+    const rawRetrievalMatches = res.retrieval_matches?.length ? res.retrieval_matches : res.matches;
+    const retrievalMatches = keepOwnedCharacterMatches(rawRetrievalMatches, characterId);
     return {
-      matches: res.matches,
-      retrievalMatches: res.retrieval_matches?.length ? res.retrieval_matches : res.matches,
+      matches,
+      retrievalMatches,
       latencyMs: Math.round(performance.now() - startedAt),
       embeddingProvider: res.embedding_provider,
       embeddingProfile: res.embedding_profile,
@@ -218,8 +244,8 @@ export async function queryRAGDetailed(
         recentContext: recentContext || "",
         rewrittenQuery: options.rewrittenQuery || null,
         matchCount,
-        matchThreshold,
-        characterId: options.characterId ?? null,
+        matchThreshold: matchThreshold ?? 0.3,
+        characterId,
         rerankRequested: options.rerank !== false,
         retrieveK: options.retrieveK ?? Math.max(matchCount, RAG_DEFAULT_RETRIEVE_K),
         rerankModel: options.rerankModel ?? "rerank-2.5-lite",
@@ -238,8 +264,8 @@ export async function queryRAGDetailed(
         recentContext: recentContext || "",
         rewrittenQuery: options.rewrittenQuery || null,
         matchCount,
-        matchThreshold,
-        characterId: options.characterId ?? null,
+        matchThreshold: matchThreshold ?? 0.3,
+        characterId,
         rerankRequested: options.rerank !== false,
         retrieveK: options.retrieveK ?? Math.max(matchCount, RAG_DEFAULT_RETRIEVE_K),
         rerankModel: options.rerankModel ?? "rerank-2.5-lite",
@@ -350,9 +376,9 @@ export function formatMaxRAGContext(matches: RAGMatch[], options: MaxRAGFormatOp
 /** Convenience: query RAG and return formatted context string. */
 export async function getRAGContext(
   userMessage: string,
-  recentContext?: string,
-  matchCount = 3,
-  options: Omit<RAGQueryOptions, "recentContext" | "matchCount" | "matchThreshold"> = {},
+  recentContext: string | undefined,
+  matchCount: number,
+  options: Omit<RAGQueryOptions, "recentContext" | "matchCount" | "matchThreshold">,
 ): Promise<string> {
   const matches = await queryRAG(userMessage, recentContext, matchCount, undefined, options);
   return formatRAGContext(matches);

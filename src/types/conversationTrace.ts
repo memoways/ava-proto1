@@ -143,6 +143,12 @@ export interface ConversationTurnTraceV1 {
     turnId: string;
     turnIndex: number;
     characterName: string;
+    /** Immutable runtime attribution; optional only for archived traces. */
+    characterKey?: "max" | "emma";
+    characterId?: string;
+    notionPageId?: string;
+    environmentId?: string;
+    promptUpdatedAt?: string;
     createdAt: string;
     status: "causal_complete" | "complete" | "error";
   };
@@ -226,7 +232,8 @@ export interface ConversationTurnTraceV1 {
   response: {
     rawLlmResponse: string | null;
     deliveredResponse: string;
-    source: "llm" | "fallback";
+    source: "llm" | "fallback" | "identity_guard";
+    identityGuardReason?: "foreign_self_identification" | null;
   };
   gm: {
     causalGuidance: {

@@ -1,7 +1,9 @@
 # Refonte RAG & system prompts — base unique « Caractères AVA »
 
 > Document de référence pour la session 24 (juin 2026).
-> Statut : approuvé, en cours d'implémentation.
+> Statut au 11 septembre 2026 : verrouillage Emma/Max implémenté et vérifié
+> localement. Publication des migrations et Edge Functions en attente de l'accès
+> au projet Lovable Cloud.
 > Auteur : Lovable + Ulrich.
 
 ## 1. Objectif
@@ -70,15 +72,15 @@ public.character_prompts(
 
 RLS activée. SELECT public. Mutations réservées au `service_role` (edge functions).
 
-La table `characters` est conservée mais `system_prompt` n'est plus lu (champ
-deprecated, gardé pour fallback historique).
+La table `characters` est conservée mais `system_prompt` n'est plus lu par aucune
+variante de prompt (champ deprecated, conservé uniquement pour diagnostic historique).
 
 La table `storyworld` reste en place (pas de drop) ; elle n'est plus alimentée
 ni lue. Idem `gameplay_steps`, `video_triggers`.
 
-## 3. Migration
+## 3. Migration initiale
 
-Migration appliquée :
+Migration historique appliquée avant le verrouillage de septembre 2026 :
 
 ```sql
 CREATE TABLE IF NOT EXISTS public.character_prompts (
@@ -119,10 +121,11 @@ Requête :
 
 - Seule clé acceptée : `databases.characters`. Les autres bases sont ignorées
   silencieusement (compat ascendante).
-- `wipe_all=true` : `DELETE FROM embeddings` global **avant** la boucle (utilisé
-  par le bouton « Wipe & rebuild RAG »).
-- `wipe_all=false` : pour chaque personnage, on supprime uniquement
-  `embeddings WHERE character_id=<id>` puis on ré-insère.
+- `wipe_all=true` et `wipe_all=false` préparent d'abord le corpus complet de
+  chaque personnage. Le remplacement est ensuite exécuté dans une transaction
+  SQL par personnage ; aucune suppression ne précède la préparation.
+- Une erreur de lecture, d'embedding ou d'écriture conserve le corpus actif
+  précédent du personnage concerné.
 
 Réponse :
 
@@ -153,10 +156,10 @@ Réponse :
 3. Générer `situation_summary` via OpenRouter (`google/gemini-2.0-flash-001`,
    temperature 0.3, max_tokens 220, prompt court factuel). Input = corps de page
    tronqué à ~6000 caractères.
-4. `DELETE embeddings WHERE source_table='characters' AND character_id=<id>`.
-5. `chunkText(pageBody)` → embed Voyage chaque chunk avec préfixe
-   `Personnage: <name> | Partie i/N\n<chunk>` → INSERT avec
-   `source_table='characters'`, `character_id=<id>` non-null.
+4. `chunkText(pageBody)` → embed Voyage chaque chunk avec préfixe
+   `Personnage: <name> | Partie i/N\n<chunk>`.
+5. Appeler `replace_character_embeddings(...)` avec le corpus complet. La RPC
+   insère les nouveaux chunks puis retire l'ancien corpus dans la même transaction.
 
 ### Garanties
 
@@ -251,8 +254,8 @@ l'expose plus dans la nav.
 ## APRÈS LA VIDÉO (si applicable)
 ```
 
-Le character_id est résolu depuis le nom avant chaque appel pour pouvoir scoper
-le RAG.
+Dans le parcours public, `character_id` n'est jamais résolu depuis un prénom. Il
+provient du profil d'exécution et de son lien explicite `notion_character_id`.
 
 ### `src/agents/gameMasterAgent.ts` + `gameMasterPRD4.ts`
 
@@ -313,7 +316,7 @@ Réorganisation `TAB_GROUPS` :
 
 ## 8. Plan de test
 
-1. Migration appliquée ✅.
+1. Migration préparée localement ; application Lovable Cloud encore à effectuer.
 2. Côté Notion : ajouter / remplir les 7 propriétés rich_text pour Max.
 3. Admin → Sync Notion → « Wipe & rebuild RAG ».
 4. Admin → Embeddings : vérifier que seuls des chunks `source_table='characters'`
@@ -331,3 +334,135 @@ Réorganisation `TAB_GROUPS` :
   de `Profondeur par niveau` (lecture par niveau actif), avec la possibilité
   de déclencher des vidéos entre niveaux.
 - Ajout des personnages Ava, Léo, Emma (mêmes structures Notion).
+
+## 10. Audit et verrouillage d'identité Emma/Max — 11 septembre 2026
+
+Cette section remplace les décisions historiques incompatibles des sections
+précédentes.
+
+### Défauts reproduits
+
+- `optimized_v3` injectait « Tu es Max » avec la fiche d'Emma. Le défaut était
+  reproductible sans RAG.
+- Les recherches RAG acceptaient un identifiant absent et les extraits sans
+  propriétaire, ce qui pouvait transformer une recherche de personnage en
+  recherche globale.
+- Les résumés étaient indexés seulement par session, étiquetaient toutes les
+  réponses « MAX » et pouvaient donc être réinjectés après un changement de
+  personnage.
+- Le corps de page Notion était parcouru avec des arrêts silencieux et une
+  profondeur limitée ; une reconstruction pouvait supprimer l'ancien corpus
+  avant d'avoir préparé le nouveau.
+- La fiche publique d'Emma contient une phrase de préambule copiée : « pour que
+  Max puisse toujours situer l'événement ». Son récit reste correctement écrit
+  du point de vue d'Emma.
+
+### Contexte immuable d'un tour
+
+Le parcours public résout maintenant une seule attribution avant l'appel et la
+conserve pour chaque tour :
+
+```ts
+{
+  characterKey,
+  displayName,
+  characterId,
+  notionPageId,
+  environmentId,
+  promptUpdatedAt,
+}
+```
+
+Les six valeurs doivent être présentes et cohérentes. `characterId` vient du
+`notion_character_id` du profil actif. `notionPageId` vient de la ligne
+`characters` liée. `promptUpdatedAt` identifie la version exacte de la fiche
+éditoriale sélectionnée pour l'environnement. Ce contexte est transmis au
+prompt, au RAG, au résumé, au Game Master et aux traces. Une fiche absente,
+incomplète, attribuée à l'autre personnage ou d'une autre version arrête la
+génération.
+
+Les quatre variantes `legacy`, `compact_v1`, `rich_v2` et `optimized_v3`
+commencent par un invariant d'identité non tronquable. Les propriétés
+`character_prompts` issues de Notion sont leur seule référence éditoriale ;
+`characters.system_prompt` n'est jamais réinjecté. Les interdits de la fiche sont
+réservés avant les sections facultatives, y compris lorsque la fiche dépasse les
+budgets habituels.
+
+### Isolation RAG et synchronisation
+
+- Le client et `query-rag` refusent un `character_id` absent ou invalide.
+- `match_embeddings_voyage` et `match_embeddings_scoped` exigent simultanément
+  le personnage et le profil d'index actif. Elles ne renvoient que
+  `source_table='characters'`, `source_id=character_id` et
+  `embeddings.character_id=character_id`.
+- La provenance est contrôlée côté Edge Function avant reclassement, puis côté
+  client avant formatage et injection. Les traces conservent source, propriétaire,
+  profil, page Notion, environnement et version de fiche.
+- Les évaluations administratives résolvent séparément un contexte exact pour
+  Emma ou Max avant chaque recherche.
+- La synchronisation suit toute la pagination et tous les enfants Notion, sans
+  limite de profondeur. Elle extrait aussi les cellules de tableaux, légendes,
+  titres, équations et URL textuelles. Une erreur intermédiaire ou un bloc texte
+  non lu fait échouer la synchronisation avec son identifiant au lieu de produire
+  silencieusement un corpus incomplet.
+- `replace_character_embeddings` remplace le corpus complet d'un personnage et
+  d'un profil dans une transaction. Une erreur annule l'opération et conserve
+  l'ancien corpus. Le nettoyage des fiches devenues inactives intervient seulement
+  après la réussite de toutes les fiches actives.
+
+Emma peut toujours parler de Max lorsque le fait figure dans sa propre page. Le
+RAG d'Emma ne reçoit aucun chunk dont la page source appartient à Max.
+
+### Résumés, reprise et traitements tardifs
+
+`session_summaries` porte désormais `character_key` et utilise la clé
+`(session_id, character_key)`. Les anciennes lignes où `character_key IS NULL`
+restent consultables pour diagnostic mais ne sont jamais utilisées dans le
+contexte vivant. Le locuteur du prompt de résumé est Emma ou Max selon le tour.
+
+L'historique transmis au modèle est découpé selon `spokenWith`. Une réponse
+historique qui revendique explicitement l'identité de l'autre personnage est
+exclue à la reprise. La mémoire structurée, la guidance, l'émotion, le contexte
+post-vidéo et les résultats du directeur sont cloisonnés ou remis à zéro au
+changement. Le changement annule le tour et la restitution en cours ; les retours
+asynchrones obsolètes sont ignorés. Les mises à jour mémoire utilisent le
+personnage capturé par le tour, pas un identifiant proposé par le modèle.
+
+### Contrôle déterministe avant diffusion
+
+Chaque texte généré et chaque réplique d'ouverture passe dans un contrôle local
+avant sous-titre, voix, avatar, Game Master et résumé. Il bloque les revendications
+explicites telles que « je suis Max », « je m'appelle Max », « ici Max » ou
+« en tant que Max » lorsque le personnage actif est Emma, et l'inverse pour Max.
+Les citations, mentions et négations légitimes restent autorisées. Un blocage
+produit immédiatement « C’est bien Emma. Reprenons. » ou son équivalent Max,
+sans second appel LLM. Les dérives narratives moins explicites restent évaluées
+après réponse par le directeur et apparaissent dans les traces.
+
+### Couverture et état de livraison
+
+Les tests ajoutés couvrent :
+
+- Emma et Max dans les quatre variantes, avec fiche complète, absente,
+  incohérente et volumineuse ;
+- les deux phrases exactes des captures, sans second appel LLM ;
+- les citations, négations et formes courantes de changement d'identité ;
+- les extraits Emma, Max et sans propriétaire avant et après reclassement ;
+- les résumés par personnage et l'exclusion des anciens résumés globaux ;
+- le passage Max → Emma, la mémoire privée, les réponses tardives et la reprise ;
+- la pagination, les tableaux, l'imbrication profonde, les blocs non lus et les
+  erreurs intermédiaires Notion ;
+- les contraintes SQL d'attribution et le remplacement transactionnel du corpus.
+
+La migration `20260911080000_lock_character_identity_and_rag.sql` et les Edge
+Functions modifiées doivent être appliquées exclusivement par Lovable / Lovable
+Cloud. Le connecteur Supabase n'a actuellement pas accès au projet
+`iralfqlslqndgvexixis` : l'état déployé, le nouveau corpus et les traces en ligne
+ne peuvent donc pas encore être certifiés.
+
+La fiche Notion d'Emma a été relue depuis sa page publique. L'édition exacte du
+préambule a été tentée, mais le connecteur courant est relié à l'espace « Ulrich »
+et non à « gamilab-prov » ; Notion a refusé l'écriture. Après reconnexion au bon
+espace, remplacer uniquement « pour que Max puisse toujours situer » par « pour
+que tu puisses toujours situer », puis lancer une synchronisation complète dans
+Lovable Cloud.
