@@ -14,6 +14,7 @@ type CharId = "max" | "emma" | "ava" | "leo";
 interface Props {
   onSelect: (id: "max" | "emma", profile: CharacterRuntimeReadiness | null) => void;
   onLockedClick?: (id: Exclude<CharId, "max">) => void;
+  onReviewContext?: () => void;
 }
 
 const CHARACTER_IMAGES: Record<CharId, string> = { max: maxImg, emma: emmaImg, ava: avaImg, leo: leoImg };
