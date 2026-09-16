@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-09-11 (relations crédibles — socle Lovable prêt, politiques Max/Emma à rédiger)
+> **Last Updated**: 2026-09-16 (onboarding du bénévole — parcours et contexte joueur intégrés)
 
 ---
 
@@ -72,6 +72,41 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-09-16 — Onboarding du bénévole : qui appelle, et pourquoi 🔷
+
+**Le problème.** Le parcours passait de l'introduction au choix du personnage
+sans expliquer qui le joueur incarnait. Le contact avec Max ou Emma apparaissait
+comme une conversation anonyme ; la connaissance des faits par le joueur n'était
+pas justifiée narrativement, et les personnages pouvaient manquer de repères sur
+le cadre institutionnel de l'appel.
+
+**L'expérience recherchée.** Avant de choisir un personnage, le joueur doit
+comprendre en une lecture qu'il est bénévole d'un dispositif de soutien, qu'il a
+accès au compte rendu transmis aux autorités, qu'il n'est pas professionnel de
+santé et qu'il ne connaît personne personnellement. Cette information doit être
+courte, rassurante, sans formulaire ni quiz, et revenir en un clic pendant le
+choix du personnage.
+
+**Correctif.** Insertion d'une séquence de trois cartes plein écran entre le
+teaser et le choix du personnage : rôle, posture et connaissances. Le cadre est
+transmis au personnage, à la mémoire et au Game Master dès le premier tour via
+le canal `player_role` existant, avec une consigne négative explicite : aucune
+rencontre antérieure, relation ou confiance inventée. Le profil joueur est
+généré par le système, sans nom, âge, genre ni donnée personnelle. La
+progression est mémorisée localement : reprise à la carte en cours après un
+rafraîchissement, pas de rejeu automatique après complétion, relecture depuis le
+lien « Revoir le contexte » sur l'écran de choix.
+
+**Validation.** Tests unitaires et de composant verts ; typecheck propre. Le
+parcours de bout en bout traverse l'onboarding avant le choix du personnage.
+Les textes ont été relus contre les critères : lecture unique, rôle non
+professionnel de santé, origine des faits connus, aucun nom fictif d'association,
+aucun formulaire.
+
+Plan : [`docs/plan_onboarding_benevole.md`](docs/plan_onboarding_benevole.md).
+
+
 
 ### 2026-09-11 — Une relation se gagne : le Game Master devient directeur de l'ouverture 🔷
 

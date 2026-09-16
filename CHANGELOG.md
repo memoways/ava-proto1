@@ -20,6 +20,8 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   rafraîchissement, pas de rejeu automatique après complétion, relecture depuis
   le choix du personnage via « Revoir le contexte ».
 - Analytics : affichage, carte vue, complétion (durée) et relecture.
+- Validation : tests unitaires et de composant verts, typecheck propre, parcours
+  bout en bout mis à jour pour franchir l'onboarding avant le choix du personnage.
 - Détail : `docs/plan_onboarding_benevole.md`.
 
 
