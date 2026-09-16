@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-09-11 (relations crédibles — socle Lovable prêt, politiques Max/Emma à rédiger)
+> **Last Updated**: 2026-09-16 (onboarding du bénévole — parcours et contexte joueur intégrés)
 
 ---
 
