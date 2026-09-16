@@ -144,6 +144,14 @@ import {
   type CharacterHandoffOffer,
 } from "@/services/characterConversation";
 
+import VolunteerBriefingScreen from "@/components/prd4/VolunteerBriefingScreen";
+import {
+  VOLUNTEER_BRIEFING_VERSION,
+  buildVolunteerRoleProfile,
+  getVolunteerBriefingProgress,
+  saveVolunteerBriefingProgress,
+} from "@/services/volunteerBriefing";
+
 const TEASER_VIDEO_URL = "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049";
 
 function asTTSProviderId(value: string | null | undefined): TTSProviderId | null {
@@ -409,26 +417,80 @@ const IndexPRD4 = () => {
     trackEvent("prd4_onboarding_started", {});
     return true;
   }, [privacyPreferences, setFilmAnswer, setPhase, unlockCinematicPlayback]);
+  // ---- Onboarding du bénévole (après l'introduction, avant le choix) --------
+  const briefingStartedAtRef = useRef<number | null>(null);
+  const [briefingReview, setBriefingReview] = useState(false);
+
+  /** Le cadre bénévole est toujours transmis au personnage, même en relecture. */
+  const applyVolunteerFrame = useCallback(() => {
+    setRoleProfile(buildVolunteerRoleProfile());
+  }, [setRoleProfile]);
+
+  const enterAfterIntroduction = useCallback(() => {
+    const progress = getVolunteerBriefingProgress();
+    if (progress.completed) {
+      applyVolunteerFrame();
+      setPhase("character_select");
+      return;
+    }
+    briefingStartedAtRef.current = Date.now();
+    trackEvent("prd4_volunteer_briefing_shown", {
+      version: VOLUNTEER_BRIEFING_VERSION,
+      resumed_at_card: progress.lastCardIndex,
+    });
+    setPhase("volunteer_briefing");
+  }, [applyVolunteerFrame, setPhase]);
+
+  const handleBriefingCardViewed = useCallback((index: number, cardId: string) => {
+    trackEvent("prd4_volunteer_briefing_card_viewed", {
+      version: VOLUNTEER_BRIEFING_VERSION,
+      card_index: index,
+      card_id: cardId,
+      review: briefingReview,
+    });
+  }, [briefingReview]);
+
+  const handleBriefingComplete = useCallback(() => {
+    applyVolunteerFrame();
+    trackEvent("prd4_volunteer_briefing_completed", {
+      version: VOLUNTEER_BRIEFING_VERSION,
+      duration_ms: briefingStartedAtRef.current ? Date.now() - briefingStartedAtRef.current : null,
+    });
+    briefingStartedAtRef.current = null;
+    setPhase("character_select");
+  }, [applyVolunteerFrame, setPhase]);
+
+  const handleBriefingReviewOpen = useCallback(() => {
+    const progress = saveVolunteerBriefingProgress({
+      replays: getVolunteerBriefingProgress().replays + 1,
+    });
+    trackEvent("prd4_volunteer_briefing_reviewed", {
+      version: VOLUNTEER_BRIEFING_VERSION,
+      replays: progress.replays,
+    });
+    setBriefingReview(true);
+  }, []);
+
   const handleFilmAnswer = useCallback(
     (a: FilmAnswer) => {
       setFilmAnswer(a);
       trackEvent("prd4_film_answered", { answer: a });
       if (a === "vu") {
-        setPhase("character_select");
+        enterAfterIntroduction();
       } else {
         setPhase("teaser");
       }
     },
-    [setFilmAnswer, setPhase],
+    [enterAfterIntroduction, setFilmAnswer, setPhase],
   );
   const handleTeaserContinue = useCallback(() => {
     markTeaserSeen(false);
-    setPhase("character_select");
-  }, [markTeaserSeen, setPhase]);
+    enterAfterIntroduction();
+  }, [enterAfterIntroduction, markTeaserSeen]);
   const handleTeaserSkip = useCallback(() => {
     markTeaserSeen(true);
-    setPhase("character_select");
-  }, [markTeaserSeen, setPhase]);
+    enterAfterIntroduction();
+  }, [enterAfterIntroduction, markTeaserSeen]);
 
   // ---- Role capture → summarize-role (LLM) ----------------------------------
   const handleRoleSubmit = useCallback(
@@ -1978,6 +2040,14 @@ const IndexPRD4 = () => {
       break;
     case "teaser":
       break;
+    case "volunteer_briefing":
+      screen = (
+        <VolunteerBriefingScreen
+          onComplete={handleBriefingComplete}
+          onCardViewed={handleBriefingCardViewed}
+        />
+      );
+      break;
     case "film_question":
       screen = <FilmQuestionScreen onAnswer={handleFilmAnswer} />;
       break;
@@ -2003,7 +2073,20 @@ const IndexPRD4 = () => {
       ) : null;
       break;
     case "character_select":
-      screen = <CharacterSelectScreen onSelect={handleSelectCharacter} onLockedClick={handleLockedClick} />;
+      screen = briefingReview ? (
+        <VolunteerBriefingScreen
+          mode="review"
+          onComplete={() => setBriefingReview(false)}
+          onClose={() => setBriefingReview(false)}
+          onCardViewed={handleBriefingCardViewed}
+        />
+      ) : (
+        <CharacterSelectScreen
+          onSelect={handleSelectCharacter}
+          onLockedClick={handleLockedClick}
+          onReviewContext={handleBriefingReviewOpen}
+        />
+      );
       break;
     case "calling_max":
       screen = <CallingMaxScreen character={startingCharacterRef.current} situation={selectedEncounterFrameRef.current} portraitUrl={activePortraitUrl} onAnswered={handleAnswered} />;

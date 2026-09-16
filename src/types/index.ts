@@ -23,6 +23,7 @@ export type ExperiencePhase =
   | "welcome"
   | "film_question"
   | "teaser"
+  | "volunteer_briefing"
   | "role_capture"
   | "role_summary"
   | "character_select"

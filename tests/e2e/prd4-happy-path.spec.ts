@@ -467,6 +467,18 @@ async function installNetworkFakes(
   };
 }
 
+/** Onboarding du bénévole : séquence de cartes entre le teaser et le choix du personnage. */
+async function completeVolunteerBriefing(page: Page) {
+  const understood = page.getByRole("button", { name: "J'ai compris" });
+  for (let step = 0; step < 5; step += 1) {
+    if (await understood.count()) {
+      await understood.click();
+      return;
+    }
+    await page.getByRole("button", { name: "Continuer" }).click();
+  }
+}
+
 test("le teaser démarre automatiquement avec le son puis Passer coupe tout", async ({ page }, testInfo) => {
   await installNetworkFakes(page);
 
@@ -506,6 +518,7 @@ test("le teaser démarre automatiquement avec le son puis Passer coupe tout", as
     (window as Window & { __e2eNativeVideoState?: { pauseCount: number } }).__e2eNativeVideoState?.pauseCount ?? 0,
   );
   await page.getByRole("button", { name: /Passer/ }).click();
+  await completeVolunteerBriefing(page);
   await expect(page.getByRole("heading", { name: "À qui veux-tu parler ?" })).toBeVisible();
   await expect.poll(() => page.evaluate((previousPauseCount) => {
     const state = (window as Window & {
@@ -532,6 +545,7 @@ test("une cinématique HLS démarre automatiquement puis Passer coupe son média
   expect(persistentPlayer).not.toBeNull();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
+  await completeVolunteerBriefing(page);
   await page.getByRole("button", { name: "Appeler Max" }).click();
   for (let turn = 1; turn <= 3; turn += 1) {
     await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
@@ -579,6 +593,7 @@ test("parcours PRD4 heureux avec trois tours de conversation", async ({ page }) 
   await expect(page.getByRole("button", { name: "Commencer" })).toBeEnabled();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
+  await completeVolunteerBriefing(page);
   await expect(page.getByRole("heading", { name: "À qui veux-tu parler ?" })).toBeVisible();
   await expect(page.getByText(/poser une question, exprimer une émotion/i)).toHaveCount(0);
 
@@ -608,6 +623,7 @@ test("une réponse vocale plus longue que le watchdog est lue jusqu'au bout", as
   await page.goto("/");
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
+  await completeVolunteerBriefing(page);
   await page.getByRole("button", { name: "Appeler Max" }).click();
   await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
 
@@ -639,6 +655,7 @@ test("diagnostic full garde la voix réactive pendant un upload de trace bloqué
   await page.goto("/?diagnostic=full");
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
+  await completeVolunteerBriefing(page);
   await page.getByRole("button", { name: "Appeler Max" }).click();
   await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
 
@@ -680,6 +697,7 @@ test("un 429 system_busy ElevenLabs est rejoué une fois puis la voix démarre",
   await page.goto("/");
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
+  await completeVolunteerBriefing(page);
   await page.getByRole("button", { name: "Appeler Max" }).click();
   await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
 
@@ -706,6 +724,7 @@ test("endurance accélérée de 35 tours avec mémoire bornée et pannes récup�
   await page.goto("/");
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
+  await completeVolunteerBriefing(page);
   await page.getByRole("button", { name: "Appeler Max" }).click();
   await expect(page.getByLabel("Temps restant")).toHaveText(/15:30|15:29/, { timeout: 10_000 });
 
