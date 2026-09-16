@@ -28,7 +28,7 @@ function portraitAlt(name: string): string {
   return name === "Emma" || name === "Ava" ? `Portrait d’${name}` : `Portrait de ${name}`;
 }
 
-const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
+const CharacterSelectScreen = ({ onSelect, onLockedClick, onReviewContext }: Props) => {
   const [lockedDialog, setLockedDialog] = useState(false);
   const [emmaOn, setEmmaOn] = useState(true);
   const [runtimePortraits, setRuntimePortraits] = useState<Partial<Record<"max" | "emma", string>>>({});
@@ -121,7 +121,18 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick }: Props) => {
           })}
 
         </div>
+
+        {onReviewContext ? (
+          <button
+            type="button"
+            onClick={onReviewContext}
+            className="story-link text-sm text-muted-foreground hover:text-foreground"
+          >
+            Revoir le contexte
+          </button>
+        ) : null}
       </div>
+
 
       <Dialog open={lockedDialog} onOpenChange={setLockedDialog}>
         <DialogContent>
