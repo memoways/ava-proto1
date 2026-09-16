@@ -144,6 +144,14 @@ import {
   type CharacterHandoffOffer,
 } from "@/services/characterConversation";
 
+import VolunteerBriefingScreen from "@/components/prd4/VolunteerBriefingScreen";
+import {
+  VOLUNTEER_BRIEFING_VERSION,
+  buildVolunteerRoleProfile,
+  getVolunteerBriefingProgress,
+  saveVolunteerBriefingProgress,
+} from "@/services/volunteerBriefing";
+
 const TEASER_VIDEO_URL = "https://play.gumlet.io/embed/6a188e39fdee17a44c1ea049";
 
 function asTTSProviderId(value: string | null | undefined): TTSProviderId | null {
