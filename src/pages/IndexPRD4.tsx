@@ -2040,6 +2040,14 @@ const IndexPRD4 = () => {
       break;
     case "teaser":
       break;
+    case "volunteer_briefing":
+      screen = (
+        <VolunteerBriefingScreen
+          onComplete={handleBriefingComplete}
+          onCardViewed={handleBriefingCardViewed}
+        />
+      );
+      break;
     case "film_question":
       screen = <FilmQuestionScreen onAnswer={handleFilmAnswer} />;
       break;
@@ -2065,7 +2073,20 @@ const IndexPRD4 = () => {
       ) : null;
       break;
     case "character_select":
-      screen = <CharacterSelectScreen onSelect={handleSelectCharacter} onLockedClick={handleLockedClick} />;
+      screen = briefingReview ? (
+        <VolunteerBriefingScreen
+          mode="review"
+          onComplete={() => setBriefingReview(false)}
+          onClose={() => setBriefingReview(false)}
+          onCardViewed={handleBriefingCardViewed}
+        />
+      ) : (
+        <CharacterSelectScreen
+          onSelect={handleSelectCharacter}
+          onLockedClick={handleLockedClick}
+          onReviewContext={handleBriefingReviewOpen}
+        />
+      );
       break;
     case "calling_max":
       screen = <CallingMaxScreen character={startingCharacterRef.current} situation={selectedEncounterFrameRef.current} portraitUrl={activePortraitUrl} onAnswered={handleAnswered} />;
