@@ -6,6 +6,23 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Non publié]
 
+### Onboarding du bénévole
+
+- Nouvelle étape courte (trois cartes) entre l'introduction et le choix du
+  personnage : rôle de bénévole d'un dispositif de soutien, posture d'écoute
+  sans qualification médicale, connaissance des faits via le compte rendu
+  transmis aux autorités, aucune relation préalable. Aucun formulaire, aucune
+  donnée personnelle, aucun nom d'association.
+- Le cadre est transmis au personnage, à la mémoire et au Game Master dès le
+  premier tour par le canal joueur existant ; il interdit explicitement toute
+  rencontre, relation ou confiance inventée. Générique pour tout personnage.
+- Progression mémorisée localement : reprise à la carte en cours après un
+  rafraîchissement, pas de rejeu automatique après complétion, relecture depuis
+  le choix du personnage via « Revoir le contexte ».
+- Analytics : affichage, carte vue, complétion (durée) et relecture.
+- Détail : `docs/plan_onboarding_benevole.md`.
+
+
 ### Relations crédibles, GM renforcé et multipersonnage natif
 
 - Ajout d'une politique relationnelle versionnée par personnage, de trois
