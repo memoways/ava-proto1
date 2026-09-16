@@ -409,26 +409,80 @@ const IndexPRD4 = () => {
     trackEvent("prd4_onboarding_started", {});
     return true;
   }, [privacyPreferences, setFilmAnswer, setPhase, unlockCinematicPlayback]);
+  // ---- Onboarding du bénévole (après l'introduction, avant le choix) --------
+  const briefingStartedAtRef = useRef<number | null>(null);
+  const [briefingReview, setBriefingReview] = useState(false);
+
+  /** Le cadre bénévole est toujours transmis au personnage, même en relecture. */
+  const applyVolunteerFrame = useCallback(() => {
+    setRoleProfile(buildVolunteerRoleProfile());
+  }, [setRoleProfile]);
+
+  const enterAfterIntroduction = useCallback(() => {
+    const progress = getVolunteerBriefingProgress();
+    if (progress.completed) {
+      applyVolunteerFrame();
+      setPhase("character_select");
+      return;
+    }
+    briefingStartedAtRef.current = Date.now();
+    trackEvent("prd4_volunteer_briefing_shown", {
+      version: VOLUNTEER_BRIEFING_VERSION,
+      resumed_at_card: progress.lastCardIndex,
+    });
+    setPhase("volunteer_briefing");
+  }, [applyVolunteerFrame, setPhase]);
+
+  const handleBriefingCardViewed = useCallback((index: number, cardId: string) => {
+    trackEvent("prd4_volunteer_briefing_card_viewed", {
+      version: VOLUNTEER_BRIEFING_VERSION,
+      card_index: index,
+      card_id: cardId,
+      review: briefingReview,
+    });
+  }, [briefingReview]);
+
+  const handleBriefingComplete = useCallback(() => {
+    applyVolunteerFrame();
+    trackEvent("prd4_volunteer_briefing_completed", {
+      version: VOLUNTEER_BRIEFING_VERSION,
+      duration_ms: briefingStartedAtRef.current ? Date.now() - briefingStartedAtRef.current : null,
+    });
+    briefingStartedAtRef.current = null;
+    setPhase("character_select");
+  }, [applyVolunteerFrame, setPhase]);
+
+  const handleBriefingReviewOpen = useCallback(() => {
+    const progress = saveVolunteerBriefingProgress({
+      replays: getVolunteerBriefingProgress().replays + 1,
+    });
+    trackEvent("prd4_volunteer_briefing_reviewed", {
+      version: VOLUNTEER_BRIEFING_VERSION,
+      replays: progress.replays,
+    });
+    setBriefingReview(true);
+  }, []);
+
   const handleFilmAnswer = useCallback(
     (a: FilmAnswer) => {
       setFilmAnswer(a);
       trackEvent("prd4_film_answered", { answer: a });
       if (a === "vu") {
-        setPhase("character_select");
+        enterAfterIntroduction();
       } else {
         setPhase("teaser");
       }
     },
-    [setFilmAnswer, setPhase],
+    [enterAfterIntroduction, setFilmAnswer, setPhase],
   );
   const handleTeaserContinue = useCallback(() => {
     markTeaserSeen(false);
-    setPhase("character_select");
-  }, [markTeaserSeen, setPhase]);
+    enterAfterIntroduction();
+  }, [enterAfterIntroduction, markTeaserSeen]);
   const handleTeaserSkip = useCallback(() => {
     markTeaserSeen(true);
-    setPhase("character_select");
-  }, [markTeaserSeen, setPhase]);
+    enterAfterIntroduction();
+  }, [enterAfterIntroduction, markTeaserSeen]);
 
   // ---- Role capture → summarize-role (LLM) ----------------------------------
   const handleRoleSubmit = useCallback(
