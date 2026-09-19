@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import CharacterSelectScreen from "./CharacterSelectScreen";
 
@@ -69,6 +69,16 @@ describe("CharacterSelectScreen", () => {
 
     await waitFor(() => expect(screen.getByRole("img", { name: "Portrait d’Emma" }))
       .toHaveAttribute("src", "https://portraits.example/emma-runtime.jpg"));
+  });
+
+  it("opens the volunteer-context review when the optional action is selected", async () => {
+    const onReviewContext = vi.fn();
+    render(<CharacterSelectScreen onSelect={vi.fn()} onReviewContext={onReviewContext} />);
+
+    await waitFor(() => expect(screen.getByRole("img", { name: "Portrait d’Emma" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Revoir le contexte" }));
+
+    expect(onReviewContext).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the selection cards focused on availability", async () => {
