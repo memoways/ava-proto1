@@ -23,10 +23,10 @@ const STATUS_LABELS: Record<ExternalTestInvitationStatus, string> = {
 };
 
 const STATUS_CLASSES: Record<ExternalTestInvitationStatus, string> = {
-  available: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
-  activated: "border-sky-500/40 bg-sky-500/10 text-sky-300",
-  expired: "border-amber-500/40 bg-amber-500/10 text-amber-300",
-  revoked: "border-slate-500/40 bg-slate-500/10 text-slate-300",
+  available: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  activated: "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+  expired: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  revoked: "border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300",
 };
 
 interface CreatedSecret {
@@ -163,7 +163,7 @@ export default function TestInvitationsTab() {
         <Card className="border-fuchsia-500/50 bg-fuchsia-500/5">
           <CardHeader><CardTitle className="text-base">À transmettre au testeur</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm font-medium text-fuchsia-200">
+            <p className="text-sm font-medium text-fuchsia-700 dark:text-fuchsia-200">
               Copiez le mot de passe maintenant : il ne sera plus affiché après avoir quitté cette page.
             </p>
             <div className="space-y-2">

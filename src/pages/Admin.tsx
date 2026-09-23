@@ -1,5 +1,6 @@
 import { getCachedSession } from "@/services/gameAuth";
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useTheme } from "next-themes";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -41,7 +42,8 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ExternalLink, ShieldCheck, UserPlus } from "lucide-react";
+import { ExternalLink, Moon, ShieldCheck, Sun, UserPlus } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAdminEnvironment } from "@/contexts/AdminEnvironmentContext";
 import { ENVIRONMENTS, canSwitchEnvironments, type EnvironmentId } from "@/services/environmentContext";
 import { trackEvent } from "@/services/posthogService";
@@ -118,6 +120,7 @@ interface SyncReport {
 }
 
 export default function Admin() {
+  const { resolvedTheme, setTheme } = useTheme();
   const { profile, environmentId, selectEnvironment } = useAdminEnvironment();
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [embeddings, setEmbeddings] = useState<EmbeddingRow[]>([]);
@@ -387,6 +390,21 @@ export default function Admin() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label={resolvedTheme === "light" ? "Activer le mode sombre" : "Activer le mode clair"}
+                  onClick={() => setTheme(resolvedTheme === "light" ? "dark" : "light")}
+                >
+                  {resolvedTheme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {resolvedTheme === "light" ? "Mode sombre" : "Mode clair"}
+              </TooltipContent>
+            </Tooltip>
             {canSwitchEnvironments(profile) ? (
               <Select value={environmentId} onValueChange={(value) => selectEnvironment(value as EnvironmentId)}>
                 <SelectTrigger className="w-[210px]" aria-label="Environnement actif">
@@ -418,7 +436,7 @@ export default function Admin() {
             <ShieldCheck className="h-4 w-4" /> PRODUCTION
           </div>
         ) : (
-          <div className="mb-4 rounded-lg border border-fuchsia-400/50 bg-fuchsia-500/15 px-4 py-2 text-sm font-bold tracking-wide text-fuchsia-100">
+          <div className="mb-4 rounded-lg border border-fuchsia-400/50 bg-fuchsia-500/15 px-4 py-2 text-sm font-bold tracking-wide text-fuchsia-700 dark:text-fuchsia-100">
             SANDBOX — {ENVIRONMENTS.find((environment) => environment.id === environmentId)?.label.toUpperCase()}
           </div>
         )}
@@ -468,7 +486,7 @@ export default function Admin() {
             </div>
           )}
           {activeGroup === "legacy" && (
-            <div className="mb-4 rounded-lg border border-amber-700/50 bg-amber-950/20 px-4 py-3 text-sm text-amber-100">
+            <div className="mb-4 rounded-lg border border-amber-700/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/20 dark:text-amber-100">
               Accès legacy temporaire journalisé. Ces vues décrivent l’ancien validateur, absent du pipeline PRD4 live.
             </div>
           )}

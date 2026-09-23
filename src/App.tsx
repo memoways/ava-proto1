@@ -3,7 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, useParams } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
 import IndexPRD4 from "./pages/IndexPRD4";
 import AdminAuthGate from "./components/AdminAuthGate";
 import PublicAccessGate from "./components/PublicAccessGate";
@@ -22,6 +23,24 @@ const Admin = lazy(() => import("./pages/Admin"));
 const LatencyTelemetryPreview = import.meta.env.DEV ? lazy(() => import("./dev/LatencyTelemetryPreview")) : null;
 const RAGConfigPreview = import.meta.env.DEV ? lazy(() => import("./dev/RAGConfigPreview")) : null;
 
+function RoutedThemeProvider({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const adminRoute = location.pathname === "/admin" || location.pathname.startsWith("/admin/");
+
+  return (
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="dark"
+      enableSystem={false}
+      forcedTheme={adminRoute ? undefined : "dark"}
+      storageKey="ava_admin_theme"
+      disableTransitionOnChange
+    >
+      {children}
+    </ThemeProvider>
+  );
+}
+
 function ExternalTestRoute() {
   const { invitationId = "" } = useParams();
   return <ExternalTestAccessGate invitationId={invitationId}><IndexPRD4 /></ExternalTestAccessGate>;
@@ -30,31 +49,33 @@ function ExternalTestRoute() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<PublicAccessGate><IndexPRD4 /></PublicAccessGate>} />
-          <Route path="/test/:invitationId" element={<ExternalTestRoute />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/confidentialite" element={<Privacy />} />
-          <Route
-            path="/admin/*"
-            element={(
-              <AdminAuthGate>
-                <Suspense fallback={<div className="p-6 text-sm">Chargement de l’admin…</div>}>
-                  <Admin />
-                </Suspense>
-              </AdminAuthGate>
-            )}
-          />
-          {LatencyTelemetryPreview && <Route path="/__preview/latency-telemetry" element={<Suspense fallback={null}><LatencyTelemetryPreview /></Suspense>} />}
-          {RAGConfigPreview && <Route path="/__preview/rag-config" element={<Suspense fallback={null}><RAGConfigPreview /></Suspense>} />}
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <RoutedThemeProvider>
+          <Toaster />
+          <Sonner />
+          <Routes>
+            <Route path="/" element={<PublicAccessGate><IndexPRD4 /></PublicAccessGate>} />
+            <Route path="/test/:invitationId" element={<ExternalTestRoute />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/confidentialite" element={<Privacy />} />
+            <Route
+              path="/admin/*"
+              element={(
+                <AdminAuthGate>
+                  <Suspense fallback={<div className="p-6 text-sm">Chargement de l’admin…</div>}>
+                    <Admin />
+                  </Suspense>
+                </AdminAuthGate>
+              )}
+            />
+            {LatencyTelemetryPreview && <Route path="/__preview/latency-telemetry" element={<Suspense fallback={null}><LatencyTelemetryPreview /></Suspense>} />}
+            {RAGConfigPreview && <Route path="/__preview/rag-config" element={<Suspense fallback={null}><RAGConfigPreview /></Suspense>} />}
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          {debugLogger.enabled && <DebugPanel />}
+        </RoutedThemeProvider>
       </BrowserRouter>
-      {debugLogger.enabled && <DebugPanel />}
     </TooltipProvider>
   </QueryClientProvider>
 );

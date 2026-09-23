@@ -54,6 +54,46 @@
     --sidebar-border: 220 14% 16%;
     --sidebar-ring: 0 72% 51%;
   }
+
+  .light {
+    color-scheme: light;
+    --background: 0 0% 100%;
+    --foreground: 220 24% 10%;
+
+    --card: 220 20% 98%;
+    --card-foreground: 220 24% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 24% 10%;
+
+    --primary: 0 72% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 18% 94%;
+    --secondary-foreground: 220 24% 12%;
+
+    --muted: 220 18% 94%;
+    --muted-foreground: 220 10% 36%;
+
+    --accent: 35 90% 45%;
+    --accent-foreground: 220 24% 10%;
+
+    --destructive: 0 72% 44%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 14% 82%;
+    --input: 220 14% 78%;
+    --ring: 0 72% 45%;
+
+    --sidebar-background: 220 20% 97%;
+    --sidebar-foreground: 220 24% 10%;
+    --sidebar-primary: 0 72% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 18% 92%;
+    --sidebar-accent-foreground: 220 24% 10%;
+    --sidebar-border: 220 14% 82%;
+    --sidebar-ring: 0 72% 45%;
+  }
 }
 
 @layer base {
@@ -64,8 +104,8 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
   /* Placeholders stay fully white: browsers and placeholder:text-* otherwise dim them. */
-  input::placeholder,
-  textarea::placeholder {
+  :root:not(.light) input::placeholder,
+  :root:not(.light) textarea::placeholder {
     color: #ffffff !important;
     opacity: 1 !important;
   }
@@ -77,13 +117,13 @@
     re-grey copy even after tokens are #fff. Force readable pure white; hover
     / semantic colors (text-primary, text-amber-*, …) keep higher specificity.
   */
-  [class*="text-muted-foreground"],
-  [class*="text-foreground/"],
-  [class*="text-white/"],
-  [class*="text-card-foreground"],
-  [class*="text-popover-foreground"],
-  [class*="text-secondary-foreground"],
-  [class*="text-sidebar-foreground"] {
+  :root:not(.light) [class*="text-muted-foreground"],
+  :root:not(.light) [class*="text-foreground/"],
+  :root:not(.light) [class*="text-white/"],
+  :root:not(.light) [class*="text-card-foreground"],
+  :root:not(.light) [class*="text-popover-foreground"],
+  :root:not(.light) [class*="text-secondary-foreground"],
+  :root:not(.light) [class*="text-sidebar-foreground"] {
     color: #ffffff;
   }
 
