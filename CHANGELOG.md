@@ -6,6 +6,17 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Non publié]
 
+### Thème du back-office
+
+- Ajout d’une bascule clair/sombre dans l’en-tête de l’administration, avec
+  mémorisation locale du choix pour chaque navigateur.
+- Nouvelle palette claire à fond blanc pour les cartes, formulaires, onglets,
+  menus et notifications ; les badges de statut restent lisibles dans les deux
+  modes.
+- Le thème reste strictement sombre dans l’expérience joueur, quelle que soit
+  la préférence choisie dans le back-office.
+- Détail : `docs/plan_theme_clair_sombre_backoffice.md`.
+
 ### Onboarding du bénévole
 
 - Nouvelle étape courte (trois cartes) entre l'introduction et le choix du
