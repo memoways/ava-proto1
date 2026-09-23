@@ -21,7 +21,7 @@ export default function SandboxGuideTab() {
           <h2 className="text-xl font-semibold">Mode d'emploi · Sandbox</h2>
           <p className="text-sm text-muted-foreground">
             Compte connecté : <strong>{profile.display_name}</strong> · Environnement actif :{" "}
-            <span className={isProduction ? "text-emerald-400" : "text-fuchsia-400 font-medium"}>
+            <span className={isProduction ? "text-emerald-700 dark:text-emerald-400" : "font-medium text-fuchsia-700 dark:text-fuchsia-400"}>
               {isProduction ? "Production" : `Sandbox — ${environmentLabel}`}
             </span>
           </p>
@@ -38,7 +38,7 @@ export default function SandboxGuideTab() {
         </div>
       </div>
 
-      <Alert className="border-fuchsia-400/50 bg-fuchsia-500/10 text-fuchsia-100">
+      <Alert className="border-fuchsia-400/50 bg-fuchsia-500/10 text-fuchsia-800 dark:text-fuchsia-100">
         <FlaskConical className="h-4 w-4" />
         <AlertTitle>En deux mots</AlertTitle>
         <AlertDescription>
