@@ -27,6 +27,15 @@ const FIRST_CHUNK_TIMEOUT_MS = 8000;
 const INTER_CHUNK_STALL_MS = 6000;
 /** Small scheduling safety margin so the first buffer never starts in the past. */
 const SCHEDULE_MARGIN_S = 0.03;
+/**
+ * Jitter buffer: audio accumulated before (re)starting playback. Without it,
+ * each late WS chunk created a gap then a hard restart — heard as "hiccups"
+ * and clicks in the middle of words.
+ */
+const PREBUFFER_S = 0.3;
+const REBUFFER_S = 0.2;
+/** Short fade applied when playback (re)starts after silence, to avoid clicks. */
+const FADE_S = 0.004;
 
 export interface GradiumStreamOptions {
   voiceId: string;
@@ -194,13 +203,21 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
     }
   };
 
-  const scheduleChunk = (samples: Float32Array, ctx: AudioContext) => {
+  let hasPlayed = false;
+  const pendingDuration = () => pendingChunks.reduce((sum, c) => sum + c.length, 0) / sampleRate;
+
+  const scheduleChunk = (samples: Float32Array, ctx: AudioContext, fadeIn = false) => {
     if (!gain) {
       gain = ctx.createGain();
       gain.connect(ctx.destination);
     }
     const buffer = ctx.createBuffer(1, samples.length, sampleRate);
-    buffer.getChannelData(0).set(samples);
+    const data = buffer.getChannelData(0);
+    data.set(samples);
+    if (fadeIn) {
+      const n = Math.min(data.length, Math.round(FADE_S * sampleRate));
+      for (let i = 0; i < n; i++) data[i] *= i / n;
+    }
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(gain);
@@ -220,9 +237,16 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
     if (!gateOpen || cancelled) return;
     const ctx = getSharedAudioContext();
     if (!ctx) return;
+    if (pendingChunks.length === 0) { checkFinished(); return; }
+    // Idle = nothing queued ahead of the audio clock (start, or underrun).
+    const idle = playCursor <= ctx.currentTime + 0.005;
+    if (idle && !eosReceived && pendingDuration() < (hasPlayed ? REBUFFER_S : PREBUFFER_S)) return;
+    let first = idle;
     while (pendingChunks.length > 0) {
-      scheduleChunk(pendingChunks.shift()!, ctx);
+      scheduleChunk(pendingChunks.shift()!, ctx, first);
+      first = false;
     }
+    hasPlayed = true;
     checkFinished();
   };
 
@@ -276,12 +300,8 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
       totalBytes += msg.audio.length; // base64 length ≈ bytes × 4/3; good enough for stats
       const samples = decodePcmChunk(msg.audio, carry);
       if (samples.length === 0) return;
-      if (gateOpen) {
-        const ctx = getSharedAudioContext();
-        if (ctx) scheduleChunk(samples, ctx);
-      } else {
-        pendingChunks.push(samples);
-      }
+      pendingChunks.push(samples);
+      flushPending();
     } else if (msg.type === "end_of_stream" || msg.type === "eos") {
       if (!firstByteMs) {
         fail(new Error("Gradium WS returned no audio"));

@@ -405,15 +405,17 @@ export function applyGradiumPerformance(
   intent?: PerformanceIntent | null,
 ): GradiumPerformanceTuning {
   if (!intent) return { temp: base.temp, paddingBonus: base.paddingBonus };
-  const tempBump = 0.08 * intent.intensity
-    + (intent.emotion === "angry" || intent.emotion === "urgent" || intent.emotion === "scared" ? 0.1 : 0);
+  // Kept small: high Gradium temperatures produce hiccups, breaths and odd
+  // pronunciations. Bump ≤ 0.1 and hard ceiling at 0.85.
+  const tempBump = Math.min(0.1, 0.04 * intent.intensity
+    + (intent.emotion === "angry" || intent.emotion === "urgent" || intent.emotion === "scared" ? 0.03 : 0));
   let padding = base.paddingBonus;
   if (intent.delivery === "rushed" || intent.emotion === "urgent") padding -= 0.6;
   if (intent.delivery === "measured" || intent.delivery === "whisper" || intent.emotion === "sad" || intent.emotion === "fragile") {
     padding += 0.5;
   }
   return {
-    temp: clamp(base.temp + tempBump, 0, 1.4),
+    temp: clamp(base.temp + tempBump, 0, Math.max(base.temp, 0.85)),
     paddingBonus: clamp(padding, -4, 4),
   };
 }
