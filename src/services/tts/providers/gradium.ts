@@ -17,6 +17,23 @@ import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { playAudioBlobRobust } from "@/services/audioPlayback";
 import { createGradiumStreamSession, isStreamingSupported } from "@/services/tts/gradiumStreamPlayer";
 
+/**
+ * Gradium-specific cleanup: ellipses, dashes and stray quotes/parentheses are
+ * read as breaths, clicks or "hiccups" by the model — turn them into plain
+ * punctuation it phrases cleanly.
+ */
+export function prepareTextForGradium(text: string): string {
+  return prepareTextForTTS(text)
+    .replace(/\s*\.{3}\s*(?=[A-Za-zÀ-ÿ0-9])/g, ", ")
+    .replace(/\.{3}/g, ".")
+    .replace(/\s+[—–-]\s+/g, ", ")
+    .replace(/[«»"“”()\[\]]/g, "")
+    .replace(/([,;:!?.])\s*,/g, "$1")
+    .replace(/,\s*([.!?])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 function buildJsonConfig(s: GradiumSettings, performance?: PerformanceIntent | null): Record<string, number | string> {
@@ -56,7 +73,7 @@ export const gradiumProvider: TTSProvider = {
 
   async generate(text: string, ctx?: TTSGenerateContext): Promise<TTSGenerateResult> {
     const s = resolveGradiumSettings(ctx?.characterKey);
-    const preparedText = prepareTextForTTS(text);
+    const preparedText = prepareTextForGradium(text);
     const voiceId = ctx?.voiceId || s.voiceId;
 
     const body = {
@@ -129,7 +146,7 @@ function createStreamingHandleWithFallback(
   s: GradiumSettings,
   ctx?: TTSGenerateContext,
 ): TTSStreamPlaybackHandle {
-  const preparedText = prepareTextForTTS(text);
+  const preparedText = prepareTextForGradium(text);
   const t0 = performance.now();
 
   const session = createGradiumStreamSession(preparedText, {

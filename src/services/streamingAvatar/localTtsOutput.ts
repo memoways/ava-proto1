@@ -11,7 +11,7 @@ import type {
 
 function chunkOptions() {
   return getActiveProviderId() === "gradium"
-    ? { maxSingleChars: 160, targetChars: 160 }
+    ? { maxSingleChars: 320, targetChars: 320 }
     : undefined;
 }
 
