@@ -118,6 +118,15 @@ describe("provider adapters", () => {
     expect(tuned.temp).toBeLessThanOrEqual(1.4);
   });
 
+  it("caps an intense Gradium performance at the diction-safe temperature", () => {
+    const tuned = applyGradiumPerformance(
+      { temp: 0.8, paddingBonus: 0 },
+      intentFromManualEmotion("angry", 2),
+    );
+
+    expect(tuned.temp).toBe(0.85);
+  });
+
   it("sends Inworld instruction and CREATIVE mode at intensity 2", () => {
     const patch = applyInworldPerformance(
       { deliveryMode: "BALANCED", speakingRate: 1 },
