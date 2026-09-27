@@ -115,7 +115,12 @@ describe("provider adapters", () => {
   it("raises Gradium temp for anger without dropping pronunciation fields", () => {
     const tuned = applyGradiumPerformance({ temp: 0.7, paddingBonus: 0 }, angry);
     expect(tuned.temp).toBeGreaterThan(0.7);
-    expect(tuned.temp).toBeLessThanOrEqual(1.4);
+    expect(tuned.temp).toBeLessThanOrEqual(0.85);
+  });
+
+  it("caps Gradium temp even when a legacy base setting exceeds the diction limit", () => {
+    const tuned = applyGradiumPerformance({ temp: 1.1, paddingBonus: 0 }, angry);
+    expect(tuned.temp).toBe(0.85);
   });
 
   it("sends Inworld instruction and CREATIVE mode at intensity 2", () => {
