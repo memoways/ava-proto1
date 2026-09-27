@@ -415,7 +415,7 @@ export function applyGradiumPerformance(
     padding += 0.5;
   }
   return {
-    temp: clamp(base.temp + tempBump, 0, Math.max(base.temp, 0.85)),
+    temp: clamp(base.temp + tempBump, 0, 0.85),
     paddingBonus: clamp(padding, -4, 4),
   };
 }
