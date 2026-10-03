@@ -493,7 +493,7 @@ export interface GameplaySettings {
   /** Seuil cosine minimal appliqué par pgvector avant reranking. */
   RAG_MATCH_THRESHOLD: number;
   /** Reranker Voyage utilisé quand le rerank est actif. */
-  RAG_RERANK_MODEL: "rerank-2.5" | "rerank-2.5-lite";
+  RAG_RERANK_MODEL: "rerank-3" | "rerank-3-lite" | "rerank-2.5" | "rerank-2.5-lite";
   /** Autorise Voyage à tronquer les documents trop longs envoyés au reranker. */
   RAG_RERANK_TRUNCATION: boolean;
   RAG_SUMMARY_EVERY_N_TURNS: number;
@@ -523,7 +523,7 @@ const gameplayDefaults: GameplaySettings = {
   RAG_QUERY_REWRITE_ENABLED: defaultSettings.RAG_QUERY_REWRITE_ENABLED ?? true,
   RAG_EMBEDDING_PROVIDER: defaultSettings.RAG_EMBEDDING_PROVIDER === "openai" ? "openai" : "voyage",
   RAG_MATCH_THRESHOLD: defaultSettings.RAG_MATCH_THRESHOLD ?? 0.3,
-  RAG_RERANK_MODEL: defaultSettings.RAG_RERANK_MODEL === "rerank-2.5" ? "rerank-2.5" : "rerank-2.5-lite",
+  RAG_RERANK_MODEL: (["rerank-3", "rerank-3-lite", "rerank-2.5"] as const).find((m) => m === defaultSettings.RAG_RERANK_MODEL) ?? "rerank-2.5-lite",
   RAG_RERANK_TRUNCATION: defaultSettings.RAG_RERANK_TRUNCATION ?? true,
   RAG_SUMMARY_EVERY_N_TURNS: defaultSettings.RAG_SUMMARY_EVERY_N_TURNS ?? 4,
   VIDEO_PLACEHOLDER_DURATION: defaultSettings.VIDEO_PLACEHOLDER_DURATION,

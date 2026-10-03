@@ -39,7 +39,7 @@ export interface EvalLiveSnapshot {
   ragRetrieveK: number;
   ragRerank: boolean;
   ragThreshold: number;
-  ragRerankModel: "rerank-2.5" | "rerank-2.5-lite";
+  ragRerankModel: "rerank-3" | "rerank-3-lite" | "rerank-2.5" | "rerank-2.5-lite";
   ragRerankTruncation: boolean;
   promptVariant: string;
 }

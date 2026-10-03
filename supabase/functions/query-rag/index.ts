@@ -25,7 +25,7 @@ interface RAGRequest {
   character_context?: Record<string, unknown>;
   rerank?: boolean;
   retrieve_k?: number;
-  rerank_model?: "rerank-2.5" | "rerank-2.5-lite";
+  rerank_model?: "rerank-3" | "rerank-3-lite" | "rerank-2.5" | "rerank-2.5-lite";
   rerank_truncation?: boolean;
   include_retrieval_matches?: boolean;
 }
@@ -91,7 +91,7 @@ async function rerankVoyage(
   documents: string[],
   apiKey: string,
   topK: number,
-  model: "rerank-2.5" | "rerank-2.5-lite",
+  model: "rerank-3" | "rerank-3-lite" | "rerank-2.5" | "rerank-2.5-lite",
   truncation: boolean,
 ): Promise<Array<{ index: number; relevance_score: number }>> {
   const r = await fetch(`${VOYAGE_API_URL}/rerank`, {
@@ -165,7 +165,10 @@ serve(async (req) => {
     const retrieveK = Math.max(matchCount, body.retrieve_k ?? 15);
     const matchThreshold = body.match_threshold ?? 0.3;
     const useRerank = body.rerank !== false && !!VOYAGE_API_KEY;
-    const rerankModel = body.rerank_model === "rerank-2.5" ? "rerank-2.5" : "rerank-2.5-lite";
+    const RERANK_MODELS = ["rerank-3", "rerank-3-lite", "rerank-2.5", "rerank-2.5-lite"] as const;
+    const rerankModel = (RERANK_MODELS as readonly string[]).includes(body.rerank_model ?? "")
+      ? body.rerank_model!
+      : "rerank-2.5-lite";
     const rerankTruncation = body.rerank_truncation !== false;
     const rerankQuery = buildRerankQuery(searchInput);
 
