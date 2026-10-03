@@ -38,7 +38,7 @@ export interface RAGQueryOptions {
   /** Override retrieve_k (top fetched before rerank). */
   retrieveK?: number;
   /** Voyage reranker override used by the isolated RAG laboratory. */
-  rerankModel?: "rerank-2.5" | "rerank-2.5-lite";
+  rerankModel?: "rerank-3" | "rerank-3-lite" | "rerank-2.5" | "rerank-2.5-lite";
   /** Whether Voyage may truncate over-long reranker inputs. */
   rerankTruncation?: boolean;
   /** Return the full pre-rerank pool. Reserved for diagnostics to keep live payloads small. */
@@ -189,7 +189,7 @@ export interface RAGQueryDetailed {
     characterId: string;
     rerankRequested: boolean;
     retrieveK: number;
-    rerankModel: "rerank-2.5" | "rerank-2.5-lite";
+    rerankModel: "rerank-3" | "rerank-3-lite" | "rerank-2.5" | "rerank-2.5-lite";
     rerankTruncation: boolean;
   };
   error?: string;

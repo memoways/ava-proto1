@@ -377,9 +377,11 @@ export default function RAGConfigTab({ initialDashboard, initialGameplay, previe
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
             <label className="text-sm font-medium text-muted-foreground">Modèle Voyage</label>
-            <Select value={gameplay.RAG_RERANK_MODEL} onValueChange={(value: "rerank-2.5" | "rerank-2.5-lite") => update({ RAG_RERANK_MODEL: value })}>
+            <Select value={gameplay.RAG_RERANK_MODEL} onValueChange={(value: "rerank-3" | "rerank-3-lite" | "rerank-2.5" | "rerank-2.5-lite") => update({ RAG_RERANK_MODEL: value })}>
               <SelectTrigger disabled={!gameplay.RAG_RERANK_ENABLED}><SelectValue /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="rerank-3-lite">rerank-3-lite — nouvelle génération, même prix (à valider)</SelectItem>
+                <SelectItem value="rerank-3">rerank-3 — nouvelle génération, qualité maximale</SelectItem>
                 <SelectItem value="rerank-2.5-lite">rerank-2.5-lite — temps réel recommandé</SelectItem>
                 <SelectItem value="rerank-2.5">rerank-2.5 — qualité maximale</SelectItem>
               </SelectContent>

@@ -85,7 +85,7 @@ export interface PRD4TurnInput {
     ragThreshold?: number;
     ragRetrieveK?: number;
     ragRerank?: boolean;
-    ragRerankModel?: "rerank-2.5" | "rerank-2.5-lite";
+    ragRerankModel?: "rerank-3" | "rerank-3-lite" | "rerank-2.5" | "rerank-2.5-lite";
     ragRerankTruncation?: boolean;
     llm?: {
       model: string;

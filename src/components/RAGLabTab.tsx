@@ -25,7 +25,7 @@ import { getGameplaySettings } from "@/services/settingsService";
 import { fetchRAGQuestionCorpus, type RAGQuestionCorpusResult } from "@/services/ragQuestionCorpus";
 
 type CharacterOption = { id: string; name: string };
-type RerankModel = "rerank-2.5" | "rerank-2.5-lite";
+type RerankModel = "rerank-3" | "rerank-3-lite" | "rerank-2.5" | "rerank-2.5-lite";
 
 const PRESETS = [
   { id: "home", label: "Fait précis", query: "Où habite Max ?", context: "" },
@@ -398,6 +398,8 @@ export default function RAGLabTab() {
               <Select value={rerankModel} onValueChange={(value: RerankModel) => setRerankModel(value)} disabled={!rerank}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="rerank-3">rerank-3 · nouvelle génération, qualité</SelectItem>
+                  <SelectItem value="rerank-3-lite">rerank-3-lite · nouvelle génération, vitesse/coût</SelectItem>
                   <SelectItem value="rerank-2.5">rerank-2.5 · qualité</SelectItem>
                   <SelectItem value="rerank-2.5-lite">rerank-2.5-lite · vitesse/coût</SelectItem>
                 </SelectContent>
