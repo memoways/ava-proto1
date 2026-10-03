@@ -6,6 +6,13 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Non publié]
 
+### RAG Voyage
+
+- Ajout des rerankers Voyage `rerank-3` et `rerank-3-lite` (configuration RAG,
+  laboratoire RAG, `query-rag` avec liste autorisée). `rerank-2.5*` conservés
+  pour rollback. Plan : `docs/plan_rag_voyage_mise_a_jour.md`.
+
+
 ### Thème du back-office
 
 - Ajout d’une bascule clair/sombre dans l’en-tête de l’administration, avec
