@@ -3,6 +3,9 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const insertPinnedQuestion = vi.fn(async () => ({ error: null }));
+const deleteSession = vi.fn(() => ({
+  eq: vi.fn(async () => ({ error: null })),
+}));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -17,6 +20,9 @@ vi.mock("@/integrations/supabase/client", () => ({
             eq: vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) })),
           })),
         };
+      }
+      if (table === "sessions") {
+        return { delete: deleteSession };
       }
       return {};
     }),
@@ -73,5 +79,27 @@ describe("SessionsTab — envoi vers le laboratoire RAG", () => {
       question: "Où habites-tu ?",
       character_name: "Max",
     }));
+  });
+
+  it("exige un second clic avant de supprimer une session", async () => {
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <SessionsTab
+          sessions={[session]}
+          selectedSessionId={null}
+          onSelectSession={vi.fn()}
+          onRefresh={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    const deleteButton = screen.getByTitle("Supprimer");
+    fireEvent.click(deleteButton);
+
+    expect(deleteSession).not.toHaveBeenCalled();
+
+    fireEvent.click(deleteButton);
+    await waitFor(() => expect(deleteSession).toHaveBeenCalledTimes(1));
+    expect(deleteSession).toHaveBeenCalledWith();
   });
 });
