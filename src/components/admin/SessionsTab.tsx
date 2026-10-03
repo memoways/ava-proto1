@@ -337,8 +337,17 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
     }
   }
 
+  // window.confirm() est bloqué silencieusement dans l'iframe de prévisualisation :
+  // confirmation par double clic (le 1er clic arme, le 2e dans les 4 s supprime).
+  const [armedDelete, setArmedDelete] = useState<string | null>(null);
   async function deleteSession(id: string) {
-    if (!confirm("Supprimer cette session définitivement ?")) return;
+    if (armedDelete !== id) {
+      setArmedDelete(id);
+      toast.warning("Cliquez à nouveau sur Supprimer pour confirmer");
+      setTimeout(() => setArmedDelete((cur) => (cur === id ? null : cur)), 4000);
+      return;
+    }
+    setArmedDelete(null);
     setDeleting(id);
     const { error } = await supabase.from("sessions").delete().eq("id", id);
     if (error) {
