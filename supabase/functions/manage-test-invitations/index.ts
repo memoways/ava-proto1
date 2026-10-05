@@ -67,7 +67,7 @@ serve(async (req) => {
   if (action === "list") {
     const { data, error } = await admin
       .from("external_test_invitations")
-      .select("id,environment_id,tester_label,created_at,valid_from,expires_at,redeemed_at,revoked_at")
+      .select("id,environment_id,tester_label,created_at,valid_from,expires_at,redeemed_at,revoked_at,multi_use")
       .eq("created_by_user_id", auth.userId)
       .order("created_at", { ascending: false });
     if (error) return json(req, { error: "Unable to list invitations" }, 500);
@@ -152,8 +152,9 @@ serve(async (req) => {
       code_hash: codeHash,
       valid_from: new Date(fromMs).toISOString(),
       expires_at: new Date(toMs).toISOString(),
+      multi_use: body.multiUse === true,
     })
-    .select("id,environment_id,tester_label,created_at,valid_from,expires_at")
+    .select("id,environment_id,tester_label,created_at,valid_from,expires_at,multi_use")
     .single();
   if (error || !invitation) return json(req, { error: "Unable to create invitation" }, 500);
 
