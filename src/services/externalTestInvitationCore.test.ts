@@ -23,15 +23,15 @@ describe("external test invitation core", () => {
     expect(constantTimeEqual("short", "longer")).toBe(false);
   });
 
-  it("derives invitation status from pre-activation and four-hour access windows", () => {
+  it("derives invitation status from the validity period", () => {
     const future = "2026-09-20T00:00:00.000Z";
     const past = "2026-09-01T00:00:00.000Z";
     const now = new Date("2026-09-10T00:00:00.000Z").getTime();
-    const recentlyRedeemed = "2026-09-09T22:00:00.000Z";
-    expect(externalTestInvitationStatus({ revoked_at: null, redeemed_at: null, expires_at: future }, now)).toBe("available");
+    expect(externalTestInvitationStatus({ revoked_at: null, redeemed_at: null, valid_from: past, expires_at: future }, now)).toBe("available");
+    expect(externalTestInvitationStatus({ revoked_at: null, redeemed_at: null, valid_from: "2026-09-15T00:00:00.000Z", expires_at: future }, now)).toBe("scheduled");
     expect(externalTestInvitationStatus({ revoked_at: null, redeemed_at: null, expires_at: past }, now)).toBe("expired");
-    expect(externalTestInvitationStatus({ revoked_at: null, redeemed_at: recentlyRedeemed, expires_at: past }, now)).toBe("activated");
-    expect(externalTestInvitationStatus({ revoked_at: null, redeemed_at: past, expires_at: future }, now)).toBe("expired");
+    expect(externalTestInvitationStatus({ revoked_at: null, redeemed_at: past, expires_at: future }, now)).toBe("activated");
+    expect(externalTestInvitationStatus({ revoked_at: null, redeemed_at: past, expires_at: past }, now)).toBe("expired");
     expect(externalTestInvitationStatus({ revoked_at: past, redeemed_at: past, expires_at: future }, now)).toBe("revoked");
   });
 });

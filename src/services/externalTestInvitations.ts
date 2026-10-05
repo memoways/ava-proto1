@@ -2,13 +2,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { ensureAnonymousTestAuth } from "@/services/gameAuth";
 import type { EnvironmentId, ExternalTestAccessContext } from "@/services/environmentContext";
 
-export type ExternalTestInvitationStatus = "available" | "activated" | "expired" | "revoked";
+export type ExternalTestInvitationStatus = "scheduled" | "available" | "activated" | "expired" | "revoked";
 
 export interface ExternalTestInvitationSummary {
   id: string;
   environment_id: EnvironmentId;
   tester_label: string;
   created_at: string;
+  valid_from: string | null;
   expires_at: string;
   redeemed_at: string | null;
   revoked_at: string | null;
@@ -40,6 +41,8 @@ export async function listExternalTestInvitations(): Promise<ExternalTestInvitat
 export async function createExternalTestInvitation(input: {
   environmentId: EnvironmentId;
   testerLabel: string;
+  validFrom: string;
+  validUntil: string;
 }): Promise<{
   invitation: ExternalTestInvitationSummary;
   link: string;
