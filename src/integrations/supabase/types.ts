@@ -811,6 +811,7 @@ export type Database = {
           environment_id: string
           expires_at: string
           id: string
+          multi_use: boolean
           redeemed_at: string | null
           redeemed_by_user_id: string | null
           revoked_at: string | null
@@ -824,6 +825,7 @@ export type Database = {
           environment_id: string
           expires_at?: string
           id?: string
+          multi_use?: boolean
           redeemed_at?: string | null
           redeemed_by_user_id?: string | null
           revoked_at?: string | null
@@ -837,6 +839,7 @@ export type Database = {
           environment_id?: string
           expires_at?: string
           id?: string
+          multi_use?: boolean
           redeemed_at?: string | null
           redeemed_by_user_id?: string | null
           revoked_at?: string | null
