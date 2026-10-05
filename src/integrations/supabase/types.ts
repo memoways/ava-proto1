@@ -815,6 +815,7 @@ export type Database = {
           redeemed_by_user_id: string | null
           revoked_at: string | null
           tester_label: string
+          valid_from: string
         }
         Insert: {
           code_hash: string
@@ -827,6 +828,7 @@ export type Database = {
           redeemed_by_user_id?: string | null
           revoked_at?: string | null
           tester_label: string
+          valid_from?: string
         }
         Update: {
           code_hash?: string
@@ -839,6 +841,7 @@ export type Database = {
           redeemed_by_user_id?: string | null
           revoked_at?: string | null
           tester_label?: string
+          valid_from?: string
         }
         Relationships: [
           {
