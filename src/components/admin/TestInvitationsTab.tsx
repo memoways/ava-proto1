@@ -207,6 +207,16 @@ export default function TestInvitationsTab() {
             <DateField id="valid-from" label="Valable à partir du" value={startDate} onChange={setStartDate} disabledBefore={new Date()} />
             <DateField id="valid-until" label="Valable jusqu’au (inclus)" value={endDate} onChange={setEndDate} disabledBefore={startDate ?? new Date()} />
           </div>
+          <div className="flex items-start gap-3 rounded-lg border p-3">
+            <Checkbox id="multi-use" checked={multiUse} onCheckedChange={(value) => setMultiUse(value === true)} className="mt-0.5" />
+            <div className="space-y-1">
+              <Label htmlFor="multi-use" className="cursor-pointer">Plusieurs testeurs, plusieurs navigateurs</Label>
+              <p className="text-xs text-muted-foreground">
+                Le même lien et le même mot de passe fonctionnent pour toutes les personnes et tous les
+                appareils, sans limite, pendant toute la période choisie.
+              </p>
+            </div>
+          </div>
           {!periodValid ? (
             <p className="text-sm text-destructive">Choisissez une date de fin identique ou postérieure à la date de début.</p>
           ) : null}
@@ -273,6 +283,9 @@ export default function TestInvitationsTab() {
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <strong>{invitation.tester_label}</strong>
+                      {invitation.multi_use ? (
+                        <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">Plusieurs testeurs</span>
+                      ) : null}
                       <span className={`rounded-full border px-2 py-0.5 text-xs ${STATUS_CLASSES[invitation.status]}`}>
                         {STATUS_LABELS[invitation.status]}
                       </span>

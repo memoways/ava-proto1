@@ -4,3 +4,4 @@
 - Base : colonne `valid_from` (défaut now()); `expires_at` = fin de période.
 - `redeem_external_test_invitation` refuse avant `valid_from` et après `expires_at`; l'accès activé dure jusqu'à `expires_at` (remplace les 4 h fixes).
 - Statut « Programmée » avant le début. Période max 1 an, fin > début, validée côté serveur.
+- Case « Plusieurs testeurs » (`multi_use`) : lien et mot de passe partageables, aucun verrou par navigateur; seules les dates ouvrent/ferment l'accès.
