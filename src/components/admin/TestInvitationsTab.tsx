@@ -125,9 +125,19 @@ export default function TestInvitationsTab() {
       toast.error("Ajoutez un nom, un pseudonyme ou une référence de test.");
       return;
     }
+    if (!startDate || !endDate || !periodValid) {
+      toast.error("Choisissez une période de validité correcte.");
+      return;
+    }
     setCreating(true);
     try {
-      const result = await createExternalTestInvitation({ environmentId, testerLabel: label });
+      const validFrom = isSameDay(startDate, new Date()) ? new Date() : startOfDay(startDate);
+      const result = await createExternalTestInvitation({
+        environmentId,
+        testerLabel: label,
+        validFrom: validFrom.toISOString(),
+        validUntil: endOfDay(endDate).toISOString(),
+      });
       setCreatedSecret({ link: result.link, code: result.code });
       setInvitations((current) => [result.invitation, ...current]);
       setTesterLabel("");
@@ -182,22 +192,28 @@ export default function TestInvitationsTab() {
           ) : null}
           <div className="space-y-2">
             <Label htmlFor="tester-label">Nom, pseudonyme ou référence du testeur</Label>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                id="tester-label"
-                value={testerLabel}
-                onChange={(event) => setTesterLabel(event.target.value)}
-                maxLength={80}
-                placeholder="Ex. Camille — test septembre"
-              />
-              <Button onClick={() => void create()} disabled={!isSandbox || !testerLabel.trim() || creating}>
-                {creating ? "Génération…" : "Générer l’invitation"}
-              </Button>
-            </div>
+            <Input
+              id="tester-label"
+              value={testerLabel}
+              onChange={(event) => setTesterLabel(event.target.value)}
+              maxLength={80}
+              placeholder="Ex. Camille — test septembre"
+            />
           </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DateField id="valid-from" label="Valable à partir du" value={startDate} onChange={setStartDate} disabledBefore={new Date()} />
+            <DateField id="valid-until" label="Valable jusqu’au (inclus)" value={endDate} onChange={setEndDate} disabledBefore={startDate ?? new Date()} />
+          </div>
+          {!periodValid ? (
+            <p className="text-sm text-destructive">Choisissez une date de fin identique ou postérieure à la date de début.</p>
+          ) : null}
+          <Button onClick={() => void create()} disabled={!isSandbox || !testerLabel.trim() || !periodValid || creating}>
+            {creating ? "Génération…" : "Générer l’invitation"}
+          </Button>
           <p className="text-xs text-muted-foreground">
-            Le lien expire après 7 jours s’il n’est pas activé. Après activation, un seul navigateur
-            peut lancer plusieurs sessions pendant 4 heures.
+            Le lien ne fonctionne que pendant la période choisie (du début de la première journée à
+            la fin de la dernière). Une fois activé, un seul navigateur peut lancer plusieurs
+            sessions jusqu’à la fin de la période.
           </p>
         </CardContent>
       </Card>
@@ -259,7 +275,7 @@ export default function TestInvitationsTab() {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Sandbox — {label} · créée le {formatDate(invitation.created_at)} · expiration {formatDate(invitation.expires_at)}
+                      Sandbox — {label} · valable du {formatDate(invitation.valid_from ?? invitation.created_at)} au {formatDate(invitation.expires_at)}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {invitation.sessionCount} session{invitation.sessionCount > 1 ? "s" : ""}
