@@ -9,6 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { ENVIRONMENTS } from "@/services/environmentContext";
@@ -86,6 +87,7 @@ function DateField({ id, label, value, onChange, disabledBefore }: {
 export default function TestInvitationsTab() {
   const { environmentId } = useAdminEnvironment();
   const [testerLabel, setTesterLabel] = useState("");
+  const [multiUse, setMultiUse] = useState(false);
   const [startDate, setStartDate] = useState<Date | undefined>(() => new Date());
   const [endDate, setEndDate] = useState<Date | undefined>(() => addDays(new Date(), 7));
   const [invitations, setInvitations] = useState<ExternalTestInvitationSummary[]>([]);
@@ -137,6 +139,7 @@ export default function TestInvitationsTab() {
         testerLabel: label,
         validFrom: validFrom.toISOString(),
         validUntil: endOfDay(endDate).toISOString(),
+        multiUse,
       });
       setCreatedSecret({ link: result.link, code: result.code });
       setInvitations((current) => [result.invitation, ...current]);
