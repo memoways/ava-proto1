@@ -1,7 +1,6 @@
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const ACCESS_DURATION_MS = 4 * 60 * 60 * 1000;
 
-export type ExternalTestInvitationStatus = "available" | "activated" | "expired" | "revoked";
+export type ExternalTestInvitationStatus = "scheduled" | "available" | "activated" | "expired" | "revoked";
 
 export function generateExternalTestCode(
   randomBytes = crypto.getRandomValues(new Uint8Array(16)),
@@ -32,15 +31,14 @@ export function constantTimeEqual(left: string, right: string): boolean {
   return difference === 0;
 }
 
+/** Validity period = [valid_from, expires_at]; activation lasts until expires_at. */
 export function externalTestInvitationStatus(
-  row: { revoked_at: string | null; redeemed_at: string | null; expires_at: string },
+  row: { revoked_at: string | null; redeemed_at: string | null; expires_at: string; valid_from?: string | null },
   now = Date.now(),
 ): ExternalTestInvitationStatus {
   if (row.revoked_at) return "revoked";
-  if (row.redeemed_at) {
-    return new Date(row.redeemed_at).getTime() + ACCESS_DURATION_MS <= now
-      ? "expired"
-      : "activated";
-  }
-  return new Date(row.expires_at).getTime() <= now ? "expired" : "available";
+  if (new Date(row.expires_at).getTime() <= now) return "expired";
+  if (row.redeemed_at) return "activated";
+  if (row.valid_from && new Date(row.valid_from).getTime() > now) return "scheduled";
+  return "available";
 }

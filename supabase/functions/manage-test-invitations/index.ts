@@ -67,7 +67,7 @@ serve(async (req) => {
   if (action === "list") {
     const { data, error } = await admin
       .from("external_test_invitations")
-      .select("id,environment_id,tester_label,created_at,expires_at,redeemed_at,revoked_at")
+      .select("id,environment_id,tester_label,created_at,valid_from,expires_at,redeemed_at,revoked_at")
       .eq("created_by_user_id", auth.userId)
       .order("created_at", { ascending: false });
     if (error) return json(req, { error: "Unable to list invitations" }, 500);
@@ -129,9 +129,20 @@ serve(async (req) => {
     return json(req, { error: "Sandbox not available for this account" }, 403);
   }
 
+  const now = Date.now();
+  const fromMs = typeof body.validFrom === "string" ? Date.parse(body.validFrom) : now;
+  const toMs = typeof body.validUntil === "string"
+    ? Date.parse(body.validUntil)
+    : now + 7 * 24 * 60 * 60 * 1000;
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs <= fromMs || toMs <= now) {
+    return json(req, { error: "La date de fin doit être après la date de début et dans le futur." }, 400);
+  }
+  if (toMs - fromMs > 366 * 24 * 60 * 60 * 1000) {
+    return json(req, { error: "La période de validité ne peut pas dépasser un an." }, 400);
+  }
+
   const code = generateExternalTestCode();
   const codeHash = await sha256Hex(normalizeExternalTestCode(code));
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data: invitation, error } = await admin
     .from("external_test_invitations")
     .insert({
@@ -139,15 +150,16 @@ serve(async (req) => {
       created_by_user_id: auth.userId,
       tester_label: testerLabel,
       code_hash: codeHash,
-      expires_at: expiresAt,
+      valid_from: new Date(fromMs).toISOString(),
+      expires_at: new Date(toMs).toISOString(),
     })
-    .select("id,environment_id,tester_label,created_at,expires_at")
+    .select("id,environment_id,tester_label,created_at,valid_from,expires_at")
     .single();
   if (error || !invitation) return json(req, { error: "Unable to create invitation" }, 500);
 
   const origin = req.headers.get("origin") ?? "https://proto1.parle-a-ava.com";
   return json(req, {
-    invitation: { ...invitation, status: "available", sessionCount: 0 },
+    invitation: { ...invitation, redeemed_at: null, revoked_at: null, status: externalTestInvitationStatus({ ...invitation, redeemed_at: null, revoked_at: null }), sessionCount: 0 },
     link: `${origin}/test/${invitation.id}`,
     code,
   }, 201);
