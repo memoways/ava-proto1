@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Copy, KeyRound, RefreshCw, ShieldX } from "lucide-react";
+import { addDays, endOfDay, format, isSameDay, startOfDay } from "date-fns";
+import { fr } from "date-fns/locale";
+import { CalendarIcon, Copy, KeyRound, RefreshCw, ShieldX } from "lucide-react";
 import { toast } from "sonner";
 import { useAdminEnvironment } from "@/contexts/AdminEnvironmentContext";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { ENVIRONMENTS } from "@/services/environmentContext";
 import {
   createExternalTestInvitation,
@@ -16,6 +21,7 @@ import {
 } from "@/services/externalTestInvitations";
 
 const STATUS_LABELS: Record<ExternalTestInvitationStatus, string> = {
+  scheduled: "Programmée",
   available: "Disponible",
   activated: "Activée",
   expired: "Expirée",
@@ -23,6 +29,7 @@ const STATUS_LABELS: Record<ExternalTestInvitationStatus, string> = {
 };
 
 const STATUS_CLASSES: Record<ExternalTestInvitationStatus, string> = {
+  scheduled: "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300",
   available: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   activated: "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300",
   expired: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
@@ -43,9 +50,44 @@ async function copy(value: string, label: string): Promise<void> {
   toast.success(`${label} copié.`);
 }
 
+function DateField({ id, label, value, onChange, disabledBefore }: {
+  id: string;
+  label: string;
+  value: Date | undefined;
+  onChange: (date: Date | undefined) => void;
+  disabledBefore: Date;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button id={id} variant="outline" className={cn("w-full justify-start text-left font-normal", !value && "text-muted-foreground")}>
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {value ? format(value, "EEEE d MMMM yyyy", { locale: fr }) : "Choisir une date"}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={value}
+            onSelect={onChange}
+            locale={fr}
+            disabled={(date) => date < startOfDay(disabledBefore)}
+            initialFocus
+            className={cn("p-3 pointer-events-auto")}
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 export default function TestInvitationsTab() {
   const { environmentId } = useAdminEnvironment();
   const [testerLabel, setTesterLabel] = useState("");
+  const [startDate, setStartDate] = useState<Date | undefined>(() => new Date());
+  const [endDate, setEndDate] = useState<Date | undefined>(() => addDays(new Date(), 7));
   const [invitations, setInvitations] = useState<ExternalTestInvitationSummary[]>([]);
   const [createdSecret, setCreatedSecret] = useState<CreatedSecret | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +95,7 @@ export default function TestInvitationsTab() {
   const [revoking, setRevoking] = useState<string | null>(null);
   const environment = ENVIRONMENTS.find((candidate) => candidate.id === environmentId);
   const isSandbox = environment?.type === "sandbox";
+  const periodValid = !!startDate && !!endDate && startOfDay(endDate) >= startOfDay(startDate);
 
   const activeCount = useMemo(
     () => invitations.filter((invitation) => invitation.status === "available").length,
