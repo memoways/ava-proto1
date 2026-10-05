@@ -10,6 +10,7 @@ export interface ExternalTestInvitationSummary {
   tester_label: string;
   created_at: string;
   valid_from: string | null;
+  multi_use?: boolean;
   expires_at: string;
   redeemed_at: string | null;
   revoked_at: string | null;
@@ -43,6 +44,7 @@ export async function createExternalTestInvitation(input: {
   testerLabel: string;
   validFrom: string;
   validUntil: string;
+  multiUse: boolean;
 }): Promise<{
   invitation: ExternalTestInvitationSummary;
   link: string;

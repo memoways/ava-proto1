@@ -8,6 +8,13 @@
       "when": 1791197423295,
       "tag": "0000_external_test_invitations_validity_period",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791203193336,
+      "tag": "0001_external_test_invitations_multi_use",
+      "breakpoints": true
     }
   ]
 }

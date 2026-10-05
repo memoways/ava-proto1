@@ -9,6 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { ENVIRONMENTS } from "@/services/environmentContext";
@@ -86,6 +87,7 @@ function DateField({ id, label, value, onChange, disabledBefore }: {
 export default function TestInvitationsTab() {
   const { environmentId } = useAdminEnvironment();
   const [testerLabel, setTesterLabel] = useState("");
+  const [multiUse, setMultiUse] = useState(false);
   const [startDate, setStartDate] = useState<Date | undefined>(() => new Date());
   const [endDate, setEndDate] = useState<Date | undefined>(() => addDays(new Date(), 7));
   const [invitations, setInvitations] = useState<ExternalTestInvitationSummary[]>([]);
@@ -137,6 +139,7 @@ export default function TestInvitationsTab() {
         testerLabel: label,
         validFrom: validFrom.toISOString(),
         validUntil: endOfDay(endDate).toISOString(),
+        multiUse,
       });
       setCreatedSecret({ link: result.link, code: result.code });
       setInvitations((current) => [result.invitation, ...current]);
@@ -204,6 +207,16 @@ export default function TestInvitationsTab() {
             <DateField id="valid-from" label="Valable à partir du" value={startDate} onChange={setStartDate} disabledBefore={new Date()} />
             <DateField id="valid-until" label="Valable jusqu’au (inclus)" value={endDate} onChange={setEndDate} disabledBefore={startDate ?? new Date()} />
           </div>
+          <div className="flex items-start gap-3 rounded-lg border p-3">
+            <Checkbox id="multi-use" checked={multiUse} onCheckedChange={(value) => setMultiUse(value === true)} className="mt-0.5" />
+            <div className="space-y-1">
+              <Label htmlFor="multi-use" className="cursor-pointer">Plusieurs testeurs, plusieurs navigateurs</Label>
+              <p className="text-xs text-muted-foreground">
+                Le même lien et le même mot de passe fonctionnent pour toutes les personnes et tous les
+                appareils, sans limite, pendant toute la période choisie.
+              </p>
+            </div>
+          </div>
           {!periodValid ? (
             <p className="text-sm text-destructive">Choisissez une date de fin identique ou postérieure à la date de début.</p>
           ) : null}
@@ -270,6 +283,9 @@ export default function TestInvitationsTab() {
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <strong>{invitation.tester_label}</strong>
+                      {invitation.multi_use ? (
+                        <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">Plusieurs testeurs</span>
+                      ) : null}
                       <span className={`rounded-full border px-2 py-0.5 text-xs ${STATUS_CLASSES[invitation.status]}`}>
                         {STATUS_LABELS[invitation.status]}
                       </span>

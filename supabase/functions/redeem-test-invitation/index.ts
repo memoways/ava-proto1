@@ -75,12 +75,14 @@ async function loadActiveAccess(
 
   const { data: invitation } = await admin
     .from("external_test_invitations")
-    .select("id,environment_id,tester_label,created_by_user_id,redeemed_by_user_id,redeemed_at,revoked_at")
+    .select("id,environment_id,tester_label,created_by_user_id,redeemed_by_user_id,redeemed_at,revoked_at,multi_use,expires_at")
     .eq("id", invitationId)
-    .eq("redeemed_by_user_id", userId)
     .is("revoked_at", null)
     .maybeSingle();
   if (!invitation?.redeemed_at) return null;
+  if (new Date(invitation.expires_at).getTime() <= Date.now()) return null;
+  // Single-use links stay bound to the browser that redeemed them; shared links do not.
+  if (!invitation.multi_use && invitation.redeemed_by_user_id !== userId) return null;
   const { data: creator } = await admin
     .from("admin_users")
     .select("display_name")
