@@ -81,7 +81,9 @@ export class HeyGenStreamingAvatarOutput implements ResponseOutput {
 
     // Explicitly disable the SDK voice-chat path: Ava's microphone belongs only
     // to its own STT pipeline and must never be published to LiveAvatar.
-    const session = new LiveAvatarSession(this.token, { voiceChat: false });
+    const session = new LiveAvatarSession(this.token, {
+      voiceChat: { defaultMuted: true },
+    });
     this.session = session;
     this.bindEvents(session);
     const connectionStartedAt = performance.now();
