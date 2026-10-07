@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-09-16 (onboarding du bénévole — parcours et contexte joueur intégrés)
+> **Last Updated**: 2026-10-07 (connexion HeyGen mise à jour — SDK LiveAvatar 0.0.19, micro explicitement coupé, sonde admin en v3)
 
 ---
 

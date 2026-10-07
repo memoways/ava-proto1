@@ -6,6 +6,21 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Non publié]
 
+### Connexion HeyGen (LiveAvatar)
+
+- Analyse de la dépréciation HeyGen v1/v2 (fin de support le 31/10/2026) : elle
+  concerne l'API REST vidéo, que le projet n'utilise pas. Le streaming
+  LiveAvatar (`api.liveavatar.com/v1`) n'est pas déprécié.
+- SDK navigateur `@heygen/liveavatar-web-sdk` 0.0.18 → 0.0.19. Rupture
+  d'interface : le micro s'activait par défaut ; `voiceChat` est désormais
+  explicitement réglé sur `{ defaultMuted: true }` pour garantir que le micro
+  reste exclusivement au pipeline STT d'Ava.
+- Sonde de diagnostic de l'admin migrée de `api.heygen.com/v2/avatars` vers
+  `v3/avatars`.
+- Validation : typecheck propre, tests de l'avatar en direct verts, Edge
+  Function `streaming-avatar-session` redéployée. Production inchangée.
+- Plan : `docs/plan_heygen_liveavatar_mise_a_jour.md`.
+
 ### RAG Voyage
 
 - Ajout des rerankers Voyage `rerank-3` et `rerank-3-lite` (configuration RAG,
