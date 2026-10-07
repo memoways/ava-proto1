@@ -79,7 +79,7 @@ serve(async (req) => {
           Deno.env.get("LIVEAVATAR_API_KEY"),
         ),
         heygenCore: await probeProvider(
-          "https://api.heygen.com/v2/avatars",
+          "https://api.heygen.com/v3/avatars",
           "X-Api-Key",
           Deno.env.get("LIVEAVATAR_API_KEY"),
         ),

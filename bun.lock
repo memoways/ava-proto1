@@ -8,7 +8,7 @@
         "@daily-co/daily-js": "^0.91.0",
         "@grainql/analytics-web": "^3.4.0",
         "@hcaptcha/react-hcaptcha": "^2.0.2",
-        "@heygen/liveavatar-web-sdk": "^0.0.18",
+        "@heygen/liveavatar-web-sdk": "^0.0.19",
         "@hookform/resolvers": "^3.10.0",
         "@radix-ui/react-accordion": "^1.2.11",
         "@radix-ui/react-alert-dialog": "^1.1.14",
@@ -198,7 +198,7 @@
 
     "@hcaptcha/react-hcaptcha": ["@hcaptcha/react-hcaptcha@2.0.2", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@hcaptcha/react-hcaptcha/-/react-hcaptcha-2.0.2.tgz", {}, "sha512-VbuH6VJ6m3BHmVBHs0fL9t+suZd7PQEqCzqL2BiUbBvbHI3XfvSgdiug2QiEPN8zskbPTIV/FfGPF53JCckrow=="],
 
-    "@heygen/liveavatar-web-sdk": ["@heygen/liveavatar-web-sdk@0.0.18", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@heygen/liveavatar-web-sdk/-/liveavatar-web-sdk-0.0.18.tgz", { "dependencies": { "events": "3.3.0", "livekit-client": "2.15.7", "typed-emitter": "2.1.0", "webrtc-issue-detector": "1.16.3" } }, "sha512-5acXQbqYLc7GXymutTXSrp4KSrk2/NRCf8UIU7JVuO76O8InVOM3YpwhdZBmTWuB+6Mght/vg07ljKZM2D1FcQ=="],
+    "@heygen/liveavatar-web-sdk": ["@heygen/liveavatar-web-sdk@0.0.19", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@heygen/liveavatar-web-sdk/-/liveavatar-web-sdk-0.0.19.tgz", { "dependencies": { "events": "3.3.0", "livekit-client": "2.15.7", "typed-emitter": "2.1.0", "webrtc-issue-detector": "1.16.3" } }, "sha512-iSO9mD0auLZeJ1ALi0pprB0l6BaBrYexq65R3qsAtNSOHWB+uugldyLtq8P1nvwVnGZrzp7AIRJq2MPIIeKWnA=="],
 
     "@hookform/resolvers": ["@hookform/resolvers@3.10.0", "", { "peerDependencies": { "react-hook-form": "^7.0.0" } }, "sha512-79Dv+3mDF7i+2ajj7SkypSKHhl1cbln1OGavqrsF7p6mbUv11xpqpacPsGDCTRvCSjEEIez2ef1NveSVL3b0Ag=="],
 
