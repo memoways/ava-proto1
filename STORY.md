@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-09-16 (onboarding du bénévole — parcours et contexte joueur intégrés)
+> **Last Updated**: 2026-10-07 (connexion HeyGen mise à jour — SDK LiveAvatar 0.0.19, micro explicitement coupé, sonde admin en v3)
 
 ---
 
@@ -2426,7 +2426,24 @@ continuité d’expérience (mémoire entre tours).
 
 ### Dernière session
 
-**2026-09-11 — Relations crédibles, GM renforcé et séquence éditoriale**
+**2026-10-07 — Connexion HeyGen : dépréciation v1/v2 analysée, SDK LiveAvatar mis à jour**
+
+**Contexte :** HeyGen annonce la fin de ses endpoints REST vidéo v1/v2 au
+31/10/2026. Analyse : notre avatar en direct passe par LiveAvatar
+(`api.liveavatar.com/v1`), produit distinct non déprécié ; le projet n'utilise
+ni génération de vidéos, ni traduction, ni templates HeyGen.
+
+**Livré :** SDK `@heygen/liveavatar-web-sdk` 0.0.18 → 0.0.19. Rupture
+d'interface détectée au typecheck : le micro s'activait par défaut non muet —
+corrigé en `voiceChat: { defaultMuted: true }`, le micro reste exclusivement au
+pipeline STT d'Ava. Sonde de diagnostic admin migrée de `v2/avatars` vers
+`v3/avatars`. Edge Function `streaming-avatar-session` redéployée ; typecheck
+propre, tests avatar verts. Plan : `docs/plan_heygen_liveavatar_mise_a_jour.md`.
+
+**Reste :** test canary d'un appel avatar en sandbox (connexion, première
+parole, absence de micro publié). Production inchangée.
+
+**Session précédente — 2026-09-11 — Relations crédibles, GM renforcé et séquence éditoriale**
 
 **Avant :** les personnages pouvaient livrer leur biographie et leurs sujets
 intimes dès les premiers échanges. La mémoire connaissait déjà confiance et
