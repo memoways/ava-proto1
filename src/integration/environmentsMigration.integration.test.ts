@@ -130,6 +130,21 @@ describe("v0.26 environments migration", () => {
     const invitationsMigration = await readFile(invitationsMigrationUrl, "utf8");
     await db.exec(invitationsMigration);
     await db.exec(invitationsMigration);
+    const validityMigrationUrl = new URL(
+      "../../drizzle/migrations/0000_external_test_invitations_validity_period.sql",
+      import.meta.url,
+    );
+    await db.exec(await readFile(validityMigrationUrl, "utf8"));
+    const multiUseMigrationUrl = new URL(
+      "../../drizzle/migrations/0001_external_test_invitations_multi_use.sql",
+      import.meta.url,
+    );
+    await db.exec(await readFile(multiUseMigrationUrl, "utf8"));
+    const multiUseAccessMigrationUrl = new URL(
+      "../../drizzle/migrations/0002_external_test_invitations_multi_use_access.sql",
+      import.meta.url,
+    );
+    await db.exec(await readFile(multiUseAccessMigrationUrl, "utf8"));
   }, 30_000);
 
   afterEach(async () => db.close());
@@ -333,5 +348,63 @@ describe("v0.26 environments migration", () => {
       insert into public.sessions (test_invitation_id)
       values ('44444444-4444-4444-8444-444444444444')
     `)).rejects.toThrow("active external test invitation required");
+  });
+
+  it("enforces a shared invitation's validity period for each anonymous tester", async () => {
+    await db.exec(`
+      insert into auth.users (id, email, is_anonymous) values
+        ('${TESTER_USER}', null, true),
+        ('${SECOND_TESTER_USER}', null, true);
+      insert into public.admin_settings (key, value, environment_id) values
+        ('ava_test_invitation_setting', '{"source":"sandbox-benoit"}', 'sandbox-benoit');
+      insert into public.external_test_invitations (
+        id, environment_id, created_by_user_id, tester_label, code_hash, valid_from, expires_at, multi_use
+      ) values (
+        '55555555-5555-4555-8555-555555555555', 'sandbox-benoit', '${PROD_USER}',
+        'Groupe pilote', repeat('b', 64), clock_timestamp() + interval '1 hour',
+        clock_timestamp() + interval '2 days', true
+      );
+    `);
+
+    const beforeValidity = await db.query(`
+      select * from public.redeem_external_test_invitation(
+        '55555555-5555-4555-8555-555555555555', repeat('b', 64), '${TESTER_USER}'
+      )
+    `);
+    expect(beforeValidity.rows).toHaveLength(0);
+
+    await db.exec(`
+      update public.external_test_invitations
+      set valid_from = clock_timestamp() - interval '1 hour'
+      where id = '55555555-5555-4555-8555-555555555555';
+    `);
+    const firstRedemption = await db.query(`
+      select * from public.redeem_external_test_invitation(
+        '55555555-5555-4555-8555-555555555555', repeat('b', 64), '${TESTER_USER}'
+      )
+    `);
+    const secondRedemption = await db.query(`
+      select * from public.redeem_external_test_invitation(
+        '55555555-5555-4555-8555-555555555555', repeat('b', 64), '${SECOND_TESTER_USER}'
+      )
+    `);
+    expect(firstRedemption.rows).toHaveLength(1);
+    expect(secondRedemption.rows).toHaveLength(1);
+
+    await db.exec(`
+      select set_config('request.jwt.claim.sub', '${SECOND_TESTER_USER}', false);
+      select set_config(
+        'request.jwt.claims',
+        '{"sub":"${SECOND_TESTER_USER}","is_anonymous":true}',
+        false
+      );
+      set role authenticated;
+    `);
+    const visibleSettings = await db.query<{ environment_id: string }>(`
+      select environment_id from public.admin_settings
+      where key = 'ava_test_invitation_setting'
+    `);
+    expect(visibleSettings.rows).toEqual([{ environment_id: "sandbox-benoit" }]);
+    await db.exec("reset role");
   });
 });
