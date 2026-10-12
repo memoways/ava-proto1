@@ -20,6 +20,7 @@ import {
   DEFAULT_DIRECTOR_CONFIG,
   listOrchestrationVersions,
   normalizeDirectorConfig,
+  registryActiveCharacterKeys,
   publishOrchestrationVersion,
   updateOrchestrationDraft,
   type ExperienceOrchestrationVersion,
