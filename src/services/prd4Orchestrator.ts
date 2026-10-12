@@ -256,7 +256,10 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     : undefined;
   const resolvedUserRoleSummary = input.userRole?.summary_for_max ?? postureSummary;
   // Cadre commun : lecture DB déjà lancée en parallèle du RAG, aucun appel IA ajouté.
-  const frameRuntime = await directorRuntimePromise;
+  const frameRuntime = await Promise.race([
+    directorRuntimePromise,
+    new Promise<{ config: null }>((resolve) => setTimeout(() => resolve({ config: null }), 400)),
+  ]);
   const experienceFrame = buildExperienceFrame({
     config: frameRuntime.config?.frame,
     filmAnswer: input.hasSeenFilm,

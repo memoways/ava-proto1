@@ -227,6 +227,8 @@ const IndexPRD4 = () => {
   const endedRef = useRef(false);
   const userRoleRef = useRef(state.userRoleProfile);
   userRoleRef.current = state.userRoleProfile;
+  const hasSeenFilmRef = useRef(state.hasSeenFilm);
+  hasSeenFilmRef.current = state.hasSeenFilm;
   const userPostureRef = useRef<UserPosture | null>(state.userPosture);
   userPostureRef.current = state.userPosture;
   const turnLatenciesRef = useRef<number[]>([]);
@@ -1147,6 +1149,7 @@ const IndexPRD4 = () => {
           conversationHistory: priorConversation,
           userMessage: userText,
           userRole: userRoleRef.current,
+          hasSeenFilm: hasSeenFilmRef.current,
           userPostureRaw: userPostureRef.current?.raw ?? null,
           timeElapsedSeconds: elapsed,
           characterContext: turnCharacterContext,
