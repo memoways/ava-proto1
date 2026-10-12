@@ -11,7 +11,6 @@ import { flushSync } from "react-dom";
 import { useExperienceState } from "@/hooks/useExperienceState";
 import type { AudioState, ConversationMessage, FilmAnswer } from "@/types";
 import { identifyUser, trackEvent } from "@/services/posthogService";
-import { summarizeRole } from "@/services/roleProfileService";
 import { processPRD4Turn } from "@/services/prd4Orchestrator";
 import {
   createPRD4Session,
@@ -77,8 +76,6 @@ import {
 import WelcomeScreen from "@/components/prd4/WelcomeScreen";
 import FilmQuestionScreen from "@/components/prd4/FilmQuestionScreen";
 import TransitionScreen from "@/components/prd4/TransitionScreen";
-import RoleCaptureScreen from "@/components/prd4/RoleCaptureScreen";
-import RoleSummaryScreen from "@/components/prd4/RoleSummaryScreen";
 import CharacterSelectScreen from "@/components/prd4/CharacterSelectScreen";
 import CallingMaxScreen from "@/components/prd4/CallingMaxScreen";
 import ConversationScreen from "@/components/prd4/ConversationScreen";
@@ -179,7 +176,6 @@ const IndexPRD4 = () => {
 
   const [userSubtitle, setUserSubtitle] = useState("");
   const [maxSubtitle, setMaxSubtitle] = useState("");
-  const [summarizing, setSummarizing] = useState(false);
   const [resumableSession, setResumableSession] = useState<ResumablePRD4Session | null>(null);
   const [resumeLoading, setResumeLoading] = useState(true);
   const [privacyPreferences, setPrivacyPreferences] = useState<PrivacyPreferences | null>(() => getPrivacyPreferences());
@@ -495,37 +491,6 @@ const IndexPRD4 = () => {
     markTeaserSeen(true);
     enterAfterIntroduction();
   }, [enterAfterIntroduction, markTeaserSeen]);
-
-  // ---- Role capture → summarize-role (LLM) ----------------------------------
-  const handleRoleSubmit = useCallback(
-    async (rawInput: string) => {
-      setSummarizing(true);
-      try {
-        const { profile, model, latency_ms } = await summarizeRole(rawInput);
-        setRoleProfile(profile);
-        trackEvent("prd4_role_created", { length: rawInput.length, model, latency_ms, relationship: profile.relationship_to_family });
-        setPhase("role_summary");
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        trackEvent("prd4_role_failed", { length: rawInput.length, error: msg.slice(0, 200) });
-        toast({ title: "Impossible d'analyser ta présentation", description: "Réessaie dans un instant.", variant: "destructive" });
-      } finally {
-        setSummarizing(false);
-      }
-    },
-    [setRoleProfile, setPhase],
-  );
-
-  const handleRolePTTError = useCallback(
-    (err: Error) => {
-      incrementPttError();
-      trackEvent("prd4_ptt_error", { phase: "role_capture", message: err.message });
-    },
-    [incrementPttError],
-  );
-
-  const handleRoleConfirm = useCallback(() => setPhase("character_select"), [setPhase]);
-  const handleRoleRestart = useCallback(() => { setRoleProfile(null); setPhase("role_capture"); }, [setRoleProfile, setPhase]);
 
   // ---- Character select / Calling -------------------------------------------
   const activateTTSFallback = useCallback(async (reason: string) => {
@@ -2066,24 +2031,6 @@ const IndexPRD4 = () => {
       break;
     case "transition_max":
       screen = <TransitionScreen onContinue={handleAnswered} />;
-      break;
-    case "role_capture":
-      screen = (
-        <RoleCaptureScreen
-          onSubmit={handleRoleSubmit}
-          onPTTError={handleRolePTTError}
-          submitting={summarizing}
-        />
-      );
-      break;
-    case "role_summary":
-      screen = state.userRoleProfile ? (
-        <RoleSummaryScreen
-          profile={state.userRoleProfile}
-          onConfirm={handleRoleConfirm}
-          onRestart={handleRoleRestart}
-        />
-      ) : null;
       break;
     case "character_select":
       screen = briefingReview ? (

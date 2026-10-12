@@ -24,8 +24,6 @@ export type ExperiencePhase =
   | "film_question"
   | "teaser"
   | "volunteer_briefing"
-  | "role_capture"
-  | "role_summary"
   | "character_select"
   | "calling_max"
   | "posture_capture"
