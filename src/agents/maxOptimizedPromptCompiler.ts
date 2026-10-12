@@ -16,6 +16,7 @@ export const OPTIMIZED_V3_LIMITS = {
   ragItemChars: 700,
   ragItems: 3,
   relationshipChars: 1_400,
+  frameChars: 1_400,
 };
 
 export const OPTIMIZED_V3_CONVERSATION_CONTRACT = `# CONTRAT DE CONVERSATION
@@ -70,6 +71,7 @@ export interface OptimizedPromptInput {
   temporalContext?: string;
   gmGuidance?: string;
   relationshipDirective?: string;
+  experienceFrame?: string;
   guards?: string;
   postVideoContext?: string;
   ragCandidates?: OptimizedRagCandidate[];
@@ -420,6 +422,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   };
 
   append("character_core", `NOYAU DE ${canonicalName.toLocaleUpperCase("fr")}`, core, OPTIMIZED_V3_LIMITS.staticChars, "static");
+  append("experience_frame", "CADRE DE L'APPEL — PRIORITAIRE", input.experienceFrame, OPTIMIZED_V3_LIMITS.frameChars, "runtime");
   append("relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective, OPTIMIZED_V3_LIMITS.relationshipChars, "runtime");
   const runtime = [input.userRole ? `Interlocuteur : ${input.userRole}` : "", input.temporalContext || "", input.gmGuidance ? `Orientation de jeu : ${input.gmGuidance}` : "", input.guards || ""]
     .filter(Boolean).join("\n");

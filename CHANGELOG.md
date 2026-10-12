@@ -6,6 +6,11 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Non publié]
 
+### Game Master multipersonnage — cadre commun
+- Cadre commun (rôle bénévole, parcours vu / non vu, posture pudique / ouverte) partagé par le personnage et le Game Master, réglable et versionné dans l'onglet Game Master. Désactivé par défaut.
+- Passages du GM limités aux personnages actifs de la version ; prompt du GM sans noms en dur.
+- Sessions : version des fiches personnages et du GM enregistrées. Plan : `docs/plan_game_master_multipersonnage.md`.
+
 ### Connexion HeyGen (LiveAvatar)
 
 - Analyse de la dépréciation HeyGen v1/v2 (fin de support le 31/10/2026) : elle

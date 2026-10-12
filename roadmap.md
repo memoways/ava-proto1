@@ -7,6 +7,8 @@
   premier test dans Qualité → LLM as judge.
 
 
+- Game Master multipersonnage : nettoyage du code legacy (attente validation) ; élargir `RuntimeCharacter` avant Ava / Léo ; corriger les fiches Notion Max/Emma (médias, inconnu).
+
 ## À court terme
 
 - Séparer les coûts et métriques par environnement (`llm_usage`,

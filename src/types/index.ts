@@ -407,6 +407,18 @@ export interface ExperienceDirectorEditorConfig {
   handoffRules: HandoffTopicRule[];
 }
 
+/** Cadre commun (rôle bénévole, parcours, posture) partagé par GM et personnages. */
+export interface ExperienceFrameConfig {
+  /** Désactivé = comportement historique, aucun bloc injecté. */
+  enabled: boolean;
+  frameText: string;
+  exposureSeen: string;
+  exposureUnseen: string;
+  posture: "reserved" | "open";
+  postureNotes: string;
+  forbidSpontaneousHandoff: boolean;
+}
+
 export interface ExperienceDirectorConfig {
   schemaVersion: 1;
   minimumHandoffTurn: number;
@@ -415,6 +427,9 @@ export interface ExperienceDirectorConfig {
   handoffTarget: "either";
   directorTimeoutMs: number;
   editor: ExperienceDirectorEditorConfig;
+  frame?: ExperienceFrameConfig;
+  /** Sous-ensemble des personnages actifs du registre. Absent = tous les actifs. */
+  activeCharacters?: string[];
 }
 
 export type DirectorAction =

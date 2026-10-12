@@ -15,6 +15,13 @@
       "when": 1791203193336,
       "tag": "0001_external_test_invitations_multi_use",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791788458358,
+      "tag": "0002_sessions_version_traceability",
+      "breakpoints": true
     }
   ]
 }

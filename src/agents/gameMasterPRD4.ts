@@ -11,6 +11,7 @@ import { getLLMSettings } from "@/services/settingsService";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
 import { normalizeMemoryText } from "@/services/conversationMemoryV1";
+import { asRuntimeCharacter } from "@/services/characterConversation";
 import type { CharacterRelationshipPolicy, ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, ExperienceDirectorConfig, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, RelationshipStateProposal, RuntimeCharacter, TraceMessage, TurnRelationshipDirective, UserRoleProfile } from "@/types";
 import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
 import {
@@ -18,6 +19,9 @@ import {
   relationshipStateToProposal,
   validateRelationshipTransition,
 } from "@/services/relationshipEngine";
+
+/** Incrémenter à chaque changement de logique ou de prompt du GM (traçabilité A/B). */
+export const GM_CODE_VERSION = "gm-2026-10-12-frame";
 
 export interface PRD4PostTurnInput {
   sessionId: string | null;
@@ -44,6 +48,8 @@ export interface PRD4PostTurnInput {
   characterContext?: CharacterExecutionContext;
   relationshipPolicy?: CharacterRelationshipPolicy;
   turnRelationshipDirective?: TurnRelationshipDirective;
+  /** Cadre commun, identique à celui injecté chez le personnage. */
+  experienceFrame?: string | null;
   /** Admin draft tests set this to false so they cannot mutate live sessions. */
   persist?: boolean;
 }
@@ -151,7 +157,7 @@ Règles "trigger_video_id" — PRIORITÉ HAUTE :
 Règles "action" :
 - Utilise {"type":"none"} par défaut.
 - Pour une cinématique, retourne videoId, reason et confidence 0..1 ; videoId doit appartenir aux vidéos disponibles.
-- Un handoff est une SUGGESTION bidirectionnelle (Max↔Emma). Retourne reason et proposalGuidance afin que le personnage actif propose lui-même le changement au tour suivant. Ne force jamais le joueur.
+- Un handoff est une SUGGESTION vers un autre personnage actif listé dans les réglages. Retourne reason et proposalGuidance afin que le personnage actif propose lui-même le changement au tour suivant. Ne force jamais le joueur.
 - Ne suppose jamais que l'autre personnage ou une vidéo est disponible : le moteur déterministe vérifiera.
 - Ne recommande pas cinématique et handoff en même temps. Le handoff est prioritaire.
 - player_switch_request : renseigne-le seulement si le joueur a demandé explicitement à parler à l'autre personnage. stance=accept si le personnage actuel accepte, object s'il refuse, defer s'il hésite.
@@ -263,6 +269,9 @@ ${characterAttribution}
 ## PROFIL JOUEUR
 ${input.userRole?.summary_for_max || "(profil indisponible)"}
 
+## CADRE DE L'APPEL (identique à celui du personnage — veille à ce qu'il soit respecté)
+${input.experienceFrame?.trim() || "(cadre commun désactivé)"}
+
 ## POSTURE INITIALE DU JOUEUR (intention / question exprimée avant le début de l'appel — à garder en mémoire pour évaluer la cohérence de l'échange)
 ${input.userPostureRaw?.trim() || "(non renseignée)"}
 
@@ -360,14 +369,26 @@ function cleanMemoryDelta(raw: unknown): ConversationMemoryDelta | null {
   };
 }
 
+/** Un passage n'est valide que vers un autre personnage actif dans la version publiée. */
+export function restrictHandoffToActiveCharacters(
+  action: DirectorAction,
+  activeCharacters: string[] | undefined,
+  currentCharacter: string,
+): DirectorAction {
+  if (action.type !== "handoff") return action;
+  if (action.targetCharacter === currentCharacter) return { type: "none" };
+  if (activeCharacters && activeCharacters.length && !activeCharacters.includes(action.targetCharacter)) return { type: "none" };
+  return action;
+}
+
 function cleanDirectorAction(raw: unknown, fallbackVideoId: string | null, endRecommended: boolean): DirectorAction {
   if (raw && typeof raw === "object") {
     const value = raw as Record<string, unknown>;
-    if (value.type === "handoff" && (value.targetCharacter === "emma" || value.targetCharacter === "max")) {
+    if (value.type === "handoff" && asRuntimeCharacter(value.targetCharacter)) {
       const reason = normalizeMemoryText(value.reason, 240);
       const proposalGuidance = normalizeMemoryText(value.proposalGuidance, 300);
       if (reason && proposalGuidance) {
-        return { type: "handoff", targetCharacter: value.targetCharacter, reason, proposalGuidance };
+        return { type: "handoff", targetCharacter: asRuntimeCharacter(value.targetCharacter)!, reason, proposalGuidance };
       }
     }
     if (value.type === "cinematic") {
@@ -490,7 +511,11 @@ export async function evaluatePostTurnPRD4(
         trigger_video_id: safeTrigger,
         labels,
         memory_delta: cleanMemoryDelta((parsed as { memory_delta?: unknown }).memory_delta),
-        action: cleanDirectorAction((parsed as { action?: unknown }).action, safeTrigger, endRecommended),
+        action: restrictHandoffToActiveCharacters(
+          cleanDirectorAction((parsed as { action?: unknown }).action, safeTrigger, endRecommended),
+          input.orchestrationConfig?.activeCharacters,
+          input.currentCharacter,
+        ),
         player_switch_request: cleanPlayerSwitchRequest((parsed as { player_switch_request?: unknown }).player_switch_request),
       };
     }

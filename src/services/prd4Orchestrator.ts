@@ -49,6 +49,7 @@ import {
   getSessionMinimumClosureSeconds,
   normalizeSessionDurationSeconds,
 } from "@/config/experienceRuntime";
+import { buildExperienceFrame } from "@/services/experienceFrame";
 import type { ConversationMessage, ConversationTurnTraceV1, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 
 export interface PRD4TurnInput {
@@ -56,6 +57,8 @@ export interface PRD4TurnInput {
   conversationHistory: ConversationMessage[];
   userMessage: string;
   userRole: UserRoleProfile | null;
+  /** Réponse du joueur à « avez-vous vu le film ? » — choisit le parcours d'exposition. */
+  hasSeenFilm?: string | null;
   timeElapsedSeconds: number;
   /** Attribution immuable du personnage, résolue avant le tour. */
   characterContext: CharacterExecutionContext;
@@ -252,6 +255,19 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     ? `L'utilisateur a démarré la conversation en exprimant ceci (à garder en mémoire tout au long de l'échange comme contexte de qui il est et de ce qu'il vient chercher) : « ${input.userPostureRaw.trim()} »`
     : undefined;
   const resolvedUserRoleSummary = input.userRole?.summary_for_max ?? postureSummary;
+  // Cadre commun : lecture DB déjà lancée en parallèle du RAG, aucun appel IA ajouté.
+  const frameRuntime = await Promise.race([
+    directorRuntimePromise,
+    new Promise<{ config: null }>((resolve) => setTimeout(() => resolve({ config: null }), 400)),
+  ]);
+  const experienceFrame = buildExperienceFrame({
+    config: frameRuntime.config?.frame,
+    filmAnswer: input.hasSeenFilm,
+    knownAboutPlayer: [
+      visibleStructuredMemory?.interlocutor?.name ? `prénom : ${visibleStructuredMemory.interlocutor.name}` : "",
+      visibleStructuredMemory?.interlocutor?.role ? `statut évoqué : ${visibleStructuredMemory.interlocutor.role}` : "",
+    ],
+  });
   const maxInput: MaxAgentInput = {
     conversationHistory: maxConversationHistory,
     userMessage: input.userMessage,
@@ -277,6 +293,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       ? { guidance: input.gmGuidance, topicsCovered: input.gmTopicsCovered }
       : undefined,
     relationshipDirective: relationshipDirective.prompt,
+    experienceFrame: experienceFrame.prompt || undefined,
   };
   let maxResponse = "";
   let max_ms = 0;
@@ -336,6 +353,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         characterContext: input.characterContext,
         relationshipPolicy,
         turnRelationshipDirective: relationshipDirective,
+        experienceFrame: experienceFrame.prompt || null,
       });
     } finally {
       input.onLatencySegment?.({

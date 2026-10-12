@@ -20,3 +20,5 @@ Ces règles s'appliquent à toute personne, agent et outil intervenant sur ce d�
 - Si un plan existant couvre déjà le sujet, le mettre à jour plutôt que créer un
   doublon.
 - Le compte rendu final doit contenir un lien direct vers le plan sauvegardé.
+
+- The shared experience frame (volunteer role, seen/unseen path, posture) is built only by `src/services/experienceFrame.ts` from the published orchestration config and injected identically into the character prompt and the GM prompt — why: no divergence between what GM and characters know.

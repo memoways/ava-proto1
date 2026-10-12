@@ -124,9 +124,13 @@ export async function updatePRD4ExperienceState(
     activeCharacter?: "max" | "emma";
     pendingHandoff?: { reason: string; proposalGuidance: string; targetCharacter?: RuntimeCharacter } | null;
     handoffCount?: number;
+    characterPromptVersions?: Record<string, string>;
+    gmCodeVersion?: string;
   },
 ): Promise<void> {
   const update = {
+    ...(payload.characterPromptVersions ? { character_prompt_versions: payload.characterPromptVersions } : {}),
+    ...(payload.gmCodeVersion ? { gm_code_version: payload.gmCodeVersion } : {}),
     ...(payload.activeCharacter ? { active_character: payload.activeCharacter, personnage_appele: payload.activeCharacter } : {}),
     ...(payload.pendingHandoff !== undefined ? { pending_handoff: payload.pendingHandoff } : {}),
     ...(payload.handoffCount !== undefined ? { handoff_count: payload.handoffCount } : {}),
