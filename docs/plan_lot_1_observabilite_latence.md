@@ -1084,3 +1084,23 @@ de publication de la demande initiale n'est donc pas présentée comme une
 validation exhaustive. Publication Lovable, tests publiés et baseline finale
 encore à effectuer ; lot2 non commencé. Choix de poursuivre ces validations
 ou d'accepter une publication avec ces limites à demander à Ulrich.
+
+### Contrôle PTT proposé avant publication — préparation en lecture seule
+
+Suite proposée pour poursuivre la validation complète du lot initial :
+un tour humain PTT et une capture sans parole. Aucun changement effectué.
+Source settingsService→environmentContext confirme la sélection par
+key/environment_id dans admin_settings ; sandbox peut avoir sa propre valeur
+sans modifier prod. SELECT Lovable Cloud natif vérifié : clé
+ava_gameplay_settings, sandbox-ulrich VOICE_HANDS_FREE.enabled=true,
+hash JSON eafeb3c14b4890eb08d52d53d0c6aa5e ; prod hash
+716aa4521856147da989b6cffb2a741b, champ enabled absent. Production distincte.
+
+Accord explicite demandé, car la demande initiale impose la conservation
+des réglages : basculer le seul booléen sandbox-ulrich à false pour une
+nouvelle session de contrôle, puis restaurer true. Préserver toutes les
+autres clés, timings, fournisseurs/voix et flags ; vérifier la valeur et le
+hash initial après restauration, ainsi que le hash prod inchangé. Garder
+Shields actif (son exception précédente est terminée). Aucun code nouveau,
+aucune migration/donnée historique à modifier. Sans accord, ne pas changer
+ce réglage et conserver PTT/no_audio réels comme non attestés.
