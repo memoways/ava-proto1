@@ -55,7 +55,6 @@ vi.mock("@/services/characterPromptService", () => ({
     ce_que_tu_sais_utilisateur: "Un inconnu appelle.",
     dynamique_conversation: "Comprendre l'intention de l'appel.",
     sujets_sensibles: "Le fusil :: confiance :: après une relation construite",
-    profondeur_par_niveau: "Contact, lien, confiance.",
     politique_relationnelle: "Moteur\nComprendre l'appel.\n\nRésistance\nRépondre partiellement.",
     references_intellectuelles: "",
     timeline: "Aujourd'hui.",

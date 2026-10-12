@@ -118,7 +118,6 @@ describe("assemblage traçable du prompt de Max", () => {
       ce_que_tu_sais_utilisateur: "Un inconnu appelle.",
       dynamique_conversation: "Répondre directement.",
       sujets_sensibles: "Emma et Mona.",
-      profondeur_par_niveau: "NIVEAU 1\nAnalytique.\nNIVEAU 2\nPremières fissures.",
     } as never);
     vi.mocked(buildCharacterPromptSections).mockReturnValue("TON: réservé\nOBJECTIF: parler d'Ava");
     vi.mocked(callLLMWithUsage).mockResolvedValue({
@@ -170,7 +169,6 @@ describe("assemblage traçable du prompt de Max", () => {
       ce_que_tu_sais_utilisateur: "Un inconnu appelle.",
       dynamique_conversation: "Répondre directement.",
       sujets_sensibles: "Emma et Mona.",
-      profondeur_par_niveau: "NIVEAU 1\nAnalytique.",
     } as never);
     vi.mocked(callLLMWithUsage).mockResolvedValue({
       content: "Lausanne.",

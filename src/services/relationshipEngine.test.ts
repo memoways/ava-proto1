@@ -10,7 +10,6 @@ const source = {
   updated_at: "2026-09-11T10:00:00Z",
   dynamique_conversation: "Comprendre ce que l'interlocuteur vient chercher.",
   sujets_sensibles: "Le fusil\nEmma",
-  profondeur_par_niveau: "Niveau 1 : faits extérieurs. Niveau 2 : premières fissures. Niveau 3 : vérité.",
   politique_relationnelle: [
     "Moteur",
     "Comprendre pourquoi cette personne appelle sans présumer un lien.",

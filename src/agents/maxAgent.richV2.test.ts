@@ -69,7 +69,6 @@ const FIELDS = {
   ce_que_tu_sais_utilisateur: "Le rôle injecté pour la session est prioritaire.",
   dynamique_conversation: "Revenir de l'abstrait vers les urgences concrètes.",
   sujets_sensibles: "Le fusil. Emma. Ava.",
-  profondeur_par_niveau: "NIVEAU 1\nAnalytique.\nNIVEAU 2\nFissure.\nNIVEAU 3\nVérité.\nNIVEAU BONUS\nResponsabilité nue.",
 };
 
 describe("buildMaxSystemPrompt — variante rich_v2", () => {
