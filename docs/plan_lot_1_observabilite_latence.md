@@ -694,3 +694,15 @@ confirmée. Le pilotage direct de l'application Codex est refusé par Computer
 Use. Question envoyée à Ulrich : afficher le test dans Brave ou dans Codex.
 Ne pas prétendre qu'un échange Emma a été exécuté. Publication finale,
 scénarios complets et baseline finale restent en attente ; lot 2 non commencé.
+
+Affichage du test résolu par Brave (choix par défaut annoncé après la question
+de préférence sans réponse) : nouvel admin connecté comme Ulrich Fischer,
+Sandbox — Ulrich, puis bouton officiel « Tester moi-même ». Onglet de test
+Brave `1830093887`, URL `https://proto1.parle-a-ava.com/?env=sandbox-ulrich`,
+Emma EN LIGNE, accueil visible, bouton Activer le micro, conservé deliverable.
+Un premier accès à l'ancien onglet Brave a expiré ; une nouvelle ouverture
+via l'identifiant navigateur 3 a fonctionné, sans reconnexion ni changement
+d'identité. Admin temporaire fermé. Ancien test intégré (micro inactif)
+terminé par UI puis fermé pour éviter deux sessions en parallèle ; aucun
+échange utilisateur n'a été enregistré par l'agent. Échange humain Emma
+toujours à effectuer et à confirmer ; frontend publié antérieur, Edge corrigées.
