@@ -2,6 +2,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { ensureGameAuth } from "@/services/gameAuth";
 import type { ExperienceDirectorConfig } from "@/types";
 import { getActiveEnvironment } from "@/services/environmentContext";
+import { normalizeExperienceFrameConfig } from "@/services/experienceFrame";
+import { AVA_CHARACTER_REGISTRY } from "@/services/characterRegistry";
+
+/** Personnages activables : ceux marqués actifs dans le registre central. */
+export function registryActiveCharacterKeys(): string[] {
+  return AVA_CHARACTER_REGISTRY.entries.filter((entry) => entry.availability === "active").map((entry) => entry.key);
+}
+
+export function normalizeActiveCharacters(raw: unknown): string[] {
+  const allowed = registryActiveCharacterKeys();
+  if (!Array.isArray(raw)) return allowed;
+  const picked = allowed.filter((key) => raw.includes(key));
+  return picked.length ? picked : allowed;
+}
 
 export type { ExperienceDirectorConfig } from "@/types";
 
@@ -105,6 +119,8 @@ export function normalizeDirectorConfig(value: Partial<ExperienceDirectorConfig>
       customInstructions: editor?.customInstructions?.trim() ?? "",
       handoffRules: sanitizeHandoffRules(editor?.handoffRules ?? DEFAULT_DIRECTOR_CONFIG.editor.handoffRules),
     },
+    frame: normalizeExperienceFrameConfig(value?.frame),
+    activeCharacters: normalizeActiveCharacters(value?.activeCharacters),
   };
 }
 
