@@ -74,8 +74,29 @@ export const DEFAULT_DIRECTOR_CONFIG: ExperienceDirectorConfig = {
     allowCinematics: true,
     customInstructions: "",
     handoffRules: [],
+    projectContext: DEFAULT_PROJECT_CONTEXT,
+    openQuestions: DEFAULT_OPEN_QUESTIONS,
+    guardrails: { falseStatusGuidance: true, derailTolerance: "medium", opennessPace: "balanced" },
   },
 };
+
+export const PROJECT_CONTEXT_MAX_CHARS = 1500;
+export const OPEN_QUESTION_MAX_CHARS = 200;
+export const OPEN_QUESTIONS_MAX = 8;
+
+function normalizeGuardrails(raw: unknown): ExperienceDirectorConfig["editor"]["guardrails"] {
+  const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    falseStatusGuidance: value.falseStatusGuidance !== false,
+    derailTolerance: value.derailTolerance === "low" || value.derailTolerance === "high" ? value.derailTolerance : "medium",
+    opennessPace: value.opennessPace === "slow" || value.opennessPace === "fast" ? value.opennessPace : "balanced",
+  };
+}
+
+function normalizeOpenQuestions(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return DEFAULT_OPEN_QUESTIONS;
+  return raw.map((item) => String(item).trim().slice(0, OPEN_QUESTION_MAX_CHARS)).filter(Boolean).slice(0, OPEN_QUESTIONS_MAX);
+}
 
 function sanitizeHandoffRules(raw: unknown): ExperienceDirectorConfig["editor"]["handoffRules"] {
   if (!Array.isArray(raw)) return [];
@@ -118,6 +139,11 @@ export function normalizeDirectorConfig(value: Partial<ExperienceDirectorConfig>
       priorities: priorities?.length ? priorities : DEFAULT_DIRECTOR_CONFIG.editor.priorities,
       customInstructions: editor?.customInstructions?.trim() ?? "",
       handoffRules: sanitizeHandoffRules(editor?.handoffRules ?? DEFAULT_DIRECTOR_CONFIG.editor.handoffRules),
+      projectContext: typeof editor?.projectContext === "string"
+        ? editor.projectContext.trim().slice(0, PROJECT_CONTEXT_MAX_CHARS)
+        : DEFAULT_PROJECT_CONTEXT,
+      openQuestions: editor?.openQuestions === undefined ? DEFAULT_OPEN_QUESTIONS : normalizeOpenQuestions(editor.openQuestions),
+      guardrails: normalizeGuardrails(editor?.guardrails),
     },
     frame: normalizeExperienceFrameConfig(value?.frame),
     activeCharacters: normalizeActiveCharacters(value?.activeCharacters),
