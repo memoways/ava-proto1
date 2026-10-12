@@ -388,3 +388,83 @@ optionnel (type seul) et redéployer les trois fonctions ; rollback global incha
 - Écritures client : `voiceTelemetry.ts` désactive les inserts internes quand la table manque (non bloquant pour la voix) ; aucune donnée V2 n'a donc été stockée en base.
 - Correction minimale proposée (non appliquée) : **une migration additive** créant `voice_turn_events` (colonnes historiques + `environment_id` FK `environments`, `context_type`), index `(environment_id, created_at DESC)`, GRANT INSERT à `anon`/`authenticated`, SELECT à `authenticated`, ALL à `service_role` ; RLS : insertion limitée à sa propre session, lecture réservée aux admins (`private.is_admin_member(auth.uid())`). Nécessite migration et droits, à valider avant.
 - Build local : `dist/assets/index-DvEiVgQ4.js` (sha256 `78853a8d46bdf91c194b252d8b863eae41814f620d13db8eb5eece9c09f83331`), `index-DzvdyyNt.css`. Diffère du nom servi `index-42YnFYBP.js` ; le nom seul ne permet pas de conclure sur la révision servie.
+
+## Sous-lot P0 : rétablissement du stockage — préparation du 12 octobre 2026
+
+Cause reproduite : la lecture admin V2 retourne une erreur, et la lecture Cloud
+native confirme `PGRST205`, table inexistante. La migration historique n'a
+jamais été appliquée ; ses policies publiques ne doivent pas être réactivées.
+Le diagnostic invalide l'hypothèse précédente « MCP ancienne ».
+
+Préparation sur `codex/p0-telemetry-storage`, sans application Cloud ni
+publication :
+
+1. Créer une migration additive dédiée à `voice_turn_events`, avec le contrat
+   historique et les dimensions environnement/contexte requises par P0.
+2. Autoriser INSERT uniquement à `authenticated` pour sa propre session de
+   moins de quatre heures, avec les dimensions exactes de cette session.
+   Les participants Auth anonymes utilisent aussi ce rôle. Aucun grant à
+   `anon`, aucun INSERT avec session absente/null ; ces refus restent hors
+   chemin vocal. Le collecteur PostHog existant est indépendant.
+3. Réserver SELECT aux membres admin via le helper existant, ne donner aucun
+   UPDATE/DELETE aux utilisateurs et ne modifier ni `sessions`, ni les helpers,
+   ni les données historiques. Le rôle serveur conserve ses droits techniques.
+4. Tester le SQL réel dans PGlite : capture propre, étranger/dimensions
+   falsifiées/ancien tour/null refusés, accès public/non-admin absent, lecture
+   admin V1/V2 et pagination, réapplication sans suppression de données.
+5. Présenter le diff et les résultats avant validation humaine de l'écart
+   « aucune migration ». Après validation seulement : chaîne PR/checks/revue,
+   fusion, application via Lovable Cloud `iralfqlslqndgvexixis`, contrôle admin
+   et MCP, puis reprise des gates preview/publication et baseline.
+
+Le changement n'ajoute pas `voice_error_events`, également absente : le besoin
+de cette table legacy sera traité séparément si la gate l'exige. Pas de nouvelle
+mémoire, de flag, de fournisseur ni de comportement vocal. Rollback du stockage :
+désactiver ses nouveaux grants/policies via une migration tracée dans Lovable,
+conserver la table et ses données ; ne jamais la supprimer pour revenir au P0.
+
+Références de sécurité vérifiées : [RLS Supabase](https://supabase.com/docs/guides/database/postgres/row-level-security)
+et [rôle des participants Auth anonymes](https://supabase.com/docs/guides/auth/auth-anonymous).
+
+### Preuves locales du sous-lot de stockage
+
+- Fichier généré par `supabase migration new` :
+  `supabase/migrations/20261012170925_p0_voice_turn_events_storage.sql`.
+  Le CLI n'est utilisé que pour la création locale du fichier ; aucune connexion
+  ni migration Cloud effectuée par ce CLI.
+- `npx vitest run src/integration/voiceTurnEventsRls.integration.test.ts` :
+  avant correction, erreur `42P01`, table absente ; après, contrôles réussis.
+- `npm run test:integration` : **29/29** (13 nouveaux contrôles de stockage +
+  les 16 contrôles existants de sessions/environnements).
+- Typecheck, ESLint ciblé et `git diff --check` réussis. Aucun changement runtime
+  ni build externe ; la compilation Lovable précédente reste distincte.
+- SQL de stockage limité à `voice_turn_events`. Les grants par défaut sont
+  révoqués explicitement ; seuls INSERT/SELECT sont réaccordés au rôle
+  `authenticated`, avec RLS propre session/admin. Aucun UPDATE/DELETE utilisateur.
+  Les policies historiques publiques sont retirées si cette table avait été
+  créée dans un autre environnement. La suite teste aussi ce cas et conserve
+  ses lignes V1. La fonction admin existante n'est pas modifiée.
+
+### Contrôles réellement exécutés sur le domaine publié
+
+Compte admin `ulrich.fischer@memoways.com`, contexte affiché « Sandbox — Ulrich ».
+Le bouton « Tester moi-même » a ouvert `https://proto1.parle-a-ava.com/?env=sandbox-ulrich`.
+Introduction jouée avec vidéo H264 prête (`readyState=4`, temps de lecture
+progressant, aucune erreur, muted=false). Le choix de contrôle « film non vu »
+est suivi d'un replay de l'introduction ; le retour conserve le chemin choisi
+sans redemander la réponse film. Max passe « EN LIGNE », affiche son ouverture
+et propose « Activer le micro », donc réglage courant mains libres. Micro jamais
+activé : aucun énoncé utilisateur, test acoustique, interruption ni baseline.
+Emma, handoff narratif et erreurs de capture restent non exécutés.
+
+Admin V2 présent sur `/admin/qualite/latences-posthog`, V1/V2 visuellement
+séparées ; « Appliquer les filtres V2 » reproduit l'erreur de table absente.
+Le refus d'accès admin sans rôle a été observé avant connexion, puis l'accès
+nommé fonctionne. L'asset principal servi est `/assets/index-42YnFYBP.js` :
+révision applicative exacte inconnue ; ces contrôles ne prouvent pas le dernier
+build Lovable `index-DvEiVgQ4.js`. Aucune nouvelle publication effectuée.
+
+Statut : correctif de stockage préparé et testé, **application Cloud et fusion
+en attente de validation de l'écart de périmètre**. Baseline V2 récente,
+effectifs, p50/p95 et coût non relevés ; ne pas les remplacer par les sessions
+historiques. Lot 2 non commencé.
