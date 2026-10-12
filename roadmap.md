@@ -2,6 +2,8 @@
 
 ## En cours
 
+- Corriger directement les passages Notion Max/Emma sur le cadre bénévole, puis laisser la resynchronisation à Ulrich ; retenir les réglages GM uniquement dans l’app.
+
 - Rédiger le corpus de questions dans la base Notion « AVA LLM-as-judge »
   (min. 5 lignes complètes, idéalement les 4 catégories) puis lancer un
   premier test dans Qualité → LLM as judge.
