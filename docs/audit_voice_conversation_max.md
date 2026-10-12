@@ -1,905 +1,205 @@
-# Audit — Robustesse et latence du pipeline vocal Max
+# Audit de latence — conversation libre Max / Emma
 
-> Statut : audit technique et plan d'amélioration
-> Date : 2026-05-22
-> Périmètre : interaction conversationnelle voix entre l'utilisateur et l'avatar Max, incluant STT, orchestration LLM, TTS, lecture audio navigateur, états UI et télémétrie.
+Date : 12 octobre 2026, Europe/Zurich. Révisions auditées : `2d83558`, puis mise à jour sur `0433518`, branche `main`. Les mesures historiques restent datées de septembre.
+Statut : audit et recommandations, **aucune optimisation applicative implémentée**.
+Plateforme : Lovable / Lovable Cloud exclusivement.
 
-***
+Cette mise à jour remplace l'analyse technique du 22 mai 2026, qui décrivait un parcours legacy. Le runtime courant est PRD4. L'historique antérieur reste consultable dans Git. Le [plan d'exécution](plan_optimisation_latence_voice_to_voice.md) et le [snapshot anonymisé](latency_voice_snapshot_2026-10-12.json) accompagnent ce rapport.
 
-## 1. Résumé exécutif
+## 1. Conclusion
 
-Le pipeline vocal est fonctionnel en environnement favorable, mais il n'est pas encore robuste pour une utilisation multi-navigateurs réelle. Les problèmes observés sur Safari, Firefox, Brave et Chrome sont cohérents avec trois faiblesses structurelles :
+Le gain structurel prioritaire consiste à supprimer l'attente de la **réponse textuelle entière** avant de fournir du texte au TTS. La voix Gradium est déjà streamée dans les tours observés. Une même génération doit établir une intention privée brève, puis produire une réponse continue diffusée progressivement, sans appel LLM indépendant pour chaque phrase.
 
-1. **Capture micro trop dépendante de** **`MediaRecorder`** **WebM/Opus** : `DeepgramSTT` force `audio/webm;codecs=opus` sans feature detection ni fallback, ce qui casse ou fragilise Safari et certains environnements Firefox.
-2. **Streaming TTS non exploité côté lecture** : le proxy ElevenLabs renvoie un flux, mais le front attend `response.blob()` complet avant de jouer l'audio. La latence de premier octet est mesurée, mais pas transformée en démarrage vocal perceptible.
-3. **Machine d'état conversationnelle sans timeouts durs partout** : plusieurs appels réseau ou opérations audio peuvent rester pendants. Le verrou `isProcessingRef` reste actif jusqu'à la fin de la lecture TTS et du Game Master post-turn, ce qui peut donner l'impression que "plus rien ne se passe".
+Dans les mesures historiques, le bloc personnage est le segment séquentiel le plus long dans **40 tours sur 41**. Le GM ne se situe pas sur le chemin du premier son, mais sa durée, sa consommation et la disponibilité de sa mémoire au prochain tour méritent un chantier distinct.
 
-Conclusion : la priorité doit être la robustesse navigateur et la récupération d'erreur, puis l'optimisation de latence. Les deux peuvent avancer ensemble si l'on met en place un moteur audio central, des timeouts, un fallback STT WebAudio PCM, et un vrai pipeline progressif LLM -> TTS -> playback.
+La fiabilité des mesures est une priorité préalable : les métadonnées de fournisseur sont incorrectes sur ces 41 tours et les compteurs STT/TTS n'ont pas toujours la signification indiquée par leur nom. Optimiser à partir des seules étiquettes « bloqueur » conduirait à une mauvaise priorité.
 
-***
+La cible produit validée est : voix avec portrait fixe, dialogue sans texte affiché ni bouton pour chaque prise de parole, écoute pendant la réponse, interruptions naturelles et mémoire privée de ce que le personnage voulait encore dire. Les fournisseurs peuvent être comparés, sous réserve de préserver identité vocale, français, continuité et canon.
 
-## 2. Architecture actuelle observée
+## 2. Sources, couverture et méthode
 
-### 2.1 Flux réel en production
+### Mesures réellement accessibles
 
-Fichiers principaux :
+- **MCP app Ava**, endpoint communiqué par Ulrich : `https://iralfqlslqndgvexixis.supabase.co/functions/v1/mcp`. Les métadonnées OAuth publiques identifient AVA Prototype 1 et ce backend Lovable. La connexion native a permis quatre outils : statistiques d'usage, latences agrégées, coûts LLM, liste de sessions.
+- **PostHog**, organisation Memoways, [projet AVA prototype 1, ID 137897](https://eu.posthog.com/project/137897). Identité vérifiée par le connecteur natif avant requêtes.
+- Code local, contrats et tests. Aucun appel de synthèse, de transcription ou de génération payant n'a été lancé pour cet audit.
 
-* `src/pages/Index.tsx` : orchestration UI, micro, tour conversationnel, TTS queue, reprise micro.
+Les outils MCP Ava **ne fournissent ni traces brutes, ni prompts effectifs, ni réglages actifs**. Leur code est maintenant accessible dans `src/lib/mcp/` à la révision `0433518`. Leurs fenêtres glissantes de 30 jours ont retourné six sessions, 113 mesures audio et 82 appels LLM. Trois sessions ont commencé le 12 octobre ; la fenêtre d'un jour contient un STT, trois TTS et deux appels LLM. La vue de latence par tour retourne **zéro échantillon**, alors que des tours PRD4 existent dans PostHog. Le code confirme la cause : `get-voice-latencies.ts` interroge `turn_latencies`, pas `voice_turn_events`. L'accès aux traces backend détaillées reste donc à compléter dans la capacité d'observabilité, sans contourner le connecteur.
 
-* `src/services/deepgramSTT.ts` : token Deepgram, micro, WebSocket STT, silence timer.
+PostHog ne contient aucun événement vocal sur les sept derniers jours. Sur 30 jours : 41 `voice_turn_completed`, 41 `prd4_gm_post_turn`, 89 `audio_latency`. Les tours complets viennent du **15 au 17 septembre, heure suisse**, et de trois sessions sandbox/user_test. Ils ne constituent pas une baseline récente de production.
 
-* `src/services/conversationOrchestrator.ts` : RAG, GM pre-turn, Max, validateur, GM post-turn.
+### Calcul
 
-* `src/agents/maxAgent.ts` : prompt Max, appels LLM streaming ou non-streaming.
+Les 41 tours ont été lus en colonnes numériques, corrélés par `turn_id`, puis pseudonymisés dans le snapshot. Les percentiles de ce rapport utilisent le rang supérieur `ceil(p × n)`. Les agrégats MCP sont conservés tels que renvoyés. La lecture de `src/lib/mcp/stats.ts` confirme une interpolation linéaire à l'indice `(n−1) × p`, arrondie à la milliseconde ; cette méthode diffère du rang supérieur utilisé pour les 41 tours. Le MCP conserve correctement null ; la conversion null → zéro relevée plus bas concerne l'autre proxy, `posthog-latency-stats`.
 
-* `src/services/tts/` : facade multi-provider, queue, providers ElevenLabs/Inworld/Hume.
+Le reste non attribué est calculé **tour par tour** :
+`response_ready - rag_ms - max_ms`.
+Le délai de sortie est également calculé tour par tour :
+`voice_ready - response_ready`.
+Aucune somme de percentiles n'est utilisée. Pour la décomposition additive, seules les moyennes des mêmes 41 tours sont additionnées.
 
-* `supabase/functions/proxy-stt/index.ts` : emission token Deepgram.
+Les événements de tours terminés ont tous un premier son « measured » et aucun `had_error`. Cela ne signifie pas zéro erreur sur toute l'expérience : un événement audio de sortie distinct est marqué `server` avant une ouverture de session.
 
-* `supabase/functions/proxy-tts/index.ts` : proxy ElevenLabs streaming.
+## 3. Mesures
 
-* `supabase/functions/proxy-llm/index.ts` : proxy OpenRouter.
+### Référence de tours complets — PostHog, 41 tours / 3 sessions
 
-Flux actuel :
+| Mesure, en ms | p50 | p90 | p95 | Moyenne | Maximum |
+|---|---:|---:|---:|---:|---:|
+| Finalisation manuelle → premier départ audio observé | 4 466 | 5 284 | 5 737 | 4 553 | 7 868 |
+| Finalisation manuelle → texte complet prêt | 3 475 | 4 376 | 4 573 | 3 574 | 6 946 |
+| RAG | 1 088 | 1 421 | 1 809 | 1 162 | 1 994 |
+| Bloc personnage : préparation résiduelle + LLM | 2 136 | 2 655 | 2 915 | 2 182 | 5 447 |
+| Texte complet prêt → premier départ audio | 937 | 1 176 | 1 219 | 979 | 1 259 |
+| Reste : finalisation STT + préparation non attribuée | 218 | 270 | 293 | 230 | 316 |
+| Lecture de la réponse | 14 137 | 20 172 | 21 680 | 14 342 | 33 213 |
+| GM post-tour, hors chemin de première voix | 3 632 | 4 734 | 4 942 | 3 853 | 5 567 |
+
+La moyenne de 4 553 ms se répartit en **47,9 % bloc personnage**, **25,5 % RAG**, **21,5 % lancement de sortie** et **5,1 % reste non attribué**. La lecture de 14,3 s n'est pas un délai de réponse : elle montre surtout l'importance du droit de reprendre la parole pendant le personnage.
+
+Emma : 33 tours / 2 sessions, premier son p50 4 556 ms, p95 6 479 ms.
+Max : 8 tours / 1 session, premier son p50 4 034 ms, p95 4 959 ms.
+Ces cohortes sont trop petites et différentes pour attribuer leur écart à un modèle ou à un personnage.
+
+### Attribution TTS vérifiée par corrélation
+
+**41 / 41 incohérences de fournisseur** : les événements de tour annoncent ElevenLabs / `eleven_multilingual_v2`, mais l'événement `audio_latency` corrélé annonce **Gradium / `gradium-tts` / WebSocket**. Les valeurs de premier son restent utilisables comme observations client ; les comparaisons ElevenLabs/Gradium construites avec l'étiquette du tour ne le sont pas.
+
+Le code fournit une explication plausible et précise : `LocalTTSOutput` et `getConfiguredTTSServiceInfo()` lisent le fournisseur global, tandis que la synthèse reçoit un `providerId` de personnage. Le découpage lit aussi le fournisseur global. Il faut instrumenter le **résultat effectif**, conserver fournisseur demandé et fournisseur exécuté, et utiliser le provider résolu pour le découpage. Aucun benchmark par fournisseur n'est déduit de ces étiquettes contradictoires.
+
+### Mesures audio internes — MCP Ava
+
+Sur 30 jours : 49 STT, 64 TTS, dont 63 premiers octets renseignés.
+STT p50 19 ms, p95 1 822 ms ; TTS « first byte » p50 947 ms, p95 1 572 ms ; génération TTS totale p50 4 742 ms, p95 8 230 ms. **Aucune mesure de playback** dans cet agrégat.
+
+Sur un jour : un STT à 436 ms ; trois TTS avec premier octet p50 1 004 ms et total p50 3 119 ms. Trois échantillons ne permettent pas de qualifier un p95 opérationnel.
+
+Ces chiffres ne sont pas interchangeables avec `voice_turn_completed.t_tts_total_ms`, qui reçoit aujourd'hui le délai jusqu'au premier playback, et non le total de génération. Ils confirment aussi qu'une génération audio de plusieurs secondes peut démarrer avant sa fin : **attendre EOS supprimerait un streaming déjà utile**.
+
+### Coût GM — MCP Ava, 30 jours
+
+- GM : 41 appels Gemini 2.5 Flash, 197 762 tokens d'entrée, 22 158 de sortie, 0,133 USD enregistrés.
+- Personnage : 41 appels GPT-5.6 Luna, 76 217 tokens d'entrée, 2 855 de sortie, 0,0215 USD enregistrés.
+- Part GM : **86,1 % du coût enregistré** ; coût moyen environ 0,00324 USD/appel contre 0,00052 USD pour le personnage.
+- Moyennes GM : environ **4 823 tokens d'entrée et 540 de sortie**, contre 1 859 et 70 pour le personnage.
+- Un échec de récupération de coût dans chaque groupe : le total enregistré ne prouve pas le montant exhaustif facturé.
+
+Le volume de sortie GM est 7,8 fois supérieur à celui du personnage. Réduire son schéma, les répétitions de contexte et le modèle sur un corpus contrôlé est donc pertinent. Les agrégats de coûts couvrent des dates différentes des 41 tours PostHog : leur égalité de nombre ne prouve pas une jointure un à un. PostHog annonce aussi un autre modèle pour huit tours ; conserver cette divergence comme une lacune d'attribution, sans choisir un modèle sur cette base.
+
+## 4. Graphe effectivement exécuté
+
+`src/App.tsx` route vers `IndexPRD4`. Le parcours legacy n'est pas la cible. Le graphe ci-dessous décrit le chemin PTT mesuré et le cœur de réponse encore commun. La branche mains libres ajoutée sur `0433518` conserve la capture après activation et passe par le tempo applicatif avant le même flush/RAG/LLM/TTS.
 
 ```mermaid
-sequenceDiagram
-  participant U as Utilisateur
-  participant UI as Index.tsx
-  participant STT as DeepgramSTT
-  participant ORCH as conversationOrchestrator
-  participant LLM as OpenRouter
-  participant TTS as TTS provider
-  participant AUD as HTMLAudioElement
-
-  U->>UI: Clique micro / parle
-  UI->>STT: start/resume
-  STT->>STT: MediaRecorder audio/webm opus
-  STT->>UI: transcript final apres silence/flush
-  UI->>ORCH: processConversationTurn
-  ORCH->>LLM: RAG + GM pre + Max non-streaming + validateur
-  ORCH-->>UI: maxResponse complet + gameMasterPromise
-  UI->>TTS: chunkTextForTTS(maxResponse)
-  TTS->>TTS: fetch proxy-tts, await response.blob()
-  TTS-->>UI: Blob audio complet
-  UI->>AUD: new Audio(objectUrl).play()
-  UI->>ORCH: attend GM post-turn en parallele
-  UI->>STT: resume micro
+flowchart LR
+  A["Geste PTT / parole"] --> B["Micro + token + WebSocket recréés"]
+  B --> C["Flush et transcript final"]
+  C --> D["RAG : profil → embedding → recherche → rerank"]
+  C --> M["Mémoire / fiche / orchestration en parallèle"]
+  D --> E["Préparation + réponse LLM entière"]
+  M --> E
+  E --> F["Découpage du texte complet"]
+  F --> G["TTS : Gradium PCM progressif ou Blob selon provider"]
+  G --> H["Lecture complète"]
+  E --> J["GM unique en arrière-plan"]
+  J --> K["Mémoire / guidance / actions du prochain tour"]
+  H --> N["Fin du verrou processing"]
 ```
 
-### 2.2 Ecart avec l'intention PRD
+PRD4 **n'exécute pas de GM pré-tour, pas de validateur LLM anti-hallucination et pas de deuxième appel pour les labels**. En retirer n'apporterait aucun gain. Le GM post-tour démarre après le texte et peut progresser pendant le TTS ; sa callback UI est attachée après la sortie.
 
-Le PRD et le README décrivent un pipeline "streaming" ou "sentence-level streaming" où Max commence à parler dès que possible. L'implémentation actuelle est plus bloquante :
+## 5. Audit de chaque étage
 
-* Max est généré via `simulateMaxResponse()`, donc texte complet avant TTS.
+### Capture, STT et passage de tour
 
-* Le TTS utilise l'endpoint streaming ElevenLabs côté proxy, mais le provider fait `await response.blob()`, donc lecture seulement après réception complète.
+Le **mode PTT** d'`IndexPRD4` recrée STT et micro à chaque prise de parole, force le mode manuel et bloque une nouvelle prise pendant processing. La **base mains libres désormais présente** conserve la capture après activation, finalise par un timer applicatif et peut interrompre pensée/voix. Elle reste désactivée par défaut ; son activation réelle par environnement n'est pas exposée par le MCP. Ne pas réimplémenter cette base : compléter le [plan mains libres existant](plan_conversation_mains_libres.md).
 
-* Le chunking TTS ne s'applique qu'après obtention de la réponse Max complète.
+Le contrat ajouté dans `AGENTS.md` place fin de parole et interruption dans **`handsFreeVoice.ts`, à partir du texte reconnu et de son timing**, jamais dans un timer de silence fournisseur. Les paramètres courants sont 900 ms après mots reconnus, +700 ms si fin hésitante, bornes 300–3 000 ms et seuil d'interruption de deux mots. La réduction 900 → 500 retirerait **400 ms de timer configuré** lorsqu'il se déclenche normalement : ce n'est pas une preuve de 400 ms gagnées sur chaque premier son. Une fin hésitante attend nominalement 1 600 ms.
 
-* La validation anti-hallucination pré-TTS garantit la sécurité éditoriale, mais ajoute une étape bloquante avant toute voix.
+Le filtre anti-écho ignore une transcription dont au moins 80 % des mots appartiennent à la réplique entière. Cela ne constitue pas une reconnaissance du locuteur : un vrai utilisateur peut réutiliser ces mots. « Non » ou « Attendez » seuls ne passent pas le seuil par défaut de deux mots ; le test existant le confirme pour « Attendez ». Ce compromis doit être évalué sur corrections courtes, écho et parole simultanée. Le barge-in commence après reconnaissance : il ne prouve pas une réaction rapide au début acoustique.
 
-Ce choix améliore la qualité et la sécurité, mais augmente fortement la latence perçue.
+Le contrôleur remet les buffers STT à zéro après flush et après la sortie, mais la réponse entière reste en historique. Les callbacks sont ignorés pendant cinématique/handoff ; la capture et les buffers doivent être vérifiés à ces frontières, car le blocage de callback n'est pas une preuve que le son du film n'a jamais alimenté le STT.
 
-***
+Deepgram capture par MediaRecorder avec timeslice 150 ms ; cela ne garantit pas une livraison toutes les 150 ms. Son timer provider 900 ms suit les **résultats reçus**, pas la dernière voix capturée. Il est désactivé en mode manuel/mains libres ; `speech_final`, `SpeechStarted` et `UtteranceEnd` ne sont pas exploités. Ces signaux peuvent améliorer diagnostic et synchronisation du flush, mais l'application garde la décision de tour.
 
-## 3. Constats critiques
+Le flush Deepgram conserve le préfixe final et l'interim, demande la queue audio puis attend un acquittement ou une condition de secours bornée. Cette protection ne doit pas être supprimée pour afficher un meilleur chiffre.
 
-### 3.1 STT : incompatibilité navigateur probable
+Gradium STT utilise ScriptProcessor 2 048 samples à 24 kHz, ignore les événements VAD `step` et `end_text`, accepte tout accusé `flushed` reçu après l'envoi sans vérifier son ID et envoie `delay_in_frames=4`. La [référence Gradium STT](https://docs.gradium.ai/guides/speech-to-text) indique une plage 7–55 et retourne la valeur active dans `ready` : il faut vérifier cette valeur effective, puis comparer des valeurs valides. La finalisation remet les buffers à zéro avant de calculer la télémétrie, ce qui peut transformer la mesure en durée depuis l'ouverture. Aucun chiffre « 320 ms » n'est considéré comme prouvé.
 
-Code actuel :
+AssemblyAI capture 4 096 samples à 16 kHz, soit une fenêtre nominale de 256 ms ; un worklet avec frames adaptées est un candidat à mesurer. Whisper reste un témoin batch ; le registre et les libellés Gradium décrivent encore du batch alors que le client est WebSocket. Gamilab reste derrière la façade existante ; pas de modification d'un projet externe.
 
-```ts
-this.mediaRecorder = new MediaRecorder(this.stream, {
-  mimeType: 'audio/webm;codecs=opus',
-});
-```
+La cible consolide le micro de session déjà disponible, l'annulation d'écho native vérifiée par `getSettings()` et la décision centralisée dans `handsFreeVoice.ts`. Les signaux acoustiques servent d'abord à mesurer et vérifier, sans retirer la décision à l'app. Une variante de réaction dès onset acoustique constitue une évolution explicite du contrat, à décider avant implémentation. Les pauses de réflexion, bruits, « oui/non » et reprises de phrase font partie des tests éliminatoires.
 
-Risque :
+### RAG, mémoire et préparation
 
-* Safari ne garantit pas `audio/webm;codecs=opus` via `MediaRecorder`.
+Le chemin RAG contient des appels séquentiels : garde de requête/quota lorsque activée, lecture du profil actif, embedding Voyage/OpenAI, RPC vectorielle, rerank éventuel. Le client attend un résultat exploitable avant le personnage. Le serveur ne découpe actuellement pas ces sous-durées ; 1 088 ms n'est donc pas « le coût de la base ».
 
-* Firefox et Chromium ont des matrices MIME différentes selon OS/version.
+Aucun rewrite LLM n'est appelé dans `processPRD4Turn` : la fonction de rewrite existe ailleurs, mais il n'y a rien à retirer du hot path courant.
 
-* Aucun `MediaRecorder.isTypeSupported()` n'est appelé.
+Le cache de résumés et la mémoire structurée sont déjà présents ; plusieurs lectures démarrent en parallèle du RAG. Ne pas les sérialiser à nouveau. Les réponses vides de résumé ne sont pas mises en cache, ce qui peut répéter des SELECT inutiles avant le premier résumé. Le runtime orchestration épinglé lit deux RPC au premier accès, puis est caché. Précharger ces données pendant la préparation de session peut retirer des attentes résiduelles sans perdre le cadre commun.
 
-* Aucun fallback `audio/mp4`, `audio/ogg`, format par défaut, ou WebAudio PCM.
+Le bloc `max_ms` commence avant l'attente des promesses mémoire et inclut le montage du prompt. Un TTFT fournisseur et un temps de prefill distincts sont nécessaires. Le RAG garde la provenance par personnage et le profil d'index ; rerank allégé ou retrieval spéculatif restent des expériences après validation de rappel factuel. L'absence de RAG n'est pas utilisée comme raccourci systématique.
 
-* Si `MediaRecorder` échoue, l'utilisateur revient à `idle` sans diagnostic actionnable.
+### LLM et cohérence des phrases
 
-Impact :
+PRD4 utilise `simulateMaxResponse → callLLMWithUsage` avec `stream:false`. L'entrée streaming legacy `callMaxAgent` est spécifique à Max et n'assure pas les mêmes contextes, traces et annulations ; la brancher directement ferait perdre des protections.
 
-* Safari : échec au démarrage micro ou absence de transcription.
+La cible est un nouveau chemin PRD4 partagé Max/Emma, conservant prompt, attribution, RAG, mémoire, rôle et cadre. Une courte **intention communicative** précède la parole dans le même appel ; ce n'est pas une génération indépendante phrase par phrase. L'intention ne doit jamais passer au TTS ni au dialogue entendu.
 
-* Firefox : comportement variable selon support du conteneur.
+Les tokens doivent être regroupés par frontières naturelles, sans attendre arbitrairement 80 caractères quand une phrase courte est complète. Abréviations, décimales, citations, ellipses et garde d'identité sont des cas de test. La diffusion irréversible exige une garde incrémentale avant chaque segment, sur le préfixe cumulé et un état de citation ; une correction après lecture serait trop tardive.
 
-* Brave/Chrome : souvent OK, mais dépend des permissions, extensions privacy, profils et politiques audio.
+`fetchProxyLLM` retire l'écoute du signal parent après les en-têtes ; la lecture SSE et le fetch upstream ne sont pas reliés à l'annulation de bout en bout. Les erreurs SSE, EOF incomplet et timeouts de corps nécessitent aussi une vérification. [OpenRouter distingue arrêt du stream et annulation fournisseur](https://openrouter.ai/docs/api_reference/streaming) : l'arrêt local ne prouve pas que toute génération ou facturation a cessé.
 
-### 3.2 STT : latence de fin de parole trop rigide
+Stabiliser le préfixe du prompt, placer les éléments variables à la suite, mesurer les cache hits et comparer le routage de faible latence sont des candidats. Le modèle doit être choisi sur **TTFT, premier segment, qualité et p95**, pas seulement tokens/seconde. Ne pas raccourcir les réponses au point de retirer leurs nuances.
 
-Code actuel :
+### TTS et rendu audio
 
-```ts
-private static SILENCE_DELAY_MS = 1500;
-```
+Gradium offre déjà un lecteur PCM progressif. Aujourd'hui il ouvre un token/socket par segment, reçoit le texte complet puis EOS. La [recette Gradium LLM → TTS](https://docs.gradium.ai/guides/recipes/llm-to-tts) permet une connexion ouverte avant la génération, des phrases ajoutées au même contexte et une réception audio parallèle. C'est le premier chemin à optimiser.
 
-Risque :
+Le prébuffer représente 300 ms **d'audio accumulé**, le rebuffer 200 ms, la marge de programmation 30 ms. Ce ne sont pas automatiquement 330 ms de temps mural récupérables : l'arrivée des chunks et EOS influencent leur coût. Comparer des seuils adaptatifs avec underruns, clics et prosodie ; ne pas supprimer la protection à l'aveugle.
 
-* Le micro ouvert impose environ 1,5 seconde avant de finaliser une phrase.
+ElevenLabs, Inworld, Hume et Cartesia restent des options intégrées à vérifier séparément. ElevenLabs/Inworld attendent un Blob et Inworld demande explicitement `stream:false`. L'opportunité est réelle pour ces chemins, mais elle ne décrit pas le Gradium observé.
 
-* Cette fenêtre est stable mais ressentie comme lente.
+Le contexte vocal par personnage et la diction restent stables entre segments. Le premier son est aujourd'hui un événement logiciel : Gradium résout `started` au scheduling, avant la sortie matérielle ; un Blob marque `audio.play()` résolu. Ajouter audio reçu, programmé et sortie estimée via [AudioContext.getOutputTimestamp](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext/getOutputTimestamp), puis contrôler acoustiquement les tests. Ne pas appeler une estimation un timestamp physique exact.
 
-* Deepgram est configuré avec `endpointing=false`; le code ignore donc les signaux serveur de fin de parole sauf transcription finale.
+### GM, mémoire d'interruption et concurrence
 
-Impact :
+Le GM fait un seul appel comprenant labels, mémoire, guidance et action. Son plafond de sortie est au moins 950 tokens, même si le réglage historique affiche 180. Le schéma et les répétitions de contexte sont plus importants à mesurer qu'un simple slider. Sa durée déclarée est prise **avant** la persistance mémoire ; ajouter génération, validation, persistance et disponibilité effective pour le tour suivant.
 
-* Latence minimale utilisateur -> Max augmente mécaniquement.
+Le code mémorise la réponse entière avant playback. Une interruption rendrait donc une partie non prononcée indistinguable d'un échange entendu. Les résumés et le GM pourraient ensuite promouvoir des révélations jamais entendues.
 
-* Les utilisateurs ont l'impression que Max "réfléchit" avant même que le pipeline LLM commence.
+L'intention privée, le texte généré, les segments effectivement lus et la continuation non prononcée doivent être distincts. Le dialogue partagé ne contient que ce qui a été livré ; le personnage peut reprendre ce qu'il avait l'intention de dire. Une suite jamais générée n'est jamais présentée comme un texte connu. L'isolation Max/Emma est conservée.
 
-### 3.3 TTS : streaming annulé par `response.blob()`
+Le prochain tour invalide actuellement les callbacks du précédent et son contrôleur ; une écoute libre avec reprises rapides augmenterait les résultats GM perdus. Utiliser des tâches GM séparées, identifiées par tour et version mémoire, sans file bloquante devant la réponse. Les actions tardives sont ignorées ; un résultat ancien ne remplace pas la relation courante. La persistance actuelle utilise compare-and-swap et deux tentatives : conserver cette protection contre les écritures concurrentes.
 
-Code actuel :
+### Télémétrie, UI et dégradation
 
-```ts
-const response = await fetch(`${SUPABASE_URL}/functions/v1/proxy-tts`, ...);
-const tFirstByte = performance.now();
-const blob = await response.blob();
-```
+Le diagnostic `blocker_step` compare des ratios à des budgets. Il annonce RAG pour 38 tours alors que le bloc personnage est plus long pour 40 : séparer **dépassement de budget** et **attente critique réellement consommée**.
 
-Le proxy :
+`numberOrNull(null)` dans le proxy PostHog devient 0. Les absences peuvent contaminer les moyennes et percentiles. Conserver null, versionner la sémantique et tester une mesure connue avec valeurs absentes.
 
-```ts
-return new Response(response.body, {
-  headers: { 'Content-Type': 'audio/mpeg', 'Transfer-Encoding': 'chunked' },
-});
-```
+Les compteurs doivent inclure tours tentés, interrompus, échoués, sans voix et terminés, avec taux de couverture. Une moyenne de succès seuls ne suffit pas. La capture PostHog reste optionnelle ; la divergence de volume avec le backend ne prouve pas une panne de persistance.
 
-Risque :
+L'UI PTT empêche la prise de parole pendant pensée/voix ; l'UI mains libres permet le micro continu et l'interruption. Les deux affichent encore le dialogue et utilisent le texte comme repli en cas de panne TTS. En mode voix seule, prévoir une réponse sonore de secours préchargée et un état de connexion accessible, sans dépendre d'un texte qui sera caché. L'entrée en expérience peut toujours demander un geste initial pour permissions/autoplay ; aucun bouton par tour n'est requis.
 
-* Le proxy reçoit et relaie un flux, mais le navigateur attend le blob complet.
+Les cinématiques restent après la réponse, le lecteur Gumlet persistant reste protégé. Les interruptions ordinaires ne déclenchent ni vidéo ni handoff obsolète.
 
-* `t_tts_first_byte_ms` est une métrique réseau, pas le temps jusqu'au premier son.
+## 6. Classement des gains et limites
 
-* Pour des réponses de 300-700 caractères, le premier son arrive après toute la génération du blob.
+1. **Très fort potentiel, non chiffré avant TTFT** : overlap génération textuelle / voix. On retire l'attente de la queue du LLM, pas toute sa durée.
+2. **Fort potentiel** : consolider la base mains libres, réduire les délais applicatifs validés et mesurer l'arrêt sonore. La lecture de 14 s médianes impose le droit de reprendre la parole ; elle n'est plus forcément une zone bloquée lorsque le mode mains libres est activé.
+3. **Potentiel à mesurer** : préouverture TTS pendant RAG/LLM, contexte de tour unique, découpage naturel, buffer adaptatif. Le 979 ms observé contient plusieurs couches.
+4. **Potentiel conditionnel** : embedding, rerank, prompt caching, préchargement et modèle. Les 1 162 ms RAG et 230 ms de reste donnent des masses mesurées, pas des gains garantis.
+5. **Coût et continuité** : GM plus compact/rapide, disponibilité mémoire et tâches concurrentes. **Ne pas additionner ses 3 853 ms à l'attente de première voix.**
 
-Impact :
+Aucun gain « milliseconde par milliseconde » n'est inventé pour les sous-étages non instrumentés. Le [plan](plan_optimisation_latence_voice_to_voice.md) précise les jalons à ajouter et les expériences capables de le mesurer.
 
-* Latence perçue TTS nettement supérieure à la latence first-byte.
+## 7. Vérifications et frontière de livraison
 
-* Les gains de l'endpoint streaming ElevenLabs sont peu exploités.
+Vérifications initiales sur `2d83558` : **89 fichiers / 407 tests unitaires passent**, `npm run typecheck` passe. Après synchronisation sur `0433518` : **92 fichiers / 423 tests unitaires passent**. Le premier typecheck de cette révision a signalé le SDK MCP absent du `node_modules` local. Après récupération isolée du SDK 3.0.5 déjà déclaré, le typecheck révèle une incompatibilité réelle : les quatre outils MCP importent les schémas Zod 3 du projet, alors que le SDK attend Zod 4 (`_zod` manquant). La version actuelle n'est donc pas déclarée verte en TypeScript. Une copie temporaire des seuls modules MCP a été vérifiée avec un alias Zod 4.6.6 compatible : son contrôle de types passe sans modifier les formulaires Zod 3 ni les fichiers du repo. Le simple import `zod/v4` du Zod 3.25 installé n'a pas suffi, à cause d'une différence de version de types. Ce sont des protections du comportement courant ; elles ne valident pas encore le VAD libre, le barge-in ou la mémoire de livraison.
 
-### 3.4 Lecture audio : autoplay et activation utilisateur
+Le contrôle de livraison a également relevé que `package.json` et `bun.lock` contiennent le SDK MCP, alors que `package-lock.json` ne le contient pas et que la CI GitHub exécute `npm ci`. `npm ci --dry-run --ignore-scripts` confirme `EUSAGE` et signale également le SDK HeyGen et des dépendances Drizzle non alignés. Le check GitHub `regression-gates` de `0433518` a également été vérifié en échec avant le commit documentaire. Ce sont des divergences préexistantes sur `0433518`, à traiter dans Lovable avant de déclarer la gate GitHub saine ; l'audit documentaire ne les corrige pas silencieusement.
 
-Code actuel :
+Aucun fichier de runtime, migration, secret, Edge Function ou configuration de fournisseur n'a été modifié par cet audit. Le checkout a seulement intégré les commits Lovable déjà présents sur `origin/main` par fast-forward. Les optimisations restent à implémenter dans des lots distincts, synchronisés puis validés dans Lovable. Les changements de ce lot concernent seulement le rapport, le plan et les preuves anonymisées.
 
-```ts
-const audio = new Audio(audioUrl);
-audio.play().catch(reject);
-```
-
-Risque :
-
-* Les politiques navigateur peuvent rejeter `play()` avec `NotAllowedError`.
-
-* Le `play()` arrive longtemps après le geste utilisateur initial, après plusieurs awaits.
-
-* Brave/Chrome peuvent bloquer selon configuration, engagement du site, iframe, préférences et protections.
-
-* Le code ne distingue pas clairement `NotAllowedError`, format non supporté, decode error, réseau, quota provider.
-
-Impact :
-
-* "TTS ne fonctionne pas toujours" sur Chromium/Brave.
-
-* L'app peut basculer en mode texte alors qu'un simple geste "Activer la voix" aurait suffi.
-
-### 3.5 Blocage conversationnel : `Promise.all` trop central
-
-Code actuel :
-
-```ts
-const [, gmResult] = await Promise.all([
-  ttsQueue ? ttsQueue.drain() : Promise.resolve(),
-  gameMasterPromise.then(r => { gmPerf.end(); return r; }),
-]);
-```
-
-Risque :
-
-* Le tour reste bloqué tant que TTS et GM post-turn ne sont pas terminés.
-
-* Si GM post-turn ou TTS ne résout jamais, `isProcessingRef` reste actif.
-
-* Le micro ne reprend qu'en `finally`, donc après toute cette attente.
-
-Impact :
-
-* Symptôme direct : "parfois ça bloque, il ne se passe plus rien".
-
-* Un échec silencieux dans une promesse peut immobiliser la conversation.
-
-### 3.6 Timeouts incomplets
-
-Présent :
-
-* Timeout validateur : 4000 ms avec fail-open.
-
-* Quelques fallbacks RAG/GM pre-turn.
-
-Manquant ou insuffisant :
-
-* Timeout `getDeepgramToken`.
-
-* Timeout WebSocket Deepgram connect/open.
-
-* Timeout `fetch` LLM via `proxy-llm`.
-
-* Timeout `fetch` TTS via providers.
-
-* Timeout lecture audio.
-
-* Timeout GM post-turn.
-
-* Timeout de reprise micro si STT WebSocket est fermé.
-
-### 3.7 Erreurs STT peu récupérables
-
-Risques :
-
-* `ws.onerror` log seulement, pas de callback UI.
-
-* `ws.onclose` log seulement, pas de reconnexion/backoff.
-
-* `resumeMic()` vérifie `sttRef.current?.isActive`, sinon recrée, mais sans raison d'erreur ni message utilisateur.
-
-* Le flux micro peut rester ouvert si une exception survient entre `getUserMedia` et `MediaRecorder.start`.
-
-### 3.8 TTSQueue : annulation et erreurs trop implicites
-
-Risques :
-
-* `cancel()` met `_cancelled`, mais ne rejette pas explicitement les entrées pending.
-
-* L'erreur est reportée une seule fois, puis `drain()` peut se terminer sans distinguer succès, annulation ou échec.
-
-* Pas de timeout par segment.
-
-* Pas de fallback provider automatique.
-
-### 3.9 Paramètres qualité vs latence
-
-Paramètres par défaut :
-
-* `eleven_multilingual_v2`
-
-* `mp3_44100_128`
-
-* `optimizeStreamingLatency: 0`
-
-* `speed: 0.94`
-
-* normalisation `on`
-
-Avantage :
-
-* Bonne diction et prosodie.
-
-Coût :
-
-* Latence plus élevée.
-
-* Fichiers audio plus lourds.
-
-* Réponses courtes envoyées en un seul chunk jusqu'à 700 caractères, donc meilleure prosodie mais premier son plus tardif.
-
-***
-
-## 4. Objectifs cibles
-
-### 4.1 Robustesse
-
-Objectif minimum :
-
-* Chrome, Brave, Firefox, Safari desktop doivent permettre une conversation texte + voix ou texte + fallback explicite.
-
-* Aucun tour ne doit pouvoir rester bloqué plus de 15 secondes sans retour UI.
-
-* Toute erreur audio doit aboutir à un état récupérable : réessayer, activer voix, passer texte, ou reprendre micro.
-
-### 4.2 Latence perçue
-
-Budgets recommandés :
-
-| Segment                                    |    Cible p50 | Cible p95 |
-| ------------------------------------------ | -----------: | --------: |
-| Fin parole utilisateur -> transcript final |   600-900 ms |   1400 ms |
-| Transcript final -> premier token Max      |  800-1500 ms |   2500 ms |
-| Premier texte TTS prêt -> premier son      |   300-800 ms |   1500 ms |
-| Fin utilisateur -> premier son Max         | 1800-3000 ms |   5000 ms |
-
-Ces cibles supposent un mode "conversation rapide", pas le preset diction maximale.
-
-***
-
-## 5. Plan d'amélioration priorisé
-
-### Phase 0 — Instrumentation et reproduction
-
-Objectif : rendre les bugs observables avant de refactorer.
-
-Actions :
-
-1. Ajouter un champ `browser_info` aux événements `audio_latency`, `tts_error`, `stt_error`, `turn_latency`.
-2. Capturer :
-
-   * `navigator.userAgent`
-
-   * `navigator.userAgentData` si disponible
-
-   * support `MediaRecorder`
-
-   * MIME choisi
-
-   * support `AudioContext`
-
-   * erreur exacte de `audio.play()`
-3. Ajouter événements :
-
-   * `stt_start_attempt`
-
-   * `stt_start_failed`
-
-   * `stt_ws_closed`
-
-   * `stt_reconnect_attempt`
-
-   * `tts_play_failed`
-
-   * `audio_unlock_failed`
-4. Ajouter un panneau admin "Diagnostics navigateur" ou enrichir `DebugPanel`.
-
-Critères d'acceptation :
-
-* Une session Safari échouée indique précisément si l'échec vient du MIME, micro permission, WebSocket, play policy ou TTS provider.
-
-* PostHog permet de filtrer erreurs par navigateur/provider/MIME.
-
-### Phase 1 — Robustesse STT multi-navigateurs
-
-Objectif : ne plus dépendre exclusivement de WebM/Opus.
-
-Actions :
-
-1. Ajouter un sélecteur MIME :
-
-```ts
-const candidates = [
-  "audio/webm;codecs=opus",
-  "audio/webm",
-  "audio/ogg;codecs=opus",
-  "audio/mp4",
-  "",
-];
-```
-
-1. Utiliser `MediaRecorder.isTypeSupported()` avant construction.
-2. Si aucun MIME fiable :
-
-   * fallback WebAudio `AudioWorklet` ou `ScriptProcessorNode` temporaire;
-
-   * convertir en PCM 16-bit mono 16 kHz;
-
-   * envoyer à Deepgram avec `encoding=linear16&sample_rate=16000&channels=1`.
-3. Ajouter gestion explicite :
-
-   * `NotAllowedError` micro : demander permission.
-
-   * `NotFoundError` : micro absent.
-
-   * `NotReadableError` : micro déjà pris.
-
-   * MIME unsupported : fallback automatique.
-4. Ajouter reconnexion WebSocket avec backoff court si fermeture inattendue.
-
-Critères d'acceptation :
-
-* Safari desktop : démarrage micro sans crash; si MediaRecorder échoue, fallback PCM.
-
-* Firefox : MIME choisi par support réel.
-
-* Une fermeture WebSocket reprend ou affiche un état clair.
-
-### Phase 2 — Déblocage audio et lecture robuste
-
-Objectif : éviter les échecs intermittents TTS sur Brave/Chrome/Safari.
-
-Actions :
-
-1. Créer un `AudioPlaybackService` central :
-
-   * `unlock()` appelé sur le premier geste utilisateur;
-
-   * création/résumé d'un `AudioContext`;
-
-   * lecture silencieuse courte pour activer la sortie audio;
-
-   * statut `locked | unlocked | failed`.
-2. Remplacer `new Audio(...).play()` direct par ce service.
-3. Si `play()` rejette :
-
-   * détecter `NotAllowedError`;
-
-   * afficher un bouton "Activer la voix";
-
-   * ne pas désactiver définitivement le TTS pour toute la session.
-4. Ajouter timeout de lecture :
-
-   * si `canplay`/`playing` ne survient pas dans N secondes, fallback texte + retry possible.
-5. Garder un élément audio réutilisable si l'approche HTMLAudioElement est conservée.
-
-Critères d'acceptation :
-
-* Brave/Chrome : si autoplay bloque, l'utilisateur a une action claire.
-
-* Le tour ne reste pas bloqué si l'audio ne démarre pas.
-
-* L'app reprend le micro ou reste en PTT correctement après échec audio.
-
-### Phase 3 — Timeouts durs et machine d'état récupérable
-
-Objectif : aucun blocage silencieux.
-
-Actions :
-
-1. Introduire un helper `withTimeout(label, promise, ms, onTimeout)`.
-2. Introduire des `AbortController` pour fetchs :
-
-   * LLM : 12-18 s selon modèle.
-
-   * TTS segment : 8-12 s.
-
-   * STT token : 5 s.
-
-   * GM post-turn : 4-6 s avec fallback.
-3. Changer `Promise.all` de fin de tour :
-
-   * le TTS ne doit pas attendre indéfiniment GM post-turn;
-
-   * GM post-turn peut produire un résultat tardif ou fallback.
-4. Faire retourner à `TTSQueue.drain()` un statut :
-
-```ts
-type TTSDrainResult = {
-  status: "played" | "cancelled" | "failed" | "skipped";
-  error?: Error;
-  playedSegments: number;
-};
-```
-
-1. Définir une machine d'état explicite :
-
-   * `idle`
-
-   * `listening`
-
-   * `finalizing_stt`
-
-   * `thinking`
-
-   * `speaking`
-
-   * `recovering`
-
-   * `text_fallback`
-
-Critères d'acceptation :
-
-* Un tour ne dépasse jamais le timeout global sans retour UI.
-
-* `isProcessingRef` revient toujours à `false`.
-
-* Le micro reprend après erreur non fatale.
-
-### Phase 4 — Réduction de latence STT
-
-Objectif : diminuer le délai après la fin de parole.
-
-Actions :
-
-1. Tester `SILENCE_DELAY_MS` à 800 ms en micro ouvert.
-2. Activer/évaluer `endpointing` Deepgram au lieu de `endpointing=false`.
-3. Utiliser les événements VAD/endpointing Deepgram pour finaliser plus tôt.
-4. En PTT, conserver `flush()` au relâchement, mais ajouter feedback "relâché, transcription en cours".
-
-Critères d'acceptation :
-
-* p50 STT final sous 900 ms.
-
-* Pas de coupures prématurées significatives sur phrases naturelles.
-
-### Phase 5 — Mode TTS basse latence
-
-Objectif : proposer un preset conversation rapide.
-
-Actions :
-
-1. Ajouter preset `realtime_conversation` :
-
-   * modèle `eleven_turbo_v2_5` ou `eleven_flash_v2_5`;
-
-   * `optimizeStreamingLatency: 1`;
-
-   * `outputFormat` plus léger si qualité acceptable;
-
-   * `speed: 1.0` ou `1.03`;
-
-   * stabilité modérée.
-2. Réduire `SINGLE_REQUEST_MAX_CHARS` en mode basse latence :
-
-   * 700 -> 220-320 caractères.
-3. Ajuster prompt Max :
-
-   * réponse orale en 1-2 phrases;
-
-   * éviter paragraphes longs.
-4. Comparer providers :
-
-   * ElevenLabs Turbo/Flash;
-
-   * Inworld stable non-streaming actuellement fiable mais à re-tester;
-
-   * Hume si qualité/latence acceptable.
-
-Critères d'acceptation :
-
-* premier son Max p50 sous 3 s après fin utilisateur sur Chrome/Brave.
-
-* qualité vocale acceptable pour un test utilisateur.
-
-### Phase 6 — Vrai streaming LLM -> TTS
-
-Objectif : commencer la synthèse dès la première phrase complète de Max.
-
-Architecture cible :
-
-```mermaid
-sequenceDiagram
-  participant LLM as Max LLM stream
-  participant SPLIT as Sentence splitter
-  participant TTS as TTS segment generator
-  participant PLAY as Audio player
-  participant GM as GM post-turn
-
-  LLM->>SPLIT: tokens
-  SPLIT->>TTS: phrase complete
-  TTS->>PLAY: audio segment des que pret
-  PLAY->>PLAY: lecture sequentielle
-  LLM->>SPLIT: suite tokens
-  SPLIT->>TTS: phrase suivante
-  GM->>GM: post-turn en arriere-plan avec timeout
-```
-
-Actions :
-
-1. Remettre `callMaxAgent(... onChunk ...)` dans le flux principal ou créer `streamValidatedMaxResponse`.
-2. Extraire les phrases complètes en streaming avec `extractSentences`.
-3. Envoyer chaque phrase au TTS dès qu'elle est stable.
-4. Garder une queue audio séquentielle.
-5. Adapter la validation anti-hallucination :
-
-   * option A : validation globale conservée, mais latence plus haute.
-
-   * option B : validation légère de phrase + garde-fous prompt stricts.
-
-   * option C : mode test basse latence sans validateur complet, avec monitoring hallucination.
-
-Critères d'acceptation :
-
-* Le premier segment TTS démarre avant la fin complète de la réponse Max.
-
-* Les sous-titres Max s'affichent progressivement.
-
-* En cas d'erreur TTS sur segment N, les segments précédents ne bloquent pas le tour.
-
-### Phase 7 — Lecture audio streamée réelle
-
-Objectif : exploiter vraiment le flux audio du provider.
-
-Options techniques :
-
-1. **MediaSource Extensions** pour MP3/AAC fragmenté si compatible.
-2. **WebAudio decode en chunks** si formats décodables par segments.
-3. **WebRTC ou WebSocket audio** si passage à une API realtime provider.
-4. **Provider realtime dédié** si ElevenLabs/Deepgram/Inworld proposent une session duplex adaptée.
-
-Remarque :
-
-* Le streaming audio navigateur est plus complexe que `blob()` et varie selon formats.
-
-* Une étape intermédiaire pragmatique est le streaming texte -> TTS par phrases courtes, même si chaque phrase reste un blob.
-
-Critères d'acceptation :
-
-* `t_tts_first_audio_ms` mesuré séparément de `t_tts_first_byte_ms`.
-
-* Le premier son démarre sans attendre le blob complet lorsque le provider le permet.
-
-***
-
-## 6. Recommandations concrètes par navigateur
-
-### Chrome / Brave
-
-Priorités :
-
-* Audio unlock sur geste utilisateur.
-
-* Gestion `NotAllowedError` de `play()`.
-
-* Timeouts TTS/LLM/GM.
-
-* Preset TTS basse latence.
-
-### Firefox
-
-Priorités :
-
-* MIME detection `MediaRecorder`.
-
-* Tester `audio/ogg;codecs=opus`.
-
-* Vérifier lecture MP3/AAC selon provider.
-
-* Logs précis WebSocket + MediaRecorder.
-
-### Safari
-
-Priorités :
-
-* Fallback WebAudio PCM pour STT.
-
-* AudioContext unlock obligatoire.
-
-* Eviter dépendance WebM côté capture.
-
-* Tester format TTS `mp3` et éventuellement `aac/mp4` si provider le permet.
-
-***
-
-## 7. Télémétrie à ajouter
-
-### 7.1 Evénements
-
-| Event                   | But                                           |
-| ----------------------- | --------------------------------------------- |
-| `audio_unlock_attempt`  | Savoir si le navigateur autorise l'audio      |
-| `audio_unlock_result`   | Diagnostiquer autoplay                        |
-| `stt_recorder_selected` | Voir MIME choisi                              |
-| `stt_recorder_failed`   | Identifier incompatibilités                   |
-| `stt_ws_lifecycle`      | open/close/error/reconnect                    |
-| `tts_play_start`        | Temps réel jusqu'au premier son               |
-| `tts_play_failed`       | Erreurs de lecture audio                      |
-| `turn_recovery`         | Quand un timeout/fallback remet l'app en état |
-
-### 7.2 Propriétés
-
-* `browser_name`
-
-* `browser_version`
-
-* `os`
-
-* `media_recorder_supported`
-
-* `selected_mime_type`
-
-* `audio_context_state`
-
-* `play_error_name`
-
-* `play_error_message`
-
-* `tts_provider`
-
-* `tts_model`
-
-* `timeout_label`
-
-* `recovered`
-
-### 7.3 Mesures nouvelles
-
-* `t_user_stop_to_stt_final_ms`
-
-* `t_stt_final_to_llm_first_token_ms`
-
-* `t_llm_first_token_to_tts_request_ms`
-
-* `t_tts_first_byte_ms`
-
-* `t_tts_first_audio_ms`
-
-* `t_turn_recovery_ms`
-
-***
-
-## 8. Plan de tests
-
-### 8.1 Tests unitaires
-
-Ajouter tests pour :
-
-* sélection MIME STT;
-
-* fallback si `MediaRecorder` absent;
-
-* classification erreurs `play()`;
-
-* timeout helper;
-
-* `TTSQueue.drain()` avec status `played/failed/cancelled`;
-
-* extraction de phrases en streaming.
-
-### 8.2 Tests navigateur manuels
-
-Matrice minimale :
-
-| Navigateur    | Micro ouvert | PTT          | TTS | Reprise apres erreur |
-| ------------- | ------------ | ------------ | --- | -------------------- |
-| Chrome macOS  | oui          | oui          | oui | oui                  |
-| Brave macOS   | oui          | oui          | oui | oui                  |
-| Firefox macOS | oui          | oui          | oui | oui                  |
-| Safari macOS  | oui/fallback | oui/fallback | oui | oui                  |
-
-Scénarios :
-
-1. Premier démarrage micro.
-2. Refus permission micro puis retry.
-3. Tour normal court.
-4. Réponse Max longue.
-5. Coupure réseau pendant TTS.
-6. Fermeture WebSocket STT.
-7. Blocage autoplay simulé.
-8. Provider TTS en 429/quota.
-
-### 8.3 Tests de latence
-
-Pour chaque navigateur :
-
-* 10 tours courts.
-
-* 10 tours longs.
-
-* p50/p95 par étape.
-
-* comparaison preset qualité vs preset basse latence.
-
-***
-
-## 9. Risques et arbitrages
-
-### Qualité vocale vs latence
-
-* `eleven_multilingual_v2` + chunks longs = meilleure prosodie, latence plus élevée.
-
-* `eleven_turbo_v2_5` / `flash` + chunks courts = meilleure réactivité, qualité potentiellement inférieure.
-
-Recommandation :
-
-* Garder deux modes configurables :
-
-  * **Qualité Max** pour démos narratives.
-
-  * **Conversation realtime** pour tests d'interaction.
-
-### Validation anti-hallucination vs latence
-
-* Validation complète avant TTS sécurise la narration.
-
-* Elle empêche le vrai streaming vocal dès le premier token.
-
-Recommandation :
-
-* Conserver la validation complète pour mode "safe".
-
-* Tester un mode "low latency" avec prompt plus strict, réponses plus courtes, monitoring hallucination, et validation post-hoc ou légère.
-
-### Streaming audio navigateur
-
-* Lecture audio pendant arrivée du flux est plus complexe que phrase-by-phrase blobs.
-
-* Safari peut imposer des contraintes de format.
-
-Recommandation :
-
-* Etape 1 : streaming texte vers chunks TTS courts.
-
-* Etape 2 : lecture streamée réelle seulement après stabilisation robuste.
-
-***
-
-## 10. Ordre d'implémentation recommandé
-
-1. **Diagnostics navigateur + événements erreurs** : indispensable pour confirmer les hypothèses.
-2. **MIME detection STT + fallback propre** : corrige Safari/Firefox.
-3. **Audio unlock + gestion** **`play()`** : corrige TTS intermittent Chromium/Brave/Safari.
-4. **Timeouts + machine d'état récupérable** : corrige les blocages.
-5. **Preset TTS basse latence + silence STT réduit** : gains rapides de fluidité.
-6. **Streaming texte Max -> TTS par phrases** : gros gain de latence perçue.
-7. **Audio streaming réel** : optimisation avancée.
-
-***
-
-## 11. References
-
-Documentation externe :
-
-* [MDN — MediaRecorder.isTypeSupported](https://developer.mozilla.org/docs/Web/API/MediaRecorder/isTypeSupported_static)
-
-* [MDN — HTMLMediaElement.play](https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/play)
-
-* [MDN — Autoplay guide for media and Web Audio APIs](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Autoplay)
-
-* [Deepgram — Supported Audio Formats](https://developers.deepgram.com/docs/supported-audio-formats)
-
-* [Deepgram — Determining Your Audio Format for Live Streaming Audio](https://developers.deepgram.com/docs/determining-your-audio-format-for-live-streaming-audio)
-
-Documentation projet :
-
-* `documents/PRD_Prototype_1.md`
-
-* `docs/posthog-setup-guide.md`
-
-* `docs/plan_max_test_inspector.md`
-
-* `CHANGELOG.md`
-
-Fichiers code audites :
-
-* `src/services/deepgramSTT.ts`
-
-* `src/pages/Index.tsx`
-
-* `src/services/conversationOrchestrator.ts`
-
-* `src/agents/maxAgent.ts`
-
-* `src/services/openRouterLLM.ts`
-
-* `src/services/tts/index.ts`
-
-* `src/services/tts/queue.ts`
-
-* `src/services/tts/providers/elevenlabs.ts`
-
-* `src/services/tts/textChunking.ts`
-
-* `supabase/functions/proxy-tts/index.ts`
-
-* `supabase/functions/proxy-llm/index.ts`
-
-***
-
-## 12. Checklist de validation avant release
-
-* [ ] Safari peut démarrer une session vocale ou afficher un fallback texte explicite.
-
-* [ ] Firefox choisit un MIME supporté et transcrit.
-
-* [ ] Brave/Chrome ne perdent pas le TTS sans message actionnable.
-
-* [ ] Toute erreur `audio.play()` est classée et trackée.
-
-* [ ] Tout fetch critique a un timeout.
-
-* [ ] `isProcessingRef` revient toujours à `false`.
-
-* [ ] Le micro reprend après erreur non fatale.
-
-* [ ] Le premier son Max est mesuré par `t_tts_first_audio_ms`.
-
-* [ ] Les dashboards PostHog permettent de filtrer par navigateur/provider/MIME.
-
-* [ ] p95 fin utilisateur -> premier son Max sous 5 s en mode basse latence.
+Références projet : [contrat de régression](core_experience_regression_contract.md), [mémoire et expérience](plan_assainissement_mecanique_orchestration_gm.md), [observabilité antérieure](posthog_latency_observability_audit.md), [traces Max](max-causal-tracing.md).

@@ -17,3 +17,8 @@ Parler au personnage sans bouton : on ouvre le micro une fois, on parle ; après
 
 ## Tests
 `src/services/handsFreeVoice.test.ts` : bornes du silence, hésitation, interruption et anti-écho.
+
+
+## Complément de latence et de continuité — 12 octobre 2026
+
+La base réalisée ci-dessus reste le point de départ. Le [plan d'optimisation voice-to-voice](plan_optimisation_latence_voice_to_voice.md) complète la mesure, la sortie LLM/TTS incrémentale et la mémoire des répliques interrompues ; il ne recrée pas la saisie mains libres. L'[audit chiffré](audit_voice_conversation_max.md) distingue les mesures PTT de septembre du fonctionnement mains libres récent. La décision de tour reste centralisée dans `handsFreeVoice.ts` sous le contrat actuel.
