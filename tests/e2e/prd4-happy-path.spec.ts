@@ -514,8 +514,8 @@ test("le teaser démarre automatiquement avec le son puis Passer coupe tout", as
     (window as Window & { __e2eNativeVideoState?: { pauseCount: number } }).__e2eNativeVideoState?.pauseCount ?? 0,
   );
   await page.getByRole("button", { name: /Passer/ }).click();
-  await completeVolunteerBriefing(page);
-  await expect(page.getByRole("heading", { name: "À qui veux-tu parler ?" })).toBeVisible();
+  await answerFilmQuestion(page);
+  await expect(page.getByRole("heading", { name: "A qui veux-tu parler ?" })).toBeVisible();
   await expect.poll(() => page.evaluate((previousPauseCount) => {
     const state = (window as Window & {
       __e2eNativeVideoState?: { playing: boolean; pauseCount: number };
@@ -541,7 +541,7 @@ test("une cinématique HLS démarre automatiquement puis Passer coupe son média
   expect(persistentPlayer).not.toBeNull();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
-  await completeVolunteerBriefing(page);
+  await answerFilmQuestion(page);
   await page.getByRole("button", { name: "Appeler Max" }).click();
   for (let turn = 1; turn <= 3; turn += 1) {
     await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
@@ -589,8 +589,8 @@ test("parcours PRD4 heureux avec trois tours de conversation", async ({ page }) 
   await expect(page.getByRole("button", { name: "Commencer" })).toBeEnabled();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
-  await completeVolunteerBriefing(page);
-  await expect(page.getByRole("heading", { name: "À qui veux-tu parler ?" })).toBeVisible();
+  await answerFilmQuestion(page);
+  await expect(page.getByRole("heading", { name: "A qui veux-tu parler ?" })).toBeVisible();
   await expect(page.getByText(/poser une question, exprimer une émotion/i)).toHaveCount(0);
 
   await page.getByRole("button", { name: "Appeler Max" }).click();
@@ -619,7 +619,7 @@ test("une réponse vocale plus longue que le watchdog est lue jusqu'au bout", as
   await page.goto("/");
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
-  await completeVolunteerBriefing(page);
+  await answerFilmQuestion(page);
   await page.getByRole("button", { name: "Appeler Max" }).click();
   await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
 
@@ -651,7 +651,7 @@ test("diagnostic full garde la voix réactive pendant un upload de trace bloqué
   await page.goto("/?diagnostic=full");
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
-  await completeVolunteerBriefing(page);
+  await answerFilmQuestion(page);
   await page.getByRole("button", { name: "Appeler Max" }).click();
   await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
 
@@ -693,7 +693,7 @@ test("un 429 system_busy ElevenLabs est rejoué une fois puis la voix démarre",
   await page.goto("/");
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
-  await completeVolunteerBriefing(page);
+  await answerFilmQuestion(page);
   await page.getByRole("button", { name: "Appeler Max" }).click();
   await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
 
@@ -720,7 +720,7 @@ test("endurance accélérée de 35 tours avec mémoire bornée et pannes récup�
   await page.goto("/");
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
-  await completeVolunteerBriefing(page);
+  await answerFilmQuestion(page);
   await page.getByRole("button", { name: "Appeler Max" }).click();
   await expect(page.getByLabel("Temps restant")).toHaveText(/15:30|15:29/, { timeout: 10_000 });
 
