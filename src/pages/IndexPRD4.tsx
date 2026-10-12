@@ -1699,6 +1699,10 @@ const IndexPRD4 = () => {
   }, [endLatencySegment, setAudioState, teardownSTT]);
 
   // ---- Mains libres -----------------------------------------------------------
+  useEffect(() => {
+    handsFreeBlockedRef.current = handoffCalling || Boolean(handoffOffer) || Boolean(activeVideo) || state.phase !== "conversation";
+  }, [activeVideo, handoffCalling, handoffOffer, state.phase]);
+
   /** Le joueur coupe la parole : la voix s'arrête, le tour en cours est abandonné. */
   const interruptCharacter = useCallback(() => {
     if (processingWatchdogRef.current) {
