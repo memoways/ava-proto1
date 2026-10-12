@@ -6,8 +6,16 @@ import { restrictHandoffToActiveCharacters } from "@/agents/gameMasterPRD4";
 const enabled = normalizeExperienceFrameConfig({ enabled: true });
 
 describe("experienceFrame", () => {
-  it("is off by default so existing behaviour is unchanged", () => {
-    expect(buildExperienceFrame({ config: undefined, filmAnswer: "vu" }).prompt).toBe("");
+  it("keeps editorial framing off by default when no film answer exists", () => {
+    expect(buildExperienceFrame({ config: undefined, filmAnswer: null })).toEqual({ enabled: false, path: null, prompt: "" });
+  });
+
+  it.each([ ["vu", "seen"], ["pas_vu", "unseen"] ] as const)("shares the %s answer even with editorial framing disabled", (filmAnswer, path) => {
+    const frame = buildExperienceFrame({ config: undefined, filmAnswer });
+    expect(frame.enabled).toBe(false);
+    expect(frame.path).toBe(path);
+    expect(frame.prompt).not.toBe("");
+    expect(frame.prompt).not.toContain(enabled.frameText);
   });
 
   it("maps film answers to paths", () => {

@@ -5,6 +5,18 @@ Plan approuvé le 2026-09-16, archivé aussi dans
 
 ## Objectif
 
+### Révision demandée le 12/10/2026 — choix film après la vidéo
+
+- Nouveau parcours commun : introduction (autoplay avec son conservé) → photo de la grange avec deux choix film → quatre personnages.
+- Masquer la séquence bénévole et son profil système dans le parcours actif, sans effacer ses fichiers ni son stockage historique.
+- Présenter le texte de soutien demandé, puis « A qui veux-tu parler ? ». Remplacer la relecture du contexte par la relecture vidéo ; retour aux personnages sans remplacer la réponse film.
+- Conserver `has_seen_film` dans la session et transmettre le choix réel au cadre partagé personnage/GM, même lorsque le cadre éditorial est désactivé. Les consignes d'accompagnement restent dans les versions publiées propres à chaque environnement.
+- Vérifier les deux choix, l’absence d’onboarding, la relecture sans perte du choix, les personnages actifs/verrouillés et l’autoplay sonore. Aucune migration ni publication Production.
+
+Le plan historique ci-dessous est conservé, mais son écran et son profil système ne sont plus utilisés par le nouveau parcours.
+
+Validation du lot : 39 tests ciblés réussis, dont transmission identique des deux réponses au personnage et au GM. Photo servie avec succès par l’aperçu Lovable (le serveur local ne sert pas les URL CDN : contrôle navigateur avec les mêmes octets servis par Lovable). Sélection et relecture vérifiées dans Chromium. La suite Playwright JS est bloquée par l’absence de sa version de Chromium ; le contrôle navigateur Python a forcé l’événement de disponibilité vidéo pour vérifier la suite du parcours. Lecture sonore réelle et accompagnement narratif à écouter en sandbox ; aucune publication Production.
+
 Insérer une étape courte entre l'introduction (teaser / question film) et le
 choix du personnage, expliquant que la personne incarne un·e bénévole d'un
 dispositif de soutien, sans aucune collecte de données personnelles, et rendre

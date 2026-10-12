@@ -70,8 +70,11 @@ export interface ExperienceFrame {
 export function buildExperienceFrame(input: ExperienceFrameInput): ExperienceFrame {
   const config = normalizeExperienceFrameConfig(input.config);
   const path = experiencePathFromFilmAnswer(input.filmAnswer);
-  if (!config.enabled) return { enabled: false, path, prompt: "" };
-  const lines: string[] = [];
+  // A film answer is factual context, not an editorial frame setting. Always
+  // share it identically with GM and character without enabling sandbox rules.
+  const filmContext = path ? `Choix initial du joueur — film : ${input.filmAnswer}.` : "";
+  if (!config.enabled) return { enabled: false, path, prompt: filmContext };
+  const lines: string[] = filmContext ? [filmContext] : [];
   if (config.frameText) lines.push(config.frameText);
   const exposure = path === "seen" ? config.exposureSeen : path === "unseen" ? config.exposureUnseen : "";
   if (exposure) lines.push(`Parcours ${path === "seen" ? "briefé (film vu)" : "découverte (film non vu)"} : ${exposure}`);

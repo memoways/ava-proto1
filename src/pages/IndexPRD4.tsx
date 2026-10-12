@@ -142,13 +142,6 @@ import {
   type CharacterHandoffOffer,
 } from "@/services/characterConversation";
 
-import VolunteerBriefingScreen from "@/components/prd4/VolunteerBriefingScreen";
-import {
-  VOLUNTEER_BRIEFING_VERSION,
-  buildVolunteerRoleProfile,
-  getVolunteerBriefingProgress,
-  saveVolunteerBriefingProgress,
-} from "@/services/volunteerBriefing";
 
 const TEASER_VIDEO_URL = "https://video.gumlet.io/673f29f4a5e1bf70aa645cb7/6acc8341689a80cf2e4a427d/main.m3u8";
 
@@ -162,7 +155,6 @@ const IndexPRD4 = () => {
     setPhase,
     setFilmAnswer,
     markTeaserSeen,
-    setRoleProfile,
     setAudioState,
     addMessage,
     removeLastMessage,
@@ -386,7 +378,6 @@ const IndexPRD4 = () => {
     // public/preloaded cinematic; on failure we stop and return to welcome.
     unlockCinematicPlayback();
     flushSync(() => {
-      setFilmAnswer("rappel");
       setPhase("teaser");
     });
 
@@ -416,81 +407,35 @@ const IndexPRD4 = () => {
     firstMaxResponseAtRef.current = null;
     trackEvent("prd4_onboarding_started", {});
     return true;
-  }, [privacyPreferences, setFilmAnswer, setPhase, unlockCinematicPlayback]);
-  // ---- Onboarding du bénévole (après l'introduction, avant le choix) --------
-  const briefingStartedAtRef = useRef<number | null>(null);
-  const [briefingReview, setBriefingReview] = useState(false);
+  }, [privacyPreferences, setPhase, unlockCinematicPlayback]);
 
-  /** Le cadre bénévole est toujours transmis au personnage, même en relecture. */
-  const applyVolunteerFrame = useCallback(() => {
-    setRoleProfile(buildVolunteerRoleProfile());
-  }, [setRoleProfile]);
-
-  const enterAfterIntroduction = useCallback(() => {
-    const progress = getVolunteerBriefingProgress();
-    if (progress.completed) {
-      applyVolunteerFrame();
-      setPhase("character_select");
-      return;
-    }
-    briefingStartedAtRef.current = Date.now();
-    trackEvent("prd4_volunteer_briefing_shown", {
-      version: VOLUNTEER_BRIEFING_VERSION,
-      resumed_at_card: progress.lastCardIndex,
-    });
-    setPhase("volunteer_briefing");
-  }, [applyVolunteerFrame, setPhase]);
-
-  const handleBriefingCardViewed = useCallback((index: number, cardId: string) => {
-    trackEvent("prd4_volunteer_briefing_card_viewed", {
-      version: VOLUNTEER_BRIEFING_VERSION,
-      card_index: index,
-      card_id: cardId,
-      review: briefingReview,
-    });
-  }, [briefingReview]);
-
-  const handleBriefingComplete = useCallback(() => {
-    applyVolunteerFrame();
-    trackEvent("prd4_volunteer_briefing_completed", {
-      version: VOLUNTEER_BRIEFING_VERSION,
-      duration_ms: briefingStartedAtRef.current ? Date.now() - briefingStartedAtRef.current : null,
-    });
-    briefingStartedAtRef.current = null;
-    setPhase("character_select");
-  }, [applyVolunteerFrame, setPhase]);
-
-  const handleBriefingReviewOpen = useCallback(() => {
-    const progress = saveVolunteerBriefingProgress({
-      replays: getVolunteerBriefingProgress().replays + 1,
-    });
-    trackEvent("prd4_volunteer_briefing_reviewed", {
-      version: VOLUNTEER_BRIEFING_VERSION,
-      replays: progress.replays,
-    });
-    setBriefingReview(true);
-  }, []);
+  // Legacy briefing files/storage are retained but never used by this flow.
+  const introductionReviewRef = useRef(false);
+  const handleIntroductionReview = useCallback(() => {
+    introductionReviewRef.current = true;
+    trackEvent("prd4_introduction_reviewed", {});
+    unlockCinematicPlayback();
+    setPhase("teaser");
+  }, [setPhase, unlockCinematicPlayback]);
 
   const handleFilmAnswer = useCallback(
     (a: FilmAnswer) => {
       setFilmAnswer(a);
       trackEvent("prd4_film_answered", { answer: a });
-      if (a === "vu") {
-        enterAfterIntroduction();
-      } else {
-        setPhase("teaser");
-      }
+      setPhase("character_select");
     },
-    [enterAfterIntroduction, setFilmAnswer, setPhase],
+    [setFilmAnswer, setPhase],
   );
   const handleTeaserContinue = useCallback(() => {
-    markTeaserSeen(false);
-    enterAfterIntroduction();
-  }, [enterAfterIntroduction, markTeaserSeen]);
+    if (!introductionReviewRef.current) markTeaserSeen(false);
+    setPhase(introductionReviewRef.current ? "character_select" : "film_question");
+    introductionReviewRef.current = false;
+  }, [setPhase, markTeaserSeen]);
   const handleTeaserSkip = useCallback(() => {
-    markTeaserSeen(true);
-    enterAfterIntroduction();
-  }, [enterAfterIntroduction, markTeaserSeen]);
+    if (!introductionReviewRef.current) markTeaserSeen(true);
+    setPhase(introductionReviewRef.current ? "character_select" : "film_question");
+    introductionReviewRef.current = false;
+  }, [setPhase, markTeaserSeen]);
 
   // ---- Character select / Calling -------------------------------------------
   const activateTTSFallback = useCallback(async (reason: string) => {
@@ -1940,6 +1885,7 @@ const IndexPRD4 = () => {
   const handleRestart = useCallback(() => {
     cleanupAudio();
     reset();
+    introductionReviewRef.current = false;
     setUserSubtitle("");
     setMaxSubtitle("");
     sessionIdRef.current = null;
@@ -2019,13 +1965,6 @@ const IndexPRD4 = () => {
     case "teaser":
       break;
     case "volunteer_briefing":
-      screen = (
-        <VolunteerBriefingScreen
-          onComplete={handleBriefingComplete}
-          onCardViewed={handleBriefingCardViewed}
-        />
-      );
-      break;
     case "film_question":
       screen = <FilmQuestionScreen onAnswer={handleFilmAnswer} />;
       break;
@@ -2033,18 +1972,11 @@ const IndexPRD4 = () => {
       screen = <TransitionScreen onContinue={handleAnswered} />;
       break;
     case "character_select":
-      screen = briefingReview ? (
-        <VolunteerBriefingScreen
-          mode="review"
-          onComplete={() => setBriefingReview(false)}
-          onClose={() => setBriefingReview(false)}
-          onCardViewed={handleBriefingCardViewed}
-        />
-      ) : (
+      screen = (
         <CharacterSelectScreen
           onSelect={handleSelectCharacter}
           onLockedClick={handleLockedClick}
-          onReviewContext={handleBriefingReviewOpen}
+          onReviewIntroduction={handleIntroductionReview}
         />
       );
       break;

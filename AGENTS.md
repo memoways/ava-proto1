@@ -22,3 +22,4 @@ Ces règles s'appliquent à toute personne, agent et outil intervenant sur ce d�
 - Le compte rendu final doit contenir un lien direct vers le plan sauvegardé.
 
 - The shared experience frame (volunteer role, seen/unseen path, posture) is built only by `src/services/experienceFrame.ts` from the published orchestration config and injected identically into the character prompt and the GM prompt — why: no divergence between what GM and characters know.
+- The initial film answer is factual session context shared through the experience frame regardless of editorial frame activation; intro replay must preserve it — why: watching the project introduction does not mean watching the film.

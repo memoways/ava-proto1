@@ -1,6 +1,7 @@
 /** PRD4 — Choix du protagoniste (Max et Emma ; Ava/Léo verrouillés). */
 import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import maxImg from "@/assets/characters/max.jpg";
 import emmaImg from "@/assets/characters/emma.jpg";
@@ -14,7 +15,7 @@ type CharId = "max" | "emma" | "ava" | "leo";
 interface Props {
   onSelect: (id: "max" | "emma", profile: CharacterRuntimeReadiness | null) => void;
   onLockedClick?: (id: Exclude<CharId, "max">) => void;
-  onReviewContext?: () => void;
+  onReviewIntroduction?: () => void;
 }
 
 const CHARACTER_IMAGES: Record<CharId, string> = { max: maxImg, emma: emmaImg, ava: avaImg, leo: leoImg };
@@ -28,7 +29,7 @@ function portraitAlt(name: string): string {
   return name === "Emma" || name === "Ava" ? `Portrait d’${name}` : `Portrait de ${name}`;
 }
 
-const CharacterSelectScreen = ({ onSelect, onLockedClick, onReviewContext }: Props) => {
+const CharacterSelectScreen = ({ onSelect, onLockedClick, onReviewIntroduction }: Props) => {
   const [lockedDialog, setLockedDialog] = useState(false);
   const [emmaOn, setEmmaOn] = useState(true);
   const [runtimePortraits, setRuntimePortraits] = useState<Partial<Record<"max" | "emma", string>>>({});
@@ -65,9 +66,14 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick, onReviewContext }: Pro
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10">
       <div className="mx-auto w-full max-w-3xl space-y-8 text-center">
-        <h2 className="font-serif text-3xl font-light text-foreground md:text-4xl">
-          À qui veux-tu parler&nbsp;?
-        </h2>
+        <div className="space-y-4">
+          <p className="text-base leading-relaxed text-foreground md:text-lg">
+            Ils ont besoin de ton soutien. Approche-les avec douceur.
+          </p>
+          <h2 className="font-serif text-3xl font-light text-foreground md:text-4xl">
+            A qui veux-tu parler&nbsp;?
+          </h2>
+        </div>
 
         <div className="grid grid-cols-2 gap-4 sm:gap-6 tablet-lg:grid-cols-4">
           {CHARACTERS.map((c) => {
@@ -77,10 +83,11 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick, onReviewContext }: Pro
               "group relative flex flex-col items-center gap-3 rounded-lg border bg-card/60 p-4 transition-all duration-200";
             if (isActive(c.id)) {
               return (
-                <button
+                <Button
+                  variant="ghost"
                   key={c.id}
                   onClick={() => onSelect(c.id as "max" | "emma", runtimeProfiles[c.id as "max" | "emma"] ?? null)}
-                  className={`${cardBase} border-primary/50 hover:-translate-y-1 hover:border-primary hover:bg-card hover:shadow-lg hover:shadow-primary/10`}
+                  className={`${cardBase} h-auto whitespace-normal border-primary/50 hover:-translate-y-1 hover:border-primary hover:bg-card hover:shadow-lg hover:shadow-primary/10`}
                   aria-label={`Appeler ${c.name}`}
                 >
                   <div className="relative">
@@ -94,14 +101,15 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick, onReviewContext }: Pro
                     <p className="font-medium text-foreground">{c.name}</p>
                     <p className="text-xs text-primary">Disponible</p>
                   </div>
-                </button>
+                </Button>
               );
             }
             return (
-              <button
+              <Button
+                variant="ghost"
                 key={c.id}
                 onClick={() => handleLocked(c.id as Exclude<CharId, "max">)}
-                className={`${cardBase} cursor-not-allowed border-border opacity-50 grayscale hover:opacity-70`}
+                className={`${cardBase} h-auto whitespace-normal cursor-not-allowed border-border opacity-50 grayscale hover:opacity-70`}
                 aria-label={`${c.name} indisponible`}
               >
                 <div className="relative">
@@ -116,20 +124,21 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick, onReviewContext }: Pro
                     Bientôt
                   </p>
                 </div>
-              </button>
+              </Button>
             );
           })}
 
         </div>
 
-        {onReviewContext ? (
-          <button
+        {onReviewIntroduction ? (
+          <Button
+            variant="link"
             type="button"
-            onClick={onReviewContext}
-            className="story-link text-sm text-muted-foreground hover:text-foreground"
+            onClick={onReviewIntroduction}
+            className="h-auto whitespace-normal text-sm text-muted-foreground hover:text-foreground"
           >
-            Revoir le contexte
-          </button>
+            Revoir la vidéo d’introduction
+          </Button>
         ) : null}
       </div>
 

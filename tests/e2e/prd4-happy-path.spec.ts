@@ -54,6 +54,7 @@ async function installNetworkFakes(
   const blockedTraceUpload = new Promise<void>((resolve) => { releaseTraceUpload = resolve; });
   const maxMessageCounts: number[] = [];
   const sessionUpdates: unknown[] = [];
+  const gmFilmContexts: string[] = [];
 
   await page.addInitScript(({ transcripts, simulateAudio }: { transcripts: string[]; simulateAudio: boolean }) => {
     let websocketIndex = 0;
@@ -398,6 +399,7 @@ async function installNetworkFakes(
             : { themes: [], topics: [], intentions: [] },
         );
       } else if (system.includes("Game Master") || system.includes("end_recommended")) {
+        gmFilmContexts.push(system);
         gmPostTurnCount += 1;
         const triggerVideo = gmPostTurnCount === options.triggerVideoAtLabel;
         content = JSON.stringify({
@@ -459,6 +461,7 @@ async function installNetworkFakes(
     getSimulatedNetworkDrops: () => simulatedNetworkDrops,
     getTriggeredVideoLoads: () => triggeredVideoLoads,
     getSessionUpdates: () => sessionUpdates,
+    getGmFilmContexts: () => gmFilmContexts,
     getTtsCallCount: () => ttsCallCount,
     getPosthogRequestCount: () => posthogRequestCount,
     getTraceUploadStarted: () => traceUploadStarted,
@@ -467,16 +470,28 @@ async function installNetworkFakes(
   };
 }
 
-/** Onboarding du bénévole : séquence de cartes entre le teaser et le choix du personnage. */
-async function completeVolunteerBriefing(page: Page) {
-  const understood = page.getByRole("button", { name: "J'ai compris" });
-  for (let step = 0; step < 5; step += 1) {
-    if (await understood.count()) {
-      await understood.click();
-      return;
-    }
-    await page.getByRole("button", { name: "Continuer" }).click();
-  }
+/** Choix film après l'introduction ; l'ancien briefing est masqué. */
+async function answerFilmQuestion(page: Page) {
+  await page.getByRole("button", { name: "Je n'ai pas vu le film", exact: true }).click();
+}
+
+for (const answer of ["vu", "pas_vu"] as const) {
+  test(`choix film ${answer} conservé après relecture et transmis au GM`, async ({ page }) => {
+    const fakes = await installNetworkFakes(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Commencer" }).click();
+    await page.getByRole("button", { name: /Passer/ }).click();
+    await page.getByRole("button", { name: answer === "vu" ? "J'ai vu le film" : "Je n'ai pas vu le film", exact: true }).click();
+    await page.getByRole("button", { name: "Revoir la vidéo d’introduction" }).click();
+    await page.getByRole("button", { name: /Passer/ }).click();
+    await page.getByRole("button", { name: "Appeler Max" }).click();
+    await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+    await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+    await expect.poll(() => fakes.getGmFilmContexts().some((prompt) => prompt.includes(`film : ${answer}.`))).toBe(true);
+    await expect.poll(() => fakes.getSessionUpdates().some((update) =>
+      typeof update === "object" && update !== null && "has_seen_film" in update && update.has_seen_film === answer,
+    )).toBe(true);
+  });
 }
 
 test("le teaser démarre automatiquement avec le son puis Passer coupe tout", async ({ page }, testInfo) => {
@@ -518,8 +533,8 @@ test("le teaser démarre automatiquement avec le son puis Passer coupe tout", as
     (window as Window & { __e2eNativeVideoState?: { pauseCount: number } }).__e2eNativeVideoState?.pauseCount ?? 0,
   );
   await page.getByRole("button", { name: /Passer/ }).click();
-  await completeVolunteerBriefing(page);
-  await expect(page.getByRole("heading", { name: "À qui veux-tu parler ?" })).toBeVisible();
+  await answerFilmQuestion(page);
+  await expect(page.getByRole("heading", { name: "A qui veux-tu parler ?" })).toBeVisible();
   await expect.poll(() => page.evaluate((previousPauseCount) => {
     const state = (window as Window & {
       __e2eNativeVideoState?: { playing: boolean; pauseCount: number };
@@ -545,7 +560,7 @@ test("une cinématique HLS démarre automatiquement puis Passer coupe son média
   expect(persistentPlayer).not.toBeNull();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
-  await completeVolunteerBriefing(page);
+  await answerFilmQuestion(page);
   await page.getByRole("button", { name: "Appeler Max" }).click();
   for (let turn = 1; turn <= 3; turn += 1) {
     await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
@@ -593,8 +608,8 @@ test("parcours PRD4 heureux avec trois tours de conversation", async ({ page }) 
   await expect(page.getByRole("button", { name: "Commencer" })).toBeEnabled();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
-  await completeVolunteerBriefing(page);
-  await expect(page.getByRole("heading", { name: "À qui veux-tu parler ?" })).toBeVisible();
+  await answerFilmQuestion(page);
+  await expect(page.getByRole("heading", { name: "A qui veux-tu parler ?" })).toBeVisible();
   await expect(page.getByText(/poser une question, exprimer une émotion/i)).toHaveCount(0);
 
   await page.getByRole("button", { name: "Appeler Max" }).click();
@@ -623,7 +638,7 @@ test("une réponse vocale plus longue que le watchdog est lue jusqu'au bout", as
   await page.goto("/");
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
-  await completeVolunteerBriefing(page);
+  await answerFilmQuestion(page);
   await page.getByRole("button", { name: "Appeler Max" }).click();
   await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
 
@@ -655,7 +670,7 @@ test("diagnostic full garde la voix réactive pendant un upload de trace bloqué
   await page.goto("/?diagnostic=full");
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
-  await completeVolunteerBriefing(page);
+  await answerFilmQuestion(page);
   await page.getByRole("button", { name: "Appeler Max" }).click();
   await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
 
@@ -697,7 +712,7 @@ test("un 429 system_busy ElevenLabs est rejoué une fois puis la voix démarre",
   await page.goto("/");
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
-  await completeVolunteerBriefing(page);
+  await answerFilmQuestion(page);
   await page.getByRole("button", { name: "Appeler Max" }).click();
   await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
 
@@ -724,7 +739,7 @@ test("endurance accélérée de 35 tours avec mémoire bornée et pannes récup�
   await page.goto("/");
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
-  await completeVolunteerBriefing(page);
+  await answerFilmQuestion(page);
   await page.getByRole("button", { name: "Appeler Max" }).click();
   await expect(page.getByLabel("Temps restant")).toHaveText(/15:30|15:29/, { timeout: 10_000 });
 

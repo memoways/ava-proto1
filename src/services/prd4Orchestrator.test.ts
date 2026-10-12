@@ -188,6 +188,23 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     vi.useRealTimers();
   });
 
+  it.each(["vu", "pas_vu"])("transmits the initial %s answer identically to the GM and character without a published frame", async (hasSeenFilm) => {
+    const result = await processPRD4Turn({
+      sessionId: "session-film-choice",
+      conversationHistory: [],
+      userMessage: "Bonjour",
+      userRole: null,
+      hasSeenFilm,
+      timeElapsedSeconds: 0,
+    });
+    await result.postTurnPromise;
+    const characterFrame = vi.mocked(simulateMaxResponse).mock.calls[0]?.[0].experienceFrame;
+    const gmFrame = vi.mocked(evaluatePostTurnPRD4).mock.calls[0]?.[0].experienceFrame;
+    expect(characterFrame).toBeTruthy();
+    expect(characterFrame).toContain(hasSeenFilm);
+    expect(gmFrame).toBe(characterFrame);
+  });
+
   it("keeps a 36th turn bounded and refreshes only unsummarized memory", async () => {
     const history = makeConversation(35);
     const result = await processPRD4Turn({
