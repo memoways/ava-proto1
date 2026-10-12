@@ -14,6 +14,7 @@ export const LEGACY_SYSTEM_PROMPT_CHARS = 24_000;
 
 
 export const MAX_DYNAMIC_SECTION_CHARS = {
+  experience_frame: 1_400,
   relationship_directive: 1_400,
   user_role: 450,
   temporal_context: 260,
