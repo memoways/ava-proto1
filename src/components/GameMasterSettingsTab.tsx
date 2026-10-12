@@ -2,7 +2,8 @@ import { normalizeExperienceFrameConfig } from "@/services/experienceFrame";
 import { displayNameForCharacter } from "@/services/characterRegistry";
 import type { ExperienceFrameConfig } from "@/types";
 import { useEffect, useMemo, useState } from "react";
-import { Archive, Beaker, Copy, Play, RefreshCw, Save, SlidersHorizontal } from "lucide-react";
+import { Archive, Beaker, Copy, Info, Play, RefreshCw, Save, SlidersHorizontal } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { evaluatePostTurnPRD4, EXPERIENCE_DIRECTOR_SYSTEM_PROMPT } from "@/agents/gameMasterPRD4";
 import { Button } from "@/components/ui/button";
@@ -694,5 +695,27 @@ export default function GameMasterSettingsTab() {
         L'ouverture du personnage, la tolérance aux dérapages et le faux statut se règlent ci-dessus. Les anciens réglages (seuil numérique de confiance, gate, GM avant le tour, prompt historique) ont été retirés.
       </section>
     </div>
+  );
+}
+
+function Hint({ text, level }: { text: string; level?: "essentiel" | "secondaire" | "expert" }) {
+  return (
+    <span className="inline-flex items-center gap-1 align-middle">
+      {level && (
+        <Badge variant={level === "essentiel" ? "default" : "outline"} className="h-4 px-1.5 text-[10px] font-normal">
+          {level}
+        </Badge>
+      )}
+      <TooltipProvider delayDuration={150}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="Aide">
+              <Info className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs text-xs leading-snug">{text}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </span>
   );
 }
