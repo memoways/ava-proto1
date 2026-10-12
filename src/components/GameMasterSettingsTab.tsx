@@ -20,6 +20,8 @@ import {
   DEFAULT_DIRECTOR_CONFIG,
   listOrchestrationVersions,
   normalizeDirectorConfig,
+  OPEN_QUESTIONS_MAX,
+  PROJECT_CONTEXT_MAX_CHARS,
   registryActiveCharacterKeys,
   publishOrchestrationVersion,
   updateOrchestrationDraft,
@@ -561,6 +563,76 @@ export default function GameMasterSettingsTab() {
                       </Button>
                     </div>
                   ))}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="gm-project-context">Contexte du projet</Label>
+                  <Textarea
+                    id="gm-project-context"
+                    value={config.editor.projectContext}
+                    disabled={selected.status !== "draft"}
+                    maxLength={PROJECT_CONTEXT_MAX_CHARS}
+                    onChange={(event) => patchEditor({ projectContext: event.target.value })}
+                    className="min-h-32"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enjeux, promesse et règles du projet transmis au Game Master à chaque tour ({config.editor.projectContext.length}/{PROJECT_CONTEXT_MAX_CHARS} caractères). Remplace l'ancienne fiche Notion. Plus c'est court, plus c'est rapide.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="gm-open-questions">Questions ouvertes</Label>
+                  <Textarea
+                    id="gm-open-questions"
+                    value={config.editor.openQuestions.join("\n")}
+                    disabled={selected.status !== "draft"}
+                    onChange={(event) => patchEditor({ openQuestions: event.target.value.split("\n").slice(0, OPEN_QUESTIONS_MAX) })}
+                    placeholder="Une question par ligne"
+                    className="min-h-20"
+                  />
+                  <p className="text-xs text-muted-foreground">Points narratifs pas encore tranchés (une par ligne, {OPEN_QUESTIONS_MAX} max.) : le Game Master guide alors vers une réponse prudente.</p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-1.5">
+                    <Label>Ouverture du personnage</Label>
+                    <Select
+                      value={config.editor.guardrails.opennessPace}
+                      disabled={selected.status !== "draft"}
+                      onValueChange={(value) => patchEditor({ guardrails: { ...config.editor.guardrails, opennessPace: value as ExperienceDirectorEditorConfig["guardrails"]["opennessPace"] } })}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="slow">Lente</SelectItem>
+                        <SelectItem value="balanced">Équilibrée</SelectItem>
+                        <SelectItem value="fast">Rapide</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Tolérance aux dérapages</Label>
+                    <Select
+                      value={config.editor.guardrails.derailTolerance}
+                      disabled={selected.status !== "draft"}
+                      onValueChange={(value) => patchEditor({ guardrails: { ...config.editor.guardrails, derailTolerance: value as ExperienceDirectorEditorConfig["guardrails"]["derailTolerance"] } })}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Faible</SelectItem>
+                        <SelectItem value="medium">Moyenne</SelectItem>
+                        <SelectItem value="high">Élevée</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
+                    <Label htmlFor="gm-false-status" className="text-sm">Faux statut : consigne au tour suivant</Label>
+                    <Switch
+                      id="gm-false-status"
+                      checked={config.editor.guardrails.falseStatusGuidance}
+                      disabled={selected.status !== "draft"}
+                      onCheckedChange={(checked) => patchEditor({ guardrails: { ...config.editor.guardrails, falseStatusGuidance: checked } })}
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
