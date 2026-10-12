@@ -29,6 +29,13 @@
       "when": 1791802699031,
       "tag": "0003_deprecate_profondeur_par_niveau",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791826220176,
+      "tag": "0004_p0_voice_turn_events_storage",
+      "breakpoints": true
     }
   ]
 }
