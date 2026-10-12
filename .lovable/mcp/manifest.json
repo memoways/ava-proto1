@@ -278,6 +278,7 @@
                               "latency_origin": {
                                 "type": "string",
                                 "enum": [
+                                  "capture_start",
                                   "ptt_release",
                                   "app_turn_decision",
                                   "transcript_final",
@@ -327,6 +328,16 @@
                                 "type": "object",
                                 "properties": {
                                   "capture_started": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "capture_ready": {
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -589,6 +600,7 @@
                                 },
                                 "required": [
                                   "capture_started",
+                                  "capture_ready",
                                   "last_audio_sent",
                                   "turn_decided",
                                   "flush_sent",
@@ -740,6 +752,9 @@
                                         "client_monotonic"
                                       ]
                                     },
+                                    "client_anchor_ms": {
+                                      "type": "number"
+                                    },
                                     "spans": {
                                       "type": "array",
                                       "items": {
@@ -865,6 +880,7 @@
                                       "type": "string",
                                       "enum": [
                                         "capture_started",
+                                        "capture_ready",
                                         "last_audio_sent",
                                         "turn_decided",
                                         "flush_sent",

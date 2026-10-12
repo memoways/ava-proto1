@@ -438,6 +438,7 @@ export class DeepgramSTT {
 
     // Smaller timeslice = lower latency for the interim results loop.
     this.mediaRecorder.start(150);
+    observeVoice(this.onVoiceObservation, "capture_started");
   }
 
   stop() {

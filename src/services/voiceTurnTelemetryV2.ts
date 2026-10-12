@@ -1,6 +1,6 @@
 /** Technical-only, bounded observations. All client offsets use one monotonic clock. */
 export const VOICE_MILESTONES = [
-  "capture_started", "last_audio_sent", "turn_decided", "flush_sent", "flush_acknowledged",
+  "capture_started", "capture_ready", "last_audio_sent", "turn_decided", "flush_sent", "flush_acknowledged",
   "transcript_final", "voice_end", "context_ready", "llm_request", "llm_headers", "llm_response",
   "first_token", "intent_ready", "safe_phrase", "tts_text_sent", "first_audio_chunk", "audio_blob_ready",
   "audio_scheduled", "output_estimated", "audio_end", "audio_cancelled",
@@ -31,6 +31,8 @@ export interface ServerObservation {
   request_id: string;
   clock: "edge_monotonic" | "client_monotonic";
   spans: ProcessSpan[];
+  client_origin_at?: number;
+  client_anchor_ms?: number;
 }
 export interface VoiceTurnV2 {
   schema_version: 2;
@@ -42,7 +44,7 @@ export interface VoiceTurnV2 {
   environment_id: string;
   context_type: string;
   input_mode: "push_to_talk" | "hands_free" | "text";
-  latency_origin: "ptt_release" | "app_turn_decision" | "transcript_final" | "text_submitted";
+  latency_origin: "capture_start" | "ptt_release" | "app_turn_decision" | "transcript_final" | "text_submitted";
   code_version: string;
   prompt_version: string | null;
   config_version: string | null;
@@ -71,10 +73,12 @@ export function observeService(observer: ((value: ServiceObservation) => void) |
   try { observer?.(value); } catch { /* Attribution is diagnostic only. */ }
 }
 /** Strip all non-technical upstream fields before collection, not only on MCP reads. */
-export function projectServerObservation(input: ServerObservation): ServerObservation {
+export function projectServerObservation(input: ServerObservation, clientOrigin?: number): ServerObservation {
   const names = new Set(["control_quota", "rag_profile", "embedding", "vector_search", "rerank", "upstream_headers", "upstream_body", "gm_generation", "gm_validation_json", "gm_validation_relationship", "gm_persistence", "gm_available"]);
   return {
     request_id: String(input.request_id).slice(0, 160),
+    ...(input.clock === "client_monotonic" && Number.isFinite(input.client_origin_at) && clientOrigin !== undefined
+      ? { client_anchor_ms: Math.round(input.client_origin_at! - clientOrigin) } : {}),
     clock: input.clock === "client_monotonic" ? "client_monotonic" : "edge_monotonic",
     spans: (Array.isArray(input.spans) ? input.spans : []).filter((span) => names.has(span.name)
       && Number.isFinite(span.start_ms) && Number.isFinite(span.end_ms) && span.start_ms >= 0 && span.end_ms >= span.start_ms)
@@ -104,14 +108,20 @@ export function createVoiceTurnV2(
   };
   send("voice_turn_started");
   const observe: VoiceObserver = (name, at = performance.now()) => {
-    if (finished || milestones[name] !== null || !Number.isFinite(at)) return;
+    if (finished || (milestones[name] !== null && name !== "last_audio_sent") || !Number.isFinite(at)) return;
     // Capture can predate the origin (release / decision). Negative offsets are intentional.
     milestones[name] = Math.round(at - originAt);
   };
   return {
     attemptId: value.attempt_id, observe,
+    setOrigin(at: number, origin: VoiceTurnV2["latency_origin"]) {
+      if (finished || !Number.isFinite(at)) return;
+      const shift = Math.round(originAt - at);
+      for (const name of VOICE_MILESTONES) if (milestones[name] !== null) milestones[name]! += shift;
+      originAt = at; value.latency_origin = origin;
+    },
     service(service: ServiceObservation) { if (!finished && value.services.length < 16) value.services.push(service); },
-    server(server: ServerObservation) { if (!finished && value.server.length < 8) value.server.push(projectServerObservation(server)); },
+    server(server: ServerObservation) { if (!finished && value.server.length < 8) value.server.push(projectServerObservation(server, originAt)); },
     versions(prompt: string | null, config: string | null) { if (!finished) { value.prompt_version = prompt; value.config_version = config; } },
     durations(generation: number | null, playback: number | null) {
       if (!finished) { value.durations.generation_total_ms = generation; value.durations.playback_ms = playback; }
@@ -134,7 +144,7 @@ export function createVoiceTurnV2(
       // Independent post-turn availability, also retained after an interrupted turn.
       const previousServices = value.services;
       const previousServer = value.server;
-      value.services = [service]; value.server = [projectServerObservation(server)];
+      value.services = [service]; value.server = [projectServerObservation(server, originAt)];
       send("voice_turn_gm");
       value.services = previousServices; value.server = previousServer;
     },

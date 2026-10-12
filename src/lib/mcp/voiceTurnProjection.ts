@@ -13,13 +13,14 @@ const serviceSchema = z.object({
 });
 const spanSchema = z.object({
   request_id: z.string().max(160), clock: z.enum(["edge_monotonic", "client_monotonic"]),
+  client_anchor_ms: z.number().finite().optional(),
   spans: z.array(z.object({ name: z.string().max(80), start_ms: z.number().finite().nonnegative(), end_ms: z.number().finite().nonnegative(), status: z.enum(["ok", "failed"]) })).max(32),
 });
 export const voiceTurnProjectionSchema = z.object({
   schema_version: z.literal(2), session_id: label, turn_id: z.string().max(160), attempt_id: z.string().max(160),
   turn_index: z.number().int().nonnegative(), character: z.string().max(80), environment_id: z.string().max(80), context_type: z.string().max(80),
   input_mode: z.enum(["push_to_talk", "hands_free", "text"]),
-  latency_origin: z.enum(["ptt_release", "app_turn_decision", "transcript_final", "text_submitted"]),
+  latency_origin: z.enum(["capture_start", "ptt_release", "app_turn_decision", "transcript_final", "text_submitted"]),
   code_version: z.string().max(160), prompt_version: label, config_version: label,
   status: z.enum(["started", "completed", "interrupted", "cancelled", "timeout", "failed", "no_audio"]), clock: z.literal("client_monotonic"),
   milestones: z.object(Object.fromEntries(VOICE_MILESTONES.map((name) => [name, z.number().finite().nullable()]))),

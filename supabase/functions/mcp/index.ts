@@ -287,6 +287,7 @@ import { z as z4 } from "npm:zod@4.6.6";
 // src/services/voiceTurnTelemetryV2.ts
 var VOICE_MILESTONES = [
   "capture_started",
+  "capture_ready",
   "last_audio_sent",
   "turn_decided",
   "flush_sent",
@@ -333,6 +334,7 @@ var serviceSchema = z4.object({
 var spanSchema = z4.object({
   request_id: z4.string().max(160),
   clock: z4.enum(["edge_monotonic", "client_monotonic"]),
+  client_anchor_ms: z4.number().finite().optional(),
   spans: z4.array(z4.object({ name: z4.string().max(80), start_ms: z4.number().finite().nonnegative(), end_ms: z4.number().finite().nonnegative(), status: z4.enum(["ok", "failed"]) })).max(32)
 });
 var voiceTurnProjectionSchema = z4.object({
@@ -345,7 +347,7 @@ var voiceTurnProjectionSchema = z4.object({
   environment_id: z4.string().max(80),
   context_type: z4.string().max(80),
   input_mode: z4.enum(["push_to_talk", "hands_free", "text"]),
-  latency_origin: z4.enum(["ptt_release", "app_turn_decision", "transcript_final", "text_submitted"]),
+  latency_origin: z4.enum(["capture_start", "ptt_release", "app_turn_decision", "transcript_final", "text_submitted"]),
   code_version: z4.string().max(160),
   prompt_version: label,
   config_version: label,

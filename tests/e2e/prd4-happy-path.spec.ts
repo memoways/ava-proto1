@@ -54,6 +54,7 @@ async function installNetworkFakes(
   const blockedTraceUpload = new Promise<void>((resolve) => { releaseTraceUpload = resolve; });
   const maxMessageCounts: number[] = [];
   const sessionUpdates: unknown[] = [];
+  const voiceEvents: Array<Record<string, unknown>> = [];
   const gmFilmContexts: string[] = [];
 
   await page.addInitScript(({ transcripts, simulateAudio }: { transcripts: string[]; simulateAudio: boolean }) => {
@@ -351,6 +352,10 @@ async function installNetworkFakes(
         personality: "méfiant mais sincère",
       }]);
     }
+    if (table === "voice_turn_events" && request.method() === "POST") {
+      voiceEvents.push(request.postDataJSON().metadata_json as Record<string, unknown>);
+      return json(route, [], 201);
+    }
     if (table === "sessions" && request.method() === "POST") {
       return json(route, { id: SESSION_ID }, 201);
     }
@@ -468,6 +473,7 @@ async function installNetworkFakes(
     getSimulatedNetworkDrops: () => simulatedNetworkDrops,
     getTriggeredVideoLoads: () => triggeredVideoLoads,
     getSessionUpdates: () => sessionUpdates,
+    getVoiceEvents: () => voiceEvents,
     getGmFilmContexts: () => gmFilmContexts,
     getTtsCallCount: () => ttsCallCount,
     getPosthogRequestCount: () => posthogRequestCount,
@@ -778,4 +784,38 @@ test("endurance accélérée de 35 tours avec mémoire bornée et pannes récup�
   expect(fakes.getSimulatedNetworkDrops()).toBe(1);
   expect(fakes.getTriggeredVideoLoads()).toBeGreaterThanOrEqual(1);
   expect(fakes.getSessionUpdates().length).toBeGreaterThanOrEqual(35);
+});
+
+
+test("V2 conserve deux échecs micro sans transcript comme tentatives distinctes", async ({ page }) => {
+  const fakes = await installNetworkFakes(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.mediaDevices, "getUserMedia", { configurable: true, value: async () => { throw new DOMException("Micro refusé", "NotAllowedError"); } });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await answerFilmQuestion(page);
+  await page.getByRole("button", { name: "Appeler Max" }).click();
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+    await expect.poll(() => fakes.getVoiceEvents().filter((event) => event.status === "failed").length).toBe(attempt);
+  }
+  const failures = fakes.getVoiceEvents().filter((event) => event.status === "failed");
+  expect(failures[0].turn_id).toBe(failures[1].turn_id);
+  expect(failures[0].attempt_id).not.toBe(failures[1].attempt_id);
+  expect(fakes.getMaxTurnCount()).toBe(0);
+});
+
+test("V2 garde un flush vide sans requête LLM dans les effectifs", async ({ page }) => {
+  const fakes = await installNetworkFakes(page, [""]);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await answerFilmQuestion(page);
+  await page.getByRole("button", { name: "Appeler Max" }).click();
+  await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+  await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+  await expect.poll(() => fakes.getVoiceEvents().filter((event) => event.status === "no_audio").length).toBe(1);
+  expect(fakes.getMaxTurnCount()).toBe(0);
 });

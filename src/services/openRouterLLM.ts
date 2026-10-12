@@ -306,6 +306,7 @@ export async function callLLMWithUsage(
   observeVoice(options?.onVoiceObservation, "llm_headers");
   if (!response.ok) {
     const err = await response.text();
+    try { const technical = JSON.parse(err)?._ava_observability; if (technical) options?.onServerObserved?.(technical); } catch { /* Non-JSON error or collector failure. */ }
     let diagnosticTrace: LLMCallDiagnosticTrace | null = null;
     if (options?.diagnostic_trace) {
       try {

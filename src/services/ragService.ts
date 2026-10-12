@@ -100,7 +100,9 @@ async function callQueryRag(
   }).finally(timeout.cancel);
   if (!response.ok) {
     const err = await response.text();
-    return { matches: [], error: `HTTP ${response.status}: ${err.slice(0, 300)}`, status: response.status };
+    let observation: import("./voiceTurnTelemetryV2").ServerObservation | undefined;
+    try { observation = JSON.parse(err)?._ava_observability; } catch { /* Non-JSON error body. */ }
+    return { matches: [], error: `HTTP ${response.status}: ${err.slice(0, 300)}`, status: response.status, _ava_observability: observation };
   }
   const data = await response.json();
   return {

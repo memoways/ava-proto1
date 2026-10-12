@@ -38,6 +38,26 @@ describe("V2 observations without changing voice decisions", () => {
     expect(events[1].value.services).toEqual([]);
     expect(events[0].value.status).toBe("started");
   });
+  it("rebases a capture attempt to the release origin without losing its identity or input tail", () => {
+    const { turn, events } = attempt();
+    turn.observe("capture_started", 1000);
+    turn.observe("last_audio_sent", 1200);
+    turn.observe("last_audio_sent", 1400);
+    turn.setOrigin(1500, "ptt_release");
+    turn.observe("output_estimated", 2000);
+    turn.finish("completed");
+    expect(events[1].value.attempt_id).toBe(events[0].value.attempt_id);
+    expect(events[1].value.milestones.capture_started).toBe(-500);
+    expect(events[1].value.milestones.last_audio_sent).toBe(-100);
+    expect(events[1].value.durations.origin_to_output_estimated_ms).toBe(500);
+  });
+  it("anchors client GM spans to the same turn clock and leaves Edge spans isolated", () => {
+    const { turn, events } = attempt();
+    turn.gm({ service: "gm", requested_provider: null, requested_model: null, resolved_provider: null, resolved_model: null, effective_provider: null, effective_model: null, transport: "http_batch" },
+      { request_id: "gm1", clock: "client_monotonic", client_origin_at: 1500, spans: [{ name: "gm_available", start_ms: 50, end_ms: 50, status: "ok" }] });
+    expect(events[1].value.server[0].client_anchor_ms).toBe(500);
+    expect(projectServerObservation({ request_id: "edge1", clock: "edge_monotonic", client_origin_at: 1500, spans: [] }, 1000).client_anchor_ms).toBeUndefined();
+  });
   it("assigns a fresh attempt ID to retries of the same causal turn", () => {
     const a = attempt(); const b = attempt();
     expect(a.turn.attemptId).not.toBe(b.turn.attemptId);
@@ -70,6 +90,12 @@ describe("V2 observations without changing voice decisions", () => {
     ] } as unknown as Parameters<typeof projectServerObservation>[0]);
     expect(observation.spans).toHaveLength(1);
     expect(JSON.stringify(observation)).not.toContain("private");
+  });
+  it("marks returned database errors and invalid validation as failed spans", async () => {
+    const spans = createMonotonicSpans("edge1");
+    await spans.run("vector_search", async () => ({ data: null, error: { message: "unavailable" } }));
+    spans.runSync("gm_validation_json", () => null);
+    expect(spans.snapshot().spans.every((span) => span.status === "failed")).toBe(true);
   });
   it("isolates process spans, including failed steps", async () => {
     const clock = vi.spyOn(performance, "now");

@@ -29,7 +29,7 @@ import { inworldProvider } from "./inworld";
 describe("inworldProvider.generate", () => {
   beforeEach(() => {
     vi.mocked(authenticatedFunctionFetch).mockResolvedValue(
-      new Response(new Blob(["audio"]), { status: 200 }),
+      new Response("audio", { status: 200, headers: { "Content-Type": "audio/wav" } }),
     );
   });
 
@@ -37,7 +37,9 @@ describe("inworldProvider.generate", () => {
     const result = await inworldProvider.generate("Bonjour.", {
       performance: intentFromManualEmotion("angry", 2),
     });
-    expect(result.blob).toBeInstanceOf(Blob);
+    // Fetch Response uses Node's Blob realm on CI; verify the audio contract and payload size.
+    expect(result.blob.size).toBe(5);
+    expect(result.blob.type).toBe("audio/wav");
     expect(vi.mocked(authenticatedFunctionFetch)).toHaveBeenCalledOnce();
     const body = JSON.parse(
       String(vi.mocked(authenticatedFunctionFetch).mock.calls[0][1]?.body),

@@ -118,6 +118,7 @@ export class GradiumSTT implements STTSession {
     };
     this.source.connect(this.processor);
     this.processor.connect(this.audioCtx.destination);
+    observeVoice(this.onVoiceObservation, "capture_started");
 
     this.startedAt = performance.now();
     this._active = true;

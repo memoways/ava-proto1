@@ -181,9 +181,9 @@ modifié.** Ne déployer ces fonctions que dans Lovable Cloud
 `iralfqlslqndgvexixis`. Le MCP doit être vérifié après publication.
 
 Vérifications locales déjà réalisées : installation `npm ci`, typecheck,
-`tsc -p tsconfig.node.json --noEmit`, lint, 43 régressions, 452 tests unitaires,
+`tsc -p tsconfig.node.json --noEmit`, lint, 43 régressions, 460 tests unitaires,
 16 intégrations PGlite, compilation Vite de compatibilité et extraction du
-manifeste MCP. Suite Playwright existante : **15/15** en mode CI
+manifeste MCP. Suite Playwright : **17/17** (15 existants et 2 nouveaux cas d’échec d’entrée) en mode CI
 (Chromium, scénarios médias Firefox/WebKit), fournisseurs et réseau simulés.
 Tests publiés Max/Emma, mains libres/barge-in réel, baseline sandbox-ulrich et
 compilation/publication Lovable : **à faire**. Ces diagnostics locaux ne sont ni
@@ -197,3 +197,24 @@ Rollback : revert du squash du lot sur main par PR, synchroniser/recompiler et
 republier via Lovable. Restaurer le comportement précédemment publié si incident ;
 conserver tables/événements historiques, aucune migration à inverser. Lot 2
 bloqué jusqu'au retour de validation fonctionnelle publiée du lot 1.
+
+### Revue et corrections avant fusion — PR #25
+
+Revue indépendante via le skill `code-review`, deux axes sur la base `95634e1` :
+Standards, zéro violation/smell actionnable ; Spec, trois lacunes corrigées avant
+fusion. Les tentatives commencent désormais au geste de capture (origine
+`capture_start` pour les entrées échouées), conservent leur attempt_id lors du
+rebasage à release/décision, et finalisent échecs micro/STT ou flush vide. Les
+jalons d'un ancien input ne sont pas réutilisés. Capture commencée côté adapter
+et capture prête côté façade sont deux jalons distincts. Les spans HTTP d'erreur sont
+conservés par RAG/LLM. Les spans GM ont `client_anchor_ms`, obtenu exclusivement
+entre horloges client identiques ; les spans Edge restent isolés.
+
+Premier check GitHub sur `79dd669` : échec d'un test Inworld préexistant, dû aux
+classes Blob distinctes de Node Fetch et jsdom (fixture sérialisée en `[object
+Blob]`). Fixture HTTP corrigée en contenu audio direct et assertion du contrat
+size/type, sans changement fournisseur. Aucun check désactivé. Les tests et la
+revue sont rejoués sur le dernier HEAD avant toute fusion.
+
+PR : https://github.com/memoways/ava-proto1/pull/25 ; SHA squash à relever après
+fusion. Preview Lovable, production et baseline publiée restent à faire.
