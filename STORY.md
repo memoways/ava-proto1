@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-07 (connexion HeyGen mise à jour — SDK LiveAvatar 0.0.19, micro explicitement coupé, sonde admin en v3)
+> **Last Updated**: 2026-10-12 (Game Master réglé dans l'app, cadre commun, nettoyage legacy ; questionnaire reporté à une tâche distincte)
 
 ---
 
@@ -67,7 +67,7 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 | HeyGen LiveAvatar | Rendu vidéo temps réel du texte final d’Ava via `avatar.speak_text` |
 | Tavus | Rendu vidéo temps réel via persona Echo et `conversation.echo` |
 | OpenAI | Embeddings text-embedding-3-small (1536 dim) |
-| Notion | Source de vérité éditoriale (contenus, personnages, règles) |
+| Notion | Source de vérité éditoriale des personnages et du monde narratif ; réglages GM dans l'app |
 
 ---
 
@@ -2426,7 +2426,66 @@ continuité d’expérience (mémoire entre tours).
 
 ### Dernière session
 
-**2026-10-07 — Connexion HeyGen : dépréciation v1/v2 analysée, SDK LiveAvatar mis à jour**
+**2026-10-12 — Game Master dans l'app, cadre commun et nettoyage des anciennes mécaniques**
+
+**Avant :** le parcours bénévole et les fiches personnages conservaient des
+traces de l'ancien appel par un inconnu ; le parcours film vu/non vu n'était
+pas transmis aux prompts. La fiche Notion Game Master décrivait un ancien
+narrateur créateur de rôle, distinct du directeur invisible actuellement utilisé.
+
+**Livré :** `experienceFrame.ts` construit un cadre commun unique, injecté à
+l'identique dans les prompts du personnage et du GM : rôle bénévole, parcours
+vu/non vu, posture et faits déjà connus. Ce cadre est réglable, versionné et
+désactivé par défaut. Les passages proposés sont bornés aux personnages actifs ;
+les sessions enregistrent les versions des fiches et du code GM utilisées.
+
+Les réglages Game Master dans l'app accueillent désormais le contexte de
+l'expérience, les questions éditoriales ouvertes et les garde-fous : prudence
+face aux statuts revendiqués, dérapages et vitesse d'ouverture. Ils suivent le
+cycle brouillon → publication d'une version dans l'environnement choisi, sans
+lecture de la fiche Notion GM. Les personnages et le monde restent synchronisés
+depuis Notion.
+
+L'ancien moteur, le GM pré-tour, les anciens réglages, les écrans de création
+de rôle âge/genre/lien familial et la fonction `summarize-role` sont retirés.
+La fiche GM et ses extraits sont retirés de la base de l'app et exclus de la
+synchronisation. Ulrich a archivé la fiche dans Notion. Les propriétés
+« Qui t'appelle » et « Dynamique de la conversation » de Max et Emma ont été
+corrigées directement dans Notion, sans réécriture de leurs récits ; leur
+resynchronisation reste à faire par Ulrich.
+
+La vidéo introductive utilise désormais l'asset Gumlet
+`6acc8341689a80cf2e4a427d`, en conservant impérativement l'autoplay avec son.
+Les tests du lecteur passent ; la lecture réelle reste à vérifier, le
+navigateur de contrôle n'ayant pas atteint le bouton « Commencer ».
+
+**Validation et livraison :** tests du cadre et des garde-fous ajoutés lors
+des développements ; vraie conversation avec le cadre activé encore à vérifier.
+Livraison via Lovable / Lovable Cloud uniquement. Aucune publication du site
+en Production. Publier une version GM en sandbox n'est pas publier le site.
+
+**Restant pour compléter le GM :**
+- Resynchroniser les fiches Max/Emma et vérifier leur cohérence avec le cadre.
+- Activer/configurer une version en sandbox et écouter les scénarios vu/non vu,
+  présentation facultative, statut revendiqué, dérapages, passage demandé ou
+  suggéré, absence de renvoi spontané et reprise après rafraîchissement.
+- Élargir `RuntimeCharacter`, les alias de changement et `summarize-session`
+  avant Ava/Léo, puis valider readiness et isolation par personnage.
+- Arbitrer les questions éditoriales ouvertes (film évoqué, identité du joueur)
+  et calibrer les postures et la progression relationnelle par personnage.
+
+**Questionnaire — chantier séparé, à faire plus tard :** le formulaire et sa
+synchronisation Notion ne sont pas modifiés dans ce lot. La question 3 demande
+encore quel rôle inventer ; la 4 évalue un résumé de personnage supprimé ;
+la 6 nomme Max au lieu du personnage appelé. Prévoir une tâche dédiée pour
+valider les nouvelles questions (compréhension du cadre bénévole, cohérence
+de l'appel), aligner formulaire/types/vue admin/mapping Notion, versionner les
+réponses en préservant l'historique, et vérifier sauvegarde et sync réelles.
+
+**Références :** [plan GM dans l'app](docs/plan_game_master_reglages_app.md),
+[plan GM multipersonnage](docs/plan_game_master_multipersonnage.md).
+
+**Session précédente — 2026-10-07 — Connexion HeyGen : dépréciation v1/v2 analysée, SDK LiveAvatar mis à jour**
 
 **Contexte :** HeyGen annonce la fin de ses endpoints REST vidéo v1/v2 au
 31/10/2026. Analyse : notre avatar en direct passe par LiveAvatar
