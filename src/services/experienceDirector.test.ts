@@ -132,10 +132,10 @@ describe("validateDirectorDecision", () => {
         allowCinematics: true,
         customInstructions: "",
         handoffRules: [{ targetCharacter: "emma", themes: ["police"], topics: [] }],
-        handoffRules: [{ targetCharacter: "emma", themes: ["police"], topics: [] }],
         projectContext: "",
         openQuestions: [],
         guardrails: { falseStatusGuidance: true, derailTolerance: "medium", opennessPace: "balanced" },
+      },
     }, "max");
     expect(decision.action.type).toBe("handoff");
     if (decision.action.type === "handoff") expect(decision.action.targetCharacter).toBe("emma");
