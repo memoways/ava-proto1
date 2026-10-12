@@ -282,6 +282,16 @@ export default function GameMasterSettingsTab() {
                   <SlidersHorizontal className="mt-0.5 h-4 w-4 text-primary" />
                   <div>
                     <h4 className="text-sm font-semibold">Éditeur de comportement</h4>
+                    <div className="mt-2 rounded border border-primary/40 bg-primary/5 p-2 text-xs leading-relaxed">
+                      <p className="font-medium">Réglage de départ conseillé pour tester</p>
+                      <ol className="ml-4 list-decimal text-muted-foreground">
+                        <li>Créer un brouillon (les réglages ne se modifient qu'en brouillon).</li>
+                        <li>Activer « Cadre commun de l'expérience », posture « Demandeur d'aide mais pudique », renvois spontanés interdits.</li>
+                        <li>Personnages actifs : Max et Emma. Garde-fous : ouverture Équilibrée, tolérance Moyenne, faux statut activé.</li>
+                        <li>Laisser le reste par défaut (marqué « expert »). Tester avec « Test sans effet réel », puis Publier.</li>
+                      </ol>
+                      <p className="mt-1 text-muted-foreground">Changer un seul réglage à la fois entre deux tests, sinon on ne sait pas ce qui a produit l'effet.</p>
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       Ces contrôles génèrent le prompt final. Les autorisations et seuils sont aussi vérifiés par le runtime.
                     </p>
@@ -290,7 +300,7 @@ export default function GameMasterSettingsTab() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label>Posture du directeur</Label>
+                    <Label>Posture du directeur <Hint level="secondaire" text="Ton des consignes que le Game Master donne au personnage. « Équilibré » convient pour la plupart des tests." /></Label>
                     <Select
                       value={config.editor.tone}
                       disabled={selected.status !== "draft"}
@@ -305,7 +315,7 @@ export default function GameMasterSettingsTab() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label>Longueur de la guidance</Label>
+                    <Label>Longueur de la guidance <Hint level="expert" text="Longueur de la consigne envoyée au personnage à chaque tour. Plus court = plus rapide et moins intrusif. Garder la valeur par défaut." /></Label>
                     <Select
                       value={config.editor.guidanceLength}
                       disabled={selected.status !== "draft"}
@@ -321,7 +331,7 @@ export default function GameMasterSettingsTab() {
                 </div>
 
                 <fieldset className="space-y-2">
-                  <legend className="text-sm font-medium">Priorités d’analyse (sélection multiple)</legend>
+                  <legend className="text-sm font-medium">Priorités d’analyse (sélection multiple) <Hint level="expert" text="Ce que le Game Master privilégie quand plusieurs objectifs se contredisent. Laisser par défaut sauf test ciblé." /></legend>
                   <p className="text-xs text-muted-foreground">Elles orientent l’arbitrage du LLM lorsqu’un échange satisfait plusieurs objectifs.</p>
                   <div className="grid gap-2 md:grid-cols-2">
                     {GM_PRIORITY_OPTIONS.map((option) => {
@@ -344,7 +354,7 @@ export default function GameMasterSettingsTab() {
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="flex items-center justify-between gap-3 rounded border p-3">
                     <div>
-                      <p className="text-sm font-medium">Suggestions de passage Max ↔ Emma</p>
+                      <p className="text-sm font-medium">Suggestions de passage Max ↔ Emma <Hint level="secondaire" text="Autorise le Game Master à proposer de parler à l’autre personnage. Off pour tester un seul personnage en profondeur." /></p>
                       <p className="text-xs text-muted-foreground">Off bloque les propositions du GM. Une demande explicite du joueur reste possible.</p>
                     </div>
                     <Switch
@@ -360,7 +370,7 @@ export default function GameMasterSettingsTab() {
                   </div>
                   <div className="flex items-center justify-between gap-3 rounded border p-3">
                     <div>
-                      <p className="text-sm font-medium">Cinématiques pilotées par le GM</p>
+                      <p className="text-sm font-medium">Cinématiques pilotées par le GM <Hint level="secondaire" text="Autorise le déclenchement des vidéos pendant la conversation. Les vidéos elles-mêmes se règlent dans l’onglet Cinématiques." /></p>
                       <p className="text-xs text-muted-foreground">Off bloque les actions cinematic ; les règles de l’onglet Cinématiques restent inchangées.</p>
                     </div>
                     <Switch
@@ -373,7 +383,7 @@ export default function GameMasterSettingsTab() {
                 </div>
 
                 <fieldset className="space-y-3 rounded border p-3">
-                  <legend className="px-1 text-sm font-medium">Cadre commun de l'expérience</legend>
+                  <legend className="px-1 text-sm font-medium">Cadre commun de l'expérience <Hint level="essentiel" text="Le plus important. Dit au personnage et au Game Master qui appelle (un·e bénévole inconnu·e), ce qu’il sait selon qu’il a vu le film ou non, et avec quelle posture le personnage accueille l’appel. À activer pour tout test." /></legend>
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-xs text-muted-foreground">Même texte envoyé au personnage actif et au Game Master. Off = comportement précédent.</p>
                     <Switch
@@ -384,21 +394,21 @@ export default function GameMasterSettingsTab() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="gm-frame-text">Cadre (rôle de l'interlocuteur, absence de relation préalable, faux statut)</Label>
+                    <Label htmlFor="gm-frame-text">Cadre (rôle de l'interlocuteur, absence de relation préalable, faux statut) <Hint text="Texte déjà rédigé. Ne le modifier que si l’on change la promesse de l’expérience." /></Label>
                     <Textarea id="gm-frame-text" className="min-h-28" value={frame.frameText} disabled={selected.status !== "draft"} onChange={(event) => patchFrame({ frameText: event.target.value })} />
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="space-y-1.5">
-                      <Label htmlFor="gm-frame-seen">Exposition — film vu</Label>
+                      <Label htmlFor="gm-frame-seen">Exposition — film vu <Hint text="Ce que le joueur est censé savoir s’il a répondu avoir vu le film." /></Label>
                       <Textarea id="gm-frame-seen" value={frame.exposureSeen} disabled={selected.status !== "draft"} onChange={(event) => patchFrame({ exposureSeen: event.target.value })} />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="gm-frame-unseen">Exposition — film non vu</Label>
+                      <Label htmlFor="gm-frame-unseen">Exposition — film non vu <Hint text="Ce que le joueur sait s’il n’a pas vu le film : le personnage ne doit pas supposer qu’il connaît l’histoire." /></Label>
                       <Textarea id="gm-frame-unseen" value={frame.exposureUnseen} disabled={selected.status !== "draft"} onChange={(event) => patchFrame({ exposureUnseen: event.target.value })} />
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Posture soutien / confiance</Label>
+                    <Label>Posture soutien / confiance <Hint level="essentiel" text="« Pudique » : le personnage a besoin d’aide mais se livre progressivement (conseillé). « Ouvert » : il parle librement dès le début, utile pour tester le contenu rapidement." /></Label>
                     <div className="flex gap-2">
                       {([['reserved', "Demandeur d'aide mais pudique"], ['open', 'Ouvert dès le départ']] as const).map(([value, label]) => (
                         <Button key={value} type="button" size="sm" variant={frame.posture === value ? "default" : "outline"} disabled={selected.status !== "draft"} onClick={() => patchFrame({ posture: value })}>{label}</Button>
@@ -407,11 +417,11 @@ export default function GameMasterSettingsTab() {
                     <Textarea aria-label="Précisions de posture" placeholder="Précisions de posture (facultatif)" value={frame.postureNotes} disabled={selected.status !== "draft"} onChange={(event) => patchFrame({ postureNotes: event.target.value })} />
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm">Interdire les renvois spontanés vers un autre personnage</p>
+                    <p className="text-sm">Interdire les renvois spontanés vers un autre personnage <Hint text="Empêche le personnage de dire de lui-même « parlez plutôt à Emma ». Laisser activé." /></p>
                     <Switch checked={frame.forbidSpontaneousHandoff} disabled={selected.status !== "draft"} onCheckedChange={(checked) => patchFrame({ forbidSpontaneousHandoff: checked })} aria-label="Interdire les renvois spontanés" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Personnages actifs dans cette version</Label>
+                    <Label>Personnages actifs dans cette version <Hint level="essentiel" text="Seuls ces personnages sont proposés au joueur et peuvent être suggérés par le Game Master. Max et Emma pour l’instant ; Ava et Léo ne sont pas prêts." /></Label>
                     <div className="flex flex-wrap gap-2">
                       {registryActiveCharacterKeys().map((key) => {
                         const on = (config.activeCharacters ?? []).includes(key);
@@ -431,7 +441,7 @@ export default function GameMasterSettingsTab() {
 
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="minimum-handoff-turn">Premier tour autorisé (GM)</Label>
+                    <Label htmlFor="minimum-handoff-turn">Premier tour autorisé (GM) <Hint level="expert" text="Le Game Master ne propose pas de changer de personnage avant ce tour. Laisser par défaut." /></Label>
                     <Input
                       id="minimum-handoff-turn"
                       type="number"
@@ -444,7 +454,7 @@ export default function GameMasterSettingsTab() {
                     <p className="text-xs text-muted-foreground">Ne s’applique pas à une demande explicite du joueur.</p>
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="max-handoffs">Passages max par session</Label>
+                    <Label htmlFor="max-handoffs">Passages max par session <Hint level="expert" text="Nombre maximum de propositions de changement de personnage dans une session." /></Label>
                     <Input
                       id="max-handoffs"
                       type="number"
@@ -457,7 +467,7 @@ export default function GameMasterSettingsTab() {
                     <p className="text-xs text-muted-foreground">Allers-retours inclus. 0 désactive les suggestions GM.</p>
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="handoff-cooldown">Pause entre deux suggestions</Label>
+                    <Label htmlFor="handoff-cooldown">Pause entre deux suggestions <Hint level="expert" text="Nombre de tours minimum entre deux propositions de changement." /></Label>
                     <Input
                       id="handoff-cooldown"
                       type="number"
@@ -470,7 +480,7 @@ export default function GameMasterSettingsTab() {
                     <p className="text-xs text-muted-foreground">Nombre de tours utilisateur minimum après un passage.</p>
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="director-timeout">Timeout du directeur (ms)</Label>
+                    <Label htmlFor="director-timeout">Timeout du directeur (ms) <Hint level="expert" text="Temps maximum laissé au Game Master pour décider. Ne pas modifier : technique." /></Label>
                     <Input
                       id="director-timeout"
                       type="number"
@@ -488,7 +498,7 @@ export default function GameMasterSettingsTab() {
                 <div className="space-y-2 rounded border p-3">
                   <div className="flex items-center justify-between gap-2">
                     <div>
-                      <p className="text-sm font-medium">Règles thématiques de suggestion</p>
+                      <p className="text-sm font-medium">Règles thématiques de suggestion <Hint level="expert" text="Ex. si le joueur parle de famille, le Game Master peut suggérer Emma. Facultatif." /></p>
                       <p className="text-xs text-muted-foreground">Si un thème ou un sujet du tour recoupe une règle, le GM propose l’autre personnage. Jamais de bascule forcée.</p>
                     </div>
                     <Button
@@ -567,7 +577,7 @@ export default function GameMasterSettingsTab() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="gm-project-context">Contexte du projet</Label>
+                  <Label htmlFor="gm-project-context">Contexte du projet <Hint level="secondaire" text="Résumé de l’intention du projet lu par le Game Master. Un texte par défaut est fourni ; l’ajuster seulement si la promesse change. Rester court." /></Label>
                   <Textarea
                     id="gm-project-context"
                     value={config.editor.projectContext}
@@ -582,7 +592,7 @@ export default function GameMasterSettingsTab() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="gm-open-questions">Questions ouvertes</Label>
+                  <Label htmlFor="gm-open-questions">Questions ouvertes <Hint level="secondaire" text="Points de l’histoire pas encore décidés. Le Game Master évite que le personnage invente une réponse définitive dessus." /></Label>
                   <Textarea
                     id="gm-open-questions"
                     value={config.editor.openQuestions.join("\n")}
@@ -596,7 +606,7 @@ export default function GameMasterSettingsTab() {
 
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-1.5">
-                    <Label>Ouverture du personnage</Label>
+                    <Label>Ouverture du personnage <Hint level="essentiel" text="Vitesse à laquelle le personnage se confie. Équilibrée conseillée ; Lente pour tester la résistance, Rapide pour accéder vite au contenu." /></Label>
                     <Select
                       value={config.editor.guardrails.opennessPace}
                       disabled={selected.status !== "draft"}
@@ -611,7 +621,7 @@ export default function GameMasterSettingsTab() {
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Tolérance aux dérapages</Label>
+                    <Label>Tolérance aux dérapages <Hint level="secondaire" text="Quand le joueur sort du sujet ou provoque : Faible = recadrage rapide, Élevée = on laisse dériver. Moyenne conseillée." /></Label>
                     <Select
                       value={config.editor.guardrails.derailTolerance}
                       disabled={selected.status !== "draft"}
@@ -626,7 +636,7 @@ export default function GameMasterSettingsTab() {
                     </Select>
                   </div>
                   <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
-                    <Label htmlFor="gm-false-status" className="text-sm">Faux statut : consigne au tour suivant</Label>
+                    <Label htmlFor="gm-false-status" className="text-sm">Faux statut : consigne au tour suivant <Hint level="essentiel" text="Si le joueur se prétend policier, médecin, ami d’Ava…, le personnage ne valide pas et le Game Master aide à recadrer au tour suivant. Laisser activé." /></Label>
                     <Switch
                       id="gm-false-status"
                       checked={config.editor.guardrails.falseStatusGuidance}
@@ -637,7 +647,7 @@ export default function GameMasterSettingsTab() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="gm-custom-instructions">Instructions complémentaires</Label>
+                  <Label htmlFor="gm-custom-instructions">Instructions complémentaires <Hint level="expert" text="Consigne libre ajoutée au Game Master. À utiliser avec parcimonie, une idée à la fois, pour un test précis." /></Label>
                   <Textarea
                     id="gm-custom-instructions"
                     value={config.editor.customInstructions}
