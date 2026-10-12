@@ -972,3 +972,25 @@ isolé de ces tests ni un total STT/TTS/RAG, ni la photographie finale après
 les tours supplémentaires. Publication frontend toujours non effectuée ;
 PTT réel, capture no_audio, handoff accepté, cinématique narrative déclenchée,
 tests publiés et baseline finale restent non attestés. Pas de passage au lot2.
+
+### Diagnostic Brave confirmé par Ulrich — 12 octobre 2026
+
+Ulrich signale le script eu-assets.i.posthog.com/static/dead-clicks-autocapture.js
+v1.402.3 bloqué. Sa capture du panneau Shields du domaine preview montre
+également eu.i.posthog.com dans « Traqueurs et publicités (182) ». Ce second
+host est le POSTHOG_HOST de posthogService.ts : blocage du canal de collecte
+confirmé côté navigateur, explication probable de l'absence V2. Ne pas
+attribuer le trou à ce seul script optionnel, ni prétendre avoir observé
+chaque requête ou démontré l'absence de tout défaut applicatif.
+
+Aucune protection navigateur, aucun réglage applicatif et aucun code modifiés.
+Prochain contrôle proposé, soumis à accord explicite car il assouplit une
+protection de confidentialité : exception Shields temporaire pour le seul
+domaine preview, un échange vocal humain court, rapprochement des mêmes
+attempt_id dans Ava et PostHog137897, puis rétablissement immédiat de Shields.
+Les mesures avec cette exception formeraient une cohorte distincte ; elles
+ne remplacent pas les essais avec protections actives. Ne pas toucher au
+domaine publié, au profil global, aux flags, prompts ou fournisseurs.
+Sans cet accord, garder Shields et signaler la couverture PostHog manquante,
+sans corriger l'application par un contournement de la protection navigateur.
+Frontend publié inchangé ; publication et gates non attestés restent ouverts.
