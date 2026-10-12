@@ -25,6 +25,7 @@ export const RICH_V2_LIMITS = {
 } as const;
 
 export const RICH_V2_DYNAMIC_SECTION_CHARS = {
+  experience_frame: 1_400,
   relationship_directive: 1_400,
   user_role: 450,
   temporal_context: 260,
