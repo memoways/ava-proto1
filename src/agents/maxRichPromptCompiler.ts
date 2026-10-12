@@ -724,7 +724,7 @@ export function compileRichCharacterSections(
   let reservedRemaining = reservedTotal;
   const sections: RichCompiledSection[] = [];
   let timelineEvents: string[] = [];
-  let depthSelection: RichDepthSelection | null = null;
+  const depthSelection: RichDepthSelection | null = null;
 
   for (const spec of specs) {
     const raw = (prompt[spec.key] as string | undefined) ?? "";
