@@ -6,6 +6,16 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Non publié]
 
+### 2026-10-12 — Décrochage après redémarrage de l'expérience
+
+- Un appel lancé après « Recommencer l'expérience » conserve sa séquence
+  de sonnerie même si le parent se rend chaque seconde. Le décrochage reste
+  à cinq secondes ; la dernière callback est appelée une seule fois et les
+  délais sont annulés lorsque l'écran se ferme.
+- Test de reproduction rouge avant correction puis vert ; 12 tests ciblés,
+  TypeScript, lint sans erreur et build local réussis. Validation Lovable
+  et publication encore à effectuer dans le lot P0.
+
 ### 2026-10-12 — Choix du film après l'intro, retrait du champ « Profondeur par niveau », conversation mains libres
 
 - Après la vidéo d'introduction, un écran pleine image (grange, famille

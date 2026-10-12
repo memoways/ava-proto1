@@ -70,6 +70,10 @@ function encounterFrame(value: string | null | undefined, maxChars = 260): strin
 const CallingMaxScreen = ({ onAnswered, character, situation, portraitUrl }: Props) => {
   const [ring, setRing] = useState(1);
   const [pickingUp, setPickingUp] = useState(false);
+  const onAnsweredRef = useRef(onAnswered);
+  useEffect(() => {
+    onAnsweredRef.current = onAnswered;
+  }, [onAnswered]);
   useRingtone(true, RINGS, RING_MS);
   const displayName = displayNameForCharacter(character);
   const portrait = portraitUrl ?? (character === "emma" ? emmaImg : maxImg);
@@ -80,13 +84,14 @@ const CallingMaxScreen = ({ onAnswered, character, situation, portraitUrl }: Pro
       intervals.push(window.setTimeout(() => setRing(i), (i - 1) * RING_MS));
     }
     const pickup = window.setTimeout(() => setPickingUp(true), RINGS * RING_MS);
-    const done = window.setTimeout(onAnswered, RINGS * RING_MS + PICKUP_DELAY_MS);
+    // Parent timer renders must not restart the ringing sequence.
+    const done = window.setTimeout(() => onAnsweredRef.current(), RINGS * RING_MS + PICKUP_DELAY_MS);
     return () => {
       intervals.forEach(clearTimeout);
       clearTimeout(pickup);
       clearTimeout(done);
     };
-  }, [onAnswered]);
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">

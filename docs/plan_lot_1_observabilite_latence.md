@@ -801,3 +801,56 @@ capture réels avant publication. Admin preview V2 chargé : 4 tentatives,
 4 observations GM, 0 ligne invalide, toutes issues des essais précédents.
 Aucune nouvelle publication du frontend, aucun réglage modifié ; suite et
 baseline finale restent ouvertes, lot 2 non commencé.
+
+### Correction du blocage d'appel après redémarrage — contrôle preview
+
+Après Max, Terminer → Continuer → Recommencer, puis Emma après replay de
+l'introduction : appel bloqué sur sonnerie 1/3. La réponse film reste pas_vu
+(session Emma `ee94abb9-a5ae-4daa-98c4-95dcc2e11c6b`). Cause identifiée : le
+timer précédent continue ses rendus ; `handleAnswered` dépend de l'objet
+timer recréé ; CallingMaxScreen annule et recrée ses délais à chaque nouvelle
+identité de callback. Ces fichiers n'étaient pas modifiés par la PR25.
+
+Correction nécessaire au gate fonctionnel : conserver les trois sonneries
+de 1 500 ms et le décrochage à 5 000 ms, planifiés une fois par montage ;
+appeler la dernière callback validée sans réinitialiser les délais lors des
+rendus parent. Annuler les délais au démontage. Aucun changement de réglage
+vocal, de durée de session, de fournisseur ou de logique mains libres.
+Test de reproduction avec callback renouvelée chaque seconde, callback
+la plus récente, absence de double appel et annulation au démontage ;
+revues Standards/Spec, CI et nouveau build Lovable avant validation réelle.
+Confiance préalable ≥90 % : cause reproduisible, aucune autre implémentation,
+pattern useRef/useEffect existant, APIs React18 sans nouvelle dépendance.
+Références officielles et exemples React :
+https://react.dev/reference/react/useEffect et https://react.dev/reference/react/useRef.
+
+Reproduction automatique : nouveau test rouge avant correction (Emma reste
+Appel en cours / 1/3), vert après. 12 tests ciblés CallingMaxScreen/useTimer/
+ConversationScreen, typecheck, build et lint sans erreur (avertissement
+préexistant IndexPRD4) réussis. Standards : 0 constat ; Spec : 0 blocage.
+
+Contrôle humain Max preview confirmé : session
+`f36f73e3-21ff-4b29-bfca-0c3b426c7df1`, fenêtre Ava native
+`[2026-10-11T19:26:45.685Z, 2026-10-12T19:26:45.685Z)`, page0/100,
+nextOffset null, cap non atteint, 0 invalide. 6 événements / 2 tentatives /
+2 GM : `5f9b29e0-cd1c-4ef9-917c-8bd2d86d5997` interrompue avant génération,
+capture_started = capture_ready = -2 284 ms (correctif capture observé) ;
+`0c22d7b3-3346-4008-8111-2b1299c922cd` completed, sortie estimée 5 923 ms,
+LLM réponse 4 932 ms, generation_total 5 451 ms, playback 10 111 ms,
+couverture13/27 (capture réutilisée, jalons null). Une sortie mesurée / deux
+tentatives : p50=p95=5 923 ms, descriptifs, sans gain revendiqué.
+Origine app_turn_decision, software_estimate ; voice_end/first_token null.
+Fournisseurs exécutés Deepgram/nova-3/websocket, OpenAI/openai/gpt-5.6-luna/
+http_batch, Gradium/gradium-tts/websocket avec override, sans fallback/retry.
+RAG quota87msok, LLM quota148msok ; GM terminé Google/gemini-2.5-flash,
+génération/validations/persistence ok. Prompt Max et config identiques au
+contrôle précédent. Première GM génération failed puis persistence ok.
+Ce n'est pas une preuve de barge-in pendant lecture audio.
+
+PostHog137897 Memoways : aucune ligne pour cette session entre19:20–19:30,
+puis aucun événement sur toute la journée UTC12octobre. Aucun contenu privé
+interrogé ; logs navigateur PostHog warn/error vides. Cause non établie,
+réglages/consentement/protections préservés. DOM bundle9MfUAJhs inchangé,
+capture corrigée attestée par comportement ; SHA servi exact encore inconnu.
+Max terminé par UI à19:27:55.297Z ; Emma après replay conserve film pas_vu.
+Publication frontend et baseline finale toujours en attente.
