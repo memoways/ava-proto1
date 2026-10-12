@@ -314,3 +314,52 @@ Rollback inchangé : restauration de la version précédemment publiée dans
 Lovable, revert tracé du squash `12d5f29311f6371af3d63a9c49e7cfc3626da352`
 par PR, synchronisation, compilation et republication Lovable. Aucune migration
 à inverser ; conserver toutes les données historiques. Aucun gain revendiqué.
+
+## Reprise Lovable — 12 octobre 2026, 16:52 UTC (connecteur Lovable installé)
+
+Périmètre : lot 1 / P0 seulement. Le blocage « connecteur Lovable absent » de la
+section précédente est désormais historique.
+
+### Cible et révision
+- Projet Lovable « AVA Prototype 1 » ; HEAD `81f2226e277c4582714e4e795c22dfc79553b1cf`,
+  ancêtre contenant le squash `12d5f29311f6371af3d63a9c49e7cfc3626da352`.
+- Backend Lovable Cloud : `project_id = "iralfqlslqndgvexixis"` (config.toml, `.env`,
+  ref inliné dans le bundle MCP) ; même instance pour preview et site publié.
+
+### Compilation
+- `tsgo -p tsconfig.app.json --noEmit` : 0 erreur. `bunx vitest run` : 100 fichiers,
+  477 tests réussis (simulés, aucun fournisseur réel).
+- `deno check` : `proxy-llm`, `posthog-latency-stats` sans erreur ; `query-rag`
+  avait une erreur de type (TS2339 `rerank_score` absent de `RagDatabaseMatch`,
+  introduite par le squash). Correctif P0 type seul : champ optionnel
+  `rerank_score?: number` ; aucun changement runtime. Ensuite sans erreur.
+- `mcp` : bundle régénéré par l'extraction du SDK `@lovable.dev/mcp-js@3.0.5`
+  (4 outils), imports `npm:zod@4.6.6`, aucun import Zod 3 ; Zod 3 conservé pour les
+  formulaires. `deno check` signale des `any` implicites dans le code généré par
+  le SDK (non édité à la main). `defineTool.ts` et `lovableMcpPlugin.ts` inchangés.
+- Erreurs Deno préexistantes hors P0, non corrigées : `manage-test-invitations`,
+  `rag-question-corpus`, `redeem-test-invitation`.
+
+### Fonctions Cloud
+- Déployées : `query-rag` (sha256 source 912edf0f…a46), `proxy-llm`
+  (58da1984…c80), `posthog-latency-stats` (b894a300…20e).
+- `mcp` : retenue par Lovable lors du déploiement de développement ; ne sera
+  déployée qu'à la publication. Le serveur MCP actuellement en ligne reste
+  l'ancienne révision (log : `get_voice_latencies` → « Voice V2 diagnostics could not
+  be read », cohérent avec l'erreur `INVALID_ARGUMENT` déjà constatée).
+- Accès anonyme : `query-rag` et `proxy-llm` 401 « Invalid game identity »,
+  `posthog-latency-stats` 401 « invalid token », `mcp` 401 sans jeton.
+
+### Preview (Playwright headless, session admin ulrich injectée)
+- Admin, sandbox-ulrich : vue Données/Sessions chargée (50 sessions).
+- Parcours joueur bloqué à « Préparation… » : Chromium headless ne lit pas le
+  codec H.264 du HLS d'introduction (`manifestIncompatibleCodecsError`). Le
+  micro n'existe pas dans ce bac à sable (périphérique factice seulement).
+- Non exécutés : Max, Emma, PTT, mains libres, interruption, audio complet,
+  cinématiques, réponse film et replay, handoff, erreurs micro/STT, capture vide.
+  À faire manuellement dans un vrai navigateur avec micro sur la preview.
+
+### Verdict
+Gate P0 partiel : compilation et trois fonctions OK ; MCP et scénarios vocaux
+réels en attente. Aucun gain de latence revendiqué. Rollback : retirer le champ
+optionnel (type seul) et redéployer les trois fonctions ; rollback global inchangé.
