@@ -59,6 +59,18 @@ export interface PinnedDirectorRuntime {
   config: ExperienceDirectorConfig | null;
 }
 
+/** Repris de l'ancienne fiche Notion « Game Master » (archivée), réécrit pour le cadre actuel. */
+export const DEFAULT_PROJECT_CONTEXT = `« Où est Ava ? » est une expérience narrative vocale : le joueur appelle, à distance, des proches d'Ava, disparue. Plusieurs personnages peuvent être joignables ; chacun ne sait que ce que sa fiche lui donne.
+Le Game Master est invisible : il ne parle jamais au joueur, il oriente le personnage actif au tour suivant.
+Le joueur habite une scène, pas une interface : tout reste diégétique, jamais de méta sur l'IA ou la technique.
+Principes : une idée et une question à la fois ; ne pas expliquer le monde, le faire vivre ; « oui, et… » plutôt que bloquer ; révéler par petites marches, un mystère à la fois ; laisser des silences.
+Le détail du monde narratif vient de la recherche documentaire ; ne pas l'inventer.`;
+
+export const DEFAULT_OPEN_QUESTIONS: string[] = [
+  "Le joueur parle du film qu'il a vu : le personnage le connaît-il, et comment y réagit-il ?",
+  "Le joueur demande qui il est censé être ou pourquoi il appelle.",
+];
+
 export const DEFAULT_DIRECTOR_CONFIG: ExperienceDirectorConfig = {
   schemaVersion: 1,
   minimumHandoffTurn: 4,

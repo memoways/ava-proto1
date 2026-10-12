@@ -19,11 +19,34 @@ const PRIORITY_LABELS: Record<ExperienceDirectorEditorConfig["priorities"][numbe
   pace: "rythme, progression et clôture naturelle dans le temps disponible",
 };
 
+const DERAIL_LABELS: Record<ExperienceDirectorGuardrails["derailTolerance"], string> = {
+  low: "faible : dès le premier écart net (insulte, absurde, hors sujet répété), guide le personnage vers un recadrage ; au deuxième, vers une proposition calme de terminer l'appel.",
+  medium: "moyenne : tolère un écart ; au deuxième, recadrage par le personnage ; au troisième, proposition calme de terminer l'appel.",
+  high: "élevée : laisse jouer les détours ; recadre seulement en cas d'insultes répétées, puis propose de terminer l'appel si cela continue.",
+};
+
+const OPENNESS_LABELS: Record<ExperienceDirectorGuardrails["opennessPace"], string> = {
+  slow: "lente : le personnage reste réservé longtemps et ne s'ouvre qu'après des signes répétés d'écoute sincère.",
+  balanced: "équilibrée : le personnage s'ouvre progressivement quand le joueur écoute et reste cohérent.",
+  fast: "rapide : le personnage se livre assez vite dès que le joueur montre de l'écoute.",
+};
+
+export function buildGuardrailsBlock(guardrails: ExperienceDirectorGuardrails): string {
+  return `Garde-fous de conversation :
+- Ouverture du personnage : ${OPENNESS_LABELS[guardrails.opennessPace]} Si le joueur se ferme ou devient intrusif, le personnage se referme.
+- Tolérance aux dérapages ${DERAIL_LABELS[guardrails.derailTolerance]} Le recadrage reste diégétique et sans morale ; action.type=end seulement après une proposition de fin restée sans effet.
+- Faux statut (le joueur se dit policier, psychologue, médecin, journaliste…) : ${guardrails.falseStatusGuidance
+    ? "le personnage ne le tient pas pour acquis ; écris dans next_turn_guidance une consigne courte pour qu'au tour suivant il reste prudent, demande poliment de quoi il s'agit et ne révèle rien de plus à cause de ce statut."
+    : "laisse le personnage gérer seul, sans consigne particulière."}`;
+}
+
 export function buildExperienceDirectorPrompt(basePrompt: string, config: ExperienceDirectorConfig): string {
   const priorities = config.editor.priorities.map((priority) => `- ${PRIORITY_LABELS[priority]}`).join("\n");
   const custom = config.editor.customInstructions.trim();
+  const projectContext = config.editor.projectContext?.trim();
+  const openQuestions = (config.editor.openQuestions ?? []).filter((question) => question.trim());
   return `${basePrompt.trim()}
-
+${projectContext ? `\n## CONTEXTE DU PROJET\n\n${projectContext}\n` : ""}${openQuestions.length ? `\n## QUESTIONS OUVERTES (pas encore tranchées)\n\nSi la conversation touche l'un de ces points, oriente le personnage vers une réponse prudente, sobre et fidèle à sa fiche, sans rien inventer :\n${openQuestions.map((question) => `- ${question.trim()}`).join("\n")}\n` : ""}
 ## RÉGLAGES ADMINISTRATEUR ACTIFS
 
 Posture du directeur : ${TONE_LABELS[config.editor.tone]}
