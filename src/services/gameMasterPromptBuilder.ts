@@ -60,6 +60,8 @@ Actions autorisées :
 ${config.editor.handoffRules.length ? `- Règles thématiques : ${config.editor.handoffRules.map((rule) => `${rule.targetCharacter} si thèmes/topics [${[...rule.themes, ...rule.topics].join(", ")}]`).join(" ; ")}.` : "- Aucune règle thématique supplémentaire."}
 - Cinématiques : ${config.editor.allowCinematics ? "autorisées lorsqu'un thème correspond et que les garde-fous valident l'action" : "désactivées — retourne trigger_video_id=null et aucune action cinematic"}.
 
+${config.editor.guardrails ? buildGuardrailsBlock(config.editor.guardrails) : ""}
+
 ${custom ? `Instructions complémentaires :\n${custom}` : "Aucune instruction complémentaire."}
 
 Ces réglages complètent les règles de format JSON ci-dessus sans les remplacer.`;
