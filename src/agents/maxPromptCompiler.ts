@@ -44,7 +44,6 @@ const CHARACTER_FIELD_SPECS: Array<{
     | "ce_que_tu_sais_utilisateur"
     | "dynamique_conversation"
     | "sujets_sensibles"
-    | "profondeur_par_niveau"
     | "politique_relationnelle"
     | "references_intellectuelles"
   >;
@@ -61,7 +60,6 @@ const CHARACTER_FIELD_SPECS: Array<{
   { key: "ce_que_tu_sais_utilisateur", title: "RELATION À L'INTERLOCUTEUR", maxChars: 450 },
   { key: "dynamique_conversation", title: "MOTEUR DE CONVERSATION", maxChars: 650 },
   { key: "sujets_sensibles", title: "SUJETS SENSIBLES", maxChars: 450 },
-  { key: "profondeur_par_niveau", title: "PROGRESSION RELATIONNELLE", maxChars: 700 },
   { key: "politique_relationnelle", title: "POLITIQUE RELATIONNELLE", maxChars: 900 },
   { key: "references_intellectuelles", title: "RÉFÉRENCES INTELLECTUELLES", maxChars: 500 },
 ];
@@ -166,9 +164,7 @@ export function compileCharacterSections(prompt: CharacterPrompt | null): Compil
     ].includes(spec.key)
       ? removeDuplicatedConversationRules(raw)
       : raw;
-    const prepared = spec.key === "profondeur_par_niveau"
-      ? condenseDepthSignatures(withoutDuplicatedRules)
-      : normalizePromptText(withoutDuplicatedRules);
+    const prepared = normalizePromptText(withoutDuplicatedRules);
     if (!prepared) return [];
     const content = truncateAtSentenceBoundary(prepared, spec.maxChars);
     return [{

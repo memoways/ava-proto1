@@ -650,7 +650,6 @@ const RICH_FIELD_SPECS: RichFieldSpec[] = [
   { key: "dynamique_conversation", title: "DYNAMIQUE", order: 6, maxChars: 1_400, reservedChars: 500, boost: ["concret", "urgence", "positionner"] },
   { key: "sujets_sensibles", title: "SUJETS SENSIBLES", order: 7, maxChars: 1_200, reservedChars: 450, boost: ["emma", "ava", "léo", "mona", "fusil"] },
   { key: "timeline", title: "CHRONOLOGIE", order: 8, maxChars: 1_800, reservedChars: 800 },
-  { key: "profondeur_par_niveau", title: "PROGRESSION DE PROFONDEUR", order: 9, maxChars: 2_600, reservedChars: 1_100 },
   { key: "politique_relationnelle", title: "POLITIQUE RELATIONNELLE", order: 10, maxChars: 1_400, reservedChars: 450 },
   { key: "references_intellectuelles", title: "RÉFÉRENCES INTELLECTUELLES", order: 11, maxChars: 900, reservedChars: 250 },
 ];
@@ -763,12 +762,6 @@ export function compileRichCharacterSections(
       reports = compiled.reports;
       detected = compiled.reports.length;
       timelineEvents = compiled.events;
-    } else if (spec.key === "profondeur_par_niveau") {
-      const compiled = compileDepth(raw, budget, options);
-      content = compiled.content;
-      reports = compiled.reports;
-      detected = compiled.reports.length;
-      depthSelection = compiled.selection;
     } else {
       const compiled = compileGenericField(spec, raw, budget);
       content = compiled.content;

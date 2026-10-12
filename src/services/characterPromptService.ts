@@ -11,7 +11,6 @@ export interface CharacterPrompt {
   ce_que_tu_sais_utilisateur: string;
   dynamique_conversation: string;
   sujets_sensibles: string;
-  profondeur_par_niveau: string;
   politique_relationnelle: string;
   references_intellectuelles: string;
   timeline: string;
@@ -30,7 +29,6 @@ export const CHARACTER_PROMPT_FIELDS: Array<{
   { key: "ce_que_tu_sais_utilisateur", label: "Qui t'appelle", hint: "Cadrage de la relation à l'interlocuteur (champ Notion : « Qui t'appelle »)." },
   { key: "dynamique_conversation", label: "Dynamique de la conversation", hint: "Comment la conversation se déroule, rythme, retenue." },
   { key: "sujets_sensibles", label: "Sujets sensibles", hint: "Sujets délicats et manière de les aborder ou esquiver." },
-  { key: "profondeur_par_niveau", label: "Profondeur par niveau", hint: "Évolution de la profondeur possible selon le lien, sans imposer de confidence." },
   { key: "politique_relationnelle", label: "Politique relationnelle", hint: "Section Notion structurée : Moteur, Signes d’ouverture, Signes de fermeture, Sujets sensibles (Sujet :: palier :: condition), Résistance et Initiative." },
   { key: "references_intellectuelles", label: "Références intellectuelles", hint: "Références culturelles et intellectuelles du personnage, indépendantes de son degré global d’ouverture." },
   { key: "timeline", label: "Timeline", hint: "Chronologie / historique des événements marquants du personnage. Aide à situer sa mémoire par rapport au moment présent." },
@@ -43,7 +41,6 @@ const EMPTY: Omit<CharacterPrompt, "character_id" | "name" | "updated_at"> = {
   ce_que_tu_sais_utilisateur: "",
   dynamique_conversation: "",
   sujets_sensibles: "",
-  profondeur_par_niveau: "",
   politique_relationnelle: "",
   references_intellectuelles: "",
   timeline: "",
@@ -98,7 +95,6 @@ export async function loadCharacterPrompt(characterId: string): Promise<Characte
     ce_que_tu_sais_utilisateur: row.ce_que_tu_sais_utilisateur || "",
     dynamique_conversation: row.dynamique_conversation || "",
     sujets_sensibles: row.sujets_sensibles || "",
-    profondeur_par_niveau: row.profondeur_par_niveau || "",
     politique_relationnelle: row.politique_relationnelle || "",
     references_intellectuelles: row.references_intellectuelles || "",
     timeline: row.timeline || "",
@@ -200,7 +196,7 @@ export async function listCharactersWithPrompts(): Promise<CharacterListEntry[]>
   return chars.map((c) => {
     const p = byId.get(c.id);
     const len = p
-      ? [p.identite_fondamentale, p.qui_tu_es, p.ce_que_tu_ne_fais_jamais, p.ce_que_tu_sais_utilisateur, p.dynamique_conversation, p.sujets_sensibles, p.profondeur_par_niveau, p.politique_relationnelle, p.references_intellectuelles, p.timeline]
+      ? [p.identite_fondamentale, p.qui_tu_es, p.ce_que_tu_ne_fais_jamais, p.ce_que_tu_sais_utilisateur, p.dynamique_conversation, p.sujets_sensibles, p.politique_relationnelle, p.references_intellectuelles, p.timeline]
           .reduce((s: number, v: string) => s + (v?.length || 0), 0)
       : 0;
     return {
@@ -225,7 +221,6 @@ export function buildCharacterPromptSections(p: CharacterPrompt | null): string 
     ["QUI T'APPELLE", p.ce_que_tu_sais_utilisateur],
     ["DYNAMIQUE DE LA CONVERSATION", p.dynamique_conversation],
     ["SUJETS SENSIBLES", p.sujets_sensibles],
-    ["PROFONDEUR PAR NIVEAU", p.profondeur_par_niveau],
     ["POLITIQUE RELATIONNELLE", p.politique_relationnelle],
     ["RÉFÉRENCES INTELLECTUELLES", p.references_intellectuelles],
   ];
