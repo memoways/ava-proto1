@@ -19,6 +19,10 @@ interface Props {
   sessionTimeRemaining: string;
   onPTTPress: () => void;
   onPTTRelease: () => void;
+  /** Mode mains libres : un seul bouton pour ouvrir/couper le micro. */
+  handsFree?: boolean;
+  handsFreeListening?: boolean;
+  onToggleHandsFree?: () => void;
   onHangUp: () => void;
   streamingAvatarActive?: boolean;
   streamingAvatarState?: StreamingAvatarConnectionState;
@@ -40,6 +44,9 @@ const ConversationScreen = ({
   sessionTimeRemaining,
   onPTTPress,
   onPTTRelease,
+  handsFree = false,
+  handsFreeListening = false,
+  onToggleHandsFree,
   onHangUp,
   streamingAvatarActive = false,
   streamingAvatarState = "inactive",
@@ -56,9 +63,13 @@ const ConversationScreen = ({
   const recording = audioState === "user_speaking";
 
   const handleToggleTalk = useCallback(() => {
+    if (handsFree) {
+      if (audioState !== "mic_starting") onToggleHandsFree?.();
+      return;
+    }
     if (audioState === "idle") onPTTPress();
     else if (audioState === "user_speaking") onPTTRelease();
-  }, [audioState, onPTTPress, onPTTRelease]);
+  }, [audioState, handsFree, onPTTPress, onPTTRelease, onToggleHandsFree]);
 
   useEffect(() => {
     const isTypingTarget = (target: EventTarget | null) => {
@@ -299,7 +310,7 @@ const ConversationScreen = ({
           )}
 
           {/* Status helper line */}
-          <p className="min-h-[1.25rem] text-xs uppercase tracking-[0.18em] text-muted-foreground/80">
+          <p hidden={handsFree} className="min-h-[1.25rem] text-xs uppercase tracking-[0.18em] text-muted-foreground/80">
             {audioState === "idle" && "Clique pour parler"}
             {audioState === "mic_starting" && "Micro en cours d'ouverture…"}
             {audioState === "user_speaking" && "Enregistrement — clique pour envoyer"}
@@ -308,6 +319,34 @@ const ConversationScreen = ({
             {audioState === "max_speaking" && `${displayName} répond…`}
           </p>
 
+          {handsFree ? (
+            <>
+              <p className="min-h-[1.25rem] text-xs uppercase tracking-[0.18em] text-muted-foreground/80">
+                {!handsFreeListening && audioState !== "mic_starting" && "Active le micro, puis parle librement"}
+                {audioState === "mic_starting" && "Micro en cours d'ouverture…"}
+                {handsFreeListening && audioState === "idle" && "À l'écoute…"}
+                {handsFreeListening && audioState === "user_speaking" && "Je t'écoute…"}
+                {audioState === "user_finalizing" && "…"}
+                {audioState === "max_thinking" && `${displayName} réfléchit…`}
+                {audioState === "max_speaking" && `${displayName} répond — tu peux l'interrompre`}
+              </p>
+              <button
+                onClick={handleToggleTalk}
+                disabled={handoffCalling || audioState === "mic_starting"}
+                className={cn(
+                  "mt-1 flex min-h-12 items-center gap-3 rounded-full border-2 px-6 py-3 text-sm font-semibold uppercase tracking-wider backdrop-blur-md transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 tablet:min-h-14 tablet:px-8 tablet:text-base",
+                  handsFreeListening
+                    ? "border-primary bg-primary/15 text-primary"
+                    : "border-primary bg-primary text-primary-foreground hover:brightness-110",
+                )}
+                aria-label={handsFreeListening ? "Couper le micro" : "Activer le micro"}
+              >
+                {audioState === "mic_starting" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mic className={cn("h-5 w-5", handsFreeListening && "animate-pulse")} />}
+                <span>{handsFreeListening ? "Micro ouvert" : "Activer le micro"}</span>
+              </button>
+            </>
+          ) : (
+          <>
           {/* Toggle Mic button — clear start/stop switch */}
           <button
             onClick={handleToggleTalk}
@@ -329,6 +368,8 @@ const ConversationScreen = ({
             )}
             <span>{recording ? "Arrêter" : "Démarrer"}</span>
           </button>
+          </>
+          )}
         </div>
       </section>
     </div>
