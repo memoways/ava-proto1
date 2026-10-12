@@ -623,7 +623,10 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
       if (extractStatus(props['État']) !== 'En cours') continue;
       const name = extractTitle(props['Nom du caractère']);
       if (!name) continue;
-      if (name.trim().toLowerCase() === 'identité & présentation' || name.trim().toLowerCase() === 'identite & presentation') {
+      // Game Master settings live only in the app (Expérience → Réglages Game Master);
+      // a Notion "Game Master" sheet is never a character nor a RAG source.
+      const normalizedName = name.trim().toLowerCase();
+      if (normalizedName === 'identité & présentation' || normalizedName === 'identite & presentation' || normalizedName === 'game master') {
         console.log(`[sync-notion] Skipping non-character entry: "${name}"`);
         continue;
       }
