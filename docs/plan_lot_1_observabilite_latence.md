@@ -1,0 +1,96 @@
+# Prompt de reprise — lot 1 : mesures fiables et MCP Ava
+
+Ce document est le prompt à transmettre au prochain assistant de développement. Il prépare le **lot 1 / P0** du [plan général](plan_optimisation_latence_voice_to_voice.md), sans dupliquer les spécifications des lots suivants.
+
+## Mission
+
+Mets en œuvre uniquement le lot 1 du plan d'optimisation voice-to-voice d'Ava Proto 1. L'objectif observable est de reconstruire la chronologie d'un tour, avec fournisseur/modèle effectifs, mesures correctement définies et couverture explicite, dans les outils admin et le MCP Ava. Rétablis aussi les prérequis de dépendances et de CI identifiés par l'audit.
+
+Ulrich demande des lots séparés. Conduis ce lot jusqu'au push et au **squash merge d'une PR vers `main`**, puis fournis un prompt de reprise Lovable pour vérifier, publier et tester. Tu es autorisé à réaliser ces étapes ; les tests et la revue doivent précéder la fusion. La validation Lovable et les mesures publiées clôturent la validation fonctionnelle du lot. Ne commence pas le lot 2 dans cette reprise.
+
+## État de départ vérifié — 12 octobre 2026
+
+- Projet : `ava-proto1`, `/Users/ulrich/CodeProjects/memoways/ava-proto1`.
+- Dépôt : `https://github.com/memoways/ava-proto1.git` ; branche locale et distante `main` synchronisées, sans modification locale avant la rédaction de ce prompt.
+- Dernière révision vérifiée avant ce document : `2980417dbf58d396ab8f070f9dbe1f6200a4c636`. Les commits suivants de documentation sont attendus : récupère `origin/main` et note la révision effective avant de coder.
+- Base applicative de l'audit : `0433518`. L'audit, le snapshot et le choix acoustique sont livrés ; aucune optimisation applicative du plan n'est encore réalisée.
+- Lovable / Lovable Cloud est l'unique plateforme de compilation et de publication. Projet backend du repo : `iralfqlslqndgvexixis`. Vérifie cette cible avant toute action backend ; utilise le projet Lovable associé à ce dépôt.
+- MCP Ava actif : `https://iralfqlslqndgvexixis.supabase.co/functions/v1/mcp`, OAuth admin ; outils de lecture actuellement limités aux agrégats. PostHog Ava : projet `137897`, organisation MemoWays, données horaires UTC.
+- Vérifié lors de l'audit : 423 tests unitaires passent sur `0433518`. Typecheck en échec après résolution isolée du SDK MCP : schémas Zod 3 incompatibles avec Zod 4 attendu par le SDK. `npm ci --dry-run --ignore-scripts` échoue sur les lockfiles désynchronisés ; `regression-gates` était déjà en échec. Ces résultats historiques sont à rejouer, pas à déclarer encore verts.
+- Non vérifié : état runtime des réglages mains libres dans chaque environnement, chronologie physique récente, fonctionnement publié des changements du lot 1.
+
+## Contexte à lire avant modification
+
+1. `AGENTS.md` et les instructions personnelles applicables.
+2. [Plan général](plan_optimisation_latence_voice_to_voice.md), surtout P0 et section 6.
+3. [Audit détaillé](audit_voice_conversation_max.md) et [snapshot anonymisé](latency_voice_snapshot_2026-10-12.json).
+4. [Plan MCP existant](plan_mcp_statistiques.md), [guide PostHog](posthog-setup-guide.md) et [base mains libres](plan_conversation_mains_libres.md).
+5. `/Users/ulrich/CodeProjects/_shared/agent-context/12-task-closeout-handoff.md` pour la clôture et la reprise.
+
+Vérifie d'abord les changements intervenus depuis l'audit. Préserve les modifications d'autres travaux. Réutilise les modules, protections et tests existants ; complète ce document avec le périmètre réellement livré et les preuves, sans créer un second plan concurrent.
+
+## Travaux du lot 1
+
+### A. Dépendances reproductibles et CI
+
+- Réaligner `package.json`, `package-lock.json` et `bun.lock` selon les usages effectifs de Lovable et de la CI. Vérifier une installation propre, sans changement de chaîne de livraison ni mise à niveau générale de dépendances.
+- Conserver Zod 3 pour les formulaires. Pour le SDK MCP 3.0.5 audité, l'alias séparé `zod-mcp: npm:zod@4.6.6` a passé le typecheck sur une copie temporaire des quatre outils ; vérifier cette compatibilité sur les versions réellement verrouillées avant de la retenir. Le simple `zod/v4` de Zod 3.25 n'a pas suffi lors de l'audit.
+- Rejouer les tests des schémas, des outils et de l'OAuth. Les corrections nécessaires pour rétablir les gates font partie du lot ; si une autre régression dépasse son périmètre, la documenter précisément et traiter le blocage avant fusion, sans désactiver le contrôle.
+
+### B. Télémétrie V2 additive
+
+- Propager `schema_version=2`, `turn_id`, `attempt_id`, environnement, personnage, mode de saisie réel, transport et versions de code/prompt/config disponibles. Préserver les événements et colonnes V1 pour les lectures historiques. Éviter doublons de finalisation et confusion entre retries, interruptions et tours suivants.
+- Distinguer fournisseur/modèle demandés, résolus et effectifs, overrides de personnage et fallback. Les métadonnées doivent venir du résultat réellement exécuté ; éviter de reporter les réglages globaux comme preuve du fournisseur effectif. Vérifier la cohérence avec le chunking, sans retoucher les buffers ou la prosodie.
+- Ajouter les jalons réellement observables du chemin courant : capture/envoi/flush/final STT, contexte prêt, requête LLM/en-têtes/réponse, texte envoyé au TTS, premier chunk, scheduling/sortie estimée, fin/annulation audio. Ajouter des spans serveur RAG (quota/profil/embedding/recherche/rerank) et GM (génération/validation/persistance/disponibilité).
+- Utiliser des durées monotones dans chaque processus et des identifiants pour corréler client/Edge/provider. Ne pas soustraire des horloges indépendantes ni sommer des percentiles ou des spans qui se chevauchent. Séparer dépassement de budget et attente critique, avec état de couverture incomplète.
+- Prévoir les futurs jalons intention/phrase sûre/candidat acoustique/atténuation/confirmation/rejet/reprise. Ils restent absents ou `null` tant que ces mécanismes n'existent pas. Le LLM batch ne fournit pas un vrai premier token ; une release PTT ne prouve pas la fin physique de parole. Exposer origine et précision, sans fabriquer ces mesures ni implémenter P1/P2 pour les obtenir.
+- Séparer première sortie, génération totale et lecture. Une sortie estimée n'est pas un timestamp acoustique exact. Ne calculer fin de voix → premier son en V2 que si la fin de voix est réellement observée ; sinon garder une autre origine explicitement nommée.
+- Corriger le traitement null → zéro du proxy de statistiques. Conserver un zéro réel lorsque mesuré. Inclure états commencé/terminé/interrompu/annulé/timeout/échec/sans audio et couverture ; ne pas masquer les échecs en ne gardant que les tours terminés.
+- La collecte reste bornée et asynchrone : aucune persistance ou requête de statistiques attendue sur le chemin vocal, aucune dépendance fonctionnelle à sa réussite. Ne pas introduire de transcription privée, prompt, token ou secret dans les nouvelles projections.
+
+### C. MCP et vues admin
+
+- Étendre le serveur existant plutôt que le reconstruire. Lire `voice_turn_events` et les projections techniques PRD4/GM ; conserver les statistiques legacy, clairement séparées. Rendre possible une chronologie diagnostique par tour sans exposer son dialogue.
+- Ajouter les filtres utiles de période, environnement, personnage, fournisseur/modèle effectifs, transport et version, seulement là où les données permettent de les appliquer. Une absence de champ n'est pas un filtre satisfait.
+- Retourner effectifs, couverture, fenêtre effective, source/version, méthode de percentile, caps et pagination. Préserver les percentiles interpolés existants ou versionner explicitement une nouvelle méthode ; distinguer la référence de septembre calculée au rang supérieur.
+- Conserver OAuth, autorisation admin, RLS, lecture seule et validation des retours. Ne pas employer de clé privilégiée pour contourner les droits de l'appelant. Toute migration éventuelle est additive, documentée et appliquée via Lovable Cloud.
+- Mettre à jour les vues de latence existantes et la documentation du contrat. Utiliser le MCP Ava et le connecteur PostHog natifs pour les lectures réelles ; aucun contournement navigateur ou accès direct externe à la base Lovable.
+
+Points d'entrée à vérifier : `src/services/voiceTelemetry.ts`, `latencyTelemetry.ts`, `latencyServiceMetadata.ts`, `posthogLatencyStats.ts`, `src/pages/IndexPRD4.tsx`, `prd4Orchestrator.ts`, `openRouterLLM.ts`, `src/services/stt/`, `src/services/tts/`, `src/services/streamingAvatar/localTtsOutput.ts`, `src/lib/mcp/`, `supabase/functions/query-rag/`, `proxy-llm/`, `posthog-latency-stats/`. Ce sont des points de lecture, pas une obligation de modifier tous ces fichiers. Le MCP backend généré par le plugin ne doit pas devenir une implémentation parallèle maintenue à la main.
+
+## Protections et limites du lot
+
+Conserver le comportement vocal, les valeurs d'environnement, les fournisseurs, les prompts métier, le RAG, les deadlines, la mémoire, le PTT, les cinématiques et le handoff. La cible finale est bien voix seule avec interruptions acoustiques confirmées, mais ce lot prépare sa mesure : il n'active ni cette stratégie, ni le streaming LLM/TTS, ni la nouvelle mémoire de livraison, ni la suppression du texte public.
+
+Préserver l'isolation Max/Emma, les confidences, le rôle et la relation. `experienceFrame.ts` reste le constructeur unique du cadre injecté au GM et au personnage ; la réponse initiale sur le film reste partagée et conservée lors du replay de l'introduction. Les accès anonymes ne gagnent aucune permission. Éviter tout nouveau service de build ou de déploiement et toute modification d'un autre projet.
+
+## Vérification et critères de livraison
+
+- Tests ciblés sur l'attribution réelle/override/fallback, `null` versus zéro, mesures partielles, origines, corrélation/retries, annulation et callbacks tardifs, absence de blocage si la télémétrie échoue.
+- Tests MCP : V1/V2 séparées, PRD4 présent, erreurs et tours incomplets visibles, caps/filtres/pagination/percentiles, projections sans contenu privé, accès refusé sans droit admin. Une absence de donnée ne produit pas un chiffre inventé.
+- Installation propre avec les lockfiles livrés, typecheck, tests de régression, unitaires et intégrations pertinents ; exécuter le parcours de `.github/workflows/core-experience-quality.yml` et obtenir ses checks GitHub verts sur le dernier HEAD de la PR. Les contrôles locaux sont des diagnostics de compatibilité ; Lovable reste la livraison.
+- Smoke tests du parcours existant : Max puis Emma, PTT, mains libres dans son réglage actuel, interruption existante, introduction/film, handoff et lecture audio ; fournisseurs simulés pour races et erreurs. Les essais réels se font dans Lovable et `sandbox-ulrich`.
+- Documenter ce qui passe, ce qui est indisponible et les limites de couverture. La baseline réelle se capture après publication, avec configuration inchangée, dates/effectifs/navigateurs/providers et révision ; ne pas la confondre avec les 41 tours de septembre. Le protocole 300 tours / 10 sessions concerne les comparaisons d'optimisation ultérieures.
+
+## Livraison GitHub : une PR du lot, fusion par squash
+
+1. Vérifier le remote, actualiser `origin/main`, noter la révision et créer une branche dédiée `codex/latency-lot-1-observability` depuis cette base. Réutiliser la branche si elle existe déjà pour ce lot. Isoler les travaux non liés sans les écraser.
+2. Implémenter, tester et relire le diff. Inclure seulement le lot et sa documentation dans les commits. Réutiliser l'authentification GitHub sécurisée existante, avec la GitHub App de livraison en priorité lorsqu'elle est configurée.
+3. Pousser la branche, ouvrir une PR vers `main` et attacher son URL au chat. La description présente problème, comportement résultant, preuves avant/après, compatibilité et rollback ; suivre le template du repo ou le skill PR applicable.
+4. Corriger les retours et les échecs, obtenir les checks requis verts sur le HEAD exact et vérifier la revue. Fusionner avec **squash merge** (`gh pr merge --squash` si aucun connecteur GitHub natif adéquat n'est disponible). Ne pas utiliser de bypass admin, de force push sur `main` ou une fusion classique suivie d'une réécriture.
+5. Vérifier l'état merged, relever PR et SHA squash réellement présent sur `origin/main`. Vérifier aussi les checks post-merge ; GitHub livré ne signifie pas Lovable publié. Si une gate bloque, présenter le blocage réel et continuer les corrections autorisées, sans annoncer une fusion non effectuée.
+
+## Clôture et prompt Lovable à produire
+
+À la fin, fournir résultat, fichiers, tests exécutés, PR, branche, SHA source et SHA squash, état GitHub/preview/production et reste. Produire en réponse un **prompt Lovable complet prêt à coller**, renseigné avec les valeurs réelles ci-dessous. Tant que la publication et les tests n'ont pas été effectués, les marquer « à faire ».
+
+Le prompt Lovable doit demander, dans cet ordre :
+
+1. **Reprise vérifiée** : ouvrir le projet Ava Proto 1 associé à `memoways/ava-proto1`, vérifier Lovable Cloud `iralfqlslqndgvexixis`, synchroniser `main` et confirmer que le SHA squash indiqué est inclus. Lire la PR, ce document et le plan général. Ne pas commencer le lot 2.
+2. **Contrôle de compatibilité** : vérifier installation/lockfiles, alias Zod limité au MCP, compilation Lovable et fonctions/migrations précises du diff. Déployer les modifications backend par Lovable Cloud ; préserver secrets, OAuth, droits, réglages et comportement vocal. Une correction éventuelle reste dans le périmètre et doit être tracée avec sa révision réelle.
+3. **Preview puis publication** : tester les parcours existants et les vues admin en preview. Si les contrôles passent, publier depuis Lovable pour permettre les tests du lot 1. Le MCP généré est vérifié après publication, car sa présence en preview n'est pas garantie. Ne pas activer les futurs flags voice-to-voice.
+4. **Test publié** : via l'accès sandbox authentifié, lancer les scénarios Max/Emma, PTT et mains libres actuel, interruption, film et handoff. Vérifier que les nouvelles données PRD4 apparaissent dans MCP/admin/PostHog, que l'attribution TTS est cohérente avec l'adaptateur exécuté et que les tours incomplets/échecs sont visibles. Vérifier aussi le refus d'accès non autorisé. Recueillir une baseline récente dans `sandbox-ulrich` avec réglages inchangés et origines de mesure explicites.
+5. **Retour de preuve** : donner URL publiée, révision effectivement servie ou méthode de vérification, état des fonctions/migrations, scénarios exécutés et résultats, couverture/effectifs, p50/p95 descriptifs, coût et anomalies éventuelles. Aucun gain de latence n'est revendiqué par ce lot d'observabilité. Distinguer les vérifications automatiques des tests qui restent à faire par Ulrich.
+6. **Rollback** : en cas de régression, restaurer le comportement précédemment publié via Lovable et un revert tracé sur `main` ; conserver les données historiques et les migrations additives. Ne pas passer au lot 2 avant validation du lot 1.
+
+Le prompt final nomme la **PR réelle**, le **SHA squash réel**, les **fichiers/fonctions/migrations réellement changés** et les **tests réellement passés**. Aucun numéro de PR ou SHA fictif, aucune promesse de publication déjà effectuée. Si l'assistant ne peut pas piloter Lovable par un outil autorisé, remettre ce prompt à Ulrich comme unique action : le coller dans le projet Lovable Ava Proto 1 ; le retour attendu est une publication identifiée accompagnée des résultats de test.

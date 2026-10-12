@@ -1,7 +1,7 @@
 # Plan — réduire la latence et préparer la conversation voice-to-voice libre
 
 Date : 12 octobre 2026. Base auditée : `0433518`, `main`, après une première lecture de `2d83558`.
-Statut : **plan proposé, implémentation non commencée**. Choix d'interruption confirmé par Ulrich le 12 octobre : réaction dès le début de voix, avec confirmation des mots ensuite.
+Statut : **mise en œuvre demandée par lots séparés, implémentation non commencée**. Choix d'interruption confirmé par Ulrich le 12 octobre : réaction dès le début de voix, avec confirmation des mots ensuite.
 Sources : [audit détaillé](audit_voice_conversation_max.md) et [snapshot chiffré anonymisé](latency_voice_snapshot_2026-10-12.json).
 
 ## Résultat visé et décisions acquises
@@ -12,7 +12,7 @@ Lovable/Lovable Cloud demeure l'unique livraison. Les fournisseurs peuvent être
 
 Les objectifs de pilote sont **p50 ≤ 1 500 ms et p95 ≤ 2 500 ms** de fin réelle de parole à premier son estimé. Pour l'interruption choisie : début de voix détecté localement → atténuation de la sortie **p95 ≤ 100 ms**, puis confirmation applicative → dernier son de l'ancienne sortie **p95 ≤ 200 ms**. Mesurer séparément voix physique → détection, détection → confirmation et arrêt matériel ; la cible locale de 100 ms ne couvre pas à elle seule la détection du micro. Ce sont des objectifs de validation proposés, pas des gains annoncés. L'ambition ultérieure 800/1 500 ms ne sera retenue qu'après mesure et sans dégrader la qualité.
 
-La base saisie mains libres/barge-in est déjà réalisée et documentée dans [son plan](plan_conversation_mains_libres.md). Ce plan se concentre sur latence, streaming et continuité ; il complète cette base sans doublon. `handsFreeVoice.ts` reste l'autorité applicative de fin de tour et d'interruption. Le lot présent livre l'audit et ce plan. L'exécution applicative doit suivre l'ordre ci-dessous ; aucune suppression de protection ou réduction arbitraire de timeout n'est un raccourci acceptable.
+La base saisie mains libres/barge-in est déjà réalisée et documentée dans [son plan](plan_conversation_mains_libres.md). Ce plan se concentre sur latence, streaming et continuité ; il complète cette base sans doublon. `handsFreeVoice.ts` reste l'autorité applicative de fin de tour et d'interruption. L'audit et le plan sont livrés ; la [reprise du lot 1](plan_lot_1_observabilite_latence.md) prépare leur exécution. L'exécution applicative doit suivre l'ordre ci-dessous ; aucune suppression de protection ou réduction arbitraire de timeout n'est un raccourci acceptable.
 
 ## 1. Mesure fiable avant optimisation — P0
 
@@ -117,4 +117,19 @@ La décision produit du 12 octobre est acquise : réaction dès début de voix, 
 
 Toute violation d'un invariant bloque le passage au lot suivant. Rollback par retour au preset courant pour les nouvelles sessions ; aucune migration destructive, suppression de fournisseur ou conversion irréversible de mémoire. L'avatar animé conserve son chemin existant et ne reçoit pas la sortie incrémentale avant ses tests spécifiques.
 
-Le tableau de suivi doit présenter chaque gain réellement mesuré, intervalle et effectif, coût marginal et évaluation de continuité. Le lot s'arrête avec un plan validé et des preuves de pilote ; aucune économie supposée de 300 ms ou de 3,6 s GM n'est comptée comme acquise.
+Le tableau de suivi doit présenter chaque gain réellement mesuré, intervalle et effectif, coût marginal et évaluation de continuité. Les preuves de pilote précèdent l'activation générale ; aucune économie supposée de 300 ms ou de 3,6 s GM n'est comptée comme acquise.
+
+## 6. Livraison par lots séparés — décision du 12 octobre 2026
+
+| Lot | Périmètre du plan | État |
+| --- | --- | --- |
+| 1 | P0 : mesures fiables, attribution, MCP, dépendances et baseline | [Prompt de reprise prêt](plan_lot_1_observabilite_latence.md) ; code non commencé |
+| 2 | P1 : mémoire de livraison, intention privée, streaming LLM/TTS et annulation | Prévu après validation du lot 1 |
+| 3 | P2 : écoute libre, interruption acoustique confirmée et UI voix seule | Prévu après validation du lot 2 |
+| 4 | P3 : GM, RAG, prompts et buffers comparés | Prévu après validation du lot 3 |
+
+Chaque lot applicatif suit **branche dédiée → commits du lot → push → PR vers `main` → contrôles et revue → squash merge → vérification du SHA sur `main` → reprise Lovable → vérification et publication → tests de la version publiée**. Le squash se fait lors de la fusion : un commit du lot sur `main`, sans réécriture de son historique. Aucun push direct de code de ces lots sur `main`, aucun contournement d'une gate en échec.
+
+À la clôture de chaque lot, fournir un prompt Lovable prêt à coller, avec PR, SHA réellement fusionné, changements, migrations/fonctions éventuelles, vérifications, scénarios de test et rollback. GitHub mergé, preview vérifiée et production publiée sont trois états distincts. Le lot suivant commence après retour de validation des tests du lot précédent, ou décision explicite d'Ulrich. Si une phase nécessite plusieurs livraisons, documenter ses sous-lots avant de les réaliser.
+
+Le lot 1 fournit les fondations de mesure ; il n'annonce pas de réduction de latence. La baseline récente se relève après publication de son instrumentation dans Lovable, en conservant le comportement vocal actuel. Les 300 tours / 10 sessions restent le protocole de comparaison des optimisations ultérieures, pas un résultat déjà obtenu.
