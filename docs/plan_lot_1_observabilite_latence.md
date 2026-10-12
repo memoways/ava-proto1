@@ -468,3 +468,23 @@ Statut : correctif de stockage préparé et testé, **application Cloud et fusio
 en attente de validation de l'écart de périmètre**. Baseline V2 récente,
 effectifs, p50/p95 et coût non relevés ; ne pas les remplacer par les sessions
 historiques. Lot 2 non commencé.
+
+### Application du stockage P0 `voice_turn_events` — 12 octobre 2026, ~17:30 UTC
+Statut du sous-lot : **validé par Ulrich, appliqué** ; parcours réel et publication restent à faire.
+- Cible confirmée avant action : `project_id = "iralfqlslqndgvexixis"` ; squash PR #26 `979c8b3e23c80c439f8c13388212fb8986e07247` ancêtre de HEAD ; table absente juste avant.
+- Appliqué via l'outil de migration Lovable Cloud, contenu de `supabase/migrations/20261012170925_p0_voice_turn_events_storage.sql`
+  identique au caractère près (seul écart : saut de ligne final). Enregistré par Lovable comme
+  `drizzle/migrations/0004_p0_voice_turn_events_storage.sql` ; types régénérés. Aucun autre SQL exécuté.
+- Vérifié : 11 colonnes (historiques + `environment_id` NOT NULL FK `environments`, `context_type` NOT NULL CHECK) ; 5 index dont
+  `idx_voice_turn_events_environment_page` ; RLS active ; policies uniquement « Participant inserts telemetry for own session » (INSERT, authenticated)
+  et « Admins read voice telemetry » (SELECT, authenticated). Privilèges : anon aucun ; authenticated SELECT+INSERT, pas UPDATE/DELETE ; service_role tous.
+  0 ligne (aucune mesure synthétique ajoutée). `voice_error_events` toujours absente, non touchée. Historique préservé (sessions 99, audio_latencies 2621).
+- Requête exacte `readVoiceTurnPage` rejouée par REST (fenêtre 11–13 oct., sandbox-ulrich, schema_version 2, range 0–100) :
+  anon → `42501 permission denied for table voice_turn_events` (HTTP 401) ; admin Ulrich avec son JWT → HTTP 200 `[]`. PGRST205 disparu.
+  V1 (`audio_latencies`/`turn_latencies`) et V2 (`voice_turn_events`) restent des sources séparées.
+- Non vérifié : lecture refusée pour un participant authentifié non admin (aucun compte existant disponible sans en créer un) — couvert par les tests PGlite de la PR #26 ;
+  insertion Cloud non testée pour ne pas inventer de mesures.
+- Compilation : `bun run build` exit `0`, `index-DvEiVgQ4.js`, révision HEAD `85fac07439384952b9c36b3529fb657d5e288f42`
+  (= squash #26 + commits Lovable de migration). Bundle MCP régénéré par SDK `@lovable.dev/mcp-js@3.0.5`, 6 imports `npm:zod@4.6.6`, 0 Zod 3, plugin non modifié ; manifeste 4 outils.
+- Fonctions : `query-rag`, `proxy-llm`, `posthog-latency-stats` déployées plus tôt (sources inchangées, sha256 identiques à la section précédente) ;
+  `mcp` (sha256 `ec4f25f3…1495`) déployée seulement à la publication. Version MCP servie non déterminée ; à revérifier après publication.

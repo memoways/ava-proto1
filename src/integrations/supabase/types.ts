@@ -1604,6 +1604,56 @@ export type Database = {
           },
         ]
       }
+      voice_turn_events: {
+        Row: {
+          blocker_step: string | null
+          context_type: string
+          created_at: string
+          environment_id: string
+          event_name: string
+          id: string
+          metadata_json: Json
+          session_id: string | null
+          severity: string | null
+          turn_id: string
+          turn_index: number | null
+        }
+        Insert: {
+          blocker_step?: string | null
+          context_type?: string
+          created_at?: string
+          environment_id?: string
+          event_name?: string
+          id?: string
+          metadata_json?: Json
+          session_id?: string | null
+          severity?: string | null
+          turn_id: string
+          turn_index?: number | null
+        }
+        Update: {
+          blocker_step?: string | null
+          context_type?: string
+          created_at?: string
+          environment_id?: string
+          event_name?: string
+          id?: string
+          metadata_json?: Json
+          session_id?: string | null
+          severity?: string | null
+          turn_id?: string
+          turn_index?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_turn_events_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "environments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
