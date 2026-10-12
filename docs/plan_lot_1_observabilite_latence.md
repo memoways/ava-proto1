@@ -596,3 +596,47 @@ observé par `capture_started`. Garder strictement les appels start(),
 les connexions, les buffers et l'ensemble des décisions inchangés.
 Vérifier par un WebSocket différé que la capture n'est pas déclarée prête
 avant son ouverture et que les deux jalons suivent le démarrage du recorder.
+
+### Livraison des corrections de mesure P0 — 12 octobre 2026
+
+- PR [#27](https://github.com/memoways/ava-proto1/pull/27), source finale
+  `3e3ef39826d808036941d17e8220df709df405aa`, squash vérifié sur main
+  `6ad0d422fce66d6ea04c483fa22e743aa371d119` à 18:14:13 UTC.
+- CI avant fusion [38288762851](https://github.com/memoways/ava-proto1/actions/runs/38288762851)
+  réussie : npm ci, typecheck, lint (0 erreur, avertissement hook préexistant),
+  44 régressions, 463 unitaires, 29 intégrations, build et 17 E2E simulés.
+  Revues Standards et Spec sur HEAD final : 0 constat actionnable chacune.
+  CI post-merge [38289544891](https://github.com/memoways/ava-proto1/actions/runs/38289544891)
+  à vérifier avant clôture ; ne pas inférer son succès du check pré-merge.
+- Sources locales SHA256 : helper monotonicSpans `47b066c9cf9fd9783a0a553fec41ac72eaa7f44f2c73e4247dd983bb48c78497` ;
+  query-rag `16c0e7c49b6dd3ec254db737f6d5c48fbd2f8620181b353d49bc9018e832af25` ;
+  proxy-llm `f0bb764fb3f7334faf77bb82057adfd07c0742c77b028074b799de0bd6b9cc07`.
+  posthog-latency-stats inchangé (`f18c6dd5…1035`). Ces empreintes ne prouvent
+  pas encore le déploiement des corrections.
+- Admin après rechargement de la fenêtre : 1 tentative Max completed,
+  1 observation GM, couverture partial, 0 ligne invalide ; p50/p95 6 823 ms.
+  PostHog du même attempt confirme output_ms 6 823, voice_end/first_token null,
+  capture_started -3 338 et capture_ready -3 822 (avant correction), 15/27.
+- Second parcours Emma préparé par UI depuis la sandbox authentifiée,
+  chemin film non vu, réglages mains libres inchangés, accueil vocal visible
+  EN LIGNE. Échange demandé à Ulrich, pas encore confirmé. Frontend publié
+  antérieur aux corrections #27 ; ne pas qualifier cet essai de validation
+  du nouveau build. Reprise/film replay déjà observés lors du premier parcours.
+
+**Blocage explicite Lovable** : diagnostic initial
+`umsg_01m4rm7r3dedfb91m7q26nrxh0` attend `plan--show`, paramètres
+`{"path":".lovable/plan.md"}`, événement
+`main:agent#00000000648567#tcb:OPSKINZK`. La reprise de compilation et du
+déploiement query-rag/proxy-llm (`umsg_01m4rn57pdewvbkf346q489wxc`) est
+`queued`, `queue_paused=true`, raison `hitl_tool`. Le connecteur
+respond_to_approval impose une décision humaine après présentation des
+paramètres ; ne pas décider automatiquement ni contourner par le navigateur.
+La décision demandée dans Codex est de rejeter ce plan ancien (recommandé),
+car les corrections sont déjà fusionnées. Aucune décision encore reçue.
+
+GitHub livré ; nouvelle compilation/déploiement des deux fonctions non
+effectués à ce stade, ancienne version toujours servie. Aucune nouvelle
+publication frontend. Baseline finale après publication, refus réel avec
+compte participant, Emma/interruption/PTT/handoff complets restent à vérifier.
+Le résultat Max n=1 est un contrôle réel post-migration, pas une comparaison
+de performances. Lot 2 non commencé.
