@@ -54,6 +54,7 @@ async function installNetworkFakes(
   const blockedTraceUpload = new Promise<void>((resolve) => { releaseTraceUpload = resolve; });
   const maxMessageCounts: number[] = [];
   const sessionUpdates: unknown[] = [];
+  const gmFilmContexts: string[] = [];
 
   await page.addInitScript(({ transcripts, simulateAudio }: { transcripts: string[]; simulateAudio: boolean }) => {
     let websocketIndex = 0;
@@ -398,6 +399,7 @@ async function installNetworkFakes(
             : { themes: [], topics: [], intentions: [] },
         );
       } else if (system.includes("Game Master") || system.includes("end_recommended")) {
+        gmFilmContexts.push(system);
         gmPostTurnCount += 1;
         const triggerVideo = gmPostTurnCount === options.triggerVideoAtLabel;
         content = JSON.stringify({
@@ -459,6 +461,7 @@ async function installNetworkFakes(
     getSimulatedNetworkDrops: () => simulatedNetworkDrops,
     getTriggeredVideoLoads: () => triggeredVideoLoads,
     getSessionUpdates: () => sessionUpdates,
+    getGmFilmContexts: () => gmFilmContexts,
     getTtsCallCount: () => ttsCallCount,
     getPosthogRequestCount: () => posthogRequestCount,
     getTraceUploadStarted: () => traceUploadStarted,
@@ -467,16 +470,9 @@ async function installNetworkFakes(
   };
 }
 
-/** Onboarding du bénévole : séquence de cartes entre le teaser et le choix du personnage. */
-async function completeVolunteerBriefing(page: Page) {
-  const understood = page.getByRole("button", { name: "J'ai compris" });
-  for (let step = 0; step < 5; step += 1) {
-    if (await understood.count()) {
-      await understood.click();
-      return;
-    }
-    await page.getByRole("button", { name: "Continuer" }).click();
-  }
+/** Choix film après l'introduction ; l'ancien briefing est masqué. */
+async function answerFilmQuestion(page: Page) {
+  await page.getByRole("button", { name: "Je n'ai pas vu le film", exact: true }).click();
 }
 
 test("le teaser démarre automatiquement avec le son puis Passer coupe tout", async ({ page }, testInfo) => {
