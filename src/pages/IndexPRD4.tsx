@@ -227,6 +227,7 @@ const IndexPRD4 = () => {
   const endedRef = useRef(false);
   const userRoleRef = useRef(state.userRoleProfile);
   userRoleRef.current = state.userRoleProfile;
+  const promptVersionsRef = useRef<Record<string, string>>({});
   const hasSeenFilmRef = useRef(state.hasSeenFilm);
   hasSeenFilmRef.current = state.hasSeenFilm;
   const userPostureRef = useRef<UserPosture | null>(state.userPosture);
@@ -1128,6 +1129,14 @@ const IndexPRD4 = () => {
         const turnCharacterContext = activeCharacterContextRef.current;
         if (!turnCharacterContext || turnCharacterContext.characterKey !== activeCharacterRef.current) {
           throw new Error("Character context is missing or obsolete; generation blocked");
+        }
+        // Traçabilité : version de fiche utilisée par personnage, écrite une fois par changement.
+        if (sessionIdRef.current && promptVersionsRef.current[turnCharacterContext.characterKey] !== turnCharacterContext.promptUpdatedAt) {
+          promptVersionsRef.current = { ...promptVersionsRef.current, [turnCharacterContext.characterKey]: turnCharacterContext.promptUpdatedAt };
+          void updatePRD4ExperienceState(sessionIdRef.current, {
+            characterPromptVersions: promptVersionsRef.current,
+            gmCodeVersion: GM_CODE_VERSION,
+          }).catch(() => undefined);
         }
         const postVideoContext = pendingPostVideoContextRef.current ?? undefined;
         pendingPostVideoContextRef.current = null;

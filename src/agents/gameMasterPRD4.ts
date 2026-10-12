@@ -20,6 +20,9 @@ import {
   validateRelationshipTransition,
 } from "@/services/relationshipEngine";
 
+/** Incrémenter à chaque changement de logique ou de prompt du GM (traçabilité A/B). */
+export const GM_CODE_VERSION = "gm-2026-10-12-frame";
+
 export interface PRD4PostTurnInput {
   sessionId: string | null;
   conversationHistory: ConversationMessage[];
