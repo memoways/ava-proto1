@@ -1213,6 +1213,7 @@ export type Database = {
           ava_start_variant: string | null
           branch: string | null
           campaign_id: string | null
+          character_prompt_versions: Json
           context_type: string
           conversation_log: Json | null
           conversation_memory: Json
@@ -1222,6 +1223,7 @@ export type Database = {
           environment_id: string
           first_max_response_at: string | null
           game_over_reason: string | null
+          gm_code_version: string | null
           gm_post_turn_log: Json
           handoff_count: number
           has_seen_film: string | null
@@ -1263,6 +1265,7 @@ export type Database = {
           ava_start_variant?: string | null
           branch?: string | null
           campaign_id?: string | null
+          character_prompt_versions?: Json
           context_type?: string
           conversation_log?: Json | null
           conversation_memory?: Json
@@ -1272,6 +1275,7 @@ export type Database = {
           environment_id?: string
           first_max_response_at?: string | null
           game_over_reason?: string | null
+          gm_code_version?: string | null
           gm_post_turn_log?: Json
           handoff_count?: number
           has_seen_film?: string | null
@@ -1313,6 +1317,7 @@ export type Database = {
           ava_start_variant?: string | null
           branch?: string | null
           campaign_id?: string | null
+          character_prompt_versions?: Json
           context_type?: string
           conversation_log?: Json | null
           conversation_memory?: Json
@@ -1322,6 +1327,7 @@ export type Database = {
           environment_id?: string
           first_max_response_at?: string | null
           game_over_reason?: string | null
+          gm_code_version?: string | null
           gm_post_turn_log?: Json
           handoff_count?: number
           has_seen_film?: string | null
