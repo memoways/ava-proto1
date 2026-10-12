@@ -38,6 +38,8 @@ interface RagDatabaseMatch {
   content: string;
   similarity: number;
   character_id: string | null;
+  /** Set only after Voyage reranking; type-only addition, runtime unchanged. */
+  rerank_score?: number;
 }
 
 async function embedOpenAI(text: string, apiKey: string, profile: RagEmbeddingProfile): Promise<number[]> {
