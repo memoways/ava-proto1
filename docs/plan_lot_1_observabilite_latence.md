@@ -649,3 +649,48 @@ cette preview ; onglet de contrôle fermé. La correspondance exacte du hash
 avec un journal de compilation Lovable reste à obtenir ; ready ne suffit pas
 à prouver le déploiement Edge demandé. L'onglet Emma sur le domaine publié
 est laissé pour la reprise, micro non activé par l'agent.
+
+### Reprise après décision humaine — 12 octobre 2026
+
+Ulrich confirme « Rejeter cet ancien plan (recommandé) » et signale que
+l'onglet Emma n'est pas visible. Rejet transmis à respond_to_approval sur
+`main:agent#00000000648567#tcb:OPSKINZK`, résultat accepted/rejected.
+Lovable a reproposé un plan de reprise au même chemin (nouvel événement
+`main:agent#00000000648611#tcb:OQ6NJIPB`) ; rejet également transmis afin
+de terminer le diagnostic et libérer la demande déjà en file. Les deux
+diagnostics sont maintenant completed et la demande de build/déploiement
+`umsg_01m4rn57pdewvbkf346q489wxc` est **completed**. Aucun blocage HITL
+ne subsiste pour cette demande.
+
+- HEAD compilé Lovable `771c3f1382a90f282bd05b319bc20fc86badfd7a`, identique
+  à main récupéré ; `6ad0d42`, `12d5f29` et `979c8b3` inclus. Depuis
+  `6e52733`, seuls les commits de `.lovable/plan.md` ont changé ; code intact.
+- `bun run build` exit 0 ; asset `index-2uc8XJ7K.js`, SHA256
+  `1207afac872e6316b300c10c20ff9db885fa14a23e15a12dcb0b13cf8097c542`.
+  Tests ciblés Deepgram/V2 29/29 sur Lovable ; autres adaptateurs vérifiés
+  par lecture, pas par un nouveau test navigateur. MCP généré SDK, 6 imports
+  Zod 4, hash inchangé `ec4f25f3…1495`, pas de maintenance parallèle.
+- query-rag et proxy-llm **redéployées sur Lovable Cloud iralfqlslqndgvexixis**.
+  SHA256 fichiers respectivement `16c0e7c4…2af25`, `f0bb764f…cc07` et
+  helper `47b066c9…8497`, identiques aux valeurs locales consignées plus haut.
+  Empreintes de déploiement Lovable (fichiers + réglages, distinctes des hashes
+  de fichier) : query-rag `9b1dcce1385ddaecd1abfbf8bef0185ede557fb24d7b094bd730fdffb94ea257` ;
+  proxy-llm `1e45da95d117cb481f489030941a309d9bf10d1c6d1751f4a5a12183555a587c`.
+  Probes anonymes : 401 Invalid game identity ; journaux immédiatement après
+  déploiement vides. Aucun tour synthétique enregistré.
+- posthog-latency-stats inchangée, déjà déployée précédemment ; MCP inchangée,
+  déploiement/révision exacte après publication toujours à vérifier.
+- Frontend corrigé non publié ; échange Emma à venir sur le domaine publié
+  antérieur, donc capable de vérifier les Edge corrigées mais pas encore le
+  déplacement capture_ready. Un vrai tour et compteur quota restent à relire.
+
+Inventaire navigateur : l'ancien onglet de test n'existe plus ; admin Ulrich
+toujours authentifié en sandbox. Nouvel onglet ouvert par « Tester moi-même »
+(id CUA 7, provider `4ed26b59-449a-4a3f-912d-d95fd5a69744`) et conservé comme
+deliverable. Emma affichée EN LIGNE après chemin film non vu, micro non activé
+par l'agent. open_in_codex et navigation app demandées, mais l'ouverture du
+panneau est toujours retournée queued ; la visibilité humaine n'est donc pas
+confirmée. Le pilotage direct de l'application Codex est refusé par Computer
+Use. Question envoyée à Ulrich : afficher le test dans Brave ou dans Codex.
+Ne pas prétendre qu'un échange Emma a été exécuté. Publication finale,
+scénarios complets et baseline finale restent en attente ; lot 2 non commencé.
