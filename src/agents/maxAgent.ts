@@ -46,7 +46,7 @@ const GAMEPLAY_RULES = `
 - Réponds de façon très concise (1-2 phrases max, 45 mots maximum) car c'est une conversation orale temps réel.
 - N'invente AUCUN fait absent du CONTEXTE AUTORISÉ DU TOUR ci-dessous.
 - Si tu ne sais pas quelque chose, dis-le plutôt que d'inventer.
-- Réagis selon la relation : tu peux répondre, nuancer, retenir, contester ou questionner. Une question peut constituer la réponse crédible à une intrusion.
+- Réagis selon la relation : tu peux répondre, nuancer, retenir, contester ou questionner. Une question peut servir à comprendre l'intention de l'interlocuteur.
 
 ## PRIORITÉ DES INSTRUCTIONS
 Les sections "FICHE PERSONNAGE" (issues de Notion) ci-dessus DÉFINISSENT TON COMPORTEMENT.
@@ -94,6 +94,8 @@ export interface MaxAgentInput {
   gmGuidance?: MaxGmGuidance;
   /** Directive déterministe du tour, disponible avant la réponse et prioritaire sur le RAG. */
   relationshipDirective?: string;
+  /** Cadre commun de l'expérience (même texte que celui reçu par le GM). */
+  experienceFrame?: string;
 }
 
 export interface MaxTemporalContext {
@@ -517,6 +519,7 @@ export async function buildMaxSystemPrompt(
 
 
     const legacySections: Array<[string, string, string | undefined]> = [
+      ["experience_frame", "CADRE DE L'APPEL — PRIORITAIRE", input.experienceFrame],
       ["relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective],
       ["user_role", "INTERLOCUTEUR (qui t'appelle)", input.userRoleSummary],
       ["temporal_context", "OÙ EN EST L'APPEL", input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined],
@@ -611,6 +614,7 @@ export async function buildMaxSystemPrompt(
       temporalContext: input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined,
       gmGuidance,
       relationshipDirective: input.relationshipDirective,
+      experienceFrame: input.experienceFrame,
       guards: guards || undefined,
       postVideoContext: input.postVideoContext,
       ragCandidates: input.ragCandidates,
@@ -702,6 +706,7 @@ export async function buildMaxSystemPrompt(
   };
 
   // La directive relationnelle est réservée et injectée avant tout contexte compressible.
+  appendDynamicSection("experience_frame", "CADRE DE L'APPEL — PRIORITAIRE", input.experienceFrame);
   appendDynamicSection("relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective);
   appendDynamicSection("temporal_context", "ÉTAT DE L'APPEL", input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined);
   appendDynamicSection("user_role", "RÔLE DE L'INTERLOCUTEUR", input.userRoleSummary);
@@ -868,6 +873,7 @@ async function buildRichMaxSystemPrompt(
     });
   };
 
+  appendDynamicSection("experience_frame", "CADRE DE L'APPEL — PRIORITAIRE", input.experienceFrame);
   appendDynamicSection("relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective);
   appendDynamicSection("temporal_context", "ÉTAT DE L'APPEL", input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined);
   appendDynamicSection("user_role", "RÔLE DE L'INTERLOCUTEUR", input.userRoleSummary);
