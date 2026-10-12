@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "sdk_version": "3.0.5",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://iralfqlslqndgvexixis.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "ava-prototype-1",
+      "version": "0.1.0",
+      "title": "AVA Prototype 1"
+    },
+    "tools": [
+      {
+        "name": "get_usage_overview",
+        "title": "Usage overview",
+        "description": "Session statistics for the AVA experience: sessions played, durations, characters called, film seen or not seen, endings, handoffs and voice modes, grouped by environment and by day. Reads session metadata only, never conversation content.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "default": 30,
+              "description": "Number of past days to include."
+            },
+            "environment": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_llm_costs",
+        "title": "Model usage and costs",
+        "description": "Language-model usage statistics: calls, tokens and cost grouped by model, feature and day, with a success or error breakdown. Reads the usage log only, never conversation content.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "default": 30,
+              "description": "Number of past days to include."
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Optional model id filter, e.g. an OpenRouter model name."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_voice_latencies",
+        "title": "Voice latencies",
+        "description": "Voice pipeline timing statistics: speech-to-text, text-to-speech first byte and total, audio playback, plus per-turn retrieval, model and validation timings as count, mean, p50, p90, p95 and max.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "default": 30,
+              "description": "Number of past days to include."
+            },
+            "environment": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_sessions",
+        "title": "List sessions",
+        "description": "Most recent game sessions as a metadata list: start and end, duration, environment, character called, film seen or not seen, voice modality, ending reason and handoff count. Conversation content is never returned.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "default": 30,
+              "description": "Number of past days to include."
+            },
+            "environment": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "description": "Maximum sessions to return, up to 100."
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "description": "Skip this many sessions, for paging."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
