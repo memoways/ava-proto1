@@ -6,6 +6,42 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Non publié]
 
+### 2026-10-12 — Choix du film après l'intro, retrait du champ « Profondeur par niveau », conversation mains libres
+
+- Après la vidéo d'introduction, un écran pleine image (grange, famille
+  réunie) propose deux boutons : « J'ai vu le film » / « Je n'ai pas vu le
+  film ». La réponse est enregistrée en session et transmise au Game Master
+  et au personnage via le cadre d'expérience, même quand le cadre éditorial
+  est désactivé. Regarder l'intro ne signifie plus avoir vu le film.
+- L'écran de choix du personnage affiche « Ils ont besoin de ton soutien.
+  Approche-les avec douceur. A qui veux-tu parler ? » et un bouton
+  « Revoir la vidéo d'introduction » qui préserve la réponse au film.
+  L'ancien onboarding bénévole est masqué du parcours mais conservé dans le
+  code (pas encore supprimé).
+- Le champ Notion « Profondeur par niveau », inexistant dans la base
+  Caractères, est retiré de l'app et de la base (colonne supprimée,
+  synchronisation et éditeur de fiches nettoyés). L'erreur de resync
+  correspondante ne peut plus se produire.
+- Conversation vocale mains libres (désactivée par défaut, réglable dans
+  Expérience → Orchestration) : micro toujours à l'écoute sans bouton,
+  fin de parole détectée dans l'app après un silence réglable, possibilité
+  d'interrompre le personnage en parlant (barge-in) avec seuil de mots
+  réglable. Une réplique interrompue est conservée en entier en mémoire.
+- Validation : tests unitaires du cadre, du routage et des règles mains
+  libres ajoutés et verts ; échec Inworld connu sans lien. Pas d'appel vocal
+  réel vérifié ; tests E2E navigateur bloqués (Chromium absent du bac à sable).
+  Aucune publication du site en Production.
+- Plans : [onboarding bénévole](docs/plan_onboarding_benevole.md) et
+  [conversation mains libres](docs/plan_conversation_mains_libres.md).
+
+#### Restant pour compléter
+
+- Vérifier à l'oreille un appel mains libres avec Max et Emma : coupure en
+  fin de parole, interruption sans coupure intempestive, réglages de silence.
+- Relancer un resync Notion et contrôler l'absence d'erreur de champs.
+- Terminer les tests E2E du parcours film dès qu'un navigateur de test est
+  disponible.
+
 ### 2026-10-12 — Game Master réglé dans l'application, retrait du legacy
 
 - Les réglages du Game Master ne proviennent plus de Notion : contexte de
