@@ -587,3 +587,12 @@ ce document ne constitue pas une application du correctif.
 Pré-implémentation : confiance >=90%, cause reproduite par un test rouge,
 module existant réutilisé sans dépendance ; signature callback/générique
 vérifiée dans le [Handbook TypeScript](https://www.typescriptlang.org/docs/handbook/2/functions.html).
+
+Complément au correctif P0 : `DeepgramSTT.start()` se termine après création
+du WebSocket, avant son ouverture et `MediaRecorder.start()`. Le jalon façade
+`capture_ready` était donc prématuré. Le retirer de la page et l'émettre dans
+les quatre adaptateurs, immédiatement après le démarrage effectif déjà
+observé par `capture_started`. Garder strictement les appels start(),
+les connexions, les buffers et l'ensemble des décisions inchangés.
+Vérifier par un WebSocket différé que la capture n'est pas déclarée prête
+avant son ouverture et que les deux jalons suivent le démarrage du recorder.
