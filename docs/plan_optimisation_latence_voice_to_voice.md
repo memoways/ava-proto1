@@ -1,7 +1,7 @@
 # Plan — réduire la latence et préparer la conversation voice-to-voice libre
 
 Date : 12 octobre 2026. Base auditée : `0433518`, `main`, après une première lecture de `2d83558`.
-Statut : **lot 1 / P0 en cours sur branche dédiée ; validation publiée Lovable à faire, lots suivants non commencés**. Choix d'interruption confirmé par Ulrich le 12 octobre : réaction dès le début de voix, avec confirmation des mots ensuite.
+Statut : **lot 1 / P0 fusionné via PR #25 (`12d5f293`), CI post-merge réussie ; validation publiée Lovable à faire, reprise bloquée par le connecteur Lovable non installé, lots suivants non commencés**. Choix d'interruption confirmé par Ulrich le 12 octobre : réaction dès le début de voix, avec confirmation des mots ensuite.
 Sources : [audit détaillé](audit_voice_conversation_max.md) et [snapshot chiffré anonymisé](latency_voice_snapshot_2026-10-12.json).
 
 ## Résultat visé et décisions acquises
@@ -123,7 +123,7 @@ Le tableau de suivi doit présenter chaque gain réellement mesuré, intervalle 
 
 | Lot | Périmètre du plan | État |
 | --- | --- | --- |
-| 1 | P0 : mesures fiables, attribution, MCP, dépendances et baseline | [Prompt de reprise prêt](plan_lot_1_observabilite_latence.md) ; code non commencé |
+| 1 | P0 : mesures fiables, attribution, MCP, dépendances et baseline | [Code fusionné et preuves de reprise](plan_lot_1_observabilite_latence.md) ; CI réussie, validation et baseline publiées à faire |
 | 2 | P1 : mémoire de livraison, intention privée, streaming LLM/TTS et annulation | Prévu après validation du lot 1 |
 | 3 | P2 : écoute libre, interruption acoustique confirmée et UI voix seule | Prévu après validation du lot 2 |
 | 4 | P3 : GM, RAG, prompts et buffers comparés | Prévu après validation du lot 3 |

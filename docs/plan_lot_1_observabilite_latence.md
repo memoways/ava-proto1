@@ -236,3 +236,81 @@ Relecture finale sur le code `2d31836` : **Standards : 0 violation restante,
 sont corrigées et leurs cas simulés testés. La PR #25 doit obtenir les gates
 GitHub verts sur son dernier HEAD ; relever ensuite le squash réel et les checks
 post-merge. Aucune publication Lovable n'a été effectuée dans ce lot local.
+
+## Reprise de validation publiée — 12 octobre 2026, 18:46 CEST
+
+Périmètre : uniquement lot 1 / P0. Compilation et publication passent
+exclusivement par Lovable/Lovable Cloud ; aucune activation P1/P2 ni changement
+de fournisseur, voix, prompt, mémoire, RAG, délai, capture ou interruption.
+
+### Preuves vérifiées dans cette reprise
+
+- `git fetch origin main` effectué sur le remote vérifié
+  `https://github.com/memoways/ava-proto1.git`. `HEAD` et `origin/main` :
+  `12d5f29311f6371af3d63a9c49e7cfc3626da352`, arbre propre avant cette mise à jour.
+- [PR #25](https://github.com/memoways/ava-proto1/pull/25) lue via `gh`
+  authentifié avec l'identité existante : `MERGED`, fusion le 12 octobre à
+  14:27:41 UTC, squash `12d5f29311f6371af3d63a9c49e7cfc3626da352`, HEAD source
+  `cbb4c3d3a792ebe8cdcc1ecd3ecb8875662adf7a`. Aucun diff entre leurs arbres.
+- [Gate avant fusion](https://github.com/memoways/ava-proto1/actions/runs/38262317183)
+  : `SUCCESS` sur le HEAD source.
+  [CI post-merge](https://github.com/memoways/ava-proto1/actions/runs/38263082891)
+  : `success` sur le squash ; étapes `npm ci`, `test:quality`, installation
+  Playwright et `test:e2e` réussies. Tests automatiques historiques vérifiés
+  par leurs résultats CI, pas rejoués localement dans cette reprise.
+- Lecture de l'adaptateur `src/lib/mcp/defineTool.ts`, du wrapper
+  `scripts/lovableMcpPlugin.ts` et du bundle généré : SDK 3.0.5 et imports
+  `npm:zod@4.6.6` présents. Aucune régénération ni correction nécessaire sur
+  cette seule inspection ; la compilation Lovable reste à vérifier.
+- PostHog natif : cible `137897`, « AVA prototype 1 », organisation Memoways
+  `019adb98-f8a7-0000-ad7c-552998c1fc21`, UTC, vérifiée et sélectionnée.
+  La découverte `read-data-schema` retourne un snapshot
+  `2026-10-12T11:50:14.540157+00:00`, antérieur à la fusion. Les noms
+  `voice_turn_started`, `voice_turn_finished`, `voice_turn_gm` n'y figurent
+  pas ; cela ne prouve pas leur absence après publication. Aucune cohorte,
+  percentile ou coût récent calculé à partir de ce snapshot.
+
+### Accès bloquants constatés
+
+- Connecteur Lovable découvert dans le catalogue : disponible, **non installé**
+  dans cette session. Aucun outil Lovable callable. Les instructions personnelles
+  imposent l'activation du connecteur adapté avant l'accès au service ; aucun
+  navigateur utilisé pour le contourner. La cible Cloud
+  `iralfqlslqndgvexixis` est confirmée dans le dépôt, pas dans le projet Lovable
+  distant. Installer le plugin Lovable et connecter le compte ayant accès au
+  projet associé à `memoways/ava-proto1` est la prochaine action humaine.
+- MCP Ava natif, `get_voice_latencies` avec `days=1` et
+  `environment=sandbox-ulrich` : `tool execution failed`, code de connecteur
+  `INVALID_ARGUMENT`, sans détail de cause. Aucune donnée retournée ; cette
+  erreur seule ne démontre ni expiration OAuth ni panne du backend. Le schéma
+  exposé dans cette session ne propose encore que `days`/`environment`, alors
+  que le code fusionné ajoute `from`/`to` et pagination. Vérifier le MCP publié
+  puis actualiser sa découverte avant une collecte V2 complète.
+- PostHog : lectures de projet et découverte accessibles. Le chargement des
+  skills internes au projet signale le scope `llm_skill:read` manquant ; le
+  skill général de requêtes est accessible. Aucune reconnexion effectuée et
+  aucune modification de données ou réglages PostHog.
+
+### État réel et suite autorisée
+
+| Surface | État vérifié |
+| --- | --- |
+| GitHub | P0 fusionné, SHA squash et CI vérifiés |
+| Preview Lovable | Non ouverte, synchronisation et compilation non vérifiées |
+| Production | URL documentée `https://ava-proto1.lovable.app` ; version effectivement servie non vérifiée, aucune publication dans cette reprise |
+| Fonctions Cloud | `query-rag`, `proxy-llm`, `posthog-latency-stats`, `mcp` : état de déploiement non vérifié |
+| Tests réels | Aucun scénario preview ou publié exécuté dans cette reprise |
+| Baseline sandbox-ulrich | Non relevée ; effectifs, couverture, p50/p95 et coût indisponibles |
+
+Après connexion Lovable : vérifier projet/dépôt/Cloud et inclusion du squash,
+compiler et contrôler les quatre fonctions, exécuter les scénarios preview
+de la demande, puis publier si les gates passent. Rejouer ensuite les scénarios
+publiés, refus non-admin inclus, et collecter la baseline récente avec bornes
+`from`/`to` fixes, pagination et déduplication par `attempt_id`. Conserver
+révision servie, navigateur/version, sessions, configuration et attribution
+effective. Le lot 2 reste non commencé jusqu'à validation fonctionnelle publiée.
+
+Rollback inchangé : restauration de la version précédemment publiée dans
+Lovable, revert tracé du squash `12d5f29311f6371af3d63a9c49e7cfc3626da352`
+par PR, synchronisation, compilation et republication Lovable. Aucune migration
+à inverser ; conserver toutes les données historiques. Aucun gain revendiqué.
