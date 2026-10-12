@@ -464,8 +464,8 @@ nommé fonctionne. L'asset principal servi est `/assets/index-42YnFYBP.js` :
 révision applicative exacte inconnue ; ces contrôles ne prouvent pas le dernier
 build Lovable `index-DvEiVgQ4.js`. Aucune nouvelle publication effectuée.
 
-Statut : correctif de stockage préparé et testé, **application Cloud et fusion
-en attente de validation de l'écart de périmètre**. Baseline V2 récente,
+Statut à la préparation : correctif de stockage préparé et testé, application
+Cloud et fusion alors en attente de validation (accord et application ci-dessous). Baseline V2 récente,
 effectifs, p50/p95 et coût non relevés ; ne pas les remplacer par les sessions
 historiques. Lot 2 non commencé.
 
@@ -488,3 +488,46 @@ Statut du sous-lot : **validé par Ulrich, appliqué** ; parcours réel et publi
   (= squash #26 + commits Lovable de migration). Bundle MCP régénéré par SDK `@lovable.dev/mcp-js@3.0.5`, 6 imports `npm:zod@4.6.6`, 0 Zod 3, plugin non modifié ; manifeste 4 outils.
 - Fonctions : `query-rag`, `proxy-llm`, `posthog-latency-stats` déployées plus tôt (sources inchangées, sha256 identiques à la section précédente) ;
   `mcp` (sha256 `ec4f25f3…1495`) déployée seulement à la publication. Version MCP servie non déterminée ; à revérifier après publication.
+
+### Vérification indépendante après application — 12 octobre 2026
+
+- Accord humain explicite dans Codex : « oui je valide cette migration additive ».
+- PR #26 passée de brouillon à prête, puis fusionnée par squash avec verrouillage
+  du HEAD testé `e0fe99c49c3d75f9d8a5ddc0ae9c680c754e2d5d` :
+  `979c8b3e23c80c439f8c13388212fb8986e07247`, le 12 octobre à 17:28:41 UTC.
+- CI avant fusion [38283146780](https://github.com/memoways/ava-proto1/actions/runs/38283146780)
+  réussie ; CI post-merge [38284464103](https://github.com/memoways/ava-proto1/actions/runs/38284464103)
+  réussie sur le squash. Aucun bypass ni changement de gate.
+- CI [38284818057](https://github.com/memoways/ava-proto1/actions/runs/38284818057)
+  également réussie sur `716c811cdc9b2373da49610ea18c59168e4f9d35`, avec
+  les fichiers et types générés par Lovable après application.
+- Revue Standards indépendante sur `e0fe99c` : aucun constat actionnable.
+  Revue Spec indépendante : aucun blocage ; les writes finaux et GM après
+  raccrochage restent possibles, sans filtre `ended_at` ajouté.
+- Comparaison locale après récupération de `main` : le SQL Lovable
+  `drizzle/migrations/0004_p0_voice_turn_events_storage.sql` est identique au
+  SQL approuvé après normalisation du saut de ligne final. Le journal/snapshot
+  et les types Supabase ont été générés par Lovable, pas maintenus en parallèle.
+- **MCP Ava natif réussi** : `get_voice_latencies`, `days=1`,
+  `environment=sandbox-ulrich`. Fenêtre exacte retournée
+  `[2026-10-11T17:31:45.936Z, 2026-10-12T17:31:45.936Z)` :
+  V2 0 événement, 0 tentative, 0 observation GM, 0 ligne invalide,
+  offset 0 / limit 100 / nextOffset null, cap 3 000 non atteint. Toutes les
+  durées V2 absentes et leurs percentiles restent `null`. V1 distincte :
+  5 mesures audio, 0 tour legacy ; ces données ne constituent pas une baseline
+  V2 et ne sont pas mélangées aux 41 tours de septembre.
+- **Admin du domaine publié** : après « Appliquer les filtres V2 », l'erreur
+  disparaît ; « 0 tentatives », « 0 observations GM », « Aucune donnée V2 dans
+  cette fenêtre », pagination désactivée. Le rôle nommé/sandbox-ulrich reste
+  actif. Un résultat vide n'est pas une latence égale à zéro.
+- Ce retour MCP démontre que l'endpoint sert déjà le contrat V2 ; il ne prouve
+  pas sa révision exacte ni le déploiement du dernier build. Aucune nouvelle
+  publication frontend effectuée dans cette reprise.
+
+Sous-lot de stockage **fusionné, appliqué et lecture admin/MCP vérifiée**.
+Un nouveau contrôle Max a été préparé via « Tester moi-même » en sandbox-ulrich,
+chemin « film non vu », avec le réglage mains libres inchangé. L'échange réel
+au micro est demandé à Ulrich ; aucune réponse utilisateur ni tentative V2
+ne doit être inférée avant sa réalisation et sa lecture effective. Publication,
+scénarios vocaux publiés complets et baseline restent en attente de cette gate.
+Lot 2 non commencé ; aucun gain de latence revendiqué.
