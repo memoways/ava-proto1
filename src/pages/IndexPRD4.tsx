@@ -128,6 +128,7 @@ import {
 } from "@/services/characterIdentityGuard";
 import { appendExperienceEvent, applyTopicHandoffFallback, validateDirectorDecision } from "@/services/experienceDirector";
 import type { ExperienceDirectorDecisionV1, RuntimeCharacter } from "@/types";
+import { endOfSpeechDelayMs, normalizeHandsFreeSettings, shouldBargeIn, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
 import {
   buildSwitchRequestGuidance,
   characterDisplayName,
@@ -185,6 +186,16 @@ const IndexPRD4 = () => {
 
   // Refs pour pipeline conversation
   const sttRef = useRef<STTSession | null>(null);
+  // Mains libres : micro ouvert en continu, fin de parole sur silence, interruption.
+  const handsFreeSettingsRef = useRef<HandsFreeVoiceSettings>(normalizeHandsFreeSettings(getGameplaySettings().VOICE_HANDS_FREE));
+  const [handsFreeEnabled, setHandsFreeEnabled] = useState(handsFreeSettingsRef.current.enabled);
+  const [handsFreeListening, setHandsFreeListening] = useState(false);
+  const handsFreeListeningRef = useRef(false);
+  const handsFreeTimerRef = useRef<number | null>(null);
+  const handsFreeFinalizingRef = useRef(false);
+  const handsFreeBlockedRef = useRef(false);
+  const handsFreeTranscriptRef = useRef<((text: string, isFinal: boolean) => void) | null>(null);
+  const lastCharacterTextRef = useRef("");
   const responseOutputRef = useRef<ResponseOutput | null>(null);
   const outputSettingsRef = useRef<OutputSettings>(getOutputSettings());
   const avatarSettingsRef = useRef<StreamingAvatarSettings>(getStreamingAvatarSettings());
@@ -328,6 +339,10 @@ const IndexPRD4 = () => {
     activeOutputControllerRef.current?.abort("experience-cleanup");
     activeOutputControllerRef.current = null;
     pttFinalizingRef.current = false;
+    if (handsFreeTimerRef.current) window.clearTimeout(handsFreeTimerRef.current);
+    handsFreeTimerRef.current = null;
+    handsFreeListeningRef.current = false;
+    setHandsFreeListening(false);
     try { sttRef.current?.stop(); } catch { /* ignore */ }
     sttRef.current = null;
     try { responseOutputRef.current?.interrupt(); } catch { /* ignore */ }
@@ -817,6 +832,8 @@ const IndexPRD4 = () => {
     const configuredDuration = normalizeSessionDurationSeconds(gameplaySettings.TIMEOUT_SECONDS);
     configuredSessionDurationRef.current = configuredDuration;
     showQuestionnaireRef.current = gameplaySettings.SHOW_QUESTIONNAIRE;
+    handsFreeSettingsRef.current = normalizeHandsFreeSettings(gameplaySettings.VOICE_HANDS_FREE);
+    setHandsFreeEnabled(handsFreeSettingsRef.current.enabled);
     setSessionDurationSeconds(configuredDuration);
 
     // The provider was started when entering `calling_max`. Do not let the
@@ -1115,6 +1132,7 @@ const IndexPRD4 = () => {
         conversationRef.current = [...conversationRef.current, maxMsg];
         addMessage(maxMsg);
         setMaxSubtitle(result.maxResponse);
+        lastCharacterTextRef.current = result.maxResponse;
         setAudioState(
           responseOutputRef.current?.mode === "streaming_avatar"
             ? "max_thinking"
@@ -1506,6 +1524,8 @@ const IndexPRD4 = () => {
           isProcessingRef.current = false;
           setAudioState("idle");
           resumeConversationTraceSync(true);
+          // Mains libres : l'écho de la réplique entendu pendant la lecture est oublié.
+          if (handsFreeListeningRef.current && !handsFreeFinalizingRef.current) sttRef.current?.resume();
         }
       }
     },
@@ -1534,6 +1554,10 @@ const IndexPRD4 = () => {
     teardownSTT();
     const stt = await createConfiguredSTT(
       (text, isFinal) => {
+        if (handsFreeListeningRef.current) {
+          handsFreeTranscriptRef.current?.(text, isFinal);
+          return;
+        }
         setUserSubtitle(text);
         if (isFinal && text.trim()) {
           endLatencySegment(sttLatencySegmentRef.current);
@@ -1673,6 +1697,107 @@ const IndexPRD4 = () => {
       }
     }
   }, [endLatencySegment, setAudioState, teardownSTT]);
+
+  // ---- Mains libres -----------------------------------------------------------
+  useEffect(() => {
+    handsFreeBlockedRef.current = handoffCalling || Boolean(handoffOffer) || Boolean(activeVideo) || state.phase !== "conversation_max";
+  }, [activeVideo, handoffCalling, handoffOffer, state.phase]);
+
+  /** Le joueur coupe la parole : la voix s'arrête, le tour en cours est abandonné. */
+  const interruptCharacter = useCallback(() => {
+    if (processingWatchdogRef.current) {
+      window.clearTimeout(processingWatchdogRef.current);
+      processingWatchdogRef.current = null;
+    }
+    activeTurnSequenceRef.current += 1;
+    activeTurnControllerRef.current?.abort("player-barge-in");
+    activeTurnControllerRef.current = null;
+    activeOutputControllerRef.current?.abort("player-barge-in");
+    activeOutputControllerRef.current = null;
+    try { responseOutputRef.current?.interrupt(); } catch { /* ignore */ }
+    isProcessingRef.current = false;
+    resumeConversationTraceSync(true);
+    setAudioState("user_speaking");
+    trackEvent("prd4_barge_in", { session_id: sessionIdRef.current, character: activeCharacterRef.current });
+  }, [setAudioState]);
+
+  const finalizeHandsFreeUtterance = useCallback(async () => {
+    handsFreeTimerRef.current = null;
+    const stt = sttRef.current;
+    if (!stt || handsFreeFinalizingRef.current || isProcessingRef.current || handsFreeBlockedRef.current) return;
+    handsFreeFinalizingRef.current = true;
+    turnInputReadyAtRef.current = performance.now();
+    turnLatencyOriginRef.current = "transcript_final";
+    setAudioState("user_finalizing");
+    try {
+      await stt.flush(); // le callback final lance processTurn
+    } finally {
+      handsFreeFinalizingRef.current = false;
+      if (sttRef.current === stt && handsFreeListeningRef.current) stt.resume();
+      if (!isProcessingRef.current) setAudioState("idle");
+    }
+  }, [setAudioState]);
+
+  handsFreeTranscriptRef.current = (text: string, isFinal: boolean) => {
+    const settings = handsFreeSettingsRef.current;
+    if (!text.trim() || handsFreeBlockedRef.current) return;
+    if (isFinal) {
+      if (isProcessingRef.current) return;
+      endLatencySegment(sttLatencySegmentRef.current);
+      sttLatencySegmentRef.current = null;
+      setUserSubtitle(text);
+      void processTurn(text);
+      return;
+    }
+    if (isProcessingRef.current) {
+      // Le personnage réfléchit ou parle : seule une vraie prise de parole l'interrompt.
+      if (!shouldBargeIn(text, lastCharacterTextRef.current, settings)) return;
+      interruptCharacter();
+    }
+    setUserSubtitle(text);
+    setAudioState("user_speaking");
+    if (handsFreeTimerRef.current) window.clearTimeout(handsFreeTimerRef.current);
+    handsFreeTimerRef.current = window.setTimeout(() => {
+      void finalizeHandsFreeUtterance();
+    }, endOfSpeechDelayMs(text, settings));
+  };
+
+  const handleToggleHandsFree = useCallback(async () => {
+    if (endedRef.current) return;
+    if (handsFreeListeningRef.current) {
+      if (handsFreeTimerRef.current) window.clearTimeout(handsFreeTimerRef.current);
+      handsFreeTimerRef.current = null;
+      handsFreeListeningRef.current = false;
+      setHandsFreeListening(false);
+      teardownSTT();
+      if (!isProcessingRef.current) setAudioState("idle");
+      return;
+    }
+    let initialStream: Promise<MediaStream> | undefined;
+    try {
+      initialStream = navigator.mediaDevices?.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      initialStream?.catch(() => { /* handled by createSTT */ });
+      setAudioState("mic_starting");
+      setUserSubtitle("");
+      handsFreeListeningRef.current = true;
+      const stt = await createSTT(initialStream);
+      stt.setManualMode(true); // la fin de parole est décidée ici, pas par le fournisseur
+      setHandsFreeListening(true);
+      if (!isProcessingRef.current) setAudioState("idle");
+      trackEvent("prd4_hands_free_started", { session_id: sessionIdRef.current, ...handsFreeSettingsRef.current });
+    } catch (err) {
+      console.warn("[PRD4] hands-free start failed:", err);
+      void initialStream?.then((stream) => stream.getTracks().forEach((track) => track.stop())).catch(() => {});
+      handsFreeListeningRef.current = false;
+      setHandsFreeListening(false);
+      teardownSTT();
+      incrementPttError();
+      setAudioState("idle");
+      toast({ title: "Micro indisponible", description: "Réessaie dans un instant.", variant: "destructive" });
+    }
+  }, [createSTT, incrementPttError, setAudioState, teardownSTT]);
 
   const handleHangUp = useCallback(() => {
     if (endedRef.current) return;
@@ -1995,6 +2120,9 @@ const IndexPRD4 = () => {
               sessionTimeRemaining={timer.formatted}
               onPTTPress={handlePTTPress}
               onPTTRelease={handlePTTRelease}
+              handsFree={handsFreeEnabled}
+              handsFreeListening={handsFreeListening}
+              onToggleHandsFree={() => void handleToggleHandsFree()}
               onHangUp={handleHangUp}
               streamingAvatarActive={streamingAvatarActive}
               streamingAvatarState={streamingAvatarState}

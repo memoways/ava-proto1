@@ -1,3 +1,4 @@
+import { HANDS_FREE_DEFAULTS, normalizeHandsFreeSettings, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
 import defaultSettings from "@/config/settings.json";
 import {
   deleteEnvironmentSetting,
@@ -498,6 +499,8 @@ export interface GameplaySettings {
   RAG_RERANK_TRUNCATION: boolean;
   RAG_SUMMARY_EVERY_N_TURNS: number;
   VIDEO_PLACEHOLDER_DURATION: number;
+  /** Conversation mains libres : fin de parole automatique et interruption du personnage. */
+  VOICE_HANDS_FREE: HandsFreeVoiceSettings;
 }
 
 const GAMEPLAY_STORAGE_KEY = "ava_gameplay_settings";
@@ -527,6 +530,7 @@ const gameplayDefaults: GameplaySettings = {
   RAG_RERANK_TRUNCATION: defaultSettings.RAG_RERANK_TRUNCATION ?? true,
   RAG_SUMMARY_EVERY_N_TURNS: defaultSettings.RAG_SUMMARY_EVERY_N_TURNS ?? 4,
   VIDEO_PLACEHOLDER_DURATION: defaultSettings.VIDEO_PLACEHOLDER_DURATION,
+  VOICE_HANDS_FREE: { ...HANDS_FREE_DEFAULTS },
 };
 
 export function getGameplaySettings(): GameplaySettings {
@@ -538,6 +542,7 @@ export function getGameplaySettings(): GameplaySettings {
         ...gameplayDefaults,
         ...parsed,
         MAX_PROMPT_VARIANT: normalizeMaxPromptVariant(parsed.MAX_PROMPT_VARIANT, gameplayDefaults.MAX_PROMPT_VARIANT),
+        VOICE_HANDS_FREE: normalizeHandsFreeSettings(parsed.VOICE_HANDS_FREE),
       };
     }
   } catch { /* ignore */ }
@@ -549,6 +554,7 @@ export async function loadGameplaySettingsFromDB(): Promise<GameplaySettings> {
   return {
     ...loaded,
     MAX_PROMPT_VARIANT: normalizeMaxPromptVariant(loaded.MAX_PROMPT_VARIANT, "legacy"),
+    VOICE_HANDS_FREE: normalizeHandsFreeSettings(loaded.VOICE_HANDS_FREE),
   };
 }
 

@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import { Clock3, RefreshCw, Save, UsersRound } from "lucide-react";
+import { AudioLines, Clock3, RefreshCw, Save, UsersRound } from "lucide-react";
+import {
+  BARGE_IN_MIN_WORDS_MAX,
+  BARGE_IN_MIN_WORDS_MIN,
+  END_OF_SPEECH_MAX_MS,
+  END_OF_SPEECH_MIN_MS,
+  HESITATION_EXTRA_MAX_MS,
+  type HandsFreeVoiceSettings,
+} from "@/services/handsFreeVoice";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -69,6 +77,7 @@ export default function GameMasterConfigTab() {
       const updated = saveGameplaySettings({
         TIMEOUT_SECONDS: gameplay.TIMEOUT_SECONDS,
         SHOW_QUESTIONNAIRE: gameplay.SHOW_QUESTIONNAIRE,
+        VOICE_HANDS_FREE: gameplay.VOICE_HANDS_FREE,
       });
       await saveGameplaySettingsToDB(updated);
       setGameplay(updated);
@@ -95,7 +104,11 @@ export default function GameMasterConfigTab() {
   };
 
   const globalChanged = gameplay.TIMEOUT_SECONDS !== savedGameplay.TIMEOUT_SECONDS
-    || gameplay.SHOW_QUESTIONNAIRE !== savedGameplay.SHOW_QUESTIONNAIRE;
+    || gameplay.SHOW_QUESTIONNAIRE !== savedGameplay.SHOW_QUESTIONNAIRE
+    || JSON.stringify(gameplay.VOICE_HANDS_FREE) !== JSON.stringify(savedGameplay.VOICE_HANDS_FREE);
+  const voice = gameplay.VOICE_HANDS_FREE;
+  const setVoice = (patch: Partial<HandsFreeVoiceSettings>) =>
+    setGameplay((current) => ({ ...current, VOICE_HANDS_FREE: { ...current.VOICE_HANDS_FREE, ...patch } }));
   const activationChanged = profiles.some((profile) => savedActivation[profile.id] !== profile.enabled);
 
   if (loading) return <p className="text-sm text-muted-foreground">Chargement de l’orchestration…</p>;
@@ -157,6 +170,71 @@ export default function GameMasterConfigTab() {
             onCheckedChange={(checked) => setGameplay((current) => ({ ...current, SHOW_QUESTIONNAIRE: checked }))}
             aria-label="Afficher le questionnaire final"
           />
+        </div>
+      </section>
+
+      <section className="space-y-4 rounded-lg border p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <AudioLines className="mt-0.5 h-5 w-5 text-primary" />
+            <div>
+              <h3 className="font-semibold">Conversation vocale mains libres</h3>
+              <p className="text-xs text-muted-foreground">
+                Le joueur active le micro une seule fois, puis parle librement : le personnage répond après un court silence et peut être interrompu. Désactivé, l’appel reste en « appuyer pour parler ».
+              </p>
+            </div>
+          </div>
+          <Button size="sm" onClick={() => void saveGlobalSettings()} disabled={saving || !globalChanged}>
+            <Save className="mr-1 h-3.5 w-3.5" />Enregistrer
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 rounded-md bg-muted/40 p-3">
+          <div>
+            <p className="text-sm font-medium">Micro toujours à l’écoute</p>
+            <p className="text-xs text-muted-foreground">Plus besoin d’appuyer pour parler ni pour finir sa phrase.</p>
+          </div>
+          <Switch checked={voice.enabled} onCheckedChange={(checked) => setVoice({ enabled: checked })} aria-label="Conversation mains libres" />
+        </div>
+
+        <div className={voice.enabled ? "space-y-4" : "pointer-events-none space-y-4 opacity-50"}>
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Silence avant la réponse</span>
+              <span className="font-mono">{voice.endOfSpeechMs} ms</span>
+            </div>
+            <Slider value={[voice.endOfSpeechMs]} min={END_OF_SPEECH_MIN_MS} max={END_OF_SPEECH_MAX_MS} step={50}
+              onValueChange={([value]) => setVoice({ endOfSpeechMs: value })} aria-label="Silence avant la réponse" />
+            <p className="text-xs text-muted-foreground">Compté après le dernier mot reconnu. Conseillé : 700–1000 ms. Sous 500 ms, le personnage coupe souvent les gens qui respirent entre deux phrases.</p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Attente en plus si le joueur hésite</span>
+              <span className="font-mono">+{voice.hesitationExtraMs} ms</span>
+            </div>
+            <Slider value={[voice.hesitationExtraMs]} min={0} max={HESITATION_EXTRA_MAX_MS} step={50}
+              onValueChange={([value]) => setVoice({ hesitationExtraMs: value })} aria-label="Attente en plus si hésitation" />
+            <p className="text-xs text-muted-foreground">Ajoutée quand la phrase semble inachevée (« euh », « et », « parce que », virgule…). Évite que le personnage réponde pendant une hésitation.</p>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-md bg-muted/40 p-3">
+            <div>
+              <p className="text-sm font-medium">Le joueur peut couper la parole</p>
+              <p className="text-xs text-muted-foreground">Quand le joueur parle pendant que le personnage répond, la voix s’arrête et le joueur reprend la main.</p>
+            </div>
+            <Switch checked={voice.bargeInEnabled} onCheckedChange={(checked) => setVoice({ bargeInEnabled: checked })} aria-label="Interruption du personnage" />
+          </div>
+
+          <div className={voice.bargeInEnabled ? "space-y-2" : "pointer-events-none space-y-2 opacity-50"}>
+            <div className="flex justify-between text-sm">
+              <span>Mots nécessaires pour interrompre</span>
+              <span className="font-mono">{voice.bargeInMinWords}</span>
+            </div>
+            <Slider value={[voice.bargeInMinWords]} min={BARGE_IN_MIN_WORDS_MIN} max={BARGE_IN_MIN_WORDS_MAX} step={1}
+              onValueChange={([value]) => setVoice({ bargeInMinWords: value })} aria-label="Mots nécessaires pour interrompre" />
+            <p className="text-xs text-muted-foreground">Conseillé : 2. À 1, une toux ou un « oui » suffit à couper. Avec haut-parleurs sans casque, monter à 3 si le personnage se coupe tout seul.</p>
+          </div>
         </div>
       </section>
 
