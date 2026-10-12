@@ -21,11 +21,14 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@daily-co/daily-js@0.91",
         "npm:@electric-sql/pglite@~0.5.4",
         "npm:@eslint/js@^9.32.0",
         "npm:@grainql/analytics-web@^3.4.0",
-        "npm:@gumlet/player.js@^3.0.8",
+        "npm:@hcaptcha/react-hcaptcha@^2.0.2",
+        "npm:@heygen/liveavatar-web-sdk@^0.0.19",
         "npm:@hookform/resolvers@^3.10.0",
+        "npm:@lovable.dev/mcp-js@3.0.5",
         "npm:@playwright/test@^1.61.1",
         "npm:@radix-ui/react-accordion@^1.2.11",
         "npm:@radix-ui/react-alert-dialog@^1.1.14",
@@ -68,10 +71,13 @@
         "npm:clsx@^2.1.1",
         "npm:cmdk@^1.1.1",
         "npm:date-fns@^3.6.0",
+        "npm:drizzle-kit@~0.31.11",
+        "npm:drizzle-orm@~0.45.3",
         "npm:embla-carousel-react@^8.6.0",
         "npm:eslint-plugin-react-hooks@^5.2.0",
         "npm:eslint-plugin-react-refresh@~0.4.20",
         "npm:eslint@^9.32.0",
+        "npm:fake-indexeddb@^6.2.5",
         "npm:globals@^15.15.0",
         "npm:hls.js@^1.6.16",
         "npm:input-otp@^1.4.2",
@@ -80,7 +86,8 @@
         "npm:lucide-react@0.462",
         "npm:next-themes@0.3",
         "npm:postcss@^8.5.6",
-        "npm:posthog-js@^1.359.1",
+        "npm:postgres@^3.4.9",
+        "npm:posthog-js@^1.399.4",
         "npm:react-day-picker@^8.10.1",
         "npm:react-dom@^18.3.1",
         "npm:react-hook-form@^7.61.1",
@@ -97,6 +104,7 @@
         "npm:vaul@~0.9.9",
         "npm:vite@^5.4.19",
         "npm:vitest@^3.2.4",
+        "npm:zod@4.6.6",
         "npm:zod@^3.25.76"
       ]
     }
