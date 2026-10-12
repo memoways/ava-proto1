@@ -899,3 +899,76 @@ ne sont pas des captures vides et sont exclus de la baseline vocale.
 Test Emma avec parole pendant réponse audio demandé à Ulrich ; résultat
 et handoff à observer, sans changer de réglage. Publication frontend,
 tests publiés et baseline finale restent ouverts. Lot2 non commencé.
+
+### Interruption Emma confirmée et refus de transfert — 12 octobre 2026
+
+Ulrich confirme « test Emma preview terminé oui emma s'est arrêtée ».
+Session2032310e-17ec-4124-9e30-c06d83d2272c, film pas_vu, bundle statique
+CG1cec7E. Snapshot Ava `[2026-10-11T19:59:44.868Z,2026-10-12T19:59:44.868Z)`,
+page0/100, nextOffsetnull, capnonatteint, invalid0 :17 événements,6 tentatives
+distinctes,5 GM. Origine app_turn_decision :5 tentatives,3 sorties mesurées ;
+origine capture_start :1 tentative cancelled, sortie null. Toute couverture
+partial ; les captures réutilisées n'inventent pas un nouveau capture_ready.
+
+| Tentative | Tour | État | Sortie estimée / annulation (ms depuis décision) |
+| --- | --- | --- | --- |
+| 9e8c795e-f7eb-4098-b977-ed3ea24da077 | 1 | interrupted avant audio | null /3213 |
+| c768c5d8-59cb-49dd-9491-4cb67c04a0f6 | 2 | interrupted après audio | 5077 /12487 |
+| 0975baff-7b02-4c42-b0c7-81f03742e9c1 | 3 | interrupted avant audio | null /1746 |
+| c6723e41-95fa-49b4-843d-86537c80a5e5 | 4 | cancelled, capture_start | null /585 |
+| cb4eb685-9d30-4967-a801-40a7941cb196 | 4 | interrupted après audio | 5564 /13384 |
+| 566ccadc-4745-4046-b0bf-9e2207345066 | 5 | completed | 3906 /null |
+
+Les deux lectures commencées puis annulées concordent avec le témoignage
+humain. Les écarts7410/7820ms sont du temps écoulé entre sortie estimée et
+annulation, pas une latence acoustique de détection. interruption_confirmed
+et voice_end restent null, aucun timestamp physique inventé. Dernière sortie
+audio_end12117ms, playback9039ms, génération4847ms. Descriptifs des3 sorties
+mesurées parmi5 tentatives app_turn_decision : p50=5077ms, p95=5515ms,
+interpolation linéaire ; aucun gain, aucun mélange avec les autres sessions.
+Capture_ready=capture_started quand observés. Deepgram/nova-3 websocket,
+OpenAI/openai/gpt-5.6-luna batch, Gradium/gradium-tts websocket override,
+sans fallback/retry. GM Google/gemini-2.5-flash :3 executed/persistés,2 aborts
+avant génération persistés ; aucune erreur fournisseur affirmée à partir
+d'un abort. Prompt Emma/config identiques au contrôle précédent. Tous ces
+tours sont hands_free, malgré metadata session push_to_talk générique.
+
+Session expirée20:02:40.827Z selon sa durée configurée. Ulrich recommence
+lui-même dans le même onglet : session61f87a2f-4858-4ef5-896b-0a4de166a8b7,
+début20:02:51.154Z, film vu (cohorte distincte), confirme ensuite « demande
+de transfert terminée ». GM tour2 action handoff mais stance object, cible
+Max : offre neutralisée conformément au garde-fou existant. UI reste Emma,
+aucun bouton de transfert, handoffCount0. C'est un refus enregistré, pas un
+handoff exécuté ni une preuve de branche acceptée.
+
+Snapshot fermé Ava `[2026-10-11T20:07:53.201Z,2026-10-12T20:07:53.201Z)`,
+page0/100 nextOffsetnull capnonatteint invalid0 :36 événements,12 tentatives,
+12 GM,7 completed et5 interrupted avant audio.7 sorties mesurées
+4050/4161/4276/4380/4475/4661/4679ms : p50=4380, p95=4674, origine
+app_turn_decision, software_estimate. GM des5 interruptions : abort confirmé
+par SELECT booléen sans extraire notes privées, persistence ok. Sept réponses
+audio complètes, fournisseurs inchangés, pas de fallback/retry sur les sorties.
+Pas d'agrégation avec sessionfilmnonvu ni avec septembre. Micro fermé par UI
+puis appel terminé après confirmation humaine ; endedAt20:07:31.794Z,
+reason user_hangup. Une réponse supplémentaire hors rôle narratif sur un
+sujet technique a été observée dans l'UI ; pas de transcription copiée dans
+ce plan, origine/non-régression P0 non établies, prompts métier inchangés.
+
+PostHog137897 organisationMemoways et clé SDK concordants ; timezoneUTC.
+Session2032310e :0 V2 entre19:45–20:05 ; fenêtre élargie sans filtre de
+session :1 pageview preview,0 V2. system.ingestion_warnings entre17:30–20:10 :
+aucune ligne. Logs capturés warn/error analytics/capture/blocked : aucune
+ligne. Ces absences ne prouvent pas que le SDK a émis les événements ni que
+Brave les a transmis. Diagnostic natif ingestion chargé ; health-issues sans
+scope health_issue:read, pas de reconnexion générale imposée puisque la
+lecture SQL native prévue par le skill fonctionne. Aucun réglage modifié.
+Liste des domaines bloqués par Shields demandée à Ulrich en lecture seule :
+capacité non exposée par les outils navigateur disponibles.
+
+Coût Ava snapshot days1 global non filtré, au moment de la première lecture
+Emma :30 appels (20completed,2success,8error),76288tokens,0.0344USD. Valeur
+globale de la journée qui inclut d'autres sessions/aborts ; pas un coût
+isolé de ces tests ni un total STT/TTS/RAG, ni la photographie finale après
+les tours supplémentaires. Publication frontend toujours non effectuée ;
+PTT réel, capture no_audio, handoff accepté, cinématique narrative déclenchée,
+tests publiés et baseline finale restent non attestés. Pas de passage au lot2.
