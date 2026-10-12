@@ -21,4 +21,6 @@ Parler au personnage sans bouton : on ouvre le micro une fois, on parle ; après
 
 ## Complément de latence et de continuité — 12 octobre 2026
 
-La base réalisée ci-dessus reste le point de départ. Le [plan d'optimisation voice-to-voice](plan_optimisation_latence_voice_to_voice.md) complète la mesure, la sortie LLM/TTS incrémentale et la mémoire des répliques interrompues ; il ne recrée pas la saisie mains libres. L'[audit chiffré](audit_voice_conversation_max.md) distingue les mesures PTT de septembre du fonctionnement mains libres récent. La décision de tour reste centralisée dans `handsFreeVoice.ts` sous le contrat actuel.
+La base réalisée ci-dessus reste le point de départ. Le [plan d'optimisation voice-to-voice](plan_optimisation_latence_voice_to_voice.md) complète la mesure, la sortie LLM/TTS incrémentale et la mémoire des répliques interrompues ; il ne recrée pas la saisie mains libres. L'[audit chiffré](audit_voice_conversation_max.md) distingue les mesures PTT de septembre du fonctionnement mains libres récent.
+
+Ulrich a choisi le 12 octobre une réaction dès début de voix, avec confirmation ensuite. Cette évolution **reste à implémenter** selon la section 3 du plan d'optimisation : décision dans `handsFreeVoice.ts`, candidat réversible, puis interruption confirmée. Les réglages et le comportement réalisés ci-dessus demeurent la base de compatibilité.
