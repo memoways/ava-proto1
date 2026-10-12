@@ -88,7 +88,7 @@ Latence : aucun appel IA ajouté en série, la médiane ≤ 2 s et le p95 ≤ 4 
 
 ## 7. Questions restantes
 
-- Le personnage « Game Master » dans la base Notion est-il encore une source voulue pour le prompt du GM ?
+- Décision d’Ulrich (12/10/2026) : tous les réglages GM sont pilotés dans l’application ; la fiche Notion Game Master ne doit plus servir de source. Son retrait du circuit de synchronisation reste à vérifier lors du nettoyage, sans supprimer la fiche.
 - Le faux statut : recadrage par le personnage seul, ou aussi une consigne du GM au tour suivant ?
 
 ## Livraison
@@ -111,7 +111,11 @@ Restant :
 - Le type `RuntimeCharacter` reste limité à `max | emma`. Les alias de détection (« papa », « père ») et `summarize-session` gardent un mapping binaire. Il faudra les élargir avant d'activer Ava ou Léo.
 - Étape 7 (nettoyage de `conversationOrchestrator`, `gameMasterAgent`, `role_capture`, `role_summary`) : en attente de ta validation de la liste.
 
-## Passages Notion contraires au cadre (à corriger par l'éditorial, non modifiés)
+## Passages Notion contraires au cadre (correction autorisée et réalisée le 12/10/2026)
+
+À la demande explicite d’Ulrich, correction directe des propriétés « Qui t'appelle » et « Dynamique de la conversation » des fiches actives Max Lorenzo et Emma Munz. Les sources médias/bouche-à-oreille, l’inconnu et la confiance personnelle acquise sont remplacés par un renvoi au cadre commun et à sa posture. La présentation reste facultative, sans relation ou biographie inventée. Le récit, la timeline, les archives et les autres champs restent inchangés. Aucune resynchronisation déclenchée : Ulrich la fera lui-même.
+
+Extraits remplacés :
 
 | Fiche | Extrait |
 |---|---|
