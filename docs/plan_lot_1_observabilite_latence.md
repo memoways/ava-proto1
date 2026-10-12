@@ -230,3 +230,9 @@ La barrière d'appartenance protège le **callback onError entier**, y compris
 le teardown et ses effets UI. Le test vérifie que le teardown fourni n'est jamais
 appelé pour l'ancienne session, et que le teardown du STT actif ne reclassifie pas
 son input failed en cancelled.
+
+Relecture finale sur le code `2d31836` : **Standards : 0 violation restante,
+0 smell actionnable ; Spec : aucun blocage restant**. Les remarques précédentes
+sont corrigées et leurs cas simulés testés. La PR #25 doit obtenir les gates
+GitHub verts sur son dernier HEAD ; relever ensuite le squash réel et les checks
+post-merge. Aucune publication Lovable n'a été effectuée dans ce lot local.
