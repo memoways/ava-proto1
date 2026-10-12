@@ -994,3 +994,32 @@ domaine publié, au profil global, aux flags, prompts ou fournisseurs.
 Sans cet accord, garder Shields et signaler la couverture PostHog manquante,
 sans corriger l'application par un contournement de la protection navigateur.
 Frontend publié inchangé ; publication et gates non attestés restent ouverts.
+
+### Exception Shields autorisée — contrôle en cours
+
+Ulrich répond « Autoriser ce test temporaire ». Panneau natif Brave vérifié
+sur le seul domaine preview : Boucliers activés, interrupteuron, puis
+basculement autorisé et relecture Boucliers désactivés/interrupteuroff.
+Réglages globaux et domaine publié non touchés. Le basculement recharge la
+page ; bundle statique toujours index-CG1cec7E.js. Nouvelle session Max
+`495c3568-ad9e-4609-90da-4b9d597c1c4b`, début20:27:14.376Z, film pas_vu,
+micro non activé par l'agent. Échange humain court demandé.
+
+PostHog137897, fenêtre20:25–20:30UTC : retour des événements applicatifs
+prd4_phase_changed(6), prd4_persistence_result(3), session_started(1),
+onboarding_started(1), film_answered(1), audio_latency(1), tts_performance(1),
+session_duration_loaded(1), first_max_response(1), avec pageview/pageleave
+et web_vitals. Cela confirme un effet du blocage Shields sur la collecte
+applicative ; le tour vocal V2 n'a pas encore commencé. Ava à20:32:43.351Z :
+aucun événement pour cette nouvelle session, micro fermé confirmé dans l'UI.
+Pas de tour fictif ni de rapprochement V2 affirmé à partir du seul onboarding.
+
+Version installée lue dans Info.plist de Brave :
+CFBundleShortVersionString155.1.97.56, CFBundleVersion197.56. Ce relevé du
+bundle installé est distinct de la version SDK navigateur, toujours null
+dans PostHog ; ne pas inventer une version déclarée par l'événement.
+
+État temporaire à ne pas oublier : Shields OFF pour la preview pendant
+l'attente du test autorisé. Réactiver dès fin du tour, vérifier ON dans le
+panneau du même domaine, avant clôture de ce contrôle. Aucun accord de
+laisser cette exception durablement ni de modifier la production.
