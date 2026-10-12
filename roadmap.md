@@ -2,7 +2,6 @@
 
 ## En cours
 
-- Parcours après introduction : photo et choix film transmis au GM, onboarding masqué sans suppression, sélection des personnages et relecture vidéo ; implémentation et validation en cours.
 
 - Resynchronisation des fiches Notion Max/Emma corrigées : attend l’action d’Ulrich. La fiche Game Master et ses extraits ont déjà été retirés de la base de l'app.
 - Validation GM en sandbox : publier une version avec cadre commun activé et vérifier conversations Max/Emma, parcours vu/non vu, garde-fous, passages et reprise ; attend configuration et écoute humaine.

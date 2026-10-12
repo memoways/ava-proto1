@@ -15,6 +15,8 @@ Plan approuvé le 2026-09-16, archivé aussi dans
 
 Le plan historique ci-dessous est conservé, mais son écran et son profil système ne sont plus utilisés par le nouveau parcours.
 
+Validation du lot : 39 tests ciblés réussis, dont transmission identique des deux réponses au personnage et au GM. Photo servie avec succès par l’aperçu Lovable (le serveur local ne sert pas les URL CDN : contrôle navigateur avec les mêmes octets servis par Lovable). Sélection et relecture vérifiées dans Chromium. La suite Playwright JS est bloquée par l’absence de sa version de Chromium ; le contrôle navigateur Python a forcé l’événement de disponibilité vidéo pour vérifier la suite du parcours. Lecture sonore réelle et accompagnement narratif à écouter en sandbox ; aucune publication Production.
+
 Insérer une étape courte entre l'introduction (teaser / question film) et le
 choix du personnage, expliquant que la personne incarne un·e bénévole d'un
 dispositif de soutien, sans aucune collecte de données personnelles, et rendre
