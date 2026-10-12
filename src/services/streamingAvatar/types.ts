@@ -45,6 +45,9 @@ export interface ResponseOutputTurnContext {
   sessionId?: string;
   turnId?: string;
   turnIndex?: number;
+  attemptId?: string;
+  onVoiceObservation?: import("../voiceTurnTelemetryV2").VoiceObserver;
+  onServiceObserved?: (value: import("../voiceTurnTelemetryV2").ServiceObservation) => void;
   signal?: AbortSignal;
   onPlaybackStart?: () => void;
   /** Per-character TTS voice override; used by the Max→Emma V1 handoff. */
@@ -67,6 +70,8 @@ export interface ResponseOutputResult {
   playedSegments: number;
   failedSegments: number;
   started: boolean;
+  services?: import("../voiceTurnTelemetryV2").ServiceObservation[];
+  generationWallMs?: number;
   error?: Error;
 }
 

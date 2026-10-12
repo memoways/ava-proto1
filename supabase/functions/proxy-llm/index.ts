@@ -1,3 +1,4 @@
+import { createMonotonicSpans } from "../_shared/monotonicSpans.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 import { requireAdmin } from "../_shared/adminAuth.ts";
@@ -57,11 +58,12 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
 }
 
 serve(async (req) => {
-  const proxyStartedAt = Date.now();
+  const proxyStartedAt = performance.now();
+  const spans = createMonotonicSpans();
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-  const denied = await enforceGameRequest(req, "proxy-llm", corsHeaders);
+  const denied = await spans.run("control_quota", () => enforceGameRequest(req, "proxy-llm", corsHeaders));
   if (denied) return denied;
 
   try {
@@ -162,8 +164,8 @@ serve(async (req) => {
       );
     }
 
-    const upstreamStartedAt = Date.now();
-    const response = await fetchWithTimeout(OPENROUTER_URL, {
+    const upstreamStartedAt = performance.now();
+    const response = await spans.run("upstream_headers", () => fetchWithTimeout(OPENROUTER_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
@@ -172,7 +174,7 @@ serve(async (req) => {
         'X-Title': 'AVA Prototype 1',
       },
       body: JSON.stringify(upstreamBody),
-    }, timeoutMs).catch((error) => {
+    }, timeoutMs)).catch((error) => {
       if (error instanceof DOMException && error.name === "AbortError") {
         return new Response(
 
@@ -182,7 +184,7 @@ serve(async (req) => {
       }
       throw error;
     });
-    const upstreamLatencyMs = Date.now() - upstreamStartedAt;
+    const upstreamLatencyMs = Math.round(performance.now() - upstreamStartedAt);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -204,10 +206,10 @@ serve(async (req) => {
         generationId: null,
         usage: null,
         upstreamLatencyMs,
-        proxyLatencyMs: Date.now() - proxyStartedAt,
+        proxyLatencyMs: Math.round(performance.now() - proxyStartedAt),
       } : undefined;
       return new Response(
-        JSON.stringify({ error: `OpenRouter error: ${response.status}`, details: errorText, _ava_trace: diagnostic }),
+        JSON.stringify({ error: `OpenRouter error: ${response.status}`, details: errorText, _ava_trace: diagnostic, _ava_observability: spans.snapshot() }),
         {
           status: response.status,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -223,7 +225,8 @@ serve(async (req) => {
     }
 
     // For non-streaming, return JSON
-    const data = await response.json();
+    const data = await spans.run("upstream_body", () => response.json());
+    data._ava_observability = spans.snapshot();
     if (body.diagnostic_trace === true) {
       data._ava_trace = {
         clientPayload: {
@@ -242,7 +245,7 @@ serve(async (req) => {
         generationId: typeof data.id === "string" ? data.id : null,
         usage: data.usage || null,
         upstreamLatencyMs,
-        proxyLatencyMs: Date.now() - proxyStartedAt,
+        proxyLatencyMs: Math.round(performance.now() - proxyStartedAt),
       };
     }
     return new Response(JSON.stringify(data), {

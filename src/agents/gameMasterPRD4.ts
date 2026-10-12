@@ -1,3 +1,5 @@
+import { createMonotonicSpans } from "../../supabase/functions/_shared/monotonicSpans";
+import type { ServiceObservation, ServerObservation } from "@/services/voiceTurnTelemetryV2";
 /**
  * PRD4 — Évaluateur post-tour du Game Master.
  *
@@ -24,6 +26,7 @@ import {
 export const GM_CODE_VERSION = "gm-2026-10-12-frame";
 
 export interface PRD4PostTurnInput {
+  onGmObserved?: (service: ServiceObservation, spans: ServerObservation) => void;
   sessionId: string | null;
   conversationHistory: ConversationMessage[];
   userMessage: string;
@@ -429,6 +432,8 @@ export async function evaluatePostTurnPRD4(
   input: PRD4PostTurnInput,
 ): Promise<PRD4PostTurnDetailedResult> {
   const startedAt = performance.now();
+  const spans = createMonotonicSpans(crypto.randomUUID(), "client_monotonic");
+  let service: ServiceObservation = { service: "gm", requested_provider: "openrouter", requested_model: null, resolved_provider: "openrouter", resolved_model: null, effective_provider: null, effective_model: null, transport: "http_batch" };
   let result: PRD4PostTurnEvaluation;
   let model = "";
   const videos = await getVideoTriggersCached();
@@ -449,7 +454,7 @@ export async function evaluatePostTurnPRD4(
   try {
     const llm = getLLMSettings();
     model = llm.LLM_MODEL_GM;
-    const callRes = await callLLMWithUsage(
+    const callRes = await spans.run("gm_generation", () => callLLMWithUsage(
       messages,
       {
         model: llm.LLM_MODEL_GM,
@@ -463,11 +468,12 @@ export async function evaluatePostTurnPRD4(
         session_id: input.sessionId ?? undefined,
         signal: input.signal,
         diagnostic_trace: input.diagnosticTrace === true,
+        onServiceObserved: (observed) => { service = observed; },
       },
-    );
+    ));
     llmTrace = callRes.diagnosticTrace;
     rawResponse = callRes.content;
-    const parsed = extractJson(callRes.content) as Partial<PRD4PostTurnEvaluation> | null;
+    const parsed = spans.runSync("gm_validation_json", () => extractJson(callRes.content)) as Partial<PRD4PostTurnEvaluation> | null;
     if (!parsed) {
       console.warn("[GM-PRD4] no JSON in response:", callRes.content.slice(0, 200));
       result = { ...DEFAULT_RESULT, notes: "Réponse LLM non parsable (fallback)." };
@@ -534,13 +540,13 @@ export async function evaluatePostTurnPRD4(
       input.currentCharacter,
       input.relationshipPolicy.version,
     );
-    const transition = validateRelationshipTransition({
+    const transition = spans.runSync("gm_validation_relationship", () => validateRelationshipTransition({
       previous,
       proposal: result.memory_delta.relationship,
       policy: input.relationshipPolicy,
       characterKey: input.currentCharacter,
       turnIndex: input.turnIndex,
-    });
+    }));
     if (!transition.accepted) executionStatus = "invalid";
     result = {
       ...result,
@@ -569,19 +575,21 @@ export async function evaluatePostTurnPRD4(
 
   if (input.sessionId && input.persist !== false) {
     try {
-      const memoryAfter = await persistPostTurnMemory(
+      const memoryAfter = await spans.run("gm_persistence", () => persistPostTurnMemory(
         input.sessionId,
         enriched,
         enriched.memory_delta ?? null,
         input.turnIndex,
         input.currentCharacter,
-      );
+      ));
       enriched = { ...enriched, memory_after: memoryAfter };
     } catch (err) {
       console.warn("[GM-PRD4] persist failed:", err);
     }
   }
 
+  spans.runSync("gm_available", () => enriched);
+  try { input.onGmObserved?.(service, spans.snapshot()); } catch { /* Observability never changes memory or actions. */ }
   return input.diagnosticTrace ? {
     ...enriched,
     diagnostic: {

@@ -94,3 +94,145 @@ Le prompt Lovable doit demander, dans cet ordre :
 6. **Rollback** : en cas de régression, restaurer le comportement précédemment publié via Lovable et un revert tracé sur `main` ; conserver les données historiques et les migrations additives. Ne pas passer au lot 2 avant validation du lot 1.
 
 Le prompt final nomme la **PR réelle**, le **SHA squash réel**, les **fichiers/fonctions/migrations réellement changés** et les **tests réellement passés**. Aucun numéro de PR ou SHA fictif, aucune promesse de publication déjà effectuée. Si l'assistant ne peut pas piloter Lovable par un outil autorisé, remettre ce prompt à Ulrich comme unique action : le coller dans le projet Lovable Ava Proto 1 ; le retour attendu est une publication identifiée accompagnée des résultats de test.
+
+## Exécution en cours — 12 octobre 2026
+
+Base actualisée : `95634e11e2f8b62ecb86a19b56d36e33db4b6848`. Branche :
+`codex/latency-lot-1-observability`. Le diagnostic `npm ci --dry-run
+--ignore-scripts` reproduit EUSAGE (SDK MCP absent, HeyGen et Drizzle divergents).
+Accès GitHub au dépôt confirmé avec l'identité existante. MCP Ava natif : sur
+1 jour dans sandbox-ulrich, 4 mesures audio et zéro tour legacy ; ce n'est pas
+une baseline V2.
+
+Implémentation additive dans les points d'entrée existants : événements V2
+started/finished/GM bornés, attribution du résultat TTS et chunking au provider
+résolu, chronologie client monotone et spans Edge isolés. Les jalons physiques
+non observables restent null. MCP/admin lisent la projection technique sans
+dialogue et séparent V1/V2. Dépendances alignées et Zod 4 réservé au MCP.
+Aucun réglage de capture, d'interruption, de délai, de prompt ou de mémoire ne
+change. Aucun déploiement externe ; vérification publiée à reprendre dans Lovable.
+
+Les preuves de tests, de revue et de livraison seront consignées ici avant PR.
+
+### Contrat réellement implémenté (P0)
+
+- `voice_turn_started`, `voice_turn_finished` et `voice_turn_gm` dans
+  `voice_turn_events.metadata_json`, et dans PostHog : `schema_version=2`,
+  `attempt_id` UUID distinct par tentative, `turn_id` causal stable,
+  environnement/personnage/mode/origine, version de code technique, versions de
+  fiche et orchestration disponibles. V1 `voice_turn_completed`, tables et champs
+  historiques conservés. Une annulation ne peut pas être refinalisée par un
+  callback audio tardif. GM reste une observation distincte, hors dénominateur des
+  tours, sans changement de mémoire ni de lancement.
+- Offsets client par `performance.now()` relatifs à release PTT, décision
+  applicative ou transcript final ; offsets capture antérieurs éventuellement
+  négatifs. Spans Edge RAG : contrôle/quota, profil, embedding, recherche, rerank.
+  Proxy LLM : contrôle/quota, headers upstream, body. GM côté client : génération,
+  validation JSON/relation, persistance et disponibilité. Chaque processus a son
+  `request_id` et son horloge ; aucune soustraction entre horloges indépendantes.
+- Fin physique de voix, premier token batch, intention, phrase sûre et candidat
+  acoustique restent null. Le premier chunk PCM, le scheduling et la sortie
+  estimée sont distincts. Un Blob reçu n'est pas assimilé à son premier chunk.
+  `t_turn_voice_ready_ms` V2 reste null sans vraie fin de voix. Les origines sont
+  ventilées ; la couverture inclut les futurs jalons réservés et reste donc
+  partielle en P0. Le dépassement de budget LLM ne prouve aucun segment critique.
+- Résultat TTS exécuté pour provider/modèle/transport, override de personnage et
+  fallback REST ; provider résolu utilisé pour le chunking, sans changer ses
+  seuils, la concurrence (2) ou la prosodie. Modèles absents non inventés.
+- Collecte V2 : 3 événements maximum par tentative (début, fin, disponibilité GM),
+  tableaux bornés, 8 inserts simultanés maximum et abort à 5 s. Les erreurs et
+  rejets sont absorbés ; aucun write attendu sur le chemin vocal. Saturation ou
+  panne peut laisser une tentative `started` ou absente : ce n'est pas un succès
+  inféré. Projection technique allowlistée avant collecte et avant lecture MCP.
+- `get_voice_latencies` ajoute `summary.v2`, fenêtre effective, méthode de
+  percentile, filtres d'environnement/personnage/versions/turn/attempt et
+  provider/modèle/transport effectifs d'un **même service** (TTS par défaut).
+  Données absentes exclues des filtres. 100 événements/page par défaut, maximum
+  300, cap 3 000, ordre stable date/id et pagination. Statistiques **de la page**,
+  pas d'une cohorte entière ; collecter les pages/dédupliquer les attempts avant
+  une baseline. Les branches audio/turn legacy conservent l'interpolation
+  linéaire, avec attribution historique non vérifiée et filtres limités à
+  fenêtre/environnement. Le proxy PostHog V1 conserve son rang supérieur,
+  maintenant annoncé explicitement, et ne convertit plus null/vide/booléen en 0.
+- Admin Latences : section V2 distincte dans la vue existante, période sélectionnée,
+  environnement actif, filtres et chronologie technique par événement, sans
+  dialogue. Tous les outils MCP vérifient le rôle admin avec le client portant
+  le JWT de l'appelant + publishable key ; aucun contournement RLS/service role.
+- Dépendances : SDK 3.0.5 exact, alias `zod-mcp: npm:zod@4.6.6`, Zod 3 maintenu pour
+  les formulaires. L'installation npm propre révèle que les types SDK suivent le
+  peer hoisté : adaptateur typé/validé Zod 4 dans `src/lib/mcp/defineTool.ts`.
+  Le plugin SDK 3.0.5 externalise mal les aliases npm : le wrapper Vite
+  `scripts/lovableMcpPlugin.ts` lui fournit le specifier Deno `npm:zod@4.6.6`.
+  La fonction MCP et son manifeste sont **régénérés par le SDK**, jamais édités
+  à la main. Un seul package déjà verrouillé change de version : HeyGen 0.0.18
+  → 0.0.19 pour satisfaire le manifeste préexistant ; aucune upgrade générale.
+- CI : la gate complète reste active. Lint appliqué aux sources ; bundle MCP
+  généré exclu, exception `prefer-const` limitée au broker d'auth généré Lovable.
+  Regex OAuth et Gradium corrigées sans modifier leur acceptation. Fixtures E2E
+  complétées avec les données d'attribution/fiche exigées par les gardes existantes ;
+  le test film inspecte tous les messages du GM et conserve son assertion.
+
+### Fonctions, migrations et livraison Lovable
+
+Fonctions modifiées : `query-rag`, `proxy-llm`, `posthog-latency-stats` et `mcp`
+(cette dernière générée). Helpers partagés `monotonicSpans.ts` et
+`telemetryNumbers.ts`. **Aucune migration, aucun secret, aucune variable ni flag
+modifié.** Ne déployer ces fonctions que dans Lovable Cloud
+`iralfqlslqndgvexixis`. Le MCP doit être vérifié après publication.
+
+Vérifications locales déjà réalisées : installation `npm ci`, typecheck,
+`tsc -p tsconfig.node.json --noEmit`, lint, 43 régressions, 461 tests unitaires,
+16 intégrations PGlite, compilation Vite de compatibilité et extraction du
+manifeste MCP. Suite Playwright : **17/17** (15 existants et 2 nouveaux cas d’échec d’entrée) en mode CI
+(Chromium, scénarios médias Firefox/WebKit), fournisseurs et réseau simulés.
+Tests publiés Max/Emma, mains libres/barge-in réel, baseline sandbox-ulrich et
+compilation/publication Lovable : **à faire**. Ces diagnostics locaux ne sont ni
+une preview Lovable validée ni une publication. Aucun gain de latence revendiqué.
+
+La cible PostHog 137897 « AVA prototype 1 », organisation
+`019adb98-f8a7-0000-ad7c-552998c1fc21`, fuseau UTC, a été confirmée via sa liste native
+sans lire sa clé API. Les données V2 publiées ne sont pas encore disponibles.
+
+Rollback : revert du squash du lot sur main par PR, synchroniser/recompiler et
+republier via Lovable. Restaurer le comportement précédemment publié si incident ;
+conserver tables/événements historiques, aucune migration à inverser. Lot 2
+bloqué jusqu'au retour de validation fonctionnelle publiée du lot 1.
+
+### Revue et corrections avant fusion — PR #25
+
+Revue indépendante via le skill `code-review`, deux axes sur la base `95634e1` :
+Standards, zéro violation/smell actionnable ; Spec, trois lacunes corrigées avant
+fusion. Les tentatives commencent désormais au geste de capture (origine
+`capture_start` pour les entrées échouées), conservent leur attempt_id lors du
+rebasage à release/décision, et finalisent échecs micro/STT ou flush vide. Les
+jalons d'un ancien input ne sont pas réutilisés. Capture commencée côté adapter
+et capture prête côté façade sont deux jalons distincts. Les spans HTTP d'erreur sont
+conservés par RAG/LLM. Les spans GM ont `client_anchor_ms`, obtenu exclusivement
+entre horloges client identiques ; les spans Edge restent isolés.
+
+Premier check GitHub sur `79dd669` : échec d'un test Inworld préexistant, dû aux
+classes Blob distinctes de Node Fetch et jsdom (fixture sérialisée en `[object
+Blob]`). Fixture HTTP corrigée en contenu audio direct et assertion du contrat
+size/type, sans changement fournisseur. Aucun check désactivé. Les tests et la
+revue sont rejoués sur le dernier HEAD avant toute fusion.
+
+PR : https://github.com/memoways/ava-proto1/pull/25 ; SHA squash à relever après
+fusion. Preview Lovable, production et baseline publiée restent à faire.
+
+La relecture des corrections a identifié un dernier cas de STT mains libres
+réutilisé : son erreur ne doit jamais finaliser le tracker déjà transféré à la
+sortie, ni viser la première capture lors d'un énoncé suivant. Le raccordement
+sélectionne uniquement le tracker d'entrée courant du STT actif ; un ancien STT
+ne finalise pas le nouveau. Test simulé ajouté : erreur pendant sortie, puis
+pendant capture suivante, puis callback d'une ancienne session STT.
+
+La barrière d'appartenance protège le **callback onError entier**, y compris
+le teardown et ses effets UI. Le test vérifie que le teardown fourni n'est jamais
+appelé pour l'ancienne session, et que le teardown du STT actif ne reclassifie pas
+son input failed en cancelled.
+
+Relecture finale sur le code `2d31836` : **Standards : 0 violation restante,
+0 smell actionnable ; Spec : aucun blocage restant**. Les remarques précédentes
+sont corrigées et leurs cas simulés testés. La PR #25 doit obtenir les gates
+GitHub verts sur son dernier HEAD ; relever ensuite le squash réel et les checks
+post-merge. Aucune publication Lovable n'a été effectuée dans ce lot local.

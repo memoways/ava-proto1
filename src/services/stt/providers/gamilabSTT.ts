@@ -1,3 +1,4 @@
+import { observeVoice } from "../../voiceTurnTelemetryV2";
 import { debugLogger } from "@/services/debugLogger";
 import { recordAudioLatency } from "@/services/latencyTelemetry";
 import { getSTTRuntimeConfig } from "../runtimeConfig";
@@ -101,6 +102,7 @@ export class GamilabSTT implements STTSession {
   private gami: GamilabSingleton | null = null;
   private listeners: unknown[] = [];
   private onTranscript: TranscriptCallback;
+  private onVoiceObservation?: STTCreateOptions["onVoiceObservation"];
   private onError?: STTCreateOptions["onError"];
   private getTelemetryContext?: STTCreateOptions["getTelemetryContext"];
   private _active = false;
@@ -116,6 +118,7 @@ export class GamilabSTT implements STTSession {
 
   constructor(onTranscript: TranscriptCallback, opts?: STTCreateOptions) {
     this.onTranscript = onTranscript;
+    this.onVoiceObservation = opts?.onVoiceObservation;
     this.onError = opts?.onError;
     this.getTelemetryContext = opts?.getTelemetryContext;
   }

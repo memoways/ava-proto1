@@ -1,3 +1,4 @@
+import { observeVoice } from "../../voiceTurnTelemetryV2";
 import { debugLogger } from "@/services/debugLogger";
 import { recordAudioLatency } from "@/services/latencyTelemetry";
 import { selectMediaRecorderMimeType } from "@/services/browserCapabilities";
@@ -19,6 +20,7 @@ const ENDPOINT = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/proxy-
  */
 export class OpenAIWhisperSTT implements STTSession {
   private onTranscript: TranscriptCallback;
+  private onVoiceObservation?: STTCreateOptions["onVoiceObservation"];
   private onError?: STTCreateOptions["onError"];
   private getTelemetryContext?: STTCreateOptions["getTelemetryContext"];
   private stream: MediaStream | null = null;
@@ -34,6 +36,7 @@ export class OpenAIWhisperSTT implements STTSession {
 
   constructor(onTranscript: TranscriptCallback, opts?: STTCreateOptions) {
     this.onTranscript = onTranscript;
+    this.onVoiceObservation = opts?.onVoiceObservation;
     this.onError = opts?.onError;
     this.getTelemetryContext = opts?.getTelemetryContext;
     this.initialStream = opts?.initialStream;
@@ -64,6 +67,7 @@ export class OpenAIWhisperSTT implements STTSession {
       if (e.data.size > 0) this.chunks.push(e.data);
     };
     this.recorder.start(250);
+    observeVoice(this.onVoiceObservation, "capture_started");
     this.startedAt = performance.now();
     this._active = true;
     this._paused = false;

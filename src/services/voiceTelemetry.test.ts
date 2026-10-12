@@ -20,7 +20,10 @@ import {
   pickVoiceTurnBlocker,
   recordVoiceError,
   recordVoiceTurnCompleted,
+  recordVoiceTurnV2,
 } from "@/services/voiceTelemetry";
+
+import { createVoiceTurnV2 } from "./voiceTurnTelemetryV2";
 
 describe("voiceTelemetry", () => {
   beforeEach(() => {
@@ -152,6 +155,15 @@ describe("voiceTelemetry", () => {
     }));
   });
 
+  it("keeps voice usable when V2 persistence rejects or remains pending", async () => {
+    const abortSignal = vi.fn(() => Promise.reject(new Error("offline")));
+    mocks.insertMock.mockReturnValue({ abortSignal });
+    const turn = createVoiceTurnV2({ session_id: "s1", turn_id: "s1:1", turn_index: 1, character: "max", environment_id: "prod", context_type: "public", input_mode: "push_to_talk", latency_origin: "ptt_release" }, performance.now(), recordVoiceTurnV2);
+    expect(() => turn.finish("failed")).not.toThrow();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(abortSignal).toHaveBeenCalledTimes(2);
+    expect(mocks.trackEventMock).toHaveBeenCalledWith("voice_turn_finished", expect.objectContaining({ status: "failed", schema_version: 2 }));
+  });
   it("records unified voice errors to PostHog and internal storage", () => {
     recordVoiceError({
       session_id: "session-1",

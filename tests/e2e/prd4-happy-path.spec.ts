@@ -54,6 +54,7 @@ async function installNetworkFakes(
   const blockedTraceUpload = new Promise<void>((resolve) => { releaseTraceUpload = resolve; });
   const maxMessageCounts: number[] = [];
   const sessionUpdates: unknown[] = [];
+  const voiceEvents: Array<Record<string, unknown>> = [];
   const gmFilmContexts: string[] = [];
 
   await page.addInitScript(({ transcripts, simulateAudio }: { transcripts: string[]; simulateAudio: boolean }) => {
@@ -263,6 +264,13 @@ async function installNetworkFakes(
     const url = new URL(request.url());
     const table = url.pathname.split("/").pop();
 
+    if (table === "get_character_runtime_readiness_for_environment") {
+      const input = request.postDataJSON() as { p_character_key: string };
+      const character = input.p_character_key;
+      return json(route, [{ character_key: character, display_name: character === "emma" ? "Emma" : "Max", enabled: true, ready: true,
+        character_id: CHARACTER_ID, notion_page_id: "77777777-7777-4777-8777-777777777777", environment_id: "prod", prompt_updated_at: "2026-10-12T00:00:00Z",
+        tts_provider: "elevenlabs", tts_voice_id: null, opening_line: null, portrait_url: null, situation_summary: "Fiche E2E" }]);
+    }
     if (table === "pin_current_orchestration_version") {
       return json(route, "66666666-6666-4666-8666-666666666666");
     }
@@ -334,7 +342,7 @@ async function installNetworkFakes(
       return json(route, []);
     }
     if (table === "character_prompts") {
-      return json(route, []);
+      return json(route, [{ character_id: CHARACTER_ID, environment_id: "prod", characters: { name: "Max" }, identite_fondamentale: "Tu es Max.", qui_tu_es: "Tu réponds en français.", situation_summary: "Max est le père d’Ava.", dynamique_conversation: "Écouter et répondre.", ce_que_tu_ne_fais_jamais: "Ne jamais changer d’identité.", timeline: "Avant et après la disparition d’Ava.", updated_at: "2026-10-12T00:00:00Z" }]);
     }
     if (table === "characters") {
       return json(route, [{
@@ -343,6 +351,10 @@ async function installNetworkFakes(
         system_prompt: "Tu es Max. Tu réponds en français avec concision.",
         personality: "méfiant mais sincère",
       }]);
+    }
+    if (table === "voice_turn_events" && request.method() === "POST") {
+      voiceEvents.push(request.postDataJSON().metadata_json as Record<string, unknown>);
+      return json(route, [], 201);
     }
     if (table === "sessions" && request.method() === "POST") {
       return json(route, { id: SESSION_ID }, 201);
@@ -399,7 +411,7 @@ async function installNetworkFakes(
             : { themes: [], topics: [], intentions: [] },
         );
       } else if (system.includes("Game Master") || system.includes("end_recommended")) {
-        gmFilmContexts.push(system);
+        gmFilmContexts.push(payload.messages?.map((message) => message.content).join("\n") ?? system);
         gmPostTurnCount += 1;
         const triggerVideo = gmPostTurnCount === options.triggerVideoAtLabel;
         content = JSON.stringify({
@@ -461,6 +473,7 @@ async function installNetworkFakes(
     getSimulatedNetworkDrops: () => simulatedNetworkDrops,
     getTriggeredVideoLoads: () => triggeredVideoLoads,
     getSessionUpdates: () => sessionUpdates,
+    getVoiceEvents: () => voiceEvents,
     getGmFilmContexts: () => gmFilmContexts,
     getTtsCallCount: () => ttsCallCount,
     getPosthogRequestCount: () => posthogRequestCount,
@@ -771,4 +784,38 @@ test("endurance accélérée de 35 tours avec mémoire bornée et pannes récup�
   expect(fakes.getSimulatedNetworkDrops()).toBe(1);
   expect(fakes.getTriggeredVideoLoads()).toBeGreaterThanOrEqual(1);
   expect(fakes.getSessionUpdates().length).toBeGreaterThanOrEqual(35);
+});
+
+
+test("V2 conserve deux échecs micro sans transcript comme tentatives distinctes", async ({ page }) => {
+  const fakes = await installNetworkFakes(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.mediaDevices, "getUserMedia", { configurable: true, value: async () => { throw new DOMException("Micro refusé", "NotAllowedError"); } });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await answerFilmQuestion(page);
+  await page.getByRole("button", { name: "Appeler Max" }).click();
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+    await expect.poll(() => fakes.getVoiceEvents().filter((event) => event.status === "failed").length).toBe(attempt);
+  }
+  const failures = fakes.getVoiceEvents().filter((event) => event.status === "failed");
+  expect(failures[0].turn_id).toBe(failures[1].turn_id);
+  expect(failures[0].attempt_id).not.toBe(failures[1].attempt_id);
+  expect(fakes.getMaxTurnCount()).toBe(0);
+});
+
+test("V2 garde un flush vide sans requête LLM dans les effectifs", async ({ page }) => {
+  const fakes = await installNetworkFakes(page, [""]);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await answerFilmQuestion(page);
+  await page.getByRole("button", { name: "Appeler Max" }).click();
+  await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+  await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+  await expect.poll(() => fakes.getVoiceEvents().filter((event) => event.status === "no_audio").length).toBe(1);
+  expect(fakes.getMaxTurnCount()).toBe(0);
 });

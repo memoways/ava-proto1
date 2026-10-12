@@ -1,3 +1,4 @@
+import { VoiceTurnDiagnostics } from "./VoiceTurnDiagnostics";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity,
@@ -323,8 +324,11 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
     void load(empty);
   };
 
+  const v2Period = useMemo(() => stats?.period ?? localPeriodRange(period, from, to)
+    ?? { from: new Date(Date.now() - 86400000).toISOString(), to: new Date().toISOString() }, [stats?.period, period, from, to]);
   return (
     <div className="space-y-5">
+      <VoiceTurnDiagnostics from={v2Period.from} to={v2Period.to} />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2"><h2 className="text-lg font-semibold">Latences AVA interne &amp; PostHog</h2><Badge>Deux sources</Badge></div>

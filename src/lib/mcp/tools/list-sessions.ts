@@ -1,6 +1,7 @@
-import { defineTool, ToolError } from "@lovable.dev/mcp-js";
-import { z } from "zod";
-import { supabaseForUser } from "../supabase";
+import { ToolError } from "@lovable.dev/mcp-js";
+import { defineTool } from "../defineTool";
+import { z } from "zod-mcp";
+import { supabaseForAdmin } from "../supabase";
 import { sinceIso } from "../stats";
 
 const MAX_LIMIT = 100;
@@ -48,7 +49,7 @@ export default defineTool({
     if (!ctx.isAuthenticated()) {
       throw new ToolError("Sign-in required: sessions are read with the connected account's own access rights.");
     }
-    const supabase = supabaseForUser(ctx);
+    const supabase = await supabaseForAdmin(ctx);
     let query = supabase
       .from("sessions")
       .select(

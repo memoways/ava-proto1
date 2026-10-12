@@ -75,3 +75,13 @@ export function supabaseForUser(ctx: ToolContext) {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
+
+/** Explicit admin gate as well as caller RLS. Never uses a privileged key. */
+export async function supabaseForAdmin(ctx: ToolContext) {
+  if (!ctx.isAuthenticated() || !ctx.getUserId()) throw new Error("Admin sign-in required");
+  const client = supabaseForUser(ctx);
+  const { data, error } = await client.from("user_roles").select("role")
+    .eq("user_id", ctx.getUserId()!).eq("role", "admin").limit(1);
+  if (error || !data?.length) throw new Error("Admin access required");
+  return client;
+}

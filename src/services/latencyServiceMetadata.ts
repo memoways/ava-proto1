@@ -4,9 +4,9 @@ import { getSTTProvider, getSTTProviderDefinition } from "@/services/stt";
 import { getActiveProviderId, getCartesiaSettings, getGradiumSettings, getHumeSettings, getInworldSettings } from "@/services/tts/providerSettings";
 import { DEEPGRAM_DEFAULT_MODEL } from "../../supabase/functions/_shared/deepgramDefaults";
 
-export function getConfiguredTTSServiceInfo(): LatencyServiceInfo {
+export function getConfiguredTTSServiceInfo(providerId?: import("./tts/types").TTSProviderId): LatencyServiceInfo {
   try {
-    const provider = getActiveProviderId();
+    const provider = providerId ?? getActiveProviderId();
     if (provider === "inworld") {
       const settings = getInworldSettings();
       return {
@@ -30,7 +30,7 @@ export function getConfiguredTTSServiceInfo(): LatencyServiceInfo {
       return {
         serviceProvider: "Gradium",
         serviceName: "gradium",
-        model: settings.voiceId || "gradium-tts",
+        model: "gradium-tts",
         mode: "streaming",
       };
     }

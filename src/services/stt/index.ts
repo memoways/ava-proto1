@@ -1,3 +1,4 @@
+import { observeVoice, observeService } from "../voiceTurnTelemetryV2";
 import { DeepgramSTT } from "@/services/deepgramSTT";
 import { debugLogger } from "@/services/debugLogger";
 import { GamilabSTT, prefetchGamilabSDK } from "./providers/gamilabSTT";
@@ -48,13 +49,29 @@ export async function createConfiguredSTT(
   onTranscript: TranscriptCallback,
   opts?: STTCreateOptions,
 ): Promise<STTSession> {
-  const provider = await resolveRuntimeSTTProvider();
+  const requested = (await loadSTTSettingsFromDB()).activeProvider;
+  const provider = await resolveRuntimeSTTProvider(requested);
+  let session: STTSession;
+  const transcript: TranscriptCallback = (text, final) => {
+    if (final) {
+      observeVoice(opts?.onVoiceObservation, "transcript_final");
+      const meta = session?.getLastFinalTelemetry?.();
+      observeService(opts?.onServiceObserved, {
+        service: "stt", requested_provider: requested, requested_model: null,
+        resolved_provider: provider, resolved_model: null,
+        effective_provider: meta?.provider ?? provider, effective_model: meta?.model ?? null,
+        transport: provider === "openai_whisper" ? "http_batch" : "websocket",
+        fallback: requested !== provider,
+      });
+    }
+    onTranscript(text, final);
+  };
   if (provider === "gamilab") {
     void Promise.resolve(opts?.initialStream).then((stream) => stream?.getTracks().forEach((track) => track.stop())).catch(() => {});
-    return new GamilabSTT(onTranscript, opts);
-  }
-  if (provider === "gradium") return new GradiumSTT(onTranscript, opts);
-  if (provider === "openai_whisper") return new OpenAIWhisperSTT(onTranscript, opts);
-  if (provider === "assemblyai") return new AssemblyAISTT(onTranscript, opts);
-  return createDeepgramSTT(onTranscript, opts);
+    session = new GamilabSTT(transcript, opts);
+  } else if (provider === "gradium") session = new GradiumSTT(transcript, opts);
+  else if (provider === "openai_whisper") session = new OpenAIWhisperSTT(transcript, opts);
+  else if (provider === "assemblyai") session = new AssemblyAISTT(transcript, opts);
+  else session = createDeepgramSTT(transcript, opts);
+  return session;
 }

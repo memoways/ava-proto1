@@ -1,3 +1,4 @@
+import { numberOrNull } from "../_shared/telemetryNumbers.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { requireAdmin } from "../_shared/adminAuth.ts";
 
@@ -93,10 +94,6 @@ function safeFilters(raw: Record<string, string> | undefined): Record<string, st
   return filters;
 }
 
-function numberOrNull(value: unknown): number | null {
-  const number = Number(value);
-  return Number.isFinite(number) && number >= 0 ? number : null;
-}
 
 function percentile(values: Array<number | null>, p: number): number | null {
   const sorted = values.filter((value): value is number => value != null).sort((a, b) => a - b);
@@ -203,6 +200,10 @@ function aggregate(rows: EventRow[], range: { period: string; from: Date; to: Da
   const fallbacks = turns.filter((row) => row.fallback).length;
   return {
     source: "PostHog",
+    schemaVersion: 1,
+    percentileMethod: "nearest_rank_ceil_p*n",
+    cappedAt: 10000,
+    capped: rows.length >= 10000,
     hasData: rows.length > 0,
     freshAt: new Date().toISOString(),
     period: { key: range.period, from: range.from.toISOString(), to: range.to.toISOString() },

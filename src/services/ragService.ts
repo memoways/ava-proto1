@@ -72,6 +72,7 @@ async function callQueryRag(
   payload: Record<string, unknown>,
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ): Promise<{
+  _ava_observability?: import("./voiceTurnTelemetryV2").ServerObservation;
   matches: RAGMatch[];
   retrieval_matches?: RAGMatch[];
   query?: string;
@@ -99,10 +100,13 @@ async function callQueryRag(
   }).finally(timeout.cancel);
   if (!response.ok) {
     const err = await response.text();
-    return { matches: [], error: `HTTP ${response.status}: ${err.slice(0, 300)}`, status: response.status };
+    let observation: import("./voiceTurnTelemetryV2").ServerObservation | undefined;
+    try { observation = JSON.parse(err)?._ava_observability; } catch { /* Non-JSON error body. */ }
+    return { matches: [], error: `HTTP ${response.status}: ${err.slice(0, 300)}`, status: response.status, _ava_observability: observation };
   }
   const data = await response.json();
   return {
+    _ava_observability: data._ava_observability,
     matches: data.matches || [],
     retrieval_matches: data.retrieval_matches || [],
     query: data.query,
@@ -164,6 +168,7 @@ export async function queryRAG(
 }
 
 export interface RAGQueryDetailed {
+  serverObservation?: import("./voiceTurnTelemetryV2").ServerObservation;
   matches: RAGMatch[];
   /** Full vector candidate pool, in cosine-similarity order, before reranking. */
   retrievalMatches: RAGMatch[];
@@ -238,6 +243,7 @@ export async function queryRAGDetailed(
       rerankQuery: res.rerank_query,
       rerankError: res.rerank_error,
       serverLatencyMs: res.latency_ms,
+      serverObservation: res._ava_observability,
       searchInput: res.search_input || options.rewrittenQuery || [userMessage, recentContext ? `Contexte récent: ${recentContext}` : ""].filter(Boolean).join("\n\n"),
       request: {
         userMessage,
