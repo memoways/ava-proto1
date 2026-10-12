@@ -114,7 +114,7 @@ describe("buildMaxSystemPrompt — variante rich_v2", () => {
     expect(timelineSection.subpartsDetected).toBeGreaterThan(0);
     expect(timelineSection.subparts?.some((sub) => sub.included)).toBe(true);
     expect(budget.timelineEvents?.join(" ")).toMatch(/Aujourd'hui/);
-    expect(budget.depthSelection?.level).toBe("niveau_3");
+    expect(budget.depthSelection).toBeUndefined();
     expect(budget.depthSelection?.levelsRepresented).toHaveLength(4);
     // Le présent est toujours injecté.
     expect(result.systemPrompt).toContain("Lausanne, aujourd'hui");
@@ -149,8 +149,7 @@ describe("buildMaxSystemPrompt — variante rich_v2", () => {
     expect(traced).toBe(budget.staticChars);
     expect(budget.timelineEvents?.join("\n")).toMatch(/Aujourd'hui à Lausanne/);
     expect(budget.timelineEvents?.join("\n")).toMatch(/Hier — jour 4/);
-    expect(budget.depthSelection?.level).toBe("niveau_3");
-    expect(budget.depthSelection?.preambleIncluded).toBe(true);
+    expect(budget.depthSelection).toBeUndefined();
   });
 
   it("reste compatible avec les anciennes traces sans bloc budget", () => {
