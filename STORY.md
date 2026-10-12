@@ -2426,7 +2426,48 @@ continuité d’expérience (mémoire entre tours).
 
 ### Dernière session
 
-**2026-10-12 — Game Master dans l'app, cadre commun et nettoyage des anciennes mécaniques**
+**2026-10-12 — Choix du film après l'intro, retrait du champ « Profondeur par niveau », conversation mains libres**
+
+**Avant :** regarder la vidéo d'introduction était enregistré comme « a vu le
+film » ; le resync Notion échouait sur un champ « Profondeur par niveau »
+inexistant dans la base Caractères ; la conversation exigeait d'appuyer sur
+un bouton pour parler et ne permettait pas d'interrompre le personnage.
+
+**Livré :**
+- Après l'intro, un écran pleine image (grange, famille réunie) propose
+  « J'ai vu le film » / « Je n'ai pas vu le film ». La réponse est persistée
+  en session et transmise au Game Master et au personnage via le cadre
+  d'expérience, même quand le cadre éditorial est désactivé. L'écran de choix
+  du personnage affiche « Ils ont besoin de ton soutien. Approche-les avec
+  douceur. A qui veux-tu parler ? » et un bouton « Revoir la vidéo
+  d'introduction » qui préserve la réponse. L'ancien onboarding bénévole est
+  masqué du parcours mais conservé dans le code.
+- Le champ « Profondeur par niveau » est retiré de l'app et de la base
+  (colonne supprimée, synchronisation et éditeur de fiches nettoyés) ;
+  l'erreur de resync correspondante ne peut plus se produire.
+- Conversation vocale mains libres (désactivée par défaut, Expérience →
+  Orchestration) : micro toujours à l'écoute sans bouton, fin de parole
+  détectée dans l'app après un silence réglable, interruption du personnage
+  en parlant (barge-in) avec seuil de mots réglable. Une réplique interrompue
+  est conservée en entier en mémoire.
+
+**Validation et livraison :** tests unitaires du cadre, du routage et des
+règles mains libres ajoutés et verts ; échec Inworld connu sans lien. Pas
+d'appel vocal réel vérifié ; tests E2E navigateur bloqués (Chromium absent du
+bac à sable). Livraison via Lovable / Lovable Cloud uniquement, aucune
+publication du site en Production.
+
+**Restant pour compléter :**
+- Vérifier à l'oreille un appel mains libres avec Max et Emma (coupure en fin
+  de parole, interruption sans coupure intempestive).
+- Relancer un resync Notion et contrôler l'absence d'erreur de champs.
+- Terminer les tests E2E du parcours film dès qu'un navigateur de test est
+  disponible.
+
+**Références :** [plan onboarding bénévole](docs/plan_onboarding_benevole.md),
+[plan conversation mains libres](docs/plan_conversation_mains_libres.md).
+
+**Session précédente — 2026-10-12 — Game Master dans l'app, cadre commun et nettoyage des anciennes mécaniques**
 
 **Avant :** le parcours bénévole et les fiches personnages conservaient des
 traces de l'ancien appel par un inconnu ; le parcours film vu/non vu n'était
