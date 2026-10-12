@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createVoiceTurnV2, observeVoice, projectServerObservation, type VoiceTurnV2 } from "./voiceTurnTelemetryV2";
+import { createVoiceTurnV2, failVoiceInputAttempt, observeVoice, projectServerObservation, type VoiceTurnV2 } from "./voiceTurnTelemetryV2";
 import { numberOrNull } from "../../supabase/functions/_shared/telemetryNumbers";
 import { createMonotonicSpans } from "../../supabase/functions/_shared/monotonicSpans";
 
@@ -57,6 +57,20 @@ describe("V2 observations without changing voice decisions", () => {
       { request_id: "gm1", clock: "client_monotonic", client_origin_at: 1500, spans: [{ name: "gm_available", start_ms: 50, end_ms: 50, status: "ok" }] });
     expect(events[1].value.server[0].client_anchor_ms).toBe(500);
     expect(projectServerObservation({ request_id: "edge1", clock: "edge_monotonic", client_origin_at: 1500, spans: [] }, 1000).client_anchor_ms).toBeUndefined();
+  });
+  it("keeps a reused hands-free STT failure scoped to input, after transfer and on the next turn", () => {
+    const initial = attempt();
+    // First capture transferred to playback; no current input remains.
+    expect(failVoiceInputAttempt(null, initial.turn, true)).toBe(false);
+    initial.turn.observe("output_estimated", 1800);
+    initial.turn.finish("completed");
+    expect(initial.events[1].value.status).toBe("completed");
+    const next = attempt();
+    expect(failVoiceInputAttempt(next.turn, initial.turn, true)).toBe(true);
+    expect(next.events[1].value.status).toBe("failed");
+    const newest = attempt();
+    expect(failVoiceInputAttempt(newest.turn, initial.turn, false)).toBe(false);
+    expect(newest.events).toHaveLength(1);
   });
   it("assigns a fresh attempt ID to retries of the same causal turn", () => {
     const a = attempt(); const b = attempt();

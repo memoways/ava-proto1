@@ -150,3 +150,14 @@ export function createVoiceTurnV2(
     },
   };
 }
+
+/** A reused STT owns the current input, never the tracker already transferred to output. */
+export function failVoiceInputAttempt(
+  currentInput: ReturnType<typeof createVoiceTurnV2> | null,
+  initialCapture: ReturnType<typeof createVoiceTurnV2> | null,
+  activeSession: boolean,
+): boolean {
+  if (!currentInput || (!activeSession && currentInput !== initialCapture)) return false;
+  currentInput.finish("failed");
+  return true;
+}

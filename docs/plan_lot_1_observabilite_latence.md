@@ -181,7 +181,7 @@ modifié.** Ne déployer ces fonctions que dans Lovable Cloud
 `iralfqlslqndgvexixis`. Le MCP doit être vérifié après publication.
 
 Vérifications locales déjà réalisées : installation `npm ci`, typecheck,
-`tsc -p tsconfig.node.json --noEmit`, lint, 43 régressions, 460 tests unitaires,
+`tsc -p tsconfig.node.json --noEmit`, lint, 43 régressions, 461 tests unitaires,
 16 intégrations PGlite, compilation Vite de compatibilité et extraction du
 manifeste MCP. Suite Playwright : **17/17** (15 existants et 2 nouveaux cas d’échec d’entrée) en mode CI
 (Chromium, scénarios médias Firefox/WebKit), fournisseurs et réseau simulés.
@@ -218,3 +218,10 @@ revue sont rejoués sur le dernier HEAD avant toute fusion.
 
 PR : https://github.com/memoways/ava-proto1/pull/25 ; SHA squash à relever après
 fusion. Preview Lovable, production et baseline publiée restent à faire.
+
+La relecture des corrections a identifié un dernier cas de STT mains libres
+réutilisé : son erreur ne doit jamais finaliser le tracker déjà transféré à la
+sortie, ni viser la première capture lors d'un énoncé suivant. Le raccordement
+sélectionne uniquement le tracker d'entrée courant du STT actif ; un ancien STT
+ne finalise pas le nouveau. Test simulé ajouté : erreur pendant sortie, puis
+pendant capture suivante, puis callback d'une ancienne session STT.
