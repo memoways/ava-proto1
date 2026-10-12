@@ -1,3 +1,6 @@
+import { normalizeExperienceFrameConfig } from "@/services/experienceFrame";
+import { displayNameForCharacter } from "@/services/characterRegistry";
+import type { ExperienceFrameConfig } from "@/types";
 import { useEffect, useMemo, useState } from "react";
 import { Archive, Beaker, Copy, Play, RefreshCw, Save, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
@@ -44,6 +47,9 @@ export default function GameMasterSettingsTab() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [config, setConfig] = useState<ExperienceDirectorConfig>(DEFAULT_DIRECTOR_CONFIG);
+  const frame = normalizeExperienceFrameConfig(config.frame);
+  const patchFrame = (patch: Partial<ExperienceFrameConfig>) =>
+    setConfig((current) => normalizeDirectorConfig({ ...current, frame: { ...normalizeExperienceFrameConfig(current.frame), ...patch } }));
   const [gameplay, setGameplay] = useState<GameplaySettings>(getGameplaySettings());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -361,6 +367,63 @@ export default function GameMasterSettingsTab() {
                     />
                   </div>
                 </div>
+
+                <fieldset className="space-y-3 rounded border p-3">
+                  <legend className="px-1 text-sm font-medium">Cadre commun de l'expérience</legend>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-muted-foreground">Même texte envoyé au personnage actif et au Game Master. Off = comportement précédent.</p>
+                    <Switch
+                      checked={frame.enabled}
+                      disabled={selected.status !== "draft"}
+                      onCheckedChange={(checked) => patchFrame({ enabled: checked })}
+                      aria-label="Activer le cadre commun"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="gm-frame-text">Cadre (rôle de l'interlocuteur, absence de relation préalable, faux statut)</Label>
+                    <Textarea id="gm-frame-text" className="min-h-28" value={frame.frameText} disabled={selected.status !== "draft"} onChange={(event) => patchFrame({ frameText: event.target.value })} />
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="gm-frame-seen">Exposition — film vu</Label>
+                      <Textarea id="gm-frame-seen" value={frame.exposureSeen} disabled={selected.status !== "draft"} onChange={(event) => patchFrame({ exposureSeen: event.target.value })} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="gm-frame-unseen">Exposition — film non vu</Label>
+                      <Textarea id="gm-frame-unseen" value={frame.exposureUnseen} disabled={selected.status !== "draft"} onChange={(event) => patchFrame({ exposureUnseen: event.target.value })} />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Posture soutien / confiance</Label>
+                    <div className="flex gap-2">
+                      {([['reserved', "Demandeur d'aide mais pudique"], ['open', 'Ouvert dès le départ']] as const).map(([value, label]) => (
+                        <Button key={value} type="button" size="sm" variant={frame.posture === value ? "default" : "outline"} disabled={selected.status !== "draft"} onClick={() => patchFrame({ posture: value })}>{label}</Button>
+                      ))}
+                    </div>
+                    <Textarea aria-label="Précisions de posture" placeholder="Précisions de posture (facultatif)" value={frame.postureNotes} disabled={selected.status !== "draft"} onChange={(event) => patchFrame({ postureNotes: event.target.value })} />
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm">Interdire les renvois spontanés vers un autre personnage</p>
+                    <Switch checked={frame.forbidSpontaneousHandoff} disabled={selected.status !== "draft"} onCheckedChange={(checked) => patchFrame({ forbidSpontaneousHandoff: checked })} aria-label="Interdire les renvois spontanés" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Personnages actifs dans cette version</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {registryActiveCharacterKeys().map((key) => {
+                        const on = (config.activeCharacters ?? []).includes(key);
+                        return (
+                          <Button key={key} type="button" size="sm" variant={on ? "default" : "outline"} disabled={selected.status !== "draft"}
+                            onClick={() => setConfig((current) => normalizeDirectorConfig({
+                              ...current,
+                              activeCharacters: on ? (current.activeCharacters ?? []).filter((item) => item !== key) : [...(current.activeCharacters ?? []), key],
+                            }))}>
+                            {displayNameForCharacter(key)}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </fieldset>
 
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-1.5">
