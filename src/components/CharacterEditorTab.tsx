@@ -9,7 +9,7 @@ import CharacterPromptEditorPanel from "@/components/CharacterPromptEditorPanel"
 const HIDDEN_NAMES = new Set([
   "identité & présentation",
   "identite & presentation",
-  // Game Master is edited in the "Game Master" tab (Mécanique)
+  // Game Master is configured only in the app (Expérience → Réglages Game Master), never from Notion
   "game master",
 ]);
 

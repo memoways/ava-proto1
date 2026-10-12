@@ -2,7 +2,8 @@
 
 ## En cours
 
-- Resynchronisation des fiches Notion Max/Emma corrigées : attend l’action d’Ulrich. Vérifier lors du nettoyage que la fiche Notion GM n’est plus utilisée ; réglages GM uniquement dans l’app.
+- Resynchronisation des fiches Notion Max/Emma corrigées : attend l’action d’Ulrich (la resync complète retire aussi l’ancienne fiche Game Master archivée et ses 12 extraits RAG).
+- Nettoyage legacy GM / multipersonnage : attend les réponses d’Ulrich aux questions du 12/10.
 
 - Rédiger le corpus de questions dans la base Notion « AVA LLM-as-judge »
   (min. 5 lignes complètes, idéalement les 4 catégories) puis lancer un
