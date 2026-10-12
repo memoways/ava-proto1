@@ -531,3 +531,68 @@ au micro est demandé à Ulrich ; aucune réponse utilisateur ni tentative V2
 ne doit être inférée avant sa réalisation et sa lecture effective. Publication,
 scénarios vocaux publiés complets et baseline restent en attente de cette gate.
 Lot 2 non commencé ; aucun gain de latence revendiqué.
+
+### Contrôle vocal réel et correction du statut quota — 12 octobre 2026
+
+Ulrich a confirmé « Échange terminé ». Lecture Ava native à 17:54:47 UTC :
+fenêtre `[2026-10-11T17:54:47.404Z, 2026-10-12T17:54:47.404Z)`, sandbox-ulrich,
+3 événements V2, 1 tentative terminée, 1 observation GM, 0 ligne invalide,
+page offset 0 / limit 100 / nextOffset null, cap 3 000 non atteint.
+Session `accc1e30-16bd-491d-a83e-f8a1cad8f137`, tentative
+`6ec5be6f-54c9-4d46-b68a-f24d1bc5b4e7`, Max, mains libres inchangé.
+STT Deepgram/nova-3/websocket ; LLM OpenAI/openai/gpt-5.6-luna/http_batch ;
+TTS gradium/gradium-tts/websocket, override personnage vrai, aucun fallback,
+aucun retry TTS. GM Google/google/gemini-2.5-flash/http_batch distinct.
+Attribution de voix précise absente de la projection : ne pas l'inférer.
+
+Origine app_turn_decision : réponse LLM 5 849 ms, sortie estimée 6 823 ms,
+génération 5 167 ms, playback 9 535 ms ; p50=p95=6 823 ms descriptifs, n=1.
+Couverture partielle 15/27 ; fin physique de parole/premier token batch null.
+Version déclarée `0.26.0+voice-telemetry-v2`, prompt
+`2026-10-12T11:04:20.434763+00:00`, config
+`9217fd34-321a-45c7-8363-6a8cf0b0157c`. Révision frontend servie inconnue,
+donc contrôle post-migration, pas baseline finale après nouvelle publication.
+PostHog 137897 confirme les trois mêmes événements et identifiants dans
+`[2026-10-12T17:50:00Z, 2026-10-12T18:00:00Z)` ; navigateur déclaré par
+PostHog Chrome 155.0 / Mac OS X (navigateur hôte Codex In-app Browser).
+Coût Ava days=1 global sans filtre environnement/session : 4 appels LLM
+completed, 13 370 tokens, 0,0068 USD, incluant 2 chat + 2 GM ; ce n'est pas
+le coût attribuable au seul tour ni le coût STT/TTS/RAG complet.
+
+Anomalies : capture_ready précède capture_started de 484 ms ; le signal
+façade après start() ne garantit pas l'ouverture WebSocket du fournisseur.
+Ne pas interpréter ces jalons comme une chronologie acoustique exacte.
+Les spans control_quota sont failed malgré une requête poursuivie :
+failedResult(null) considère comme échec le null de succès d'enforceGameRequest.
+
+Plan correctif autorisé P0 : conserver le classifieur par défaut pour les
+résultats DB/validation, ajouter un prédicat de résultat explicite aux spans
+async, et passer `denied => denied !== null` aux deux contrôles quota.
+Vérifier autorisation null → ok, refus HTTP → failed, exceptions → failed,
+retours DB invalides inchangés et réponse de contrôle retournée à l'identique.
+Aucun changement d'auth, de quota, de réglage vocal, de SQL ni de secret.
+Tests ciblés/typecheck/lint, PR distincte revue et CI avant squash main,
+puis synchronisation/compilation/déploiement des deux fonctions via Lovable.
+Publication finale et scénarios complets restent soumis aux gates d'origine.
+
+Diagnostic Lovable confirmé (message `umsg_01m4rm7r3dedfb91m7q26nrxh0`) :
+le quota de cette session est consommé à 17:54:11 (query-rag) et 17:54:14
+(proxy-llm), sans erreur game-guard sur la période. EXECUTE RPC réservé aux
+rôles authenticated/service_role/postgres, pas anon. Le défaut vient du
+collecteur introduit par P0 ; les erreurs 42501 de 16:55 venaient des probes
+anonymes. Pas de refus réel ni de fail-open constaté sur l'échange humain.
+Lovable a néanmoins écrit son diagnostic dans `.lovable/plan.md` (commit
+`7c8a9cbd9631ce177bbb6a296ff5b4a0df7b168f`) malgré la consigne lecture seule ;
+ce document ne constitue pas une application du correctif.
+Pré-implémentation : confiance >=90%, cause reproduite par un test rouge,
+module existant réutilisé sans dépendance ; signature callback/générique
+vérifiée dans le [Handbook TypeScript](https://www.typescriptlang.org/docs/handbook/2/functions.html).
+
+Complément au correctif P0 : `DeepgramSTT.start()` se termine après création
+du WebSocket, avant son ouverture et `MediaRecorder.start()`. Le jalon façade
+`capture_ready` était donc prématuré. Le retirer de la page et l'émettre dans
+les quatre adaptateurs, immédiatement après le démarrage effectif déjà
+observé par `capture_started`. Garder strictement les appels start(),
+les connexions, les buffers et l'ensemble des décisions inchangés.
+Vérifier par un WebSocket différé que la capture n'est pas déclarée prête
+avant son ouverture et que les deux jalons suivent le démarrage du recorder.

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const authenticatedFunctionFetch = vi.hoisted(() => vi.fn());
 
@@ -8,10 +8,49 @@ import {
   buildDeepgramWebSocketUrl,
   getDeepgramToken,
   getDeepgramWebSocketProtocols,
+  DeepgramSTT,
 } from "./deepgramSTT";
 
 describe("Deepgram token diagnostics", () => {
   beforeEach(() => authenticatedFunctionFetch.mockReset());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("reports capture readiness only after a delayed WebSocket opens and recording starts", async () => {
+    authenticatedFunctionFetch.mockResolvedValue(new Response(JSON.stringify({ key: "temporary-jwt" })));
+    const milestones: string[] = [];
+    const startRecording = vi.fn(() => milestones.push("recorder_started"));
+    const sockets: TestSocket[] = [];
+    class TestSocket {
+      static OPEN = 1;
+      readyState = 0;
+      onopen?: () => void;
+      constructor() { sockets.push(this); }
+      close() { this.readyState = 3; }
+    }
+    class TestRecorder {
+      static isTypeSupported() { return true; }
+      state = "recording";
+      start = startRecording;
+      stop() { this.state = "inactive"; }
+    }
+    vi.stubGlobal("WebSocket", TestSocket);
+    vi.stubGlobal("MediaRecorder", TestRecorder);
+    const stopTrack = vi.fn();
+    const stt = new DeepgramSTT(vi.fn(), {
+      initialStream: { getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream,
+      onVoiceObservation: (name) => milestones.push(name),
+    });
+    try {
+      await stt.start();
+      expect(milestones).toEqual([]);
+      expect(startRecording).not.toHaveBeenCalled();
+      sockets[0].readyState = TestSocket.OPEN;
+      sockets[0].onopen!();
+      expect(milestones).toEqual(["recorder_started", "capture_started", "capture_ready"]);
+      expect(startRecording).toHaveBeenCalledWith(150);
+    } finally { stt.stop(); }
+    expect(stopTrack).toHaveBeenCalledOnce();
+  });
 
   it("turns an upstream grant permission failure into an actionable message", async () => {
     authenticatedFunctionFetch.mockResolvedValue(new Response(JSON.stringify({

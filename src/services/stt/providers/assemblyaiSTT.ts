@@ -121,6 +121,7 @@ export class AssemblyAISTT implements STTSession {
     this.source.connect(this.processor);
     this.processor.connect(this.audioCtx.destination);
     observeVoice(this.onVoiceObservation, "capture_started");
+    observeVoice(this.onVoiceObservation, "capture_ready");
     this._active = true;
     this._paused = false;
     this.capturePaused = false;

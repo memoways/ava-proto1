@@ -1661,7 +1661,6 @@ const IndexPRD4 = () => {
       },
     );
     await stt.start();
-    inputTelemetryRef.current?.observe("capture_ready");
     recordPassiveVoiceNetworkObservation({
       sttConnected: true,
       lastSttConnectedAt: Date.now(),

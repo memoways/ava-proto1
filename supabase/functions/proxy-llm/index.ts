@@ -63,7 +63,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-  const denied = await spans.run("control_quota", () => enforceGameRequest(req, "proxy-llm", corsHeaders));
+  const denied = await spans.run("control_quota", () => enforceGameRequest(req, "proxy-llm", corsHeaders), (response) => response !== null);
   if (denied) return denied;
 
   try {

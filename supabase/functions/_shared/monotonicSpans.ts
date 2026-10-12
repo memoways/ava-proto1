@@ -10,10 +10,10 @@ export function createMonotonicSpans(requestId: string = crypto.randomUUID(), cl
   const origin = performance.now();
   const spans: Array<{ name: string; start_ms: number; end_ms: number; status: "ok" | "failed" }> = [];
   return {
-    async run<T>(name: string, fn: () => PromiseLike<T>): Promise<T> {
+    async run<T>(name: string, fn: () => PromiseLike<T>, isFailure: (value: T) => boolean = failedResult): Promise<T> {
       const start = performance.now();
       let status: "ok" | "failed" = "ok";
-      try { const value = await fn(); if (failedResult(value)) status = "failed"; return value; } catch (error) { status = "failed"; throw error; }
+      try { const value = await fn(); if (isFailure(value)) status = "failed"; return value; } catch (error) { status = "failed"; throw error; }
       finally { if (spans.length < 32) spans.push({ name, start_ms: Math.round(start - origin), end_ms: Math.round(performance.now() - origin), status }); }
     },
     runSync<T>(name: string, fn: () => T): T {

@@ -127,4 +127,17 @@ describe("V2 observations without changing voice decisions", () => {
     expect(spans.snapshot()).toEqual({ request_id: "edge1", clock: "edge_monotonic", spans: [{ name: "embedding", start_ms: 10, end_ms: 25, status: "failed" }] });
     clock.mockRestore();
   });
+  it("preserves quota decisions while recording allowed null and HTTP refusals accurately", async () => {
+    const spans = createMonotonicSpans("quota");
+    const quotaFailed = (denied: Response | null) => denied !== null;
+    expect(await spans.run("control_quota", async () => null, quotaFailed)).toBeNull();
+    for (const status of [401, 429, 503]) {
+      const denied = new Response(null, { status });
+      expect(await spans.run("control_quota", async () => denied, quotaFailed)).toBe(denied);
+      expect(denied.status).toBe(status);
+    }
+    await expect(spans.run("control_quota", async () => { throw new Error("quota unavailable"); }, quotaFailed))
+      .rejects.toThrow("quota unavailable");
+    expect(spans.snapshot().spans.map((span) => span.status)).toEqual(["ok", "failed", "failed", "failed", "failed"]);
+  });
 });

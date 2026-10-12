@@ -68,6 +68,7 @@ export class OpenAIWhisperSTT implements STTSession {
     };
     this.recorder.start(250);
     observeVoice(this.onVoiceObservation, "capture_started");
+    observeVoice(this.onVoiceObservation, "capture_ready");
     this.startedAt = performance.now();
     this._active = true;
     this._paused = false;

@@ -110,7 +110,7 @@ async function rerankVoyage(
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   const spans = createMonotonicSpans();
-  const denied = await spans.run("control_quota", () => enforceGameRequest(req, "query-rag", corsHeaders));
+  const denied = await spans.run("control_quota", () => enforceGameRequest(req, "query-rag", corsHeaders), (response) => response !== null);
   if (denied) return denied;
 
   const startedAt = performance.now();
