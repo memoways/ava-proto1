@@ -33,9 +33,6 @@ verify_jwt = false
 [functions.proxy-stt-config]
 verify_jwt = false
 
-[functions.summarize-role]
-verify_jwt = false
-
 [functions.sync-questionnaire]
 verify_jwt = false
 

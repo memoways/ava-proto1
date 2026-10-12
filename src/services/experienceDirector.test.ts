@@ -132,6 +132,9 @@ describe("validateDirectorDecision", () => {
         allowCinematics: true,
         customInstructions: "",
         handoffRules: [{ targetCharacter: "emma", themes: ["police"], topics: [] }],
+        projectContext: "",
+        openQuestions: [],
+        guardrails: { falseStatusGuidance: true, derailTolerance: "medium", opennessPace: "balanced" },
       },
     }, "max");
     expect(decision.action.type).toBe("handoff");

@@ -59,6 +59,18 @@ export interface PinnedDirectorRuntime {
   config: ExperienceDirectorConfig | null;
 }
 
+/** Repris de l'ancienne fiche Notion « Game Master » (archivée), réécrit pour le cadre actuel. */
+export const DEFAULT_PROJECT_CONTEXT = `« Où est Ava ? » est une expérience narrative vocale : le joueur appelle, à distance, des proches d'Ava, disparue. Plusieurs personnages peuvent être joignables ; chacun ne sait que ce que sa fiche lui donne.
+Le Game Master est invisible : il ne parle jamais au joueur, il oriente le personnage actif au tour suivant.
+Le joueur habite une scène, pas une interface : tout reste diégétique, jamais de méta sur l'IA ou la technique.
+Principes : une idée et une question à la fois ; ne pas expliquer le monde, le faire vivre ; « oui, et… » plutôt que bloquer ; révéler par petites marches, un mystère à la fois ; laisser des silences.
+Le détail du monde narratif vient de la recherche documentaire ; ne pas l'inventer.`;
+
+export const DEFAULT_OPEN_QUESTIONS: string[] = [
+  "Le joueur parle du film qu'il a vu : le personnage le connaît-il, et comment y réagit-il ?",
+  "Le joueur demande qui il est censé être ou pourquoi il appelle.",
+];
+
 export const DEFAULT_DIRECTOR_CONFIG: ExperienceDirectorConfig = {
   schemaVersion: 1,
   minimumHandoffTurn: 4,
@@ -74,8 +86,30 @@ export const DEFAULT_DIRECTOR_CONFIG: ExperienceDirectorConfig = {
     allowCinematics: true,
     customInstructions: "",
     handoffRules: [],
+    projectContext: DEFAULT_PROJECT_CONTEXT,
+    openQuestions: DEFAULT_OPEN_QUESTIONS,
+    guardrails: { falseStatusGuidance: true, derailTolerance: "medium", opennessPace: "balanced" },
   },
 };
+
+export const PROJECT_CONTEXT_MAX_CHARS = 1500;
+export const OPEN_QUESTION_MAX_CHARS = 200;
+export const OPEN_QUESTIONS_MAX = 8;
+
+function normalizeGuardrails(raw: unknown): ExperienceDirectorConfig["editor"]["guardrails"] {
+  const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    falseStatusGuidance: value.falseStatusGuidance !== false,
+    derailTolerance: value.derailTolerance === "low" || value.derailTolerance === "high" ? value.derailTolerance : "medium",
+    opennessPace: value.opennessPace === "slow" || value.opennessPace === "fast" ? value.opennessPace : "balanced",
+  };
+}
+
+function normalizeOpenQuestions(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return DEFAULT_OPEN_QUESTIONS;
+  // Lignes conservées telles quelles pendant la saisie ; les vides sont ignorées à la construction du prompt.
+  return raw.map((item) => String(item).slice(0, OPEN_QUESTION_MAX_CHARS)).slice(0, OPEN_QUESTIONS_MAX);
+}
 
 function sanitizeHandoffRules(raw: unknown): ExperienceDirectorConfig["editor"]["handoffRules"] {
   if (!Array.isArray(raw)) return [];
@@ -118,6 +152,11 @@ export function normalizeDirectorConfig(value: Partial<ExperienceDirectorConfig>
       priorities: priorities?.length ? priorities : DEFAULT_DIRECTOR_CONFIG.editor.priorities,
       customInstructions: editor?.customInstructions?.trim() ?? "",
       handoffRules: sanitizeHandoffRules(editor?.handoffRules ?? DEFAULT_DIRECTOR_CONFIG.editor.handoffRules),
+      projectContext: typeof editor?.projectContext === "string"
+        ? editor.projectContext.trim().slice(0, PROJECT_CONTEXT_MAX_CHARS)
+        : DEFAULT_PROJECT_CONTEXT,
+      openQuestions: editor?.openQuestions === undefined ? DEFAULT_OPEN_QUESTIONS : normalizeOpenQuestions(editor.openQuestions),
+      guardrails: normalizeGuardrails(editor?.guardrails),
     },
     frame: normalizeExperienceFrameConfig(value?.frame),
     activeCharacters: normalizeActiveCharacters(value?.activeCharacters),

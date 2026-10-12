@@ -24,8 +24,6 @@ export type ExperiencePhase =
   | "film_question"
   | "teaser"
   | "volunteer_briefing"
-  | "role_capture"
-  | "role_summary"
   | "character_select"
   | "calling_max"
   | "posture_capture"
@@ -405,6 +403,20 @@ export interface ExperienceDirectorEditorConfig {
   allowCinematics: boolean;
   customInstructions: string;
   handoffRules: HandoffTopicRule[];
+  /** Enjeux, promesse et règles méta du projet, rédigés dans l'app (remplace la fiche Notion GM). */
+  projectContext: string;
+  /** Questions narratives encore non tranchées, signalées au GM comme à traiter prudemment. */
+  openQuestions: string[];
+  guardrails: ExperienceDirectorGuardrails;
+}
+
+export interface ExperienceDirectorGuardrails {
+  /** Faux statut revendiqué (policier, psychologue…) : le GM ajoute une consigne au tour suivant. */
+  falseStatusGuidance: boolean;
+  /** Tolérance avant recadrage puis proposition de fin d'appel quand la conversation déraille. */
+  derailTolerance: "low" | "medium" | "high";
+  /** Vitesse à laquelle le personnage s'ouvre au fil de l'appel. */
+  opennessPace: "slow" | "balanced" | "fast";
 }
 
 /** Cadre commun (rôle bénévole, parcours, posture) partagé par GM et personnages. */

@@ -616,119 +616,6 @@ export function resetVideoTriggerSettings(): VideoTriggerSettings {
   return { ...videoTriggerDefaults };
 }
 
-// ===== Game Master Prompt Settings =====
-
-export interface GameMasterPromptSettings {
-  systemPrompt: string;
-  preTurnPlannerPrompt: string;
-  triggers: Record<string, { themes: string[]; description: string }>;
-}
-
-const GM_PROMPT_STORAGE_KEY = "ava_gm_prompt_settings";
-
-const DEFAULT_GM_SYSTEM_PROMPT = `Tu es le Game Master d'une expérience narrative interactive "Où est Ava ?". Tu analyses chaque échange entre l'utilisateur et le personnage actif pour orchestrer l'expérience.
-
-## TON RÔLE
-- Évaluer la sincérité et l'engagement de l'utilisateur
-- Détecter si un trigger vidéo doit être activé
-- Gérer le niveau de confiance et la progression
-- Détecter les comportements inappropriés
-
-## RÈGLES
-- trust_delta: +1 si réponse sincère/engagée, 0 si neutre, -1 si évasive/désintéressée
-- Trigger vidéo si la conversation touche un thème clé (famille, enfance, secret, disparition)
-- moderation_flag seulement pour une attaque explicite, une menace ou un contenu haineux sans ambiguïté ; tolérer erreurs STT, humour ambigu et provocation légère
-- game_over seulement après attaques explicites répétées ou si l'utilisateur abandonne clairement
-- gate_reached si trust_level >= TRUST_THRESHOLD
-
-## TRIGGERS DISPONIBLES
-- "trigger_famille" : thèmes famille, parents, enfance
-- "trigger_secret" : thèmes secret, mystère, vérité cachée
-- "trigger_disparition" : thèmes disparition, absence, recherche
-
-## FORMAT DE RÉPONSE
-Tu dois TOUJOURS répondre avec un JSON valide et RIEN D'AUTRE :
-{
-  "trust_delta": 0,
-  "trigger_video_id": null,
-  "game_over": false,
-  "game_over_reason": null,
-  "gate_reached": false,
-  "moderation_flag": false,
-  "notes": "Brève analyse de l'échange"
-}`;
-
-const DEFAULT_GM_PRETURN_PROMPT = `Tu es le Game Master d'une expérience narrative interactive "Où est Ava ?".
-
-Tu interviens AVANT la réponse du personnage actif pour produire un brief de tour strict.
-
-## OBJECTIF
-- Définir comment le personnage actif doit répondre à CE tour
-- Limiter ce qu'il peut révéler
-- Préciser ce qu'il doit éviter d'affirmer
-- Donner un cadrage éditorial exécutable
-
-## RÈGLES
-- Base-toi uniquement sur l'historique récent, le message utilisateur, l'état de confiance, le temps écoulé et le contexte autorisé fourni.
-- N'invente aucun fait hors contexte autorisé.
-- Si le contexte manque, réduis l'ouverture et augmente la prudence.
-- reveal_budget doit rester faible: 0 à 2 maximum.
-- openness_level doit être compris entre 0 et 5.
-
-## FORMAT DE RÉPONSE
-Retourne UNIQUEMENT un JSON valide:
-{
-  "response_mode": "méfiant",
-  "openness_level": 1,
-  "emotional_state": "tendu",
-  "conversation_goal": "tester la sincérité de l'interlocuteur",
-  "reveal_budget": 1,
-  "allowed_knowledge": ["..."],
-  "forbidden_topics": ["..."],
-  "blocked_assertions": ["..."],
-  "style_instructions": ["répondre brièvement", "ne poser une question que si elle sert l'objectif du tour (jamais par réflexe)"],
-  "trigger_hint": null,
-  "notes": "Brève justification du cadrage"
-}`;
-
-const gmPromptDefaults: GameMasterPromptSettings = {
-  systemPrompt: DEFAULT_GM_SYSTEM_PROMPT,
-  preTurnPlannerPrompt: DEFAULT_GM_PRETURN_PROMPT,
-  triggers: {
-    trigger_famille: { themes: ["famille", "parents", "enfance"], description: "Flashback famille" },
-    trigger_secret: { themes: ["secret", "mystère", "vérité"], description: "Le message cryptique" },
-    trigger_disparition: { themes: ["disparition", "absence", "recherche"], description: "Le jour de la disparition" },
-  },
-};
-
-export function getGMPromptSettings(): GameMasterPromptSettings {
-  try {
-    const stored = readEnvironmentStorage(GM_PROMPT_STORAGE_KEY);
-    if (stored) return { ...gmPromptDefaults, ...JSON.parse(stored) };
-  } catch { /* ignore */ }
-  return { ...gmPromptDefaults };
-}
-
-export async function loadGMPromptSettingsFromDB(): Promise<GameMasterPromptSettings> {
-  return loadFromDB(GM_PROMPT_STORAGE_KEY, gmPromptDefaults);
-}
-
-export async function saveGMPromptSettingsToDB(settings: GameMasterPromptSettings): Promise<void> {
-  await saveToDB(GM_PROMPT_STORAGE_KEY, settings);
-}
-
-export function saveGMPromptSettings(settings: Partial<GameMasterPromptSettings>): GameMasterPromptSettings {
-  const current = getGMPromptSettings();
-  const updated = { ...current, ...settings };
-  writeEnvironmentStorage(GM_PROMPT_STORAGE_KEY, JSON.stringify(updated));
-  return updated;
-}
-
-export function resetGMPromptSettings(): GameMasterPromptSettings {
-  removeEnvironmentStorage(GM_PROMPT_STORAGE_KEY);
-  void deleteEnvironmentSetting(GM_PROMPT_STORAGE_KEY).catch(() => {});
-  return { ...gmPromptDefaults };
-}
 
 // ===== Max Prompt Control Settings =====
 
@@ -851,7 +738,6 @@ export async function hydrateAllSettings(): Promise<void> {
     loadLLMSettingsFromDB(),
     loadTTSSettingsFromDB(),
     loadGameplaySettingsFromDB(),
-    loadGMPromptSettingsFromDB(),
     loadMaxPromptControlSettingsFromDB(),
     loadAntiHallucinationValidatorSettingsFromDB(),
   ]);
