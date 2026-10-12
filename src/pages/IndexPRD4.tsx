@@ -5,6 +5,7 @@
  * réelle STT + TTS via TTSQueue, GM post-turn PRD4 en void (jamais bloquant).
  * Fin de session : durée admin OU clôture naturelle du GM après le seuil minimum.
  */
+import { GM_CODE_VERSION } from "@/agents/gameMasterPRD4";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { useExperienceState } from "@/hooks/useExperienceState";
