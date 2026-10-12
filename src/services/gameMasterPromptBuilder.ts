@@ -1,4 +1,4 @@
-import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig } from "@/types";
+import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig, ExperienceDirectorGuardrails } from "@/types";
 
 const TONE_LABELS: Record<ExperienceDirectorEditorConfig["tone"], string> = {
   discreet: "Discret : observe et intervient seulement lorsqu'une décision est utile.",
