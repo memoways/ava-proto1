@@ -783,3 +783,21 @@ Connexion humaine demandée sur l'URL de preview, sans mot de passe transmis
 frontend corrigé. Nouvelle publication, validation capture corrigée, PTT réel,
 barge-in audio, cinématiques/handoff exécutés et baseline finale restent ouverts.
 Lot2 non commencé ; réglages et données historiques préservés.
+
+### Connexion preview et préparation du contrôle réel — 12 octobre 2026, 19:22 UTC
+
+Ulrich confirme « connecté à la preview dans Brave ». Back-office vérifié
+sur le domaine preview, compte admin attendu et Sandbox — Ulrich. Ouverture
+par le lien officiel « Tester moi-même » : onglet Brave `1830093908`,
+`https://id-preview--1265958d-b74e-40f2-917d-182fe05163fc.lovable.app/?env=sandbox-ulrich`.
+Introduction passée, réponse factuelle « Je n'ai pas vu le film », Max EN LIGNE,
+micro inactif. Échange humain demandé, aucun tour vocal simulé par l'agent.
+
+Bundle observé dans le DOM : `/assets/index-9MfUAJhs.js`. Il ne correspond
+pas au nom du bundle produit par le build attesté (`index-2uc8XJ7K.js`) :
+la révision effectivement servie reste à établir, sans assimiler le HEAD
+GitHub au frontend chargé. Le prochain tour doit vérifier les jalons de
+capture réels avant publication. Admin preview V2 chargé : 4 tentatives,
+4 observations GM, 0 ligne invalide, toutes issues des essais précédents.
+Aucune nouvelle publication du frontend, aucun réglage modifié ; suite et
+baseline finale restent ouvertes, lot 2 non commencé.
