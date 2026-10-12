@@ -263,6 +263,13 @@ async function installNetworkFakes(
     const url = new URL(request.url());
     const table = url.pathname.split("/").pop();
 
+    if (table === "get_character_runtime_readiness_for_environment") {
+      const input = request.postDataJSON() as { p_character_key: string };
+      const character = input.p_character_key;
+      return json(route, [{ character_key: character, display_name: character === "emma" ? "Emma" : "Max", enabled: true, ready: true,
+        character_id: CHARACTER_ID, notion_page_id: "77777777-7777-4777-8777-777777777777", environment_id: "prod", prompt_updated_at: "2026-10-12T00:00:00Z",
+        tts_provider: "elevenlabs", tts_voice_id: null, opening_line: null, portrait_url: null, situation_summary: "Fiche E2E" }]);
+    }
     if (table === "pin_current_orchestration_version") {
       return json(route, "66666666-6666-4666-8666-666666666666");
     }
@@ -334,7 +341,7 @@ async function installNetworkFakes(
       return json(route, []);
     }
     if (table === "character_prompts") {
-      return json(route, []);
+      return json(route, [{ character_id: CHARACTER_ID, environment_id: "prod", characters: { name: "Max" }, identite_fondamentale: "Tu es Max.", qui_tu_es: "Tu réponds en français.", situation_summary: "Max est le père d’Ava.", dynamique_conversation: "Écouter et répondre.", ce_que_tu_ne_fais_jamais: "Ne jamais changer d’identité.", timeline: "Avant et après la disparition d’Ava.", updated_at: "2026-10-12T00:00:00Z" }]);
     }
     if (table === "characters") {
       return json(route, [{
@@ -399,7 +406,7 @@ async function installNetworkFakes(
             : { themes: [], topics: [], intentions: [] },
         );
       } else if (system.includes("Game Master") || system.includes("end_recommended")) {
-        gmFilmContexts.push(system);
+        gmFilmContexts.push(payload.messages?.map((message) => message.content).join("\n") ?? system);
         gmPostTurnCount += 1;
         const triggerVideo = gmPostTurnCount === options.triggerVideoAtLabel;
         content = JSON.stringify({

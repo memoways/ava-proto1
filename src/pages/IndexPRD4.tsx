@@ -1,3 +1,5 @@
+import { createVoiceTurnV2, type VoiceMilestone, type ServiceObservation, type VoiceObserver } from "@/services/voiceTurnTelemetryV2";
+import { getRuntimeContext } from "@/services/environmentContext";
 /**
  * IndexPRD4 — Nouveau parcours (mai 2026).
  *
@@ -42,6 +44,7 @@ import {
   buildVoiceTurnCompletedPayload,
   createVoiceTurnId,
   recordVoiceTurnCompleted,
+  recordVoiceTurnV2,
 } from "@/services/voiceTelemetry";
 import { useTimer } from "@/hooks/useTimer";
 import { toast } from "@/hooks/use-toast";
@@ -211,6 +214,8 @@ const IndexPRD4 = () => {
   const sttLatencySegmentRef = useRef<string | null>(null);
   const pttFinalizingRef = useRef(false);
   const turnInputReadyAtRef = useRef<number | null>(null);
+  const inputMilestonesRef = useRef<Partial<Record<VoiceMilestone, number>>>({});
+  const inputServiceRef = useRef<ServiceObservation | null>(null);
   const turnLatencyOriginRef = useRef<"ptt_finalized" | "transcript_final">("transcript_final");
   const selectedEncounterFrameRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -487,6 +492,9 @@ const IndexPRD4 = () => {
       providerId?: TTSProviderId;
       characterKey?: string;
       userMessage?: string | null;
+      attemptId?: string;
+      onVoiceObservation?: VoiceObserver;
+      onServiceObserved?: (value: ServiceObservation) => void;
     } = {},
   ): Promise<ResponseOutputResult> => {
     let output = responseOutputRef.current;
@@ -519,6 +527,9 @@ const IndexPRD4 = () => {
       sessionId: sessionIdRef.current ?? undefined,
       turnId: context.turnId,
       turnIndex: context.turnIndex,
+      attemptId: context.attemptId,
+      onVoiceObservation: context.onVoiceObservation,
+      onServiceObserved: context.onServiceObserved,
       signal: context.signal,
       onPlaybackStart: context.onPlaybackStart,
       voiceId: context.voiceId,
@@ -1020,10 +1031,28 @@ const IndexPRD4 = () => {
 
       const turnIndex = conversationRef.current.filter((m) => m.role === "user").length;
       const turnId = createVoiceTurnId(sessionIdRef.current, turnIndex);
+      const turnCharacter = activeCharacterRef.current;
+      const inputMode = handsFreeListeningRef.current ? "hands_free" : "push_to_talk";
+      const runtime = getRuntimeContext();
+      const telemetry = createVoiceTurnV2({
+        session_id: sessionIdRef.current, turn_id: turnId, turn_index: turnIndex, character: turnCharacter,
+        environment_id: runtime.environmentId, context_type: runtime.contextType, input_mode: inputMode,
+        latency_origin: latencyOrigin === "ptt_finalized" ? "ptt_release" : inputMode === "hands_free" ? "app_turn_decision" : latencyOrigin,
+      }, inputReadyAt, recordVoiceTurnV2);
+      for (const [name, at] of Object.entries(inputMilestonesRef.current)) telemetry.observe(name as VoiceMilestone, at);
+      inputMilestonesRef.current = {};
+      if (inputServiceRef.current) telemetry.service(inputServiceRef.current);
+      inputServiceRef.current = null;
+      telemetry.observe("transcript_final");
+      const finishAborted = () => telemetry.finish(
+        turnController.signal.reason === "player-barge-in" ? "interrupted"
+          : /deadline/.test(String(turnController.signal.reason)) ? "timeout" : "cancelled",
+      );
+      turnController.signal.addEventListener("abort", finishAborted, { once: true });
       const configuredDuration = configuredSessionDurationRef.current;
       const elapsed = configuredDuration - (timerRef.current?.remaining ?? configuredDuration);
       const llmSettings = (() => { try { return getLLMSettings(); } catch { return null; } })();
-      const ttsService = getConfiguredTTSServiceInfo();
+      const ttsService = getConfiguredTTSServiceInfo(activeTTSProviderIdRef.current ?? undefined);
       const ragService = getConfiguredRAGServiceInfo();
       const latencySegmentIds: Record<string, string | null> = {};
       const serviceLabelForLatency = (segment: string) => {
@@ -1099,6 +1128,11 @@ const IndexPRD4 = () => {
           turnId,
           turnIndex,
           diagnosticTraceEnabled: diagnosticTraceEnabledRef.current,
+          onVoiceObservation: telemetry.observe,
+          onServiceObserved: telemetry.service,
+          onServerObserved: telemetry.server,
+          onVersionsObserved: telemetry.versions,
+          onGmObserved: telemetry.gm,
         });
 
         if (!isCurrentTurn()) return;
@@ -1179,7 +1213,10 @@ const IndexPRD4 = () => {
           });
         }, TURN_FIRST_AUDIO_DEADLINE_MS);
         const onPlaybackStart = () => {
+          if (!isCurrentTurn() || outputController.signal.aborted) return;
           firstPlaybackAt ??= performance.now();
+          // Blob/avatars expose software playback start, never a physical acoustic timestamp.
+          telemetry.observe("output_estimated", firstPlaybackAt);
           if (processingWatchdogRef.current) {
             window.clearTimeout(processingWatchdogRef.current);
             processingWatchdogRef.current = null;
@@ -1195,6 +1232,9 @@ const IndexPRD4 = () => {
         const outputResult = await renderResponseText(result.maxResponse, {
           turnId,
           turnIndex,
+          attemptId: telemetry.attemptId,
+          onVoiceObservation: telemetry.observe,
+          onServiceObserved: telemetry.service,
           signal: outputController.signal,
           onPlaybackStart,
           voiceId: activeVoiceIdRef.current ?? undefined,
@@ -1210,6 +1250,11 @@ const IndexPRD4 = () => {
           window.clearTimeout(processingWatchdogRef.current);
           processingWatchdogRef.current = null;
         }
+        if (outputResult.status === "played") telemetry.observe("audio_end");
+        telemetry.durations(outputResult.generatedSegments > 0 ? outputResult.generationWallMs ?? null : null, outputResult.status === "played" ? outputResult.playbackTotalMs : null);
+        telemetry.finish(outputController.signal.aborted && /deadline/.test(String(outputController.signal.reason)) ? "timeout"
+          : outputResult.status === "failed" ? "failed" : outputResult.status === "cancelled" ? "cancelled"
+          : outputResult.started ? "completed" : "no_audio");
         if (!isCurrentTurn()) return;
         resumeConversationTraceSync(true);
         const tts_ms = firstPlaybackAt == null ? undefined : Math.max(0, Math.round(firstPlaybackAt - ttsStart));
@@ -1227,7 +1272,7 @@ const IndexPRD4 = () => {
               : "not_measured";
           maxMsg.pipeline.segmentServices = {
             ...(maxMsg.pipeline.segmentServices || {}),
-            tts_ms: ttsService,
+            tts_ms: { serviceProvider: outputResult.provider, serviceName: outputResult.provider, model: outputResult.model ?? "Unknown" },
           };
           if ((tts_ms ?? 0) > (maxMsg.pipeline.max_ms ?? 0) && (tts_ms ?? 0) > (maxMsg.pipeline.rag_ms ?? 0)) {
             maxMsg.pipeline.blocker = "tts_ms";
@@ -1254,7 +1299,7 @@ const IndexPRD4 = () => {
           turn_id: turnId,
           turn_index: turnIndex,
           character: activeCharacterRef.current,
-          voice_modality: "push_to_talk",
+          voice_modality: inputMode === "hands_free" ? "micro_ouvert" : "push_to_talk",
           user_message_len: userText.length,
           max_response_len: result.maxResponse.length,
           timings: {
@@ -1283,7 +1328,7 @@ const IndexPRD4 = () => {
             model: sttTelemetry?.model,
             mode: "realtime",
           },
-          stt_trigger: "ptt_flush",
+          stt_trigger: inputMode === "hands_free" ? "silence" : "ptt_flush",
           latency_origin: latencyOrigin,
           had_error: outputResult.status === "failed",
           error_type: outputResult.status === "failed"
@@ -1492,6 +1537,7 @@ const IndexPRD4 = () => {
         }
 
       } catch (err) {
+        telemetry.finish(turnController.signal.aborted ? "cancelled" : "failed");
         if (turnController.signal.aborted || activeTurnSequenceRef.current !== turnSequence) return;
         console.error("[PRD4] turn failed:", err);
         const diagnosticFailure = diagnosticTraceEnabledRef.current;
@@ -1516,6 +1562,7 @@ const IndexPRD4 = () => {
           variant: "destructive",
         });
       } finally {
+        turnController.signal.removeEventListener("abort", finishAborted);
         if (activeTurnSequenceRef.current === turnSequence) {
           if (processingWatchdogRef.current) {
             window.clearTimeout(processingWatchdogRef.current);
@@ -1589,9 +1636,12 @@ const IndexPRD4 = () => {
           };
         },
         initialStream,
+        onVoiceObservation: (name, at) => { if (sttRef.current === stt && at !== undefined) inputMilestonesRef.current[name] = at; },
+        onServiceObserved: (service) => { if (sttRef.current === stt) inputServiceRef.current = service; },
       },
     );
     await stt.start();
+    inputMilestonesRef.current.capture_started = performance.now();
     recordPassiveVoiceNetworkObservation({
       sttConnected: true,
       lastSttConnectedAt: Date.now(),
@@ -1676,6 +1726,7 @@ const IndexPRD4 = () => {
     }
     pttFinalizingRef.current = true;
     turnInputReadyAtRef.current = performance.now();
+    inputMilestonesRef.current.turn_decided = turnInputReadyAtRef.current;
     turnLatencyOriginRef.current = "ptt_finalized";
     setAudioState("user_finalizing");
     try {
@@ -1727,6 +1778,7 @@ const IndexPRD4 = () => {
     if (!stt || handsFreeFinalizingRef.current || isProcessingRef.current || handsFreeBlockedRef.current) return;
     handsFreeFinalizingRef.current = true;
     turnInputReadyAtRef.current = performance.now();
+    inputMilestonesRef.current.turn_decided = turnInputReadyAtRef.current;
     turnLatencyOriginRef.current = "transcript_final";
     setAudioState("user_finalizing");
     try {

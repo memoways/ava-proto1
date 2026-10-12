@@ -30,6 +30,9 @@ export interface TTSGenerateContext {
   session_id?: string | null;
   turn_id?: string | null;
   turn_index?: number | null;
+  attempt_id?: string;
+  onVoiceObservation?: import("../voiceTurnTelemetryV2").VoiceObserver;
+  onServiceObserved?: (value: import("../voiceTurnTelemetryV2").ServiceObservation) => void;
   /** Cancels provider generation when the owning conversation turn becomes stale. */
   signal?: AbortSignal;
 }

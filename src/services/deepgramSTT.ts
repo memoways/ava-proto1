@@ -1,3 +1,4 @@
+import { observeVoice, type VoiceObserver } from "./voiceTurnTelemetryV2";
 import { debugLogger } from "./debugLogger";
 import { recordAudioLatency } from "./latencyTelemetry";
 import { createTimeoutSignal, withTimeout } from "./asyncUtils";
@@ -132,6 +133,7 @@ export interface STTFinalTelemetry {
 export class DeepgramSTT {
   private ws: WebSocket | null = null;
   private onTranscript: TranscriptCallback;
+  private onVoiceObservation?: VoiceObserver;
   private mediaRecorder: MediaRecorder | null = null;
   private stream: MediaStream | null = null;
   private silenceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -162,8 +164,9 @@ export class DeepgramSTT {
   }
 
 
-  constructor(onTranscript: TranscriptCallback, opts?: { onError?: STTErrorCallback; getTelemetryContext?: () => STTTelemetryContext; initialStream?: MediaStream | Promise<MediaStream> }) {
+  constructor(onTranscript: TranscriptCallback, opts?: { onError?: STTErrorCallback; getTelemetryContext?: () => STTTelemetryContext; onVoiceObservation?: VoiceObserver; initialStream?: MediaStream | Promise<MediaStream> }) {
     this.onTranscript = onTranscript;
+    this.onVoiceObservation = opts?.onVoiceObservation;
     this.onError = opts?.onError;
     this.getTelemetryContext = opts?.getTelemetryContext;
     this.initialStream = opts?.initialStream;
@@ -214,7 +217,7 @@ export class DeepgramSTT {
 
     const finalizeSentAt = performance.now();
     if (this.ws?.readyState === WebSocket.OPEN) {
-      try { this.ws.send(JSON.stringify({ type: "Finalize" })); } catch { /* fallback below */ }
+      try { this.ws.send(JSON.stringify({ type: "Finalize" })); observeVoice(this.onVoiceObservation, "flush_sent"); } catch { /* fallback below */ }
     }
 
     // Deepgram may omit `from_finalize` when little audio remains, so also
@@ -429,6 +432,7 @@ export class DeepgramSTT {
     this.mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0 && this.ws?.readyState === WebSocket.OPEN) {
         this.ws.send(event.data);
+        observeVoice(this.onVoiceObservation, "last_audio_sent");
       }
     };
 

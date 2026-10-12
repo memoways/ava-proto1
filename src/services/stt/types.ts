@@ -60,6 +60,8 @@ export interface STTSession {
 }
 
 export interface STTCreateOptions {
+  onVoiceObservation?: import("../voiceTurnTelemetryV2").VoiceObserver;
+  onServiceObserved?: (value: import("../voiceTurnTelemetryV2").ServiceObservation) => void;
   onError?: STTErrorCallback;
   getTelemetryContext?: () => STTTelemetryContext;
   /** Optional microphone stream request started synchronously from the user gesture. */

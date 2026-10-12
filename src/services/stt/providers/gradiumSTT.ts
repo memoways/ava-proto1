@@ -1,3 +1,4 @@
+import { observeVoice } from "../../voiceTurnTelemetryV2";
 import { debugLogger } from "@/services/debugLogger";
 import { recordAudioLatency } from "@/services/latencyTelemetry";
 import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types";
@@ -26,6 +27,7 @@ const FLUSH_TIMEOUT_MS = 2500;
  */
 export class GradiumSTT implements STTSession {
   private onTranscript: TranscriptCallback;
+  private onVoiceObservation?: STTCreateOptions["onVoiceObservation"];
   private onError?: STTCreateOptions["onError"];
   private getTelemetryContext?: STTCreateOptions["getTelemetryContext"];
   private stream: MediaStream | null = null;
@@ -48,6 +50,7 @@ export class GradiumSTT implements STTSession {
 
   constructor(onTranscript: TranscriptCallback, opts?: STTCreateOptions) {
     this.onTranscript = onTranscript;
+    this.onVoiceObservation = opts?.onVoiceObservation;
     this.onError = opts?.onError;
     this.getTelemetryContext = opts?.getTelemetryContext;
     this.initialStream = opts?.initialStream;
@@ -111,6 +114,7 @@ export class GradiumSTT implements STTSession {
       if (this._paused || this.capturePaused || this.ws?.readyState !== WebSocket.OPEN) return;
       const samples = event.inputBuffer.getChannelData(0);
       this.ws.send(JSON.stringify({ type: "audio", audio: pcm16Base64(samples) }));
+      observeVoice(this.onVoiceObservation, "last_audio_sent");
     };
     this.source.connect(this.processor);
     this.processor.connect(this.audioCtx.destination);
@@ -163,6 +167,7 @@ export class GradiumSTT implements STTSession {
     try {
       if (this.ws?.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify({ type: "flush", flush_id: id }));
+        observeVoice(this.onVoiceObservation, "flush_sent");
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -194,6 +199,7 @@ export class GradiumSTT implements STTSession {
         this.onTranscript(this.getCompleteTranscript(), false);
       } else if (msg?.type === "flushed") {
         this.flushAckAt = performance.now();
+        if (msg.flush_id === this.flushId) observeVoice(this.onVoiceObservation, "flush_acknowledged");
       } else if (msg?.type === "error") {
         const error = new Error(String(msg.message || "Gradium STT error"));
         this.onError?.(error, { provider: "gradium", code: msg.code });

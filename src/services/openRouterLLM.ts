@@ -1,3 +1,4 @@
+import { observeVoice, observeService, type VoiceObserver, type ServiceObservation, type ServerObservation } from "./voiceTurnTelemetryV2";
 import { trackLLMCall } from "./llmUsageTracker";
 import { debugLogger } from "./debugLogger";
 import { TimeoutError, withTimeout } from "./asyncUtils";
@@ -14,6 +15,9 @@ interface Message {
 }
 
 interface LLMOptions {
+  onVoiceObservation?: VoiceObserver;
+  onServiceObserved?: (value: ServiceObservation) => void;
+  onServerObserved?: (value: ServerObservation) => void;
   model?: string;
   temperature?: number;
   max_tokens?: number;
@@ -268,6 +272,7 @@ export async function callLLMWithUsage(
   const startedAt = performance.now();
   const timeoutMs = options?.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS;
   const samplingParameters = getSupportedSamplingParameters(model, options?.temperature, options?.top_p);
+  observeVoice(options?.onVoiceObservation, "llm_request", startedAt);
 
   let response: Response;
   try {
@@ -298,6 +303,7 @@ export async function callLLMWithUsage(
     throw err;
   }
 
+  observeVoice(options?.onVoiceObservation, "llm_headers");
   if (!response.ok) {
     const err = await response.text();
     let diagnosticTrace: LLMCallDiagnosticTrace | null = null;
@@ -319,6 +325,16 @@ export async function callLLMWithUsage(
   }
 
   const data = await response.json();
+  observeVoice(options?.onVoiceObservation, "llm_response");
+  observeService(options?.onServiceObserved, {
+    service: options?.feature_key === "prd4_gm_post_turn" ? "gm" : "llm",
+    requested_provider: "openrouter", requested_model: options?.model ?? null,
+    resolved_provider: "openrouter", resolved_model: model,
+    effective_provider: typeof data.provider === "string" ? data.provider : null,
+    effective_model: typeof data.model === "string" && data.model ? data.model : null,
+    transport: "http_batch", fallback: typeof data.model === "string" && data.model !== model,
+  });
+  try { if (data._ava_observability) options?.onServerObserved?.(data._ava_observability); } catch { /* diagnostic only */ }
   const content = data.choices?.[0]?.message?.content || '';
   const usage = data.usage || null;
   const generationId = data.id || null;

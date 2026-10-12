@@ -6,8 +6,27 @@
 import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@3.0.5";
 
 // src/lib/mcp/tools/get-usage-overview.ts
-import { defineTool, ToolError } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z } from "npm:zod@^3.25.76";
+import { ToolError } from "npm:@lovable.dev/mcp-js@3.0.5";
+
+// src/lib/mcp/defineTool.ts
+import { defineTool as sdkDefineTool } from "npm:@lovable.dev/mcp-js@3.0.5";
+import { z } from "npm:zod@4.6.6";
+function defineTool(definition) {
+  const input = z.object(definition.inputSchema).strict();
+  return sdkDefineTool({
+    ...definition,
+    handler: async (args, ctx) => {
+      const result = await definition.handler(input.parse(args), ctx);
+      if (definition.outputSchema && result.structuredContent !== void 0) {
+        return { ...result, structuredContent: definition.outputSchema.parse(result.structuredContent) };
+      }
+      return result;
+    }
+  });
+}
+
+// src/lib/mcp/tools/get-usage-overview.ts
+import { z as z2 } from "npm:zod@4.6.6";
 
 // src/lib/mcp/supabase.ts
 import { createClient } from "npm:@supabase/supabase-js@^2.98.0";
@@ -61,6 +80,13 @@ function supabaseForUser(ctx) {
     auth: { persistSession: false, autoRefreshToken: false }
   });
 }
+async function supabaseForAdmin(ctx) {
+  if (!ctx.isAuthenticated() || !ctx.getUserId()) throw new Error("Admin sign-in required");
+  const client = supabaseForUser(ctx);
+  const { data, error } = await client.from("user_roles").select("role").eq("user_id", ctx.getUserId()).eq("role", "admin").limit(1);
+  if (error || !data?.length) throw new Error("Admin access required");
+  return client;
+}
 
 // src/lib/mcp/stats.ts
 var DAY_MS = 864e5;
@@ -113,16 +139,16 @@ function tally(rows, pick, fallback = "non renseign\xE9") {
   const counts = {};
   for (const row of rows) {
     const raw = pick(row);
-    const label = raw === null || raw === void 0 || raw === "" ? fallback : String(raw);
-    counts[label] = (counts[label] ?? 0) + 1;
+    const label2 = raw === null || raw === void 0 || raw === "" ? fallback : String(raw);
+    counts[label2] = (counts[label2] ?? 0) + 1;
   }
   return counts;
 }
 function groupBy(rows, key) {
   const groups = {};
   for (const row of rows) {
-    const label = key(row);
-    (groups[label] ??= []).push(row);
+    const label2 = key(row);
+    (groups[label2] ??= []).push(row);
   }
   return groups;
 }
@@ -134,15 +160,15 @@ var get_usage_overview_default = defineTool({
   title: "Usage overview",
   description: "Session statistics for the AVA experience: sessions played, durations, characters called, film seen or not seen, endings, handoffs and voice modes, grouped by environment and by day. Reads session metadata only, never conversation content.",
   inputSchema: {
-    days: z.number().int().min(1).max(365).default(30).describe("Number of past days to include."),
-    environment: z.string().min(1).optional().describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed.")
+    days: z2.number().int().min(1).max(365).default(30).describe("Number of past days to include."),
+    environment: z2.string().min(1).optional().describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed.")
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ days, environment }, ctx) => {
     if (!ctx.isAuthenticated()) {
       throw new ToolError("Sign-in required: statistics are read with the connected account's own access rights.");
     }
-    const supabase = supabaseForUser(ctx);
+    const supabase = await supabaseForAdmin(ctx);
     let query = supabase.from("sessions").select(
       "id,started_at,duration_seconds,environment_id,context_type,personnage_appele,active_character,has_seen_film,game_over_reason,narrative_end,modalite_voix,output_mode,handoff_count,teaser_shown,ava_start_variant"
     ).gte("started_at", sinceIso(days)).order("started_at", { ascending: false }).range(0, MAX_SESSIONS - 1);
@@ -182,23 +208,23 @@ var get_usage_overview_default = defineTool({
 });
 
 // src/lib/mcp/tools/get-llm-costs.ts
-import { defineTool as defineTool2, ToolError as ToolError2 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z2 } from "npm:zod@^3.25.76";
+import { ToolError as ToolError2 } from "npm:@lovable.dev/mcp-js@3.0.5";
+import { z as z3 } from "npm:zod@4.6.6";
 var MAX_USAGE_ROWS = 5e3;
-var get_llm_costs_default = defineTool2({
+var get_llm_costs_default = defineTool({
   name: "get_llm_costs",
   title: "Model usage and costs",
   description: "Language-model usage statistics: calls, tokens and cost grouped by model, feature and day, with a success or error breakdown. Reads the usage log only, never conversation content.",
   inputSchema: {
-    days: z2.number().int().min(1).max(365).default(30).describe("Number of past days to include."),
-    model: z2.string().min(1).optional().describe("Optional model id filter, e.g. an OpenRouter model name.")
+    days: z3.number().int().min(1).max(365).default(30).describe("Number of past days to include."),
+    model: z3.string().min(1).optional().describe("Optional model id filter, e.g. an OpenRouter model name.")
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ days, model }, ctx) => {
     if (!ctx.isAuthenticated()) {
       throw new ToolError2("Sign-in required: usage costs are read with the connected account's own access rights.");
     }
-    const supabase = supabaseForUser(ctx);
+    const supabase = await supabaseForAdmin(ctx);
     let query = supabase.from("llm_usage").select(
       "created_at,feature_key,request_type,model,prompt_tokens,completion_tokens,total_tokens,cost_usd,status"
     ).gte("created_at", new Date(Date.now() - days * 864e5).toISOString()).order("created_at", { ascending: false }).range(0, MAX_USAGE_ROWS - 1);
@@ -255,32 +281,229 @@ var get_llm_costs_default = defineTool2({
   }
 });
 
+// src/lib/mcp/voiceTurnProjection.ts
+import { z as z4 } from "npm:zod@4.6.6";
+
+// src/services/voiceTurnTelemetryV2.ts
+var VOICE_MILESTONES = [
+  "capture_started",
+  "last_audio_sent",
+  "turn_decided",
+  "flush_sent",
+  "flush_acknowledged",
+  "transcript_final",
+  "voice_end",
+  "context_ready",
+  "llm_request",
+  "llm_headers",
+  "llm_response",
+  "first_token",
+  "intent_ready",
+  "safe_phrase",
+  "tts_text_sent",
+  "first_audio_chunk",
+  "audio_blob_ready",
+  "audio_scheduled",
+  "output_estimated",
+  "audio_end",
+  "audio_cancelled",
+  "acoustic_candidate",
+  "attenuation",
+  "interruption_confirmed",
+  "interruption_rejected",
+  "audio_resumed"
+];
+
+// src/lib/mcp/voiceTurnProjection.ts
+var label = z4.string().max(160).nullable();
+var duration = z4.number().finite().nonnegative().nullable();
+var serviceSchema = z4.object({
+  service: z4.enum(["stt", "llm", "tts", "rag", "gm"]),
+  requested_provider: label,
+  requested_model: label,
+  resolved_provider: label,
+  resolved_model: label,
+  effective_provider: label,
+  effective_model: label,
+  transport: label,
+  character_override: z4.boolean().optional(),
+  fallback: z4.boolean().optional(),
+  retry_count: z4.number().int().nonnegative().optional()
+});
+var spanSchema = z4.object({
+  request_id: z4.string().max(160),
+  clock: z4.enum(["edge_monotonic", "client_monotonic"]),
+  spans: z4.array(z4.object({ name: z4.string().max(80), start_ms: z4.number().finite().nonnegative(), end_ms: z4.number().finite().nonnegative(), status: z4.enum(["ok", "failed"]) })).max(32)
+});
+var voiceTurnProjectionSchema = z4.object({
+  schema_version: z4.literal(2),
+  session_id: label,
+  turn_id: z4.string().max(160),
+  attempt_id: z4.string().max(160),
+  turn_index: z4.number().int().nonnegative(),
+  character: z4.string().max(80),
+  environment_id: z4.string().max(80),
+  context_type: z4.string().max(80),
+  input_mode: z4.enum(["push_to_talk", "hands_free", "text"]),
+  latency_origin: z4.enum(["ptt_release", "app_turn_decision", "transcript_final", "text_submitted"]),
+  code_version: z4.string().max(160),
+  prompt_version: label,
+  config_version: label,
+  status: z4.enum(["started", "completed", "interrupted", "cancelled", "timeout", "failed", "no_audio"]),
+  clock: z4.literal("client_monotonic"),
+  milestones: z4.object(Object.fromEntries(VOICE_MILESTONES.map((name) => [name, z4.number().finite().nullable()]))),
+  services: z4.array(serviceSchema).max(16),
+  server: z4.array(spanSchema).max(8),
+  durations: z4.object({ origin_to_response_ms: duration, origin_to_output_estimated_ms: duration, t_turn_voice_ready_ms: duration, generation_total_ms: duration, playback_ms: duration }),
+  coverage: z4.object({ state: z4.enum(["complete", "partial"]), observed: z4.number().int().nonnegative(), expected: z4.number().int().nonnegative(), missing: z4.array(z4.enum(VOICE_MILESTONES)).max(VOICE_MILESTONES.length) }),
+  output_precision: z4.enum(["software_estimate", "unavailable"]),
+  critical_wait: z4.literal("coverage_incomplete"),
+  budget_exceeded: z4.array(z4.string().max(80)).max(16)
+});
+function projectVoiceEvents(rows) {
+  const events = rows.flatMap((row) => {
+    const parsed = voiceTurnProjectionSchema.safeParse(row.metadata_json);
+    return parsed.success ? [{ id: row.id, created_at: row.created_at, event_name: row.event_name, turn: parsed.data }] : [];
+  });
+  const attempts = /* @__PURE__ */ new Map();
+  for (const event of events) {
+    if (event.event_name === "voice_turn_gm") continue;
+    const key = event.turn.attempt_id;
+    const previous = attempts.get(key);
+    if (!previous || previous.status === "started") attempts.set(key, event.turn);
+  }
+  const turns = [...attempts.values()];
+  return {
+    events,
+    invalidRows: rows.length - events.length,
+    summary: {
+      byOrigin: Object.fromEntries([...new Set(turns.map((turn) => turn.latency_origin))].map((origin) => {
+        const cohort = turns.filter((turn) => turn.latency_origin === origin);
+        return [origin, { attempts: cohort.length, outputEstimatedMs: latencyStats(cohort.map((turn) => turn.durations.origin_to_output_estimated_ms)) }];
+      })),
+      attempts: turns.length,
+      statuses: tally(turns, (turn) => turn.status),
+      coverage: tally(turns, (turn) => turn.coverage.state),
+      originToResponseMs: latencyStats(turns.map((turn) => turn.durations.origin_to_response_ms)),
+      originToOutputEstimatedMs: latencyStats(turns.map((turn) => turn.durations.origin_to_output_estimated_ms)),
+      voiceEndToOutputEstimatedMs: latencyStats(turns.map((turn) => turn.durations.t_turn_voice_ready_ms)),
+      generationTotalMs: latencyStats(turns.map((turn) => turn.durations.generation_total_ms)),
+      playbackMs: latencyStats(turns.map((turn) => turn.durations.playback_ms)),
+      gmObservations: events.filter((event) => event.event_name === "voice_turn_gm").length
+    }
+  };
+}
+var countsSchema = z4.record(z4.string(), z4.number().int().nonnegative());
+var latencyStatsSchema = z4.object({ count: z4.number().int().nonnegative(), min: duration, mean: duration, p50: duration, p90: duration, p95: duration, max: duration });
+var voiceTurnPageSchema = z4.object({
+  events: z4.array(z4.object({ id: z4.string(), created_at: z4.string(), event_name: z4.enum(["voice_turn_started", "voice_turn_finished", "voice_turn_gm"]), turn: voiceTurnProjectionSchema })).max(300),
+  invalidRows: z4.number().int().nonnegative(),
+  summary: z4.object({
+    byOrigin: z4.record(z4.string(), z4.object({ attempts: z4.number().int().nonnegative(), outputEstimatedMs: latencyStatsSchema })),
+    attempts: z4.number().int().nonnegative(),
+    statuses: countsSchema,
+    coverage: countsSchema,
+    originToResponseMs: latencyStatsSchema,
+    originToOutputEstimatedMs: latencyStatsSchema,
+    voiceEndToOutputEstimatedMs: latencyStatsSchema,
+    generationTotalMs: latencyStatsSchema,
+    playbackMs: latencyStatsSchema,
+    gmObservations: z4.number().int().nonnegative()
+  }),
+  page: z4.object({ offset: z4.number().int().nonnegative(), limit: z4.number().int().nonnegative(), nextOffset: z4.number().int().nullable(), cappedAt: z4.literal(3e3), capped: z4.boolean() }),
+  window: z4.object({ from: z4.string(), to: z4.string() }),
+  summaryScope: z4.literal("returned_page_not_full_cohort"),
+  percentileMethod: z4.literal("linear_interpolation_(n-1)*p_rounded_ms"),
+  source: z4.literal("voice_turn_events"),
+  schemaVersion: z4.literal(2)
+});
+
+// src/lib/mcp/voiceTurnQuery.ts
+async function readVoiceTurnPage(client, filters) {
+  const limit = Math.min(300, Math.max(1, filters.limit ?? 100));
+  const offset = Math.min(3e3, Math.max(0, filters.offset ?? 0));
+  const remaining = Math.min(limit, 3e3 - offset);
+  if (!remaining) return { ...projectVoiceEvents([]), page: { offset, limit, nextOffset: null, cappedAt: 3e3, capped: true }, window: { from: filters.from, to: filters.to }, summaryScope: "returned_page_not_full_cohort", percentileMethod: "linear_interpolation_(n-1)*p_rounded_ms", source: "voice_turn_events", schemaVersion: 2 };
+  let query = client.from("voice_turn_events").select("id,created_at,event_name,metadata_json").gte("created_at", filters.from).lt("created_at", filters.to).in("event_name", ["voice_turn_started", "voice_turn_finished", "voice_turn_gm"]).eq("metadata_json->>schema_version", "2").order("created_at", { ascending: false }).order("id", { ascending: false });
+  if (filters.environment) query = query.eq("environment_id", filters.environment);
+  for (const name of ["character", "code_version", "prompt_version", "config_version", "turn_id", "attempt_id"]) {
+    if (filters[name]) query = query.eq(`metadata_json->>${name}`, filters[name]);
+  }
+  if (filters.provider || filters.model || filters.transport) {
+    const service = { service: filters.service ?? "tts" };
+    if (filters.provider) service.effective_provider = filters.provider;
+    if (filters.model) service.effective_model = filters.model;
+    if (filters.transport) service.transport = filters.transport;
+    query = query.contains("metadata_json", { services: [service] });
+  }
+  const { data, error } = await query.range(offset, offset + remaining);
+  if (error) throw new Error("Voice V2 diagnostics could not be read");
+  const rows = data ?? [];
+  const hasMore = rows.length > remaining;
+  return {
+    ...projectVoiceEvents(rows.slice(0, remaining)),
+    page: { offset, limit: remaining, nextOffset: hasMore && offset + remaining < 3e3 ? offset + remaining : null, cappedAt: 3e3, capped: hasMore && offset + remaining >= 3e3 },
+    window: { from: filters.from, to: filters.to },
+    summaryScope: "returned_page_not_full_cohort",
+    percentileMethod: "linear_interpolation_(n-1)*p_rounded_ms",
+    source: "voice_turn_events",
+    schemaVersion: 2
+  };
+}
+
 // src/lib/mcp/tools/get-voice-latencies.ts
-import { defineTool as defineTool3, ToolError as ToolError3 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z3 } from "npm:zod@^3.25.76";
+import { ToolError as ToolError3 } from "npm:@lovable.dev/mcp-js@3.0.5";
+import { z as z5 } from "npm:zod@4.6.6";
 var MAX_ROWS = 3e3;
-var get_voice_latencies_default = defineTool3({
+var get_voice_latencies_default = defineTool({
   name: "get_voice_latencies",
   title: "Voice latencies",
   description: "Voice pipeline timing statistics: speech-to-text, text-to-speech first byte and total, audio playback, plus per-turn retrieval, model and validation timings as count, mean, p50, p90, p95 and max.",
   inputSchema: {
-    days: z3.number().int().min(1).max(365).default(30).describe("Number of past days to include."),
-    environment: z3.string().min(1).optional().describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed.")
+    from: z5.iso.datetime().optional(),
+    to: z5.iso.datetime().optional(),
+    character: z5.string().min(1).max(80).optional(),
+    provider: z5.string().min(1).max(160).optional(),
+    model: z5.string().min(1).max(160).optional(),
+    service: z5.enum(["stt", "llm", "tts", "gm"]).default("tts"),
+    transport: z5.string().min(1).max(80).optional(),
+    code_version: z5.string().min(1).max(160).optional(),
+    prompt_version: z5.string().min(1).max(160).optional(),
+    config_version: z5.string().min(1).max(160).optional(),
+    turn_id: z5.string().min(1).max(160).optional(),
+    attempt_id: z5.string().min(1).max(160).optional(),
+    offset: z5.number().int().min(0).max(3e3).default(0),
+    limit: z5.number().int().min(1).max(300).default(100),
+    days: z5.number().int().min(1).max(365).default(30).describe("Number of past days to include."),
+    environment: z5.string().min(1).optional().describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed.")
   },
+  outputSchema: z5.object({ summary: z5.object({
+    windowDays: z5.number(),
+    window: z5.object({ from: z5.string(), to: z5.string() }),
+    percentileMethod: z5.string(),
+    environmentFilter: z5.string().nullable(),
+    legacy: z5.object({ source: z5.array(z5.string()), attribution: z5.string(), filtersApplied: z5.array(z5.string()), additionalV2FiltersApplied: z5.literal(false) }),
+    v2: voiceTurnPageSchema,
+    audio: z5.object({ samples: z5.number(), cappedAt: z5.number(), byDirection: z5.record(z5.string(), z5.number()), byContextType: z5.record(z5.string(), z5.number()), sttMs: latencyStatsSchema, ttsFirstByteMs: latencyStatsSchema, ttsTotalMs: latencyStatsSchema, playbackMs: latencyStatsSchema, spokenChars: z5.number(), heardChars: z5.number() }),
+    turn: z5.object({ samples: z5.number(), cappedAt: z5.number(), byContextType: z5.record(z5.string(), z5.number()), ragTotalMs: latencyStatsSchema, characterLlmMs: latencyStatsSchema, characterFirstTokenMs: latencyStatsSchema, validatorMs: latencyStatsSchema, gameMasterPostMs: latencyStatsSchema, turnTotalMs: latencyStatsSchema, fallbackTurns: z5.number(), tokens: z5.number() })
+  }) }),
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
-  handler: async ({ days, environment }, ctx) => {
+  handler: async ({ days, environment, from, to, ...filters }, ctx) => {
     if (!ctx.isAuthenticated()) {
       throw new ToolError3("Sign-in required: latency data is read with the connected account's own access rights.");
     }
-    const supabase = supabaseForUser(ctx);
-    const since = sinceIso(days);
+    const supabase = await supabaseForAdmin(ctx);
+    const since = from ?? sinceIso(days);
+    const until = to ?? (/* @__PURE__ */ new Date()).toISOString();
+    if (Date.parse(since) >= Date.parse(until) || Date.parse(until) - Date.parse(since) > 365 * 864e5) throw new ToolError3("Invalid time window (maximum 365 days)");
+    const v2 = await readVoiceTurnPage(supabase, { ...filters, from: since, to: until, environment });
     let audioQuery = supabase.from("audio_latencies").select(
       "direction,t_stt_ms,t_tts_first_byte_ms,t_tts_total_ms,t_audio_playback_ms,stt_text_len,tts_text_len,context_type"
-    ).gte("created_at", since).order("created_at", { ascending: false }).range(0, MAX_ROWS - 1);
+    ).gte("created_at", since).lt("created_at", until).order("created_at", { ascending: false }).range(0, MAX_ROWS - 1);
     if (environment) audioQuery = audioQuery.eq("environment_id", environment);
     let turnQuery = supabase.from("turn_latencies").select(
       "t_rag_total_ms,t_max_llm_ms,t_max_first_token_ms,t_validator_ms,t_gm_post_ms,t_turn_total_ms,rag_matches_count,usage_total_tokens,had_fallback,context_type"
-    ).gte("created_at", since).order("created_at", { ascending: false }).range(0, MAX_ROWS - 1);
+    ).gte("created_at", since).lt("created_at", until).order("created_at", { ascending: false }).range(0, MAX_ROWS - 1);
     if (environment) turnQuery = turnQuery.eq("environment_id", environment);
     const [audio, turn] = await Promise.all([audioQuery, turnQuery]);
     if (audio.error) throw new ToolError3(`Audio latencies could not be read: ${audio.error.message}`);
@@ -289,6 +512,10 @@ var get_voice_latencies_default = defineTool3({
     const turnRows = turn.data ?? [];
     const summary = {
       windowDays: days,
+      window: { from: since, to: until },
+      percentileMethod: "linear_interpolation_(n-1)*p_rounded_ms",
+      legacy: { source: ["audio_latencies", "turn_latencies"], attribution: "historical_not_verified", filtersApplied: ["window", "environment"], additionalV2FiltersApplied: false },
+      v2,
       environmentFilter: environment ?? null,
       audio: {
         samples: audioRows.length,
@@ -324,30 +551,30 @@ var get_voice_latencies_default = defineTool3({
 });
 
 // src/lib/mcp/tools/list-sessions.ts
-import { defineTool as defineTool4, ToolError as ToolError4 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z4 } from "npm:zod@^3.25.76";
+import { ToolError as ToolError4 } from "npm:@lovable.dev/mcp-js@3.0.5";
+import { z as z6 } from "npm:zod@4.6.6";
 var MAX_LIMIT = 100;
 function isoOrNull(value) {
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
-var list_sessions_default = defineTool4({
+var list_sessions_default = defineTool({
   name: "list_sessions",
   title: "List sessions",
   description: "Most recent game sessions as a metadata list: start and end, duration, environment, character called, film seen or not seen, voice modality, ending reason and handoff count. Conversation content is never returned.",
   inputSchema: {
-    days: z4.number().int().min(1).max(365).default(30).describe("Number of past days to include."),
-    environment: z4.string().min(1).optional().describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed."),
-    limit: z4.number().int().min(1).max(MAX_LIMIT).default(25).describe("Maximum sessions to return, up to 100."),
-    offset: z4.number().int().min(0).default(0).describe("Skip this many sessions, for paging.")
+    days: z6.number().int().min(1).max(365).default(30).describe("Number of past days to include."),
+    environment: z6.string().min(1).optional().describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed."),
+    limit: z6.number().int().min(1).max(MAX_LIMIT).default(25).describe("Maximum sessions to return, up to 100."),
+    offset: z6.number().int().min(0).default(0).describe("Skip this many sessions, for paging.")
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ days, environment, limit, offset }, ctx) => {
     if (!ctx.isAuthenticated()) {
       throw new ToolError4("Sign-in required: sessions are read with the connected account's own access rights.");
     }
-    const supabase = supabaseForUser(ctx);
+    const supabase = await supabaseForAdmin(ctx);
     let query = supabase.from("sessions").select(
       "id,started_at,ended_at,duration_seconds,environment_id,context_type,personnage_appele,active_character,has_seen_film,game_over_reason,narrative_end,modalite_voix,output_mode,handoff_count,tester_label"
     ).gte("started_at", sinceIso(days)).order("started_at", { ascending: false }).range(offset, offset + limit - 1);

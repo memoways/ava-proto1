@@ -1,6 +1,7 @@
-import { defineTool, ToolError } from "@lovable.dev/mcp-js";
-import { z } from "zod";
-import { supabaseForUser } from "../supabase";
+import { ToolError } from "@lovable.dev/mcp-js";
+import { defineTool } from "../defineTool";
+import { z } from "zod-mcp";
+import { supabaseForAdmin } from "../supabase";
 import { groupBy, isoDay, round4, sumBy, tally } from "../stats";
 
 const MAX_USAGE_ROWS = 5000;
@@ -29,7 +30,7 @@ export default defineTool({
     if (!ctx.isAuthenticated()) {
       throw new ToolError("Sign-in required: usage costs are read with the connected account's own access rights.");
     }
-    const supabase = supabaseForUser(ctx);
+    const supabase = await supabaseForAdmin(ctx);
     let query = supabase
       .from("llm_usage")
       .select(

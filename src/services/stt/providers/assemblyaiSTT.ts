@@ -1,3 +1,4 @@
+import { observeVoice } from "../../voiceTurnTelemetryV2";
 import { debugLogger } from "@/services/debugLogger";
 import { recordAudioLatency } from "@/services/latencyTelemetry";
 import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types";
@@ -17,6 +18,7 @@ const TOKEN_ENDPOINT = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/
  */
 export class AssemblyAISTT implements STTSession {
   private onTranscript: TranscriptCallback;
+  private onVoiceObservation?: STTCreateOptions["onVoiceObservation"];
   private onError?: STTCreateOptions["onError"];
   private getTelemetryContext?: STTCreateOptions["getTelemetryContext"];
 
@@ -39,6 +41,7 @@ export class AssemblyAISTT implements STTSession {
 
   constructor(onTranscript: TranscriptCallback, opts?: STTCreateOptions) {
     this.onTranscript = onTranscript;
+    this.onVoiceObservation = opts?.onVoiceObservation;
     this.onError = opts?.onError;
     this.getTelemetryContext = opts?.getTelemetryContext;
     this.initialStream = opts?.initialStream;
@@ -112,6 +115,7 @@ export class AssemblyAISTT implements STTSession {
       const input = e.inputBuffer.getChannelData(0);
       const pcm = floatTo16BitPCM(input);
       this.ws.send(pcm);
+      observeVoice(this.onVoiceObservation, "last_audio_sent");
     };
 
     this.source.connect(this.processor);
@@ -136,7 +140,7 @@ export class AssemblyAISTT implements STTSession {
     this.capturePaused = true;
     const requestedAt = performance.now();
     if (this.ws?.readyState === WebSocket.OPEN) {
-      try { this.ws.send(JSON.stringify({ type: "ForceEndpoint" })); } catch { /* use latest running text */ }
+      try { this.ws.send(JSON.stringify({ type: "ForceEndpoint" })); observeVoice(this.onVoiceObservation, "flush_sent"); } catch { /* use latest running text */ }
     }
     await waitForCondition(() => this.lastTurnEndedAt >= requestedAt, 1300);
     const finalText = this.fullTranscript.trim();

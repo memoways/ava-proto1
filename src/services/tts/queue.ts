@@ -1,3 +1,4 @@
+import { observeVoice, observeService, type ServiceObservation } from "../voiceTurnTelemetryV2";
 /**
  * TTS Audio Queue — provider-agnostic sentence queue.
  *
@@ -39,6 +40,7 @@ export class TTSQueue {
   private firstEnqueuedAt: number | null = null;
   private firstPlaybackStartMs: number | null = null;
   private generationWallMs = 0;
+  private services: ServiceObservation[] = [];
   private lastSentText = "";
   private pending: PendingEntry[] = [];
   private flushScheduled = false;
@@ -153,7 +155,13 @@ export class TTSQueue {
       previousText,
       nextText,
       signal: this.abortController.signal,
+      onServiceObserved: (service) => {
+        if (this._cancelled) return;
+        if (this.services.length < 16) this.services.push(service);
+        observeService(entry.options?.onServiceObserved, service);
+      },
     };
+    observeVoice(entry.options?.onVoiceObservation, "tts_text_sent");
 
     // Streaming-capable provider (currently Gradium): generation starts now and
     // buffers behind the handle's closed gate; the chain link opens it in turn.
@@ -200,19 +208,20 @@ export class TTSQueue {
     firstPlaybackStartMs: number;
     generationWallMs: number;
     error?: Error;
+    services?: ServiceObservation[];
   }> {
     await this.queue;
     const firstPlaybackStartMs = this.firstPlaybackStartMs ?? 0;
     if (this._cancelled) {
-      return { status: "cancelled", playedSegments: this.playbackCount, failedSegments: this.failedCount, generatedSegments: this.generationCount, playbackStartMs: this.playbackStartMsTotal, playbackTotalMs: this.playbackTotalMs, firstPlaybackStartMs, generationWallMs: this.generationWallMs, error: this.lastError };
+      return { ...(this.services.length ? { services: [...this.services] } : {}), status: "cancelled", playedSegments: this.playbackCount, failedSegments: this.failedCount, generatedSegments: this.generationCount, playbackStartMs: this.playbackStartMsTotal, playbackTotalMs: this.playbackTotalMs, firstPlaybackStartMs, generationWallMs: this.generationWallMs, error: this.lastError };
     }
     if (this.failedCount > 0) {
-      return { status: "failed", playedSegments: this.playbackCount, failedSegments: this.failedCount, generatedSegments: this.generationCount, playbackStartMs: this.playbackStartMsTotal, playbackTotalMs: this.playbackTotalMs, firstPlaybackStartMs, generationWallMs: this.generationWallMs, error: this.lastError };
+      return { ...(this.services.length ? { services: [...this.services] } : {}), status: "failed", playedSegments: this.playbackCount, failedSegments: this.failedCount, generatedSegments: this.generationCount, playbackStartMs: this.playbackStartMsTotal, playbackTotalMs: this.playbackTotalMs, firstPlaybackStartMs, generationWallMs: this.generationWallMs, error: this.lastError };
     }
     if (this.playbackCount === 0) {
-      return { status: "skipped", playedSegments: 0, failedSegments: 0, generatedSegments: this.generationCount, playbackStartMs: 0, playbackTotalMs: 0, firstPlaybackStartMs, generationWallMs: this.generationWallMs };
+      return { ...(this.services.length ? { services: [...this.services] } : {}), status: "skipped", playedSegments: 0, failedSegments: 0, generatedSegments: this.generationCount, playbackStartMs: 0, playbackTotalMs: 0, firstPlaybackStartMs, generationWallMs: this.generationWallMs };
     }
-    return { status: "played", playedSegments: this.playbackCount, failedSegments: 0, generatedSegments: this.generationCount, playbackStartMs: this.playbackStartMsTotal, playbackTotalMs: this.playbackTotalMs, firstPlaybackStartMs, generationWallMs: this.generationWallMs };
+    return { ...(this.services.length ? { services: [...this.services] } : {}), status: "played", playedSegments: this.playbackCount, failedSegments: 0, generatedSegments: this.generationCount, playbackStartMs: this.playbackStartMsTotal, playbackTotalMs: this.playbackTotalMs, firstPlaybackStartMs, generationWallMs: this.generationWallMs };
   }
 
   cancel(): void {

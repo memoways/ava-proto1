@@ -26,23 +26,18 @@
           "openWorldHint": false
         },
         "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
           "properties": {
             "days": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 365,
               "default": 30,
-              "description": "Number of past days to include."
+              "type": "number"
             },
             "environment": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed."
+              "type": "string"
             }
           },
-          "additionalProperties": false,
-          "$schema": "http://json-schema.org/draft-07/schema#"
+          "additionalProperties": false
         },
         "outputSchema": null
       },
@@ -56,23 +51,18 @@
           "openWorldHint": false
         },
         "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
           "properties": {
             "days": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 365,
               "default": 30,
-              "description": "Number of past days to include."
+              "type": "number"
             },
             "model": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Optional model id filter, e.g. an OpenRouter model name."
+              "type": "string"
             }
           },
-          "additionalProperties": false,
-          "$schema": "http://json-schema.org/draft-07/schema#"
+          "additionalProperties": false
         },
         "outputSchema": null
       },
@@ -86,25 +76,2388 @@
           "openWorldHint": false
         },
         "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
           "properties": {
+            "from": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            },
+            "character": {
+              "type": "string"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "service": {
+              "default": "tts",
+              "type": "string",
+              "enum": [
+                "stt",
+                "llm",
+                "tts",
+                "gm"
+              ]
+            },
+            "transport": {
+              "type": "string"
+            },
+            "code_version": {
+              "type": "string"
+            },
+            "prompt_version": {
+              "type": "string"
+            },
+            "config_version": {
+              "type": "string"
+            },
+            "turn_id": {
+              "type": "string"
+            },
+            "attempt_id": {
+              "type": "string"
+            },
+            "offset": {
+              "default": 0,
+              "type": "number"
+            },
+            "limit": {
+              "default": 100,
+              "type": "number"
+            },
             "days": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 365,
               "default": 30,
-              "description": "Number of past days to include."
+              "type": "number"
             },
             "environment": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed."
+              "type": "string"
             }
           },
-          "additionalProperties": false,
-          "$schema": "http://json-schema.org/draft-07/schema#"
+          "additionalProperties": false
         },
-        "outputSchema": null
+        "outputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "summary": {
+              "type": "object",
+              "properties": {
+                "windowDays": {
+                  "type": "number"
+                },
+                "window": {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "from",
+                    "to"
+                  ],
+                  "additionalProperties": false
+                },
+                "percentileMethod": {
+                  "type": "string"
+                },
+                "environmentFilter": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "legacy": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "attribution": {
+                      "type": "string"
+                    },
+                    "filtersApplied": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalV2FiltersApplied": {
+                      "type": "boolean",
+                      "const": false
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "attribution",
+                    "filtersApplied",
+                    "additionalV2FiltersApplied"
+                  ],
+                  "additionalProperties": false
+                },
+                "v2": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "event_name": {
+                            "type": "string",
+                            "enum": [
+                              "voice_turn_started",
+                              "voice_turn_finished",
+                              "voice_turn_gm"
+                            ]
+                          },
+                          "turn": {
+                            "type": "object",
+                            "properties": {
+                              "schema_version": {
+                                "type": "number",
+                                "const": 2
+                              },
+                              "session_id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "turn_id": {
+                                "type": "string"
+                              },
+                              "attempt_id": {
+                                "type": "string"
+                              },
+                              "turn_index": {
+                                "type": "number"
+                              },
+                              "character": {
+                                "type": "string"
+                              },
+                              "environment_id": {
+                                "type": "string"
+                              },
+                              "context_type": {
+                                "type": "string"
+                              },
+                              "input_mode": {
+                                "type": "string",
+                                "enum": [
+                                  "push_to_talk",
+                                  "hands_free",
+                                  "text"
+                                ]
+                              },
+                              "latency_origin": {
+                                "type": "string",
+                                "enum": [
+                                  "ptt_release",
+                                  "app_turn_decision",
+                                  "transcript_final",
+                                  "text_submitted"
+                                ]
+                              },
+                              "code_version": {
+                                "type": "string"
+                              },
+                              "prompt_version": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "config_version": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "started",
+                                  "completed",
+                                  "interrupted",
+                                  "cancelled",
+                                  "timeout",
+                                  "failed",
+                                  "no_audio"
+                                ]
+                              },
+                              "clock": {
+                                "type": "string",
+                                "const": "client_monotonic"
+                              },
+                              "milestones": {
+                                "type": "object",
+                                "properties": {
+                                  "capture_started": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "last_audio_sent": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "turn_decided": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "flush_sent": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "flush_acknowledged": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "transcript_final": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "voice_end": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "context_ready": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "llm_request": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "llm_headers": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "llm_response": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "first_token": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "intent_ready": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "safe_phrase": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "tts_text_sent": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "first_audio_chunk": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "audio_blob_ready": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "audio_scheduled": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "output_estimated": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "audio_end": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "audio_cancelled": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "acoustic_candidate": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "attenuation": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "interruption_confirmed": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "interruption_rejected": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "audio_resumed": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "capture_started",
+                                  "last_audio_sent",
+                                  "turn_decided",
+                                  "flush_sent",
+                                  "flush_acknowledged",
+                                  "transcript_final",
+                                  "voice_end",
+                                  "context_ready",
+                                  "llm_request",
+                                  "llm_headers",
+                                  "llm_response",
+                                  "first_token",
+                                  "intent_ready",
+                                  "safe_phrase",
+                                  "tts_text_sent",
+                                  "first_audio_chunk",
+                                  "audio_blob_ready",
+                                  "audio_scheduled",
+                                  "output_estimated",
+                                  "audio_end",
+                                  "audio_cancelled",
+                                  "acoustic_candidate",
+                                  "attenuation",
+                                  "interruption_confirmed",
+                                  "interruption_rejected",
+                                  "audio_resumed"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "services": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "service": {
+                                      "type": "string",
+                                      "enum": [
+                                        "stt",
+                                        "llm",
+                                        "tts",
+                                        "rag",
+                                        "gm"
+                                      ]
+                                    },
+                                    "requested_provider": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "requested_model": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "resolved_provider": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "resolved_model": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "effective_provider": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "effective_model": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "transport": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "character_override": {
+                                      "type": "boolean"
+                                    },
+                                    "fallback": {
+                                      "type": "boolean"
+                                    },
+                                    "retry_count": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "service",
+                                    "requested_provider",
+                                    "requested_model",
+                                    "resolved_provider",
+                                    "resolved_model",
+                                    "effective_provider",
+                                    "effective_model",
+                                    "transport"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "server": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "request_id": {
+                                      "type": "string"
+                                    },
+                                    "clock": {
+                                      "type": "string",
+                                      "enum": [
+                                        "edge_monotonic",
+                                        "client_monotonic"
+                                      ]
+                                    },
+                                    "spans": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "name": {
+                                            "type": "string"
+                                          },
+                                          "start_ms": {
+                                            "type": "number"
+                                          },
+                                          "end_ms": {
+                                            "type": "number"
+                                          },
+                                          "status": {
+                                            "type": "string",
+                                            "enum": [
+                                              "ok",
+                                              "failed"
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "name",
+                                          "start_ms",
+                                          "end_ms",
+                                          "status"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "request_id",
+                                    "clock",
+                                    "spans"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "durations": {
+                                "type": "object",
+                                "properties": {
+                                  "origin_to_response_ms": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "origin_to_output_estimated_ms": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "t_turn_voice_ready_ms": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "generation_total_ms": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "playback_ms": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "origin_to_response_ms",
+                                  "origin_to_output_estimated_ms",
+                                  "t_turn_voice_ready_ms",
+                                  "generation_total_ms",
+                                  "playback_ms"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "coverage": {
+                                "type": "object",
+                                "properties": {
+                                  "state": {
+                                    "type": "string",
+                                    "enum": [
+                                      "complete",
+                                      "partial"
+                                    ]
+                                  },
+                                  "observed": {
+                                    "type": "number"
+                                  },
+                                  "expected": {
+                                    "type": "number"
+                                  },
+                                  "missing": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "capture_started",
+                                        "last_audio_sent",
+                                        "turn_decided",
+                                        "flush_sent",
+                                        "flush_acknowledged",
+                                        "transcript_final",
+                                        "voice_end",
+                                        "context_ready",
+                                        "llm_request",
+                                        "llm_headers",
+                                        "llm_response",
+                                        "first_token",
+                                        "intent_ready",
+                                        "safe_phrase",
+                                        "tts_text_sent",
+                                        "first_audio_chunk",
+                                        "audio_blob_ready",
+                                        "audio_scheduled",
+                                        "output_estimated",
+                                        "audio_end",
+                                        "audio_cancelled",
+                                        "acoustic_candidate",
+                                        "attenuation",
+                                        "interruption_confirmed",
+                                        "interruption_rejected",
+                                        "audio_resumed"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "state",
+                                  "observed",
+                                  "expected",
+                                  "missing"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "output_precision": {
+                                "type": "string",
+                                "enum": [
+                                  "software_estimate",
+                                  "unavailable"
+                                ]
+                              },
+                              "critical_wait": {
+                                "type": "string",
+                                "const": "coverage_incomplete"
+                              },
+                              "budget_exceeded": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "schema_version",
+                              "session_id",
+                              "turn_id",
+                              "attempt_id",
+                              "turn_index",
+                              "character",
+                              "environment_id",
+                              "context_type",
+                              "input_mode",
+                              "latency_origin",
+                              "code_version",
+                              "prompt_version",
+                              "config_version",
+                              "status",
+                              "clock",
+                              "milestones",
+                              "services",
+                              "server",
+                              "durations",
+                              "coverage",
+                              "output_precision",
+                              "critical_wait",
+                              "budget_exceeded"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "created_at",
+                          "event_name",
+                          "turn"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "invalidRows": {
+                      "type": "number"
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "byOrigin": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "attempts": {
+                                "type": "number"
+                              },
+                              "outputEstimatedMs": {
+                                "type": "object",
+                                "properties": {
+                                  "count": {
+                                    "type": "number"
+                                  },
+                                  "min": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "mean": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "p50": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "p90": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "p95": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "max": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "count",
+                                  "min",
+                                  "mean",
+                                  "p50",
+                                  "p90",
+                                  "p95",
+                                  "max"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "attempts",
+                              "outputEstimatedMs"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "attempts": {
+                          "type": "number"
+                        },
+                        "statuses": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "number"
+                          }
+                        },
+                        "coverage": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "number"
+                          }
+                        },
+                        "originToResponseMs": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "number"
+                            },
+                            "min": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "mean": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p50": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p90": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p95": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "max": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "count",
+                            "min",
+                            "mean",
+                            "p50",
+                            "p90",
+                            "p95",
+                            "max"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "originToOutputEstimatedMs": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "number"
+                            },
+                            "min": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "mean": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p50": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p90": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p95": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "max": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "count",
+                            "min",
+                            "mean",
+                            "p50",
+                            "p90",
+                            "p95",
+                            "max"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "voiceEndToOutputEstimatedMs": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "number"
+                            },
+                            "min": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "mean": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p50": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p90": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p95": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "max": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "count",
+                            "min",
+                            "mean",
+                            "p50",
+                            "p90",
+                            "p95",
+                            "max"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "generationTotalMs": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "number"
+                            },
+                            "min": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "mean": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p50": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p90": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p95": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "max": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "count",
+                            "min",
+                            "mean",
+                            "p50",
+                            "p90",
+                            "p95",
+                            "max"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "playbackMs": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "number"
+                            },
+                            "min": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "mean": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p50": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p90": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p95": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "max": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "count",
+                            "min",
+                            "mean",
+                            "p50",
+                            "p90",
+                            "p95",
+                            "max"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "gmObservations": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "byOrigin",
+                        "attempts",
+                        "statuses",
+                        "coverage",
+                        "originToResponseMs",
+                        "originToOutputEstimatedMs",
+                        "voiceEndToOutputEstimatedMs",
+                        "generationTotalMs",
+                        "playbackMs",
+                        "gmObservations"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "offset": {
+                          "type": "number"
+                        },
+                        "limit": {
+                          "type": "number"
+                        },
+                        "nextOffset": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cappedAt": {
+                          "type": "number",
+                          "const": 3000
+                        },
+                        "capped": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "offset",
+                        "limit",
+                        "nextOffset",
+                        "cappedAt",
+                        "capped"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "window": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "string"
+                        },
+                        "to": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "from",
+                        "to"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "summaryScope": {
+                      "type": "string",
+                      "const": "returned_page_not_full_cohort"
+                    },
+                    "percentileMethod": {
+                      "type": "string",
+                      "const": "linear_interpolation_(n-1)*p_rounded_ms"
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "voice_turn_events"
+                    },
+                    "schemaVersion": {
+                      "type": "number",
+                      "const": 2
+                    }
+                  },
+                  "required": [
+                    "events",
+                    "invalidRows",
+                    "summary",
+                    "page",
+                    "window",
+                    "summaryScope",
+                    "percentileMethod",
+                    "source",
+                    "schemaVersion"
+                  ],
+                  "additionalProperties": false
+                },
+                "audio": {
+                  "type": "object",
+                  "properties": {
+                    "samples": {
+                      "type": "number"
+                    },
+                    "cappedAt": {
+                      "type": "number"
+                    },
+                    "byDirection": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "number"
+                      }
+                    },
+                    "byContextType": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "number"
+                      }
+                    },
+                    "sttMs": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "mean": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p50": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p90": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p95": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "max": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "min",
+                        "mean",
+                        "p50",
+                        "p90",
+                        "p95",
+                        "max"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "ttsFirstByteMs": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "mean": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p50": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p90": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p95": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "max": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "min",
+                        "mean",
+                        "p50",
+                        "p90",
+                        "p95",
+                        "max"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "ttsTotalMs": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "mean": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p50": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p90": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p95": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "max": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "min",
+                        "mean",
+                        "p50",
+                        "p90",
+                        "p95",
+                        "max"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "playbackMs": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "mean": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p50": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p90": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p95": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "max": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "min",
+                        "mean",
+                        "p50",
+                        "p90",
+                        "p95",
+                        "max"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "spokenChars": {
+                      "type": "number"
+                    },
+                    "heardChars": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "samples",
+                    "cappedAt",
+                    "byDirection",
+                    "byContextType",
+                    "sttMs",
+                    "ttsFirstByteMs",
+                    "ttsTotalMs",
+                    "playbackMs",
+                    "spokenChars",
+                    "heardChars"
+                  ],
+                  "additionalProperties": false
+                },
+                "turn": {
+                  "type": "object",
+                  "properties": {
+                    "samples": {
+                      "type": "number"
+                    },
+                    "cappedAt": {
+                      "type": "number"
+                    },
+                    "byContextType": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "number"
+                      }
+                    },
+                    "ragTotalMs": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "mean": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p50": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p90": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p95": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "max": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "min",
+                        "mean",
+                        "p50",
+                        "p90",
+                        "p95",
+                        "max"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "characterLlmMs": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "mean": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p50": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p90": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p95": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "max": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "min",
+                        "mean",
+                        "p50",
+                        "p90",
+                        "p95",
+                        "max"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "characterFirstTokenMs": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "mean": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p50": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p90": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p95": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "max": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "min",
+                        "mean",
+                        "p50",
+                        "p90",
+                        "p95",
+                        "max"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "validatorMs": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "mean": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p50": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p90": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p95": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "max": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "min",
+                        "mean",
+                        "p50",
+                        "p90",
+                        "p95",
+                        "max"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "gameMasterPostMs": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "mean": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p50": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p90": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p95": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "max": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "min",
+                        "mean",
+                        "p50",
+                        "p90",
+                        "p95",
+                        "max"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "turnTotalMs": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "number"
+                        },
+                        "min": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "mean": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p50": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p90": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "p95": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "max": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "min",
+                        "mean",
+                        "p50",
+                        "p90",
+                        "p95",
+                        "max"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "fallbackTurns": {
+                      "type": "number"
+                    },
+                    "tokens": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "samples",
+                    "cappedAt",
+                    "byContextType",
+                    "ragTotalMs",
+                    "characterLlmMs",
+                    "characterFirstTokenMs",
+                    "validatorMs",
+                    "gameMasterPostMs",
+                    "turnTotalMs",
+                    "fallbackTurns",
+                    "tokens"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "windowDays",
+                "window",
+                "percentileMethod",
+                "environmentFilter",
+                "legacy",
+                "v2",
+                "audio",
+                "turn"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "summary"
+          ],
+          "additionalProperties": false
+        }
       },
       {
         "name": "list_sessions",
@@ -116,36 +2469,26 @@
           "openWorldHint": false
         },
         "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
           "properties": {
             "days": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 365,
               "default": 30,
-              "description": "Number of past days to include."
+              "type": "number"
             },
             "environment": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed."
+              "type": "string"
             },
             "limit": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
               "default": 25,
-              "description": "Maximum sessions to return, up to 100."
+              "type": "number"
             },
             "offset": {
-              "type": "integer",
-              "minimum": 0,
               "default": 0,
-              "description": "Skip this many sessions, for paging."
+              "type": "number"
             }
           },
-          "additionalProperties": false,
-          "$schema": "http://json-schema.org/draft-07/schema#"
+          "additionalProperties": false
         },
         "outputSchema": null
       }

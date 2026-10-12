@@ -1,3 +1,4 @@
+import { observeVoice, observeService, type VoiceObserver, type ServiceObservation, type ServerObservation } from "./voiceTurnTelemetryV2";
 /**
  * PRD4 — Orchestrateur lean d'un tour de conversation.
  *
@@ -53,6 +54,11 @@ import { buildExperienceFrame } from "@/services/experienceFrame";
 import type { ConversationMessage, ConversationTurnTraceV1, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 
 export interface PRD4TurnInput {
+  onVoiceObservation?: VoiceObserver;
+  onServiceObserved?: (value: ServiceObservation) => void;
+  onServerObserved?: (value: ServerObservation) => void;
+  onVersionsObserved?: (prompt: string | null, config: string | null) => void;
+  onGmObserved?: (service: ServiceObservation, spans: ServerObservation) => void;
   sessionId: string | null;
   conversationHistory: ConversationMessage[];
   userMessage: string;
@@ -205,6 +211,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       ),
       RAG_DEGRADED_MODE_DEADLINE_MS,
     );
+    try { if (ragDetailed.serverObservation) input.onServerObserved?.(ragDetailed.serverObservation); } catch { /* diagnostic only */ }
     const matches = ragDetailed.matches;
     ragError = ragDetailed.error || null;
     if (ragError) {
@@ -295,6 +302,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     relationshipDirective: relationshipDirective.prompt,
     experienceFrame: experienceFrame.prompt || undefined,
   };
+  observeVoice(input.onVoiceObservation, "context_ready");
+  try { input.onVersionsObserved?.(input.characterContext.promptUpdatedAt, "versionId" in frameRuntime ? frameRuntime.versionId : null); } catch { /* diagnostic only */ }
   let maxResponse = "";
   let max_ms = 0;
   let maxResult: Awaited<ReturnType<typeof simulateMaxResponse>> | null = null;
@@ -305,6 +314,9 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     const remainingMs = Math.floor(responseDeadlineAt - performance.now());
     if (remainingMs < 250) throw new Error("PRD4 response deadline exhausted after RAG");
     maxResult = await simulateMaxResponse(maxInput, {
+      onVoiceObservation: input.onVoiceObservation,
+      onServiceObserved: input.onServiceObserved,
+      onServerObserved: input.onServerObserved,
       characterName: input.characterContext.displayName,
       characterContext: input.characterContext,
       featureKey: evaluationOverrides?.featureKey ?? "prd4_chat",
@@ -319,6 +331,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     console.warn("[PRD4 orchestrator] Max LLM failed (fallback response):", err);
     maxError = err instanceof Error ? err.message : String(err);
     maxFailureDiagnostic = err instanceof SimulateMaxResponseError ? err.diagnosticContext : null;
+    observeService(input.onServiceObserved, { service: "llm", requested_provider: "openrouter", requested_model: maxFailureDiagnostic?.requestedSettings?.model ?? null, resolved_provider: "openrouter", resolved_model: null, effective_provider: null, effective_model: null, transport: "http_batch", fallback: true });
     maxResponse = MAX_FALLBACK_RESPONSE;
   } finally {
     max_ms = Math.round(performance.now() - maxStart);
@@ -332,6 +345,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     try {
       const directorRuntime = await directorRuntimePromise;
       return await evaluatePostTurnPRD4({
+        onGmObserved: input.onGmObserved,
         sessionId: input.sessionId,
         conversationHistory: recentConversation,
         userMessage: input.userMessage,

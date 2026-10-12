@@ -1,3 +1,4 @@
+import { observeVoice, type VoiceObserver } from "../voiceTurnTelemetryV2";
 /**
  * Gradium TTS WebSocket streaming — WS transport + progressive Web Audio playback.
  *
@@ -44,6 +45,7 @@ export interface GradiumStreamOptions {
   /** temp / cfg_coef / padding_bonus / rewrite_rules / pronunciation_id */
   jsonConfig: Record<string, unknown>;
   signal?: AbortSignal;
+  onVoiceObservation?: VoiceObserver;
 }
 
 export interface GradiumStreamStats {
@@ -230,7 +232,12 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
       checkFinished();
     };
     audibleOutput = true;
-    if (!started.settled) started.resolve();
+    if (!started.settled) {
+      observeVoice(opts.onVoiceObservation, "audio_scheduled");
+      const outputAt = performance.now() + Math.max(0, startAt - ctx.currentTime) * 1000 + (ctx.outputLatency || 0) * 1000;
+      observeVoice(opts.onVoiceObservation, "output_estimated", outputAt);
+      started.resolve();
+    }
   };
 
   const flushPending = () => {
@@ -294,6 +301,7 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
       if (preAudioTimer) { clearTimeout(preAudioTimer); preAudioTimer = null; }
       if (!firstByteMs) {
         firstByteMs = Math.round(performance.now() - t0);
+        observeVoice(opts.onVoiceObservation, "first_audio_chunk");
         debugLogger.log({ service: "tts", level: "info", direction: "in", label: `TTS-GR-WS first chunk in ${firstByteMs}ms` });
       }
       armStallTimer();

@@ -72,6 +72,7 @@ async function callQueryRag(
   payload: Record<string, unknown>,
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ): Promise<{
+  _ava_observability?: import("./voiceTurnTelemetryV2").ServerObservation;
   matches: RAGMatch[];
   retrieval_matches?: RAGMatch[];
   query?: string;
@@ -103,6 +104,7 @@ async function callQueryRag(
   }
   const data = await response.json();
   return {
+    _ava_observability: data._ava_observability,
     matches: data.matches || [],
     retrieval_matches: data.retrieval_matches || [],
     query: data.query,
@@ -164,6 +166,7 @@ export async function queryRAG(
 }
 
 export interface RAGQueryDetailed {
+  serverObservation?: import("./voiceTurnTelemetryV2").ServerObservation;
   matches: RAGMatch[];
   /** Full vector candidate pool, in cosine-similarity order, before reranking. */
   retrievalMatches: RAGMatch[];
@@ -238,6 +241,7 @@ export async function queryRAGDetailed(
       rerankQuery: res.rerank_query,
       rerankError: res.rerank_error,
       serverLatencyMs: res.latency_ms,
+      serverObservation: res._ava_observability,
       searchInput: res.search_input || options.rewrittenQuery || [userMessage, recentContext ? `Contexte récent: ${recentContext}` : ""].filter(Boolean).join("\n\n"),
       request: {
         userMessage,

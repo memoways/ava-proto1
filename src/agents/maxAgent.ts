@@ -230,6 +230,9 @@ export type MaxLlmOverrides = {
 export async function simulateMaxResponse(
   input: MaxAgentInput,
   opts?: {
+    onVoiceObservation?: import("@/services/voiceTurnTelemetryV2").VoiceObserver;
+    onServiceObserved?: (value: import("@/services/voiceTurnTelemetryV2").ServiceObservation) => void;
+    onServerObserved?: (value: import("@/services/voiceTurnTelemetryV2").ServerObservation) => void;
     characterName?: string;
     characterContext?: CharacterExecutionContext;
     featureKey?: string;
@@ -271,6 +274,9 @@ export async function simulateMaxResponse(
   try {
     result = await callLLMWithUsage(messages, {
       model,
+      onVoiceObservation: opts?.onVoiceObservation,
+      onServiceObserved: opts?.onServiceObserved,
+      onServerObserved: opts?.onServerObserved,
       temperature,
       max_tokens: maxTokens,
       top_p: topP,

@@ -27,7 +27,7 @@ export function prepareTextForGradium(text: string): string {
     .replace(/\s*\.{3}\s*(?=[A-Za-zÀ-ÿ0-9])/g, ", ")
     .replace(/\.{3}/g, ".")
     .replace(/\s+[—–-]\s+/g, ", ")
-    .replace(/[«»"“”()\[\]]/g, "")
+    .replace(/[«»"“”()[\]]/g, "")
     .replace(/([,;:!?.])\s*,/g, "$1")
     .replace(/,\s*([.!?])/g, "$1")
     .replace(/\s{2,}/g, " ")
@@ -154,6 +154,7 @@ function createStreamingHandleWithFallback(
     format: s.streamingFormat,
     jsonConfig: buildJsonConfig(s, ctx?.performance),
     signal: ctx?.signal,
+    onVoiceObservation: ctx?.onVoiceObservation,
   });
 
   // Single state machine: "ws" until a pre-audio failure flips it to "fallback".

@@ -1,7 +1,6 @@
 import { TTSQueue } from "@/services/tts/queue";
 import { chunkTextForTTS } from "@/services/tts/textChunking";
 import { getActiveProviderId } from "@/services/tts/providerSettings";
-import { getConfiguredTTSServiceInfo } from "@/services/latencyServiceMetadata";
 import type {
   ResponseOutput,
   ResponseOutputPrepareContext,
@@ -9,8 +8,8 @@ import type {
   ResponseOutputTurnContext,
 } from "./types";
 
-function chunkOptions() {
-  return getActiveProviderId() === "gradium"
+function chunkOptions(providerId: string) {
+  return providerId === "gradium"
     ? { maxSingleChars: 320, targetChars: 320 }
     : undefined;
 }
@@ -29,20 +28,24 @@ export class LocalTTSOutput implements ResponseOutput {
     text: string,
     context?: ResponseOutputTurnContext,
   ): Promise<ResponseOutputResult> {
-    const service = getConfiguredTTSServiceInfo();
+    const providerId = context?.providerId ?? getActiveProviderId();
     const queue = new TTSQueue({
       onFirstPlaybackStart: context?.onPlaybackStart,
     });
     this.queue = queue;
     const cancel = () => queue.cancel();
     context?.signal?.addEventListener("abort", cancel, { once: true });
-    for (const chunk of chunkTextForTTS(text, chunkOptions())) {
+    for (const chunk of chunkTextForTTS(text, chunkOptions(providerId))) {
       queue.enqueue(chunk, {
         session_id: context?.sessionId,
         turn_id: context?.turnId,
         turn_index: context?.turnIndex,
         voiceId: context?.voiceId,
-        providerId: context?.providerId,
+        providerId,
+        characterOverride: context?.providerId != null,
+        attempt_id: context?.attemptId,
+        onVoiceObservation: context?.onVoiceObservation,
+        onServiceObserved: context?.onServiceObserved,
         characterKey: context?.characterKey,
         performance: context?.performance,
       });
@@ -53,8 +56,8 @@ export class LocalTTSOutput implements ResponseOutput {
     });
     return {
       ...result,
-      provider: service.serviceProvider,
-      model: service.model,
+      provider: result.services?.[0]?.effective_provider ?? "unknown",
+      model: result.services?.[0]?.effective_model ?? undefined,
       started: result.playedSegments > 0,
     };
   }

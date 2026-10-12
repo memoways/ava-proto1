@@ -368,7 +368,7 @@ function recordAvaLatencyEvents(payload: VoiceTurnCompletedPayload): void {
       model: payload.gm_model || "Unknown",
       mode: "",
     },
-  ].filter((segment) => typeof segment.duration === "number" && Number.isFinite(segment.duration) && segment.duration > 0);
+  ].filter((segment) => typeof segment.duration === "number" && Number.isFinite(segment.duration) && segment.duration >= 0);
 
   trackEvent("ava_turn_latency_summary", {
     session_id: payload.session_id ?? null,
@@ -448,5 +448,35 @@ export function recordVoiceError(record: VoiceErrorRecord): void {
         }
         console.warn("[voiceTelemetry] insert voice_error_events", error.message);
       });
+  });
+}
+
+let pendingV2Inserts = 0;
+const MAX_PENDING_V2_INSERTS = 8;
+
+/** At most three bounded technical records per attempt; no persistence awaited by voice. */
+export function recordVoiceTurnV2(event: string, payload: import("./voiceTurnTelemetryV2").VoiceTurnV2): void {
+  safe(() => trackEvent(event, payload as unknown as Record<string, unknown>));
+  safe(() => {
+    if (voiceTurnEventsUnavailable || pendingV2Inserts >= MAX_PENDING_V2_INSERTS) return;
+    pendingV2Inserts++;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    void Promise.resolve().then(() => supabase.from("voice_turn_events" as never).insert({
+      session_id: payload.session_id,
+      turn_id: payload.turn_id,
+      turn_index: payload.turn_index,
+      event_name: event,
+      severity: payload.status === "failed" || payload.status === "timeout" ? "failed" : "ok",
+      blocker_step: "unknown",
+      environment_id: payload.environment_id,
+      context_type: payload.context_type,
+      metadata_json: payload,
+    } as never).abortSignal(controller.signal)).then(({ error }) => {
+      if (error && isMissingTelemetryTable(error.message)) voiceTurnEventsUnavailable = true;
+    }).catch(() => undefined).finally(() => {
+      clearTimeout(timeout);
+      pendingV2Inserts--;
+    });
   });
 }

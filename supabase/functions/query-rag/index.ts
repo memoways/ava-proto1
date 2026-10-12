@@ -1,3 +1,4 @@
+import { createMonotonicSpans } from "../_shared/monotonicSpans.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
@@ -106,10 +107,11 @@ async function rerankVoyage(
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
-  const denied = await enforceGameRequest(req, "query-rag", corsHeaders);
+  const spans = createMonotonicSpans();
+  const denied = await spans.run("control_quota", () => enforceGameRequest(req, "query-rag", corsHeaders));
   if (denied) return denied;
 
-  const startedAt = Date.now();
+  const startedAt = performance.now();
   try {
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     const VOYAGE_API_KEY = Deno.env.get('VOYAGE_API_KEY');
@@ -148,11 +150,11 @@ serve(async (req) => {
       ? `${userQuery}\n\nContexte récent: ${body.recent_context}`
       : userQuery;
 
-    const { data: indexState, error: indexStateError } = await supabase
+    const { data: indexState, error: indexStateError } = await spans.run("rag_profile", () => supabase
       .from("rag_index_state")
       .select("active_profile")
       .eq("id", true)
-      .maybeSingle();
+      .maybeSingle());
     if (indexStateError) {
       throw new Error(`Active RAG profile unavailable: ${indexStateError.message}`);
     }
@@ -177,26 +179,26 @@ serve(async (req) => {
     const providerUsed = provider;
     if (provider === "voyage") {
       if (!VOYAGE_API_KEY) throw new Error("VOYAGE_API_KEY not configured");
-      const emb = await embedVoyageQuery(searchInput, VOYAGE_API_KEY, profile);
-      const { data, error } = await supabase.rpc('match_embeddings_voyage', {
+      const emb = await spans.run("embedding", () => embedVoyageQuery(searchInput, VOYAGE_API_KEY, profile));
+      const { data, error } = await spans.run("vector_search", () => supabase.rpc('match_embeddings_voyage', {
         query_embedding: JSON.stringify(emb),
         match_count: useRerank ? retrieveK : matchCount,
         match_threshold: matchThreshold,
         p_character_id: characterId,
         p_embedding_profile: profile.id,
-      });
+      }));
       if (error) throw new Error(`pgvector(voyage) error: ${error.message}`);
       matches = data || [];
     } else {
       if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not configured");
-      const emb = await embedOpenAI(searchInput, OPENAI_API_KEY, profile);
-      const { data, error } = await supabase.rpc('match_embeddings_scoped', {
+      const emb = await spans.run("embedding", () => embedOpenAI(searchInput, OPENAI_API_KEY, profile));
+      const { data, error } = await spans.run("vector_search", () => supabase.rpc('match_embeddings_scoped', {
         query_embedding: JSON.stringify(emb),
         match_count: useRerank ? retrieveK : matchCount,
         match_threshold: matchThreshold,
         p_character_id: characterId,
         p_embedding_profile: profile.id,
-      });
+      }));
       if (error) throw new Error(`pgvector(openai) error: ${error.message}`);
       matches = data || [];
     }
@@ -233,7 +235,7 @@ serve(async (req) => {
     if (useRerank && matches.length > 0) {
       try {
         const docs = matches.map((m) => m.content);
-        const reranked = await rerankVoyage(rerankQuery, docs, VOYAGE_API_KEY!, matchCount, rerankModel, rerankTruncation);
+        const reranked = await spans.run("rerank", () => rerankVoyage(rerankQuery, docs, VOYAGE_API_KEY!, matchCount, rerankModel, rerankTruncation));
         // Map indices back to matches and attach rerank_score
         matches = reranked.map((r) => ({
           ...matches[r.index],
@@ -271,13 +273,14 @@ serve(async (req) => {
       rerank_query: useRerank ? rerankQuery : null,
       rerank_error: rerankError,
       character_id: characterId,
-      latency_ms: Date.now() - startedAt,
+      latency_ms: Math.round(performance.now() - startedAt),
+      _ava_observability: spans.snapshot(),
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: unknown) {
     console.error('[query-rag] Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    return new Response(JSON.stringify({ error: errorMessage, _ava_observability: spans.snapshot() }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

@@ -1,3 +1,4 @@
+import { observeVoice, observeService } from "../voiceTurnTelemetryV2";
 /**
  * Public TTS façade — single entry point for the rest of the app.
  *
@@ -25,6 +26,7 @@ export { chunkTextForTTS, extractSentences } from "@/services/tts/textChunking";
 export interface TTSOptions extends TTSGenerateContext {
   /** Force a specific provider for this call (ignored by TTSQueue). */
   providerId?: TTSProviderId;
+  characterOverride?: boolean;
 }
 
 function classifyError(statusCode: number | undefined, message: string): "quota" | "rate_limit" | "auth" | "network" | "server" | "client" | "unknown" {
@@ -107,9 +109,17 @@ async function generateWithBoundedRetry(
 export async function generateSpeech(text: string, opts?: TTSOptions): Promise<Blob> {
   const provider = opts?.providerId ? getProviderById(opts.providerId) : getActiveProvider();
   const tRequest = performance.now();
+  observeVoice(opts?.onVoiceObservation, "tts_text_sent", tRequest);
   try {
     const { result: { blob, meta }, retryCount } = await generateWithBoundedRetry(provider, text, opts);
     const totalElapsedMs = Math.round(performance.now() - tRequest);
+    observeService(opts?.onServiceObserved, {
+      service: "tts", requested_provider: opts?.providerId ?? provider.id, requested_model: meta.model ?? null,
+      resolved_provider: provider.id, resolved_model: meta.model ?? null,
+      effective_provider: meta.provider, effective_model: meta.model ?? null,
+      transport: "rest", character_override: opts?.characterOverride ?? !!opts?.providerId, fallback: false, retry_count: retryCount,
+    });
+    observeVoice(opts?.onVoiceObservation, "audio_blob_ready");
     recordAudioLatency({
       session_id: opts?.session_id ?? undefined,
       turn_index: opts?.turn_index ?? undefined,
@@ -119,6 +129,7 @@ export async function generateSpeech(text: string, opts?: TTSOptions): Promise<B
       tts_text_len: text.length,
       metadata: {
         turn_id: opts?.turn_id ?? null,
+        attempt_id: opts?.attempt_id ?? null,
         provider: meta.provider,
         model: meta.model,
         status_code: meta.statusCode ?? 200,
@@ -146,6 +157,7 @@ export async function generateSpeech(text: string, opts?: TTSOptions): Promise<B
       tts_text_len: text.length,
       metadata: {
         turn_id: opts?.turn_id ?? null,
+        attempt_id: opts?.attempt_id ?? null,
         provider: provider.id,
         status_code: statusCode ?? 0,
         error_type: classifyError(statusCode, message),
@@ -174,6 +186,13 @@ export function tryCreateStreamingPlayback(text: string, opts?: TTSOptions): TTS
   const tRequest = performance.now();
   handle.generationDone.then(
     (stats) => {
+      observeService(opts?.onServiceObserved, {
+        service: "tts", requested_provider: opts?.providerId ?? provider.id, requested_model: stats.model ?? null,
+        resolved_provider: provider.id, resolved_model: stats.model ?? null,
+        effective_provider: stats.provider, effective_model: stats.model ?? null,
+        transport: stats.transport, character_override: opts?.characterOverride ?? !!opts?.providerId,
+        fallback: stats.transport === "rest_fallback", retry_count: 0,
+      });
       recordAudioLatency({
         session_id: opts?.session_id ?? undefined,
         turn_index: opts?.turn_index ?? undefined,
@@ -183,6 +202,7 @@ export function tryCreateStreamingPlayback(text: string, opts?: TTSOptions): TTS
         tts_text_len: text.length,
         metadata: {
           turn_id: opts?.turn_id ?? null,
+        attempt_id: opts?.attempt_id ?? null,
           provider: stats.provider,
           model: stats.model,
           status_code: stats.statusCode ?? 200,
@@ -205,6 +225,7 @@ export function tryCreateStreamingPlayback(text: string, opts?: TTSOptions): TTS
         tts_text_len: text.length,
         metadata: {
           turn_id: opts?.turn_id ?? null,
+        attempt_id: opts?.attempt_id ?? null,
           provider: provider.id,
           status_code: statusCode ?? 0,
           error_type: classifyError(statusCode, message),
