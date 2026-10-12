@@ -14,7 +14,6 @@ interface RelationshipPromptSource {
   politique_relationnelle?: string | null;
   dynamique_conversation?: string | null;
   sujets_sensibles?: string | null;
-  profondeur_par_niveau?: string | null;
   updated_at?: string | null;
 }
 

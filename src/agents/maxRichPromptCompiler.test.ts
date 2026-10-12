@@ -60,7 +60,6 @@ function makePrompt(overrides: Partial<CharacterPrompt> = {}): CharacterPrompt {
     ce_que_tu_sais_utilisateur: "Le rôle injecté pour la session est prioritaire.\n\nSi aucun rôle n'a été donné, un inconnu a entendu parler de la montagne.",
     dynamique_conversation: "Mettre de l'ordre en racontant.\n\nRevenir de l'abstrait vers les urgences concrètes.",
     sujets_sensibles: "Le fusil.\n\nEmma, Léo, Ava, Mona.\n\nLes morts, les corps, les tremblements.",
-    profondeur_par_niveau: DEPTH,
     politique_relationnelle: "Moteur\nComprendre l'appel.\n\nRésistance\nRépondre partiellement.",
     references_intellectuelles: "Journalisme scientifique et histoire des crises.",
     ...overrides,
@@ -118,7 +117,6 @@ describe("maxRichPromptCompiler — rich_v2", () => {
       "dynamique_conversation",
       "sujets_sensibles",
       "timeline",
-      "profondeur_par_niveau",
       "politique_relationnelle",
       "references_intellectuelles",
     ]);

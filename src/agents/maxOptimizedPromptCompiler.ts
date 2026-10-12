@@ -82,7 +82,7 @@ const FIELD_SPECS: Array<{
   key: keyof Pick<CharacterPrompt,
     "situation_summary" | "identite_fondamentale" | "qui_tu_es" | "dynamique_conversation" |
     "ce_que_tu_ne_fais_jamais" | "ce_que_tu_sais_utilisateur" | "timeline" |
-    "sujets_sensibles" | "profondeur_par_niveau" | "politique_relationnelle" | "references_intellectuelles">;
+    "sujets_sensibles" | "politique_relationnelle" | "references_intellectuelles">;
   title: string;
   baseScore: number;
   group: "core" | "canon";
@@ -96,7 +96,6 @@ const FIELD_SPECS: Array<{
   { key: "ce_que_tu_sais_utilisateur", title: "RELATION À L'INTERLOCUTEUR", baseScore: 650, group: "canon" },
   { key: "timeline", title: "TIMELINE CANONIQUE PERTINENTE", baseScore: 700, group: "canon", required: true },
   { key: "sujets_sensibles", title: "SUJETS SENSIBLES PERTINENTS", baseScore: 360, group: "canon" },
-  { key: "profondeur_par_niveau", title: "PROFONDEUR ACTIVE", baseScore: 420, group: "canon" },
   { key: "politique_relationnelle", title: "POLITIQUE RELATIONNELLE", baseScore: 740, group: "core" },
   { key: "references_intellectuelles", title: "RÉFÉRENCES INTELLECTUELLES", baseScore: 260, group: "canon" },
 ];

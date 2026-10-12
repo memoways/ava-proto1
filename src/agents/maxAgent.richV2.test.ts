@@ -69,7 +69,6 @@ const FIELDS = {
   ce_que_tu_sais_utilisateur: "Le rôle injecté pour la session est prioritaire.",
   dynamique_conversation: "Revenir de l'abstrait vers les urgences concrètes.",
   sujets_sensibles: "Le fusil. Emma. Ava.",
-  profondeur_par_niveau: "NIVEAU 1\nAnalytique.\nNIVEAU 2\nFissure.\nNIVEAU 3\nVérité.\nNIVEAU BONUS\nResponsabilité nue.",
 };
 
 describe("buildMaxSystemPrompt — variante rich_v2", () => {
@@ -115,8 +114,7 @@ describe("buildMaxSystemPrompt — variante rich_v2", () => {
     expect(timelineSection.subpartsDetected).toBeGreaterThan(0);
     expect(timelineSection.subparts?.some((sub) => sub.included)).toBe(true);
     expect(budget.timelineEvents?.join(" ")).toMatch(/Aujourd'hui/);
-    expect(budget.depthSelection?.level).toBe("niveau_3");
-    expect(budget.depthSelection?.levelsRepresented).toHaveLength(4);
+    expect(budget.depthSelection).toBeUndefined();
     // Le présent est toujours injecté.
     expect(result.systemPrompt).toContain("Lausanne, aujourd'hui");
   });
@@ -150,8 +148,7 @@ describe("buildMaxSystemPrompt — variante rich_v2", () => {
     expect(traced).toBe(budget.staticChars);
     expect(budget.timelineEvents?.join("\n")).toMatch(/Aujourd'hui à Lausanne/);
     expect(budget.timelineEvents?.join("\n")).toMatch(/Hier — jour 4/);
-    expect(budget.depthSelection?.level).toBe("niveau_3");
-    expect(budget.depthSelection?.preambleIncluded).toBe(true);
+    expect(budget.depthSelection).toBeUndefined();
   });
 
   it("reste compatible avec les anciennes traces sans bloc budget", () => {

@@ -67,7 +67,6 @@ function sheet(character: "max" | "emma", volume = 1) {
     ce_que_tu_sais_utilisateur: expand("L'interlocuteur vient de se présenter."),
     dynamique_conversation: expand("Répondre précisément à ce qui vient d'être dit."),
     sujets_sensibles: expand("Ava, Mona et le retour du chalet."),
-    profondeur_par_niveau: expand("NIVEAU 1 : rester factuel. NIVEAU 2 : laisser une fissure."),
   };
 }
 
