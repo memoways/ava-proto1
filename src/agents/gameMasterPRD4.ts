@@ -369,6 +369,18 @@ function cleanMemoryDelta(raw: unknown): ConversationMemoryDelta | null {
   };
 }
 
+/** Un passage n'est valide que vers un autre personnage actif dans la version publiée. */
+export function restrictHandoffToActiveCharacters(
+  action: DirectorAction,
+  activeCharacters: string[] | undefined,
+  currentCharacter: string,
+): DirectorAction {
+  if (action.type !== "handoff") return action;
+  if (action.targetCharacter === currentCharacter) return { type: "none" };
+  if (activeCharacters && activeCharacters.length && !activeCharacters.includes(action.targetCharacter)) return { type: "none" };
+  return action;
+}
+
 function cleanDirectorAction(raw: unknown, fallbackVideoId: string | null, endRecommended: boolean): DirectorAction {
   if (raw && typeof raw === "object") {
     const value = raw as Record<string, unknown>;
@@ -499,7 +511,11 @@ export async function evaluatePostTurnPRD4(
         trigger_video_id: safeTrigger,
         labels,
         memory_delta: cleanMemoryDelta((parsed as { memory_delta?: unknown }).memory_delta),
-        action: cleanDirectorAction((parsed as { action?: unknown }).action, safeTrigger, endRecommended),
+        action: restrictHandoffToActiveCharacters(
+          cleanDirectorAction((parsed as { action?: unknown }).action, safeTrigger, endRecommended),
+          input.orchestrationConfig?.activeCharacters,
+          input.currentCharacter,
+        ),
         player_switch_request: cleanPlayerSwitchRequest((parsed as { player_switch_request?: unknown }).player_switch_request),
       };
     }
