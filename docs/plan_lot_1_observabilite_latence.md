@@ -377,3 +377,14 @@ optionnel (type seul) et redéployer les trois fonctions ; rollback global incha
 - Logs (16:55–16:58 UTC) : boot/listen/shutdown normaux sur les trois fonctions. `query-rag` et `proxy-llm` : `42501 permission denied for function consume_game_rate_limit` lors des requêtes anonymes de contrôle, suivies du refus 401 attendu. Origine non diagnostiquée, aucun droit modifié.
 - Erreurs Deno du bundle MCP (TS7006, `any` implicite) : effet bloquant non observé. Le déploiement de `mcp` a été retenu par Lovable, pas tenté. Aucune conclusion possible avant la publication.
 - Version MCP servie : non déterminable. Le seul message « Voice V2 diagnostics could not be read » ne prouve pas l'ancienne révision.
+
+### Diagnostic « Mesures V2 indisponibles » — 12 octobre 2026, ~17:05 UTC (lecture seule)
+- Cause observée : la table `public.voice_turn_events` **n'existe pas** dans Lovable Cloud `iralfqlslqndgvexixis`
+  (`to_regclass` = NULL ; aucune colonne, RLS, grant ni policy). PostgREST, requête de `voiceTurnQuery.ts` :
+  `PGRST205 — Could not find the table 'public.voice_turn_events' in the schema cache`. `voice_error_events` est absente aussi.
+- Migration `20260522103000_voice_observability_events.sql` absente de l'historique appliqué (seule `20260821085107` est enregistrée).
+  `20260821085107` n'ajoute `environment_id`/`context_type` que si la table existe (`IF to_regclass … IS NOT NULL`), donc l'ajout n'a pas eu lieu.
+- Écart de contrat : la migration historique ne crée pas `environment_id` ; la requête V2 filtre dessus. Policies historiques `USING (true)` (lecture publique), incompatibles avec la règle « projections techniques refusées aux non-admin ».
+- Écritures client : `voiceTelemetry.ts` désactive les inserts internes quand la table manque (non bloquant pour la voix) ; aucune donnée V2 n'a donc été stockée en base.
+- Correction minimale proposée (non appliquée) : **une migration additive** créant `voice_turn_events` (colonnes historiques + `environment_id` FK `environments`, `context_type`), index `(environment_id, created_at DESC)`, GRANT INSERT à `anon`/`authenticated`, SELECT à `authenticated`, ALL à `service_role` ; RLS : insertion limitée à sa propre session, lecture réservée aux admins (`private.is_admin_member(auth.uid())`). Nécessite migration et droits, à valider avant.
+- Build local : `dist/assets/index-DvEiVgQ4.js` (sha256 `78853a8d46bdf91c194b252d8b863eae41814f620d13db8eb5eece9c09f83331`), `index-DzvdyyNt.css`. Diffère du nom servi `index-42YnFYBP.js` ; le nom seul ne permet pas de conclure sur la révision servie.
