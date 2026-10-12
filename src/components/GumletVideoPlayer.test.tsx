@@ -4,6 +4,20 @@ import { resolveNativeVideoSource } from "@/services/videoPlayback";
 import GumletVideoPlayer from "./GumletVideoPlayer";
 
 describe("GumletVideoPlayer", () => {
+  it("plays the replacement introduction automatically with full-volume audio", () => {
+    const watchUrl = "https://gumlet.tv/watch/6acc8341689a80cf2e4a427d";
+    const hlsUrl = "https://video.gumlet.io/673f29f4a5e1bf70aa645cb7/6acc8341689a80cf2e4a427d/main.m3u8";
+    expect(resolveNativeVideoSource(watchUrl)).toEqual({ url: hlsUrl, kind: "hls" });
+    expect(resolveNativeVideoSource(hlsUrl)).toEqual({ url: hlsUrl, kind: "hls" });
+    render(<GumletVideoPlayer videoUrl={hlsUrl} onComplete={() => {}} onSkip={() => {}} />);
+    const player = screen.getByTitle("Video player") as HTMLVideoElement;
+    expect(player.autoplay).toBe(true);
+    expect(player.muted).toBe(false);
+    expect(player.defaultMuted).toBe(false);
+    expect(player.volume).toBe(1);
+    expect(player.controls).toBe(false);
+  });
+
   it("converts every valid Gumlet watch/embed URL to direct HLS", () => {
     expect(resolveNativeVideoSource("https://gumlet.tv/watch/6a188e39fdee17a44c1ea049")).toEqual({
       url: "https://video.gumlet.io/673f29f4a5e1bf70aa645cb7/6a188e39fdee17a44c1ea049/main.m3u8",
