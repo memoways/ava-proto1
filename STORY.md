@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-12 (Game Master réglé dans l'app, cadre commun, nettoyage legacy ; questionnaire reporté à une tâche distincte)
+> **Last Updated**: 2026-10-12 (Choix du film après l'intro, champ « Profondeur par niveau » retiré, conversation vocale mains libres réglable)
 
 ---
 
