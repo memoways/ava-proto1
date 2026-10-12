@@ -2,6 +2,10 @@
 
 ## En cours
 
+- Serveur MCP de statistiques (lecture seule, protégé par connexion) : publier
+  le site puis connecter Codex et vérifier un premier relevé de chiffres ;
+  attend publication. Plan `docs/plan_mcp_statistiques.md`.
+
 
 - Resynchronisation des fiches Notion Max/Emma corrigées : attend l’action d’Ulrich. La fiche Game Master et ses extraits ont déjà été retirés de la base de l'app.
 - Validation GM en sandbox : publier une version avec cadre commun activé et vérifier conversations Max/Emma, parcours vu/non vu, garde-fous, passages et reprise ; attend configuration et écoute humaine.

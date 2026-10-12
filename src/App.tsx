@@ -13,6 +13,7 @@ import Auth from "./pages/Auth";
 import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
 import DebugPanel from "./components/DebugPanel";
+import OAuthConsent from "./pages/OAuthConsent";
 import { debugLogger } from "./services/debugLogger";
 
 // Init debug logger based on URL params
@@ -57,6 +58,7 @@ const App = () => (
             <Route path="/" element={<PublicAccessGate><IndexPRD4 /></PublicAccessGate>} />
             <Route path="/test/:invitationId" element={<ExternalTestRoute />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
             <Route path="/confidentialite" element={<Privacy />} />
             <Route
               path="/admin/*"

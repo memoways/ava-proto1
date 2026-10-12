@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { oauthReturnPath } from "@/lib/oauth-return-path";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +9,10 @@ import { toast } from "sonner";
 
 export default function Auth() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  // A consent request sends the admin here with ?next=…; keep that return path.
+  const nextPath = oauthReturnPath(params.get("next"));
+  const adminTarget = nextPath === "/" ? "/admin" : nextPath;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,17 +21,17 @@ export default function Auth() {
     // Anonymous participant sessions are not admin sessions.
     supabase.auth.getSession().then(({ data }) => {
       if (data.session && data.session.user.is_anonymous !== true) {
-        navigate("/admin", { replace: true });
+        navigate(adminTarget, { replace: true });
       }
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session && session.user.is_anonymous !== true) {
-        navigate("/admin", { replace: true });
+        navigate(adminTarget, { replace: true });
       }
     });
     return () => sub.subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, adminTarget]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
