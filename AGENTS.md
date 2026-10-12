@@ -23,3 +23,4 @@ Ces règles s'appliquent à toute personne, agent et outil intervenant sur ce d�
 
 - The shared experience frame (volunteer role, seen/unseen path, posture) is built only by `src/services/experienceFrame.ts` from the published orchestration config and injected identically into the character prompt and the GM prompt — why: no divergence between what GM and characters know.
 - The initial film answer is factual session context shared through the experience frame regardless of editorial frame activation; intro replay must preserve it — why: watching the project introduction does not mean watching the film.
+- Hands-free voice end-of-speech and barge-in are decided in the app by `src/services/handsFreeVoice.ts` from recognized text timing, never by an STT provider silence timer — why: identical behaviour for every STT provider and tunable per environment.
