@@ -691,7 +691,7 @@ export default function GameMasterSettingsTab() {
       )}
 
       <section className="rounded-lg border border-muted p-4 text-xs text-muted-foreground">
-        Les anciens seuils de confiance, tolérance aux insultes, gate, placeholder vidéo, modes de parole, prompt historique et GM pré-tour restent conservés en données legacy mais ne sont plus présentés comme actifs dans PRD4.
+        L'ouverture du personnage, la tolérance aux dérapages et le faux statut se règlent ci-dessus. Les anciens réglages (seuil numérique de confiance, gate, GM avant le tour, prompt historique) ont été retirés.
       </section>
     </div>
   );

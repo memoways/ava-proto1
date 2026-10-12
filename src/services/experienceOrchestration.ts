@@ -107,7 +107,8 @@ function normalizeGuardrails(raw: unknown): ExperienceDirectorConfig["editor"]["
 
 function normalizeOpenQuestions(raw: unknown): string[] {
   if (!Array.isArray(raw)) return DEFAULT_OPEN_QUESTIONS;
-  return raw.map((item) => String(item).trim().slice(0, OPEN_QUESTION_MAX_CHARS)).filter(Boolean).slice(0, OPEN_QUESTIONS_MAX);
+  // Lignes conservées telles quelles pendant la saisie ; les vides sont ignorées à la construction du prompt.
+  return raw.map((item) => String(item).slice(0, OPEN_QUESTION_MAX_CHARS)).slice(0, OPEN_QUESTIONS_MAX);
 }
 
 function sanitizeHandoffRules(raw: unknown): ExperienceDirectorConfig["editor"]["handoffRules"] {
