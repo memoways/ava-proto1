@@ -6,6 +6,53 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Non publié]
 
+### 2026-10-12 — Game Master réglé dans l'application, retrait du legacy
+
+- Les réglages du Game Master ne proviennent plus de Notion : contexte de
+  l'expérience, questions ouvertes et garde-fous sont éditables dans
+  Expérience → Réglages Game Master et versionnés avec l'orchestration
+  (brouillon → version publiée dans l'environnement choisi).
+- Ajout des réglages de prudence face à un statut revendiqué (policier,
+  psychologue…), de tolérance aux dérapages et de vitesse d'ouverture.
+- Retrait de l'ancien moteur de conversation, du GM pré-tour, de leurs
+  réglages obsolètes, des écrans âge/genre/lien familial et de `summarize-role`.
+  Le directeur post-tour reste le moteur actuel.
+- La fiche Game Master et ses extraits ont été retirés de la base de l'app ;
+  la synchronisation Notion ignore cette fiche, même si elle réapparaît.
+  Notion reste la source éditoriale des personnages et du monde narratif.
+- Corrections ciblées dans les propriétés « Qui t'appelle » et « Dynamique de
+  la conversation » de Max et Emma dans Notion : aucun lien, rencontre ni
+  confiance préalable inventés. Resynchronisation à effectuer par Ulrich.
+- Vidéo introductive remplacée par l'asset Gumlet `6acc8341689a80cf2e4a427d` ;
+  autoplay avec son conservé. Tests réussis ; lecture réelle encore à vérifier.
+- Validation déjà réalisée lors de l'implémentation : tests de garde-fous
+  ajoutés. Aucune publication du site en Production.
+- Plans : [GM dans l'app](docs/plan_game_master_reglages_app.md) et
+  [GM multipersonnage](docs/plan_game_master_multipersonnage.md).
+
+#### Restant pour compléter
+
+- Configurer et publier une version GM dans une sandbox, puis vérifier de
+  vraies conversations Max/Emma : film vu/non vu, présentation facultative,
+  statut revendiqué, dérapages, passages autorisés et reprise après refresh.
+- Resynchroniser les fiches Max/Emma corrigées et contrôler le cadre obtenu.
+- Élargir `RuntimeCharacter` (encore `max | emma`), les alias de changement et
+  le mapping de `summarize-session` avant toute activation d'Ava ou de Léo ;
+  vérifier ensuite l'isolation et la readiness de chaque personnage.
+- Arbitrer les questions éditoriales ouvertes (référence au film, joueur qui
+  demande qui il incarne), puis calibrer ouverture et retenue par personnage.
+
+#### Questionnaire — tâche distincte, à réaliser plus tard
+
+- Aucune modification du questionnaire ni de sa synchronisation dans ce lot.
+- Revoir les questions 3 (rôle « à inventer »), 4 (résumé de personnage qui
+  n'existe plus) et 6 (Max nommé alors que l'expérience est multipersonnage).
+- Définir et valider les nouvelles questions sur la compréhension du cadre
+  bénévole et la prise en compte de ce cadre par le personnage appelé.
+- Aligner le formulaire, les types, la lecture admin et le mapping Notion ;
+  versionner les nouvelles réponses sans altérer les réponses historiques,
+  puis tester la sauvegarde et la synchronisation de bout en bout.
+
 ### Game Master multipersonnage — cadre commun
 - Cadre commun (rôle bénévole, parcours vu / non vu, posture pudique / ouverte) partagé par le personnage et le Game Master, réglable et versionné dans l'onglet Game Master. Désactivé par défaut.
 - Passages du GM limités aux personnages actifs de la version ; prompt du GM sans noms en dur.
