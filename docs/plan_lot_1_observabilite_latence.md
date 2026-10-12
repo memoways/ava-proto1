@@ -1023,3 +1023,64 @@ dans PostHog ; ne pas inventer une version déclarée par l'événement.
 l'attente du test autorisé. Réactiver dès fin du tour, vérifier ON dans le
 panneau du même domaine, avant clôture de ce contrôle. Aucun accord de
 laisser cette exception durablement ni de modifier la production.
+
+### Contrôle croisé V2 réussi, Shields rétabli — 12 octobre 2026, 22:39 CEST
+
+Ulrich confirme « contrôle PostHog terminé ». Micro encore ouvert après
+la réponse : fermé par l'agent via Couper le micro, fermeture vérifiée.
+Session495c3568-ad9e-4609-90da-4b9d597c1c4b, tentative unique
+`12c320d9-db0d-404e-8b93-bea9680cc077`, Max, hands_free, film pas_vu,
+statuscompleted, config9217fd34-321a-45c7-8363-6a8cf0b0157c, promptMax
+2026-10-12T11:04:20.434763+00:00. Frontend preview CG1cec7E.js, source
+compilée fa9bea9 ; diff code/backend/dépendances entre fa9bea9 et HEADf677593
+vide (seuls comptes rendus depuis). Exact SHA des octets servis non établi.
+
+Ava natif : fenêtre `[2026-10-11T20:37:30.318Z,2026-10-12T20:37:30.318Z)`,
+page0/100, nextOffsetnull, capnonatteint, invalid0,3 événements :
+voice_turn_started20:36:18.602875Z, GM20:36:31.599278Z,
+finished20:36:38.775723Z. Capture_started=capture_ready=-3298ms ; sortie
+estimée4645ms, réponseLLM3778ms, generation_total6097ms, playback11420ms,
+audio_end15203ms. Couverture15/27partial. Origineapp_turn_decision,
+software_estimate, voice_end/first_token null. n1, p50=p95=4645ms descriptifs,
+aucun gain revendiqué, cohorte distincte des essais Shieldsactif.
+
+PostHog137897 natif, fenêtre fixe20:25–20:40UTC :3 mêmes événements et même
+attempt_id, statuscompleted, origineapp_turn_decision,4645ms,15/27, mesures
+absentes null. UUID PostHog started01a131d4-9788-79a2-822f-035e7bfb5df2,
+GM01a131d4-ca7f-7a0c-9a41-ca6acd0d1642,
+finished01a131d4-e6b4-71db-b7bf-0ed95992e236. Horodatages PostHog
+20:36:18.468Z /20:36:31.551Z /20:36:38.736Z distincts de created_at DB,
+pas fusionnés en une horloge. NavigateurBrave, version déclarée null,
+version du bundle installé155.1.97.56 relevée séparément. Projection
+technique seule ; aucune transcription, prompt textuel, token ou secret.
+
+STTDeepgram/nova-3/websocket ; LLMOpenAI/openai/gpt-5.6-luna/http_batch ;
+TTSGradium/gradium-tts/websocket, overridetrue, fallbackfalse,retry0.
+Voix exacte non exposée par le contrat, aucune identité de voix inventée.
+Quotas RAG109msok et LLM88msok ; tous spansRAG/LLMok. GMGoogle/
+gemini-2.5-flash, génération/validation/persistence/availabilityok.
+
+Restitution immédiatement après relevé : panneau natif du même domaine,
+Boucliers désactivés/interrupteuroff→basculement→réouverture du panneau,
+Boucliers activés/interrupteuron explicitement vérifiés. Réactivation
+recharge la page, micro déjà fermé. Exception terminée ; protections
+globales et domaine publié inchangés. Les événements après exception
+permettent d'expliquer l'absence avec Shieldsactif sans changer le code
+ni contourner durablement les protections du navigateur.
+
+Coût Ava days1 global à22:39CEST :50 appels,110761tokens,0.0551USD,
+32completed/18error. Les erreurs incluent des aborts et d'autres sessions :
+pas un taux d'erreur de ce contrôle. Coût non isolé de la session, STT/TTS/RAG
+non inclus, ne pas inventer un total complet. Réglages métier inchangés.
+
+État de livraison réel : PR25–28 fusionnées, sourcefa9bea9 revue/CIprémérge
+et post-merge réussies, buildLovable vert, Max/Emma réels en preview,
+interruption audio et refus de transfert vérifiés, adminV2 et rapprochement
+PostHogV2 réussis. PTT réel avec réglage actuel mainslibres, capture no_audio,
+handoff accepté et cinématique narrative déclenchée non attestés ; couverture
+automatique distincte (17E2E). Écart de rôle d'Emma observé sur un autre tour,
+origine/non-régression non établie, aucun prompt métier changé. La condition
+de publication de la demande initiale n'est donc pas présentée comme une
+validation exhaustive. Publication Lovable, tests publiés et baseline finale
+encore à effectuer ; lot2 non commencé. Choix de poursuivre ces validations
+ou d'accepter une publication avec ces limites à demander à Ulrich.
