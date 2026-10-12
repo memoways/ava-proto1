@@ -1,37 +1,29 @@
-# P0 — Faux statut « failed » du contrôle de quota (diagnostic et correction proposée)
+# P0 — Reprise compilation et déploiement après la PR #27 (sans réimplémentation)
 
-## Constat (lecture seule, 12 oct. 2026, Lovable Cloud iralfqlslqndgvexixis)
+## Situation vérifiée
+- PR #27 « fix: correct quota status and capture readiness in P0 telemetry » est fusionnée : squash `6ad0d422fce66d6ea04c483fa22e743aa371d119`. Le HEAD de `main` sur GitHub est `6e52733cea6ae29cce63884ac2e824586946b705`.
+- Le projet Lovable est encore à `7c8a9cb` : ni la PR #27 ni le HEAD de `main` ne sont présents. `query-rag` et `proxy-llm` contiennent toujours l'ancien appel `control_quota`.
+- Le plan précédent, sur ce même défaut, est abandonné. Aucun code ne sera réécrit.
 
-- Session accc1e30, ~17:54 UTC : la ligne de quota du participant a bien été consommée.
-  `query-rag` : 1 requête (fenêtre ouverte 17:54:11) ; `proxy-llm` : 4 requêtes (fenêtre ouverte 17:54:14).
-  Le contrôle a donc été appliqué et a autorisé ces appels. Pas de vrai refus, pas de contournement (fail-open).
-- Aucun log `[game-guard] ... rate-limit error` pour `query-rag` ni pour `proxy-llm` sur cette période : l'appel de quota n'a pas échoué.
-- `public.consume_game_rate_limit(p_bucket text, p_session_id uuid)` : SECURITY DEFINER ; EXECUTE pour authenticated, service_role et postgres ; pas pour anon.
-  Ces droits sont inchangés depuis la migration `20260712165019_secure_public_game_sessions.sql`, réappliquée telle quelle le 10 sept.
-- Les erreurs `42501` de 16:55 UTC venaient de mes appels de contrôle faits avec la clé anonyme, sans identité de jeu. Elles n'ont aucun lien avec l'échange réel.
+## Étapes
+1. **Synchronisation** : attendre que Lovable ramène `main` GitHub dans le projet. Je ne lance moi-même aucune commande git. Ensuite, vérifier que `6ad0d42` et `6e52733` sont bien ancêtres de HEAD. S'ils ne le sont pas, m'arrêter et le signaler.
+2. **Cible** : confirmer `project_id = iralfqlslqndgvexixis`.
+3. **Compilation** :
+   - `bun run build`, avec l'exit code réel.
+   - Tests automatiques de la PR #27 et `deno check` des fonctions touchées.
+   - Régénération du MCP par le SDK 3.0.5 uniquement (imports `npm:zod@4.6.6`, plugin intact).
+4. **Déploiement Lovable Cloud** : uniquement les fonctions modifiées par la PR #27 (`query-rag`, `proxy-llm`, et un helper partagé s'il change). Relever les empreintes SHA256. `mcp` reste en attente de la publication.
+5. **Contrôles** :
+   - Refus anonyme toujours 401.
+   - Logs récents propres.
+   - Lecture V2 admin toujours HTTP 200.
+   - Aucune donnée synthétique.
+   - Sur le prochain tour réel d'Ulrich : `control_quota: ok` et la ligne de quota consommée.
+6. **Traçabilité** : consigner dans `docs/plan_lot_1_observabilite_latence.md` les preuves suivantes :
+   - la révision ;
+   - le build ;
+   - les fonctions déployées ;
+   - les limites ;
+   - le diagnostic en lecture seule (quota bien consommé à 17:54, faux statut « failed » dû à `null` interprété comme échec, droits de la fonction de quota inchangés depuis juillet).
 
-## Cause exacte
-
-`supabase/functions/_shared/monotonicSpans.ts` arrive avec le squash P0 `12d5f29`. La fonction `failedResult` y considère `null` comme un échec.
-Or `enforceGameRequest` renvoie `null` quand l'appel est **autorisé**, et une `Response` (401/429/503) quand il est refusé.
-Chaque contrôle de quota réussi est donc marqué `control_quota: failed` dans `_ava_observability`.
-
-- C'est une **régression P0 d'observabilité seulement**. Le contrôle et la voix ne sont pas touchés.
-- Les vrais refus restent bien marqués « failed » : une `Response` 4xx/5xx a `ok === false`.
-- Conséquence sur la mesure : le statut de ce jalon est faux. La durée relevée (~166 ms et ~80 ms) reste valable.
-
-## Impact sur la gate de publication
-
-Ce défaut ne bloque pas le parcours vocal. Il bloque en revanche la validation des mesures V2 : tous les tours afficheraient un échec de quota.
-Je recommande de le corriger avant de publier. Sinon, publier en documentant que `control_quota.status` n'est pas fiable.
-
-## Correction P0 proposée (non appliquée)
-
-1. Dans `query-rag` et `proxy-llm`, envelopper l'appel `control_quota` : `null` (autorisé) donne `ok`, une `Response` donne `failed`.
-   Alternative : passer à `spans.run` un classificateur propre au jalon. Aucun changement de `failedResult` pour les autres jalons.
-2. Tests unitaires : appel autorisé (`null`) → `ok` ; 401, 429 et 503 → `failed`.
-3. Redéployer uniquement `query-rag` et `proxy-llm` via Lovable Cloud.
-   Vérifier sur un tour réel en sandbox-ulrich : `control_quota: ok`, et la ligne de quota consommée.
-4. Consigner le diagnostic et la correction dans `docs/plan_lot_1_observabilite_latence.md`.
-
-Hors périmètre : migration, droits, secrets, prompts, voix, capture, et la fonction de quota elle-même.
+Hors périmètre : publication du frontend, migration, droits, secrets, prompts, voix, capture et lot 2.
