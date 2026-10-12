@@ -115,7 +115,6 @@ describe("buildMaxSystemPrompt — variante rich_v2", () => {
     expect(timelineSection.subparts?.some((sub) => sub.included)).toBe(true);
     expect(budget.timelineEvents?.join(" ")).toMatch(/Aujourd'hui/);
     expect(budget.depthSelection).toBeUndefined();
-    expect(budget.depthSelection?.levelsRepresented).toHaveLength(4);
     // Le présent est toujours injecté.
     expect(result.systemPrompt).toContain("Lausanne, aujourd'hui");
   });
