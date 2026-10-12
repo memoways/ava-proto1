@@ -854,3 +854,48 @@ réglages/consentement/protections préservés. DOM bundle9MfUAJhs inchangé,
 capture corrigée attestée par comportement ; SHA servi exact encore inconnu.
 Max terminé par UI à19:27:55.297Z ; Emma après replay conserve film pas_vu.
 Publication frontend et baseline finale toujours en attente.
+
+### Livraison PR28 et contrôle visuel Lovable — 12 octobre 2026, 19:47 UTC
+
+PR https://github.com/memoways/ava-proto1/pull/28, HEAD source revu
+`fc3f6894f0c8ccef40e90b1535bd8183a0ac0c7a`, squash main
+`fa9bea9a1d306963c3336f541534f4e6841939e6`, fusion19:40:44Z.
+CI avant fusion https://github.com/memoways/ava-proto1/actions/runs/38298510806
+et post-merge https://github.com/memoways/ava-proto1/actions/runs/38299239967
+réussies : qualité complète et17 E2E. Aucun fichier non lié dans le commit.
+
+Lovable natif, message `umsg_01m4rt4ntketbrqqfge45cgnvx` terminé : HEAD
+compilé fa9bea9, PR25/26/27 incluses, 3/3 CallingMaxScreen, bun run build
+exit0. Bundle produit `index-ndT0HfP9.js`, SHA256
+`8199e2e6acd39e0f8978c54a634f124f3af6858e58bc8921c52e48fbd8660ae3` ; CSS
+`index-DzvdyyNt.css`, SHA256
+`58ffb3e41b8105b49f656de148774dc77f479fb9b7741aec576c33fc60075253`.
+MCP régénéré par SDK, 6 imports npm:zod@4.6.6 ; aucune Edge redéployée,
+aucune mutation DB/réglage/secret. Lovable signale27 erreurs Deno préexistantes
+sur redeem/manage-test-invitations et rag-question-corpus ; hors PR28,
+laissées inchangées, build frontend réussi. Pas de contrôle Deno global vert
+revendiqué, ni d'autorisation nouvelle demandée pour élargir le lot.
+
+Attention provenance : l'agent Lovable a inspecté son localhost Vite
+(`/src/main.tsx`, onAnsweredRef présent). Le domaine statique preview dans
+Brave sert après reload `/assets/index-CG1cec7E.js` : cette observation prime
+pour le test humain, et ne doit pas être assimilée au bundle ndT0HfP9 ni à
+une empreinte SHA servie vérifiée. Nouveau bundle et comportement attestés.
+
+Scénario réel UI rejoué dans le même onglet1830093908 : Max sans activer le
+micro, puis Terminer→Continuer→Recommencer→film pas_vu→replay→Emma.
+Emma décroche et affiche EN LIGNE avec bouton Activer le micro : blocage
+résolu dans cette preview. Session Max vide de contrôle
+`7cd81d13-d8b3-4d9f-b352-774c62067447` terminée par UI ; session Emma
+`2032310e-17ec-4124-9e30-c06d83d2272c` début19:46:33.950Z, film pas_vu
+confirmé via Ava natif, en attente de parole humaine. La session Emma
+anciennement bloquée `ee94abb9-a5ae-4daa-98c4-95dcc2e11c6b` s'est terminée
+par timeout à19:38:40.553Z, sans tour vocal inventé ni suppression de données.
+
+PostHog reçoit3 pageviews Brave (versionnull) sur le domaine preview entre
+19:20 et19:35 ; aucun rapprochement V2 de la session Max. La présence de
+visites ne valide pas la remontée des tours. Les contrôles sans microphone
+ne sont pas des captures vides et sont exclus de la baseline vocale.
+Test Emma avec parole pendant réponse audio demandé à Ulrich ; résultat
+et handoff à observer, sans changer de réglage. Publication frontend,
+tests publiés et baseline finale restent ouverts. Lot2 non commencé.
