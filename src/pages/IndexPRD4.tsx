@@ -1700,7 +1700,7 @@ const IndexPRD4 = () => {
 
   // ---- Mains libres -----------------------------------------------------------
   useEffect(() => {
-    handsFreeBlockedRef.current = handoffCalling || Boolean(handoffOffer) || Boolean(activeVideo) || state.phase !== "conversation";
+    handsFreeBlockedRef.current = handoffCalling || Boolean(handoffOffer) || Boolean(activeVideo) || state.phase !== "conversation_max";
   }, [activeVideo, handoffCalling, handoffOffer, state.phase]);
 
   /** Le joueur coupe la parole : la voix s'arrête, le tour en cours est abandonné. */

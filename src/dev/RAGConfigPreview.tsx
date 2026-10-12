@@ -7,6 +7,7 @@ const GAMEPLAY: GameplaySettings = {
   TRUST_THRESHOLD: 0.62,
   TIMEOUT_SECONDS: 300,
   SHOW_QUESTIONNAIRE: true,
+  VOICE_HANDS_FREE: { enabled: false, endOfSpeechMs: 900, hesitationExtraMs: 700, bargeInEnabled: true, bargeInMinWords: 2 },
   MAX_INSULT_TOLERANCE: 3,
   MIN_QUESTIONS_BEFORE_GATE: 3,
   RAG_TOP_K: 3,
