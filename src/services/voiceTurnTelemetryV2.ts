@@ -151,13 +151,15 @@ export function createVoiceTurnV2(
   };
 }
 
-/** A reused STT owns the current input, never the tracker already transferred to output. */
-export function failVoiceInputAttempt(
-  currentInput: ReturnType<typeof createVoiceTurnV2> | null,
+/** Guard the entire error callback, including teardown, before any stale-session effect. */
+export function handleVoiceInputError(
+  inputRef: { current: ReturnType<typeof createVoiceTurnV2> | null },
   initialCapture: ReturnType<typeof createVoiceTurnV2> | null,
   activeSession: boolean,
-): boolean {
-  if (!currentInput || (!activeSession && currentInput !== initialCapture)) return false;
-  currentInput.finish("failed");
-  return true;
+  onOwnedError: () => void,
+): void {
+  if (!activeSession && (!inputRef.current || inputRef.current !== initialCapture)) return;
+  inputRef.current?.finish("failed");
+  inputRef.current = null;
+  onOwnedError();
 }

@@ -225,3 +225,8 @@ sortie, ni viser la première capture lors d'un énoncé suivant. Le raccordemen
 sélectionne uniquement le tracker d'entrée courant du STT actif ; un ancien STT
 ne finalise pas le nouveau. Test simulé ajouté : erreur pendant sortie, puis
 pendant capture suivante, puis callback d'une ancienne session STT.
+
+La barrière d'appartenance protège le **callback onError entier**, y compris
+le teardown et ses effets UI. Le test vérifie que le teardown fourni n'est jamais
+appelé pour l'ancienne session, et que le teardown du STT actif ne reclassifie pas
+son input failed en cancelled.

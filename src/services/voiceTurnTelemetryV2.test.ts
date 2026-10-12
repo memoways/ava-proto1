@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createVoiceTurnV2, failVoiceInputAttempt, observeVoice, projectServerObservation, type VoiceTurnV2 } from "./voiceTurnTelemetryV2";
+import { createVoiceTurnV2, handleVoiceInputError, observeVoice, projectServerObservation, type VoiceTurnV2 } from "./voiceTurnTelemetryV2";
 import { numberOrNull } from "../../supabase/functions/_shared/telemetryNumbers";
 import { createMonotonicSpans } from "../../supabase/functions/_shared/monotonicSpans";
 
@@ -61,15 +61,23 @@ describe("V2 observations without changing voice decisions", () => {
   it("keeps a reused hands-free STT failure scoped to input, after transfer and on the next turn", () => {
     const initial = attempt();
     // First capture transferred to playback; no current input remains.
-    expect(failVoiceInputAttempt(null, initial.turn, true)).toBe(false);
+    const teardown = vi.fn();
+    handleVoiceInputError({ current: null }, initial.turn, true, teardown);
+    expect(teardown).toHaveBeenCalledOnce();
     initial.turn.observe("output_estimated", 1800);
     initial.turn.finish("completed");
     expect(initial.events[1].value.status).toBe("completed");
     const next = attempt();
-    expect(failVoiceInputAttempt(next.turn, initial.turn, true)).toBe(true);
+    const nextRef = { current: next.turn as typeof next.turn | null };
+    handleVoiceInputError(nextRef, initial.turn, true, () => {
+      teardown();
+      nextRef.current?.finish("cancelled");
+    });
+    expect(nextRef.current).toBeNull();
     expect(next.events[1].value.status).toBe("failed");
     const newest = attempt();
-    expect(failVoiceInputAttempt(newest.turn, initial.turn, false)).toBe(false);
+    handleVoiceInputError({ current: newest.turn }, initial.turn, false, teardown);
+    expect(teardown).toHaveBeenCalledTimes(2);
     expect(newest.events).toHaveLength(1);
   });
   it("assigns a fresh attempt ID to retries of the same causal turn", () => {

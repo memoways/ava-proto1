@@ -1,4 +1,4 @@
-import { createVoiceTurnV2, failVoiceInputAttempt, type ServiceObservation, type VoiceObserver } from "@/services/voiceTurnTelemetryV2";
+import { createVoiceTurnV2, handleVoiceInputError, type ServiceObservation, type VoiceObserver } from "@/services/voiceTurnTelemetryV2";
 import { getRuntimeContext } from "@/services/environmentContext";
 /**
  * IndexPRD4 — Nouveau parcours (mai 2026).
@@ -1631,8 +1631,7 @@ const IndexPRD4 = () => {
         }
       },
       {
-        onError: (err) => {
-          if (failVoiceInputAttempt(inputTelemetryRef.current, captureTelemetry, sttRef.current === stt)) inputTelemetryRef.current = null;
+        onError: (err) => handleVoiceInputError(inputTelemetryRef, captureTelemetry, sttRef.current === stt, () => {
           console.error("[PRD4 STT]", err);
           incrementPttError();
           trackEvent("prd4_ptt_error", { phase: "conversation", message: err.message });
@@ -1644,7 +1643,7 @@ const IndexPRD4 = () => {
             sttLatencySegmentRef.current = null;
           }
           setAudioState("idle");
-        },
+        }),
         getTelemetryContext: () => {
           const turnIndex = conversationRef.current.filter((m) => m.role === "user").length + 1;
           return {
