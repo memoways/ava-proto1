@@ -706,3 +706,80 @@ d'identité. Admin temporaire fermé. Ancien test intégré (micro inactif)
 terminé par UI puis fermé pour éviter deux sessions en parallèle ; aucun
 échange utilisateur n'a été enregistré par l'agent. Échange humain Emma
 toujours à effectuer et à confirmer ; frontend publié antérieur, Edge corrigées.
+
+### Contrôle réel Emma après redéploiement Edge — 12 octobre 2026
+
+Ulrich confirme « Brave, dans une fenêtre visible » puis « échange Emma terminé ».
+MCP Ava natif : fenêtre `[2026-10-11T18:55:39.470Z, 2026-10-12T18:55:39.470Z)`,
+page offset 0 / limit 100 / nextOffset null, cap 3 000 non atteint, 0 ligne
+invalide. La page contient aussi Max antérieur : ne pas utiliser son agrégat
+global pour une comparaison avant/après. Cohorte Emma isolée par session
+`c052127f-6e96-4697-b30c-5f3fc8979c21` (début 18:51:42.493Z), 9 événements
+V2, 3 tentatives distinctes, 3 observations GM indépendantes :
+
+| Tour / tentative | État final | Décision → sortie estimée | Couverture |
+| --- | --- | --- | --- |
+| 1 / `11c547b9-1c22-4f6f-a328-0003fecc5c63` | interrupted avant contexte/LLM/audio | null | 7/27 |
+| 2 / `4dcf3a4a-18ab-44ef-b997-5db3a674758a` | completed | 5 882 ms | 13/27 |
+| 3 / `129c51fe-c86b-4e69-8edb-99381c3013e6` | completed | 4 186 ms | 15/27 |
+
+Origine `app_turn_decision`, précision `software_estimate`. Descriptifs pour
+les seules 2 sorties mesurées / 3 tentatives : p50 5 034 ms, p95 5 797 ms,
+interpolation linéaire `(n-1)*p`, arrondie au ms. L'interruption n'est pas
+remplacée par zéro. Ce petit contrôle ne constitue pas un gain de latence,
+ni une baseline finale après nouvelle publication. Fin physique de parole
+et premier token batch restent null. L'interruption est avant génération,
+pas une preuve de barge-in pendant lecture audio.
+
+STT Deepgram / nova-3 / websocket ; LLM OpenAI / openai/gpt-5.6-luna /
+http_batch ; TTS gradium / gradium-tts / websocket, override personnage
+vrai, sans fallback ni retry. GM des deux tours terminés : Google /
+google/gemini-2.5-flash / http_batch. Voix exacte non exposée par le contrat
+technique ; version navigateur non relevée (Brave confirmé par UI et Ulrich).
+Prompt Emma `2026-10-12T11:03:37.612668+00:00`, config
+`9217fd34-321a-45c7-8363-6a8cf0b0157c`, code déclaré
+`0.26.0+voice-telemetry-v2`. Bundle DOM réellement servi dans Brave :
+`/assets/index-42YnFYBP.js`, frontend publié antérieur au correctif capture.
+Capture_ready est donc encore prématuré (tour3 -3 685 vs started -3 292 ms).
+La session metadata « push_to_talk » décrit la modalité configurée ; les
+trois tentatives sont `hands_free`. Aucun test PTT réel ne peut en être déduit.
+
+**Correction quota validée sur trafic réel** : 4 spans control_quota `ok`
+sur les deux tours terminés. Requête Cloud bornée en lecture seule via outil
+Lovable natif : query-rag request_count 3, fenêtre 18:54:12.477486Z ; proxy-llm
+request_count 1, fenêtre 18:55:17.431766Z. Ces compteurs sont par fenêtre
+glissante réinitialisable, pas un total cumulatif des 3 tours. Aucun identifiant
+utilisateur/secret affiché, aucune mutation SQL. La demande de diagnostic
+par agent Lovable en mode actif avait été refusée par l'auto-review (risque
+d'écriture/déploiement) ; remplacée par ces SELECT techniques bornés.
+
+GM tour1 : execution_status failed, signal d'abort confirmé par booléen SQL
+sur la note technique, sans extraire la note ; persistence réussie 252 ms.
+Tours2/3 GM executed et persistés. Tour3 : action proposée handoff mais
+player_switch_request.stance `defer` ; code existant neutralise l'offre lors
+d'une demande joueur différée. UI reste Emma, sans bouton de transfert ;
+handoff_count 0, aucun experience_event de transfert/blocage dans la fenêtre.
+Ne pas présenter ce refus éditorial comme un transfert exécuté ou une panne.
+
+**PostHog 137897 non rapproché pour Emma** : même session, événements V2,
+fenêtre `[2026-10-12T18:50:00Z, 2026-10-12T19:00:00Z)` puis journée UTC
+entière après absence : 0 ligne. Ne pas en déduire 0 tentative. Projet natif
+reconfirmé AVA prototype1, organisation Memoways. Des événements pageview/
+onboarding/phases existent sur la fenêtre, sans preuve qu'ils viennent de ce
+tour. DOM : 3 scripts PostHog présents ; logs capturés aucune erreur PostHog
+ou ERR_BLOCKED_BY_CLIENT. Cause indéterminée ; pas de désactivation de Shields,
+pas de changement de consentement, pas de flag modifié.
+
+Coût Ava natif days=1, global sans filtre environnement/session : 10 appels
+(8 completed, 2 error), 27 856 tokens, 0,014 USD (GM 0,012 + chat 0,002).
+Inclut Max, interruptions et autres appels du jour ; pas le coût isolé Emma,
+ni un coût complet STT/TTS/RAG. Aucun chiffre absent n'a été inventé.
+
+**Gate suivante réelle** : preview corrigée `/auth` ouverte dans Brave,
+écran Connexion Admin non connecté (autre domaine que celui publié). Email
+tenté, mais pilotage interrompu (`Detached`) ; résultat de saisie non confirmé.
+Connexion humaine demandée sur l'URL de preview, sans mot de passe transmis
+à Codex. Ulrich doit confirmer le back-office avant les parcours sur le
+frontend corrigé. Nouvelle publication, validation capture corrigée, PTT réel,
+barge-in audio, cinématiques/handoff exécutés et baseline finale restent ouverts.
+Lot2 non commencé ; réglages et données historiques préservés.
