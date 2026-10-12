@@ -94,3 +94,30 @@ Latence : aucun appel IA ajouté en série, la médiane ≤ 2 s et le p95 ≤ 4 
 ## Livraison
 
 Lovable Cloud uniquement, en sandbox. Aucune publication en Production sans ta décision explicite.
+
+---
+
+## Avancement (12/10/2026)
+
+Livré (sandbox, rien publié en Production) :
+- Étape 0 : plan enregistré, inventaire ci-dessous.
+- Étape 1 : `src/services/experienceFrame.ts` construit le cadre commun (cadre, parcours vu / non vu, posture, faits déjà connus, interdiction des renvois spontanés). Le même bloc est injecté dans les quatre variantes de prompt du personnage (section réservée `experience_frame`) et dans le prompt du GM. La réponse « film vu » est maintenant transmise à chaque tour (`hasSeenFilm`). La lecture des réglages est bornée à 400 ms et ne fait aucun appel IA.
+- Étapes 2-3 : `ExperienceDirectorConfig.frame` et `activeCharacters` sont versionnés avec l'orchestration existante. Une nouvelle section est disponible dans l'onglet admin Game Master. Désactivé par défaut, donc comportement inchangé tant qu'une version avec le cadre activé n'est pas publiée.
+- Étape 4 (partielle) : le prompt du GM ne nomme plus Max ni Emma pour les passages. Un passage proposé vers un personnage inactif ou vers le personnage actuel est ignoré. La règle legacy « intrusion » des personnages est neutralisée.
+- Étape 5 : la détection locale des demandes du joueur existait déjà (`detectPlayerSwitchRequest`). Les renvois spontanés sont interdits via le cadre.
+- Étape 6 : colonnes `sessions.character_prompt_versions` et `sessions.gm_code_version`, remplies au premier tour de chaque personnage.
+
+Restant :
+- Le type `RuntimeCharacter` reste limité à `max | emma`. Les alias de détection (« papa », « père ») et `summarize-session` gardent un mapping binaire. Il faudra les élargir avant d'activer Ava ou Léo.
+- Étape 7 (nettoyage de `conversationOrchestrator`, `gameMasterAgent`, `role_capture`, `role_summary`) : en attente de ta validation de la liste.
+
+## Passages Notion contraires au cadre (à corriger par l'éditorial, non modifiés)
+
+| Fiche | Extrait |
+|---|---|
+| Max, Emma | « les histoires de violence circulent très vite — réseaux sociaux, médias, bouche-à-oreille » |
+| Max, Emma | « Tu ne t'étonnes pas qu'un inconnu connaisse les détails de ce qui s'est passé au chalet » |
+| Max, Emma | « C'est un inconnu qui t'appelle — et dans ce contexte, c'est normal » |
+| Max | « Cet inconnu tombe au moment exact où tu as besoin d'un regard extérieur » |
+
+Les mentions « intrus » / « inconnu » du récit (Léo, Peter au chalet) font partie de l'histoire et ne posent pas de problème.
