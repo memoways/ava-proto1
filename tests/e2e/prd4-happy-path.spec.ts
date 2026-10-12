@@ -475,6 +475,25 @@ async function answerFilmQuestion(page: Page) {
   await page.getByRole("button", { name: "Je n'ai pas vu le film", exact: true }).click();
 }
 
+for (const answer of ["vu", "pas_vu"] as const) {
+  test(`choix film ${answer} conservé après relecture et transmis au GM`, async ({ page }) => {
+    const fakes = await installNetworkFakes(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Commencer" }).click();
+    await page.getByRole("button", { name: /Passer/ }).click();
+    await page.getByRole("button", { name: answer === "vu" ? "J'ai vu le film" : "Je n'ai pas vu le film", exact: true }).click();
+    await page.getByRole("button", { name: "Revoir la vidéo d’introduction" }).click();
+    await page.getByRole("button", { name: /Passer/ }).click();
+    await page.getByRole("button", { name: "Appeler Max" }).click();
+    await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+    await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+    await expect.poll(() => fakes.getGmFilmContexts().some((prompt) => prompt.includes(`film : ${answer}.`))).toBe(true);
+    await expect.poll(() => fakes.getSessionUpdates().some((update) =>
+      typeof update === "object" && update !== null && "has_seen_film" in update && update.has_seen_film === answer,
+    )).toBe(true);
+  });
+}
+
 test("le teaser démarre automatiquement avec le son puis Passer coupe tout", async ({ page }, testInfo) => {
   await installNetworkFakes(page);
 
