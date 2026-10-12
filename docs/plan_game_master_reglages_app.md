@@ -34,3 +34,7 @@ Tests : faux statut → consigne GM au tour suivant ; seuil de dérapage ; taill
 - Suppression : `conversationOrchestrator.ts`, `gameMasterAgent.ts` (+ tests), `GameMasterPromptSettings` legacy de `settingsService.ts`, `RoleCaptureScreen`, `RoleSummaryScreen`, phases `role_capture/role_summary`, Edge Function `summarize-role`.
 - Données : DELETE de la ligne `characters` GM (cascade embeddings/prompt) via requête de données.
 - Plan enregistré dans `docs/plan_game_master_reglages_app.md`.
+
+## État — 12/10/2026
+Réalisé : contexte projet, questions ouvertes et garde-fous (ouverture, dérapages, faux statut) dans Réglages Game Master, versionnés ; ancien moteur, ancien GM avant le tour, anciens réglages GM, écrans âge/genre et fonction `summarize-role` supprimés ; fiche GM et ses extraits retirés de la base ; la synchro Notion ignore toute fiche « Game Master ». Tests ajoutés (`gameMasterPromptBuilder.guardrails.test.ts`). Rien en Production.
+Restant : question 4 du questionnaire (« justesse du résumé de rôle ») ne correspond plus au parcours ; `RuntimeCharacter` limité à Max/Emma.
