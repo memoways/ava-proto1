@@ -1,0 +1,1 @@
+COMMENT ON COLUMN public.character_prompts.profondeur_par_niveau IS 'DEPRECATED: no Notion property; no longer synced, edited or injected into character prompts. Drop after Production publish.';
