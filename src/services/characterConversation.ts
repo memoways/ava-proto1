@@ -8,6 +8,7 @@ export interface CharacterHandoffOffer {
   reason: string;
   proposalGuidance: string;
   targetCharacter: RuntimeCharacter;
+  gmApproval?: { turnId: string; orchestrationVersionId: string };
 }
 
 const CHARACTER_ALIASES: Record<string, RuntimeCharacter> = {
@@ -139,6 +140,24 @@ export function inferCharacterSwitchStance(characterReply: string): CharacterSwi
   return "defer";
 }
 
+/** A GM recommendation is not consent: require an actual transfer agreement. */
+export function hasCharacterHandoffConsent(
+  characterReply: string,
+  target: RuntimeCharacter,
+  gmStance?: CharacterSwitchStance | null,
+): boolean {
+  if (gmStance === "object" || gmStance === "defer") return false;
+  const text = normalizeSwitchText(characterReply);
+  const negativeTransfer = /\b(?:ne|n['’])\s*(?:(?:vais|peux|veux|voudrais|compte|souhaite)\s+)?(?:pas|jamais)\s+(?:(?:te|le|la|lui|vous|me)\s+){0,3}(?:pass\w*|appel\w*|mett\w*|contact\w*|parl\w*)/i.test(text)
+    || /\bne\s+(?:(?:te|le|la|lui|vous|me)\s+){0,3}(?:pass\w*|appel\w*|mett\w*|contact\w*|parl\w*)\s+(?:pas|jamais)/i.test(text)
+    || /(?:pas maintenant|pas question|plus tard|reste avec moi|je refuse|peut[- ]etre|pas encore|on verra)/i.test(text);
+  if (negativeTransfer) return false;
+  // The executed GM classifies a direct player request with its full context.
+  if (gmStance === "accept") return true;
+  return /(?:je te (?:la|le) passe\b|je t['’]y passe\b|je t y passe\b|appelle[- ](?:la|le)\b)/i.test(text)
+    || new RegExp(`(?:tu peux|je (?:vais|peux|veux bien)).{0,35}(?:parler|appeler|passer|joindre|contacter).{0,20}\\b${target}\\b`, "i").test(text);
+}
+
 export function parseHandoffOffer(raw: unknown, fallbackTarget: RuntimeCharacter = "emma"): CharacterHandoffOffer | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
@@ -150,4 +169,20 @@ export function parseHandoffOffer(raw: unknown, fallbackTarget: RuntimeCharacter
     proposalGuidance: proposalGuidance || `Propose de parler à ${characterDisplayName(fallbackTarget)}.`,
     targetCharacter: asRuntimeCharacter(value.targetCharacter) ?? fallbackTarget,
   };
+}
+
+/** Old recommendations without recorded GM approval cannot unlock a resumed call. */
+export function parseGmApprovedHandoffOffer(
+  raw: unknown,
+  fallbackTarget: RuntimeCharacter,
+  orchestrationVersionId: string | null | undefined,
+): CharacterHandoffOffer | null {
+  const offer = parseHandoffOffer(raw, fallbackTarget);
+  if (!offer || !raw || typeof raw !== "object") return null;
+  const approval = (raw as Record<string, unknown>).gmApproval;
+  if (!approval || typeof approval !== "object") return null;
+  const fields = approval as Record<string, unknown>;
+  if (typeof fields.turnId !== "string" || !fields.turnId.trim()
+    || !orchestrationVersionId || fields.orchestrationVersionId !== orchestrationVersionId) return null;
+  return { ...offer, gmApproval: { turnId: fields.turnId, orchestrationVersionId } };
 }
