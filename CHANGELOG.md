@@ -6,12 +6,17 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Publié via Lovable] — 2026-10-13
 
-### Complément de recette P0 — préparation et diagnostic, sans nouvelle publication
+### Complément de recette P0 — bilan, sans nouvelle publication
 
-- Recette humaine courte sauvegardée, nouvel appel Emma préparé dans Brave
-  via l'admin publié → Tester moi-même / Sandbox Ulrich. Aucun tour vocal
-  exécuté au relevé initial ; transfert accepté et fin naturelle de cinématique
-  restent à observer avec Ulrich.
+- Recette humaine exécutée dans Brave, via l'admin publié → Tester moi-même /
+  Sandbox Ulrich : fin naturelle de cinématique confirmée par
+  cinematic_completed/skipped=false, retour chez Emma et nouvel échange
+  vocal attestés dans la même session. Prompt post-vidéo exact non conservé.
+- Demande unique vers Max : GM exécuté, recommandation handoff et classement
+  accept, mais contrôle de consentement rejetant les réponses d'Emma.
+  Aucun bouton, offre persistée ou transfert ; « transfert accepté non observé ».
+  Replay local du contrôle réel confirme ce résultat. Les conditions complètes
+  d'une offre affichable ne sont pas établies ; aucun correctif spéculatif.
 - Écart Emma du 12 octobre retrouvé : réponse technique hors récit après
   des fragments utilisateur techniques ; GM demandant d'abord le retour au
   récit puis encourageant cette aide. Fiche/version Emma confirmées, cadre
@@ -20,10 +25,10 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - 26 tests ciblés du cadre commun et de l'orchestrateur passent. Dernier
   code publié `f251eb3` inchangé ; P1 non commencé et passage non décidé.
   [Protocole et preuves](docs/plan_lot_1_observabilite_latence.md).
-- Premier échange humain publié confirmé ensuite par Ulrich : réponse
-  d'Emma dans le récit et retour à l'écoute ; GM exécuté sans transfert,
-  compteur0. Deuxième échange demandé, transfert et fin de cinématique
-  encore ouverts. Aucun gain de latence revendiqué.
+- Appel clôturé proprement, micro fermé, compteur0 et contrainte non négative
+  conservée. Aucun prompt, réglage ou code modifié ; aucune republication.
+  Passage P1 proposé après validation explicite des réserves de ce bilan.
+  Aucun gain de latence revendiqué.
 
 Cette section donne l'état livré après les derniers contrôles. Les entrées
 plus anciennes conservent leur état au moment de leur rédaction.

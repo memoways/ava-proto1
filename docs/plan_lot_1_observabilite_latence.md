@@ -1811,7 +1811,91 @@ Lovable HEAD `1fea1dc`, ready / agent terminé. Aucun nouveau code livré,
 aucune publication ; contrôle vocal limité au domaine publié, pas à la preview.
 La documentation de ce premier échange complète ce point de reprise.
 
-#### Prompt prêt à reprendre
+#### Bilan de la recette humaine restante — 13 octobre 2026, 16:34 CEST
+
+Même session publiée `3e5bb2d0-ded4-4ba7-aa12-05d343ad2040`, Brave,
+sandbox-ulrich, film pas_vu, bundle `index-B6k7eAnd.js`, code publié
+`f251eb3` (#32). Ulrich confirme « deuxième échange terminé avec vidéo »,
+puis « demande terminée — mais pas d'offre bouton pour aller parler avec Max ».
+
+**Cinématique terminée naturellement.** GM tour5 executed/action cinematic,
+vidéo `83df9675-3d2a-4ffb-abe2-cb3d5dc224ca` (Max hésite avec son fusil).
+Événements Cloud natifs : cinematic_played `14:29:21.063824Z`, puis
+cinematic_completed `14:29:34.967912Z`, payload skipped=false ; aucun
+cinematic_skipped. UI après lecture : Emma EN LIGNE / À L'ÉCOUTE, timer5:20,
+micro ouvert. Le tour vocal suivant commence à `14:30:55.626852Z` ; après
+annulation de cette tentative6, la tentative7 complète et la réponse d'Emma
+est lue. Cela atteste la reprise réelle de capture/génération/lecture après
+la vidéo, sans réactivation manuelle du micro ni changement de session.
+
+Le contexte de cette vidéo est présent en Cloud. Le chemin source
+`finishActiveVideo` place `context || post_video_context` dans la référence
+post-vidéo, consommée au début du tour suivant et transmise à l'orchestrateur.
+La continuité de sujet est observée. **Limite** : aucune trace de prompt
+assemblé conservée pour cette session ; contenu exact effectivement envoyé
+après vidéo et éventuel effet de l'annulation du tour6 non attestés.
+Ne pas transformer ce contrôle de source en preuve du payload LLM réel.
+
+**Demande unique de transfert : offre non obtenue, sans répétition.**
+GM tour6 failed/action none ; tour7 executed/action handoff vers Max,
+player_switch_request stance accept ; tour8 executed/action handoff vers Max.
+La réponse7 autorise un essai tout en exprimant une incertitude sur la
+réponse de Max. La réponse8 après le bref « Ok » n'énonce aucun transfert
+explicite. UI : zéro bouton Appeler, pending_handoff null, compteur0 ;
+aucun handoff_proposed, handoff_executed ou handoff_blocked en Cloud.
+Cette absence de handoff_blocked n'atteste pas l'approbation de toutes les
+gardes : un consentement non constitué est traité avant une offre affichable.
+
+Replay local utile des réponses7/8 dans **la fonction réelle**
+`hasCharacterHandoffConsent` de `characterConversation.ts` (transpilée par
+TypeScript, sans appel fournisseur ni mutation) : false / false, y compris
+avec gmStance=accept au tour7. La formulation d'incertitude « je ne sais pas
+s'il… » correspond au veto courant ; la permission pronominale longue
+n'est pas une des formes d'accord explicite reconnues. En outre, la
+transcription finale7 ne nomme pas Max, donc le détecteur client de demande
+directe ne dispose pas de cette cible explicite ; le GM peut la déduire du
+contexte mais son classement seul ne constitue pas une permission.
+Au tour8, le « D'accord » dans une réponse plus longue ne confirme pas
+explicitement le transfert. Aucun élargissement de reconnaissance ou
+assouplissement du veto pour obtenir artificiellement le scénario positif.
+
+Verdict : **transfert accepté non observé** au sens du contrat applicatif
+GM + règles + consentement explicite. Les conditions complètes d'une offre
+affichable ne sont pas établies ; aucun défaut précis de bouton manquant
+après offre approuvée et consentie reproduit. Clic, sonneries de transfert,
+arrivée chez Max et conservation du timer pendant un transfert GM ne sont
+donc pas exécutés dans cette recette. Les anciens essais d'appels libres
+restent distincts. La même session et son timer continu sont attestés pour
+le parcours vidéo (5:20 → 4:19 → 1:39), pas pour un transfert inexécuté.
+
+**Clôture.** Micro fermé par Couper le micro, puis Terminer à
+`2026-10-13T14:34:23.966Z` ; ended_at confirmé, user_hangup, durée865s,
+active_character emma, handoff_count0, film/config/fiche conservés. UI :
+« La communication se coupe », bouton Continuer. Cohorte technique bornée :
+8 tentatives V2 (4 completed, 4 interrupted), 8 observations GM, 24 événements
+V2 ; 4 événements legacy voice_turn_completed séparés. Aucune statistique
+de latence recalculée ni gain revendiqué sur cette petite recette.
+
+**Décision de passage proposée.** Le P0 reste publié avec limites. Le complément
+de recette a été exécuté jusqu'à son résultat observable, sans fabriquer un
+accord : vidéo naturelle et reprise vocale attestées ; transfert positif non
+observé ; écart Emma historique retrouvé, cause technique non démontrée et
+pas de replay génératif du déclencheur. Aucun correctif de code justifié à ce
+stade. P1 peut être préparé comme lot séparé uniquement après validation
+explicite de ce bilan et de ses réserves par Ulrich ; ne pas présenter la
+branche positive du transfert ou le prompt post-vidéo exact comme validés.
+P1/P2/P3 non commencés. Aucun prompt, fournisseur, voix, flag, deadline,
+seuil, migration, secret, Shields ou algorithme mains libres modifié.
+
+Dernier contrôle Lovable natif avant clôture documentaire : HEAD `554b3de`,
+ready / agent terminé, projet/workspace/Cloud attendus. Source GitHub et
+preview documentaire synchronisées ; aucun parcours vocal preview rejoué.
+Production `f251eb3` inchangée et contrôlée sur le domaine canonique ; aucune
+republication demandée. Tests ciblés déjà verts26/26 ; replay de consentement
+supplémentaire réussi, git diff --check propre. Pas de nouvelle CI applicative
+complète revendiquée pour ces seuls changements documentaires.
+
+#### Prompt historique de recette — exécuté, voir le bilan ci-dessus
 
 Reprends uniquement le complément de recette du lot 1/P0 d’Ava Proto 1, avant le lot 2/P1. Ne commence pas le streaming ni l’interruption acoustique dans cette reprise.
 
@@ -1844,3 +1928,25 @@ Si une correction est nécessaire : documente-la dans le plan existant avant imp
 Termine par les preuves : scénarios, sessions/tours et décisions techniques utiles, résultat et limites de chaque contrôle, révisions, état GitHub/preview/publié et reste éventuel. Mets à jour les plans concernés, CHANGELOG et STORY ; commit et push de la documentation sur main. Ne transforme pas une limite en succès. La baseline P0 à deux tours terminés est descriptive et antérieure au correctif GM : aucun gain de latence à en déduire.
 
 Le prochain développement sera le lot 2/P1 : mémoire de livraison et intention privée, génération LLM unique en streaming, TTS Gradium incrémental par tour et annulation cohérente. Dans cette reprise, prépare seulement sa décision de passage à partir de la recette ; pas d’implémentation P1/P2/P3.
+
+#### Reprise après recette — décision avant P1
+
+Projet memoways/ava-proto1, workspace local inchangé, main descendant de
+554b3de avec le bilan de recette du 13 octobre16:34CEST. Dernier code publié
+f251eb3 / PR32 ; seuls documents changés depuis, aucun correctif de code.
+Lire le dernier bilan ci-dessus et la section6 du plan général.
+
+Le parcours publié sandbox-ulrich dans Brave a attesté la vidéo naturelle
+et la reprise vocale ; transfert accepté non observé après une demande
+unique, contrôle de consentement false malgré classement GM accept.
+Écart Emma historique retrouvé sans cause technique démontrée ; prompt
+historique et prompt post-vidéo exact non conservés. Session de recette
+3e5bb2d0-ded4-4ba7-aa12-05d343ad2040 clôturée, micro fermé, compteur0.
+
+La prochaine action est une décision d'Ulrich sur le passage à P1 avec ces
+réserves. Ne pas relancer automatiquement la recette ni une demande refusée,
+ne pas interpréter une reprise de chat comme une validation des réserves.
+Si P1 est explicitement autorisé, l'ouvrir en lot séparé selon son plan :
+mémoire de livraison/intention privée, streaming cohérent, annulation.
+Sinon ne pas commencer P1/P2/P3. Lovable reste l'unique livraison ; aucune
+migration ou modification de réglage nouvelle autorisée par cette clôture.

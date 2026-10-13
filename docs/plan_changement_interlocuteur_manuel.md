@@ -98,6 +98,24 @@ Emma retourne à l'écoute ; GM executed/action none au tour2, compteur0,
 aucune offre. Un deuxième échange narratif est demandé avant la demande
 unique de transfert. Le transfert accepté reste non observé.
 
+### Résultat de la demande unique — 13 octobre 2026
+
+La demande a été exécutée après une cinématique terminée naturellement.
+GM tour7 executed/action handoff vers Max / stance accept, puis tour8
+executed/action handoff. Emma autorise un essai avec incertitude sur la
+réponse de Max ; la réponse suivante ne donne aucun transfert explicite.
+Replay dans hasCharacterHandoffConsent réel : false aux deux tours,
+notamment à cause du veto « je ne sais pas s'il… » et de l'absence d'une
+forme explicite reconnue. Le GM seul n'autorise donc aucun bouton.
+pending_handoff null, zéro bouton, aucun handoff_proposed/executed,
+compteur0. Aucun refus répété, aucun seuil ou prompt changé.
+
+Les conditions complètes d'une offre affichable ne sont pas établies :
+**transfert accepté non observé**, pas de défaut de bouton après une offre
+approuvée et consentie démontré. Clic/sonneries/arrivée chez Max non exécutés.
+Appel terminé proprement14:34:23.966Z, user_hangup, même session.
+Preuves et réserves : [bilan P0](plan_lot_1_observabilite_latence.md).
+
 [PR #32](https://github.com/memoways/ava-proto1/pull/32) fusionnée sur main
 à `2026-10-13T10:37:58Z`, commit `f251eb38a2094977f3ed5adbdfb8a2008f584ab2`.
 [CI finale 38383503886](https://github.com/memoways/ava-proto1/actions/runs/38383503886)

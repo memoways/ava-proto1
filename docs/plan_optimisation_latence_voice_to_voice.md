@@ -1,7 +1,7 @@
 # Plan — réduire la latence et préparer la conversation voice-to-voice libre
 
 Date : 12 octobre 2026. Base auditée : `0433518`, `main`, après une première lecture de `2d83558`.
-Statut actualisé le 13 octobre 2026 : **lot 1 / P0 publié via Lovable, échanges réels Max/Emma et baseline initiale relevés ; publication autorisée avec limites documentées. Correctifs de session/décrochage et appels soumis au GM livrés, dernier code publié `f251eb3` (PR #32), CHANGELOG/STORY actualisés par `7ab783c`. Transfert GM accepté et fin de cinématique non attestés en réel, écart de rôle Emma du 12 octobre inexpliqué ; lots 2–4 non commencés**. Choix d'interruption confirmé par Ulrich le 12 octobre : réaction dès le début de voix, avec confirmation des mots ensuite. Preuves dans le [bilan P0](plan_lot_1_observabilite_latence.md) et le [correctif des appels](plan_changement_interlocuteur_manuel.md) ; ces contrôles ne prouvent pas l'implémentation de la stratégie acoustique future.
+Statut actualisé le 13 octobre 2026 : **lot 1 / P0 publié via Lovable, échanges réels Max/Emma et baseline initiale relevés ; dernier code publié `f251eb3` (PR #32). Recette complémentaire exécutée : cinématique finie naturellement et reprise vocale attestées, transfert accepté non observé, écart Emma du 12 octobre retrouvé sans cause technique démontrée ; prompt post-vidéo exact non attesté. Passage P1 proposé avec réserves, non décidé ; lots 2–4 non commencés**. Choix d'interruption confirmé par Ulrich le 12 octobre : réaction dès le début de voix, avec confirmation des mots ensuite. Preuves dans le [bilan P0](plan_lot_1_observabilite_latence.md) et le [correctif des appels](plan_changement_interlocuteur_manuel.md) ; ces contrôles ne prouvent pas l'implémentation de la stratégie acoustique future.
 Sources : [audit détaillé](audit_voice_conversation_max.md) et [snapshot chiffré anonymisé](latency_voice_snapshot_2026-10-12.json).
 
 ## Résultat visé et décisions acquises
@@ -121,18 +121,21 @@ Le tableau de suivi doit présenter chaque gain réellement mesuré, intervalle 
 
 ## 6. Livraison par lots séparés — décision du 12 octobre 2026
 
-Complément de recette engagé le 13 octobre : appel humain préparé sur le
-site publié dans Sandbox Ulrich ; transfert accepté et fin naturelle de
-cinématique restent en attente. Écart Emma retrouvé dans l'historique du
-12 octobre : aide technique hors récit, GM d'abord correctif puis permissif ;
-aucun défaut de code démontré ni prompt historique complet disponible.
-26 tests ciblés du cadre et de l'orchestrateur verts. [Bilan de reprise P0](plan_lot_1_observabilite_latence.md).
-**Passage P1 non décidé**, aucun développement P1/P2/P3 engagé ; décision
-après recette humaine ou acceptation explicite des limites par Ulrich.
+Complément de recette exécuté le 13 octobre sur le site publié / Sandbox
+Ulrich : cinématique finie naturellement (skipped=false), retour chez Emma
+et nouvel échange vocal attestés. Demande unique vers Max : GM handoff/
+accept, mais consentement rejeté par le contrôle actuel ; aucune offre,
+**transfert accepté non observé**. Prompt post-vidéo exact non attesté.
+Écart Emma retrouvé dans l'historique du 12 octobre : aide technique hors
+récit, GM d'abord correctif puis permissif ; aucun défaut de code démontré
+ni prompt historique complet disponible. 26 tests ciblés verts et replay
+du contrôle de consentement réussi. [Bilan P0](plan_lot_1_observabilite_latence.md).
+**Passage P1 proposé avec ces réserves, non décidé** : attend la validation
+explicite du bilan par Ulrich. Aucun développement P1/P2/P3 engagé.
 
 | Lot | Périmètre du plan | État |
 | --- | --- | --- |
-| 1 | P0 : mesures fiables, attribution, MCP, dépendances et baseline | [Publié avec baseline et limites](plan_lot_1_observabilite_latence.md) ; recette restante proposée avant P1 : transfert GM accepté, fin de cinématique, diagnostic du rôle Emma |
+| 1 | P0 : mesures fiables, attribution, MCP, dépendances et baseline | [Publié avec baseline et recette complémentaire](plan_lot_1_observabilite_latence.md) ; vidéo naturelle et reprise vocale attestées, transfert accepté non observé, écart Emma retrouvé sans cause technique démontrée |
 | 2 | P1 : mémoire de livraison, intention privée, streaming LLM/TTS et annulation | Prévu après validation du lot 1 |
 | 3 | P2 : écoute libre, interruption acoustique confirmée et UI voix seule | Prévu après validation du lot 2 |
 | 4 | P3 : GM, RAG, prompts et buffers comparés | Prévu après validation du lot 3 |

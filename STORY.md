@@ -84,20 +84,26 @@ avec 26 tests ciblés verts. L'absence de prompt assemblé conservé pour cette
 session empêche de conclure sur une troncature ou une régression P0.
 Aucune correction spéculative n'est livrée.
 
-Un nouvel appel publié est préparé dans Brave, Sandbox Ulrich, depuis
-Tester moi-même. Le geste vocal humain reste nécessaire pour poursuivre
-le protocole court : accord GM et personnage, puis transfert par bouton ;
-cinématique finissant naturellement, retour au personnage et à l'écoute.
-Au relevé de préparation, aucun tour vocal exécuté : ces scénarios restent
-ouverts. Le dernier code publié reste `f251eb3`, sans republication.
-Le passage à P1 attend les résultats ou une décision explicite sur les limites.
-[Protocole et diagnostic](docs/plan_lot_1_observabilite_latence.md).
+L'appel publié dans Brave, Sandbox Ulrich, depuis Tester moi-même, a permis
+de laisser une cinématique narrative finir sans Passer. L'événement
+cinematic_completed porte skipped=false ; Emma revient et un nouvel échange
+vocal aboutit sans réactiver le micro. Le contexte vidéo est présent et le
+chemin de transmission est vérifié dans le code ; le prompt exact envoyé
+après lecture n'est pas conservé, donc cette preuve reste partielle.
 
-Le premier échange humain est ensuite confirmé terminé : Emma répond sur
-sa famille puis reprend l'écoute. Le GM n'offre aucun transfert à ce tour,
-et un deuxième échange narratif est préparé. Cette réponse dans le récit
-ne reproduit pas le déclencheur technique historique et ne démontre donc
-pas la résolution de la déviation. La recette positive reste à poursuivre.
+Une seule demande vers Max suit ces images. Le GM recommande le passage et
+classe la réponse comme un accord, mais la formulation conditionnelle et
+incertaine d'Emma n'est pas acceptée par le contrôle de consentement ; le
+tour suivant ne donne pas non plus de permission explicite. Le replay du
+contrôle réel confirme l'absence d'offre. Aucun bouton n'est forcé et aucune
+demande répétée : transfert accepté non observé. L'appel est clôturé avec
+compteur0. Les réponses dans le récit pendant cette recette ne reproduisent
+pas le déclencheur technique historique et ne démontrent pas sa résolution.
+
+Le code publié reste `f251eb3`, sans correctif ni republication. Le passage
+à P1 est proposé avec les réserves documentées, après validation explicite
+d'Ulrich ; aucun streaming ou autre lot commencé.
+[Protocole et diagnostic](docs/plan_lot_1_observabilite_latence.md).
 
 ### 2026-10-13 — Passer à un autre personnage devient un choix narratif
 
