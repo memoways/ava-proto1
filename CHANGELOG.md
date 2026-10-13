@@ -156,6 +156,11 @@ plus anciennes conservent leur état au moment de leur rédaction.
   vertes, 46/541/34 et 36 E2E sans retry, types/build Lovable verts. Nouvel essai
   canary Max préparé dans Brave ; cause upstream non encore établie,
   aucune hausse de budget ni changement de modèle.
+- Recette suivante : deux `finish_reason=length`, puis une réponse complète.
+  Cause établie : l'en-tête P1 consomme une partie importante du budget de sortie.
+  Correctif de format en cours : intention compacte et parole bornée depuis
+  le budget existant, sans hausse de max_tokens ni modification des prompts
+  éditoriaux, du canon ou du batch. Publication toujours bloquée avant recette.
   [Plan P1](docs/plan_lot_2_memoire_streaming_coherent.md).
 
 Les mentions de non-publication et les listes de recette des entrées du

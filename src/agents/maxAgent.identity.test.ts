@@ -26,9 +26,11 @@ vi.mock("@/services/characterPromptService", () => ({
 }));
 
 import { loadCharacterPrompt } from "@/services/characterPromptService";
-import { getGameplaySettings } from "@/services/settingsService";
+import { getGameplaySettings, getLLMSettings } from "@/services/settingsService";
+import { callLLMWithUsage, streamLLM } from "@/services/openRouterLLM";
+import { ResponseIntentParser, SPEECH_BOUNDARY } from "@/services/responseIntentStream";
 import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
-import { buildMaxSystemPrompt } from "./maxAgent";
+import { buildMaxSystemPrompt, simulateMaxResponse } from "./maxAgent";
 
 const variants = ["legacy", "compact_v1", "rich_v2", "optimized_v3"] as const;
 
@@ -122,5 +124,43 @@ describe("identity lock across prompt variants", () => {
     expect(trace.finalSystemPrompt.startsWith("# IDENTITÉ ACTIVE")).toBe(true);
     expect(trace.finalSystemPrompt).toContain("Tu es Emma Munz");
     expect(trace.finalSystemPrompt).toContain("INTERDIT_IDENTITAIRE_TEMOIN");
+  });
+});
+
+describe('P1 format within the selected output budget', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getGameplaySettings).mockReturnValue({ MAX_PROMPT_VARIANT: 'optimized_v3' } as never);
+    vi.mocked(getLLMSettings).mockReturnValue({ LLM_MODEL: 'openai/gpt-5.6-luna', LLM_MAX_TOKENS: 220, LLM_TEMPERATURE: 0.7, LLM_TOP_P: 0.9 } as never);
+  });
+  it.each([
+    ['max', 220, 45], ['emma', 220, 45], ['max', 100, 22], ['emma', 100, 22],
+  ] as const)('uses one %s stream, keeping budget %s and limiting speech to %s words', async (character, maxTokens, speechWords) => {
+    vi.mocked(loadCharacterPrompt).mockResolvedValue(sheet(character) as never);
+    const speech = 'Je reste inquiet pour Ava.';
+    const wire = JSON.stringify({goal:'Écouter',points:[]}) + SPEECH_BOUNDARY + speech;
+    vi.mocked(streamLLM).mockImplementationOnce(async (_messages, onChunk) => { onChunk(wire, false); return wire; });
+    const spoken: string[] = [];
+    const parser = new ResponseIntentParser(contexts[character], () => {}, text => spoken.push(text));
+    const result = await simulateMaxResponse(input, { characterContext: contexts[character], llmOverrides:{maxTokens}, diagnosticTrace:true, onSpeechToken:t=>parser.push(t), finishSpeech:()=>parser.finish() });
+    expect(streamLLM).toHaveBeenCalledTimes(1);
+    expect(callLLMWithUsage).not.toHaveBeenCalled();
+    const [messages, , options] = vi.mocked(streamLLM).mock.calls[0];
+    expect(options).toMatchObject({model:'openai/gpt-5.6-luna', max_tokens:maxTokens});
+    expect(messages[0].content).toContain(`discours : ${speechWords} mots maximum`);
+    expect(messages[0].content).toContain('en-tête privé');
+    expect(messages[0].content).toContain(`Tu es ${contexts[character].displayName}`);
+    expect(result.promptTrace?.finalSystemPrompt).toBe(messages[0].content);
+    expect(result.response).toBe(speech);
+    expect(spoken).toEqual([speech]);
+  });
+  it('keeps the batch prompt and token budget unchanged', async () => {
+    vi.mocked(loadCharacterPrompt).mockResolvedValue(sheet('emma') as never);
+    const baseline = await buildMaxSystemPrompt(input, contexts.emma.displayName, contexts.emma);
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({content:'Je vous écoute.',usage:null,generationId:null,model:'openai/gpt-5.6-luna',latencyMs:10,diagnosticTrace:null});
+    const result = await simulateMaxResponse(input,{characterContext:contexts.emma});
+    expect(result.systemPrompt).toBe(baseline.finalSystemPrompt);
+    expect(callLLMWithUsage).toHaveBeenCalledWith(expect.any(Array),expect.objectContaining({max_tokens:220}));
+    expect(streamLLM).not.toHaveBeenCalled();
   });
 });
