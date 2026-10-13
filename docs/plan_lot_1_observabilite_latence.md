@@ -1104,3 +1104,103 @@ hash initial après restauration, ainsi que le hash prod inchangé. Garder
 Shields actif (son exception précédente est terminée). Aucun code nouveau,
 aucune migration/donnée historique à modifier. Sans accord, ne pas changer
 ce réglage et conserver PTT/no_audio réels comme non attestés.
+
+### Reprise du contrôle PTT — 13 octobre 2026
+
+Ulrich demande de continuer là où le lot s'est arrêté. Reprise du contrôle
+PTT temporaire décrit ci-dessus, strictement dans sandbox-ulrich, avec
+restauration du booléen initial après chargement du réglage pour la session.
+Le changement ne doit pas rester actif pendant l'attente humaine : les
+réglages sont chargés pour l'appel, puis la valeur serveur sera rétablie
+avant la demande d'échange vocal. Production et autres clés préservées.
+
+État initial relu via Lovable natif : projet1265958d-b74e-40f2-917d-182fe05163fc,
+workspace5glbtPltldwz9tgNwIi4, ready/agentFinishedtrue, révision702d3d6394cb28ee15822a570467ee1c2218ee59,
+base Cloud activée/supabase. Dépôt local propre à la même révision.
+admin_settings.value est jsonb ; les deux hashes et valeurs correspondent
+au relevé précédent : sandbox eafeb3c14b4890eb08d52d53d0c6aa5e/true,
+prod716aa4521856147da989b6cffb2a741b/champ absent.
+
+La lecture d'onglet par l'extension Brave échoue (Debugger unattached).
+La fenêtre native Brave permet la validation visuelle : preview sandbox
+sur l'accueil Commencer, aucun appel en cours. Shields activés/interrupteuron
+confirmés pour le domaine exact de preview ; aucune protection modifiée.
+Le contrôle natif de fenêtre reste limité à Ava.
+
+Préparation réalisée : UPDATE conditionnel au hash initial et au hash prod,
+uniquement jsonb_set(VOICE_HANDS_FREE.enabled=false), une seule ligne modifiée
+à05:22:27.389501UTC, hash temporairef5c0308f452619165c57d2c7a462cab0.
+Preview rechargée, introduction passée, film pas_vu, Appeler Max. UI native
+confirme Max EN LIGNE / CLIQUE POUR PARLER / Démarrer l'enregistrement.
+Sessione27466df-c94a-42c1-ae1b-8151e2f897a4, début05:23:04.330UTC,
+sandbox-ulrich/contextsandbox, Max/tts. Aucune capture déclenchée par l'agent.
+
+Avant l'attente humaine, restauration conditionnelle au hash temporaire
+à05:23:27.244051UTC : enabled=true, hash initial
+eafeb3c14b4890eb08d52d53d0c6aa5e retrouvé. SELECT distinct confirme prod
+716aa4521856147da989b6cffb2a741b inchangé, y compris updated_at initial.
+Toutes les valeurs JSON initiales sont restaurées ; seule la date d'audit
+sandbox reflète la manipulation temporaire. Le mode PTT reste dans la
+référence de réglages de cet appel déjà chargé, sans changement serveur
+persistant pendant l'attente. Ne pas recharger l'onglet avant le contrôle.
+
+Action humaine demandée : clic micro, courte phrase à Max, deuxième clic
+pour envoyer, attendre sa réponse puis confirmer contrôle PTT terminé.
+PTT réel et capture no_audio restent non attestés à ce stade. Publication
+Lovable et baseline publiée encore à effectuer ; aucun lot2 engagé.
+
+### PTT réel confirmé — 13 octobre 2026, 07:24 CEST
+
+Ulrich confirme contrôle PTT terminé. Ava natif, fenêtre
+[2026-10-12T05:24:44.072Z,2026-10-13T05:24:44.072Z), page0/100,
+nextOffsetnull, cappedfalse, invalid0. Session préparée ci-dessus, tentative
+7a1a2fb2-5392-4d9f-8beb-bd89789571e3,3 événements : started05:23:48.285169,
+GM05:24:12.860596, finished05:24:20.615399UTC. input_modepush_to_talk,
+origine finaleptt_release, statuscompleted. Capture_started=ready=-12713ms,
+turn_decided0, flush_sent4, transcript_final219, contexte1760,
+LLMresponse4074, premier chunk4715, sortieestimée5062, audio_end15835ms.
+generation_total6194ms, playback11759ms, couverture15/27partial.
+voice_end/first_tokennull, précisionsoftware_estimate. Cohorte PTTn1 :
+p50=p95=5062ms descriptifs, distincte de mainslibres, aucun gain revendiqué.
+
+STTDeepgram/nova-3/websocket, LLMOpenAI/openai/gpt-5.6-luna/http_batch,
+TTSGradium/gradium-tts/websocket/overridetrue/fallbackfalse/retry0. Versions
+prompt/config identiques au contrôle Max précédent ; aucun fournisseur,
+timing ou contenu privé modifié. Tous spansRAG/LLMok, quotas80/144msok.
+GMGoogle/gemini-2.5-flash, génération/validation/persistence/availabilityok.
+Projection technique seule ; voix exacte non exposée.
+
+Action humaine suivante demandée dans le même appel PTT : capture de deux
+secondes sans parole puis deuxième clic. no_audio pas encore attesté.
+
+### Capture sans parole confirmée — 13 octobre 2026, 07:26 CEST
+
+Ulrich confirme capture sans parole terminée. Même session PTT, tentative
+907816df-b7e6-4719-9d39-e25e765571a0, started05:25:32.693074UTC puis
+finished05:25:42.919854UTC, statusno_audio, originecapture_start.
+Capture_started=ready1494ms, turn_decided10266, flush_sent10282 ; durée
+observée de capture environ8.8s, différente des2s proposés, conserver
+la mesure réelle. transcript_final/contexte/LLM/TTS/output/audio_endnull,
+services[], aucune observation GM pour cette tentative. Couverture5/27
+partial. Aucun zéro inventé, aucune réponse déclenchée.
+
+Snapshot Ava [2026-10-12T05:26:04.541Z,2026-10-13T05:26:04.541Z),
+page0/100,nextOffsetnull,cappedfalse,invalid0 ; cette session contient
+5 événements,2 tentatives dédupliquées,1 completed/PTT et1 no_audio.
+Comptage PostHog V2 de cette session dans05:20–05:30UTC : aucune ligne,
+Shields actif. Rapprochement Ava/PostHog déjà attesté hier sur le tour Max
+avec exception temporaire autorisée puis protection rétablie ; ne pas
+réouvrir cette exception pour ces contrôles.
+
+Après le contrôle, Ulrich utilise d'autres fenêtres Brave. Les commandes
+natives signalent ce changement pendant la tentative de retour à Ava ;
+aucun clic Terminer réussi ni fin de session affirmée. La capture est
+finalisée no_audio côté télémétrie, et le réglage serveur a déjà été
+restauré avant les échanges humains. Ne pas interférer avec ses fenêtres.
+
+État : PTT réel et capture vide sont maintenant attestés. Handoff accepté
+et cinématique narrative déclenchée restent non attestés en réel (tests
+automatiques distincts), et l'écart de rôle Emma garde son origine inconnue.
+Aucune publication frontend supplémentaire effectuée. Une publication
+avec ces limites nécessite un choix explicite, puisque la demande initiale
+conditionne la publication à la réussite des parcours.
