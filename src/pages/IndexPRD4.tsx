@@ -138,9 +138,9 @@ import {
   detectPlayerSwitchRequest,
   hasSpokenWithCharacter,
   inferSpokenWith,
-  inferCharacterSwitchStance,
+  hasCharacterHandoffConsent,
   lastHandoffUserTurn,
-  parseHandoffOffer,
+  parseGmApprovedHandoffOffer,
   sliceConversationForCharacter,
   tagSpokenWith,
   type CharacterHandoffOffer,
@@ -256,15 +256,19 @@ const IndexPRD4 = () => {
   const activeTTSProviderIdRef = useRef<TTSProviderId | null>(null);
   const handoffCountRef = useRef(0);
   const handoffRecommendationRef = useRef<CharacterHandoffOffer | null>(null);
-  const pendingPlayerSwitchRef = useRef<RuntimeCharacter | null>(null);
-  const switchToCharacterRef = useRef<((target: RuntimeCharacter, source: "player" | "gm" | "manual") => Promise<void>) | null>(null);
   const [handoffOffer, setHandoffOffer] = useState<CharacterHandoffOffer | null>(null);
+  const handoffOfferRef = useRef<CharacterHandoffOffer | null>(null);
+  const acceptedHandoffRef = useRef<CharacterHandoffOffer | null>(null);
+  const setCurrentHandoffOffer = useCallback((offer: CharacterHandoffOffer | null) => {
+    handoffOfferRef.current = offer;
+    setHandoffOffer(offer);
+  }, []);
   const [handoffCalling, setHandoffCalling] = useState(false);
   const [handoffCallingTarget, setHandoffCallingTarget] = useState<RuntimeCharacter>("emma");
   const handoffCallingRef = useRef(false);
-  const manualCallingTargetRef = useRef<RuntimeCharacter | null>(null);
-  const manualCallIdRef = useRef<string | null>(null);
-  const [manualCallingTarget, setManualCallingTarget] = useState<RuntimeCharacter | null>(null);
+  const approvedCallingTargetRef = useRef<RuntimeCharacter | null>(null);
+  const handoffAttemptIdRef = useRef<string | null>(null);
+  const [approvedCallingTarget, setApprovedCallingTarget] = useState<RuntimeCharacter | null>(null);
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
   const [teaserPlayerReady, setTeaserPlayerReady] = useState(false);
@@ -341,9 +345,10 @@ const IndexPRD4 = () => {
 
   // ---- Helpers conversation -------------------------------------------------
   const cleanupAudio = useCallback(() => {
-    manualCallingTargetRef.current = null;
-    manualCallIdRef.current = null;
-    setManualCallingTarget(null);
+    approvedCallingTargetRef.current = null;
+    acceptedHandoffRef.current = null;
+    handoffAttemptIdRef.current = null;
+    setApprovedCallingTarget(null);
     handoffCallingRef.current = false;
     setHandoffCalling(false);
     activeTurnSequenceRef.current += 1;
@@ -803,7 +808,8 @@ const IndexPRD4 = () => {
     handoffCountRef.current = session.handoff_count;
     startingCharacterRef.current = session.active_character;
     setSelectedCharacter(session.active_character);
-    setHandoffOffer(parseHandoffOffer(session.pending_handoff, session.active_character === "emma" ? "max" : "emma"));
+    setCurrentHandoffOffer(parseGmApprovedHandoffOffer(session.pending_handoff,
+      session.active_character === "emma" ? "max" : "emma", session.orchestration_version_id));
     pendingGmGuidanceRef.current = latestGm?.next_turn_guidance?.trim() || null;
     pendingEmotionalStateRef.current = null;
     gmTopicsCoveredRef.current = latestGm?.topics_covered ?? [];
@@ -834,7 +840,7 @@ const IndexPRD4 = () => {
       remaining_seconds: remainingSeconds,
       turns: safeConversationLog.filter((message) => message.role === "user").length,
     });
-  }, [cleanupAudio, restoreConversation, resumableSession, setSelectedCharacter, timer]);
+  }, [cleanupAudio, restoreConversation, resumableSession, setCurrentHandoffOffer, setSelectedCharacter, timer]);
   const handleLockedClick = useCallback(
     (id: "emma" | "ava" | "leo") => trackEvent("prd4_character_locked_clicked", { character: id }),
     [],
@@ -914,8 +920,7 @@ const IndexPRD4 = () => {
     setActivePortraitUrl(profile?.portraitUrl ?? null);
     handoffCountRef.current = 0;
     handoffRecommendationRef.current = null;
-    pendingPlayerSwitchRef.current = null;
-    setHandoffOffer(null);
+    setCurrentHandoffOffer(null);
     setHandoffCalling(false);
     pendingGmGuidanceRef.current = null;
     pendingEmotionalStateRef.current = null;
@@ -986,6 +991,7 @@ const IndexPRD4 = () => {
     setAudioState,
     setPhase,
     setSelectedCharacter,
+    setCurrentHandoffOffer,
     timer,
   ]);
 
@@ -1125,13 +1131,13 @@ const IndexPRD4 = () => {
         pendingPostVideoContextRef.current = null;
         // Consommation one-shot : une guidance périmée ne doit pas survivre à son tour.
         const requestedSwitch = detectPlayerSwitchRequest(userText, activeCharacterRef.current);
-        pendingPlayerSwitchRef.current = requestedSwitch;
         const switchGuidance = requestedSwitch
           ? buildSwitchRequestGuidance(activeCharacterRef.current, requestedSwitch)
           : null;
         const gmGuidance = [pendingGmGuidanceRef.current, switchGuidance].filter(Boolean).join(" ") || null;
         pendingGmGuidanceRef.current = null;
         const handoffProposalForThisTurn = handoffRecommendationRef.current;
+        handoffRecommendationRef.current = null;
         const priorConversation = sliceConversationForCharacter(
           conversationRef.current.slice(0, -1),
           activeCharacterRef.current,
@@ -1367,41 +1373,6 @@ const IndexPRD4 = () => {
           void updatePRD4Conversation(sessionIdRef.current, conversationRef.current);
         }
 
-        // A handoff recommendation first guides a natural proposal by Max. The
-        // explicit choice only appears after that next spoken reply completed.
-        if (handoffProposalForThisTurn && handoffProposalForThisTurn.targetCharacter !== activeCharacterRef.current) {
-          handoffRecommendationRef.current = null;
-          setHandoffOffer(handoffProposalForThisTurn);
-          if (sessionIdRef.current) {
-            void updatePRD4ExperienceState(sessionIdRef.current, { pendingHandoff: handoffProposalForThisTurn });
-            void appendExperienceEvent({
-              sessionId: sessionIdRef.current,
-              eventKey: `handoff-proposed:${turnId}`,
-              eventType: "handoff_proposed",
-              turnId,
-              turnIndex,
-              character: activeCharacterRef.current,
-              payload: { reason: handoffProposalForThisTurn.reason, targetCharacter: handoffProposalForThisTurn.targetCharacter },
-            });
-          }
-          trackEvent("prd4_handoff_proposed", {
-            session_id: sessionIdRef.current,
-            turn_id: turnId,
-            turn_index: turnIndex,
-            target_character: handoffProposalForThisTurn.targetCharacter,
-          });
-        }
-
-        if (requestedSwitch) {
-          const stance = inferCharacterSwitchStance(result.maxResponse);
-          if (stance === "accept") {
-            pendingPlayerSwitchRef.current = null;
-            void switchToCharacterRef.current?.(requestedSwitch, "player");
-          } else if (stance === "object") {
-            pendingPlayerSwitchRef.current = null;
-          }
-        }
-
         // ---- Directeur d'expérience unique : labels, mémoire, guidance et une
         // action recommandée, toujours après le texte et la voix du personnage.
         void result.postTurnPromise.then(async (ev) => {
@@ -1458,24 +1429,31 @@ const IndexPRD4 = () => {
           if (!isCurrentTurn()) return;
           const settings = videoTriggerSettingsRef.current;
           const directorConfig = ev.orchestration_config;
-          const pendingPlayerTarget = requestedSwitch && pendingPlayerSwitchRef.current === requestedSwitch
-            ? requestedSwitch
+          const gmStance = ev.player_switch_request?.targetCharacter === requestedSwitch
+            ? ev.player_switch_request.stance : null;
+          const currentAction = ev.action ?? { type: "none" };
+          const requestedOffer: CharacterHandoffOffer | null = requestedSwitch
+            && gmStance === "accept"
+            && currentAction.type === "handoff" && currentAction.targetCharacter === requestedSwitch
+            && hasCharacterHandoffConsent(result.maxResponse, requestedSwitch, gmStance)
+            ? { targetCharacter: requestedSwitch, reason: currentAction.reason, proposalGuidance: currentAction.proposalGuidance }
             : null;
-          if (pendingPlayerTarget) {
-            const stance = ev.player_switch_request?.targetCharacter === pendingPlayerTarget
-              ? ev.player_switch_request.stance
-              : "defer";
-            pendingPlayerSwitchRef.current = null;
-            if (stance === "accept") {
-              void switchToCharacterRef.current?.(pendingPlayerTarget, "player");
-            }
-          }
+          const recommendedOffer = handoffProposalForThisTurn
+            && hasCharacterHandoffConsent(result.maxResponse, handoffProposalForThisTurn.targetCharacter,
+              ev.player_switch_request?.targetCharacter === handoffProposalForThisTurn.targetCharacter
+                ? ev.player_switch_request.stance : undefined)
+            ? handoffProposalForThisTurn : null;
+          const consentedOffer = requestedOffer ?? recommendedOffer;
+          const offerConfirmed = ev.execution_status === "executed" && consentedOffer
+            && (currentAction.type === "none"
+              || (currentAction.type === "handoff" && currentAction.targetCharacter === consentedOffer.targetCharacter));
           const decision: ExperienceDirectorDecisionV1 = applyTopicHandoffFallback({
             labels: ev.labels ?? { themes: [], topics: [], intentions: [] },
             nextTurnGuidance: ev.next_turn_guidance || null,
             memoryDelta: ev.memory_delta ?? null,
-            action: requestedSwitch ? { type: "none" } : (ev.action ?? { type: "none" }),
-          }, directorConfig, activeCharacterRef.current);
+            action: offerConfirmed ? { type: "handoff", ...consentedOffer }
+              : ev.execution_status !== "executed" || requestedSwitch ? { type: "none" } : currentAction,
+          }, ev.execution_status === "executed" && !requestedSwitch ? directorConfig : null, activeCharacterRef.current);
           const targetCharacter = decision.action.type === "handoff" ? decision.action.targetCharacter : "emma";
           const guarded = validateDirectorDecision(decision, {
             configPublished: Boolean(ev.orchestration_version_id),
@@ -1488,7 +1466,8 @@ const IndexPRD4 = () => {
             minimumHandoffTurn: directorConfig?.minimumHandoffTurn ?? 4,
             maximumHandoffsPerSession: directorConfig?.maximumHandoffsPerSession ?? 8,
             minimumTurnsBetweenHandoffs: directorConfig?.minimumTurnsBetweenHandoffs ?? 2,
-            targetReady: (targetCharacter === "emma" ? emmaProfile : maxProfile)?.enabled !== false,
+            targetReady: (targetCharacter === "emma" ? emmaProfile : maxProfile)?.enabled === true
+              && (targetCharacter === "emma" ? emmaProfile : maxProfile)?.ready === true,
             playedVideoIds: triggeredVideoIdsRef.current,
             availableVideoIds: videos.filter((video) => Boolean(video.video_url)).map((video) => video.id),
             lastVideoTurn: Number.isFinite(lastVideoTurnRef.current) ? lastVideoTurnRef.current : null,
@@ -1513,7 +1492,21 @@ const IndexPRD4 = () => {
             });
           }
 
-          if (guarded.action.type === "handoff") {
+          if (guarded.action.type === "handoff" && offerConfirmed) {
+            const offer = { reason: guarded.action.reason, proposalGuidance: guarded.action.proposalGuidance,
+              targetCharacter: guarded.action.targetCharacter,
+              gmApproval: { turnId, orchestrationVersionId: ev.orchestration_version_id! } };
+            setCurrentHandoffOffer(offer);
+            if (sid) {
+              void updatePRD4ExperienceState(sid, { pendingHandoff: offer });
+              void appendExperienceEvent({ sessionId: sid, eventKey: `handoff-proposed:${turnId}`,
+                eventType: "handoff_proposed", turnId, turnIndex, character: activeCharacterRef.current,
+                orchestrationVersionId: ev.orchestration_version_id,
+                payload: { reason: offer.reason, targetCharacter: offer.targetCharacter } });
+            }
+            trackEvent("prd4_handoff_proposed", { session_id: sid, turn_id: turnId,
+              turn_index: turnIndex, target_character: offer.targetCharacter });
+          } else if (guarded.action.type === "handoff") {
             handoffRecommendationRef.current = {
               reason: guarded.action.reason,
               proposalGuidance: guarded.action.proposalGuidance,
@@ -1610,6 +1603,7 @@ const IndexPRD4 = () => {
       endLatencySegment,
       finalizeAndEnd,
       handoffOffer,
+    setCurrentHandoffOffer,
       latencyOverlayEnabled,
       setAudioState,
       setLastUserLabels,
@@ -1933,9 +1927,10 @@ const IndexPRD4 = () => {
     void finalizeAndEnd("user_hangup");
   }, [finalizeAndEnd]);
 
-  const switchToCharacter = useCallback(async (target: RuntimeCharacter, source: "player" | "gm" | "manual") => {
-    if (endedRef.current || handoffCallingRef.current || activeCharacterRef.current === target ||
-      (source !== "manual" && manualCallingTargetRef.current)) return;
+  const switchToCharacter = useCallback(async (target: RuntimeCharacter) => {
+    if (endedRef.current || handoffCallingRef.current || activeCharacterRef.current === target
+      || acceptedHandoffRef.current?.targetCharacter !== target) return;
+    const source = "gm" as const;
     handoffCallingRef.current = true;
     const from = activeCharacterRef.current;
     activeTurnControllerRef.current?.abort("character-switch");
@@ -1944,11 +1939,11 @@ const IndexPRD4 = () => {
     const switchSequence = activeTurnSequenceRef.current;
     setHandoffCallingTarget(target);
     setHandoffCalling(true);
-    setManualCallingTarget(null);
+    setApprovedCallingTarget(null);
     const sid = sessionIdRef.current;
     const isSwitchCurrent = () => !endedRef.current &&
       activeTurnSequenceRef.current === switchSequence && sessionIdRef.current === sid;
-    const eventSuffix = source === "manual" ? `:manual-${manualCallIdRef.current ?? crypto.randomUUID()}` : "";
+    const eventSuffix = `:gm-${handoffAttemptIdRef.current ?? crypto.randomUUID()}`;
     const targetName = characterDisplayName(target);
     trackEvent("prd4_handoff_accepted", { session_id: sid, target_character: target, source });
     if (sid) void appendExperienceEvent({
@@ -1971,7 +1966,7 @@ const IndexPRD4 = () => {
       const firstContact = !hasSpokenWithCharacter(conversationRef.current, target);
       const nextHandoffCount = handoffCountRef.current + 1;
       // A refused session write must leave the displayed actor and counter
-      // intact, so another manual attempt can safely retry the same transition.
+      // intact, so the approved offer can safely retry the same transition.
       if (sid) await updatePRD4ExperienceState(sid, {
         activeCharacter: target,
         pendingHandoff: null,
@@ -1990,7 +1985,7 @@ const IndexPRD4 = () => {
       setActivePortraitUrl(profile?.portraitUrl ?? null);
       handoffCountRef.current = nextHandoffCount;
       setSelectedCharacter(target);
-      setHandoffOffer(null);
+      setCurrentHandoffOffer(null);
       const recordExecuted = () => {
         if (sid) {
           void appendExperienceEvent({
@@ -2003,46 +1998,36 @@ const IndexPRD4 = () => {
         }
         trackEvent("prd4_handoff_executed", { session_id: sid, target_character: target, first_contact: firstContact, source });
       };
-      if (firstContact || source === "manual") {
-        const rawOpeningLine = profile?.openingLine?.trim() || (target === "max" ? OPENING_LINE : "Allô ?");
-        const openingLine = guardCharacterResponse(rawOpeningLine, characterContext).response;
-        const opening = tagSpokenWith({ role: target, content: openingLine, timestamp: Date.now() }, target);
-        conversationRef.current = [...conversationRef.current, opening];
-        addMessage(opening);
-        setMaxSubtitle(openingLine);
-        if (source === "manual" && sid) await updatePRD4Conversation(sid, conversationRef.current);
-        if (!isSwitchCurrent()) return;
-        // Once the target and greeting are saved, another manual call may
-        // interrupt the greeting without erasing this executed transition.
-        if (source === "manual") recordExecuted();
-        handoffCallingRef.current = false;
-        manualCallingTargetRef.current = null;
-        setAudioState("max_speaking");
-        setHandoffCalling(false);
-        const openingController = new AbortController();
-        activeOutputControllerRef.current = openingController;
-        await renderResponseText(openingLine, {
-          turnId: `${sid ?? "local"}:${target}-opening`,
-          turnIndex: conversationRef.current.filter((message) => message.role === "user").length,
-          voiceId: profile?.ttsVoiceId ?? undefined,
-          providerId: asTTSProviderId(profile?.ttsProvider) ?? undefined,
-          characterKey: target,
-          signal: openingController.signal,
-        });
-      } else {
-        handoffCallingRef.current = false;
-        manualCallingTargetRef.current = null;
-        setHandoffCalling(false);
-      }
+      const rawOpeningLine = profile?.openingLine?.trim() || (target === "max" ? OPENING_LINE : "Allô ?");
+      const openingLine = guardCharacterResponse(rawOpeningLine, characterContext).response;
+      const opening = tagSpokenWith({ role: target, content: openingLine, timestamp: Date.now() }, target);
+      conversationRef.current = [...conversationRef.current, opening];
+      addMessage(opening);
+      setMaxSubtitle(openingLine);
+      if (sid) await updatePRD4Conversation(sid, conversationRef.current);
+      if (!isSwitchCurrent()) return;
+      recordExecuted();
+      acceptedHandoffRef.current = null;
+      handoffCallingRef.current = false;
+      approvedCallingTargetRef.current = null;
+      setAudioState("max_speaking");
+      setHandoffCalling(false);
+      const openingController = new AbortController();
+      activeOutputControllerRef.current = openingController;
+      await renderResponseText(openingLine, {
+        turnId: `${sid ?? "local"}:${target}-opening`,
+        turnIndex: conversationRef.current.filter((message) => message.role === "user").length,
+        voiceId: profile?.ttsVoiceId ?? undefined,
+        providerId: asTTSProviderId(profile?.ttsProvider) ?? undefined,
+        characterKey: target,
+        signal: openingController.signal,
+      });
       if (!isSwitchCurrent()) return;
       setAudioState("idle");
-      if (source !== "manual") {
-        if (sid) void updatePRD4Conversation(sid, conversationRef.current);
-        recordExecuted();
-      }
     } catch (error) {
       if (!isSwitchCurrent()) return;
       setHandoffCalling(false);
+      if (activeCharacterRef.current === from) setCurrentHandoffOffer(acceptedHandoffRef.current);
       toast({
         title: `${targetName} n’est pas disponible`,
         description: error instanceof Error ? error.message : `Restez avec ${characterDisplayName(from)}.`,
@@ -2058,40 +2043,44 @@ const IndexPRD4 = () => {
     } finally {
       if (isSwitchCurrent()) {
         handoffCallingRef.current = false;
-        manualCallingTargetRef.current = null;
+        approvedCallingTargetRef.current = null;
+        acceptedHandoffRef.current = null;
       }
     }
-  }, [activateTTSFallback, addMessage, renderResponseText, setAudioState, setSelectedCharacter]);
+  }, [activateTTSFallback, addMessage, renderResponseText, setAudioState, setCurrentHandoffOffer, setSelectedCharacter]);
 
-  const handleManualCall = useCallback(() => {
-    if (endedRef.current || state.audioState === "mic_starting" || handoffCallingRef.current || manualCallingTargetRef.current) return;
-    const target = activeCharacterRef.current === "emma" ? "max" : "emma";
+  const handleAcceptHandoff = useCallback(() => {
+    if (endedRef.current || state.audioState === "mic_starting" || handoffCallingRef.current || approvedCallingTargetRef.current) return;
+    const offer = handoffOfferRef.current;
+    if (!offer?.gmApproval || offer.targetCharacter === activeCharacterRef.current) return;
+    const target = offer.targetCharacter;
     finishInputTelemetry("cancelled");
     cleanupAudio();
+    acceptedHandoffRef.current = offer;
+    setCurrentHandoffOffer(null);
     if (processingWatchdogRef.current) window.clearTimeout(processingWatchdogRef.current);
     processingWatchdogRef.current = null;
     isProcessingRef.current = false;
-    pendingPlayerSwitchRef.current = null;
     resumeConversationTraceSync(true);
     setUserSubtitle("");
     setMaxSubtitle("");
     setAudioState("idle");
-    manualCallingTargetRef.current = target;
-    manualCallIdRef.current = crypto.randomUUID();
-    setManualCallingTarget(target);
-  }, [cleanupAudio, finishInputTelemetry, setAudioState, state.audioState]);
+    approvedCallingTargetRef.current = target;
+    handoffAttemptIdRef.current = crypto.randomUUID();
+    setApprovedCallingTarget(target);
+  }, [cleanupAudio, finishInputTelemetry, setAudioState, setCurrentHandoffOffer, state.audioState]);
 
-  const handleManualCallAnswered = useCallback(() => {
-    const target = manualCallingTargetRef.current;
-    if (target && !endedRef.current) void switchToCharacter(target, "manual");
+  const handleApprovedCallAnswered = useCallback(() => {
+    const target = approvedCallingTargetRef.current;
+    if (target && !endedRef.current) void switchToCharacter(target);
   }, [switchToCharacter]);
 
-  switchToCharacterRef.current = switchToCharacter;
 
   const handleRejectHandoff = useCallback(() => {
-    const offer = handoffOffer;
+    if (approvedCallingTargetRef.current || handoffCallingRef.current) return;
+    const offer = handoffOfferRef.current;
     if (!offer) return;
-    setHandoffOffer(null);
+    setCurrentHandoffOffer(null);
     const sid = sessionIdRef.current;
     if (sid) {
       void updatePRD4ExperienceState(sid, { pendingHandoff: null, handoffCount: handoffCountRef.current });
@@ -2104,13 +2093,7 @@ const IndexPRD4 = () => {
       });
     }
     trackEvent("prd4_handoff_refused", { session_id: sid, target_character: offer.targetCharacter });
-  }, [handoffOffer]);
-
-  const handleAcceptHandoff = useCallback(async () => {
-    const offer = handoffOffer;
-    if (!offer) return;
-    await switchToCharacter(offer.targetCharacter, "gm");
-  }, [handoffOffer, switchToCharacter]);
+  }, [setCurrentHandoffOffer]);
 
   // Cleanup au démontage
   useEffect(() => () => { cleanupAudio(); }, [cleanupAudio]);
@@ -2215,9 +2198,8 @@ const IndexPRD4 = () => {
     activeTTSProviderIdRef.current = null;
     handoffCountRef.current = 0;
     handoffRecommendationRef.current = null;
-    pendingPlayerSwitchRef.current = null;
     startingCharacterRef.current = "max";
-    setHandoffOffer(null);
+    setCurrentHandoffOffer(null);
     setHandoffCalling(false);
     activeTurnControllerRef.current?.abort("experience-restart");
     activeTurnControllerRef.current = null;
@@ -2228,7 +2210,7 @@ const IndexPRD4 = () => {
     callPreparationRef.current = null;
     expectedAvatarTextRef.current.clear();
     endedRef.current = false;
-  }, [cleanupAudio, reset]);
+  }, [cleanupAudio, reset, setCurrentHandoffOffer]);
 
   const finishActiveVideo = useCallback((skipped: boolean) => {
     if (!activeVideo) return;
@@ -2300,8 +2282,8 @@ const IndexPRD4 = () => {
       screen = (
         <>
           {!activeVideo?.video_url ? (
-            manualCallingTarget ? (
-              <CallingMaxScreen character={manualCallingTarget} onAnswered={handleManualCallAnswered} />
+            approvedCallingTarget ? (
+              <CallingMaxScreen character={approvedCallingTarget} onAnswered={handleApprovedCallAnswered} />
             ) : (
             <ConversationScreen
               audioState={state.audioState}
@@ -2325,7 +2307,6 @@ const IndexPRD4 = () => {
               handoffCallingTarget={handoffCallingTarget}
               onAcceptHandoff={() => void handleAcceptHandoff()}
               onRejectHandoff={handleRejectHandoff}
-              onManualCall={handleManualCall}
             />
             )
           ) : null}

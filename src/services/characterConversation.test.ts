@@ -4,10 +4,54 @@ import {
   detectPlayerSwitchRequest,
   hasSpokenWithCharacter,
   inferCharacterSwitchStance,
+  hasCharacterHandoffConsent,
+  parseGmApprovedHandoffOffer,
+  parseHandoffOffer,
   lastHandoffUserTurn,
   sliceConversationForCharacter,
   tagSpokenWith,
 } from "./characterConversation";
+
+describe("character consent to a GM-authorized handoff", () => {
+  it("restores only offers approved under the current orchestration version", () => {
+    const recommendation = { reason: "Max accepte.", targetCharacter: "max" };
+    expect(parseGmApprovedHandoffOffer(recommendation, "max", "v1")).toBeNull();
+    const approved = { ...recommendation, gmApproval: { turnId: "turn-4", orchestrationVersionId: "v1" } };
+    expect(parseGmApprovedHandoffOffer(approved, "max", "v2")).toBeNull();
+    expect(parseGmApprovedHandoffOffer(approved, "max", "v1")?.gmApproval).toEqual(approved.gmApproval);
+  });
+  it.each([
+    ["D'accord, je te la passe.", "emma", undefined, true],
+    ["Tu peux appeler Max si tu veux.", "max", undefined, true],
+    ["D'accord, raconte-moi ta journée.", "emma", undefined, false],
+    ["Tu peux appeler Emma.", "max", undefined, false],
+    ["Je ne vais pas te passer Max comme ça.", "max", "accept", false],
+    ["D'accord, mais je ne te la passe pas.", "emma", "accept", false],
+    ["Je te la passe.", "emma", "object", false],
+    ["Je te la passe.", "emma", "defer", false],
+    ["Oui.", "emma", "accept", true],
+    ["Je ne sais pas ce qu'il dira, mais tu peux appeler Max.", "max", undefined, true],
+    ["Je te le passerai plus tard.", "max", undefined, false],
+    ["Tu peux peut-être appeler Max.", "max", undefined, false],
+    ["Je te le passe pas.", "max", undefined, false],
+    ["Appelle-le pas.", "max", undefined, false],
+    ["Non, je préfère que tu restes avec moi.", "max", "accept", false],
+    ["Je préfère que tu restes avec moi.", "max", "accept", false],
+    ["Tu peux pas appeler Max.", "max", undefined, false],
+    ["Je peux pas te passer Max.", "max", "accept", false],
+    ["Je ne veux pas que tu appelles Max.", "max", "accept", false],
+    ["Je peux te dire que c'est inutile d'appeler Max.", "max", "accept", false],
+    ["Je te passe Max.", "max", "accept", true],
+  ] as const)("requires transfer consent: %s", (reply, target, stance, expected) => {
+    expect(hasCharacterHandoffConsent(reply, target, stance)).toBe(expected);
+  });
+  it("keeps the approval when a saved session first normalizes its pending offer", () => {
+    const raw = { reason: "Max accepte.", targetCharacter: "max",
+      gmApproval: { turnId: "turn-4", orchestrationVersionId: "v1" } };
+    const normalized = parseHandoffOffer(raw);
+    expect(parseGmApprovedHandoffOffer(normalized, "max", "v1")?.gmApproval).toEqual(raw.gmApproval);
+  });
+});
 
 const log: ConversationMessage[] = [
   tagSpokenWith({ role: "max", content: "Allô ?", timestamp: 1 }, "max"),

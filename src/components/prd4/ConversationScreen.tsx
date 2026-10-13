@@ -34,7 +34,6 @@ interface Props {
   handoffCallingTarget?: "max" | "emma";
   onAcceptHandoff?: () => void;
   onRejectHandoff?: () => void;
-  onManualCall?: () => void;
 }
 
 const ConversationScreen = ({
@@ -59,19 +58,19 @@ const ConversationScreen = ({
   handoffCallingTarget = "emma",
   onAcceptHandoff,
   onRejectHandoff,
-  onManualCall,
 }: Props) => {
   const disabled = handoffCalling || Boolean(handoffOffer) || audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "max_thinking" || audioState === "max_speaking";
   const recording = audioState === "user_speaking";
 
   const handleToggleTalk = useCallback(() => {
+    if (handoffCalling || handoffOffer) return;
     if (handsFree) {
       if (audioState !== "mic_starting") onToggleHandsFree?.();
       return;
     }
     if (audioState === "idle") onPTTPress();
     else if (audioState === "user_speaking") onPTTRelease();
-  }, [audioState, handsFree, onPTTPress, onPTTRelease, onToggleHandsFree]);
+  }, [audioState, handoffCalling, handoffOffer, handsFree, onPTTPress, onPTTRelease, onToggleHandsFree]);
 
   useEffect(() => {
     const isTypingTarget = (target: EventTarget | null) => {
@@ -80,12 +79,13 @@ const ConversationScreen = ({
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.code !== "Space" || event.repeat || isTypingTarget(event.target)) return;
+      if (handoffCalling || handoffOffer) return;
       event.preventDefault();
       handleToggleTalk();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleToggleTalk]);
+  }, [handleToggleTalk, handoffCalling, handoffOffer]);
 
   // Derive the last character/user lines from THIS character's slice only so
   // a return to Max never flashes Emma's last line (and the reverse).
@@ -309,14 +309,6 @@ const ConversationScreen = ({
                 <Button variant="outline" onClick={onRejectHandoff}>Rester avec {displayName}</Button>
               </div>
             </div>
-          )}
-
-          {onManualCall && !handoffOffer && (
-            <Button variant="outline" className="gap-2 rounded-full bg-background/80"
-              disabled={audioState === "mic_starting"} onClick={onManualCall}>
-              <PhoneCall className="h-4 w-4" aria-hidden />
-              Appeler {displayNameForCharacter(activeCharacter === "emma" ? "max" : "emma")}
-            </Button>
           )}
 
           {/* Status helper line */}

@@ -8,6 +8,7 @@ export interface CharacterHandoffOffer {
   reason: string;
   proposalGuidance: string;
   targetCharacter: RuntimeCharacter;
+  gmApproval?: { turnId: string; orchestrationVersionId: string };
 }
 
 const CHARACTER_ALIASES: Record<string, RuntimeCharacter> = {
@@ -139,15 +140,55 @@ export function inferCharacterSwitchStance(characterReply: string): CharacterSwi
   return "defer";
 }
 
+/** A GM recommendation is not consent: require an actual transfer agreement. */
+export function hasCharacterHandoffConsent(
+  characterReply: string,
+  target: RuntimeCharacter,
+  gmStance?: CharacterSwitchStance | null,
+): boolean {
+  if (gmStance === "object" || gmStance === "defer") return false;
+  const text = normalizeSwitchText(characterReply);
+  const negativeTransfer = /\b(?:(?:ne|n['’])\s*)?(?:(?:vais|peux|veux|voudrais|compte|souhaite)\s+)?(?:pas|jamais|plus)\s+(?:(?:te|le|la|lui|vous|me)\s+){0,3}(?:pass\w*|appel\w*|mett\w*|contact\w*|parl\w*)/i.test(text)
+    || /\bne\s+(?:(?:te|le|la|lui|vous|me)\s+){0,3}(?:pass\w*|appel\w*|mett\w*|contact\w*|parl\w*)\s+(?:pas|jamais)/i.test(text)
+    || /\b(?:pass\w*|appel\w*)(?:[- ](?:le|la|moi|nous))?\s+(?:pas|jamais|plus)\b/i.test(text)
+    || /(?:^non\b|\bmais non\b|pas maintenant|pas question|pas le bon moment|plus tard|rest(?:e|es|er|ez) avec moi|je refuse|peut[- ]etre|pas encore|on verra|pas sur(?:e)?\b|je hesite\b|je (?:ne )?sais pas(?: trop)?(?:[,.!?]|$| si\b))/i.test(text);
+  if (negativeTransfer) return false;
+  // A short yes can confirm the direct request classified by the GM. Longer
+  // replies still need an explicit transfer agreement, not a broad text span.
+  if (gmStance === "accept" && /^(?:oui|d['’]accord|d accord|ok(?:ay)?|bien sur)[ .!]*$/i.test(text.trim())) return true;
+  return /(?:je te (?:la|le) passe\b|je t['’]y passe\b|je t y passe\b|appelle[- ](?:la|le)\b)/i.test(text)
+    || new RegExp(`\\b(?:tu peux|on (?:peut|va)|je (?:vais|peux|veux bien))\\s+(?:(?:bien sur|bien|donc|maintenant|directement|simplement|aller|aussi|te|vous)\\s+){0,4}(?:parler|appeler|passer|joindre|contacter)\\s+(?:(?:a|avec|le|la)\\s+){0,2}${target}\\b`, "i").test(text)
+    || new RegExp(`\\bje (?:te|vous) passe ${target}\\b`, "i").test(text);
+}
+
 export function parseHandoffOffer(raw: unknown, fallbackTarget: RuntimeCharacter = "emma"): CharacterHandoffOffer | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
   const reason = typeof value.reason === "string" ? value.reason.trim() : "";
   const proposalGuidance = typeof value.proposalGuidance === "string" ? value.proposalGuidance.trim() : "";
+  const approval = value.gmApproval && typeof value.gmApproval === "object"
+    ? value.gmApproval as Record<string, unknown> : null;
+  const gmApproval = approval && typeof approval.turnId === "string" && approval.turnId.trim()
+    && typeof approval.orchestrationVersionId === "string" && approval.orchestrationVersionId.trim()
+    && asRuntimeCharacter(value.targetCharacter)
+    ? { turnId: approval.turnId, orchestrationVersionId: approval.orchestrationVersionId } : null;
   if (!reason) return null;
   return {
     reason,
     proposalGuidance: proposalGuidance || `Propose de parler à ${characterDisplayName(fallbackTarget)}.`,
     targetCharacter: asRuntimeCharacter(value.targetCharacter) ?? fallbackTarget,
+    ...(gmApproval ? { gmApproval } : {}),
   };
+}
+
+/** Old recommendations without recorded GM approval cannot unlock a resumed call. */
+export function parseGmApprovedHandoffOffer(
+  raw: unknown,
+  fallbackTarget: RuntimeCharacter,
+  orchestrationVersionId: string | null | undefined,
+): CharacterHandoffOffer | null {
+  const offer = parseHandoffOffer(raw, fallbackTarget);
+  if (!offer?.gmApproval || !orchestrationVersionId
+    || offer.gmApproval.orchestrationVersionId !== orchestrationVersionId) return null;
+  return offer;
 }

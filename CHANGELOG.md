@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-13 — Appels proposés par le Game Master
+
+- Pendant la conversation, les boutons Appeler Max/Emma apparaissent seulement
+  après une recommandation du GM validée et l'accord du personnage. Le joueur
+  peut accepter l'appel ou rester ; une demande vocale ne transfère plus seule.
+- Les décisions GM retardées, échouées, refusées ou bloquées par les règles
+  narratives n'activent aucun bouton. Une recommandation doit devenir une
+  proposition consentie avant d'être affichée.
+- L'appel autorisé conserve les sonneries, la session, le temps restant,
+  l'isolation des historiques et la protection des captures abandonnées.
+- La reprise restaure seulement les offres avec approbation GM enregistrée
+  sous la version d'orchestration courante. Pas de nouvelle migration.
+
 ## 2026-10-13 — Repeated manual calls
 
 - Allow more than one character call in the same session while retaining the
@@ -16,6 +29,9 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 ## [Non publié]
 
 ### 2026-10-13 — Appel manuel entre Emma et Max
+
+Interprétation initiale remplacée par « Appels proposés par le Game Master »
+ci-dessus, selon la clarification d'Ulrich du même jour.
 
 - Le joueur peut appeler l'autre personnage depuis la conversation, même
   pendant une réponse et sans proposition narrative. Le clic coupe le micro

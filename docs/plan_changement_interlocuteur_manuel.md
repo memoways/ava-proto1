@@ -1,5 +1,87 @@
 # Appel manuel de l'autre personnage
 
+## Clarification prioritaire d'Ulrich — 13 octobre 2026
+
+La demande actuelle remplace l'interprétation d'appel libre ci-dessous :
+aucun bouton Appeler Max/Emma par défaut pendant la conversation. Le GM
+autorise une proposition selon l'échange et les règles narratives ; le
+personnage doit accepter, puis le joueur choisit Appeler ou Rester. Le clic
+autorisé ferme capture/sortie, joue les sonneries et change de personnage
+dans la même session. La sélection du premier personnage reste disponible.
+
+Base du correctif : main `2ee4110` (runtime publié `5615851`). Plan :
+1. Supprimer le bouton permanent et le chemin d'appel libre. Rattacher les
+   sonneries au seul bouton d'acceptation d'une offre GM courante.
+2. Retirer le transfert automatique décidé par regex de réponse personnage.
+   Une demande vocale attend la décision GM et les gardes narratives avant
+   toute offre ; les refus/hésitations n'activent pas le bouton.
+3. La recommandation GM précédente guide une proposition au tour suivant,
+   mais une réponse qui refuse ou n'accepte pas ne doit pas ouvrir l'offre.
+   Attendre le GM post-tour exécuté ; aucun timeout/résultat périmé ne vaut
+   permission. Conserver les seuils/cooldowns/config/voix/prompts.
+4. Composant : bouton absent sans offre, présent dans les deux sens avec
+   offre. E2E simulés : refus, GM retardé/échoué, accord avant seuil bloqué,
+   proposition consentie et refusée, appel autorisé avec sonneries/session,
+   refus de PATCH puis reprise ; conserver les protections STT de capture.
+5. Qualité complète, deux revues indépendantes du diff depuis `2ee4110`,
+   CI, fusion main, synchronisation et contrôle preview par Lovable. Publier
+   le correctif après vérification ; test publié de l'absence par défaut.
+
+Aucune nouvelle migration : la contrainte non négative autorisée dans #31
+reste compatible avec les compteurs historiques et les règles du GM. Aucun
+secret/flag/provider/algorithme hands-free modifié. Confiance95% : source du
+bouton permanent et contournement vocal identifiés ; offre GM/validation et
+écran sonnerie réutilisables, tests existants. Référence React officielle :
+https://react.dev/learn/conditional-rendering. Livraison corrective à suivre.
+
+Correctif local : bouton libre et transfert vocal automatique retirés.
+La classification GM d'un accord ne suffit pas sans recommandation handoff ;
+la recommandation passe les gardes du directeur, et la proposition attend
+l'accord du personnage après guidance. Un GM échoué/invalide/retardé ne vaut
+pas permission. Les offres sauvegardées portent l'approbation GM et sa version ;
+les recommandations anciennes non approuvées ne rouvrent pas un bouton à la
+reprise. Sonneries et événements d'appel réutilisés, source gm, clés distinctes.
+Un refus de PATCH conserve le personnage, compteur et offre pour réessayer.
+
+Deux tests composants reproduisent rouge le bouton permanent avant correction,
+puis verts. Qualité locale : 44 régressions, 482 unitaires, 30 intégrations,
+lint sans erreur (un avertissement préexistant), typecheck et build réussis.
+11 E2E Chromium simulés réussis : deux sens, aucune bascule automatique,
+GM refuse/hésite/retarde/échoue, accord classifié sans recommandation, seuil
+narratif, recommandation suivie de refus/accord et choix Rester, PATCH refusé
+puis repris. Les six anciens E2E d'appel libre n'expriment plus le contrat ;
+remplacés par ces parcours GM. Protections STT et tests de remplacement de
+capture lors du recommencement/flush mains libres conservés. Revues et CI
+sur la révision finale, puis preview/publication, restent à effectuer.
+
+Revues de `e049646` : refus oraux sans « ne » et demandes de rester pouvaient
+contredire un GM classant accept ; l'approbation GM était aussi perdue par le
+premier parse de session avant la reprise. Cinq tests reproduisent rouge ces
+cas, puis verts après veto des refus explicites et conservation du stamp
+sanitisé. Deux tests supplémentaires traversent la vraie fonction de chargement
+DB → session → validation de reprise ; une offre approuvée de la bonne version
+est conservée, une ancienne offre ou autre version est refusée. Trois E2E
+vérifient les contradictions GM accept + refus oral, sans bouton ni bascule.
+
+Revue complémentaire `499b187` : deux négations orales avec auxiliaire restaient
+non couvertes (« Tu peux pas appeler Max », « Je peux pas te passer Max »).
+Quatre régressions supplémentaires rouges avant correction, puis vertes.
+Le consentement n'est plus déduit d'un vaste fragment de texte : phrases
+explicites de transfert, ou oui court à une demande directement classifiée
+et recommandée par le GM. Les négations avec/sans auxiliaire restent veto.
+Les faits négatifs sans lien avec le transfert ne bloquent pas une proposition
+claire. Aucun prompt ni configuration narrative changé.
+
+CI `38381793755` : qualité complète réussie et 32/33 E2E verts. Seule la
+lecture immédiate du journal asynchrone « seuil narratif » échoue : la trace
+réseau du retry contient bien handoff_blocked/handoff_before_minimum_turn et
+l'interface sans bouton. Le test attend maintenant cet événement avec poll,
+comme le test de refus joueur. Aucun changement produit pour cette correction
+d'attente ; CI complète à relancer sur ce dernier HEAD.
+
+Les sections suivantes sont l'historique de l'interprétation initiale,
+supplantée par cette clarification ; elles ne définissent plus la règle produit.
+
 Demande explicite d'Ulrich le 13 octobre 2026 après le contrôle publié
 d'Emma : un bouton doit couper Emma, appeler Max directement, faire entendre
 quelques sonneries, puis laisser Max répondre. Le bouton symétrique depuis
@@ -58,9 +140,11 @@ primitives actuelles. La stratégie de `handsFreeVoice.ts` reste inchangée.
 
 ## Livraison
 
-État actuel : publié via Lovable le 13 octobre 2026, après migration autorisée
+Livraison précédente : publiée via Lovable le 13 octobre 2026, après migration autorisée
 et contrôles réels des deux sens en preview puis sur le domaine canonique.
-Preuves et révisions finales dans la dernière section ci-dessous.
+Preuves de cette livraison dans la section « Livraison finale vérifiée ».
+Elle concerne l'interprétation initiale ; le correctif GM de la clarification
+en tête du document doit encore être livré.
 
 Historique initial avant livraison : branche `codex/manual-character-call`,
 base `c91b683`. Deux reproductions composant rouges avant le bouton, puis

@@ -14,28 +14,10 @@ const baseProps = {
 };
 
 describe("ConversationScreen", () => {
-  it.each([
-    ["emma", "Max"],
-    ["max", "Emma"],
-  ] as const)("lets the player call the other character while %s is speaking without a GM offer", (activeCharacter, targetName) => {
-    const onManualCall = vi.fn();
+  it.each(["emma", "max"] as const)("has no default call button while talking to %s", (activeCharacter) => {
     render(<ConversationScreen {...baseProps} activeCharacter={activeCharacter}
-      audioState="max_speaking" conversationLog={[]} onManualCall={onManualCall} />);
-
-    const call = screen.getByRole("button", { name: `Appeler ${targetName}` });
-    expect(call).toBeEnabled();
-    fireEvent.click(call);
-    expect(onManualCall).toHaveBeenCalledOnce();
-  });
-
-  it("waits for microphone startup to settle before a manual call", () => {
-    const onManualCall = vi.fn();
-    render(<ConversationScreen {...baseProps} activeCharacter="emma"
-      audioState="mic_starting" conversationLog={[]} onManualCall={onManualCall} />);
-    const call = screen.getByRole("button", { name: "Appeler Max" });
-    expect(call).toBeDisabled();
-    fireEvent.click(call);
-    expect(onManualCall).not.toHaveBeenCalled();
+      audioState="max_speaking" conversationLog={[]} onAcceptHandoff={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /^Appeler / })).not.toBeInTheDocument();
   });
 
   it("shows a bidirectional GM offer and hides the other character's last line", () => {
@@ -60,6 +42,8 @@ describe("ConversationScreen", () => {
   });
 
   it("labels a return offer toward Max while talking to Emma", () => {
+    const onAcceptHandoff = vi.fn();
+    const onRejectHandoff = vi.fn();
     render(
       <ConversationScreen
         {...baseProps}
@@ -68,12 +52,18 @@ describe("ConversationScreen", () => {
           tagSpokenWith({ role: "emma", content: "Oui ?", timestamp: 1 }, "emma"),
         ]}
         handoffOffer={{ reason: "Max connaît cette partie.", targetCharacter: "max" }}
+        onAcceptHandoff={onAcceptHandoff}
+        onRejectHandoff={onRejectHandoff}
       />,
     );
 
     expect(screen.getByText("Emma vous propose de parler avec Max.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Appeler Max" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rester avec Emma" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Appeler Max" }));
+    expect(onAcceptHandoff).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Rester avec Emma" }));
+    expect(onRejectHandoff).toHaveBeenCalledOnce();
   });
 
   it("uses the portrait runtime of the active character", () => {
