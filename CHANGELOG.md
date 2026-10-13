@@ -6,6 +6,15 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Non publié]
 
+### 2026-10-13 — Session renouvelée pour les appels vocaux
+
+- Les requêtes protégées utilisent la session courante après renouvellement
+  du jeton Supabase. La déduplication de connexion reste limitée aux appels
+  simultanés ; elle ne conserve plus le premier jeton indéfiniment.
+- Deux tests reproduisent le jeton périmé après renouvellement et après
+  expiration du cache court, puis passent avec la correction. Aucun quota,
+  fournisseur ou réglage vocal modifié ; livraison Lovable à vérifier.
+
 ### 2026-10-12 — Décrochage après redémarrage de l'expérience
 
 - Un appel lancé après « Recommencer l'expérience » conserve sa séquence

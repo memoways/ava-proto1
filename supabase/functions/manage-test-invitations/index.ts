@@ -48,7 +48,6 @@ serve(async (req) => {
   if (!action || !["list", "create", "revoke"].includes(action)) {
     return json(req, { error: "Invalid action" }, 400);
   }
-  if (!body) return json(req, { error: "Invalid request" }, 400);
 
   const url = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");

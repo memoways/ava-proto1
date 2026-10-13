@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const auth = vi.hoisted(() => ({
   getSession: vi.fn(),
   signInAnonymously: vi.fn(),
+  onAuthStateChange: vi.fn(),
 }));
 
 const roleQuery = vi.hoisted(() => ({
@@ -98,6 +99,55 @@ describe("gameAuth", () => {
     const headers = request.headers as Headers;
     expect(headers.get("Authorization")).toBe("Bearer test-access-token");
     expect(headers.get("apikey")).toBeTruthy();
+  });
+
+  it("uses the refreshed JWT instead of retaining the first resolved game session", async () => {
+    auth.getSession.mockResolvedValue({ data: { session }, error: null });
+    let firstRequest = true;
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init: RequestInit) => {
+      const authorization = new Headers(init.headers).get("Authorization");
+      const expired = !firstRequest && authorization === "Bearer test-access-token";
+      firstRequest = false;
+      return expired
+        ? new Response(JSON.stringify({ error: "Security service unavailable" }), { status: 503 })
+        : new Response(null, { status: 204 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const endpoint = "https://example.test/functions/v1/proxy-stt";
+    await authenticatedFunctionFetch(endpoint);
+
+    const notifyAuthChange = auth.onAuthStateChange.mock.calls[0][0];
+    notifyAuthChange("TOKEN_REFRESHED", { ...session, access_token: "renewed-access-token" });
+
+    const response = await authenticatedFunctionFetch(endpoint);
+
+    expect(response.status).toBe(204);
+    expect(new Headers(fetchMock.mock.calls[1][1].headers).get("Authorization"))
+      .toBe("Bearer renewed-access-token");
+    expect(auth.signInAnonymously).not.toHaveBeenCalled();
+  });
+
+  it("rereads the current session when the short session cache expires", async () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(10_000);
+    auth.getSession
+      .mockResolvedValueOnce({ data: { session }, error: null })
+      .mockResolvedValueOnce({
+        data: { session: { ...session, access_token: "current-access-token" } },
+        error: null,
+      });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await authenticatedFunctionFetch("https://example.test/functions/v1/proxy-stt");
+      clock.mockReturnValue(16_000);
+      await authenticatedFunctionFetch("https://example.test/functions/v1/proxy-stt");
+
+      expect(new Headers(fetchMock.mock.calls[1][1].headers).get("Authorization"))
+        .toBe("Bearer current-access-token");
+      expect(auth.signInAnonymously).not.toHaveBeenCalled();
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it("keeps the Lovable preview compatible while Phase 1 is disabled", async () => {

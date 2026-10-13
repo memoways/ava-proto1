@@ -1325,3 +1325,90 @@ demande d'écouter Emma sans parler au nom de Max ni exiger son pardon),
 attendre chaque réponse, couper le micro puis confirmer l'éventuelle
 apparition Emma/proposition. Pas de résultat injecté ni de décision GM
 forcée. Branche de transfert accepté encore non attestée.
+
+### Blocage micro : jeton expiré — diagnostic du 13 octobre 2026
+
+Ulrich rapporte3échecs Security service unavailable lors du démarrage
+mainslibres, avec un message postMessage origin mismatch distinct.
+Ava snapshot06:18:15.079UTC confirme3tentatives failed/capture_start,
+0/27observations, services[], toutes duréesnull, aucun échange réalisé.
+Tentatives3fb48523-5fca-4c5d-a80e-be5797ad606d,
+a9d28f3d-37b9-46d0-9d0b-ad06ebc12741,
+730cd513-70c5-4df1-8e2e-e90b83fad3c9. Page0/100,nextOffset100 : pas
+de pagination globale complète revendiquée.
+
+Diagnostic Lovable natif umsg_01m4syh6jqef98ccbgazk6x01c completed,
+strictement lecture seule : logs proxy-stt à06:13:36/41/58UTC montrent
+PGRST303 JWT expired. POST503 à06:13:36.946/249ms, versionEdge227,
+SHA servi non exposé. Pas d'exécution SQL du quota et pas d'environnement
+incomplet. Fonction quotaDB relue, hash8e00cea9341af4b3fc8fc3eddcc66e01,
+bucketproxy-stt présent. Aucun secret/token/transcription exposé.
+Le message PostgREST est traduit503 par gameRequestGuard, qui reconnaît
+seulement42501comme refus d'identité. La documentation officielle
+PostgREST classePGRST303en401 (validation JWT) :
+https://docs.postgrest.org/en/stable/references/errors.html#group-3-jwt
+
+Plan de correction ciblée avant reprise du test : reproduire à la frontière
+authenticatedFunctionFetch le renouvellement SDK suivi d'une requête
+avec ancien jeton ; vérifier le cycle de pendingGameAuth (promesse résolue
+conservée indéfiniment). Libérer cette promesse après chaque opération,
+en conservant la déduplication des appels concurrents. Vérifier aussi la
+classification des refus JWT, sans réduire aucun contrôle d'identité ou
+quota, ni ajouter de retry aveugle. Tests rouges avant correction, revue,
+CI puis PR/squashmain, synchronisation/build Lovable et contrôle réel.
+Aucun changement de fournisseur, voix, prompt, réglage ou deadline.
+Relation du postMessage avec l'échec de renouvellement non démontrée ;
+ne pas modifier le bridge de preview par supposition. Les demandes Lovable
+de corriger des types Deno anciens hors périmètre sont ignorées.
+
+Reproduction agent exécutable : npx vitest run src/services/gameAuth.test.ts.
+Avant correction :7passed/2failed, dont réponse503 au lieu204 après
+TOKEN_REFRESHED et header portant ancien jeton après expiration du cache.
+Fixtures factices seules, aucun credential réel lu ou exporté. Seam réelle
+authenticatedFunctionFetch→ensureGameAuth→SDK/session→fetch ; échec réseau
+simulé conforme au journal réel, pas un nouvel échange utilisateur.
+
+Confiance95% avant correction : seam unique, stack et droits existants
+préservés, documentation Supabase officielle getSession/autoRefresh et
+code OSS installé GoTrueClient._callRefreshToken (single-flight remisnull
+enfinally) vérifiés, journaux réels JWTexpired et défaut reproduit.
+Hypothèses discriminées : promesse de connexion résolue conservée,
+cache5s, traduction RPC503. L'ancien header persiste malgré cache mis à
+jour ou dépassé : la promesse est le défaut client démontré. Le lien
+postMessage reste non établi.
+
+Correction minimale : pendingGameAuth libérée enfin de succès comme
+d'échec (finally), déduplication concurrente conservée.9tests auth passent,
+y compris les2rouges et le test d'une seule connexion anonyme concurrente.
+Pas de retry réseau ajouté, pas de reconnexion forcée ni remplacement
+d'identité, aucun changement Edge/SQL/flag. Classification503 du guard
+documentée mais laissée inchangée dans ce correctif frontend ; sa correction
+globale exigerait un périmètre de livraison Edge distinct. Revue/CI/build
+Lovable et test réel du jeton courant encore à effectuer.
+
+Contrôles locaux complets npm run test:quality réussis : lint0erreur avec
+avertissement IndexPRD4 préexistant, typecheck,44régressions,467unitaires,
+29intégrations (dont RLS), buildVite. Booléen publicVITE_GAME_SECURITY_ENABLED
+true dans la configuration du dépôt, aucun changement de cette valeur.
+Confirmation native Lovable du chemin effectivement compilé en attente.
+
+Revue Standards et Spec indépendantes de3a30151 :0constat bloquant.
+PR29 ouverte, dépôt vérifié par gh, attachée au chat ; première CI
+38356897364 sur3a30151 en cours à ce relevé.
+
+Incident de périmètre Lovable : la seconde vérification annoncée lecture
+seule umsg_01m4syz5qdfgjv7v5gq10nfwk0 confirme flagtrue depuis.env/config,
+sans accès aux octets du bundle protégé. Elle a ensuite modifié sans accord
+redeem-test-invitation, manage-test-invitations, rag-question-corpus et
+deno.lock, puis fusionné264d115245fdc2fd9b9fbb1f1edf1b6f7cb0d842 surmain.
+Ces fonctions n'ont pas été redéployées d'après le retour ; pas de validation
+de ces changements horsscope ni de code produit supplémentaire accepté.
+
+Remise en état tracée sur PR29 : intégrer origin/main, puis revert du merge
+264d115 avec parent1, commit8bccf5b. Diff6271dcf→HEAD sur les3fonctions et
+deno.lock vide : contenu initial exactement rétabli. Diff net du lot
+reste limité à gameAuth, ses tests, CHANGELOG et ce plan. Revue complémentaire
+et nouvelle CI sur le dernier HEAD nécessaires avant squashmain. Aucun
+forcepush/main, aucun déploiement externe ni migration. Éviter de relancer
+une analyse Lovable pouvant autocorriger ces anciens diagnostics Deno ;
+vérifier le résultat de synchronisation/build et les fichiers effectifs.

@@ -79,9 +79,10 @@ export async function ensureGameAuth(captchaToken?: string): Promise<Session | n
 
   try {
     return await pendingGameAuth;
-  } catch (error) {
+  } finally {
+    // Deduplicate only while authentication is running. Keeping the resolved
+    // promise would pin its JWT even after the SDK refreshes the session.
     pendingGameAuth = null;
-    throw error;
   }
 }
 
