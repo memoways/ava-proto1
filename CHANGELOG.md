@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-13 — Repeated manual calls
+
+- Allow more than one character call in the same session while retaining the
+  non-negative counter and existing session data and access rules.
+- Keep the current actor and counter when the session update is refused, so
+  the player can retry without a mismatch between the screen and saved state.
+- Cover the historical database constraint and refused updates before retry.
+
+
 Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).

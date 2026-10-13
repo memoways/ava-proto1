@@ -1969,6 +1969,15 @@ const IndexPRD4 = () => {
       await new Promise<void>((resolve) => window.setTimeout(resolve, 900));
       if (!isSwitchCurrent()) return;
       const firstContact = !hasSpokenWithCharacter(conversationRef.current, target);
+      const nextHandoffCount = handoffCountRef.current + 1;
+      // A refused session write must leave the displayed actor and counter
+      // intact, so another manual attempt can safely retry the same transition.
+      if (sid) await updatePRD4ExperienceState(sid, {
+        activeCharacter: target,
+        pendingHandoff: null,
+        handoffCount: nextHandoffCount,
+      });
+      if (!isSwitchCurrent()) return;
       pendingGmGuidanceRef.current = null;
       pendingEmotionalStateRef.current = null;
       pendingPostVideoContextRef.current = null;
@@ -1979,15 +1988,9 @@ const IndexPRD4 = () => {
       activeVoiceIdRef.current = profile?.ttsVoiceId ?? null;
       activeTTSProviderIdRef.current = asTTSProviderId(profile?.ttsProvider);
       setActivePortraitUrl(profile?.portraitUrl ?? null);
-      handoffCountRef.current += 1;
+      handoffCountRef.current = nextHandoffCount;
       setSelectedCharacter(target);
       setHandoffOffer(null);
-      if (sid) await updatePRD4ExperienceState(sid, {
-        activeCharacter: target,
-        pendingHandoff: null,
-        handoffCount: handoffCountRef.current,
-      });
-      if (!isSwitchCurrent()) return;
       const recordExecuted = () => {
         if (sid) {
           void appendExperienceEvent({

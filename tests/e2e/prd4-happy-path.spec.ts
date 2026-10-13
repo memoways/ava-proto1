@@ -657,6 +657,38 @@ test("appel manuel : une cible devenue indisponible conserve le personnage et la
   expect(fakes.getSessionInsertCount()).toBe(1);
 });
 
+test("appel manuel : un PATCH refusé conserve Emma et le compteur pour réessayer", async ({ page }) => {
+  test.setTimeout(40_000);
+  const fakes = await installNetworkFakes(page, [], { ttsSuccess: true, characterOpenings: true });
+  let rejected = false;
+  await page.route(`${SUPABASE_ORIGIN}/rest/v1/sessions**`, async (route) => {
+    const request = route.request();
+    if (request.method() === "PATCH" && request.postDataJSON().active_character && !rejected) {
+      rejected = true;
+      return json(route, { code: "23514", message: 'new row violates check constraint "sessions_handoff_count_check"' }, 400);
+    }
+    return route.fallback();
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await answerFilmQuestion(page);
+  await page.getByRole("button", { name: "Appeler Emma" }).click();
+  await expect(page.getByRole("img", { name: "Portrait d’Emma" })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Appeler Max", exact: true }).click();
+  await expect(page.getByText("Max n’est pas disponible", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("img", { name: "Portrait d’Emma" })).toBeVisible();
+  expect(fakes.getExperienceEvents().filter(event => event.event_type === "handoff_executed")).toHaveLength(0);
+  await page.getByRole("button", { name: "Appeler Max", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Portrait d’Max" })).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => fakes.getExperienceEvents().filter(event => event.event_type === "handoff_executed").length).toBe(1);
+  const persisted = fakes.getSessionUpdates().filter((value): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null && "active_character" in value);
+  expect(persisted).toHaveLength(1);
+  expect(persisted[0]).toMatchObject({ active_character: "max", handoff_count: 1 });
+  expect(fakes.getSessionInsertCount()).toBe(1);
+});
+
 test("capture remplacée : un démarrage rejeté après recommencement laisse le nouveau micro actif", async ({ page }) => {
   test.setTimeout(45_000);
   await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true, skipQuestionnaire: true });
