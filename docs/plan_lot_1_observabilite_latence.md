@@ -1279,3 +1279,28 @@ Spans RAG/LLM observés tousok. Cohorte descriptive distincte du PTT,
 aucun gain ni baseline publiée revendiqués. Micro fermé demandé à l'humain ;
 contrôle UI agent interrompu par changement de fenêtre Brave, aucune
 fermeture par clic agent affirmée.
+
+Ulrich confirme ensuite avoir cliqué sur Passer. cinematic_skipped est donc
+une sortie volontaire : déclenchement et bouton Passer fonctionnels, aucun
+incident de fermeture automatique déduit. Lecture jusqu'à la fin reste
+distincte et non attestée. Transfert différé préservé sans modification de
+règle ni de données métier.
+
+Suite prévue : un échange rassurant laissant Max accepter ou différer le
+transfert. L'appel arrive à sa limite de16minutes ; préparer une session
+avec assez de temps plutôt que demander un échange pendant sa fermeture.
+Pilotage natif Brave bloqué sur le changement de fenêtre : lecture AX
+accessible, actions dans le menu Fenêtre refusées comme changement utilisateur.
+Relecture de l'état et nouvelle sélection de l'app n'ont pas débloqué les
+actions. Aucune commande système alternative ni contournement utilisé.
+Action humaine unique demandée : afficher l'onglet preview sandbox dans
+Brave et confirmer preview visible, sans ouvrir le micro. Reprendre les
+boutons de test après ce retour ; ne pas affirmer une nouvelle session
+préparée avant confirmation UI. Source runtime et réglages inchangés,
+aucune publication nouvelle effectuée.
+
+Fin de la session5d703f2a confirmée par SELECT natif :
+ended_at2026-10-13T06:02:13.221Z, timeout_configured_duration,
+active_charactermax/handoff_count0. Les horodatages persistés de début/fin
+délimitent19min36s de temps mural ; ne pas les confondre avec la limite
+configurée de960s ni en inférer une cause sans diagnostic dédié.
