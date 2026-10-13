@@ -15,6 +15,9 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   conservés. Chaque appel manuel reçoit un salut, y compris lors d'un retour.
   Les doubles clics et les réponses tardives de l'ancien personnage sont
   bloqués ; les appels sont tracés avec la source `manual`.
+- Les résultats STT et les finalisations d'une capture abandonnée sont
+  écartés, y compris la transcription batch Whisper reçue après l'arrêt.
+  Le changement manuel reprend l'envoi des traces diagnostiques en attente.
 - Validation et livraison Lovable en cours ; plan séparé dans
   `docs/plan_changement_interlocuteur_manuel.md`.
 

@@ -69,3 +69,28 @@ pour éviter une course du fixture avec le salut initial. Aucun délai produit
 changé pour corriger ces attentes. Suite : contrôles et revues sur dernier
 HEAD, CI, preview puis livraison Lovable. P0 déjà publié ; baseline du
 nouveau bouton séparée.
+
+### Revue et corrections de concurrence
+
+Deux revues indépendantes de b9f7e9a trouvent une finalisation STT abandonnée
+encore traitable (Whisper finalise après stop), et une reprise de l'outbox
+diagnostique manquante. Deux E2E reproduisent réellement avant correction :
+ancien texte Whisper déclenche un LLM chez Max (attendu0, obtenu1), et
+trace annulée jamais envoyée (attendu>0, obtenu0). Source seule du problème
+aux callbacks/lifecycle Index, pas aux décisions de fin de parole.
+
+Correctif : retirer l'identité STT courante avant stop ; callback transcript
+accepté seulement pour le STT courant et une session active ; installer
+cette identité avant start, abandonner silencieusement un démarrage périmé
+et fermer son stream. Les finalisations PTT/mains libres ne modifient que
+leur capture encore courante. Le clic reprend explicitement l'outbox.
+Régression Whisper vérifie capture et flush abandonnés tandis qu'un nouveau
+micro est déjà actif chez Max. Algorithme handsFreeVoice et fournisseurs
+inchangés. Contrôles/revues complémentaires sur prochain HEAD nécessaires.
+
+Après correction : qualité locale complète réussie,44régressions,
+470unitaires,29intégrations, lint0erreur (avertissement préexistant),
+typecheck et build. Quatre parcours manuels E2E réussis, y compris les deux
+reproductions de revue désormais vertes. Les variantes Whisper renforcées
+(capture et flush avec nouveau micro ouvert) sont en cours de contrôle ;
+les deux revues complémentaires et la CI doivent porter sur le HEAD corrigé.

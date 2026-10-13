@@ -25,6 +25,8 @@ interface NetworkFakeOptions {
   blockTraceUpload?: boolean;
   characterOpenings?: boolean;
   delayCharacterResponseMs?: number;
+  whisperResponse?: string;
+  delayWhisperResponseMs?: number;
 }
 
 function json(route: Route, body: unknown, status = 200) {
@@ -53,6 +55,7 @@ async function installNetworkFakes(
   let posthogRequestCount = 0;
   let traceUploadStarted = 0;
   let traceUploadCompleted = 0;
+  let whisperReplyCount = 0;
   let releaseTraceUpload: (() => void) | null = null;
   const blockedTraceUpload = new Promise<void>((resolve) => { releaseTraceUpload = resolve; });
   const maxMessageCounts: number[] = [];
@@ -62,7 +65,7 @@ async function installNetworkFakes(
   const voiceEvents: Array<Record<string, unknown>> = [];
   const gmFilmContexts: string[] = [];
 
-  await page.addInitScript(({ transcripts, simulateAudio }: { transcripts: string[]; simulateAudio: boolean }) => {
+  await page.addInitScript(({ transcripts, simulateAudio, batchAudio }: { transcripts: string[]; simulateAudio: boolean; batchAudio: boolean }) => {
     let websocketIndex = 0;
     type E2ETestWindow = Window & {
       __e2eLongAudio?: boolean;
@@ -94,6 +97,7 @@ async function installNetworkFakes(
       },
     });
     localStorage.setItem("ava:prod:ava_gameplay_settings", JSON.stringify({ RAG_SUMMARY_EVERY_N_TURNS: 4 }));
+    if (batchAudio) localStorage.setItem("ava:prod:ava_stt_settings", JSON.stringify({ activeProvider: "openai_whisper" }));
     // PostHog intentionally filters HeadlessChrome as a bot. Use a regular
     // browser UA so this E2E can attest that real-user telemetry reaches the
     // network without weakening the production bot filter.
@@ -206,7 +210,7 @@ async function installNetworkFakes(
         if (type === "dataavailable") this.dataAvailableListeners.push(listener);
       }
       requestData() {
-        const event = { data: new Blob(["audio"]) } as BlobEvent;
+        const event = { data: new Blob([batchAudio ? "audio".repeat(300) : "audio"]) } as BlobEvent;
         this.ondataavailable?.(event);
         const listeners = this.dataAvailableListeners.splice(0);
         listeners.forEach((listener) => {
@@ -227,7 +231,7 @@ async function installNetworkFakes(
     });
     Object.defineProperty(window, "WebSocket", { configurable: true, value: E2EWebSocket });
     Object.defineProperty(window, "MediaRecorder", { configurable: true, value: E2EMediaRecorder });
-  }, { transcripts, simulateAudio: options.ttsSuccess === true });
+  }, { transcripts, simulateAudio: options.ttsSuccess === true, batchAudio: options.whisperResponse !== undefined });
 
   await page.route("https://video.gumlet.io/**", (route) => {
     if (route.request().url().includes(E2E_VIDEO_ASSET_ID)) triggeredVideoLoads += 1;
@@ -387,6 +391,15 @@ async function installNetworkFakes(
     if (functionName === "proxy-stt") {
       return json(route, { key: "e2e-short-lived-token", expires_in: 60, model: "nova-3", language: "fr" });
     }
+    if (functionName === "proxy-stt-config" && options.whisperResponse !== undefined) {
+      return json(route, { configured: { deepgram: true, openai_whisper: true } });
+    }
+    if (functionName === "proxy-stt-whisper") {
+      await new Promise(resolve => setTimeout(resolve, options.delayWhisperResponseMs ?? 0));
+      await json(route, { text: options.whisperResponse });
+      whisperReplyCount += 1;
+      return;
+    }
     if (functionName === "query-rag") {
       ragCallCount += 1;
       if (ragCallCount === options.dropRagAt) {
@@ -497,6 +510,7 @@ async function installNetworkFakes(
     getPosthogRequestCount: () => posthogRequestCount,
     getTraceUploadStarted: () => traceUploadStarted,
     getTraceUploadCompleted: () => traceUploadCompleted,
+    getWhisperReplyCount: () => whisperReplyCount,
     releaseTraceUpload: () => releaseTraceUpload?.(),
   };
 }
@@ -556,13 +570,13 @@ test("appel manuel : coupe la voix, sonne et revient au personnage dans la même
   expect(stateUpdates.every(update => !update.ended_at)).toBe(true);
 });
 
-test("appel manuel : une réponse LLM tardive de l'ancien personnage ne revient pas après les sonneries", async ({ page }) => {
+test("appel manuel : une réponse LLM tardive est écartée et les traces reprennent après les sonneries", async ({ page }) => {
   test.setTimeout(30_000);
   const oldResponse = "Réponse tardive d'Emma à ne pas jouer chez Max.";
   const fakes = await installNetworkFakes(page, ["Comment se passe ta journée ?"], {
-    ttsSuccess: true, maxResponse: oldResponse, characterOpenings: true, delayCharacterResponseMs: 5_000,
+    ttsSuccess: true, maxResponse: oldResponse, characterOpenings: true, delayCharacterResponseMs: 5_000, diagnosticAdmin: true,
   });
-  await page.goto("/");
+  await page.goto("/?diagnostic=full");
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
   await answerFilmQuestion(page);
@@ -577,8 +591,37 @@ test("appel manuel : une réponse LLM tardive de l'ancien personnage ne revient 
   await expect(page.getByRole("img", { name: "Portrait d’Max" })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText("Allô, ici Max.", { exact: true })).toBeVisible();
   await expect(page.getByText(oldResponse, { exact: true })).toHaveCount(0);
+  await expect.poll(fakes.getTraceUploadStarted, { timeout: 5_000 }).toBeGreaterThan(0);
   expect(fakes.getSessionInsertCount()).toBe(1);
 });
+
+for (const stage of ["capture", "flush"] as const) {
+test(`appel manuel : la transcription Whisper abandonnée pendant ${stage} ne remplace pas la nouvelle capture`, async ({ page }) => {
+  const abandonedText = "Parole enregistrée avec Emma avant l'appel de Max.";
+  const fakes = await installNetworkFakes(page, [], {
+    ttsSuccess: true, characterOpenings: true, whisperResponse: abandonedText, delayWhisperResponseMs: 7_000,
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await answerFilmQuestion(page);
+  await page.getByRole("button", { name: "Appeler Emma" }).click();
+  await expect.poll(() => page.evaluate(() =>
+    (window as Window & { __e2eAudioState?: { ended: number } }).__e2eAudioState?.ended ?? 0), { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+  await expect(page.getByRole("button", { name: "Arrêter l'enregistrement" })).toBeEnabled();
+  if (stage === "flush") await page.getByRole("button", { name: "Arrêter l'enregistrement" }).press("Enter");
+  await page.getByRole("button", { name: "Appeler Max", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Portrait d’Max" })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+  await expect(page.getByRole("button", { name: "Arrêter l'enregistrement" })).toBeEnabled();
+  await expect.poll(fakes.getWhisperReplyCount, { timeout: 5_000 }).toBe(1);
+  await page.waitForLoadState("networkidle");
+  expect(fakes.getMaxTurnCount()).toBe(0);
+  await expect(page.getByText(abandonedText, { exact: false })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Arrêter l'enregistrement" })).toBeEnabled();
+});
+}
 
 test("appel manuel : une cible devenue indisponible conserve le personnage et la session", async ({ page }) => {
   const fakes = await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true });

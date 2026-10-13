@@ -352,12 +352,14 @@ const IndexPRD4 = () => {
     activeOutputControllerRef.current?.abort("experience-cleanup");
     activeOutputControllerRef.current = null;
     pttFinalizingRef.current = false;
+    handsFreeFinalizingRef.current = false;
     if (handsFreeTimerRef.current) window.clearTimeout(handsFreeTimerRef.current);
     handsFreeTimerRef.current = null;
     handsFreeListeningRef.current = false;
     setHandsFreeListening(false);
-    try { sttRef.current?.stop(); } catch { /* ignore */ }
+    const stt = sttRef.current;
     sttRef.current = null;
+    try { stt?.stop(); } catch { /* ignore */ }
     try { responseOutputRef.current?.interrupt(); } catch { /* ignore */ }
     const output = responseOutputRef.current;
     responseOutputRef.current = null;
@@ -1618,15 +1620,18 @@ const IndexPRD4 = () => {
   // ---- PTT handlers : démarre/reprend STT, finalise au release -------------
   const teardownSTT = useCallback((preserveInputTelemetry = false) => {
     if (!preserveInputTelemetry) finishInputTelemetry("cancelled");
-    try { sttRef.current?.stop(); } catch { /* ignore */ }
+    const stt = sttRef.current;
     sttRef.current = null;
+    try { stt?.stop(); } catch { /* ignore */ }
   }, [finishInputTelemetry]);
 
   const createSTT = useCallback(async (initialStream?: Promise<MediaStream>) => {
     teardownSTT(true);
+    const captureSequence = activeTurnSequenceRef.current;
     const captureTelemetry = inputTelemetryRef.current;
     const stt = await createConfiguredSTT(
       (text, isFinal) => {
+        if (sttRef.current !== stt || endedRef.current) return;
         if (handsFreeListeningRef.current) {
           handsFreeTranscriptRef.current?.(text, isFinal);
           return;
@@ -1669,13 +1674,21 @@ const IndexPRD4 = () => {
         onServiceObserved: (service) => { if (sttRef.current === stt) inputTelemetryRef.current?.service(service); },
       },
     );
+    if (endedRef.current || activeTurnSequenceRef.current !== captureSequence) {
+      void Promise.resolve(stt.stop()).catch(() => {});
+      throw new DOMException("Voice capture replaced", "StaleCaptureError");
+    }
+    sttRef.current = stt;
     await stt.start();
+    if (sttRef.current !== stt || endedRef.current) {
+      void Promise.resolve(stt.stop()).catch(() => {});
+      throw new DOMException("Voice capture replaced", "StaleCaptureError");
+    }
     recordPassiveVoiceNetworkObservation({
       sttConnected: true,
       lastSttConnectedAt: Date.now(),
     });
     stt.setManualMode(true); // toggle-to-talk: pas de silence auto-finalize
-    sttRef.current = stt;
     return stt;
   }, [endLatencySegment, finishInputTelemetry, incrementPttError, processTurn, setAudioState, teardownSTT]);
 
@@ -1724,9 +1737,10 @@ const IndexPRD4 = () => {
       await createSTT(initialStream);
       setAudioState("user_speaking");
     } catch (err) {
+      void initialStream?.then((stream) => stream.getTracks().forEach((track) => track.stop())).catch(() => {});
+      if (err instanceof Error && err.name === "StaleCaptureError") return;
       finishInputTelemetry("failed");
       console.warn("[PRD4] PTT start failed:", err);
-      void initialStream?.then((stream) => stream.getTracks().forEach((track) => track.stop())).catch(() => {});
       endLatencySegment(sttLatencySegmentRef.current);
       sttLatencySegmentRef.current = null;
       teardownSTT();
@@ -1766,11 +1780,12 @@ const IndexPRD4 = () => {
       // revision have been preserved. The final callback starts processTurn.
       await stt.flush();
     } catch (error) {
+      if (sttRef.current !== stt) return;
       finishInputTelemetry("failed");
       throw error;
     } finally {
-      pttFinalizingRef.current = false;
       if (sttRef.current === stt) {
+        pttFinalizingRef.current = false;
         endLatencySegment(sttLatencySegmentRef.current);
         sttLatencySegmentRef.current = null;
         if (!isProcessingRef.current) {
@@ -1821,12 +1836,15 @@ const IndexPRD4 = () => {
     try {
       await stt.flush(); // le callback final lance processTurn
     } catch (error) {
+      if (sttRef.current !== stt) return;
       finishInputTelemetry("failed");
       throw error;
     } finally {
-      handsFreeFinalizingRef.current = false;
-      if (sttRef.current === stt && handsFreeListeningRef.current) stt.resume();
-      if (!isProcessingRef.current) { finishInputTelemetry("no_audio"); setAudioState("idle"); }
+      if (sttRef.current === stt) {
+        handsFreeFinalizingRef.current = false;
+        if (handsFreeListeningRef.current) stt.resume();
+        if (!isProcessingRef.current) { finishInputTelemetry("no_audio"); setAudioState("idle"); }
+      }
     }
   }, [finishInputTelemetry, setAudioState]);
 
@@ -1882,9 +1900,10 @@ const IndexPRD4 = () => {
       if (!isProcessingRef.current) setAudioState("idle");
       trackEvent("prd4_hands_free_started", { session_id: sessionIdRef.current, ...handsFreeSettingsRef.current });
     } catch (err) {
+      void initialStream?.then((stream) => stream.getTracks().forEach((track) => track.stop())).catch(() => {});
+      if (err instanceof Error && err.name === "StaleCaptureError") return;
       finishInputTelemetry("failed");
       console.warn("[PRD4] hands-free start failed:", err);
-      void initialStream?.then((stream) => stream.getTracks().forEach((track) => track.stop())).catch(() => {});
       handsFreeListeningRef.current = false;
       setHandsFreeListening(false);
       teardownSTT();
@@ -2036,6 +2055,7 @@ const IndexPRD4 = () => {
     processingWatchdogRef.current = null;
     isProcessingRef.current = false;
     pendingPlayerSwitchRef.current = null;
+    resumeConversationTraceSync(true);
     setUserSubtitle("");
     setMaxSubtitle("");
     setAudioState("idle");
