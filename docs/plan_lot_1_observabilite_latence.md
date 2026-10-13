@@ -1443,3 +1443,41 @@ Deux échanges humains demandés pour confirmer capture réelle puis décision
 de transfert, avec arrêt du contrôle si Micro indisponible réapparaît.
 Le renouvellement JWT est reproduit en test automatique ; ne pas affirmer
 un contrôle réel d'une heure d'expiration qui n'a pas été exécuté.
+
+### Micro réel fonctionnel après correctif, refus Emma — 13 octobre 2026, 08:50 CEST
+
+Ulrich confirme contrôle micro et transfert terminé, reste avec Max et
+signale2paires de logs AbortError: Conversation turn aborted. Ava natif
+snapshot [2026-10-12T06:50:54.341Z,2026-10-13T06:50:54.341Z),page0/100,
+nextOffset100,cappedfalse,invalid0. SQL borné sur la même session et fenêtre
+confirme15V2 (5started/5finished/5GM),5attempt_id, plus2legacy séparés.
+Ces15V2 sont tous dans la page reçue, pagination globale non complète.
+
+Tentatives1a2d9078f-0c68-4a5c-aedf-75ca5bc7a324,
+3ad639090-f1eb-4132-93bd-445c84b5c8b8,
+4/8da6f0d3-7271-49d8-93ff-92627e40279f interrupted, sortiesnull,
+audio_cancelled2457/2500/1979ms. GM failed correspondant avec booléen
+mentions-aborttrue. Aucun dialogue ni note privée lus. Les AbortError
+signalent ces annulations ; ne pas les compter comme indisponibilité du
+micro ni leur attribuer une latence d'interruption acoustique.
+
+Tours2/c35da277-4849-4ed1-8ae8-31b8e2d6034d et
+5/cddf9f3c-d6a1-4ad6-a895-23e571fa8038 completed, audio_end19293/15964ms,
+sorties estimées6287/4797ms, couverture13/27partial, origineapp_turn_decision,
+modehands_free, software_estimate, voice_end/first_tokennull. n2,p50=5542ms,
+p95=6213ms arrondi (interpolation linéaire), descriptif sans gain ni cohorte
+publiée. Deepgram/nova-3/websocket, OpenAI/openai/gpt-5.6-luna/http_batch,
+Gradium/gradium-tts/websocket/overridetrue/fallbackfalse/retry0 ; spans
+RAG/LLM observés tousok. Micro réel et réponses complètes attestés sur D9Lf-5hk,
+ce qui valide la reprise après la panne JWT ; expiration réelle d'une heure
+toujours non exécutée, cas couvert par tests ciblés.
+
+GMtour5 executed/actionnone, requesttargetemma/stanceobject. Aucune
+experience_event de transfert : refus conservé, pas de panne déduite de
+la seule absence d'Emma. La phrase humaine proposée était longue et la
+détection explicite client reconnaît notamment parler à Emma. Dernier
+contrôle court demandé dans le même appel encore EN LIGNE, micro fermé :
+« J'aimerais parler à Emma, s'il te plaît », attendre puis couper le micro,
+confirmer l'éventuelle proposition ou apparition d'Emma. Pas de règle
+forcée ni de modification de capture. Transfert accepté encore non attesté.
+CI post-merge38357947025 sur3e2e1ce désormaissuccess.
