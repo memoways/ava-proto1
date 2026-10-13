@@ -104,3 +104,36 @@ un ancien rejet de micro ne ferme pas le nouveau ; désactivation/réactivation
 HF pendant flush permet au nouveau tour d'aboutir. Variantes Whisper capture
 et flush avec nouveau micro actif également vertes. Prochain HEAD à revoir
 avant fusion ; aucune publication de ce bouton encore effectuée.
+
+### Contrôle réel après PR #30 — 13 octobre 2026
+
+HEAD 937ac42 validé par les deux revues sans observation restante et CI
+38370956927 réussie : 44 régressions, 470 unitaires, 29 intégrations et
+24 E2E. PR #30 fusionnée en 2094d27, synchronisée dans Lovable ; preview
+sert index-B7DiZfXD.js. Aucun nouveau bouton encore publié.
+
+Session réelle sandbox-ulrich 8f52edc3-ae6e-4431-b205-1a63e1d07dc0 :
+Emma → Max exécuté, source manual, même session et timer, compteur1.
+Retour Max → Emma refusé par la base ; interface avait déjà changé d'acteur.
+Cause confirmée dans pg_constraint : sessions_handoff_count_check limite
+handoff_count à [0,1]. Les anciens E2E simulaient des PATCH toujours acceptés.
+
+Correctif prévu avant publication : remplacer uniquement cette contrainte
+par handoff_count >=0, conserver NOT NULL/default et toutes les données/RLS ;
+ne changer l'acteur et son compteur en mémoire qu'après acceptation du PATCH.
+Ajouter un test PGlite qui reproduit la limite historique puis vérifie trois
+appels et les refus de négatif/null ; E2E refuse le PATCH, vérifie le maintien
+d'Emma puis la reprise avec compteur1. Migration locale créée par CLI officielle
+(sans connexion externe) : 20261013090739_allow_repeated_manual_calls.sql.
+Application exclusivement Lovable Cloud iralfqlslqndgvexixis ; la demande
+initiale interdisait les migrations, donc demander l'accord sur ce correctif
+concret avant toute application cloud. Pas de changement de secret/flag/provider.
+Confiance95% : contrainte native et migration historique concordent, seam SQL
+PGlite et moteur existants, aucune migration d'assouplissement antérieure.
+Référence officielle : https://www.postgresql.org/docs/current/sql-altertable.html.
+
+Les deux reproductions sont rouges avant correction, puis vertes. Qualité
+complète corrigée : 44 régressions, 470 unitaires, 30 intégrations, lint sans
+erreur, typecheck et build réussis. E2E de refus/reprise réussi. Deux revues
+indépendantes du complément : 0 constat bloquant. Application Cloud et
+publication attendent l'accord humain demandé ; aucun SQL Cloud modifié.
