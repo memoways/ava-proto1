@@ -72,6 +72,13 @@ et recommandée par le GM. Les négations avec/sans auxiliaire restent veto.
 Les faits négatifs sans lien avec le transfert ne bloquent pas une proposition
 claire. Aucun prompt ni configuration narrative changé.
 
+CI `38381793755` : qualité complète réussie et 32/33 E2E verts. Seule la
+lecture immédiate du journal asynchrone « seuil narratif » échoue : la trace
+réseau du retry contient bien handoff_blocked/handoff_before_minimum_turn et
+l'interface sans bouton. Le test attend maintenant cet événement avec poll,
+comme le test de refus joueur. Aucun changement produit pour cette correction
+d'attente ; CI complète à relancer sur ce dernier HEAD.
+
 Les sections suivantes sont l'historique de l'interprétation initiale,
 supplantée par cette clarification ; elles ne définissent plus la règle produit.
 

@@ -666,7 +666,7 @@ test("appel GM : un accord recommandé avant le seuil narratif reste bloqué", a
   await sendHandoffTurn(page, text);
   await page.waitForLoadState("networkidle");
   await expect(page.getByRole("button", { name: /^Appeler / })).toHaveCount(0);
-  expect(fakes.getExperienceEvents().find(e => e.event_type === "handoff_blocked")?.payload.blockedReason)
+  await expect.poll(() => fakes.getExperienceEvents().find(e => e.event_type === "handoff_blocked")?.payload.blockedReason)
     .toBe("handoff_before_minimum_turn");
 });
 
