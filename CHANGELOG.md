@@ -1,69 +1,114 @@
 # Changelog
 
-## 2026-10-13 — Appels proposés par le Game Master
-
-- Pendant la conversation, les boutons Appeler Max/Emma apparaissent seulement
-  après une recommandation du GM validée et l'accord du personnage. Le joueur
-  peut accepter l'appel ou rester ; une demande vocale ne transfère plus seule.
-- Les décisions GM retardées, échouées, refusées ou bloquées par les règles
-  narratives n'activent aucun bouton. Une recommandation doit devenir une
-  proposition consentie avant d'être affichée.
-- L'appel autorisé conserve les sonneries, la session, le temps restant,
-  l'isolation des historiques et la protection des captures abandonnées.
-- La reprise restaure seulement les offres avec approbation GM enregistrée
-  sous la version d'orchestration courante. Pas de nouvelle migration.
-
-## 2026-10-13 — Repeated manual calls
-
-- Allow more than one character call in the same session while retaining the
-  non-negative counter and existing session data and access rules.
-- Keep the current actor and counter when the session update is refused, so
-  the player can retry without a mismatch between the screen and saved state.
-- Cover the historical database constraint and refused updates before retry.
-
-
 Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
-## [Non publié]
+## [Publié via Lovable] — 2026-10-13
 
-### 2026-10-13 — Appel manuel entre Emma et Max
+Cette section donne l'état livré après les derniers contrôles. Les entrées
+plus anciennes conservent leur état au moment de leur rédaction.
 
-Interprétation initiale remplacée par « Appels proposés par le Game Master »
-ci-dessus, selon la clarification d'Ulrich du même jour.
+### Appels proposés par le Game Master
 
-- Le joueur peut appeler l'autre personnage depuis la conversation, même
-  pendant une réponse et sans proposition narrative. Le clic coupe le micro
-  et la voix, annule le tour, puis lance les trois sonneries avant le décroché.
-- La session, le temps restant et l'historique isolé par personnage sont
-  conservés. Chaque appel manuel reçoit un salut, y compris lors d'un retour.
-  Les doubles clics et les réponses tardives de l'ancien personnage sont
-  bloqués ; les appels sont tracés avec la source `manual`.
-- Les résultats STT et les finalisations d'une capture abandonnée sont
-  écartés, y compris la transcription batch Whisper reçue après l'arrêt.
-  Le changement manuel reprend l'envoi des traces diagnostiques en attente.
-- Validation et livraison Lovable en cours ; plan séparé dans
-  `docs/plan_changement_interlocuteur_manuel.md`.
+- Pendant la conversation, les boutons Appeler Max/Emma apparaissent seulement
+  après une recommandation du GM exécutée, validée par les gardes narratives,
+  et un accord explicite du personnage. Le joueur choisit Appeler ou Rester ;
+  une demande vocale ne provoque plus de transfert automatique. Le choix du
+  premier personnage reste disponible à l'écran initial.
+- Les refus et hésitations du personnage restent prioritaires, y compris
+  quand le GM classe sa réponse comme un accord. Un GM retardé, échoué,
+  périmé ou une décision bloquée par les règles n'active aucun bouton.
+- L'appel autorisé coupe capture et audio, annule le tour abandonné et joue
+  les trois sonneries. Session, timer et historiques isolés sont conservés ;
+  doubles clics, transcriptions et callbacks tardifs sont écartés. Les appels
+  autorisés sont tracés avec la source `gm` et des clés de tentative distinctes.
+- La reprise ne restaure que les offres portant une approbation GM sous la
+  version d'orchestration de la session. Les anciennes offres non approuvées
+  n'ouvrent aucun bouton. Aucun prompt, réglage vocal ni nouvelle migration
+  modifié pour cette correction.
+- [PR #32](https://github.com/memoways/ava-proto1/pull/32), fusion `f251eb3`,
+  publiée via Lovable. CI avant et après fusion vertes : 44 régressions,
+  494 unitaires, 30 intégrations, 33 E2E, typecheck, lint et build ; deux revues
+  indépendantes sans constat restant. Max et Emma contrôlés en preview puis
+  sur le domaine publié : zéro bouton de transfert par défaut et clôture propre.
+- La branche positive GM + consentement + clic est couverte automatiquement ;
+  un transfert accepté pendant une conversation humaine reste non observé.
+  Plan et preuves : [appels proposés par le GM](docs/plan_changement_interlocuteur_manuel.md).
 
-### 2026-10-13 — Session renouvelée pour les appels vocaux
+### Appels répétés et persistance cohérente
+
+- La migration explicitement autorisée de la
+  [PR #31](https://github.com/memoways/ava-proto1/pull/31) remplace le plafond
+  historique `handoff_count <= 1` par un compteur non négatif. Appliquée dans
+  Lovable Cloud ; données, droits et RLS conservés. Les règles narratives du GM
+  continuent de limiter les transferts autorisés.
+- Si l'enregistrement de session échoue, le personnage et le compteur restent
+  inchangés ; l'offre approuvée reste disponible pour réessayer. Le changement
+  d'interlocuteur n'est appliqué qu'après confirmation de persistance.
+- L'appel libre ajouté dans la [PR #30](https://github.com/memoways/ava-proto1/pull/30)
+  était une étape intermédiaire publiée, remplacée par la règle GM de #32.
+  Ses anciens contrôles réels dans les deux sens ne prouvent pas un accord GM.
+  Ne pas réintroduire le plafond 1 sur les compteurs historiques supérieurs à 1.
+
+### Lot 1 / P0 — Observabilité vocale V2
+
+- Chronologie PRD4 distincte des historiques V1 : tentatives commencées,
+  terminées, interrompues, échouées ou sans audio ; observations GM séparées.
+  Attribution des fournisseurs/modèles/transports effectivement exécutés,
+  spans RAG/LLM/GM et couverture explicite des jalons disponibles.
+- Vues admin et outils MCP Ava lisent des projections techniques filtrées et
+  paginées, sans dialogue ni secret. Une donnée absente reste absente ; elle
+  ne devient ni zéro ni succès. Collecte bornée et asynchrone hors chemin vocal.
+- Dépendances alignées pour une installation propre ; SDK MCP 3.0.5 et Zod 4
+  isolé du Zod 3 des formulaires, fonction MCP régénérée par le SDK. Migration
+  de stockage V2 additive autorisée et appliquée via Lovable Cloud.
+- Corrections du diagnostic quota et de l'ordre des jalons de capture : les
+  requêtes autorisées ne sont plus classées comme refusées ; la capture est
+  mesurée depuis son démarrage et sa disponibilité, sans inventer une fin
+  acoustique de parole ou un premier token du LLM batch.
+- Frontend P0 publié via Lovable le 13 octobre. Max et Emma en mains libres et
+  interruption observés sur le domaine publié ; PTT et capture sans parole
+  vérifiés en preview. Les quatre outils MCP Ava et la vue admin V2 répondent.
+- Baseline P0 publiée, avant le correctif des boutons GM : 4 tentatives
+  (2 terminées, 2 interrompues),
+  12 événements V2 et 4 observations GM. Pour les deux tours terminés,
+  décision applicative → sortie audio estimée : p50 4 218,5 ms / p95 4 261,25 ms.
+  Couverture partielle, fin physique de parole non mesurée, aucun gain revendiqué.
+  Zéro événement PostHog sur cette même cohorte signifie absence de données,
+  pas latence nulle ; le contrôle croisé positif en preview est distinct.
+- Publication autorisée avec limites : transfert GM accepté non testé en réel,
+  cinématique déclenchée puis passée (fin de lecture non attestée), écart de
+  rôle Emma du 12 octobre inexpliqué. Versions exactes des artefacts Edge déployés
+  et refus d'un compte non-admin réel non attestés. Lot 2 non commencé.
+  Preuves et baseline : [plan P0](docs/plan_lot_1_observabilite_latence.md).
+
+### Session renouvelée pour les appels vocaux
 
 - Les requêtes protégées utilisent la session courante après renouvellement
-  du jeton Supabase. La déduplication de connexion reste limitée aux appels
-  simultanés ; elle ne conserve plus le premier jeton indéfiniment.
+  du jeton Supabase. La déduplication reste limitée aux connexions simultanées ;
+  elle ne conserve plus le premier jeton indéfiniment.
 - Deux tests reproduisent le jeton périmé après renouvellement et après
   expiration du cache court, puis passent avec la correction. Aucun quota,
-  fournisseur ou réglage vocal modifié ; livraison Lovable à vérifier.
+  fournisseur ou réglage vocal modifié. [PR #29](https://github.com/memoways/ava-proto1/pull/29)
+  fusionnée et incluse dans le P0 publié ; micro réel fonctionnel en preview
+  après correction, puis échanges réels Max/Emma sur le site publié.
 
-### 2026-10-12 — Décrochage après redémarrage de l'expérience
+### Décrochage après redémarrage de l'expérience
 
-- Un appel lancé après « Recommencer l'expérience » conserve sa séquence
-  de sonnerie même si le parent se rend chaque seconde. Le décrochage reste
-  à cinq secondes ; la dernière callback est appelée une seule fois et les
-  délais sont annulés lorsque l'écran se ferme.
-- Test de reproduction rouge avant correction puis vert ; 12 tests ciblés,
-  TypeScript, lint sans erreur et build local réussis. Validation Lovable
-  et publication encore à effectuer dans le lot P0.
+- Un appel lancé après Recommencer l'expérience conserve sa séquence même
+  si le parent se rend chaque seconde. Décrochage à cinq secondes, dernière
+  callback appelée une seule fois, délais annulés lorsque l'écran se ferme.
+- Test de reproduction rouge puis vert ; [PR #28](https://github.com/memoways/ava-proto1/pull/28)
+  fusionnée et incluse dans le P0 publié. Les nouveaux appels Max/Emma ont été
+  contrôlés en preview puis sur le domaine publié.
+
+## [Non publié]
+
+Les mentions de non-publication et les listes de recette des entrées du
+12 octobre ci-dessous décrivent leur état initial. Le bilan P0 publié ci-dessus
+actualise les parcours effectivement contrôlés, sans valider les travaux
+éditoriaux, synchronisations ou autres recettes qui ne l'ont pas été.
 
 ### 2026-10-12 — Choix du film après l'intro, retrait du champ « Profondeur par niveau », conversation mains libres
 

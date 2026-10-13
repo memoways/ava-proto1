@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-12 (Choix du film après l'intro, champ « Profondeur par niveau » retiré, conversation vocale mains libres réglable)
+> **Last Updated**: 2026-10-13 (P0 publié, mesure V2, appels soumis au GM et au consentement du personnage)
 
 ---
 
@@ -73,7 +73,132 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-10-13 — Passer à un autre personnage devient un choix narratif
+
+**Le besoin clarifié.** Après les essais vocaux, Ulrich demandait un bouton
+qui coupe Emma, fait sonner Max, puis le laisse répondre, et le même passage
+dans l'autre sens. La première interprétation avait rendu ce bouton permanent.
+Ulrich a précisé la règle : le joueur ne doit pas pouvoir changer librement
+pendant l'appel. Le GM décide selon la conversation et les règles narratives ;
+le personnage doit accepter avant que le joueur puisse choisir.
+
+**Le contrat actuel.** Le choix du premier personnage reste disponible.
+Pendant la conversation, une demande de transfert attend une recommandation
+GM exécutée et validée, puis un accord explicite du personnage. Un refus ou
+une hésitation ne devient pas un accord parce que le GM l'a mal classé.
+Les seuils narratifs, délais entre transferts et disponibilité de la cible
+restent appliqués. Les décisions échouées, retardées ou périmées n'ouvrent
+aucun bouton. Une proposition consentie affiche Appeler ou Rester ; la voix
+seule ne déclenche aucune bascule automatique.
+
+**L'appel autorisé.** Le clic ferme capture et sortie audio, annule le tour,
+fait entendre trois sonneries, puis ouvre l'autre interlocuteur dans la même
+session, avec le temps restant et les mémoires séparées conservés. Un double
+clic ou un résultat tardif de l'ancien personnage ne crée pas un second appel.
+Si l'enregistrement échoue, l'écran reste sur le personnage courant et conserve
+l'offre approuvée pour réessayer. À la reprise, seules les offres avec une
+approbation GM enregistrée pour la version de session peuvent réapparaître.
+
+**La persistance.** Les essais de l'étape intermédiaire avaient révélé une
+ancienne contrainte de base limitée à un transfert. Ulrich a autorisé la
+migration vers un compteur non négatif, appliquée dans Lovable Cloud sans
+modifier les données, droits ou RLS. Les transferts répétés restent soumis
+aux règles du GM. Les anciens compteurs supérieurs à 1 sont conservés ; le
+correctif GM ne demande aucune migration supplémentaire.
+
+**Livraison vérifiée.** Les PR #30 et #31 ont livré l'étape intermédiaire ;
+[PR #32](https://github.com/memoways/ava-proto1/pull/32), fusion `f251eb3`,
+la remplace et est publiée via Lovable. Deux revues sans constat restant,
+CI avant/après fusion vertes : 44 régressions, 494 unitaires, 30 intégrations,
+33 E2E, typecheck, lint et build. Les quatre appels de contrôle Max/Emma en
+preview puis sur le domaine publié démarrent sans bouton de transfert et se
+clôturent proprement. Le parcours GM autorisé est validé automatiquement ;
+un transfert accepté dans une conversation humaine reste à observer.
+Les anciens passages par bouton libre ne constituent pas cette preuve.
+
+Plan et traces : [appels proposés par le Game Master](docs/plan_changement_interlocuteur_manuel.md).
+
+### 2026-10-13 — Mesurer les échanges avant de les accélérer
+
+**Le problème.** Les statistiques historiques ne suffisaient pas à expliquer
+l'attente d'un tour PRD4 : fournisseur réellement exécuté, échec ou interruption,
+attente RAG/LLM, génération et lecture audio étaient difficiles à distinguer.
+Le lot 1/P0 prépare une mesure fiable avant toute optimisation ultérieure.
+
+**Ce qui change.** Une chronologie V2 relie chaque tentative à son tour et
+sépare les observations GM. Elle conserve les tours commencés, interrompus,
+échoués ou sans audio au lieu de ne montrer que les réponses terminées.
+Les fournisseurs, modèles et transports viennent des adaptateurs exécutés,
+avec spans techniques RAG/LLM/GM, origine de mesure et couverture explicites.
+Les outils MCP Ava et l'admin lisent des projections techniques sans dialogue
+ni secret ; V1 reste distinct. La collecte est bornée, asynchrone et ne bloque
+pas la voix. Un champ absent ne devient pas zéro ; une sortie audio estimée
+par le logiciel n'est pas une mesure acoustique de fin de parole.
+
+**Les corrections issues des essais.** Les états quota sont corrigés sans
+changer les règles de quota, et les jalons de capture suivent leur ordre réel.
+Les appels après redémarrage conservent leur décrochage malgré les rendus du
+parent. Les requêtes vocales protégées utilisent désormais le jeton de session
+renouvelé au lieu de conserver un ancien jeton ; le micro a refonctionné dans
+le contrôle réel après cette correction. Dépendances et SDK MCP sont alignés,
+Zod 4 reste isolé des formulaires Zod 3, et le MCP est généré par le SDK.
+Le stockage V2 a reçu une migration additive explicitement autorisée dans
+Lovable Cloud ; aucune chaîne de livraison externe n'a été créée.
+
+**Le résultat publié.** Le P0 a été publié via Lovable le 13 octobre, avec
+échanges réels Max/Emma et interruption d'Emma confirmée par Ulrich. PTT et
+capture sans parole sont validés en preview. La baseline du 13 octobre
+(07:39:31.634–07:54:51.468 UTC) porte sur le frontend P0 avant le correctif
+GM ; elle reste séparée des essais de boutons. Sur cette fenêtre bornée,
+4 tentatives donnent 2 réponses terminées et 2 interruptions, 12 événements
+V2 et 4 observations GM. Pour les deux réponses terminées seulement,
+décision applicative → sortie estimée : p50 4 218,5 ms / p95 4 261,25 ms.
+Ce petit échantillon à couverture partielle n'atteste aucun gain de latence.
+La fin physique de parole et le premier token batch restent non mesurés.
+PostHog n'a aucun événement sur cette cohorte publiée ; cela ne signifie pas
+une latence nulle. Le rapprochement positif Ava/PostHog en preview, après
+exception temporaire Brave autorisée puis rétablie, reste un contrôle distinct.
+
+**Les limites conservées.** Ulrich a autorisé la publication avec le transfert
+GM accepté non attesté en réel, une cinématique déclenchée mais passée avant
+la fin et un écart de rôle d'Emma du 12 octobre encore inexpliqué. Les versions
+exactes des artefacts Edge déployés ne sont pas attestées ; le refus non-admin
+est couvert automatiquement, sans compte réel disponible. Ces limites ne
+sont pas effacées par les tests des boutons. Le lot 2 n'a pas commencé.
+
+Plan, cohortes et preuves : [lot 1/P0 observabilité](docs/plan_lot_1_observabilite_latence.md).
+
+### 2026-10-12 — Un cadre commun, sans confondre l'introduction et le film
+
+Le joueur indique après l'introduction s'il a vu le film. Cette réponse est
+un fait de session transmis de manière identique au personnage et au GM,
+même si le cadre éditorial est désactivé. Revoir l'introduction la conserve.
+Le constructeur unique `experienceFrame.ts` empêche les deux interlocuteurs
+système de recevoir des versions différentes du rôle, des connaissances ou
+de la posture du joueur. L'ancien onboarding à trois cartes est masqué dans
+le parcours actuel, conservé dans le code ; le choix du personnage rappelle
+le soutien et la douceur attendus.
+
+Les réglages GM sont désormais édités et versionnés dans l'application ;
+Notion reste la source éditoriale des personnages et du monde narratif.
+Le moteur legacy et ses anciens écrans ont été retirés. Le champ inexistant
+Profondeur par niveau a été supprimé de l'éditeur et de la synchronisation.
+Le mode mains libres règle la fin de parole dans l'application et permet
+l'interruption de la voix ; les fournisseurs STT fournissent des signaux et
+du texte sans décider eux-mêmes des tours. Les contrôles réels ultérieurs
+et les limites de publication sont consignés dans le bilan P0 ci-dessus.
+Ava et Léo restent indisponibles tant que leur contenu runtime n'est pas prêt.
+
+Plans : [cadre bénévole](docs/plan_onboarding_benevole.md),
+[GM dans l'application](docs/plan_game_master_reglages_app.md) et
+[mains libres](docs/plan_conversation_mains_libres.md).
+
+
 ### 2026-09-16 — Onboarding du bénévole : qui appelle, et pourquoi 🔷
+
+> État historique : les trois cartes décrites ci-dessous sont masquées dans
+> le parcours depuis le 12 octobre ; le bilan du cadre commun ci-dessus décrit
+> le comportement actuel.
 
 **Le problème.** Le parcours passait de l'introduction au choix du personnage
 sans expliquer qui le joueur incarnait. Le contact avec Max ou Emma apparaissait
