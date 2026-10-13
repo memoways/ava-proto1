@@ -1507,3 +1507,37 @@ s'il te plaît », attendre la réponse, couper le micro, indiquer le résultat.
 Transfert accepté réel toujours non attesté. Les17E2E antérieurs ne couvrent
 pas explicitement cette branche UI ; les tests unitaires de décision ne
 remplacent pas cette preuve. Publication frontend public non effectuée.
+
+### Contrôle inverse terminé, refus confirmé — 13 octobre 2026, 09:25 CEST
+
+Ulrich confirme une réponse complète d'Emma exprimant son refus de passer
+Max et proposant de recevoir un message à lui transmettre. Aucun dialogue
+privé recopié dans ce compte rendu. GM natif sessiona635b6ca,
+tour1 executed/actionnone, requesttargetmax/stanceobject, mentions-abortfalse.
+Aucun experience_event de transfert. Ava natif handoffCount0 ; UI toujours
+Emma EN LIGNE et bouton Activer le micro : micro fermé après le contrôle.
+Ce refus est cohérent avec la réponse, sans panne du transfert déduite.
+
+Snapshot Ava [2026-10-12T07:24:58.983Z,2026-10-13T07:24:58.983Z),
+page0/100,nextOffset100,cappedfalse,invalidRows0. SQL sur la même session
+et fenêtre confirme3V2 (started/finished/GM), tous présents dans la page,
+plus1legacy exclu. Une tentativea59895df-5254-4dbc-93c9-cebc92d70b91,
+completed/hands_free/origineapp_turn_decision. Sortie estimée4824ms,
+audio_end13680ms, generation3791ms, playback9984ms, couverture15/27partial,
+voice_end/first_tokennull, software_estimate. n1,p50=p95=4824ms descriptifs,
+aucun gain ni baseline finale publiée. Deepgram/nova-3/websocket,
+OpenAI/openai/gpt-5.6-luna/http_batch, Gradium/gradium-tts/websocket,
+overridetrue/fallbackfalse/retry0. RAG/LLM/GM spans observés tousok.
+PromptEmma2026-10-12T11:03:37.612668Z,
+config9217fd34-321a-45c7-8363-6a8cf0b0157c ; aucune règle changée.
+
+Limites de la gate : refus réels attestés dans les deux sens ; branche
+acceptée jamais exécutée en réel malgré les contrôles. Cinématique
+déclenchée et Passer attestés, lecture narrative jusqu'à la fin non attestée.
+Écart de rôle d'Emma constaté le12octobre encore inexpliqué. Frontend public
+non publié par cette reprise ; tests complets publiés et baseline finale
+en attente. Aucune nouvelle correction produit justifiée par le seul refus,
+aucune nouvelle demande vocale répétitive. La publication avec ces limites
+requiert un choix explicite d'Ulrich, compte tenu de sa condition initiale
+« Si compilation et parcours passent, publie » et de son choix précédent
+de poursuivre les parcours en preview. Lot2 non commencé.
