@@ -203,3 +203,13 @@ Firefox/WebKit), puis régression P1 supplémentaire réussie : panne après
 « Bonjour. », accord uniquement dans la suite non jouée, GM sur Bonjour et
 aucun bouton Appeler. Tests RLS existants + RPC passent (12), montrant refus
 anon, isolation propriétaire et curseur monotone. Qualité finale en cours.
+
+Deuxième revue : secours REST détaché après headers et échec de lecture classé
+comme annulation. Corrigés avec reader explicite, signal jusqu'à EOF,
+annulation sur deadline du corps et statuts conservés. Tests headers reçus /
+corps bloqué / abort, deadline et échec de lecture ajoutés et verts. Le proxy
+Gradium transmet aussi req.signal au fournisseur (token et REST). Deux fonctions
+Cloud à déployer : proxy-llm et proxy-tts-gradium. Les autres artefacts P0 restent
+inchangés. Qualité locale précédente : 46 régressions, 532 unitaires, 34
+intégrations, lint/typecheck/build verts ; les trois tests supplémentaires
+passent séparément, CI finale attendue sur le nouveau HEAD.

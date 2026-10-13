@@ -41,6 +41,10 @@ describe('P1 streamed voice delivery',()=>{
   a.start.reject(new Error('ws'));a.gen.reject(new Error('ws'));a.end.reject(new Error('ws'));await Promise.resolve();t.onEvent({type:'segment',text:'Bonjour.'});t.onEvent({type:'complete',response:'Bonjour.'});expect((await t.finish()).status).toBe('played');expect(fallback).toHaveBeenCalledTimes(1);
   const b=setup();b.session.hasAudibleOutput=true;const fallback2=vi.fn(),other=prepareStreamedVoiceTurn(ctx,{onReceipt:vi.fn(),fallback:fallback2,onPlaybackStart:vi.fn()});other.onEvent({type:'segment',text:'Bonjour.'});b.start.resolve();await Promise.resolve();b.end.reject(new Error('drop'));b.gen.reject(new Error('drop'));await Promise.resolve();expect((await other.finish()).status).toBe('failed');expect(fallback2).not.toHaveBeenCalled();
  });
+ it('preserves a failed REST playback as failure when nothing was cancelled',async()=>{
+  const a=setup(),onReceipt=vi.fn();const t=prepareStreamedVoiceTurn(ctx,{onReceipt,fallback:vi.fn(async()=>({...played,status:'failed' as const,error:new Error('playback')})),onPlaybackStart:vi.fn()});
+  a.start.reject(new Error('ws'));a.gen.reject(new Error('ws'));a.end.reject(new Error('ws'));await Promise.resolve();t.onEvent({type:'segment',text:'Bonjour.'});t.onEvent({type:'complete',response:'Bonjour.'});const result=await t.finish();expect(result.status).toBe('failed');expect(result.error?.message).toBe('playback');expect(onReceipt.mock.calls[0][0].status).toBe('failed');
+ });
  it('cancellation before sound rejects delivery and late promises do not reanimate output',async()=>{
   const {start,gen,end}=setup(),controller=new AbortController(),receipt=vi.fn(),play=vi.fn(),fallback=vi.fn();const t=prepareStreamedVoiceTurn({...ctx,signal:controller.signal},{onReceipt:receipt,fallback,onPlaybackStart:play});controller.abort('session-end');start.resolve();gen.resolve({firstByteMs:1,totalGenMs:2,bytes:1});end.resolve({playbackTotalMs:5});await expect(t.delivery).rejects.toThrow();await t.finish();expect(play).not.toHaveBeenCalled();expect(fallback).not.toHaveBeenCalled();expect(receipt).toHaveBeenCalledTimes(1);
  });

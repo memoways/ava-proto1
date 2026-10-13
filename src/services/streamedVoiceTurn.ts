@@ -153,7 +153,7 @@ export function prepareStreamedVoiceTurn(context: TTSGenerateContext & { charact
             r.scheduledSamples = r.playedSamples = r.sampleRate = null;
             finalize(r);
           }
-          return outputLifetime.signal.aborted || settled && finalReceipt?.status !== 'completed' ? cancelled() : result;
+          return outputLifetime.signal.aborted ? cancelled() : result;
           } catch (fallbackError) {
             if (!settled) finalize(receipt('failed'));
             return { ...cancelled(), status: outputLifetime.signal.aborted ? 'cancelled' : 'failed',

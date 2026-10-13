@@ -12,7 +12,7 @@ import { applyGradiumPerformance } from "@/services/tts/performanceIntent";
 import type { PerformanceIntent } from "@/services/tts/performanceIntent";
 import { debugLogger } from "@/services/debugLogger";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
-import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
+import { withTimeout } from "@/services/asyncUtils";
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { playAudioBlobRobust } from "@/services/audioPlayback";
 import { createGradiumStreamSession, createGradiumTurnSession, isStreamingSupported } from "@/services/tts/gradiumStreamPlayer";
@@ -80,25 +80,47 @@ async function generateGradiumSpeech(text: string, ctx: TTSGenerateContext | und
     const startTime = Date.now();
     const tRequest = performance.now();
     const debugId = debugLogger.logFetch("tts", `TTS-GR "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts-gradium`, body);
-    const timeout = createTimeoutSignal(12000, ctx?.signal);
-
-    const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-tts-gradium`, {
+    const controller = new AbortController();
+    const abort = () => controller.abort(ctx?.signal?.reason);
+    if (ctx?.signal?.aborted) abort();
+    else ctx?.signal?.addEventListener('abort', abort, { once: true });
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    const cancelReader = () => { void reader?.cancel(controller.signal.reason).catch(() => {}); };
+    controller.signal.addEventListener('abort', cancelReader, { once: true });
+    try {
+    const response = await withTimeout('tts_gradium_request', authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-tts-gradium`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: timeout.signal,
-    }).finally(timeout.cancel);
+      signal: controller.signal,
+    }), 12000, () => controller.abort(new Error('Gradium request deadline')));
     const tFirstByte = performance.now();
 
+    reader = response.body?.getReader();
+    if (!reader) throw new Error('Gradium audio body missing');
+    const readBlob = async () => {
+      const chunks: Uint8Array[] = [];
+      let bytes = 0;
+      while (true) {
+        if (controller.signal.aborted) throw new DOMException('Gradium body cancelled', 'AbortError');
+        const { done, value } = await reader!.read();
+        if (controller.signal.aborted) throw new DOMException('Gradium body cancelled', 'AbortError');
+        if (done) break;
+        bytes += value.length;
+        if (bytes > 32 * 1024 * 1024) throw new Error('Gradium audio body exceeds 32 MiB');
+        chunks.push(new Uint8Array(value));
+      }
+      return new Blob(chunks, { type: response.headers.get('Content-Type') || 'audio/wav' });
+    };
+    const blob = await withTimeout("tts_gradium_blob", readBlob(), 12000, () => controller.abort(new Error('Gradium body deadline')));
     if (!response.ok) {
-      const err = await response.text();
+      const err = await blob.text();
       debugLogger.logResponse(debugId, "tts", "TTS-GR", response.status, startTime, err);
       const error = new Error(`Gradium TTS error: ${response.status} - ${err}`);
       (error as Error & { statusCode?: number }).statusCode = response.status;
       throw error;
     }
 
-    const blob = await withTimeout("tts_gradium_blob", response.blob(), 12000);
     if (blob.size === 0) {
       // The proxy pipes the upstream body without buffering, so an empty
       // generation is only detectable here.
@@ -118,6 +140,12 @@ async function generateGradiumSpeech(text: string, ctx: TTSGenerateContext | und
         totalMs: Math.round(tEnd - tRequest),
       },
     };
+    } finally {
+      controller.abort();
+      ctx?.signal?.removeEventListener('abort', abort);
+      controller.signal.removeEventListener('abort', cancelReader);
+      void reader?.cancel().catch(() => {});
+    }
 }
 
 export const gradiumProvider: TTSProvider = {

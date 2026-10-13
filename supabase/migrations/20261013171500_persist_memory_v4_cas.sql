@@ -24,3 +24,4 @@ as $$
 $$;
 revoke all on function public.persist_conversation_memory_v4(uuid,jsonb,jsonb,integer,integer,jsonb) from public, anon;
 grant execute on function public.persist_conversation_memory_v4(uuid,jsonb,jsonb,integer,integer,jsonb) to authenticated;
+notify pgrst, 'reload schema';
