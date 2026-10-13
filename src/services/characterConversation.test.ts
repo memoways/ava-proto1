@@ -37,6 +37,11 @@ describe("character consent to a GM-authorized handoff", () => {
     ["Appelle-le pas.", "max", undefined, false],
     ["Non, je préfère que tu restes avec moi.", "max", "accept", false],
     ["Je préfère que tu restes avec moi.", "max", "accept", false],
+    ["Tu peux pas appeler Max.", "max", undefined, false],
+    ["Je peux pas te passer Max.", "max", "accept", false],
+    ["Je ne veux pas que tu appelles Max.", "max", "accept", false],
+    ["Je peux te dire que c'est inutile d'appeler Max.", "max", "accept", false],
+    ["Je te passe Max.", "max", "accept", true],
   ] as const)("requires transfer consent: %s", (reply, target, stance, expected) => {
     expect(hasCharacterHandoffConsent(reply, target, stance)).toBe(expected);
   });

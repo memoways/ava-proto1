@@ -63,6 +63,15 @@ DB → session → validation de reprise ; une offre approuvée de la bonne vers
 est conservée, une ancienne offre ou autre version est refusée. Trois E2E
 vérifient les contradictions GM accept + refus oral, sans bouton ni bascule.
 
+Revue complémentaire `499b187` : deux négations orales avec auxiliaire restaient
+non couvertes (« Tu peux pas appeler Max », « Je peux pas te passer Max »).
+Quatre régressions supplémentaires rouges avant correction, puis vertes.
+Le consentement n'est plus déduit d'un vaste fragment de texte : phrases
+explicites de transfert, ou oui court à une demande directement classifiée
+et recommandée par le GM. Les négations avec/sans auxiliaire restent veto.
+Les faits négatifs sans lien avec le transfert ne bloquent pas une proposition
+claire. Aucun prompt ni configuration narrative changé.
+
 Les sections suivantes sont l'historique de l'interprétation initiale,
 supplantée par cette clarification ; elles ne définissent plus la règle produit.
 

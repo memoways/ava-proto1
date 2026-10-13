@@ -148,15 +148,17 @@ export function hasCharacterHandoffConsent(
 ): boolean {
   if (gmStance === "object" || gmStance === "defer") return false;
   const text = normalizeSwitchText(characterReply);
-  const negativeTransfer = /\b(?:ne|n['’])\s*(?:(?:vais|peux|veux|voudrais|compte|souhaite)\s+)?(?:pas|jamais)\s+(?:(?:te|le|la|lui|vous|me)\s+){0,3}(?:pass\w*|appel\w*|mett\w*|contact\w*|parl\w*)/i.test(text)
+  const negativeTransfer = /\b(?:(?:ne|n['’])\s*)?(?:(?:vais|peux|veux|voudrais|compte|souhaite)\s+)?(?:pas|jamais|plus)\s+(?:(?:te|le|la|lui|vous|me)\s+){0,3}(?:pass\w*|appel\w*|mett\w*|contact\w*|parl\w*)/i.test(text)
     || /\bne\s+(?:(?:te|le|la|lui|vous|me)\s+){0,3}(?:pass\w*|appel\w*|mett\w*|contact\w*|parl\w*)\s+(?:pas|jamais)/i.test(text)
     || /\b(?:pass\w*|appel\w*)(?:[- ](?:le|la|moi|nous))?\s+(?:pas|jamais|plus)\b/i.test(text)
     || /(?:^non\b|\bmais non\b|pas maintenant|pas question|pas le bon moment|plus tard|rest(?:e|es|er|ez) avec moi|je refuse|peut[- ]etre|pas encore|on verra|pas sur(?:e)?\b|je hesite\b|je (?:ne )?sais pas(?: trop)?(?:[,.!?]|$| si\b))/i.test(text);
   if (negativeTransfer) return false;
-  // The executed GM classifies a direct player request with its full context.
-  if (gmStance === "accept") return true;
+  // A short yes can confirm the direct request classified by the GM. Longer
+  // replies still need an explicit transfer agreement, not a broad text span.
+  if (gmStance === "accept" && /^(?:oui|d['’]accord|d accord|ok(?:ay)?|bien sur)[ .!]*$/i.test(text.trim())) return true;
   return /(?:je te (?:la|le) passe\b|je t['’]y passe\b|je t y passe\b|appelle[- ](?:la|le)\b)/i.test(text)
-    || new RegExp(`(?:tu peux|je (?:vais|peux|veux bien)).{0,35}(?:parler|appeler|passer|joindre|contacter).{0,20}\\b${target}\\b`, "i").test(text);
+    || new RegExp(`\\b(?:tu peux|on (?:peut|va)|je (?:vais|peux|veux bien))\\s+(?:(?:bien sur|bien|donc|maintenant|directement|simplement|aller|aussi|te|vous)\\s+){0,4}(?:parler|appeler|passer|joindre|contacter)\\s+(?:(?:a|avec|le|la)\\s+){0,2}${target}\\b`, "i").test(text)
+    || new RegExp(`\\bje (?:te|vous) passe ${target}\\b`, "i").test(text);
 }
 
 export function parseHandoffOffer(raw: unknown, fallbackTarget: RuntimeCharacter = "emma"): CharacterHandoffOffer | null {
