@@ -1241,3 +1241,41 @@ successifs (écoute, relation avec Emma, confiance/famille, demande de
 transfert), attendre chaque réponse et toute vidéo, couper le micro à
 la fin puis signaler vidéo/Emma éventuelle. Vérification en attente :
 ne pas présenter les phrases proposées comme des échanges exécutés.
+
+### Cinématique déclenchée et transfert différé — 13 octobre 2026, 07:50 CEST
+
+Ulrich confirme parcours terminé : vidéo apparue avant sa demande de
+parler à Emma, aucune proposition Emma. Projection Lovable Cloud native
+confirme GMtour6 executed/actioncinematic, vidéo
+6b1d99e8-c024-4050-88b5-f94da1dd027e (mauvaise conscience),
+cinematic_played05:48:46.430868UTC puis cinematic_skipped05:48:54.494186UTC.
+Déclenchement et sortie du lecteur attestés ; lecture complète non attestée.
+Clarification humaine demandée : clic Passer ou fermeture seule. Le code
+distingue onComplete(false) et onSkip(true) ; aucune correction déduite
+sans confirmation de la manipulation réellement faite.
+
+GMtour8 executed/actionnone, player_switch_request targetemma/stancedefer.
+Session active_charactermax, handoff_count0, pending_handoff absent.
+Absence de proposition cohérente avec la décision différée, aucune branche
+acceptée ni transfert exécuté revendiqués. GMtours1/3/5/7 failed avec
+indicateur notes-mentions-aborttrue (sans lire/exposer les notes privées).
+Tours2/4/6/8 executed ;8 observations GM au total.
+
+Ava snapshot [2026-10-12T05:50:50.236Z,2026-10-13T05:50:50.236Z),
+page0/100,nextOffset100,cappedfalse,invalid0. Le catalogue MCP n'expose pas
+from/to/offset : ne pas inventer ces arguments ni affirmer une pagination
+complète globale. Vérification native SQL avec les mêmes bornes et la
+session exacte :28 lignes, dont24V2 (8started/8finished/8GM),8attempt_id ;
+4legacyvoice_turn_completed distincts exclus. Les24V2 de cette session
+sont donc tous présents dans la page observée, sans extrapoler au reste.
+
+Tentatives1/3/5/7 interrupted,2/4/6/8 completed, modehands_free.
+Sorties estimées des completed triées4267/4521/5031/5304ms,
+n4,p50=4776,p95=5263ms (interpolation linéaire), origineapp_turn_decision,
+software_estimate. Couverture13/27 pour completed, voice_end/first_tokennull.
+Fournisseurs Deepgram/nova-3, OpenAI/openai/gpt-5.6-luna batch,
+Gradium/gradium-tts websocket/overridetrue/fallbackfalse/retry0.
+Spans RAG/LLM observés tousok. Cohorte descriptive distincte du PTT,
+aucun gain ni baseline publiée revendiqués. Micro fermé demandé à l'humain ;
+contrôle UI agent interrompu par changement de fenêtre Brave, aucune
+fermeture par clic agent affirmée.
