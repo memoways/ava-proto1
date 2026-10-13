@@ -73,6 +73,26 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-10-13 — Retrouver la déviation d'Emma avant de conclure la recette P0
+
+La session du 12 octobre contient bien l'écart signalé : après des fragments
+techniques captés au micro, Emma donne des conseils informatiques. Le GM
+demande un retour au récit au tour 11, puis encourage l'aide technique au
+tour 12. La fiche et sa version sont celles d'Emma ; le cadre éditorial est
+désactivé. Le constructeur commun reste identique pour les deux agents,
+avec 26 tests ciblés verts. L'absence de prompt assemblé conservé pour cette
+session empêche de conclure sur une troncature ou une régression P0.
+Aucune correction spéculative n'est livrée.
+
+Un nouvel appel publié est préparé dans Brave, Sandbox Ulrich, depuis
+Tester moi-même. Le geste vocal humain reste nécessaire pour poursuivre
+le protocole court : accord GM et personnage, puis transfert par bouton ;
+cinématique finissant naturellement, retour au personnage et à l'écoute.
+Au relevé de préparation, aucun tour vocal exécuté : ces scénarios restent
+ouverts. Le dernier code publié reste `f251eb3`, sans republication.
+Le passage à P1 attend les résultats ou une décision explicite sur les limites.
+[Protocole et diagnostic](docs/plan_lot_1_observabilite_latence.md).
+
 ### 2026-10-13 — Passer à un autre personnage devient un choix narratif
 
 **Le besoin clarifié.** Après les essais vocaux, Ulrich demandait un bouton

@@ -121,6 +121,15 @@ Le tableau de suivi doit présenter chaque gain réellement mesuré, intervalle 
 
 ## 6. Livraison par lots séparés — décision du 12 octobre 2026
 
+Complément de recette engagé le 13 octobre : appel humain préparé sur le
+site publié dans Sandbox Ulrich ; transfert accepté et fin naturelle de
+cinématique restent en attente. Écart Emma retrouvé dans l'historique du
+12 octobre : aide technique hors récit, GM d'abord correctif puis permissif ;
+aucun défaut de code démontré ni prompt historique complet disponible.
+26 tests ciblés du cadre et de l'orchestrateur verts. [Bilan de reprise P0](plan_lot_1_observabilite_latence.md).
+**Passage P1 non décidé**, aucun développement P1/P2/P3 engagé ; décision
+après recette humaine ou acceptation explicite des limites par Ulrich.
+
 | Lot | Périmètre du plan | État |
 | --- | --- | --- |
 | 1 | P0 : mesures fiables, attribution, MCP, dépendances et baseline | [Publié avec baseline et limites](plan_lot_1_observabilite_latence.md) ; recette restante proposée avant P1 : transfert GM accepté, fin de cinématique, diagnostic du rôle Emma |

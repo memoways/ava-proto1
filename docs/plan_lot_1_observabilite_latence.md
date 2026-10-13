@@ -1676,6 +1676,114 @@ décisions narratives ni redemander les refus déjà confirmés. Les limites de
 versions Edge et de compte non-admin réel restent documentées ; ne pas les
 déclarer résolues par cette recette. Le prompt réutilisable suit.
 
+#### Recette restante engagée — 13 octobre 2026
+
+Base locale propre `main` / `ed70b67`, dernier code publié `f251eb3` (#32).
+Cibles vérifiées par les outils natifs Lovable : compte ulrichmemoways,
+workspace Memoways `5glbtPltldwz9tgNwIi4`, projet
+`1265958d-b74e-40f2-917d-182fe05163fc`, ready / agent terminé / HEAD `ed70b67`.
+Cloud activé ; `supabase/config.toml` lu par le connecteur confirme
+`iralfqlslqndgvexixis`. Aucun build ou déploiement demandé.
+
+Protocole humain court, exclusivement dans Brave depuis l'admin publié,
+Sandbox Ulrich → Tester moi-même :
+
+1. Nouvel appel Emma, quelques échanges de soutien naturels, une réponse
+   complète par tour, puis une seule demande de parler à Max. Ne pas insister
+   après un refus. Lire la décision GM exécutée et ses gardes ; vérifier
+   l'accord explicite d'Emma. Si l'offre apparaît, l'agent clique Appeler puis
+   contrôle sonneries, cible, ID de session et timer avant/après. Si l'accord
+   et l'approbation sont réunis sans bouton, diagnostiquer ce défaut précis.
+   Sinon conserver « transfert accepté non observé ».
+2. Aborder un sujet narratif associé à une cinématique existante ; laisser
+   le déclenchement normal se produire puis la lecture finir sans Passer.
+   Contrôler retour au personnage, contexte post-vidéo et reprise de l'écoute.
+3. Comparer la trace historique Emma, version du cadre, fiche, assemblage du
+   prompt, historique et GM ; séparer faits, hypothèses et non-reproduction.
+   Corriger uniquement un défaut de code démontré, avec reproduction, plan,
+   branche codex/, PR, revues et CI finale puis livraison Lovable complète.
+
+Aucun changement de prompt, seuil, fournisseur, voix, flag, deadline,
+migration ou stratégie mains libres ; aucune voix synthétique injectée.
+Shields conservés. Les nouvelles sessions restent hors baseline P0.
+Décision de passage P1 à préparer après les résultats ; P1/P2/P3 non commencés.
+
+#### Diagnostic historique Emma et état de reprise — 13 octobre 2026
+
+Lecture bornée par le connecteur Lovable Cloud de la session sandbox-ulrich
+`61f87a2f-4858-4ef5-896b-0a4de166a8b7` du 12 octobre, film `vu`.
+L'écart est retrouvé dans les réponses des tours GM 11/12, vers
+`20:06:35Z` et `20:07:14Z` : Emma donne des indications de configuration
+informatique puis propose de poursuivre cette aide. Le journal montre
+auparavant plusieurs fragments utilisateur sur un problème technique.
+Aucun dialogue complet, donnée d'authentification ou note privée recopiés ici.
+
+Comparaison des cinq sources :
+
+- Cadre : orchestration v6 `9217fd34-321a-45c7-8363-6a8cf0b0157c`,
+  `frame.enabled=false`. Le code fournit alors uniquement le choix factuel
+  du film aux deux agents, par `experienceFrame.ts`. Le texte éditorial
+  désactivé ne peut être traité comme une consigne active du tour.
+- Fiche : Emma Munz, ID `4397272f-3c4e-4d9b-9bff-4f7320ff8d89`,
+  source Notion `3f762322-e595-81f9-880f-e309adec7075`, version
+  `2026-10-12T11:03:37.612668+00:00`, identique à la version de session.
+  Aucun override sandbox de fiche trouvé : héritage prod prévu par
+  `characterPromptService.ts`. Identité de sociologue et cadre d'appel de
+  soutien présents ; aucune attribution de rôle informatique dans la fiche lue.
+- Prompt : assemblage du cadre commun unique confirmé dans
+  `prd4Orchestrator.ts`, injection aux deux agents ; fiche et guidance GM
+  passent par les sections de `maxAgent.ts`. **Aucune trace dans
+  `conversation_turn_traces` pour cette session** : prompt exact envoyé,
+  variante et troncatures historiques non attestés. Le code actuel seul
+  ne prouve pas les octets effectivement envoyés ce soir-là.
+- Historique : les demandes techniques précèdent la réponse hors récit.
+  C'est le déclencheur observé ; l'intention des paroles captées et leur
+  provenance hors de l'application ne sont pas établies.
+- GM : tour 10 failed ; tour 11 executed, confusion true / qualité low,
+  guidance de retour au sujet de l'appel ; tour 12 executed, confusion false /
+  qualité high, guidance poursuivant l'aide technique. Le contexte GM publié
+  exige pourtant une scène diégétique, sans méta technique.
+
+**Prouvé** : déviation historique du personnage, reconnaissance puis
+renforcement contradictoire par le GM. **Hypothèses non établies** : poids de
+l'historique hors récit, respect insuffisant du contrat par les modèles,
+omission/troncature de sections. **Non-reproduction** : aucun nouveau tour
+technique envoyé et aucun replay LLM réalisé ; aucune affirmation de résolution.
+Défaut déterministe du routage, du constructeur commun ou de la sélection
+d'Emma non démontré. Aucun correctif de code ou de prompt dans cette reprise.
+
+Vérification locale : `npx vitest run src/services/experienceFrame.test.ts
+src/services/prd4Orchestrator.test.ts` : **26/26 verts**. Les deux tests
+film vu/non vu vérifient l'égalité du cadre envoyé au personnage et au GM.
+Ils ne reproduisent pas la déviation générative observée le 12 octobre.
+Pas de nouvelle CI complète ni de build Lovable revendiqués.
+
+Recette publiée préparée depuis admin authentifié → Tester moi-même,
+Brave onglet `1830099190`,
+`https://proto1.parle-a-ava.com/?env=sandbox-ulrich`,
+bundle DOM `index-B6k7eAnd.js`. Introduction passée (distincte de la
+cinématique narrative à tester), parcours de recette `pas_vu`, choix initial
+Emma puis EN LIGNE et zéro bouton de transfert. Session
+`3e5bb2d0-ded4-4ba7-aa12-05d343ad2040`, début
+`2026-10-13T14:18:24.969011Z`. Au relevé avant le geste humain : compteur0,
+aucun tour enregistré, aucun GM ; micro fermé dans l'UI.
+
+Action humaine suivante : activer le micro et un premier échange bref de
+soutien, puis confirmer la fin de réponse. Une seule action a été demandée ;
+les étapes suivantes attendent cette confirmation. L'onglet reste préparé.
+Si le timer expire avant la reprise, préparer un nouvel appel depuis l'admin
+sans assimiler cette expiration à un scénario vocal exécuté.
+
+Verdict provisoire : **transfert accepté non observé**, fin naturelle de
+cinématique non exécutée dans cette reprise ; diagnostic historique retrouvé,
+cause technique non établie. Passage P1 non décidé : attendre les deux recettes
+humaines et leur bilan, ou une décision explicite d'Ulrich sur les limites.
+GitHub `origin/main` vérifié par fetch sur `ed70b67` avant les mises à jour
+documentaires ; identité existante validée sans reconnexion après exécution
+dans le contexte système autorisé. Preview Lovable HEAD `ed70b67` ready ;
+aucun contrôle vocal preview rejoué. Dernier code publié `f251eb3` inchangé,
+pas de nouvelle publication, migration ou mutation des réglages Cloud.
+
 #### Prompt prêt à reprendre
 
 Reprends uniquement le complément de recette du lot 1/P0 d’Ava Proto 1, avant le lot 2/P1. Ne commence pas le streaming ni l’interruption acoustique dans cette reprise.

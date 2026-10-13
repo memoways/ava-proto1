@@ -6,6 +6,21 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Publié via Lovable] — 2026-10-13
 
+### Complément de recette P0 — préparation et diagnostic, sans nouvelle publication
+
+- Recette humaine courte sauvegardée, nouvel appel Emma préparé dans Brave
+  via l'admin publié → Tester moi-même / Sandbox Ulrich. Aucun tour vocal
+  exécuté au relevé initial ; transfert accepté et fin naturelle de cinématique
+  restent à observer avec Ulrich.
+- Écart Emma du 12 octobre retrouvé : réponse technique hors récit après
+  des fragments utilisateur techniques ; GM demandant d'abord le retour au
+  récit puis encourageant cette aide. Fiche/version Emma confirmées, cadre
+  éditorial désactivé, aucun prompt complet conservé pour la session.
+  Cause de code non prouvée, aucune correction de prompt ou de réglage.
+- 26 tests ciblés du cadre commun et de l'orchestrateur passent. Dernier
+  code publié `f251eb3` inchangé ; P1 non commencé et passage non décidé.
+  [Protocole et preuves](docs/plan_lot_1_observabilite_latence.md).
+
 Cette section donne l'état livré après les derniers contrôles. Les entrées
 plus anciennes conservent leur état au moment de leur rédaction.
 

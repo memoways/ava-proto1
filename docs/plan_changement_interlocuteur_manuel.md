@@ -81,6 +81,18 @@ d'attente ; CI complète réussie sur le dernier HEAD selon le bilan ci-dessous.
 
 ## Livraison corrective — 13 octobre 2026
 
+### Complément de recette en attente du geste humain — 13 octobre 2026
+
+Nouvel appel publié préparé via l'admin → Tester moi-même dans Brave,
+sandbox-ulrich, Emma, film pas_vu, bundle `index-B6k7eAnd.js`, session
+`3e5bb2d0-ded4-4ba7-aa12-05d343ad2040`. Choix initial disponible puis
+aucun bouton pendant l'appel ; micro fermé, aucun tour au relevé initial.
+Protocole court sauvegardé dans le [plan P0](plan_lot_1_observabilite_latence.md) :
+échanges de soutien, une seule demande après le minimum narratif, lecture du
+GM et de l'accord explicite, puis clic par l'agent si l'offre est autorisée.
+Refus sans répétition ; pas de permission déduite d'une demande seule.
+Transfert accepté non observé à ce stade, aucune correction ni republication.
+
 [PR #32](https://github.com/memoways/ava-proto1/pull/32) fusionnée sur main
 à `2026-10-13T10:37:58Z`, commit `f251eb38a2094977f3ed5adbdfb8a2008f584ab2`.
 [CI finale 38383503886](https://github.com/memoways/ava-proto1/actions/runs/38383503886)
