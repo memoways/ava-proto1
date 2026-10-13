@@ -1,4 +1,4 @@
-# Appel manuel de l'autre personnage
+# Appels proposés par le Game Master
 
 ## Clarification prioritaire d'Ulrich — 13 octobre 2026
 
@@ -32,7 +32,7 @@ reste compatible avec les compteurs historiques et les règles du GM. Aucun
 secret/flag/provider/algorithme hands-free modifié. Confiance95% : source du
 bouton permanent et contournement vocal identifiés ; offre GM/validation et
 écran sonnerie réutilisables, tests existants. Référence React officielle :
-https://react.dev/learn/conditional-rendering. Livraison corrective à suivre.
+https://react.dev/learn/conditional-rendering. Livraison corrective attestée ci-dessous.
 
 Correctif local : bouton libre et transfert vocal automatique retirés.
 La classification GM d'un accord ne suffit pas sans recommandation handoff ;
@@ -43,7 +43,7 @@ les recommandations anciennes non approuvées ne rouvrent pas un bouton à la
 reprise. Sonneries et événements d'appel réutilisés, source gm, clés distinctes.
 Un refus de PATCH conserve le personnage, compteur et offre pour réessayer.
 
-Deux tests composants reproduisent rouge le bouton permanent avant correction,
+Vérification initiale locale : deux tests composants reproduisent rouge le bouton permanent avant correction,
 puis verts. Qualité locale : 44 régressions, 482 unitaires, 30 intégrations,
 lint sans erreur (un avertissement préexistant), typecheck et build réussis.
 11 E2E Chromium simulés réussis : deux sens, aucune bascule automatique,
@@ -51,8 +51,8 @@ GM refuse/hésite/retarde/échoue, accord classifié sans recommandation, seuil
 narratif, recommandation suivie de refus/accord et choix Rester, PATCH refusé
 puis repris. Les six anciens E2E d'appel libre n'expriment plus le contrat ;
 remplacés par ces parcours GM. Protections STT et tests de remplacement de
-capture lors du recommencement/flush mains libres conservés. Revues et CI
-sur la révision finale, puis preview/publication, restent à effectuer.
+capture lors du recommencement/flush mains libres conservés. Ces résultats intermédiaires sont complétés par les revues, la CI finale et
+la livraison décrites ci-dessous.
 
 Revues de `e049646` : refus oraux sans « ne » et demandes de rester pouvaient
 contredire un GM classant accept ; l'approbation GM était aussi perdue par le
@@ -77,7 +77,70 @@ lecture immédiate du journal asynchrone « seuil narratif » échoue : la trace
 réseau du retry contient bien handoff_blocked/handoff_before_minimum_turn et
 l'interface sans bouton. Le test attend maintenant cet événement avec poll,
 comme le test de refus joueur. Aucun changement produit pour cette correction
-d'attente ; CI complète à relancer sur ce dernier HEAD.
+d'attente ; CI complète réussie sur le dernier HEAD selon le bilan ci-dessous.
+
+## Livraison corrective — 13 octobre 2026
+
+[PR #32](https://github.com/memoways/ava-proto1/pull/32) fusionnée sur main
+à `2026-10-13T10:37:58Z`, commit `f251eb38a2094977f3ed5adbdfb8a2008f584ab2`.
+[CI finale 38383503886](https://github.com/memoways/ava-proto1/actions/runs/38383503886)
+réussie sur `82c14d722128e8656a095782d08c23c3d099cb9c` : 44 régressions,
+494 unitaires, 30 intégrations PGlite, 33/33 E2E, lint sans erreur (un
+avertissement préexistant), typecheck et build. Deux revues indépendantes
+Standards/Spec sans constat restant sur `7a4d4b4` ; revue incrémentale du
+seul changement de test `82c14d7` également sans constat. Aucun code produit
+modifié entre ces deux révisions.
+[CI post-fusion 38384697497](https://github.com/memoways/ava-proto1/actions/runs/38384697497)
+également réussie sur `f251eb3`.
+
+Lovable natif vérifie la cible : projet `1265958d-b74e-40f2-917d-182fe05163fc`,
+workspace Memoways `5glbtPltldwz9tgNwIi4`, Cloud Supabase activé
+`iralfqlslqndgvexixis`. Le HEAD Lovable correspond à `f251eb3`, agent terminé,
+projet ready. Preview servie avec `index-sUKr0zuI.js` après synchronisation.
+Contrôles réels dans Brave, sandbox-ulrich : choix initial disponible, écran
+d’appel et salut de Max/Emma, puis zéro bouton Appeler dans la conversation.
+Micro jamais activé, aucune parole simulée injectée dans l'application.
+
+Sessions preview :
+- Max `e53af115-4c62-489e-a5b5-676cb3ab93c8`, début `10:40:01.683425Z`,
+  fin par Terminer `10:40:22.750Z`.
+- Emma `c0629007-a593-4eae-b700-4b1329ebe476`, début `10:41:00.828191Z`,
+  fin par Terminer `10:41:25.490Z`.
+
+Publication par deploy_project Lovable natif, une seule demande, ID
+`189a34ed-4133-41c0-b72e-879e7ef80946`, réponse pending. Le connecteur
+n'expose pas le statut final du job ; la livraison est attestée par le frontend
+nouvellement servi et les contrôles fonctionnels sur le domaine canonique.
+Nouvel onglet ouvert via Tester moi-même dans l'admin publié, Sandbox Ulrich,
+URL https://proto1.parle-a-ava.com/?env=sandbox-ulrich,
+frontend DOM `index-B6k7eAnd.js` (ancien publié `index-D3Q4mR9A.js`).
+
+Sessions publiées :
+- Max `3c01f001-bc8f-48ab-b8bd-70973f47ab75`, début `10:42:46.808123Z`,
+  fin par Terminer `10:43:26.093Z`.
+- Emma `006194b2-46f2-49a6-9bb8-3bdc74069668`, début `10:44:10.695595Z`,
+  fin par Terminer `10:44:45.716Z`.
+
+Les deux personnages sont en ligne avec leur salut et zéro bouton de transfert
+par défaut en preview comme en publié. Lecture native des quatre sessions :
+active_character conforme, handoff_count0, pas_vu conservé, ended_at renseigné.
+Les contrôles sont clôturés ; l'onglet publié est laissé à l'accueil pour Ulrich.
+
+La branche positive GM + consentement + clic + sonneries, ainsi que les refus,
+retards, erreurs, seuils et reprises sont attestés par les E2E simulés. Un
+transfert réellement accepté pendant une conversation humaine n'a pas encore
+été observé ; les anciens appels libres ne constituent pas cette preuve.
+Les limites P0 déjà documentées restent valables. Aucun prompt, seuil narratif,
+réglage, fournisseur, secret, Edge Function ou migration changé pour ce correctif.
+
+Pour tester : ouvrir l'admin publié, garder Sandbox Ulrich, cliquer Tester
+moi-même et commencer un nouvel appel. Le choix initial est libre ; pendant
+l'appel, une demande seule n'affiche pas le bouton. Le GM doit recommander un
+transfert valide et le personnage donner un accord explicite ; le joueur peut
+ensuite Appeler ou Rester. Il n'y a aucun transfert vocal automatique.
+Aucun prompt supplémentaire ni nouvelle migration à lancer dans Lovable ;
+la synchronisation, les contrôles preview et la publication ont été effectués.
+Recharger les anciens onglets de test avant de comparer les versions.
 
 Les sections suivantes sont l'historique de l'interprétation initiale,
 supplantée par cette clarification ; elles ne définissent plus la règle produit.
