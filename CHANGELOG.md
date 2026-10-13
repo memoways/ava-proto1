@@ -152,8 +152,10 @@ plus anciennes conservent leur état au moment de leur rédaction.
   contrôle Deno P1 Lovable verts. Recette réelle : première réponse Max naturelle
   et reçus conservés, tour suivant échoué `LLM response incomplete` ; publication
   bloquée et canary remise à false. Correctif de traces SSE terminales et des
-  statuts de coût testé (541 unitaires), en cours de livraison ; cause upstream
-  non encore établie, aucune hausse de budget ni changement de modèle.
+  statuts de coût livré par #35 (`0eff02e`), revues et CI avant/après fusion
+  vertes, 46/541/34 et 36 E2E sans retry, types/build Lovable verts. Nouvel essai
+  canary Max préparé dans Brave ; cause upstream non encore établie,
+  aucune hausse de budget ni changement de modèle.
   [Plan P1](docs/plan_lot_2_memoire_streaming_coherent.md).
 
 Les mentions de non-publication et les listes de recette des entrées du

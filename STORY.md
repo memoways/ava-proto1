@@ -91,6 +91,10 @@ les deux proxies P1. La recette humaine confirme une réponse Max naturelle,
 puis échoue sur une génération incomplète. Le reçu partiel est conservé ;
 la publication attend le diagnostic et une nouvelle preuve réelle. La canary
 est remise au batch pour les nouvelles sessions, sans changer le budget ni la voix.
+Une trace plus précise est livrée par #35 (`0eff02e`), revue et CI vertes,
+pour garder la raison terminale, l'identifiant et les tokens même en échec.
+Un nouvel appel canary est préparé pour recueillir cette preuve réelle ;
+ce correctif ne suffit pas à considérer l'échec upstream résolu.
 [Plan et preuves P1](docs/plan_lot_2_memoire_streaming_coherent.md).
 
 

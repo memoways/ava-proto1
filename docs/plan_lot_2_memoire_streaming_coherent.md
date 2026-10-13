@@ -1,6 +1,6 @@
 # Reprise — lot 2 / P1 : mémoire de livraison et streaming cohérent
 
-Date : 13 octobre 2026. Statut : **P1 fusionné sur main (#33 et #34), migration
+Date : 13 octobre 2026. Statut : **P1 fusionné sur main (#33, #34 et #35), migration
 et fonctions Lovable Cloud livrées ; preview technique vérifiée, recette humaine et
 publication frontend encore à effectuer**. Base d'exécution : main `0a60a64`.
 Dernier frontend publié : `f251eb3` / PR #32. Le commit de ce document ou un
@@ -335,3 +335,30 @@ lint/typecheck/build. Deux revues indépendantes sur diff depuis aa28d01 sans
 blocage ; 20 tests Spec et 13 tests Standards exécutés. CI et livraison du
 sous-lot encore à réaliser ; cause de l'échec réel toujours non prouvée.
 Clôture session confirmée dans Cloud à 19:52:07 UTC, handoff_count0.
+
+PR #35 HEAD revu `e8e0e3e46bec8ad5641888da45652d43fa30fa8f`, CI
+`38458982538` verte : 46/541/34 et 36 E2E sans retry. Squash
+`0eff02ed2fb8566226a5820c0add7a358069aae4`, main synchronisé. Lovable message
+`umsg_01m4vdyygve339cv8yenrby4v9` confirme HEAD et tsgo/npm typecheck/bun build
+exit0. Build `index-DxsqQlJa.js`, SHA256
+`6a2b42f8c0adb6a0c6a8c08594a255a5d2d0788e2673a7971b1127e3a74cd49a`.
+GET preview sans session Lovable renvoie401 : pas d'attestation de bundle
+servi depuis ce connecteur. Brave authentifié charge après refresh un nouveau
+module `index-BbRLJPl1.js` (ancien `index-ramW_xNi.js`) ; cette observation ne
+prouve pas l'égalité du bundle public avec le build local.
+
+Brave reconnecté : ancien onglet non attachable, nouvel admin `1830099317`
+contrôlable dans le même profil Brave, Ulrich/sandbox confirmés. Canary réactivée
+uniquement sandbox pour un nouvel appel de diagnostic ; prochaine demande
+humaine reprend le déclencheur sans modifier budget ni prompt. Production batch,
+publication toujours bloquée, cause upstream encore à confirmer.
+
+CI post-squash #35 `38460110034` verte sur `0eff02e`. Nouvel appel ouvert via
+admin → Tester moi-même dans Brave, onglet `1830099320`, session
+`3eb4f401-c9d1-4ff6-bab5-1dc8868236b4`, 20:11:21 UTC : Max, film vu, V4,
+incremental=true confirmés. Micro ouvert. Demande humaine en attente :
+« Raconte-moi comment s'est passée cette journée », sans interruption, pour
+relever raison terminale et génération exacte si le problème se reproduit.
+Aucune parole injectée ni nouvelle cause inférée en l'absence de ce résultat.
+Frontend publié reste `f251eb3`. La recette P1, la résolution éventuelle de
+l'échec et la publication/vérification publiée restent à accomplir.
