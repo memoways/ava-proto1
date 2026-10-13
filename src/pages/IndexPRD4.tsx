@@ -809,7 +809,7 @@ const IndexPRD4 = () => {
     startingCharacterRef.current = session.active_character;
     setSelectedCharacter(session.active_character);
     setCurrentHandoffOffer(parseGmApprovedHandoffOffer(session.pending_handoff,
-      session.active_character === "emma" ? "max" : "emma", latestGm?.orchestration_version_id));
+      session.active_character === "emma" ? "max" : "emma", session.orchestration_version_id));
     pendingGmGuidanceRef.current = latestGm?.next_turn_guidance?.trim() || null;
     pendingEmotionalStateRef.current = null;
     gmTopicsCoveredRef.current = latestGm?.topics_covered ?? [];

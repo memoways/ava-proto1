@@ -54,6 +54,15 @@ remplacés par ces parcours GM. Protections STT et tests de remplacement de
 capture lors du recommencement/flush mains libres conservés. Revues et CI
 sur la révision finale, puis preview/publication, restent à effectuer.
 
+Revues de `e049646` : refus oraux sans « ne » et demandes de rester pouvaient
+contredire un GM classant accept ; l'approbation GM était aussi perdue par le
+premier parse de session avant la reprise. Cinq tests reproduisent rouge ces
+cas, puis verts après veto des refus explicites et conservation du stamp
+sanitisé. Deux tests supplémentaires traversent la vraie fonction de chargement
+DB → session → validation de reprise ; une offre approuvée de la bonne version
+est conservée, une ancienne offre ou autre version est refusée. Trois E2E
+vérifient les contradictions GM accept + refus oral, sans bouton ni bascule.
+
 Les sections suivantes sont l'historique de l'interprétation initiale,
 supplantée par cette clarification ; elles ne définissent plus la règle produit.
 

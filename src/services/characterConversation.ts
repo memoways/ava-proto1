@@ -150,7 +150,8 @@ export function hasCharacterHandoffConsent(
   const text = normalizeSwitchText(characterReply);
   const negativeTransfer = /\b(?:ne|n['’])\s*(?:(?:vais|peux|veux|voudrais|compte|souhaite)\s+)?(?:pas|jamais)\s+(?:(?:te|le|la|lui|vous|me)\s+){0,3}(?:pass\w*|appel\w*|mett\w*|contact\w*|parl\w*)/i.test(text)
     || /\bne\s+(?:(?:te|le|la|lui|vous|me)\s+){0,3}(?:pass\w*|appel\w*|mett\w*|contact\w*|parl\w*)\s+(?:pas|jamais)/i.test(text)
-    || /(?:pas maintenant|pas question|plus tard|reste avec moi|je refuse|peut[- ]etre|pas encore|on verra)/i.test(text);
+    || /\b(?:pass\w*|appel\w*)(?:[- ](?:le|la|moi|nous))?\s+(?:pas|jamais|plus)\b/i.test(text)
+    || /(?:^non\b|\bmais non\b|pas maintenant|pas question|pas le bon moment|plus tard|rest(?:e|es|er|ez) avec moi|je refuse|peut[- ]etre|pas encore|on verra|pas sur(?:e)?\b|je hesite\b|je (?:ne )?sais pas(?: trop)?(?:[,.!?]|$| si\b))/i.test(text);
   if (negativeTransfer) return false;
   // The executed GM classifies a direct player request with its full context.
   if (gmStance === "accept") return true;
@@ -163,11 +164,18 @@ export function parseHandoffOffer(raw: unknown, fallbackTarget: RuntimeCharacter
   const value = raw as Record<string, unknown>;
   const reason = typeof value.reason === "string" ? value.reason.trim() : "";
   const proposalGuidance = typeof value.proposalGuidance === "string" ? value.proposalGuidance.trim() : "";
+  const approval = value.gmApproval && typeof value.gmApproval === "object"
+    ? value.gmApproval as Record<string, unknown> : null;
+  const gmApproval = approval && typeof approval.turnId === "string" && approval.turnId.trim()
+    && typeof approval.orchestrationVersionId === "string" && approval.orchestrationVersionId.trim()
+    && asRuntimeCharacter(value.targetCharacter)
+    ? { turnId: approval.turnId, orchestrationVersionId: approval.orchestrationVersionId } : null;
   if (!reason) return null;
   return {
     reason,
     proposalGuidance: proposalGuidance || `Propose de parler à ${characterDisplayName(fallbackTarget)}.`,
     targetCharacter: asRuntimeCharacter(value.targetCharacter) ?? fallbackTarget,
+    ...(gmApproval ? { gmApproval } : {}),
   };
 }
 
@@ -178,11 +186,7 @@ export function parseGmApprovedHandoffOffer(
   orchestrationVersionId: string | null | undefined,
 ): CharacterHandoffOffer | null {
   const offer = parseHandoffOffer(raw, fallbackTarget);
-  if (!offer || !raw || typeof raw !== "object") return null;
-  const approval = (raw as Record<string, unknown>).gmApproval;
-  if (!approval || typeof approval !== "object") return null;
-  const fields = approval as Record<string, unknown>;
-  if (typeof fields.turnId !== "string" || !fields.turnId.trim()
-    || !orchestrationVersionId || fields.orchestrationVersionId !== orchestrationVersionId) return null;
-  return { ...offer, gmApproval: { turnId: fields.turnId, orchestrationVersionId } };
+  if (!offer?.gmApproval || !orchestrationVersionId
+    || offer.gmApproval.orchestrationVersionId !== orchestrationVersionId) return null;
+  return offer;
 }

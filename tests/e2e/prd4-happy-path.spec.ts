@@ -645,6 +645,19 @@ test("appel GM : classifier un accord sans recommander le transfert ne suffit pa
   expect(fakes.getExperienceEvents().filter(e => e.event_type === "handoff_proposed")).toHaveLength(0);
 });
 
+for (const refusal of ["Je te le passe pas.", "Appelle-le pas.", "Non, je préfère que tu restes avec moi."]) {
+  test(`appel GM : un accord GM contradictoire ne gomme pas le refus « ${refusal} »`, async ({ page }) => {
+    const turns = [...HANDOFF_TURNS, "J'aimerais parler à Max, s'il te plaît."];
+    const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+      gmTarget: "max", gmStance: "accept", gmHandoffAt: 4, maxResponse: refusal });
+    await startCharacterConversation(page, "Emma");
+    for (const text of turns) { await sendHandoffTurn(page, text); await page.waitForLoadState("networkidle"); }
+    await expect(page.getByRole("button", { name: /^Appeler / })).toHaveCount(0);
+    await expect(page.getByRole("img", { name: "Portrait d’Emma" })).toBeVisible();
+    expect(fakes.getExperienceEvents().filter(e => e.event_type === "handoff_proposed")).toHaveLength(0);
+  });
+}
+
 test("appel GM : un accord recommandé avant le seuil narratif reste bloqué", async ({ page }) => {
   const text = "J'aimerais parler à Max, s'il te plaît.";
   const fakes = await installNetworkFakes(page, [text], { ttsSuccess: true, characterOpenings: true,
