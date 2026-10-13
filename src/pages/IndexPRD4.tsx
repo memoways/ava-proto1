@@ -257,10 +257,14 @@ const IndexPRD4 = () => {
   const handoffCountRef = useRef(0);
   const handoffRecommendationRef = useRef<CharacterHandoffOffer | null>(null);
   const pendingPlayerSwitchRef = useRef<RuntimeCharacter | null>(null);
-  const switchToCharacterRef = useRef<((target: RuntimeCharacter, source: "player" | "gm") => Promise<void>) | null>(null);
+  const switchToCharacterRef = useRef<((target: RuntimeCharacter, source: "player" | "gm" | "manual") => Promise<void>) | null>(null);
   const [handoffOffer, setHandoffOffer] = useState<CharacterHandoffOffer | null>(null);
   const [handoffCalling, setHandoffCalling] = useState(false);
   const [handoffCallingTarget, setHandoffCallingTarget] = useState<RuntimeCharacter>("emma");
+  const handoffCallingRef = useRef(false);
+  const manualCallingTargetRef = useRef<RuntimeCharacter | null>(null);
+  const manualCallIdRef = useRef<string | null>(null);
+  const [manualCallingTarget, setManualCallingTarget] = useState<RuntimeCharacter | null>(null);
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
   const [teaserPlayerReady, setTeaserPlayerReady] = useState(false);
@@ -337,18 +341,25 @@ const IndexPRD4 = () => {
 
   // ---- Helpers conversation -------------------------------------------------
   const cleanupAudio = useCallback(() => {
+    manualCallingTargetRef.current = null;
+    manualCallIdRef.current = null;
+    setManualCallingTarget(null);
+    handoffCallingRef.current = false;
+    setHandoffCalling(false);
     activeTurnSequenceRef.current += 1;
     activeTurnControllerRef.current?.abort("experience-cleanup");
     activeTurnControllerRef.current = null;
     activeOutputControllerRef.current?.abort("experience-cleanup");
     activeOutputControllerRef.current = null;
     pttFinalizingRef.current = false;
+    handsFreeFinalizingRef.current = false;
     if (handsFreeTimerRef.current) window.clearTimeout(handsFreeTimerRef.current);
     handsFreeTimerRef.current = null;
     handsFreeListeningRef.current = false;
     setHandsFreeListening(false);
-    try { sttRef.current?.stop(); } catch { /* ignore */ }
+    const stt = sttRef.current;
     sttRef.current = null;
+    try { stt?.stop(); } catch { /* ignore */ }
     try { responseOutputRef.current?.interrupt(); } catch { /* ignore */ }
     const output = responseOutputRef.current;
     responseOutputRef.current = null;
@@ -1609,15 +1620,20 @@ const IndexPRD4 = () => {
   // ---- PTT handlers : démarre/reprend STT, finalise au release -------------
   const teardownSTT = useCallback((preserveInputTelemetry = false) => {
     if (!preserveInputTelemetry) finishInputTelemetry("cancelled");
-    try { sttRef.current?.stop(); } catch { /* ignore */ }
+    pttFinalizingRef.current = false;
+    handsFreeFinalizingRef.current = false;
+    const stt = sttRef.current;
     sttRef.current = null;
+    try { stt?.stop(); } catch { /* ignore */ }
   }, [finishInputTelemetry]);
 
   const createSTT = useCallback(async (initialStream?: Promise<MediaStream>) => {
     teardownSTT(true);
+    const captureSequence = activeTurnSequenceRef.current;
     const captureTelemetry = inputTelemetryRef.current;
     const stt = await createConfiguredSTT(
       (text, isFinal) => {
+        if (sttRef.current !== stt || endedRef.current) return;
         if (handsFreeListeningRef.current) {
           handsFreeTranscriptRef.current?.(text, isFinal);
           return;
@@ -1659,14 +1675,34 @@ const IndexPRD4 = () => {
         },
         onServiceObserved: (service) => { if (sttRef.current === stt) inputTelemetryRef.current?.service(service); },
       },
-    );
-    await stt.start();
+    ).catch((error: unknown) => {
+      if (endedRef.current || activeTurnSequenceRef.current !== captureSequence) {
+        throw new DOMException("Voice capture replaced", "StaleCaptureError");
+      }
+      throw error;
+    });
+    const discardReplacedCapture = (): never => {
+      try { void Promise.resolve(stt.stop()).catch(() => {}); } catch { /* already closed */ }
+      throw new DOMException("Voice capture replaced", "StaleCaptureError");
+    };
+    if (endedRef.current || activeTurnSequenceRef.current !== captureSequence) {
+      discardReplacedCapture();
+    }
+    sttRef.current = stt;
+    try {
+      await stt.start();
+    } catch (error) {
+      if (sttRef.current !== stt || endedRef.current) discardReplacedCapture();
+      throw error;
+    }
+    if (sttRef.current !== stt || endedRef.current) {
+      discardReplacedCapture();
+    }
     recordPassiveVoiceNetworkObservation({
       sttConnected: true,
       lastSttConnectedAt: Date.now(),
     });
     stt.setManualMode(true); // toggle-to-talk: pas de silence auto-finalize
-    sttRef.current = stt;
     return stt;
   }, [endLatencySegment, finishInputTelemetry, incrementPttError, processTurn, setAudioState, teardownSTT]);
 
@@ -1715,9 +1751,10 @@ const IndexPRD4 = () => {
       await createSTT(initialStream);
       setAudioState("user_speaking");
     } catch (err) {
+      void initialStream?.then((stream) => stream.getTracks().forEach((track) => track.stop())).catch(() => {});
+      if (err instanceof Error && err.name === "StaleCaptureError") return;
       finishInputTelemetry("failed");
       console.warn("[PRD4] PTT start failed:", err);
-      void initialStream?.then((stream) => stream.getTracks().forEach((track) => track.stop())).catch(() => {});
       endLatencySegment(sttLatencySegmentRef.current);
       sttLatencySegmentRef.current = null;
       teardownSTT();
@@ -1757,11 +1794,12 @@ const IndexPRD4 = () => {
       // revision have been preserved. The final callback starts processTurn.
       await stt.flush();
     } catch (error) {
+      if (sttRef.current !== stt) return;
       finishInputTelemetry("failed");
       throw error;
     } finally {
-      pttFinalizingRef.current = false;
       if (sttRef.current === stt) {
+        pttFinalizingRef.current = false;
         endLatencySegment(sttLatencySegmentRef.current);
         sttLatencySegmentRef.current = null;
         if (!isProcessingRef.current) {
@@ -1812,12 +1850,15 @@ const IndexPRD4 = () => {
     try {
       await stt.flush(); // le callback final lance processTurn
     } catch (error) {
+      if (sttRef.current !== stt) return;
       finishInputTelemetry("failed");
       throw error;
     } finally {
-      handsFreeFinalizingRef.current = false;
-      if (sttRef.current === stt && handsFreeListeningRef.current) stt.resume();
-      if (!isProcessingRef.current) { finishInputTelemetry("no_audio"); setAudioState("idle"); }
+      if (sttRef.current === stt) {
+        handsFreeFinalizingRef.current = false;
+        if (handsFreeListeningRef.current) stt.resume();
+        if (!isProcessingRef.current) { finishInputTelemetry("no_audio"); setAudioState("idle"); }
+      }
     }
   }, [finishInputTelemetry, setAudioState]);
 
@@ -1873,9 +1914,10 @@ const IndexPRD4 = () => {
       if (!isProcessingRef.current) setAudioState("idle");
       trackEvent("prd4_hands_free_started", { session_id: sessionIdRef.current, ...handsFreeSettingsRef.current });
     } catch (err) {
+      void initialStream?.then((stream) => stream.getTracks().forEach((track) => track.stop())).catch(() => {});
+      if (err instanceof Error && err.name === "StaleCaptureError") return;
       finishInputTelemetry("failed");
       console.warn("[PRD4] hands-free start failed:", err);
-      void initialStream?.then((stream) => stream.getTracks().forEach((track) => track.stop())).catch(() => {});
       handsFreeListeningRef.current = false;
       setHandsFreeListening(false);
       teardownSTT();
@@ -1891,32 +1933,41 @@ const IndexPRD4 = () => {
     void finalizeAndEnd("user_hangup");
   }, [finalizeAndEnd]);
 
-  const switchToCharacter = useCallback(async (target: RuntimeCharacter, source: "player" | "gm") => {
-    if (handoffCalling || activeCharacterRef.current === target) return;
+  const switchToCharacter = useCallback(async (target: RuntimeCharacter, source: "player" | "gm" | "manual") => {
+    if (endedRef.current || handoffCallingRef.current || activeCharacterRef.current === target ||
+      (source !== "manual" && manualCallingTargetRef.current)) return;
+    handoffCallingRef.current = true;
     const from = activeCharacterRef.current;
     activeTurnControllerRef.current?.abort("character-switch");
     activeOutputControllerRef.current?.abort("character-switch");
     activeTurnSequenceRef.current += 1;
+    const switchSequence = activeTurnSequenceRef.current;
     setHandoffCallingTarget(target);
     setHandoffCalling(true);
+    setManualCallingTarget(null);
     const sid = sessionIdRef.current;
+    const isSwitchCurrent = () => !endedRef.current &&
+      activeTurnSequenceRef.current === switchSequence && sessionIdRef.current === sid;
+    const eventSuffix = source === "manual" ? `:manual-${manualCallIdRef.current ?? crypto.randomUUID()}` : "";
     const targetName = characterDisplayName(target);
     trackEvent("prd4_handoff_accepted", { session_id: sid, target_character: target, source });
     if (sid) void appendExperienceEvent({
       sessionId: sid,
-      eventKey: `handoff-accepted:${from}-${target}`,
+      eventKey: `handoff-accepted:${from}-${target}${eventSuffix}`,
       eventType: "handoff_accepted",
       character: from,
       payload: { reason: source, targetCharacter: target },
     });
     try {
       const profile = await getCharacterRuntimeReadiness(target).catch(() => null);
+      if (!isSwitchCurrent()) return;
       const characterContext = toCharacterExecutionContext(profile);
       if (!profile?.enabled || !profile.ready || !characterContext) {
         throw new Error(`${targetName} n’a pas de fiche et d’attribution validées dans Orchestration.`);
       }
       if (target === "emma") await activateTTSFallback("emma_handoff_tts_v1");
       await new Promise<void>((resolve) => window.setTimeout(resolve, 900));
+      if (!isSwitchCurrent()) return;
       const firstContact = !hasSpokenWithCharacter(conversationRef.current, target);
       pendingGmGuidanceRef.current = null;
       pendingEmotionalStateRef.current = null;
@@ -1936,38 +1987,58 @@ const IndexPRD4 = () => {
         pendingHandoff: null,
         handoffCount: handoffCountRef.current,
       });
-      if (firstContact) {
+      if (!isSwitchCurrent()) return;
+      const recordExecuted = () => {
+        if (sid) {
+          void appendExperienceEvent({
+            sessionId: sid,
+            eventKey: `handoff-executed:${from}-${target}${eventSuffix}`,
+            eventType: "handoff_executed",
+            character: target,
+            payload: { timerPreserved: true, sessionPreserved: true, firstContact, source },
+          });
+        }
+        trackEvent("prd4_handoff_executed", { session_id: sid, target_character: target, first_contact: firstContact, source });
+      };
+      if (firstContact || source === "manual") {
         const rawOpeningLine = profile?.openingLine?.trim() || (target === "max" ? OPENING_LINE : "Allô ?");
         const openingLine = guardCharacterResponse(rawOpeningLine, characterContext).response;
         const opening = tagSpokenWith({ role: target, content: openingLine, timestamp: Date.now() }, target);
         conversationRef.current = [...conversationRef.current, opening];
         addMessage(opening);
         setMaxSubtitle(openingLine);
+        if (source === "manual" && sid) await updatePRD4Conversation(sid, conversationRef.current);
+        if (!isSwitchCurrent()) return;
+        // Once the target and greeting are saved, another manual call may
+        // interrupt the greeting without erasing this executed transition.
+        if (source === "manual") recordExecuted();
+        handoffCallingRef.current = false;
+        manualCallingTargetRef.current = null;
         setAudioState("max_speaking");
         setHandoffCalling(false);
+        const openingController = new AbortController();
+        activeOutputControllerRef.current = openingController;
         await renderResponseText(openingLine, {
           turnId: `${sid ?? "local"}:${target}-opening`,
           turnIndex: conversationRef.current.filter((message) => message.role === "user").length,
           voiceId: profile?.ttsVoiceId ?? undefined,
           providerId: asTTSProviderId(profile?.ttsProvider) ?? undefined,
           characterKey: target,
+          signal: openingController.signal,
         });
       } else {
+        handoffCallingRef.current = false;
+        manualCallingTargetRef.current = null;
         setHandoffCalling(false);
       }
+      if (!isSwitchCurrent()) return;
       setAudioState("idle");
-      if (sid) {
-        void updatePRD4Conversation(sid, conversationRef.current);
-        void appendExperienceEvent({
-          sessionId: sid,
-          eventKey: `handoff-executed:${from}-${target}`,
-          eventType: "handoff_executed",
-          character: target,
-          payload: { timerPreserved: true, sessionPreserved: true, firstContact, source },
-        });
+      if (source !== "manual") {
+        if (sid) void updatePRD4Conversation(sid, conversationRef.current);
+        recordExecuted();
       }
-      trackEvent("prd4_handoff_executed", { session_id: sid, target_character: target, first_contact: firstContact, source });
     } catch (error) {
+      if (!isSwitchCurrent()) return;
       setHandoffCalling(false);
       toast({
         title: `${targetName} n’est pas disponible`,
@@ -1976,13 +2047,41 @@ const IndexPRD4 = () => {
       });
       if (sid) void appendExperienceEvent({
         sessionId: sid,
-        eventKey: `handoff-blocked-on-accept:${from}-${target}`,
+        eventKey: `handoff-blocked-on-accept:${from}-${target}${eventSuffix}`,
         eventType: "handoff_blocked",
         character: from,
         payload: { blockedReason: error instanceof Error ? error.message : String(error) },
       });
+    } finally {
+      if (isSwitchCurrent()) {
+        handoffCallingRef.current = false;
+        manualCallingTargetRef.current = null;
+      }
     }
-  }, [activateTTSFallback, addMessage, handoffCalling, renderResponseText, setAudioState, setSelectedCharacter]);
+  }, [activateTTSFallback, addMessage, renderResponseText, setAudioState, setSelectedCharacter]);
+
+  const handleManualCall = useCallback(() => {
+    if (endedRef.current || state.audioState === "mic_starting" || handoffCallingRef.current || manualCallingTargetRef.current) return;
+    const target = activeCharacterRef.current === "emma" ? "max" : "emma";
+    finishInputTelemetry("cancelled");
+    cleanupAudio();
+    if (processingWatchdogRef.current) window.clearTimeout(processingWatchdogRef.current);
+    processingWatchdogRef.current = null;
+    isProcessingRef.current = false;
+    pendingPlayerSwitchRef.current = null;
+    resumeConversationTraceSync(true);
+    setUserSubtitle("");
+    setMaxSubtitle("");
+    setAudioState("idle");
+    manualCallingTargetRef.current = target;
+    manualCallIdRef.current = crypto.randomUUID();
+    setManualCallingTarget(target);
+  }, [cleanupAudio, finishInputTelemetry, setAudioState, state.audioState]);
+
+  const handleManualCallAnswered = useCallback(() => {
+    const target = manualCallingTargetRef.current;
+    if (target && !endedRef.current) void switchToCharacter(target, "manual");
+  }, [switchToCharacter]);
 
   switchToCharacterRef.current = switchToCharacter;
 
@@ -2198,6 +2297,9 @@ const IndexPRD4 = () => {
       screen = (
         <>
           {!activeVideo?.video_url ? (
+            manualCallingTarget ? (
+              <CallingMaxScreen character={manualCallingTarget} onAnswered={handleManualCallAnswered} />
+            ) : (
             <ConversationScreen
               audioState={state.audioState}
               userSubtitle={userSubtitle}
@@ -2220,7 +2322,9 @@ const IndexPRD4 = () => {
               handoffCallingTarget={handoffCallingTarget}
               onAcceptHandoff={() => void handleAcceptHandoff()}
               onRejectHandoff={handleRejectHandoff}
+              onManualCall={handleManualCall}
             />
+            )
           ) : null}
           <LatencyOverlay enabled={latencyOverlayEnabled} segments={latencySegments} currentTurn={latencyCurrentTurn} />
         </>
