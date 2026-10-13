@@ -1412,3 +1412,34 @@ et nouvelle CI sur le dernier HEAD nécessaires avant squashmain. Aucun
 forcepush/main, aucun déploiement externe ni migration. Éviter de relancer
 une analyse Lovable pouvant autocorriger ces anciens diagnostics Deno ;
 vérifier le résultat de synchronisation/build et les fichiers effectifs.
+
+### Correctif auth livré en preview — 13 octobre 2026, 08:42 CEST
+
+Dernier HEAD75def8c9885bc085a9c5ec3955dea90730b4907d : revues
+Standards/Spec complémentaires0constat, CI38357281860success,
+qualité complète et17E2E (étape06:36:25→06:38:21UTC). PR29 squash merged
+à06:39:29UTC, main3e2e1ce5416f0b8deb714cef2f4823176494b453.
+Checkout main fast-forward propre,4fichiers du diagnostic horsscope
+identiques à6271dcf, diff net uniquement auth/test/CHANGELOG/plan.
+
+Lovable natif synchronisé3e2e1ce/ready/agentFinishedtrue. Synchronisation
+automatique du frontend vérifiée par navigateur authentifié : avant
+reloadscript/assets/index-CG1cec7E.js, aprèsreload
+/assets/index-D9Lf-5hk.js et accueil Commencer fonctionnel. Méthode de
+preuve : SHA de source synchronisée, diff runtime limité au correctifauth,
+nouveau nom de bundle observé dans DOM puis contrôle réel à exécuter.
+SHA des octets du bundle servi non établi ; pas de nouvelle commande agent
+de build pouvant réintroduire les corrections Deno horsscope. Compilation
+locale/CI verte distincte de cette preuve de build automatique preview.
+Pas de publication frontend sur le domaine public ni redéploiement Edge
+demandé pour ce correctif frontend. Classification guard503 inchangée.
+CI post-merge38357947025 démarrée sur3e2e1ce, en cours au relevé.
+
+Nouvelle sessione1a7e6fd-b7d9-4cd1-91ac-429ae4ff45e9,
+début06:42:26.476UTC, sandbox-ulrich/contextsandbox, Max/film pas_vu/tts.
+UI native confirme EN LIGNE et Activer le micro, onglet1830098971conservé.
+Échec précédent1e01f4f7 terminé06:26:57.534UTC par timeout,960s.
+Deux échanges humains demandés pour confirmer capture réelle puis décision
+de transfert, avec arrêt du contrôle si Micro indisponible réapparaît.
+Le renouvellement JWT est reproduit en test automatique ; ne pas affirmer
+un contrôle réel d'une heure d'expiration qui n'a pas été exécuté.
