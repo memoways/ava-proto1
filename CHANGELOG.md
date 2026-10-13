@@ -149,7 +149,11 @@ plus anciennes conservent leur état au moment de leur rédaction.
   (`3c3b67c`, `07eaed4`), deux revues sans blocage et CI finale verte :
   46 régressions, 536 unitaires, 34 intégrations, 36 E2E sans retry.
   RPC appliquée et deux proxies déployés dans Lovable Cloud ; types, build et
-  contrôle Deno P1 Lovable verts. Recette humaine et publication frontend en attente.
+  contrôle Deno P1 Lovable verts. Recette réelle : première réponse Max naturelle
+  et reçus conservés, tour suivant échoué `LLM response incomplete` ; publication
+  bloquée et canary remise à false. Correctif de traces SSE terminales et des
+  statuts de coût testé (541 unitaires), en cours de livraison ; cause upstream
+  non encore établie, aucune hausse de budget ni changement de modèle.
   [Plan P1](docs/plan_lot_2_memoire_streaming_coherent.md).
 
 Les mentions de non-publication et les listes de recette des entrées du

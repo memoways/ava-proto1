@@ -87,7 +87,10 @@ recette canary sandbox-ulrich.
 Implémentation fusionnée (#33 et #34), revues et CI finale vertes, dont 36 E2E
 sans retry. La RPC et les deux proxies sont livrés dans Lovable Cloud. La
 compatibilité de types Lovable est corrigée et vérifiée, ainsi que le build et
-les deux proxies P1. La recette humaine et la publication frontend restent à effectuer.
+les deux proxies P1. La recette humaine confirme une réponse Max naturelle,
+puis échoue sur une génération incomplète. Le reçu partiel est conservé ;
+la publication attend le diagnostic et une nouvelle preuve réelle. La canary
+est remise au batch pour les nouvelles sessions, sans changer le budget ni la voix.
 [Plan et preuves P1](docs/plan_lot_2_memoire_streaming_coherent.md).
 
 

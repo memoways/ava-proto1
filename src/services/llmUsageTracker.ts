@@ -319,12 +319,12 @@ export async function trackLLMCall(params: {
 async function retryCostFetch(
   logId: string,
   generationId: string,
-  params: { session_id?: string | null; prompt_tokens?: number; completion_tokens?: number; total_tokens?: number },
+  params: { session_id?: string | null; prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; status?: string },
   delays: number[]
 ): Promise<void> {
   if (delays.length === 0) {
     console.warn(`[LLM Tracker] Cost unavailable after all retries for ${generationId}`);
-    await updateLLMUsage(logId, { status: "cost_fetch_failed" });
+    await updateLLMUsage(logId, { status: params.status === 'error' ? 'error' : "cost_fetch_failed" });
     return;
   }
 
@@ -345,7 +345,7 @@ async function retryCostFetch(
           prompt_tokens: costData.prompt_tokens || params.prompt_tokens,
           completion_tokens: costData.completion_tokens || params.completion_tokens,
           total_tokens: costData.total_tokens || params.total_tokens,
-          status: "completed",
+          status: params.status === 'error' ? 'error' : "completed",
         });
         console.log(`[LLM Tracker] Cost updated: $${costData.cost_usd} for ${generationId}`);
       } else {
@@ -379,6 +379,7 @@ export async function retryCostForRow(row: {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
+  status?: string;
 }): Promise<boolean> {
   if (!row.generation_id) return false;
   const costData = await fetchGenerationCost(row.generation_id, {
@@ -391,7 +392,7 @@ export async function retryCostForRow(row: {
       prompt_tokens: costData.prompt_tokens || row.prompt_tokens,
       completion_tokens: costData.completion_tokens || row.completion_tokens,
       total_tokens: costData.total_tokens || row.total_tokens,
-      status: "completed",
+      status: row.status === 'error' ? 'error' : "completed",
     });
     return true;
   }
