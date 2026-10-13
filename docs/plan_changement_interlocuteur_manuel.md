@@ -58,7 +58,11 @@ primitives actuelles. La stratégie de `handsFreeVoice.ts` reste inchangée.
 
 ## Livraison
 
-Implémenté localement, pas encore livré. Branche `codex/manual-character-call`,
+État actuel : publié via Lovable le 13 octobre 2026, après migration autorisée
+et contrôles réels des deux sens en preview puis sur le domaine canonique.
+Preuves et révisions finales dans la dernière section ci-dessous.
+
+Historique initial avant livraison : branche `codex/manual-character-call`,
 base `c91b683`. Deux reproductions composant rouges avant le bouton, puis
 vertes. Trois nouveaux E2E Chromium simulés réussis : interruption audio,
 trois bascules avec clés distinctes dans une même session, retour avec salut,
@@ -137,3 +141,68 @@ complète corrigée : 44 régressions, 470 unitaires, 30 intégrations, lint san
 erreur, typecheck et build réussis. E2E de refus/reprise réussi. Deux revues
 indépendantes du complément : 0 constat bloquant. Application Cloud et
 publication attendent l'accord humain demandé ; aucun SQL Cloud modifié.
+
+### Livraison finale vérifiée — 13 octobre 2026
+
+Ulrich autorise explicitement « cette migration pour les appels répétés ».
+PR [#31](https://github.com/memoways/ava-proto1/pull/31) fusionnée en
+`56158512fc0e8f8e915c69fbadbe537a671b9ee5`, après CI complète
+[38374688314](https://github.com/memoways/ava-proto1/actions/runs/38374688314)
+sur `16b6a5c` : 44 régressions, 470 unitaires, 30 intégrations, 25 E2E,
+typecheck, lint sans erreur et build. Deux revues indépendantes sans constat
+bloquant. CI post-fusion
+[38376338000](https://github.com/memoways/ava-proto1/actions/runs/38376338000)
+également réussie sur `5615851`. PR #30 avait livré le bouton en `2094d27` ;
+PR #31 complète la contrainte réelle et le traitement du refus.
+
+Cible vérifiée avec les connecteurs Lovable natifs : projet
+`1265958d-b74e-40f2-917d-182fe05163fc`, workspace Memoways
+`5glbtPltldwz9tgNwIi4`, base Supabase fournie par Lovable
+`iralfqlslqndgvexixis` (config.toml synchronisé et Cloud activé).
+Migration appliquée par query_database natif, transaction exacte du fichier
+avec lock_timeout 5s. Lecture de pg_constraint après application :
+`sessions_handoff_count_check`, `CHECK ((handoff_count >= 0))`, validée.
+Colonne toujours NOT NULL, défaut0. Aucun UPDATE/DELETE de données dans cette
+migration ; aucune modification de RLS, droits, secret, flag ou fournisseur.
+
+Preview synchronisée sur `5615851`, frontend `index-pIhFyOdh.js`.
+Session sandbox-ulrich `ce162520-3aa3-439d-8b5c-7d7b2d4462f1`, début
+`2026-10-13T09:28:27.849182Z` : Emma → Max → Emma → Max, compteur3,
+une seule session, choix film pas_vu conservé. Les écrans d'appel puis les
+portraits/boutons cibles correspondent. Temps affiché 15:47 → 15:18 →
+14:54 → 14:19, sans réinitialisation. Trois handoff_executed distincts,
+source manual, sessionPreserved/timerPreserved true ; premier contact true
+puis false/false. Les quatre saluts initiaux ou de retour ont des lignes
+TTS-Queue Generated/Played en websocket, texte masqué lors de l'inspection.
+Session clôturée par Terminer à `2026-10-13T09:30:33.507Z`, user_hangup.
+
+Publication native deploy_project, ID
+`f9ce5822-8f96-4d20-8b07-643e4a7c2a4a`, réponse pending. Aucun deuxième
+déploiement pour sonder ce statut. Vérification observable : nouvel onglet
+ouvert depuis Tester moi-même dans l'admin publié, environnement Sandbox
+Ulrich ; URL https://proto1.parle-a-ava.com/?env=sandbox-ulrich et bundle
+DOM `index-D3Q4mR9A.js`, différent du P0 `index-5XOMh72h.js`. Le connecteur
+n'expose pas le statut final du job ni un hash des octets servis ; l'état
+publié est attesté par le nouveau frontend et les parcours fonctionnels.
+
+Session publiée `d6021247-ac3f-42b9-a305-b9dbd4639837`, début
+`2026-10-13T09:32:25.828834Z` : Emma → Max → Emma réussi, compteur2,
+une seule session, pas_vu conservé. Temps 15:46 → 15:29 → 14:37.
+Deux événements exécutés distincts, source manual, session et timer
+conservés ; firstContact true puis false. TTS websocket des trois saluts
+généré et lu selon les journaux navigateur. Session clôturée par Terminer
+à `2026-10-13T09:34:45.481Z`, user_hangup. Micro jamais ouvert pendant
+ces contrôles de bouton ; aucune parole synthétique injectée dans l'application.
+
+Les tests automatiques attestent la coupure audio/capture en cours, les
+callbacks abandonnés et le PATCH refusé puis repris. Les contrôles réels
+ci-dessus attestent les appels par bouton, leurs écrans et leur persistance,
+avec lecture audio journalisée ; ce ne sont pas une nouvelle mesure
+acoustique ni une validation humaine de coupure pendant un échange vocal.
+Ce choix manuel n'atteste pas une décision narrative GM de transfert accepté.
+Baseline et limites P0 antérieures restent dans
+[plan_lot_1_observabilite_latence.md](plan_lot_1_observabilite_latence.md) ;
+pas de mélange avec ces nouvelles sessions, aucun gain de latence revendiqué.
+Lot2 non commencé. En cas de rollback frontend, conserver les compteurs
+historiques et la contrainte non négative : ne pas réintroduire un plafond1
+sur des sessions qui ont maintenant plusieurs appels.

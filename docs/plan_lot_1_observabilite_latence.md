@@ -1648,3 +1648,13 @@ La lecture exacte des versions Edge reste non attestée. Lot2 non commencé.
 Ulrich demande maintenant un bouton manuel pour couper l'interlocuteur,
 appeler directement l'autre avec sonneries et réponse : nouveau changement
 produit explicitement autorisé, à tracer séparément de ce P0 publié.
+
+Complément demandé livré le 13 octobre 2026 : boutons manuels Emma/Max,
+PR #30 puis correctif de contrainte PR #31 (`5615851`). Migration des appels
+répétés explicitement autorisée et appliquée via Lovable Cloud. Contrôles
+réels des deux sens réussis en preview puis sur le domaine publié. Plan,
+révisions, sessions et limites dans
+[plan_changement_interlocuteur_manuel.md](plan_changement_interlocuteur_manuel.md).
+Ces parcours manuels n'attestent pas un transfert proposé et accepté par le
+GM ; les limites P0 précédemment acceptées restent valables. La baseline P0
+ci-dessus conserve ses bornes et sa version antérieures à ce complément.
