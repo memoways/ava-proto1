@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient, type SupabaseClient, type User } from "https://esm.sh/@supabase/supabase-js@2.98.0";
+import { createClient, type User } from "https://esm.sh/@supabase/supabase-js@2.98.0";
 import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 import {
   constantTimeEqual,
@@ -42,7 +42,7 @@ function json(req: Request, body: unknown, status = 200): Response {
 
 async function authenticatedAnonymousUser(req: Request): Promise<{
   user: User;
-  caller: SupabaseClient;
+  caller: ReturnType<typeof createClient>;
 } | null> {
   const authorization = req.headers.get("Authorization") ?? "";
   const url = Deno.env.get("SUPABASE_URL");
@@ -60,7 +60,7 @@ async function authenticatedAnonymousUser(req: Request): Promise<{
 }
 
 async function loadActiveAccess(
-  admin: SupabaseClient,
+  admin: ReturnType<typeof createClient>,
   userId: string,
   invitationId: string,
 ): Promise<AccessContext | null> {
@@ -130,7 +130,7 @@ serve(async (req) => {
   );
   if (limited) return limited;
 
-  const code = typeof body?.code === "string" ? normalizeExternalTestCode(body.code) : "";
+  const code = typeof body.code === "string" ? normalizeExternalTestCode(body.code) : "";
   if (code.length < 19 || code.length > 64) return json(req, { ok: false });
   const codeHash = await sha256Hex(code);
   const { data: invitationHash } = await admin

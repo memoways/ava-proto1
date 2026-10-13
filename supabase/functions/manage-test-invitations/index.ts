@@ -43,7 +43,7 @@ serve(async (req) => {
   const auth = await requireAdmin(req, headersFor(req));
   if (!auth.ok || !auth.userId) return auth.response!;
 
-  const body = (await req.json().catch(() => null) ?? {}) as Record<string, unknown>;
+  const body = await req.json().catch(() => null) as Record<string, unknown> | null;
   const action = body?.action as Action | undefined;
   if (!action || !["list", "create", "revoke"].includes(action)) {
     return json(req, { error: "Invalid action" }, 400);
