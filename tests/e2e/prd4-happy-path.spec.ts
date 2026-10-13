@@ -4,6 +4,7 @@ const PROJECT_ID = "iralfqlslqndgvexixis";
 const SUPABASE_ORIGIN = `https://${PROJECT_ID}.supabase.co`;
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const CHARACTER_ID = "22222222-2222-4222-8222-222222222222";
+const EMMA_CHARACTER_ID = "22222222-2222-4222-8222-222222222223";
 const ANONYMOUS_USER_ID = "33333333-3333-4333-8333-333333333333";
 const E2E_VIDEO_ASSET_ID = "aaaaaaaaaaaaaaaaaaaaaaaa";
 
@@ -22,6 +23,8 @@ interface NetworkFakeOptions {
   ttsBusyOnce?: boolean;
   diagnosticAdmin?: boolean;
   blockTraceUpload?: boolean;
+  characterOpenings?: boolean;
+  delayCharacterResponseMs?: number;
 }
 
 function json(route: Route, body: unknown, status = 200) {
@@ -54,6 +57,8 @@ async function installNetworkFakes(
   const blockedTraceUpload = new Promise<void>((resolve) => { releaseTraceUpload = resolve; });
   const maxMessageCounts: number[] = [];
   const sessionUpdates: unknown[] = [];
+  let sessionInsertCount = 0;
+  const experienceEvents: Array<{ event_type: string; event_key: string; payload: Record<string, unknown> }> = [];
   const voiceEvents: Array<Record<string, unknown>> = [];
   const gmFilmContexts: string[] = [];
 
@@ -268,8 +273,8 @@ async function installNetworkFakes(
       const input = request.postDataJSON() as { p_character_key: string };
       const character = input.p_character_key;
       return json(route, [{ character_key: character, display_name: character === "emma" ? "Emma" : "Max", enabled: true, ready: true,
-        character_id: CHARACTER_ID, notion_page_id: "77777777-7777-4777-8777-777777777777", environment_id: "prod", prompt_updated_at: "2026-10-12T00:00:00Z",
-        tts_provider: "elevenlabs", tts_voice_id: null, opening_line: null, portrait_url: null, situation_summary: "Fiche E2E" }]);
+        character_id: character === "emma" ? EMMA_CHARACTER_ID : CHARACTER_ID, notion_page_id: "77777777-7777-4777-8777-777777777777", environment_id: "prod", prompt_updated_at: "2026-10-12T00:00:00Z",
+        tts_provider: "elevenlabs", tts_voice_id: options.characterOpenings ? (character === "emma" ? "e2e-emma-voice" : "e2e-max-voice") : null, opening_line: options.characterOpenings ? `Allô, ici ${character === "emma" ? "Emma" : "Max"}.` : null, portrait_url: null, situation_summary: "Fiche E2E" }]);
     }
     if (table === "pin_current_orchestration_version") {
       return json(route, "66666666-6666-4666-8666-666666666666");
@@ -342,13 +347,16 @@ async function installNetworkFakes(
       return json(route, []);
     }
     if (table === "character_prompts") {
-      return json(route, [{ character_id: CHARACTER_ID, environment_id: "prod", characters: { name: "Max" }, identite_fondamentale: "Tu es Max.", qui_tu_es: "Tu réponds en français.", situation_summary: "Max est le père d’Ava.", dynamique_conversation: "Écouter et répondre.", ce_que_tu_ne_fais_jamais: "Ne jamais changer d’identité.", timeline: "Avant et après la disparition d’Ava.", updated_at: "2026-10-12T00:00:00Z" }]);
+      const emma = url.searchParams.get("character_id") === `eq.${EMMA_CHARACTER_ID}`;
+      const name = emma ? "Emma" : "Max";
+      return json(route, [{ character_id: emma ? EMMA_CHARACTER_ID : CHARACTER_ID, environment_id: "prod", characters: { name }, identite_fondamentale: `Tu es ${name}.`, qui_tu_es: "Tu réponds en français.", situation_summary: emma ? "Emma est la mère d’Ava." : "Max est le père d’Ava.", dynamique_conversation: "Écouter et répondre.", ce_que_tu_ne_fais_jamais: "Ne jamais changer d’identité.", timeline: "Avant et après la disparition d’Ava.", updated_at: "2026-10-12T00:00:00Z" }]);
     }
     if (table === "characters") {
+      const emma = url.searchParams.get("id") === `eq.${EMMA_CHARACTER_ID}`;
       return json(route, [{
-        id: CHARACTER_ID,
-        name: "Max Lorenzo",
-        system_prompt: "Tu es Max. Tu réponds en français avec concision.",
+        id: emma ? EMMA_CHARACTER_ID : CHARACTER_ID,
+        name: emma ? "Emma Lorenzo" : "Max Lorenzo",
+        system_prompt: `Tu es ${emma ? "Emma" : "Max"}. Tu réponds en français avec concision.`,
         personality: "méfiant mais sincère",
       }]);
     }
@@ -357,7 +365,12 @@ async function installNetworkFakes(
       return json(route, [], 201);
     }
     if (table === "sessions" && request.method() === "POST") {
+      sessionInsertCount += 1;
       return json(route, { id: SESSION_ID }, 201);
+    }
+    if (table === "experience_events" && request.method() === "POST") {
+      experienceEvents.push(request.postDataJSON());
+      return json(route, [], 201);
     }
     if (table === "sessions" && request.method() === "PATCH") {
       sessionUpdates.push(request.postDataJSON());
@@ -441,6 +454,9 @@ async function installNetworkFakes(
       } else {
         maxTurnCount += 1;
         maxMessageCounts.push(payload.messages?.length ?? 0);
+        if (options.delayCharacterResponseMs) {
+          await new Promise((resolve) => setTimeout(resolve, options.delayCharacterResponseMs));
+        }
         if (maxTurnCount === options.failMaxAt) {
           return json(route, { error: "simulated_provider_failure" }, 503);
         }
@@ -473,6 +489,8 @@ async function installNetworkFakes(
     getSimulatedNetworkDrops: () => simulatedNetworkDrops,
     getTriggeredVideoLoads: () => triggeredVideoLoads,
     getSessionUpdates: () => sessionUpdates,
+    getSessionInsertCount: () => sessionInsertCount,
+    getExperienceEvents: () => experienceEvents,
     getVoiceEvents: () => voiceEvents,
     getGmFilmContexts: () => gmFilmContexts,
     getTtsCallCount: () => ttsCallCount,
@@ -487,6 +505,100 @@ async function installNetworkFakes(
 async function answerFilmQuestion(page: Page) {
   await page.getByRole("button", { name: "Je n'ai pas vu le film", exact: true }).click();
 }
+
+test("appel manuel : coupe la voix, sonne et revient au personnage dans la même session", async ({ page }) => {
+  test.setTimeout(60_000);
+  const oldResponse = "Une réponse d'Emma que le joueur coupe pour appeler Max.";
+  const fakes = await installNetworkFakes(page, ["Comment se passe ta journée ?"], {
+    ttsSuccess: true, maxResponse: oldResponse, characterOpenings: true,
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await answerFilmQuestion(page);
+  await page.getByRole("button", { name: "Appeler Emma" }).click();
+  await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
+  await expect.poll(() => page.evaluate(() =>
+    (window as Window & { __e2eAudioState?: { ended: number } }).__e2eAudioState?.ended ?? 0)).toBeGreaterThan(0);
+  await page.evaluate(() => { (window as Window & { __e2eLongAudio?: boolean }).__e2eLongAudio = true; });
+  await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+  await expect(page.getByText("Comment se passe ta journée ?", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Arrêter l'enregistrement" }).press("Enter");
+  await expect(page.getByText(oldResponse, { exact: true })).toBeVisible();
+  const pausesBeforeCall = await page.evaluate(() =>
+    (window as Window & { __e2eAudioState?: { paused: number } }).__e2eAudioState?.paused ?? 0);
+  // Two synchronous clicks reproduce the race before React paints the call screen.
+  await page.getByRole("button", { name: "Appeler Max", exact: true }).evaluate((button) => {
+    (button as HTMLButtonElement).click(); (button as HTMLButtonElement).click();
+  });
+  await expect(page.getByText("Appel en cours…", { exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Max", exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() =>
+    (window as Window & { __e2eAudioState?: { paused: number } }).__e2eAudioState?.paused ?? 0)).toBeGreaterThan(pausesBeforeCall);
+  await expect(page.getByRole("img", { name: "Portrait d’Max" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("Allô, ici Max.", { exact: true })).toBeVisible();
+  await expect(page.getByText(oldResponse, { exact: true })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Appeler Emma", exact: true }).click();
+  await expect(page.getByText("Appel en cours…", { exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Portrait d’Emma" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("Allô, ici Emma.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Appeler Max", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Portrait d’Max" })).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => fakes.getExperienceEvents().filter(event => event.event_type === "handoff_executed").length).toBe(3);
+  const executed = fakes.getExperienceEvents().filter(event => event.event_type === "handoff_executed");
+  expect(new Set(executed.map(event => event.event_key)).size).toBe(3);
+  expect(executed.every(event => event.payload.source === "manual" && event.payload.sessionPreserved === true)).toBe(true);
+  expect(fakes.getSessionInsertCount()).toBe(1);
+  const stateUpdates = fakes.getSessionUpdates().filter((update): update is Record<string, unknown> =>
+    typeof update === "object" && update !== null);
+  expect(stateUpdates.filter(update => update.active_character).map(update => update.active_character)).toEqual(["max", "emma", "max"]);
+  expect(stateUpdates.every(update => !update.ended_at)).toBe(true);
+});
+
+test("appel manuel : une réponse LLM tardive de l'ancien personnage ne revient pas après les sonneries", async ({ page }) => {
+  test.setTimeout(30_000);
+  const oldResponse = "Réponse tardive d'Emma à ne pas jouer chez Max.";
+  const fakes = await installNetworkFakes(page, ["Comment se passe ta journée ?"], {
+    ttsSuccess: true, maxResponse: oldResponse, characterOpenings: true, delayCharacterResponseMs: 5_000,
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await answerFilmQuestion(page);
+  await page.getByRole("button", { name: "Appeler Emma" }).click();
+  await expect.poll(() => page.evaluate(() =>
+    (window as Window & { __e2eAudioState?: { ended: number } }).__e2eAudioState?.ended ?? 0), { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+  await expect(page.getByText("Comment se passe ta journée ?", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Arrêter l'enregistrement" }).press("Enter");
+  await expect.poll(() => fakes.getMaxTurnCount()).toBe(1);
+  await page.getByRole("button", { name: "Appeler Max", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Portrait d’Max" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("Allô, ici Max.", { exact: true })).toBeVisible();
+  await expect(page.getByText(oldResponse, { exact: true })).toHaveCount(0);
+  expect(fakes.getSessionInsertCount()).toBe(1);
+});
+
+test("appel manuel : une cible devenue indisponible conserve le personnage et la session", async ({ page }) => {
+  const fakes = await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await answerFilmQuestion(page);
+  await page.getByRole("button", { name: "Appeler Emma" }).click();
+  await expect(page.getByRole("img", { name: "Portrait d’Emma" })).toBeVisible({ timeout: 10_000 });
+  await page.route(`${SUPABASE_ORIGIN}/rest/v1/rpc/get_character_runtime_readiness_for_environment`, async (route) => {
+    const input = route.request().postDataJSON() as { p_character_key: string };
+    if (input.p_character_key !== "max") return route.fallback();
+    return json(route, [{ character_key: "max", display_name: "Max", enabled: false, ready: false }]);
+  });
+  await page.getByRole("button", { name: "Appeler Max", exact: true }).click();
+  await expect(page.getByText("Max n’est pas disponible", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("img", { name: "Portrait d’Emma" })).toBeVisible();
+  expect(fakes.getExperienceEvents().filter(event => event.event_type === "handoff_executed")).toHaveLength(0);
+  expect(fakes.getSessionInsertCount()).toBe(1);
+});
 
 for (const answer of ["vu", "pas_vu"] as const) {
   test(`choix film ${answer} conservé après relecture et transmis au GM`, async ({ page }) => {

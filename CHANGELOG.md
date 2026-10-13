@@ -6,6 +6,18 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Non publié]
 
+### 2026-10-13 — Appel manuel entre Emma et Max
+
+- Le joueur peut appeler l'autre personnage depuis la conversation, même
+  pendant une réponse et sans proposition narrative. Le clic coupe le micro
+  et la voix, annule le tour, puis lance les trois sonneries avant le décroché.
+- La session, le temps restant et l'historique isolé par personnage sont
+  conservés. Chaque appel manuel reçoit un salut, y compris lors d'un retour.
+  Les doubles clics et les réponses tardives de l'ancien personnage sont
+  bloqués ; les appels sont tracés avec la source `manual`.
+- Validation et livraison Lovable en cours ; plan séparé dans
+  `docs/plan_changement_interlocuteur_manuel.md`.
+
 ### 2026-10-13 — Session renouvelée pour les appels vocaux
 
 - Les requêtes protégées utilisent la session courante après renouvellement

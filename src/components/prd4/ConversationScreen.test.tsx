@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import ConversationScreen from "./ConversationScreen";
 import { tagSpokenWith } from "@/services/characterConversation";
@@ -14,6 +14,30 @@ const baseProps = {
 };
 
 describe("ConversationScreen", () => {
+  it.each([
+    ["emma", "Max"],
+    ["max", "Emma"],
+  ] as const)("lets the player call the other character while %s is speaking without a GM offer", (activeCharacter, targetName) => {
+    const onManualCall = vi.fn();
+    render(<ConversationScreen {...baseProps} activeCharacter={activeCharacter}
+      audioState="max_speaking" conversationLog={[]} onManualCall={onManualCall} />);
+
+    const call = screen.getByRole("button", { name: `Appeler ${targetName}` });
+    expect(call).toBeEnabled();
+    fireEvent.click(call);
+    expect(onManualCall).toHaveBeenCalledOnce();
+  });
+
+  it("waits for microphone startup to settle before a manual call", () => {
+    const onManualCall = vi.fn();
+    render(<ConversationScreen {...baseProps} activeCharacter="emma"
+      audioState="mic_starting" conversationLog={[]} onManualCall={onManualCall} />);
+    const call = screen.getByRole("button", { name: "Appeler Max" });
+    expect(call).toBeDisabled();
+    fireEvent.click(call);
+    expect(onManualCall).not.toHaveBeenCalled();
+  });
+
   it("shows a bidirectional GM offer and hides the other character's last line", () => {
     render(
       <ConversationScreen
