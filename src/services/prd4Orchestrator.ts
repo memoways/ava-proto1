@@ -342,7 +342,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     console.warn("[PRD4 orchestrator] Max LLM failed (fallback response):", err);
     maxError = err instanceof Error ? err.message : String(err);
     maxFailureDiagnostic = err instanceof SimulateMaxResponseError ? err.diagnosticContext : null;
-    observeService(input.onServiceObserved, { service: "llm", requested_provider: "openrouter", requested_model: maxFailureDiagnostic?.requestedSettings?.model ?? null, resolved_provider: "openrouter", resolved_model: null, effective_provider: null, effective_model: null, transport: "http_batch", fallback: true });
+    observeService(input.onServiceObserved, { service: "llm", requested_provider: "openrouter", requested_model: maxFailureDiagnostic?.requestedSettings?.model ?? null, resolved_provider: "openrouter", resolved_model: null, effective_provider: null, effective_model: null, transport: input.streamControl ? "sse" : "http_batch", fallback: true });
     maxResponse = MAX_FALLBACK_RESPONSE;
   } finally {
     max_ms = Math.round(performance.now() - maxStart);
@@ -354,6 +354,9 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     const deliveredResponse = input.streamControl ? await input.streamControl.delivery : maxResponse;
     input.signal?.throwIfAborted();
     if (input.streamControl && !deliveredResponse.trim()) throw new Error("No confirmed delivery for GM");
+    if (input.streamControl && diagnosticTraceEnabled && input.sessionId) {
+      void patchQueuedConversationTurnTrace(input.sessionId, turnIndex, ["response", "deliveredResponse"], deliveredResponse).catch(() => {});
+    }
     const gmStart = performance.now();
     input.onLatencySegment?.({ type: "start", segment: "GM", service: "GM post-turn" });
     try {
@@ -486,7 +489,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       },
       response: {
         rawLlmResponse: maxResult?.response ?? null,
-        deliveredResponse: maxResponse,
+        deliveredResponse: input.streamControl ? "" : maxResponse,
         source: identityGuard.blocked ? "identity_guard" : maxResult ? "llm" : "fallback",
         identityGuardReason: identityGuard.reason,
       },

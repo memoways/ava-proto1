@@ -239,7 +239,19 @@ serve(async (req) => {
 
     // For streaming, return the response body directly
     if (stream) {
-      return new Response(response.body, {
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("Upstream streaming body missing");
+      const body = new ReadableStream<Uint8Array>({
+        start(target) {
+          target.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ _ava_observability: spans.snapshot() })}\n\n`));
+        },
+        async pull(target) {
+          try { const { done, value } = await reader.read(); if (done) target.close(); else target.enqueue(value); }
+          catch (error) { target.error(error); }
+        },
+        async cancel(reason) { await reader.cancel(reason).catch(() => {}); },
+      });
+      return new Response(body, {
         headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' },
       });
     }

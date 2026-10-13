@@ -1,10 +1,15 @@
 // @vitest-environment node
+import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyConversationMemory, mergeConversationMemory } from '@/services/conversationMemoryV1';
 import type { ResponseDeliveryReceipt } from '@/services/responseDelivery';
 const harness=vi.hoisted(()=>({query: null as unknown as (sql:string,args?:unknown[])=>Promise<{rows:Record<string,unknown>[]}>,beforeUpdate:null as null|(()=>Promise<void>)}));
-vi.mock('@/integrations/supabase/client',()=>({supabase:{from:()=>{
+vi.mock('@/integrations/supabase/client',()=>({supabase:{rpc:(_name:string,args:Record<string,unknown>)=>({async maybeSingle(){
+ if(harness.beforeUpdate){const hook=harness.beforeUpdate;harness.beforeUpdate=null;await hook();}
+ const r=await harness.query('select * from public.persist_conversation_memory_v4($1::uuid,$2::jsonb,$3::jsonb,$4::integer,$5::integer,$6::jsonb)',[args.p_session_id,JSON.stringify(args.p_expected_memory),JSON.stringify(args.p_next_memory),args.p_expected_last_turn??null,args.p_next_last_turn??null,args.p_post_turn_log?JSON.stringify(args.p_post_turn_log):null]);
+ return {data:r.rows[0]??null,error:null};
+}}),from:()=>{
  const filters:Record<string,unknown>={};let values:Record<string,unknown>|null=null;
  const q={select:()=>q,eq:(k:string,v:unknown)=>{filters[k]=v;return q;},is:(k:string,v:unknown)=>{filters[k]=v;return q;},update:(v:Record<string,unknown>)=>{values=v;return q;},
  async maybeSingle(){
@@ -20,7 +25,7 @@ const receipt:ResponseDeliveryReceipt={turnId:'t1',turnIndex:1,character:'max',i
 const entry={engagement_delta:0,confusion_detected:false,role_usage_quality:'unknown' as const,topics_covered:[],transition_recommended:false,cinematic_hint:null,next_turn_guidance:'',end_recommended:false,moderation_flag:false,notes:''};
 describe('V4 receipt persistence and optimistic JSONB concurrency',()=>{
  let db:PGlite;let id:string;
- beforeEach(async()=>{db=new PGlite();id=crypto.randomUUID();harness.query=(sql,args)=>db.query(sql,args);harness.beforeUpdate=null;clearConversationMemoryCache();await db.exec('create table sessions(id text primary key,conversation_memory jsonb,memory_last_turn integer default 0,gm_post_turn_log jsonb default \'[]\'::jsonb)');await db.query('insert into sessions(id,conversation_memory) values($1,$2::jsonb)',[id,JSON.stringify(createEmptyConversationMemory())]);});
+ beforeEach(async()=>{db=new PGlite();id=crypto.randomUUID();harness.query=(sql,args)=>db.query(sql,args);harness.beforeUpdate=null;clearConversationMemoryCache();await db.exec('create role authenticated; create role anon; create table sessions(id uuid primary key,conversation_memory jsonb,memory_last_turn integer default 0,gm_post_turn_log jsonb default \'[]\'::jsonb)');await db.exec(await readFile(new URL('../../supabase/migrations/20261013171500_persist_memory_v4_cas.sql',import.meta.url),'utf8'));await db.query('insert into sessions(id,conversation_memory) values($1,$2::jsonb)',[id,JSON.stringify(createEmptyConversationMemory())]);});
  afterEach(async()=>db.close());
  it('retains receipt locally immediately and persists without advancing factual cursor',async()=>{
   const write=persistDeliveryReceipt(id,receipt);expect((await fetchConversationMemory(id)).deliveryByCharacter?.max?.[0]).toEqual(receipt);await write;

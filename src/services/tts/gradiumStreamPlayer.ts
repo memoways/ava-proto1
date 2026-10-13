@@ -178,7 +178,7 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
   let openedAt = 0;
   let eosReceived = false;
   let cancelled = false;
-  let firstByteMs = 0;
+  let firstByteMs: number | null = null;
   let totalBytes = 0;
   let audibleOutput = false;
   let firstFrameLogged = false;
@@ -337,7 +337,7 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
     if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
     closeWs();
     generationDone.resolve({
-      firstByteMs,
+      firstByteMs: firstByteMs ?? 0,
       totalGenMs: Math.round(performance.now() - t0),
       bytes: totalBytes,
     });
@@ -363,7 +363,7 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
     }
     if (msg.type === "audio" && typeof msg.audio === "string") {
       if (preAudioTimer) { clearTimeout(preAudioTimer); preAudioTimer = null; }
-      if (!firstByteMs) {
+      if (firstByteMs === null) {
         firstByteMs = Math.round(performance.now() - t0);
         observeVoice(opts.onVoiceObservation, "first_audio_chunk");
         debugLogger.log({ service: "tts", level: "info", direction: "in", label: `TTS-GR-WS first chunk in ${firstByteMs}ms` });
@@ -384,7 +384,7 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
         timestamps.push({ text: msg.text, stop: msg.stop_s }); notifyProgress();
       }
     } else if (msg.type === "end_of_stream" || msg.type === "eos") {
-      if (!firstByteMs) {
+      if (firstByteMs === null) {
         fail(new Error("Gradium WS returned no audio"));
         return;
       }
@@ -401,7 +401,7 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
     for (const text of pendingText.splice(0)) {
       ws.send(JSON.stringify({ type: "text", text }));
       observeVoice(opts.onVoiceObservation, "tts_text_sent");
-      if (!firstByteMs) armPreAudioTimer("tts_gradium_ws_first_chunk", FIRST_CHUNK_TIMEOUT_MS);
+      if (firstByteMs === null) armPreAudioTimer("tts_gradium_ws_first_chunk", FIRST_CHUNK_TIMEOUT_MS);
     }
     if (finishRequested && !eosSent) {
       eosSent = true; ws.send(JSON.stringify({ type: "end_of_stream" }));
@@ -452,8 +452,8 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
       // A clean close after audio means the server finished without an explicit
       // end_of_stream frame (or we missed it) — treat as generation complete.
       if (cancelled || eosReceived) return;
-      if (firstByteMs && eosSent && event.code === 1000) { onGenerationComplete(); return; }
-      if (firstByteMs) { fail(new Error("Gradium socket closed during turn")); return; }
+      if (firstByteMs !== null && eosSent && event.code === 1000) { onGenerationComplete(); return; }
+      if (firstByteMs !== null) { fail(new Error("Gradium socket closed during turn")); return; }
       // Closed before any audio: surface the close code/reason so a failure
       // that survives the redeploy is diagnosable in one round-trip (e.g. token
       // rejected, setup parse error, unexpected message shape).

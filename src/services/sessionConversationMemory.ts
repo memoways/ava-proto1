@@ -114,21 +114,16 @@ export async function persistPostTurnMemory(
     const nextLastTurn = delta && turnIndex > currentLastTurn ? turnIndex : currentLastTurn;
     const nextLog = appendPostTurnEntry(data.gm_post_turn_log, entry);
     signal?.throwIfAborted();
-    let updateQuery = supabase
-      .from("sessions")
-      .update({
-        conversation_memory: JSON.parse(JSON.stringify(nextMemory)) as Json,
-        memory_last_turn: nextLastTurn,
-        gm_post_turn_log: JSON.parse(JSON.stringify(nextLog)) as Json,
-      })
-      .eq("id", sessionId)
-      .eq("memory_last_turn", currentLastTurn);
-    updateQuery = data.conversation_memory == null ? updateQuery.is("conversation_memory", null)
-      : updateQuery.eq("conversation_memory", JSON.stringify(data.conversation_memory));
+    let updateQuery = supabase.rpc("persist_conversation_memory_v4", {
+      p_session_id: sessionId,
+      p_expected_memory: data.conversation_memory,
+      p_next_memory: JSON.parse(JSON.stringify(nextMemory)) as Json,
+      p_expected_last_turn: currentLastTurn,
+      p_next_last_turn: nextLastTurn,
+      p_post_turn_log: JSON.parse(JSON.stringify(nextLog)) as Json,
+    });
     if (signal) updateQuery = updateQuery.abortSignal(signal);
-    const { data: updated, error: updateError } = await updateQuery
-      .select("conversation_memory, memory_last_turn")
-      .maybeSingle();
+    const { data: updated, error: updateError } = await updateQuery.maybeSingle();
     if (updateError) throw updateError;
     if (updated) {
       const persisted = overlayDeliveries(sessionId, normalizeConversationMemory(updated.conversation_memory));
@@ -204,6 +199,7 @@ function overlayDeliveries(sessionId: string, memory: ConversationMemoryV1): Con
   if (!overlay) return memory;
   const merged = { ...memory.deliveryByCharacter };
   for (const character of ['max', 'emma'] as const) {
+    if (!(merged[character]?.length || overlay[character]?.length)) continue;
     const byId = new Map((merged[character] ?? []).map(r => [r.turnId, r]));
     for (const receipt of overlay[character] ?? []) byId.set(receipt.turnId, receipt);
     merged[character] = [...byId.values()].sort((a, b) => a.turnIndex - b.turnIndex).slice(-16);
@@ -222,10 +218,11 @@ export function persistDeliveryReceipt(sessionId: string, receipt: import('./res
       if (error) throw error;
       if (!data) throw new Error('Delivery session missing');
       const next = overlayDeliveries(sessionId, normalizeConversationMemory(data.conversation_memory));
-      let query = supabase.from('sessions').update({ conversation_memory: JSON.parse(JSON.stringify(next)) as Json }).eq('id', sessionId);
-      query = data.conversation_memory == null ? query.is('conversation_memory', null)
-        : query.eq('conversation_memory', JSON.stringify(data.conversation_memory));
-      const { data: updated, error: updateError } = await query.select('conversation_memory').maybeSingle();
+      const { data: updated, error: updateError } = await supabase.rpc('persist_conversation_memory_v4', {
+        p_session_id: sessionId,
+        p_expected_memory: data.conversation_memory,
+        p_next_memory: JSON.parse(JSON.stringify(next)) as Json,
+      }).maybeSingle();
       if (updateError) throw updateError;
       if (updated) { memoryCache.set(sessionId, overlayDeliveries(sessionId, normalizeConversationMemory(updated.conversation_memory))); return; }
     }

@@ -66,13 +66,7 @@ function resolveRestFormat(format: GradiumSettings["outputFormat"]): GradiumSett
   return oggOpusPlayable ? "opus" : "wav";
 }
 
-export const gradiumProvider: TTSProvider = {
-  id: "gradium",
-  label: "Gradium TTS",
-  description: "TTS Gradium (WebSocket streaming + REST fallback). Voix naturelles, 237 voix.",
-
-  async generate(text: string, ctx?: TTSGenerateContext): Promise<TTSGenerateResult> {
-    const s = resolveGradiumSettings(ctx?.characterKey);
+async function generateGradiumSpeech(text: string, ctx: TTSGenerateContext | undefined, s: GradiumSettings): Promise<TTSGenerateResult> {
     const preparedText = prepareTextForGradium(text);
     const voiceId = ctx?.voiceId || s.voiceId;
 
@@ -124,6 +118,15 @@ export const gradiumProvider: TTSProvider = {
         totalMs: Math.round(tEnd - tRequest),
       },
     };
+}
+
+export const gradiumProvider: TTSProvider = {
+  id: "gradium",
+  label: "Gradium TTS",
+  description: "TTS Gradium (WebSocket streaming + REST fallback). Voix naturelles, 237 voix.",
+
+  async generate(text: string, ctx?: TTSGenerateContext): Promise<TTSGenerateResult> {
+    return generateGradiumSpeech(text, ctx, resolveGradiumSettings(ctx?.characterKey));
   },
 
   createStreamingPlayback(text: string, ctx?: TTSGenerateContext): TTSStreamPlaybackHandle | null {
@@ -273,10 +276,13 @@ function createStreamingHandleWithFallback(
 /** Freezes the existing character voice and settings at turn preparation. */
 export function createGradiumIncrementalTurn(ctx: TTSGenerateContext, onProgress?: import("../gradiumStreamPlayer").GradiumStreamOptions["onProgress"]) {
   const s = resolveGradiumSettings(ctx.characterKey);
-  return createGradiumTurnSession({
+  const session = createGradiumTurnSession({
     voiceId: ctx.voiceId || s.voiceId,
     format: s.outputFormat === "pcm_24000" ? "pcm_24000" : "pcm_48000",
     jsonConfig: buildJsonConfig(s, ctx.performance), signal: ctx.signal,
     onVoiceObservation: ctx.onVoiceObservation, onProgress,
+  });
+  return Object.assign(session, {
+    generateFallback: (text: string, signal: AbortSignal) => generateGradiumSpeech(text, { ...ctx, signal }, s),
   });
 }

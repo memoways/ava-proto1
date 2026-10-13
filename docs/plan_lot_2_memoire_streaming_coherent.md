@@ -127,11 +127,11 @@ Cible native Lovable confirmée : projet et workspace ci-dessus, Cloud activé.
    continuation privée), normalisation V1–V3 sans réécriture de faits, projection
    de l'historique livré et reprise privée bornée. Persistance dans JSONB
    `sessions.conversation_memory` et `conversation_log` existants : aucune
-   migration nécessaire. Comparaison du JSON complet pour éviter qu'une écriture
+   modification de colonne nécessaire. RPC additive CAS transmise en POST pour éviter qu'une écriture
    GM ou reçu concurrente efface l'autre ; cache local disponible au tour suivant.
 6. `settingsService.ts` / `GameMasterConfigTab.tsx` : flag
    `VOICE_INCREMENTAL_OUTPUT`, false pour les réglages existants, sélectionné
-   au décrochage et conservé pendant l’appel ; canary uniquement sandbox-ulrich.
+   à la création de session et conservé à la reprise dans la mémoire V4 ; canary uniquement sandbox-ulrich.
    `IndexPRD4.tsx` : chemin Gradium incrémental pour sortie TTS Gradium déjà
    sélectionnée ; compatibilité batch des autres sorties/laboratoires conservée.
    Signaux d'interruption existants, générations immuables, capture et seuils
@@ -170,3 +170,36 @@ JSONB PostgreSQL embarqué reproduisent les courses reçu/GM, sans migration
 et sans accès à une base externe. Gates intégration, E2E et revues en cours.
 Identité GitHub existante confirmée par requête authentifiée hors sandbox ;
 aucune GitHub App configurée sur cette machine, aucune reconnexion.
+
+### Correction de stockage avant livraison — revue indépendante
+
+La comparaison optimiste du JSONB dans `.eq` produit une URL HTTP trop longue
+(~24 Ko pour seize reçus courts, démontré avec le SDK). Remplacement indispensable
+par `persist_conversation_memory_v4`, RPC SQL recevant ancien/nouveau JSON dans
+le corps POST. Migration additive `20261013171500_persist_memory_v4_cas.sql` :
+aucune colonne ni donnée modifiée, fonction SECURITY INVOKER, RLS existantes,
+EXECUTE réservé à authenticated, aucune élévation de droits. Mise à jour atomique
+mémoire/log/cursor avec égalité NULL-safe du snapshot et curseur monotone.
+Pas de changement des migrations P0, du compteur handoff ni des secrets.
+Application uniquement au Cloud Lovable du projet vérifié après fusion ;
+contrôle existence/droits et essais isolés avant publication.
+Rollback frontend au batch conservé ; RPC additive peut rester sans appel.
+
+### Corrections de revue et preuves
+
+Revues Standards/Spec sur `ad0f871` : consentement depuis texte non entendu,
+watchdog sortie non relié, blancs originaux des reçus et URL CAS trop longue.
+Corrections réalisées : gardes sur livré, annulation du handle + secours,
+offsets conservés dans le texte original, RPC CAS en POST. Le premier son
+arrivé après EOF mais avant la fin de lecture clôt désormais son watchdog
+sans couper une réponse longue. Fallback Gradium REST du discours sûr entier,
+avec les paramètres figés, uniquement avant tout audio ; pas de synthèse par
+phrase dans ce secours. Flag épinglé à la création et à la reprise de session.
+Observations TTS WebSocket/REST et spans Edge disponibles restent attribués
+sans inventer les jalons absents ; trace diagnostique P1 distingue généré/livré.
+
+Preuves locales intermédiaires : 35 E2E complets réussis (Chromium + media
+Firefox/WebKit), puis régression P1 supplémentaire réussie : panne après
+« Bonjour. », accord uniquement dans la suite non jouée, GM sur Bonjour et
+aucun bouton Appeler. Tests RLS existants + RPC passent (12), montrant refus
+anon, isolation propriétaire et curseur monotone. Qualité finale en cours.

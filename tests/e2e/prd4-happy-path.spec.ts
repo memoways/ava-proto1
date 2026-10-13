@@ -15,6 +15,8 @@ const TRANSCRIPTS = [
 ];
 
 interface NetworkFakeOptions {
+  incrementalOutput?: boolean;
+  gradiumDropAt?: number;
   failMaxAt?: number;
   gmTarget?: "max" | "emma";
   gmStance?: "accept" | "object" | "defer";
@@ -73,14 +75,20 @@ async function installNetworkFakes(
   const experienceEvents: Array<{ event_type: string; event_key: string; payload: Record<string, unknown> }> = [];
   const voiceEvents: Array<Record<string, unknown>> = [];
   const gmFilmContexts: string[] = [];
+  let sessionMemory: Record<string, unknown> = {};
+  let memoryLastTurn = 0;
 
-  await page.addInitScript(({ transcripts, simulateAudio, batchAudio, handsFree, skipQuestionnaire, delayFirstSTTFinalMs }: { transcripts: string[]; simulateAudio: boolean; batchAudio: boolean; handsFree: boolean; skipQuestionnaire: boolean; delayFirstSTTFinalMs: number }) => {
+  await page.addInitScript(({ transcripts, simulateAudio, batchAudio, handsFree, skipQuestionnaire, delayFirstSTTFinalMs, incrementalOutput, gradiumDropAt }: { transcripts: string[]; simulateAudio: boolean; batchAudio: boolean; handsFree: boolean; skipQuestionnaire: boolean; delayFirstSTTFinalMs: number; incrementalOutput: boolean; gradiumDropAt: number }) => {
     let websocketIndex = 0;
+    let gradiumIndex = 0;
     type E2ETestWindow = Window & {
       __e2eLongAudio?: boolean;
       __e2eAudioState?: { ended: number; paused: number };
       __e2eNativeVideoState?: { playing: boolean; playCount: number; pauseCount: number };
       __e2eSTTFinals?: number;
+      __e2eGradiumTexts?: string[];
+      __e2eGradiumSetups?: number;
+      __e2eGradiumEos?: number;
     };
     const testWindow = window as E2ETestWindow;
     // These scenarios exercise the PRD4 flow after a successful public gate.
@@ -107,6 +115,7 @@ async function installNetworkFakes(
       },
     });
     localStorage.setItem("ava:prod:ava_gameplay_settings", JSON.stringify({ RAG_SUMMARY_EVERY_N_TURNS: 4,
+      ...(incrementalOutput ? { VOICE_INCREMENTAL_OUTPUT: true } : {}),
       ...(handsFree ? { VOICE_HANDS_FREE: { enabled: true } } : {}),
       ...(skipQuestionnaire ? { SHOW_QUESTIONNAIRE: false } : {}),
     }));
@@ -171,8 +180,12 @@ async function installNetworkFakes(
       onerror: (() => void) | null = null;
       onclose: (() => void) | null = null;
       private transcript = "";
+      private isGradium = false;
+      private gradiumIndex = 0;
 
       constructor(url: string | URL) {
+        this.isGradium = String(url).startsWith("wss://api.gradium.com/") || String(url).startsWith("wss://api.gradium.ai/");
+        if (this.isGradium) this.gradiumIndex = ++gradiumIndex;
         const isDeepgram = String(url).startsWith("wss://api.deepgram.com/");
         const transcript = isDeepgram
           ? transcripts[websocketIndex++] ?? `Tour simulé ${websocketIndex}`
@@ -194,7 +207,23 @@ async function installNetworkFakes(
       send(data: string | Blob | ArrayBuffer) {
         if (typeof data !== "string") return;
         try {
-          const command = JSON.parse(data) as { type?: string };
+          const command = JSON.parse(data) as { type?: string; text?: string };
+          if (this.isGradium) {
+            if (command.type === 'setup') testWindow.__e2eGradiumSetups = (testWindow.__e2eGradiumSetups ?? 0) + 1;
+            if (command.type === 'text') {
+              if (this.gradiumIndex === gradiumDropAt && command.text === 'Bonjour.') {
+                setTimeout(() => this.onmessage?.(new MessageEvent('message',{data:JSON.stringify({type:'text',text:'Bonjour.',start_s:0,stop_s:0.1})})),10);
+              }
+              testWindow.__e2eGradiumTexts = [...(testWindow.__e2eGradiumTexts ?? []), command.text ?? ''];
+              setTimeout(() => this.onmessage?.(new MessageEvent('message', { data: JSON.stringify({ type: 'audio', audio: btoa('\0'.repeat(38400)) }) })), 5);
+            }
+            if (command.type === 'end_of_stream') {
+              testWindow.__e2eGradiumEos = (testWindow.__e2eGradiumEos ?? 0) + 1;
+              if (this.gradiumIndex === gradiumDropAt) setTimeout(() => this.onmessage?.(new MessageEvent('message',{data:JSON.stringify({type:'error',message:'simulated_mid_audio_failure'})})),250);
+              else setTimeout(() => this.onmessage?.(new MessageEvent('message', { data: JSON.stringify({ type: 'end_of_stream' }) })), 20);
+            }
+            return;
+          }
           if (command.type !== "Finalize") return;
           testWindow.__e2eSTTFinals = (testWindow.__e2eSTTFinals ?? 0) + 1;
           setTimeout(() => this.onmessage?.(new MessageEvent("message", {
@@ -248,6 +277,8 @@ async function installNetworkFakes(
   }, { transcripts, simulateAudio: options.ttsSuccess === true, batchAudio: options.whisperResponse !== undefined,
     handsFree: options.handsFree === true, skipQuestionnaire: options.skipQuestionnaire === true,
     delayFirstSTTFinalMs: options.delayFirstSTTFinalMs ?? 0,
+    incrementalOutput: options.incrementalOutput === true,
+    gradiumDropAt: options.gradiumDropAt ?? -1,
   });
 
   await page.route("https://video.gumlet.io/**", (route) => {
@@ -290,12 +321,17 @@ async function installNetworkFakes(
     const url = new URL(request.url());
     const table = url.pathname.split("/").pop();
 
+    if (table === 'persist_conversation_memory_v4') {
+      const payload=request.postDataJSON();sessionMemory=payload.p_next_memory;memoryLastTurn=payload.p_next_last_turn??memoryLastTurn;
+      sessionUpdates.push({conversation_memory:sessionMemory});
+      return json(route,{conversation_memory:sessionMemory,memory_last_turn:memoryLastTurn});
+    }
     if (table === "get_character_runtime_readiness_for_environment") {
       const input = request.postDataJSON() as { p_character_key: string };
       const character = input.p_character_key;
       return json(route, [{ character_key: character, display_name: character === "emma" ? "Emma" : "Max", enabled: true, ready: true,
         character_id: character === "emma" ? EMMA_CHARACTER_ID : CHARACTER_ID, notion_page_id: "77777777-7777-4777-8777-777777777777", environment_id: "prod", prompt_updated_at: "2026-10-12T00:00:00Z",
-        tts_provider: "elevenlabs", tts_voice_id: options.characterOpenings ? (character === "emma" ? "e2e-emma-voice" : "e2e-max-voice") : null, opening_line: options.characterOpenings ? `Allô, ici ${character === "emma" ? "Emma" : "Max"}.` : null, portrait_url: null, situation_summary: "Fiche E2E" }]);
+        tts_provider: options.incrementalOutput ? "gradium" : "elevenlabs", tts_voice_id: options.characterOpenings ? (character === "emma" ? "e2e-emma-voice" : "e2e-max-voice") : null, opening_line: options.characterOpenings ? `Allô, ici ${character === "emma" ? "Emma" : "Max"}.` : null, portrait_url: null, situation_summary: "Fiche E2E" }]);
     }
     if (table === "pin_current_orchestration_version") {
       return json(route, "66666666-6666-4666-8666-666666666666");
@@ -364,6 +400,7 @@ async function installNetworkFakes(
     if (table === "admin_settings") {
       if (url.searchParams.get("key") === "eq.ava_gameplay_settings") {
         return json(route, [{ environment_id: "prod", value: { TIMEOUT_SECONDS: 930,
+          ...(options.incrementalOutput ? { VOICE_INCREMENTAL_OUTPUT: true } : {}),
           ...(options.handsFree ? { VOICE_HANDS_FREE: { enabled: true } } : {}),
           ...(options.skipQuestionnaire ? { SHOW_QUESTIONNAIRE: false } : {}),
         } }]);
@@ -397,8 +434,18 @@ async function installNetworkFakes(
       return json(route, [], 201);
     }
     if (table === "sessions" && request.method() === "PATCH") {
-      sessionUpdates.push(request.postDataJSON());
+      const patch = request.postDataJSON();
+      sessionUpdates.push(patch);
+      if (options.incrementalOutput) {
+        sessionMemory = patch.conversation_memory ?? sessionMemory;
+        memoryLastTurn = patch.memory_last_turn ?? memoryLastTurn;
+        return json(route, { conversation_memory: sessionMemory, memory_last_turn: memoryLastTurn });
+      }
       return json(route, []);
+    }
+    if (table === "sessions" && options.incrementalOutput && request.method() === "GET"
+      && !url.searchParams.has('ended_at')) {
+      return json(route, { conversation_memory: sessionMemory, memory_last_turn: memoryLastTurn, gm_post_turn_log: [] });
     }
     return json(route, [], request.method() === "POST" ? 201 : 200);
   });
@@ -428,6 +475,10 @@ async function installNetworkFakes(
       }
       return json(route, { matches: [], embedding_provider: "e2e", rerank_used: false, latency_ms: 1 });
     }
+    if (functionName === "proxy-tts-gradium") {
+      if (request.method() === 'GET') return json(route, { token: 'e2e-short-lived-token' });
+      return route.fulfill({status:200,contentType:'audio/wav',body:'e2e-audio'});
+    }
     if (functionName === "proxy-tts") {
       ttsCallCount += 1;
       if (options.ttsBusyOnce && ttsCallCount === 1) {
@@ -446,7 +497,7 @@ async function installNetworkFakes(
       return route.fulfill({ status: 422, contentType: "application/json", body: JSON.stringify({ error: "TTS disabled in E2E" }) });
     }
     if (functionName === "proxy-llm") {
-      const payload = request.postDataJSON() as { messages?: Array<{ role: string; content: string }> };
+      const payload = request.postDataJSON() as { stream?: boolean; messages?: Array<{ role: string; content: string }> };
       const system = payload.messages?.[0]?.content ?? "";
       let content: string;
       if (system.includes("analyste du Game Master")) {
@@ -500,6 +551,12 @@ async function installNetworkFakes(
           return json(route, { error: "simulated_provider_failure" }, 503);
         }
         content = options.characterReplies?.[maxTurnCount - 1] ?? options.maxResponse ?? `Réponse de Max pour le tour ${maxTurnCount}.`;
+      }
+      if (payload.stream) {
+        const response = JSON.stringify({goal:'PRIVATE_INTENT_CANARY',points:['Point privé']}) + '\n<speech>\n' + content;
+        const chunks = [response.slice(0, 12),response.slice(12, 45),response.slice(45)];
+        return route.fulfill({ status:200,contentType:'text/event-stream',body:chunks.map(text =>
+          `data: ${JSON.stringify({id:`generation-${maxTurnCount}`,model:'e2e-model',choices:[{delta:{content:text}}]})}\n\n`).join('') + 'data: [DONE]\n\n' });
       }
       return json(route, {
         id: `generation-${maxTurnCount}`,
@@ -1110,4 +1167,45 @@ test("V2 garde un flush vide sans requête LLM dans les effectifs", async ({ pag
   await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
   await expect.poll(() => fakes.getVoiceEvents().filter((event) => event.status === "no_audio").length).toBe(1);
   expect(fakes.getMaxTurnCount()).toBe(0);
+});
+
+for (const character of ['Max','Emma'] as const) {
+  test(`P1 ${character}: one private generation and one Gradium context, persisted delivery`, async ({page}) => {
+    const fakes=await installNetworkFakes(page,['Bonjour, je suis ici pour écouter.'],{incrementalOutput:true,maxResponse:'Bonjour. Je vous écoute.',ttsSuccess:true});
+    await startCharacterConversation(page,character);
+    await expect(page.getByRole('button',{name:"Démarrer l'enregistrement"})).toBeEnabled();
+    await page.evaluate(()=>{const w=window as Window & {__e2eGradiumTexts?:string[];__e2eGradiumSetups?:number;__e2eGradiumEos?:number};w.__e2eGradiumTexts=[];w.__e2eGradiumSetups=0;w.__e2eGradiumEos=0;});
+    await page.getByRole('button',{name:"Démarrer l'enregistrement"}).click();
+    await expect(page.getByText('Bonjour, je suis ici pour écouter.',{exact:false})).toBeVisible();
+    await page.getByRole('button',{name:"Arrêter l'enregistrement"}).press('Enter');
+    await expect.poll(()=>fakes.getGmPostTurnCount()).toBe(1);
+    const transport=await page.evaluate(()=>{
+      const w=window as Window & {__e2eGradiumTexts?:string[];__e2eGradiumSetups?:number;__e2eGradiumEos?:number};
+      return {text:w.__e2eGradiumTexts,setups:w.__e2eGradiumSetups,eos:w.__e2eGradiumEos};
+    });
+    expect(fakes.getMaxTurnCount()).toBe(1);expect(transport).toEqual({text:['Bonjour.','Je vous écoute.'],setups:1,eos:1});
+    expect(transport.text?.join(' ')).not.toContain('PRIVATE_INTENT_CANARY');
+    await expect.poll(()=>JSON.stringify(fakes.getSessionUpdates())).toContain('deliveryByCharacter');
+    const updates=JSON.stringify(fakes.getSessionUpdates());expect(updates).toContain('"status":"completed"');expect(updates).toContain(`"character":"${character.toLowerCase()}"`);
+    expect(fakes.getGmFilmContexts().join(' ')).not.toContain('PRIVATE_INTENT_CANARY');
+    await expect(page.getByRole('button',{name:/^Appeler /})).toHaveCount(0);
+  });
+}
+
+test('P1 : un accord généré après le préfixe entendu ne donne pas la permission de transférer',async({page})=>{
+  const turns=[...HANDOFF_TURNS,"J'aimerais parler à Max, s'il te plaît."];
+  const fakes=await installNetworkFakes(page,turns,{incrementalOutput:true,ttsSuccess:true,gradiumDropAt:5,
+    characterReplies:['Bonjour.','Je vous écoute.','Merci.','Bonjour. D’accord, je te le passe.'],gmTarget:'max',gmStance:'accept',gmHandoffAt:4});
+  await startCharacterConversation(page,'Emma');
+  for (let i=0;i<turns.length;i++) {
+    await expect(page.getByRole('button',{name:"Démarrer l'enregistrement"})).toBeEnabled();
+    await page.getByRole('button',{name:"Démarrer l'enregistrement"}).click();
+    await expect(page.getByText(turns[i],{exact:false})).toBeVisible();
+    await page.getByRole('button',{name:"Arrêter l'enregistrement"}).press('Enter');
+    await expect.poll(()=>fakes.getGmPostTurnCount()).toBe(i+1);
+  }
+  await expect(page.getByRole('button',{name:/^Appeler /})).toHaveCount(0);
+  expect(fakes.getGmFilmContexts().at(-1)).not.toContain('D’accord, je te le passe.');
+  expect(fakes.getGmFilmContexts().at(-1)).toContain('Bonjour.');
+  expect(JSON.stringify(fakes.getSessionUpdates())).toContain('"status":"failed"');
 });

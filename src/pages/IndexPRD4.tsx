@@ -637,6 +637,7 @@ const IndexPRD4 = () => {
     diagnosticTraceEnabledRef.current = diagnosticTraceEnabled;
 
     const startingCharacter = startingCharacterRef.current;
+    incrementalOutputEnabledRef.current = getGameplaySettings().VOICE_INCREMENTAL_OUTPUT === true;
     const sid = await createPRD4Session(
       state.userRoleProfile,
       startingCharacter,
@@ -769,6 +770,7 @@ const IndexPRD4 = () => {
   const handleResumeCall = useCallback(async () => {
     const session = resumableSession;
     if (!session) return;
+    incrementalOutputEnabledRef.current = session.conversation_memory.incrementalOutputEnabled === true;
     cleanupAudio();
     const now = Date.now();
     const timerWindow = resolveResumeTimerWindow(session.started_at, session.resume_expires_at, now);
@@ -864,7 +866,6 @@ const IndexPRD4 = () => {
     const configuredDuration = normalizeSessionDurationSeconds(gameplaySettings.TIMEOUT_SECONDS);
     configuredSessionDurationRef.current = configuredDuration;
     showQuestionnaireRef.current = gameplaySettings.SHOW_QUESTIONNAIRE;
-    incrementalOutputEnabledRef.current = gameplaySettings.VOICE_INCREMENTAL_OUTPUT === true;
     handsFreeSettingsRef.current = normalizeHandsFreeSettings(gameplaySettings.VOICE_HANDS_FREE);
     setHandsFreeEnabled(handsFreeSettingsRef.current.enabled);
     setSessionDurationSeconds(configuredDuration);
@@ -1123,6 +1124,7 @@ const IndexPRD4 = () => {
       let streamedVoice: ReturnType<typeof prepareStreamedVoiceTurn> | null = null;
       let earlyFirstPlaybackAt: number | null = null;
       let streamTtsStartedAt: number | null = null;
+      let streamGenerationComplete = false;
       let responseReceipt: ResponseDeliveryReceipt | undefined;
       let responseMessage: ConversationMessage | null = null;
       const owningSessionId = sessionIdRef.current;
@@ -1133,7 +1135,7 @@ const IndexPRD4 = () => {
         });
         const existing = responseMessage ?? conversationRef.current.find(m => m.delivery?.turnId === receipt.turnId);
         if (existing) { existing.delivery = receipt; existing.content = receipt.generated; }
-        else if (turnController.signal.aborted && receipt.generated && sessionIdRef.current === owningSessionId) {
+        else if ((turnController.signal.aborted || receipt.status === 'failed') && receipt.generated && sessionIdRef.current === owningSessionId) {
           const interrupted = tagSpokenWith({ role: turnCharacter, content: receipt.generated,
             delivery: receipt, timestamp: Date.now() }, turnCharacter);
           conversationRef.current = [...conversationRef.current, interrupted];
@@ -1188,16 +1190,14 @@ const IndexPRD4 = () => {
             onPlaybackStart: () => {
               if (!isCurrentTurn()) return;
               earlyFirstPlaybackAt = performance.now();
+              if (streamGenerationComplete && processingWatchdogRef.current) {
+                window.clearTimeout(processingWatchdogRef.current); processingWatchdogRef.current = null;
+              }
               setAudioState('max_speaking');
               // This watchdog protects generation until completion, even if audio has begun.
             },
             onReceipt: persistReceipt,
-            fallback: text => renderResponseText(text, { turnId, turnIndex, signal: turnController.signal,
-              voiceId, providerId: 'gradium', characterKey: turnCharacter, userMessage: userText,
-              attemptId: telemetry.attemptId, onVoiceObservation: telemetry.observe,
-              onServiceObserved: telemetry.service, onPlaybackStart: () => {
-                if (isCurrentTurn()) { earlyFirstPlaybackAt ??= performance.now(); setAudioState('max_speaking'); }
-              } }),
+
           });
         }
         const turnInput = {
@@ -1234,6 +1234,7 @@ const IndexPRD4 = () => {
           : await processPRD4Turn(turnInput);
 
         if (!isCurrentTurn()) return;
+        streamGenerationComplete = true;
 
         if (processingWatchdogRef.current) {
           window.clearTimeout(processingWatchdogRef.current);
@@ -1294,6 +1295,7 @@ const IndexPRD4 = () => {
           if (activeOutputControllerRef.current !== outputController || outputController.signal.aborted) return;
           console.warn("[PRD4] TTS first-audio watchdog fired — cancelling output only");
           outputController.abort("tts-first-audio-deadline");
+          streamedVoice?.cancel("tts-first-audio-deadline");
           try { responseOutputRef.current?.interrupt(); } catch { /* ignore */ }
           setAudioState("idle");
           toast({
@@ -1442,6 +1444,7 @@ const IndexPRD4 = () => {
           void updatePRD4Conversation(sessionIdRef.current, conversationRef.current);
         }
 
+        const deliveredCharacterText = responseReceipt?.delivered ?? result.maxResponse;
         // ---- Directeur d'expérience unique : labels, mémoire, guidance et une
         // action recommandée, toujours après le texte et la voix du personnage.
         void result.postTurnPromise.then(async (ev) => {
@@ -1504,11 +1507,11 @@ const IndexPRD4 = () => {
           const requestedOffer: CharacterHandoffOffer | null = requestedSwitch
             && gmStance === "accept"
             && currentAction.type === "handoff" && currentAction.targetCharacter === requestedSwitch
-            && hasCharacterHandoffConsent(result.maxResponse, requestedSwitch, gmStance)
+            && hasCharacterHandoffConsent(deliveredCharacterText, requestedSwitch, gmStance)
             ? { targetCharacter: requestedSwitch, reason: currentAction.reason, proposalGuidance: currentAction.proposalGuidance }
             : null;
           const recommendedOffer = handoffProposalForThisTurn
-            && hasCharacterHandoffConsent(result.maxResponse, handoffProposalForThisTurn.targetCharacter,
+            && hasCharacterHandoffConsent(deliveredCharacterText, handoffProposalForThisTurn.targetCharacter,
               ev.player_switch_request?.targetCharacter === handoffProposalForThisTurn.targetCharacter
                 ? ev.player_switch_request.stance : undefined)
             ? handoffProposalForThisTurn : null;
@@ -1628,7 +1631,7 @@ const IndexPRD4 = () => {
         telemetry.finish(turnController.signal.aborted ? "cancelled" : "failed");
         if (turnController.signal.aborted || activeTurnSequenceRef.current !== turnSequence) return;
         console.error("[PRD4] turn failed:", err);
-        const diagnosticFailure = diagnosticTraceEnabledRef.current;
+        const diagnosticFailure = diagnosticTraceEnabledRef.current && !streamedVoice;
         if (diagnosticFailure) {
           // Le tour n'a pas été diffusé : retire le message optimiste afin qu'un
           // nouvel appui PTT rejoue bien le même index causal, sans doublon.

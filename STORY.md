@@ -80,7 +80,8 @@ l’avait interrompue. P1 ajoute une intention privée dans la même génératio
 une parole segmentée et un socket Gradium pour le tour entier. Le reçu distingue
 le préfixe entendu, le texte incertain et la continuation privée. Seul le
 préfixe livré alimente le GM et les résumés ; les historiques Max/Emma restent
-isolés. Les colonnes JSON existantes suffisent, sans migration. Le flag de
+isolés. Les colonnes JSON existantes sont conservées ; une RPC additive
+protège les écritures concurrentes sans dépasser les limites HTTP. Le flag de
 sortie progressive reste désactivé par défaut pour une canary sandbox-ulrich.
 Implémentation et tests en cours ; aucune publication P1 encore effectuée.
 [Plan et preuves P1](docs/plan_lot_2_memoire_streaming_coherent.md).

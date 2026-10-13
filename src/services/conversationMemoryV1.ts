@@ -213,6 +213,7 @@ export function normalizeConversationMemory(raw: unknown): ConversationMemoryV1 
     characterItems: sanitizeCharacterItems(candidate.characterItems, lastTurn),
     characterStates: sanitizeCharacterStates(candidate.characterStates, lastTurn),
     deliveryByCharacter: normalizeDeliveries(candidate.deliveryByCharacter),
+    ...(typeof candidate.incrementalOutputEnabled === "boolean" ? { incrementalOutputEnabled: candidate.incrementalOutputEnabled } : {}),
   };
 }
 

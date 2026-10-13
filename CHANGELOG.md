@@ -142,7 +142,8 @@ plus anciennes conservent leur état au moment de leur rédaction.
 - Gradium incrémental par tour, voix/réglages figés, buffer borné, suivi des
   samples et timestamps ; secours transport avant son seulement, aucun replay
   après sortie. Reçus V4 isolés, contexte entendu distinct du texte généré,
-  GM et résumés sur livraison confirmée. Stockage JSONB existant, aucune migration.
+  GM et résumés sur livraison confirmée. Colonnes JSONB existantes et RPC CAS
+  additive avec RLS conservées ; aucune transformation de données.
 - Flag Sortie vocale progressive désactivé par défaut ; activation canary prévue
   uniquement sandbox-ulrich. Tests et livraison GitHub/Lovable en cours.
   [Plan P1](docs/plan_lot_2_memoire_streaming_coherent.md).

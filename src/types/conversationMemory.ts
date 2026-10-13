@@ -38,6 +38,8 @@ export interface ConversationRelationshipState {
 export interface ConversationMemoryV1 {
   /** Version 3 keeps V1/V2 compatibility and adds a validated relationship state. */
   version: 1 | 2 | 3 | 4;
+  /** P1 output preset pinned at session creation. Old sessions keep batch. */
+  incrementalOutputEnabled?: boolean;
   deliveryByCharacter?: import("@/services/responseDelivery").DeliveryByCharacter;
   lastTurn: number;
   interlocutor: {

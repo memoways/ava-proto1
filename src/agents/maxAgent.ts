@@ -254,6 +254,7 @@ export async function simulateMaxResponse(
     ? formatPrivateDeliveryContext(input.conversationMemory?.deliveryByCharacter?.[opts.characterContext.characterKey]) : '';
   const systemPrompt = promptTrace.finalSystemPrompt + (privateContext ? `\n# CONTINUITÉ PRIVÉE\n${privateContext}` : '')
     + (opts?.onSpeechToken ? RESPONSE_STREAM_CONTRACT : '');
+  promptTrace.finalSystemPrompt = systemPrompt;
   const messages: TraceMessage[] = [
     { role: "system", content: systemPrompt },
     ...input.conversationHistory.map((msg) => ({
