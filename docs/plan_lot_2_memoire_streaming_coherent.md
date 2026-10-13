@@ -362,3 +362,41 @@ relever raison terminale et génération exacte si le problème se reproduit.
 Aucune parole injectée ni nouvelle cause inférée en l'absence de ce résultat.
 Frontend publié reste `f251eb3`. La recette P1, la résolution éventuelle de
 l'échec et la publication/vérification publiée restent à accomplir.
+
+### Cause établie — format P1 trop volumineux pour le budget existant
+
+Nouvelle recette : deux coupures `finish_reason=length`, générations
+`gen-1791922732-gKomWTSV0CMSqWQjyhdW` et
+`gen-1791922746-WzR1AUDpqi0b970Cshbg` ; tokens observés 222 et 230
+(ne pas présenter ces comptages fournisseur comme une égalité exacte au
+paramètre220). Troisième réponse terminée, 182 tokens, génération
+`gen-1791922752-ltepTcB7OTaQ4vRhzEbz`. Reçus des deux échecs : intention
+366/350 caractères, parole448/491, livré0, reste incertain/privé conservé.
+Reçu du succès : intention268 caractères, généré/livré407 caractères.
+Appel clôturé par l'agent, canary remise à false avant correction.
+
+Le contrat initial autorise une intention volumineuse puis un discours sans
+borne globale compatible avec la sortie220. La garde length coupe justement
+l'audio ; la relâcher masquerait une vraie troncature. Référence primaire :
+[max_tokens OpenRouter](https://openrouter.ai/docs/api_reference/parameters)
+borne la sortie totale, en-tête privé compris. L'avertissement de bridge
+postMessage fourni par Ulrich est distinct des raisons terminales length.
+
+Sous-lot format P1 sur branche codex dédiée : `buildResponseStreamContract`
+reçoit le budget déjà sélectionné dans simulateMaxResponse, impose une
+intention compacte (goal8mots, 0–2 points4mots) et un discours≤45mots avec
+marge conservatrice pour JSON/frontière ; budgets<120 : goal4mots, points[],
+parole réduite. Borne calculée depuis le budget existant, jamais budget augmenté.
+Il s'agit du format de la même génération P1, sans changement du compilateur
+éditorial/canon/cadre commun/GM/RAG, ni changement de modèle, voix ou délai.
+La limite de mots est une instruction conservatrice, pas un compteur exact
+de tokens : contrôle length/EOF reste bloquant et recette réelle indispensable.
+Schéma parser/normalisation mémoire inchangé, anciens reçus privés conservés.
+
+Tests au seam simulateMaxResponse : une seule génération, budget220 inchangé,
+contrat compact réellement présent dans prompt final/trace, budgetoverride
+plus petit respecté, batch sans format P1. Puis parser/SSE/coordination,
+qualité, revues, CI, PR/squash, Lovable, nouvelle recette Max/Emma/annulation.
+Confiance95% : cause length identifiée, duplication absente, montage PRD4 et
+APIs existants, documentation officielle vérifiée ; les essais réels décideront
+de l'efficacité. Aucune garantie de gain de latence ni publication anticipée.

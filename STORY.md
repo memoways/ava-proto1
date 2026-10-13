@@ -95,6 +95,10 @@ Une trace plus précise est livrée par #35 (`0eff02e`), revue et CI vertes,
 pour garder la raison terminale, l'identifiant et les tokens même en échec.
 Un nouvel appel canary est préparé pour recueillir cette preuve réelle ;
 ce correctif ne suffit pas à considérer l'échec upstream résolu.
+Cette trace établit ensuite deux fins `length`, suivies d'un succès. Le format
+privé doit partager le budget de sortie avec la parole. Le correctif P1 rend
+son intention compacte et borne la réponse dans ce même budget ; il garde le
+contrôle de troncature et attend une nouvelle recette réelle avant publication.
 [Plan et preuves P1](docs/plan_lot_2_memoire_streaming_coherent.md).
 
 

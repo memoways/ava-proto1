@@ -1,4 +1,4 @@
-import { RESPONSE_STREAM_CONTRACT } from "@/services/responseIntentStream";
+import { buildResponseStreamContract } from "@/services/responseIntentStream";
 import { formatPrivateDeliveryContext } from "@/services/responseDelivery";
 import { callLLM, callLLMWithUsage, LLMProxyRequestError, streamLLM, type LLMUsage } from "@/services/openRouterLLM";
 import { debugLogger } from "@/services/debugLogger";
@@ -250,10 +250,12 @@ export async function simulateMaxResponse(
   const promptBuildStartedAt = performance.now();
   const promptTrace = await buildMaxSystemPrompt(input, characterName, opts?.characterContext);
   const promptBuildLatencyMs = Math.round(performance.now() - promptBuildStartedAt);
+  const llm = getLLMSettings();
+  const maxTokens = opts?.llmOverrides?.maxTokens ?? llm.LLM_MAX_TOKENS;
   const privateContext = opts?.characterContext
     ? formatPrivateDeliveryContext(input.conversationMemory?.deliveryByCharacter?.[opts.characterContext.characterKey]) : '';
   const systemPrompt = promptTrace.finalSystemPrompt + (privateContext ? `\n# CONTINUITÉ PRIVÉE\n${privateContext}` : '')
-    + (opts?.onSpeechToken ? RESPONSE_STREAM_CONTRACT : '');
+    + (opts?.onSpeechToken ? buildResponseStreamContract(maxTokens) : '');
   promptTrace.finalSystemPrompt = systemPrompt;
   const messages: TraceMessage[] = [
     { role: "system", content: systemPrompt },
@@ -264,10 +266,8 @@ export async function simulateMaxResponse(
     { role: "user", content: input.userMessage },
   ];
 
-  const llm = getLLMSettings();
   const model = opts?.llmOverrides?.model ?? llm.LLM_MODEL;
   const temperature = opts?.llmOverrides?.temperature ?? llm.LLM_TEMPERATURE;
-  const maxTokens = opts?.llmOverrides?.maxTokens ?? llm.LLM_MAX_TOKENS;
   const topP = opts?.llmOverrides?.topP ?? llm.LLM_TOP_P;
   const reasoning = isReasoningEnabledForModel(model, llm);
   const requestedSettings = {

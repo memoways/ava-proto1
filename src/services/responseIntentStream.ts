@@ -2,7 +2,17 @@ import { guardCharacterResponse, type CharacterExecutionContext } from './charac
 
 export interface ResponseIntent { goal: string; points: string[] }
 export const SPEECH_BOUNDARY = '\n<speech>\n';
-export const RESPONSE_STREAM_CONTRACT = `\n# FORMAT DE SORTIE IMPÉRATIF\nDans cette même réponse, écris d'abord une seule ligne JSON {"goal":"objectif communicatif privé","points":["point à couvrir"]}. Objectif maximum 240 caractères, 0 à 4 points de 160 caractères maximum. Ce sont des intentions de communication courtes, pas un raisonnement détaillé. Puis écris exactement la frontière \\n<speech>\\n et ton discours in character. Aucun markdown, aucune autre métadonnée, aucun tag dans le discours. L'intention est privée, jamais entendue. Une intention ou une continuation privée n'est jamais une confidence déjà entendue. Respecte les mêmes limites de confidences et le canon. Termine chaque phrase.\n`;
+/** Output guidance reserves space for the private header without raising the API budget.
+ * Word bounds are conservative guidance, not a tokenizer; SSE still rejects length. */
+export function buildResponseStreamContract(maxTokens: number): string {
+  const budget = Number.isFinite(maxTokens) ? Math.max(1, Math.floor(maxTokens)) : 220;
+  const small = budget < 120;
+  const speechWords = Math.min(45, Math.max(1, Math.floor((budget - (small ? 32 : 70)) / 3)));
+  const intent = small
+    ? 'goal : 4 mots maximum ; points : tableau vide []'
+    : 'goal : 8 mots maximum ; points : 0 à 2 points de 4 mots maximum chacun';
+  return `\n# FORMAT DE SORTIE IMPÉRATIF\nDans cette même réponse, écris d'abord une seule ligne JSON {"goal":"objectif privé","points":[]}. Garde cet en-tête privé compact : ${intent}. Objectif ≤240 caractères, chaque point ≤160 caractères. Ce sont des intentions de communication, pas un raisonnement détaillé. Puis écris exactement la frontière \\n<speech>\\n et ton discours in character. Limite du discours : ${speechWords} mots maximum, y compris citations et questions. Le budget total de ${budget} tokens inclut le JSON et la parole : ne consomme pas la place de la parole avec l'intention. Choisis l'essentiel si la demande est large ; termine tes phrases dans cette limite. Aucun markdown, aucune autre métadonnée, aucun tag dans le discours. L'intention est privée, jamais entendue. Une intention ou une continuation privée n'est jamais une confidence déjà entendue. Respecte les mêmes limites de confidences et le canon.\n`;
+}
 
 export function normalizeResponseIntent(value: unknown): ResponseIntent | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
