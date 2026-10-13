@@ -1658,3 +1658,54 @@ révisions, sessions et limites dans
 Ces parcours manuels n'attestent pas un transfert proposé et accepté par le
 GM ; les limites P0 précédemment acceptées restent valables. La baseline P0
 ci-dessus conserve ses bornes et sa version antérieures à ce complément.
+
+### Reprise proposée après le correctif GM — 13 octobre 2026
+
+L'interprétation d'appel libre de #30/#31 est remplacée par la PR #32,
+`f251eb3`, publiée via Lovable. Accord GM valide et consentement explicite du
+personnage précèdent désormais l'offre au joueur ; aucune bascule vocale
+automatique. Contrôles réels Max/Emma sans bouton permanent en preview et
+publié, 33 E2E et CI post-fusion verts. Preuves dans le plan des appels.
+
+Ulrich demande un prompt de reprise, sans lancer l'implémentation suivante.
+Le complément recommandé est une recette ciblée des limites encore ouvertes,
+avant décision de passage au lot 2/P1. La publication P0 déjà autorisée reste
+livrée ; cette recommandation ne révoque pas cet accord. La recette prépare
+transfert accepté, fin de vidéo et diagnostic du rôle Emma, sans forcer les
+décisions narratives ni redemander les refus déjà confirmés. Les limites de
+versions Edge et de compte non-admin réel restent documentées ; ne pas les
+déclarer résolues par cette recette. Le prompt réutilisable suit.
+
+#### Prompt prêt à reprendre
+
+Reprends uniquement le complément de recette du lot 1/P0 d’Ava Proto 1, avant le lot 2/P1. Ne commence pas le streaming ni l’interruption acoustique dans cette reprise.
+
+Dépôt : memoways/ava-proto1.
+Workspace local : /Users/ulrich/CodeProjects/memoways/ava-proto1.
+Branche de référence : main ; point de reprise documentaire 7ab783cb98bd89fffa5752ef39e1b4cec211ab8b, ou descendant contenant ce commit. Dernier code publié : f251eb38a2094977f3ed5adbdfb8a2008f584ab2, PR #32.
+Lovable est l’unique chaîne de compilation et de publication : projet 1265958d-b74e-40f2-917d-182fe05163fc, workspace Memoways 5glbtPltldwz9tgNwIi4, Lovable Cloud iralfqlslqndgvexixis. Site publié : https://proto1.parle-a-ava.com ; essais exclusivement dans sandbox-ulrich.
+
+Lis AGENTS.md, CHANGELOG.md, STORY.md et ces plans dans le dépôt :
+- docs/plan_lot_1_observabilite_latence.md, en particulier le bilan publié et les limites ;
+- docs/plan_changement_interlocuteur_manuel.md, clarification prioritaire et livraison corrective ;
+- docs/plan_optimisation_latence_voice_to_voice.md, ordre des lots et gates.
+Actualise l’état depuis main et les connecteurs natifs, sans écraser les modifications d’autres travaux. Les anciennes sections des plans racontent des étapes intermédiaires : le dernier bilan prévaut.
+
+État acquis : P0 publié ; échanges réels Max/Emma, interruption, PTT et capture vide documentés selon leur environnement de test. PR #32 publiée avec CI avant/après fusion verte : 44 régressions, 494 unitaires, 30 intégrations, 33 E2E et deux revues sans constat restant. Absence de bouton permanent vérifiée pour les deux personnages en preview puis en publié. Les appels libres de #30/#31 ont été remplacés ; leurs essais ne prouvent pas un transfert accepté par le GM.
+
+Règle produit impérative : seul le choix du premier personnage est libre. Pendant l’appel, une recommandation GM exécutée et validée par les règles narratives, puis un accord explicite du personnage, permettent d’afficher Appeler ou Rester. Une demande vocale seule ne transfère pas. Refus/hésitations, échec, retard ou décision périmée ne donnent aucune permission. Ne baisse pas les seuils, ne change pas les prompts et ne fabrique pas une approbation pour obtenir un bouton. Le clic autorisé coupe capture et audio, joue les sonneries, conserve la session, le timer et les historiques isolés.
+
+Travail restant, dans cet ordre :
+1. Préparer dans Brave une recette humaine courte et ciblée du transfert GM accepté. Retrouver les contrôles et refus déjà documentés ; ne pas répéter les mêmes demandes en boucle. Vérifier séparément recommandation GM, consentement du personnage, disponibilité du bouton, clic, sonneries, personnage cible et persistance dans la même session. Un refus narratif valide n’est pas un bug. Si aucun accord survient, consigner « non observé », sans forcer la règle. Si les conditions sont réunies mais le bouton manque, reproduire et diagnostiquer ce défaut précis.
+2. Observer une cinématique déclenchée normalement et la laisser finir sans cliquer Passer. Vérifier sa fin, le retour au même personnage, le contexte post-vidéo et la reprise de l’écoute. Le déclenchement et le bouton Passer sont déjà validés ; seule la lecture jusqu’au bout reste ouverte.
+3. Diagnostiquer l’écart de rôle d’Emma signalé le 12 octobre : retrouver sa trace, comparer cadre d’expérience, fiche, prompt, historique et décision GM. experienceFrame.ts reste l’unique constructeur commun. Distinguer cause prouvée, non-reproduction et hypothèse ; corriger seulement un défaut démontré, sans réécrire le canon ni élargir à une refonte éditoriale.
+
+Utilise les connecteurs natifs authentifiés avant le navigateur, vérifie chaque cible, et respecte les accès Lovable Cloud. Ouvre les tests depuis l’admin Sandbox Ulrich → Tester moi-même. Prépare toi-même l’onglet ; demande à Ulrich seulement le geste vocal humain nécessaire, une action à la fois. Pas de parole synthétique injectée dans l’application réelle. Ne désactive pas Brave Shields et ne modifie aucun réglage de sécurité sans accord spécifique. Ne touche jamais Gami DigiDouble et n’affiche aucun animal de compagnie.
+
+Aucune nouvelle migration ni changement de fournisseur, voix, flag, deadline, seuil narratif ou algorithme handsFreeVoice n’est autorisé par ce complément. Conserve les migrations déjà appliquées, dont le compteur handoff non négatif ; ne réintroduis pas le plafond historique de 1. Ne présente pas un AbortError d’un tour volontairement interrompu comme un échec du tour suivant.
+
+Si une correction est nécessaire : documente-la dans le plan existant avant implémentation, ajoute une reproduction utile, puis branche dédiée codex/ → tests appropriés → PR vers main → revues et CI sur le HEAD final → squash merge. Préserve les travaux non liés. Ramène tout dans Lovable ; contrôle la preview avant publication, puis vérifie la version publiée dans sandbox-ulrich. Aucun déploiement externe. Si aucun code n’a changé, ne republie pas inutilement.
+
+Termine par les preuves : scénarios, sessions/tours et décisions techniques utiles, résultat et limites de chaque contrôle, révisions, état GitHub/preview/publié et reste éventuel. Mets à jour les plans concernés, CHANGELOG et STORY ; commit et push de la documentation sur main. Ne transforme pas une limite en succès. La baseline P0 à deux tours terminés est descriptive et antérieure au correctif GM : aucun gain de latence à en déduire.
+
+Le prochain développement sera le lot 2/P1 : mémoire de livraison et intention privée, génération LLM unique en streaming, TTS Gradium incrémental par tour et annulation cohérente. Dans cette reprise, prépare seulement sa décision de passage à partir de la recette ; pas d’implémentation P1/P2/P3.

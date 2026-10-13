@@ -1,7 +1,7 @@
 # Plan — réduire la latence et préparer la conversation voice-to-voice libre
 
 Date : 12 octobre 2026. Base auditée : `0433518`, `main`, après une première lecture de `2d83558`.
-Statut : **lot 1 / P0 fusionné via PR #25 (`12d5f293`), CI et compilation Lovable réussies ; trois fonctions Cloud déployées. Stockage manquant rétabli par PR #26 (`979c8b3`), migration validée/appliquée, lecture admin et MCP V2 vérifiée. Échange vocal réel, publication finale et baseline en attente ; lots suivants non commencés**. Choix d'interruption confirmé par Ulrich le 12 octobre : réaction dès le début de voix, avec confirmation des mots ensuite.
+Statut actualisé le 13 octobre 2026 : **lot 1 / P0 publié via Lovable, échanges réels Max/Emma et baseline initiale relevés ; publication autorisée avec limites documentées. Correctifs de session/décrochage et appels soumis au GM livrés, dernier code publié `f251eb3` (PR #32), CHANGELOG/STORY actualisés par `7ab783c`. Transfert GM accepté et fin de cinématique non attestés en réel, écart de rôle Emma du 12 octobre inexpliqué ; lots 2–4 non commencés**. Choix d'interruption confirmé par Ulrich le 12 octobre : réaction dès le début de voix, avec confirmation des mots ensuite. Preuves dans le [bilan P0](plan_lot_1_observabilite_latence.md) et le [correctif des appels](plan_changement_interlocuteur_manuel.md) ; ces contrôles ne prouvent pas l'implémentation de la stratégie acoustique future.
 Sources : [audit détaillé](audit_voice_conversation_max.md) et [snapshot chiffré anonymisé](latency_voice_snapshot_2026-10-12.json).
 
 ## Résultat visé et décisions acquises
@@ -123,7 +123,7 @@ Le tableau de suivi doit présenter chaque gain réellement mesuré, intervalle 
 
 | Lot | Périmètre du plan | État |
 | --- | --- | --- |
-| 1 | P0 : mesures fiables, attribution, MCP, dépendances et baseline | [Code fusionné et preuves de reprise](plan_lot_1_observabilite_latence.md) ; stockage appliqué, lectures V2 rétablies ; tests vocaux, publication finale et baseline à faire |
+| 1 | P0 : mesures fiables, attribution, MCP, dépendances et baseline | [Publié avec baseline et limites](plan_lot_1_observabilite_latence.md) ; recette restante proposée avant P1 : transfert GM accepté, fin de cinématique, diagnostic du rôle Emma |
 | 2 | P1 : mémoire de livraison, intention privée, streaming LLM/TTS et annulation | Prévu après validation du lot 1 |
 | 3 | P2 : écoute libre, interruption acoustique confirmée et UI voix seule | Prévu après validation du lot 2 |
 | 4 | P3 : GM, RAG, prompts et buffers comparés | Prévu après validation du lot 3 |
