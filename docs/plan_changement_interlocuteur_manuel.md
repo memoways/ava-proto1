@@ -93,6 +93,11 @@ GM et de l'accord explicite, puis clic par l'agent si l'offre est autorisée.
 Refus sans répétition ; pas de permission déduite d'une demande seule.
 Transfert accepté non observé à ce stade, aucune correction ni republication.
 
+Complément humain : premier échange de soutien confirmé terminé par Ulrich,
+Emma retourne à l'écoute ; GM executed/action none au tour2, compteur0,
+aucune offre. Un deuxième échange narratif est demandé avant la demande
+unique de transfert. Le transfert accepté reste non observé.
+
 [PR #32](https://github.com/memoways/ava-proto1/pull/32) fusionnée sur main
 à `2026-10-13T10:37:58Z`, commit `f251eb38a2094977f3ed5adbdfb8a2008f584ab2`.
 [CI finale 38383503886](https://github.com/memoways/ava-proto1/actions/runs/38383503886)

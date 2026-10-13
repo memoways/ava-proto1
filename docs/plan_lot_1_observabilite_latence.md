@@ -1784,6 +1784,33 @@ dans le contexte système autorisé. Preview Lovable HEAD `ed70b67` ready ;
 aucun contrôle vocal preview rejoué. Dernier code publié `f251eb3` inchangé,
 pas de nouvelle publication, migration ou mutation des réglages Cloud.
 
+#### Premier échange humain confirmé — 13 octobre 2026
+
+Ulrich confirme « premier échange terminé » dans la session publiée
+`3e5bb2d0-ded4-4ba7-aa12-05d343ad2040`. Emma répond depuis la situation
+familiale prévue, sans aide technique. UI : EN LIGNE puis À L'ÉCOUTE,
+micro ouvert, pas de bouton de transfert ; timer continu (11:33 puis 8:31).
+Le premier geste humain a produit deux tentatives :
+`c37500f9-eea6-4141-93bc-64c176193f2d` / tour1 interrupted,
+GM failed/action none ; `07241caf-e3be-4a8d-9ffc-8e7647b16bfb` / tour2
+completed, GM executed/action none, sans demande de transfert.
+Version de fiche Emma identique à celle du 12 octobre ; compteur0 et
+pending_handoff null. Ce premier échange atteste micro, réponse complète
+confirmée par Ulrich et retour à l'écoute ; aucune mesure acoustique ni gain.
+La contrainte Cloud relue est validée : `CHECK ((handoff_count >= 0))`.
+
+Deuxième geste demandé, toujours dans le même appel : parler une fois de
+ce qui pèse dans la relation avec Max depuis le retour ; laisser toute
+cinématique finir sans Passer, puis confirmer la fin. Au dernier relevé UI,
+ce deuxième échange n'est pas encore observé. La demande de transfert
+reste ultérieure, une seule fois après les gardes narratives, jamais en boucle.
+Les scénarios positifs transfert/fin de cinématique restent ouverts.
+
+Documentation de préparation poussée sur main en `1fea1dc`, distant vérifié ;
+Lovable HEAD `1fea1dc`, ready / agent terminé. Aucun nouveau code livré,
+aucune publication ; contrôle vocal limité au domaine publié, pas à la preview.
+La documentation de ce premier échange complète ce point de reprise.
+
 #### Prompt prêt à reprendre
 
 Reprends uniquement le complément de recette du lot 1/P0 d’Ava Proto 1, avant le lot 2/P1. Ne commence pas le streaming ni l’interruption acoustique dans cette reprise.

@@ -20,6 +20,10 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - 26 tests ciblés du cadre commun et de l'orchestrateur passent. Dernier
   code publié `f251eb3` inchangé ; P1 non commencé et passage non décidé.
   [Protocole et preuves](docs/plan_lot_1_observabilite_latence.md).
+- Premier échange humain publié confirmé ensuite par Ulrich : réponse
+  d'Emma dans le récit et retour à l'écoute ; GM exécuté sans transfert,
+  compteur0. Deuxième échange demandé, transfert et fin de cinématique
+  encore ouverts. Aucun gain de latence revendiqué.
 
 Cette section donne l'état livré après les derniers contrôles. Les entrées
 plus anciennes conservent leur état au moment de leur rédaction.

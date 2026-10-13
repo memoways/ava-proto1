@@ -93,6 +93,12 @@ ouverts. Le dernier code publié reste `f251eb3`, sans republication.
 Le passage à P1 attend les résultats ou une décision explicite sur les limites.
 [Protocole et diagnostic](docs/plan_lot_1_observabilite_latence.md).
 
+Le premier échange humain est ensuite confirmé terminé : Emma répond sur
+sa famille puis reprend l'écoute. Le GM n'offre aucun transfert à ce tour,
+et un deuxième échange narratif est préparé. Cette réponse dans le récit
+ne reproduit pas le déclencheur technique historique et ne démontre donc
+pas la résolution de la déviation. La recette positive reste à poursuivre.
+
 ### 2026-10-13 — Passer à un autre personnage devient un choix narratif
 
 **Le besoin clarifié.** Après les essais vocaux, Ulrich demandait un bouton
