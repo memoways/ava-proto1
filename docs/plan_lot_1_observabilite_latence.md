@@ -1304,3 +1304,24 @@ ended_at2026-10-13T06:02:13.221Z, timeout_configured_duration,
 active_charactermax/handoff_count0. Les horodatages persistés de début/fin
 délimitent19min36s de temps mural ; ne pas les confondre avec la limite
 configurée de960s ni en inférer une cause sans diagnostic dédié.
+
+### Nouveau contrôle de transfert préparé — 13 octobre 2026, 08:11 CEST
+
+Ulrich confirme preview visible. Accès direct par URL révèle deux onglets
+Brave de même preview ; sélection du nouvel onglet1830098971, ouvert par
+Ulrich à06:07:50.448UTC, au lieu de l'ancien1830097121. Ce nouvel onglet
+répond aux commandes de navigateur ; le blocage du menu natif n'est pas
+contourné par un autre outil système. Cible URL/env vérifiée à chaque étape.
+
+Accueil Commencer→Passer introduction→film pas_vu→Appeler Max.
+Nouvelle session1e01f4f7-1406-407b-9383-dce7a6eed871, début
+06:10:50.653UTC, sandbox-ulrich/contextsandbox, Max/tts. UI confirme
+EN LIGNE/Activer le micro et mainslibres, onglet conservé pour l'action
+humaine. Lovable headedb8aea/ready, baseCloud activée ; SELECT confirme
+hash sandbox initial/true et hash prod initial. Aucun réglage modifié.
+
+Action humaine demandée : deux échanges (écoute sans jugement, puis
+demande d'écouter Emma sans parler au nom de Max ni exiger son pardon),
+attendre chaque réponse, couper le micro puis confirmer l'éventuelle
+apparition Emma/proposition. Pas de résultat injecté ni de décision GM
+forcée. Branche de transfert accepté encore non attestée.
