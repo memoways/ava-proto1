@@ -60,7 +60,7 @@ export async function fetchConversationMemory(
     console.warn("[ConversationMemory] fetch failed:", error.message);
     return createEmptyConversationMemory();
   }
-  const memory = normalizeConversationMemory(data?.conversation_memory);
+  const memory = overlayDeliveries(sessionId, normalizeConversationMemory(data?.conversation_memory));
   const normalized = data?.memory_last_turn != null && data.memory_last_turn > memory.lastTurn
     ? { ...memory, lastTurn: data.memory_last_turn }
     : memory;
@@ -94,8 +94,10 @@ export async function persistPostTurnMemory(
   delta: ConversationMemoryDelta | null,
   turnIndex: number,
   activeCharacter: RuntimeCharacter,
+  signal?: AbortSignal,
 ): Promise<ConversationMemoryV1> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
+    signal?.throwIfAborted();
     const { data, error } = await supabase
       .from("sessions")
       .select("conversation_memory, memory_last_turn, gm_post_turn_log")
@@ -105,26 +107,26 @@ export async function persistPostTurnMemory(
     if (!data) return createEmptyConversationMemory();
 
     const currentLastTurn = data.memory_last_turn ?? 0;
-    const currentMemory = normalizeConversationMemory(data.conversation_memory);
+    const currentMemory = overlayDeliveries(sessionId, normalizeConversationMemory(data.conversation_memory));
     const nextMemory = delta && turnIndex > currentLastTurn
       ? mergeConversationMemory(currentMemory, delta, turnIndex, activeCharacter)
       : currentMemory;
     const nextLastTurn = delta && turnIndex > currentLastTurn ? turnIndex : currentLastTurn;
     const nextLog = appendPostTurnEntry(data.gm_post_turn_log, entry);
-    const { data: updated, error: updateError } = await supabase
-      .from("sessions")
-      .update({
-        conversation_memory: JSON.parse(JSON.stringify(nextMemory)) as Json,
-        memory_last_turn: nextLastTurn,
-        gm_post_turn_log: JSON.parse(JSON.stringify(nextLog)) as Json,
-      })
-      .eq("id", sessionId)
-      .eq("memory_last_turn", currentLastTurn)
-      .select("conversation_memory, memory_last_turn")
-      .maybeSingle();
+    signal?.throwIfAborted();
+    let updateQuery = supabase.rpc("persist_conversation_memory_v4", {
+      p_session_id: sessionId,
+      p_expected_memory: data.conversation_memory,
+      p_next_memory: JSON.parse(JSON.stringify(nextMemory)) as Json,
+      p_expected_last_turn: currentLastTurn,
+      p_next_last_turn: nextLastTurn,
+      p_post_turn_log: JSON.parse(JSON.stringify(nextLog)) as Json,
+    });
+    if (signal) updateQuery = updateQuery.abortSignal(signal);
+    const { data: updated, error: updateError } = await updateQuery.maybeSingle();
     if (updateError) throw updateError;
     if (updated) {
-      const persisted = normalizeConversationMemory(updated.conversation_memory);
+      const persisted = overlayDeliveries(sessionId, normalizeConversationMemory(updated.conversation_memory));
       memoryCache.set(sessionId, persisted);
       return persisted;
     }
@@ -185,4 +187,49 @@ export async function fetchResumablePRD4Session(now = new Date()): Promise<Resum
     pending_handoff: parseHandoffOffer(data.pending_handoff),
     handoff_count: data.handoff_count ?? 0,
   };
+}
+
+// Receipts are available locally before network persistence. They never change
+// lastTurn: only the director owns the historical factual-memory cursor.
+const pendingDeliveries = new Map<string, import('./responseDelivery').DeliveryByCharacter>();
+const deliveryWrites = new Map<string, Promise<void>>();
+
+function overlayDeliveries(sessionId: string, memory: ConversationMemoryV1): ConversationMemoryV1 {
+  const overlay = pendingDeliveries.get(sessionId);
+  if (!overlay) return memory;
+  const merged = { ...memory.deliveryByCharacter };
+  for (const character of ['max', 'emma'] as const) {
+    if (!(merged[character]?.length || overlay[character]?.length)) continue;
+    const byId = new Map((merged[character] ?? []).map(r => [r.turnId, r]));
+    for (const receipt of overlay[character] ?? []) byId.set(receipt.turnId, receipt);
+    merged[character] = [...byId.values()].sort((a, b) => a.turnIndex - b.turnIndex).slice(-16);
+  }
+  return { ...memory, version: 4, deliveryByCharacter: merged };
+}
+
+export function persistDeliveryReceipt(sessionId: string, receipt: import('./responseDelivery').ResponseDeliveryReceipt): Promise<void> {
+  const overlay = pendingDeliveries.get(sessionId) ?? {};
+  overlay[receipt.character] = [...(overlay[receipt.character] ?? []).filter(r => r.turnId !== receipt.turnId), receipt].slice(-16);
+  pendingDeliveries.set(sessionId, overlay);
+  memoryCache.set(sessionId, overlayDeliveries(sessionId, memoryCache.get(sessionId) ?? createEmptyConversationMemory()));
+  const write = async () => {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const { data, error } = await supabase.from('sessions').select('conversation_memory').eq('id', sessionId).maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error('Delivery session missing');
+      const next = overlayDeliveries(sessionId, normalizeConversationMemory(data.conversation_memory));
+      const { data: updated, error: updateError } = await supabase.rpc('persist_conversation_memory_v4', {
+        p_session_id: sessionId,
+        p_expected_memory: data.conversation_memory,
+        p_next_memory: JSON.parse(JSON.stringify(next)) as Json,
+      }).maybeSingle();
+      if (updateError) throw updateError;
+      if (updated) { memoryCache.set(sessionId, overlayDeliveries(sessionId, normalizeConversationMemory(updated.conversation_memory))); return; }
+    }
+    throw new Error('Delivery receipt persistence contention');
+  };
+  const pending = (deliveryWrites.get(sessionId) ?? Promise.resolve()).catch(() => {}).then(write);
+  deliveryWrites.set(sessionId, pending);
+  void pending.finally(() => { if (deliveryWrites.get(sessionId) === pending) deliveryWrites.delete(sessionId); }).catch(() => {});
+  return pending;
 }

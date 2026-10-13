@@ -118,6 +118,7 @@ export interface GameState {
 }
 
 export interface ConversationMessage {
+  delivery?: import("@/services/responseDelivery").ResponseDeliveryReceipt;
   role: "user" | "max" | "emma";
   content: string;
   timestamp: number;

@@ -73,6 +73,20 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-10-13 — P1 : retenir ce qui a été entendu, reprendre une intention privée
+
+Le personnage pouvait mémoriser sa réplique entière alors que le joueur
+l’avait interrompue. P1 ajoute une intention privée dans la même génération,
+une parole segmentée et un socket Gradium pour le tour entier. Le reçu distingue
+le préfixe entendu, le texte incertain et la continuation privée. Seul le
+préfixe livré alimente le GM et les résumés ; les historiques Max/Emma restent
+isolés. Les colonnes JSON existantes sont conservées ; une RPC additive
+protège les écritures concurrentes sans dépasser les limites HTTP. Le flag de
+sortie progressive reste désactivé par défaut pour une canary sandbox-ulrich.
+Implémentation et tests en cours ; aucune publication P1 encore effectuée.
+[Plan et preuves P1](docs/plan_lot_2_memoire_streaming_coherent.md).
+
+
 ### 2026-10-13 — Retrouver la déviation d'Emma avant de conclure la recette P0
 
 La session du 12 octobre contient bien l'écart signalé : après des fragments

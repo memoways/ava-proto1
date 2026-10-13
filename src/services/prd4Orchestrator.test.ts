@@ -71,7 +71,7 @@ import { materializeConversationTurnTrace } from "@/services/conversationTraceFo
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { fetchConversationMemory } from "@/services/sessionConversationMemory";
 import { getGameplaySettings } from "@/services/settingsService";
-import { processPRD4Turn as processPRD4TurnImpl, type PRD4TurnInput } from "@/services/prd4Orchestrator";
+import { streamPRD4Turn, processPRD4Turn as processPRD4TurnImpl, type PRD4TurnInput } from "@/services/prd4Orchestrator";
 import {
   MAX_LLM_RESPONSE_DEADLINE_MS,
   RAG_DEGRADED_MODE_DEADLINE_MS,
@@ -181,6 +181,33 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     vi.mocked(summarizeSessionAsync).mockResolvedValue();
     vi.mocked(enqueueConversationTurnTrace).mockResolvedValue({ durable: true, enqueueMs: 3 });
     vi.mocked(patchQueuedConversationTurnTrace).mockResolvedValue();
+  });
+
+  it("streams with the shared Emma frame and waits for delivered text before GM", async () => {
+    let deliver!: (text: string) => void;
+    const delivery = new Promise<string>(resolve => { deliver = resolve; });
+    const events: string[] = [];
+    vi.mocked(simulateMaxResponse).mockImplementationOnce(async (_input, opts) => {
+      opts?.onSpeechToken?.('{"goal":"Écouter","points":[]}\n<speech>\nBonjour. Une confidence privée. ');
+      return { response: opts?.finishSpeech?.() ?? '', systemPrompt: 'system' };
+    });
+    const result = await streamPRD4Turn({ sessionId: 'session-stream', characterContext: EMMA_CONTEXT,
+      conversationHistory: [], userMessage: 'Bonjour', userRole: null, hasSeenFilm: 'pas_vu', timeElapsedSeconds: 30 },
+      event => events.push(event.type), delivery);
+    expect(simulateMaxResponse).toHaveBeenCalledTimes(1);
+    expect(evaluatePostTurnPRD4).not.toHaveBeenCalled();
+    expect(events).toEqual(['intent','segment','complete']);
+    expect(vi.mocked(simulateMaxResponse).mock.calls[0][0].experienceFrame).toBeTruthy();
+    deliver('Bonjour.'); await result.postTurnPromise;
+    expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0]).toMatchObject({maxResponse:'Bonjour.',currentCharacter:'emma'});
+  });
+
+  it("does not evaluate an unheard response and preserves the batch call graph", async () => {
+    const delivery = Promise.resolve('');
+    const result = await streamPRD4Turn({ sessionId: null, characterContext: MAX_CONTEXT,
+      conversationHistory: [], userMessage: 'Bonjour', userRole: null, timeElapsedSeconds: 30 }, ()=>{}, delivery);
+    await expect(result.postTurnPromise).rejects.toThrow('No confirmed delivery');
+    expect(evaluatePostTurnPRD4).not.toHaveBeenCalled();
   });
 
   afterEach(() => {
@@ -310,12 +337,12 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     });
     const maxInput = vi.mocked(simulateMaxResponse).mock.calls[0][0];
     expect(vi.mocked(queryRAGDetailed).mock.calls[0][2]).toBe(6);
-    expect(maxInput.conversationMemory).toMatchObject({ ...structuredMemory, version: 3 });
+    expect(maxInput.conversationMemory).toMatchObject({ ...structuredMemory, version: 4 });
     expect(maxInput.conversationHistory).toEqual(history.slice(-6));
     expect(maxInput.ragCandidates).toHaveLength(6);
     await result.postTurnPromise;
     expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0].conversationMemoryBefore)
-      .toMatchObject({ ...structuredMemory, version: 3 });
+      .toMatchObject({ ...structuredMemory, version: 4 });
   });
 
   it("transmet le contexte temporel et la guidance GM à Max", async () => {

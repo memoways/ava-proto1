@@ -46,6 +46,7 @@ export interface GradiumStreamOptions {
   jsonConfig: Record<string, unknown>;
   signal?: AbortSignal;
   onVoiceObservation?: VoiceObserver;
+  onProgress?: (progress: GradiumAudioProgress) => void;
 }
 
 export interface GradiumStreamStats {
@@ -56,7 +57,17 @@ export interface GradiumStreamStats {
   bytes: number;
 }
 
+export interface GradiumAudioProgress {
+  scheduledSamples: number;
+  playedSamples: number;
+  sampleRate: number;
+  /** Only timestamped text whose stop sample has passed the output clock. */
+  confirmedText: string;
+}
 export interface GradiumStreamSession {
+  appendText(text: string): void;
+  finish(): void;
+  progress(): GradiumAudioProgress;
   open(): void;
   started: Promise<void>;
   finished: Promise<{ playbackTotalMs: number }>;
@@ -120,7 +131,16 @@ function decodePcmChunk(base64: string, carry: { byte: number | null }): Float32
 }
 
 export function createGradiumStreamSession(text: string, opts: GradiumStreamOptions): GradiumStreamSession {
+  const session = createGradiumTurnSession(opts);
+  session.appendText(text);
+  session.finish();
+  return session;
+}
+
+/** One token/socket/setup and one EOS for the entire incrementally supplied turn. */
+export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStreamSession {
   const t0 = performance.now();
+  const lifetime = new AbortController();
   const sampleRate = opts.format === "pcm_48000" ? 48000 : 24000;
   const wireFormat = opts.format === "pcm_48000" ? "pcm" : opts.format;
 
@@ -129,11 +149,36 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
   const generationDone = deferred<GradiumStreamStats>();
 
   let ws: WebSocket | null = null;
+  let socketReady = false;
+  let finishRequested = false;
+  let eosSent = false;
+  const pendingText: string[] = [];
+  let submittedChars = 0;
+  let scheduledSamples = 0;
+  let frozenProgress: GradiumAudioProgress | null = null;
+  const scheduled: { start: number; length: number; offset: number }[] = [];
+  const timestamps: { text: string; stop: number }[] = [];
+  const progress = (): GradiumAudioProgress => {
+    if (frozenProgress) return frozenProgress;
+    const ctx = getSharedAudioContext();
+    const clock = ctx ? ctx.currentTime - (ctx.outputLatency || 0) : -1;
+    let playedSamples = 0;
+    for (const chunk of scheduled) {
+      playedSamples += Math.max(0, Math.min(chunk.length, Math.floor((clock - chunk.start) * sampleRate)));
+    }
+    let confirmedText = '';
+    for (const timestamp of timestamps) {
+      if (timestamp.stop * sampleRate > playedSamples) break;
+      confirmedText += timestamp.text;
+    }
+    return { scheduledSamples, playedSamples, sampleRate, confirmedText };
+  };
+  const notifyProgress = () => { try { opts.onProgress?.(progress()); } catch { /* observer only */ } };
   let gateOpen = false;
   let openedAt = 0;
   let eosReceived = false;
   let cancelled = false;
-  let firstByteMs = 0;
+  let firstByteMs: number | null = null;
   let totalBytes = 0;
   let audibleOutput = false;
   let firstFrameLogged = false;
@@ -144,18 +189,22 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
   let playCursor = 0;
   let preAudioTimer: ReturnType<typeof setTimeout> | null = null;
   let stallTimer: ReturnType<typeof setTimeout> | null = null;
+  let drainTimer: ReturnType<typeof setTimeout> | null = null;
 
   const clearTimers = () => {
+    if (drainTimer) { clearTimeout(drainTimer); drainTimer = null; }
     if (preAudioTimer) { clearTimeout(preAudioTimer); preAudioTimer = null; }
     if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
   };
 
   const teardownAudio = () => {
     for (const src of liveSources) {
+      src.onended = null;
       try { src.stop(); } catch { /* already stopped */ }
     }
     liveSources.clear();
     pendingChunks.length = 0;
+    pendingText.length = 0;
     try { gain?.disconnect(); } catch { /* ignore */ }
     gain = null;
   };
@@ -164,6 +213,7 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
     if (!ws) return;
     const socket = ws;
     ws = null;
+    socket.onopen = null;
     socket.onmessage = null;
     socket.onerror = null;
     socket.onclose = null;
@@ -172,7 +222,9 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
 
   const fail = (err: unknown) => {
     if (cancelled) return;
+    frozenProgress = progress();
     cancelled = true;
+    lifetime.abort(err);
     clearTimers();
     closeWs();
     teardownAudio();
@@ -199,8 +251,14 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
   const checkFinished = () => {
     if (cancelled || finished.settled) return;
     if (eosReceived && gateOpen && pendingChunks.length === 0 && liveSources.size === 0 && started.settled) {
+      if (progress().playedSamples < scheduledSamples) {
+        if (!drainTimer) drainTimer = setTimeout(() => { drainTimer = null; checkFinished(); }, 25);
+        return;
+      }
       clearTimers();
       removeAbortListener();
+      frozenProgress = { ...progress(), playedSamples: scheduledSamples };
+      notifyProgress();
       finished.resolve({ playbackTotalMs: Math.round(performance.now() - openedAt) });
     }
   };
@@ -225,13 +283,19 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
     source.connect(gain);
     const startAt = Math.max(ctx.currentTime + SCHEDULE_MARGIN_S, playCursor);
     source.start(startAt);
+    scheduled.push({ start: startAt, length: samples.length, offset: scheduledSamples });
+    scheduledSamples += samples.length;
     playCursor = startAt + buffer.duration;
     liveSources.add(source);
     source.onended = () => {
+      if (cancelled) return;
       liveSources.delete(source);
+      try { source.disconnect(); } catch { /* already disconnected */ }
+      notifyProgress();
       checkFinished();
     };
     audibleOutput = true;
+    notifyProgress();
     if (!started.settled) {
       observeVoice(opts.onVoiceObservation, "audio_scheduled");
       const outputAt = performance.now() + Math.max(0, startAt - ctx.currentTime) * 1000 + (ctx.outputLatency || 0) * 1000;
@@ -273,7 +337,7 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
     if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
     closeWs();
     generationDone.resolve({
-      firstByteMs,
+      firstByteMs: firstByteMs ?? 0,
       totalGenMs: Math.round(performance.now() - t0),
       bytes: totalBytes,
     });
@@ -283,7 +347,7 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
 
   const handleMessage = (event: MessageEvent) => {
     if (cancelled) return;
-    let msg: { type?: string; audio?: string; message?: string; code?: unknown };
+    let msg: { type?: string; audio?: string; text?: string; start_s?: number; stop_s?: number; message?: string; code?: unknown };
     try {
       msg = JSON.parse(event.data);
     } catch {
@@ -299,7 +363,7 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
     }
     if (msg.type === "audio" && typeof msg.audio === "string") {
       if (preAudioTimer) { clearTimeout(preAudioTimer); preAudioTimer = null; }
-      if (!firstByteMs) {
+      if (firstByteMs === null) {
         firstByteMs = Math.round(performance.now() - t0);
         observeVoice(opts.onVoiceObservation, "first_audio_chunk");
         debugLogger.log({ service: "tts", level: "info", direction: "in", label: `TTS-GR-WS first chunk in ${firstByteMs}ms` });
@@ -308,13 +372,23 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
       totalBytes += msg.audio.length; // base64 length ≈ bytes × 4/3; good enough for stats
       const samples = decodePcmChunk(msg.audio, carry);
       if (samples.length === 0) return;
+      const ctx = getSharedAudioContext();
+      const ahead = Math.max(0, playCursor - (ctx?.currentTime ?? 0)) + pendingDuration() + samples.length / sampleRate;
+      if (ahead > 30) { fail(new Error("Gradium audio buffer exceeded 30 seconds")); return; }
       pendingChunks.push(samples);
       flushPending();
+    } else if (msg.type === "text" && typeof msg.text === "string" && typeof msg.stop_s === "number"
+      && Number.isFinite(msg.stop_s) && msg.stop_s >= 0) {
+      if (timestamps.length >= 4000) { fail(new Error("Gradium timestamp buffer exceeded")); return; }
+      if (!timestamps.length || msg.stop_s >= timestamps[timestamps.length - 1].stop) {
+        timestamps.push({ text: msg.text, stop: msg.stop_s }); notifyProgress();
+      }
     } else if (msg.type === "end_of_stream" || msg.type === "eos") {
-      if (!firstByteMs) {
+      if (firstByteMs === null) {
         fail(new Error("Gradium WS returned no audio"));
         return;
       }
+      if (!eosSent) { fail(new Error("Gradium premature EOS")); return; }
       onGenerationComplete();
     } else if (msg.type === "error") {
       fail(new Error(`Gradium WS error: ${String(msg.message || msg.code || "unknown")}`));
@@ -322,8 +396,20 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
     // "ready" and unknown message types are ignored on purpose.
   };
 
+  const sendPendingText = () => {
+    if (cancelled || !socketReady || !ws) return;
+    for (const text of pendingText.splice(0)) {
+      ws.send(JSON.stringify({ type: "text", text }));
+      observeVoice(opts.onVoiceObservation, "tts_text_sent");
+      if (firstByteMs === null) armPreAudioTimer("tts_gradium_ws_first_chunk", FIRST_CHUNK_TIMEOUT_MS);
+    }
+    if (finishRequested && !eosSent) {
+      eosSent = true; ws.send(JSON.stringify({ type: "end_of_stream" }));
+    }
+  };
+
   const start = async () => {
-    const timeout = createTimeoutSignal(TOKEN_TIMEOUT_MS, opts.signal);
+    const timeout = createTimeoutSignal(TOKEN_TIMEOUT_MS, lifetime.signal);
     let token: string;
     try {
       const tokenRes = await authenticatedFunctionFetch(TOKEN_ENDPOINT, { method: "GET", signal: timeout.signal });
@@ -353,9 +439,9 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
         output_format: wireFormat,
         json_config: opts.jsonConfig,
       }));
-      ws.send(JSON.stringify({ type: "text", text }));
-      ws.send(JSON.stringify({ type: "end_of_stream" }));
-      armPreAudioTimer("tts_gradium_ws_first_chunk", FIRST_CHUNK_TIMEOUT_MS);
+      socketReady = true;
+      if (preAudioTimer) { clearTimeout(preAudioTimer); preAudioTimer = null; }
+      sendPendingText();
     };
     ws.onmessage = handleMessage;
     ws.onerror = () => {
@@ -366,7 +452,8 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
       // A clean close after audio means the server finished without an explicit
       // end_of_stream frame (or we missed it) — treat as generation complete.
       if (cancelled || eosReceived) return;
-      if (firstByteMs) { onGenerationComplete(); return; }
+      if (firstByteMs !== null && eosSent && event.code === 1000) { onGenerationComplete(); return; }
+      if (firstByteMs !== null) { fail(new Error("Gradium socket closed during turn")); return; }
       // Closed before any audio: surface the close code/reason so a failure
       // that survives the redeploy is diagnosable in one round-trip (e.g. token
       // rejected, setup parse error, unexpected message shape).
@@ -379,6 +466,19 @@ export function createGradiumStreamSession(text: string, opts: GradiumStreamOpti
   start().catch((err) => fail(err));
 
   return {
+    appendText(text: string) {
+      if (cancelled) throw abortError();
+      if (finishRequested) throw new Error("Gradium text after finish");
+      if (!text.trim()) return;
+      submittedChars += text.length;
+      if (submittedChars > 12000) { fail(new Error("Gradium text buffer exceeded")); throw new Error("Gradium text buffer exceeded"); }
+      pendingText.push(text); sendPendingText();
+    },
+    finish() {
+      if (cancelled || finishRequested) return;
+      finishRequested = true; sendPendingText();
+    },
+    progress,
     open() {
       if (gateOpen || cancelled) return;
       gateOpen = true;

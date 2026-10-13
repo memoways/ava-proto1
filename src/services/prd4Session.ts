@@ -1,3 +1,5 @@
+import { createEmptyConversationMemory } from "./conversationMemoryV1";
+import { getGameplaySettings } from "./settingsService";
 /**
  * PRD4 — helpers de persistance session (createSession + updates spécifiques).
  * Réutilise la table `sessions` existante.
@@ -31,6 +33,8 @@ export async function createPRD4Session(
     personnage_appele: character,
     player_role: (userRole as unknown as Json) ?? null,
     modalite_voix: "push_to_talk",
+    conversation_memory: JSON.parse(JSON.stringify({ ...createEmptyConversationMemory(),
+      incrementalOutputEnabled: getGameplaySettings().VOICE_INCREMENTAL_OUTPUT === true })) as Json,
     ...extra,
     environment_id: runtime.environmentId,
     context_type: runtime.contextType,

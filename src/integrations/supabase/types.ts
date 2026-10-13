@@ -1659,6 +1659,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      persist_conversation_memory_v4: {
+        Args: { p_session_id: string; p_expected_memory: Json; p_next_memory: Json;
+          p_expected_last_turn?: number; p_next_last_turn?: number; p_post_turn_log?: Json }
+        Returns: { conversation_memory: Json; memory_last_turn: number }[]
+      }
       consume_game_rate_limit: {
         Args: { p_bucket: string; p_session_id?: string }
         Returns: Json

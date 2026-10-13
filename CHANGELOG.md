@@ -134,6 +134,20 @@ plus anciennes conservent leur état au moment de leur rédaction.
 
 ## [Non publié]
 
+### Lot 2 / P1 — en cours, sortie progressive et mémoire de livraison
+
+- Une génération personnage produit une intention privée puis des phrases sûres.
+  Montage PRD4 Max/Emma partagé, batch et laboratoires conservés ; en-tête jamais
+  envoyé à la voix, erreurs SSE et annulation du reader explicites.
+- Gradium incrémental par tour, voix/réglages figés, buffer borné, suivi des
+  samples et timestamps ; secours transport avant son seulement, aucun replay
+  après sortie. Reçus V4 isolés, contexte entendu distinct du texte généré,
+  GM et résumés sur livraison confirmée. Colonnes JSONB existantes et RPC CAS
+  additive avec RLS conservées ; aucune transformation de données.
+- Flag Sortie vocale progressive désactivé par défaut ; activation canary prévue
+  uniquement sandbox-ulrich. Tests et livraison GitHub/Lovable en cours.
+  [Plan P1](docs/plan_lot_2_memoire_streaming_coherent.md).
+
 Les mentions de non-publication et les listes de recette des entrées du
 12 octobre ci-dessous décrivent leur état initial. Le bilan P0 publié ci-dessus
 actualise les parcours effectivement contrôlés, sans valider les travaux

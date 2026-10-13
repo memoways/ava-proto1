@@ -78,6 +78,7 @@ export default function GameMasterConfigTab() {
         TIMEOUT_SECONDS: gameplay.TIMEOUT_SECONDS,
         SHOW_QUESTIONNAIRE: gameplay.SHOW_QUESTIONNAIRE,
         VOICE_HANDS_FREE: gameplay.VOICE_HANDS_FREE,
+        VOICE_INCREMENTAL_OUTPUT: gameplay.VOICE_INCREMENTAL_OUTPUT,
       });
       await saveGameplaySettingsToDB(updated);
       setGameplay(updated);
@@ -105,6 +106,7 @@ export default function GameMasterConfigTab() {
 
   const globalChanged = gameplay.TIMEOUT_SECONDS !== savedGameplay.TIMEOUT_SECONDS
     || gameplay.SHOW_QUESTIONNAIRE !== savedGameplay.SHOW_QUESTIONNAIRE
+    || gameplay.VOICE_INCREMENTAL_OUTPUT !== savedGameplay.VOICE_INCREMENTAL_OUTPUT
     || JSON.stringify(gameplay.VOICE_HANDS_FREE) !== JSON.stringify(savedGameplay.VOICE_HANDS_FREE);
   const voice = gameplay.VOICE_HANDS_FREE;
   const setVoice = (patch: Partial<HandsFreeVoiceSettings>) =>
@@ -195,6 +197,14 @@ export default function GameMasterConfigTab() {
             <p className="text-xs text-muted-foreground">Plus besoin d’appuyer pour parler ni pour finir sa phrase.</p>
           </div>
           <Switch checked={voice.enabled} onCheckedChange={(checked) => setVoice({ enabled: checked })} aria-label="Conversation mains libres" />
+        </div>
+
+        <div className="flex items-center justify-between gap-4 rounded-md bg-muted/40 p-3">
+          <div>
+            <p className="text-sm font-medium">Sortie vocale progressive</p>
+            <p className="text-xs text-muted-foreground">Avec Gradium, la voix commence pendant la génération. La mémoire distingue ce qui a été entendu après une interruption.</p>
+          </div>
+          <Switch checked={gameplay.VOICE_INCREMENTAL_OUTPUT} onCheckedChange={checked => setGameplay(current => ({ ...current, VOICE_INCREMENTAL_OUTPUT: checked }))} aria-label="Sortie vocale progressive" />
         </div>
 
         <div className={voice.enabled ? "space-y-4" : "pointer-events-none space-y-4 opacity-50"}>

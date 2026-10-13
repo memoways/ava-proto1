@@ -95,10 +95,26 @@ describe("Phase 1 sessions RLS and provider quotas", () => {
     await db.exec(await readFile(ragLabQuestionsMigrationUrl, "utf8"));
     await db.exec(await readFile(ragLabCorpusMigrationUrl, "utf8"));
     await db.exec(await readFile(conversationMemoryMigrationUrl, "utf8"));
+    await db.exec(await readFile(new URL("../../supabase/migrations/20260522133602_984103bb-9be5-48f2-8312-8c223ebdcc69.sql", import.meta.url), "utf8"));
+    await db.exec(await readFile(new URL("../../supabase/migrations/20261013171500_persist_memory_v4_cas.sql", import.meta.url), "utf8"));
   }, 30_000);
 
   afterEach(async () => {
     await db.close();
+  });
+
+  it("P1 invoker RPC preserves ownership RLS, rejects anon and never regresses the memory cursor", async () => {
+    await authenticate(db, USER_A);
+    const own = await db.query<{id:string;conversation_memory:unknown}>("insert into public.sessions default values returning id, conversation_memory");
+    const id = own.rows[0].id;
+    const initial = JSON.stringify(own.rows[0].conversation_memory);
+    const update = "select * from public.persist_conversation_memory_v4($1::uuid,$2::jsonb,$3::jsonb,$4::integer,$5::integer)";
+    expect((await db.query(update,[id,initial,'{"version":4}',0,1])).rows).toHaveLength(1);
+    expect((await db.query(update,[id,'{"version":4}','{}',1,0])).rows).toEqual([]);
+    await authenticate(db, USER_B);
+    expect((await db.query(update,[id,'{"version":4}','{}',1,2])).rows).toEqual([]);
+    await authenticate(db, USER_B, 'anon');
+    await expect(db.query(update,[id,'{"version":4}','{}',1,2])).rejects.toThrow(/permission denied/i);
   });
 
   it("rejects a caller carrying only the public anon key", async () => {

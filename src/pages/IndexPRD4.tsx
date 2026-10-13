@@ -13,7 +13,11 @@ import { flushSync } from "react-dom";
 import { useExperienceState } from "@/hooks/useExperienceState";
 import type { AudioState, ConversationMessage, FilmAnswer } from "@/types";
 import { identifyUser, trackEvent } from "@/services/posthogService";
-import { processPRD4Turn } from "@/services/prd4Orchestrator";
+import { prepareStreamedVoiceTurn } from "@/services/streamedVoiceTurn";
+import { persistDeliveryReceipt } from "@/services/sessionConversationMemory";
+import { getActiveProviderId } from "@/services/tts/providerSettings";
+import type { ResponseDeliveryReceipt } from "@/services/responseDelivery";
+import { processPRD4Turn, streamPRD4Turn } from "@/services/prd4Orchestrator";
 import {
   createPRD4Session,
   endPRD4Session,
@@ -191,6 +195,7 @@ const IndexPRD4 = () => {
   const sttRef = useRef<STTSession | null>(null);
   // Mains libres : micro ouvert en continu, fin de parole sur silence, interruption.
   const handsFreeSettingsRef = useRef<HandsFreeVoiceSettings>(normalizeHandsFreeSettings(getGameplaySettings().VOICE_HANDS_FREE));
+  const incrementalOutputEnabledRef = useRef(getGameplaySettings().VOICE_INCREMENTAL_OUTPUT === true);
   const [handsFreeEnabled, setHandsFreeEnabled] = useState(handsFreeSettingsRef.current.enabled);
   const [handsFreeListening, setHandsFreeListening] = useState(false);
   const handsFreeListeningRef = useRef(false);
@@ -632,6 +637,7 @@ const IndexPRD4 = () => {
     diagnosticTraceEnabledRef.current = diagnosticTraceEnabled;
 
     const startingCharacter = startingCharacterRef.current;
+    incrementalOutputEnabledRef.current = getGameplaySettings().VOICE_INCREMENTAL_OUTPUT === true;
     const sid = await createPRD4Session(
       state.userRoleProfile,
       startingCharacter,
@@ -764,6 +770,7 @@ const IndexPRD4 = () => {
   const handleResumeCall = useCallback(async () => {
     const session = resumableSession;
     if (!session) return;
+    incrementalOutputEnabledRef.current = session.conversation_memory.incrementalOutputEnabled === true;
     cleanupAudio();
     const now = Date.now();
     const timerWindow = resolveResumeTimerWindow(session.started_at, session.resume_expires_at, now);
@@ -1114,6 +1121,30 @@ const IndexPRD4 = () => {
           }
         : undefined;
 
+      let streamedVoice: ReturnType<typeof prepareStreamedVoiceTurn> | null = null;
+      let earlyFirstPlaybackAt: number | null = null;
+      let streamTtsStartedAt: number | null = null;
+      let streamGenerationComplete = false;
+      let responseReceipt: ResponseDeliveryReceipt | undefined;
+      let responseMessage: ConversationMessage | null = null;
+      const owningSessionId = sessionIdRef.current;
+      const persistReceipt = (receipt: ResponseDeliveryReceipt) => {
+        responseReceipt = receipt;
+        if (owningSessionId) void persistDeliveryReceipt(owningSessionId, receipt).catch(error => {
+          console.error('[P1 delivery] Receipt persistence failed; local receipt retained', error);
+        });
+        const existing = responseMessage ?? conversationRef.current.find(m => m.delivery?.turnId === receipt.turnId);
+        if (existing) { existing.delivery = receipt; existing.content = receipt.generated; }
+        else if ((turnController.signal.aborted || receipt.status === 'failed') && receipt.generated && sessionIdRef.current === owningSessionId) {
+          const interrupted = tagSpokenWith({ role: turnCharacter, content: receipt.generated,
+            delivery: receipt, timestamp: Date.now() }, turnCharacter);
+          conversationRef.current = [...conversationRef.current, interrupted];
+          addMessage(interrupted);
+        }
+        if (owningSessionId && sessionIdRef.current === owningSessionId) {
+          void updatePRD4Conversation(owningSessionId, conversationRef.current);
+        }
+      };
       try {
         const turnCharacterContext = activeCharacterContextRef.current;
         if (!turnCharacterContext || turnCharacterContext.characterKey !== activeCharacterRef.current) {
@@ -1142,7 +1173,34 @@ const IndexPRD4 = () => {
           conversationRef.current.slice(0, -1),
           activeCharacterRef.current,
         );
-        const result = await processPRD4Turn({
+        const incremental = incrementalOutputEnabledRef.current
+          && responseOutputRef.current?.mode === 'tts'
+          && (activeTTSProviderIdRef.current ?? getActiveProviderId()) === 'gradium';
+        if (incremental) {
+          streamTtsStartedAt = performance.now();
+          lastCharacterTextRef.current = '';
+          const voiceId = activeVoiceIdRef.current ?? undefined;
+          const performanceIntent = derivePerformanceIntent({ text: '', characterKey: turnCharacter,
+            previousEmotionalState: pendingEmotionalStateRef.current, userMessage: userText });
+          streamedVoice = prepareStreamedVoiceTurn({ characterKey: turnCharacter, voiceId,
+            performance: performanceIntent, signal: turnController.signal,
+            turn_id: turnId, turn_index: turnIndex, session_id: owningSessionId,
+            attempt_id: telemetry.attemptId, onVoiceObservation: telemetry.observe,
+            onServiceObserved: telemetry.service }, {
+            onPlaybackStart: () => {
+              if (!isCurrentTurn()) return;
+              earlyFirstPlaybackAt = performance.now();
+              if (streamGenerationComplete && processingWatchdogRef.current) {
+                window.clearTimeout(processingWatchdogRef.current); processingWatchdogRef.current = null;
+              }
+              setAudioState('max_speaking');
+              // This watchdog protects generation until completion, even if audio has begun.
+            },
+            onReceipt: persistReceipt,
+
+          });
+        }
+        const turnInput = {
           sessionId: sessionIdRef.current,
           conversationHistory: priorConversation,
           userMessage: userText,
@@ -1165,17 +1223,26 @@ const IndexPRD4 = () => {
           onServerObserved: telemetry.server,
           onVersionsObserved: telemetry.versions,
           onGmObserved: telemetry.gm,
-        });
+        };
+        const result = streamedVoice
+          ? await streamPRD4Turn(turnInput, event => {
+              streamedVoice?.onEvent(event);
+              if (isCurrentTurn() && event.type === 'segment') {
+                lastCharacterTextRef.current += ` ${event.text}`;
+              }
+            }, streamedVoice.delivery)
+          : await processPRD4Turn(turnInput);
 
         if (!isCurrentTurn()) return;
+        streamGenerationComplete = true;
 
         if (processingWatchdogRef.current) {
           window.clearTimeout(processingWatchdogRef.current);
           processingWatchdogRef.current = null;
         }
 
-        const ttsStart = performance.now();
-        const responseReadyMs = Math.max(0, Math.round(ttsStart - inputReadyAt));
+        const ttsStart = streamTtsStartedAt ?? performance.now();
+        const responseReadyMs = Math.max(0, Math.round(performance.now() - inputReadyAt));
         const blocker =
           (result.timings.max_ms ?? 0) >= (result.timings.rag_ms ?? 0) ? "max_ms" : "rag_ms";
         const maxMsg: ConversationMessage = tagSpokenWith({
@@ -1195,6 +1262,8 @@ const IndexPRD4 = () => {
             },
           },
         }, activeCharacterRef.current);
+        responseMessage = maxMsg;
+        if (responseReceipt) maxMsg.delivery = responseReceipt;
         conversationRef.current = [...conversationRef.current, maxMsg];
         addMessage(maxMsg);
         setMaxSubtitle(result.maxResponse);
@@ -1217,15 +1286,16 @@ const IndexPRD4 = () => {
             })
           : null;
         let outputLatencySegmentDone = false;
-        let firstPlaybackAt: number | null = null;
+        let firstPlaybackAt: number | null = earlyFirstPlaybackAt;
         const outputController = new AbortController();
         activeOutputControllerRef.current = outputController;
         const abortOutputFromTurn = () => outputController.abort(turnController.signal.reason);
         turnController.signal.addEventListener("abort", abortOutputFromTurn, { once: true });
-        processingWatchdogRef.current = window.setTimeout(() => {
+        if (earlyFirstPlaybackAt == null) processingWatchdogRef.current = window.setTimeout(() => {
           if (activeOutputControllerRef.current !== outputController || outputController.signal.aborted) return;
           console.warn("[PRD4] TTS first-audio watchdog fired — cancelling output only");
           outputController.abort("tts-first-audio-deadline");
+          streamedVoice?.cancel("tts-first-audio-deadline");
           try { responseOutputRef.current?.interrupt(); } catch { /* ignore */ }
           setAudioState("idle");
           toast({
@@ -1248,7 +1318,7 @@ const IndexPRD4 = () => {
           if (!isCurrentTurn() || outputController.signal.aborted) return;
           firstPlaybackAt ??= performance.now();
           // Blob/avatars expose software playback start, never a physical acoustic timestamp.
-          telemetry.observe("output_estimated", firstPlaybackAt);
+          if (!streamedVoice) telemetry.observe("output_estimated", firstPlaybackAt);
           if (processingWatchdogRef.current) {
             window.clearTimeout(processingWatchdogRef.current);
             processingWatchdogRef.current = null;
@@ -1261,7 +1331,7 @@ const IndexPRD4 = () => {
             firstAudioTimeouts: 0,
           });
         };
-        const outputResult = await renderResponseText(result.maxResponse, {
+        const outputResult = await (streamedVoice ? streamedVoice.finish() : renderResponseText(result.maxResponse, {
           turnId,
           turnIndex,
           attemptId: telemetry.attemptId,
@@ -1273,7 +1343,7 @@ const IndexPRD4 = () => {
           providerId: activeTTSProviderIdRef.current ?? undefined,
           characterKey: activeCharacterRef.current,
           userMessage: userText,
-        }).finally(() => {
+        })).finally(() => {
           turnController.signal.removeEventListener("abort", abortOutputFromTurn);
           if (activeOutputControllerRef.current === outputController) activeOutputControllerRef.current = null;
           if (!outputLatencySegmentDone) endLatencySegment(outputLatencySegmentId);
@@ -1283,6 +1353,7 @@ const IndexPRD4 = () => {
           processingWatchdogRef.current = null;
         }
         if (outputResult.status === "played") telemetry.observe("audio_end");
+        if (streamedVoice && earlyFirstPlaybackAt != null) onPlaybackStart();
         telemetry.durations(outputResult.generatedSegments > 0 ? outputResult.generationWallMs ?? null : null, outputResult.status === "played" ? outputResult.playbackTotalMs : null);
         telemetry.finish(outputController.signal.aborted && /deadline/.test(String(outputController.signal.reason)) ? "timeout"
           : outputResult.status === "failed" ? "failed" : outputResult.status === "cancelled" ? "cancelled"
@@ -1373,6 +1444,7 @@ const IndexPRD4 = () => {
           void updatePRD4Conversation(sessionIdRef.current, conversationRef.current);
         }
 
+        const deliveredCharacterText = responseReceipt?.delivered ?? result.maxResponse;
         // ---- Directeur d'expérience unique : labels, mémoire, guidance et une
         // action recommandée, toujours après le texte et la voix du personnage.
         void result.postTurnPromise.then(async (ev) => {
@@ -1435,11 +1507,11 @@ const IndexPRD4 = () => {
           const requestedOffer: CharacterHandoffOffer | null = requestedSwitch
             && gmStance === "accept"
             && currentAction.type === "handoff" && currentAction.targetCharacter === requestedSwitch
-            && hasCharacterHandoffConsent(result.maxResponse, requestedSwitch, gmStance)
+            && hasCharacterHandoffConsent(deliveredCharacterText, requestedSwitch, gmStance)
             ? { targetCharacter: requestedSwitch, reason: currentAction.reason, proposalGuidance: currentAction.proposalGuidance }
             : null;
           const recommendedOffer = handoffProposalForThisTurn
-            && hasCharacterHandoffConsent(result.maxResponse, handoffProposalForThisTurn.targetCharacter,
+            && hasCharacterHandoffConsent(deliveredCharacterText, handoffProposalForThisTurn.targetCharacter,
               ev.player_switch_request?.targetCharacter === handoffProposalForThisTurn.targetCharacter
                 ? ev.player_switch_request.stance : undefined)
             ? handoffProposalForThisTurn : null;
@@ -1559,7 +1631,7 @@ const IndexPRD4 = () => {
         telemetry.finish(turnController.signal.aborted ? "cancelled" : "failed");
         if (turnController.signal.aborted || activeTurnSequenceRef.current !== turnSequence) return;
         console.error("[PRD4] turn failed:", err);
-        const diagnosticFailure = diagnosticTraceEnabledRef.current;
+        const diagnosticFailure = diagnosticTraceEnabledRef.current && !streamedVoice;
         if (diagnosticFailure) {
           // Le tour n'a pas été diffusé : retire le message optimiste afin qu'un
           // nouvel appui PTT rejoue bien le même index causal, sans doublon.
@@ -1581,6 +1653,7 @@ const IndexPRD4 = () => {
           variant: "destructive",
         });
       } finally {
+        streamedVoice?.cancel('turn-cleanup');
         turnController.signal.removeEventListener("abort", finishAborted);
         if (activeTurnSequenceRef.current === turnSequence) {
           if (processingWatchdogRef.current) {

@@ -581,6 +581,7 @@ export async function evaluatePostTurnPRD4(
         enriched.memory_delta ?? null,
         input.turnIndex,
         input.currentCharacter,
+        ...(input.signal ? [input.signal] as const : []),
       ));
       enriched = { ...enriched, memory_after: memoryAfter };
     } catch (err) {

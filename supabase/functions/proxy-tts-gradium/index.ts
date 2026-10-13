@@ -49,6 +49,7 @@ serve(async (req) => {
 
     if (req.method === "GET") {
       const tokenRes = await fetch("https://api.gradium.ai/api/api-keys/token", {
+        signal: req.signal,
         headers: { "x-api-key": apiKey },
       });
       const tokenBody = await tokenRes.text();
@@ -98,6 +99,7 @@ serve(async (req) => {
       method: "POST",
       headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      signal: req.signal,
     });
 
     if (!response.ok) {

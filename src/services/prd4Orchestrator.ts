@@ -1,3 +1,5 @@
+import { ResponseIntentParser, type ResponseIntent } from "./responseIntentStream";
+import { projectDeliveredConversation } from "./responseDelivery";
 import { observeVoice, observeService, type VoiceObserver, type ServiceObservation, type ServerObservation } from "./voiceTurnTelemetryV2";
 /**
  * PRD4 — Orchestrateur lean d'un tour de conversation.
@@ -54,6 +56,9 @@ import { buildExperienceFrame } from "@/services/experienceFrame";
 import type { ConversationMessage, ConversationTurnTraceV1, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 
 export interface PRD4TurnInput {
+  /** Internal shared execution seam; batch callers omit it. */
+  streamControl?: { onToken: (text: string) => void; finishSpeech: () => string;
+    delivery: Promise<string>; onFallback: (text: string) => void; hasSegments: () => boolean };
   onVoiceObservation?: VoiceObserver;
   onServiceObserved?: (value: ServiceObservation) => void;
   onServerObserved?: (value: ServerObservation) => void;
@@ -135,6 +140,8 @@ const MAX_FALLBACK_RESPONSE =
 
 export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnResult> {
   assertCharacterExecutionContext(input.characterContext);
+  input.signal?.throwIfAborted();
+  input = { ...input, conversationHistory: projectDeliveredConversation(input.conversationHistory) };
   const t0 = performance.now();
   const diagnosticTraceEnabled = input.diagnosticTraceEnabled === true;
   const turnId = input.turnId || crypto.randomUUID();
@@ -324,14 +331,18 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       signal: input.signal,
       diagnosticTrace: diagnosticTraceEnabled,
       llmOverrides: evaluationOverrides?.llm,
+      onSpeechToken: input.streamControl?.onToken,
+      finishSpeech: input.streamControl?.finishSpeech,
     });
     identityGuard = guardCharacterResponse(maxResult.response, input.characterContext);
     maxResponse = identityGuard.response;
   } catch (err) {
+    if (input.signal?.aborted || input.streamControl?.hasSegments()) throw err;
+    input.streamControl?.onFallback(MAX_FALLBACK_RESPONSE);
     console.warn("[PRD4 orchestrator] Max LLM failed (fallback response):", err);
     maxError = err instanceof Error ? err.message : String(err);
     maxFailureDiagnostic = err instanceof SimulateMaxResponseError ? err.diagnosticContext : null;
-    observeService(input.onServiceObserved, { service: "llm", requested_provider: "openrouter", requested_model: maxFailureDiagnostic?.requestedSettings?.model ?? null, resolved_provider: "openrouter", resolved_model: null, effective_provider: null, effective_model: null, transport: "http_batch", fallback: true });
+    observeService(input.onServiceObserved, { service: "llm", requested_provider: "openrouter", requested_model: maxFailureDiagnostic?.requestedSettings?.model ?? null, resolved_provider: "openrouter", resolved_model: null, effective_provider: null, effective_model: null, transport: input.streamControl ? "sse" : "http_batch", fallback: true });
     maxResponse = MAX_FALLBACK_RESPONSE;
   } finally {
     max_ms = Math.round(performance.now() - maxStart);
@@ -340,6 +351,12 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
 
   // --- GM post-turn (void) ---------------------------------------------------
   const runPostTurn = async () => {
+    const deliveredResponse = input.streamControl ? await input.streamControl.delivery : maxResponse;
+    input.signal?.throwIfAborted();
+    if (input.streamControl && !deliveredResponse.trim()) throw new Error("No confirmed delivery for GM");
+    if (input.streamControl && diagnosticTraceEnabled && input.sessionId) {
+      void patchQueuedConversationTurnTrace(input.sessionId, turnIndex, ["response", "deliveredResponse"], deliveredResponse).catch(() => {});
+    }
     const gmStart = performance.now();
     input.onLatencySegment?.({ type: "start", segment: "GM", service: "GM post-turn" });
     try {
@@ -349,7 +366,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         sessionId: input.sessionId,
         conversationHistory: recentConversation,
         userMessage: input.userMessage,
-        maxResponse,
+        maxResponse: deliveredResponse,
         userRole: input.userRole,
         conversationMemoryBefore: visibleStructuredMemory,
         userPostureRaw: input.userPostureRaw ?? null,
@@ -472,7 +489,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       },
       response: {
         rawLlmResponse: maxResult?.response ?? null,
-        deliveredResponse: maxResponse,
+        deliveredResponse: input.streamControl ? "" : maxResponse,
         source: identityGuard.blocked ? "identity_guard" : maxResult ? "llm" : "fallback",
         identityGuardReason: identityGuard.reason,
       },
@@ -534,6 +551,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     return result;
   });
 
+  postTurnPromise.catch(() => {});
+
   // Backward-compatible projection for UI consumers. No second LLM call is
   // made: labels and action now come from the single post-turn director call.
   const labelPromise: Promise<PRD4LabelResult> = postTurnPromise.then((result) => {
@@ -549,20 +568,27 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     };
   });
 
+  labelPromise.catch(() => {});
+
   if (
     input.sessionId &&
     summaryEvery > 0 &&
     turnIndex - lastSummarizedTurn >= summaryEvery
   ) {
+    const runSummary = (deliveredResponse: string) => {
+    if (input.signal?.aborted || !deliveredResponse.trim()) return;
     const pendingSummary = selectUnsummarizedConversation(
       [
         ...input.conversationHistory,
         { role: "user", content: input.userMessage, timestamp: Date.now() },
-        { role: activeCharacter, content: maxResponse, timestamp: Date.now() },
+        { role: activeCharacter, content: deliveredResponse, timestamp: Date.now() },
       ],
       lastSummarizedTurn,
     );
-    void summarizeSessionAsync(input.sessionId, pendingSummary, turnIndex, input.characterContext);
+    void summarizeSessionAsync(input.sessionId!, pendingSummary, turnIndex, input.characterContext);
+    };
+    if (input.streamControl) void input.streamControl.delivery.then(runSummary).catch(() => {});
+    else runSummary(maxResponse);
   }
 
   return {
@@ -583,4 +609,38 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     labelPromise,
     traceId,
   };
+}
+
+export type PRD4StreamEvent =
+  | { type: "intent"; intent: ResponseIntent }
+  | { type: "segment"; text: string }
+  | { type: "complete"; response: string }
+  | { type: "interrupted" | "failed"; intent: ResponseIntent | null; generated: string; error: unknown };
+
+/** One character generation through the exact shared PRD4 graph. */
+export async function streamPRD4Turn(input: PRD4TurnInput, onEvent: (event: PRD4StreamEvent) => void,
+  delivery: Promise<string>): Promise<PRD4TurnResult> {
+  let segments = 0;
+  delivery.catch(() => {});
+  const emit = (event: PRD4StreamEvent) => { input.signal?.throwIfAborted(); onEvent(event); };
+  const parser = new ResponseIntentParser(input.characterContext, intent => {
+    observeVoice(input.onVoiceObservation, "intent_ready"); emit({ type: "intent", intent });
+  }, text => {
+    observeVoice(input.onVoiceObservation, "safe_phrase"); segments++; emit({ type: "segment", text });
+  });
+  try {
+    const result = await processPRD4Turn({ ...input, streamControl: {
+      onToken: text => parser.push(text), finishSpeech: () => parser.finish(), delivery,
+      hasSegments: () => segments > 0,
+      onFallback: text => emit({ type: "segment", text }),
+    }});
+    // The consumer owns delivery; attach rejection handlers before it can cancel.
+    result.postTurnPromise.catch(() => {}); result.labelPromise.catch(() => {});
+    emit({ type: "complete", response: result.maxResponse });
+    return result;
+  } catch (error) {
+    onEvent({ type: input.signal?.aborted ? "interrupted" : "failed", intent: parser.intent,
+      generated: parser.generated.trim(), error });
+    throw error;
+  }
 }
