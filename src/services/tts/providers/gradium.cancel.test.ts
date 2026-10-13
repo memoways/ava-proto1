@@ -4,6 +4,14 @@ import {authenticatedFunctionFetch} from '@/services/gameAuth';
 import {gradiumProvider} from './gradium';
 afterEach(()=>vi.useRealTimers());
 describe('Gradium REST body ownership',()=>{
+ it('preserves only the bytes of fragmented audio views and their content type',async()=>{
+  const view=new Uint8Array([9,1,2,9]).subarray(1,3);
+  vi.mocked(authenticatedFunctionFetch).mockResolvedValueOnce(new Response(new ReadableStream<Uint8Array>({start(controller){controller.enqueue(view);controller.enqueue(new Uint8Array([3]));controller.close();}}),{headers:{'Content-Type':'audio/ogg'}}));
+  const result=await gradiumProvider.generate('Bonjour.');
+  expect(result.blob.type).toBe('audio/ogg');
+  const bytes=await new Promise<ArrayBuffer>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result as ArrayBuffer);reader.onerror=()=>reject(reader.error);reader.readAsArrayBuffer(result.blob);});
+  expect(Array.from(new Uint8Array(bytes))).toEqual([1,2,3]);
+ });
  it('cancels a blocked audio reader after headers when the parent is aborted',async()=>{
   const parent=new AbortController(),cancel=vi.fn();
   vi.mocked(authenticatedFunctionFetch).mockResolvedValueOnce(new Response(new ReadableStream<Uint8Array>({cancel}),{headers:{'Content-Type':'audio/wav'}}));

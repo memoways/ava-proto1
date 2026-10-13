@@ -99,7 +99,7 @@ async function generateGradiumSpeech(text: string, ctx: TTSGenerateContext | und
     reader = response.body?.getReader();
     if (!reader) throw new Error('Gradium audio body missing');
     const readBlob = async () => {
-      const chunks: Uint8Array[] = [];
+      const chunks: ArrayBuffer[] = [];
       let bytes = 0;
       while (true) {
         if (controller.signal.aborted) throw new DOMException('Gradium body cancelled', 'AbortError');
@@ -108,7 +108,9 @@ async function generateGradiumSpeech(text: string, ctx: TTSGenerateContext | und
         if (done) break;
         bytes += value.length;
         if (bytes > 32 * 1024 * 1024) throw new Error('Gradium audio body exceeds 32 MiB');
-        chunks.push(new Uint8Array(value));
+        const copy = new Uint8Array(value.length);
+        copy.set(value);
+        chunks.push(copy.buffer);
       }
       return new Blob(chunks, { type: response.headers.get('Content-Type') || 'audio/wav' });
     };

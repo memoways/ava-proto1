@@ -213,3 +213,33 @@ Cloud à déployer : proxy-llm et proxy-tts-gradium. Les autres artefacts P0 res
 inchangés. Qualité locale précédente : 46 régressions, 532 unitaires, 34
 intégrations, lint/typecheck/build verts ; les trois tests supplémentaires
 passent séparément, CI finale attendue sur le nouveau HEAD.
+
+### Livraison #33 et correction de compatibilité Lovable
+
+#33 squash `3c3b67c` (HEAD revu `21406ed`), CI pré-fusion verte : 46 régressions,
+535 unitaires, 34 intégrations ; 35 E2E au premier passage et un scénario batch
+Emma→Max réussi au retry (36 exécutés). Ne pas présenter ce run comme sans retry.
+RPC appliquée par connecteur Lovable, migration `20261013171500` enregistrée,
+invoker confirmé, anon interdit/authenticated autorisé, RLS active. Deux Edge
+Functions déployées par Lovable : empreintes soumises proxy-llm
+`962b68be4840e9aea09552adacd5d34892ab9ec728a2af326c53c8df2dd53a7f` et
+proxy-tts-gradium `eadd3c2b7467a4ede1eb1db5ba993ad3ae4743c0e2d8b4780cadd2ab7ec2d940`.
+Numéros de versions Cloud non fournis : source soumise attestée, version servie
+exacte pas indépendamment attestée. Aucun frontend P1 publié.
+
+Lovable a régénéré automatiquement les types Supabase (`b794e7c`), puis un
+commit de trajectoire (`916b466`), conservés. Bun build exit0, mais le compilateur
+TypeScript Lovable refuse `Uint8Array<ArrayBufferLike>[]` comme BlobPart[]
+(TS2345, gradium.ts113), alors que TypeScript local/CI l'accepte. Sous-lot correctif
+sur `codex/p1-lovable-body-types` : stocker les copies audio en `ArrayBuffer[]`,
+avec copie explicite dans un nouveau Uint8Array avant accès à buffer. Identique
+à la copie précédente, sans changement de format, voix, délais ou API. Tests
+existants de lecture/annulation et qualité, nouvelle PR, revues, CI et squash,
+puis reprise Lovable avec typecheck explicite avant recette et publication.
+
+Correction vérifiée localement : qualité complète verte (46 régressions,
+535 unitaires, 34 intégrations, lint/typecheck/build), puis test supplémentaire
+de conservation exacte des octets sur chunks fragmentés et vue avec offset
+réussi ; typecheck relancé après ajout. CI post-fusion #33 et types Lovable
+également vertes (`38428435954`, `38428954061`). Recette humaine P1 et publication
+restent à réaliser ; activation incrémentale toujours désactivée par défaut.
