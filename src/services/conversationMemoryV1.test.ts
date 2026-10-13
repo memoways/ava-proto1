@@ -46,7 +46,7 @@ describe("ConversationMemoryV1", () => {
     const normalized = normalizeConversationMemory({ version: 99, lastTurn: -1, relationship: { depth: "wrong" } });
     const rendered = formatConversationMemory(normalized, 80);
 
-    expect(normalized.version).toBe(3);
+    expect(normalized.version).toBe(4);
     expect(normalized.lastTurn).toBe(0);
     expect(rendered.length).toBeLessThanOrEqual(80);
   });

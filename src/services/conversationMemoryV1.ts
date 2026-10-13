@@ -1,3 +1,4 @@
+import { normalizeDeliveries } from "./responseDelivery";
 import type {
   ConversationDepth,
   ConversationMemoryDelta,
@@ -27,7 +28,7 @@ const LIMITS = {
 export function createEmptyConversationMemory(): ConversationMemoryV1 {
   const relationshipState = createInitialRelationshipState("max", "unversioned");
   return {
-    version: 3,
+    version: 4,
     lastTurn: 0,
     interlocutor: { name: null, role: null, traits: [] },
     userFacts: [],
@@ -45,6 +46,7 @@ export function createEmptyConversationMemory(): ConversationMemoryV1 {
     lastExchange: null,
     characterItems: [],
     characterStates: {},
+    deliveryByCharacter: {},
   };
 }
 
@@ -189,7 +191,7 @@ export function normalizeConversationMemory(raw: unknown): ConversationMemoryV1 
     : createEmptyConversationMemory().relationship;
 
   return {
-    version: 3,
+    version: 4,
     lastTurn,
     interlocutor: {
       name: normalizeMemoryText(interlocutor.name, 80) || null,
@@ -210,6 +212,7 @@ export function normalizeConversationMemory(raw: unknown): ConversationMemoryV1 
     lastExchange: normalizeMemoryText(candidate.lastExchange, LIMITS.lastExchangeChars) || null,
     characterItems: sanitizeCharacterItems(candidate.characterItems, lastTurn),
     characterStates: sanitizeCharacterStates(candidate.characterStates, lastTurn),
+    deliveryByCharacter: normalizeDeliveries(candidate.deliveryByCharacter),
   };
 }
 
@@ -445,6 +448,8 @@ export function filterConversationMemoryForCharacter(
   if (character === "emma") {
     return {
       ...memory,
+      characterStates: scoped ? { [character]: scoped } : {},
+      deliveryByCharacter: { [character]: memory.deliveryByCharacter?.[character] ?? [] },
       userFacts: scoped ? asItems(scoped.userFacts) : [],
       maxDisclosures: scoped ? asItems(scoped.characterDisclosures) : [],
       commitments: scoped ? asItems(scoped.commitments) : [],
@@ -462,6 +467,8 @@ export function filterConversationMemoryForCharacter(
   }
   return {
     ...memory,
+      characterStates: scoped ? { [character]: scoped } : {},
+      deliveryByCharacter: { [character]: memory.deliveryByCharacter?.[character] ?? [] },
     userFacts: scoped ? asItems(scoped.userFacts) : memory.userFacts,
     maxDisclosures: scoped ? asItems(scoped.characterDisclosures) : memory.maxDisclosures,
     commitments: scoped ? asItems(scoped.commitments) : memory.commitments,

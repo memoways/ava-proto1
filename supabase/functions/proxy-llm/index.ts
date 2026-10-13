@@ -49,12 +49,31 @@ function clampTimeoutMs(value: unknown, fallback: number): number {
 
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const abort = () => controller.abort(init.signal?.reason);
+  if (init.signal?.aborted) abort();
+  else init.signal?.addEventListener("abort", abort, { once: true });
+  let timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const clean = () => { clearTimeout(timeoutId); init.signal?.removeEventListener("abort", abort); };
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timeoutId);
-  }
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    if (!response.body) { clean(); return response; }
+    const reader = response.body.getReader();
+    const body = new ReadableStream<Uint8Array>({
+      async pull(target) {
+        try {
+          const { done, value } = await reader.read();
+          if (done) { clean(); reader.releaseLock(); target.close(); }
+          else {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            target.enqueue(value);
+          }
+        } catch (error) { clean(); target.error(error); }
+      },
+      async cancel(reason) { controller.abort(reason); clean(); await reader.cancel(reason).catch(() => {}); },
+    });
+    return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+  } catch (error) { clean(); throw error; }
 }
 
 serve(async (req) => {
@@ -174,6 +193,7 @@ serve(async (req) => {
         'X-Title': 'AVA Prototype 1',
       },
       body: JSON.stringify(upstreamBody),
+      signal: req.signal,
     }, timeoutMs)).catch((error) => {
       if (error instanceof DOMException && error.name === "AbortError") {
         return new Response(

@@ -1,3 +1,5 @@
+import { RESPONSE_STREAM_CONTRACT } from "@/services/responseIntentStream";
+import { formatPrivateDeliveryContext } from "@/services/responseDelivery";
 import { callLLM, callLLMWithUsage, LLMProxyRequestError, streamLLM, type LLMUsage } from "@/services/openRouterLLM";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMemoryV1, ConversationMessage, LLMCallDiagnosticTrace, MaxConstraintCheckResult, MaxPromptAssemblyTrace, MaxTurnKnowledgeContext, TraceMessage } from "@/types";
@@ -240,13 +242,18 @@ export async function simulateMaxResponse(
     signal?: AbortSignal;
     diagnosticTrace?: boolean;
     llmOverrides?: MaxLlmOverrides;
+    onSpeechToken?: (text: string) => void;
+    finishSpeech?: () => string;
   },
 ): Promise<SimulateMaxResult> {
   const characterName = opts?.characterContext?.displayName || opts?.characterName || "Max";
   const promptBuildStartedAt = performance.now();
   const promptTrace = await buildMaxSystemPrompt(input, characterName, opts?.characterContext);
   const promptBuildLatencyMs = Math.round(performance.now() - promptBuildStartedAt);
-  const systemPrompt = promptTrace.finalSystemPrompt;
+  const privateContext = opts?.characterContext
+    ? formatPrivateDeliveryContext(input.conversationMemory?.deliveryByCharacter?.[opts.characterContext.characterKey]) : '';
+  const systemPrompt = promptTrace.finalSystemPrompt + (privateContext ? `\n# CONTINUITÉ PRIVÉE\n${privateContext}` : '')
+    + (opts?.onSpeechToken ? RESPONSE_STREAM_CONTRACT : '');
   const messages: TraceMessage[] = [
     { role: "system", content: systemPrompt },
     ...input.conversationHistory.map((msg) => ({
@@ -272,7 +279,7 @@ export async function simulateMaxResponse(
   };
   let result: Awaited<ReturnType<typeof callLLMWithUsage>>;
   try {
-    result = await callLLMWithUsage(messages, {
+    const options = {
       model,
       onVoiceObservation: opts?.onVoiceObservation,
       onServiceObserved: opts?.onServiceObserved,
@@ -285,7 +292,12 @@ export async function simulateMaxResponse(
       feature_key: opts?.featureKey || "max_prompt_test",
       session_id: input.session_id,
       diagnostic_trace: opts?.diagnosticTrace === true,
-    });
+    };
+    if (opts?.onSpeechToken) {
+      const started = performance.now();
+      const content = await streamLLM(messages, (text, done) => { if (!done) opts.onSpeechToken?.(text); }, options);
+      result = { content: opts.finishSpeech?.() ?? content, usage: null, generationId: null, model, latencyMs: performance.now() - started, diagnosticTrace: null };
+    } else result = await callLLMWithUsage(messages, options);
   } catch (error) {
     if (!opts?.diagnosticTrace) throw error;
     throw new SimulateMaxResponseError(

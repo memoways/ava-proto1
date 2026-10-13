@@ -15,7 +15,7 @@ import { prepareTextForTTS } from "@/services/tts/textPrep";
 import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { playAudioBlobRobust } from "@/services/audioPlayback";
-import { createGradiumStreamSession, isStreamingSupported } from "@/services/tts/gradiumStreamPlayer";
+import { createGradiumStreamSession, createGradiumTurnSession, isStreamingSupported } from "@/services/tts/gradiumStreamPlayer";
 
 /**
  * Gradium-specific cleanup: ellipses, dashes and stray quotes/parentheses are
@@ -268,4 +268,15 @@ function createStreamingHandleWithFallback(
       rejectFinished(err);
     },
   };
+}
+
+/** Freezes the existing character voice and settings at turn preparation. */
+export function createGradiumIncrementalTurn(ctx: TTSGenerateContext, onProgress?: import("../gradiumStreamPlayer").GradiumStreamOptions["onProgress"]) {
+  const s = resolveGradiumSettings(ctx.characterKey);
+  return createGradiumTurnSession({
+    voiceId: ctx.voiceId || s.voiceId,
+    format: s.outputFormat === "pcm_24000" ? "pcm_24000" : "pcm_48000",
+    jsonConfig: buildJsonConfig(s, ctx.performance), signal: ctx.signal,
+    onVoiceObservation: ctx.onVoiceObservation, onProgress,
+  });
 }

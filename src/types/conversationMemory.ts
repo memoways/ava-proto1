@@ -37,7 +37,8 @@ export interface ConversationRelationshipState {
 
 export interface ConversationMemoryV1 {
   /** Version 3 keeps V1/V2 compatibility and adds a validated relationship state. */
-  version: 1 | 2 | 3;
+  version: 1 | 2 | 3 | 4;
+  deliveryByCharacter?: import("@/services/responseDelivery").DeliveryByCharacter;
   lastTurn: number;
   interlocutor: {
     name: string | null;

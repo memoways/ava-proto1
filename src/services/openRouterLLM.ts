@@ -1,3 +1,4 @@
+import { consumeLLMSse } from "./llmSse";
 import { observeVoice, observeService, type VoiceObserver, type ServiceObservation, type ServerObservation } from "./voiceTurnTelemetryV2";
 import { trackLLMCall } from "./llmUsageTracker";
 import { debugLogger } from "./debugLogger";
@@ -106,132 +107,56 @@ export async function streamLLM(
     last_user: messages[messages.length - 1]?.content?.slice(0, 200),
   });
 
-  let response: Response;
-  try {
-    response = await fetchProxyLLM(
-      {
-        messages,
-        stream: true,
-        model: options?.model,
-        ...samplingParameters,
-        max_tokens: options?.max_tokens,
-        timeout_ms: timeoutMs,
-        reasoning: options?.reasoning ?? isReasoningEnabledForModel(model),
-      },
-      timeoutMs,
-      `LLM stream ${model}`,
-      options?.signal,
-    );
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    trackLLMCall({
-      session_id: options?.session_id,
-      feature_key: featureKey,
-      model,
-      status: "error",
-      error_message: errorMessage.slice(0, 200),
-    });
-    throw err;
-  }
-
-  if (!response.ok) {
-    const err = await response.text();
-    debugLogger.logResponse(debugId, "llm", `Stream ${model}`, response.status, startTime, err);
-    // Track error
-    trackLLMCall({
-      session_id: options?.session_id,
-      feature_key: featureKey,
-      model,
-      status: "error",
-      error_message: `HTTP ${response.status}: ${err.slice(0, 200)}`,
-    });
-    throw new Error(`LLM error: ${response.status} - ${err}`);
-  }
-
-  debugLogger.log({ service: "llm", level: "info", direction: "in", label: `Stream started (${model})`, durationMs: Date.now() - startTime });
-
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('No response body');
-
-  const decoder = new TextDecoder();
-  let fullText = '';
-  let buffer = '';
-  let usageData: LLMUsagePayload | null = null;
+  const controller = new AbortController();
+  const abort = () => controller.abort(options?.signal?.reason);
+  if (options?.signal?.aborted) abort();
+  else options?.signal?.addEventListener("abort", abort, { once: true });
   let generationId: string | null = null;
-
-  while (true) {
-    const { done, value } = await withTimeout(
-      `LLM stream read ${model}`,
-      reader.read(),
-      timeoutMs,
-      () => reader.cancel().catch(() => {}),
-    );
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-
-    let newlineIndex: number;
-    while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-      let line = buffer.slice(0, newlineIndex);
-      buffer = buffer.slice(newlineIndex + 1);
-
-      if (line.endsWith('\r')) line = line.slice(0, -1);
-      if (line.startsWith(':') || line.trim() === '') continue;
-      if (!line.startsWith('data: ')) continue;
-
-      const jsonStr = line.slice(6).trim();
-      if (jsonStr === '[DONE]') {
-        onChunk(fullText, true);
-        debugLogger.log({ service: "llm", level: "success", direction: "in", label: `Stream complete (${model})`, durationMs: Date.now() - startTime, payload: `${fullText.length} chars, ${usageData?.total_tokens || "?"} tokens` });
-        // Track usage after stream completes
-        trackLLMCall({
-          session_id: options?.session_id,
-          feature_key: featureKey,
-          model,
-          prompt_tokens: usageData?.prompt_tokens,
-          completion_tokens: usageData?.completion_tokens,
-          total_tokens: usageData?.total_tokens,
-          generation_id: generationId,
-          status: "success",
-        });
-        return fullText;
-      }
-
-      try {
-        const parsed = JSON.parse(jsonStr);
-        const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-        if (content) {
-          fullText += content;
-          onChunk(content, false);
-        }
-        // Capture usage data from the stream (sent in final chunk by OpenRouter)
-        if (parsed.usage) {
-          usageData = parsed.usage;
-        }
-        // Capture generation id
-        if (parsed.id && !generationId) {
-          generationId = parsed.id;
-        }
-      } catch {
-        buffer = line + '\n' + buffer;
-        break;
-      }
-    }
+  let usage: LLMUsagePayload | null = null;
+  let firstToken = false;
+  observeVoice(options?.onVoiceObservation, "llm_request");
+  try {
+    const response = await withTimeout(`LLM stream ${model}`,
+      authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
+        body: JSON.stringify({ messages, stream: true, model, ...samplingParameters,
+          max_tokens: options?.max_tokens, timeout_ms: timeoutMs,
+          reasoning: options?.reasoning ?? isReasoningEnabledForModel(model) }),
+      }), timeoutMs, () => controller.abort());
+    observeVoice(options?.onVoiceObservation, "llm_headers");
+    if (!response.ok) throw new Error(`LLM error: ${response.status}`);
+    if (!response.body) throw new Error('No response body');
+    const fullText = await consumeLLMSse(response.body, content => {
+      if (!firstToken) { firstToken = true; observeVoice(options?.onVoiceObservation, "first_token"); }
+      onChunk(content, false);
+    }, { signal: controller.signal, timeoutMs, onMetadata: value => {
+      if (typeof value.id === 'string') generationId = value.id;
+      if (value.usage) usage = value.usage as LLMUsagePayload;
+      if (typeof value.model === 'string') observeService(options?.onServiceObserved, {
+        service: 'llm', requested_provider: 'openrouter', requested_model: model,
+        resolved_provider: 'openrouter', resolved_model: model,
+        effective_provider: typeof value.provider === 'string' ? value.provider : null,
+        effective_model: value.model, transport: 'sse', fallback: value.model !== model,
+      });
+      if (value._ava_observability) options?.onServerObserved?.(value._ava_observability as ServerObservation);
+    }});
+    if (controller.signal.aborted) throw new DOMException('LLM cancelled', 'AbortError');
+    observeVoice(options?.onVoiceObservation, "llm_response");
+    onChunk(fullText, true);
+    const finalUsage = usage as LLMUsagePayload | null;
+    trackLLMCall({ session_id: options?.session_id, feature_key: featureKey, model,
+      prompt_tokens: finalUsage?.prompt_tokens, completion_tokens: finalUsage?.completion_tokens,
+      total_tokens: finalUsage?.total_tokens, generation_id: generationId, status: 'success' });
+    debugLogger.logResponse(debugId, 'llm', `Stream ${model}`, response.status, startTime);
+    return fullText;
+  } catch (error) {
+    trackLLMCall({ session_id: options?.session_id, feature_key: featureKey, model,
+      status: 'error', error_message: error instanceof Error ? error.message.slice(0, 200) : 'Stream failed' });
+    throw error;
+  } finally {
+    controller.abort();
+    options?.signal?.removeEventListener('abort', abort);
   }
-
-  onChunk(fullText, true);
-  // Track even if no [DONE] marker received
-  trackLLMCall({
-    session_id: options?.session_id,
-    feature_key: featureKey,
-    model,
-    prompt_tokens: usageData?.prompt_tokens,
-    completion_tokens: usageData?.completion_tokens,
-    total_tokens: usageData?.total_tokens,
-    generation_id: generationId,
-    status: "success",
-  });
-  return fullText;
 }
 
 export interface LLMUsage {
