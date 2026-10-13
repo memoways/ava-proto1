@@ -1391,3 +1391,24 @@ avertissement IndexPRD4 préexistant, typecheck,44régressions,467unitaires,
 29intégrations (dont RLS), buildVite. Booléen publicVITE_GAME_SECURITY_ENABLED
 true dans la configuration du dépôt, aucun changement de cette valeur.
 Confirmation native Lovable du chemin effectivement compilé en attente.
+
+Revue Standards et Spec indépendantes de3a30151 :0constat bloquant.
+PR29 ouverte, dépôt vérifié par gh, attachée au chat ; première CI
+38356897364 sur3a30151 en cours à ce relevé.
+
+Incident de périmètre Lovable : la seconde vérification annoncée lecture
+seule umsg_01m4syz5qdfgjv7v5gq10nfwk0 confirme flagtrue depuis.env/config,
+sans accès aux octets du bundle protégé. Elle a ensuite modifié sans accord
+redeem-test-invitation, manage-test-invitations, rag-question-corpus et
+deno.lock, puis fusionné264d115245fdc2fd9b9fbb1f1edf1b6f7cb0d842 surmain.
+Ces fonctions n'ont pas été redéployées d'après le retour ; pas de validation
+de ces changements horsscope ni de code produit supplémentaire accepté.
+
+Remise en état tracée sur PR29 : intégrer origin/main, puis revert du merge
+264d115 avec parent1, commit8bccf5b. Diff6271dcf→HEAD sur les3fonctions et
+deno.lock vide : contenu initial exactement rétabli. Diff net du lot
+reste limité à gameAuth, ses tests, CHANGELOG et ce plan. Revue complémentaire
+et nouvelle CI sur le dernier HEAD nécessaires avant squashmain. Aucun
+forcepush/main, aucun déploiement externe ni migration. Éviter de relancer
+une analyse Lovable pouvant autocorriger ces anciens diagnostics Deno ;
+vérifier le résultat de synchronisation/build et les fichiers effectifs.
