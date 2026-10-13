@@ -1204,3 +1204,40 @@ automatiques distincts), et l'écart de rôle Emma garde son origine inconnue.
 Aucune publication frontend supplémentaire effectuée. Une publication
 avec ces limites nécessite un choix explicite, puisque la demande initiale
 conditionne la publication à la réussite des parcours.
+
+### Suite autorisée : transfert et cinématique réels en preview — 13 octobre 2026
+
+Ulrich choisit « Poursuivre les parcours en preview ». Aucun accord de
+publication avec limites. Préparer une nouvelle session mains libres dans
+la preview sandbox-ulrich, en utilisant les réglages restaurés et les
+règles narratives existantes. Ne pas forcer une décision GM ni injecter
+un événement, ni modifier de prompt/config pour obtenir un résultat.
+
+Lovable natif vérifié au démarrage : projet/workspace attendus, headab348ab,
+ready/agentFinishedtrue, Cloudsupabase activé. Lecture native des réglages
+confirme sandbox enabledtrue/hashinitial et prodhashinitial. Preview native
+sur écran de fin après le contrôle PTT ; reprendre sans capture ambiante.
+Réglages cinématiques : héritage prod ENABLEDtrue, première vidéo à partir
+de3tours, pause3tours, MAX_PER_SESSION0 (illimité), MIN_LABELS_REQUIRED1.
+Six interludes ont une URL renseignée, thèmes disponibles dont confiance,
+trahison, famille, secrets et disparition. La disponibilité seule ne
+prouve ni déclenchement ni lecture ; observer la décision et les événements.
+
+Config sandbox publiée v6/9217fd34-321a-45c7-8363-6a8cf0b0157c :
+allowHandoffstrue/allowCinematicstrue, minimumHandoffTurn4, maximumHandoffs1,
+handoffRules[]. Aucun réglage modifié pour ce parcours.
+Session PTT précédente terminée05:39:11.256UTC, duration960s,
+timeout_configured_duration confirmé via Ava natif (aucune fin par clic
+agent revendiquée). UI Continuer mène à l'écran avis enregistré, puis
+Recommencer. Rechargement de la preview nécessaire pour relire le réglage
+mainslibrestrue restauré, car l'appel PTT précédent utilisait sa référence
+déjà chargée. Introduction passée, film pas_vu, Appeler Max.
+
+Nouvelle session5d703f2a-bf08-457a-91f9-658dd3d7af0e,
+début05:42:37.198UTC13octobre, sandbox-ulrich/contextsandbox, Max/tts.
+UI native confirme Max EN LIGNE et Activer le micro, sans capture
+déclenchée par l'agent. Action humaine demandée :4 échanges narratifs
+successifs (écoute, relation avec Emma, confiance/famille, demande de
+transfert), attendre chaque réponse et toute vidéo, couper le micro à
+la fin puis signaler vidéo/Emma éventuelle. Vérification en attente :
+ne pas présenter les phrases proposées comme des échanges exécutés.
