@@ -134,7 +134,7 @@ plus anciennes conservent leur état au moment de leur rédaction.
 
 ## [Non publié]
 
-### Lot 2 / P1 — en cours, sortie progressive et mémoire de livraison
+### Lot 2 / P1 — fusionné, recette et publication frontend en attente
 
 - Une génération personnage produit une intention privée puis des phrases sûres.
   Montage PRD4 Max/Emma partagé, batch et laboratoires conservés ; en-tête jamais
@@ -145,7 +145,11 @@ plus anciennes conservent leur état au moment de leur rédaction.
   GM et résumés sur livraison confirmée. Colonnes JSONB existantes et RPC CAS
   additive avec RLS conservées ; aucune transformation de données.
 - Flag Sortie vocale progressive désactivé par défaut ; activation canary prévue
-  uniquement sandbox-ulrich. Tests et livraison GitHub/Lovable en cours.
+  uniquement sandbox-ulrich, activée pour la recette. PR #33 et correctif de typage Lovable #34 fusionnés
+  (`3c3b67c`, `07eaed4`), deux revues sans blocage et CI finale verte :
+  46 régressions, 536 unitaires, 34 intégrations, 36 E2E sans retry.
+  RPC appliquée et deux proxies déployés dans Lovable Cloud ; types, build et
+  contrôle Deno P1 Lovable verts. Recette humaine et publication frontend en attente.
   [Plan P1](docs/plan_lot_2_memoire_streaming_coherent.md).
 
 Les mentions de non-publication et les listes de recette des entrées du

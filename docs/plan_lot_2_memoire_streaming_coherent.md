@@ -1,8 +1,9 @@
 # Reprise — lot 2 / P1 : mémoire de livraison et streaming cohérent
 
-Date : 13 octobre 2026. Statut : **implémentation P1 en cours ; recette et
-livraison non encore effectuées**. Base d'exécution vérifiée : main `0a60a64`, dépôt propre.
-Dernier code publié : `f251eb3` / PR #32. Le commit de ce document ou un
+Date : 13 octobre 2026. Statut : **P1 fusionné sur main (#33 et #34), migration
+et fonctions Lovable Cloud livrées ; preview technique vérifiée, recette humaine et
+publication frontend encore à effectuer**. Base d'exécution : main `0a60a64`.
+Dernier frontend publié : `f251eb3` / PR #32. Le commit de ce document ou un
 descendant devient le point de reprise documentaire.
 
 ## Décision de passage
@@ -243,3 +244,53 @@ de conservation exacte des octets sur chunks fragmentés et vue avec offset
 réussi ; typecheck relancé après ajout. CI post-fusion #33 et types Lovable
 également vertes (`38428435954`, `38428954061`). Recette humaine P1 et publication
 restent à réaliser ; activation incrémentale toujours désactivée par défaut.
+
+### Correctif #34 — gate finale et reprise Lovable
+
+Deux revues indépendantes Spec/Standards : aucun constat bloquant sur
+`916b466…b597d02`. CI `38454199403` verte : 46 régressions, **536 unitaires**,
+34 intégrations, lint/typecheck/build ; **36 E2E passent sans retry**.
+PR #34 squash mergée en `07eaed436a072623820dcd1dac4a0e8a8012d657`, main local
+et distant synchronisés. Le retry du run #33 reste une réserve historique,
+pas une réserve du run final #34.
+
+Reprise native Lovable demandée sur ce SHA : message
+`umsg_01m4vbzkahfffbgmbd0ngc3ht4`, typecheck Lovable et build explicites,
+aucune édition autonome, aucun réglage ni publication. Preview admin Brave
+actualisée : identité Ulrich, environnement Sandbox — Ulrich, nouvelle sortie
+progressive visible et désactivée, délais 900/700 ms et seuil trois mots
+inchangés. Recette via Tester moi-même à préparer après compiler vert.
+
+### Preview technique vérifiée — recette humaine prête
+
+Lovable confirme HEAD `07eaed4`, arbre propre, `tsgo` 7.0.0-dev.20260320.1
+et `npm run typecheck` TypeScript 5.8.3 exit0, zéro erreur ; `bun run build`
+exit0. Bundle compilé `index-DIFCkXsB.js`, SHA256
+`e951dfe12b60ccda69ef0ea259c16c2e61246dd1df4a66d9144c15ecda15bd94`.
+La preview HTTP200 utilise Vite dev : cette empreinte est celle du build,
+pas une attestation de bundle effectivement servi en preview.
+
+Contrôle natif complémentaire message `umsg_01m4vc4stpfzfaqf3x6fyysv4m` :
+`deno check` des deux proxies P1 exit0. Le journal historique signale des
+erreurs Deno dans rag-question-corpus/manage-test-invitations/redeem-test-invitation ;
+leurs fichiers sont identiques à `0a60a64` (diff vide), hors P1, aucune correction.
+
+Canary activée par connecteur natif Lovable : seul `VOICE_INCREMENTAL_OUTPUT`
+de sandbox-ulrich passe à true. Production null (défaut false), mains libres
+et seuils 900/700 ms/trois mots inchangés. Contrôle UI confirmé dans Brave.
+Admin preview → Tester moi-même a ouvert l'onglet `1830099280`, introduction
+passée, question film affichée. Réponse factuelle demandée à Ulrich, en attente ;
+aucune conversation humaine ni injection de parole réalisée. Shields inchangés.
+Onglets admin preview `1830099245` et admin publié `1830099248` préparés.
+Publication frontend et vérification publiée restent à réaliser après recette.
+Rollback pour nouvelles sessions : remettre ce seul flag sandbox à false ;
+les sessions existantes conservent leur preset épinglé et leurs reçus.
+
+Ulrich confirme « J'ai vu le film ». Session canary Max créée :
+`7e8b5cb2-e2ab-40de-a465-bc2dc14301f8`, 19:37:46 UTC, sandbox,
+`has_seen_film=vu`, mémoire V4, incremental=true vérifiés par métadonnées.
+Ouverture micro expirée après 10000 ms (`microphone_permission`), avant tout
+tour vocal. Aucune cause Shields démontrée, aucun changement de protection.
+Demande d'ouverture/permission dans l'onglet AVA présentée à Ulrich ;
+recette vocale toujours à effectuer, pas de publication anticipée.
+CI après squash `38455494583` sur `07eaed4` également verte.

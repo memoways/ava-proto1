@@ -82,8 +82,12 @@ le préfixe entendu, le texte incertain et la continuation privée. Seul le
 préfixe livré alimente le GM et les résumés ; les historiques Max/Emma restent
 isolés. Les colonnes JSON existantes sont conservées ; une RPC additive
 protège les écritures concurrentes sans dépasser les limites HTTP. Le flag de
-sortie progressive reste désactivé par défaut pour une canary sandbox-ulrich.
-Implémentation et tests en cours ; aucune publication P1 encore effectuée.
+sortie progressive reste désactivé par défaut et est activé seulement pour la
+recette canary sandbox-ulrich.
+Implémentation fusionnée (#33 et #34), revues et CI finale vertes, dont 36 E2E
+sans retry. La RPC et les deux proxies sont livrés dans Lovable Cloud. La
+compatibilité de types Lovable est corrigée et vérifiée, ainsi que le build et
+les deux proxies P1. La recette humaine et la publication frontend restent à effectuer.
 [Plan et preuves P1](docs/plan_lot_2_memoire_streaming_coherent.md).
 
 
