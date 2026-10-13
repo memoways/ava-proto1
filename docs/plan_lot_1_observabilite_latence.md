@@ -1950,3 +1950,14 @@ Si P1 est explicitement autorisé, l'ouvrir en lot séparé selon son plan :
 mémoire de livraison/intention privée, streaming cohérent, annulation.
 Sinon ne pas commencer P1/P2/P3. Lovable reste l'unique livraison ; aucune
 migration ou modification de réglage nouvelle autorisée par cette clôture.
+
+#### Décision clarifiée après clôture — 13 octobre 2026
+
+Ulrich demande une réponse oui/non et, si oui, le prompt de reprise.
+Réponse : **oui, passer au lot 2/P1**. Le P0 est livré et sa recette n'a
+démontré aucun défaut de code bloquant. Ses limites restent documentées,
+sans les transformer en succès ; elles ne justifient pas de répéter les
+demandes narratives ni de bloquer par défaut le travail mémoire/streaming.
+Le [prompt P1 sauvegardé](plan_lot_2_memoire_streaming_coherent.md) supplante
+la demande de décision encore ouverte dans le paragraphe de reprise précédent.
+P1 non implémenté dans ce chat ; démarrage dans la reprise suivante.

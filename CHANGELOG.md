@@ -8,6 +8,11 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ### Complément de recette P0 — bilan, sans nouvelle publication
 
+- Suite clarifiée : **oui au lot 2/P1**, prompt de reprise
+  [sauvegardé](docs/plan_lot_2_memoire_streaming_coherent.md). Les réserves P0
+  restent documentées ; aucun défaut de code bloquant démontré. P1 prêt à
+  lancer dans le prochain chat, aucune implémentation ni publication nouvelle.
+
 - Recette humaine exécutée dans Brave, via l'admin publié → Tester moi-même /
   Sandbox Ulrich : fin naturelle de cinématique confirmée par
   cinematic_completed/skipped=false, retour chez Emma et nouvel échange
@@ -23,11 +28,11 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   éditorial désactivé, aucun prompt complet conservé pour la session.
   Cause de code non prouvée, aucune correction de prompt ou de réglage.
 - 26 tests ciblés du cadre commun et de l'orchestrateur passent. Dernier
-  code publié `f251eb3` inchangé ; P1 non commencé et passage non décidé.
+  code publié `f251eb3` inchangé ; P1 prêt à lancer, non commencé.
   [Protocole et preuves](docs/plan_lot_1_observabilite_latence.md).
 - Appel clôturé proprement, micro fermé, compteur0 et contrainte non négative
   conservée. Aucun prompt, réglage ou code modifié ; aucune republication.
-  Passage P1 proposé après validation explicite des réserves de ce bilan.
+  Passage P1 retenu pour la reprise suivante, réserves conservées.
   Aucun gain de latence revendiqué.
 
 Cette section donne l'état livré après les derniers contrôles. Les entrées

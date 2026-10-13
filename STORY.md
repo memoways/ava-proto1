@@ -105,6 +105,12 @@ Le code publié reste `f251eb3`, sans correctif ni republication. Le passage
 d'Ulrich ; aucun streaming ou autre lot commencé.
 [Protocole et diagnostic](docs/plan_lot_1_observabilite_latence.md).
 
+Ulrich demande ensuite une décision claire : oui, passer à P1. L'observabilité
+P0 est livrée et la recette n'a démontré aucun défaut de code bloquant.
+Les réserves sont conservées, sans nouvelle boucle de demandes narratives.
+Le [prompt de reprise P1](docs/plan_lot_2_memoire_streaming_coherent.md) est
+sauvegardé pour le prochain chat ; son implémentation n'a pas commencé ici.
+
 ### 2026-10-13 — Passer à un autre personnage devient un choix narratif
 
 **Le besoin clarifié.** Après les essais vocaux, Ulrich demandait un bouton

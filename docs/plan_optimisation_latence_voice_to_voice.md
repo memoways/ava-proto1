@@ -1,7 +1,7 @@
 # Plan — réduire la latence et préparer la conversation voice-to-voice libre
 
 Date : 12 octobre 2026. Base auditée : `0433518`, `main`, après une première lecture de `2d83558`.
-Statut actualisé le 13 octobre 2026 : **lot 1 / P0 publié via Lovable, échanges réels Max/Emma et baseline initiale relevés ; dernier code publié `f251eb3` (PR #32). Recette complémentaire exécutée : cinématique finie naturellement et reprise vocale attestées, transfert accepté non observé, écart Emma du 12 octobre retrouvé sans cause technique démontrée ; prompt post-vidéo exact non attesté. Passage P1 proposé avec réserves, non décidé ; lots 2–4 non commencés**. Choix d'interruption confirmé par Ulrich le 12 octobre : réaction dès le début de voix, avec confirmation des mots ensuite. Preuves dans le [bilan P0](plan_lot_1_observabilite_latence.md) et le [correctif des appels](plan_changement_interlocuteur_manuel.md) ; ces contrôles ne prouvent pas l'implémentation de la stratégie acoustique future.
+Statut actualisé le 13 octobre 2026 : **lot 1 / P0 publié via Lovable, échanges réels Max/Emma et baseline initiale relevés ; dernier code publié `f251eb3` (PR #32). Recette complémentaire exécutée : cinématique finie naturellement et reprise vocale attestées, transfert accepté non observé, écart Emma du 12 octobre retrouvé sans cause technique démontrée ; prompt post-vidéo exact non attesté. Passage P1 retenu pour la reprise suivante avec réserves conservées ; lots 2–4 non commencés**. Choix d'interruption confirmé par Ulrich le 12 octobre : réaction dès le début de voix, avec confirmation des mots ensuite. Preuves dans le [bilan P0](plan_lot_1_observabilite_latence.md) et le [correctif des appels](plan_changement_interlocuteur_manuel.md) ; ces contrôles ne prouvent pas l'implémentation de la stratégie acoustique future.
 Sources : [audit détaillé](audit_voice_conversation_max.md) et [snapshot chiffré anonymisé](latency_voice_snapshot_2026-10-12.json).
 
 ## Résultat visé et décisions acquises
@@ -130,13 +130,16 @@ accept, mais consentement rejeté par le contrôle actuel ; aucune offre,
 récit, GM d'abord correctif puis permissif ; aucun défaut de code démontré
 ni prompt historique complet disponible. 26 tests ciblés verts et replay
 du contrôle de consentement réussi. [Bilan P0](plan_lot_1_observabilite_latence.md).
-**Passage P1 proposé avec ces réserves, non décidé** : attend la validation
-explicite du bilan par Ulrich. Aucun développement P1/P2/P3 engagé.
+**Passage P1 retenu pour la reprise suivante**, à la demande d'Ulrich de
+préparer le prompt : aucun défaut de code bloquant démontré par la recette.
+Les réserves ci-dessus restent explicites ; elles ne requièrent pas de
+relancer P0 par défaut. [Prompt du lot 2/P1](plan_lot_2_memoire_streaming_coherent.md).
+Aucun développement P1/P2/P3 engagé dans ce chat de préparation.
 
 | Lot | Périmètre du plan | État |
 | --- | --- | --- |
 | 1 | P0 : mesures fiables, attribution, MCP, dépendances et baseline | [Publié avec baseline et recette complémentaire](plan_lot_1_observabilite_latence.md) ; vidéo naturelle et reprise vocale attestées, transfert accepté non observé, écart Emma retrouvé sans cause technique démontrée |
-| 2 | P1 : mémoire de livraison, intention privée, streaming LLM/TTS et annulation | Prévu après validation du lot 1 |
+| 2 | P1 : mémoire de livraison, intention privée, streaming LLM/TTS et annulation | [Prêt à lancer dans la reprise suivante](plan_lot_2_memoire_streaming_coherent.md) ; implémentation non commencée |
 | 3 | P2 : écoute libre, interruption acoustique confirmée et UI voix seule | Prévu après validation du lot 2 |
 | 4 | P3 : GM, RAG, prompts et buffers comparés | Prévu après validation du lot 3 |
 
