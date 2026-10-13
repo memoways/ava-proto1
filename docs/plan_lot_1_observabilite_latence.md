@@ -1453,8 +1453,8 @@ nextOffset100,cappedfalse,invalid0. SQL borné sur la même session et fenêtre
 confirme15V2 (5started/5finished/5GM),5attempt_id, plus2legacy séparés.
 Ces15V2 sont tous dans la page reçue, pagination globale non complète.
 
-Tentatives1a2d9078f-0c68-4a5c-aedf-75ca5bc7a324,
-3ad639090-f1eb-4132-93bd-445c84b5c8b8,
+Tours1/a2d9078f-0c68-4a5c-aedf-75ca5bc7a324,
+3/ad639090-f1eb-4132-93bd-445c84b5c8b8,
 4/8da6f0d3-7271-49d8-93ff-92627e40279f interrupted, sortiesnull,
 audio_cancelled2457/2500/1979ms. GM failed correspondant avec booléen
 mentions-aborttrue. Aucun dialogue ni note privée lus. Les AbortError
@@ -1481,3 +1481,29 @@ contrôle court demandé dans le même appel encore EN LIGNE, micro fermé :
 confirmer l'éventuelle proposition ou apparition d'Emma. Pas de règle
 forcée ni de modification de capture. Transfert accepté encore non attesté.
 CI post-merge38357947025 sur3e2e1ce désormaissuccess.
+
+### Trois refus explicites et contrôle inverse préparé — 13 octobre 2026, 09:12 CEST
+
+Ulrich a répété trois fois la demande courte vers Emma, sans bouton de
+transfert ; Max indique ne rien pouvoir faire. Projection technique native
+du GM de la sessione1a7e6fd : tours7/9/11 exécutés, actionnone,
+requesttargetemma/stanceobject ; tours6/8/10 failed avec mentions-aborttrue.
+Les demandes sont reconnues et refusées, aucun transfert accepté ou exécuté.
+Les deux profils sandbox-ulrich sont enabled, référence personnage et voix
+présentes, validations prompt/RAG/qualitative/isolation valides. Config
+publiée9217fd34-321a-45c7-8363-6a8cf0b0157c, version6 : handoffs autorisés,
+minimum4, maximum1, règles vides. config.frame.enabledfalse ; le booléen
+forbidSpontaneousHandofftrue dans ce frame inactif ne démontre donc pas
+une cause de refus. Aucune modification éditoriale ou de disponibilité.
+Appel terminé06:58:34.517UTC par timeout_configured_duration, handoffCount0.
+
+Contrôle inverse préparé dans le même onglet Brave1830098971 de preview :
+nouvelle sessiona635b6ca-8b97-4bc9-af43-62ce0fbb5f64,
+début07:11:24.858UTC, sandbox-ulrich/contextsandbox, Emma/film pas_vu/tts.
+UI confirme Emma EN LIGNE, bouton Activer le micro (micro fermé). Même
+contexte initial et mêmes réglages ; seule la personne appelée change.
+Action humaine demandée une seule fois : « J'aimerais parler à Max,
+s'il te plaît », attendre la réponse, couper le micro, indiquer le résultat.
+Transfert accepté réel toujours non attesté. Les17E2E antérieurs ne couvrent
+pas explicitement cette branche UI ; les tests unitaires de décision ne
+remplacent pas cette preuve. Publication frontend public non effectuée.
