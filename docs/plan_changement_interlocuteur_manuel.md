@@ -94,3 +94,13 @@ typecheck et build. Quatre parcours manuels E2E réussis, y compris les deux
 reproductions de revue désormais vertes. Les variantes Whisper renforcées
 (capture et flush avec nouveau micro ouvert) sont en cours de contrôle ;
 les deux revues complémentaires et la CI doivent porter sur le HEAD corrigé.
+
+Revue complémentaire bdbecfd : deux défauts initiaux corrigés. Deux cas
+supplémentaires protégés : les rejets tardifs de construction/démarrage STT
+sont requalifiés si leur capture a été remplacée ; teardownSTT libère les
+verrous de finalisation de la capture retirée, sans laisser un ancien finally
+toucher la nouvelle capture. Deux E2E dédiés passent : après recommencement,
+un ancien rejet de micro ne ferme pas le nouveau ; désactivation/réactivation
+HF pendant flush permet au nouveau tour d'aboutir. Variantes Whisper capture
+et flush avec nouveau micro actif également vertes. Prochain HEAD à revoir
+avant fusion ; aucune publication de ce bouton encore effectuée.

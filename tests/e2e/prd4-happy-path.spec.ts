@@ -27,6 +27,9 @@ interface NetworkFakeOptions {
   delayCharacterResponseMs?: number;
   whisperResponse?: string;
   delayWhisperResponseMs?: number;
+  handsFree?: boolean;
+  skipQuestionnaire?: boolean;
+  delayFirstSTTFinalMs?: number;
 }
 
 function json(route: Route, body: unknown, status = 200) {
@@ -65,12 +68,13 @@ async function installNetworkFakes(
   const voiceEvents: Array<Record<string, unknown>> = [];
   const gmFilmContexts: string[] = [];
 
-  await page.addInitScript(({ transcripts, simulateAudio, batchAudio }: { transcripts: string[]; simulateAudio: boolean; batchAudio: boolean }) => {
+  await page.addInitScript(({ transcripts, simulateAudio, batchAudio, handsFree, skipQuestionnaire, delayFirstSTTFinalMs }: { transcripts: string[]; simulateAudio: boolean; batchAudio: boolean; handsFree: boolean; skipQuestionnaire: boolean; delayFirstSTTFinalMs: number }) => {
     let websocketIndex = 0;
     type E2ETestWindow = Window & {
       __e2eLongAudio?: boolean;
       __e2eAudioState?: { ended: number; paused: number };
       __e2eNativeVideoState?: { playing: boolean; playCount: number; pauseCount: number };
+      __e2eSTTFinals?: number;
     };
     const testWindow = window as E2ETestWindow;
     // These scenarios exercise the PRD4 flow after a successful public gate.
@@ -96,7 +100,10 @@ async function installNetworkFakes(
         }
       },
     });
-    localStorage.setItem("ava:prod:ava_gameplay_settings", JSON.stringify({ RAG_SUMMARY_EVERY_N_TURNS: 4 }));
+    localStorage.setItem("ava:prod:ava_gameplay_settings", JSON.stringify({ RAG_SUMMARY_EVERY_N_TURNS: 4,
+      ...(handsFree ? { VOICE_HANDS_FREE: { enabled: true } } : {}),
+      ...(skipQuestionnaire ? { SHOW_QUESTIONNAIRE: false } : {}),
+    }));
     if (batchAudio) localStorage.setItem("ava:prod:ava_stt_settings", JSON.stringify({ activeProvider: "openai_whisper" }));
     // PostHog intentionally filters HeadlessChrome as a bot. Use a regular
     // browser UA so this E2E can attest that real-user telemetry reaches the
@@ -183,6 +190,7 @@ async function installNetworkFakes(
         try {
           const command = JSON.parse(data) as { type?: string };
           if (command.type !== "Finalize") return;
+          testWindow.__e2eSTTFinals = (testWindow.__e2eSTTFinals ?? 0) + 1;
           setTimeout(() => this.onmessage?.(new MessageEvent("message", {
             data: JSON.stringify({
               type: "Results",
@@ -190,7 +198,7 @@ async function installNetworkFakes(
               from_finalize: true,
               channel: { alternatives: [{ transcript: this.transcript }] },
             }),
-          })), 0);
+          })), testWindow.__e2eSTTFinals === 1 ? delayFirstSTTFinalMs : 0);
         } catch { /* binary audio and unrelated commands are ignored */ }
       }
       close() {
@@ -231,7 +239,10 @@ async function installNetworkFakes(
     });
     Object.defineProperty(window, "WebSocket", { configurable: true, value: E2EWebSocket });
     Object.defineProperty(window, "MediaRecorder", { configurable: true, value: E2EMediaRecorder });
-  }, { transcripts, simulateAudio: options.ttsSuccess === true, batchAudio: options.whisperResponse !== undefined });
+  }, { transcripts, simulateAudio: options.ttsSuccess === true, batchAudio: options.whisperResponse !== undefined,
+    handsFree: options.handsFree === true, skipQuestionnaire: options.skipQuestionnaire === true,
+    delayFirstSTTFinalMs: options.delayFirstSTTFinalMs ?? 0,
+  });
 
   await page.route("https://video.gumlet.io/**", (route) => {
     if (route.request().url().includes(E2E_VIDEO_ASSET_ID)) triggeredVideoLoads += 1;
@@ -346,7 +357,10 @@ async function installNetworkFakes(
     }
     if (table === "admin_settings") {
       if (url.searchParams.get("key") === "eq.ava_gameplay_settings") {
-        return json(route, [{ environment_id: "prod", value: { TIMEOUT_SECONDS: 930 } }]);
+        return json(route, [{ environment_id: "prod", value: { TIMEOUT_SECONDS: 930,
+          ...(options.handsFree ? { VOICE_HANDS_FREE: { enabled: true } } : {}),
+          ...(options.skipQuestionnaire ? { SHOW_QUESTIONNAIRE: false } : {}),
+        } }]);
       }
       return json(route, []);
     }
@@ -641,6 +655,64 @@ test("appel manuel : une cible devenue indisponible conserve le personnage et la
   await expect(page.getByRole("img", { name: "Portrait d’Emma" })).toBeVisible();
   expect(fakes.getExperienceEvents().filter(event => event.event_type === "handoff_executed")).toHaveLength(0);
   expect(fakes.getSessionInsertCount()).toBe(1);
+});
+
+test("capture remplacée : un démarrage rejeté après recommencement laisse le nouveau micro actif", async ({ page }) => {
+  test.setTimeout(45_000);
+  await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true, skipQuestionnaire: true });
+  await page.addInitScript(() => {
+    const previous = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    let calls = 0;
+    Object.defineProperty(navigator.mediaDevices, "getUserMedia", { configurable: true, value: () => {
+      if (++calls > 1) return previous({ audio: true });
+      return new Promise<MediaStream>((_resolve, reject) => {
+        (window as Window & { __e2eRejectFirstCapture?: () => void }).__e2eRejectFirstCapture = () => reject(new Error("Old microphone startup rejected"));
+      });
+    } });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await answerFilmQuestion(page);
+  await page.getByRole("button", { name: "Appeler Emma" }).click();
+  await expect.poll(() => page.evaluate(() =>
+    (window as Window & { __e2eAudioState?: { ended: number } }).__e2eAudioState?.ended ?? 0), { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+  await expect(page.getByText("Micro en cours d'ouverture…", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Terminer", exact: true }).click();
+  await page.getByRole("button", { name: "Continuer", exact: true }).click();
+  await page.getByRole("button", { name: /Recommencer/ }).click();
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await answerFilmQuestion(page);
+  await page.getByRole("button", { name: "Appeler Max" }).click();
+  await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+  await expect(page.getByRole("button", { name: "Arrêter l'enregistrement" })).toBeEnabled();
+  await page.evaluate(() => (window as Window & { __e2eRejectFirstCapture?: () => void }).__e2eRejectFirstCapture?.());
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("button", { name: "Arrêter l'enregistrement" })).toBeEnabled();
+  await expect(page.getByText("Micro indisponible", { exact: true })).toHaveCount(0);
+});
+
+test("capture remplacée : couper puis réactiver le micro pendant un flush mains libres laisse le nouveau tour aboutir", async ({ page }) => {
+  const fakes = await installNetworkFakes(page, ["Première question interrompue avant la réponse.", "Une nouvelle question après réactivation du micro."], {
+    ttsSuccess: true, characterOpenings: true, handsFree: true, delayFirstSTTFinalMs: 7_000,
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer" }).click();
+  await page.getByRole("button", { name: /Passer/ }).click();
+  await answerFilmQuestion(page);
+  await page.getByRole("button", { name: "Appeler Max" }).click();
+  await expect.poll(() => page.evaluate(() =>
+    (window as Window & { __e2eAudioState?: { ended: number } }).__e2eAudioState?.ended ?? 0), { timeout: 10_000 }).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "Activer le micro" }).click();
+  await expect.poll(() => page.evaluate(() =>
+    (window as Window & { __e2eSTTFinals?: number }).__e2eSTTFinals ?? 0)).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "Couper le micro" }).click();
+  await page.getByRole("button", { name: "Activer le micro" }).click();
+  await expect.poll(fakes.getMaxTurnCount, { timeout: 10_000 }).toBe(1);
+  await expect(page.getByText("Réponse de Max pour le tour 1.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Couper le micro" }).click();
 });
 
 for (const answer of ["vu", "pas_vu"] as const) {

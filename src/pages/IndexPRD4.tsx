@@ -1620,6 +1620,8 @@ const IndexPRD4 = () => {
   // ---- PTT handlers : démarre/reprend STT, finalise au release -------------
   const teardownSTT = useCallback((preserveInputTelemetry = false) => {
     if (!preserveInputTelemetry) finishInputTelemetry("cancelled");
+    pttFinalizingRef.current = false;
+    handsFreeFinalizingRef.current = false;
     const stt = sttRef.current;
     sttRef.current = null;
     try { stt?.stop(); } catch { /* ignore */ }
@@ -1673,16 +1675,28 @@ const IndexPRD4 = () => {
         },
         onServiceObserved: (service) => { if (sttRef.current === stt) inputTelemetryRef.current?.service(service); },
       },
-    );
-    if (endedRef.current || activeTurnSequenceRef.current !== captureSequence) {
-      void Promise.resolve(stt.stop()).catch(() => {});
+    ).catch((error: unknown) => {
+      if (endedRef.current || activeTurnSequenceRef.current !== captureSequence) {
+        throw new DOMException("Voice capture replaced", "StaleCaptureError");
+      }
+      throw error;
+    });
+    const discardReplacedCapture = (): never => {
+      try { void Promise.resolve(stt.stop()).catch(() => {}); } catch { /* already closed */ }
       throw new DOMException("Voice capture replaced", "StaleCaptureError");
+    };
+    if (endedRef.current || activeTurnSequenceRef.current !== captureSequence) {
+      discardReplacedCapture();
     }
     sttRef.current = stt;
-    await stt.start();
+    try {
+      await stt.start();
+    } catch (error) {
+      if (sttRef.current !== stt || endedRef.current) discardReplacedCapture();
+      throw error;
+    }
     if (sttRef.current !== stt || endedRef.current) {
-      void Promise.resolve(stt.stop()).catch(() => {});
-      throw new DOMException("Voice capture replaced", "StaleCaptureError");
+      discardReplacedCapture();
     }
     recordPassiveVoiceNetworkObservation({
       sttConnected: true,
