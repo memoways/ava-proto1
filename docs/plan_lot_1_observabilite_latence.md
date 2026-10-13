@@ -1541,3 +1541,110 @@ aucune nouvelle demande vocale répétitive. La publication avec ces limites
 requiert un choix explicite d'Ulrich, compte tenu de sa condition initiale
 « Si compilation et parcours passent, publie » et de son choix précédent
 de poursuivre les parcours en preview. Lot2 non commencé.
+
+### Publication autorisée avec limites — 13 octobre 2026
+
+Ulrich choisit explicitement « Autoriser la publication avec ces limites » :
+transfert accepté non testé en réel, cinématique déclenchée/passee mais pas
+regardée jusqu'au bout, écart de rôle d'Emma du12octobre inexpliqué.
+Cette autorisation remplace la gate bloquant la publication, sans transformer
+ces limites en contrôles réussis. Suite autorisée : publication native
+Lovable, vérification frontend/fonctions/MCP, contrôles publiés dans
+sandbox-ulrich puis baseline descriptive Ava/PostHog. Aucun changement de
+règle produit, prompt, voix, réglage ou protection Brave ajouté.
+
+Préflight natif Lovable : projet1265958d-b74e-40f2-917d-182fe05163fc,
+workspaceMemoways5glbtPltldwz9tgNwIi4, head57d04a7b296c6792137d2a957d80d72da81f2395,
+ready/agentFinishedtrue, Cloudsupabaseenabled. Checkoutmain propre à ce
+préflight. Déploiement et révision servie encore à vérifier.
+
+### Publication P0 et baseline initiale publiée — 13 octobre 2026, 10:00 CEST
+
+Publication native deploy_project : deployment_id
+da57124c-7c53-4c5b-8f21-6fea2016aedb, réponsepending,
+URLava-proto1.lovable.app. Aucun second déploiement lancé pour sonder son
+statut. Méthode de vérification observable : HEAD Lovable57d04a7/ready,
+nouveau bundle DOM/assets/index-5XOMh72h.js sur le domaine canonique
+https://proto1.parle-a-ava.com et dans les deux nouveaux onglets publiés,
+admin sandbox authentifié, parcours Max/Emma et véritables tours fonctionnels.
+Hash des octets servis et statut final de l'ID de déploiement non exposés
+par le connecteur ; ne pas les déduire du seul statutready. Nouvelle version
+publique fonctionnelle observée ; baseline antérieure de preview séparée.
+
+Vérification sûre du code synchronisé, sans relance d'agent : read_file natif
+sur57d04a7, égalité exacte avec les quatre fichiers locaux. Hashes sources :
+query-rag16c0e7c49b6dd3ec254db737f6d5c48fbd2f8620181b353d49bc9018e832af25,
+proxy-llmf0bb764fb3f7334faf77bb82057adfd07c0742c77b028074b799de0bd6b9cc07,
+posthog-latency-statsf18c6dd5f1f627f55fb4427ad3bebcab9ad2819927b9e8f7b946fd494fa31035,
+mcpec4f25f3d554e38107e26f0ae1dfad940ea7e3aabec3db3da8ffea39cd3b1495.
+MCP conserve la bannière AUTO-GENERATED, SDK3.0.5,6imports npm:zod@4.6.6,
+0importZod3. Les quatre outils Ava natifs répondent, avec projectionV2
+fonctionnelle. query-rag/proxy-llm produisent les spans décrits ci-dessous ;
+vue admin publiée V2 fonctionne, et sa section PostHog répond correctement
+avec absence explicite de données pour ses filtres. Dates/versions exactes
+des artefacts Edge actuellement déployés non établies par cette vérification.
+
+Lecture des métadonnées de déploiement par agent Lovable en plan_mode
+rejetée par la revue automatique d'approbation : l'agent avait déjà modifié
+le projet malgré une consigne de lecture seule. Aucun contournement ni
+relance. Connecteur Supabase ne dispose pas de l'accès à ce Cloud Lovable ;
+aucun backend externe substitué. Autre rejet : project-get PostHog retourne
+un jeton API inutile à la vérification d'identité. Remplacé par projects-get
+sans jeton, puis switch-project137897 ; cible confirmée AVA prototype1,
+organisationMemoways019adb98-f8a7-0000-ad7c-552998c1fc21, régionEU.
+
+Baseline bornée [2026-10-13T07:39:31.634Z,2026-10-13T07:54:51.468Z),
+Brave installé155.1.97.56 (Info.plist), sandbox-ulrich, mains libres réelles,
+config9217fd34-321a-45c7-8363-6a8cf0b0157c. Hashes réglages inchangés :
+sandboxeafeb3c14b4890eb08d52d53d0c6aa5e, prod716aa4521856147da989b6cffb2a741b.
+Sessions Max3d6fa33a-0ef7-4592-9c53-f5de6a36ce62,
+Emmae7f60aec-9aa1-4e6f-883c-9d6be7ae85ad, filmpas_vu.
+Replay de l'introduction avant Emma : retour direct au choix personnage,
+sans reposer la question film ; sessions.has_seen_filmpas_vu conservé.
+
+SQL natif de cette cohorte, même fenêtre, ORDERBYcreated_at/id,LIMIT101/OFFSET0 :
+12V2 retournés, totalSQL12, pas de page supplémentaire pour cette cohorte,
+4attempt_id distincts, plus2legacy exclus. Snapshot MCP quotidien finit à
+07:54:51.468Z,page0/100,nextOffset100,cappedfalse,invalid0 ; les12V2 de la
+cohorte sont présents, pagination globale quotidienne non parcourue ni
+extrapolée. Deux completed, deux interrupted ; observations GM4.
+
+Max66048851-89dc-4cb1-9995-307bec27e614 : completed, sortie4171ms,
+audio_end7813ms,couverture15/27, GMexecuted/actionnone.
+Emma9ab966cf-c7cf-4c06-ad92-92220a12a64e : interrupted avant sortie,
+audio_cancelled1158ms, sortienull,couverture7/27, GMfailed/mentions-aborttrue.
+Emmaa727d02e-3aa7-462f-bf6d-ebb9b9ff9c49 : interrupted après sortie5629ms,
+audio_cancelled15907ms,couverture13/27, GMexecuted/actionnone.
+Emmaace7c0f4-d098-4d69-b953-7d925f81c2d5 : completed, sortie4266ms,
+audio_end15280ms,couverture13/27, GMexecuted/actionnone,
+requesttargetmax/stanceobject, aucun transfert. Ulrich confirme que l'audio
+d'Emma s'est coupé relativement rapidement lorsqu'il a parlé ; pas de durée
+acoustique déduite des jalons logiciels.
+
+Origineapp_turn_decision/software_estimate uniquement. Sur les2completed,
+p50=4218.5ms,p95=4261.25ms (interpolation linéaire ; affichage4219/4261).
+Par personnage n1 : Maxp50=p954171, Emmap50=p954266. Interrompu avec sortie
+estimée n1 :5629ms séparé, interrompu sans sortie n1 :null. voice_end et
+first_token restentnull, couverturepartielle, aucun gain revendiqué.
+Fournisseurs exécutés Deepgram/nova-3/websocket,
+OpenAI/openai/gpt-5.6-luna/http_batch, Gradium/gradium-tts/websocket,
+overridetrue/fallbackfalse/retry0 ; GMGoogle/gemini-2.5-flash/http_batch.
+Voix runtime attribuées aux profils Gradium : Maxb5ioHAR7JuHVLskk,
+EmmaJReEQbhiZbfpeMYy (IDs de profil, pas de champ voix supplémentaire inventé
+dans la projection V2). Prompts Max2026-10-12T11:04:20.434763Z,
+Emma2026-10-12T11:03:37.612668Z. Spans RAG/LLM exécutés observésok ;
+GM3exécutés,1annulé. PostHogSQL même cohorte/fenêtre/LIMIT101 :0ligne,
+avec Shields conservés dans leur réglage courant ; absence, pas latence0.
+Rapprochement Ava/PostHog positif du12octobre documenté séparément, sans
+l'incorporer à cette baseline publiée. Coûts MCP globaux1jour au relevé :
+92appels,191283tokens,0.0972USD,55completed/37error ; tous environnements,
+plusieurs sessions et annulations, aucun coût isolé de cette cohorte ou
+de STT/TTS/RAG déduit.
+
+Limites : PTT/no_audio vérifiés en preview, non rejoués sur ce nouveau frontend
+publié ; refus participant authentifié nonadmin couvert en PGlite, pas par
+un compte réel ; limites éditoriales et vidéo précédemment acceptées conservées.
+La lecture exacte des versions Edge reste non attestée. Lot2 non commencé.
+Ulrich demande maintenant un bouton manuel pour couper l'interlocuteur,
+appeler directement l'autre avec sonneries et réponse : nouveau changement
+produit explicitement autorisé, à tracer séparément de ce P0 publié.
