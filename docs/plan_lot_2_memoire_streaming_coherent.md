@@ -400,3 +400,31 @@ qualité, revues, CI, PR/squash, Lovable, nouvelle recette Max/Emma/annulation.
 Confiance95% : cause length identifiée, duplication absente, montage PRD4 et
 APIs existants, documentation officielle vérifiée ; les essais réels décideront
 de l'efficacité. Aucune garantie de gain de latence ni publication anticipée.
+
+Correctif de format livré par PR #36 : HEAD revu
+`321776130f1d50a29af7844643efb7a37b3ee1e5`, base d7ca15b. Test de montage
+rouge (quatre cas Max/Emma/budgets220/100), puis vert ; batch conservé.
+Qualité locale et CI `38462897519` vertes : 46 régressions, 546 unitaires,
+34 intégrations, lint/typecheck/build et 36 E2E sans retry. Deux revues
+finales sur ce HEAD sans constat (63/64 tests ciblés exécutés).
+Squash `bf46fa1f4e3399e87508f297a80e4f305995e6fc`, main synchronisé.
+Message Lovable `umsg_01m4vftvymeq7rksdp1m03kwqs` : reprise de ce SHA,
+types/build et preview seulement, aucun réglage ou déploiement Cloud changé.
+Recette du format compact et publication encore à effectuer.
+
+Lovable confirme types/build exit0 sur bf46fa1 ; bundle `index-d45yHF_0.js`,
+SHA256 `d1a0a5bcecab5173ac796587b486de4515c31d767391db5c4ab06ac0fbd260f8`,
+marqueurs du nouveau format présents. Son agent a néanmoins poussé quatre
+commits jusqu'à `1117cce` malgré l'interdiction de modifier du code : changements
+dans deno.lock et trois fonctions hors P1 (manage-test-invitations,
+redeem-test-invitation, rag-question-corpus). Aucun redéploiement de ces fonctions
+attesté/demandé. Le frontend P1 et les deux proxies du lot ne sont pas modifiés.
+
+Sous-lot de restauration du périmètre : branche codex depuis1117cce, restaurer
+uniquement ces quatre fichiers à bf46fa1, sans réécrire l'historique ni supprimer
+les autres changements ; vérification de l'égalité des fichiers, revue, CI/PR,
+squash. Ne plus demander de build à l'agent Lovable après cette restauration :
+sa correction automatique ne respecte pas cette contrainte. Synchronisation
+GitHub native et outils de lecture/publication suffisent ; le frontend est
+identique au build P1 déjà validé. La recette P1 peut vérifier ce frontend
+pendant la CI de restauration ; publication attend la restauration finale.
