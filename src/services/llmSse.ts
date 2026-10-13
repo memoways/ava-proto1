@@ -14,10 +14,11 @@ export async function consumeLLMSse(body: ReadableStream<Uint8Array>, onToken: (
     const payload = data.join('\n'); data = [];
     if (payload.trim() === '[DONE]') { completed = true; return; }
     const value = JSON.parse(payload);
+    // Preserve terminal technical evidence before rejecting its content.
+    options.onMetadata?.(value);
     if (value.error) throw new Error(`LLM SSE error: ${value.error.message ?? 'upstream failure'}`);
     const choice = value.choices?.[0];
-    if (choice?.finish_reason === 'error' || choice?.finish_reason === 'length') throw new Error('LLM response incomplete');
-    options.onMetadata?.(value);
+    if (choice?.finish_reason === 'error' || choice?.finish_reason === 'length') throw new Error(`LLM response incomplete (${choice.finish_reason})`);
     const content = choice?.delta?.content;
     if (typeof content === 'string' && content) { text += content; onToken(content); }
   };

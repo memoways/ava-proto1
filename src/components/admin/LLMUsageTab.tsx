@@ -95,6 +95,7 @@ export default function LLMUsageTab() {
     let ok = 0;
     for (const r of failed) {
       const success = await retryCostForRow({
+        status: r.status,
         id: r.id,
         session_id: r.session_id,
         generation_id: r.generation_id,

@@ -113,6 +113,7 @@ export async function streamLLM(
   else options?.signal?.addEventListener("abort", abort, { once: true });
   let generationId: string | null = null;
   let usage: LLMUsagePayload | null = null;
+  let finishReason: string | null = null;
   let firstToken = false;
   observeVoice(options?.onVoiceObservation, "llm_request");
   try {
@@ -132,6 +133,8 @@ export async function streamLLM(
     }, { signal: controller.signal, timeoutMs, onMetadata: value => {
       if (typeof value.id === 'string') generationId = value.id;
       if (value.usage) usage = value.usage as LLMUsagePayload;
+      const choices = value.choices as Array<{ finish_reason?: unknown }> | undefined;
+      if (Array.isArray(choices) && typeof choices[0]?.finish_reason === 'string') finishReason = choices[0].finish_reason;
       if (typeof value.model === 'string') observeService(options?.onServiceObserved, {
         service: 'llm', requested_provider: 'openrouter', requested_model: model,
         resolved_provider: 'openrouter', resolved_model: model,
@@ -150,7 +153,11 @@ export async function streamLLM(
     debugLogger.logResponse(debugId, 'llm', `Stream ${model}`, response.status, startTime);
     return fullText;
   } catch (error) {
+    const failedUsage = usage as LLMUsagePayload | null;
     trackLLMCall({ session_id: options?.session_id, feature_key: featureKey, model,
+      generation_id: generationId, prompt_tokens: failedUsage?.prompt_tokens,
+      completion_tokens: failedUsage?.completion_tokens, total_tokens: failedUsage?.total_tokens,
+      metadata: { finish_reason: finishReason },
       status: 'error', error_message: error instanceof Error ? error.message.slice(0, 200) : 'Stream failed' });
     throw error;
   } finally {

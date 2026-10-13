@@ -294,3 +294,44 @@ tour vocal. Aucune cause Shields démontrée, aucun changement de protection.
 Demande d'ouverture/permission dans l'onglet AVA présentée à Ulrich ;
 recette vocale toujours à effectuer, pas de publication anticipée.
 CI après squash `38455494583` sur `07eaed4` également verte.
+
+### Recette réelle P1 — échec bloquant avant publication
+
+Micro ouvert après action humaine, réponse naturelle Max confirmée sans JSON
+ni intention privée entendue. Tour2 reçu completed : généré/livré 194 caractères,
+445440 samples joués/programmés à 48000 Hz. Tour1 interrompu avant toute sortie
+(zéro texte/sample). Demande humaine suivante pour interruption : tour3 failed,
+`LLM response incomplete`, généré535, livré0, incertain511, privé24,
+scheduled168960/played47407. Ne pas compter ce scénario comme une interruption
+humaine validée ; la génération s'est arrêtée en échec.
+
+Réglage hérité prod conservé : gpt-5.6-luna, maximum220 tokens. Cause terminale
+pas encore distinguée (finish_reason length ou error). Le generationId fourni
+par Ulrich est celui du GM précédent, pas celui du tour en échec. llm_usage
+perd id/usage dans catch ; métadonnées de fin consommées après la vérification
+de troncature, donc observation absente. Proxies Deno/types/build toujours verts.
+
+Sous-lot diagnostic P1 avant nouvelle recette : conserver id, usage et reason
+terminal dans le chemin SSE échoué, sans relâcher le rejet de troncature ni
+changer modèle/budget/délais. Test au seam streamLLM sur SSE terminal length/error
+avant correction, puis qualité, revue/CI/PR/squash et sync Lovable. Aucun nouvel
+appel LLM de synthèse. Confiance95% pour cette correction d'observation : absence
+de doublon vérifiée, API et stockage metadata_json existants, batch inchangé.
+La cause de la troncature reste à établir avec preuve fournisseur.
+
+Canary sandbox remise à false pour nouvelles sessions ; production inchangée.
+Ulrich confirme appel terminé. Contrôle Brave déconnecté (debugger unattached),
+à reconnecter avant prochaine recette ; aucun contournement ni changement Shields.
+Publication frontend bloquée par cet échec, P2/P3 non commencés.
+
+Preuve de la correction d'observation :
+`npx vitest run src/services/openRouterLLM.failure.test.ts` rouge (2 échecs,
+message incomplet sans raison), puis vert après correction. Métadonnées
+terminales capturées avant rejet ; id/usage/finish_reason conservés en erreur,
+sans émission de contenu terminal ni seconde génération. Récupération du coût
+automatique, épuisement des retries et retry admin conservent status error.
+Qualité locale complète verte : 46 régressions, 541 unitaires, 34 intégrations,
+lint/typecheck/build. Deux revues indépendantes sur diff depuis aa28d01 sans
+blocage ; 20 tests Spec et 13 tests Standards exécutés. CI et livraison du
+sous-lot encore à réaliser ; cause de l'échec réel toujours non prouvée.
+Clôture session confirmée dans Cloud à 19:52:07 UTC, handoff_count0.
