@@ -973,7 +973,7 @@ test("une cinématique HLS démarre automatiquement puis Passer coupe son média
     "Que sais-tu au sujet d'Ava ?",
     "Montre-moi le souvenir familial.",
   ];
-  await installNetworkFakes(page, transcripts, { triggerVideoAtLabel: 3 });
+  const fakes = await installNetworkFakes(page, transcripts, { triggerVideoAtLabel: 3 });
 
   await page.goto("/");
   const persistentPlayer = await page.locator("video[title='Video player']").elementHandle();
@@ -990,7 +990,7 @@ test("une cinématique HLS démarre automatiquement puis Passer coupe son média
     await stopRecording.press("Enter");
     if (turn < 3) {
       await expect.poll(fakes.getTtsText).toContain(`Réponse de Max pour le tour ${turn}.`);
-    await expect(page.getByText(`Réponse de Max pour le tour ${turn}.`)).toHaveCount(0);
+      await expect(page.getByText(`Réponse de Max pour le tour ${turn}.`)).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
     }
   }

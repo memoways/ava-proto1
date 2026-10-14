@@ -59,6 +59,16 @@ Date : 14 octobre 2026. Base : `9f4aba4`, projet Lovable
   sur l'écran personnage ; user transcript visible sous preset voix seule.
 - Aucune migration, variable, secret ou fonction Cloud modifié. Pas de tuning
   de voix, fournisseur, GM, RAG, timers applicatifs ou preset de production.
+- Premier run CI : 43/45 E2E verts ; deux échecs du même test cinématique
+  (Chromium/Firefox), variable de fixture non liée dans l'assertion modifiée.
+  Liaison corrigée ; aucun défaut applicatif dans ces deux traces. Second run
+  attendu. Libellé admin actualisé ; ancien flag voix seule conservé dans les
+  presets pour compatibilité, sans proposer un contrôle devenu sans effet.
+- Brave confirmé par Ulrich. Essai de référence privé dans Brave avant
+  correctif : connexion 12943 ms, notification parole 661 ms après envoi,
+  durée de parole 6460 ms, played 1/1, session automatiquement fermée. Audio
+  réellement entendu encore à confirmer ; inspection DOM média indisponible
+  (délai de commande navigateur), aucune conclusion réseau/CPU tirée de ce délai.
 - Livraison en cours ; recette réelle de l'audio/vidéo encore à attester.
 
 La finalisation Deepgram sans acquittement peut désormais attendre 1,5 s ;
