@@ -75,7 +75,27 @@ export interface ResponseOutputResult {
   error?: Error;
 }
 
+/** Technical-only fields; never include room URLs, tokens or spoken text. */
+export interface AvatarMediaDiagnostics {
+  event: "tracks" | "playback" | "network" | "cpu";
+  audioTracks?: number;
+  videoTracks?: number;
+  playback?: "playing" | "blocked" | "failed";
+  errorName?: string;
+  networkState?: string;
+  audioBitrate?: number | null;
+  videoBitrate?: number | null;
+  audioPacketLoss?: number | null;
+  videoPacketLoss?: number | null;
+  audioJitter?: number | null;
+  videoJitter?: number | null;
+  roundTripTime?: number | null;
+  cpuState?: "low" | "high";
+  cpuReason?: string;
+}
+
 export interface ResponseOutputCallbacks {
+  onMediaDiagnostics?: (diagnostics: AvatarMediaDiagnostics) => void;
   onConnectionStateChange?: (state: StreamingAvatarConnectionState) => void;
   onStreamReady?: () => void;
   onDisconnected?: (reason?: string) => void;

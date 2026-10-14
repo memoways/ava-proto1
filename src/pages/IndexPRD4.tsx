@@ -714,6 +714,9 @@ const IndexPRD4 = () => {
       avatarSettings,
       callbacks: {
         onConnectionStateChange: setStreamingAvatarState,
+        onMediaDiagnostics: diagnostics => trackEvent("prd4_streaming_avatar_media", {
+          session_id: sid, provider: avatarSettings.activeProvider, ...diagnostics,
+        }),
         onStreamReady: () => {
           avatarFirstFrameAtRef.current = performance.now();
           setStreamingAvatarState("ready");

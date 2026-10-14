@@ -110,7 +110,13 @@ export default function StreamingAvatarTestPanel({
         avatarSettings: effective,
         callbacks: {
           onConnectionStateChange: (state) => push(`État connexion : ${state}`),
-          onStreamReady: () => push("Flux vidéo prêt", "ok"),
+          onStreamReady: () => push("Flux média prêt (Tavus : audio + vidéo)", "ok"),
+          onMediaDiagnostics: diagnostics => {
+            if (diagnostics.event === "tracks") push(`Pistes reçues : audio=${diagnostics.audioTracks}, vidéo=${diagnostics.videoTracks}`);
+            if (diagnostics.event === "playback") push(`Lecture navigateur : ${diagnostics.playback}${diagnostics.errorName ? ` (${diagnostics.errorName})` : ""}`, diagnostics.playback === "playing" ? "ok" : "error");
+            if (diagnostics.event === "cpu") push(`Charge locale Daily : ${diagnostics.cpuState} (${diagnostics.cpuReason})`, diagnostics.cpuState === "high" ? "error" : "info");
+            if (diagnostics.event === "network") push(`Réseau : ${diagnostics.networkState}, audio ${diagnostics.audioBitrate ?? "—"} bit/s, vidéo ${diagnostics.videoBitrate ?? "—"} bit/s, pertes audio ${diagnostics.audioPacketLoss ?? "—"}, vidéo ${diagnostics.videoPacketLoss ?? "—"}, jitter audio ${diagnostics.audioJitter ?? "—"}, vidéo ${diagnostics.videoJitter ?? "—"}, RTT ${diagnostics.roundTripTime ?? "—"}`);
+          },
           onDisconnected: (reason) => push(`Déconnexion : ${reason ?? "inconnue"}`, "error"),
           onSpeakStart: () => push("L'avatar commence à parler", "ok"),
           onSpeakEnd: () => push("L'avatar a fini de parler", "ok"),
@@ -218,7 +224,7 @@ export default function StreamingAvatarTestPanel({
             </div>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
               <SummaryRow label="Connexion" value={ms(summary.connectionMs)} />
-              <SummaryRow label="Premier son/image" value={ms(summary.firstPlaybackMs)} />
+              <SummaryRow label="Début de parole fournisseur" value={ms(summary.firstPlaybackMs)} />
               <SummaryRow label="Durée de lecture" value={ms(summary.playbackTotalMs)} />
               <SummaryRow label="Durée totale du test" value={ms(summary.totalMs)} />
               <SummaryRow label="Session Ava" value={summary.sessionId?.slice(0, 8) ?? "—"} />

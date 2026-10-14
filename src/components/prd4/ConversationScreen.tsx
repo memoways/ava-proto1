@@ -40,13 +40,11 @@ interface Props {
 const ConversationScreen = ({
   audioState,
   userSubtitle,
-  maxSubtitle,
   conversationLog,
   sessionTimeRemaining,
   onPTTPress,
   onPTTRelease,
   handsFree = false,
-  voiceOnly = false,
   handsFreeListening = false,
   onToggleHandsFree,
   onHangUp,
@@ -90,27 +88,11 @@ const ConversationScreen = ({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleToggleTalk, handoffCalling, handoffOffer]);
 
-  // Derive the last character/user lines from THIS character's slice only so
-  // a return to Max never flashes Emma's last line (and the reverse).
-  const { lastMaxText, lastUserText } = useMemo(() => {
+  // Only the user's words are displayed, scoped to the active character.
+  const lastUserText = useMemo(() => {
     const visibleLog = sliceConversationForCharacter(conversationLog, activeCharacter);
-    let mx = "";
-    let us = "";
-    for (let i = visibleLog.length - 1; i >= 0; i--) {
-      const m = visibleLog[i];
-      if (!mx && m.role !== "user") mx = m.content;
-      else if (!us && m.role === "user") us = m.content;
-      if (mx && us) break;
-    }
-    return { lastMaxText: mx, lastUserText: us };
+    return [...visibleLog].reverse().find(message => message.role === "user")?.content ?? "";
   }, [activeCharacter, conversationLog]);
-
-  // While Max is generating, show the streaming maxSubtitle; otherwise fallback
-  // to the last assistant message from the log.
-  const displayedMax =
-    (audioState === "max_speaking" || audioState === "max_thinking") && maxSubtitle
-      ? maxSubtitle
-      : lastMaxText;
 
   // While the user is speaking, show the live interim STT text; otherwise the
   // last finalized user message from the log.
@@ -125,6 +107,11 @@ const ConversationScreen = ({
   const [hasFrozenFrame, setHasFrozenFrame] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const attachVideo = useCallback((element: HTMLVideoElement | null) => {
+    videoRef.current = element;
+    attachAvatarMedia?.(element);
+  }, [attachAvatarMedia]);
 
   const handleVideoLive = useCallback(() => setVideoLive(true), []);
   const handleVideoStall = useCallback(() => setVideoLive(false), []);
@@ -148,14 +135,14 @@ const ConversationScreen = ({
     let last = 0;
     const capture = (time: number) => {
       raf = requestAnimationFrame(capture);
-      if (time - last < 150) return;
+      if (time - last < 500) return;
       last = time;
       const video = videoRef.current;
       const canvas = canvasRef.current;
       if (!video || !canvas || video.readyState < 2 || !video.videoWidth) return;
-      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+      if (canvas.width !== Math.min(video.videoWidth, 640)) {
+        canvas.width = Math.min(video.videoWidth, 640);
+        canvas.height = Math.round(canvas.width * video.videoHeight / video.videoWidth);
       }
       const context = canvas.getContext("2d");
       if (!context) return;
@@ -212,10 +199,7 @@ const ConversationScreen = ({
       )}
       {streamingAvatarActive && (
         <video
-          ref={(element) => {
-            videoRef.current = element;
-            attachAvatarMedia?.(element);
-          }}
+          ref={attachVideo}
           autoPlay
           playsInline
           muted={false}
@@ -224,13 +208,12 @@ const ConversationScreen = ({
           onCanPlay={handleVideoLive}
           onWaiting={handleVideoStall}
           onStalled={handleVideoStall}
-          onSuspend={handleVideoStall}
           onEmptied={handleVideoStall}
           className={cn(
             "absolute inset-0 h-full w-full object-cover transition-opacity duration-300",
             videoVisible ? "opacity-100" : "opacity-0",
           )}
-          aria-label="Flux vidéo en direct de Max"
+          aria-label={`Flux vidéo en direct de ${displayName}`}
         />
       )}
 
@@ -285,16 +268,11 @@ const ConversationScreen = ({
 
       <div className="flex-1" />
 
-      {/* Bottom: Max line, then user line (subtitle style — replaced each turn) */}
+      {/* Bottom: live user transcription, then the exact submitted line */}
       <section className="relative z-10 px-4 pb-6 md:px-8 md:pb-8 tablet:pb-10">
         <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-3 tablet:gap-4">
 
-          {!voiceOnly && displayedMax && (
-            <p className="text-center font-serif text-xl leading-snug text-foreground drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] md:text-2xl transition-opacity duration-200">
-              {displayedMax}
-            </p>
-          )}
-          {!voiceOnly && displayedUser && (
+          {displayedUser && (
             <p
               className="text-center text-base italic leading-snug text-white/95 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)] md:text-lg"
               aria-live="polite"

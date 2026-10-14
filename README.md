@@ -6,6 +6,8 @@
 > **Créé avec**: Lovable  
 > **Démarré**: 2026-03-07  
 
+> **Correctif en cours (2026-10-14) — Tavus et transcription** : transcription utilisateur visible en direct puis après envoi, sans sous-titres personnage ; flux Tavus conservé entre rendus React, préparation audio + vidéo et erreurs de lecture explicites. Deepgram attend l'acquittement de la fin audio, avec récupération bornée. Diagnostics réseau/CPU dans le test privé. [Plan et validation](docs/plan_tavus_audio_transcription.md).
+
 ## Plateforme de référence
 
 **Lovable compile le code et publie le site.** Le backend, la base de données, les Edge Functions et les secrets passent par **Lovable Cloud**, avec **Supabase fourni par Lovable**. Il ne faut pas remplacer cette chaîne par un build, un déploiement, un hébergeur ou un projet Supabase externe.

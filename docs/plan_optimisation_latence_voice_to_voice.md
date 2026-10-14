@@ -6,7 +6,7 @@ Sources : [audit détaillé](audit_voice_conversation_max.md) et [snapshot chiff
 
 ## Résultat visé et décisions acquises
 
-Une conversation Max/Emma en français, avec portrait fixe et sans transcription affichée ni bouton pour chaque prise de parole. Micro actif pendant les réponses, interruptions naturelles, continuité de la réponse entière et mémoire de l'intention non prononcée. La même génération établit une intention privée puis diffuse les phrases ; aucun appel indépendant par phrase.
+Une conversation Max/Emma en français, avec portrait fixe et sans bouton pour chaque prise de parole. **Décision du 14 octobre : afficher la transcription utilisateur en direct puis le texte envoyé, sans sous-titres personnage**, selon le [plan Tavus/transcription](plan_tavus_audio_transcription.md). Micro actif pendant les réponses, interruptions naturelles, continuité de la réponse entière et mémoire de l'intention non prononcée. La même génération établit une intention privée puis diffuse les phrases ; aucun appel indépendant par phrase.
 
 Lovable/Lovable Cloud demeure l'unique livraison. Les fournisseurs peuvent être comparés ; aucun changement de voix ou de modèle n'est retenu sans qualité équivalente. Le corpus, le contexte par personnage, les confidences, la relation, le rôle, la réponse initiale sur le film et le cadre commun restent protégés.
 
@@ -72,7 +72,7 @@ La base saisie mains libres/barge-in est déjà réalisée et documentée dans [
 - Deepgram : conserver mode manuel, final + interim, keepalive lorsque l'envoi est suspendu et flush de secours borné. Les signaux provider servent à acquitter l'audio/finaliser le texte, sans devenir le décideur du tour.
 - Gradium STT : suivre `ready`, `step` diagnostique, `end_text` et le `flush_id` exact ; tester les délais valides 7 et 10, partir de 10 jusqu'à comparaison française. Les messages d'un vieux flush ne finalisent jamais le nouveau tour.
 - Remplacer ScriptProcessor Gradium/AssemblyAI par AudioWorklet, assembler les frames conformes au fournisseur et respecter la fréquence effective ; ne pas supposer que celle demandée est appliquée.
-- Voix seule : masquer les transcriptions utilisateur/personnage dans la conversation publique, conserver texte interne et outils admin. Les contrôles de session, de consentement et de handoff restent ; aucun bouton pour parler par tour.
+- Voix seule : la décision initiale de masquer tout le dialogue est remplacée le 14 octobre par la transcription utilisateur visible en direct et après envoi ; les réponses personnage restent sans sous-titres. Conserver texte interne et outils admin. Les contrôles de session, de consentement et de handoff restent ; aucun bouton pour parler par tour.
 - Précharger une courte voix de secours pour panne de sortie, avec un statut accessible. Aucun fallback ne dépend d'un dialogue textuel caché.
 - Pendant une cinématique, suspendre la boucle de prise de tour puis la réarmer proprement ; ne pas transcrire le film comme utilisateur. Préserver Gumlet et le contexte post-vidéo.
 

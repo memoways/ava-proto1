@@ -14,11 +14,11 @@ const baseProps = {
 };
 
 describe("ConversationScreen", () => {
-  it("voice-only hides dialogue while preserving status, microphone and explicit GM consent", () => {
+  it("voice-only preserves user transcription and hides character dialogue while preserving status, microphone and explicit GM consent", () => {
     render(<ConversationScreen {...baseProps} voiceOnly handsFree handsFreeListening activeCharacter="max" audioState="max_speaking"
-      userSubtitle="Parole du joueur" maxSubtitle="Parole du personnage" conversationLog={[]}
+      userSubtitle="Parole du joueur" maxSubtitle="Parole du personnage" conversationLog={[tagSpokenWith({ role: "user", content: "Parole du joueur", timestamp: 1 }, "max")]}
       handoffOffer={{ reason: "Consentement validé", targetCharacter: "emma" }} />);
-    expect(screen.queryByText("Parole du joueur")).not.toBeInTheDocument();expect(screen.queryByText("Parole du personnage")).not.toBeInTheDocument();
+    expect(screen.getByText("« Parole du joueur »")).toBeInTheDocument();expect(screen.queryByText("Parole du personnage")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Max répond");
     expect(screen.getByRole("button", { name: "Couper le micro" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Terminer" })).toBeInTheDocument();
@@ -47,7 +47,7 @@ describe("ConversationScreen", () => {
     expect(screen.getByText("Max vous propose de parler avec Emma.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Appeler Emma" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rester avec Max" })).toBeInTheDocument();
-    expect(screen.getByText("Je t'écoute.")).toBeInTheDocument();
+    expect(screen.queryByText("Je t'écoute.")).not.toBeInTheDocument();
     expect(screen.queryByText("Secret d'Emma")).not.toBeInTheDocument();
   });
 

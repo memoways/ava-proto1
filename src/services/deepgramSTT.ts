@@ -139,8 +139,7 @@ export class DeepgramSTT {
   private silenceTimer: ReturnType<typeof setTimeout> | null = null;
   private fullTranscript = "";
   private latestInterimTranscript = "";
-  private lastResultAt = 0;
-  private finalizeAcknowledgedAt = 0;
+  private finalizeAcknowledgedAt = Number.NEGATIVE_INFINITY;
   private flushPromise: Promise<void> | null = null;
   /** Timestamp (performance.now()) du dernier mot reçu — sert à mesurer la latence STT après silence. */
   private lastSpeechAt = 0;
@@ -231,17 +230,15 @@ export class DeepgramSTT {
     this.capturePaused = true;
 
     const finalizeSentAt = performance.now();
+    this.finalizeAcknowledgedAt = Number.NEGATIVE_INFINITY;
     if (this.ws?.readyState === WebSocket.OPEN) {
       try { this.ws.send(JSON.stringify({ type: "Finalize" })); observeVoice(this.onVoiceObservation, "flush_sent"); } catch { /* fallback below */ }
     }
 
-    // Deepgram may omit `from_finalize` when little audio remains, so also
-    // accept a short quiet period after the last revised result.
-    await waitForCondition(() => {
-      if (this.finalizeAcknowledgedAt >= finalizeSentAt) return true;
-      const elapsed = performance.now() - finalizeSentAt;
-      return elapsed >= 450 && this.lastResultAt > 0 && performance.now() - this.lastResultAt >= 250;
-    }, 1500);
+    // Only from_finalize acknowledges the submitted audio tail. An interim,
+    // even received after Finalize, may still omit its final words. If the
+    // provider omits the acknowledgement, retain the full bounded grace period.
+    await waitForCondition(() => this.finalizeAcknowledgedAt >= finalizeSentAt || generation !== this.generation, 1500);
     if (generation !== this.generation) return;
 
     const finalText = combineTranscriptParts(this.fullTranscript, this.latestInterimTranscript);
@@ -353,10 +350,12 @@ export class DeepgramSTT {
       const data = JSON.parse(event.data);
       if (data.type === 'Results') {
         if (data.from_finalize && !this.flushPromise) return;
-        if (data.from_finalize) this.finalizeAcknowledgedAt = performance.now();
+        if (data.from_finalize) {
+          this.finalizeAcknowledgedAt = performance.now();
+          observeVoice(this.onVoiceObservation, "flush_acknowledged");
+        }
         const transcript = data.channel?.alternatives?.[0]?.transcript || '';
         if (transcript) {
-          this.lastResultAt = performance.now();
           const isFinal = data.is_final;
           if (isFinal) {
             this.fullTranscript += (this.fullTranscript ? ' ' : '') + transcript;
