@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod-mcp";
+import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
+import getVoiceLatencies from "./tools/get-voice-latencies";
 import { createVoiceTurnV2, type VoiceTurnV2 } from "../../services/voiceTurnTelemetryV2";
 import { projectVoiceEvents, voiceTurnProjectionSchema, voiceTurnPageSchema } from "./voiceTurnProjection";
 
@@ -11,6 +14,14 @@ export function voiceFixture(status: "completed" | "failed" | "interrupted" = "c
   return rows;
 }
 describe("MCP technical projection", () => {
+  it("serializes the actual tool output for published MCP discovery", () => {
+    const schema = getVoiceLatencies.outputSchema;
+    if (!(schema instanceof z.ZodObject)) throw new Error("Voice latency output must be an object schema");
+    // SDK declarations use its bundled Zod version; runtime consumes our pinned alias.
+    expect(() => toJsonSchemaCompat(schema as unknown as Parameters<typeof toJsonSchemaCompat>[0], {
+      target: "draft-2020-12", pipeStrategy: "output",
+    })).not.toThrow();
+  });
   it("accepts historical V2 events without P2 milestones, keeping missing measures null", () => {
     const value = structuredClone(voiceFixture()[0].metadata_json);
     delete (value.milestones as Partial<typeof value.milestones>).audio_suspended;
