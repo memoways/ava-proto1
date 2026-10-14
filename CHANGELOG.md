@@ -171,6 +171,15 @@ plus anciennes conservent leur état au moment de leur rédaction.
 
 ## [Non publié]
 
+### Préparation du lot 3 / P2
+
+- [Prompt complet de reprise](docs/plan_lot_3_ecoute_libre_interruptions.md)
+  sauvegardé : préflight ciblé des deux timeouts GM P1, interruption acoustique
+  candidate/confirmée/rejetée, capture continue et UI voix seule. Contrat P1,
+  stratégie texte et batch conservés ; pilote et activation générale restent
+  distincts. Aucun code, réglage ou déploiement modifié par cette préparation.
+  P3 reste hors périmètre.
+
 
 Les mentions de non-publication et les listes de recette des entrées du
 12 octobre ci-dessous décrivent leur état initial. Le bilan P0 publié ci-dessus

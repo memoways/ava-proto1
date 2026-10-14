@@ -5,9 +5,10 @@ et fonctions Lovable Cloud livrées, revues et CI finales vertes ; Max/Emma et
 interruption/reprise vérifiés en preview, frontend publié via Lovable et échange
 Max complet vérifié sur le domaine publié. Canary sandbox-ulrich, batch par défaut
 conservé. Réserve : deux timeouts GM post-tour de12s, cause non démontrée**.
-Base d'exécution : main `0a60a64`.
-Dernier frontend publié : `f251eb3` / PR #32. Le commit de ce document ou un
-descendant devient le point de reprise documentaire.
+Base d'exécution historique : main `0a60a64`.
+Frontend P1 publié depuis `19cfa5f` (code `fe9c954`, PR #33 à #37),
+clôture documentaire `f3c61be`. La reprise suivante est le
+[lot 3/P2](plan_lot_3_ecoute_libre_interruptions.md), préparé sans implémentation.
 
 ## Décision de passage
 
@@ -24,7 +25,7 @@ La spécification complète reste la section 2 du
 [plan général](plan_optimisation_latence_voice_to_voice.md#2-mémoire-de-livraison-et-streaming-cohérent--p1).
 Ce document est le point d'entrée d'exécution, pas une spécification concurrente.
 
-## Prompt à coller dans le prochain chat
+## Prompt P1 historique — exécuté, voir le dernier bilan
 
 Mets en œuvre uniquement le lot 2/P1 d’Ava Proto 1 : mémoire de ce qui a
 réellement été livré, intention privée, streaming LLM/TTS cohérent et annulation.
@@ -541,7 +542,8 @@ plus), CI 38516189902 success avant publication. L'API de publication reste une
 réponse pending sans endpoint de suivi exposé ; le frontend P1 réellement servi,
 le tour humain et son reçu Cloud constituent la vérification effective, sans
 attestation indépendante du SHA compilé exact ni des versions Edge servies.
-Le pilote comparatif 300 tours / 10 sessions, la stratégie acoustique P2 et l'UI P3
-ne sont pas exécutés dans ce lot. Réserves P0 historiques conservées. Les
+Le pilote comparatif 300 tours / 10 sessions, la stratégie acoustique et l'UI
+voix seule P2, ainsi que les optimisations P3, ne sont pas exécutés dans ce lot.
+Réserves P0 historiques conservées. Les
 relectures/transferts/vidéos/callbacks tardifs sont couverts par les tests
 déterministes ; aucun nouveau transfert humain P0 revendiqué.

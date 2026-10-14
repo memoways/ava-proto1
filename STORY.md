@@ -73,6 +73,16 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-10-14 — Préparer P2 sans effacer les réserves P1
+
+Ulrich demande le prompt du prochain lot. La reprise prépare le diagnostic
+ciblé des deux timeouts GM, puis l'écoute libre et l'interruption acoustique
+réversible : atténuer un candidat, confirmer la parole ou reprendre au même
+curseur après rejet. L'UI voix seule appartient à P2. Le corpus de 300 tours
+sur 10 sessions reste une mesure à réaliser avant activation générale ; les
+essais P1 ne le remplacent pas. Aucun code ni environnement ne change ici,
+P3 n'est pas commencé. [Prompt P2](docs/plan_lot_3_ecoute_libre_interruptions.md).
+
 ### 2026-10-13 — P1 : retenir ce qui a été entendu, reprendre une intention privée
 
 Le personnage pouvait mémoriser sa réplique entière alors que le joueur
