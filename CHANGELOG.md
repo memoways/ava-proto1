@@ -229,8 +229,15 @@ plus anciennes conservent leur état au moment de leur rédaction.
   mesurées.
 - Vérifications locales passées : 46 régressions, 575 unitaires, 34
   intégrations, typecheck, lint, build et 45 E2E multi-navigateurs sans retry.
-  Lovable Cloud, preview, publication et recette humaine Brave ne sont pas
-  encore modifiés.
+- PR [#41](https://github.com/memoways/ava-proto1/pull/41) revue et squash-merge
+  dans `main` à `75ef4d9`. La CI post-merge
+  [38559843781](https://github.com/memoways/ava-proto1/actions/runs/38559843781)
+  est verte, avec `test:quality` et 45 E2E multi-navigateurs sans retry.
+- Lovable Cloud a synchronisé ce SHA et publié le déploiement
+  `e4dfc5dc-1685-4a24-881d-bbf74294495e`. Preview et domaine publié ont été
+  contrôlés dans Brave ; les onglets `sandbox-ulrich` et admin → « Tester
+  moi-même » sont préparés. La recette vocale humaine reste à exécuter par
+  Ulrich ; aucune parole synthétique n'a été injectée.
 
 ### Préparation du lot 4 / P3
 

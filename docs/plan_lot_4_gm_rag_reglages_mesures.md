@@ -1,6 +1,6 @@
 # Reprise — lot 4 / P3 : GM, RAG, prompts et buffers comparés
 
-Date : 14 octobre 2026. Statut : **implémentation P3 locale vérifiée ; livraison GitHub/Lovable à clôturer**.
+Date : 14 octobre 2026. Statut : **P3 livré, fusionné et publié via GitHub/Lovable Cloud ; recette humaine Brave préparée**.
 Ce document conserve le prompt complet, le diagnostic, les décisions P3 et les
 preuves de clôture. La livraison reste exclusivement Lovable/Lovable Cloud.
 
@@ -295,11 +295,11 @@ levée sans preuve. Pas d'extension au-delà de ce lot.
 
 ## Prochaine action à la reprise
 
-Relancer les suites qualité et E2E après les correctifs finaux, puis créer la
-branche `codex/`, ouvrir la PR vers `main`, attendre les revues/CI, effectuer le
-squash merge, synchroniser Lovable, contrôler la preview et publier uniquement
-depuis Lovable Cloud. La recette humaine restera limitée à Brave,
-`sandbox-ulrich`, admin → « Tester moi-même », sans parole synthétique.
+La recette humaine reste à faire par Ulrich dans les trois onglets Brave
+préparés : publié `sandbox-ulrich`, preview `sandbox-ulrich` et admin →
+« Tester moi-même ». Elle doit rester limitée à Brave, sans parole synthétique
+injectée par l'agent et sans modification de Shields. Aucun nouveau test P0,
+P1 ou P2 n'est requis pour la clôture de ce lot.
 
 ## Préflight P3 effectué — 14 octobre 2026, avant implémentation
 
@@ -385,3 +385,35 @@ L'incohérence fenêtre globale 11 s / promesse historique de 8 s après 3,5 s d
   les jalons V2 manquants, le corpus RAG comparatif et les mesures acoustiques
   de clic/trou ne sont pas transformés en gains. Aucun P0/P1/P2, Shield,
   speech synthesis, migration de mémoire ou environnement Gami n'a été relancé.
+
+## Livraison vérifiée — 14 octobre 2026
+
+- GitHub : PR [#41](https://github.com/memoways/ava-proto1/pull/41) revue puis
+  squash-merge dans `main` à `75ef4d9af71914da539976a762fc3876af2bc97f`.
+  La CI post-merge [38559843781](https://github.com/memoways/ava-proto1/actions/runs/38559843781)
+  est verte : `test:quality`, 45 E2E multi-navigateurs, sans retry.
+- Lovable : le projet `1265958d-b74e-40f2-917d-182fe05163fc` est `ready` sur
+  le SHA `75ef4d9`, puis a été publié nativement par Lovable Cloud avec le
+  déploiement `e4dfc5dc-1685-4a24-881d-bbf74294495e`. La preview est
+  `https://id-preview--1265958d-b74e-40f2-917d-182fe05163fc.lovable.app` et
+  le domaine publié est `https://proto1.parle-a-ava.com`.
+- Vérification visuelle non destructive : les pages publiée et preview
+  affichent « Où est Ava ? » dans Brave en `sandbox-ulrich`. L'onglet admin
+  publié est ouvert et authentifié ; l'agent n'a pas lancé de session vocale
+  ni injecté de parole synthétique.
+- Limites et rollback : les deux timeouts GM historiques, les jalons V2
+  manquants et les mesures acoustiques non disponibles restent réservés. En
+  cas de reprise manuelle, revenir dans Lovable Cloud au commit précédent
+  `fe1c25c657f44497b074cd416bfaf8938107044`, sans changer Shields ni les
+  contrats P0/P1/P2.
+
+### Prompt Lovable prêt à coller
+
+Synchroniser AVA Prototype 1 depuis `main` au commit
+`75ef4d9af71914da539976a762fc3876af2bc97f`, conserver Lovable Cloud comme
+unique chaîne de compilation et de livraison, puis publier uniquement après
+validation du projet `1265958d-b74e-40f2-917d-182fe05163fc`. Ne modifier ni
+les voix, ni le canon, ni le cadre commun, ni les contrats P1/P2, ni les
+transferts, migrations, batch ou Shields. Ne pas injecter de parole synthétique.
+Si une régression est observée, restaurer le commit précédent
+`fe1c25c657f44497b074cd416bfaf8938107044` dans Lovable Cloud.
