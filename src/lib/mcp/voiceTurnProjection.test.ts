@@ -44,6 +44,8 @@ describe("MCP technical projection", () => {
     expect(result.summary.attempts).toBe(2);
     expect(result.summary.statuses).toEqual({ failed: 1, interrupted: 1 });
     expect(result.summary.gmObservations).toBe(1);
+    expect(result.summary.gmGenerationStatuses).toEqual({ not_measured: 1 });
+    expect(result.summary.gmAvailabilityStatuses).toEqual({ not_measured: 1 });
     expect(result.invalidRows).toBe(1);
     expect(result.summary.originToOutputEstimatedMs.count).toBe(2);
     expect(result.summary.originToOutputEstimatedMs.p50).toBe(0);

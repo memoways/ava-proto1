@@ -1,8 +1,8 @@
 # Reprise — lot 4 / P3 : GM, RAG, prompts et buffers comparés
 
-Date : 14 octobre 2026. Statut : **prompt de reprise préparé ; P3 non commencé**.
-Ce document prépare le prochain lot. Aucun réglage, code applicatif, migration
-ou déploiement n'est modifié par sa préparation.
+Date : 14 octobre 2026. Statut : **implémentation P3 locale vérifiée ; livraison GitHub/Lovable à clôturer**.
+Ce document conserve le prompt complet, le diagnostic, les décisions P3 et les
+preuves de clôture. La livraison reste exclusivement Lovable/Lovable Cloud.
 
 ## Point de reprise vérifié
 
@@ -295,6 +295,93 @@ levée sans preuve. Pas d'extension au-delà de ce lot.
 
 ## Prochaine action à la reprise
 
-Actualiser les cibles et le diagnostic GM/couverture via les connecteurs
-natifs, puis compléter l'architecture et l'ordre des sous-lots dans ce
-document avant implémentation. Aucun développement P3 effectué ici.
+Relancer les suites qualité et E2E après les correctifs finaux, puis créer la
+branche `codex/`, ouvrir la PR vers `main`, attendre les revues/CI, effectuer le
+squash merge, synchroniser Lovable, contrôler la preview et publier uniquement
+depuis Lovable Cloud. La recette humaine restera limitée à Brave,
+`sandbox-ulrich`, admin → « Tester moi-même », sans parole synthétique.
+
+## Préflight P3 effectué — 14 octobre 2026, avant implémentation
+
+### Cibles et état vérifiés
+
+- Le dépôt local est propre sur `main` à `fe1c25ca657f44497b074cd416bfaf8938107044`, descendant de la référence documentaire `77db463`. Le manifest `.lovable/mcp/manifest.json` est conservé.
+- Le connecteur Lovable natif confirme le projet `1265958d-b74e-40f2-917d-182fe05163fc`, workspace `5glbtPltldwz9tgNwIi4`, SHA effectif `fe1c25c`, statut `ready`, agent terminé et preview `https://id-preview--1265958d-b74e-40f2-917d-182fe05163fc.lovable.app`. La publication existante reste `https://proto1.parle-a-ava.com` ; aucun déploiement n'est lancé au préflight.
+- Le connecteur MCP app Ava répond avec OAuth administrateur sur le Cloud Lovable attendu. `list_sessions`, `get_usage_overview`, `get_voice_latencies` et `get_llm_costs` ont été exécutés en lecture seule. Sur 30 jours filtrés `sandbox-ulrich` : 46 sessions, 203 échantillons audio, 39 tentatives V2 (18 completed, 11 interrupted, 4 cancelled, 6 failed), 23 sorties estimées, p50 4 196 ms / p95 5 607 ms depuis l'origine applicative. La mesure `voiceEndToOutputEstimatedMs` est absente (0 échantillon) et le résumé de tours exposé par ce connecteur reste à 0 ; aucune cible de gain n'est donc déclarée atteinte.
+- Les coûts globaux, non filtrables par environnement, portent sur 234 appels et 597 481 tokens : 112 GM `google/gemini-2.5-flash`, 122 tours personnage `openai/gpt-5.6-luna`, 64 appels en erreur. Ce relevé sert de contexte de coût, pas de cohorte comparative ni de preuve d'un modèle à retenir.
+
+### Diagnostic GM borné
+
+- La preview Max (`3f2ded7a-fc05-4ae6-a66a-575f99402f8c`, tour 4, requête `b412ebbb-8093-4ea9-b038-3bd53bbdc75b`) et le publié Max (`1e5a72b5-5aa2-4263-bba0-db55ddf7f616`, tour 1, requête `66884b15-d4c3-4819-aedc-70ebdc7f9ba2`) présentent le même motif : `gm_generation` failed à respectivement 12 005/12 151 ms et 12 002/12 094 ms environ, puis `gm_persistence` et `gm_available` réussissent. Les observations GM montrent le modèle demandé sans modèle effectif résolu sur ces deux lignes, tandis que des tours voisins réussis indiquent `google/gemini-2.5-flash`.
+- Le personnage a livré sa réponse et son reçu dans les deux cas. Les protections visibles sont le `GM_POST_TURN_TIMEOUT_MS` de 12 000 ms, l'abort de la requête LLM, la persistance CAS bornée à deux essais et la publication de la disponibilité après persistance. Aucun delta mémoire, action autorisée ou transfert tardif n'est démontré par ces données.
+- Cause retenue : **inconnue**. Le relevé ne sépare pas l'attente fournisseur, la résolution/modèle effectif, l'abort client et une réponse arrivée après deadline. Il ne justifie ni baisse de deadline, ni baisse du plafond JSON, ni tuning prompt/modèle, ni relance P0/P1/P2. Le premier sous-lot ajoute seulement une classification technique bornée (annulé volontairement, timeout, échec HTTP/JSON, persistance/CAS, disponible) et vérifie les invariants d'obsolescence.
+
+### Couverture des mesures et réserves conservées
+
+- Les jalons V2 attendus sont au nombre de 29 ; les pages MCP retournent encore des lignes `partial`, des tentatives `capture_start` sans sortie et des GM séparés des effectifs de tours. Les événements montrent `voice_end`, `first_token`, `safe_phrase`, `audio_blob_ready`, interruptions et reprise souvent absents. AudioContext reste une estimation logicielle, pas une fin physique de parole.
+- La couverture RAG est meilleure pour les spans `rag_profile`, `embedding`, `vector_search` et `rerank`, mais la projection publique ne porte pas encore de cohorte laboratoire avec question, variante et rappel validé. La couverture du prébuffer ne mesure pas encore explicitement underrun, clic, trou interphrase et continuité par seuil.
+- Les réserves GM/P0/P2 et le pilote 300 tours/10 sessions restent ouverts. Le plan P3 ne relance pas la recette historique, ne modifie pas Shields, n'injecte aucune parole synthétique et ne touche pas Gami DigiDouble.
+
+## Architecture et ordre des sous-lots P3 retenus avant code
+
+1. **GM et instrumentation technique bornée.** Conserver `evaluatePostTurnPRD4` comme unique appel post-tour, `prd4Orchestrator` hors chemin critique, `experienceFrame.ts` comme source unique et `persist_conversation_memory_v4` comme CAS. Ajouter les statuts/spans de cause sans exposer dialogue ni payload privé ; distinguer génération, validation JSON/relation, persistance, disponibilité et attente effective du tour suivant. Les tests couvrent timeout, abort, réponse tardive, JSON tronqué, CAS concurrent, action obsolète et absence de mutation du reçu/personnage/autorisation.
+2. **Lectures de contexte et mémoire.** Dédupliquer les lectures concurrentes par clés minimales `environment/session/character/prompt-orchestration/RAG-profile/memory-version`, avec caches d'in-flight bornés et cache négatif uniquement pour une absence confirmée. Une erreur réseau reste une panne et n'est jamais mémorisée comme absence. Invalider sur écriture, handoff, reprise, fin de session ou changement de version ; aucune cache globale inter-personnages et aucune conversion de mémoire V4.
+3. **RAG/prompts comparés dans le laboratoire existant.** Garder les questions françaises canoniques et elliptiques, noms propres et contexte. Exécuter une variable à la fois : rerank courant, `rerank-2.5-lite`, sans rerank, puis pré-retrieval annulable sur transcript stable. Enregistrer variante, versions, effectifs, rappel/canon/confidentialité, embedding/recherche/rerank séparés, erreurs et annulations. Aucun résultat de laboratoire ne modifie le chemin live sans gate explicite ; aucune inférence de cache hit depuis un préfixe identique.
+4. **Prompt GM et modèle.** Construire un budget de comparaison où le JSON complet, la mémoire, l'identité, la confidentialité, le canon, la relation, le film et le handoff restent présents. Comparer prompt baseline puis réduction sémantique et modèle rapide avec corpus fixé. Le plancher GM effectif reste au moins 950 jusqu'à preuve de JSON complet sans troncature ; le réglage admin ne sera pas abaissé arbitrairement à 180. Les versions prompt/modèle/configuration sont épinglées par essai.
+5. **Prébuffer vocal mesuré.** Exposer uniquement dans le banc isolé les variantes existantes 300 ms, 160 ms et 240 ms, puis un rebuffer adaptatif si les données le justifient. Mesurer premier son logiciel, niveau d'avance, underrun, clic/fin abrupte, trou interphrase, continuité, suffixe conservé après pause/reprise, EOS, annulation et livraison. Garder Gradium, les voix Max/Emma, le contexte socket par tour, le transport de secours et le batch existant inchangés par défaut ; ElevenLabs/Inworld restent secondaires et ne peuvent pas remplacer silencieusement une voix.
+
+### Contrats, budgets, expériences, gates et rollback
+
+- Les clés et versions sont incluses dans toute mesure ; les horloges monotones ne sont pas soustraites entre navigateur et Edge. Les valeurs absentes restent `null`, les snapshots sont dédupliqués, les observations GM ne gonflent pas les effectifs de tours et une page MCP bornée n'est pas une cohorte complète.
+- Les comparaisons s'exécutent une seule variable à la fois sur le même corpus, pauses, voix, contexte, révisions et profil RAG. Les seuils proposés restent p50 ≤ 1 500 ms / p95 ≤ 2 500 ms fin de parole→sortie estimée, détection→atténuation p95 ≤ 100 ms et confirmation→arrêt p95 ≤ 200 ms ; ils ne valent pas preuve tant que les jalons manquent.
+- Gates bloquantes : fuite privée, mélange Max/Emma, identité étrangère, film réinterprété, confidence non livrée promue, consentement forcé, action GM tardive, JSON tronqué, croissance de contexte, erreur ou underrun au-dessus de la baseline comparable. Une annulation ou un appel avorté n'est jamais compté comme gain de disponibilité.
+- Activation : code compatible et défauts actuels conservés ; canary limitée à `sandbox-ulrich`, preset/version explicitement épinglé après gates. Rollback vers le preset courant, sans cache/pré-retrieval spéculatif, stratégie texte et batch de compatibilité. Les anciennes sessions gardent leurs paramètres.
+- Validation prévue : tests unitaires et intégration des seams, laboratoire RAG/prompt, tests réels de transfert AudioWorklet existants, `npm run test:quality`, E2E isolés multi-navigateurs, deux revues Standards/Spec, CI puis seulement synchronisation Lovable, preview, publication et vérification publiée dans Brave.
+
+L'incohérence fenêtre globale 11 s / promesse historique de 8 s après 3,5 s de RAG est documentée mais **hors correctif P3** : toute modification de délai exige un sous-lot dédié et n'est pas incluse dans l'implémentation ci-dessous.
+
+## Implémentation P3 — 14 octobre 2026
+
+- GM : `execution_reason` distingue désormais l'abort parent, le timeout
+  client, l'échec HTTP, le JSON invalide, la transition relationnelle
+  invalide, la persistance échouée et l'erreur runtime. Le span
+  `gm_available` reste séparé du statut du tour vocal et passe en échec si le
+  résultat GM n'est pas exécutable. Une persistance échouée neutralise action
+  et delta mémoire côté résultat retourné ; le reçu et la réponse personnage
+  restent indépendants. Aucun délai ni plafond JSON n'a été abaissé.
+- Contexte/mémoire : lectures concurrentes dédupliquées en vol pour mémoire
+  session, résumé, prompt personnage et runtime d'orchestration ; absence de
+  résumé confirmée seulement avec TTL court, erreurs non mises en cache ;
+  résumé monotone par `last_turn`, clés prompt par environnement et
+  invalidation conservée sur écritures. Les CAS V4, les handoffs et les
+  migrations ne changent pas.
+- RAG : le laboratoire existant reste isolé du live et exporte maintenant une
+  clé de variante stable comprenant rerank/modèle, retrieve/top/threshold,
+  truncation et rewrite, ainsi que les révisions source/built du corpus de
+  questions et les snapshots d'effectifs. Aucun réglage live n'est activé par
+  cette mesure.
+- GM/prompts : le banc admin propose une comparaison fixe de trois cas, sur
+  deux modèles au plus, avec version de prompt, plafond effectif, complétude
+  JSON, statuts, p50/p95 et export JSON. Le test reste sans persistance et
+  n'injecte aucune parole.
+- Buffers : Gradium conserve par défaut 300/200 ms et expose seulement via le
+  contexte de test les presets 160 et 240 ms. Les statistiques de génération
+  portent preset, seuils, rebuffer, underrun logiciel et trou maximal ; le MCP
+  Ava les projette dans `get_voice_latencies`. Aucune voix, aucun batch et
+  aucun fallback de transport n'est modifié par défaut.
+- Livraison partielle P1 : le reçu ne déclare comme livré qu'un préfixe confirmé
+  par les timestamps audio ; après une chute Gradium, la continuation non
+  confirmée reste privée et le GM ne reçoit jamais une phrase extrapolée depuis
+  un seul échantillon audio.
+- Vérifications locales : tests ciblés GM/RAG/mémoire/TTS/MCP passés,
+  régression 46/46, unité 575/575, intégration 34/34, typecheck, lint et
+  build passés. Les percentiles des comparaisons utilisent une interpolation
+  linéaire. Les deux revues indépendantes Standards/Spec ont relevé puis
+  corrigé le snapshot runtime borné, le JSON GM complet, la neutralisation des
+  sorties non exécutées, la comparaison RAG multi-variantes, l'export GM et la
+  mesure partielle sans extrapolation audio. E2E complet multi-navigateurs :
+  45/45 sans retry.
+- Limites conservées : la cause des deux timeouts historiques reste inconnue ;
+  les jalons V2 manquants, le corpus RAG comparatif et les mesures acoustiques
+  de clic/trou ne sont pas transformés en gains. Aucun P0/P1/P2, Shield,
+  speech synthesis, migration de mémoire ou environnement Gami n'a été relancé.

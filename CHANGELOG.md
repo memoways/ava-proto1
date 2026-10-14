@@ -210,6 +210,28 @@ plus anciennes conservent leur état au moment de leur rédaction.
 
 ## [Non publié]
 
+### Lot 4 / P3 — GM, RAG, prompts et buffers comparés — 2026-10-14
+
+- Diagnostic GM borné : raisons d'exécution explicites, plancher effectif de
+  950 tokens, JSON incomplet invalidé, sorties et mémoire neutralisées lorsque
+  le GM n'est pas exécuté ou que la persistance échoue. Le reçu vocal reste
+  indépendant ; les réserves P0/P1/P2 et les deux timeouts historiques restent
+  ouvertes.
+- Mémoire, prompts et runtime partagés : déduplication des lectures en vol,
+  invalidation versionnée, résumé monotone et snapshot runtime partagé borné.
+  Le banc GM compare trois cas, deux modèles au plus et les variantes de prompt
+  baseline/draft, avec p50/p95 interpolés et export.
+- Le laboratoire RAG compare courant/léger/sans rerank et exporte variante,
+  latences, erreurs et révisions source/built du corpus. Gradium conserve le
+  défaut 300/200 ms ; les presets 160/240 sont comparables dans le banc et les
+  compteurs de rebuffer/underrun et trous logiciels remontent au MCP Ava. Les
+  seuils de prébuffer/rebuffer ne sont pas présentés comme des durées acoustiques
+  mesurées.
+- Vérifications locales passées : 46 régressions, 575 unitaires, 34
+  intégrations, typecheck, lint, build et 45 E2E multi-navigateurs sans retry.
+  Lovable Cloud, preview, publication et recette humaine Brave ne sont pas
+  encore modifiés.
+
 ### Préparation du lot 4 / P3
 
 - [Prompt complet de reprise](docs/plan_lot_4_gm_rag_reglages_mesures.md)

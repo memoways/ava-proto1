@@ -72,4 +72,16 @@ describe('Gradium incremental turn',()=>{
   it('keeps whole-segment compatibility and rejects append after finish',async()=>{
     const session=createGradiumStreamSession('Oui.',opts),ws=await socket();expect(ws.sent.map(x=>x.type)).toEqual(['setup','text','end_of_stream']);expect(()=>session.appendText('Non.')).toThrow('after finish');session.cancel();
   });
+  it('exposes comparable buffer presets and software underrun measurements', async()=>{
+    const session=createGradiumTurnSession({...opts, bufferPreset:'160'}),ws=await socket();
+    session.appendText('Bonjour.');session.open();ws.message(audio(0.4));await session.started;
+    mock.clock.currentTime=0.5;
+    ws.message(audio(0.1));
+    expect(mock.sources).toHaveLength(1);
+    ws.message(audio(0.2));
+    session.finish();ws.message({type:'end_of_stream'});
+    const stats=await session.generationDone;
+    expect(stats).toMatchObject({bufferPreset:'160',prebufferMs:160,rebufferMs:160,rebufferCount:1,underrunCount:1});
+    expect(stats.maxGapMs).toBeGreaterThan(0);
+  });
 });

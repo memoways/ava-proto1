@@ -52,4 +52,21 @@ describe("MCP V2 contract with legacy separation", () => {
   it("requires an authenticated caller", async () => {
     await expect(tool.handler!({}, { isAuthenticated: () => false } as unknown as ToolContext)).rejects.toThrow("Sign-in required");
   });
+  it("projects Gradium buffer telemetry without changing legacy samples", async () => {
+    const voice = query([]);
+    const audio = query([{
+      direction: "out", context_type: "sandbox", t_tts_total_ms: 120,
+      metadata_json: {
+        buffer_preset: "160", buffer_prebuffer_ms: 160, buffer_rebuffer_ms: 160,
+        buffer_rebuffer_count: 1, buffer_underrun_count: 1, buffer_max_gap_ms: 24,
+      },
+    }]);
+    mock.client.from.mockImplementation((table) => table === "voice_turn_events" ? voice : table === "audio_latencies" ? audio : query([]));
+    const result = await tool.handler!({ days: 1 }, ctx);
+    const summary = (result.structuredContent as { summary: { audio: { samples: number; buffer: { samples: number; presets: Record<string, number>; prebufferMs: { p50: number | null }; rebufferCount: number; underrunCount: number; maxGapMs: { p95: number | null } } } } }).summary;
+    expect(summary.audio.samples).toBe(1);
+    expect(summary.audio.buffer).toMatchObject({ samples: 1, presets: { "160": 1 }, rebufferCount: 1, underrunCount: 1 });
+    expect(summary.audio.buffer.prebufferMs.p50).toBe(160);
+    expect(summary.audio.buffer.maxGapMs.p95).toBe(24);
+  });
 });

@@ -23,7 +23,7 @@ import {
 } from "@/services/relationshipEngine";
 
 /** Incrémenter à chaque changement de logique ou de prompt du GM (traçabilité A/B). */
-export const GM_CODE_VERSION = "gm-2026-10-12-frame";
+export const GM_CODE_VERSION = "gm-2026-10-14-p3";
 
 export interface PRD4PostTurnInput {
   onGmObserved?: (service: ServiceObservation, spans: ServerObservation) => void;
@@ -45,6 +45,9 @@ export interface PRD4PostTurnInput {
   signal?: AbortSignal;
   diagnosticTrace?: boolean;
   systemPromptOverride?: string | null;
+  /** Isolated admin/lab override; live callers omit it and use published settings. */
+  modelOverride?: string | null;
+  promptVersionOverride?: string | null;
   orchestrationVersionId?: string | null;
   orchestrationConfig?: ExperienceDirectorConfig | null;
   currentCharacter: RuntimeCharacter;
@@ -425,6 +428,19 @@ function cleanPlayerSwitchRequest(raw: unknown): PRD4PostTurnEvaluation["player_
   return { targetCharacter, stance };
 }
 
+const REQUIRED_GM_JSON_FIELDS = [
+  "engagement_delta", "confusion_detected", "role_usage_quality", "topics_covered",
+  "transition_recommended", "cinematic_hint", "next_turn_guidance", "end_recommended",
+  "moderation_flag", "notes", "trigger_video_id", "labels", "action",
+  "player_switch_request", "memory_delta",
+] as const;
+
+function isCompleteGMJson(value: unknown): value is Partial<PRD4PostTurnEvaluation> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return REQUIRED_GM_JSON_FIELDS.every((field) => Object.prototype.hasOwnProperty.call(record, field));
+}
+
 /**
  * Évalue le tour qui vient de se jouer. Toujours résout (jamais throw).
  */
@@ -436,6 +452,7 @@ export async function evaluatePostTurnPRD4(
   let service: ServiceObservation = { service: "gm", requested_provider: "openrouter", requested_model: null, resolved_provider: "openrouter", resolved_model: null, effective_provider: null, effective_model: null, transport: "http_batch" };
   let result: PRD4PostTurnEvaluation;
   let model = "";
+  let effectiveMaxTokens = 950;
   const videos = await getVideoTriggersCached();
   const validIds = new Set(videos.map((v) => v.id));
   const triggered = new Set(input.triggeredVideoIds ?? []);
@@ -451,18 +468,20 @@ export async function evaluatePostTurnPRD4(
   let rawResponse: string | null = null;
   let diagnosticError: string | null = null;
   let executionStatus: NonNullable<PRD4PostTurnEvaluation["execution_status"]> = "executed";
+  let executionReason: NonNullable<PRD4PostTurnEvaluation["execution_reason"]> = "executed";
   try {
     const llm = getLLMSettings();
-    model = llm.LLM_MODEL_GM;
+    model = input.modelOverride?.trim() || llm.LLM_MODEL_GM;
+    effectiveMaxTokens = Math.max(llm.LLM_MAX_TOKENS_GM ?? 0, 950);
     const callRes = await spans.run("gm_generation", () => callLLMWithUsage(
       messages,
       {
-        model: llm.LLM_MODEL_GM,
+        model,
         temperature: 0.2,
         // Le réglage GM historique (souvent 180) suffit aux labels mais pas à
         // l'évaluation + memory_delta. Ce plancher évite un JSON tronqué sans
         // ajouter d'appel LLM.
-        max_tokens: Math.max(llm.LLM_MAX_TOKENS_GM ?? 0, 950),
+        max_tokens: effectiveMaxTokens,
         timeoutMs: input.orchestrationConfig?.directorTimeoutMs ?? GM_POST_TURN_TIMEOUT_MS,
         feature_key: "prd4_gm_post_turn",
         session_id: input.sessionId ?? undefined,
@@ -474,11 +493,12 @@ export async function evaluatePostTurnPRD4(
     llmTrace = callRes.diagnosticTrace;
     rawResponse = callRes.content;
     const parsed = spans.runSync("gm_validation_json", () => extractJson(callRes.content)) as Partial<PRD4PostTurnEvaluation> | null;
-    if (!parsed) {
+    if (!isCompleteGMJson(parsed)) {
       console.warn("[GM-PRD4] no JSON in response:", callRes.content.slice(0, 200));
       result = { ...DEFAULT_RESULT, notes: "Réponse LLM non parsable (fallback)." };
       diagnosticError = "Réponse JSON non parsable";
       executionStatus = "invalid";
+      executionReason = "invalid_json";
     } else {
       const rawTrigger = parsed.trigger_video_id ? String(parsed.trigger_video_id) : null;
       const safeTrigger = rawTrigger && validIds.has(rawTrigger) && !triggered.has(rawTrigger) ? rawTrigger : null;
@@ -531,6 +551,13 @@ export async function evaluatePostTurnPRD4(
     result = { ...DEFAULT_RESULT, notes: `Erreur LLM: ${(err as Error).message?.slice(0, 100) || "inconnue"}` };
     diagnosticError = err instanceof Error ? err.message : String(err);
     executionStatus = "failed";
+    executionReason = input.signal?.aborted
+      ? "parent_aborted"
+      : err instanceof LLMProxyRequestError
+        ? "http_error"
+        : err instanceof Error && err.name === "TimeoutError"
+          ? "client_timeout"
+          : "runtime_error";
     llmTrace = err instanceof LLMProxyRequestError ? err.diagnosticTrace : llmTrace;
   }
 
@@ -547,17 +574,35 @@ export async function evaluatePostTurnPRD4(
       characterKey: input.currentCharacter,
       turnIndex: input.turnIndex,
     }));
-    if (!transition.accepted) executionStatus = "invalid";
+    if (!transition.accepted) {
+      executionStatus = "invalid";
+      executionReason = "relationship_invalid";
+    }
     result = {
       ...result,
       relationship_transition: transition,
-      memory_delta: {
-        ...result.memory_delta,
-        relationship: {
-          ...result.memory_delta.relationship,
-          ...relationshipStateToProposal(transition.next),
-        },
-      },
+      memory_delta: transition.accepted ? {
+          ...result.memory_delta,
+          relationship: {
+            ...result.memory_delta.relationship,
+            ...relationshipStateToProposal(transition.next),
+          },
+        } : null,
+    };
+  }
+
+  // No non-executed GM result may transfer an action, handoff, cinematic or
+  // memory mutation to the next turn. The diagnostic result remains useful,
+  // but its gameplay effects are neutral until a successful GM evaluation.
+  if (executionStatus !== "executed") {
+    result = {
+      ...result,
+      action: { type: "none" },
+      trigger_video_id: null,
+      transition_recommended: false,
+      end_recommended: false,
+      player_switch_request: null,
+      memory_delta: null,
     };
   }
 
@@ -567,8 +612,11 @@ export async function evaluatePostTurnPRD4(
     turn_index: input.turnIndex,
     latency_ms: Math.round(performance.now() - startedAt),
     model,
+    prompt_version: input.promptVersionOverride?.trim() || input.orchestrationVersionId || GM_CODE_VERSION,
+    max_tokens: effectiveMaxTokens,
     created_at: new Date().toISOString(),
     execution_status: executionStatus,
+    execution_reason: executionReason,
     orchestration_version_id: input.orchestrationVersionId ?? null,
     orchestration_config: input.orchestrationConfig ?? null,
   };
@@ -586,10 +634,28 @@ export async function evaluatePostTurnPRD4(
       enriched = { ...enriched, memory_after: memoryAfter };
     } catch (err) {
       console.warn("[GM-PRD4] persist failed:", err);
+      if (executionStatus === "executed") {
+        executionStatus = "failed";
+        executionReason = "persistence_failed";
+      }
+      enriched = {
+        ...enriched,
+        execution_status: executionStatus,
+        execution_reason: executionReason,
+        action: { type: "none" },
+        trigger_video_id: null,
+        transition_recommended: false,
+        end_recommended: false,
+        player_switch_request: null,
+        memory_delta: null,
+        memory_after: null,
+      };
     }
   }
 
-  spans.runSync("gm_available", () => enriched);
+  spans.runSync("gm_available", () => executionStatus === "executed"
+    ? enriched
+    : { error: executionReason });
   try { input.onGmObserved?.(service, spans.snapshot()); } catch { /* Observability never changes memory or actions. */ }
   return input.diagnosticTrace ? {
     ...enriched,

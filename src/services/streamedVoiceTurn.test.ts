@@ -45,6 +45,17 @@ describe('P1 streamed voice delivery',()=>{
   const a=setup(),onReceipt=vi.fn();const t=prepareStreamedVoiceTurn(ctx,{onReceipt,fallback:vi.fn(async()=>({...played,status:'failed' as const,error:new Error('playback')})),onPlaybackStart:vi.fn()});
   a.start.reject(new Error('ws'));a.gen.reject(new Error('ws'));a.end.reject(new Error('ws'));await Promise.resolve();t.onEvent({type:'segment',text:'Bonjour.'});t.onEvent({type:'complete',response:'Bonjour.'});const result=await t.finish();expect(result.status).toBe('failed');expect(result.error?.message).toBe('playback');expect(onReceipt.mock.calls[0][0].status).toBe('failed');
  });
+ it('does not invent a delivered prefix before timestamp confirmation',async()=>{
+  const {session,start,gen,end}=setup(),receipt=vi.fn();
+  Object.defineProperty(session,'hasAudibleOutput',{value:true});
+  session.progress.mockReturnValue({scheduledSamples:1000,playedSamples:100,sampleRate:24000,confirmedText:''});
+  const t=prepareStreamedVoiceTurn(ctx,{onReceipt:receipt,fallback:vi.fn(),onPlaybackStart:vi.fn()});
+  t.onEvent({type:'segment',text:'Bonjour.'});t.onEvent({type:'segment',text:'La suite reste privée.'});
+  start.resolve();gen.reject(new Error('drop'));end.reject(new Error('drop'));await Promise.resolve();
+  const result=await t.finish();
+  expect(result.status).toBe('failed');
+  expect(receipt.mock.calls[0][0]).toMatchObject({status:'failed',delivered:'',uncertain:'Bonjour. La suite reste privée.'});
+ });
  it('cancellation before sound rejects delivery and late promises do not reanimate output',async()=>{
   const {start,gen,end}=setup(),controller=new AbortController(),receipt=vi.fn(),play=vi.fn(),fallback=vi.fn();const t=prepareStreamedVoiceTurn({...ctx,signal:controller.signal},{onReceipt:receipt,fallback,onPlaybackStart:play});controller.abort('session-end');start.resolve();gen.resolve({firstByteMs:1,totalGenMs:2,bytes:1});end.resolve({playbackTotalMs:5});await expect(t.delivery).rejects.toThrow();await t.finish();expect(play).not.toHaveBeenCalled();expect(fallback).not.toHaveBeenCalled();expect(receipt).toHaveBeenCalledTimes(1);
  });

@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-14 (P2 publié et MCP vérifié ; prompt P3 préparé, canary sandbox-ulrich et production batch conservées)
+> **Last Updated**: 2026-10-14 (implémentation locale P3 vérifiée ; livraison Lovable à clôturer, canary sandbox-ulrich et production batch conservées)
 
 ---
 
@@ -83,6 +83,21 @@ annulation. Un levier par comparaison, aucun gain sans corpus compatible,
 aucune activation générale sans pilote. Le nouveau manifest Lovable sur
 main `77db463` est préservé. Réserves P0/P1/P2 conservées, aucun code ni
 réglage P3 modifié. [Prompt du lot 4](docs/plan_lot_4_gm_rag_reglages_mesures.md).
+
+### 2026-10-14 — Lot 4 / P3 : GM, RAG, prompts et buffers comparés
+
+L'implémentation locale ajoute le diagnostic GM borné, le contrat JSON complet
+et les raisons d'exécution ; tout résultat non exécuté reste sans action,
+transfert, cinématique ni delta mémoire. Les caches de mémoire, prompts et
+runtime sont dédupliqués et invalidés par version, avec un snapshot du cadre
+commun partagé entre personnage et GM dans une limite de temps. Le laboratoire
+RAG compare trois variantes et le banc GM compare trois cas, deux modèles au
+plus et les prompts baseline/draft, avec p50/p95 interpolés et exports. Gradium
+conserve 300/200 ms par défaut ; les presets et compteurs de trous logiciels
+sont observables sans prétendre mesurer un gain acoustique. La livraison
+partielle repose uniquement sur la confirmation timestampée, sans extrapolation
+à partir d'un échantillon. Voix, canon, cadre commun, transferts, migrations,
+batch, Shields et réserves P0/P1/P2 restent inchangés. [Plan P3](docs/plan_lot_4_gm_rag_reglages_mesures.md).
 
 ### 2026-10-14 — P2 : écouter pendant la réponse, confirmer avant de couper
 

@@ -43,6 +43,15 @@ function score(value: number | undefined): string {
   return typeof value === "number" ? value.toFixed(3) : "—";
 }
 
+function percentileMs(values: number[], p: number): number | null {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = (sorted.length - 1) * p;
+  const low = Math.floor(index);
+  const high = Math.ceil(index);
+  return Math.round(low === high ? sorted[low] : sorted[low] + (sorted[high] - sorted[low]) * (index - low));
+}
+
 function characterLabel(match: RAGMatch, characters: CharacterOption[]): string {
   if (!match.character_id) return "Partagé";
   return characters.find((character) => character.id === match.character_id)?.name || match.character_id.slice(0, 8);
@@ -75,12 +84,20 @@ export default function RAGLabTab() {
   const [rewriteLatencyMs, setRewriteLatencyMs] = useState<number | null>(null);
   const [rewrittenQuery, setRewrittenQuery] = useState<string | null>(null);
   const [result, setResult] = useState<RAGQueryDetailed | null>(null);
+  const [comparisonResult, setComparisonResult] = useState<Record<string, unknown> | null>(null);
+  const [comparisonRunning, setComparisonRunning] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [questionCorpus, setQuestionCorpus] = useState<RAGQuestionCorpusResult | null>(null);
   const [questionCorpusLoading, setQuestionCorpusLoading] = useState(false);
   const [questionCorpusError, setQuestionCorpusError] = useState<string | null>(null);
   const [selectedFrequentQuestionId, setSelectedFrequentQuestionId] = useState("");
   const questionCorpusRequestInFlight = useRef(false);
+  const experimentAbort = useRef<AbortController | null>(null);
+  const experimentSequence = useRef(0);
+
+  useEffect(() => () => {
+    experimentAbort.current?.abort("RAG laboratory unmounted");
+  }, []);
 
   useEffect(() => {
     void supabase
@@ -165,6 +182,11 @@ export default function RAGLabTab() {
       return;
     }
 
+    experimentAbort.current?.abort("RAG laboratory experiment superseded");
+    const controller = new AbortController();
+    experimentAbort.current = controller;
+    const sequence = ++experimentSequence.current;
+    const isCurrent = () => experimentSequence.current === sequence && !controller.signal.aborted;
     const safeMatchCount = clampNumber(matchCount, 1, 20);
     const safeRetrieveK = clampNumber(Math.max(retrieveK, safeMatchCount), safeMatchCount, 100);
     const safeThreshold = clampNumber(threshold, 0, 1);
@@ -173,6 +195,7 @@ export default function RAGLabTab() {
     setThreshold(safeThreshold);
     setRunning(true);
     setResult(null);
+    setComparisonResult(null);
     setSelectedIds([]);
     setRewrittenQuery(null);
     setRewriteLatencyMs(null);
@@ -181,7 +204,8 @@ export default function RAGLabTab() {
       let rewritten: string | null = null;
       if (rewrite) {
         const rewriteStartedAt = performance.now();
-        rewritten = await rewriteRAGQuery(query.trim(), recentContext.trim(), character?.name);
+        rewritten = await rewriteRAGQuery(query.trim(), recentContext.trim(), character?.name, controller.signal);
+        if (!isCurrent()) return;
         setRewriteLatencyMs(Math.round(performance.now() - rewriteStartedAt));
         setRewrittenQuery(rewritten);
       }
@@ -200,17 +224,76 @@ export default function RAGLabTab() {
           rerankTruncation,
           includeRetrievalMatches: true,
           timeoutMs: 20_000,
+          signal: controller.signal,
         },
       );
+      if (!isCurrent()) return;
       setResult(response);
       setSelectedIds(response.matches.slice(0, MAX_MAX_RAG_ITEMS).map((match) => match.id));
       if (response.error) toast.error(response.error);
       else if (response.rerankError) toast.warning("Recherche terminée, mais le reranking a échoué");
       else toast.success(`${response.matches.length} résultat(s) final(aux)`);
     } catch (error) {
+      if (controller.signal.aborted) return;
       toast.error(error instanceof Error ? error.message : String(error));
     } finally {
-      setRunning(false);
+      if (isCurrent()) setRunning(false);
+    }
+  }
+
+  async function runComparison() {
+    if (!query.trim() || !characterId) {
+      toast.error("Sélectionnez un personnage et une question avant la comparaison");
+      return;
+    }
+    experimentAbort.current?.abort("RAG comparison superseded");
+    const controller = new AbortController();
+    experimentAbort.current = controller;
+    const sequence = ++experimentSequence.current;
+    const isCurrent = () => experimentSequence.current === sequence && !controller.signal.aborted;
+    const safeMatchCount = clampNumber(matchCount, 1, 20);
+    const safeRetrieveK = clampNumber(Math.max(retrieveK, safeMatchCount), safeMatchCount, 100);
+    const safeThreshold = clampNumber(threshold, 0, 1);
+    setComparisonRunning(true);
+    const variants = [
+      { id: "current", rerank, rerankModel, rerankTruncation },
+      { id: "light", rerank: true, rerankModel: "rerank-2.5-lite" as RerankModel, rerankTruncation },
+      { id: "none", rerank: false, rerankModel, rerankTruncation: false },
+    ];
+    const rows: Array<Record<string, unknown>> = [];
+    try {
+      let rewritten = rewrittenQuery;
+      if (rewrite && !rewritten) rewritten = await rewriteRAGQuery(query.trim(), recentContext.trim(), character?.name, controller.signal);
+      for (const variant of variants) {
+        if (!isCurrent()) return;
+        const response = await queryRAGDetailed(query.trim(), recentContext.trim(), safeMatchCount, safeThreshold, {
+          characterId, rerank: variant.rerank, retrieveK: safeRetrieveK, rewrittenQuery: rewritten || undefined,
+          rerankModel: variant.rerankModel, rerankTruncation: variant.rerankTruncation,
+          includeRetrievalMatches: true, timeoutMs: 20_000, signal: controller.signal,
+        });
+        rows.push({
+          variant: variant.id, variant_key: response.request.variantKey, experiment_id: response.request.experimentId,
+          latency_ms: response.latencyMs, server_latency_ms: response.serverLatencyMs ?? null,
+          retrieval_matches: response.retrievalMatches.length, final_matches: response.matches.length,
+          rerank_used: response.rerankUsed ?? false, error: response.error ?? null, rerank_error: response.rerankError ?? null,
+        });
+      }
+      if (!isCurrent()) return;
+      setComparisonResult({
+        generated_at: new Date().toISOString(), question: query.trim(), recent_context: recentContext.trim(),
+        character_id: characterId, corpus: questionCorpus ? { sourceRevision: questionCorpus.sourceRevision, builtRevision: questionCorpus.builtRevision } : null,
+        rows,
+        summary: Object.fromEntries(variants.map((variant) => {
+          const sample = rows.filter((row) => row.variant === variant.id);
+          const durations = sample.map((row) => Number(row.latency_ms)).filter(Number.isFinite);
+          return [variant.id, { samples: sample.length, p50_ms: percentileMs(durations, 0.5), p95_ms: percentileMs(durations, 0.95), errors: sample.filter((row) => row.error).length }];
+        })),
+      });
+      toast.success("Comparaison RAG courant / léger / sans rerank terminée");
+    } catch (error) {
+      if (!controller.signal.aborted) toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (isCurrent()) setComparisonRunning(false);
     }
   }
 
@@ -410,9 +493,14 @@ export default function RAGLabTab() {
             </div>
           </div>
 
-          <Button onClick={runExperiment} disabled={running || !characterId || !query.trim()} size="lg">
-            <Search className="mr-2 h-4 w-4" /> {running ? "Expérience en cours…" : "Lancer l’expérience RAG"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={runExperiment} disabled={running || comparisonRunning || !characterId || !query.trim()} size="lg">
+              <Search className="mr-2 h-4 w-4" /> {running ? "Expérience en cours…" : "Lancer l’expérience RAG"}
+            </Button>
+            <Button variant="outline" onClick={() => void runComparison()} disabled={running || comparisonRunning || !characterId || !query.trim()} size="lg">
+              {comparisonRunning ? "Comparaison en cours…" : "Comparer 3 variantes"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -425,7 +513,18 @@ export default function RAGLabTab() {
                   <CardTitle className="text-base">3. Mécanique observée</CardTitle>
                   <CardDescription>Ce parcours explique pourquoi un chunk atteint — ou non — le prompt final.</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => downloadJson({ query, recentContext, character, result, selectedIds, formattedContext, knowledgeContext })}>
+                <Button variant="outline" size="sm" onClick={() => downloadJson({
+                  exportedAt: new Date().toISOString(),
+                  questionCorpus: questionCorpus ? {
+                    sourceRevision: questionCorpus.sourceRevision,
+                    builtRevision: questionCorpus.builtRevision,
+                    updatedAt: questionCorpus.updatedAt,
+                    sourceQuestionCount: questionCorpus.sourceQuestionCount,
+                    uniqueQuestionCount: questionCorpus.uniqueQuestionCount,
+                    sessionCount: questionCorpus.sessionCount,
+                  } : null,
+                  query, recentContext, character, result, comparison: comparisonResult, selectedIds, formattedContext, knowledgeContext,
+                })}>
                   <Download className="mr-1 h-4 w-4" /> Export JSON
                 </Button>
               </div>
@@ -458,6 +557,9 @@ export default function RAGLabTab() {
                   <p className="mt-1 text-xs text-muted-foreground">{formattedContext.length} caractères de contexte</p>
                 </div>
               </div>
+              <p className="font-mono text-[11px] text-muted-foreground" data-testid="rag-variant-key">
+                Variante comparée : {result.request.variantKey}
+              </p>
 
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="rounded-lg border bg-muted/10 p-3">

@@ -210,6 +210,12 @@ export function tryCreateStreamingPlayback(text: string, opts?: TTSOptions): TTS
           transport: stats.transport,
           performance_emotion: opts?.performance?.emotion ?? null,
           performance_source: opts?.performance?.source ?? null,
+          buffer_preset: stats.bufferPreset ?? null,
+          buffer_prebuffer_ms: stats.prebufferMs ?? null,
+          buffer_rebuffer_ms: stats.rebufferMs ?? null,
+          buffer_rebuffer_count: stats.rebufferCount ?? null,
+          buffer_underrun_count: stats.underrunCount ?? null,
+          buffer_max_gap_ms: stats.maxGapMs ?? null,
         },
       });
     },

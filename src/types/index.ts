@@ -367,9 +367,21 @@ export interface PRD4PostTurnEvaluation {
   turn_index?: number;
   latency_ms?: number;
   model?: string;
+  prompt_version?: string | null;
+  max_tokens?: number;
   created_at?: string;
   /** Distinguishes a valid GM result from a parse failure or runtime failure. */
   execution_status?: "executed" | "invalid" | "failed";
+  /** Technical classification kept separate from the parent voice-turn status. */
+  execution_reason?:
+    | "executed"
+    | "parent_aborted"
+    | "client_timeout"
+    | "http_error"
+    | "invalid_json"
+    | "relationship_invalid"
+    | "persistence_failed"
+    | "runtime_error";
   /** Personnage du tour, attribué par le runtime et jamais par le modèle. */
   character_key?: import("./conversationMemory").RuntimeCharacter;
   /** Delta mémoire produit dans le même appel GM, sans appel LLM supplémentaire. */

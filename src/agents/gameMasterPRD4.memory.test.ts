@@ -45,6 +45,7 @@ describe("Game Master PRD4 — memory_delta", () => {
       turnIndex: 4, timeElapsedSeconds: 90, sessionDurationSeconds: 900, minimumClosureSeconds: 600,
       conversationMemoryBefore: before, relationshipPolicy, signal: parent.signal });
     expect(result.execution_status).toBe("failed");
+    expect(result.execution_reason).toBe(kind === "timeout" ? "client_timeout" : "parent_aborted");
     expect(result.memory_delta).toBeNull();
     expect(result.memory_after).toEqual(before);
     expect(result.action).toEqual({ type: "none" });
@@ -54,6 +55,25 @@ describe("Game Master PRD4 — memory_delta", () => {
     expect(persistPostTurnMemory).toHaveBeenCalledWith("p1-session", expect.objectContaining({ execution_status: "failed" }), null, 4, "max", parent.signal);
     expect(callLLMWithUsage).toHaveBeenCalledOnce();
     expect(vi.mocked(callLLMWithUsage).mock.calls[0][1]).toMatchObject({ timeoutMs: 12000, signal: parent.signal });
+  });
+
+  it("publie un span GM disponible en échec sans le confondre avec le tour vocal", async () => {
+    vi.mocked(callLLMWithUsage).mockRejectedValueOnce(new TimeoutError("llm", 12000));
+    vi.mocked(persistPostTurnMemory).mockResolvedValueOnce(createEmptyConversationMemory());
+    let observation: { spans: Array<{ name: string; status: string }> } | null = null;
+    const result = await evaluatePostTurnPRD4({
+      sessionId: "session-observation",
+      conversationHistory: [], userMessage: "Bonjour", maxResponse: "Je t'écoute.",
+      currentCharacter: "max", userRole: null, turnIndex: 2,
+      timeElapsedSeconds: 20, sessionDurationSeconds: 900, minimumClosureSeconds: 600,
+      onGmObserved: (_service, spans) => { observation = spans; },
+    });
+    expect(result.execution_reason).toBe("client_timeout");
+    expect(observation?.spans).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "gm_generation", status: "failed" }),
+      expect.objectContaining({ name: "gm_persistence", status: "ok" }),
+      expect.objectContaining({ name: "gm_available", status: "failed" }),
+    ]));
   });
 
   it("produit et persiste le delta dans le même appel LLM", async () => {
@@ -82,6 +102,8 @@ describe("Game Master PRD4 — memory_delta", () => {
         moderation_flag: false,
         notes: "",
         trigger_video_id: null,
+        action: { type: "none" },
+        player_switch_request: null,
         memory_delta: delta,
       }),
       model: "openai/gpt-4.1-mini",
@@ -133,6 +155,8 @@ describe("Game Master PRD4 — memory_delta", () => {
         moderation_flag: false,
         notes: "",
         trigger_video_id: null,
+        action: { type: "none" },
+        player_switch_request: null,
         memory_delta: {
           relationship: {
             tier: "link",
@@ -172,6 +196,42 @@ describe("Game Master PRD4 — memory_delta", () => {
     expect(result.diagnostic?.messages[1].content).toContain(
       '"sourceTurn":4,"characterKey":"max","policyVersion":"policy-v1"',
     );
+  });
+
+  it("ne persiste aucun delta lorsqu'une proposition relationnelle est rejetée", async () => {
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({
+      content: JSON.stringify({
+        labels: { themes: [], topics: [], intentions: [] },
+        engagement_delta: 0,
+        confusion_detected: false,
+        role_usage_quality: "medium",
+        topics_covered: [],
+        transition_recommended: false,
+        cinematic_hint: null,
+        next_turn_guidance: "",
+        end_recommended: false,
+        moderation_flag: false,
+        notes: "",
+        trigger_video_id: null,
+        action: { type: "none" },
+        player_switch_request: null,
+        memory_delta: {
+          userFacts: ["fait qui ne doit pas passer"],
+          relationship: { tier: "trust", topicOpenness: {}, justification: "hors tour", evidence: ["honesty"], sourceTurn: 99, characterKey: "max", policyVersion: "policy-v1" },
+        },
+      }),
+      model: "openai/gpt-4.1-mini", latencyMs: 10, usage: null, generationId: null, diagnosticTrace: null,
+    } as never);
+    vi.mocked(persistPostTurnMemory).mockResolvedValueOnce(createEmptyConversationMemory());
+    const result = await evaluatePostTurnPRD4({
+      sessionId: "session-invalid-relationship", conversationHistory: [], userMessage: "Bonjour", maxResponse: "Je t'écoute.",
+      currentCharacter: "max", userRole: null, turnIndex: 4, timeElapsedSeconds: 20,
+      sessionDurationSeconds: 900, minimumClosureSeconds: 600, relationshipPolicy,
+    });
+    expect(result.execution_status).toBe("invalid");
+    expect(result.execution_reason).toBe("relationship_invalid");
+    expect(result.memory_delta).toBeNull();
+    expect(persistPostTurnMemory).toHaveBeenCalledWith("session-invalid-relationship", expect.anything(), null, 4, "max");
   });
 
 });

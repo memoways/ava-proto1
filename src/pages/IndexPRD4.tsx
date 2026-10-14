@@ -858,7 +858,9 @@ const IndexPRD4 = () => {
     setSelectedCharacter(session.active_character);
     setCurrentHandoffOffer(parseGmApprovedHandoffOffer(session.pending_handoff,
       session.active_character === "emma" ? "max" : "emma", session.orchestration_version_id));
-    pendingGmGuidanceRef.current = latestGm?.next_turn_guidance?.trim() || null;
+    pendingGmGuidanceRef.current = latestGm?.execution_status === "executed"
+      ? latestGm.next_turn_guidance?.trim() || null
+      : null;
     pendingEmotionalStateRef.current = null;
     gmTopicsCoveredRef.current = latestGm?.topics_covered ?? [];
     endedRef.current = false;
@@ -1497,10 +1499,13 @@ const IndexPRD4 = () => {
         // action recommandée, toujours après le texte et la voix du personnage.
         void result.postTurnPromise.then(async (ev) => {
           if (!isCurrentTurn()) return;
-          pendingGmGuidanceRef.current = ev.next_turn_guidance?.trim() || null;
-          pendingEmotionalStateRef.current = ev.memory_after?.relationship.emotionalState
-            ?? pendingEmotionalStateRef.current;
-          if (ev.topics_covered?.length) {
+          const gmExecuted = ev.execution_status === "executed";
+          pendingGmGuidanceRef.current = gmExecuted ? ev.next_turn_guidance?.trim() || null : null;
+          if (gmExecuted) {
+            pendingEmotionalStateRef.current = ev.memory_after?.relationship.emotionalState
+              ?? pendingEmotionalStateRef.current;
+          }
+          if (gmExecuted && ev.topics_covered?.length) {
             const known = new Set(gmTopicsCoveredRef.current.map((t) => t.toLowerCase()));
             for (const topic of ev.topics_covered) {
               const clean = topic?.trim();
@@ -1524,7 +1529,7 @@ const IndexPRD4 = () => {
             orchestration_version_id: ev.orchestration_version_id ?? null,
             execution_status: ev.execution_status ?? "executed",
           });
-          if (ev.labels) {
+          if (gmExecuted && ev.labels) {
             const total = (ev.labels.themes?.length ?? 0) + (ev.labels.topics?.length ?? 0) + (ev.labels.intentions?.length ?? 0);
             const log = conversationRef.current;
             if (total > 0) {
@@ -1568,9 +1573,9 @@ const IndexPRD4 = () => {
             && (currentAction.type === "none"
               || (currentAction.type === "handoff" && currentAction.targetCharacter === consentedOffer.targetCharacter));
           const decision: ExperienceDirectorDecisionV1 = applyTopicHandoffFallback({
-            labels: ev.labels ?? { themes: [], topics: [], intentions: [] },
-            nextTurnGuidance: ev.next_turn_guidance || null,
-            memoryDelta: ev.memory_delta ?? null,
+            labels: gmExecuted ? ev.labels ?? { themes: [], topics: [], intentions: [] } : { themes: [], topics: [], intentions: [] },
+            nextTurnGuidance: gmExecuted ? ev.next_turn_guidance || null : null,
+            memoryDelta: gmExecuted ? ev.memory_delta ?? null : null,
             action: offerConfirmed ? { type: "handoff", ...consentedOffer }
               : ev.execution_status !== "executed" || requestedSwitch ? { type: "none" } : currentAction,
           }, ev.execution_status === "executed" && !requestedSwitch ? directorConfig : null, activeCharacterRef.current);

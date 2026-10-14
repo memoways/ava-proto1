@@ -53,6 +53,8 @@ type CharacterPromptRow = Database["public"]["Tables"]["character_prompts"]["Row
 
 const byIdCache = new Map<string, CharacterPrompt>();
 const byNameCache = new Map<string, CharacterPrompt>();
+const promptInFlight = new Map<string, Promise<CharacterPrompt | null>>();
+let promptCacheEpoch = 0;
 
 function environmentCacheKey(value: string, environmentId = getActiveEnvironment()): string {
   return `${environmentId}:${value}`;
@@ -60,15 +62,26 @@ function environmentCacheKey(value: string, environmentId = getActiveEnvironment
 
 export function clearCharacterPromptCache(characterId?: string) {
   if (!characterId) {
+    promptCacheEpoch += 1;
     byIdCache.clear();
     byNameCache.clear();
+    promptInFlight.clear();
+    idByNameCache.clear();
     return;
   }
+  promptCacheEpoch += 1;
   for (const environmentId of ["prod", "sandbox-ulrich", "sandbox-romed", "sandbox-benoit"] as EnvironmentId[]) {
     const key = environmentCacheKey(characterId, environmentId);
     const existing = byIdCache.get(key);
     byIdCache.delete(key);
     if (existing?.name) byNameCache.delete(environmentCacheKey(existing.name, environmentId));
+    promptInFlight.delete(key);
+  }
+  for (const [key, prompt] of byNameCache) {
+    if (prompt.character_id === characterId) byNameCache.delete(key);
+  }
+  for (const [key, id] of idByNameCache) {
+    if (id === characterId) idByNameCache.delete(key);
   }
 }
 
@@ -76,34 +89,45 @@ export async function loadCharacterPrompt(characterId: string): Promise<Characte
   const environmentId = getActiveEnvironment();
   const cacheKey = environmentCacheKey(characterId, environmentId);
   if (byIdCache.has(cacheKey)) return byIdCache.get(cacheKey)!;
-  const { data, error } = await supabase
-    .from("character_prompts")
-    .select("*, characters!inner(name)")
-    .eq("character_id", characterId)
-    .in("environment_id", environmentId === "prod" ? ["prod"] : [environmentId, "prod"]);
-  if (error || !data?.length) return null;
-  const rows = data as unknown as CharacterPromptRow[];
-  const row = rows.find((candidate) => candidate.environment_id === environmentId)
-    ?? rows.find((candidate) => candidate.environment_id === "prod");
-  if (!row) return null;
-  const prompt: CharacterPrompt = {
-    character_id: row.character_id,
-    name: row.characters?.name,
-    identite_fondamentale: row.identite_fondamentale || "",
-    qui_tu_es: row.qui_tu_es || "",
-    ce_que_tu_ne_fais_jamais: row.ce_que_tu_ne_fais_jamais || "",
-    ce_que_tu_sais_utilisateur: row.ce_que_tu_sais_utilisateur || "",
-    dynamique_conversation: row.dynamique_conversation || "",
-    sujets_sensibles: row.sujets_sensibles || "",
-    politique_relationnelle: row.politique_relationnelle || "",
-    references_intellectuelles: row.references_intellectuelles || "",
-    timeline: row.timeline || "",
-    situation_summary: row.situation_summary || "",
-    updated_at: row.updated_at,
-  };
-  byIdCache.set(cacheKey, prompt);
-  if (prompt.name) byNameCache.set(environmentCacheKey(prompt.name, environmentId), prompt);
-  return prompt;
+  const pending = promptInFlight.get(cacheKey);
+  if (pending) return pending;
+  const requestEpoch = promptCacheEpoch;
+  const request = (async () => {
+    const { data, error } = await supabase
+      .from("character_prompts")
+      .select("*, characters!inner(name)")
+      .eq("character_id", characterId)
+      .in("environment_id", environmentId === "prod" ? ["prod"] : [environmentId, "prod"]);
+    if (error || !data?.length) return null;
+    const rows = data as unknown as CharacterPromptRow[];
+    const row = rows.find((candidate) => candidate.environment_id === environmentId)
+      ?? rows.find((candidate) => candidate.environment_id === "prod");
+    if (!row) return null;
+    const prompt: CharacterPrompt = {
+      character_id: row.character_id,
+      name: row.characters?.name,
+      identite_fondamentale: row.identite_fondamentale || "",
+      qui_tu_es: row.qui_tu_es || "",
+      ce_que_tu_ne_fais_jamais: row.ce_que_tu_ne_fais_jamais || "",
+      ce_que_tu_sais_utilisateur: row.ce_que_tu_sais_utilisateur || "",
+      dynamique_conversation: row.dynamique_conversation || "",
+      sujets_sensibles: row.sujets_sensibles || "",
+      politique_relationnelle: row.politique_relationnelle || "",
+      references_intellectuelles: row.references_intellectuelles || "",
+      timeline: row.timeline || "",
+      situation_summary: row.situation_summary || "",
+      updated_at: row.updated_at,
+    };
+    if (requestEpoch !== promptCacheEpoch) return prompt;
+    byIdCache.set(cacheKey, prompt);
+    if (prompt.name) byNameCache.set(environmentCacheKey(prompt.name, environmentId), prompt);
+    return prompt;
+  })();
+  promptInFlight.set(cacheKey, request);
+  void request.finally(() => {
+    if (promptInFlight.get(cacheKey) === request) promptInFlight.delete(cacheKey);
+  }).catch(() => {});
+  return request;
 }
 
 /**
@@ -143,7 +167,7 @@ const idByNameCache = new Map<string, string>();
 /** Resolve the characters.id row from a display name with fallback cascade. Cached in-memory. */
 export async function resolveCharacterIdByName(name: string): Promise<string | null> {
   if (!name) return null;
-  const key = name.trim().toLowerCase();
+  const key = environmentCacheKey(name.trim().toLowerCase());
   if (idByNameCache.has(key)) return idByNameCache.get(key)!;
   const row = await findCharacterRowByName(name);
   const id = row?.id || null;

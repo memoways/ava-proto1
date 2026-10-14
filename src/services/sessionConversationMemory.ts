@@ -17,6 +17,19 @@ import { asRuntimeCharacter, parseHandoffOffer, type CharacterHandoffOffer } fro
 import { ensureGameAuth } from "@/services/gameAuth";
 
 const memoryCache = new Map<string, ConversationMemoryV1>();
+const memoryInFlight = new Map<string, Promise<ConversationMemoryV1>>();
+const memoryFetchVersion = new Map<string, number>();
+let memoryCacheEpoch = 0;
+
+function cacheMemoryAfterWrite(sessionId: string, memory: ConversationMemoryV1): ConversationMemoryV1 {
+  const current = memoryCache.get(sessionId);
+  if (current && current.lastTurn > memory.lastTurn) return current;
+  memoryCache.set(sessionId, memory);
+  // Any read that started before this write must not overwrite the newer
+  // snapshot when it resolves later.
+  memoryFetchVersion.set(sessionId, (memoryFetchVersion.get(sessionId) ?? 0) + 1);
+  return memory;
+}
 
 export interface ResumablePRD4Session {
   id: string;
@@ -40,8 +53,16 @@ export interface ResumablePRD4Session {
 }
 
 export function clearConversationMemoryCache(sessionId?: string): void {
-  if (sessionId) memoryCache.delete(sessionId);
-  else memoryCache.clear();
+  if (sessionId) {
+    memoryCache.delete(sessionId);
+    memoryInFlight.delete(sessionId);
+    memoryFetchVersion.set(sessionId, (memoryFetchVersion.get(sessionId) ?? 0) + 1);
+  } else {
+    memoryCacheEpoch += 1;
+    memoryCache.clear();
+    memoryInFlight.clear();
+    memoryFetchVersion.clear();
+  }
 }
 
 export async function fetchConversationMemory(
@@ -51,21 +72,37 @@ export async function fetchConversationMemory(
   if (!sessionId) return createEmptyConversationMemory();
   const cached = memoryCache.get(sessionId);
   if (cached && !options.force) return cached;
-  const { data, error } = await supabase
-    .from("sessions")
-    .select("conversation_memory, memory_last_turn")
-    .eq("id", sessionId)
-    .maybeSingle();
-  if (error) {
-    console.warn("[ConversationMemory] fetch failed:", error.message);
-    return createEmptyConversationMemory();
+  if (!options.force) {
+    const pending = memoryInFlight.get(sessionId);
+    if (pending) return pending;
   }
-  const memory = overlayDeliveries(sessionId, normalizeConversationMemory(data?.conversation_memory));
-  const normalized = data?.memory_last_turn != null && data.memory_last_turn > memory.lastTurn
-    ? { ...memory, lastTurn: data.memory_last_turn }
-    : memory;
-  memoryCache.set(sessionId, normalized);
-  return normalized;
+  const fetchEpoch = memoryCacheEpoch;
+  const fetchVersion = (memoryFetchVersion.get(sessionId) ?? 0) + 1;
+  memoryFetchVersion.set(sessionId, fetchVersion);
+  const request = (async () => {
+    const { data, error } = await supabase
+      .from("sessions")
+      .select("conversation_memory, memory_last_turn")
+      .eq("id", sessionId)
+      .maybeSingle();
+    if (error) {
+      console.warn("[ConversationMemory] fetch failed:", error.message);
+      return createEmptyConversationMemory();
+    }
+    const memory = overlayDeliveries(sessionId, normalizeConversationMemory(data?.conversation_memory));
+    const normalized = data?.memory_last_turn != null && data.memory_last_turn > memory.lastTurn
+      ? { ...memory, lastTurn: data.memory_last_turn }
+      : memory;
+    if (fetchEpoch === memoryCacheEpoch && memoryFetchVersion.get(sessionId) === fetchVersion) memoryCache.set(sessionId, normalized);
+    return normalized;
+  })();
+  if (!options.force) {
+    memoryInFlight.set(sessionId, request);
+    void request.finally(() => {
+      if (memoryInFlight.get(sessionId) === request) memoryInFlight.delete(sessionId);
+    }).catch(() => {});
+  }
+  return request;
 }
 
 function appendPostTurnEntry(current: unknown, entry: PRD4PostTurnEvaluation): PRD4PostTurnEvaluation[] {
@@ -127,7 +164,7 @@ export async function persistPostTurnMemory(
     if (updateError) throw updateError;
     if (updated) {
       const persisted = overlayDeliveries(sessionId, normalizeConversationMemory(updated.conversation_memory));
-      memoryCache.set(sessionId, persisted);
+      cacheMemoryAfterWrite(sessionId, persisted);
       return persisted;
     }
   }
@@ -135,7 +172,7 @@ export async function persistPostTurnMemory(
   // returning an older cached snapshot here would temporarily regress Max's
   // memory even though the database contains the correct newer state.
   const latest = await fetchConversationMemory(sessionId, { force: true });
-  memoryCache.set(sessionId, latest);
+  cacheMemoryAfterWrite(sessionId, latest);
   return latest;
 }
 
@@ -159,7 +196,7 @@ export async function fetchResumablePRD4Session(now = new Date()): Promise<Resum
     : [];
   if (!conversation.length) return null;
   const memory = normalizeConversationMemory(data.conversation_memory);
-  memoryCache.set(data.id, memory);
+  cacheMemoryAfterWrite(data.id, memory);
   const activeCharacter = asRuntimeCharacter(data.active_character);
   if (!activeCharacter) {
     console.warn("[PRD4 resume] session has no valid active character; resume refused");
@@ -211,7 +248,7 @@ export function persistDeliveryReceipt(sessionId: string, receipt: import('./res
   const overlay = pendingDeliveries.get(sessionId) ?? {};
   overlay[receipt.character] = [...(overlay[receipt.character] ?? []).filter(r => r.turnId !== receipt.turnId), receipt].slice(-16);
   pendingDeliveries.set(sessionId, overlay);
-  memoryCache.set(sessionId, overlayDeliveries(sessionId, memoryCache.get(sessionId) ?? createEmptyConversationMemory()));
+  cacheMemoryAfterWrite(sessionId, overlayDeliveries(sessionId, memoryCache.get(sessionId) ?? createEmptyConversationMemory()));
   const write = async () => {
     for (let attempt = 0; attempt < 4; attempt++) {
       const { data, error } = await supabase.from('sessions').select('conversation_memory').eq('id', sessionId).maybeSingle();
@@ -224,7 +261,7 @@ export function persistDeliveryReceipt(sessionId: string, receipt: import('./res
         p_next_memory: JSON.parse(JSON.stringify(next)) as Json,
       }).maybeSingle();
       if (updateError) throw updateError;
-      if (updated) { memoryCache.set(sessionId, overlayDeliveries(sessionId, normalizeConversationMemory(updated.conversation_memory))); return; }
+      if (updated) { cacheMemoryAfterWrite(sessionId, overlayDeliveries(sessionId, normalizeConversationMemory(updated.conversation_memory))); return; }
     }
     throw new Error('Delivery receipt persistence contention');
   };

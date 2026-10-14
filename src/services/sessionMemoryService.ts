@@ -23,6 +23,10 @@ export interface SessionSummaryRecord {
 // à chaque tour (last_turn perçu = 0). Les sessions ne survivent pas à un
 // rechargement de page (historique en mémoire), donc ce cache suffit au live.
 const summaryCache = new Map<string, SessionSummaryRecord>();
+const summaryMissingCache = new Map<string, number>();
+const summaryInFlight = new Map<string, Promise<SessionSummaryRecord | null>>();
+const SUMMARY_MISSING_TTL_MS = 5_000;
+let summaryCacheEpoch = 0;
 
 function summaryCacheKey(sessionId: string, character: RuntimeCharacter): string {
   return `${sessionId}::${character}`;
@@ -30,7 +34,10 @@ function summaryCacheKey(sessionId: string, character: RuntimeCharacter): string
 
 /** Test/admin helper — vide le cache mémoire des résumés. */
 export function clearSessionSummaryCache(): void {
+  summaryCacheEpoch += 1;
   summaryCache.clear();
+  summaryMissingCache.clear();
+  summaryInFlight.clear();
 }
 
 /** Fetch the latest compressed summary for a session (null if none). */
@@ -42,26 +49,48 @@ export async function fetchSessionSummary(
   const cacheKey = summaryCacheKey(sessionId, character);
   const cached = summaryCache.get(cacheKey);
   if (cached) return cached;
-  try {
-    // Fallback BDD : ne renvoie une ligne que pour un utilisateur admin
-    // (RLS admin-only) — utile au banc d'essai, silencieusement vide en live.
-    const { data, error } = await supabase
-      .from("session_summaries")
-      .select("session_id, character_key, summary, last_turn, updated_at")
-      .eq("session_id", sessionId)
-      .eq("character_key", character)
-      .maybeSingle();
-    if (error) {
-      console.warn("[SessionMemory] fetch error", error.message);
+  const missingUntil = summaryMissingCache.get(cacheKey);
+  if (missingUntil && missingUntil > Date.now()) return null;
+  if (missingUntil) summaryMissingCache.delete(cacheKey);
+  const pending = summaryInFlight.get(cacheKey);
+  if (pending) return pending;
+
+  const requestEpoch = summaryCacheEpoch;
+  const request = (async () => {
+    try {
+      // Fallback BDD : ne renvoie une ligne que pour un utilisateur admin
+      // (RLS admin-only) — utile au banc d'essai, silencieusement vide en live.
+      const { data, error } = await supabase
+        .from("session_summaries")
+        .select("session_id, character_key, summary, last_turn, updated_at")
+        .eq("session_id", sessionId)
+        .eq("character_key", character)
+        .maybeSingle();
+      if (error) {
+        console.warn("[SessionMemory] fetch error", error.message);
+        return null;
+      }
+      const record = (data as SessionSummaryRecord | null) ?? null;
+      if (record && requestEpoch === summaryCacheEpoch) {
+        const current = summaryCache.get(cacheKey);
+        if (current && current.last_turn > record.last_turn) return current;
+        summaryCache.set(cacheKey, record);
+        summaryMissingCache.delete(cacheKey);
+      } else if (!record && requestEpoch === summaryCacheEpoch) {
+        // A confirmed absence is safe to coalesce briefly. Errors are never
+        // cached as absence, so a transient RLS/network failure can recover.
+        summaryMissingCache.set(cacheKey, Date.now() + SUMMARY_MISSING_TTL_MS);
+      }
+      return record;
+    } catch (err) {
+      console.warn("[SessionMemory] fetch exception", err);
       return null;
+    } finally {
+      if (summaryInFlight.get(cacheKey) === request) summaryInFlight.delete(cacheKey);
     }
-    const record = (data as SessionSummaryRecord | null) ?? null;
-    if (record) summaryCache.set(cacheKey, record);
-    return record;
-  } catch (err) {
-    console.warn("[SessionMemory] fetch exception", err);
-    return null;
-  }
+  })();
+  summaryInFlight.set(cacheKey, request);
+  return request;
 }
 
 /** Fire-and-forget call to summarize-session. Does NOT throw. */
@@ -73,6 +102,7 @@ export async function summarizeSessionAsync(
 ): Promise<void> {
   if (!sessionId || !conversation.length) return;
   const characterKey = typeof character === "string" ? character : character.characterKey;
+  const requestEpoch = summaryCacheEpoch;
   const startTime = Date.now();
   const debugId = debugLogger.logFetch("other", `summarize-session (turn=${turnCount})`, `${SUPABASE_URL}/functions/v1/summarize-session`, { session_id: sessionId, turn_count: turnCount });
   try {
@@ -97,13 +127,22 @@ export async function summarizeSessionAsync(
     const data = await r.json();
     const summary = typeof data?.summary === "string" ? data.summary.trim() : "";
     if (summary) {
-      summaryCache.set(summaryCacheKey(sessionId, characterKey), {
+      const cacheKey = summaryCacheKey(sessionId, characterKey);
+      const next: SessionSummaryRecord = {
         session_id: sessionId,
         character_key: characterKey,
         summary,
         last_turn: Number.isFinite(Number(data?.last_turn)) ? Number(data.last_turn) : turnCount,
         updated_at: new Date().toISOString(),
-      });
+      };
+      if (requestEpoch !== summaryCacheEpoch) return;
+      const current = summaryCache.get(cacheKey);
+      // Older fire-and-forget responses must not regress the summary used by
+      // the next turn. Equal turns are last-write-wins by completion order.
+      if (!current || next.last_turn >= current.last_turn) {
+        summaryCache.set(cacheKey, next);
+        summaryMissingCache.delete(cacheKey);
+      }
     }
     debugLogger.logResponse(debugId, "other", `summary updated (${summary.length} chars)`, 200, startTime);
   } catch (err) {

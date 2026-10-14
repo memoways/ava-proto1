@@ -50,6 +50,9 @@ export function projectVoiceEvents(rows: VoiceEventRow[]) {
     if (!previous || previous.status === "started") attempts.set(key, event.turn);
   }
   const turns = [...attempts.values()];
+  const gmEvents = events.filter((event) => event.event_name === "voice_turn_gm");
+  const gmSpanStatus = (event: typeof gmEvents[number], spanName: string): "ok" | "failed" | "not_measured" =>
+    event.turn.server.flatMap((server) => server.spans).find((span) => span.name === spanName)?.status ?? "not_measured";
   return {
     events, invalidRows: rows.length - events.length,
     summary: {
@@ -64,7 +67,9 @@ export function projectVoiceEvents(rows: VoiceEventRow[]) {
       voiceEndToOutputEstimatedMs: latencyStats(turns.map((turn) => turn.durations.t_turn_voice_ready_ms)),
       generationTotalMs: latencyStats(turns.map((turn) => turn.durations.generation_total_ms)),
       playbackMs: latencyStats(turns.map((turn) => turn.durations.playback_ms)),
-      gmObservations: events.filter((event) => event.event_name === "voice_turn_gm").length,
+      gmObservations: gmEvents.length,
+      gmGenerationStatuses: tally(gmEvents, (event) => gmSpanStatus(event, "gm_generation")),
+      gmAvailabilityStatuses: tally(gmEvents, (event) => gmSpanStatus(event, "gm_available")),
     },
   };
 }
@@ -79,6 +84,7 @@ export const voiceTurnPageSchema = z.object({
     attempts: z.number().int().nonnegative(), statuses: countsSchema, coverage: countsSchema,
     originToResponseMs: latencyStatsSchema, originToOutputEstimatedMs: latencyStatsSchema, voiceEndToOutputEstimatedMs: latencyStatsSchema,
     generationTotalMs: latencyStatsSchema, playbackMs: latencyStatsSchema, gmObservations: z.number().int().nonnegative(),
+    gmGenerationStatuses: countsSchema, gmAvailabilityStatuses: countsSchema,
   }),
   page: z.object({ offset: z.number().int().nonnegative(), limit: z.number().int().nonnegative(), nextOffset: z.number().int().nullable(), cappedAt: z.literal(3000), capped: z.boolean() }),
   window: z.object({ from: z.string(), to: z.string() }), summaryScope: z.literal("returned_page_not_full_cohort"),

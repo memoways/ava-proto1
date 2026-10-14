@@ -221,7 +221,7 @@ async function installNetworkFakes(
             if (command.type === 'setup') testWindow.__e2eGradiumSetups = (testWindow.__e2eGradiumSetups ?? 0) + 1;
             if (command.type === 'text') {
               if (this.gradiumIndex === gradiumDropAt && command.text === 'Bonjour.') {
-                setTimeout(() => this.onmessage?.(new MessageEvent('message',{data:JSON.stringify({type:'text',text:'Bonjour.',start_s:0,stop_s:0.1})})),10);
+                setTimeout(() => this.onmessage?.(new MessageEvent('message',{data:JSON.stringify({type:'text',text:'Bonjour.',start_s:0,stop_s:0.01})})),10);
               }
               testWindow.__e2eGradiumTexts = [...(testWindow.__e2eGradiumTexts ?? []), command.text ?? ''];
               setTimeout(() => this.onmessage?.(new MessageEvent('message', { data: JSON.stringify({ type: 'audio', audio: btoa('\0'.repeat(p2 ? 230400 : 38400)) }) })), 5);
@@ -582,6 +582,7 @@ async function installNetworkFakes(
           trigger_video_id: triggerVideo ? "44444444-4444-4444-8444-444444444444" : null,
           player_switch_request: options.gmStance
             ? { targetCharacter: options.gmTarget ?? "max", stance: options.gmStance } : null,
+          memory_delta: null,
           action: gmPostTurnCount === options.gmHandoffAt
             ? { type: "handoff", targetCharacter: options.gmTarget ?? "max", reason: "Le GM recommande ce transfert.", proposalGuidance: "Propose le transfert si tu es d'accord." }
             : triggerVideo

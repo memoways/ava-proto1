@@ -35,6 +35,8 @@ export interface TTSGenerateContext {
   onServiceObserved?: (value: import("../voiceTurnTelemetryV2").ServiceObservation) => void;
   /** Cancels provider generation when the owning conversation turn becomes stale. */
   signal?: AbortSignal;
+  /** Lab-only Gradium buffer preset; omitted means the current live default. */
+  bufferPreset?: import("./gradiumStreamPlayer").GradiumBufferPreset;
 }
 
 export interface TTSGenerateResult {
@@ -59,6 +61,12 @@ export interface TTSStreamGenerationStats {
   firstByteMs?: number;
   /** Time until all audio was generated/received (ms since handle creation). */
   totalMs?: number;
+  bufferPreset?: import("./gradiumStreamPlayer").GradiumBufferPreset | null;
+  prebufferMs?: number | null;
+  rebufferMs?: number | null;
+  rebufferCount?: number | null;
+  underrunCount?: number | null;
+  maxGapMs?: number | null;
 }
 
 /**
