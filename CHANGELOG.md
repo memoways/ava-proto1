@@ -4,7 +4,7 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
-## [Non publié] — 2026-10-14 — Tavus et transcription utilisateur
+## [Publié via Lovable] — 2026-10-14 — Tavus et transcription utilisateur
 
 - Transcript utilisateur en direct et après envoi, y compris en voix seule ;
   aucune réplique personnage sous-titrée dans PRD4.
@@ -18,6 +18,12 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   `from_finalize`, la finalisation reste immédiate. Acquittement tracé en V2.
 - Diagnostics techniques Tavus réseau, pistes, refus de lecture et CPU Daily,
   sans dialogue ou secret. [Plan](docs/plan_tavus_audio_transcription.md).
+- PR #43 fusionnée dans `95d061d`, CI de branche et de main vertes :
+  582 tests unitaires, 34 intégration, 48 régression et 45 E2E.
+  Publication effectuée par Ulrich dans Lovable. Recette sur le domaine publié,
+  environnement sandbox-ulrich, dans l'expérience réelle avec Max sur Brave :
+  transcription observée en direct et conservée pendant la réponse ; Ulrich
+  confirme le fonctionnement après deux échanges, puis clôture l'appel.
 
 ## [Publié via Lovable] — 2026-10-14
 
