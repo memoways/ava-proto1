@@ -290,10 +290,10 @@ async function installNetworkFakes(
         createGain() { return { connect() {}, disconnect() {}, gain: { value: 1, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {}, cancelScheduledValues() {} } }; }
         createOscillator() { return { frequency: { value: 0, setValueAtTime() {} }, type: "sine", connect(target: unknown) { return target; }, disconnect() {}, start() {}, stop() {} }; }
         createBufferSource() {
-          const context = this;
+          const currentTime = () => this.currentTime;
           let timer: ReturnType<typeof setTimeout> | undefined;
           return { buffer: null as null | { duration: number }, onended: null as null | (() => void), connect() {}, disconnect() {},
-            start(at = 0) { timer = setTimeout(() => this.onended?.(), Math.max(0, at - context.currentTime + (this.buffer?.duration ?? 0)) * 1000); },
+            start(at = 0) { timer = setTimeout(() => this.onended?.(), Math.max(0, at - currentTime() + (this.buffer?.duration ?? 0)) * 1000); },
             stop() { clearTimeout(timer); },
           };
         }
