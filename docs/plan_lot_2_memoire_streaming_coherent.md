@@ -1,8 +1,10 @@
 # Reprise — lot 2 / P1 : mémoire de livraison et streaming cohérent
 
-Date : 13 octobre 2026. Statut : **P1 fusionné sur main (#33, #34 et #35), migration
-et fonctions Lovable Cloud livrées ; preview technique vérifiée, recette humaine et
-publication frontend encore à effectuer**. Base d'exécution : main `0a60a64`.
+Date : 14 octobre 2026. Statut : **P1 fusionné sur main (#33 à #37), migration
+et fonctions Lovable Cloud livrées, revues et CI finales vertes ; preview technique,
+réponse Max complète et interruption/reprise humaines vérifiées. Contrôle Emma,
+publication frontend et vérification publiée restent à effectuer**.
+Base d'exécution : main `0a60a64`.
 Dernier frontend publié : `f251eb3` / PR #32. Le commit de ce document ou un
 descendant devient le point de reprise documentaire.
 
@@ -428,3 +430,49 @@ sa correction automatique ne respecte pas cette contrainte. Synchronisation
 GitHub native et outils de lecture/publication suffisent ; le frontend est
 identique au build P1 déjà validé. La recette P1 peut vérifier ce frontend
 pendant la CI de restauration ; publication attend la restauration finale.
+
+### Restauration vérifiée et recette du format compact
+
+PR #37 : HEAD `1d1b09a29c7a11fd5bd7272fa3ed293a14c561fa`, deux revues
+indépendantes sans constat, CI `38465567592` verte : 46 régressions,
+546 unitaires, 34 intégrations et 36 E2E sans retry. Squash
+`fe9c954fa70d613bdd1519a58b7e76fe4f09f49c`, main propre et synchronisé.
+La CI post-merge `38467051553` est encore en cours à ce relevé. Native
+Lovable confirme ce même SHA et agentFinished=true ; lecture des quatre
+fichiers restaurés : égalité exacte avec bf46fa1. Le reste du code est
+également identique à bf46fa1. Aucun autre déploiement de fonction demandé.
+
+Nouvelle session Max `3f2ded7a-fc05-4ae6-a66a-575f99402f8c`, depuis la
+destination observée du lien admin « Tester moi-même » dans Brave,
+sandbox-ulrich, film vu, V4 et sortie incrémentale confirmés. Le 13 octobre
+2026 à 20:58 UTC, Ulrich confirme une réponse complète et naturelle à la
+demande qui avait provoqué les deux coupures. Une génération personnage
+`gen-1791925122-Pzb9dllaP4BBAgDBAsKt`, completed, 100 tokens observés ;
+intention97 caractères, parole générée/livrée260 caractères, aucun texte
+incertain/privé restant, 814080 échantillons programmés et joués. GM post-tour
+distinct exécuté après livraison. Cette réussite est un tour réel, pas une
+garantie statistique : interruption et Emma restent à vérifier avant publication.
+
+Ulrich confirme ensuite l'arrêt de Max puis une réponse cohérente à sa nouvelle
+demande, sans replay. Reçu du tour2 : interrupted, généré211, livré36,
+incertain175 caractères, programmé549120/joué283183 samples. Une tentative
+intermédiaire interrompue ne génère/livre aucun texte ou audio. Tour4 terminé :
+généré/livré187 caractères, 449280 samples programmés et joués. Intention privée
+130 puis101 caractères ; générations personnage terminées95 puis82 tokens.
+Une entrée « Stream failed » correspond à la tentative interrompue sans audio ;
+un GM post-tour échoue sur son timeout existant12000ms après la reprise.
+Ces observations ne prouvent pas un taux d'échec inférieur à la baseline ;
+aucun délai/modèle/seuil changé. Appel fermé par Terminer, écran de fin observé.
+
+Reprise le 14 octobre 2026 : CI post-merge `38467051553` confirmée success
+sur fe9c954. Contrôle humain Emma et publication/vérification publiée restent
+à effectuer ; la recette P0 n'est pas relancée.
+
+Clôture Max confirmée dans Cloud à `2026-10-13 21:05:10.948+00`.
+Le 14 octobre à 07:20 heure de Zurich, la connexion Brave (profil Personne1,
+extension cca71dc6) est visible et liste les onglets AVA, mais l'ouverture
+d'un nouvel onglet expire via createBrowserTab puis tabs.new. Aucun nouvel
+appel Emma préparé, aucun micro ouvert ; ne pas considérer la recette Emma
+exécutée. Reconnexion du contrôle Brave nécessaire, sans changement de Shields
+ni contournement par un autre navigateur. Projet Lovable relu : workspace
+Memoways, SHA fe9c954 et agentFinished=true ; aucune publication P1 demandée.
