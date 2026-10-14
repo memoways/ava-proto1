@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mock = vi.hoisted(() => ({ clock: { currentTime: 0, outputLatency: 0.1, state: 'running' }, sources: [] as { start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn>; onended: (()=>void)|null }[] }));
 vi.mock('@/services/audioPlayback', () => ({getSharedAudioContext: () => ({ ...mock.clock,
-  createGain: () => ({connect:vi.fn(),disconnect:vi.fn()}),
+  createGain: () => ({connect:vi.fn(),disconnect:vi.fn(),gain:{value:1,cancelScheduledValues:vi.fn(),setValueAtTime:vi.fn(),linearRampToValueAtTime:vi.fn()}}),
   createBuffer: (_:number,n:number,rate:number) => ({getChannelData:()=>new Float32Array(n),duration:n/rate}),
   createBufferSource: () => { const s={start:vi.fn(),stop:vi.fn(),connect:vi.fn(),disconnect:vi.fn(),onended:null}; mock.sources.push(s); return s; },
 })}));
@@ -50,6 +50,24 @@ describe('Gradium incremental turn',()=>{
   it('rejects overflow and a socket closed in mid-generation without replay',async()=>{
     const session=createGradiumTurnSession(opts),ws=await socket();session.appendText('Bonjour.');session.open();ws.message(audio(31));await expect(session.finished).rejects.toThrow('buffer');expect(mock.sources).toHaveLength(0);
     Socket.all=[];const second=createGradiumTurnSession(opts),ws2=await socket();second.appendText('Bonjour.');second.open();ws2.message(audio(0.4));ws2.onclose?.({code:1000,reason:''});await expect(second.finished).rejects.toThrow('during turn');
+  });
+  it('retains the render cursor and resumes only the unrendered suffix in the same TTS context', async () => {
+    const session=createGradiumTurnSession(opts), ws=await socket();
+    session.appendText('Bonjour.');session.open();ws.message(audio(0.4));await session.started;
+    mock.clock.currentTime=0.2;expect(session.attenuate()).toBe(true);expect(session.progress().playedSamples).toBeGreaterThan(0);
+    expect(session.pause()).toBe(true);const rendered=Math.floor((0.2-0.03)*24000);
+    mock.clock.currentTime=0.5;expect(session.progress().playedSamples).toBe(rendered);
+    ws.message(audio(0.4));session.finish();ws.message({type:'end_of_stream'});
+    let finished=false;void session.finished.then(()=>{finished=true;});await Promise.resolve();expect(finished).toBe(false);expect(mock.sources).toHaveLength(1);
+    expect(session.resume()).toBe(true);expect(mock.sources).toHaveLength(3);expect(session.progress().scheduledSamples).toBe(19200);
+    expect(ws.sent.filter(x=>x.type==='setup')).toHaveLength(1);expect(ws.sent.filter(x=>x.type==='end_of_stream')).toHaveLength(1);expect(authenticatedFunctionFetch).toHaveBeenCalledOnce();
+    mock.clock.currentTime=2;mock.sources[1].onended?.();mock.sources[2].onended?.();await session.finished;expect(session.progress().playedSamples).toBe(19200);
+  });
+  it('counts attenuated audio and rejects resume/late scheduling after cancellation', async () => {
+    const session=createGradiumTurnSession(opts),ws=await socket();session.appendText('Oui.');session.open();ws.message(audio(0.4));
+    session.attenuate();mock.clock.currentTime=0.3;const played=session.progress().playedSamples;expect(played).toBeGreaterThan(0);
+    session.pause();session.cancel('player-barge-in');expect(session.resume()).toBe(false);expect(session.progress().playedSamples).toBe(played);
+    ws.message(audio(0.4));expect(mock.sources).toHaveLength(1);
   });
   it('keeps whole-segment compatibility and rejects append after finish',async()=>{
     const session=createGradiumStreamSession('Oui.',opts),ws=await socket();expect(ws.sent.map(x=>x.type)).toEqual(['setup','text','end_of_stream']);expect(()=>session.appendText('Non.')).toThrow('after finish');session.cancel();

@@ -1,5 +1,6 @@
 import { createEmptyConversationMemory } from "./conversationMemoryV1";
 import { getGameplaySettings } from "./settingsService";
+import { normalizeHandsFreeSettings } from "./handsFreeVoice";
 /**
  * PRD4 — helpers de persistance session (createSession + updates spécifiques).
  * Réutilise la table `sessions` existante.
@@ -34,6 +35,7 @@ export async function createPRD4Session(
     player_role: (userRole as unknown as Json) ?? null,
     modalite_voix: "push_to_talk",
     conversation_memory: JSON.parse(JSON.stringify({ ...createEmptyConversationMemory(),
+      voicePreset: { handsFree: normalizeHandsFreeSettings(getGameplaySettings().VOICE_HANDS_FREE), voiceOnly: getGameplaySettings().VOICE_ONLY_UI === true },
       incrementalOutputEnabled: getGameplaySettings().VOICE_INCREMENTAL_OUTPUT === true })) as Json,
     ...extra,
     environment_id: runtime.environmentId,

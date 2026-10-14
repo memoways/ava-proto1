@@ -73,6 +73,10 @@ export interface GradiumStreamSession {
   finished: Promise<{ playbackTotalMs: number }>;
   generationDone: Promise<GradiumStreamStats>;
   cancel(reason?: unknown): void;
+  attenuate(): boolean;
+  pause(): boolean;
+  resume(): boolean;
+  estimatedStopAt(): number | null;
   /** True once at least one chunk has been scheduled for playback (audible). */
   readonly hasAudibleOutput: boolean;
 }
@@ -156,7 +160,7 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
   let submittedChars = 0;
   let scheduledSamples = 0;
   let frozenProgress: GradiumAudioProgress | null = null;
-  const scheduled: { start: number; length: number; offset: number }[] = [];
+  const scheduled: { start: number; length: number; offset: number; samples: Float32Array | null; source: AudioBufferSourceNode }[] = [];
   const timestamps: { text: string; stop: number }[] = [];
   const progress = (): GradiumAudioProgress => {
     if (frozenProgress) return frozenProgress;
@@ -182,10 +186,12 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
   let totalBytes = 0;
   let audibleOutput = false;
   let firstFrameLogged = false;
-  const pendingChunks: Float32Array[] = [];
+  const pendingChunks: { samples: Float32Array; offset?: number }[] = [];
   const liveSources = new Set<AudioBufferSourceNode>();
   const carry: { byte: number | null } = { byte: null };
   let gain: GainNode | null = null;
+  let volume = 1;
+  let paused = false;
   let playCursor = 0;
   let preAudioTimer: ReturnType<typeof setTimeout> | null = null;
   let stallTimer: ReturnType<typeof setTimeout> | null = null;
@@ -249,7 +255,7 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
   }
 
   const checkFinished = () => {
-    if (cancelled || finished.settled) return;
+    if (cancelled || finished.settled || paused) return;
     if (eosReceived && gateOpen && pendingChunks.length === 0 && liveSources.size === 0 && started.settled) {
       if (progress().playedSamples < scheduledSamples) {
         if (!drainTimer) drainTimer = setTimeout(() => { drainTimer = null; checkFinished(); }, 25);
@@ -264,11 +270,48 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
   };
 
   let hasPlayed = false;
-  const pendingDuration = () => pendingChunks.reduce((sum, c) => sum + c.length, 0) / sampleRate;
+  const pendingDuration = () => pendingChunks.reduce((sum, c) => sum + c.samples.length, 0) / sampleRate;
 
-  const scheduleChunk = (samples: Float32Array, ctx: AudioContext, fadeIn = false) => {
+  const setVolume = (value: number) => {
+    volume = value;
+    const ctx = getSharedAudioContext();
+    if (gain && ctx) {
+      gain.gain.cancelScheduledValues(ctx.currentTime);
+      gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(value, ctx.currentTime + FADE_S);
+    }
+  };
+
+  const pause = (): boolean => {
+    if (cancelled || finished.settled) return false;
+    if (paused) return true;
+    const ctx = getSharedAudioContext();
+    if (!ctx) return false;
+    paused = true;
+    const suffixes: { samples: Float32Array; offset: number }[] = [];
+    for (const chunk of scheduled) {
+      if (!liveSources.has(chunk.source) || !chunk.samples) continue;
+      // The render cursor includes the output tail still travelling to the device.
+      // Keep that tail in the ledger; only samples not yet rendered may resume.
+      const consumed = Math.max(0, Math.min(chunk.length, Math.floor((ctx.currentTime - chunk.start) * sampleRate)));
+      if (consumed < chunk.length) suffixes.push({ samples: chunk.samples.slice(consumed), offset: chunk.offset + consumed });
+      chunk.length = consumed;
+      chunk.samples = null;
+      chunk.source.onended = null;
+      try { chunk.source.stop(); chunk.source.disconnect(); } catch { /* already ended */ }
+    }
+    liveSources.clear();
+    pendingChunks.unshift(...suffixes);
+    playCursor = ctx.currentTime;
+    notifyProgress();
+    return true;
+  };
+
+  const scheduleChunk = (chunk: { samples: Float32Array; offset?: number }, ctx: AudioContext, fadeIn = false) => {
+    const { samples } = chunk;
     if (!gain) {
       gain = ctx.createGain();
+      gain.gain.setValueAtTime(volume, ctx.currentTime);
       gain.connect(ctx.destination);
     }
     const buffer = ctx.createBuffer(1, samples.length, sampleRate);
@@ -283,13 +326,15 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
     source.connect(gain);
     const startAt = Math.max(ctx.currentTime + SCHEDULE_MARGIN_S, playCursor);
     source.start(startAt);
-    scheduled.push({ start: startAt, length: samples.length, offset: scheduledSamples });
-    scheduledSamples += samples.length;
+    const record = { start: startAt, length: samples.length, offset: chunk.offset ?? scheduledSamples, samples: samples as Float32Array | null, source };
+    scheduled.push(record);
+    if (chunk.offset === undefined) scheduledSamples += samples.length;
     playCursor = startAt + buffer.duration;
     liveSources.add(source);
     source.onended = () => {
       if (cancelled) return;
       liveSources.delete(source);
+      record.samples = null;
       try { source.disconnect(); } catch { /* already disconnected */ }
       notifyProgress();
       checkFinished();
@@ -305,7 +350,7 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
   };
 
   const flushPending = () => {
-    if (!gateOpen || cancelled) return;
+    if (!gateOpen || cancelled || paused) return;
     const ctx = getSharedAudioContext();
     if (!ctx) return;
     if (pendingChunks.length === 0) { checkFinished(); return; }
@@ -375,7 +420,7 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
       const ctx = getSharedAudioContext();
       const ahead = Math.max(0, playCursor - (ctx?.currentTime ?? 0)) + pendingDuration() + samples.length / sampleRate;
       if (ahead > 30) { fail(new Error("Gradium audio buffer exceeded 30 seconds")); return; }
-      pendingChunks.push(samples);
+      pendingChunks.push({ samples });
       flushPending();
     } else if (msg.type === "text" && typeof msg.text === "string" && typeof msg.stop_s === "number"
       && Number.isFinite(msg.stop_s) && msg.stop_s >= 0) {
@@ -504,6 +549,20 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
     finished: finished.promise,
     generationDone: generationDone.promise,
     cancel,
+    attenuate() {
+      if (cancelled || finished.settled) return false;
+      setVolume(0.18); return true;
+    },
+    pause,
+    resume() {
+      if (cancelled || finished.settled) return false;
+      paused = false; setVolume(1); flushPending(); return true;
+    },
+    estimatedStopAt() {
+      const ctx = getSharedAudioContext();
+      return ctx && audibleOutput && Number.isFinite(ctx.outputLatency)
+        ? performance.now() + ctx.outputLatency * 1000 : null;
+    },
     get hasAudibleOutput() { return audibleOutput; },
   };
 }

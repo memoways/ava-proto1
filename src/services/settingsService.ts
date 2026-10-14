@@ -503,6 +503,7 @@ export interface GameplaySettings {
   VOICE_HANDS_FREE: HandsFreeVoiceSettings;
   /** P1 canary, disabled for existing environments. */
   VOICE_INCREMENTAL_OUTPUT: boolean;
+  VOICE_ONLY_UI: boolean;
 }
 
 const GAMEPLAY_STORAGE_KEY = "ava_gameplay_settings";
@@ -534,6 +535,7 @@ const gameplayDefaults: GameplaySettings = {
   VIDEO_PLACEHOLDER_DURATION: defaultSettings.VIDEO_PLACEHOLDER_DURATION,
   VOICE_HANDS_FREE: { ...HANDS_FREE_DEFAULTS },
   VOICE_INCREMENTAL_OUTPUT: false,
+  VOICE_ONLY_UI: false,
 };
 
 export function getGameplaySettings(): GameplaySettings {
@@ -547,6 +549,7 @@ export function getGameplaySettings(): GameplaySettings {
         MAX_PROMPT_VARIANT: normalizeMaxPromptVariant(parsed.MAX_PROMPT_VARIANT, gameplayDefaults.MAX_PROMPT_VARIANT),
         VOICE_HANDS_FREE: normalizeHandsFreeSettings(parsed.VOICE_HANDS_FREE),
         VOICE_INCREMENTAL_OUTPUT: parsed.VOICE_INCREMENTAL_OUTPUT === true,
+        VOICE_ONLY_UI: parsed.VOICE_ONLY_UI === true,
       };
     }
   } catch { /* ignore */ }
@@ -560,6 +563,7 @@ export async function loadGameplaySettingsFromDB(): Promise<GameplaySettings> {
     MAX_PROMPT_VARIANT: normalizeMaxPromptVariant(loaded.MAX_PROMPT_VARIANT, "legacy"),
     VOICE_HANDS_FREE: normalizeHandsFreeSettings(loaded.VOICE_HANDS_FREE),
     VOICE_INCREMENTAL_OUTPUT: loaded.VOICE_INCREMENTAL_OUTPUT === true,
+    VOICE_ONLY_UI: loaded.VOICE_ONLY_UI === true,
   };
 }
 

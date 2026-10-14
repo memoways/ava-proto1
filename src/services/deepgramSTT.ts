@@ -151,6 +151,10 @@ export class DeepgramSTT {
   private selectedMimeType = "";
   private lastFinalTelemetry: STTFinalTelemetry | null = null;
   private manualMode = false;
+  private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
+  private capturePaused = false;
+  private flushAudio: Blob[] = [];
+  private generation = 0;
   private config: DeepgramConfig | null = null;
   private initialStream?: MediaStream | Promise<MediaStream>;
 
@@ -189,15 +193,24 @@ export class DeepgramSTT {
   pause() {
     this._paused = true;
     if (this.silenceTimer) clearTimeout(this.silenceTimer);
+    if (this.mediaRecorder?.state === "recording") this.mediaRecorder.pause();
+    this.fullTranscript = ""; this.latestInterimTranscript = "";
+    this.flushAudio = [];
   }
 
   /** Resume listening after pause */
   resume() {
+    if (!this._paused && !this.capturePaused && this.mediaRecorder?.state !== "paused") return;
     this._paused = false;
+    this.capturePaused = false;
     this.fullTranscript = "";
     this.latestInterimTranscript = "";
     if (this.mediaRecorder?.state === "paused") {
       try { this.mediaRecorder.resume(); } catch { /* noop */ }
+    }
+    for (const blob of this.flushAudio.splice(0)) {
+      if (this.ws?.readyState !== WebSocket.OPEN) break;
+      this.ws.send(blob); observeVoice(this.onVoiceObservation, "last_audio_sent");
     }
   }
 
@@ -211,9 +224,11 @@ export class DeepgramSTT {
   }
 
   private async finalizeCurrentTurn(): Promise<void> {
+    const generation = this.generation;
     if (this.silenceTimer) clearTimeout(this.silenceTimer);
     await requestLatestRecorderData(this.mediaRecorder);
-    try { this.mediaRecorder?.pause(); } catch { /* unsupported; finalization still bounded */ }
+    if (generation !== this.generation) return;
+    this.capturePaused = true;
 
     const finalizeSentAt = performance.now();
     if (this.ws?.readyState === WebSocket.OPEN) {
@@ -227,6 +242,7 @@ export class DeepgramSTT {
       const elapsed = performance.now() - finalizeSentAt;
       return elapsed >= 450 && this.lastResultAt > 0 && performance.now() - this.lastResultAt >= 250;
     }, 1500);
+    if (generation !== this.generation) return;
 
     const finalText = combineTranscriptParts(this.fullTranscript, this.latestInterimTranscript);
     this.fullTranscript = "";
@@ -238,6 +254,7 @@ export class DeepgramSTT {
   }
 
   async start() {
+    const generation = this.generation;
     // Get microphone first: browsers are stricter when media permission is
     // requested after an awaited network call instead of directly from a user gesture.
     // High-quality mono capture with browser DSP for better STT accuracy.
@@ -258,16 +275,18 @@ export class DeepgramSTT {
       streamPromise,
       10000,
     );
+    if (generation !== this.generation) { this.stream.getTracks().forEach(track => track.stop()); this.stream = null; throw new DOMException("Capture replaced", "AbortError"); }
 
     let config: DeepgramConfig;
     try {
       config = await getDeepgramToken();
       this.config = config;
     } catch (err) {
-      this.stream.getTracks().forEach((track) => track.stop());
+      this.stream?.getTracks().forEach((track) => track.stop());
       this.stream = null;
       throw err;
     }
+    if (generation !== this.generation) throw new DOMException("Capture replaced", "AbortError");
 
     // Connect to Deepgram WebSocket with project keyterm dictionary + admin overrides.
     const keyterms = getDictionaryTerms();
@@ -290,6 +309,7 @@ export class DeepgramSTT {
 
 
     this.ws = new WebSocket(wsUrl, getDeepgramWebSocketProtocols(config.key));
+    const socket = this.ws;
     const openTimeout = setTimeout(() => {
       if (this.ws?.readyState !== WebSocket.OPEN) {
         const error = new Error("Deepgram WebSocket open timeout");
@@ -300,6 +320,12 @@ export class DeepgramSTT {
     }, 8000);
 
     this.ws.onopen = () => {
+      if (this.ws !== socket || this.generation !== generation) return;
+      this.keepAliveTimer = setInterval(() => {
+        if ((this._paused || this.mediaRecorder?.state === "paused") && this.ws?.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify({ type: "KeepAlive" }));
+        }
+      }, 3000);
       clearTimeout(openTimeout);
       console.log('[Deepgram] WebSocket connected');
       debugLogger.log({ service: "stt", level: "success", direction: "in", label: "Deepgram WebSocket connected" });
@@ -321,10 +347,12 @@ export class DeepgramSTT {
     };
 
     this.ws.onmessage = (event) => {
+      if (this.ws !== socket || this.generation !== generation) return;
       if (this._paused) return; // Ignore transcripts while paused
 
       const data = JSON.parse(event.data);
       if (data.type === 'Results') {
+        if (data.from_finalize && !this.flushPromise) return;
         if (data.from_finalize) this.finalizeAcknowledgedAt = performance.now();
         const transcript = data.channel?.alternatives?.[0]?.transcript || '';
         if (transcript) {
@@ -355,8 +383,11 @@ export class DeepgramSTT {
     };
 
     this.ws.onclose = () => {
+      if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
+      this.keepAliveTimer = null;
       clearTimeout(openTimeout);
       console.log('[Deepgram] WebSocket closed');
+      if (this.stream) this.onError?.(new Error("Deepgram STT disconnected"), getBrowserDiagnostics(this.selectedMimeType));
     };
   }
 
@@ -430,6 +461,11 @@ export class DeepgramSTT {
     this.mediaRecorder = new MediaRecorder(this.stream, options);
 
     this.mediaRecorder.ondataavailable = (event) => {
+      if (this._paused) return;
+      if (this.capturePaused) {
+        if (this.flushAudio.length >= 20) { this.onError?.(new Error("Deepgram pending capture exceeded 3 seconds")); return; }
+        this.flushAudio.push(event.data); return;
+      }
       if (event.data.size > 0 && this.ws?.readyState === WebSocket.OPEN) {
         this.ws.send(event.data);
         observeVoice(this.onVoiceObservation, "last_audio_sent");
@@ -443,10 +479,15 @@ export class DeepgramSTT {
   }
 
   stop() {
+    this.generation++; this.flushAudio = []; this.capturePaused = false;
+    if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
+    this.keepAliveTimer = null;
+    if (this.mediaRecorder) this.mediaRecorder.ondataavailable = null;
     if (this.silenceTimer) clearTimeout(this.silenceTimer);
     if (this.mediaRecorder?.state !== 'inactive') {
       this.mediaRecorder?.stop();
     }
+    if (this.ws) this.ws.onclose = null;
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.close();
     }

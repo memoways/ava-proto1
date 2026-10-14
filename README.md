@@ -12,6 +12,19 @@
 
 Les développements réalisés depuis un autre environnement doivent rester compatibles avec Lovable et être ramenés dans le projet Lovable avant toute validation ou publication. Les instructions obligatoires destinées à tous les agents et outils du dépôt sont dans [`AGENTS.md`](AGENTS.md).
 
+### Accès aux données Lovable Cloud depuis un assistant
+
+Utiliser le connecteur **MCP app Ava**, serveur `ava-prototype-1`, endpoint
+`https://iralfqlslqndgvexixis.supabase.co/functions/v1/mcp`, avec OAuth admin.
+Il expose `list_sessions`, `get_usage_overview`, `get_llm_costs` et
+`get_voice_latencies` en lecture seule, sans dialogue ni secret. Le connecteur
+Supabase générique n'est pas le point d'accès aux données de ce Cloud Lovable ;
+son refus ne justifie pas de demander une reconnexion pour Ava.
+Contrat et limites : [plan MCP](docs/plan_mcp_statistiques.md) ; diagnostics
+V2 et preuves réelles : [bilan P0](docs/plan_lot_1_observabilite_latence.md).
+Les lectures des sessions et latences dans `sandbox-ulrich` ont été vérifiées
+via le connecteur natif le 14 octobre 2026.
+
 La mise en public est bloquée par la [release gate](docs/public_release_gate.md). Un aperçu interne peut être utilisé pour le développement, mais aucun lien ne doit être diffusé à des testeurs externes avant validation des critères de sécurité, persistance et endurance.
 
 > **Mise à jour récente (2026-09-11) — relations crédibles, GM et mesures AVA** : chaque personnage suit une politique relationnelle versionnée avec trois paliers cachés, résistance et initiative propres à son caractère. Le GM post-tour propose les évolutions sans ralentir la réponse ; un moteur déterministe contrôle puis mémorise l'état séparément pour chaque personnage. Les mesures internes AVA sont la source principale du diagnostic de réactivité, rapprochées de PostHog par session et par tour. Plan et état de validation : [`docs/plan_orchestration_experience_et_reglages_gm.md`](docs/plan_orchestration_experience_et_reglages_gm.md).

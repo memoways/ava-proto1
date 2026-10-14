@@ -79,6 +79,7 @@ export default function GameMasterConfigTab() {
         SHOW_QUESTIONNAIRE: gameplay.SHOW_QUESTIONNAIRE,
         VOICE_HANDS_FREE: gameplay.VOICE_HANDS_FREE,
         VOICE_INCREMENTAL_OUTPUT: gameplay.VOICE_INCREMENTAL_OUTPUT,
+        VOICE_ONLY_UI: gameplay.VOICE_ONLY_UI,
       });
       await saveGameplaySettingsToDB(updated);
       setGameplay(updated);
@@ -107,6 +108,7 @@ export default function GameMasterConfigTab() {
   const globalChanged = gameplay.TIMEOUT_SECONDS !== savedGameplay.TIMEOUT_SECONDS
     || gameplay.SHOW_QUESTIONNAIRE !== savedGameplay.SHOW_QUESTIONNAIRE
     || gameplay.VOICE_INCREMENTAL_OUTPUT !== savedGameplay.VOICE_INCREMENTAL_OUTPUT
+    || gameplay.VOICE_ONLY_UI !== savedGameplay.VOICE_ONLY_UI
     || JSON.stringify(gameplay.VOICE_HANDS_FREE) !== JSON.stringify(savedGameplay.VOICE_HANDS_FREE);
   const voice = gameplay.VOICE_HANDS_FREE;
   const setVoice = (patch: Partial<HandsFreeVoiceSettings>) =>
@@ -208,6 +210,18 @@ export default function GameMasterConfigTab() {
         </div>
 
         <div className={voice.enabled ? "space-y-4" : "pointer-events-none space-y-4 opacity-50"}>
+          <div className="flex items-center justify-between gap-4 rounded-md bg-muted/40 p-3">
+            <div><p className="text-sm font-medium">Conversation voix seule</p><p className="text-xs text-muted-foreground">Masquer les sous-titres dans l'appel ; contrôles et statuts accessibles conservés.</p></div>
+            <Switch checked={gameplay.VOICE_ONLY_UI} onCheckedChange={checked => setGameplay(current => ({ ...current, VOICE_ONLY_UI: checked }))} aria-label="Conversation voix seule" />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="interruption-strategy" className="text-sm">Détection d'interruption</label>
+            <select id="interruption-strategy" className="block rounded-md border bg-background p-2 text-sm" value={voice.interruptionStrategy ?? "text"}
+              onChange={event => setVoice({ interruptionStrategy: event.target.value === "acoustic_confirmed" ? "acoustic_confirmed" : "text" })}>
+              <option value="text">Paroles reconnues</option><option value="acoustic_confirmed">Voix candidate puis parole confirmée</option>
+            </select>
+            <p className="text-xs text-muted-foreground">Canary avec sortie progressive Gradium et annulation d'écho effective ; sinon compatibilité par paroles reconnues.</p>
+          </div>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span>Silence avant la réponse</span>

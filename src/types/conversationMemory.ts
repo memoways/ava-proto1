@@ -40,6 +40,7 @@ export interface ConversationMemoryV1 {
   version: 1 | 2 | 3 | 4;
   /** P1 output preset pinned at session creation. Old sessions keep batch. */
   incrementalOutputEnabled?: boolean;
+  voicePreset?: { handsFree: import("@/services/handsFreeVoice").HandsFreeVoiceSettings; voiceOnly: boolean };
   deliveryByCharacter?: import("@/services/responseDelivery").DeliveryByCharacter;
   lastTurn: number;
   interlocutor: {

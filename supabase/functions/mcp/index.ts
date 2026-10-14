@@ -310,9 +310,11 @@ var VOICE_MILESTONES = [
   "audio_cancelled",
   "acoustic_candidate",
   "attenuation",
+  "audio_suspended",
   "interruption_confirmed",
   "interruption_rejected",
-  "audio_resumed"
+  "audio_resumed",
+  "output_stop_estimated"
 ];
 
 // src/lib/mcp/voiceTurnProjection.ts
@@ -353,14 +355,27 @@ var voiceTurnProjectionSchema = z4.object({
   config_version: label,
   status: z4.enum(["started", "completed", "interrupted", "cancelled", "timeout", "failed", "no_audio"]),
   clock: z4.literal("client_monotonic"),
-  milestones: z4.object(Object.fromEntries(VOICE_MILESTONES.map((name) => [name, z4.number().finite().nullable()]))),
+  milestones: z4.object(Object.fromEntries(VOICE_MILESTONES.map((name) => [name, z4.number().finite().nullable().optional().transform((value) => value ?? null)]))),
   services: z4.array(serviceSchema).max(16),
   server: z4.array(spanSchema).max(8),
   durations: z4.object({ origin_to_response_ms: duration, origin_to_output_estimated_ms: duration, t_turn_voice_ready_ms: duration, generation_total_ms: duration, playback_ms: duration }),
   coverage: z4.object({ state: z4.enum(["complete", "partial"]), observed: z4.number().int().nonnegative(), expected: z4.number().int().nonnegative(), missing: z4.array(z4.enum(VOICE_MILESTONES)).max(VOICE_MILESTONES.length) }),
   output_precision: z4.enum(["software_estimate", "unavailable"]),
   critical_wait: z4.literal("coverage_incomplete"),
-  budget_exceeded: z4.array(z4.string().max(80)).max(16)
+  budget_exceeded: z4.array(z4.string().max(80)).max(16),
+  interruptions: z4.array(z4.object({
+    interruption_id: z4.string().max(80),
+    event: z4.enum(["acoustic_candidate", "attenuation", "audio_suspended", "interruption_confirmed", "interruption_rejected", "audio_resumed", "interruption_recovery"]),
+    offset_ms: z4.number().finite()
+  })).max(64).optional(),
+  interruptions_capped: z4.boolean().optional(),
+  capture_dsp: z4.object({
+    echoCancellation: z4.boolean(),
+    noiseSuppression: z4.boolean().nullable(),
+    autoGainControl: z4.boolean().nullable(),
+    trackSampleRate: z4.number().finite().positive().nullable(),
+    contextSampleRate: z4.number().finite().positive()
+  }).optional()
 });
 function projectVoiceEvents(rows) {
   const events = rows.flatMap((row) => {

@@ -16,6 +16,7 @@ const TRANSCRIPTS = [
 
 interface NetworkFakeOptions {
   incrementalOutput?: boolean;
+  p2?: boolean;
   gradiumDropAt?: number;
   failMaxAt?: number;
   gmTarget?: "max" | "emma";
@@ -78,7 +79,7 @@ async function installNetworkFakes(
   let sessionMemory: Record<string, unknown> = {};
   let memoryLastTurn = 0;
 
-  await page.addInitScript(({ transcripts, simulateAudio, batchAudio, handsFree, skipQuestionnaire, delayFirstSTTFinalMs, incrementalOutput, gradiumDropAt }: { transcripts: string[]; simulateAudio: boolean; batchAudio: boolean; handsFree: boolean; skipQuestionnaire: boolean; delayFirstSTTFinalMs: number; incrementalOutput: boolean; gradiumDropAt: number }) => {
+  await page.addInitScript(({ transcripts, simulateAudio, batchAudio, handsFree, skipQuestionnaire, delayFirstSTTFinalMs, incrementalOutput, gradiumDropAt, p2 }: { transcripts: string[]; simulateAudio: boolean; batchAudio: boolean; handsFree: boolean; skipQuestionnaire: boolean; delayFirstSTTFinalMs: number; incrementalOutput: boolean; gradiumDropAt: number; p2: boolean }) => {
     let websocketIndex = 0;
     let gradiumIndex = 0;
     type E2ETestWindow = Window & {
@@ -89,6 +90,9 @@ async function installNetworkFakes(
       __e2eGradiumTexts?: string[];
       __e2eGradiumSetups?: number;
       __e2eGradiumEos?: number;
+      __e2eSpeech?: (voiced: boolean) => void;
+      __e2eRecognize?: (text: string) => void;
+      __e2eLoseMicrophone?: () => void;
     };
     const testWindow = window as E2ETestWindow;
     // These scenarios exercise the PRD4 flow after a successful public gate.
@@ -116,7 +120,8 @@ async function installNetworkFakes(
     });
     localStorage.setItem("ava:prod:ava_gameplay_settings", JSON.stringify({ RAG_SUMMARY_EVERY_N_TURNS: 4,
       ...(incrementalOutput ? { VOICE_INCREMENTAL_OUTPUT: true } : {}),
-      ...(handsFree ? { VOICE_HANDS_FREE: { enabled: true } } : {}),
+      ...(handsFree ? { VOICE_HANDS_FREE: { enabled: true, ...(p2 ? { interruptionStrategy: "acoustic_confirmed" } : {}) } } : {}),
+      ...(p2 ? { VOICE_ONLY_UI: true } : {}),
       ...(skipQuestionnaire ? { SHOW_QUESTIONNAIRE: false } : {}),
     }));
     if (batchAudio) localStorage.setItem("ava:prod:ava_stt_settings", JSON.stringify({ activeProvider: "openai_whisper" }));
@@ -191,6 +196,10 @@ async function installNetworkFakes(
           ? transcripts[websocketIndex++] ?? `Tour simulé ${websocketIndex}`
           : "";
         this.transcript = transcript;
+        if (isDeepgram && p2) testWindow.__e2eRecognize = text => {
+          this.transcript = text;
+          this.onmessage?.(new MessageEvent("message", { data: JSON.stringify({ type: "Results", is_final: false, channel: { alternatives: [{ transcript: text }] } }) }));
+        };
         setTimeout(() => {
           this.onopen?.();
           if (!isDeepgram) return;
@@ -215,7 +224,7 @@ async function installNetworkFakes(
                 setTimeout(() => this.onmessage?.(new MessageEvent('message',{data:JSON.stringify({type:'text',text:'Bonjour.',start_s:0,stop_s:0.1})})),10);
               }
               testWindow.__e2eGradiumTexts = [...(testWindow.__e2eGradiumTexts ?? []), command.text ?? ''];
-              setTimeout(() => this.onmessage?.(new MessageEvent('message', { data: JSON.stringify({ type: 'audio', audio: btoa('\0'.repeat(38400)) }) })), 5);
+              setTimeout(() => this.onmessage?.(new MessageEvent('message', { data: JSON.stringify({ type: 'audio', audio: btoa('\0'.repeat(p2 ? 230400 : 38400)) }) })), 5);
             }
             if (command.type === 'end_of_stream') {
               testWindow.__e2eGradiumEos = (testWindow.__e2eGradiumEos ?? 0) + 1;
@@ -264,9 +273,50 @@ async function installNetworkFakes(
       stop() { this.state = "inactive"; }
     }
 
+    if (p2) {
+      // The application player and detector run unchanged; only the device/clock
+      // are simulated. Linux headless runners have no reliable audio device.
+      class CaptureAudioContext {
+        state = "running"; sampleRate = 48000; outputLatency = 0; baseLatency = 0;
+        destination = {}; audioWorklet = { addModule: async () => {} };
+        private origin = performance.now();
+        get currentTime() { return (performance.now() - this.origin) / 1000; }
+        async resume() { this.state = "running"; }
+        async close() { this.state = "closed"; }
+        createBuffer(_channels: number, length: number, rate: number) {
+          const data = new Float32Array(length);
+          return { duration: length / rate, length, sampleRate: rate, getChannelData: () => data };
+        }
+        createGain() { return { connect() {}, disconnect() {}, gain: { value: 1, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {}, cancelScheduledValues() {} } }; }
+        createOscillator() { return { frequency: { value: 0, setValueAtTime() {} }, type: "sine", connect(target: unknown) { return target; }, disconnect() {}, start() {}, stop() {} }; }
+        createBufferSource() {
+          const currentTime = () => this.currentTime;
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          return { buffer: null as null | { duration: number }, onended: null as null | (() => void), connect() {}, disconnect() {},
+            start(at = 0) { timer = setTimeout(() => this.onended?.(), Math.max(0, at - currentTime() + (this.buffer?.duration ?? 0)) * 1000); },
+            stop() { clearTimeout(timer); },
+          };
+        }
+        createMediaStreamSource(_stream: MediaStream) { return { connect() {}, disconnect() {} } as unknown as MediaStreamAudioSourceNode; }
+      }
+      const ports: { onmessage: ((event: { data: unknown }) => void) | null }[] = [];
+      class CaptureWorklet {
+        port = { onmessage: null as null | ((event: { data: unknown }) => void), close() {}, postMessage() {} };
+        constructor() { ports.push(this.port); }
+        connect() {} disconnect() {}
+      }
+      Object.defineProperty(window, "AudioContext", { configurable: true, value: CaptureAudioContext });
+      Object.defineProperty(window, "AudioWorkletNode", { configurable: true, value: CaptureWorklet });
+      let voiced = false;
+      testWindow.__e2eSpeech = value => { voiced = value; };
+      setInterval(() => {
+        const samples = Float32Array.from({ length: 320 }, (_, i) => voiced ? Math.sin(i * 2 * Math.PI * 200 / 16000) * 0.06 : 0);
+        for (const port of ports) port.onmessage?.({ data: { type: "frame", samples } });
+      }, 20);
+    }
     const fakeStream = {
       getTracks: () => [{ stop() {} }],
-      getAudioTracks: () => [{ stop() {} }],
+      getAudioTracks: () => [{ stop() {}, getSettings: () => ({ echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 48000 }), addEventListener(type: string, callback: () => void) { if (type === "ended") testWindow.__e2eLoseMicrophone = callback; } }],
     };
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
@@ -277,7 +327,7 @@ async function installNetworkFakes(
   }, { transcripts, simulateAudio: options.ttsSuccess === true, batchAudio: options.whisperResponse !== undefined,
     handsFree: options.handsFree === true, skipQuestionnaire: options.skipQuestionnaire === true,
     delayFirstSTTFinalMs: options.delayFirstSTTFinalMs ?? 0,
-    incrementalOutput: options.incrementalOutput === true,
+    incrementalOutput: options.incrementalOutput === true, p2: options.p2 === true,
     gradiumDropAt: options.gradiumDropAt ?? -1,
   });
 
@@ -401,7 +451,8 @@ async function installNetworkFakes(
       if (url.searchParams.get("key") === "eq.ava_gameplay_settings") {
         return json(route, [{ environment_id: "prod", value: { TIMEOUT_SECONDS: 930,
           ...(options.incrementalOutput ? { VOICE_INCREMENTAL_OUTPUT: true } : {}),
-          ...(options.handsFree ? { VOICE_HANDS_FREE: { enabled: true } } : {}),
+          ...(options.handsFree ? { VOICE_HANDS_FREE: { enabled: true, ...(options.p2 ? { interruptionStrategy: "acoustic_confirmed" } : {}) } } : {}),
+          ...(options.p2 ? { VOICE_ONLY_UI: true } : {}),
           ...(options.skipQuestionnaire ? { SHOW_QUESTIONNAIRE: false } : {}),
         } }]);
       }
@@ -426,6 +477,7 @@ async function installNetworkFakes(
       return json(route, [], 201);
     }
     if (table === "sessions" && request.method() === "POST") {
+      sessionMemory = request.postDataJSON()?.conversation_memory ?? {};
       sessionInsertCount += 1;
       return json(route, { id: SESSION_ID }, 201);
     }
@@ -1208,4 +1260,61 @@ test('P1 : un accord généré après le préfixe entendu ne donne pas la permis
   expect(fakes.getGmFilmContexts().at(-1)).not.toContain('D’accord, je te le passe.');
   expect(fakes.getGmFilmContexts().at(-1)).toContain('Bonjour.');
   expect(JSON.stringify(fakes.getSessionUpdates())).toContain('"status":"failed"');
+});
+
+
+test("P2 : candidat rejeté réversible puis correction sur un mot, UI voix seule et nouveau tour", async ({ page }) => {
+  const fakes = await installNetworkFakes(page, ["Bonjour Max, je suis là pour écouter."], {
+    p2: true, handsFree: true, incrementalOutput: true, ttsSuccess: true, maxResponse: "Bonjour. Je vous écoute.",
+  });
+  await startCharacterConversation(page, "Max");
+  await page.getByRole("button", { name: "Activer le micro" }).click();
+  await expect.poll(fakes.getMaxTurnCount).toBe(1);
+  await expect(page.getByRole("status")).toHaveText(/Max répond/);
+  await expect(page.getByText("Bonjour Max, je suis là pour écouter.")).toHaveCount(0);
+  const speech = async (value: boolean) => page.evaluate(value => (window as Window & { __e2eSpeech?: (value: boolean) => void }).__e2eSpeech?.(value), value);
+  await speech(true); await page.waitForTimeout(90); await speech(false);
+  await page.waitForTimeout(1650);
+  expect(fakes.getMaxTurnCount()).toBe(1); expect(fakes.getGmPostTurnCount()).toBe(0);
+  await speech(true); await page.waitForTimeout(210);
+  await page.evaluate(() => (window as Window & { __e2eRecognize?: (text: string) => void }).__e2eRecognize?.("non"));
+  await speech(false);
+  await expect.poll(() => fakes.getVoiceEvents().some(event => Array.isArray(event.interruptions) && event.interruptions.some((entry: { event: string }) => entry.event === "interruption_confirmed"))).toBe(true);
+  await expect.poll(fakes.getMaxTurnCount).toBe(2);
+  // Two 4.8-second chunks must actually reach their simulated render cursor.
+  await expect.poll(() => fakes.getVoiceEvents().some(event => event.status === "completed"), { timeout: 15000 }).toBe(true);
+  const events = fakes.getVoiceEvents().flatMap(event => Array.isArray(event.interruptions) ? event.interruptions : []);
+  expect(events.some(event => event.event === "interruption_rejected")).toBe(true);
+  expect(events.some(event => event.event === "audio_resumed")).toBe(true);
+  expect(events.some(event => event.event === "audio_suspended")).toBe(true);
+  expect(JSON.stringify(fakes.getSessionUpdates())).toContain('"interruptionStrategy":"acoustic_confirmed"');
+  await expect(page.getByRole("button", { name: "Terminer" })).toBeVisible();
+  await page.getByRole("button", { name: "Terminer" }).click();
+  expect(JSON.stringify(fakes.getSessionUpdates())).not.toContain('"delivered":"PRIVATE_INTENT_CANARY');
+});
+
+
+test("P2 : couper le micro pendant un candidat suspendu reprend la même réponse", async ({ page }) => {
+  const fakes = await installNetworkFakes(page, ["Bonjour Max, je suis là."], { p2: true, handsFree: true, incrementalOutput: true, ttsSuccess: true, maxResponse: "Bonjour. Je vous écoute." });
+  await startCharacterConversation(page, "Max");await page.getByRole("button", { name: "Activer le micro" }).click();
+  await expect(page.getByRole("status")).toHaveText(/Max répond/);
+  await page.evaluate(() => (window as Window & { __e2eSpeech?: (value: boolean) => void }).__e2eSpeech?.(true));
+  await page.waitForTimeout(220);await page.getByRole("button", { name: "Couper le micro" }).click();
+  await expect.poll(() => fakes.getVoiceEvents().some(event => event.status === "completed"), { timeout: 15000 }).toBe(true);
+  expect(fakes.getMaxTurnCount()).toBe(1);
+  const events = fakes.getVoiceEvents().flatMap(event => Array.isArray(event.interruptions) ? event.interruptions : []);
+  expect(events.some(event => event.event === "audio_suspended")).toBe(true);expect(events.some(event => event.event === "audio_resumed")).toBe(true);
+  expect(events.some(event => event.event === "interruption_confirmed")).toBe(false);
+  await expect(page.getByRole("button", { name: "Activer le micro" })).toBeVisible();await page.getByRole("button", { name: "Terminer" }).click();
+});
+
+test("P2 : perte du micro sans candidat arrête sortie et génération", async ({ page }) => {
+  const fakes = await installNetworkFakes(page, ["Bonjour Max, je suis là."], { p2: true, handsFree: true, incrementalOutput: true, ttsSuccess: true, maxResponse: "Bonjour. Je vous écoute." });
+  await startCharacterConversation(page, "Max");await page.getByRole("button", { name: "Activer le micro" }).click();
+  await expect(page.getByRole("status")).toHaveText(/Max répond/);
+  await page.evaluate(() => (window as Window & { __e2eLoseMicrophone?: () => void }).__e2eLoseMicrophone?.());
+  await expect.poll(() => fakes.getVoiceEvents().some(event => event.status === "cancelled")).toBe(true);
+  await expect(page.getByRole("button", { name: "Activer le micro" })).toBeVisible();
+  expect(fakes.getMaxTurnCount()).toBe(1);expect(fakes.getGmPostTurnCount()).toBe(0);
+  await page.getByRole("button", { name: "Terminer" }).click();
 });

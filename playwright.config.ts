@@ -66,14 +66,14 @@ export default defineConfig({
     },
     {
       name: "firefox-media",
-      grep: /teaser démarre|cinématique HLS/,
+      grep: /teaser démarre|cinématique HLS|P2 :/,
       use: { ...devices["Desktop Firefox"] },
     },
     {
       name: "webkit-media",
       // Teaser covers Safari HLS autoplay/skip. The cinematic path needs a
       // conversation + GM trigger and is too flaky on the shared WebKit runner.
-      grep: /teaser démarre/,
+      grep: /teaser démarre|P2 :/,
       use: { ...devices["Desktop Safari"] },
     },
   ],

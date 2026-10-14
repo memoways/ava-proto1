@@ -8,6 +8,7 @@ const GAMEPLAY: GameplaySettings = {
   TIMEOUT_SECONDS: 300,
   SHOW_QUESTIONNAIRE: true,
   VOICE_INCREMENTAL_OUTPUT: false,
+  VOICE_ONLY_UI: false,
   VOICE_HANDS_FREE: { enabled: false, endOfSpeechMs: 900, hesitationExtraMs: 700, bargeInEnabled: true, bargeInMinWords: 2 },
   MAX_INSULT_TOLERANCE: 3,
   MIN_QUESTIONS_BEFORE_GATE: 3,

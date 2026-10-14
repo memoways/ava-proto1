@@ -23,11 +23,16 @@ export const voiceTurnProjectionSchema = z.object({
   latency_origin: z.enum(["capture_start", "ptt_release", "app_turn_decision", "transcript_final", "text_submitted"]),
   code_version: z.string().max(160), prompt_version: label, config_version: label,
   status: z.enum(["started", "completed", "interrupted", "cancelled", "timeout", "failed", "no_audio"]), clock: z.literal("client_monotonic"),
-  milestones: z.object(Object.fromEntries(VOICE_MILESTONES.map((name) => [name, z.number().finite().nullable()]))),
+  milestones: z.object(Object.fromEntries(VOICE_MILESTONES.map((name) => [name, z.number().finite().nullable().optional().transform(value => value ?? null)]))),
   services: z.array(serviceSchema).max(16), server: z.array(spanSchema).max(8),
   durations: z.object({ origin_to_response_ms: duration, origin_to_output_estimated_ms: duration, t_turn_voice_ready_ms: duration, generation_total_ms: duration, playback_ms: duration }),
   coverage: z.object({ state: z.enum(["complete", "partial"]), observed: z.number().int().nonnegative(), expected: z.number().int().nonnegative(), missing: z.array(z.enum(VOICE_MILESTONES)).max(VOICE_MILESTONES.length) }),
   output_precision: z.enum(["software_estimate", "unavailable"]), critical_wait: z.literal("coverage_incomplete"), budget_exceeded: z.array(z.string().max(80)).max(16),
+  interruptions: z.array(z.object({ interruption_id: z.string().max(80),
+    event: z.enum(["acoustic_candidate", "attenuation", "audio_suspended", "interruption_confirmed", "interruption_rejected", "audio_resumed", "interruption_recovery"]), offset_ms: z.number().finite() })).max(64).optional(),
+  interruptions_capped: z.boolean().optional(),
+  capture_dsp: z.object({ echoCancellation: z.boolean(), noiseSuppression: z.boolean().nullable(), autoGainControl: z.boolean().nullable(),
+    trackSampleRate: z.number().finite().positive().nullable(), contextSampleRate: z.number().finite().positive() }).optional(),
 });
 export type VoiceTurnProjection = z.infer<typeof voiceTurnProjectionSchema>;
 export interface VoiceEventRow { id: string; created_at: string; event_name: string; metadata_json: unknown }

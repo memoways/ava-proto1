@@ -15,6 +15,7 @@ import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
 import { evaluatePostTurnPRD4 } from "./gameMasterPRD4";
 import { createEmptyConversationMemory, mergeConversationMemory } from "@/services/conversationMemoryV1";
 import type { CharacterRelationshipPolicy } from "@/types";
+import { TimeoutError } from "@/services/asyncUtils";
 
 const relationshipPolicy: CharacterRelationshipPolicy = {
   schemaVersion: 1,
@@ -31,6 +32,29 @@ const relationshipPolicy: CharacterRelationshipPolicy = {
 
 describe("Game Master PRD4 — memory_delta", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it.each(["timeout", "parent-abort"])("keeps a failed %s GM separate from delivered speech and permissions", async kind => {
+    const parent = new AbortController();
+    const failure = kind === "timeout" ? new TimeoutError("llm", 12000) : new DOMException("superseded", "AbortError");
+    if (kind === "parent-abort") parent.abort("superseded-turn");
+    vi.mocked(callLLMWithUsage).mockRejectedValueOnce(failure);
+    const before = createEmptyConversationMemory();
+    vi.mocked(persistPostTurnMemory).mockResolvedValueOnce(before);
+    const result = await evaluatePostTurnPRD4({ sessionId: "p1-session", conversationHistory: [],
+      userMessage: "Attends", maxResponse: "Je t'écoute.", currentCharacter: "max", userRole: null,
+      turnIndex: 4, timeElapsedSeconds: 90, sessionDurationSeconds: 900, minimumClosureSeconds: 600,
+      conversationMemoryBefore: before, relationshipPolicy, signal: parent.signal });
+    expect(result.execution_status).toBe("failed");
+    expect(result.memory_delta).toBeNull();
+    expect(result.memory_after).toEqual(before);
+    expect(result.action).toEqual({ type: "none" });
+    expect(result.player_switch_request).toBeNull();
+    expect(result.trigger_video_id).toBeNull();
+    expect(result.end_recommended).toBe(false);
+    expect(persistPostTurnMemory).toHaveBeenCalledWith("p1-session", expect.objectContaining({ execution_status: "failed" }), null, 4, "max", parent.signal);
+    expect(callLLMWithUsage).toHaveBeenCalledOnce();
+    expect(vi.mocked(callLLMWithUsage).mock.calls[0][1]).toMatchObject({ timeoutMs: 12000, signal: parent.signal });
+  });
 
   it("produit et persiste le delta dans le même appel LLM", async () => {
     const delta = {
