@@ -166,8 +166,7 @@ export function createAcousticInterruptionController(hooks: {
     },
     transcript(text: string, at: number): boolean {
       if (!candidate || at < candidate.start || at - candidate.lastVoice > 1400) return false;
-      let heard = text.trim();
-      if (candidate.baseline && heard.startsWith(candidate.baseline)) heard = heard.slice(candidate.baseline.length).trim();
+      const heard = withoutRejectedPrefix(text.trim(), candidate.baseline).trim();
       if (!heard || !recognizedWordsChanged(candidate.baseline, text)) return false;
       const h = words(heard), played = words(candidate.output.playedText()).slice(-24);
       // Only a contiguous actually played phrase is echo evidence. Shared vocabulary

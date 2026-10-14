@@ -16,6 +16,9 @@ describe("acoustic candidates at the output/recognition seam", () => {
     expect(withoutRejectedPrefix("bonjour Max", rejected)).toBe("bonjour Max");
     expect(withoutRejectedPrefix("Où est Ava?", rejected)).toBe("");
     expect(s.confirm).not.toHaveBeenCalled();
+    controller.signal(true, 100, s.output, rejected);
+    expect(controller.transcript("Où est Ava. Non", 120)).toBe(true);
+    expect(s.confirm).toHaveBeenCalledWith("Non");
   });
   it("attenuates immediately, suspends persistent voice, and confirms one word", () => {
     const s = setup(); s.controller.signal(true, 0, s.output, "");
