@@ -328,6 +328,7 @@
                                 "type": "object",
                                 "properties": {
                                   "capture_started": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -338,6 +339,7 @@
                                     ]
                                   },
                                   "capture_ready": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -348,6 +350,7 @@
                                     ]
                                   },
                                   "last_audio_sent": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -358,6 +361,7 @@
                                     ]
                                   },
                                   "turn_decided": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -368,6 +372,7 @@
                                     ]
                                   },
                                   "flush_sent": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -378,6 +383,7 @@
                                     ]
                                   },
                                   "flush_acknowledged": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -388,6 +394,7 @@
                                     ]
                                   },
                                   "transcript_final": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -398,6 +405,7 @@
                                     ]
                                   },
                                   "voice_end": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -408,6 +416,7 @@
                                     ]
                                   },
                                   "context_ready": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -418,6 +427,7 @@
                                     ]
                                   },
                                   "llm_request": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -428,6 +438,7 @@
                                     ]
                                   },
                                   "llm_headers": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -438,6 +449,7 @@
                                     ]
                                   },
                                   "llm_response": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -448,6 +460,7 @@
                                     ]
                                   },
                                   "first_token": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -458,6 +471,7 @@
                                     ]
                                   },
                                   "intent_ready": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -468,6 +482,7 @@
                                     ]
                                   },
                                   "safe_phrase": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -478,6 +493,7 @@
                                     ]
                                   },
                                   "tts_text_sent": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -488,6 +504,7 @@
                                     ]
                                   },
                                   "first_audio_chunk": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -498,6 +515,7 @@
                                     ]
                                   },
                                   "audio_blob_ready": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -508,6 +526,7 @@
                                     ]
                                   },
                                   "audio_scheduled": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -518,6 +537,7 @@
                                     ]
                                   },
                                   "output_estimated": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -528,6 +548,7 @@
                                     ]
                                   },
                                   "audio_end": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -538,6 +559,7 @@
                                     ]
                                   },
                                   "audio_cancelled": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -548,6 +570,7 @@
                                     ]
                                   },
                                   "acoustic_candidate": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -558,6 +581,18 @@
                                     ]
                                   },
                                   "attenuation": {
+                                    "default": null,
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "audio_suspended": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -568,6 +603,7 @@
                                     ]
                                   },
                                   "interruption_confirmed": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -578,6 +614,7 @@
                                     ]
                                   },
                                   "interruption_rejected": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -588,6 +625,18 @@
                                     ]
                                   },
                                   "audio_resumed": {
+                                    "default": null,
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "output_stop_estimated": {
+                                    "default": null,
                                     "anyOf": [
                                       {
                                         "type": "number"
@@ -623,9 +672,11 @@
                                   "audio_cancelled",
                                   "acoustic_candidate",
                                   "attenuation",
+                                  "audio_suspended",
                                   "interruption_confirmed",
                                   "interruption_rejected",
-                                  "audio_resumed"
+                                  "audio_resumed",
+                                  "output_stop_estimated"
                                 ],
                                 "additionalProperties": false
                               },
@@ -903,9 +954,11 @@
                                         "audio_cancelled",
                                         "acoustic_candidate",
                                         "attenuation",
+                                        "audio_suspended",
                                         "interruption_confirmed",
                                         "interruption_rejected",
-                                        "audio_resumed"
+                                        "audio_resumed",
+                                        "output_stop_estimated"
                                       ]
                                     }
                                   }
@@ -934,6 +987,90 @@
                                 "items": {
                                   "type": "string"
                                 }
+                              },
+                              "interruptions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "interruption_id": {
+                                      "type": "string"
+                                    },
+                                    "event": {
+                                      "type": "string",
+                                      "enum": [
+                                        "acoustic_candidate",
+                                        "attenuation",
+                                        "audio_suspended",
+                                        "interruption_confirmed",
+                                        "interruption_rejected",
+                                        "audio_resumed",
+                                        "interruption_recovery"
+                                      ]
+                                    },
+                                    "offset_ms": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "interruption_id",
+                                    "event",
+                                    "offset_ms"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "interruptions_capped": {
+                                "type": "boolean"
+                              },
+                              "capture_dsp": {
+                                "type": "object",
+                                "properties": {
+                                  "echoCancellation": {
+                                    "type": "boolean"
+                                  },
+                                  "noiseSuppression": {
+                                    "anyOf": [
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "autoGainControl": {
+                                    "anyOf": [
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "trackSampleRate": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "contextSampleRate": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "echoCancellation",
+                                  "noiseSuppression",
+                                  "autoGainControl",
+                                  "trackSampleRate",
+                                  "contextSampleRate"
+                                ],
+                                "additionalProperties": false
                               }
                             },
                             "required": [
