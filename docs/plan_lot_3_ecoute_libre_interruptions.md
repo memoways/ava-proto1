@@ -497,6 +497,13 @@ de sortie. Correction ciblée : mémoriser le préfixe corrélé rejeté puis re
 ce seul préfixe (y compris révision de ponctuation), sans vider l'énoncé suivant.
 Test au seam candidat → rejet → nouvelle parole et préfixe absent ajouté.
 
+CI initiale `38527380267` : 41 E2E réussis, 2 Firefox échoués et 2 retries
+Chromium/WebKit. Les fakes P2 conservaient un AudioContext matériel Linux
+pour une capture déjà simulée ; activation inachevée dans les traces Firefox.
+Le périphérique/curseur Web Audio est désormais simulé explicitement dans ces
+seuls E2E, player/détecteur/automate applicatifs inchangés. Attente de fin portée
+à 15 s pour deux chunks PCM de 4,8 s, sans modifier un timeout produit.
+
 Recette courte : Brave, admin → Tester moi-même, sandbox-ulrich. Vérifier
 Max puis Emma avec leur voix inchangée : réponse entière, une correction
 « non, attends » au milieu, réponse nouvelle après sa fin de parole ; une

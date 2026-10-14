@@ -274,9 +274,29 @@ async function installNetworkFakes(
     }
 
     if (p2) {
-      const NativeAudioContext = window.AudioContext;
-      class CaptureAudioContext extends NativeAudioContext {
-        constructor() { super(); Object.defineProperty(this.audioWorklet, "addModule", { value: async () => {} }); }
+      // The application player and detector run unchanged; only the device/clock
+      // are simulated. Linux headless runners have no reliable audio device.
+      class CaptureAudioContext {
+        state = "running"; sampleRate = 48000; outputLatency = 0; baseLatency = 0;
+        destination = {}; audioWorklet = { addModule: async () => {} };
+        private origin = performance.now();
+        get currentTime() { return (performance.now() - this.origin) / 1000; }
+        async resume() { this.state = "running"; }
+        async close() { this.state = "closed"; }
+        createBuffer(_channels: number, length: number, rate: number) {
+          const data = new Float32Array(length);
+          return { duration: length / rate, length, sampleRate: rate, getChannelData: () => data };
+        }
+        createGain() { return { connect() {}, disconnect() {}, gain: { value: 1, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {}, cancelScheduledValues() {} } }; }
+        createOscillator() { return { frequency: { value: 0, setValueAtTime() {} }, type: "sine", connect(target: unknown) { return target; }, disconnect() {}, start() {}, stop() {} }; }
+        createBufferSource() {
+          const context = this;
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          return { buffer: null as null | { duration: number }, onended: null as null | (() => void), connect() {}, disconnect() {},
+            start(at = 0) { timer = setTimeout(() => this.onended?.(), Math.max(0, at - context.currentTime + (this.buffer?.duration ?? 0)) * 1000); },
+            stop() { clearTimeout(timer); },
+          };
+        }
         createMediaStreamSource(_stream: MediaStream) { return { connect() {}, disconnect() {} } as unknown as MediaStreamAudioSourceNode; }
       }
       const ports: { onmessage: ((event: { data: unknown }) => void) | null }[] = [];
@@ -1261,7 +1281,8 @@ test("P2 : candidat rejeté réversible puis correction sur un mot, UI voix seul
   await speech(false);
   await expect.poll(() => fakes.getVoiceEvents().some(event => Array.isArray(event.interruptions) && event.interruptions.some((entry: { event: string }) => entry.event === "interruption_confirmed"))).toBe(true);
   await expect.poll(fakes.getMaxTurnCount).toBe(2);
-  await expect.poll(() => fakes.getVoiceEvents().some(event => event.status === "completed")).toBe(true);
+  // Two 4.8-second chunks must actually reach their simulated render cursor.
+  await expect.poll(() => fakes.getVoiceEvents().some(event => event.status === "completed"), { timeout: 15000 }).toBe(true);
   const events = fakes.getVoiceEvents().flatMap(event => Array.isArray(event.interruptions) ? event.interruptions : []);
   expect(events.some(event => event.event === "interruption_rejected")).toBe(true);
   expect(events.some(event => event.event === "audio_resumed")).toBe(true);
@@ -1279,7 +1300,7 @@ test("P2 : couper le micro pendant un candidat suspendu reprend la même répons
   await expect(page.getByRole("status")).toHaveText(/Max répond/);
   await page.evaluate(() => (window as Window & { __e2eSpeech?: (value: boolean) => void }).__e2eSpeech?.(true));
   await page.waitForTimeout(220);await page.getByRole("button", { name: "Couper le micro" }).click();
-  await expect.poll(() => fakes.getVoiceEvents().some(event => event.status === "completed"), { timeout: 8000 }).toBe(true);
+  await expect.poll(() => fakes.getVoiceEvents().some(event => event.status === "completed"), { timeout: 15000 }).toBe(true);
   expect(fakes.getMaxTurnCount()).toBe(1);
   const events = fakes.getVoiceEvents().flatMap(event => Array.isArray(event.interruptions) ? event.interruptions : []);
   expect(events.some(event => event.event === "audio_suspended")).toBe(true);expect(events.some(event => event.event === "audio_resumed")).toBe(true);
