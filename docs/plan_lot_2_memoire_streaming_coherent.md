@@ -1,9 +1,10 @@
 # Reprise — lot 2 / P1 : mémoire de livraison et streaming cohérent
 
 Date : 14 octobre 2026. Statut : **P1 fusionné sur main (#33 à #37), migration
-et fonctions Lovable Cloud livrées, revues et CI finales vertes ; preview technique,
-réponse Max complète et interruption/reprise humaines vérifiées. Contrôle Emma,
-publication frontend et vérification publiée restent à effectuer**.
+et fonctions Lovable Cloud livrées, revues et CI finales vertes ; Max/Emma et
+interruption/reprise vérifiés en preview, frontend publié via Lovable et échange
+Max complet vérifié sur le domaine publié. Canary sandbox-ulrich, batch par défaut
+conservé. Réserve : deux timeouts GM post-tour de12s, cause non démontrée**.
 Base d'exécution : main `0a60a64`.
 Dernier frontend publié : `f251eb3` / PR #32. Le commit de ce document ou un
 descendant devient le point de reprise documentaire.
@@ -476,3 +477,71 @@ appel Emma préparé, aucun micro ouvert ; ne pas considérer la recette Emma
 exécutée. Reconnexion du contrôle Brave nécessaire, sans changement de Shields
 ni contournement par un autre navigateur. Projet Lovable relu : workspace
 Memoways, SHA fe9c954 et agentFinished=true ; aucune publication P1 demandée.
+
+### Preview P1 validée — publication native
+
+Après reconnexion Brave, l'admin preview recharge correctement sans changer
+Shields. Lien « Tester moi-même » cliqué dans l'admin Ulrich/sandbox, nouvel
+onglet1830101712 ; session Emma `61100b77-d42f-4b8a-8c7f-dab2f380a9ad`,
+14 octobre05:25:41 UTC, film vu et V4 confirmés. Après permission micro humaine,
+Ulrich confirme une réponse complète/naturelle avec la voix habituelle d'Emma,
+sans JSON ni consigne privée. Reçu uniquement emma : tour2 completed,
+généré/livré199 caractères, intention137 caractères, incertain0,
+529920 samples programmés/joués ; génération personnage
+`gen-1791955616-JkhqVfk3gWwiaAvnIAUz`, 94 tokens observés. GM post-tour réussi.
+Une tentative précédente interrompue avant texte/audio a un reçu vide et une
+entrée « Stream failed » ; aucun discours non livré promu en fait entendu.
+Appel fermé par Terminer. Pas de transfert humain ajouté à la recette P0.
+
+Lovable natif confirme main19cfa5f, workspace Memoways et agentFinished=true ;
+code identique au SHA fe9c954 dont CI finale success, seul plan ajouté.
+Publication via deploy_project du projet1265958d, sans nouveau nom/domaine,
+sans nouvelle tâche d'agent Lovable ni réglage/Edge Function hors P1.
+La sortie incrémentale reste canary sandbox-ulrich ; prod hérite du défautfalse.
+Les trois réponses complètes compactes et l'interruption réelle ne remplacent
+pas le protocole de300tours/10sessions : aucun gain p50/p95 ni taux d'échec
+statistique déclaré. La vérification publiée reste à effectuer après livraison.
+
+CI de main19cfa5f `38516189902` terminée success avant publication. Appel
+Emma clôturé dans Cloud à05:27:45 UTC. Publication native demandée le14octobre :
+deployment_id `641bfd2c-cba2-41e3-9894-36ecdba9abc9`, statut de réponse pending,
+URL `https://ava-proto1.lovable.app` (aucun renommage demandé). Le connecteur
+n'expose pas de lecture dédiée du statut de déploiement ; get_project reste
+ready/is_published=true sur19cfa5f. Vérification effective sur le domaine
+existant `https://proto1.parle-a-ava.com` : nouvel asset
+`/assets/index-a5mRW6jy.js`, admin P1 et flag sandbox visibles. Cette observation
+atteste le frontend P1 servi, sans prétendre connaître son SHA de build exact.
+Appel Max publié ouvert par le lien officiel admin Tester moi-même,
+onglet1830101718, session `1e5a72b5-5aa2-4263-bba0-db55ddf7f616`,
+05:30:52 UTC, filmvu/V4. Échange réel publié et clôture encore à vérifier.
+
+### Vérification publiée et clôture du lot
+
+Ulrich confirme une réponse publiée Max complète/naturelle, sans coupure ni JSON.
+Reçu tour 1 completed, généré/livré 247 caractères, intention privée 124 caractères,
+incertain 0, 867840 samples programmés/joués ; unique génération personnage
+`gen-1791955921-JZav4yvGvc7rBRRD45YV`, 102 tokens observés. Le tour a utilisé
+le chemin P1 sur le domaine publié, avec persistance V4 Lovable Cloud. Appel
+fermé par Terminer, micro arrêté et écran de fin constaté ; admin publié conservé
+dans Brave. Aucun réglage Shields changé, aucune parole synthétique injectée.
+Clôture Cloud confirmée à `2026-10-14 05:33:08.986+00`.
+
+GM post-tour publié : timeout 12000 ms, comme après la reprise Max en preview.
+Le délai et le montage du prompt GM sont inchangés depuis f251eb3 ; seul le signal
+parent de persistance est propagé par P1. Une lecture technique agrégée des appels
+GM du 1 octobre au 13 octobre 17:00 UTC relève 62 appels et 24 erreurs « Conversation
+turn aborted », zéro message de ce timeout. Elle ne démontre donc pas que les
+deux timeouts existaient déjà ni qu'ils sont causés par P1. Aucune comparaison
+de taux d'échec fiable possible avec ces petites cohortes et des interruptions
+différentes. Réserve maintenue ; pas d'augmentation de deadline ni correction
+spéculative hors lot. Aucun GM en échec n'autorise de transfert/action tardive.
+
+Livraison : code P1 fe9c954, publication depuis 19cfa5f (documentation seule en
+plus), CI 38516189902 success avant publication. L'API de publication reste une
+réponse pending sans endpoint de suivi exposé ; le frontend P1 réellement servi,
+le tour humain et son reçu Cloud constituent la vérification effective, sans
+attestation indépendante du SHA compilé exact ni des versions Edge servies.
+Le pilote comparatif 300 tours / 10 sessions, la stratégie acoustique P2 et l'UI P3
+ne sont pas exécutés dans ce lot. Réserves P0 historiques conservées. Les
+relectures/transferts/vidéos/callbacks tardifs sont couverts par les tests
+déterministes ; aucun nouveau transfert humain P0 revendiqué.

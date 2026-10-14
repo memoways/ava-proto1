@@ -4,6 +4,43 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Publié via Lovable] — 2026-10-14
+
+### Lot 2 / P1 — mémoire de livraison et streaming cohérent
+
+- Une génération personnage produit une intention privée puis des phrases sûres.
+  Montage PRD4 Max/Emma partagé, batch et laboratoires conservés ; en-tête jamais
+  envoyé à la voix, erreurs SSE et annulation du reader explicites.
+- Gradium incrémental par tour, voix/réglages figés, buffer borné, suivi des
+  samples et timestamps ; secours transport avant son seulement, aucun replay
+  après sortie. Reçus V4 isolés, contexte entendu distinct du texte généré,
+  GM et résumés sur livraison confirmée. Colonnes JSONB existantes et RPC CAS
+  additive avec RLS conservées ; aucune transformation de données.
+- Flag Sortie vocale progressive désactivé par défaut ; canary activée uniquement
+  dans sandbox-ulrich. PR #33 à #37 fusionnées : typage compatible Lovable,
+  diagnostic des fins SSE et format privé compact, puis restauration des quatre
+  fichiers hors lot modifiés automatiquement par Lovable. Revues finales sans
+  constat et CI verte : 46 régressions, 546 unitaires, 34 intégrations,
+  36 E2E sans retry. RPC appliquée, deux proxies livrés dans Lovable Cloud ;
+  types/build et contrôle Deno P1 Lovable vérifiés.
+- Les deux coupures réelles `finish_reason=length` provenaient d'un format privé
+  trop volumineux pour le budget existant. Intention compacte et parole bornée
+  partagent ce budget ; max_tokens, modèle, voix, délais, prompts éditoriaux,
+  canon, cadre commun, transferts, migrations P0 et batch conservés.
+- Preview Brave, admin → Tester moi-même, sandbox-ulrich : réponse Max complète,
+  arrêt puis nouvelle réponse cohérente sans replay, réponse Emma complète avec
+  sa voix habituelle, aucun JSON/consigne privée entendu. Reçus V4 vérifiés :
+  préfixe interrompu distinct du reste incertain, reçus isolés par personnage.
+  Un timeout GM après la reprise Max est documenté ; aucun taux d'échec ou gain
+  de latence statistique revendiqué. Appels clôturés. P2/P3 non commencés.
+  Publication native Lovable depuis `19cfa5f` (code `fe9c954`) ; domaine publié
+  vérifié dans Brave, réponse Max complète et reçu V4 intégralement livré.
+  Deux timeouts GM post-tour de 12 secondes sont conservés comme réserve,
+  sans cause démontrée ni réglage modifié. Production conserve le batch.
+  CI finale sur `19cfa5f` verte avant publication ; appels et micros clôturés.
+  [Plan P1](docs/plan_lot_2_memoire_streaming_coherent.md).
+
+
 ## [Publié via Lovable] — 2026-10-13
 
 ### Complément de recette P0 — bilan, sans nouvelle publication
@@ -134,34 +171,6 @@ plus anciennes conservent leur état au moment de leur rédaction.
 
 ## [Non publié]
 
-### Lot 2 / P1 — fusionné, recette et publication frontend en attente
-
-- Une génération personnage produit une intention privée puis des phrases sûres.
-  Montage PRD4 Max/Emma partagé, batch et laboratoires conservés ; en-tête jamais
-  envoyé à la voix, erreurs SSE et annulation du reader explicites.
-- Gradium incrémental par tour, voix/réglages figés, buffer borné, suivi des
-  samples et timestamps ; secours transport avant son seulement, aucun replay
-  après sortie. Reçus V4 isolés, contexte entendu distinct du texte généré,
-  GM et résumés sur livraison confirmée. Colonnes JSONB existantes et RPC CAS
-  additive avec RLS conservées ; aucune transformation de données.
-- Flag Sortie vocale progressive désactivé par défaut ; activation canary prévue
-  uniquement sandbox-ulrich, activée pour la recette. PR #33 et correctif de typage Lovable #34 fusionnés
-  (`3c3b67c`, `07eaed4`), deux revues sans blocage et CI finale verte :
-  46 régressions, 536 unitaires, 34 intégrations, 36 E2E sans retry.
-  RPC appliquée et deux proxies déployés dans Lovable Cloud ; types, build et
-  contrôle Deno P1 Lovable verts. Recette réelle : première réponse Max naturelle
-  et reçus conservés, tour suivant échoué `LLM response incomplete` ; publication
-  bloquée et canary remise à false. Correctif de traces SSE terminales et des
-  statuts de coût livré par #35 (`0eff02e`), revues et CI avant/après fusion
-  vertes, 46/541/34 et 36 E2E sans retry, types/build Lovable verts. Nouvel essai
-  canary Max préparé dans Brave ; cause upstream non encore établie,
-  aucune hausse de budget ni changement de modèle.
-- Recette suivante : deux `finish_reason=length`, puis une réponse complète.
-  Cause établie : l'en-tête P1 consomme une partie importante du budget de sortie.
-  Correctif de format en cours : intention compacte et parole bornée depuis
-  le budget existant, sans hausse de max_tokens ni modification des prompts
-  éditoriaux, du canon ou du batch. Publication toujours bloquée avant recette.
-  [Plan P1](docs/plan_lot_2_memoire_streaming_coherent.md).
 
 Les mentions de non-publication et les listes de recette des entrées du
 12 octobre ci-dessous décrivent leur état initial. Le bilan P0 publié ci-dessus

@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-13 (P0 publié, mesure V2, appels soumis au GM et au consentement du personnage)
+> **Last Updated**: 2026-10-14 (P1 publié via Lovable, mémoire V4 et sortie progressive en canary sandbox-ulrich)
 
 ---
 
@@ -99,6 +99,20 @@ Cette trace établit ensuite deux fins `length`, suivies d'un succès. Le format
 privé doit partager le budget de sortie avec la parole. Le correctif P1 rend
 son intention compacte et borne la réponse dans ce même budget ; il garde le
 contrôle de troncature et attend une nouvelle recette réelle avant publication.
+Le format compact est ensuite fusionné par #36, et #37 retire les corrections
+automatiques Lovable hors du lot. Le code final, les deux revues et la CI passent
+(46 régressions, 546 unitaires, 34 intégrations, 36 E2E sans retry). En preview
+Brave/sandbox-ulrich, Ulrich confirme une réponse Max complète, son interruption
+puis une nouvelle réponse cohérente sans replay, et une réponse Emma complète
+avec sa voix habituelle. Les reçus distinguent le préfixe Max livré du reste
+incertain ; Emma possède ses propres reçus. Un timeout GM après la reprise Max
+reste documenté, sans changement de délai ni affirmation statistique. Les appels
+sont clôturés. Le frontend est publié nativement via Lovable depuis19cfa5f
+(codefe9c954) et un échange Max complet est confirmé sur le domaine publié,
+avec247 caractères livrés et un reçu V4 intégral. Deux timeouts GM de12secondes
+restent une réserve sans cause démontrée ; aucun réglage changé. Le batch reste
+le défaut de production, P2/P3 ne sont pas commencés et le pilote statistique
+reste distinct de cette recette.
 [Plan et preuves P1](docs/plan_lot_2_memoire_streaming_coherent.md).
 
 
