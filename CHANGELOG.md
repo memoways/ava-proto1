@@ -171,7 +171,7 @@ plus anciennes conservent leur état au moment de leur rédaction.
 
 ## [Non publié]
 
-### Lot 3 / P2 — réalisation locale en cours
+### Lot 3 / P2 — fusionné, correction de recette preview en cours
 
 - Interruption acoustique candidate puis confirmée, pause/réprise des samples
   non lus dans le même contexte Gradium, sans reçu ni GM au rejet. Capture
@@ -183,7 +183,13 @@ plus anciennes conservent leur état au moment de leur rédaction.
   [plan P2](docs/plan_lot_3_ecoute_libre_interruptions.md) précisent le routage
   natif du Cloud Lovable. Deux GM P1 failed retrouvés, aucune cause démontrée
   ni tuning. Contrat P1, voix, canon, cadre, transferts et batch conservés.
-- Contrôles locaux et revues en cours ; aucune livraison P2 encore attestée.
+- PR #38 squash dans `48f4d52`, deux revues finales sans constat et CI verte :
+  568 unitaires, 34 intégrations, 46 régressions, 45 E2E sans retry. Preview
+  synchronisée et canary sandbox-ulrich préparée. Première recette humaine
+  échouée : transfert AudioWorklet détache le tableau avant réallocation,
+  qui devient de taille zéro. Test avec transfert réel reproduit la perte ;
+  allocation du suivant avant transfert corrigée et qualité locale verte.
+  Canary P2 désactivée pendant correction ; aucune publication P2 encore.
   Pilote 300 tours/10 sessions et mesures acoustiques physiques restent
   distincts. P3 hors périmètre.
 

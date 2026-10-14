@@ -83,8 +83,13 @@ un rejet reprend son suffixe de samples, une parole confirmée annule le tour
 et garde son reçu partiel. Le premier phonème du prochain énoncé est retenu
 pendant flush, les captures tardives sont écartées, et le preset est épinglé
 dans V4. Voix, canon et règles de transfert restent inchangés. Tests et revues
-en cours ; aucun P2 publié encore, aucun pilote statistique acquis et P3 non
-commencé. [Plan, protocole et état réel](docs/plan_lot_3_ecoute_libre_interruptions.md).
+réussis sur la PR #38 fusionnée dans `48f4d52` (568/34/46 et 45 E2E sans retry).
+La première recette humaine révèle une limite des mocks : le transfert réel
+détache le tableau PCM avant sa réallocation, qui devient de taille zéro.
+Le test VM utilise désormais un vrai transfert et reproduit la perte après
+une frame ; allouer avant transfert corrige la continuité. Canary désactivée
+pendant correction, publication suspendue. Aucun pilote statistique acquis,
+P3 non commencé. [Plan, protocole et état réel](docs/plan_lot_3_ecoute_libre_interruptions.md).
 
 ### 2026-10-14 — Préparer P2 sans effacer les réserves P1
 

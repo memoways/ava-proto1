@@ -22,9 +22,10 @@ class AvaPcmCapture extends AudioWorkletProcessor {
   }
   emit() {
     const frame = this.frame;
-    this.port.postMessage({ type: "frame", samples: frame }, [frame.buffer]);
+    // Transfer detaches frame.buffer synchronously. Allocate before detaching.
     this.frame = new Float32Array(frame.length);
     this.used = 0;
+    this.port.postMessage({ type: "frame", samples: frame }, [frame.buffer]);
   }
   process(inputs) {
     const channel = inputs[0]?.[0];

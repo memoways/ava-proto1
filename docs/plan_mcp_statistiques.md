@@ -63,7 +63,11 @@ expose ses données, sous forme d'outils.
   d'autorisation ; sans `next` l'admin retrouve sa dernière page ; la page
   d'autorisation affiche ses messages d'erreur.
 - La fonction backend générée porte l'émetteur exact du projet.
-- Non vérifié : un vrai échange avec Codex, qui suppose le site republié.
+- Vérifié le 14 octobre 2026 depuis Codex : les quatre outils du connecteur
+  **MCP app Ava** répondent sur le Cloud `iralfqlslqndgvexixis`, OAuth admin.
+  Usage, sessions et latences filtrés sur `sandbox-ulrich` ; coûts globaux
+  puisque leur contrat ne porte pas l'environnement. Les deux timeouts GM P1
+  ont été retrouvés via les spans V2 de cet outil.
 
 ## Utilisation
 
