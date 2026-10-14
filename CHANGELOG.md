@@ -4,6 +4,21 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Non publié] — 2026-10-14 — Tavus et transcription utilisateur
+
+- Transcript utilisateur en direct et après envoi, y compris en voix seule ;
+  aucune réplique personnage sous-titrée dans PRD4.
+- Rattachement vidéo stable ; suppression du faux stall sur `suspend`, image
+  de secours bornée à 640 px / 2 captures par seconde. Tavus attend audio +
+  vidéo, conserve le flux lors du renouvellement d'une piste et vérifie
+  `play()` avant parole. Événements de parole filtrés par conversation et
+  dédoublonnés ; micro/caméra non publiés comme auparavant.
+- Deepgram conserve la fenêtre de finalisation de 1,5 s en l'absence
+  d'acquittement, au lieu de conclure sur un ancien/interim incomplet. Avec
+  `from_finalize`, la finalisation reste immédiate. Acquittement tracé en V2.
+- Diagnostics techniques Tavus réseau, pistes, refus de lecture et CPU Daily,
+  sans dialogue ou secret. [Plan](docs/plan_tavus_audio_transcription.md).
+
 ## [Publié via Lovable] — 2026-10-14
 
 ### Lot 3 / P2 — écoute libre, interruptions confirmées et voix seule

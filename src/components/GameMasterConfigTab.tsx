@@ -211,8 +211,7 @@ export default function GameMasterConfigTab() {
 
         <div className={voice.enabled ? "space-y-4" : "pointer-events-none space-y-4 opacity-50"}>
           <div className="flex items-center justify-between gap-4 rounded-md bg-muted/40 p-3">
-            <div><p className="text-sm font-medium">Conversation voix seule</p><p className="text-xs text-muted-foreground">Masquer les sous-titres dans l'appel ; contrôles et statuts accessibles conservés.</p></div>
-            <Switch checked={gameplay.VOICE_ONLY_UI} onCheckedChange={checked => setGameplay(current => ({ ...current, VOICE_ONLY_UI: checked }))} aria-label="Conversation voix seule" />
+            <div><p className="text-sm font-medium">Transcription du joueur</p><p className="text-xs text-muted-foreground">La parole du joueur est affichée en direct puis après envoi. Le personnage répond à la voix, sans sous-titres.</p></div>
           </div>
           <div className="space-y-2">
             <label htmlFor="interruption-strategy" className="text-sm">Détection d'interruption</label>

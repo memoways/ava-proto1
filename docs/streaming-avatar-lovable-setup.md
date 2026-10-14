@@ -1,6 +1,6 @@
 # Streaming Avatar — activation dans Lovable Cloud
 
-Le mode avatar est un moteur de rendu. Ava reste l’unique propriétaire du STT, du RAG, des règles, du LLM et du texte final affiché. Aucun son du micro n’est publié vers HeyGen ou Tavus.
+Le mode avatar est un moteur de rendu. Ava reste l’unique propriétaire du STT, du RAG, des règles, du LLM et du texte final envoyé. Aucun son du micro n’est publié vers HeyGen ou Tavus.
 
 ## Éléments à appliquer dans Lovable
 
@@ -20,6 +20,31 @@ Le mode avatar est un moteur de rendu. Ava reste l’unique propriétaire du STT
 - Tavus : le navigateur émet `conversation.echo` avec `modality: "text"` et `done: true`. Ne pas utiliser `conversation.respond`.
 - La Persona ID Tavus doit avoir `pipeline_mode: "echo"`. L’Edge Function le vérifie avant chaque création ; ce mode désactive Perception, STT et LLM Tavus ainsi que son entrée micro.
 - Les clés API ne quittent jamais l’Edge Function. Le navigateur reçoit uniquement un jeton de session média éphémère.
+
+## Lecture Tavus et diagnostic (14 octobre 2026)
+
+Le flux est prêt seulement quand les pistes audio et vidéo sont reçues. Le lecteur
+conserve son `srcObject` entre mises à jour React et renouvellements de pistes.
+Une erreur de `play()` est remontée avant envoi de parole ; le chemin de repli
+existant s'applique avant début de parole, sans présenter une lecture muette
+comme un succès. Une notification Tavus de parole reste une mesure fournisseur,
+pas une mesure acoustique du premier son effectivement entendu.
+
+Le test privé affiche pistes, refus navigateur (`NotAllowedError`), état réseau,
+débit reçu, pertes/jitter et RTT Daily, ainsi que l'état de charge CPU locale et
+sa cause (`decode`, `encode`, `scheduleDuration`). Les valeurs réseau sont celles
+du SDK Daily, sans conversion d'unité supposée. En conversation, le même
+échantillon technique est envoyé via `prd4_streaming_avatar_media`, toutes les
+5 secondes et aux changements. Aucun texte, token ou URL de salle n'y figure.
+Un réseau dégradé est un indice réseau ; une charge `high/decode` est un indice de
+charge locale. La RAM et une panne Tavus ne sont pas déduites de ces signaux seuls.
+
+Seule la transcription utilisateur est visible en bas, y compris avec le preset
+voix seule. Les répliques personnage restent conservées dans le journal interne.
+Le STT choisi est inchangé : les providers batch n'offrent pas de partiels en
+cours de capture, tandis que les providers streaming les exposent.
+
+Voir le [plan et les preuves de validation](plan_tavus_audio_transcription.md).
 
 ## Validation canary
 

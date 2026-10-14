@@ -64,6 +64,7 @@ async function installNetworkFakes(
   let simulatedNetworkDrops = 0;
   let triggeredVideoLoads = 0;
   let ttsCallCount = 0;
+  const ttsTexts: string[] = [];
   let posthogRequestCount = 0;
   let traceUploadStarted = 0;
   let traceUploadCompleted = 0;
@@ -532,6 +533,7 @@ async function installNetworkFakes(
       return route.fulfill({status:200,contentType:'audio/wav',body:'e2e-audio'});
     }
     if (functionName === "proxy-tts") {
+      ttsTexts.push((request.postDataJSON() as { text: string }).text);
       ttsCallCount += 1;
       if (options.ttsBusyOnce && ttsCallCount === 1) {
         return json(route, {
@@ -644,6 +646,7 @@ async function installNetworkFakes(
     getVoiceEvents: () => voiceEvents,
     getGmFilmContexts: () => gmFilmContexts,
     getTtsCallCount: () => ttsCallCount,
+    getTtsText: () => ttsTexts.join(" "),
     getPosthogRequestCount: () => posthogRequestCount,
     getTraceUploadStarted: () => traceUploadStarted,
     getTraceUploadCompleted: () => traceUploadCompleted,
@@ -705,7 +708,8 @@ for (const [character, target] of [["Emma", "Max"], ["Max", "Emma"]] as const) {
     await expect(page.getByText("Appel en cours…", { exact: true })).toBeVisible();
     await expect(page.getByRole("img", { name: target, exact: true })).toBeVisible();
     await expect(page.getByRole("img", { name: `Portrait d’${target}` })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(`Allô, ici ${target}.`, { exact: true })).toBeVisible();
+    await expect.poll(fakes.getTtsText).toContain(`Allô, ici ${target}.`);
+    await expect(page.getByText(`Allô, ici ${target}.`, { exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /^Appeler / })).toHaveCount(0);
     await expect.poll(() => fakes.getExperienceEvents().filter(e => e.event_type === "handoff_executed").length).toBe(1);
     const executed = fakes.getExperienceEvents().find(e => e.event_type === "handoff_executed");
@@ -886,7 +890,8 @@ test("capture remplacée : couper puis réactiver le micro pendant un flush main
   await page.getByRole("button", { name: "Couper le micro" }).click();
   await page.getByRole("button", { name: "Activer le micro" }).click();
   await expect.poll(fakes.getMaxTurnCount, { timeout: 10_000 }).toBe(1);
-  await expect(page.getByText("Réponse de Max pour le tour 1.", { exact: true })).toBeVisible();
+  await expect.poll(fakes.getTtsText).toContain("Réponse de Max pour le tour 1.");
+  await expect(page.getByText("Réponse de Max pour le tour 1.", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Couper le micro" }).click();
 });
 
@@ -968,7 +973,7 @@ test("une cinématique HLS démarre automatiquement puis Passer coupe son média
     "Que sais-tu au sujet d'Ava ?",
     "Montre-moi le souvenir familial.",
   ];
-  await installNetworkFakes(page, transcripts, { triggerVideoAtLabel: 3 });
+  const fakes = await installNetworkFakes(page, transcripts, { triggerVideoAtLabel: 3 });
 
   await page.goto("/");
   const persistentPlayer = await page.locator("video[title='Video player']").elementHandle();
@@ -984,7 +989,8 @@ test("une cinématique HLS démarre automatiquement puis Passer coupe son média
     await expect(stopRecording).toBeEnabled();
     await stopRecording.press("Enter");
     if (turn < 3) {
-      await expect(page.getByText(`Réponse de Max pour le tour ${turn}.`)).toBeVisible({ timeout: 10_000 });
+      await expect.poll(fakes.getTtsText).toContain(`Réponse de Max pour le tour ${turn}.`);
+      await expect(page.getByText(`Réponse de Max pour le tour ${turn}.`)).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
     }
   }
@@ -1034,7 +1040,8 @@ test("parcours PRD4 heureux avec trois tours de conversation", async ({ page }) 
     await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
     await expect(page.getByText(new RegExp(TRANSCRIPTS[turn - 1].slice(0, 24)))).toBeVisible();
     await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
-    await expect(page.getByText(`Réponse de Max pour le tour ${turn}.`)).toBeVisible({ timeout: 10_000 });
+    await expect.poll(fakes.getTtsText).toContain(`Réponse de Max pour le tour ${turn}.`);
+    await expect(page.getByText(`Réponse de Max pour le tour ${turn}.`)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
   }
 
@@ -1045,7 +1052,7 @@ test("parcours PRD4 heureux avec trois tours de conversation", async ({ page }) 
 
 test("une réponse vocale plus longue que le watchdog est lue jusqu'au bout", async ({ page }) => {
   const longResponse = "D'accord, je vais reprendre calmement. La tension à la maison est palpable. Emma et moi ne nous parlons presque plus, et Léo comme Ava restent profondément affectés. J'essaie de les protéger sans toujours savoir si je fais les bons choix.";
-  await installNetworkFakes(page, ["Raconte-moi toute la suite sans couper."], {
+  const fakes = await installNetworkFakes(page, ["Raconte-moi toute la suite sans couper."], {
     ttsSuccess: true,
     maxResponse: longResponse,
   });
@@ -1063,7 +1070,8 @@ test("une réponse vocale plus longue que le watchdog est lue jusqu'au bout", as
   });
   await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
 
-  await expect(page.getByText(longResponse)).toBeVisible({ timeout: 10_000 });
+  await expect.poll(fakes.getTtsText).toContain(longResponse);
+  await expect(page.getByText(longResponse)).toHaveCount(0);
   await expect.poll(async () => page.evaluate(() =>
     (window as Window & { __e2eAudioState?: { ended: number } }).__e2eAudioState?.ended ?? 0,
   )).toBeGreaterThanOrEqual(2);
@@ -1092,7 +1100,8 @@ test("diagnostic full garde la voix réactive pendant un upload de trace bloqué
   await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
   await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
 
-  await expect(page.getByText("Réponse de Max pour le tour 1.")).toBeVisible({ timeout: 10_000 });
+  await expect.poll(fakes.getTtsText).toContain("Réponse de Max pour le tour 1.");
+  await expect(page.getByText("Réponse de Max pour le tour 1.")).toHaveCount(0);
   await expect.poll(fakes.getTraceUploadStarted, { timeout: 5_000 }).toBe(1);
   expect(fakes.getTraceUploadCompleted()).toBe(0);
   await expect.poll(async () => page.evaluate(() =>
@@ -1134,7 +1143,8 @@ test("un 429 system_busy ElevenLabs est rejoué une fois puis la voix démarre",
   await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
   await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
 
-  await expect(page.getByText("Réponse de Max pour le tour 1.")).toBeVisible({ timeout: 10_000 });
+  await expect.poll(fakes.getTtsText).toContain("Réponse de Max pour le tour 1.");
+  await expect(page.getByText("Réponse de Max pour le tour 1.")).toHaveCount(0);
   await expect.poll(fakes.getTtsCallCount).toBeGreaterThanOrEqual(2);
   await expect(page.getByText("Voix temporairement indisponible")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
@@ -1172,7 +1182,8 @@ test("endurance accélérée de 35 tours avec mémoire bornée et pannes récup�
     const expected = turn === 18
       ? /la ligne accroche/i
       : new RegExp(`Réponse de Max pour le tour ${turn}`);
-    await expect(page.getByText(expected)).toBeVisible({ timeout: 10_000 });
+    await expect.poll(fakes.getTtsText).toMatch(expected);
+    await expect(page.getByText(expected)).toHaveCount(0);
 
     if (turn !== 3 && await skipVideo.isVisible().catch(() => false)) {
       await skipVideo.click();
@@ -1272,7 +1283,8 @@ test("P2 : candidat rejeté réversible puis correction sur un mot, UI voix seul
   await page.getByRole("button", { name: "Activer le micro" }).click();
   await expect.poll(fakes.getMaxTurnCount).toBe(1);
   await expect(page.getByRole("status")).toHaveText(/Max répond/);
-  await expect(page.getByText("Bonjour Max, je suis là pour écouter.")).toHaveCount(0);
+  await expect(page.getByText("Bonjour Max, je suis là pour écouter.", { exact: false })).toBeVisible();
+  await expect(page.getByText("Bonjour. Je vous écoute.", { exact: true })).toHaveCount(0);
   const speech = async (value: boolean) => page.evaluate(value => (window as Window & { __e2eSpeech?: (value: boolean) => void }).__e2eSpeech?.(value), value);
   await speech(true); await page.waitForTimeout(90); await speech(false);
   await page.waitForTimeout(1650);

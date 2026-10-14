@@ -21,7 +21,7 @@ const baseProps = {
 };
 
 describe("ConversationScreen streaming avatar", () => {
-  it("keeps the subtitle and controls over a receive-only video element", () => {
+  it("keeps user transcription and controls over a receive-only video element", () => {
     const attachAvatarMedia = vi.fn();
     render(
       <ConversationScreen
@@ -39,9 +39,20 @@ describe("ConversationScreen streaming avatar", () => {
     fireEvent.loadedData(video);
     expect(video).toHaveClass("object-cover", "opacity-100");
     expect(attachAvatarMedia).toHaveBeenCalledWith(video);
-    expect(screen.getByText("Le texte exact envoyé au fournisseur.")).toBeInTheDocument();
+    expect(screen.queryByText("Le texte exact envoyé au fournisseur.")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Terminer/i })).toBeInTheDocument();
+  });
+
+  it("does not reattach the video while live user transcription changes", () => {
+    const attachAvatarMedia = vi.fn();
+    const props = { ...baseProps, streamingAvatarActive: true, attachAvatarMedia,
+      audioState: "user_speaking" as const, voiceOnly: true };
+    const { rerender } = render(<ConversationScreen {...props} userSubtitle="Je voudrais" />);
+    expect(screen.getByText("« Je voudrais »")).toBeInTheDocument();
+    rerender(<ConversationScreen {...props} userSubtitle="Je voudrais comprendre la fin" />);
+    expect(screen.getByText("« Je voudrais comprendre la fin »")).toBeInTheDocument();
+    expect(attachAvatarMedia).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the Max poster visible and announces the TTS fallback", () => {
