@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { autoSessionTitle } from "./sessionTitle";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity, ScanSearch, FlaskConical } from "lucide-react";
@@ -340,6 +341,37 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
   // window.confirm() est bloqué silencieusement dans l'iframe de prévisualisation :
   // confirmation par double clic (le 1er clic arme, le 2e dans les 4 s supprime).
   const [armedDelete, setArmedDelete] = useState<string | null>(null);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [armedBulk, setArmedBulk] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  function toggleChecked(id: string, on: boolean) {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id); else next.delete(id);
+      return next;
+    });
+  }
+  async function deleteChecked() {
+    if (!armedBulk) {
+      setArmedBulk(true);
+      toast.warning("Cliquez à nouveau pour confirmer la suppression");
+      setTimeout(() => setArmedBulk(false), 4000);
+      return;
+    }
+    setArmedBulk(false);
+    setBulkDeleting(true);
+    const ids = [...checkedIds];
+    let failed = 0;
+    for (let i = 0; i < ids.length; i += 100) {
+      const { error } = await supabase.from("sessions").delete().in("id", ids.slice(i, i + 100));
+      if (error) { failed += 1; toast.error("Erreur suppression: " + error.message); }
+    }
+    if (!failed) toast.success(`${ids.length} session(s) supprimée(s)`);
+    if (selected && checkedIds.has(selected.id)) onSelectSession(null);
+    setCheckedIds(new Set());
+    setBulkDeleting(false);
+    onRefresh();
+  }
   async function deleteSession(id: string) {
     if (armedDelete !== id) {
       setArmedDelete(id);
@@ -420,6 +452,23 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
             </SelectContent>
           </Select>
         </div>
+        <div className="mb-2 flex items-center gap-3 text-sm">
+          <Checkbox
+            aria-label="Tout sélectionner"
+            checked={visibleSessions.length > 0 && visibleSessions.every((s) => checkedIds.has(s.id))}
+            onCheckedChange={(v) => setCheckedIds(v === true ? new Set(visibleSessions.map((s) => s.id)) : new Set())}
+          />
+          <span className="text-muted-foreground">{checkedIds.size} sélectionnée(s)</span>
+          <Button
+            size="sm"
+            variant={armedBulk ? "destructive" : "outline"}
+            disabled={checkedIds.size === 0 || bulkDeleting}
+            onClick={deleteChecked}
+          >
+            <Trash2 className="mr-1 h-3 w-3" />
+            {armedBulk ? `Confirmer la suppression (${checkedIds.size})` : "Supprimer la sélection"}
+          </Button>
+        </div>
         <ScrollArea className="h-[70vh] border rounded-lg">
           {visibleSessions.map((s) => (
             <div
@@ -433,19 +482,24 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
               }}
             >
               <div className="flex justify-between items-start">
+                <div className="flex gap-2">
+                  <div onClick={(e) => e.stopPropagation()} className="pt-0.5">
+                    <Checkbox
+                      aria-label="Sélectionner la session"
+                      checked={checkedIds.has(s.id)}
+                      onCheckedChange={(v) => toggleChecked(s.id, v === true)}
+                    />
+                  </div>
                 <div>
-                  {s.name ? (
-                    <span className="text-sm font-semibold">{s.name}</span>
-                  ) : (
-                    <span className="text-xs font-mono text-muted-foreground">{s.id.slice(0, 8)}</span>
-                  )}
-                  <p className="text-xs text-muted-foreground">{fmt(s.started_at)}</p>
+                  <span className="text-sm font-semibold">{s.name || autoSessionTitle(s)}</span>
+                  <p className="text-[10px] font-mono text-muted-foreground">{s.id.slice(0, 8)} · {fmt(s.started_at)}</p>
                   <p className="mt-1 text-xs"><span className="text-muted-foreground">Compte :</span> {s.account_display_name ?? "public"}</p>
                   <p className="text-[11px] text-muted-foreground">
                     {s.environment_id} · {s.test_invitation_id ? "test externe" : s.context_type}
                     {s.campaign_id ? ` · ${s.campaign_id}` : ""}
                     {s.tester_label ? ` · ${s.tester_label}` : ""}
                   </p>
+                </div>
                 </div>
                 <div className="text-right text-xs flex items-center gap-2">
                   <span className={`inline-block px-2 py-0.5 rounded-full ${
