@@ -138,7 +138,7 @@ import {
 } from "@/services/characterIdentityGuard";
 import { appendExperienceEvent, applyTopicHandoffFallback, validateDirectorDecision } from "@/services/experienceDirector";
 import type { ExperienceDirectorDecisionV1, RuntimeCharacter } from "@/types";
-import { createAcousticInterruptionController, recognizedWordsChanged, endOfSpeechDelayMs, normalizeHandsFreeSettings, shouldBargeIn, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
+import { createAcousticInterruptionController, recognizedWordsChanged, withoutRejectedPrefix, endOfSpeechDelayMs, normalizeHandsFreeSettings, shouldBargeIn, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
 import {
   buildSwitchRequestGuidance,
   characterDisplayName,
@@ -2022,6 +2022,7 @@ const IndexPRD4 = () => {
   if (!acousticRef.current) acousticRef.current = createAcousticInterruptionController({
     observe: event => activeVoiceTelemetryRef.current?.interruption(event),
     confirm: text => { confirmedTextRef.current = text; interruptCharacter(); },
+    discard: text => { discardedPrefixRef.current = text; },
     recover: () => {
       activeTurnControllerRef.current?.abort("stt-recovery");
       activeOutputControllerRef.current?.abort("stt-recovery");
@@ -2038,7 +2039,7 @@ const IndexPRD4 = () => {
     let text = rawText;
     if (isFinal) {
       if (isProcessingRef.current) return;
-      if (discardedPrefixRef.current && text.startsWith(discardedPrefixRef.current)) text = text.slice(discardedPrefixRef.current.length).trim();
+      text = withoutRejectedPrefix(text, discardedPrefixRef.current);
       lastTranscriptRef.current = ""; discardedPrefixRef.current = "";
       if (!text.trim()) return;
       endLatencySegment(sttLatencySegmentRef.current); sttLatencySegmentRef.current = null;
@@ -2055,7 +2056,7 @@ const IndexPRD4 = () => {
         if (!shouldBargeIn(text, lastCharacterTextRef.current, settings)) { lastTranscriptRef.current = text; return; }
         interruptCharacter();
       }
-    } else if (discardedPrefixRef.current && text.startsWith(discardedPrefixRef.current)) text = text.slice(discardedPrefixRef.current.length).trim();
+    } else text = withoutRejectedPrefix(text, discardedPrefixRef.current);
     lastTranscriptRef.current = rawText;
     if (!changed || !text.trim()) return;
     if (!inputTelemetryRef.current) beginInputTelemetry("hands_free");

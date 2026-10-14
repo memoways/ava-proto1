@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAcousticInterruptionController, recognizedWordsChanged } from "./handsFreeVoice";
+import { createAcousticInterruptionController, recognizedWordsChanged, withoutRejectedPrefix } from "./handsFreeVoice";
 
 function setup() {
   const output = { attenuate: vi.fn(() => true), pause: vi.fn(() => true), resume: vi.fn(() => true), playedText: () => "Je ne sais pas où est Ava." };
@@ -7,6 +7,16 @@ function setup() {
   return { output, observe, confirm, recover, controller: createAcousticInterruptionController({ observe, confirm, recover }) };
 }
 describe("acoustic candidates at the output/recognition seam", () => {
+  it("retires rejected echo without losing the following utterance or a punctuation revision", () => {
+    const s = setup(); let rejected = "";
+    const controller = createAcousticInterruptionController({ observe: s.observe, confirm: s.confirm, recover: s.recover, discard: text => { rejected = text; } });
+    controller.signal(true, 0, s.output, "");
+    expect(controller.transcript("où est Ava", 20)).toBe(false);
+    expect(withoutRejectedPrefix("Où est Ava. Bonjour Max", rejected)).toBe("Bonjour Max");
+    expect(withoutRejectedPrefix("bonjour Max", rejected)).toBe("bonjour Max");
+    expect(withoutRejectedPrefix("Où est Ava?", rejected)).toBe("");
+    expect(s.confirm).not.toHaveBeenCalled();
+  });
   it("attenuates immediately, suspends persistent voice, and confirms one word", () => {
     const s = setup(); s.controller.signal(true, 0, s.output, "");
     expect(s.output.attenuate).toHaveBeenCalledOnce(); expect(s.confirm).not.toHaveBeenCalled();

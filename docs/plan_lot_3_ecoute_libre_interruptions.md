@@ -492,6 +492,11 @@ n'est pas inclus dans cette confiance ; ses réserves sont maintenues.
 
 ## Protocole humain et pilote préparé
 
+Revue finale Spec : un écho rejeté pouvait rester dans le buffer STT à la fin
+de sortie. Correction ciblée : mémoriser le préfixe corrélé rejeté puis retirer
+ce seul préfixe (y compris révision de ponctuation), sans vider l'énoncé suivant.
+Test au seam candidat → rejet → nouvelle parole et préfixe absent ajouté.
+
 Recette courte : Brave, admin → Tester moi-même, sandbox-ulrich. Vérifier
 Max puis Emma avec leur voix inchangée : réponse entière, une correction
 « non, attends » au milieu, réponse nouvelle après sa fin de parole ; une

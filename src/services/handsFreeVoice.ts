@@ -104,6 +104,16 @@ export function recognizedWordsChanged(previous: string, next: string): boolean 
   return words(previous).join(" ") !== words(next).join(" ");
 }
 
+/** Remove only a known rejected prefix, tolerating provider punctuation revisions. */
+export function withoutRejectedPrefix(text: string, prefix: string): string {
+  const rejected = words(prefix);
+  if (!rejected.length) return text;
+  const tokens = Array.from(text.matchAll(/[\p{L}\p{N}]+/gu));
+  if (tokens.length < rejected.length || rejected.some((word, i) => words(tokens[i][0])[0] !== word)) return text;
+  const last = tokens[rejected.length - 1];
+  return text.slice((last.index ?? 0) + last[0].length).replace(/^[\s.,!?;:…]+/, "");
+}
+
 export interface ReversibleVoiceOutput {
   attenuate(): boolean;
   pause(): boolean;
@@ -118,6 +128,7 @@ export function createAcousticInterruptionController(hooks: {
   observe: (event: InterruptionObservation) => void;
   confirm: (text: string) => void;
   recover: () => void;
+  discard?: (text: string) => void;
 }) {
   let candidate: { id: string; start: number; lastVoice: number; voiced: boolean; paused: boolean;
     baseline: string; output: ReversibleVoiceOutput } | null = null;
@@ -162,7 +173,7 @@ export function createAcousticInterruptionController(hooks: {
       // Only a contiguous actually played phrase is echo evidence. Shared vocabulary
       // with the generated reply cannot veto a correction; short yes/no remain valid.
       const isEcho = h.length >= 3 && played.join(" ").includes(h.join(" "));
-      if (isEcho) { reject(at); return false; }
+      if (isEcho) { hooks.discard?.(text); reject(at); return false; }
       event("interruption_confirmed", at);
       candidate = null;
       hooks.confirm(heard);
