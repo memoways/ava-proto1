@@ -184,6 +184,14 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     prompt: null,
     config: null,
   }));
+  // Bound the read so a Lovable RPC cannot block the character forever. The
+  // resolved snapshot is shared by the character and GM; a timeout therefore
+  // degrades both to the same explicit default instead of creating divergence.
+  const directorRuntimeSnapshotPromise = withTimeout(
+    "prd4_director_runtime",
+    directorRuntimePromise,
+    400,
+  ).catch(() => ({ versionId: null, versionNumber: null, prompt: null, config: null }));
 
   // --- RAG (best-effort, non-bloquant en cas d'erreur) -----------------------
   const ragStart = performance.now();
@@ -230,6 +238,10 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     ragContext = formatMaxRAGContext(matches, maxRagFormatOptionsForVariant(gameplay?.MAX_PROMPT_VARIANT));
     knowledgeContext = buildKnowledgeContextFromRAG(matches);
   } catch (err) {
+    // An aborted parent means this turn is obsolete, not that RAG merely
+    // degraded. Let the caller stop the character path before it can emit a
+    // response for a newer turn.
+    if (input.signal?.aborted) throw err;
     console.warn("[PRD4 orchestrator] RAG failed (non-fatal):", err);
     ragError = err instanceof Error ? err.message : String(err);
     ragErrorKind = /timed out/i.test(ragError) ? "rag_timeout" : "rag_client_error";
@@ -237,6 +249,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
 
   const rag_ms = Math.round(performance.now() - ragStart);
   input.onLatencySegment?.({ type: "end", segment: "RAG", service: "RAG", durationMs: rag_ms });
+  input.signal?.throwIfAborted();
 
   // --- Max --------------------------------------------------------------------
   const maxStart = performance.now();
@@ -270,10 +283,11 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     : undefined;
   const resolvedUserRoleSummary = input.userRole?.summary_for_max ?? postureSummary;
   // Cadre commun : lecture DB déjà lancée en parallèle du RAG, aucun appel IA ajouté.
-  const frameRuntime = await Promise.race([
-    directorRuntimePromise,
-    new Promise<{ config: null }>((resolve) => setTimeout(() => resolve({ config: null }), 400)),
-  ]);
+  // The published runtime is part of the shared experience frame. Do not
+  // manufacture a frame from a timeout fallback while the pinned config is
+  // still in flight: character and GM must receive the exact same frame.
+  const frameRuntime = await directorRuntimeSnapshotPromise;
+  input.signal?.throwIfAborted();
   const experienceFrame = buildExperienceFrame({
     config: frameRuntime.config?.frame,
     filmAnswer: input.hasSeenFilm,
@@ -360,7 +374,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     const gmStart = performance.now();
     input.onLatencySegment?.({ type: "start", segment: "GM", service: "GM post-turn" });
     try {
-      const directorRuntime = await directorRuntimePromise;
+      const directorRuntime = frameRuntime;
       return await evaluatePostTurnPRD4({
         onGmObserved: input.onGmObserved,
         sessionId: input.sessionId,

@@ -186,6 +186,7 @@ function createStreamingHandleWithFallback(
     voiceId: ctx?.voiceId || s.voiceId,
     format: s.streamingFormat,
     jsonConfig: buildJsonConfig(s, ctx?.performance),
+    bufferPreset: ctx?.bufferPreset,
     signal: ctx?.signal,
     onVoiceObservation: ctx?.onVoiceObservation,
   });
@@ -218,6 +219,12 @@ function createStreamingHandleWithFallback(
         statusCode: 200,
         firstByteMs: stats.firstByteMs,
         totalMs: stats.totalGenMs,
+        bufferPreset: stats.bufferPreset,
+        prebufferMs: stats.prebufferMs,
+        rebufferMs: stats.rebufferMs,
+        rebufferCount: stats.rebufferCount,
+        underrunCount: stats.underrunCount,
+        maxGapMs: stats.maxGapMs,
       });
     },
     (err) => maybeFallback(err),
@@ -252,6 +259,12 @@ function createStreamingHandleWithFallback(
           statusCode: result.meta.statusCode,
           firstByteMs: Math.round(performance.now() - t0),
           totalMs: Math.round(performance.now() - t0),
+          bufferPreset: null,
+          prebufferMs: null,
+          rebufferMs: null,
+          rebufferCount: null,
+          underrunCount: null,
+          maxGapMs: null,
         });
         if (openRequested) launchFallbackPlayback();
       },
@@ -309,7 +322,7 @@ export function createGradiumIncrementalTurn(ctx: TTSGenerateContext, onProgress
   const session = createGradiumTurnSession({
     voiceId: ctx.voiceId || s.voiceId,
     format: s.outputFormat === "pcm_24000" ? "pcm_24000" : "pcm_48000",
-    jsonConfig: buildJsonConfig(s, ctx.performance), signal: ctx.signal,
+    jsonConfig: buildJsonConfig(s, ctx.performance), bufferPreset: ctx.bufferPreset, signal: ctx.signal,
     onVoiceObservation: ctx.onVoiceObservation, onProgress,
   });
   return Object.assign(session, {

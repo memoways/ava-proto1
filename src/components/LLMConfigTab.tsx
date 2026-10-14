@@ -369,8 +369,9 @@ export default function LLMConfigTab() {
           <Slider
             value={[settings.LLM_MAX_TOKENS_GM]}
             onValueChange={([v]) => updateLocal({ LLM_MAX_TOKENS_GM: v })}
-            min={50} max={500} step={25}
+            min={950} max={2000} step={50}
           />
+          <p className="mt-1 text-xs text-muted-foreground">Plancher P3 : 950 tokens pour conserver le JSON complet (le réglage historique 180 est refusé).</p>
         </div>
       </section>
 

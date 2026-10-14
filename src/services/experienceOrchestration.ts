@@ -334,39 +334,52 @@ export async function uploadCharacterPortrait(
 }
 
 const runtimeCache = new Map<string, PinnedDirectorRuntime>();
+const runtimeInFlight = new Map<string, Promise<PinnedDirectorRuntime>>();
+const runtimeCacheEpoch = new Map<string, number>();
 
 export async function fetchPinnedDirectorRuntime(sessionId: string | null): Promise<PinnedDirectorRuntime> {
   if (!sessionId) return { versionId: null, versionNumber: null, prompt: null, config: null };
   const cached = runtimeCache.get(sessionId);
   if (cached) return cached;
-  await ensureGameAuth();
-  const { data: pinned, error: pinError } = await supabase.rpc(
-    "pin_current_orchestration_version" as never,
-    { p_session_id: sessionId } as never,
-  );
-  if (pinError) throw pinError;
-  if (!pinned) {
-    const empty = { versionId: null, versionNumber: null, prompt: null, config: null };
-    runtimeCache.set(sessionId, empty);
-    return empty;
-  }
-  const { data, error } = await supabase.rpc(
-    "get_pinned_orchestration_runtime" as never,
-    { p_session_id: sessionId } as never,
-  );
-  if (error) throw error;
-  const rows = (data ?? null) as unknown as Record<string, unknown>[] | null;
-  const row = Array.isArray(rows) ? rows[0] : undefined;
-  const runtime: PinnedDirectorRuntime = {
-    versionId: typeof row?.version_id === "string" ? row.version_id : String(pinned),
-    versionNumber: typeof row?.version_number === "number" ? row.version_number : null,
-    prompt: typeof row?.prompt === "string" ? row.prompt : null,
-    config: row?.config && typeof row.config === "object"
-      ? normalizeDirectorConfig(row.config as Partial<ExperienceDirectorConfig>)
-      : null,
-  };
-  runtimeCache.set(sessionId, runtime);
-  return runtime;
+  const pending = runtimeInFlight.get(sessionId);
+  if (pending) return pending;
+  const requestEpoch = runtimeCacheEpoch.get(sessionId) ?? 0;
+  runtimeCacheEpoch.set(sessionId, requestEpoch);
+  const request = (async () => {
+    await ensureGameAuth();
+    const { data: pinned, error: pinError } = await supabase.rpc(
+      "pin_current_orchestration_version" as never,
+      { p_session_id: sessionId } as never,
+    );
+    if (pinError) throw pinError;
+    if (!pinned) {
+      const empty = { versionId: null, versionNumber: null, prompt: null, config: null };
+      if (runtimeCacheEpoch.get(sessionId) === requestEpoch) runtimeCache.set(sessionId, empty);
+      return empty;
+    }
+    const { data, error } = await supabase.rpc(
+      "get_pinned_orchestration_runtime" as never,
+      { p_session_id: sessionId } as never,
+    );
+    if (error) throw error;
+    const rows = (data ?? null) as unknown as Record<string, unknown>[] | null;
+    const row = Array.isArray(rows) ? rows[0] : undefined;
+    const runtime: PinnedDirectorRuntime = {
+      versionId: typeof row?.version_id === "string" ? row.version_id : String(pinned),
+      versionNumber: typeof row?.version_number === "number" ? row.version_number : null,
+      prompt: typeof row?.prompt === "string" ? row.prompt : null,
+      config: row?.config && typeof row.config === "object"
+        ? normalizeDirectorConfig(row.config as Partial<ExperienceDirectorConfig>)
+        : null,
+    };
+    if (runtimeCacheEpoch.get(sessionId) === requestEpoch) runtimeCache.set(sessionId, runtime);
+    return runtime;
+  })();
+  runtimeInFlight.set(sessionId, request);
+  void request.finally(() => {
+    if (runtimeInFlight.get(sessionId) === request) runtimeInFlight.delete(sessionId);
+  }).catch(() => {});
+  return request;
 }
 
 export interface CharacterRuntimeReadiness {
@@ -415,6 +428,15 @@ export async function getCharacterRuntimeReadiness(character: "max" | "emma"): P
 }
 
 export function clearDirectorRuntimeCache(sessionId?: string): void {
-  if (sessionId) runtimeCache.delete(sessionId);
-  else runtimeCache.clear();
+  if (sessionId) {
+    runtimeCache.delete(sessionId);
+    runtimeInFlight.delete(sessionId);
+    runtimeCacheEpoch.set(sessionId, (runtimeCacheEpoch.get(sessionId) ?? 0) + 1);
+  } else {
+    runtimeCache.clear();
+    runtimeInFlight.clear();
+    for (const sessionKey of runtimeCacheEpoch.keys()) {
+      runtimeCacheEpoch.set(sessionKey, (runtimeCacheEpoch.get(sessionKey) ?? 0) + 1);
+    }
+  }
 }

@@ -33,8 +33,12 @@ const SCHEDULE_MARGIN_S = 0.03;
  * each late WS chunk created a gap then a hard restart — heard as "hiccups"
  * and clicks in the middle of words.
  */
-const PREBUFFER_S = 0.3;
-const REBUFFER_S = 0.2;
+export const GRADIUM_BUFFER_PRESETS = {
+  current: { prebufferMs: 300, rebufferMs: 200 },
+  "160": { prebufferMs: 160, rebufferMs: 160 },
+  "240": { prebufferMs: 240, rebufferMs: 200 },
+} as const;
+export type GradiumBufferPreset = keyof typeof GRADIUM_BUFFER_PRESETS;
 /** Short fade applied when playback (re)starts after silence, to avoid clicks. */
 const FADE_S = 0.004;
 
@@ -44,6 +48,8 @@ export interface GradiumStreamOptions {
   format: "pcm_24000" | "pcm_48000";
   /** temp / cfg_coef / padding_bonus / rewrite_rules / pronunciation_id */
   jsonConfig: Record<string, unknown>;
+  /** Lab-only playback buffer choice. Omitting it preserves the current 300/200 ms behaviour. */
+  bufferPreset?: GradiumBufferPreset;
   signal?: AbortSignal;
   onVoiceObservation?: VoiceObserver;
   onProgress?: (progress: GradiumAudioProgress) => void;
@@ -55,6 +61,12 @@ export interface GradiumStreamStats {
   /** ms from session creation to upstream end_of_stream (all audio received). */
   totalGenMs: number;
   bytes: number;
+  bufferPreset: GradiumBufferPreset;
+  prebufferMs: number;
+  rebufferMs: number;
+  rebufferCount: number;
+  underrunCount: number;
+  maxGapMs: number;
 }
 
 export interface GradiumAudioProgress {
@@ -147,6 +159,8 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
   const lifetime = new AbortController();
   const sampleRate = opts.format === "pcm_48000" ? 48000 : 24000;
   const wireFormat = opts.format === "pcm_48000" ? "pcm" : opts.format;
+  const bufferPreset: GradiumBufferPreset = opts.bufferPreset ?? "current";
+  const bufferConfig = GRADIUM_BUFFER_PRESETS[bufferPreset];
 
   const started = deferred<void>();
   const finished = deferred<{ playbackTotalMs: number }>();
@@ -196,6 +210,10 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
   let preAudioTimer: ReturnType<typeof setTimeout> | null = null;
   let stallTimer: ReturnType<typeof setTimeout> | null = null;
   let drainTimer: ReturnType<typeof setTimeout> | null = null;
+  let gapOpen = false;
+  let rebufferCount = 0;
+  let underrunCount = 0;
+  let maxGapMs = 0;
 
   const clearTimers = () => {
     if (drainTimer) { clearTimeout(drainTimer); drainTimer = null; }
@@ -356,13 +374,23 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
     if (pendingChunks.length === 0) { checkFinished(); return; }
     // Idle = nothing queued ahead of the audio clock (start, or underrun).
     const idle = playCursor <= ctx.currentTime + 0.005;
-    if (idle && !eosReceived && pendingDuration() < (hasPlayed ? REBUFFER_S : PREBUFFER_S)) return;
+    if (idle && !eosReceived && pendingDuration() < (hasPlayed ? bufferConfig.rebufferMs : bufferConfig.prebufferMs) / 1000) {
+      const gapMs = Math.max(0, ctx.currentTime - playCursor) * 1000;
+      if (hasPlayed && gapMs > 5 && !gapOpen) {
+        gapOpen = true;
+        rebufferCount += 1;
+        underrunCount += 1;
+        maxGapMs = Math.max(maxGapMs, Math.round(gapMs));
+      }
+      return;
+    }
     let first = idle;
     while (pendingChunks.length > 0) {
       scheduleChunk(pendingChunks.shift()!, ctx, first);
       first = false;
     }
     hasPlayed = true;
+    gapOpen = false;
     checkFinished();
   };
 
@@ -385,6 +413,12 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
       firstByteMs: firstByteMs ?? 0,
       totalGenMs: Math.round(performance.now() - t0),
       bytes: totalBytes,
+      bufferPreset,
+      prebufferMs: bufferConfig.prebufferMs,
+      rebufferMs: bufferConfig.rebufferMs,
+      rebufferCount,
+      underrunCount,
+      maxGapMs,
     });
     flushPending();
     checkFinished();

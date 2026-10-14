@@ -4,7 +4,7 @@ import { ToolError } from "@lovable.dev/mcp-js";
 import { defineTool } from "../defineTool";
 import { z } from "zod-mcp";
 import { supabaseForAdmin } from "../supabase";
-import { latencyStats, sinceIso, sumBy, tally } from "../stats";
+import { latencyStats, sinceIso, sumBy, tally, toNumber } from "../stats";
 
 const MAX_ROWS = 3000;
 
@@ -41,7 +41,7 @@ export default defineTool({
     percentileMethod: z.string(), environmentFilter: z.string().nullable(),
     legacy: z.object({ source: z.array(z.string()), attribution: z.string(), filtersApplied: z.array(z.string()), additionalV2FiltersApplied: z.literal(false) }),
     v2: voiceTurnPageSchema,
-    audio: z.object({ samples: z.number(), cappedAt: z.number(), byDirection: z.record(z.string(), z.number()), byContextType: z.record(z.string(), z.number()), sttMs: latencyStatsSchema, ttsFirstByteMs: latencyStatsSchema, ttsTotalMs: latencyStatsSchema, playbackMs: latencyStatsSchema, spokenChars: z.number(), heardChars: z.number() }),
+    audio: z.object({ samples: z.number(), cappedAt: z.number(), byDirection: z.record(z.string(), z.number()), byContextType: z.record(z.string(), z.number()), sttMs: latencyStatsSchema, ttsFirstByteMs: latencyStatsSchema, ttsTotalMs: latencyStatsSchema, playbackMs: latencyStatsSchema, spokenChars: z.number(), heardChars: z.number(), buffer: z.object({ samples: z.number(), presets: z.record(z.string(), z.number()), prebufferMs: latencyStatsSchema, rebufferMs: latencyStatsSchema, rebufferCount: z.number(), underrunCount: z.number(), maxGapMs: latencyStatsSchema }) }),
     turn: z.object({ samples: z.number(), cappedAt: z.number(), byContextType: z.record(z.string(), z.number()), ragTotalMs: latencyStatsSchema, characterLlmMs: latencyStatsSchema, characterFirstTokenMs: latencyStatsSchema, validatorMs: latencyStatsSchema, gameMasterPostMs: latencyStatsSchema, turnTotalMs: latencyStatsSchema, fallbackTurns: z.number(), tokens: z.number() }),
   }) }),
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
@@ -58,7 +58,7 @@ export default defineTool({
     let audioQuery = supabase
       .from("audio_latencies")
       .select(
-        "direction,t_stt_ms,t_tts_first_byte_ms,t_tts_total_ms,t_audio_playback_ms,stt_text_len,tts_text_len,context_type",
+        "direction,t_stt_ms,t_tts_first_byte_ms,t_tts_total_ms,t_audio_playback_ms,stt_text_len,tts_text_len,context_type,metadata_json",
       )
       .gte("created_at", since)
       .lt("created_at", until)
@@ -83,6 +83,11 @@ export default defineTool({
 
     const audioRows = audio.data ?? [];
     const turnRows = turn.data ?? [];
+    const audioMeta = (row: { metadata_json?: unknown }): Record<string, unknown> =>
+      row.metadata_json && typeof row.metadata_json === "object" && !Array.isArray(row.metadata_json)
+        ? row.metadata_json as Record<string, unknown>
+        : {};
+    const bufferRows = audioRows.filter((row) => typeof audioMeta(row).buffer_preset === "string");
 
     const summary = {
       windowDays: days,
@@ -102,6 +107,15 @@ export default defineTool({
         playbackMs: latencyStats(audioRows.map((row) => row.t_audio_playback_ms)),
         spokenChars: sumBy(audioRows, (row) => row.tts_text_len),
         heardChars: sumBy(audioRows, (row) => row.stt_text_len),
+        buffer: {
+          samples: bufferRows.length,
+          presets: tally(bufferRows, (row) => String(audioMeta(row).buffer_preset)),
+          prebufferMs: latencyStats(bufferRows.map((row) => toNumber(audioMeta(row).buffer_prebuffer_ms))),
+          rebufferMs: latencyStats(bufferRows.map((row) => toNumber(audioMeta(row).buffer_rebuffer_ms))),
+          rebufferCount: sumBy(bufferRows, (row) => toNumber(audioMeta(row).buffer_rebuffer_count)),
+          underrunCount: sumBy(bufferRows, (row) => toNumber(audioMeta(row).buffer_underrun_count)),
+          maxGapMs: latencyStats(bufferRows.map((row) => toNumber(audioMeta(row).buffer_max_gap_ms))),
+        },
       },
       turn: {
         samples: turnRows.length,

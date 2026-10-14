@@ -51,6 +51,7 @@ describe("queryRAGDetailed — requête réellement envoyée", () => {
       include_retrieval_matches: true,
     });
     expect(result.searchInput).toBe("Où est Ava ?\n\nContexte récent: Max a parlé de Lausanne");
+    expect(result.request.variantKey).toBe("rerank=rerank-2.5-lite|retrieve=15|top=5|threshold=0.3|truncate=false|raw");
   });
 
   it("envoie la requête réécrite et conserve l'ordre ainsi que tous les scores", async () => {

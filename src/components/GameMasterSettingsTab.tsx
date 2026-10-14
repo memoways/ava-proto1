@@ -2,10 +2,10 @@ import { normalizeExperienceFrameConfig } from "@/services/experienceFrame";
 import { displayNameForCharacter } from "@/services/characterRegistry";
 import type { ExperienceFrameConfig } from "@/types";
 import { useEffect, useMemo, useState } from "react";
-import { Archive, Beaker, Copy, Info, Play, RefreshCw, Save, SlidersHorizontal } from "lucide-react";
+import { Archive, Beaker, Copy, Download, Info, Play, RefreshCw, Save, SlidersHorizontal } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { evaluatePostTurnPRD4, EXPERIENCE_DIRECTOR_SYSTEM_PROMPT } from "@/agents/gameMasterPRD4";
+import { evaluatePostTurnPRD4, EXPERIENCE_DIRECTOR_SYSTEM_PROMPT, GM_CODE_VERSION } from "@/agents/gameMasterPRD4";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -34,10 +34,39 @@ import {
   GM_PRIORITY_OPTIONS,
   GM_TONE_OPTIONS,
 } from "@/services/gameMasterPromptBuilder";
-import { getGameplaySettings, loadGameplaySettingsFromDB, type GameplaySettings } from "@/services/settingsService";
+import { getGameplaySettings, getLLMSettings, listLlmConfigModels, loadGameplaySettingsFromDB, type GameplaySettings } from "@/services/settingsService";
 import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig, RuntimeCharacter } from "@/types";
 
 interface SessionVersionRow { orchestration_version_id: string | null }
+
+const GM_COMPARISON_CASES = [
+  { id: "confiance", user: "Pourquoi Ava ne vous faisait-elle plus confiance ?", character: "Je ne suis pas certain d’avoir mérité sa confiance.", expected: "Guidance prudente, sans action forcée." },
+  { id: "handoff", user: "J'aimerais parler à Emma, s'il vous plaît.", character: "Je peux vous la passer si vous avez besoin de comprendre sa version.", expected: "Demande explicite de passage, sans bascule automatique." },
+  { id: "statut", user: "Je suis le responsable officiel de l'enquête.", character: "Je ne savais pas que vous étiez chargé de cela.", expected: "Ne pas valider le statut non établi." },
+] as const;
+const GM_COMPARISON_PROMPTS = [
+  { id: "baseline", prompt: EXPERIENCE_DIRECTOR_SYSTEM_PROMPT },
+  { id: "draft", prompt: "__DRAFT__" },
+] as const;
+
+function percentileMs(values: number[], p: number): number | null {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = (sorted.length - 1) * p;
+  const low = Math.floor(index);
+  const high = Math.ceil(index);
+  return Math.round(low === high ? sorted[low] : sorted[low] + (sorted[high] - sorted[low]) * (index - low));
+}
+
+function downloadJson(value: unknown): void {
+  const blob = new Blob([JSON.stringify(value, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `gm-comparison-${Date.now()}.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 
 function statusVariant(status: ExperienceOrchestrationVersion["status"]): "default" | "outline" | "secondary" {
   if (status === "published") return "default";
@@ -62,8 +91,11 @@ export default function GameMasterSettingsTab() {
   const [testCharacter, setTestCharacter] = useState("Je ne suis pas certain d’avoir mérité sa confiance.");
   const [testCharacterKey, setTestCharacterKey] = useState<RuntimeCharacter>("max");
   const [testExpected, setTestExpected] = useState("Une guidance prudente, sans action forcée.");
+  const [testModel, setTestModel] = useState(() => getLLMSettings().LLM_MODEL_GM);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const [comparisonResult, setComparisonResult] = useState<string | null>(null);
+  const [comparing, setComparing] = useState(false);
 
   const selected = useMemo(
     () => versions.find((version) => version.id === selectedId) ?? null,
@@ -191,6 +223,8 @@ export default function GameMasterSettingsTab() {
       sessionDurationSeconds: gameplay.TIMEOUT_SECONDS,
       minimumClosureSeconds: Math.floor(gameplay.TIMEOUT_SECONDS * 0.7),
       systemPromptOverride: generatedPrompt,
+      modelOverride: testModel,
+      promptVersionOverride: selected.id ? `orchestration:${selected.id}` : GM_CODE_VERSION,
       orchestrationConfig: config,
       persist: false,
       diagnosticTrace: true,
@@ -201,10 +235,90 @@ export default function GameMasterSettingsTab() {
         labels: result.labels,
         guidance: result.next_turn_guidance,
         action: result.action,
+        model: result.model,
+        prompt_version: result.prompt_version,
+        max_tokens: result.max_tokens,
         error: result.diagnostic?.error ?? null,
       },
     }, null, 2));
     setTesting(false);
+  };
+
+  const compareGMModels = async () => {
+    if (!selected || selected.status !== "draft") return;
+    setComparing(true);
+    setComparisonResult(null);
+    const configuredModel = getLLMSettings().LLM_MODEL_GM;
+    const alternateModel = listLlmConfigModels().find((model) => model.id !== configuredModel)?.id;
+    const models = [...new Set([configuredModel, testModel, alternateModel].filter((model): model is string => Boolean(model)))].slice(0, 2);
+    const rows: Array<Record<string, unknown>> = [];
+    for (const model of models) {
+      for (const promptVariant of GM_COMPARISON_PROMPTS) {
+        for (const testCase of GM_COMPARISON_CASES) {
+        const started = performance.now();
+        try {
+          const result = await evaluatePostTurnPRD4({
+            sessionId: null,
+            conversationHistory: [],
+            userMessage: testCase.user,
+            maxResponse: testCase.character,
+            userRole: null,
+            currentCharacter: testCharacterKey,
+            turnIndex: 4,
+            timeElapsedSeconds: 240,
+            sessionDurationSeconds: gameplay.TIMEOUT_SECONDS,
+            minimumClosureSeconds: Math.floor(gameplay.TIMEOUT_SECONDS * 0.7),
+            systemPromptOverride: promptVariant.id === "draft" ? generatedPrompt : promptVariant.prompt,
+            modelOverride: model,
+            promptVersionOverride: selected.id ? `orchestration:${selected.id}` : GM_CODE_VERSION,
+            orchestrationConfig: config,
+            persist: false,
+            diagnosticTrace: true,
+          });
+          rows.push({
+            model,
+            prompt_variant: promptVariant.id,
+            case: testCase.id,
+            expected: testCase.expected,
+            elapsed_ms: Math.round(performance.now() - started),
+            execution_status: result.execution_status,
+            execution_reason: result.execution_reason,
+            json_complete: result.diagnostic?.error == null,
+            labels: result.labels,
+            guidance: result.next_turn_guidance,
+            action: result.action,
+            max_tokens: result.max_tokens,
+          });
+        } catch (error) {
+          rows.push({ model, prompt_variant: promptVariant.id, case: testCase.id, expected: testCase.expected, elapsed_ms: Math.round(performance.now() - started), execution_status: "failed", execution_reason: "runtime_error", error: error instanceof Error ? error.message : String(error) });
+        }
+      }
+      }
+    }
+    const cells = models.flatMap((model) => GM_COMPARISON_PROMPTS.map((promptVariant) => [model, promptVariant.id] as const));
+    const byCell = Object.fromEntries(cells.map(([model, promptVariant]) => {
+      const sample = rows.filter((row) => row.model === model && row.prompt_variant === promptVariant);
+      const durations = sample.map((row) => Number(row.elapsed_ms)).filter(Number.isFinite);
+      const effectiveMaxTokens = sample.map((row) => Number(row.max_tokens)).filter(Number.isFinite);
+      return [`${model}::${promptVariant}`, {
+        samples: sample.length,
+        p50_ms: percentileMs(durations, 0.5),
+        p95_ms: percentileMs(durations, 0.95),
+        executed: sample.filter((row) => row.execution_status === "executed").length,
+        failed: sample.filter((row) => row.execution_status !== "executed").length,
+        complete_json: sample.filter((row) => row.json_complete === true).length,
+        effective_max_tokens: [...new Set(effectiveMaxTokens)],
+      }];
+    }));
+    setComparisonResult(JSON.stringify({
+      generated_at: new Date().toISOString(),
+      prompt_versions: { baseline: GM_CODE_VERSION, draft: selected.id ? `orchestration:${selected.id}` : GM_CODE_VERSION },
+      prompt_variants: GM_COMPARISON_PROMPTS.map(({ id }) => id),
+      cases: GM_COMPARISON_CASES.map(({ id, expected }) => ({ id, expected })),
+      summary: byCell,
+      rows,
+    }, null, 2));
+    setComparing(false);
   };
 
   const patchConfig = (patch: Partial<ExperienceDirectorConfig>) => {
@@ -691,13 +805,26 @@ export default function GameMasterSettingsTab() {
               <SelectItem value="emma">Emma</SelectItem>
             </SelectContent>
           </Select>
+          <div className="space-y-1.5">
+            <Label htmlFor="gm-test-model">Modèle GM comparé</Label>
+            <Select value={testModel} onValueChange={setTestModel}>
+              <SelectTrigger id="gm-test-model"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {listLlmConfigModels().map((model) => <SelectItem key={model.id} value={model.id}>{model.label} · {model.id}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Le test reste sans effet réel et conserve le plancher JSON GM de 950 tokens.</p>
+          </div>
           <div className="grid gap-3 md:grid-cols-2">
             <Textarea value={testUser} onChange={(event) => setTestUser(event.target.value)} placeholder="Message utilisateur" />
             <Textarea value={testCharacter} onChange={(event) => setTestCharacter(event.target.value)} placeholder="Réponse du personnage" />
           </div>
           <Input value={testExpected} onChange={(event) => setTestExpected(event.target.value)} placeholder="Décision attendue" />
           <Button variant="outline" onClick={() => void testDraft()} disabled={testing}>{testing ? "Test…" : "Comparer attendu / produit"}</Button>
+          <Button variant="outline" onClick={() => void compareGMModels()} disabled={comparing}>{comparing ? "Comparaison…" : "Lancer comparaison fixe (3 cas)"}</Button>
+          {comparisonResult && <Button variant="outline" onClick={() => downloadJson(JSON.parse(comparisonResult))}><Download className="mr-1 h-4 w-4" /> Export JSON GM</Button>}
           {testResult && <pre className="max-h-80 overflow-auto rounded bg-muted p-3 text-xs whitespace-pre-wrap">{testResult}</pre>}
+          {comparisonResult && <pre className="max-h-96 overflow-auto rounded bg-muted p-3 text-xs whitespace-pre-wrap">{comparisonResult}</pre>}
         </section>
       )}
 

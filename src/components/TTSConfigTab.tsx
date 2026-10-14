@@ -9,6 +9,7 @@ import { Save, RotateCcw, CheckCircle2, HelpCircle } from "lucide-react";
 import { generateSpeech, playAudioBlob, tryCreateStreamingPlayback } from "@/services/tts";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
 import type { TTSProviderId } from "@/services/tts/types";
+import { GRADIUM_BUFFER_PRESETS, type GradiumBufferPreset } from "@/services/tts/gradiumStreamPlayer";
 import {
   getActiveProviderId,
   loadActiveProviderFromDB,
@@ -143,6 +144,7 @@ export default function TTSConfigTab() {
   // Test
   const [testing, setTesting] = useState<TTSProviderId | null>(null);
   const [testingStream, setTestingStream] = useState(false);
+  const [gradiumBufferPreset, setGradiumBufferPreset] = useState<GradiumBufferPreset>("current");
   const [auditionEmotion, setAuditionEmotion] = useState<CanonicalEmotion>("tense");
   const auditionEmotionRef = useRef(auditionEmotion);
   auditionEmotionRef.current = auditionEmotion;
@@ -206,6 +208,7 @@ export default function TTSConfigTab() {
       characterKey: character?.character_key,
       voiceId: character?.tts_voice_id ?? undefined,
       performance: intentFromManualEmotion(auditionEmotionRef.current, AUDITION_INTENSITY),
+      ...(mode === "stream" && gradiumBufferPreset !== "current" ? { bufferPreset: gradiumBufferPreset } : {}),
     };
     if (mode === "rest") {
       setTesting("gradium");
@@ -240,7 +243,7 @@ export default function TTSConfigTab() {
     } finally {
       setTestingStream(false);
     }
-  }, [grCharacters]);
+  }, [grCharacters, gradiumBufferPreset]);
 
   // ElevenLabs helpers
   function updateEl(patch: Partial<TTSSettings>) {
@@ -861,6 +864,19 @@ export default function TTSConfigTab() {
               <option value="pcm_48000">pcm_48000 (natif Gradium)</option>
             </select>
             <span className="block text-xs text-muted-foreground/60">PCM brut envoyé sur le WebSocket. 24 kHz = moitié moins de données ; 48 kHz = qualité native.</span>
+          </label>
+
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-muted-foreground">Preset buffer — banc streaming</span>
+            <select value={gradiumBufferPreset}
+              onChange={(e) => setGradiumBufferPreset(e.target.value as GradiumBufferPreset)}
+              disabled={!grSettings.streamingEnabled}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50">
+              {Object.entries(GRADIUM_BUFFER_PRESETS).map(([id, preset]) => (
+                <option key={id} value={id}>{id} · {preset.prebufferMs}/{preset.rebufferMs} ms</option>
+              ))}
+            </select>
+            <span className="block text-xs text-muted-foreground/60">Banc admin uniquement ; le chemin live conserve toujours `current`.</span>
           </label>
         </div>
 

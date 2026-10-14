@@ -390,6 +390,8 @@ function projectVoiceEvents(rows) {
     if (!previous || previous.status === "started") attempts.set(key, event.turn);
   }
   const turns = [...attempts.values()];
+  const gmEvents = events.filter((event) => event.event_name === "voice_turn_gm");
+  const gmSpanStatus = (event, spanName) => event.turn.server.flatMap((server) => server.spans).find((span) => span.name === spanName)?.status ?? "not_measured";
   return {
     events,
     invalidRows: rows.length - events.length,
@@ -406,7 +408,9 @@ function projectVoiceEvents(rows) {
       voiceEndToOutputEstimatedMs: latencyStats(turns.map((turn) => turn.durations.t_turn_voice_ready_ms)),
       generationTotalMs: latencyStats(turns.map((turn) => turn.durations.generation_total_ms)),
       playbackMs: latencyStats(turns.map((turn) => turn.durations.playback_ms)),
-      gmObservations: events.filter((event) => event.event_name === "voice_turn_gm").length
+      gmObservations: gmEvents.length,
+      gmGenerationStatuses: tally(gmEvents, (event) => gmSpanStatus(event, "gm_generation")),
+      gmAvailabilityStatuses: tally(gmEvents, (event) => gmSpanStatus(event, "gm_available"))
     }
   };
 }
@@ -425,7 +429,9 @@ var voiceTurnPageSchema = z4.object({
     voiceEndToOutputEstimatedMs: latencyStatsSchema,
     generationTotalMs: latencyStatsSchema,
     playbackMs: latencyStatsSchema,
-    gmObservations: z4.number().int().nonnegative()
+    gmObservations: z4.number().int().nonnegative(),
+    gmGenerationStatuses: countsSchema,
+    gmAvailabilityStatuses: countsSchema
   }),
   page: z4.object({ offset: z4.number().int().nonnegative(), limit: z4.number().int().nonnegative(), nextOffset: z4.number().int().nullable(), cappedAt: z4.literal(3e3), capped: z4.boolean() }),
   window: z4.object({ from: z4.string(), to: z4.string() }),
@@ -501,7 +507,7 @@ var get_voice_latencies_default = defineTool({
     environmentFilter: z5.string().nullable(),
     legacy: z5.object({ source: z5.array(z5.string()), attribution: z5.string(), filtersApplied: z5.array(z5.string()), additionalV2FiltersApplied: z5.literal(false) }),
     v2: voiceTurnPageSchema,
-    audio: z5.object({ samples: z5.number(), cappedAt: z5.number(), byDirection: z5.record(z5.string(), z5.number()), byContextType: z5.record(z5.string(), z5.number()), sttMs: latencyStatsSchema, ttsFirstByteMs: latencyStatsSchema, ttsTotalMs: latencyStatsSchema, playbackMs: latencyStatsSchema, spokenChars: z5.number(), heardChars: z5.number() }),
+    audio: z5.object({ samples: z5.number(), cappedAt: z5.number(), byDirection: z5.record(z5.string(), z5.number()), byContextType: z5.record(z5.string(), z5.number()), sttMs: latencyStatsSchema, ttsFirstByteMs: latencyStatsSchema, ttsTotalMs: latencyStatsSchema, playbackMs: latencyStatsSchema, spokenChars: z5.number(), heardChars: z5.number(), buffer: z5.object({ samples: z5.number(), presets: z5.record(z5.string(), z5.number()), prebufferMs: latencyStatsSchema, rebufferMs: latencyStatsSchema, rebufferCount: z5.number(), underrunCount: z5.number(), maxGapMs: latencyStatsSchema }) }),
     turn: z5.object({ samples: z5.number(), cappedAt: z5.number(), byContextType: z5.record(z5.string(), z5.number()), ragTotalMs: latencyStatsSchema, characterLlmMs: latencyStatsSchema, characterFirstTokenMs: latencyStatsSchema, validatorMs: latencyStatsSchema, gameMasterPostMs: latencyStatsSchema, turnTotalMs: latencyStatsSchema, fallbackTurns: z5.number(), tokens: z5.number() })
   }) }),
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
@@ -515,7 +521,7 @@ var get_voice_latencies_default = defineTool({
     if (Date.parse(since) >= Date.parse(until) || Date.parse(until) - Date.parse(since) > 365 * 864e5) throw new ToolError3("Invalid time window (maximum 365 days)");
     const v2 = await readVoiceTurnPage(supabase, { ...filters, from: since, to: until, environment });
     let audioQuery = supabase.from("audio_latencies").select(
-      "direction,t_stt_ms,t_tts_first_byte_ms,t_tts_total_ms,t_audio_playback_ms,stt_text_len,tts_text_len,context_type"
+      "direction,t_stt_ms,t_tts_first_byte_ms,t_tts_total_ms,t_audio_playback_ms,stt_text_len,tts_text_len,context_type,metadata_json"
     ).gte("created_at", since).lt("created_at", until).order("created_at", { ascending: false }).range(0, MAX_ROWS - 1);
     if (environment) audioQuery = audioQuery.eq("environment_id", environment);
     let turnQuery = supabase.from("turn_latencies").select(
@@ -527,6 +533,8 @@ var get_voice_latencies_default = defineTool({
     if (turn.error) throw new ToolError3(`Turn latencies could not be read: ${turn.error.message}`);
     const audioRows = audio.data ?? [];
     const turnRows = turn.data ?? [];
+    const audioMeta = (row) => row.metadata_json && typeof row.metadata_json === "object" && !Array.isArray(row.metadata_json) ? row.metadata_json : {};
+    const bufferRows = audioRows.filter((row) => typeof audioMeta(row).buffer_preset === "string");
     const summary = {
       windowDays: days,
       window: { from: since, to: until },
@@ -544,7 +552,16 @@ var get_voice_latencies_default = defineTool({
         ttsTotalMs: latencyStats(audioRows.map((row) => row.t_tts_total_ms)),
         playbackMs: latencyStats(audioRows.map((row) => row.t_audio_playback_ms)),
         spokenChars: sumBy(audioRows, (row) => row.tts_text_len),
-        heardChars: sumBy(audioRows, (row) => row.stt_text_len)
+        heardChars: sumBy(audioRows, (row) => row.stt_text_len),
+        buffer: {
+          samples: bufferRows.length,
+          presets: tally(bufferRows, (row) => String(audioMeta(row).buffer_preset)),
+          prebufferMs: latencyStats(bufferRows.map((row) => toNumber(audioMeta(row).buffer_prebuffer_ms))),
+          rebufferMs: latencyStats(bufferRows.map((row) => toNumber(audioMeta(row).buffer_rebuffer_ms))),
+          rebufferCount: sumBy(bufferRows, (row) => toNumber(audioMeta(row).buffer_rebuffer_count)),
+          underrunCount: sumBy(bufferRows, (row) => toNumber(audioMeta(row).buffer_underrun_count)),
+          maxGapMs: latencyStats(bufferRows.map((row) => toNumber(audioMeta(row).buffer_max_gap_ms)))
+        }
       },
       turn: {
         samples: turnRows.length,

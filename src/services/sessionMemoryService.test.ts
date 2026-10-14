@@ -47,6 +47,16 @@ describe("sessionMemoryService — cache mémoire des résumés", () => {
     expect(maybeSingle).toHaveBeenCalledOnce();
   });
 
+  it("déduplique deux lectures concurrentes d'un résumé absent", async () => {
+    let resolveRead!: (value: { data: null; error: null }) => void;
+    maybeSingle.mockReturnValueOnce(new Promise((resolve) => { resolveRead = resolve; }));
+    const first = fetchSessionSummary(SESSION_ID, "max");
+    const second = fetchSessionSummary(SESSION_ID, "max");
+    expect(maybeSingle).toHaveBeenCalledOnce();
+    resolveRead({ data: null, error: null });
+    await expect(Promise.all([first, second])).resolves.toEqual([null, null]);
+  });
+
   it("relit le résumé depuis le cache après une summarisation réussie, sans requête BDD", async () => {
     vi.mocked(authenticatedFunctionFetch).mockResolvedValue({
       ok: true,

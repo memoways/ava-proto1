@@ -3,12 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import type { MaxTurnKnowledgeContext } from "@/types";
 import { authenticatedFunctionFetch } from "./gameAuth";
 import { createTimeoutSignal } from "./asyncUtils";
-import { RAG_DEFAULT_RETRIEVE_K } from "@/config/experienceRuntime";
 import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
+import { getActiveEnvironment } from "@/services/environmentContext";
 
 import { getCachedSession } from "@/services/gameAuth";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const RAG_SERVER_DEFAULT_RETRIEVE_K = 15;
 
 export interface RAGMatch {
   id: string;
@@ -186,6 +187,10 @@ export interface RAGQueryDetailed {
   serverLatencyMs?: number;
   searchInput: string;
   request: {
+    /** Stable snapshot label so exports can be compared without relying on UI state. */
+    variantKey?: string;
+    experimentId?: string;
+    environmentId?: string;
     userMessage: string;
     recentContext: string;
     rewrittenQuery: string | null;
@@ -194,10 +199,32 @@ export interface RAGQueryDetailed {
     characterId: string;
     rerankRequested: boolean;
     retrieveK: number;
-    rerankModel: "rerank-3" | "rerank-3-lite" | "rerank-2.5" | "rerank-2.5-lite";
+    rerankModel: "rerank-3" | "rerank-3-lite" | "rerank-2.5" | "rerank-2.5-lite" | "none";
     rerankTruncation: boolean;
   };
   error?: string;
+}
+
+export function buildRAGVariantKey(input: {
+  rerank?: boolean;
+  retrieveK?: number;
+  matchCount: number;
+  matchThreshold?: number;
+  rerankModel?: RAGQueryOptions["rerankModel"];
+  rerankTruncation?: boolean;
+  rewrittenQuery?: string;
+}): string {
+  const rerank = input.rerank !== false;
+  const model = rerank ? (input.rerankModel ?? "rerank-2.5-lite") : "none";
+  const rewrite = input.rewrittenQuery ? "rewrite" : "raw";
+  return [
+    `rerank=${model}`,
+    `retrieve=${input.retrieveK ?? Math.max(input.matchCount, RAG_SERVER_DEFAULT_RETRIEVE_K)}`,
+    `top=${input.matchCount}`,
+    `threshold=${input.matchThreshold ?? 0.3}`,
+    `truncate=${input.rerankTruncation !== false}`,
+    rewrite,
+  ].join("|");
 }
 
 /** Detailed RAG query for diagnostics: returns latency + provider + error if any. */
@@ -210,6 +237,7 @@ export async function queryRAGDetailed(
 ): Promise<RAGQueryDetailed> {
   const characterId = requireCharacterId(options.characterId);
   const startedAt = performance.now();
+  const experimentId = crypto.randomUUID();
   try {
     const res = await callQueryRag({
       query: options.rewrittenQuery || undefined,
@@ -246,6 +274,9 @@ export async function queryRAGDetailed(
       serverObservation: res._ava_observability,
       searchInput: res.search_input || options.rewrittenQuery || [userMessage, recentContext ? `Contexte récent: ${recentContext}` : ""].filter(Boolean).join("\n\n"),
       request: {
+        variantKey: buildRAGVariantKey({ ...options, matchCount, matchThreshold }),
+        experimentId,
+        environmentId: getActiveEnvironment(),
         userMessage,
         recentContext: recentContext || "",
         rewrittenQuery: options.rewrittenQuery || null,
@@ -253,8 +284,8 @@ export async function queryRAGDetailed(
         matchThreshold: matchThreshold ?? 0.3,
         characterId,
         rerankRequested: options.rerank !== false,
-        retrieveK: options.retrieveK ?? Math.max(matchCount, RAG_DEFAULT_RETRIEVE_K),
-        rerankModel: options.rerankModel ?? "rerank-2.5-lite",
+        retrieveK: options.retrieveK ?? Math.max(matchCount, RAG_SERVER_DEFAULT_RETRIEVE_K),
+        rerankModel: options.rerank === false ? "none" : options.rerankModel ?? "rerank-2.5-lite",
         rerankTruncation: options.rerankTruncation !== false,
       },
       error: res.error,
@@ -266,6 +297,9 @@ export async function queryRAGDetailed(
       latencyMs: Math.round(performance.now() - startedAt),
       searchInput: options.rewrittenQuery || [userMessage, recentContext ? `Contexte récent: ${recentContext}` : ""].filter(Boolean).join("\n\n"),
       request: {
+        variantKey: buildRAGVariantKey({ ...options, matchCount, matchThreshold }),
+        experimentId,
+        environmentId: getActiveEnvironment(),
         userMessage,
         recentContext: recentContext || "",
         rewrittenQuery: options.rewrittenQuery || null,
@@ -273,8 +307,8 @@ export async function queryRAGDetailed(
         matchThreshold: matchThreshold ?? 0.3,
         characterId,
         rerankRequested: options.rerank !== false,
-        retrieveK: options.retrieveK ?? Math.max(matchCount, RAG_DEFAULT_RETRIEVE_K),
-        rerankModel: options.rerankModel ?? "rerank-2.5-lite",
+        retrieveK: options.retrieveK ?? Math.max(matchCount, RAG_SERVER_DEFAULT_RETRIEVE_K),
+        rerankModel: options.rerank === false ? "none" : options.rerankModel ?? "rerank-2.5-lite",
         rerankTruncation: options.rerankTruncation !== false,
       },
       error: err instanceof Error ? err.message : String(err),
@@ -459,12 +493,13 @@ export async function syncNotion(databases: Record<string, string> = AVA_NOTION_
 }
 
 /** Lightweight LLM-based query rewriter — turns "et toi ?" into a self-contained search query. */
-export async function rewriteRAGQuery(userMessage: string, recentContext?: string, characterName?: string): Promise<string | null> {
+export async function rewriteRAGQuery(userMessage: string, recentContext?: string, characterName?: string, signal?: AbortSignal): Promise<string | null> {
   try {
     const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/rewrite-query`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_message: userMessage, recent_context: recentContext, character_name: characterName }),
+      signal,
     });
     if (!response.ok) return null;
     const data = await response.json();
