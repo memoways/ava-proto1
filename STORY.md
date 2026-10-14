@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-14 (P1 publié via Lovable, mémoire V4 et sortie progressive en canary sandbox-ulrich)
+> **Last Updated**: 2026-10-14 (P2 publié via Lovable et MCP Ava vérifié, canary sandbox-ulrich, batch conservé en production)
 
 ---
 
@@ -92,8 +92,13 @@ le micro en fonctionnement ; Ulrich confirme Max/Emma complets, voix habituelles
 et interruption sans replay. La publication révèle un second seam manquant :
 un transform Zod invalide le JSON Schema du serveur MCP entier. Le sérialiseur
 SDK réel et les logs Cloud confirment la cause ; default(null) garde les mesures
-historiques et sérialise correctement. Le contrôle publié continue avec ce
-correctif ciblé, sans changement de voix ni reconnexion. Aucun pilote statistique acquis,
+historiques et sérialise correctement. PR #40 fusionnée dans `0daa7e3`, deux
+revues finales sans constat, CI 569/34/46 et 45 E2E sans retry, puis CI main
+verte. Republication Lovable : quatre outils MCP rétablis. Sur le domaine
+publié, Ulrich confirme Max complet, voix habituelle et micro actif ; reçu V4
+completed, 211 caractères livrés sans portion incertaine, mémoire isolée,
+preset P2 épinglé et appel clôturé. Le bruit bref preview est déclaré fluide,
+mais aucun rejet acoustique réel n'est observé dans cet essai. Aucun pilote statistique acquis,
 P3 non commencé. [Plan, protocole et état réel](docs/plan_lot_3_ecoute_libre_interruptions.md).
 
 ### 2026-10-14 — Préparer P2 sans effacer les réserves P1

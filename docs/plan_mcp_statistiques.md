@@ -68,6 +68,13 @@ expose ses données, sous forme d'outils.
   Usage, sessions et latences filtrés sur `sandbox-ulrich` ; coûts globaux
   puisque leur contrat ne porte pas l'environnement. Les deux timeouts GM P1
   ont été retrouvés via les spans V2 de cet outil.
+- Après publication P2, un transform Zod de milestone empêche le serveur
+  entier de démarrer. Logs Lovable Cloud et sérialiseur SDK réel reproduisent
+  l'erreur ; `.nullable().default(null)` remplace ce transform sans changer
+  les valeurs historiques. PR #40 squash dans `0daa7e3`, CI verte avec test
+  du schéma réel. Republication Lovable puis quatre outils retestés avec
+  succès à 09:06 UTC le 14 octobre 2026 ; projection V2 `invalidRows=0`,
+  candidats et jalons P2 visibles. Aucune reconnexion OAuth nécessaire.
 
 ## Utilisation
 

@@ -6,6 +6,45 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Publié via Lovable] — 2026-10-14
 
+### Lot 3 / P2 — écoute libre, interruptions confirmées et voix seule
+
+- Interruption acoustique candidate puis confirmée, pause/reprise des samples
+  non lus dans le même contexte Gradium, sans reçu ni GM au rejet. Capture
+  AudioWorklet pour Gradium/AssemblyAI, phonème suivant retenu pendant flush,
+  barrières de génération et arrêt sur perte de micro ; Deepgram manuel et
+  keepalive conservés. Voix seule accessible sous flag false par défaut,
+  secours vocal fixe et presets épinglés dans V4 sans migration.
+- Les quatre outils du MCP Ava ont été testés avec succès ; README et
+  [plan P2](docs/plan_lot_3_ecoute_libre_interruptions.md) précisent le routage
+  natif du Cloud Lovable. Deux GM P1 failed retrouvés, aucune cause démontrée
+  ni tuning. Contrat P1, voix, canon, cadre, transferts et batch conservés.
+- PR #38 squash dans `48f4d52`, deux revues finales sans constat et CI verte :
+  568 unitaires, 34 intégrations, 46 régressions, 45 E2E sans retry. Preview
+  synchronisée et canary sandbox-ulrich préparée. Première recette humaine
+  échouée : transfert AudioWorklet détache le tableau avant réallocation,
+  qui devient de taille zéro. Test avec transfert réel reproduit la perte ;
+  allocation du suivant avant transfert corrigée et qualité locale verte.
+  Canary P2 désactivée pendant correction ; PR #39 fusionnée dans `aef4dfb`,
+  CI 568/34/46 +45 E2E sans retry. Recette corrigée Max/Emma complète et voix
+  habituelles ; interruption Max puis nouvelle réponse sans replay, micro-off
+  réactivable, V4 et preset isolés vérifiés dans Lovable Cloud.
+- Publication native lancée ; contrôle MCP détecte une régression de schéma :
+  transform des milestones non sérialisable en JSON Schema, bloquant les quatre
+  outils au chargement. Cause confirmée par logs Cloud et sérialiseur SDK réel.
+  default(null) conserve les anciennes mesures absentes, test rouge/vert ajouté,
+  PR #40 squash dans `0daa7e3`, deux revues finales sans constat et CI
+  569/34/46 +45 E2E sans retry ; CI main après fusion verte. Republication
+  Lovable effectuée, quatre outils MCP Ava rétablis et retestés, V2 sans
+  lignes invalides. Aucun changement de voix ni reconnexion OAuth.
+- Sur le domaine publié, recette Max dans Brave, admin → Tester moi-même,
+  sandbox-ulrich : réponse complète, voix habituelle, micro actif. UI voix
+  seule observée ; reçu V4 completed avec 211 caractères livrés, 0 incertain,
+  preset épinglé et mémoire isolée. Appel et capture clôturés.
+- Canary P2 seulement sandbox-ulrich ; batch et défauts production conservés.
+  Bruit bref preview déclaré fluide, rejet acoustique réel non observé dans
+  cet essai. Pilote 300 tours/10 sessions, arrêt physique et activation
+  générale non réalisés ; réserves GM P1/P0 conservées. P3 non commencé.
+
 ### Lot 2 / P1 — mémoire de livraison et streaming cohérent
 
 - Une génération personnage produit une intention privée puis des phrases sûres.
@@ -170,36 +209,6 @@ plus anciennes conservent leur état au moment de leur rédaction.
   contrôlés en preview puis sur le domaine publié.
 
 ## [Non publié]
-
-### Lot 3 / P2 — fusionné, correction de recette preview en cours
-
-- Interruption acoustique candidate puis confirmée, pause/réprise des samples
-  non lus dans le même contexte Gradium, sans reçu ni GM au rejet. Capture
-  AudioWorklet pour Gradium/AssemblyAI, phonème suivant retenu pendant flush,
-  barrières de génération et arrêt sur perte de micro ; Deepgram manuel et
-  keepalive conservés. Voix seule accessible sous flag false par défaut,
-  secours vocal fixe et presets épinglés dans V4 sans migration.
-- Les quatre outils du MCP Ava ont été testés avec succès ; README et
-  [plan P2](docs/plan_lot_3_ecoute_libre_interruptions.md) précisent le routage
-  natif du Cloud Lovable. Deux GM P1 failed retrouvés, aucune cause démontrée
-  ni tuning. Contrat P1, voix, canon, cadre, transferts et batch conservés.
-- PR #38 squash dans `48f4d52`, deux revues finales sans constat et CI verte :
-  568 unitaires, 34 intégrations, 46 régressions, 45 E2E sans retry. Preview
-  synchronisée et canary sandbox-ulrich préparée. Première recette humaine
-  échouée : transfert AudioWorklet détache le tableau avant réallocation,
-  qui devient de taille zéro. Test avec transfert réel reproduit la perte ;
-  allocation du suivant avant transfert corrigée et qualité locale verte.
-  Canary P2 désactivée pendant correction ; PR #39 fusionnée dans `aef4dfb`,
-  CI 568/34/46 +45 E2E sans retry. Recette corrigée Max/Emma complète et voix
-  habituelles ; interruption Max puis nouvelle réponse sans replay, micro-off
-  réactivable, V4 et preset isolés vérifiés dans Lovable Cloud.
-- Publication native lancée ; contrôle MCP détecte une régression de schéma :
-  transform des milestones non sérialisable en JSON Schema, bloquant les quatre
-  outils au chargement. Cause confirmée par logs Cloud et sérialiseur SDK réel.
-  default(null) conserve les anciennes mesures absentes, test rouge/vert ajouté,
-  qualité locale 569/34/46 verte. Contrôle publié et restauration MCP en cours.
-  Pilote 300 tours/10 sessions et mesures acoustiques physiques restent
-  distincts. P3 hors périmètre.
 
 ### Préparation du lot 3 / P2
 

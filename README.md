@@ -22,8 +22,12 @@ Supabase générique n'est pas le point d'accès aux données de ce Cloud Lovabl
 son refus ne justifie pas de demander une reconnexion pour Ava.
 Contrat et limites : [plan MCP](docs/plan_mcp_statistiques.md) ; diagnostics
 V2 et preuves réelles : [bilan P0](docs/plan_lot_1_observabilite_latence.md).
-Les lectures des sessions et latences dans `sandbox-ulrich` ont été vérifiées
-via le connecteur natif le 14 octobre 2026.
+Les quatre outils ont été vérifiés via le connecteur natif le 14 octobre 2026,
+après republication du correctif JSON Schema P2 ; mesures absentes conservées
+à null. Pour une vérification technique ciblée non exposée par ces outils,
+le MCP Lovable `query_database` cible ce même projet/Cloud après vérification
+de son identité ; sélectionner uniquement les métadonnées nécessaires.
+Livraison et réserves : [bilan P2](docs/plan_lot_3_ecoute_libre_interruptions.md).
 
 La mise en public est bloquée par la [release gate](docs/public_release_gate.md). Un aperçu interne peut être utilisé pour le développement, mais aucun lien ne doit être diffusé à des testeurs externes avant validation des critères de sécurité, persistance et endurance.
 

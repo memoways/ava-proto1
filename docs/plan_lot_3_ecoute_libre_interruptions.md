@@ -1,10 +1,11 @@
 # Reprise — lot 3 / P2 : écoute libre et interruptions confirmées
 
-Date : 14 octobre 2026. Statut actuel : **P2 fusionné dans `main`, `48f4d52`
-(PR #38), correctif de transfert fusionné par PR #39 dans `aef4dfb`, CI et
-deux revues finales vertes. Canary P2 réactivée sur la preview corrigée,
-recettes humaines preview Max/Emma réussies. Publication native lancée depuis
-`aef4dfb` ; contrôle publié/MCP en cours, incident MCP après publication**.
+Date : 14 octobre 2026. Statut actuel : **P2 livré par Lovable depuis
+`0daa7e3`, PR #38/#39/#40 fusionnées par squash, deux revues finales par PR
+et CI finales vertes. Recettes humaines preview Max/Emma et publié Max
+réussies dans Brave / sandbox-ulrich ; appels clôturés. Quatre outils MCP Ava
+rétablis et vérifiés. Canary P2 uniquement sandbox-ulrich, batch conservé
+en production. Pilote statistique et mesures physiques non réalisés**.
 Le prompt ci-dessous conserve la préparation
 historique après P1 et le contrat obligatoire de ce lot.
 
@@ -544,7 +545,8 @@ Refresh natif puis canary P2 réactivée uniquement sandbox-ulrich, mêmes
 réglages. Admin → Tester moi-même : nouvel appel Max prêt, micro fermé.
 Session échouée `13394105-6610-4200-aefd-f5476731f086` clôturée à 07:57:34 UTC,
 session corrigée `37d9abbb-edaf-47e7-9de2-774fa6ab3027` préparée à 08:14:15 UTC.
-Le succès physique attend la réponse humaine ; aucune preuve artificielle.
+À ce relevé intermédiaire, la recette humaine attendait sa confirmation ;
+la réponse ultérieure est consignée ci-dessous, sans preuve artificielle.
 
 ### Correctif ciblé MCP après publication
 
@@ -583,8 +585,8 @@ comme l'historique conservant null. Qualité locale verte : 569/34/46,
 lint/typecheck/build ; fonction mcp régénérée par SDK uniquement.
 Lovable a écrit un plan hors autorisation en `.lovable/plan.md`, commit
 `1d3e09a` (aucun code modifié). Ulrich a explicitement refusé sa validation
-`plan--show` ; ce seul changement sera restauré à l'état `aef4dfb` dans la
-PR ciblée, sans réécrire main ni toucher aux autres travaux.
+`plan--show` ; ce seul changement a été restauré à l'état `aef4dfb` dans la
+PR #40, sans réécrire main ni toucher aux autres travaux.
 
 - PR [#38](https://github.com/memoways/ava-proto1/pull/38), branche
   `codex/p2-hands-free-interruptions`, HEAD final revu
@@ -603,9 +605,56 @@ PR ciblée, sans réécrire main ni toucher aux autres travaux.
   délais 900/700 et seuil texte 3 conservés. Admin → Tester moi-même ; appel Max
   préparé, micro fermé. Réponse film `vu` conservée depuis les sessions humaines
   de baseline vérifiées via MCP Ava. Aucune parole synthétique injectée.
-- Première recette vocale humaine : échouée, correctif ciblé ci-dessus. Publication et vérification
-  publiée encore à réaliser ; les 300 tours et objectifs physiques restent
-  non attestés. La fusion GitHub n'est pas une publication.
+- Première recette vocale humaine : échouée, correctif ciblé ci-dessus. Au
+  relevé initial de PR #38, publication et vérification publiée restaient à
+  réaliser. Leur bilan final suit ; les 300 tours et objectifs physiques
+  restent non attestés. La fusion GitHub n'est pas une publication.
+
+### Bilan final publié — 14 octobre 2026
+
+- PR [#40](https://github.com/memoways/ava-proto1/pull/40), branche
+  `codex/p2-mcp-schema`, HEAD final revu
+  `6ee0697959a4d926bc646fa53df5659db6e5ad84` : deux revues indépendantes
+  Spec/Standards sans constat. CI
+  [38538197826](https://github.com/memoways/ava-proto1/actions/runs/38538197826)
+  success : 569 unitaires, 34 intégrations, 46 régressions et 45 E2E sans
+  retry ; lint sans erreur (un warning préexistant), typecheck/build réussis.
+- Squash main `0daa7e315f5f1ef81d5c9a7735b914e121065312`, 09:03:53 UTC.
+  CI après fusion
+  [38539614778](https://github.com/memoways/ava-proto1/actions/runs/38539614778)
+  success à 09:13:42 UTC. Workspace main synchronisé ; MCP Lovable confirme
+  ce SHA, projet ready et agentFinished=true.
+- Republication native Lovable
+  `cefe6424-cc0e-4215-bf0e-e6eaa36e4c5f`, depuis `0daa7e3`. Le lancement
+  retourne pending ; le succès est ensuite attesté par les quatre outils MCP
+  fonctionnels et le parcours vocal réel sur `https://proto1.parle-a-ava.com`.
+  Aucun SHA de bundle servi ni numéro Edge exact n'est indépendamment attesté.
+- Les quatre outils **MCP app Ava** répondent après republication : usage,
+  sessions et latences filtrés sandbox-ulrich, coûts globaux. La projection
+  V2 retournée à 09:06 UTC comporte `invalidRows=0` et les jalons P2 de la
+  session Max corrigée. Son périmètre reste la page retournée, sans conclusion
+  statistique sur une cohorte ni assimilation des observations GM à des tours.
+- Contrôle publié préparé depuis admin → Tester moi-même, Sandbox — Ulrich,
+  dans Brave. Session Max `bd6dc87e-328a-4d61-b3a7-e6ea6d184e79`,
+  09:11:50 → 09:14:03 UTC, film `vu`. Ulrich confirme « Réponse complète,
+  voix habituelle, micro actif ». UI voix seule observée, statut À L'ÉCOUTE
+  et bouton Couper le micro après réponse ; Terminer libère la capture.
+- Lecture technique ciblée par MCP Lovable sur le même Cloud : mémoire V4,
+  preset acoustic_confirmed / voix seule / progressif épinglé, délais
+  900/700 et seuil texte 3 ; livraison isolée à Max. Reçu tour 1 completed :
+  211 caractères générés et livrés, 0 incertain, 0 continuation privée,
+  préfixe valide. Aucun dialogue ni intention privée lu pour cette vérification.
+- Preview Max et Emma précédentes clôturées, nouvelle session publiée clôturée.
+  Aucune parole synthétique injectée en réel et aucun changement de Shields.
+  Production conserve les défauts batch et flags P2 désactivés ; canary
+  active seulement dans sandbox-ulrich. P3 non commencé.
+
+Les réserves GM P1 demeurent : cause des deux délais 12000 ms inconnue,
+invariants vérifiés, aucun tuning. Réserves P0 historiques conservées sans
+relance. Le bruit bref réel a été déclaré fluide, mais aucun rejet acoustique
+n'a été observé dans cet essai : ne pas le présenter comme preuve de reprise
+physique. Le pilote 300 tours / 10 sessions, l'arrêt matériel et l'activation
+générale restent à réaliser selon le protocole suivant.
 
 Recette courte : Brave, admin → Tester moi-même, sandbox-ulrich. Vérifier
 Max puis Emma avec leur voix inchangée : réponse entière, une correction
