@@ -1626,6 +1626,24 @@
                         },
                         "gmObservations": {
                           "type": "number"
+                        },
+                        "gmGenerationStatuses": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "number"
+                          }
+                        },
+                        "gmAvailabilityStatuses": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "number"
+                          }
                         }
                       },
                       "required": [
@@ -1638,7 +1656,9 @@
                         "voiceEndToOutputEstimatedMs",
                         "generationTotalMs",
                         "playbackMs",
-                        "gmObservations"
+                        "gmObservations",
+                        "gmGenerationStatuses",
+                        "gmAvailabilityStatuses"
                       ],
                       "additionalProperties": false
                     },
@@ -2068,6 +2088,273 @@
                     },
                     "heardChars": {
                       "type": "number"
+                    },
+                    "buffer": {
+                      "type": "object",
+                      "properties": {
+                        "samples": {
+                          "type": "number"
+                        },
+                        "presets": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "number"
+                          }
+                        },
+                        "prebufferMs": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "number"
+                            },
+                            "min": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "mean": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p50": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p90": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p95": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "max": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "count",
+                            "min",
+                            "mean",
+                            "p50",
+                            "p90",
+                            "p95",
+                            "max"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "rebufferMs": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "number"
+                            },
+                            "min": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "mean": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p50": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p90": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p95": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "max": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "count",
+                            "min",
+                            "mean",
+                            "p50",
+                            "p90",
+                            "p95",
+                            "max"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "rebufferCount": {
+                          "type": "number"
+                        },
+                        "underrunCount": {
+                          "type": "number"
+                        },
+                        "maxGapMs": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "number"
+                            },
+                            "min": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "mean": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p50": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p90": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "p95": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "max": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "count",
+                            "min",
+                            "mean",
+                            "p50",
+                            "p90",
+                            "p95",
+                            "max"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "samples",
+                        "presets",
+                        "prebufferMs",
+                        "rebufferMs",
+                        "rebufferCount",
+                        "underrunCount",
+                        "maxGapMs"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -2080,7 +2367,8 @@
                     "ttsTotalMs",
                     "playbackMs",
                     "spokenChars",
-                    "heardChars"
+                    "heardChars",
+                    "buffer"
                   ],
                   "additionalProperties": false
                 },
