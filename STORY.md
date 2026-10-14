@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-14 (P2 publié via Lovable et MCP Ava vérifié, canary sandbox-ulrich, batch conservé en production)
+> **Last Updated**: 2026-10-14 (P2 publié et MCP vérifié ; prompt P3 préparé, canary sandbox-ulrich et production batch conservées)
 
 ---
 
@@ -72,6 +72,17 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-10-14 — Préparer P3 avec des comparaisons mesurées
+
+Ulrich demande le prompt du prochain lot après livraison P2. La reprise
+prépare GM, RAG, prompts et buffers comparés, en commençant par les réserves
+GM et la couverture des mesures. Le reçu entendu reste immédiat ; mémoire
+GM, caches et pré-retrieval doivent respecter versions, provenance et
+annulation. Un levier par comparaison, aucun gain sans corpus compatible,
+aucune activation générale sans pilote. Le nouveau manifest Lovable sur
+main `77db463` est préservé. Réserves P0/P1/P2 conservées, aucun code ni
+réglage P3 modifié. [Prompt du lot 4](docs/plan_lot_4_gm_rag_reglages_mesures.md).
 
 ### 2026-10-14 — P2 : écouter pendant la réponse, confirmer avant de couper
 

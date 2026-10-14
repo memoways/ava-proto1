@@ -8,6 +8,8 @@ rétablis et vérifiés. Canary P2 uniquement sandbox-ulrich, batch conservé
 en production. Pilote statistique et mesures physiques non réalisés**.
 Le prompt ci-dessous conserve la préparation
 historique après P1 et le contrat obligatoire de ce lot.
+Prochain lot : [prompt de reprise 4/P3](plan_lot_4_gm_rag_reglages_mesures.md),
+préparé sans démarrer son implémentation ni lever les réserves ci-dessous.
 
 ## Point de reprise et résultat attendu
 

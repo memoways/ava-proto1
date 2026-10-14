@@ -1,7 +1,7 @@
 # Plan — réduire la latence et préparer la conversation voice-to-voice libre
 
 Date : 12 octobre 2026. Base auditée : `0433518`, `main`, après une première lecture de `2d83558`.
-Statut actualisé le 14 octobre 2026 : **lot 1 / P0 publié via Lovable, échanges réels Max/Emma et baseline initiale relevés ; code P0 publié `f251eb3` (PR #32). Recette complémentaire exécutée : cinématique finie naturellement et reprise vocale attestées, transfert accepté non observé, écart Emma du 12 octobre retrouvé sans cause technique démontrée ; prompt post-vidéo exact non attesté. P1 publié via Lovable depuis `19cfa5f` (code `fe9c954`, PR #33 à #37), CI et revues vertes, RPC/proxies Cloud livrés ; Max/Emma et interruption/reprise vérifiés en preview, réponse Max complète et reçu V4 vérifiés sur le domaine publié. Canary sandbox-ulrich, batch conservé par défaut ; deux timeouts GM post-tour de12s restent une réserve sans cause démontrée. Réserves P0 conservées ; P2/P3 non commencés**. Choix d'interruption confirmé par Ulrich le 12 octobre : réaction dès le début de voix, avec confirmation des mots ensuite. Preuves dans le [bilan P0](plan_lot_1_observabilite_latence.md) et le [correctif des appels](plan_changement_interlocuteur_manuel.md) ; ces contrôles ne prouvent pas l'implémentation de la stratégie acoustique future.
+Statut actualisé le 14 octobre 2026 : **P0/P1/P2 publiés via Lovable ; dernier code P2 `0daa7e3` (PR #38/#39/#40), clôture `5938d12`, revues et CI vertes. Preview Max/Emma et publié Max vérifiés avec voix habituelles ; interruption Max sans replay en preview, micro continu et reçu V4 complet sur le site publié. Quatre outils MCP Ava rétablis et vérifiés. Canary sandbox-ulrich seulement, batch conservé en production. Deux timeouts GM P1 de 12 s sans cause démontrée, réserves P0 conservées ; rejet acoustique réel, mesure matérielle et pilote 300 tours non attestés. Prompt lot 4/P3 préparé, aucune implémentation P3**. Choix d'interruption confirmé par Ulrich le 12 octobre : réaction dès le début de voix, avec confirmation des mots ensuite. Preuves et limites dans les [bilans P0](plan_lot_1_observabilite_latence.md), [P1](plan_lot_2_memoire_streaming_coherent.md) et [P2](plan_lot_3_ecoute_libre_interruptions.md) ; reprise dans le [prompt P3](plan_lot_4_gm_rag_reglages_mesures.md).
 Sources : [audit détaillé](audit_voice_conversation_max.md) et [snapshot chiffré anonymisé](latency_voice_snapshot_2026-10-12.json).
 
 ## Résultat visé et décisions acquises
@@ -113,7 +113,7 @@ La base saisie mains libres/barge-in est déjà réalisée et documentée dans [
 
 Réutiliser `VOICE_HANDS_FREE.enabled` et `bargeInEnabled` existants, sans changer leur valeur actuelle dans les environnements. Ajouter deux flags désactivés par défaut : sortie incrémentale et UI audio seule. Ajouter une stratégie d'interruption `text` / `acoustic_confirmed`, normalisée à `text` pour les configurations existantes. Le pilote sélectionne explicitement `acoustic_confirmed`, cible choisie par Ulrich. Chaque session épingle ce preset. P0 est activé d'abord ; P1, P2 puis P3 sont évalués en sandbox, ensuite en preview Lovable et sur un pilote interne de 10 sessions.
 
-La décision produit du 12 octobre est acquise : réaction dès début de voix, avec confirmation ensuite. `AGENTS.md` conserve l'autorité de `handsFreeVoice.ts` et référence cette évolution. La stratégie texte reste le chemin de compatibilité et de rollback ; l'évolution acoustique décrite ici n'est pas encore implémentée ni activée dans l'application.
+La décision produit du 12 octobre est acquise : réaction dès début de voix, avec confirmation ensuite. `AGENTS.md` conserve l'autorité de `handsFreeVoice.ts`. La stratégie texte reste le chemin de compatibilité et de rollback ; l'évolution acoustique est livrée par P2, activée seulement dans sandbox-ulrich. Son pilote et ses mesures physiques restent à réaliser avant activation générale.
 
 Toute violation d'un invariant bloque le passage au lot suivant. Rollback par retour au preset courant pour les nouvelles sessions ; aucune migration destructive, suppression de fournisseur ou conversion irréversible de mémoire. L'avatar animé conserve son chemin existant et ne reçoit pas la sortie incrémentale avant ses tests spécifiques.
 
@@ -134,14 +134,15 @@ du contrôle de consentement réussi. [Bilan P0](plan_lot_1_observabilite_latenc
 préparer le prompt : aucun défaut de code bloquant démontré par la recette.
 Les réserves ci-dessus restent explicites ; elles ne requièrent pas de
 relancer P0 par défaut. [Prompt du lot 2/P1](plan_lot_2_memoire_streaming_coherent.md).
-Aucun développement P1/P2/P3 engagé dans ce chat de préparation.
+Lors de la préparation initiale du 12 octobre, aucun développement P1/P2/P3
+n'était engagé. Les bilans et le tableau actualisés ci-dessous prévalent.
 
 | Lot | Périmètre du plan | État |
 | --- | --- | --- |
 | 1 | P0 : mesures fiables, attribution, MCP, dépendances et baseline | [Publié avec baseline et recette complémentaire](plan_lot_1_observabilite_latence.md) ; vidéo naturelle et reprise vocale attestées, transfert accepté non observé, écart Emma retrouvé sans cause technique démontrée |
 | 2 | P1 : mémoire de livraison, intention privée, streaming LLM/TTS et annulation | [Publié via Lovable, #33 à #37](plan_lot_2_memoire_streaming_coherent.md) ; revues/CI vertes, RPC/proxies Cloud livrés, Max/Emma et interruption/reprise validés en preview, réponse Max complète vérifiée publiée. Canary sandbox-ulrich, batch par défaut ; deux timeouts GM de12s sans cause démontrée restent une réserve |
-| 3 | P2 : écoute libre, interruption acoustique confirmée et UI voix seule | [Prompt de reprise préparé](plan_lot_3_ecoute_libre_interruptions.md), préflight ciblé des réserves GM P1 puis exécution P2 en canary ; aucune implémentation commencée |
-| 4 | P3 : GM, RAG, prompts et buffers comparés | Prévu après validation du lot 3 |
+| 3 | P2 : écoute libre, interruption acoustique confirmée et UI voix seule | [Publié via Lovable, #38/#39/#40](plan_lot_3_ecoute_libre_interruptions.md) ; preview Max/Emma et publié Max vérifiés, MCP rétabli, canary sandbox-ulrich. Rejet réel, arrêt matériel et pilote non attestés |
+| 4 | P3 : GM, RAG, prompts et buffers comparés | [Prompt complet préparé](plan_lot_4_gm_rag_reglages_mesures.md) à la demande d'Ulrich ; préflight borné des réserves et plan avant code. Aucune implémentation engagée |
 
 Chaque lot applicatif suit **branche dédiée → commits du lot → push → PR vers `main` → contrôles et revue → squash merge → vérification du SHA sur `main` → reprise Lovable → vérification et publication → tests de la version publiée**. Le squash se fait lors de la fusion : un commit du lot sur `main`, sans réécriture de son historique. Aucun push direct de code de ces lots sur `main`, aucun contournement d'une gate en échec.
 

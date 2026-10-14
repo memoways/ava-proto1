@@ -210,6 +210,15 @@ plus anciennes conservent leur état au moment de leur rédaction.
 
 ## [Non publié]
 
+### Préparation du lot 4 / P3
+
+- [Prompt complet de reprise](docs/plan_lot_4_gm_rag_reglages_mesures.md)
+  sauvegardé : diagnostic GM borné, mémoire en arrière-plan versionnée,
+  contexte dédupliqué, RAG/prompts/prébuffer comparés un levier à la fois.
+  Bilan P2 et tableau du plan général actualisés ; réserves GM/P0/P2 et
+  pilote non réalisé conservés. Référence main `77db463`, nouveau manifest
+  Lovable préservé. Aucun code, réglage ou déploiement P3 modifié ici.
+
 ### Préparation du lot 3 / P2
 
 - [Prompt complet de reprise](docs/plan_lot_3_ecoute_libre_interruptions.md)
