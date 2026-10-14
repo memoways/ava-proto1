@@ -1,8 +1,10 @@
 # Reprise — lot 3 / P2 : écoute libre et interruptions confirmées
 
-Date : 14 octobre 2026. Statut actuel : **P2 implémenté localement sur
-`codex/p2-hands-free-interruptions` ; contrôles et revues en cours, aucune
-publication P2 à ce relevé**. Le prompt ci-dessous conserve la préparation
+Date : 14 octobre 2026. Statut actuel : **P2 fusionné dans `main`, `48f4d52`
+(PR #38), CI et deux revues finales vertes ; recette preview échouée sur le
+transfert AudioWorklet, correctif ciblé testé localement, canary P2 désactivée,
+publication suspendue**.
+Le prompt ci-dessous conserve la préparation
 historique après P1 et le contrat obligatoire de ce lot.
 
 ## Point de reprise et résultat attendu
@@ -503,6 +505,54 @@ pour une capture déjà simulée ; activation inachevée dans les traces Firefox
 Le périphérique/curseur Web Audio est désormais simulé explicitement dans ces
 seuls E2E, player/détecteur/automate applicatifs inchangés. Attente de fin portée
 à 15 s pour deux chunks PCM de 4,8 s, sans modifier un timeout produit.
+
+## Livraison P2 — état vérifié
+
+### Correctif ciblé de la recette réelle — transfert AudioWorklet
+
+La première recette preview échoue : connexion Deepgram puis « Micro à
+réactiver », sans question complète. Publication suspendue. Le worklet appelle
+postMessage avec transfert du buffer avant de lire `frame.length` pour allouer
+le suivant ; le transfert détache le tableau et sa longueur devient 0.
+Reproduction native `structuredClone(..., { transfer: [frame.buffer] })` :
+lengthAfterTransfer=0. Le fake du test VM ne transférait pas le buffer, ce qui
+masquait ce défaut ; les E2E P2 simulent explicitement le périphérique.
+
+Sous-lot correctif prévu avant implémentation : test VM utilisant un véritable
+transfert structuredClone, observer la perte après première frame puis conserver
+la taille avant le transfert et allouer le buffer suivant avant postMessage.
+Vérifier continuité 16/24 kHz, resampling 44,1/48 kHz et flush, puis qualité/CI,
+deux revues, PR codex/ → main et squash ; refresh preview et même test humain.
+Aucun changement de DSP, timer de surveillance, STT, Shields ou voix pour
+masquer le défaut. Il ne s'agit pas des warnings postMessage Lovable d'origine.
+
+Reproduction rouge : les trois tests worklet utilisant un transfert réel échouent
+(1 frame au lieu de 12 ; frame suivante absente). Après allocation avant
+transfert : ces trois tests et 11 tests voisins passent. Qualité locale complète
+verte : 568 unitaires, 34 intégrations, 46 régressions, lint/typecheck/build.
+Appel défaillant clôturé ; stratégie text et voix seule false rétablies dans
+sandbox-ulrich pendant correction, sans changer le preset P1 900/700.
+
+- PR [#38](https://github.com/memoways/ava-proto1/pull/38), branche
+  `codex/p2-hands-free-interruptions`, HEAD final revu
+  `f709fe50bfa4ff540fcfa77fdf8544acba5f684d` ; deux revues indépendantes
+  Spec/Standards sans constat restant. Application finale : `d0aac98` ; les
+  commits suivants isolent les périphériques E2E et corrigent le lint du fake.
+- CI finale [38529828574](https://github.com/memoways/ava-proto1/actions/runs/38529828574)
+  success : 568 unitaires, 34 intégrations, 46 régressions, 45 E2E sans retry,
+  lint sans erreur, typecheck et build réussis.
+- Squash merge : `48f4d52561c9289689ea7d8b72c273740819a4de`, 07:50:14 UTC.
+  Workspace main synchronisé. MCP Lovable constate ce même SHA, projet ready,
+  agentFinished=true ; aucun agent de correction globale invoqué.
+- Preview Brave : nouveaux contrôles voix seule et stratégie acoustique visibles
+  après refresh natif Lovable. Admin authentifié, environnement Sandbox — Ulrich,
+  preset P2 sauvegardé (mains libres, progressif, acoustic_confirmed, voix seule),
+  délais 900/700 et seuil texte 3 conservés. Admin → Tester moi-même ; appel Max
+  préparé, micro fermé. Réponse film `vu` conservée depuis les sessions humaines
+  de baseline vérifiées via MCP Ava. Aucune parole synthétique injectée.
+- Première recette vocale humaine : échouée, correctif ciblé ci-dessus. Publication et vérification
+  publiée encore à réaliser ; les 300 tours et objectifs physiques restent
+  non attestés. La fusion GitHub n'est pas une publication.
 
 Recette courte : Brave, admin → Tester moi-même, sandbox-ulrich. Vérifier
 Max puis Emma avec leur voix inchangée : réponse entière, une correction

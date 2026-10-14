@@ -8,7 +8,7 @@ function worklet(rate: number, targetRate: number, frameSamples: number) {
   let Processor: new (options: unknown) => { process(inputs: Float32Array[][]): boolean; port: { onmessage: (event: unknown) => void } };
   runInNewContext(readFileSync("public/audio/pcm-capture-worklet.js", "utf8"), {
     sampleRate: rate, Float32Array,
-    AudioWorkletProcessor: class { port = { onmessage: null, postMessage: (value: typeof messages[number]) => messages.push(value) }; },
+    AudioWorkletProcessor: class { port = { onmessage: null, postMessage: (value: typeof messages[number], transfer: ArrayBuffer[] = []) => messages.push(structuredClone(value, { transfer })) }; },
     registerProcessor: (_: string, constructor: typeof Processor) => { Processor = constructor; },
   });
   return { processor: new Processor!({ processorOptions: { targetRate, frameSamples } }), messages };
