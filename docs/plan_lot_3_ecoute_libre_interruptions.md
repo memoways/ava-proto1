@@ -1,9 +1,10 @@
 # Reprise — lot 3 / P2 : écoute libre et interruptions confirmées
 
 Date : 14 octobre 2026. Statut actuel : **P2 fusionné dans `main`, `48f4d52`
-(PR #38), CI et deux revues finales vertes ; recette preview échouée sur le
-transfert AudioWorklet, correctif ciblé testé localement, canary P2 désactivée,
-publication suspendue**.
+(PR #38), correctif de transfert fusionné par PR #39 dans `aef4dfb`, CI et
+deux revues finales vertes. Canary P2 réactivée sur la preview corrigée,
+recettes humaines preview Max/Emma réussies. Publication native lancée depuis
+`aef4dfb` ; contrôle publié/MCP en cours, incident MCP après publication**.
 Le prompt ci-dessous conserve la préparation
 historique après P1 et le contrat obligatoire de ce lot.
 
@@ -532,6 +533,58 @@ transfert : ces trois tests et 11 tests voisins passent. Qualité locale complè
 verte : 568 unitaires, 34 intégrations, 46 régressions, lint/typecheck/build.
 Appel défaillant clôturé ; stratégie text et voix seule false rétablies dans
 sandbox-ulrich pendant correction, sans changer le preset P1 900/700.
+
+Livraison du correctif : PR [#39](https://github.com/memoways/ava-proto1/pull/39),
+HEAD `14cbb5c21ca688c7f962ce75d9b3070a036caa0a`, deux revues indépendantes
+sans constat ; CI [38532213832](https://github.com/memoways/ava-proto1/actions/runs/38532213832)
+success, 568/34/46 et 45 E2E sans retry. Squash main
+`aef4dfb319a9bdc35594165160c74d93a86d6a1d`, 08:11:47 UTC ; workspace
+synchronisé et même SHA constaté via MCP Lovable, ready/agentFinished=true.
+Refresh natif puis canary P2 réactivée uniquement sandbox-ulrich, mêmes
+réglages. Admin → Tester moi-même : nouvel appel Max prêt, micro fermé.
+Session échouée `13394105-6610-4200-aefd-f5476731f086` clôturée à 07:57:34 UTC,
+session corrigée `37d9abbb-edaf-47e7-9de2-774fa6ab3027` préparée à 08:14:15 UTC.
+Le succès physique attend la réponse humaine ; aucune preuve artificielle.
+
+### Correctif ciblé MCP après publication
+
+Recette corrigée confirmée par Ulrich : Max complet et voix habituelle,
+interruption puis nouvelle réponse sans replay, bruit bref déclaré fluide,
+micro-off avec sortie complète et bouton réactivable ; Emma complète et voix
+habituelle. Max V4/preset épinglé, reçu interrompu conservateur (234 caractères
+incertains, aucun préfixe promu), autres réponses livrées isolées ; Emma V4
+isolée. DSP réel : AEC/NS/AGC true, track 48 kHz, contexte capture 16 kHz.
+Candidat `a058caca-b2d1-4391-aa6d-c2b1b308fac9` : atténuation même timestamp,
+suspension +128 ms, confirmation +316 ms, arrêt logiciel estimé +26 ms après
+confirmation. Un seul cas, sans percentile ni preuve matérielle. Rejet bruit
+réel non observé dans les événements de cet essai ; couvert automatiquement
+et à confirmer sur pilote, pas revendiqué comme preuve physique.
+
+Publication native `76aec5a6-1902-4d21-96b8-3eb474d71191` lancée depuis
+`aef4dfb` ; flags production absents et normalisés false, canary sandbox seule.
+Après publication, outils MCP Ava retournent -32603 Internal error. Hypothèse
+reproduite localement : `.optional().transform(value => value ?? null)` dans
+le schéma public des milestones n'est pas sérialisable en JSON Schema.
+Sous-lot avant implémentation : test au vrai schéma de sortie du tool et au
+sérialiseur SDK, remplacer transform par default(null), conserver historiques
+et null sans conversion en zéro, regénérer uniquement mcp par build SDK ;
+qualité, revues, PR codex/ → main, CI, squash et publication Lovable. Vérifier
+les quatre outils après publication et la voix sur domaine publié. Diagnostic
+Cloud Lovable plan-mode en lecture seule demandé ; aucune correction globale
+ni migration ni reconnexion ne doit masquer cette panne.
+
+Preuve Cloud reçue : trois boots de `mcp` lèvent l'exception exacte
+`get_voice_latencies outputSchema cannot be represented as JSON Schema:
+Transforms cannot be represented in JSON Schema`, stack assertToolSchemas
+(mcp-js 3.0.5) → defineMcp → mcp/index.ts:890. L'auth OAuth était valide avant
+publication ; aucune demande de reconnexion. Le test du schéma réel via
+`toJsonSchemaCompat` est rouge sur transform, vert sur default(null), tout
+comme l'historique conservant null. Qualité locale verte : 569/34/46,
+lint/typecheck/build ; fonction mcp régénérée par SDK uniquement.
+Lovable a écrit un plan hors autorisation en `.lovable/plan.md`, commit
+`1d3e09a` (aucun code modifié). Ulrich a explicitement refusé sa validation
+`plan--show` ; ce seul changement sera restauré à l'état `aef4dfb` dans la
+PR ciblée, sans réécrire main ni toucher aux autres travaux.
 
 - PR [#38](https://github.com/memoways/ava-proto1/pull/38), branche
   `codex/p2-hands-free-interruptions`, HEAD final revu

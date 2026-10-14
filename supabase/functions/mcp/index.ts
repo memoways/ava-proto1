@@ -355,7 +355,7 @@ var voiceTurnProjectionSchema = z4.object({
   config_version: label,
   status: z4.enum(["started", "completed", "interrupted", "cancelled", "timeout", "failed", "no_audio"]),
   clock: z4.literal("client_monotonic"),
-  milestones: z4.object(Object.fromEntries(VOICE_MILESTONES.map((name) => [name, z4.number().finite().nullable().optional().transform((value) => value ?? null)]))),
+  milestones: z4.object(Object.fromEntries(VOICE_MILESTONES.map((name) => [name, z4.number().finite().nullable().default(null)]))),
   services: z4.array(serviceSchema).max(16),
   server: z4.array(spanSchema).max(8),
   durations: z4.object({ origin_to_response_ms: duration, origin_to_output_estimated_ms: duration, t_turn_voice_ready_ms: duration, generation_total_ms: duration, playback_ms: duration }),

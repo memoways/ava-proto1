@@ -189,7 +189,15 @@ plus anciennes conservent leur état au moment de leur rédaction.
   échouée : transfert AudioWorklet détache le tableau avant réallocation,
   qui devient de taille zéro. Test avec transfert réel reproduit la perte ;
   allocation du suivant avant transfert corrigée et qualité locale verte.
-  Canary P2 désactivée pendant correction ; aucune publication P2 encore.
+  Canary P2 désactivée pendant correction ; PR #39 fusionnée dans `aef4dfb`,
+  CI 568/34/46 +45 E2E sans retry. Recette corrigée Max/Emma complète et voix
+  habituelles ; interruption Max puis nouvelle réponse sans replay, micro-off
+  réactivable, V4 et preset isolés vérifiés dans Lovable Cloud.
+- Publication native lancée ; contrôle MCP détecte une régression de schéma :
+  transform des milestones non sérialisable en JSON Schema, bloquant les quatre
+  outils au chargement. Cause confirmée par logs Cloud et sérialiseur SDK réel.
+  default(null) conserve les anciennes mesures absentes, test rouge/vert ajouté,
+  qualité locale 569/34/46 verte. Contrôle publié et restauration MCP en cours.
   Pilote 300 tours/10 sessions et mesures acoustiques physiques restent
   distincts. P3 hors périmètre.
 

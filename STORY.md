@@ -87,8 +87,13 @@ réussis sur la PR #38 fusionnée dans `48f4d52` (568/34/46 et 45 E2E sans retry
 La première recette humaine révèle une limite des mocks : le transfert réel
 détache le tableau PCM avant sa réallocation, qui devient de taille zéro.
 Le test VM utilise désormais un vrai transfert et reproduit la perte après
-une frame ; allouer avant transfert corrige la continuité. Canary désactivée
-pendant correction, publication suspendue. Aucun pilote statistique acquis,
+une frame ; allouer avant transfert corrige la continuité. La PR #39 remet
+le micro en fonctionnement ; Ulrich confirme Max/Emma complets, voix habituelles
+et interruption sans replay. La publication révèle un second seam manquant :
+un transform Zod invalide le JSON Schema du serveur MCP entier. Le sérialiseur
+SDK réel et les logs Cloud confirment la cause ; default(null) garde les mesures
+historiques et sérialise correctement. Le contrôle publié continue avec ce
+correctif ciblé, sans changement de voix ni reconnexion. Aucun pilote statistique acquis,
 P3 non commencé. [Plan, protocole et état réel](docs/plan_lot_3_ecoute_libre_interruptions.md).
 
 ### 2026-10-14 — Préparer P2 sans effacer les réserves P1
