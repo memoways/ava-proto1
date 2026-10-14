@@ -79,6 +79,12 @@ export function prepareStreamedVoiceTurn(context: TTSGenerateContext & { charact
   else context.signal?.addEventListener('abort', onAbort, { once: true });
   return {
     delivery,
+    estimatedStopAt: () => settled || fallbackActive ? null : session.estimatedStopAt(),
+    get reversibleOutput() {
+      if (settled || fallbackActive || audioError) return null;
+      return { attenuate: () => session.attenuate(), pause: () => session.pause(),
+        resume: () => session.resume(), playedText: () => session.progress().confirmedText };
+    },
     onEvent(event: PRD4StreamEvent) {
       if (settled) {
         if ((event.type === 'interrupted' || event.type === 'failed') && finalReceipt) {

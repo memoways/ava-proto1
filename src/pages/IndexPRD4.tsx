@@ -7,6 +7,9 @@ import { getRuntimeContext } from "@/services/environmentContext";
  * réelle STT + TTS via TTSQueue, GM post-turn PRD4 en void (jamais bloquant).
  * Fin de session : durée admin OU clôture naturelle du GM après le seuil minimum.
  */
+import { createLocalSpeechDetector } from "@/services/localSpeechDetection";
+import { generateSpeech } from "@/services/tts";
+import { playAudioBlobRobust } from "@/services/audioPlayback";
 import { GM_CODE_VERSION } from "@/agents/gameMasterPRD4";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
@@ -135,7 +138,7 @@ import {
 } from "@/services/characterIdentityGuard";
 import { appendExperienceEvent, applyTopicHandoffFallback, validateDirectorDecision } from "@/services/experienceDirector";
 import type { ExperienceDirectorDecisionV1, RuntimeCharacter } from "@/types";
-import { endOfSpeechDelayMs, normalizeHandsFreeSettings, shouldBargeIn, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
+import { createAcousticInterruptionController, recognizedWordsChanged, endOfSpeechDelayMs, normalizeHandsFreeSettings, shouldBargeIn, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
 import {
   buildSwitchRequestGuidance,
   characterDisplayName,
@@ -204,6 +207,32 @@ const IndexPRD4 = () => {
   const handsFreeBlockedRef = useRef(false);
   const handsFreeTranscriptRef = useRef<((text: string, isFinal: boolean) => void) | null>(null);
   const lastCharacterTextRef = useRef("");
+  const streamedVoiceRef = useRef<ReturnType<typeof prepareStreamedVoiceTurn> | null>(null);
+  const acousticRef = useRef<ReturnType<typeof createAcousticInterruptionController> | null>(null);
+  const detectorRef = useRef<Awaited<ReturnType<typeof createLocalSpeechDetector>>>(null);
+  const acousticVoiceRef = useRef(false);
+  const lastTranscriptRef = useRef("");
+  const discardedPrefixRef = useRef("");
+  const confirmedTextRef = useRef("");
+  const activeVoiceTelemetryRef = useRef<ReturnType<typeof createVoiceTurnV2> | null>(null);
+  const [voiceOnly, setVoiceOnly] = useState(false);
+  const rescueRef = useRef(new Map<RuntimeCharacter, Blob>());
+  const rescuePendingRef = useRef(new Set<RuntimeCharacter>());
+  const voiceOnlyRef = useRef(voiceOnly); voiceOnlyRef.current = voiceOnly;
+  const preloadRescueRef = useRef<(character: RuntimeCharacter, voiceId?: string, providerId?: TTSProviderId) => void>(() => {});
+  const handsFreeNeedsRearmRef = useRef(false);
+  const rearmHandsFreeRef = useRef<() => Promise<void>>(async () => {});
+  const rescueLifetimeRef = useRef(new AbortController());
+  preloadRescueRef.current = (character, voiceId, providerId) => {
+    if (!voiceOnlyRef.current || endedRef.current || rescueRef.current.has(character) || rescuePendingRef.current.has(character)) return;
+    if (rescueLifetimeRef.current.signal.aborted) rescueLifetimeRef.current = new AbortController();
+    const lifetime = rescueLifetimeRef.current;
+    rescuePendingRef.current.add(character);
+    void generateSpeech("La connexion a coupé. Tu peux réessayer.", { characterKey: character, voiceId, providerId, signal: lifetime.signal })
+      .then(blob => { if (!lifetime.signal.aborted) rescueRef.current.set(character, blob); }).catch(() => {})
+      .finally(() => rescuePendingRef.current.delete(character));
+  };
+
   const responseOutputRef = useRef<ResponseOutput | null>(null);
   const outputSettingsRef = useRef<OutputSettings>(getOutputSettings());
   const avatarSettingsRef = useRef<StreamingAvatarSettings>(getStreamingAvatarSettings());
@@ -356,6 +385,9 @@ const IndexPRD4 = () => {
     setApprovedCallingTarget(null);
     handoffCallingRef.current = false;
     setHandoffCalling(false);
+    detectorRef.current?.stop(); detectorRef.current = null;
+    acousticRef.current?.reset(); acousticVoiceRef.current = false;
+    streamedVoiceRef.current = null; rescueLifetimeRef.current.abort(); rescueRef.current.clear(); handsFreeNeedsRearmRef.current = false;
     activeTurnSequenceRef.current += 1;
     activeTurnControllerRef.current?.abort("experience-cleanup");
     activeTurnControllerRef.current = null;
@@ -637,7 +669,12 @@ const IndexPRD4 = () => {
     diagnosticTraceEnabledRef.current = diagnosticTraceEnabled;
 
     const startingCharacter = startingCharacterRef.current;
-    incrementalOutputEnabledRef.current = getGameplaySettings().VOICE_INCREMENTAL_OUTPUT === true;
+    rescueLifetimeRef.current = new AbortController();
+    const pinnedGameplay = getGameplaySettings();
+    incrementalOutputEnabledRef.current = pinnedGameplay.VOICE_INCREMENTAL_OUTPUT === true;
+    handsFreeSettingsRef.current = normalizeHandsFreeSettings(pinnedGameplay.VOICE_HANDS_FREE);
+    setHandsFreeEnabled(handsFreeSettingsRef.current.enabled);
+    setVoiceOnly(pinnedGameplay.VOICE_ONLY_UI === true);
     const sid = await createPRD4Session(
       state.userRoleProfile,
       startingCharacter,
@@ -771,6 +808,10 @@ const IndexPRD4 = () => {
     const session = resumableSession;
     if (!session) return;
     incrementalOutputEnabledRef.current = session.conversation_memory.incrementalOutputEnabled === true;
+    const preset = session.conversation_memory.voicePreset;
+    handsFreeSettingsRef.current = normalizeHandsFreeSettings(preset?.handsFree ?? { ...getGameplaySettings().VOICE_HANDS_FREE, interruptionStrategy: "text" });
+    setHandsFreeEnabled(handsFreeSettingsRef.current.enabled);
+    setVoiceOnly(preset?.voiceOnly === true);
     cleanupAudio();
     const now = Date.now();
     const timerWindow = resolveResumeTimerWindow(session.started_at, session.resume_expires_at, now);
@@ -866,7 +907,7 @@ const IndexPRD4 = () => {
     const configuredDuration = normalizeSessionDurationSeconds(gameplaySettings.TIMEOUT_SECONDS);
     configuredSessionDurationRef.current = configuredDuration;
     showQuestionnaireRef.current = gameplaySettings.SHOW_QUESTIONNAIRE;
-    handsFreeSettingsRef.current = normalizeHandsFreeSettings(gameplaySettings.VOICE_HANDS_FREE);
+    // Voice behavior was pinned with the session; admin changes affect new sessions.
     setHandsFreeEnabled(handsFreeSettingsRef.current.enabled);
     setSessionDurationSeconds(configuredDuration);
 
@@ -947,6 +988,7 @@ const IndexPRD4 = () => {
     // Réplique d'ouverture du personnage actif (scriptée pour amorcer)
     const rawOpening = profile?.openingLine?.trim() || (startingCharacter === "max" ? OPENING_LINE : "Allô ?");
     const opening = guardCharacterResponse(rawOpening, characterContext).response;
+    preloadRescueRef.current(startingCharacter, activeVoiceIdRef.current ?? undefined, activeTTSProviderIdRef.current ?? undefined);
     setMaxSubtitle(opening);
     const openingMsg: ConversationMessage = tagSpokenWith(
       { role: startingCharacter, content: opening, timestamp: Date.now() },
@@ -1083,6 +1125,8 @@ const IndexPRD4 = () => {
       inputTelemetryRef.current = null;
       telemetry.setOrigin(inputReadyAt, latencyOrigin === "ptt_finalized" ? "ptt_release" : inputMode === "hands_free" ? "app_turn_decision" : latencyOrigin);
       telemetry.observe("transcript_final");
+      activeVoiceTelemetryRef.current = telemetry;
+      if (detectorRef.current) telemetry.captureDsp(detectorRef.current.dsp);
       const finishAborted = () => telemetry.finish(
         turnController.signal.reason === "player-barge-in" ? "interrupted"
           : /deadline/.test(String(turnController.signal.reason)) ? "timeout" : "cancelled",
@@ -1199,6 +1243,7 @@ const IndexPRD4 = () => {
             onReceipt: persistReceipt,
 
           });
+          streamedVoiceRef.current = streamedVoice;
         }
         const turnInput = {
           sessionId: sessionIdRef.current,
@@ -1359,6 +1404,9 @@ const IndexPRD4 = () => {
           : outputResult.status === "failed" ? "failed" : outputResult.status === "cancelled" ? "cancelled"
           : outputResult.started ? "completed" : "no_audio");
         if (!isCurrentTurn()) return;
+        if (outputResult.status === "failed" && voiceOnly && rescueRef.current.has(turnCharacter)) {
+          void playAudioBlobRobust(rescueRef.current.get(turnCharacter)!, undefined, undefined, turnController.signal);
+        }
         resumeConversationTraceSync(true);
         const tts_ms = firstPlaybackAt == null ? undefined : Math.max(0, Math.round(firstPlaybackAt - ttsStart));
         const voiceReadyMs = firstPlaybackAt == null ? undefined : Math.max(0, Math.round(firstPlaybackAt - inputReadyAt));
@@ -1653,6 +1701,7 @@ const IndexPRD4 = () => {
           variant: "destructive",
         });
       } finally {
+        if (streamedVoiceRef.current === streamedVoice) { streamedVoiceRef.current = null; acousticRef.current?.reset(); }
         streamedVoice?.cancel('turn-cleanup');
         turnController.signal.removeEventListener("abort", finishAborted);
         if (activeTurnSequenceRef.current === turnSequence) {
@@ -1678,6 +1727,7 @@ const IndexPRD4 = () => {
       handoffOffer,
     setCurrentHandoffOffer,
       latencyOverlayEnabled,
+      voiceOnly,
       setAudioState,
       setLastUserLabels,
       startLatencySegment,
@@ -1689,6 +1739,9 @@ const IndexPRD4 = () => {
     if (!preserveInputTelemetry) finishInputTelemetry("cancelled");
     pttFinalizingRef.current = false;
     handsFreeFinalizingRef.current = false;
+    detectorRef.current?.stop(); detectorRef.current = null;
+    acousticRef.current?.reset(); acousticVoiceRef.current = false;
+    lastTranscriptRef.current = ""; discardedPrefixRef.current = "";
     const stt = sttRef.current;
     sttRef.current = null;
     try { stt?.stop(); } catch { /* ignore */ }
@@ -1716,6 +1769,10 @@ const IndexPRD4 = () => {
       {
         onError: (err) => handleVoiceInputError(inputTelemetryRef, captureTelemetry, sttRef.current === stt, () => {
           console.error("[PRD4 STT]", err);
+          acousticRef.current?.sttFailed(performance.now());
+          handsFreeListeningRef.current = false; setHandsFreeListening(false);
+          activeTurnControllerRef.current?.abort("stt-recovery");
+          activeOutputControllerRef.current?.abort("stt-recovery");
           incrementPttError();
           trackEvent("prd4_ptt_error", { phase: "conversation", message: err.message });
           setUserSubtitle("Micro indisponible — réessaie.");
@@ -1769,6 +1826,14 @@ const IndexPRD4 = () => {
       sttConnected: true,
       lastSttConnectedAt: Date.now(),
     });
+    stt.getStream?.()?.getAudioTracks?.().forEach(track => track.addEventListener?.("ended", () => {
+      if (sttRef.current !== stt) return;
+      activeTurnControllerRef.current?.abort("microphone-ended");
+      activeOutputControllerRef.current?.abort("microphone-ended");
+      try { responseOutputRef.current?.interrupt(); } catch { /* already closed */ }
+      teardownSTT(); handsFreeListeningRef.current = false; setHandsFreeListening(false);
+      isProcessingRef.current = false; setAudioState("idle");
+    }, { once: true }));
     stt.setManualMode(true); // toggle-to-talk: pas de silence auto-finalize
     return stt;
   }, [endLatencySegment, finishInputTelemetry, incrementPttError, processTurn, setAudioState, teardownSTT]);
@@ -1816,6 +1881,7 @@ const IndexPRD4 = () => {
       setAudioState("mic_starting");
       setUserSubtitle("");
       await createSTT(initialStream);
+      preloadRescueRef.current(activeCharacterRef.current, activeVoiceIdRef.current ?? undefined, activeTTSProviderIdRef.current ?? undefined);
       setAudioState("user_speaking");
     } catch (err) {
       void initialStream?.then((stream) => stream.getTracks().forEach((track) => track.stop())).catch(() => {});
@@ -1884,11 +1950,31 @@ const IndexPRD4 = () => {
   // ---- Mains libres -----------------------------------------------------------
   useEffect(() => {
     handsFreeBlockedRef.current = handoffCalling || Boolean(handoffOffer) || Boolean(activeVideo) || state.phase !== "conversation_max";
-    if (handsFreeBlockedRef.current) finishInputTelemetry("cancelled");
-  }, [activeVideo, finishInputTelemetry, handoffCalling, handoffOffer, state.phase]);
+    if (handsFreeBlockedRef.current) {
+      finishInputTelemetry("cancelled");
+      if (handsFreeTimerRef.current) clearTimeout(handsFreeTimerRef.current);
+      handsFreeTimerRef.current = null;
+      acousticRef.current?.reset(); acousticVoiceRef.current = false;
+      discardedPrefixRef.current = ""; lastTranscriptRef.current = "";
+      if (handsFreeListeningRef.current) {
+        handsFreeNeedsRearmRef.current = true;
+        teardownSTT();
+        activeTurnSequenceRef.current++;
+        activeTurnControllerRef.current?.abort("capture-interlude");
+        activeOutputControllerRef.current?.abort("capture-interlude");
+        isProcessingRef.current = false;
+      }
+    } else if (handsFreeNeedsRearmRef.current && handsFreeListeningRef.current) {
+      handsFreeNeedsRearmRef.current = false;
+      handsFreeListeningRef.current = false;
+      void rearmHandsFreeRef.current();
+    }
+  }, [activeVideo, finishInputTelemetry, handoffCalling, handoffOffer, state.phase, teardownSTT]);
 
   /** Le joueur coupe la parole : la voix s'arrête, le tour en cours est abandonné. */
   const interruptCharacter = useCallback(() => {
+    const estimatedStop = streamedVoiceRef.current?.estimatedStopAt();
+    if (estimatedStop != null) activeVoiceTelemetryRef.current?.observe("output_stop_estimated", estimatedStop);
     if (processingWatchdogRef.current) {
       window.clearTimeout(processingWatchdogRef.current);
       processingWatchdogRef.current = null;
@@ -1909,6 +1995,10 @@ const IndexPRD4 = () => {
     handsFreeTimerRef.current = null;
     const stt = sttRef.current;
     if (!stt || handsFreeFinalizingRef.current || isProcessingRef.current || handsFreeBlockedRef.current) return;
+    if (acousticVoiceRef.current) {
+      handsFreeTimerRef.current = window.setTimeout(() => void finalizeHandsFreeUtterance(), 100);
+      return;
+    }
     handsFreeFinalizingRef.current = true;
     turnInputReadyAtRef.current = performance.now();
     inputTelemetryRef.current?.observe("turn_decided", turnInputReadyAtRef.current);
@@ -1929,34 +2019,55 @@ const IndexPRD4 = () => {
     }
   }, [finishInputTelemetry, setAudioState]);
 
-  handsFreeTranscriptRef.current = (text: string, isFinal: boolean) => {
+  if (!acousticRef.current) acousticRef.current = createAcousticInterruptionController({
+    observe: event => activeVoiceTelemetryRef.current?.interruption(event),
+    confirm: text => { confirmedTextRef.current = text; interruptCharacter(); },
+    recover: () => {
+      activeTurnControllerRef.current?.abort("stt-recovery");
+      activeOutputControllerRef.current?.abort("stt-recovery");
+      try { responseOutputRef.current?.interrupt(); } catch { /* already stopped */ }
+      handsFreeListeningRef.current = false; setHandsFreeListening(false);
+      teardownSTT(); isProcessingRef.current = false; setAudioState("idle");
+      toast({ title: "Micro à réactiver", description: "La reconnaissance a coupé. Réactive le micro pour reprendre.", variant: "destructive" });
+    },
+  });
+
+  handsFreeTranscriptRef.current = (rawText: string, isFinal: boolean) => {
     const settings = handsFreeSettingsRef.current;
-    if (!text.trim() || handsFreeBlockedRef.current) return;
+    if (!rawText.trim() || handsFreeBlockedRef.current) return;
+    let text = rawText;
     if (isFinal) {
       if (isProcessingRef.current) return;
-      endLatencySegment(sttLatencySegmentRef.current);
-      sttLatencySegmentRef.current = null;
-      setUserSubtitle(text);
-      void processTurn(text);
-      return;
+      if (discardedPrefixRef.current && text.startsWith(discardedPrefixRef.current)) text = text.slice(discardedPrefixRef.current.length).trim();
+      lastTranscriptRef.current = ""; discardedPrefixRef.current = "";
+      if (!text.trim()) return;
+      endLatencySegment(sttLatencySegmentRef.current); sttLatencySegmentRef.current = null;
+      setUserSubtitle(text); void processTurn(text); return;
     }
+    const changed = recognizedWordsChanged(lastTranscriptRef.current, text);
     if (isProcessingRef.current) {
-      // Le personnage réfléchit ou parle : seule une vraie prise de parole l'interrompt.
-      if (!shouldBargeIn(text, lastCharacterTextRef.current, settings)) return;
-      interruptCharacter();
-    }
+      const acoustic = settings.interruptionStrategy === "acoustic_confirmed" && detectorRef.current && streamedVoiceRef.current?.reversibleOutput;
+      if (acoustic) {
+        if (!acousticRef.current?.transcript(text, performance.now())) { lastTranscriptRef.current = text; return; }
+        discardedPrefixRef.current = text.endsWith(confirmedTextRef.current) ? text.slice(0, text.length - confirmedTextRef.current.length) : "";
+        text = confirmedTextRef.current;
+      } else {
+        if (!shouldBargeIn(text, lastCharacterTextRef.current, settings)) { lastTranscriptRef.current = text; return; }
+        interruptCharacter();
+      }
+    } else if (discardedPrefixRef.current && text.startsWith(discardedPrefixRef.current)) text = text.slice(discardedPrefixRef.current.length).trim();
+    lastTranscriptRef.current = rawText;
+    if (!changed || !text.trim()) return;
     if (!inputTelemetryRef.current) beginInputTelemetry("hands_free");
-    setUserSubtitle(text);
-    setAudioState("user_speaking");
+    setUserSubtitle(text); setAudioState("user_speaking");
     if (handsFreeTimerRef.current) window.clearTimeout(handsFreeTimerRef.current);
-    handsFreeTimerRef.current = window.setTimeout(() => {
-      void finalizeHandsFreeUtterance();
-    }, endOfSpeechDelayMs(text, settings));
+    handsFreeTimerRef.current = window.setTimeout(() => void finalizeHandsFreeUtterance(), endOfSpeechDelayMs(text, settings));
   };
 
   const handleToggleHandsFree = useCallback(async () => {
     if (endedRef.current) return;
     if (handsFreeListeningRef.current) {
+      handsFreeNeedsRearmRef.current = false;
       if (handsFreeTimerRef.current) window.clearTimeout(handsFreeTimerRef.current);
       handsFreeTimerRef.current = null;
       handsFreeListeningRef.current = false;
@@ -1976,7 +2087,28 @@ const IndexPRD4 = () => {
       setUserSubtitle("");
       handsFreeListeningRef.current = true;
       const stt = await createSTT(initialStream);
-      stt.setManualMode(true); // la fin de parole est décidée ici, pas par le fournisseur
+      stt.setManualMode(true); // application-owned end of speech
+      const stream = stt.getStream?.();
+      if (stream && handsFreeSettingsRef.current.interruptionStrategy === "acoustic_confirmed") {
+        const detector = await createLocalSpeechDetector(stream, (voiced, at) => {
+          if (sttRef.current !== stt || !handsFreeListeningRef.current || handsFreeBlockedRef.current) return;
+          acousticVoiceRef.current = voiced;
+          const output = handsFreeSettingsRef.current.bargeInEnabled && isProcessingRef.current ? streamedVoiceRef.current?.reversibleOutput ?? null : null;
+          acousticRef.current?.signal(voiced, at, output, lastTranscriptRef.current);
+        }, () => {
+          if (sttRef.current !== stt) return;
+          activeTurnControllerRef.current?.abort("acoustic-capture-failed");
+          activeOutputControllerRef.current?.abort("acoustic-capture-failed");
+          try { responseOutputRef.current?.interrupt(); } catch { /* already stopped */ }
+          teardownSTT(); handsFreeListeningRef.current = false; setHandsFreeListening(false);
+          isProcessingRef.current = false; setAudioState("idle");
+          toast({ title: "Micro à réactiver", description: "Réactive le micro pour reprendre.", variant: "destructive" });
+        }).catch(() => null);
+        if (sttRef.current !== stt || endedRef.current) { detector?.stop(); return; }
+        detectorRef.current = detector;
+
+      }
+      preloadRescueRef.current(activeCharacterRef.current, activeVoiceIdRef.current ?? undefined, activeTTSProviderIdRef.current ?? undefined);
       setHandsFreeListening(true);
       if (!isProcessingRef.current) setAudioState("idle");
       trackEvent("prd4_hands_free_started", { session_id: sessionIdRef.current, ...handsFreeSettingsRef.current });
@@ -1993,6 +2125,8 @@ const IndexPRD4 = () => {
       toast({ title: "Micro indisponible", description: "Réessaie dans un instant.", variant: "destructive" });
     }
   }, [beginInputTelemetry, createSTT, finishInputTelemetry, incrementPttError, setAudioState, teardownSTT]);
+
+  rearmHandsFreeRef.current = handleToggleHandsFree;
 
   const handleHangUp = useCallback(() => {
     if (endedRef.current) return;
@@ -2085,6 +2219,7 @@ const IndexPRD4 = () => {
       approvedCallingTargetRef.current = null;
       setAudioState("max_speaking");
       setHandoffCalling(false);
+      preloadRescueRef.current(target, profile?.ttsVoiceId ?? undefined, asTTSProviderId(profile?.ttsProvider) ?? undefined);
       const openingController = new AbortController();
       activeOutputControllerRef.current = openingController;
       await renderResponseText(openingLine, {
@@ -2367,6 +2502,7 @@ const IndexPRD4 = () => {
               onPTTPress={handlePTTPress}
               onPTTRelease={handlePTTRelease}
               handsFree={handsFreeEnabled}
+              voiceOnly={voiceOnly}
               handsFreeListening={handsFreeListening}
               onToggleHandsFree={() => void handleToggleHandsFree()}
               onHangUp={handleHangUp}

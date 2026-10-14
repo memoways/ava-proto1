@@ -11,6 +11,13 @@ export function voiceFixture(status: "completed" | "failed" | "interrupted" = "c
   return rows;
 }
 describe("MCP technical projection", () => {
+  it("accepts historical V2 events without P2 milestones, keeping missing measures null", () => {
+    const value = structuredClone(voiceFixture()[0].metadata_json);
+    delete (value.milestones as Partial<typeof value.milestones>).audio_suspended;
+    delete value.interruptions;delete value.capture_dsp;
+    const projected = voiceTurnProjectionSchema.parse(value);
+    expect(projected.milestones.audio_suspended).toBeNull();expect(projected.interruptions).toBeUndefined();
+  });
   it("strips private dialogue, prompts and credentials from every projected nesting", () => {
     const rows = voiceFixture();
     const value = { ...rows[1].metadata_json, transcript: "private dialogue", prompt: "private prompt", token: "secret", services: [{ service: "tts", requested_provider: "elevenlabs", requested_model: null, resolved_provider: "gradium", resolved_model: null, effective_provider: "gradium", effective_model: "gradium-tts", transport: "rest_fallback", transcript: "private", secret: "secret" }] };

@@ -1,8 +1,9 @@
 # Reprise — lot 3 / P2 : écoute libre et interruptions confirmées
 
-Date : 14 octobre 2026. Statut : **prompt de reprise préparé ; aucune
-implémentation P2, modification de réglage ou nouvelle publication dans ce
-chat de préparation**. La demande d'Ulrich est de préparer la suite après P1.
+Date : 14 octobre 2026. Statut actuel : **P2 implémenté localement sur
+`codex/p2-hands-free-interruptions` ; contrôles et revues en cours, aucune
+publication P2 à ce relevé**. Le prompt ci-dessous conserve la préparation
+historique après P1 et le contrat obligatoire de ce lot.
 
 ## Point de reprise et résultat attendu
 
@@ -286,3 +287,242 @@ commit/push de la clôture ; ne commence aucun autre lot.
 Ce sont des points d'inspection, pas un choix d'architecture déjà implémenté.
 Les sous-lots et leurs dépendances seront enregistrés ici avant le premier
 changement applicatif. Préparation actuelle : documentation uniquement.
+
+## Préflight d'exécution — 14 octobre 2026 : routage MCP Ava vérifié
+
+Demande actuelle : exécuter uniquement P2 jusqu'à sa livraison Lovable,
+avec diagnostic préalable des deux timeouts GM P1. P0 n'est pas relancé et
+P3 reste hors périmètre. Aucun changement applicatif effectué à ce relevé.
+
+- État local vérifié : branche `main`,
+  `8dd55dbd2f222d99f2b5cda748289c77e13908e0`, workspace initialement propre,
+  remote `https://github.com/memoways/ava-proto1.git`.
+- Connecteur Lovable authentifié : compte `ulrichmemoways`, workspace
+  Memoways `5glbtPltldwz9tgNwIi4`, projet Ava
+  `1265958d-b74e-40f2-917d-182fe05163fc`. Le projet est prêt,
+  `agentFinished=true`, et son SHA courant correspond à `8dd55db`.
+  Ces métadonnées ne prouvent pas la révision du bundle publié.
+- `get_database_status` Lovable confirme `enabled=true`, `stack=supabase`.
+  Aucun SQL, changement Cloud, build ou publication demandé.
+- Le connecteur natif Supabase refuse `get_project` ciblé sur
+  `iralfqlslqndgvexixis` : `ProtocolError`, MCP `-32600`,
+  `You do not have permission to perform this action` ; son champ structuré
+  rapporte `INVALID_ARGUMENT`. La réponse textuelle précise donc un refus
+  de permission, sans démontrer une expiration d'identifiants.
+- L'arrêt initial et la demande de reconnexion Supabase étaient une erreur
+  de routage de l'assistant. Ulrich rappelle le connecteur spécial fonctionnel.
+  Le [plan MCP](plan_mcp_statistiques.md) documentait déjà l'accès par l'app ;
+  le [bilan P0](plan_lot_1_observabilite_latence.md) donne l'endpoint exact et
+  ses preuves. Le README précise désormais cette entrée pour les reprises.
+- **MCP app Ava testé et fonctionnel**, OAuth admin, endpoint
+  `https://iralfqlslqndgvexixis.supabase.co/functions/v1/mcp` :
+  `list_sessions(days=2, environment=sandbox-ulrich, limit=10)` retourne
+  les deux sessions P1 ; `get_voice_latencies(days=2,
+  environment=sandbox-ulrich)` retourne leurs projections techniques V2,
+  sans dialogue ni secrets. Aucun navigateur ou SQL direct utilisé.
+- Les deux autres outils natifs répondent également sans erreur :
+  `get_usage_overview(days=2, environment=sandbox-ulrich)` et
+  `get_llm_costs(days=2)`. Ce dernier n'offre pas de filtre d'environnement,
+  conformément au contrat documenté. Les quatre outils ont donc été testés.
+- Fenêtre du relevé V2 conservé : `[2026-10-12T06:20:15.474Z,
+  2026-10-14T06:20:15.474Z)`, page 0/100, `nextOffset=100`, aucune ligne
+  invalide. Statistiques limitées à la page, pas à toute la cohorte.
+- Preview Max tour 4 : tentative `e8ae0885-3f72-454a-94d0-27e7fa99270f`,
+  GM `b412ebbb-8093-4ea9-b038-3bd53bbdc75b` ; génération failed
+  de 146 à 12151 ms (12005 ms), persistance ok de 12151 à 12347 ms.
+- Publié Max tour 1 : tentative `0f4d1a2c-0cf5-40bc-be34-83d225ebe7a0`,
+  GM `66884b15-d4c3-4819-aedc-70ebdc7f9ba2` ; génération failed
+  de 92 à 12094 ms (12002 ms), persistance ok de 12095 à 12297 ms.
+- Les deux portent la config épinglée `9217fd34-321a-45c7-8363-6a8cf0b0157c`.
+  Le statut completed des événements GM est celui du tour vocal associé,
+  pas un succès du GM : son span génération est failed. Le GM du tour 1
+  preview est distinct et réussi (4291 ms de génération).
+- Le modèle effectif, les spans headers/corps GM et le signal parent ne
+  sont pas disponibles dans ces projections d'échec. Aucune attribution
+  fournisseur ni cause P1 démontrée. Les deux réserves restent ouvertes.
+
+Accès technique rétabli sans intervention de reconnexion. Prochaine étape :
+vérifier les invariants des résultats GM échoués/périmés aux seams réels,
+puis compléter l'architecture et les sous-lots P2 avant l'implémentation.
+Pas de PR, fusion, activation canary ou publication P2 à ce relevé.
+
+Contrôle automatique initial, avant tout changement applicatif : 27 tests
+réussis dans `gameMasterPRD4.memory`, `prd4Orchestrator`,
+`sessionConversationMemory` et `ConversationScreen`. Ils couvrent les
+contrats existants ; ils ne reproduisent pas la cause des deux timeouts.
+Le préflight complet et le plan d'architecture P2 restent à terminer.
+
+## Plan d'exécution retenu — 14 octobre 2026, avant implémentation
+
+### Architecture et sous-lots
+
+1. Préflight borné : comparer le GM commun aux chemins batch/SSE ; tests au
+   seam `evaluatePostTurnPRD4` pour timeout et signal parent, persistance sans
+   delta, absence d'action/consentement. Les deux échecs réels sont retrouvés
+   via MCP Ava ; leur cause demeure inconnue, pas de tuning ni recette P0.
+2. `handsFreeVoice.ts` : stratégie normalisée `text` / `acoustic_confirmed`,
+   automate candidat/atténué/suspendu/confirmé/rejeté, timer de parole distinct,
+   transcription identique ignorée. Capture et sortie ont des états séparés.
+   La détection locale fournit seulement des indices (énergie, périodicité,
+   variations spectrales/zero crossings), jamais une décision de tour.
+3. `tts/gradiumStreamPlayer.ts` : gain propre au tour, pause au curseur des
+   samples rendus, conservation des PCM non lus et ledger de livraison. Les
+   BufferSource Web Audio sont à usage unique : leur arrêt/reprogrammation
+   utilise uniquement le suffixe PCM non rendu ; socket, contexte TTS,
+   intention, promesses et tour restent identiques. Aucun `session.cancel`,
+   aucun `AudioContext.suspend`, aucun replay ni nouvel appel à TTS au rejet.
+   L'outputLatency continue de décaler le suivi du son estimé après pause.
+   Buffer existant de 30 s conservé, attente candidate bornée à 8 s ; si la
+   voix persiste sans STT à cette limite, fermer la capture et arrêter la
+   sortie à une frontière d'erreur explicite, sans confirmer ni lancer LLM.
+   Batch, avatars et secours blob : stratégie texte faute de pause réversible.
+4. Capture : AudioWorklet partagé comme primitive de frames, contexte micro
+   indépendant du player, fréquence effective mesurée et conversion PCM
+   conforme (Gradium 24 kHz/1920 samples, AssemblyAI fréquence annoncée/50 ms).
+   Vérifier DSP sur `MediaStreamTrack.getSettings()` ; absence d'AEC effective
+   rend la stratégie acoustique indisponible, avec compatibilité texte.
+   Deepgram garde son MediaRecorder, mode manuel, keepalive et flush borné.
+   Gradium attend `ready`, écoute `end_text`, expose `step` comme diagnostic,
+   acquitte seulement le `flush_id` exact ; délai initial 10, comparaison 7
+   réservée au corpus français. Aucun provider supprimé.
+5. `IndexPRD4.tsx` : atténuer/suspendre seulement une sortie réversible du
+   tour courant ; confirmer avec parole nouvelle corrélée à la fenêtre
+   candidate (un « non » ou « attends » suffit). Écho comparé au préfixe
+   effectivement joué, jamais à toute la réponse générée. Sur rejet, le
+   player reprend seul ; pas de mémoire, reçu ni GM. Sur confirmation,
+   annulation P1 et reçu partiel existants, puis fin applicative du nouvel
+   énoncé avant LLM. L'ancienne sortie ne fait plus `resume()` si la capture
+   tourne déjà : ce callback ne peut vider le nouvel énoncé.
+   Vidéo/handoff/offre : désarmer, reset effectif du STT ; le retour reprend
+   un buffer vide. Panne/perte permission/fin : fermer capture et sortie.
+6. UI voix seule sous flag par défaut false ; conversation sans sous-titres,
+   état accessible, contrôle micro, Terminer et Appeler/Rester conservés.
+   Le PTT existant demeure disponible en mode de compatibilité. Précharger
+   après geste micro un court secours TTS fixe avec la voix du personnage,
+   hors dialogue/mémoire ; si ce secours manque, statut accessible et retry.
+7. Qualité, deux revues indépendantes HEAD final, CI, PR `codex/` → main,
+   squash, synchronisation native Lovable, preview Brave puis publication et
+   contrôle publié. Les tests humains nécessitent la voix d'Ulrich ; préparer
+   les onglets et demander un seul geste à la fois, sans injection synthétique.
+
+### Stockage et observabilité
+
+Pas de migration : preset normalisé (stratégie, timing, UI) dans la mémoire
+V4 JSONB existante, conservé par normalisation/merge/CAS, épinglé à la création
+et repris avec la session. Une ancienne session reprend text/UI courante ;
+les flags de nouvelles sessions restent désactivés hors canary explicite.
+Télémétrie V2 additive : candidats bornés par `interruption_id`, offsets
+monotones et mesures DSP techniques sans audio ni texte ; début détecté,
+atténuation, pause, confirmation/rejet, reprise/arrêt estimé. Projections
+admin/MCP filtrées mises à jour. Aucun null converti en zéro. Les mesures
+AudioContext restent des estimations ; pas de preuve d'arrêt matériel sans
+référence acoustique autorisée. Pas de gain statistique revendiqué.
+
+### Tests, pilote et rollback
+
+Tests seams réels : gain/pause/suffixe/reçu sans duplication et sans EOS
+précoce, buffer borné pendant pause ; automate un mot, écho, toux/bruit,
+expiration avec voix persistante, récupération STT ; frames resampling et
+flush exact/tardif ; mémoire/preset/reprise ; UI accessible et PTT/batch.
+E2E simulés isolés Chromium, Firefox et WebKit selon capacités disponibles,
+incluant capture→flush→réponse→nouvel énoncé et frontières vidéo/handoff.
+Exécuter regression/unit/integration/lint/typecheck/build, puis E2E et CI.
+Délais 900/700/500 et hésitation 700/300 comparés un levier à la fois lors du
+pilote humain ; aucune modification de défaut sur petit échantillon.
+Préparer tableau 300 tours/10 sessions avec pauses françaises, voix, révisions,
+effectifs, faux endpoints/coupures/atténuations, couverture et références.
+Le code compatible peut être publié avec flags off ; activation générale
+attend corpus/gates. Rollback : nouvelles sessions text/UI actuelle/batch,
+anciennes sessions épinglées conservées ; pas de migration destructive.
+
+### Références techniques vérifiées
+
+- [Gradium STT](https://docs.gradium.ai/guides/speech-to-text) : ready,
+  text/end_text, step et flush exact ; frames PCM 24 kHz de 80 ms.
+- [Gradium délais valides](https://gradium.ai/blog/semantic-vad) : 7 et 10
+  disponibles, 4 existant non conforme ; départ 10 sans changer la voix.
+- [Web Audio BufferSource](https://developer.mozilla.org/en-US/docs/Web/API/AudioBufferSourceNode/start) :
+  offset en secondes, node à usage unique ; pause isolée sur suffixe retenu.
+- [Exemples AudioWorklet MDN](https://github.com/mdn/webaudio-examples) :
+  primitive native compatible Vite, sans nouvelle dépendance STT ni service.
+
+Confiance d'implémentation P2 : 93 % après inspection des seams existants,
+absence de duplication, conformité Lovable et documentation providers/Web
+Audio. Le diagnostic de cause des deux timeouts GM reste non démontré et
+n'est pas inclus dans cette confiance ; ses réserves sont maintenues.
+
+## Exécution locale et corrections de revue
+
+- Préflight : les deux GM failed sont retrouvés par MCP Ava. Le batch et
+  l'incrémental utilisent le même `evaluatePostTurnPRD4`, délai inchangé
+  de 12000 ms, réception confirmée requise pour P1. Deux tests nouveaux
+  injectent timeout et annulation parent au seam GM : aucun delta mémoire,
+  action, proposition consentie, vidéo ou fin ; log d'échec distinct conservé.
+  Les protections de persistance CAS et de résultat périmé restent celles
+  de P1. Aucun défaut expliquant les deux échecs fournisseur démontré.
+- Automate candidat, gain isolé, pause au curseur rendu, suffixe non lu,
+  confirmation sur un mot et rejet sans reçu/GM supplémentaires implémentés.
+  Les samples atténués restent comptés ; `output_stop_estimated` ajoute
+  l'estimation de queue de sortie lorsqu'outputLatency est disponible.
+- Capture AudioWorklet à fréquence réelle ; resampling et frames 24 kHz/80 ms
+  Gradium, fréquence annoncée/50 ms AssemblyAI. Gradium ready/flush exact et
+  messages horodatés retirés, délai valide 10. Deepgram conserve mode manuel
+  et keepalive pendant pause ; `resume()` est idempotent sur capture active.
+- Revue préparatoire Spec/Standards : pertes pendant flush, worklet tardif
+  après stop, candidat suspendu au micro-off, perte de périphérique et secours
+  PTT/handoff corrigés. Pendant flush, conserver les nouvelles frames PCM
+  (Gradium : 40 frames, 3,2 s ; AssemblyAI : 60 frames, 3 s) ou les chunks
+  MediaRecorder (Deepgram : 20 chunks) puis envoyer cette seule queue après
+  ACK/flush borné. Aucune reconstruction du phonème depuis du texte.
+  Frontières vidéo/offre/handoff : arrêter la capture ancienne et la recréer
+  après la frontière, avec consentement micro existant et generation guards.
+- Perte de track, panne STT ou détecteur devenu muet arrêtent capture/sorties ;
+  mic-off rejette et reprend le candidat réversiblement. Secours fixe avec
+  la voix active préchargé aussi en PTT et au changement de personnage ;
+  il n'entre jamais dans dialogue, reçu ou mémoire narrative.
+- Preset handsFree et voix seule conservé dans V4 par normalisation/merge/CAS,
+  sans migration ; ancienne session : text/UI actuelle. Défauts production
+  et timers 900/700 préservés. Ni activation canary ni réglage distant à ce stade.
+- Contrôle qualité complet : 567 unitaires, 34 intégrations, 46 régressions,
+  typecheck/build réussis ; lint sans erreur (un avertissement de dépendance
+  préexistant). Suite E2E complète initiale : 39 sans retry ; les neuf scénarios
+  P2 finaux passent également sans retry, incluant micro-off et perte de track
+  sur les trois navigateurs simulés (suite finale : 45 cas). Revues et CI du HEAD final suivent ; ces
+  nombres intermédiaires ne sont pas une preuve humaine ni une mesure de gain.
+
+## Protocole humain et pilote préparé
+
+Recette courte : Brave, admin → Tester moi-même, sandbox-ulrich. Vérifier
+Max puis Emma avec leur voix inchangée : réponse entière, une correction
+« non, attends » au milieu, réponse nouvelle après sa fin de parole ; une
+toux/bruit bref doit atténuer puis reprendre la même réponse ; coupure micro
+pendant candidat et fin de session doivent rester utilisables. Ne pas forcer
+de consentement GM ni relancer P0. Aucune voix synthétique injectée en réel.
+Référence acoustique physique : non capturée ; objectifs hardware non attestés.
+
+Pilote acoustique : 10 sessions de 30 tours (300), 5 baseline P1/text et
+5 acoustic_confirmed, mêmes voix, modèle, révision, RAG et timers 900/700.
+Brave seulement pour la voix humaine autorisée ; percentiles réels des autres
+navigateurs non attestés. Répartir 6 sessions Max / 4 Emma, 3 Max et 2 Emma
+par stratégie. Alterner question canonique, reformulation elliptique, pause
+de réflexion, reprise, « oui/non/attends », noms propres ; inclure bruit/toux,
+casque/haut-parleur, candidat avant son/premier mot/milieu/fin et interruptions
+rapides. Les variantes 900/700/500 et hésitation 700/300, puis Gradium 7/10,
+nécessitent des cohortes distinctes en changeant un seul levier à la fois.
+
+| Session prévue | Personnage | Stratégie | Tours réels | Révision/preset | Résultat/gates |
+| --- | --- | --- | --- | --- | --- |
+| B1–B3 | Max | text | À renseigner | À épingler | Non exécuté |
+| B4–B5 | Emma | text | À renseigner | À épingler | Non exécuté |
+| P1–P3 | Max | acoustic_confirmed | À renseigner | À épingler | Non exécuté |
+| P4–P5 | Emma | acoustic_confirmed | À renseigner | À épingler | Non exécuté |
+
+Pour chaque tour : session/attempt/turn/interruption_id, question et pause
+contrôlée, état final, premier/dernier mot, faux endpoint, fausse atténuation,
+fausse coupure, identité/fuite/mémoire, underrun/replay, disponibilité et
+couverture. Dédupliquer les snapshots V2 par tentative/candidat/événement,
+exclure les observations GM des effectifs de tours. Chronométrer séparément
+détection→atténuation, confirmation→arrêt estimé, rejet→reprise ; valeurs
+absentes restent null. Publier effectifs/p50/p95 par cohorte ; aucune durée
+de timer économisée n'est un gain de bout en bout. 300 tours/10 sessions
+restent à réaliser, sans corpus fictif ni activation générale.

@@ -171,6 +171,22 @@ plus anciennes conservent leur état au moment de leur rédaction.
 
 ## [Non publié]
 
+### Lot 3 / P2 — réalisation locale en cours
+
+- Interruption acoustique candidate puis confirmée, pause/réprise des samples
+  non lus dans le même contexte Gradium, sans reçu ni GM au rejet. Capture
+  AudioWorklet pour Gradium/AssemblyAI, phonème suivant retenu pendant flush,
+  barrières de génération et arrêt sur perte de micro ; Deepgram manuel et
+  keepalive conservés. Voix seule accessible sous flag false par défaut,
+  secours vocal fixe et presets épinglés dans V4 sans migration.
+- Les quatre outils du MCP Ava ont été testés avec succès ; README et
+  [plan P2](docs/plan_lot_3_ecoute_libre_interruptions.md) précisent le routage
+  natif du Cloud Lovable. Deux GM P1 failed retrouvés, aucune cause démontrée
+  ni tuning. Contrat P1, voix, canon, cadre, transferts et batch conservés.
+- Contrôles locaux et revues en cours ; aucune livraison P2 encore attestée.
+  Pilote 300 tours/10 sessions et mesures acoustiques physiques restent
+  distincts. P3 hors périmètre.
+
 ### Préparation du lot 3 / P2
 
 - [Prompt complet de reprise](docs/plan_lot_3_ecoute_libre_interruptions.md)

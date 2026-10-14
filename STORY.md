@@ -73,6 +73,19 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-10-14 — P2 : écouter pendant la réponse, confirmer avant de couper
+
+La demande porte sur l'écoute libre et l'UI voix seule. Le MCP Ava existant
+donne bien accès aux données Cloud : les quatre outils répondent, et les deux
+timeouts GM P1 sont retrouvés sans diagnostic de cause démontré. L'implémentation
+locale conserve la génération au candidat, atténue puis suspend la sortie ;
+un rejet reprend son suffixe de samples, une parole confirmée annule le tour
+et garde son reçu partiel. Le premier phonème du prochain énoncé est retenu
+pendant flush, les captures tardives sont écartées, et le preset est épinglé
+dans V4. Voix, canon et règles de transfert restent inchangés. Tests et revues
+en cours ; aucun P2 publié encore, aucun pilote statistique acquis et P3 non
+commencé. [Plan, protocole et état réel](docs/plan_lot_3_ecoute_libre_interruptions.md).
+
 ### 2026-10-14 — Préparer P2 sans effacer les réserves P1
 
 Ulrich demande le prompt du prochain lot. La reprise prépare le diagnostic

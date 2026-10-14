@@ -6,6 +6,7 @@ import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { waitForCondition } from "../finalization";
 import { getDictionaryTerms } from "../dictionary";
 import { getSTTProviderSettings } from "../providerSettings";
+import { createPcmCapture, encodePcm16 } from "../pcmCapture";
 
 
 
@@ -24,9 +25,9 @@ export class AssemblyAISTT implements STTSession {
 
   private ws: WebSocket | null = null;
   private stream: MediaStream | null = null;
-  private audioCtx: AudioContext | null = null;
-  private source: MediaStreamAudioSourceNode | null = null;
-  private processor: ScriptProcessorNode | null = null;
+  private capture: Awaited<ReturnType<typeof createPcmCapture>> | null = null;
+  private generation = 0;
+  private flushAudio: Float32Array[] = [];
   private _active = false;
   private _paused = false;
   private capturePaused = false;
@@ -59,22 +60,17 @@ export class AssemblyAISTT implements STTSession {
   setManualMode(manual: boolean) { this.manualMode = manual; }
 
   async start() {
+    const generation = this.generation;
     const tokenRes = await authenticatedFunctionFetch(TOKEN_ENDPOINT);
     if (!tokenRes.ok) throw new Error(`AssemblyAI token error: ${tokenRes.status}`);
     const { token, sample_rate = 16000 } = await tokenRes.json();
+    if (generation !== this.generation) throw new DOMException("Capture replaced", "AbortError");
 
     this.stream = await Promise.resolve(
-      this.initialStream ?? navigator.mediaDevices.getUserMedia({ audio: { sampleRate: sample_rate, channelCount: 1 } }),
+      this.initialStream ?? navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } }),
     );
     this.initialStream = undefined;
-    const AudioCtx = window.AudioContext || (window as Window & {
-      webkitAudioContext?: typeof AudioContext;
-    }).webkitAudioContext;
-    if (!AudioCtx) throw new Error("Web Audio API unavailable");
-    this.audioCtx = new AudioCtx({ sampleRate: sample_rate });
-    this.source = this.audioCtx.createMediaStreamSource(this.stream);
-    this.processor = this.audioCtx.createScriptProcessor(4096, 1, 1);
-
+    if (generation !== this.generation) { this.stream.getTracks().forEach(track => track.stop()); this.stream = null; throw new DOMException("Capture replaced", "AbortError"); }
     // AssemblyAI v3 accepts a `keyterms_prompt` JSON array + turn-detection knobs.
     const keyterms = getDictionaryTerms();
     const aa = getSTTProviderSettings("assemblyai");
@@ -107,19 +103,23 @@ export class AssemblyAISTT implements STTSession {
       };
     });
 
-    this.ws.onmessage = (event) => this.handleMessage(event);
-    this.ws.onclose = () => debugLogger.log({ service: "stt", level: "info", direction: "in", label: "AssemblyAI WS closed" });
+    const socket = this.ws;
+    if (generation !== this.generation) { socket.close(); throw new DOMException("Capture replaced", "AbortError"); }
+    this.ws.onmessage = (event) => { if (this.ws === socket && generation === this.generation) this.handleMessage(event); };
+    this.ws.onerror = () => this.onError?.(new Error("AssemblyAI STT error"), { provider: "assemblyai" });
+    this.ws.onclose = () => { if (this._active) this.onError?.(new Error("AssemblyAI STT disconnected"), { provider: "assemblyai" }); };
 
-    this.processor.onaudioprocess = (e) => {
-      if (this._paused || this.capturePaused || this.ws?.readyState !== WebSocket.OPEN) return;
-      const input = e.inputBuffer.getChannelData(0);
-      const pcm = floatTo16BitPCM(input);
-      this.ws.send(pcm);
+    const capture = await createPcmCapture(this.stream, sample_rate, Math.round(sample_rate * 0.05), samples => {
+      if (this._paused || this.ws?.readyState !== WebSocket.OPEN) return;
+      if (this.capturePaused) {
+        if (this.flushAudio.length >= 60) { this.onError?.(new Error("AssemblyAI pending capture exceeded 3 seconds")); return; }
+        this.flushAudio.push(samples); return;
+      }
+      this.ws.send(encodePcm16(samples));
       observeVoice(this.onVoiceObservation, "last_audio_sent");
-    };
-
-    this.source.connect(this.processor);
-    this.processor.connect(this.audioCtx.destination);
+    }, error => { if (generation === this.generation) this.onError?.(error, { provider: "assemblyai" }); });
+    if (generation !== this.generation || this.ws !== socket) { capture.stop(); throw new DOMException("Capture replaced", "AbortError"); }
+    this.capture = capture;
     observeVoice(this.onVoiceObservation, "capture_started");
     observeVoice(this.onVoiceObservation, "capture_ready");
     this._active = true;
@@ -127,8 +127,15 @@ export class AssemblyAISTT implements STTSession {
     this.capturePaused = false;
   }
 
-  pause() { this._paused = true; this.capturePaused = true; }
-  resume() { this._paused = false; this.capturePaused = false; this.fullTranscript = ""; }
+  pause() { this._paused = true; this.capturePaused = true; this.flushAudio = []; this.capture?.enabled(false); }
+  resume() {
+    if (!this._paused && !this.capturePaused) return;
+    this._paused = false; this.capturePaused = false; this.fullTranscript = ""; this.capture?.enabled(true);
+    for (const samples of this.flushAudio.splice(0)) {
+      if (this.ws?.readyState !== WebSocket.OPEN) break;
+      this.ws.send(encodePcm16(samples)); observeVoice(this.onVoiceObservation, "last_audio_sent");
+    }
+  }
 
   flush(): Promise<void> {
     if (this.flushPromise) return this.flushPromise;
@@ -139,29 +146,30 @@ export class AssemblyAISTT implements STTSession {
   }
 
   private async finalizeCurrentTurn(): Promise<void> {
+    const generation = this.generation;
+    await this.capture?.flush();
+    if (generation !== this.generation) return;
     this.capturePaused = true;
     const requestedAt = performance.now();
     if (this.ws?.readyState === WebSocket.OPEN) {
       try { this.ws.send(JSON.stringify({ type: "ForceEndpoint" })); observeVoice(this.onVoiceObservation, "flush_sent"); } catch { /* use latest running text */ }
     }
     await waitForCondition(() => this.lastTurnEndedAt >= requestedAt, 1300);
+    if (generation !== this.generation) return;
     const finalText = this.fullTranscript.trim();
     this.fullTranscript = "";
     if (finalText) this.emitFinal(finalText, "ptt_flush");
   }
 
   async stop() {
-    this._active = false;
-    try { this.processor?.disconnect(); } catch { /* ignore */ }
-    try { this.source?.disconnect(); } catch { /* ignore */ }
-    try { await this.audioCtx?.close(); } catch { /* ignore */ }
+    this.generation++; this._active = false; this._paused = true;
+    this.capture?.stop();
     try { this.ws?.close(); } catch { /* ignore */ }
     this.stream?.getTracks().forEach((t) => t.stop());
     this.ws = null;
     this.stream = null;
-    this.audioCtx = null;
-    this.source = null;
-    this.processor = null;
+    this.capture = null;
+    this.flushAudio = [];
     this.fullTranscript = "";
   }
 
@@ -226,14 +234,4 @@ export class AssemblyAISTT implements STTSession {
     this.firstPartialAt = 0;
     this.onTranscript(finalText, true);
   }
-}
-
-function floatTo16BitPCM(input: Float32Array): ArrayBuffer {
-  const buffer = new ArrayBuffer(input.length * 2);
-  const view = new DataView(buffer);
-  for (let i = 0; i < input.length; i++) {
-    const s = Math.max(-1, Math.min(1, input[i]));
-    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-  }
-  return buffer;
 }

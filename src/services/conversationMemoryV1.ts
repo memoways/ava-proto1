@@ -1,4 +1,5 @@
 import { normalizeDeliveries } from "./responseDelivery";
+import { normalizeHandsFreeSettings } from "./handsFreeVoice";
 import type {
   ConversationDepth,
   ConversationMemoryDelta,
@@ -214,6 +215,9 @@ export function normalizeConversationMemory(raw: unknown): ConversationMemoryV1 
     characterStates: sanitizeCharacterStates(candidate.characterStates, lastTurn),
     deliveryByCharacter: normalizeDeliveries(candidate.deliveryByCharacter),
     ...(typeof candidate.incrementalOutputEnabled === "boolean" ? { incrementalOutputEnabled: candidate.incrementalOutputEnabled } : {}),
+    ...(candidate.voicePreset && typeof candidate.voicePreset === "object" ? { voicePreset: {
+      handsFree: normalizeHandsFreeSettings(candidate.voicePreset.handsFree), voiceOnly: candidate.voicePreset.voiceOnly === true,
+    } } : {}),
   };
 }
 

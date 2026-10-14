@@ -21,6 +21,7 @@ interface Props {
   onPTTRelease: () => void;
   /** Mode mains libres : un seul bouton pour ouvrir/couper le micro. */
   handsFree?: boolean;
+  voiceOnly?: boolean;
   handsFreeListening?: boolean;
   onToggleHandsFree?: () => void;
   onHangUp: () => void;
@@ -45,6 +46,7 @@ const ConversationScreen = ({
   onPTTPress,
   onPTTRelease,
   handsFree = false,
+  voiceOnly = false,
   handsFreeListening = false,
   onToggleHandsFree,
   onHangUp,
@@ -63,14 +65,15 @@ const ConversationScreen = ({
   const recording = audioState === "user_speaking";
 
   const handleToggleTalk = useCallback(() => {
-    if (handoffCalling || handoffOffer) return;
     if (handsFree) {
+      if ((handoffCalling || handoffOffer) && !handsFreeListening) return;
       if (audioState !== "mic_starting") onToggleHandsFree?.();
       return;
     }
+    if (handoffCalling || handoffOffer) return;
     if (audioState === "idle") onPTTPress();
     else if (audioState === "user_speaking") onPTTRelease();
-  }, [audioState, handoffCalling, handoffOffer, handsFree, onPTTPress, onPTTRelease, onToggleHandsFree]);
+  }, [audioState, handoffCalling, handoffOffer, handsFree, handsFreeListening, onPTTPress, onPTTRelease, onToggleHandsFree]);
 
   useEffect(() => {
     const isTypingTarget = (target: EventTarget | null) => {
@@ -286,12 +289,12 @@ const ConversationScreen = ({
       <section className="relative z-10 px-4 pb-6 md:px-8 md:pb-8 tablet:pb-10">
         <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-3 tablet:gap-4">
 
-          {displayedMax && (
+          {!voiceOnly && displayedMax && (
             <p className="text-center font-serif text-xl leading-snug text-foreground drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] md:text-2xl transition-opacity duration-200">
               {displayedMax}
             </p>
           )}
-          {displayedUser && (
+          {!voiceOnly && displayedUser && (
             <p
               className="text-center text-base italic leading-snug text-white/95 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)] md:text-lg"
               aria-live="polite"
@@ -312,7 +315,7 @@ const ConversationScreen = ({
           )}
 
           {/* Status helper line */}
-          <p hidden={handsFree} className="min-h-[1.25rem] text-xs uppercase tracking-[0.18em] text-muted-foreground/80">
+          <p role="status" aria-live="polite" hidden={handsFree} className="min-h-[1.25rem] text-xs uppercase tracking-[0.18em] text-muted-foreground/80">
             {audioState === "idle" && "Clique pour parler"}
             {audioState === "mic_starting" && "Micro en cours d'ouverture…"}
             {audioState === "user_speaking" && "Enregistrement — clique pour envoyer"}
@@ -323,7 +326,7 @@ const ConversationScreen = ({
 
           {handsFree ? (
             <>
-              <p className="min-h-[1.25rem] text-xs uppercase tracking-[0.18em] text-muted-foreground/80">
+              <p role="status" aria-live="polite" className="min-h-[1.25rem] text-xs uppercase tracking-[0.18em] text-muted-foreground/80">
                 {!handsFreeListening && audioState !== "mic_starting" && "Active le micro, puis parle librement"}
                 {audioState === "mic_starting" && "Micro en cours d'ouverture…"}
                 {handsFreeListening && audioState === "idle" && "À l'écoute…"}
@@ -334,7 +337,7 @@ const ConversationScreen = ({
               </p>
               <button
                 onClick={handleToggleTalk}
-                disabled={handoffCalling || audioState === "mic_starting"}
+                disabled={handoffCalling || (Boolean(handoffOffer) && !handsFreeListening) || audioState === "mic_starting"}
                 className={cn(
                   "mt-1 flex min-h-12 items-center gap-3 rounded-full border-2 px-6 py-3 text-sm font-semibold uppercase tracking-wider backdrop-blur-md transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 tablet:min-h-14 tablet:px-8 tablet:text-base",
                   handsFreeListening

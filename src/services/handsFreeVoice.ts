@@ -15,6 +15,7 @@ export interface HandsFreeVoiceSettings {
   bargeInEnabled: boolean;
   /** Nombre de mots reconnus nécessaires pour interrompre (évite toux, bruits, écho). */
   bargeInMinWords: number;
+  interruptionStrategy?: "text" | "acoustic_confirmed";
 }
 
 export const END_OF_SPEECH_MIN_MS = 300;
@@ -29,6 +30,7 @@ export const HANDS_FREE_DEFAULTS: HandsFreeVoiceSettings = {
   hesitationExtraMs: 700,
   bargeInEnabled: true,
   bargeInMinWords: 2,
+  interruptionStrategy: "text",
 };
 
 function clamp(value: unknown, min: number, max: number, fallback: number): number {
@@ -45,6 +47,7 @@ export function normalizeHandsFreeSettings(raw: Partial<HandsFreeVoiceSettings> 
     hesitationExtraMs: clamp(value.hesitationExtraMs, 0, HESITATION_EXTRA_MAX_MS, HANDS_FREE_DEFAULTS.hesitationExtraMs),
     bargeInEnabled: value.bargeInEnabled !== false,
     bargeInMinWords: clamp(value.bargeInMinWords, BARGE_IN_MIN_WORDS_MIN, BARGE_IN_MIN_WORDS_MAX, HANDS_FREE_DEFAULTS.bargeInMinWords),
+    interruptionStrategy: value.interruptionStrategy === "acoustic_confirmed" ? "acoustic_confirmed" : "text",
   };
 }
 
@@ -95,4 +98,81 @@ export function shouldBargeIn(heardText: string, characterText: string, settings
   if (spoken.size === 0) return true;
   const echoed = heard.filter((word) => spoken.has(word)).length;
   return echoed / heard.length < 0.8;
+}
+
+export function recognizedWordsChanged(previous: string, next: string): boolean {
+  return words(previous).join(" ") !== words(next).join(" ");
+}
+
+export interface ReversibleVoiceOutput {
+  attenuate(): boolean;
+  pause(): boolean;
+  resume(): boolean;
+  playedText(): string;
+}
+export type InterruptionEvent = "acoustic_candidate" | "attenuation" | "audio_suspended" | "interruption_confirmed" | "interruption_rejected" | "audio_resumed" | "interruption_recovery";
+export interface InterruptionObservation { interruption_id: string; event: InterruptionEvent; at: number }
+
+/** Application authority. STT and local VAD only supply evidence; neither commits a turn. */
+export function createAcousticInterruptionController(hooks: {
+  observe: (event: InterruptionObservation) => void;
+  confirm: (text: string) => void;
+  recover: () => void;
+}) {
+  let candidate: { id: string; start: number; lastVoice: number; voiced: boolean; paused: boolean;
+    baseline: string; output: ReversibleVoiceOutput } | null = null;
+  const event = (name: InterruptionEvent, at: number) => {
+    if (candidate) hooks.observe({ interruption_id: candidate.id, event: name, at });
+  };
+  const reject = (at: number) => {
+    if (!candidate) return;
+    event("interruption_rejected", at);
+    if (candidate.output.resume()) event("audio_resumed", at);
+    candidate = null;
+  };
+  return {
+    get pending() { return candidate !== null; },
+    reset() { reject(performance.now()); },
+    signal(voiced: boolean, at: number, output: ReversibleVoiceOutput | null, baseline: string) {
+      if (!candidate && voiced && output) {
+        candidate = { id: crypto.randomUUID(), start: at, lastVoice: at, voiced: true, paused: false, baseline, output };
+        event("acoustic_candidate", at);
+        if (!output.attenuate()) { candidate = null; return; }
+        event("attenuation", at);
+      }
+      if (!candidate) return;
+      candidate.voiced = voiced;
+      if (voiced) candidate.lastVoice = at;
+      if (voiced && !candidate.paused && at - candidate.start >= 120) {
+        candidate.paused = candidate.output.pause();
+        if (candidate.paused) event("audio_suspended", at);
+      }
+      if (at - candidate.start >= 8000) {
+        if (voiced || at - candidate.lastVoice < 300) {
+          event("interruption_recovery", at); candidate = null; hooks.recover();
+        } else reject(at);
+      } else if (!voiced && at - candidate.lastVoice >= 450 && at - candidate.start >= 1400) reject(at);
+    },
+    transcript(text: string, at: number): boolean {
+      if (!candidate || at < candidate.start || at - candidate.lastVoice > 1400) return false;
+      let heard = text.trim();
+      if (candidate.baseline && heard.startsWith(candidate.baseline)) heard = heard.slice(candidate.baseline.length).trim();
+      if (!heard || !recognizedWordsChanged(candidate.baseline, text)) return false;
+      const h = words(heard), played = words(candidate.output.playedText()).slice(-24);
+      // Only a contiguous actually played phrase is echo evidence. Shared vocabulary
+      // with the generated reply cannot veto a correction; short yes/no remain valid.
+      const isEcho = h.length >= 3 && played.join(" ").includes(h.join(" "));
+      if (isEcho) { reject(at); return false; }
+      event("interruption_confirmed", at);
+      candidate = null;
+      hooks.confirm(heard);
+      return true;
+    },
+    sttFailed(at: number) {
+      if (!candidate) return;
+      if (candidate.voiced || at - candidate.lastVoice < 300) {
+        event("interruption_recovery", at); candidate = null; hooks.recover();
+      } else reject(at);
+    },
+  };
 }

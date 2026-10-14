@@ -4,7 +4,7 @@ export const VOICE_MILESTONES = [
   "transcript_final", "voice_end", "context_ready", "llm_request", "llm_headers", "llm_response",
   "first_token", "intent_ready", "safe_phrase", "tts_text_sent", "first_audio_chunk", "audio_blob_ready",
   "audio_scheduled", "output_estimated", "audio_end", "audio_cancelled",
-  "acoustic_candidate", "attenuation", "interruption_confirmed", "interruption_rejected", "audio_resumed",
+  "acoustic_candidate", "attenuation", "audio_suspended", "interruption_confirmed", "interruption_rejected", "audio_resumed", "output_stop_estimated",
 ] as const;
 export type VoiceMilestone = typeof VOICE_MILESTONES[number];
 export type VoiceTurnStatus = "started" | "completed" | "interrupted" | "cancelled" | "timeout" | "failed" | "no_audio";
@@ -64,6 +64,9 @@ export interface VoiceTurnV2 {
   output_precision: "software_estimate" | "unavailable";
   critical_wait: "coverage_incomplete";
   budget_exceeded: string[];
+  interruptions?: { interruption_id: string; event: import("./handsFreeVoice").InterruptionEvent; offset_ms: number }[];
+  interruptions_capped?: boolean;
+  capture_dsp?: { echoCancellation: boolean; noiseSuppression: boolean | null; autoGainControl: boolean | null; trackSampleRate: number | null; contextSampleRate: number };
 }
 export type VoiceObserver = (name: VoiceMilestone, at?: number) => void;
 export function observeVoice(observer: VoiceObserver | undefined, name: VoiceMilestone, at = performance.now()): void {
@@ -98,6 +101,7 @@ export function createVoiceTurnV2(
     durations: { origin_to_response_ms: null, origin_to_output_estimated_ms: null, t_turn_voice_ready_ms: null, generation_total_ms: null, playback_ms: null },
     coverage: { state: "partial", observed: 0, expected: VOICE_MILESTONES.length, missing: [...VOICE_MILESTONES] },
     output_precision: "unavailable", critical_wait: "coverage_incomplete", budget_exceeded: [],
+    interruptions: [], interruptions_capped: false,
   };
   let finished = false;
   const send = (event: Parameters<typeof emit>[0]) => {
@@ -114,10 +118,18 @@ export function createVoiceTurnV2(
   };
   return {
     attemptId: value.attempt_id, observe,
+    interruption(event: import("./handsFreeVoice").InterruptionObservation) {
+      if (finished) return;
+      if (value.interruptions!.length >= 64) { value.interruptions_capped = true; return; }
+      value.interruptions!.push({ interruption_id: event.interruption_id, event: event.event, offset_ms: Math.round(event.at - originAt) });
+      if (event.event !== "interruption_recovery") observe(event.event, event.at);
+    },
+    captureDsp(dsp: NonNullable<VoiceTurnV2["capture_dsp"]>) { if (!finished) value.capture_dsp = { ...dsp }; },
     setOrigin(at: number, origin: VoiceTurnV2["latency_origin"]) {
       if (finished || !Number.isFinite(at)) return;
       const shift = Math.round(originAt - at);
       for (const name of VOICE_MILESTONES) if (milestones[name] !== null) milestones[name]! += shift;
+      for (const event of value.interruptions ?? []) event.offset_ms += shift;
       originAt = at; value.latency_origin = origin;
     },
     service(service: ServiceObservation) { if (!finished && value.services.length < 16) value.services.push(service); },

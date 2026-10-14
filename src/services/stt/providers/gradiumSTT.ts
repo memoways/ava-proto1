@@ -5,18 +5,13 @@ import type { STTCreateOptions, STTSession, TranscriptCallback } from "../types"
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { waitForCondition } from "../finalization";
 import { getSTTProviderSettings } from "../providerSettings";
+import { createPcmCapture, pcmBase64 } from "../pcmCapture";
 
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const ENDPOINT = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/proxy-stt-gradium`;
 const GRADIUM_WS_URL = "wss://api.gradium.ai/api/speech/asr";
 const TARGET_SAMPLE_RATE = 24_000;
-// Gradium recommends 1920-sample (80 ms) chunks at 24 kHz. ScriptProcessor
-// only accepts power-of-two sizes, so we use 2048 samples and let Gradium
-// re-align internally — still delivers a frame roughly every 85 ms.
-const PROCESSOR_BUFFER_SIZE = 2048;
-// delay_in_frames: 1 frame = 80 ms. Lower = more reactive partials.
-// 4 frames = ~320 ms tail before the model emits text.
-const GRADIUM_DELAY_IN_FRAMES = 4;
+const GRADIUM_DELAY_IN_FRAMES = 10;
 const FLUSH_TIMEOUT_MS = 2500;
 
 
@@ -32,9 +27,7 @@ export class GradiumSTT implements STTSession {
   private getTelemetryContext?: STTCreateOptions["getTelemetryContext"];
   private stream: MediaStream | null = null;
   private ws: WebSocket | null = null;
-  private audioCtx: AudioContext | null = null;
-  private source: MediaStreamAudioSourceNode | null = null;
-  private processor: ScriptProcessorNode | null = null;
+  private capture: Awaited<ReturnType<typeof createPcmCapture>> | null = null;
   private _active = false;
   private _paused = false;
   private capturePaused = false;
@@ -43,6 +36,14 @@ export class GradiumSTT implements STTSession {
   private lastMessageAt = 0;
   private flushAckAt = 0;
   private flushId = 0;
+  private acknowledgedFlushId = 0;
+  private awaitingReady: (() => void) | null = null;
+  private ready = false;
+  private generation = 0;
+  private sentSamples = 0;
+  private retiredThrough = 0;
+  private flushThrough = 0;
+  private flushAudio: Float32Array[] = [];
   private lastFinalTelemetry: import("../types").STTFinalTelemetryBase | null = null;
   private flushPromise: Promise<void> | null = null;
   private initialStream?: MediaStream | Promise<MediaStream>;
@@ -62,26 +63,25 @@ export class GradiumSTT implements STTSession {
   setManualMode(_manual: boolean) { /* Gradium turn finalization is controlled by flush(). */ }
 
   async start() {
+    const startingGeneration = this.generation;
     const tokenRes = await authenticatedFunctionFetch(ENDPOINT, { method: "GET" });
     if (!tokenRes.ok) throw new Error(`Gradium token ${tokenRes.status}: ${await tokenRes.text()}`);
     const { token } = await tokenRes.json();
     if (!token) throw new Error("Gradium token missing");
+    if (startingGeneration !== this.generation) throw new DOMException("Capture replaced", "AbortError");
 
     this.stream = await Promise.resolve(
-      this.initialStream ?? navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } }),
+      this.initialStream ?? navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } }),
     );
     this.initialStream = undefined;
-
-    const AudioCtx = window.AudioContext || (window as Window & {
-      webkitAudioContext?: typeof AudioContext;
-    }).webkitAudioContext;
-    if (!AudioCtx) throw new Error("Web Audio API unavailable");
-    this.audioCtx = new AudioCtx({ sampleRate: TARGET_SAMPLE_RATE });
-    const sampleRate = Math.round(this.audioCtx.sampleRate || TARGET_SAMPLE_RATE);
+    if (startingGeneration !== this.generation) { this.stream.getTracks().forEach(track => track.stop()); this.stream = null; throw new DOMException("Capture replaced", "AbortError"); }
 
     const wsUrl = new URL(GRADIUM_WS_URL);
     wsUrl.searchParams.set("token", token);
     this.ws = new WebSocket(wsUrl);
+    const socket = this.ws;
+    const generation = this.generation;
+    socket.onmessage = event => { if (this.ws === socket && this.generation === generation) this.handleMessage(event); };
 
     await new Promise<void>((resolve, reject) => {
       const timeout = window.setTimeout(() => reject(new Error("Gradium WS open timeout")), 8000);
@@ -93,7 +93,7 @@ export class GradiumSTT implements STTSession {
         this.ws!.send(JSON.stringify({
           type: "setup",
           model_name: "default",
-          input_format: sampleRate === TARGET_SAMPLE_RATE ? "pcm" : `pcm_${sampleRate}`,
+          input_format: "pcm",
           json_config: jsonConfig,
         }));
         resolve();
@@ -104,20 +104,28 @@ export class GradiumSTT implements STTSession {
       };
     });
 
-    this.ws.onmessage = (event) => this.handleMessage(event);
+    if (!this.ready) await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => { this.awaitingReady = null; reject(new Error("Gradium ready timeout")); }, 8000);
+      this.awaitingReady = () => { clearTimeout(timeout); this.awaitingReady = null; resolve(); };
+    });
+    if (this.generation !== generation) throw new DOMException("Capture replaced", "AbortError");
     this.ws.onerror = () => this.onError?.(new Error("Gradium WS error"), { provider: "gradium" });
-    this.ws.onclose = () => debugLogger.log({ service: "stt", level: "info", direction: "in", label: "Gradium WS closed" });
-
-    this.source = this.audioCtx.createMediaStreamSource(this.stream);
-    this.processor = this.audioCtx.createScriptProcessor(PROCESSOR_BUFFER_SIZE, 1, 1);
-    this.processor.onaudioprocess = (event) => {
-      if (this._paused || this.capturePaused || this.ws?.readyState !== WebSocket.OPEN) return;
-      const samples = event.inputBuffer.getChannelData(0);
-      this.ws.send(JSON.stringify({ type: "audio", audio: pcm16Base64(samples) }));
-      observeVoice(this.onVoiceObservation, "last_audio_sent");
+    this.ws.onclose = () => {
+      if (this._active) this.onError?.(new Error("Gradium STT disconnected"), { provider: "gradium" });
     };
-    this.source.connect(this.processor);
-    this.processor.connect(this.audioCtx.destination);
+
+    const capture = await createPcmCapture(this.stream, TARGET_SAMPLE_RATE, 1920, samples => {
+      if (this._paused || this.ws?.readyState !== WebSocket.OPEN) return;
+      if (this.capturePaused) {
+        if (this.flushAudio.length >= 40) { this.onError?.(new Error("Gradium pending capture exceeded 3.2 seconds")); return; }
+        this.flushAudio.push(samples); return;
+      }
+      this.ws.send(JSON.stringify({ type: "audio", audio: pcmBase64(samples) }));
+      this.sentSamples += samples.length;
+      observeVoice(this.onVoiceObservation, "last_audio_sent");
+    }, error => { if (this.generation === generation) this.onError?.(error, { provider: "gradium" }); });
+    if (this.generation !== generation || this.ws !== socket) { capture.stop(); throw new DOMException("Capture replaced", "AbortError"); }
+    this.capture = capture;
     observeVoice(this.onVoiceObservation, "capture_started");
     observeVoice(this.onVoiceObservation, "capture_ready");
 
@@ -128,11 +136,19 @@ export class GradiumSTT implements STTSession {
     debugLogger.log({ service: "stt", level: "success", direction: "in", label: "Gradium STT realtime connected" });
   }
 
-  pause() { this._paused = true; this.capturePaused = true; }
+  pause() { this._paused = true; this.capturePaused = true; this.retiredThrough = this.sentSamples / TARGET_SAMPLE_RATE; this.flushAudio = []; this.capture?.enabled(false); }
   resume() {
+    if (!this._paused && !this.capturePaused) return; // Output completion must not erase a live utterance.
     this._paused = false;
     this.capturePaused = false;
     this.resetTranscriptBuffers();
+    this.retiredThrough = Math.max(this.retiredThrough, this.flushThrough);
+    this.capture?.enabled(true);
+    for (const samples of this.flushAudio.splice(0)) {
+      if (this.ws?.readyState !== WebSocket.OPEN) break;
+      this.ws.send(JSON.stringify({ type: "audio", audio: pcmBase64(samples) })); this.sentSamples += samples.length;
+      observeVoice(this.onVoiceObservation, "last_audio_sent");
+    }
   }
   flush(): Promise<void> {
     if (this.flushPromise) return this.flushPromise;
@@ -143,28 +159,29 @@ export class GradiumSTT implements STTSession {
   }
 
   async stop() {
+    this.generation++;
     this._active = false;
     this._paused = true;
     this.capturePaused = true;
     try {
       if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ type: "end_of_stream" }));
     } catch { /* ignore */ }
-    try { this.processor?.disconnect(); } catch { /* ignore */ }
-    try { this.source?.disconnect(); } catch { /* ignore */ }
-    try { await this.audioCtx?.close(); } catch { /* ignore */ }
+    this.capture?.stop();
     try { this.ws?.close(); } catch { /* ignore */ }
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
-    this.audioCtx = null;
-    this.source = null;
-    this.processor = null;
+    this.capture = null;
+    this.flushAudio = [];
     this.ws = null;
     this.resetTranscriptBuffers();
   }
 
   private async finalizeCurrentTurn(trigger: "ptt_flush") {
+    const generation = this.generation;
+    await this.capture?.flush();
+    if (this.generation !== generation) return;
     this.capturePaused = true;
-    const flushRequestedAt = performance.now();
+    this.flushThrough = this.sentSamples / TARGET_SAMPLE_RATE;
     const id = ++this.flushId;
     try {
       if (this.ws?.readyState === WebSocket.OPEN) {
@@ -177,19 +194,22 @@ export class GradiumSTT implements STTSession {
     }
 
     await waitForCondition(() => {
-      if (this.flushAckAt >= flushRequestedAt) return true;
-      return this.lastMessageAt >= flushRequestedAt && performance.now() - this.lastMessageAt >= 220;
+      return this.acknowledgedFlushId === id || this.generation !== generation;
     }, FLUSH_TIMEOUT_MS);
 
+    if (this.generation !== generation) return;
     const text = this.getCompleteTranscript();
-    this.resetTranscriptBuffers();
     if (text) this.emitFinal(text, trigger);
+    this.resetTranscriptBuffers();
   }
 
   private handleMessage(event: MessageEvent) {
     try {
       const msg = JSON.parse(event.data);
-      if (msg?.type === "text" && typeof msg.text === "string") {
+      if (msg?.type === "ready") { this.ready = true; this.awaitingReady?.(); }
+      else if (msg?.type === "text" && typeof msg.text === "string") {
+        if (this._paused || (typeof msg.flush_id === "number" && msg.flush_id < this.flushId)
+          || (typeof msg.start_s === "number" && msg.start_s < this.retiredThrough)) return;
         this.lastMessageAt = performance.now();
         if (!this.firstPartialAt) this.firstPartialAt = this.lastMessageAt;
         const text = msg.text.trim();
@@ -200,8 +220,13 @@ export class GradiumSTT implements STTSession {
         this.textParts.push(text);
         this.onTranscript(this.getCompleteTranscript(), false);
       } else if (msg?.type === "flushed") {
+        if (msg.flush_id !== this.flushId) return;
+        this.acknowledgedFlushId = msg.flush_id;
         this.flushAckAt = performance.now();
         if (msg.flush_id === this.flushId) observeVoice(this.onVoiceObservation, "flush_acknowledged");
+      } else if (msg?.type === "step" || msg?.type === "end_text") {
+        // Diagnostic/provider completion only; application timing remains authoritative.
+        this.lastMessageAt = performance.now();
       } else if (msg?.type === "error") {
         const error = new Error(String(msg.message || "Gradium STT error"));
         this.onError?.(error, { provider: "gradium", code: msg.code });
@@ -252,21 +277,5 @@ export class GradiumSTT implements STTSession {
     });
     this.onTranscript(text, true);
   }
-}
-
-function pcm16Base64(samples: Float32Array): string {
-  const bytes = new Uint8Array(samples.length * 2);
-  const view = new DataView(bytes.buffer);
-  for (let i = 0; i < samples.length; i++) {
-    const sample = Math.max(-1, Math.min(1, samples[i]));
-    view.setInt16(i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
-  }
-
-  let binary = "";
-  const chunkSize = 0x8000;
-  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
-  }
-  return btoa(binary);
 }
 

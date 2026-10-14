@@ -14,6 +14,16 @@ const baseProps = {
 };
 
 describe("ConversationScreen", () => {
+  it("voice-only hides dialogue while preserving status, microphone and explicit GM consent", () => {
+    render(<ConversationScreen {...baseProps} voiceOnly handsFree handsFreeListening activeCharacter="max" audioState="max_speaking"
+      userSubtitle="Parole du joueur" maxSubtitle="Parole du personnage" conversationLog={[]}
+      handoffOffer={{ reason: "Consentement validé", targetCharacter: "emma" }} />);
+    expect(screen.queryByText("Parole du joueur")).not.toBeInTheDocument();expect(screen.queryByText("Parole du personnage")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Max répond");
+    expect(screen.getByRole("button", { name: "Couper le micro" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Terminer" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Appeler Emma" })).toBeInTheDocument();expect(screen.getByRole("button", { name: "Rester avec Max" })).toBeInTheDocument();
+  });
   it.each(["emma", "max"] as const)("has no default call button while talking to %s", (activeCharacter) => {
     render(<ConversationScreen {...baseProps} activeCharacter={activeCharacter}
       audioState="max_speaking" conversationLog={[]} onAcceptHandoff={vi.fn()} />);
