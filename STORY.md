@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-14 (implémentation locale P3 vérifiée ; livraison Lovable à clôturer, canary sandbox-ulrich et production batch conservées)
+> **Last Updated**: 2026-10-14 (lot 4/P3 fusionné et publié via Lovable Cloud ; recette humaine Brave préparée, canary sandbox-ulrich et production batch conservées)
 
 ---
 
@@ -98,6 +98,13 @@ sont observables sans prétendre mesurer un gain acoustique. La livraison
 partielle repose uniquement sur la confirmation timestampée, sans extrapolation
 à partir d'un échantillon. Voix, canon, cadre commun, transferts, migrations,
 batch, Shields et réserves P0/P1/P2 restent inchangés. [Plan P3](docs/plan_lot_4_gm_rag_reglages_mesures.md).
+
+Le lot est maintenant fusionné dans `main` via la PR #41, au commit `75ef4d9`,
+avec CI post-merge verte (`test:quality` et 45 E2E sans retry). Lovable Cloud a
+synchronisé et publié ce commit ; la preview et le domaine publié affichent
+l'entrée « Où est Ava ? » dans Brave en `sandbox-ulrich`. Les onglets publié,
+preview et admin sont prêts pour la recette humaine ; elle seule reste à
+effectuer, sans parole synthétique injectée et sans changement de Shields.
 
 ### 2026-10-14 — P2 : écouter pendant la réponse, confirmer avant de couper
 
