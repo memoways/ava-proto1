@@ -199,3 +199,14 @@ Implémentation et vérifications locales :
 - Aucun échange réel multipersonnage n'étant conservé, validation de cette branche
   par fixtures uniquement. Pas de publication de production ; l'accord explicite
   demandé précédemment reste nécessaire.
+
+Clôture de l'extension : révision fonctionnelle `ec5948eb9f73677b5a5fbd65afbcb99c233ecb0a`
+confirmée dans Lovable. Après rechargement, bouton « Tout » : **99 sessions / 676
+tours**, identiques au comptage SQL en lecture seule. Courbes STT et LLM inspectées
+sur tout l'historique : graduations espacées, séries interrompues aux absences de
+mesure, tableaux défilables et noms historiques conservés. Aucun service/model
+inventé pour les données manquantes. Le détail session montre bien participants,
+parcours et changements. Arbre de travail propre après commit ; tous les fichiers
+runtime modifiés sont des lecteurs ou composants administrateur. Local/GitHub :
+terminé sur main ; preview : vérifiée ; production : inchangée, publication et
+vérification du site publié restent conditionnées à l'accord explicite d'Ulrich.
