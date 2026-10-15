@@ -182,4 +182,20 @@ Implémentation et vérifications locales :
 - Les fixtures couvrent Max → Emma → Max, un futur personnage, l'isolation des
   tours Emma, les 205 sessions paginées, une suppression entre pages, une erreur
   de page et l'annulation. Aucun scénario synthétique injecté en base.
-- Synchronisation et vérification visuelle Lovable à effectuer ; pas de publication.
+- Révision `a93ef8f3db7d45005a932a3aa40a3b4dab41338c` poussée sur main
+  et synchronisée dans Lovable. Preview authentifiée Ulrich contrôlée :
+  **111 sessions chargées / 99 sessions avec timings** ; filtre Emma :
+  **13 sessions**, comparaison des 8 sélectionnées sur **55 tours**.
+  Options Max/Emma/Ava/Léo visibles ; titres Max et Emma dans la liste et les
+  graphiques. Données → Sessions affiche **111/111**, et les métadonnées
+  « Personnages rencontrés / Parcours / Changements » sont visibles dans le détail.
+- Contrôle visuel : barres de service distinctes du marqueur d'attente,
+  couverture indiquée (Emma sélectionnée : 51/55 débuts de lecture mesurés),
+  percentiles séparés entre transcription finalisée et fin PTT.
+- Ajustements de présentation après contrôle : titres longs contenus dans la
+  colonne, graduations espacées lorsque de nombreuses sessions sont sélectionnées,
+  tableaux de courbes défilables, titre de détail cohérent avec le nom automatique.
+  Après ajustements : 15 tests ciblés, typage et lint ciblé réussis.
+- Aucun échange réel multipersonnage n'étant conservé, validation de cette branche
+  par fixtures uniquement. Pas de publication de production ; l'accord explicite
+  demandé précédemment reste nécessaire.

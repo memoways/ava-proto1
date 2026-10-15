@@ -991,8 +991,8 @@ function SegmentEvolutionChart({
               <XAxis
                 dataKey="sessionNumber"
                 tick={{ fontSize: 11 }}
-                interval={0}
-                minTickGap={8}
+                interval="preserveStartEnd"
+                minTickGap={24}
               />
               <YAxis
                 tick={{ fontSize: 11 }}
@@ -1064,7 +1064,7 @@ function SegmentEvolutionChart({
       )}
 
       {detailRows.length > 0 && (
-        <div className="overflow-x-auto border-t pt-2">
+        <div className="max-h-72 overflow-auto border-t pt-2">
           <table className="w-full text-[11px]">
             <thead className="text-muted-foreground">
               <tr>
@@ -1606,7 +1606,7 @@ export default function LatencyBlockingTab() {
       </div>
 
       {loadError && <p role="alert" className="text-sm text-destructive">{loadError}. L’historique affiché peut être incomplet. Utilise Rafraîchir.</p>}
-      <p className="text-xs text-muted-foreground">{aggregates.length} sessions avec mesures sur {sessions.length} chargées. Les sessions sans timings restent consultables dans Données → Sessions.</p>
+      <p className="text-xs text-muted-foreground">{aggregates.length} sessions avec mesures{characterFilter !== "all" ? ` pour ${displayNameForCharacter(characterFilter)}` : ""} sur {sessions.length} chargées. Les sessions sans timings restent consultables dans Données → Sessions.</p>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Sessions list with checkboxes */}
         <div className="border rounded-lg flex flex-col">
@@ -1778,7 +1778,7 @@ export default function LatencyBlockingTab() {
                   <button
                     type="button"
                     onClick={() => handleFocus(a.session.id)}
-                    className="flex-1 text-left"
+                    className="flex-1 min-w-0 text-left"
                   >
                     <div className="flex justify-between items-center mb-1 gap-2">
                       <span className="font-semibold truncate" title={sessionLabel(a.session)}>
