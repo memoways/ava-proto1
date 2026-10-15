@@ -100,3 +100,21 @@ Les mesures absentes ne seront ni reconstituées artificiellement ni mises à z�
 Référence API consultée : [Supabase JavaScript select/range](https://supabase.com/docs/reference/javascript/range).
 Changelog officiel du 15 octobre consulté ; les changements PostgreSQL et
 middleware signalés ne concernent pas le filtre de lecture existant.
+
+## Complément — noms des sessions, 15 octobre 2026
+
+Demande : reprendre dans la liste le titre déjà utilisé par Données → Sessions,
+par exemple « Ulrich · 14.10.26 16:07 · test court (1 tours), fin … ».
+
+Plan : réutiliser `autoSessionTitle` de `admin/sessionTitle.ts` lorsque `name`
+est vide ; conserver en priorité les noms manuels. Ajouter à la projection
+sessions existante les métadonnées requises (durée, invitation, libellé testeur).
+Le libellé commun de cette vue alimente également les graphiques et les détails.
+Afficher le titre complet au survol. Aucun nouveau calcul ni réseau côté joueur.
+Vérifier le cas sans nom et la conservation des noms manuels, puis pousser main
+et confirmer la synchronisation Lovable. Publication toujours en attente d'accord.
+
+Réalisé : fonction partagée réutilisée, noms manuels prioritaires, titre complet
+au survol. Vérifications : 5 tests ciblés réussis (vue et helper des titres),
+typecheck, ESLint ciblé et `git diff --check` sans erreur. Changement limité à
+l'affichage administrateur et aux champs de sa requête existante.

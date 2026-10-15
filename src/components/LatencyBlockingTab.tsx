@@ -53,6 +53,7 @@ import {
 import { displayNameForCharacter } from "@/services/characterRegistry";
 import { getConfiguredLatencyServices } from "@/services/latencyServiceMetadata";
 import LLMTokenCostPanel from "@/components/admin/LLMTokenCostPanel";
+import { autoSessionTitle } from "@/components/admin/sessionTitle";
 import { RAG_DEGRADED_MODE_DEADLINE_MS } from "@/config/experienceRuntime";
 
 interface SessionRow {
@@ -64,12 +65,15 @@ interface SessionRow {
   game_over_reason: string | null;
   context_type: string;
   environment_id: string | null;
+  duration_seconds: number | null;
+  tester_label: string | null;
+  test_invitation_id: string | null;
   active_character: string | null;
   gm_post_turn_log: PRD4PostTurnEvaluation[] | null;
 }
 
 function sessionLabel(s: SessionRow): string {
-  return s.name?.trim() || s.id.slice(0, 8);
+  return s.name?.trim() || autoSessionTitle({ ...s, environment_id: s.environment_id ?? s.context_type });
 }
 
 interface TurnTiming extends ConversationPipelineTimings {
@@ -1592,7 +1596,7 @@ export default function LatencyBlockingTab() {
     setLoading(true);
     let query = supabase
       .from("sessions")
-      .select("id, name, started_at, ended_at, conversation_log, game_over_reason, context_type, environment_id, active_character, gm_post_turn_log")
+      .select("id, name, started_at, ended_at, conversation_log, game_over_reason, context_type, environment_id, duration_seconds, tester_label, test_invitation_id, active_character, gm_post_turn_log")
       .order("started_at", { ascending: false })
       .limit(50);
     if (!includeSandbox) query = query.neq("context_type", "sandbox");
@@ -1955,7 +1959,7 @@ export default function LatencyBlockingTab() {
                     className="flex-1 text-left"
                   >
                     <div className="flex justify-between items-center mb-1 gap-2">
-                      <span className="font-semibold truncate" title={a.session.id}>
+                      <span className="font-semibold truncate" title={sessionLabel(a.session)}>
                         {sessionLabel(a.session)}
                       </span>
                       <span className="text-muted-foreground shrink-0">{a.turnCount} tour(s)</span>

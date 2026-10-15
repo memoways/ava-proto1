@@ -33,6 +33,11 @@ function session(id: string, context: string, startedAt: string) {
     context_type: context,
     environment_id: context === "sandbox" ? "sandbox-ulrich" : "prod",
     started_at: startedAt,
+    ended_at: "2026-10-14T14:08:30Z",
+    duration_seconds: 32,
+    game_over_reason: "fin",
+    tester_label: null,
+    test_invitation_id: null,
     conversation_log: [
       { role: "user", content: "Bonjour", timestamp: 1 },
       { role: "max", content: "Bonjour !", timestamp: 2, pipeline: { max_ms: 800, rag_ms: 100 } },
@@ -82,5 +87,16 @@ describe("LatencyBlockingTab session scope", () => {
     expect(screen.getByRole("button", { name: /Historical September session/ })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(/1 sélectionnée/)).toBeInTheDocument());
     expect(screen.getByText(/Les sessions sandbox sont masquées/)).toBeInTheDocument();
+  });
+
+  it("uses the existing automatic session title instead of the numeric id when no name is saved", async () => {
+    const recent = { ...session("512186fe-0000-0000-0000-000000000000", "sandbox", "2026-10-14T14:07:58Z"), name: null };
+    mocks.select.mockReturnValue({ order: () => ({ limit: async () => ({ data: [recent], error: null }) }) });
+    openTab();
+
+    const row = await screen.findByRole("button", { name: /Ulrich · .*test court \(1 tours\), fin : fin/ });
+    expect(row).toBeInTheDocument();
+    expect(screen.getByTitle(/Ulrich · .*test court \(1 tours\), fin : fin/)).toBeInTheDocument();
+    expect(mocks.select).toHaveBeenCalledWith(expect.stringContaining("tester_label, test_invitation_id"));
   });
 });
