@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -20,7 +20,10 @@ vi.mock("@/integrations/supabase/client", () => ({
 vi.mock("@/components/admin/LLMTokenCostPanel", () => ({ default: () => null }));
 vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: PropsWithChildren) => <div>{children}</div>,
-  LineChart: ({ children }: PropsWithChildren) => <div>{children}</div>,
+  LineChart: ({ children, onMouseMove, onMouseLeave }: PropsWithChildren<{
+    onMouseMove?: (state: { activeLabel: string; isTooltipActive: boolean }) => void;
+    onMouseLeave?: () => void;
+  }>) => <div data-testid="evolution-chart" onMouseMove={() => onMouseMove?.({ activeLabel: "#1", isTooltipActive: true })} onMouseLeave={onMouseLeave}>{children}</div>,
   Line: (props: Record<string, unknown>) => { mocks.lines(props); return null; },
   CartesianGrid: () => null, Legend: () => null, ReferenceLine: () => null,
   XAxis: () => null, YAxis: () => null, Tooltip: () => null,
@@ -104,6 +107,20 @@ describe("LatencyBlockingTab session scope", () => {
     expect(screen.getByRole("button", { name: /Historical September session/ })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(/1 sélectionnée/)).toBeInTheDocument());
     expect(screen.getByText(/Les sessions sandbox sont masquées/)).toBeInTheDocument();
+  });
+
+  it("shows hover details outside the chart and clears them when leaving", async () => {
+    openTab();
+    await screen.findByRole("button", { name: /Recent October session/ });
+    const chart = screen.getAllByTestId("evolution-chart")[0];
+    const panel = screen.getByRole("complementary", { name: "Détails du survol Personnage LLM" });
+    expect(within(panel).getByText(/Survole une session/)).toBeInTheDocument();
+    fireEvent.mouseMove(chart);
+    expect(within(panel).getByText("Historical September session")).toBeInTheDocument();
+    expect(within(panel).getAllByText("0.80 s")).toHaveLength(3);
+    expect(within(chart).queryByText("Historical September session")).not.toBeInTheDocument();
+    fireEvent.mouseLeave(chart.parentElement!);
+    expect(within(panel).getByText(/Survole une session/)).toBeInTheDocument();
   });
 
   it("uses the existing automatic session title instead of the numeric id when no name is saved", async () => {

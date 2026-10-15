@@ -943,6 +943,7 @@ function SegmentEvolutionChart({
   highlightedSessionId: string | null;
   onHighlightSession: (sessionId: string) => void;
 }) {
+  const [hoveredSessionNumber, setHoveredSessionNumber] = useState<string | null>(null);
   const segmentPoints = points.filter((p) => p.segmentKey === segment.key);
   const serviceOptions = [...new Map(segmentPoints.map((p) => [p.serviceKey, p.serviceLabel])).entries()];
   const visibleServiceKeys = selectedService === "all" ? serviceOptions.map(([key]) => key) : [selectedService].filter(Boolean);
@@ -953,6 +954,8 @@ function SegmentEvolutionChart({
   const colorByService = new Map(serviceOptions.map(([key], index) => [key, SERVICE_COLORS[index % SERVICE_COLORS.length]]));
   const sessionNumberById = new Map(chartData.map((row) => [String(row.sessionId), String(row.sessionNumber)]));
   const highlightedX = highlightedSessionId ? sessionNumberById.get(highlightedSessionId) : undefined;
+  const hoveredSession = chartData.find(row => row.sessionNumber === hoveredSessionNumber);
+  const hoveredPoints = hoveredSession ? visiblePoints.filter(point => point.sessionId === hoveredSession.sessionId) : [];
 
   return (
     <div className="rounded-md border p-3 space-y-3">
@@ -984,82 +987,112 @@ function SegmentEvolutionChart({
           Aucune donnée {segment.label} enrichie dans les sessions sélectionnées.
         </p>
       ) : (
-        <div className="h-[260px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 8, right: 18, left: 0, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis
-                dataKey="sessionNumber"
-                tick={{ fontSize: 11 }}
-                interval="preserveStartEnd"
-                minTickGap={24}
-              />
-              <YAxis
-                tick={{ fontSize: 11 }}
-                tickFormatter={(v: number) => v.toFixed(2)}
-                label={{ value: "secondes", angle: -90, position: "insideLeft", style: { fontSize: 11 } }}
-              />
-              <RechartsTooltip
-                formatter={(value: number | string, name: string) => [
-                  typeof value === "number" ? `${value.toFixed(2)} s` : value,
-                  name,
-                ]}
-                labelFormatter={(label) => {
-                  const row = chartData.find(point => point.sessionNumber === label);
-                  return row ? `${row.sessionLabel} · ${row.sessionStartedAt ? new Date(String(row.sessionStartedAt)).toLocaleString("fr-CH") : "date inconnue"}` : `Session ${label}`;
-                }}
-              />
-              {highlightedX && (
-                <ReferenceLine
-                  x={highlightedX}
-                  stroke="hsl(var(--foreground))"
-                  strokeDasharray="4 3"
-                  label={{ value: highlightedX, position: "top", fontSize: 11, fill: "hsl(var(--foreground))" }}
+        <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_18rem]" onMouseLeave={() => setHoveredSessionNumber(null)}>
+          <div className="h-[260px] min-w-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={chartData}
+                margin={{ top: 8, right: 18, left: 0, bottom: 8 }}
+                onMouseMove={state => setHoveredSessionNumber(state.isTooltipActive ? String(state.activeLabel) : null)}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis
+                  dataKey="sessionNumber"
+                  tick={{ fontSize: 11 }}
+                  interval="preserveStartEnd"
+                  minTickGap={24}
                 />
-              )}
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              {visibleServiceKeys.map((serviceKey) => {
-                const label = serviceOptions.find(([key]) => key === serviceKey)?.[1] || "Unknown";
-                const color = colorByService.get(serviceKey) || segment.color;
-                return (
-                  <Fragment key={serviceKey}>
-                    <Line
-                      key={`${serviceKey}-min`}
-                      type="linear"
-                      dataKey={`${serviceKey}__min`}
-                      name={`${label} · min`}
-                      stroke={color}
-                      strokeDasharray="3 3"
-                      strokeWidth={1.5}
-                      dot={false}
-                      connectNulls={false}
-                    />
-                    <Line
-                      key={`${serviceKey}-median`}
-                      type="linear"
-                      dataKey={`${serviceKey}__median`}
-                      name={`${label} · médiane`}
-                      stroke={color}
-                      strokeWidth={2.5}
-                      dot={{ r: 2 }}
-                      connectNulls={false}
-                    />
-                    <Line
-                      key={`${serviceKey}-max`}
-                      type="linear"
-                      dataKey={`${serviceKey}__max`}
-                      name={`${label} · max`}
-                      stroke={color}
-                      strokeDasharray="5 2"
-                      strokeWidth={1.5}
-                      dot={false}
-                      connectNulls={false}
-                    />
-                  </Fragment>
-                );
-              })}
-            </LineChart>
-          </ResponsiveContainer>
+                <YAxis
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(v: number) => v.toFixed(2)}
+                  label={{ value: "secondes", angle: -90, position: "insideLeft", style: { fontSize: 11 } }}
+                />
+                <RechartsTooltip content={() => null} />
+                {highlightedX && (
+                  <ReferenceLine
+                    x={highlightedX}
+                    stroke="hsl(var(--foreground))"
+                    strokeDasharray="4 3"
+                    label={{ value: highlightedX, position: "top", fontSize: 11, fill: "hsl(var(--foreground))" }}
+                  />
+                )}
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {visibleServiceKeys.map((serviceKey) => {
+                  const label = serviceOptions.find(([key]) => key === serviceKey)?.[1] || "Unknown";
+                  const color = colorByService.get(serviceKey) || segment.color;
+                  return (
+                    <Fragment key={serviceKey}>
+                      <Line
+                        key={`${serviceKey}-min`}
+                        type="linear"
+                        dataKey={`${serviceKey}__min`}
+                        name={`${label} · min`}
+                        stroke={color}
+                        strokeDasharray="3 3"
+                        strokeWidth={1.5}
+                        dot={false}
+                        connectNulls={false}
+                      />
+                      <Line
+                        key={`${serviceKey}-median`}
+                        type="linear"
+                        dataKey={`${serviceKey}__median`}
+                        name={`${label} · médiane`}
+                        stroke={color}
+                        strokeWidth={2.5}
+                        dot={{ r: 2 }}
+                        connectNulls={false}
+                      />
+                      <Line
+                        key={`${serviceKey}-max`}
+                        type="linear"
+                        dataKey={`${serviceKey}__max`}
+                        name={`${label} · max`}
+                        stroke={color}
+                        strokeDasharray="5 2"
+                        strokeWidth={1.5}
+                        dot={false}
+                        connectNulls={false}
+                      />
+                    </Fragment>
+                  );
+                })}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <aside
+            aria-label={`Détails du survol ${segment.label}`}
+            className="min-w-0 h-44 xl:h-[260px] overflow-auto rounded-md border bg-popover p-3 text-popover-foreground text-xs space-y-3"
+          >
+            {hoveredSession ? (
+              <>
+                <div>
+                  <p className="font-medium break-words">{String(hoveredSession.sessionLabel)}</p>
+                  <p className="text-muted-foreground mt-1">
+                    {hoveredSession.sessionStartedAt ? new Date(String(hoveredSession.sessionStartedAt)).toLocaleString("fr-CH") : "Date inconnue"}
+                  </p>
+                </div>
+                {hoveredPoints.map(point => (
+                  <div key={point.serviceKey} className="space-y-1.5">
+                    <p className="font-medium break-words">
+                      <span className="inline-block h-2 w-2 rounded-full mr-1.5" style={{ backgroundColor: colorByService.get(point.serviceKey) }} />
+                      {point.serviceLabel}
+                    </p>
+                    <dl className="grid grid-cols-3 gap-2 tabular-nums">
+                      {[["Min", point.minMs], ["Médiane", point.medianMs], ["Max", point.maxMs]].map(([label, value]) => (
+                        <div key={label}>
+                          <dt className="text-muted-foreground">{label}</dt>
+                          <dd>{(Number(value) / 1000).toFixed(2)} s</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <p className="text-muted-foreground">Survole une session dans le graphique pour afficher ses valeurs ici.</p>
+            )}
+          </aside>
         </div>
       )}
 

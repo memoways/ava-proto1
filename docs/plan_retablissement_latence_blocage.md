@@ -210,3 +210,17 @@ parcours et changements. Arbre de travail propre après commit ; tous les fichie
 runtime modifiés sont des lecteurs ou composants administrateur. Local/GitHub :
 terminé sur main ; preview : vérifiée ; production : inchangée, publication et
 vérification du site publié restent conditionnées à l'accord explicite d'Ulrich.
+
+### Survol des courbes — 15 octobre 2026
+
+Remplacer l'infobulle Recharts blanche qui recouvre les courbes par un panneau
+dans le flux de la page : à droite sur grand écran, sous le graphique sur petit
+écran. Réserver sa place, respecter les couleurs du thème et regrouper min,
+médiane et max par service pour la session survolée. Vérifier le survol et la
+sortie du graphique, le typage et le lint ciblés. Modification limitée au lecteur
+administrateur, sans requête ni traitement dans la conversation.
+
+Réalisé : panneau réservé aux couleurs du thème, valeurs regroupées par service,
+infobulle flottante désactivée. Les 7 tests du composant passent, dont un contrôle
+des valeurs hors du graphique et de leur effacement à la sortie de la zone.
+Typage, ESLint ciblé et `git diff --check` réussis.
