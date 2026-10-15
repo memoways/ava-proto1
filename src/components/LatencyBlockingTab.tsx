@@ -63,6 +63,7 @@ interface SessionRow {
   conversation_log: ConversationMessage[] | null;
   game_over_reason: string | null;
   context_type: string;
+  environment_id: string | null;
   active_character: string | null;
   gm_post_turn_log: PRD4PostTurnEvaluation[] | null;
 }
@@ -1540,7 +1541,17 @@ export default function LatencyBlockingTab() {
     tts_ms: "all",
   });
   const [highlightedEvolutionSessionId, setHighlightedEvolutionSessionId] = useState<string | null>(null);
-  const [includeSandbox, setIncludeSandbox] = useState(false);
+  // Recent internal conversations are sandbox sessions and carry real measurements.
+  const [includeSandbox, setIncludeSandbox] = useState(true);
+
+  function changeSandboxScope(include: boolean) {
+    setSessions([]);
+    setSelectedIds(new Set());
+    setExpandedIds(new Set());
+    setFocusId(null);
+    setHasInitialized(false);
+    setIncludeSandbox(include);
+  }
 
   function handleFocus(id: string) {
     setFocusId(id);
@@ -1581,7 +1592,7 @@ export default function LatencyBlockingTab() {
     setLoading(true);
     let query = supabase
       .from("sessions")
-      .select("id, name, started_at, ended_at, conversation_log, game_over_reason, context_type, active_character, gm_post_turn_log")
+      .select("id, name, started_at, ended_at, conversation_log, game_over_reason, context_type, environment_id, active_character, gm_post_turn_log")
       .order("started_at", { ascending: false })
       .limit(50);
     if (!includeSandbox) query = query.neq("context_type", "sandbox");
@@ -1750,18 +1761,22 @@ export default function LatencyBlockingTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-lg font-semibold">Latence & blocage</h2>
           <p className="text-xs text-muted-foreground">
             Sélectionne une ou plusieurs sessions pour comparer uniquement les latences de service. Par défaut: les {DEFAULT_SELECTED_SESSION_COUNT} plus récentes.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Périmètre : les 50 dernières sessions, {includeSandbox ? "sandboxes incluses" : "hors sandbox"}.
+            {!includeSandbox && " Les sessions sandbox sont masquées, y compris leurs mesures récentes."}
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={load} disabled={loading}>
           {loading ? "Chargement..." : "Rafraîchir"}
         </Button>
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Switch checked={includeSandbox} onCheckedChange={setIncludeSandbox} /> Inclure les sandboxes
+          <Switch aria-label="Inclure les sandboxes" checked={includeSandbox} onCheckedChange={changeSandboxScope} disabled={loading} /> Inclure les sandboxes
         </label>
       </div>
 
@@ -1953,6 +1968,9 @@ export default function LatencyBlockingTab() {
                     <div className="text-muted-foreground">
                       {a.session.started_at ? new Date(a.session.started_at).toLocaleString("fr-CH") : "—"}
                     </div>
+                    <Badge variant="outline" className="mt-1 text-[10px]">
+                      {a.session.environment_id ?? a.session.context_type}
+                    </Badge>
                     <div className="flex items-center gap-2 mt-1">
                       <span>
                         Latence moy. <strong className="text-foreground font-mono">{fmtMs(serviceLatencyTotal(a.avg))}</strong>
