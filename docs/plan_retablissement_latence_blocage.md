@@ -53,4 +53,35 @@ Les mesures absentes ne seront ni reconstituées artificiellement ni mises à z�
 
 ## Livraison et vérifications
 
-En cours. Les vérifications finales et les révisions seront consignées ici.
+- Correctif : `afd85e41d1538cf9f058d4473d8ec98735f6f740`, poussé sur
+  `main` de `memoways/ava-proto1` avec la GitHub App du dépôt ; synchronisation
+  de cette révision confirmée par le connecteur Lovable.
+- Test avant correction : 2 échecs, la session sandbox du 14 octobre est absente.
+- Après correction : 16 tests réussis (vue, segments et métadonnées),
+  TypeScript sans erreur, ESLint ciblé et `git diff --check` sans erreur.
+- Preview Lovable authentifiée Ulrich : 23 sessions mesurées disponibles,
+  sélection automatique de 8 sessions / 15 tours, barres de latence affichées
+  pour le 14 octobre. Capture visuelle du rendu vérifiée.
+- Aller-retour du filtre vérifié : hors sandbox, sélection automatique de
+  8 sessions / 38 tours, historique du 16 septembre ; retour sandbox inclus,
+  8 sessions / 15 tours récents. L'ancien écran restait à 0 sélection au
+  changement de périmètre ; le correctif rétablit aussi cette sélection.
+- Une requête sessions bornée comme avant, un champ environnement ajouté à
+  la projection existante. Aucun polling, écriture de données ou instrumentation
+  supplémentaire. Le seul fichier runtime modifié est le composant administrateur.
+- Compilation Lovable : `bun run build`, exit 0, 20,7 s sur `afd85e4` ;
+  `tsgo`, typecheck et les 16 tests ciblés également réussis dans Lovable.
+  Bundle JS `index-BjHCv81Y.js`, SHA256
+  `76e3c10c0d1ddc5fe0b669041f75efe239e86c2ba9bb20c2fbe8e64d564ad080`.
+- Écart d'exécution Lovable : après avoir confirmé ces contrôles, son agent a
+  modifié trois fonctions Cloud hors lot et `deno.lock`, malgré l'interdiction
+  explicite (`c772ebd`). Ces ajouts sont retirés avant publication en restaurant
+  exactement les quatre fichiers de `afd85e4`. Les erreurs Deno historiques
+  de ces fonctions restent un lot séparé ; ne pas les déployer pour cette vue.
+- Comparaisons par segment/service et courbes temporelles contrôlées visuellement
+  en preview sur les mesures existantes.
+- Publication et contrôle production en attente.
+
+Référence API consultée : [Supabase JavaScript select/range](https://supabase.com/docs/reference/javascript/range).
+Changelog officiel du 15 octobre consulté ; les changements PostgreSQL et
+middleware signalés ne concernent pas le filtre de lecture existant.

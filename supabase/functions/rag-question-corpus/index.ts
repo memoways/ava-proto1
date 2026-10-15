@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAdmin } from "../_shared/adminAuth.ts";
 import {
   cleanCorpusQuestion,
@@ -189,7 +189,7 @@ async function fetchAllRows<T>(buildQuery: (from: number, to: number) => Promise
   }
 }
 
-async function collectCorpus(supabase: SupabaseClient) {
+async function collectCorpus(supabase: ReturnType<typeof createClient>) {
   const pinnedRows = await fetchAllRows<PinnedRow>((from, to) => supabase
     .from("rag_lab_pinned_questions")
     .select("session_id, message_index, question, character_name, created_at")
@@ -392,7 +392,7 @@ function presentQuestions(candidates: SemanticCandidate[]) {
     .slice(0, 20);
 }
 
-async function buildSemanticCorpus(supabase: SupabaseClient, apiKey: string, claimedRevision: number) {
+async function buildSemanticCorpus(supabase: ReturnType<typeof createClient>, apiKey: string, claimedRevision: number) {
   const corpus = await collectCorpus(supabase);
   const exactGroups = groupExactQuestions(corpus.occurrences);
   const analyzedBatches = await mapConcurrent(chunks(exactGroups, ANALYSIS_BATCH_SIZE), 3, (batch) => analyzeExactBatch(apiKey, batch));
