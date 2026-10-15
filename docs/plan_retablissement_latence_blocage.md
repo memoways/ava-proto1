@@ -118,3 +118,68 @@ Réalisé : fonction partagée réutilisée, noms manuels prioritaires, titre co
 au survol. Vérifications : 5 tests ciblés réussis (vue et helper des titres),
 typecheck, ESLint ciblé et `git diff --check` sans erreur. Changement limité à
 l'affichage administrateur et aux champs de sa requête existante.
+
+## Extension — personnages, historique complet et fidélité des graphiques
+
+Demande du 15 octobre : personnages réellement rencontrés dans les métadonnées
+et les titres, changements de personnage visibles, filtres extensibles ; vérifier
+les sessions manquantes et les représentations graphiques.
+
+Constats Cloud en lecture seule : 111 sessions présentes au moment du contrôle,
+99 avec timings ; historique depuis le 8 mars. Les 50 plus récentes s'arrêtent
+au 17 juillet. Les deux lecteurs (`Admin`, `LatencyBlockingTab`) imposent 50.
+676 réponses avec pipeline, dont 102 avec origine explicite du total, 94 avec
+premier son mesuré et 8 sans premier son mesuré. Aucun parcours multipersonnage
+dans les données actuellement conservées ; ce cas doit être vérifié par fixtures.
+
+Plan :
+1. Produire les métadonnées structurées `character_keys`, `character_sequence`
+   et `character_switch_count` depuis `conversation_log` déjà persisté.
+   Réutiliser le registre pour les noms et compléter les options avec les clés
+   observées, sans limiter le filtre à Max/Emma. Une sélection sans conversation
+   reste distincte d'un échange réel. Aucun backfill ni écriture côté joueur.
+2. Partager un lecteur admin paginé par curseur `id`, sans plafond arbitraire,
+   tri chronologique après lecture ; annulation au changement de vue et erreur
+   explicite si une page échoue. La pagination par curseur évite les décalages
+   d'offset lors des suppressions. Chargement uniquement dans le back-office.
+3. Conserver les totaux et leur origine dans les agrégats et les détails ;
+   distinguer mesures et cumuls historiques estimés, ne pas afficher un son non
+   mesuré comme 0 ms. Séparer cumul des services et attente observée (les spans
+   se chevauchent). Pourcentages normalisés sur le cumul des services.
+4. Ne pas attribuer aux tours historiques la configuration actuelle quand leurs
+   métadonnées manquent. Ne pas relier les trous de couverture dans les courbes,
+   utiliser des segments linéaires et afficher date/nom de session au survol.
+   Distinguer étape dominante et dépassement du budget indicatif.
+5. Tests de non-régression : plus de 50/100 sessions, erreurs d'une page,
+   annulation, sessions mixtes et futurs personnages, calculs pondérés par tour,
+   totaux mesurés/non mesurés et fidélité des barres/courbes. Typage/lint, puis
+   synchronisation et contrôle visuel Lovable. Aucun changement de conversation,
+   STT/TTS, capture, orchestration, schéma ou fonction Cloud. Publication en attente.
+
+Implémentation et vérifications locales :
+- Lecteur partagé `adminSessionHistory.ts` : pages de 100 par curseur UUID,
+  tri final par date, métadonnées `character_metadata` structurées produites à
+  la lecture depuis les messages persistés. Aucune colonne dupliquée, migration,
+  écriture ou modification du parcours joueur. Anciennes sessions prises en charge.
+- Titres et détails : participants, ordre des échanges et nombre de changements ;
+  noms manuels conservés. Options issues du registre et des personnages observés.
+  Un filtre personnage isole ses tours dans une conversation mixte.
+- Les totaux observés sont conservés dans les moyennes, maximums et détails.
+  Percentiles par origine de mesure ; cumuls legacy séparés des mesures.
+  Barres dimensionnées sur le cumul des services, marqueur d'attente distinct,
+  pourcentages normalisés et trous des courbes non interpolés. Configuration
+  actuelle jamais attribuée à des métadonnées historiques absentes.
+- « Blocage » de l'ancien écran désignait toute étape dominante, même rapide.
+  Les badges et filtres parlent désormais de dépassements des budgets indicatifs,
+  avec choix du dépassement relatif le plus important ; aucun diagnostic causal
+  de blocage n'est inventé à partir de la seule durée d'un segment.
+- Avant correction : tests composant rouges sur la 51e session et le total
+  observé de 1 850 ms remplacé par le cumul de services chevauchants.
+- Après correction : **117 fichiers / 603 tests unitaires réussis**, typage et
+  ESLint ciblé sans erreur, `git diff --check` propre. Compilation locale de
+  compatibilité avec la configuration Lovable : `npm run build`, exit 0,
+  12,84 s. Ce build local n'est pas un déploiement.
+- Les fixtures couvrent Max → Emma → Max, un futur personnage, l'isolation des
+  tours Emma, les 205 sessions paginées, une suppression entre pages, une erreur
+  de page et l'annulation. Aucun scénario synthétique injecté en base.
+- Synchronisation et vérification visuelle Lovable à effectuer ; pas de publication.

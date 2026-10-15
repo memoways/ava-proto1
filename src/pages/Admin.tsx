@@ -1,5 +1,5 @@
 import { getCachedSession } from "@/services/gameAuth";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useTheme } from "next-themes";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +27,7 @@ import AntiHallucinationValidatorTab from "@/components/AntiHallucinationValidat
 import HallucinationMetricsTab from "@/components/HallucinationMetricsTab";
 import LatencyBlockingTab from "@/components/LatencyBlockingTab";
 import LatencyTelemetryTab from "@/components/LatencyTelemetryTab";
+import { fetchAdminSessionHistory } from "@/services/adminSessionHistory";
 import SessionsTab, { type SessionRow } from "@/components/admin/SessionsTab";
 import QuestionnairesTab from "@/components/admin/QuestionnairesTab";
 import LLMUsageTab from "@/components/admin/LLMUsageTab";
@@ -130,6 +131,8 @@ export default function Admin() {
   const [syncReport, setSyncReport] = useState<SyncReport | null>(null);
   const [embFilter, setEmbFilter] = useState<string>("all");
   const [loading, setLoading] = useState(false);
+  const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
+  const sessionLoadController = useRef<AbortController | null>(null);
   const [characters, setCharacters] = useState<CharacterRow[]>([]);
   const [editingChar, setEditingChar] = useState<CharacterRow | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
@@ -189,33 +192,33 @@ export default function Admin() {
   const navigateToTab = (tabId: string) => navigate(adminTabPath(tabId));
 
   const loadSessions = useCallback(async () => {
+    sessionLoadController.current?.abort();
+    const controller = new AbortController();
+    sessionLoadController.current = controller;
     setLoading(true);
-    const [{ data }, { data: members }] = await Promise.all([
-      supabase.from("sessions").select("*").order("started_at", { ascending: false }).limit(50),
-      supabase.from("admin_users" as never).select("user_id,display_name"),
-    ]);
-    const memberNames = new Map(
-      ((members ?? []) as Array<{ user_id: string; display_name: string }>)
-        .map((member) => [member.user_id, member.display_name]),
-    );
-    const withAccount = (session: SessionRow): SessionRow => ({
-      ...session,
-      account_display_name: session.started_by_user_id
-        ? memberNames.get(session.started_by_user_id) ?? "membre"
-        : "public",
-    });
-    const recentSessions = ((data as unknown as SessionRow[]) || []).map(withAccount);
-    if (selectedSessionId && !recentSessions.some((session) => session.id === selectedSessionId)) {
-      const { data: requestedSession } = await supabase
-        .from("sessions")
-        .select("*")
-        .eq("id", selectedSessionId)
-        .maybeSingle();
-      if (requestedSession) recentSessions.push(withAccount(requestedSession as unknown as SessionRow));
+    setSessionLoadError(null);
+    try {
+      const [data, { data: members }] = await Promise.all([
+        fetchAdminSessionHistory<SessionRow>({ signal: controller.signal }),
+        supabase.from("admin_users" as never).select("user_id,display_name").abortSignal(controller.signal),
+      ]);
+      if (controller.signal.aborted) return;
+      const memberNames = new Map(
+        ((members ?? []) as Array<{ user_id: string; display_name: string }>)
+          .map((member) => [member.user_id, member.display_name]),
+      );
+      setSessions(data.map(session => ({
+        ...session,
+        account_display_name: session.started_by_user_id
+          ? memberNames.get(session.started_by_user_id) ?? "membre"
+          : "public",
+      })));
+    } catch (error) {
+      if (!controller.signal.aborted) setSessionLoadError(error instanceof Error ? error.message : "Historique indisponible");
+    } finally {
+      if (!controller.signal.aborted) setLoading(false);
     }
-    setSessions(recentSessions);
-    setLoading(false);
-  }, [selectedSessionId]);
+  }, []);
 
   useEffect(() => {
     hydrateAllSettings(); // Load all settings from DB into localStorage
@@ -226,6 +229,7 @@ export default function Admin() {
 
   useEffect(() => {
     void loadSessions();
+    return () => sessionLoadController.current?.abort();
   }, [loadSessions]);
 
   async function loadEmbeddings() {
@@ -530,6 +534,7 @@ export default function Admin() {
 
           {/* ==================== SESSIONS ==================== */}
           <TabsContent value="sessions">
+            {sessionLoadError && <p role="alert" className="text-sm text-destructive">{sessionLoadError}. L’historique affiché peut être incomplet.</p>}
             <SessionsTab
               sessions={sessions}
               selectedSessionId={selectedSessionId}

@@ -1,3 +1,5 @@
+import { sessionCharacterLabel, type SessionCharacterInput } from "@/services/sessionCharacters";
+
 const ENV_LABELS: Record<string, string> = {
   prod: "Production",
   "sandbox-ulrich": "Ulrich",
@@ -5,13 +7,13 @@ const ENV_LABELS: Record<string, string> = {
   "sandbox-romed": "Romed",
 };
 
-interface TitleInput {
+interface TitleInput extends SessionCharacterInput {
   environment_id: string;
   started_at: string | null;
   duration_seconds: number | null;
   game_over_reason: string | null;
   ended_at: string | null;
-  conversation_log: Array<{ role?: string; content?: string }> | null;
+  conversation_log: Array<{ role?: string; spokenWith?: string; content?: string }> | null;
   test_invitation_id?: string | null;
   tester_label?: string | null;
 }
@@ -43,5 +45,5 @@ export function autoSessionTitle(s: TitleInput): string {
   const date = s.started_at
     ? new Date(s.started_at).toLocaleString("fr-CH", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })
     : "date inconnue";
-  return `${accountLabel(s)} · ${date} · ${describeSession(s)}`;
+  return `${accountLabel(s)} · ${date} · ${sessionCharacterLabel(s)} · ${describeSession(s)}`;
 }

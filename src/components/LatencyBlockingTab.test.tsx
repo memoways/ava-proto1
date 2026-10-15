@@ -1,3 +1,4 @@
+import type { PropsWithChildren } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -5,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   excludeSandbox: vi.fn(),
   select: vi.fn(),
+  rows: [] as Array<Record<string, unknown>>,
+  lines: vi.fn(),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -14,13 +17,13 @@ vi.mock("@/integrations/supabase/client", () => ({
     }),
   },
 }));
-vi.mock("@/services/latencyServiceMetadata", () => ({
-  getConfiguredLatencyServices: () => ({}),
-}));
 vi.mock("@/components/admin/LLMTokenCostPanel", () => ({ default: () => null }));
-vi.mock("recharts", async (importOriginal) => ({
-  ...await importOriginal<typeof import("recharts")>(),
-  ResponsiveContainer: () => null,
+vi.mock("recharts", () => ({
+  ResponsiveContainer: ({ children }: PropsWithChildren) => <div>{children}</div>,
+  LineChart: ({ children }: PropsWithChildren) => <div>{children}</div>,
+  Line: (props: Record<string, unknown>) => { mocks.lines(props); return null; },
+  CartesianGrid: () => null, Legend: () => null, ReferenceLine: () => null,
+  XAxis: () => null, YAxis: () => null, Tooltip: () => null,
 }));
 
 import LatencyBlockingTab from "./LatencyBlockingTab";
@@ -52,18 +55,30 @@ function openTab() {
 
 describe("LatencyBlockingTab session scope", () => {
   afterEach(cleanup);
+  Element.prototype.scrollIntoView = vi.fn();
   beforeEach(() => {
     vi.clearAllMocks();
     const historical = session("Historical September session", "public", "2026-09-16T12:31:46Z");
     const recent = session("Recent October session", "sandbox", "2026-10-14T14:07:58Z");
-    mocks.excludeSandbox.mockResolvedValue({ data: [historical], error: null });
-    mocks.select.mockImplementation(() => ({
-      order: () => ({
-        limit: () => Object.assign(Promise.resolve({ data: [recent, historical], error: null }), {
-          neq: mocks.excludeSandbox,
-        }),
-      }),
-    }));
+    mocks.rows = [recent, historical];
+    mocks.select.mockImplementation(() => {
+      let limit = Infinity;
+      let after = "";
+      let exclude = false;
+      const query = {
+        order: () => query,
+        limit: (value: number) => { limit = value; return query; },
+        neq: (key: string, value: string) => { mocks.excludeSandbox(key, value); exclude = true; return query; },
+        gt: (_key: string, value: string) => { after = value; return query; },
+        abortSignal: () => query,
+        then: (resolve: (value: unknown) => unknown) => Promise.resolve(resolve({
+          data: mocks.rows.filter(row => (!exclude || row.context_type !== "sandbox") && String(row.id) > after)
+            .sort((a, b) => String(a.id).localeCompare(String(b.id))).slice(0, limit),
+          error: null,
+        })),
+      };
+      return query;
+    });
   });
 
   it("shows the recent sandbox measurements and comparisons on first opening", async () => {
@@ -75,6 +90,8 @@ describe("LatencyBlockingTab session scope", () => {
     expect(screen.getAllByText("sandbox-ulrich").length).toBeGreaterThan(0);
     await waitFor(() => expect(screen.getByText(/2 sélectionnée/)).toBeInTheDocument());
     expect(screen.getAllByText("800 ms").length).toBeGreaterThan(0);
+    expect(mocks.lines).toHaveBeenCalled();
+    expect(mocks.lines.mock.calls.every(([props]) => props.type === "linear" && props.connectNulls === false)).toBe(true);
   });
 
   it("allows explicit sandbox exclusion and automatically selects the remaining history", async () => {
@@ -91,7 +108,7 @@ describe("LatencyBlockingTab session scope", () => {
 
   it("uses the existing automatic session title instead of the numeric id when no name is saved", async () => {
     const recent = { ...session("512186fe-0000-0000-0000-000000000000", "sandbox", "2026-10-14T14:07:58Z"), name: null };
-    mocks.select.mockReturnValue({ order: () => ({ limit: async () => ({ data: [recent], error: null }) }) });
+    mocks.rows = [recent];
     openTab();
 
     const row = await screen.findByRole("button", { name: /Ulrich · .*test court \(1 tours\), fin : fin/ });
@@ -99,4 +116,42 @@ describe("LatencyBlockingTab session scope", () => {
     expect(screen.getByTitle(/Ulrich · .*test court \(1 tours\), fin : fin/)).toBeInTheDocument();
     expect(mocks.select).toHaveBeenCalledWith(expect.stringContaining("tester_label, test_invitation_id"));
   });
+  it("loads measured sessions beyond the first fifty rows", async () => {
+    mocks.rows = Array.from({ length: 105 }, (_, i) => session(`session-${String(i).padStart(3, "0")}`, "public", "2026-05-01T10:00:00Z"));
+    openTab();
+    expect(await screen.findByRole("button", { name: /session-104/ })).toBeInTheDocument();
+    expect(screen.getByText("Sessions (105)")).toBeInTheDocument();
+  });
+
+  it("preserves measured first-sound totals instead of replacing them with the sum of overlapping services", async () => {
+    const recent = session("Observed first sound", "sandbox", "2026-10-14T14:07:58Z");
+    mocks.rows = [{ ...recent, conversation_log: [recent.conversation_log[0], {
+      role: "max", content: "Réponse", timestamp: 2,
+      pipeline: { rag_ms: 500, max_ms: 1200, tts_first_playback_ms: 600, total_ms: 1850,
+        latency_origin: "ptt_finalized", first_sound_status: "measured" },
+    }] }];
+    openTab();
+    expect(await screen.findByRole("button", { name: /Observed first sound.*1[.,]85 s/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Afficher les tours/ }));
+    expect(screen.getAllByText("1.85 s").length).toBeGreaterThan(1);
+  });
+
+  it("filters the actual turns of a mixed conversation and offers future characters", async () => {
+    const mixed = session("Mixed session", "sandbox", "2026-10-14T14:07:58Z");
+    mocks.rows = [{ ...mixed, conversation_log: [
+      { role: "user", spokenWith: "max", content: "a", timestamp: 1 },
+      { role: "max", content: "Max reply", timestamp: 2, pipeline: { max_ms: 800 } },
+      { role: "user", spokenWith: "emma", content: "b", timestamp: 3 },
+      { role: "emma", spokenWith: "emma", content: "Emma reply", timestamp: 4, pipeline: { max_ms: 300 } },
+    ] }];
+    openTab();
+    await screen.findByRole("button", { name: /Mixed session.*2 tour/ });
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Filtrer les latences par personnage" }), { key: "ArrowDown" });
+    expect(await screen.findByRole("option", { name: "Léo" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("option", { name: "Emma" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Mixed session.*1 tour.*300 ms/ })).toBeInTheDocument());
+    expect(screen.getByText(/Agrégé sur 1 tour/)).toBeInTheDocument();
+    expect(screen.getByText(/1 sélectionnée/)).toBeInTheDocument();
+  });
+
 });

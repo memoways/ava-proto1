@@ -5,7 +5,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { displayNameForCharacter } from "@/services/characterRegistry";
 import { autoSessionTitle } from "./sessionTitle";
+import { sessionCharacterLabel, sessionCharacterMetadata, sessionCharacterOptions } from "@/services/sessionCharacters";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity, ScanSearch, FlaskConical } from "lucide-react";
@@ -52,6 +54,7 @@ export interface SessionRow {
 
 interface AdminConversationMessage {
   role: "user" | "max" | "emma";
+  spokenWith?: string;
   content: string;
   gmFallback?: {
     kind?: string;
@@ -261,6 +264,8 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
   const [environmentFilter, setEnvironmentFilter] = useState("all");
   const [contextFilter, setContextFilter] = useState("all");
   const [campaignFilter, setCampaignFilter] = useState("all");
+  const [characterFilter, setCharacterFilter] = useState("all");
+  const characterOptions = useMemo(() => sessionCharacterOptions(sessions), [sessions]);
   const campaigns = useMemo(
     () => [...new Set(sessions.map((session) => session.campaign_id).filter((value): value is string => Boolean(value)))],
     [sessions],
@@ -269,7 +274,8 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
     (environmentFilter === "all" || session.environment_id === environmentFilter)
     && (contextFilter === "all" || session.context_type === contextFilter)
     && (campaignFilter === "all" || session.campaign_id === campaignFilter)
-  )), [campaignFilter, contextFilter, environmentFilter, sessions]);
+    && (characterFilter === "all" || sessionCharacterMetadata(session).character_keys.includes(characterFilter))
+  )), [campaignFilter, characterFilter, contextFilter, environmentFilter, sessions]);
 
   useEffect(() => {
     if (!selectedSessionId) {
@@ -453,6 +459,16 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
           </Select>
         </div>
         <div className="mb-2 flex items-center gap-3 text-sm">
+          <Select value={characterFilter} onValueChange={setCharacterFilter}>
+            <SelectTrigger aria-label="Filtrer les sessions par personnage"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les personnages</SelectItem>
+              {characterOptions.map(({ key, label }) => <SelectItem key={key} value={key}>{label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <p className="mb-2 text-xs text-muted-foreground">{visibleSessions.length} sessions affichées sur {sessions.length} chargées.</p>
+        <div className="mb-2 flex items-center gap-3 text-sm">
           <Checkbox
             aria-label="Tout sélectionner"
             checked={visibleSessions.length > 0 && visibleSessions.every((s) => checkedIds.has(s.id))}
@@ -492,6 +508,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                   </div>
                 <div>
                   <span className="text-sm font-semibold">{s.name || autoSessionTitle(s)}</span>
+                  <p className="text-xs text-muted-foreground">{sessionCharacterLabel(s)}</p>
                   <p className="text-[10px] font-mono text-muted-foreground">{s.id.slice(0, 8)} · {fmt(s.started_at)}</p>
                   <p className="mt-1 text-xs"><span className="text-muted-foreground">Compte :</span> {s.account_display_name ?? "public"}</p>
                   <p className="text-[11px] text-muted-foreground">
@@ -637,6 +654,9 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
               <Stat label="Durée" value={`${selected.duration_seconds ?? "—"}s`} />
               <Stat label="Branch" value={selected.branch || "—"} />
               <Stat label="Raison fin" value={selected.game_over_reason || "—"} />
+              <Stat label="Personnages rencontrés" value={sessionCharacterMetadata(selected).character_keys.map(displayNameForCharacter).join(", ") || "Aucune conversation"} />
+              <Stat label="Parcours des personnages" value={sessionCharacterLabel(selected)} />
+              <Stat label="Changements de personnage" value={String(sessionCharacterMetadata(selected).character_switch_count)} />
               <Stat label="Compte" value={selected.account_display_name ?? "public"} />
               <Stat label="Environnement" value={selected.environment_id} />
               <Stat label="Contexte" value={selected.context_type} />
