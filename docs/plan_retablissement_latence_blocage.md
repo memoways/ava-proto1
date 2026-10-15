@@ -80,7 +80,22 @@ Les mesures absentes ne seront ni reconstituées artificiellement ni mises à z�
   de ces fonctions restent un lot séparé ; ne pas les déployer pour cette vue.
 - Comparaisons par segment/service et courbes temporelles contrôlées visuellement
   en preview sur les mesures existantes.
-- Publication et contrôle production en attente.
+- Restauration : `51afe887e5ca0bf85ee045b6efe517c5634d7d20`, poussée sur
+  main et synchronisée dans Lovable. Diff final depuis `1b2f709` : uniquement
+  `LatencyBlockingTab.tsx`, son test et ce plan. Aucune différence Cloud ni lockfile.
+- Publication tentée par le connecteur Lovable : refusée par le contrôle
+  automatique d'autorisation, qui exige un accord humain explicite pour la
+  publication en production. Aucun contournement et aucun déploiement effectué.
+- Local et GitHub : correction terminée et poussée sur main. Preview Lovable :
+  graphiques et filtres vérifiés. Production : inchangée, contrôle du correctif
+  impossible avant publication. Reste : accord explicite, publication native
+  Lovable, puis contrôle de la page publiée.
+
+## Où voir le résultat
+
+- [Preview — Qualité / Latence et blocage](https://id-preview--1265958d-b74e-40f2-917d-182fe05163fc.lovable.app/admin/qualite/latence-et-blocages)
+- [Projet Lovable](https://lovable.dev/projects/1265958d-b74e-40f2-917d-182fe05163fc)
+- [Code sur main](https://github.com/memoways/ava-proto1/commit/51afe887e5ca0bf85ee045b6efe517c5634d7d20)
 
 Référence API consultée : [Supabase JavaScript select/range](https://supabase.com/docs/reference/javascript/range).
 Changelog officiel du 15 octobre consulté ; les changements PostgreSQL et
