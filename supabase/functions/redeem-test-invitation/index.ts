@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient, type User } from "https://esm.sh/@supabase/supabase-js@2.98.0";
+import { createClient, type SupabaseClient, type User } from "https://esm.sh/@supabase/supabase-js@2.98.0";
 import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 import {
   constantTimeEqual,
@@ -42,7 +42,7 @@ function json(req: Request, body: unknown, status = 200): Response {
 
 async function authenticatedAnonymousUser(req: Request): Promise<{
   user: User;
-  caller: ReturnType<typeof createClient>;
+  caller: SupabaseClient;
 } | null> {
   const authorization = req.headers.get("Authorization") ?? "";
   const url = Deno.env.get("SUPABASE_URL");
@@ -60,7 +60,7 @@ async function authenticatedAnonymousUser(req: Request): Promise<{
 }
 
 async function loadActiveAccess(
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient,
   userId: string,
   invitationId: string,
 ): Promise<AccessContext | null> {
@@ -104,7 +104,7 @@ serve(async (req) => {
 
   const identity = await authenticatedAnonymousUser(req);
   if (!identity) return json(req, { error: "Anonymous authentication required" }, 401);
-  const body = await req.json().catch(() => null) as Record<string, unknown> | null;
+  const body = (await req.json().catch(() => null) ?? {}) as Record<string, unknown>;
   const action = body?.action;
   const invitationId = typeof body?.invitationId === "string" ? body.invitationId : "";
   if ((action !== "status" && action !== "redeem") || !invitationId) {
