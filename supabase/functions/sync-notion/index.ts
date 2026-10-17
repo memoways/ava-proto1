@@ -134,7 +134,6 @@ const PROMPT_FIELD_ALIASES: Record<string, string[]> = {
   ],
   dynamique_conversation: ["Dynamique de la conversation"],
   sujets_sensibles: ["Sujets sensibles"],
-  politique_relationnelle: ["Politique relationnelle", "Progression relationnelle"],
   references_intellectuelles: ["Références intellectuelles", "References intellectuelles"],
   timeline: ["Timeline", "Chronologie", "Historique"],
 };

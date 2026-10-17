@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Non publié] — 2026-10-17 — Retrait de Politique relationnelle
+
+- Le champ vide n'est plus lu. Il disparaît de la synchro Notion, de l'éditeur
+  de fiche et de `character_prompts`. La relation d'un appel se construit
+  depuis Dynamique de la conversation et Sujets sensibles.
+
 ## [Non publié] — 2026-10-17 — Chunks des souvenirs éditoriaux
 
 - Un titre `### SOUVENIR` est un chunk entier : période parente, identifiant,

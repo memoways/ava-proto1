@@ -9,30 +9,7 @@ import {
 const source = {
   updated_at: "2026-09-11T10:00:00Z",
   dynamique_conversation: "Comprendre ce que l'interlocuteur vient chercher.",
-  sujets_sensibles: "Le fusil\nEmma",
-  politique_relationnelle: [
-    "Moteur",
-    "Comprendre pourquoi cette personne appelle sans présumer un lien.",
-    "",
-    "Signes d’ouverture",
-    "- écoute précise",
-    "- respect d'une limite",
-    "- confrontation pertinente",
-    "",
-    "Signes de fermeture",
-    "- insistance après une limite",
-    "- hostilité",
-    "",
-    "Sujets sensibles",
-    "- Le fusil :: confiance :: après une relation construite",
-    "- Emma :: lien :: si la question respecte sa place",
-    "",
-    "Résistance",
-    "Répondre partiellement, déplacer le sujet ou questionner l'intention.",
-    "",
-    "Initiative",
-    "Reprendre un fil qui compte pour lui, sans question réflexe.",
-  ].join("\n"),
+  sujets_sensibles: "Le fusil :: confiance :: après une relation construite\nEmma :: lien :: si la question respecte sa place",
 };
 
 describe("relationship engine", () => {

@@ -356,19 +356,14 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
       {relationshipPreview && (
         <div className="space-y-2 border rounded-lg p-4 bg-muted/20">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <Label className="text-sm font-semibold">Politique relationnelle compilée</Label>
+            <Label className="text-sm font-semibold">Relation compilée</Label>
             <span className="text-xs text-muted-foreground">
-              source {relationshipPreview.source === "notion" ? "Notion" : "compatibilité"} · version {relationshipPreview.version}
+              version {relationshipPreview.version}
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            {relationshipPreview.sensitiveTopics.length} condition(s) de sujet · {relationshipPreview.openingSignals.length} signe(s) d’ouverture · {relationshipPreview.closingSignals.length} signe(s) de fermeture.
+            Construite depuis Dynamique de la conversation et Sujets sensibles. {relationshipPreview.sensitiveTopics.length} condition(s) de sujet · {relationshipPreview.openingSignals.length} signe(s) d’ouverture · {relationshipPreview.closingSignals.length} signe(s) de fermeture.
           </p>
-          {relationshipPreview.source !== "notion" && (
-            <p className="text-xs text-amber-400">
-              Le champ « Politique relationnelle » est vide : le runtime utilise temporairement les champs historiques compilés.
-            </p>
-          )}
         </div>
       )}
 

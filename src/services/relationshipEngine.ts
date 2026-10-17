@@ -11,7 +11,6 @@ import type {
 } from "@/types";
 
 interface RelationshipPromptSource {
-  politique_relationnelle?: string | null;
   dynamique_conversation?: string | null;
   sujets_sensibles?: string | null;
   updated_at?: string | null;
@@ -73,34 +72,6 @@ function cleanList(value: string | undefined, max = 8): string[] {
     .slice(0, max);
 }
 
-function splitPolicySections(value: string): Map<string, string> {
-  const sections = new Map<string, string>();
-  let current = "moteur";
-  let buffer: string[] = [];
-  const flush = () => {
-    const content = buffer.join("\n").trim();
-    if (content) sections.set(current, content);
-    buffer = [];
-  };
-  for (const rawLine of value.replace(/\r/g, "").split("\n")) {
-    const line = rawLine.trim();
-    const heading = line.match(/^(?:#{1,4}\s*)?(moteur(?: de l['’]appel)?|signes? d['’]ouverture|signes? de fermeture|sujets? sensibles?|conditions?|resistance|résistance|initiative)\s*:?[\s]*$/i);
-    if (heading) {
-      flush();
-      current = normalized(heading[1]);
-    } else buffer.push(rawLine);
-  }
-  flush();
-  return sections;
-}
-
-function section(sections: Map<string, string>, includes: string[]): string {
-  for (const [key, value] of sections) {
-    if (includes.some((needle) => key.includes(needle))) return value;
-  }
-  return "";
-}
-
 function parseTier(value: string | undefined, fallback: RelationshipTier): RelationshipTier {
   const key = normalized(value ?? "");
   if (key === "contact" || key.includes("prise de contact") || key.includes("niveau 1")) return "contact";
@@ -132,34 +103,21 @@ export function compileCharacterRelationshipPolicy(
   source: RelationshipPromptSource,
   characterKey: string,
 ): CharacterRelationshipPolicy {
-  const rawPolicy = source.politique_relationnelle?.trim() ?? "";
-  const sections = splitPolicySections(rawPolicy);
   const version = source.updated_at?.trim() || "unversioned";
-  const callDrive = cleanText(
-    section(sections, ["moteur"]) || source.dynamique_conversation,
-    500,
-  ) || "Comprendre pourquoi cette personne appelle sans lui offrir immédiatement une intimité acquise.";
-  const openingSignals = cleanList(section(sections, ["ouverture"]), 8);
-  const closingSignals = cleanList(section(sections, ["fermeture"]), 8);
-  const topicSection = section(sections, ["sujet", "condition"]);
+  const callDrive = cleanText(source.dynamique_conversation, 500)
+    || "Comprendre pourquoi cette personne appelle sans lui offrir immédiatement une intimité acquise.";
 
   return {
     schemaVersion: 1,
     characterKey,
     version,
     callDrive,
-    openingSignals: openingSignals.length
-      ? openingSignals
-      : ["écoute précise", "franchise", "respect d'une limite", "confrontation pertinente"],
-    closingSignals: closingSignals.length
-      ? closingSignals
-      : ["insistance après une limite", "contradiction intéressée", "hostilité explicite"],
-    sensitiveTopics: parseTopicRules(topicSection, source.sujets_sensibles ?? ""),
-    resistanceStyle: cleanText(section(sections, ["resistance"]), 350)
-      || "Répondre partiellement, déplacer le sujet ou demander ce que l'interlocuteur cherche, sans devenir un assistant complaisant.",
-    initiativeStyle: cleanText(section(sections, ["initiative"]), 350)
-      || "Poursuivre son propre besoin et reprendre un fil utile ; une question est possible lorsqu'elle engage réellement l'interlocuteur.",
-    source: rawPolicy ? "notion" : "legacy_compiled",
+    openingSignals: ["écoute précise", "franchise", "respect d'une limite", "confrontation pertinente"],
+    closingSignals: ["insistance après une limite", "contradiction intéressée", "hostilité explicite"],
+    sensitiveTopics: parseTopicRules("", source.sujets_sensibles ?? ""),
+    resistanceStyle: "Répondre partiellement, déplacer le sujet ou demander ce que l'interlocuteur cherche, sans devenir un assistant complaisant.",
+    initiativeStyle: "Poursuivre son propre besoin et reprendre un fil utile ; une question est possible lorsqu'elle engage réellement l'interlocuteur.",
+    source: "legacy_compiled",
   };
 }
 

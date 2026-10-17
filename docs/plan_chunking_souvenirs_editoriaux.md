@@ -5,13 +5,13 @@ Lot du 17 octobre 2026. Aucune écriture Notion, aucune synchronisation, aucune 
 ## Sources relues
 
 - Tâche : [Améliorer la rédaction et le chunking](https://app.notion.com/p/3fb62322e59580c2ba77ecccf1a6b0b9), état En cours.
-- Appel du 16 octobre avec Romed : les séparateurs éditoriaux définissent le chunk ; ne pas lancer de chunking automatique tant que le contenu et la mécanique ne coïncident pas. Politique relationnelle jugée contradictoire et laissée vide.
+- Appel du 16 octobre avec Romed : les séparateurs éditoriaux définissent le chunk ; ne pas lancer de chunking automatique tant que le contenu et la mécanique ne coïncident pas. Politique relationnelle, jugée contradictoire et laissée vide, a ensuite été retirée.
 - Fiches relues le 17 octobre, dernière modification le 16 octobre, état En cours :
   - [Max Lorenzo](https://app.notion.com/p/3f762322e59581ba8241c7f6b28f31fd) : 124 souvenirs `### SOUVENIR`. Corps le plus long : 1 693 caractères dans l’export (audit : 1 694). Avec la période parente, le plus long bloc fait 1 756 caractères (`MAX J-5.04`). 31 corps dépassent 1 000 caractères (audit : 32).
   - [Emma Munz](https://app.notion.com/p/3f762322e59581f9880fe309adec7075) : 122 souvenirs. Corps le plus long : 1 476 caractères (audit : 1 491). Avec la période : 1 539. 33 corps dépassent 1 000 caractères.
 - Identifiants réels : `MAX J-7.01`, `EMMA permanent.04`, `MAX aujourd'hui.01`. Le modèle `MAX-J1-001` n’est pas exigé.
 - Chaque souvenir a un titre de niveau 3, Point de vue, Quand et Lieu. Le titre de niveau 2 au-dessus est la période.
-- Propriétés de prompt, non indexées comme souvenirs : Identité fondamentale, Qui tu es, Qui t'appelle, Dynamique de la conversation, Sujets sensibles, Références intellectuelles, Timeline, Ce que tu ne fais jamais. La Timeline reste un index de titres dans le prompt. Politique relationnelle est vide. Rôle familial et Âge ne vont pas dans le RAG.
+- Propriétés de prompt, non indexées comme souvenirs : Identité fondamentale, Qui tu es, Qui t'appelle, Dynamique de la conversation, Sujets sensibles, Références intellectuelles, Timeline, Ce que tu ne fais jamais. La Timeline reste un index de titres dans le prompt. Politique relationnelle a été retirée de Notion, de l'application et de `character_prompts` : le champ était vide et n'est plus lu. Rôle familial et Âge ne vont pas dans le RAG.
 - Ava Munz et Léo Munz restent hors de ce lot : pas d’indexation, pas de modification de fiche.
 
 ## Limite Voyage
