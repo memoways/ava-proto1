@@ -12,6 +12,20 @@
 
 Ces règles s'appliquent à toute personne, agent et outil intervenant sur ce dépôt.
 
+## Dossier unique (obligatoire)
+
+Le seul checkout Ava est `/Users/ulrich/CodeProjects/memoways/ava-proto1`.
+Le seul dépôt distant est `https://github.com/memoways/ava-proto1`.
+
+- Interdit de créer un dossier, un clone ou un worktree Git à côté de ce checkout
+  (`ava-proto1-*`, `ava-proto1-worktrees`, ou tout autre chemin sous
+  `~/CodeProjects`).
+- Un checkout isolé n’est acceptable que s’il est déjà ouvert par l’outil dans
+  `~/.cursor/worktrees/` ou `~/.codex/worktrees/`. Ne pas lancer `git worktree add`
+  ni `mkdir` vers un autre chemin.
+- À la fin du lot, le travail va sur GitHub par la branche et la PR. Le dossier
+  visible du projet reste le checkout canonique.
+
 ## Documentation des plans (obligatoire)
 
 - Tout plan produit ou approuvé pour ce dépôt doit être enregistré dans `docs/`
