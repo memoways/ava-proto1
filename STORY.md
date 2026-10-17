@@ -73,6 +73,14 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-10-17 — Souvenirs éditoriaux en chunks entiers
+
+Max a 124 souvenirs et Emma 122. Chacun devient un chunk, avec sa période,
+sans fusion ni coupe à 1 000 caractères. L'injection garde jusqu'à 3 souvenirs
+entiers, dans un plafond de 2 000 caractères par souvenir et 6 100 au total.
+Aucun souvenir actuel n'approche les 32 000 tokens de Voyage. Le profil actif
+reste voyage-4-realtime. [Plan](docs/plan_chunking_souvenirs_editoriaux.md).
+
 ### 2026-10-14 — Préparer P3 avec des comparaisons mesurées
 
 Ulrich demande le prompt du prochain lot après livraison P2. La reprise

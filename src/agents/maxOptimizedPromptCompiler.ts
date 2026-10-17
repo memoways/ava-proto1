@@ -4,6 +4,8 @@ import {
   memorySearchTerms,
   normalizeConversationMemory,
 } from "@/services/conversationMemoryV1";
+import { MAX_MAX_RAG_CONTEXT_CHARS, MAX_MAX_RAG_ITEM_CHARS, MAX_MAX_RAG_ITEMS } from "@/services/ragBudget";
+import { trimRagContextToWholeSouvenirs } from "@/services/ragService";
 import type { ConversationMemoryV1, MaxPromptAssemblyTrace } from "@/types";
 
 export const OPTIMIZED_V3_LIMITS = {
@@ -12,9 +14,9 @@ export const OPTIMIZED_V3_LIMITS = {
   staticChars: 4_500,
   runtimeChars: 800,
   memoryChars: 1_200,
-  ragChars: 1_800,
-  ragItemChars: 700,
-  ragItems: 3,
+  ragChars: MAX_MAX_RAG_CONTEXT_CHARS,
+  ragItemChars: MAX_MAX_RAG_ITEM_CHARS,
+  ragItems: MAX_MAX_RAG_ITEMS,
   relationshipChars: 1_400,
   frameChars: 1_400,
 };
@@ -379,7 +381,9 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
       budgetSections.push({ key, title, chars: 0, originalChars: 0, included: false, truncated: false, omissionReason: "section_vide" });
       return "";
     }
-    const cappedOriginal = capAtBoundary(original, cap);
+    const cappedOriginal = key === "rag_context"
+      ? trimRagContextToWholeSouvenirs(original, cap)
+      : capAtBoundary(original, cap);
     const novelty = source === "static" || source === "rag"
       ? { text: cappedOriginal, removedChars: 0, keptBy: undefined }
       : retainNovelContent(cappedOriginal, selectedForDedup);
@@ -398,7 +402,9 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
     const prefix = `\n\n# ${title}\n`;
     const systemLimit = Math.max(2_000, OPTIMIZED_V3_LIMITS.generatedContextChars - input.historyChars);
     const remaining = systemLimit - prompt.length - prefix.length;
-    const bounded = capAtBoundary(content, Math.max(0, remaining));
+    const bounded = key === "rag_context"
+      ? trimRagContextToWholeSouvenirs(content, Math.max(0, remaining))
+      : capAtBoundary(content, Math.max(0, remaining));
     if (!bounded) {
       unitDecisions.push({ id, source, sourceKey: key, title, text: content, score: 0, status: "budget", originalChars: original.length, removedChars: novelty.removedChars, reason: "budget" });
       budgetSections.push({ key, title, chars: 0, originalChars: original.length, included: false, truncated: false, omissionReason: "budget_contexte_epuise" });
@@ -463,16 +469,16 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
       unitDecisions.push({ ...unit, status: "lower_rank", originalChars: clean.length, removedChars: clean.length - afterRag.text.length, reason: "lower_rank" });
       continue;
     }
-    const capped = capAtBoundary(afterRag.text, Math.min(OPTIMIZED_V3_LIMITS.ragItemChars, OPTIMIZED_V3_LIMITS.ragChars - ragUsed));
-    if (!capped || ragUsed + capped.length > OPTIMIZED_V3_LIMITS.ragChars) {
+    const room = Math.min(OPTIMIZED_V3_LIMITS.ragItemChars, OPTIMIZED_V3_LIMITS.ragChars - ragUsed);
+    if (afterRag.text.length > room) {
       unitDecisions.push({ ...unit, status: "budget", originalChars: clean.length, removedChars: clean.length - afterRag.text.length, reason: "budget" });
       continue;
     }
     const removedChars = Math.max(0, clean.length - afterRag.text.length);
-    const selected = { ...unit, text: capped };
+    const selected = { ...unit, text: afterRag.text };
     ragSelected.push(selected);
-    ragBlocks.push(`Souvenir ${ragSelected.length}\n${capped}`);
-    ragUsed += capped.length;
+    ragBlocks.push(`Souvenir ${ragSelected.length}\n${afterRag.text}`);
+    ragUsed += afterRag.text.length;
     unitDecisions.push({
       ...selected,
       status: "selected",

@@ -1,4 +1,5 @@
 import type { CharacterPrompt } from "@/services/characterPromptService";
+import { MAX_MAX_RAG_CONTEXT_CHARS } from "@/services/ragBudget";
 
 export const MAX_SYSTEM_PROMPT_CHARS = 12_000;
 export const MAX_STATIC_PROMPT_CHARS = 7_000;
@@ -20,7 +21,7 @@ export const MAX_DYNAMIC_SECTION_CHARS = {
   temporal_context: 260,
   session_summary: 900,
   gm_guidance: 350,
-  rag_context: 2_100,
+  rag_context: MAX_MAX_RAG_CONTEXT_CHARS,
   post_video: 500,
   turn_guards: 500,
 } as const;

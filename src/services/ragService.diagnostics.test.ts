@@ -100,6 +100,30 @@ describe("queryRAGDetailed — requête réellement envoyée", () => {
     expect(result.retrievalMatches.map((match) => match.id)).toEqual(["max"]);
   });
 
+  it("ne donne pas à Max un souvenir privé d'Emma, ni l'inverse", async () => {
+    const emmaId = "22222222-2222-4222-8222-222222222222";
+    const privateMemories = [
+      { id: "max-private", source_table: "characters", source_id: MAX_ID, character_id: MAX_ID, content: "### SOUVENIR MAX J-1.01 — Tu caches le thermos à Emma.", similarity: 0.91 },
+      { id: "emma-private", source_table: "characters", source_id: emmaId, character_id: emmaId, content: "### SOUVENIR EMMA J-2.01 — Max t'avoue le thermos qu'il t'avait caché.", similarity: 0.99 },
+    ];
+    vi.mocked(authenticatedFunctionFetch).mockResolvedValue(new Response(JSON.stringify({
+      matches: privateMemories,
+      retrieval_matches: [...privateMemories].reverse(),
+    }), { status: 200 }));
+
+    const forMax = await queryRAGDetailed("Le thermos", undefined, 5, 0.3, { characterId: MAX_ID });
+    expect(forMax.matches.map((item) => item.content).join("\n")).toContain("Tu caches le thermos");
+    expect(forMax.matches.map((item) => item.content).join("\n")).not.toContain("EMMA");
+
+    vi.mocked(authenticatedFunctionFetch).mockResolvedValue(new Response(JSON.stringify({
+      matches: privateMemories,
+      retrieval_matches: [...privateMemories].reverse(),
+    }), { status: 200 }));
+    const forEmma = await queryRAGDetailed("Le thermos", undefined, 5, 0.3, { characterId: emmaId });
+    expect(forEmma.matches.map((item) => item.content).join("\n")).toContain("Max t'avoue le thermos");
+    expect(forEmma.matches.map((item) => item.content).join("\n")).not.toContain("MAX J-1.01");
+  });
+
   it("refuse une recherche sans identifiant de personnage", async () => {
     await expect(queryRAGDetailed("Question", undefined, 5, 0.3, {} as never)).rejects.toThrow(/characterId/i);
     expect(authenticatedFunctionFetch).not.toHaveBeenCalled();
@@ -127,7 +151,7 @@ describe("formatMaxRAGContext — contexte live compact", () => {
     expect(context).not.toContain("source_table");
     expect(context).not.toContain("score");
     expect(context).not.toContain("Quatrième");
-    expect(context.length).toBeLessThanOrEqual(2_100);
+    expect(context.length).toBeLessThanOrEqual(6_100);
   });
 
   it("écarte un chunk qui partage 120 caractères consécutifs", () => {
@@ -139,5 +163,44 @@ describe("formatMaxRAGContext — contexte live compact", () => {
     ]);
     expect(context.match(/Souvenir \d/g)).toHaveLength(2);
     expect(context).not.toContain("fin B");
+  });
+
+  it("conserve deux souvenirs distincts qui partagent Point de vue, Quand et Lieu", () => {
+    const header = [
+      "## Il y a quatre jours, jour 1 à la montagne",
+      "Point de vue : Max Lorenzo",
+      "Quand : il y a quatre jours — jour 1 à la montagne, dans la vieille voiture",
+      "Lieu : vieille voiture près du chalet, au bout du chemin forestier",
+    ].join("\n");
+    const context = formatMaxRAGContext([
+      match("1", `${header}\n### SOUVENIR MAX J-1.01 — Thermos\nTu trouves le thermos et tu te tais.`),
+      match("2", `${header}\n### SOUVENIR MAX J-1.02 — Silence\nTu avoues le thermos et Emma quitte l'annexe.`),
+    ]);
+    expect(context).toContain("tu te tais");
+    expect(context).toContain("quitte l'annexe");
+    expect(context.match(/Souvenir \d/g)).toHaveLength(2);
+  });
+
+  it("injecte entier un souvenir de 1 694 caractères et écarte le suivant s'il ne tient pas", () => {
+    const ending = "La dernière phrase du thermos reste entière.";
+    const whole = `${"a".repeat(1694 - ending.length)}${ending}`;
+    expect(whole).toHaveLength(1694);
+    const kept = formatMaxRAGContext([match("1", whole)]);
+    expect(kept).toContain(ending);
+    expect(kept).not.toContain("…");
+
+    const first = "Tu trouves le thermos et tu te tais jusqu'au bout.";
+    const secondEnding = "La phrase d'Emma ne doit pas être coupée.";
+    const second = `${"b".repeat(800)}${secondEnding}`;
+    const partialBudget = formatMaxRAGContext(
+      [match("1", first), match("2", second)],
+      { totalChars: first.length + 20 },
+    );
+    expect(partialBudget).toContain("jusqu'au bout");
+    expect(partialBudget).not.toContain(secondEnding);
+    expect(partialBudget).not.toContain("…");
+
+    const tooLong = `${"c".repeat(150)}Fin qui ne doit pas apparaître coupée.`;
+    expect(formatMaxRAGContext([match("1", tooLong)], { itemChars: 100 })).toBe("");
   });
 });
