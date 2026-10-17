@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Non publié] — 2026-10-17 — Chunks des souvenirs éditoriaux
+
+- Un titre `### SOUVENIR` est un chunk entier : période parente, identifiant,
+  titre, Point de vue, Quand, Lieu et récit. Deux souvenirs ne sont plus
+  fusionnés ni recouverts. Une page sans ce marqueur garde l'ancien découpage.
+- Injection : 3 souvenirs maximum, 2 000 caractères par souvenir, 6 100 au
+  total. Un souvenir qui ne tient pas entier n'est pas coupé.
+- Aucun souvenir actuel de Max (124, max 1 694) ni d'Emma (122, max 1 491)
+  ne dépasse 32 000 tokens. Le profil `voyage-4-realtime` reste inchangé.
+- [Plan](docs/plan_chunking_souvenirs_editoriaux.md).
+
 ## [Publié via Lovable] — 2026-10-14 — Tavus et transcription utilisateur
 
 - Transcript utilisateur en direct et après envoi, y compris en voix seule ;

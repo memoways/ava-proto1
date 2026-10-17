@@ -7,6 +7,9 @@ import type { CharacterExecutionContext } from "@/services/characterIdentityGuar
 import { getActiveEnvironment } from "@/services/environmentContext";
 
 import { getCachedSession } from "@/services/gameAuth";
+import { MAX_MAX_RAG_CONTEXT_CHARS, MAX_MAX_RAG_ITEM_CHARS, MAX_MAX_RAG_ITEMS } from "@/services/ragBudget";
+
+export { MAX_MAX_RAG_CONTEXT_CHARS, MAX_MAX_RAG_ITEM_CHARS, MAX_MAX_RAG_ITEMS };
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const RAG_SERVER_DEFAULT_RETRIEVE_K = 15;
@@ -320,9 +323,6 @@ export async function queryRAGDetailed(
 // au milieu de phrases (ex: "…habites à Lausanne" perdu).
 const MAX_RAG_CONTEXT_CHARS = 1200;
 const MAX_KNOWLEDGE_ITEM_CHARS = 900;
-export const MAX_MAX_RAG_ITEMS = 3;
-export const MAX_MAX_RAG_ITEM_CHARS = 700;
-export const MAX_MAX_RAG_CONTEXT_CHARS = 2_100;
 const RAG_OVERLAP_WINDOW_CHARS = 120;
 
 function compactText(text: string, maxChars: number): string {
@@ -331,25 +331,18 @@ function compactText(text: string, maxChars: number): string {
   return `${clean.slice(0, maxChars - 1).trim()}…`;
 }
 
-function compactAtSentenceBoundary(text: string, maxChars: number): string {
-  const clean = text.replace(/\s+/g, " ").trim();
-  if (maxChars <= 0) return "";
-  if (clean.length <= maxChars) return clean;
-  if (maxChars === 1) return "…";
-  const candidate = clean.slice(0, maxChars - 1).trimEnd();
-  const matches = [...candidate.matchAll(/[.!?…](?=\s|$)/g)];
-  const sentenceEnd = matches.at(-1)?.index;
-  if (sentenceEnd !== undefined && sentenceEnd + 1 >= Math.floor(maxChars * 0.45)) {
-    return candidate.slice(0, sentenceEnd + 1).trim();
-  }
-  const wordEnd = candidate.lastIndexOf(" ");
-  return `${candidate.slice(0, Math.max(0, wordEnd)).trim()}…`;
-}
-
 function cleanMaxMemoryContent(content: string): string {
   return content
     .replace(/\bPartie\s+\d+\s*\/\s*\d+\b\s*[:—-]?/gi, "")
     .replace(/^\s*\[[^\]]+\]\s*/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function narrativeForDedup(content: string): string {
+  return content
+    .replace(/\bPartie\s+\d+\s*\/\s*\d+\b\s*[:—-]?/gi, "")
+    .replace(/^(?:#{1,3}\s+.*|Point de vue\s*:.*|Quand\s*:.*|Lieu\s*:.*|Personnage\s*:.*)$/gim, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -382,35 +375,54 @@ export function formatRAGContext(matches: RAGMatch[]): string {
  * deduplicated narrative memories within the declared prompt budget.
  */
 export interface MaxRAGFormatOptions {
-  /** Caractères max par souvenir (compact_v1 : 700 · rich_v2 : 900). */
+  /** Caractères max par souvenir entier (2 000). */
   itemChars?: number;
-  /** Budget total du bloc RAG (compact_v1 : 2 100 · rich_v2 : 2 700). */
+  /** Budget total du bloc RAG (6 100, soit trois souvenirs au plafond). */
   totalChars?: number;
   maxItems?: number;
+}
+
+/**
+ * Keeps only leading "Souvenir N" blocks that fit entirely.
+ * A souvenir that would be cut is omitted instead.
+ */
+export function trimRagContextToWholeSouvenirs(context: string, maxChars: number): string {
+  const clean = context.trim();
+  if (!clean || maxChars <= 0) return "";
+  if (clean.length <= maxChars) return clean;
+  const parts = clean.split(/\n\n(?=Souvenir \d+\n)/);
+  let output = "";
+  for (const part of parts) {
+    const next = output ? `${output}\n\n${part}` : part;
+    if (next.length > maxChars) break;
+    output = next;
+  }
+  return output;
 }
 
 export function formatMaxRAGContext(matches: RAGMatch[], options: MaxRAGFormatOptions = {}): string {
   const itemChars = options.itemChars ?? MAX_MAX_RAG_ITEM_CHARS;
   const totalChars = options.totalChars ?? MAX_MAX_RAG_CONTEXT_CHARS;
   const maxItems = options.maxItems ?? MAX_MAX_RAG_ITEMS;
-  const selected: string[] = [];
+  const selected: Array<{ clean: string; narrative: string }> = [];
   for (const match of matches) {
-    const clean = cleanMaxMemoryContent(match.content);
-    if (!clean || selected.some((existing) => sharesConsecutiveWindow(existing, clean))) continue;
-    selected.push(compactAtSentenceBoundary(clean, itemChars));
     if (selected.length >= maxItems) break;
+    const clean = cleanMaxMemoryContent(match.content);
+    const narrative = narrativeForDedup(match.content);
+    if (!clean || clean.length > itemChars) continue;
+    if (selected.some((existing) => sharesConsecutiveWindow(existing.narrative, narrative))) continue;
+    const prefix = selected.length ? `\n\nSouvenir ${selected.length + 1}\n` : `Souvenir ${selected.length + 1}\n`;
+    const used = selected.reduce((sum, item, index) => {
+      const label = index === 0 ? `Souvenir 1\n` : `\n\nSouvenir ${index + 1}\n`;
+      return sum + label.length + item.clean.length;
+    }, 0);
+    if (used + prefix.length + clean.length > totalChars) continue;
+    selected.push({ clean, narrative });
   }
 
-  let output = "";
-  for (let index = 0; index < selected.length; index += 1) {
-    const prefix = output ? `\n\nSouvenir ${index + 1}\n` : `Souvenir ${index + 1}\n`;
-    const remaining = totalChars - output.length - prefix.length;
-    if (remaining <= 0) break;
-    const content = compactAtSentenceBoundary(selected[index], remaining);
-    if (!content) break;
-    output += `${prefix}${content}`;
-  }
-  return output;
+  return selected
+    .map((item, index) => `Souvenir ${index + 1}\n${item.clean}`)
+    .join("\n\n");
 }
 
 /** Convenience: query RAG and return formatted context string. */

@@ -21,6 +21,7 @@ export interface RagEmbeddingProfile {
   dimension: 1024 | 1536;
   dtype: "float";
   chunkingStrategy: "notion-structure-v1" | "notion-structure-v1-contextualized";
+  /** Size cap for pages without a `### SOUVENIR` heading. Editorial souvenirs stay whole. */
   chunkSizeChars: number;
   chunkOverlapChars: number;
   recommended: boolean;
@@ -97,6 +98,13 @@ export const RAG_EMBEDDING_PROFILES: Record<RagEmbeddingProfileId, RagEmbeddingP
     experimental: false,
   },
 };
+
+/**
+ * voyage-4-large and rerank-2.5-lite accept 32_000 tokens per text.
+ * https://docs.voyageai.com/docs/embeddings
+ * Editorial souvenirs are not split to `chunkSizeChars` to stay under this limit.
+ */
+export const VOYAGE_MAX_TEXT_TOKENS = 32_000;
 
 export const DEFAULT_RAG_EMBEDDING_PROFILE_ID: RagEmbeddingProfileId = "voyage-4-realtime";
 export const LEGACY_VOYAGE_PROFILE_ID: RagEmbeddingProfileId = "voyage-3-legacy";

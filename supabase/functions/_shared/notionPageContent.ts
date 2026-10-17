@@ -1,3 +1,5 @@
+import { VOYAGE_MAX_TEXT_TOKENS } from "./ragProfiles.ts";
+
 export interface NotionTextItem {
   plain_text?: string;
 }
@@ -80,7 +82,8 @@ export function extractNotionBlockText(block: NotionContentBlock): { text: strin
   if (!text && (block.type === "bookmark" || block.type === "link_preview" || block.type === "embed")) {
     text = data.url || "";
   }
-  if (block.type.startsWith("heading_") && text) text = `\n## ${text}`;
+  if (block.type === "heading_3" && /^SOUVENIR\b/i.test(text.trim())) text = `\n### ${text.trim()}`;
+  else if (block.type.startsWith("heading_") && text) text = `\n## ${text}`;
   else if ((block.type === "bulleted_list_item" || block.type === "numbered_list_item") && text) text = `- ${text}`;
   else if (block.type === "to_do" && text) text = `- [${data.checked ? "x" : " "}] ${text}`;
   else if (block.type === "quote" && text) text = `> ${text}`;
@@ -116,4 +119,129 @@ export async function collectNotionPageContent(
 
   await visit(rootId);
   return { content: blocks.join("\n\n"), unreadBlocks };
+}
+
+const SOUVENIR_HEADING = /^###[ \t]+SOUVENIR\b/i;
+const PERIOD_HEADING = /^##[ \t]+(?!#)/;
+
+export interface OversizedEditorialSouvenir {
+  title: string;
+  characters: number;
+  estimatedTokens: number;
+}
+
+export interface NotionChunkingResult {
+  chunks: string[];
+  oversizedSouvenirs: OversizedEditorialSouvenir[];
+}
+
+/** Upper bound for French text: one token per three characters. Warns before Voyage's real limit. */
+export function estimateEmbeddingTokens(text: string): number {
+  return Math.ceil(text.length / 3);
+}
+
+export function pageHasEditorialSouvenirs(text: string): boolean {
+  return text.split("\n").some((line) => SOUVENIR_HEADING.test(line.trim()));
+}
+
+function chunkTextLegacy(text: string, maxChunkSize = 1000, overlap = 150): string[] {
+  const sections = text.split(/\n## /);
+  const chunks: string[] = [];
+  let currentChunk = "";
+  for (const section of sections) {
+    const sectionText = chunks.length === 0 && !text.startsWith("\n## ") ? section : `## ${section}`;
+    if (sectionText.length > maxChunkSize) {
+      if (currentChunk.trim()) { chunks.push(currentChunk.trim()); currentChunk = ""; }
+      const paragraphs = sectionText.split(/\n\n|\n(?=-\s)/);
+      let subChunk = "";
+      for (const para of paragraphs) {
+        if (para.length > maxChunkSize) {
+          if (subChunk.trim()) { chunks.push(subChunk.trim()); subChunk = ""; }
+          const sentences = para.split(/(?<=[.!?])\s+/);
+          let sentenceChunk = "";
+          for (const sentence of sentences) {
+            if (sentenceChunk.length + sentence.length > maxChunkSize && sentenceChunk.length > 0) {
+              chunks.push(sentenceChunk.trim());
+              sentenceChunk = sentence;
+            } else {
+              sentenceChunk += (sentenceChunk ? " " : "") + sentence;
+            }
+          }
+          if (sentenceChunk.trim()) subChunk = sentenceChunk;
+        } else if (subChunk.length + para.length > maxChunkSize && subChunk.length > 0) {
+          chunks.push(subChunk.trim());
+          subChunk = para;
+        } else {
+          subChunk += (subChunk ? "\n" : "") + para;
+        }
+      }
+      if (subChunk.trim()) currentChunk = subChunk;
+    } else if (currentChunk.length + sectionText.length > maxChunkSize && currentChunk.length > 0) {
+      chunks.push(currentChunk.trim());
+      currentChunk = sectionText;
+    } else {
+      currentChunk += (currentChunk ? "\n" : "") + sectionText;
+    }
+  }
+  if (currentChunk.trim()) chunks.push(currentChunk.trim());
+  if (overlap > 0 && chunks.length > 1) {
+    const overlapped: string[] = [chunks[0]];
+    for (let i = 1; i < chunks.length; i++) {
+      const prevTail = chunks[i - 1].slice(-overlap);
+      overlapped.push(`…${prevTail}\n\n${chunks[i]}`);
+    }
+    return overlapped;
+  }
+  return chunks;
+}
+
+function chunkEditorialSouvenirs(text: string): NotionChunkingResult {
+  const chunks: string[] = [];
+  const oversizedSouvenirs: OversizedEditorialSouvenir[] = [];
+  let period = "";
+  let current: string[] | null = null;
+
+  const flush = () => {
+    if (!current) return;
+    const body = current.join("\n").trim();
+    current = null;
+    if (!body) return;
+    const chunk = (period ? `${period}\n\n${body}` : body).trim();
+    chunks.push(chunk);
+    const estimatedTokens = estimateEmbeddingTokens(chunk);
+    if (estimatedTokens > VOYAGE_MAX_TEXT_TOKENS) {
+      const title = chunk.split("\n").find((line) => SOUVENIR_HEADING.test(line.trim()))?.trim()
+        ?? "souvenir sans titre";
+      oversizedSouvenirs.push({ title, characters: chunk.length, estimatedTokens });
+    }
+  };
+
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (SOUVENIR_HEADING.test(trimmed)) {
+      flush();
+      current = [trimmed];
+      continue;
+    }
+    if (PERIOD_HEADING.test(trimmed)) {
+      flush();
+      period = trimmed;
+      continue;
+    }
+    if (current) current.push(line);
+  }
+  flush();
+  return { chunks, oversizedSouvenirs };
+}
+
+/**
+ * Pages with `### SOUVENIR` become one chunk per souvenir, including the parent
+ * period, with no size merge and no overlap. Other pages keep the historical
+ * heading / size / overlap split.
+ */
+export function chunkNotionPage(text: string, maxChunkSize = 1000, overlap = 150): NotionChunkingResult {
+  if (!pageHasEditorialSouvenirs(text)) {
+    return { chunks: chunkTextLegacy(text, maxChunkSize, overlap), oversizedSouvenirs: [] };
+  }
+  return chunkEditorialSouvenirs(text);
 }

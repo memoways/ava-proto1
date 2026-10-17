@@ -1,4 +1,5 @@
 import type { CharacterPrompt } from "@/services/characterPromptService";
+import { MAX_MAX_RAG_CONTEXT_CHARS, MAX_MAX_RAG_ITEM_CHARS, MAX_MAX_RAG_ITEMS } from "@/services/ragBudget";
 
 /**
  * rich_v2 — compilation déterministe de la fiche Notion du personnage actif.
@@ -32,15 +33,15 @@ export const RICH_V2_DYNAMIC_SECTION_CHARS = {
   session_summary: 1_200,
   gm_guidance: 350,
   turn_guards: 500,
-  rag_context: 2_700,
+  rag_context: MAX_MAX_RAG_CONTEXT_CHARS,
   post_video: 500,
 } as const;
 
-/** RAG propre à rich_v2 : 3 souvenirs de 900 caractères maximum. */
+/** RAG : 3 souvenirs entiers, plafond partagé avec les autres variantes. */
 export const RICH_V2_RAG = {
-  maxItems: 3,
-  maxItemChars: 900,
-  maxTotalChars: 2_700,
+  maxItems: MAX_MAX_RAG_ITEMS,
+  maxItemChars: MAX_MAX_RAG_ITEM_CHARS,
+  maxTotalChars: MAX_MAX_RAG_CONTEXT_CHARS,
 } as const;
 
 /** En-tête exact du noyau statique — compté dans le budget. */

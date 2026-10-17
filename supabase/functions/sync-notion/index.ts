@@ -11,6 +11,7 @@ import {
 } from "../_shared/ragProfiles.ts";
 import {
   collectNotionPageContent,
+  chunkNotionPage,
   loadPaginatedNotionChildren,
   type NotionContentBlock,
 } from "../_shared/notionPageContent.ts";
@@ -66,6 +67,7 @@ interface CharacterSyncResult {
   prompt_fields_filled: number;
   mapping_warnings: MappingWarning[];
   content_warnings: Array<{ id: string; type: string }>;
+  editorial_oversized?: Array<{ title: string; characters: number; estimatedTokens: number }>;
 }
 
 interface SyncRequest {
@@ -486,57 +488,6 @@ serve(async (req) => {
       return base;
     }
 
-    function chunkText(text: string, maxChunkSize = 1000, overlap = 150): string[] {
-      const sections = text.split(/\n## /);
-      const chunks: string[] = [];
-      let currentChunk = '';
-      for (const section of sections) {
-        const sectionText = chunks.length === 0 && !text.startsWith('\n## ') ? section : `## ${section}`;
-        if (sectionText.length > maxChunkSize) {
-          if (currentChunk.trim()) { chunks.push(currentChunk.trim()); currentChunk = ''; }
-          const paragraphs = sectionText.split(/\n\n|\n(?=-\s)/);
-          let subChunk = '';
-          for (const para of paragraphs) {
-            if (para.length > maxChunkSize) {
-              if (subChunk.trim()) { chunks.push(subChunk.trim()); subChunk = ''; }
-              const sentences = para.split(/(?<=[.!?])\s+/);
-              let sentenceChunk = '';
-              for (const sentence of sentences) {
-                if (sentenceChunk.length + sentence.length > maxChunkSize && sentenceChunk.length > 0) {
-                  chunks.push(sentenceChunk.trim());
-                  sentenceChunk = sentence;
-                } else {
-                  sentenceChunk += (sentenceChunk ? ' ' : '') + sentence;
-                }
-              }
-              if (sentenceChunk.trim()) subChunk = sentenceChunk;
-            } else if (subChunk.length + para.length > maxChunkSize && subChunk.length > 0) {
-              chunks.push(subChunk.trim());
-              subChunk = para;
-            } else {
-              subChunk += (subChunk ? '\n' : '') + para;
-            }
-          }
-          if (subChunk.trim()) currentChunk = subChunk;
-        } else if (currentChunk.length + sectionText.length > maxChunkSize && currentChunk.length > 0) {
-          chunks.push(currentChunk.trim());
-          currentChunk = sectionText;
-        } else {
-          currentChunk += (currentChunk ? '\n' : '') + sectionText;
-        }
-      }
-      if (currentChunk.trim()) chunks.push(currentChunk.trim());
-      if (overlap > 0 && chunks.length > 1) {
-        const overlapped: string[] = [chunks[0]];
-        for (let i = 1; i < chunks.length; i++) {
-          const prevTail = chunks[i - 1].slice(-overlap);
-          overlapped.push(`…${prevTail}\n\n${chunks[i]}`);
-        }
-        return overlapped;
-      }
-      return chunks;
-    }
-
     async function generateSituationSummary(
       name: string,
       pageContent: string,
@@ -693,13 +644,21 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
 
 
       let chunksCreated = 0;
+      let editorialOversized: Array<{ title: string; characters: number; estimatedTokens: number }> = [];
       if (doRag) {
         if (pageContent.trim().length < 10) {
           throw new Error(`Notion page body is empty for ${name}; previous RAG corpus was preserved`);
         }
         {
           const headerPrefix = `Personnage: ${name}${archetype ? ` | Archétype: ${archetype}` : ''}`;
-          const chunks = chunkText(pageContent, targetProfile.chunkSizeChars, targetProfile.chunkOverlapChars);
+          const chunked = chunkNotionPage(pageContent, targetProfile.chunkSizeChars, targetProfile.chunkOverlapChars);
+          editorialOversized = chunked.oversizedSouvenirs;
+          if (editorialOversized.length) {
+            console.warn(
+              `[sync-notion] "${name}": souvenirs au-dessus de 32000 tokens estimés, laissés entiers. Couper chacun une seule fois sur une articulation narrative réelle : ${editorialOversized.map((item) => item.title).join(" | ")}`,
+            );
+          }
+          const chunks = chunked.chunks;
           const chunkContents = chunks.map((chunk, index) =>
             `${headerPrefix} | Partie ${index + 1}/${chunks.length}\n${chunk}`
           );
@@ -735,6 +694,7 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
         prompt_fields_filled: filledCount,
         mapping_warnings: fieldWarnings,
         content_warnings: pageResult.unreadBlocks,
+        ...(editorialOversized.length ? { editorial_oversized: editorialOversized } : {}),
       });
       }
 

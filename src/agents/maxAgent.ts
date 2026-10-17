@@ -1,3 +1,4 @@
+import { trimRagContextToWholeSouvenirs } from "@/services/ragService";
 import { buildResponseStreamContract } from "@/services/responseIntentStream";
 import { formatPrivateDeliveryContext } from "@/services/responseDelivery";
 import { callLLM, callLLMWithUsage, LLMProxyRequestError, streamLLM, type LLMUsage } from "@/services/openRouterLLM";
@@ -35,6 +36,11 @@ import {
   buildOptimizedPromptAssembly,
   type OptimizedRagCandidate,
 } from "@/agents/maxOptimizedPromptCompiler";
+
+function fitPromptSection(key: string, value: string, maxChars: number): string {
+  if (key === "rag_context") return trimRagContextToWholeSouvenirs(value, maxChars);
+  return truncateAtSentenceBoundary(value, maxChars);
+}
 
 // Gameplay rules — always appended regardless of character.
 // IMPORTANT: ces règles sont des INVARIANTS TECHNIQUES uniquement.
@@ -704,10 +710,10 @@ export async function buildMaxSystemPrompt(
       return;
     }
     const sectionCap = MAX_DYNAMIC_SECTION_CHARS[key];
-    const sectionContent = truncateAtSentenceBoundary(original, sectionCap);
+    const sectionContent = fitPromptSection(key, original, sectionCap);
     const prefix = `\n\n## ${title}\n`;
     const remaining = MAX_SYSTEM_PROMPT_CHARS - prompt.length - prefix.length;
-    const content = truncateAtSentenceBoundary(sectionContent, Math.max(0, remaining));
+    const content = fitPromptSection(key, sectionContent, Math.max(0, remaining));
     if (!content) {
       budgetSections.push({ key, title, chars: 0, originalChars: original.length, included: false, truncated: false, omissionReason: "budget_systeme_epuise" });
       return;
@@ -872,10 +878,10 @@ async function buildRichMaxSystemPrompt(
       budgetSections.push({ key, title, chars: 0, originalChars: 0, included: false, truncated: false, omissionReason: "section_vide" });
       return;
     }
-    const capped = truncateAtSentenceBoundary(original, RICH_V2_DYNAMIC_SECTION_CHARS[key]);
+    const capped = fitPromptSection(key, original, RICH_V2_DYNAMIC_SECTION_CHARS[key]);
     const prefix = `\n\n## ${title}\n`;
     const remaining = RICH_V2_LIMITS.systemHardCapChars - prompt.length - prefix.length;
-    const content = truncateAtSentenceBoundary(capped, Math.max(0, remaining));
+    const content = fitPromptSection(key, capped, Math.max(0, remaining));
     if (!content) {
       budgetSections.push({ key, title, chars: 0, originalChars: original.length, included: false, truncated: false, omissionReason: "budget_systeme_epuise" });
       return;

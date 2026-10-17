@@ -165,7 +165,7 @@ describe("rich_v2 — politique RAG", () => {
     similarity: 0.9 - index / 100,
   })) as RAGMatch[];
 
-  it("n'applique les souvenirs de 900 caractères qu'à rich_v2", () => {
+  it("applique le plafond partagé des souvenirs entiers à rich_v2", () => {
     expect(maxRagFormatOptionsForVariant("rich_v2")).toEqual({
       maxItems: RICH_V2_RAG.maxItems,
       itemChars: RICH_V2_RAG.maxItemChars,
