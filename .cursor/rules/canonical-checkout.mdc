@@ -1,0 +1,19 @@
+---
+description: Ava has one visible checkout. Never create a sibling folder or worktree.
+alwaysApply: true
+---
+
+# Un seul dossier Ava
+
+Le checkout canonique est `/Users/ulrich/CodeProjects/memoways/ava-proto1`.
+Le remote est `https://github.com/memoways/ava-proto1`.
+
+- Ne jamais créer de clone, de copie ou de `git worktree` sous `~/CodeProjects`
+  à côté de ce dossier. `ava-proto1-quelque-chose` et `ava-proto1-worktrees`
+  sont interdits.
+- Travailler dans le checkout déjà ouvert. S’il s’agit du dossier canonique,
+  y rester.
+- Un second checkout n’est acceptable que s’il existe déjà dans
+  `~/.cursor/worktrees/` ou `~/.codex/worktrees/`. Ne pas en créer ailleurs.
+- Livrer sur GitHub depuis ce dépôt. Ne pas laisser un dossier de travail
+  visible après le lot.
