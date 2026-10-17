@@ -73,6 +73,12 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-10-17 — Retrait de Politique relationnelle
+
+Le champ était vide et la synchro le signalait. Il est retiré de Notion, de
+l'éditeur et de `character_prompts`. La relation d'un appel se construit
+depuis Dynamique de la conversation et Sujets sensibles.
+
 ### 2026-10-17 — Souvenirs éditoriaux en chunks entiers
 
 Max a 124 souvenirs et Emma 122. Chacun devient un chunk, avec sa période,

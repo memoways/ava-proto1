@@ -18,14 +18,13 @@ function makePrompt(overrides: Partial<CharacterPrompt> = {}): CharacterPrompt {
     ce_que_tu_sais_utilisateur: "Un inconnu appelle.",
     dynamique_conversation: "Répondre directement.",
     sujets_sensibles: "Emma et Mona.",
-    politique_relationnelle: "Moteur\nComprendre l'appel.\n\nRésistance\nRépondre partiellement.",
     references_intellectuelles: "Journalisme scientifique.",
     ...overrides,
   };
 }
 
 describe("maxPromptCompiler", () => {
-  it("conserve l'ordre déterministe des neuf champs et omet les champs vides", () => {
+  it("conserve l'ordre déterministe des champs et omet les champs vides", () => {
     const sections = compileCharacterSections(makePrompt({ sujets_sensibles: "" }));
     expect(sections.map((section) => section.key)).toEqual([
       "situation_summary",
@@ -35,7 +34,6 @@ describe("maxPromptCompiler", () => {
       "ce_que_tu_ne_fais_jamais",
       "ce_que_tu_sais_utilisateur",
       "dynamique_conversation",
-      "politique_relationnelle",
       "references_intellectuelles",
     ]);
   });

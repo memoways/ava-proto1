@@ -45,7 +45,6 @@ const CHARACTER_FIELD_SPECS: Array<{
     | "ce_que_tu_sais_utilisateur"
     | "dynamique_conversation"
     | "sujets_sensibles"
-    | "politique_relationnelle"
     | "references_intellectuelles"
   >;
   title: string;
@@ -61,7 +60,6 @@ const CHARACTER_FIELD_SPECS: Array<{
   { key: "ce_que_tu_sais_utilisateur", title: "RELATION À L'INTERLOCUTEUR", maxChars: 450 },
   { key: "dynamique_conversation", title: "MOTEUR DE CONVERSATION", maxChars: 650 },
   { key: "sujets_sensibles", title: "SUJETS SENSIBLES", maxChars: 450 },
-  { key: "politique_relationnelle", title: "POLITIQUE RELATIONNELLE", maxChars: 900 },
   { key: "references_intellectuelles", title: "RÉFÉRENCES INTELLECTUELLES", maxChars: 500 },
 ];
 

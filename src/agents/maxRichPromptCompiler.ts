@@ -651,7 +651,6 @@ const RICH_FIELD_SPECS: RichFieldSpec[] = [
   { key: "dynamique_conversation", title: "DYNAMIQUE", order: 6, maxChars: 1_400, reservedChars: 500, boost: ["concret", "urgence", "positionner"] },
   { key: "sujets_sensibles", title: "SUJETS SENSIBLES", order: 7, maxChars: 1_200, reservedChars: 450, boost: ["emma", "ava", "léo", "mona", "fusil"] },
   { key: "timeline", title: "CHRONOLOGIE", order: 8, maxChars: 1_800, reservedChars: 800 },
-  { key: "politique_relationnelle", title: "POLITIQUE RELATIONNELLE", order: 10, maxChars: 1_400, reservedChars: 450 },
   { key: "references_intellectuelles", title: "RÉFÉRENCES INTELLECTUELLES", order: 11, maxChars: 900, reservedChars: 250 },
 ];
 
