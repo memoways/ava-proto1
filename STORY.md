@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-14 (lot 4/P3 fusionné et publié via Lovable Cloud ; recette humaine Brave préparée, canary sandbox-ulrich et production batch conservées)
+> **Last Updated**: 2026-10-19 (diagnostic du switching et prompt du premier lot préparés ; implémentation à démarrer)
 
 ---
 
@@ -72,6 +72,19 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-10-19 — Démarrer le switching dans des chats séparés
+
+L’appel avec Emma montre que le GM accepte le passage vers Max mais que les
+filtres locaux rejettent ses formulations naturelles. Le diagnostic et la
+maquette ont été fusionnés par la PR #49. Ulrich demande une réalisation par
+petits lots, avec une reprise autonome à chaque fois. Le premier lot prépare
+le contrat de consentement et ses tests sans brancher la nouvelle logique dans
+l’appel réel. Chaque clôture actualise CHANGELOG, STORY et le plan, vérifie la
+livraison et fournit le prompt du prochain chat. L’implémentation n’a pas
+commencé ; aucune nouvelle publication produit.
+[Plan](docs/plan_changement_interlocuteur_manuel.md) ·
+[Prompt du premier lot](docs/prompt_reprise_switch_personnages_lot_1.md).
 
 ### 2026-10-17 — Retrait de Politique relationnelle
 
