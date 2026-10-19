@@ -57,3 +57,43 @@ et CI en cours à la création de la PR. Aucun gain de latence revendiqué.
 Lovable Cloud de `posthog-latency-stats` et `mcp`, compilation/preview, puis un tour
 vidéo réel et les mesures visibles dans Qualité. La publication et les mesures
 réelles restent distinctes des tests locaux ; pas de mesures rétroactives.
+
+## Publication autorisée et vérifiée — 19 octobre 2026
+
+- Accord explicite d'Ulrich : « Oui, publier et déployer ». Le refus initial de
+  publication sans cet accord a été respecté.
+- PR [#47](https://github.com/memoways/ava-proto1/pull/47) fusionnée :
+  `813cef8b837d5b8b143630523fbc23143905d3ca`. CI de la PR et CI post-fusion
+  réussies ; 631 tests unitaires, 34 d'intégration et 45 navigateur réussis.
+- `posthog-latency-stats` déployée par Lovable Cloud, démarrage attesté dans les
+  journaux le 19 octobre à 11:05:36–37 UTC. Appel anonyme refusé 401.
+- Lovable a ajouté les types `SupabaseClient` et des gardes `!body` redondantes
+  pour corriger ses erreurs Deno préexistantes dans `manage-test-invitations`,
+  `redeem-test-invitation` et `rag-question-corpus`. Ces fonctions n'ont pas été
+  redéployées pendant cette intervention. Les différences ont été relues : pas
+  de nouveau parcours métier, modification de droits ni dépendance runtime.
+  Deno check réussit dans Lovable sur les trois fonctions ; 8 tests associés
+  réussissent, puis 18 tests ciblés sont rejoués localement avec succès.
+- Révision Lovable publiée : `cd9286bdb490ee526df38e6c2d3bc65987f2a33c`.
+  Compilation Lovable « build OK » à 11:07:07 UTC. Manifeste MCP régénéré pour
+  `video` et `durations.video_wait_ms`. Checkout canonique synchronisé et propre.
+- Publication native demandée : `ac0566f0-7178-4fc1-88bb-adcba93e0fb9`.
+  Le statut terminal détaillé de ce job n'est pas exposé par le connecteur ;
+  le résultat est vérifié sur le site effectivement servi : HTTP 200, module
+  `assets/index-Bcr-tbnY.js` contenant le nouveau libellé vidéo, et vérification
+  visuelle authentifiée des deux panneaux en production.
+- [Latence & blocage publiée](https://proto1.parle-a-ava.com/admin/qualite/latence-et-blocages) :
+  étape vidéo et évolution visibles ; historique sans vidéo non mesuré.
+- [Latences PostHog publiées](https://proto1.parle-a-ava.com/admin/qualite/latences-posthog) :
+  filtre Service vidéo, décomposition vidéo et réponse authentifiée PostHog
+  avec fraîcheur affichée au 19 octobre à 13:10:16 Europe/Zurich.
+- MCP opérationnel après publication : appel natif `get_voice_latencies`
+  réussi, 0 ligne V2 invalide ; journaux `oauth.verify.ok` et `outcome: ok`
+  à 11:10:01–02 UTC. Lovable livre MCP par la publication du site ; aucune
+  empreinte/version du bundle effectivement déployé n'est disponible pour
+  attester séparément son schéma. Ne pas confondre disponibilité et preuve de
+  version exacte.
+
+Reste fonctionnel : observer le premier nouveau tour vidéo réel pour confirmer
+la mesure du fournisseur effectif et son passage dans les données V1/V2. Aucun
+tour payant ni donnée synthétique n'a été ajouté pour simuler cette preuve.
