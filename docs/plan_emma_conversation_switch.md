@@ -1,5 +1,7 @@
 # Plan — Emma au départ et passage Max ↔ Emma
 
+> Pour le diagnostic du 19 octobre 2026, la pastille d’appel et le plan actuel, voir [Passage Emma ↔ Max](plan_changement_interlocuteur_manuel.md). Ce document conserve la conception initiale d’août.
+
 > Enregistré depuis le plan d’implémentation approuvé le 2026-08-25.
 > Publication exclusive : Lovable / Lovable Cloud.
 
