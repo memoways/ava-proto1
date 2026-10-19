@@ -5,7 +5,7 @@ import { latencyStats, tally } from "./stats";
 const label = z.string().max(160).nullable();
 const duration = z.number().finite().nonnegative().nullable();
 const serviceSchema = z.object({
-  service: z.enum(["stt", "llm", "tts", "rag", "gm"]),
+  service: z.enum(["stt", "llm", "tts", "video", "rag", "gm"]),
   requested_provider: label, requested_model: label,
   resolved_provider: label, resolved_model: label,
   effective_provider: label, effective_model: label, transport: label,
@@ -25,7 +25,7 @@ export const voiceTurnProjectionSchema = z.object({
   status: z.enum(["started", "completed", "interrupted", "cancelled", "timeout", "failed", "no_audio"]), clock: z.literal("client_monotonic"),
   milestones: z.object(Object.fromEntries(VOICE_MILESTONES.map((name) => [name, z.number().finite().nullable().default(null)]))),
   services: z.array(serviceSchema).max(16), server: z.array(spanSchema).max(8),
-  durations: z.object({ origin_to_response_ms: duration, origin_to_output_estimated_ms: duration, t_turn_voice_ready_ms: duration, generation_total_ms: duration, playback_ms: duration }),
+  durations: z.object({ origin_to_response_ms: duration, origin_to_output_estimated_ms: duration, t_turn_voice_ready_ms: duration, generation_total_ms: duration, playback_ms: duration, video_wait_ms: duration.optional() }),
   coverage: z.object({ state: z.enum(["complete", "partial"]), observed: z.number().int().nonnegative(), expected: z.number().int().nonnegative(), missing: z.array(z.enum(VOICE_MILESTONES)).max(VOICE_MILESTONES.length) }),
   output_precision: z.enum(["software_estimate", "unavailable"]), critical_wait: z.literal("coverage_incomplete"), budget_exceeded: z.array(z.string().max(80)).max(16),
   interruptions: z.array(z.object({ interruption_id: z.string().max(80),

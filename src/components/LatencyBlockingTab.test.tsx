@@ -97,6 +97,20 @@ describe("LatencyBlockingTab session scope", () => {
     expect(mocks.lines.mock.calls.every(([props]) => props.type === "linear" && props.connectNulls === false)).toBe(true);
   });
 
+  it("shows the measured video provider and avatar in comparisons and evolution", async () => {
+    const row = session("Video session", "sandbox", "2026-10-18T12:00:00Z");
+    Object.assign(row.conversation_log[1].pipeline, { video_ms: 1250, video_status: "started", max_ms: 300,
+      total_ms: 1600, latency_origin: "text_submitted", first_sound_status: "measured",
+      segmentServices: { video_ms: { serviceProvider: "future-video", model: "actual-avatar", mode: "webrtc" } } });
+    mocks.rows = [row];
+    openTab();
+    await screen.findByRole("button", { name: /Video session/ });
+    expect(screen.getAllByText(/future-video/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/actual-avatar/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1.25 s").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Évolution temporelle par service/)).toBeInTheDocument();
+  });
+
   it("allows explicit sandbox exclusion and automatically selects the remaining history", async () => {
     openTab();
     await screen.findByRole("button", { name: /Recent October session/ });

@@ -51,3 +51,16 @@ describe("latency view aggregates", () => {
     ]);
   });
 });
+
+describe("video aggregates", () => {
+  it("aggregates video and TTS fallback separately and preserves measured wait", () => {
+    const row = session();
+    row.conversation_log![1].pipeline = { video_ms: 1600, video_status: "failed", tts_first_playback_ms: 400,
+      max_ms: 300, total_ms: 2400, latency_origin: "text_submitted", first_sound_status: "measured" };
+    const aggregate = aggregateLatencySession(row, "max");
+    expect(aggregate.avg.video_ms).toBe(1600);
+    expect(aggregate.avg.tts_first_playback_ms).toBe(400);
+    expect(aggregate.topBlocker).toBe("video_ms");
+    expect(getPlayerWaitLatencyTotal(aggregate.avg)).toBe(2400);
+  });
+});

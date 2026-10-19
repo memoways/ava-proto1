@@ -28,6 +28,9 @@ export interface PosthogSlowTurn {
   model: string | null;
   stt: string | null;
   tts: string | null;
+  video?: string | null;
+  videoModel?: string | null;
+  videoStatus?: string | null;
   browser: string | null;
   responseReadyMs: number | null;
   firstSoundMs: number | null;
@@ -36,6 +39,7 @@ export interface PosthogSlowTurn {
   ragMs: number | null;
   maxMs: number | null;
   ttsMs: number | null;
+  videoMs?: number | null;
   blocker: string | null;
   severity: string | null;
   fallback: boolean;
@@ -55,9 +59,10 @@ export interface PosthogLatencyStats {
     fallbacks: number;
     fallbackRate: number | null;
   };
-  latency: Record<"responseReady" | "firstSound" | "endToEnd" | "stt" | "rag" | "max" | "tts" | "gmPost", PercentileMetric>;
+  /** Video fields are optional during a rolling Lovable Cloud update. */
+  latency: Record<"responseReady" | "firstSound" | "endToEnd" | "stt" | "rag" | "max" | "tts" | "gmPost", PercentileMetric> & { video?: PercentileMetric };
   blockers: Array<{ key: string; count: number }>;
-  providers: Record<"models" | "stt" | "tts" | "browsers" | "characters", Array<{ key: string; count: number }>>;
+  providers: Record<"models" | "stt" | "tts" | "browsers" | "characters", Array<{ key: string; count: number }>> & { video?: Array<{ key: string; count: number }> };
   actions: {
     cinematics: { recommended: number; played: number; skipped: number };
     handoffs: { proposed: number; accepted: number; refused: number; executed: number; blocked: number };
@@ -104,6 +109,7 @@ export interface VoiceEventRow {
     max_model?: string;
     stt_provider?: string;
     tts_provider?: string;
+    video_provider?: string;
     browser_family?: string;
     first_sound_status?: "measured" | "failed" | "not_measured";
     had_error?: boolean;
@@ -182,6 +188,7 @@ export async function loadInternalLatencyComparison(
     models: countDimension(voiceInEnvironment.map((row) => row.metadata_json?.max_model)),
     stt: countDimension(voiceInEnvironment.map((row) => row.metadata_json?.stt_provider)),
     tts: countDimension(voiceInEnvironment.map((row) => row.metadata_json?.tts_provider)),
+    video: countDimension(voiceInEnvironment.map((row) => row.metadata_json?.video_provider)),
     browsers: countDimension(voiceInEnvironment.map((row) => row.metadata_json?.browser_family)),
   };
   const voice = voiceInEnvironment.filter((row) => {
@@ -191,6 +198,7 @@ export async function loadInternalLatencyComparison(
       model: metadata.max_model,
       stt: metadata.stt_provider,
       tts: metadata.tts_provider,
+      video: metadata.video_provider,
       browser: metadata.browser_family,
     };
     return Object.entries(options.filters ?? {}).every(([key, expected]) => !expected || dimensions[key] === expected);

@@ -61,3 +61,15 @@ describe("MCP technical projection", () => {
     expect(voiceTurnPageSchema.safeParse({ summary: { attempts: 1 } }).success).toBe(false);
   });
 });
+
+it("keeps video services and their wait visible without invalidating V2 turns", () => {
+  const rows = voiceFixture();
+  const value = rows[1].metadata_json;
+  value.services.push({ service: "video", requested_provider: "future-video", requested_model: "avatar-a",
+    resolved_provider: "future-video", resolved_model: "avatar-a", effective_provider: "future-video", effective_model: "avatar-a", transport: "webrtc" });
+  value.durations.video_wait_ms = 1200;
+  const result = projectVoiceEvents(rows);
+  expect(result.invalidRows).toBe(0);
+  expect(result.events[1].turn.durations.video_wait_ms).toBe(1200);
+  expect(result.events[1].turn.services[0].service).toBe("video");
+});

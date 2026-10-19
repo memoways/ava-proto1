@@ -38,6 +38,7 @@ interface PendingSpeech {
 export class TavusStreamingAvatarOutput implements ResponseOutput {
   readonly mode = "streaming_avatar" as const;
   readonly provider = "tavus";
+  get model() { return this.settings.replicaId; }
   private readonly settings: TavusAvatarSettings;
   private readonly callbacks: ResponseOutputCallbacks;
   private readonly connectionTimeoutMs: number;

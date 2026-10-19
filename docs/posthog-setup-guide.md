@@ -48,7 +48,7 @@ Cela signifie : tout ce qui apparaît dans l'onglet admin **Latences** et **Cons
 | `turn_latency` | `latencyTelemetry.ts` → `createTurnTimer().emit()` | `session_id`, `turn_index`, `character`, `voice_modality`, `user_message_len`, `max_response_len`, `t_rag_rewrite_ms`, `t_rag_query_ms`, `t_rag_total_ms`, `t_knowledge_build_ms`, `t_gm_pre_ms`, `t_max_llm_ms`, `t_max_first_token_ms`, `t_validator_ms`, `t_gm_post_ms`, `t_turn_total_ms`, `rag_matches_count`, `rag_top_similarity`, `max_model`, `gm_model`, `validator_model`, `usage_total_tokens`, `had_fallback` |
 | `turn_latency_post` | `conversationOrchestrator.ts` | `session_id`, `t_gm_post_ms` (mesure asynchrone post-réponse) |
 | `audio_latency` | `recordAudioLatency()` | `direction` (`in`=STT / `out`=TTS), `t_stt_ms`, `t_tts_first_byte_ms`, `t_tts_total_ms`, `stt_text_len`, `tts_text_len`, `metadata.provider` (`elevenlabs`/`hume`/`inworld`), `metadata.model`, `metadata.status_code`, `metadata.error_type` (`ok`/`quota`/`auth`/`network`/`server`/`client`/`unknown`), `metadata.stitched_previous`, `metadata.stitched_next` |
-| `voice_turn_completed` | `voiceTelemetry.ts` | Événement agrégé fin de tour : `turn_id`, `session_id`, `turn_index`, `t_turn_response_ready_ms`, `t_turn_voice_ready_ms`, `t_turn_end_to_end_ms`, `blocker_step`, `blocker_reason`, `severity`, `browser_family`, `voice_modality`, `max_model`, `tts_provider`, segments TTS |
+| `voice_turn_completed` | `voiceTelemetry.ts` | Événement agrégé fin de tour : `turn_id`, `session_id`, `turn_index`, `t_turn_response_ready_ms`, `t_turn_voice_ready_ms`, `t_turn_end_to_end_ms`, `blocker_step`, `blocker_reason`, `severity`, `browser_family`, `voice_modality`, `max_model`, `tts_provider`, segments TTS ; vidéo : `t_video_wait_ms`, `video_provider`, `video_model`, `video_status`, `video.precision`, `had_fallback` |
 | `voice_error` | `voiceTelemetry.ts` | Erreur unifiée : `component`, `provider`, `error_type`, `error_message`, `recoverable`, `fallback_used`, `browser_family`, `turn_id` |
 
 Les événements `voice_turn_completed` et `voice_error` sont aussi persistés en Supabase dans `voice_turn_events` et `voice_error_events`, afin que l'admin interne et PostHog s'appuient sur le même schéma.
@@ -219,3 +219,33 @@ Si une propriété affiche "—" dans les graphes : revenir à §3.3 et forcer l
 - **Ajout d'un nouvel événement** : ajouter `trackEvent("nom", { … })` côté app + documenter ici + créer l'insight dans PostHog.
 - **Ajout d'une nouvelle propriété latence** : étendre `TurnLatencyRecord` ou `AudioLatencyRecord` dans `src/services/latencyTelemetry.ts`. Elle remonte automatiquement.
 - **Désactivation d'urgence de la télémétrie** : `disableTelemetry()` exporté depuis `latencyTelemetry.ts` (toggle runtime, sans rebuild).
+
+### Latence vidéo dans Qualité (19 octobre 2026)
+
+`video_ms` / `t_video_wait_ms` mesure l'appel de rendu jusqu'au premier callback
+existant de parole du fournisseur. La voix intégrée est incluse : aucune latence
+TTS locale supplémentaire n'est attribuée à un succès vidéo. En cas d'échec avant
+parole, l'attente vidéo est conservée et le TTS de secours est mesuré après cette
+attente. Le total observé reste inchangé. `video_status` distingue `started`,
+`failed`, `cancelled` et `not_measured` ; la durée d'échec n'est pas présentée comme
+un démarrage réussi. Les percentiles vidéo portent sur les attentes observées,
+y compris les tentatives échouées/annulées, et non uniquement les succès.
+
+Fournisseur et identifiant d'avatar/modèle viennent de l'instance exécutée, jamais
+des réglages actuels ni d'une valeur fixe du dashboard. La précision reste
+`provider_speech_event` : estimation logicielle, pas premier pixel/son physique.
+La préparation initiale de session vidéo n'est pas additionnée à chaque tour.
+Les anciennes sessions n'ont pas de mesure vidéo rétroactive.
+
+Les événements existants `voice_turn_completed`, `ava_turn_latency_summary` et
+`ava_latency_segment` portent ces valeurs (`segment_key=video_ms` pour le segment).
+V2 conserve le service `video` et `durations.video_wait_ms`. Pas de table ni de
+requête réseau supplémentaire pour collecter ces valeurs ; les envois existants
+restent fire-and-forget. Pour le budget diagnostique vidéo : 800 ms, sans promesse
+de gain ni changement des délais d'exécution.
+
+La fonction Lovable Cloud `posthog-latency-stats` fournit `latency.video`,
+`providers.video`, le filtre `video` et les champs vidéo des tours lents. Le bundle
+`mcp` accepte également les observations vidéo. Les deux fonctions doivent être
+synchronisées/déployées par Lovable ; l'interface tolère l'ancienne réponse
+PostHog pendant cette transition. Voir [le plan](plan_mesures_latence_video.md).
