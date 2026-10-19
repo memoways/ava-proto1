@@ -141,6 +141,7 @@ import {
 import { appendExperienceEvent, applyTopicHandoffFallback, validateDirectorDecision } from "@/services/experienceDirector";
 import type { ExperienceDirectorDecisionV1, RuntimeCharacter } from "@/types";
 import { createAcousticInterruptionController, recognizedWordsChanged, withoutRejectedPrefix, endOfSpeechDelayMs, normalizeHandsFreeSettings, shouldBargeIn, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
+import { createMicRecoveryPolicy, isMicSilentlyDead, MIC_WATCHDOG_STRIKES } from "@/services/handsFreeRecovery";
 import {
   buildSwitchRequestGuidance,
   characterDisplayName,
@@ -224,6 +225,12 @@ const IndexPRD4 = () => {
   const preloadRescueRef = useRef<(character: RuntimeCharacter, voiceId?: string, providerId?: TTSProviderId) => void>(() => {});
   const handsFreeNeedsRearmRef = useRef(false);
   const rearmHandsFreeRef = useRef<() => Promise<void>>(async () => {});
+  // Reprise automatique du micro : la conversation reste intacte, seul le flux STT est rouvert.
+  const micRecoveryRef = useRef(createMicRecoveryPolicy());
+  const micRecoveryTimerRef = useRef<number | null>(null);
+  const handsFreeStartingRef = useRef(false);
+  const micGaveUpRef = useRef(false);
+  const scheduleMicRecoveryRef = useRef<(reason: string) => boolean>(() => false);
   const rescueLifetimeRef = useRef(new AbortController());
   preloadRescueRef.current = (character, voiceId, providerId) => {
     if (!voiceOnlyRef.current || endedRef.current || rescueRef.current.has(character) || rescuePendingRef.current.has(character)) return;
@@ -1800,12 +1807,17 @@ const IndexPRD4 = () => {
       {
         onError: (err) => handleVoiceInputError(inputTelemetryRef, captureTelemetry, sttRef.current === stt, () => {
           console.error("[PRD4 STT]", err);
+          const wasHandsFree = handsFreeListeningRef.current;
           acousticRef.current?.sttFailed(performance.now());
           handsFreeListeningRef.current = false; setHandsFreeListening(false);
-          activeTurnControllerRef.current?.abort("stt-recovery");
-          activeOutputControllerRef.current?.abort("stt-recovery");
+          // Mains libres : la réplique en cours continue, seul le micro est rouvert.
+          // En appuyer-pour-parler, le tour en cours reste abandonné comme avant.
+          if (!wasHandsFree) {
+            activeTurnControllerRef.current?.abort("stt-recovery");
+            activeOutputControllerRef.current?.abort("stt-recovery");
+          }
           incrementPttError();
-          trackEvent("prd4_ptt_error", { phase: "conversation", message: err.message });
+          trackEvent("prd4_ptt_error", { phase: "conversation", message: err.message, hands_free: wasHandsFree });
           setUserSubtitle("Micro indisponible — réessaie.");
           // Force reset: drop the dead STT so the next click recreates a fresh one
           teardownSTT();
@@ -1813,7 +1825,8 @@ const IndexPRD4 = () => {
             endLatencySegment(sttLatencySegmentRef.current);
             sttLatencySegmentRef.current = null;
           }
-          setAudioState("idle");
+          if (!wasHandsFree || !isProcessingRef.current) setAudioState("idle");
+          if (wasHandsFree) scheduleMicRecoveryRef.current(`stt_error:${err.message}`);
         }),
         getTelemetryContext: () => {
           const turnIndex = conversationRef.current.filter((m) => m.role === "user").length + 1;
@@ -2060,13 +2073,15 @@ const IndexPRD4 = () => {
       try { responseOutputRef.current?.interrupt(); } catch { /* already stopped */ }
       handsFreeListeningRef.current = false; setHandsFreeListening(false);
       teardownSTT(); isProcessingRef.current = false; setAudioState("idle");
-      toast({ title: "Micro à réactiver", description: "La reconnaissance a coupé. Réactive le micro pour reprendre.", variant: "destructive" });
+      scheduleMicRecoveryRef.current("acoustic_recovery");
     },
   });
 
   handsFreeTranscriptRef.current = (rawText: string, isFinal: boolean) => {
     const settings = handsFreeSettingsRef.current;
     if (!rawText.trim() || handsFreeBlockedRef.current) return;
+    // Le micro livre de la parole : le budget de reprise automatique est rendu.
+    micRecoveryRef.current.reset(); micGaveUpRef.current = false;
     let text = rawText;
     if (isFinal) {
       if (isProcessingRef.current) return;
@@ -2100,6 +2115,8 @@ const IndexPRD4 = () => {
     if (endedRef.current) return;
     if (handsFreeListeningRef.current) {
       handsFreeNeedsRearmRef.current = false;
+      if (micRecoveryTimerRef.current) window.clearTimeout(micRecoveryTimerRef.current);
+      micRecoveryTimerRef.current = null;
       if (handsFreeTimerRef.current) window.clearTimeout(handsFreeTimerRef.current);
       handsFreeTimerRef.current = null;
       handsFreeListeningRef.current = false;
@@ -2109,6 +2126,7 @@ const IndexPRD4 = () => {
       return;
     }
     let initialStream: Promise<MediaStream> | undefined;
+    handsFreeStartingRef.current = true;
     beginInputTelemetry("hands_free");
     try {
       initialStream = navigator.mediaDevices?.getUserMedia({
@@ -2134,7 +2152,7 @@ const IndexPRD4 = () => {
           try { responseOutputRef.current?.interrupt(); } catch { /* already stopped */ }
           teardownSTT(); handsFreeListeningRef.current = false; setHandsFreeListening(false);
           isProcessingRef.current = false; setAudioState("idle");
-          toast({ title: "Micro à réactiver", description: "Réactive le micro pour reprendre.", variant: "destructive" });
+          scheduleMicRecoveryRef.current("acoustic_capture_failed");
         }).catch(() => null);
         if (sttRef.current !== stt || endedRef.current) { detector?.stop(); return; }
         detectorRef.current = detector;
@@ -2146,7 +2164,16 @@ const IndexPRD4 = () => {
       trackEvent("prd4_hands_free_started", { session_id: sessionIdRef.current, ...handsFreeSettingsRef.current });
     } catch (err) {
       void initialStream?.then((stream) => stream.getTracks().forEach((track) => track.stop())).catch(() => {});
-      if (err instanceof Error && err.name === "StaleCaptureError") return;
+      if (err instanceof Error && err.name === "StaleCaptureError") {
+        // Capture remplacée pendant son ouverture (changement de tour, transfert…) :
+        // sans micro et sans relance en attente, la reprise doit être reprogrammée.
+        if (!endedRef.current && handsFreeListeningRef.current && !sttRef.current && !handsFreeNeedsRearmRef.current) {
+          handsFreeListeningRef.current = false;
+          setHandsFreeListening(false);
+          scheduleMicRecoveryRef.current("stale_capture");
+        }
+        return;
+      }
       finishInputTelemetry("failed");
       console.warn("[PRD4] hands-free start failed:", err);
       handsFreeListeningRef.current = false;
@@ -2154,11 +2181,73 @@ const IndexPRD4 = () => {
       teardownSTT();
       incrementPttError();
       setAudioState("idle");
-      toast({ title: "Micro indisponible", description: "Réessaie dans un instant.", variant: "destructive" });
+      // Une réouverture automatique qui échoue est retentée avant d'alerter le joueur.
+      if (micRecoveryRef.current.attempts === 0) {
+        toast({ title: "Micro indisponible", description: "Réessaie dans un instant.", variant: "destructive" });
+      } else scheduleMicRecoveryRef.current("rearm_failed");
+    } finally {
+      handsFreeStartingRef.current = false;
     }
   }, [beginInputTelemetry, createSTT, finishInputTelemetry, incrementPttError, setAudioState, teardownSTT]);
 
   rearmHandsFreeRef.current = handleToggleHandsFree;
+
+  scheduleMicRecoveryRef.current = (reason: string) => {
+    if (endedRef.current) return false;
+    if (micRecoveryTimerRef.current) return true;
+    const delay = micRecoveryRef.current.next();
+    if (delay === null) {
+      if (!micGaveUpRef.current) {
+        micGaveUpRef.current = true;
+        trackEvent("prd4_mic_recovery_failed", { session_id: sessionIdRef.current, reason });
+        toast({ title: "Micro à réactiver", description: "La reconnaissance a coupé. Réactive le micro pour reprendre.", variant: "destructive" });
+      }
+      return false;
+    }
+    trackEvent("prd4_mic_recovery", { session_id: sessionIdRef.current, reason, attempt: micRecoveryRef.current.attempts, delay_ms: delay });
+    setUserSubtitle("Reconnexion du micro…");
+    micRecoveryTimerRef.current = window.setTimeout(() => {
+      micRecoveryTimerRef.current = null;
+      if (endedRef.current || handsFreeListeningRef.current || handsFreeNeedsRearmRef.current) return;
+      if (handsFreeBlockedRef.current) {
+        // Vidéo ou transfert en cours : l'effet de blocage rouvrira le micro à la fin.
+        handsFreeNeedsRearmRef.current = true; handsFreeListeningRef.current = true;
+        return;
+      }
+      void rearmHandsFreeRef.current();
+    }, delay);
+    return true;
+  };
+
+  // Filet de sécurité : un micro censé écouter sans flux STT connecté (fermeture
+  // silencieuse du fournisseur) est relancé sans attendre une action du joueur.
+  useEffect(() => {
+    if (!handsFreeListening) return;
+    let strikes = 0;
+    const id = window.setInterval(() => {
+      const dead = isMicSilentlyDead({
+        listening: handsFreeListeningRef.current,
+        ended: endedRef.current,
+        blocked: handsFreeBlockedRef.current || handsFreeNeedsRearmRef.current,
+        starting: handsFreeStartingRef.current || micRecoveryTimerRef.current !== null,
+        sttActive: sttRef.current?.isActive === true,
+      });
+      strikes = dead ? strikes + 1 : 0;
+      if (strikes < MIC_WATCHDOG_STRIKES) return;
+      strikes = 0;
+      console.warn("[PRD4] hands-free mic lost without error — reopening");
+      handsFreeListeningRef.current = false; setHandsFreeListening(false);
+      teardownSTT();
+      if (!isProcessingRef.current) setAudioState("idle");
+      scheduleMicRecoveryRef.current("watchdog");
+    }, 2_000);
+    return () => window.clearInterval(id);
+  }, [handsFreeListening, setAudioState, teardownSTT]);
+
+  useEffect(() => () => {
+    if (micRecoveryTimerRef.current) window.clearTimeout(micRecoveryTimerRef.current);
+    micRecoveryTimerRef.current = null;
+  }, []);
 
   const handleHangUp = useCallback(() => {
     if (endedRef.current) return;
@@ -2536,7 +2625,7 @@ const IndexPRD4 = () => {
               handsFree={handsFreeEnabled}
               voiceOnly={voiceOnly}
               handsFreeListening={handsFreeListening}
-              onToggleHandsFree={() => void handleToggleHandsFree()}
+              onToggleHandsFree={() => { micRecoveryRef.current.reset(); micGaveUpRef.current = false; void handleToggleHandsFree(); }}
               onHangUp={handleHangUp}
               streamingAvatarActive={streamingAvatarActive}
               streamingAvatarState={streamingAvatarState}

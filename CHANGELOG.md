@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Non publié] — 2026-10-19 — Reprise automatique du micro mains libres
+
+- Bug : en conversation mains libres (observé avec Emma, après une session
+  réussie avec Max), toute coupure du flux de reconnaissance vocale coupait
+  définitivement le micro, abandonnait la réplique en cours et affichait un
+  toast rouge « Micro à réactiver ».
+- Le micro se rouvre maintenant seul (3 tentatives à 0,3 s / 1 s / 2,5 s) ;
+  la conversation, la mémoire et la réplique en cours ne sont pas touchées.
+  Le toast rouge n'apparaît qu'après l'échec des 3 tentatives.
+- Un contrôle toutes les 2 s relance aussi un micro censé écouter mais sans
+  flux STT connecté, et une capture remplacée pendant son ouverture n'est
+  plus abandonnée en silence.
+- Nouveaux événements `prd4_mic_recovery` / `prd4_mic_recovery_failed`
+  (raison de la coupure incluse) pour retrouver la cause réelle.
+- Non vérifié avec un vrai micro (aucun appel vocal possible dans le bac à
+  sable) ; livraison via Lovable / Lovable Cloud uniquement.
+
 ## [Documentation] — 2026-10-19 — Reprise du switching par petits lots
 
 - Diagnostic de l’appel Emma du 19 octobre et plan de passage Emma ↔ Max :
