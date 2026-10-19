@@ -691,6 +691,7 @@
                                         "stt",
                                         "llm",
                                         "tts",
+                                        "video",
                                         "rag",
                                         "gm"
                                       ]
@@ -890,6 +891,16 @@
                                     ]
                                   },
                                   "playback_ms": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "video_wait_ms": {
                                     "anyOf": [
                                       {
                                         "type": "number"

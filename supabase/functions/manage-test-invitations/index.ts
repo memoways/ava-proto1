@@ -45,7 +45,7 @@ serve(async (req) => {
 
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;
   const action = body?.action as Action | undefined;
-  if (!action || !["list", "create", "revoke"].includes(action)) {
+  if (!body || !action || !["list", "create", "revoke"].includes(action)) {
     return json(req, { error: "Invalid action" }, 400);
   }
 
