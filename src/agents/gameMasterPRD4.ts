@@ -27,7 +27,7 @@ import {
 } from "@/services/relationshipEngine";
 
 /** Incrémenter à chaque changement de logique ou de prompt du GM (traçabilité A/B). */
-export const GM_CODE_VERSION = "gm-2026-10-22-handoff-evidence-references";
+export const GM_CODE_VERSION = "gm-2026-10-22-world-boundary";
 
 export interface PRD4PostTurnInput {
   onGmObserved?: (service: ServiceObservation, spans: ServerObservation) => void;
@@ -102,7 +102,7 @@ Tu retournes EXACTEMENT cet objet :
   "labels": {                       // Labels extraits du DERNIER message utilisateur. Max 4 labels au total cumulés sur les 3 listes. Ne PAS inventer : si rien d'évident, mets une liste vide. Ne force jamais.
     "themes": string[],             // Grand thème narratif (1-3 mots, en minuscules). Ex: "famille", "patriarcat", "trahison", "secrets", "confiance", "deuil", "violence", "mémoire". Vide si pas clair.
     "topics": string[],             // Sujet concret évoqué (1-3 mots). Ex: "sœur", "enfance", "disparition", "film", "police". Vide si pas clair.
-    "intentions": string[]          // Intention de l'utilisateur (1-2 mots). Ex: "question", "défi", "empathie", "doute", "provocation". Vide si pas claire.
+    "intentions": string[]          // Intention de l'utilisateur (1-2 mots). Ex: "question", "défi", "empathie", "doute", "provocation", "hors-sujet". Vide si pas claire.
   },
   "engagement_delta": number,       // -2..+2 — qualité de l'échange pour le joueur
   "confusion_detected": boolean,    // true si le joueur semble perdu ou le personnage actif contradictoire
@@ -150,6 +150,11 @@ Tu retournes EXACTEMENT cet objet :
     "lastExchange": string          // une phrase factuelle, max 35 mots
   }
 }
+
+Règles "hors-monde" — le personnage n'a le droit de parler que de ce que contiennent sa fiche, sa mémoire de session et ses souvenirs (RAG) : sa situation, ce qui lui arrive, la pandémie :
+- Si le dernier message du joueur porte sur un sujet étranger à l'histoire (recette, outil ou logiciel, technique, culture, actualité, conseil, savoir général…), ou si la réponse du personnage vient de sortir de ce périmètre (information extérieure, réponse à une question hors-sujet), ajoute "hors-sujet" à labels.intentions et écris dans next_turn_guidance un recadrage court.
+- Ce recadrage demande au personnage de refuser en rôle (il ne sait pas, il n'a pas la bande passante), de rappeler que seule compte la situation qui est la sienne et la pandémie, et de proposer d'en reparler une autre fois, pas maintenant. Jamais de morale ni de sortie du personnage.
+- Un premier hors-sujet est un recadrage, pas un dérapage : n'utilise pas action.type=end pour cela et laisse moderation_flag=false.
 
 Règles "labels" :
 - MAX 4 labels au total (additionnés sur themes + topics + intentions).

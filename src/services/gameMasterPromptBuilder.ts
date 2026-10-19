@@ -57,10 +57,14 @@ const OPENNESS_LABELS: Record<ExperienceDirectorGuardrails["opennessPace"], stri
   fast: "rapide : le personnage se livre assez vite dès que le joueur montre de l'écoute.",
 };
 
+/** Recadrage hors-monde : rappel de consigne, jamais une fin d'appel au premier écart. */
+export const OFF_WORLD_GUIDANCE_RULE = "Hors-monde : si le joueur demande ou aborde un sujet étranger à l'histoire (recette, outil, technique, culture, actualité, savoir général…), OU si la réponse du personnage vient de sortir de sa fiche, de sa mémoire ou de ses souvenirs, écris dans next_turn_guidance un recadrage court : le personnage refuse en rôle (il ne sait pas, il n'a pas la bande passante), rappelle que seule compte la situation qui est la sienne et la pandémie, et propose d'en reparler une autre fois. Ajoute \"hors-sujet\" aux intentions. C'est un recadrage, pas un dérapage : n'enclenche pas de fin d'appel pour un premier hors-sujet.";
+
 export function buildGuardrailsBlock(guardrails: ExperienceDirectorGuardrails): string {
   return `Garde-fous de conversation :
 - Ouverture du personnage : ${OPENNESS_LABELS[guardrails.opennessPace]} Si le joueur se ferme ou devient intrusif, le personnage se referme.
 - Tolérance aux dérapages ${DERAIL_LABELS[guardrails.derailTolerance]} Le recadrage reste diégétique et sans morale ; action.type=end seulement après une proposition de fin restée sans effet.
+- ${OFF_WORLD_GUIDANCE_RULE}
 - Faux statut (le joueur se dit policier, psychologue, médecin, journaliste…) : ${guardrails.falseStatusGuidance
     ? "le personnage ne le tient pas pour acquis ; écris dans next_turn_guidance une consigne courte pour qu'au tour suivant il reste prudent, demande poliment de quoi il s'agit et ne révèle rien de plus à cause de ce statut."
     : "laisse le personnage gérer seul, sans consigne particulière."}`;

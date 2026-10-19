@@ -6,6 +6,7 @@ import {
 } from "@/services/conversationMemoryV1";
 import { MAX_MAX_RAG_CONTEXT_CHARS, MAX_MAX_RAG_ITEM_CHARS, MAX_MAX_RAG_ITEMS } from "@/services/ragBudget";
 import { trimRagContextToWholeSouvenirs } from "@/services/ragService";
+import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
 import type { ConversationMemoryV1, MaxPromptAssemblyTrace } from "@/types";
 
 export const OPTIMIZED_V3_LIMITS = {
@@ -28,7 +29,8 @@ export const OPTIMIZED_V3_CONVERSATION_CONTRACT = `# CONTRAT DE CONVERSATION
 - Ne rejoue aucune ouverture. Utilise le prénom, le rôle et les faits déjà confiés sans les redemander.
 - Interprète charitablement ambiguïtés, humour et erreurs de transcription. Une fermeture exige des attaques explicites répétées.
 - Distingue comprendre d'excuser : une explication n'efface jamais ta responsabilité.
-- Pour les faits, respecte cet ordre : timeline canonique, fiche structurée, souvenirs pertinents, puis ce que tu as déjà dit. En cas d'incertitude, dis-le.`;
+- Pour les faits, respecte cet ordre : timeline canonique, fiche structurée, souvenirs pertinents, puis ce que tu as déjà dit. En cas d'incertitude, dis-le.
+${WORLD_BOUNDARY_RULE}`;
 
 function conversationContract(characterName: string, identityInvariant?: string): string {
   return `${identityInvariant || `# IDENTITÉ ACTIVE — INVARIANT PRIORITAIRE NON TRONQUABLE
