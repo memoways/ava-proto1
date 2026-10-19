@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [À publier via Lovable] — 2026-10-19 — Personnages cadrés dans leur monde
+
+- Bug « sorties de contexte » : Max donnait une recette, Emma répondait sur
+  Notion. Règle de hors-champ unique (`src/agents/worldBoundary.ts`) ajoutée au
+  contrat de conversation des quatre variantes de prompt (legacy, compact,
+  rich_v2, optimized_v3) : refus en rôle, sans début de réponse, retour à la
+  situation et à la pandémie, « une autre fois, pas maintenant ».
+- Prompt statique uniquement : aucun appel LLM ni filtre ajouté, donc aucune
+  latence en plus sur le chemin vocal.
+- Game Master (`gm-2026-10-19-p1`) : détecte un sujet hors-monde ou une réponse
+  qui sort de la fiche/RAG, ajoute l'intention `hors-sujet` et écrit un
+  recadrage dans `next_turn_guidance` pour le tour suivant. Un premier
+  hors-sujet n'est ni un dérapage ni une fin d'appel. La règle est aussi dans
+  le bloc garde-fous, donc active même si le prompt de base est surchargé.
+- Aucune migration ni réglage Cloud. À valider en appel réel après publication.
+
 ## [Documentation] — 2026-10-19 — Reprise du switching par petits lots
 
 - Diagnostic de l’appel Emma du 19 octobre et plan de passage Emma ↔ Max :

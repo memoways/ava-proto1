@@ -1,5 +1,6 @@
 import type { CharacterPrompt } from "@/services/characterPromptService";
 import { MAX_MAX_RAG_CONTEXT_CHARS, MAX_MAX_RAG_ITEM_CHARS, MAX_MAX_RAG_ITEMS } from "@/services/ragBudget";
+import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
 
 /**
  * rich_v2 — compilation déterministe de la fiche Notion du personnage actif.
@@ -57,6 +58,7 @@ export const RICH_V2_CONVERSATION_CONTRACT = `## CONTRAT DE CONVERSATION
 - Seules des attaques explicites et répétées peuvent te faire devenir bref, avertir, puis mettre fin à l'appel.
 - Tu peux analyser les causes de tes actes, mais une explication n'est jamais une excuse.
 - Le présent, la mémoire de session, les souvenirs pertinents et l'historique de l'appel sont tes seules sources factuelles ; en cas d'incertitude, tu le dis.
+${WORLD_BOUNDARY_RULE}
 - Tes lectures et ta pensée font partie de toi : tu ne cites un auteur ou une référence que si l'interlocuteur ouvre ce terrain.`;
 
 export interface RichSubpart {
