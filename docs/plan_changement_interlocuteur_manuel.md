@@ -122,6 +122,12 @@ Corriger dans `GameMasterSettingsTab.tsx` les textes d’aide incohérents avec 
 3. **Pastille et symétrie.** Modifier `ConversationScreen`, portraits et callbacks existants ; remplacer la carte basse ; continuer l’échange tant que le joueur n’appelle pas. Corriger les aides admin. Critère : pastille sous le personnage actif, accessible, animation optionnelle, appel dans les deux sens sous contrôle GM.
 4. **Recette et livraison Lovable.** Qualité complète, E2E avec décisions GM contrôlées, configuration sandbox de recette, synchronisation GitHub/Lovable, vérification preview puis conversation humaine sandbox. Publication du produit uniquement après résultat observable accepté ; aucune chaîne externe. Ne pas déclarer l’expérience corrigée sur la seule base des mocks.
 
+### Exécution par chats frais — consigne du 19 octobre 2026
+
+Le [prompt autonome du lot 1](prompt_reprise_switch_personnages_lot_1.md) lance uniquement le contrat et les tests. Ce premier lot prépare types, nettoyage compatible, instructions GM testables et validateur pur ; il ne branche pas encore la nouvelle autorisation dans le runtime et ne change aucun prompt effectif publié. L’audit de décision est d’abord un résultat pur, sa persistance attend le lot 2.
+
+À chaque clôture : actualiser `CHANGELOG.md`, `STORY.md` et ce plan avec les preuves et l’état réel ; vérifier la CI du HEAD avant fusion vers `main` ; produire et sauvegarder un prompt autonome du prochain lot pour un nouveau chat. Si le lot reste incomplet, le prompt doit d’abord en permettre la finalisation. Répéter ces obligations dans chaque prompt suivant. Aucun enchaînement automatique de lots ni publication produit pour le lot préparatoire. Les choix de quota et de validité d’offre du §8 n’ont pas à être activés dans le lot 1.
+
 ## 6. Validation attendue
 
 - Unitaires : T6 différé ; T10 pronom/faux prénom contextualisé ; T11 nom explicite + accord naturel ; inquiétude émotionnelle sans refus ; refus explicites et sans « ne » ; « Je vais l’appeler… enfin non » ; extrait affirmatif choisi au milieu d’un refus ; oui hors contexte ; cible incohérente ; décision invalide/périmée ; offre révoquée et nouvelles versions.

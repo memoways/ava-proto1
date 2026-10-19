@@ -4,6 +4,16 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Documentation] — 2026-10-19 — Reprise du switching par petits lots
+
+- Diagnostic de l’appel Emma du 19 octobre et plan de passage Emma ↔ Max :
+  validation du consentement, pastille d’appel et continuité de session.
+- [Prompt du lot 1](docs/prompt_reprise_switch_personnages_lot_1.md) : contrat
+  et tests préparatoires, compatibles avec le GM existant, sans branchement runtime.
+- Chaque lot doit actualiser CHANGELOG, STORY et le plan, vérifier la CI avant
+  fusion et fournir le prompt autonome du prochain chat. Aucun correctif
+  produit, réglage Cloud ou déploiement réalisé par cette préparation.
+
 ## [Publié via Lovable] — 2026-10-19 — Latence des services vidéo
 
 - Qualité → Latence & blocage et Latence PostHog : segment vidéo, P50/P95,
