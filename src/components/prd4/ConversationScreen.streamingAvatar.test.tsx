@@ -68,6 +68,34 @@ describe("ConversationScreen streaming avatar", () => {
     expect(screen.getByText("Mode voix")).toBeInTheDocument();
   });
 
+  it("never shows Max's live stream or frozen frame over Emma", () => {
+    const attachAvatarMedia = vi.fn();
+    const { container, rerender } = render(
+      <ConversationScreen
+        {...baseProps}
+        streamingAvatarActive
+        streamingAvatarState="ready"
+        attachAvatarMedia={attachAvatarMedia}
+      />,
+    );
+    expect(screen.getByLabelText("Flux vidéo en direct de Max")).toBeInTheDocument();
+
+    rerender(
+      <ConversationScreen
+        {...baseProps}
+        activeCharacter="emma"
+        streamingAvatarActive
+        streamingAvatarState="ready"
+        attachAvatarMedia={attachAvatarMedia}
+      />,
+    );
+
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.querySelector("canvas")).toBeNull();
+    expect(screen.queryByText("Mode voix")).not.toBeInTheDocument();
+    expect(screen.getByAltText("Portrait d’Emma")).toBeInTheDocument();
+  });
+
   it("asks for an explicit handoff choice and calls the selected action", () => {
     const onAcceptHandoff = vi.fn();
     const onRejectHandoff = vi.fn();

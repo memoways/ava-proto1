@@ -678,6 +678,9 @@ const IndexPRD4 = () => {
     diagnosticTraceEnabledRef.current = diagnosticTraceEnabled;
 
     const startingCharacter = startingCharacterRef.current;
+    // Le flux vidéo en direct est celui de Max : un autre personnage (Emma) démarre
+    // en voix seule, avec sa photo, pour ne jamais afficher le flux de Max.
+    const outputMode = startingCharacter === "max" ? outputSettings.mode : "tts";
     rescueLifetimeRef.current = new AbortController();
     const pinnedGameplay = getGameplaySettings();
     incrementalOutputEnabledRef.current = pinnedGameplay.VOICE_INCREMENTAL_OUTPUT === true;
@@ -689,9 +692,9 @@ const IndexPRD4 = () => {
       startingCharacter,
       {
         diagnostic_trace_enabled: diagnosticTraceEnabled,
-        output_mode: outputSettings.mode,
+        output_mode: outputMode,
         streaming_avatar_provider:
-          outputSettings.mode === "streaming_avatar" ? avatarSettings.activeProvider : null,
+          outputMode === "streaming_avatar" ? avatarSettings.activeProvider : null,
         resume_expires_at: new Date(
           Date.now() + (configuredSessionDurationRef.current + 300) * 1_000,
         ).toISOString(),
@@ -704,9 +707,9 @@ const IndexPRD4 = () => {
       session_id: sid,
       character: startingCharacter,
       diagnostic_trace_enabled: diagnosticTraceEnabled,
-      output_mode: outputSettings.mode,
+      output_mode: outputMode,
       streaming_avatar_provider:
-        outputSettings.mode === "streaming_avatar" ? avatarSettings.activeProvider : null,
+        outputMode === "streaming_avatar" ? avatarSettings.activeProvider : null,
     });
     const startedAt = onboardingStartedAtRef.current;
     const posture = userPostureRef.current;
@@ -719,7 +722,7 @@ const IndexPRD4 = () => {
     });
 
     const output = await createResponseOutput({
-      mode: outputSettings.mode,
+      mode: outputMode,
       avatarSettings,
       callbacks: {
         onConnectionStateChange: setStreamingAvatarState,
