@@ -35,6 +35,7 @@ interface PendingSpeech {
 export class HeyGenStreamingAvatarOutput implements ResponseOutput {
   readonly mode = "streaming_avatar" as const;
   readonly provider = "heygen";
+  get model() { return this.settings.avatarId; }
   private readonly settings: HeyGenAvatarSettings;
   private readonly callbacks: ResponseOutputCallbacks;
   private readonly connectionTimeoutMs: number;

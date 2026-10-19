@@ -9,7 +9,7 @@ export const VOICE_MILESTONES = [
 export type VoiceMilestone = typeof VOICE_MILESTONES[number];
 export type VoiceTurnStatus = "started" | "completed" | "interrupted" | "cancelled" | "timeout" | "failed" | "no_audio";
 export interface ServiceObservation {
-  service: "stt" | "llm" | "tts" | "rag" | "gm";
+  service: "stt" | "llm" | "tts" | "video" | "rag" | "gm";
   requested_provider: string | null;
   requested_model: string | null;
   resolved_provider: string | null;
@@ -59,6 +59,8 @@ export interface VoiceTurnV2 {
     t_turn_voice_ready_ms: number | null;
     generation_total_ms: number | null;
     playback_ms: number | null;
+    /** Video includes its integrated voice; never added again to the observed total. */
+    video_wait_ms?: number;
   };
   coverage: { state: "complete" | "partial"; observed: number; expected: number; missing: string[] };
   output_precision: "software_estimate" | "unavailable";
@@ -135,8 +137,11 @@ export function createVoiceTurnV2(
     service(service: ServiceObservation) { if (!finished && value.services.length < 16) value.services.push(service); },
     server(server: ServerObservation) { if (!finished && value.server.length < 8) value.server.push(projectServerObservation(server, originAt)); },
     versions(prompt: string | null, config: string | null) { if (!finished) { value.prompt_version = prompt; value.config_version = config; } },
-    durations(generation: number | null, playback: number | null) {
-      if (!finished) { value.durations.generation_total_ms = generation; value.durations.playback_ms = playback; }
+    durations(generation: number | null, playback: number | null, videoWait?: number) {
+      if (!finished) {
+        value.durations.generation_total_ms = generation; value.durations.playback_ms = playback;
+        if (videoWait != null && Number.isFinite(videoWait) && videoWait >= 0) value.durations.video_wait_ms = videoWait;
+      }
     },
     finish(status: Exclude<VoiceTurnStatus, "started">) {
       if (finished) return;

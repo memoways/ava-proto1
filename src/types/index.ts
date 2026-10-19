@@ -153,6 +153,9 @@ export interface ConversationPipelineTimings {
   tts_ms?: number;
   /** Explicit TTS service latency for new sessions. Old `tts_ms` values may include full audio playback. */
   tts_first_playback_ms?: number;
+  /** Video render → provider speech start, or elapsed wait before a failed attempt. Includes provider TTS. */
+  video_ms?: number;
+  video_status?: import("@/services/streamingAvatar/types").VideoLatencyObservation["status"];
   gm_post_ms?: number;
   /** GM post-tour runs after playback and never contributes to player wait. */
   gm_post_status?: "executed" | "failed" | "invalid" | "not_measured";

@@ -7,6 +7,7 @@ export type LatencySegmentKey =
   | "max_ms"
   | "validator_ms"
   | "tts_ms"
+  | "video_ms"
   | "gm_post_ms"
   | "total_ms";
 
@@ -79,6 +80,7 @@ export const LATENCY_SEGMENT_LABELS: Record<LatencySegmentKey, string> = {
   max_ms: "Personnage LLM",
   validator_ms: "Validateur",
   tts_ms: "TTS",
+  video_ms: "Vidéo (voix intégrée)",
   gm_post_ms: "GM post-tour (hors attente)",
   total_ms: "Total",
 };
@@ -90,6 +92,7 @@ export const PLAYER_WAIT_SEGMENT_KEYS: LatencySegmentKey[] = [
   "max_ms",
   "validator_ms",
   "tts_ms",
+  "video_ms",
 ];
 
 const PIPELINE_KEYS: LatencySegmentKey[] = [
@@ -99,6 +102,7 @@ const PIPELINE_KEYS: LatencySegmentKey[] = [
   "max_ms",
   "validator_ms",
   "tts_ms",
+  "video_ms",
   "gm_post_ms",
 ];
 

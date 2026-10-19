@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Non publié] — 2026-10-19 — Latence des services vidéo
+
+- Qualité → Latence & blocage et Latence PostHog : segment vidéo, P50/P95,
+  fournisseur/identifiant d'avatar effectifs, évolution et filtre vidéo.
+- Mesure passive du rendu jusqu'au premier événement de parole fournisseur,
+  incluant sa voix intégrée. Échec vidéo et TTS de secours restent séparés,
+  sans double comptage du total ni attente réseau ajoutée par la mesure.
+- Événements existants et chronologie V2 enrichis ; historique compatible,
+  sans migration. Publication par Lovable Cloud uniquement.
+- [Plan et vérifications](docs/plan_mesures_latence_video.md).
+
 ## [Non publié] — 2026-10-17 — Retrait de Politique relationnelle
 
 - Le champ vide n'est plus lu. Il disparaît de la synchro Notion, de l'éditeur

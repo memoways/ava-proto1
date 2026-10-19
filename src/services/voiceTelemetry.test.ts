@@ -191,3 +191,23 @@ describe("voiceTelemetry", () => {
     }));
   });
 });
+
+describe("video telemetry", () => {
+  it("adds the actual service to existing events and detects video budget overruns", () => {
+    vi.clearAllMocks();
+    mocks.insertMock.mockReturnValue({ then: vi.fn() });
+    const payload = buildVoiceTurnCompletedPayload({ turn_id: "v:1", turn_index: 1, character: "max",
+      timings: { t_max_llm_ms: 500, t_video_wait_ms: 2000, t_turn_voice_ready_ms: 2600 },
+      video: { provider: "future-video", model: "avatar-a", waitMs: 2000, status: "started", precision: "provider_speech_event" },
+    });
+    expect(payload).toMatchObject({ video_provider: "future-video", video_model: "avatar-a", video_status: "started",
+      t_video_wait_ms: 2000, blocker_step: "video", severity: "critical", t_turn_voice_ready_ms: 2600 });
+    expect(payload.tts_provider).toBeUndefined();
+    recordVoiceTurnCompleted(payload);
+    expect(mocks.trackEventMock).toHaveBeenCalledWith("ava_latency_segment", expect.objectContaining({
+      segment_key: "video_ms", duration_ms: 2000, provider: "future-video", model: "avatar-a", blocked: true,
+    }));
+    expect(mocks.trackEventMock.mock.calls.some(([event, value]) => event === "ava_latency_segment" && value.segment_key === "tts_ms")).toBe(false);
+    expect(mocks.insertMock).toHaveBeenCalledWith(expect.objectContaining({ metadata_json: expect.objectContaining({ video_provider: "future-video", t_video_wait_ms: 2000 }) }));
+  });
+});

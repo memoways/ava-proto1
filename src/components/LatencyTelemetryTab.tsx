@@ -58,6 +58,7 @@ const FILTER_CONFIG = [
   { key: "model", label: "Modèle personnage", providerKey: "models" },
   { key: "stt", label: "STT", providerKey: "stt" },
   { key: "tts", label: "TTS", providerKey: "tts" },
+  { key: "video", label: "Service vidéo", providerKey: "video" },
   { key: "browser", label: "Navigateur", providerKey: "browsers" },
 ] as const;
 
@@ -67,8 +68,8 @@ type FilterState = Record<FilterKey, string>;
 type FilterOptions = Record<FilterKey, string[]>;
 type TimelineMetric = "responseReady" | "firstSound" | "endToEnd";
 
-const EMPTY_FILTERS: FilterState = { character: "", model: "", stt: "", tts: "", browser: "" };
-const EMPTY_FILTER_OPTIONS: FilterOptions = { character: [], model: [], stt: [], tts: [], browser: [] };
+const EMPTY_FILTERS: FilterState = { character: "", model: "", stt: "", tts: "", video: "", browser: "" };
+const EMPTY_FILTER_OPTIONS: FilterOptions = { character: [], model: [], stt: [], tts: [], video: [], browser: [] };
 
 const LATENCY_STAGES = [
   { key: "responseReady", label: "Texte prêt" },
@@ -78,6 +79,7 @@ const LATENCY_STAGES = [
   { key: "rag", label: "RAG" },
   { key: "max", label: "Personnage LLM" },
   { key: "tts", label: "TTS fournisseur" },
+  { key: "video", label: "Vidéo (voix intégrée)" },
   { key: "gmPost", label: "GM post-tour (hors attente)" },
 ] as const;
 
@@ -93,6 +95,7 @@ const PROVIDER_LABELS: Record<ProviderKey, string> = {
   models: "Modèles personnage",
   stt: "Providers STT",
   tts: "Providers TTS",
+  video: "Services vidéo",
   browsers: "Navigateurs",
   characters: "Personnages",
 };
@@ -134,7 +137,7 @@ function mergeFilterOptions(
 ): FilterOptions {
   const next = { ...current };
   for (const config of FILTER_CONFIG) {
-    const incoming = providers[config.providerKey].map((item) => item.key);
+    const incoming = (providers[config.providerKey] ?? []).map((item) => item.key);
     next[config.key] = [...new Set([...current[config.key], ...incoming])].sort((left, right) => left.localeCompare(right));
   }
   return next;
@@ -290,9 +293,9 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
   const latencyChartData = useMemo(() => stats ? LATENCY_STAGES.map((stage) => ({
     label: stage.label,
-    p50: stats.latency[stage.key].p50,
-    p95: stats.latency[stage.key].p95,
-    measured: stats.latency[stage.key].measured,
+    p50: stats.latency[stage.key]?.p50 ?? null,
+    p95: stats.latency[stage.key]?.p95 ?? null,
+    measured: stats.latency[stage.key]?.measured ?? 0,
   })) : [], [stats]);
   const timelineChartData = useMemo(() => (stats?.timeline ?? []).map((point) => ({
     timestamp: new Date(point.timestamp).toLocaleString("fr-FR", {
@@ -353,7 +356,7 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
           {activeFilterCount > 0 && <Badge variant="secondary">{activeFilterCount} filtre{activeFilterCount > 1 ? "s" : ""} actif{activeFilterCount > 1 ? "s" : ""}</Badge>}
         </div>
         {period === "custom" && <div className="grid gap-2 sm:grid-cols-2"><Input type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} aria-label="Début" /><Input type="datetime-local" value={to} onChange={(event) => setTo(event.target.value)} aria-label="Fin" /></div>}
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {FILTER_CONFIG.map((config) => (
             <Select
               key={config.key}
@@ -531,7 +534,7 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
               <div className="flex flex-wrap items-start justify-between gap-3 border-b p-4">
                 <div>
                   <h3 className="flex items-center gap-2 font-semibold"><Timer className="h-4 w-4" />Tours les plus lents</h3>
-                  <p className="mt-0.5 text-xs text-muted-foreground">Cliquez une ligne pour détailler la chaîne STT → RAG → LLM → TTS.</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Cliquez une ligne pour détailler la chaîne STT → RAG → LLM → TTS ou vidéo. La vidéo inclut la voix du fournisseur ; son démarrage est une estimation via son événement de parole.</p>
                 </div>
                 <Badge variant="outline">top {(stats.slowestTurns ?? []).length}</Badge>
               </div>
@@ -539,7 +542,7 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[900px] text-xs">
                     <thead className="bg-muted/40 text-muted-foreground">
-                      <tr><th className="p-3 text-left font-medium">Heure</th><th className="p-3 text-left font-medium">Tour</th><th className="p-3 text-left font-medium">Session</th><th className="p-3 text-left font-medium">End-to-end</th><th className="p-3 text-left font-medium">Premier son</th><th className="p-3 text-left font-medium">Blocker</th><th className="p-3 text-left font-medium">Modèle</th><th className="p-3 text-left font-medium">TTS</th><th className="p-3 text-left font-medium">État</th></tr>
+                      <tr><th className="p-3 text-left font-medium">Heure</th><th className="p-3 text-left font-medium">Tour</th><th className="p-3 text-left font-medium">Session</th><th className="p-3 text-left font-medium">End-to-end</th><th className="p-3 text-left font-medium">Premier son</th><th className="p-3 text-left font-medium">Blocker</th><th className="p-3 text-left font-medium">Modèle</th><th className="p-3 text-left font-medium">Sortie voix / vidéo</th><th className="p-3 text-left font-medium">État</th></tr>
                     </thead>
                     <tbody>
                       {(stats.slowestTurns ?? []).map((turn, index) => {
@@ -560,7 +563,7 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
                           <td className="p-3 font-mono">{fmtMs(turn.firstSoundMs)}</td>
                           <td className="p-3"><Badge variant="secondary">{turn.blocker ?? "—"}</Badge></td>
                           <td className="max-w-[180px] truncate p-3" title={turn.model ?? undefined}>{turn.model ?? "—"}</td>
-                          <td className="p-3">{turn.tts ?? "—"}</td>
+                          <td className="p-3">{[turn.video, turn.tts].filter(Boolean).join(" → ") || "—"}</td>
                           <td className="p-3">{turn.severity === "failed" ? <Badge variant="destructive">Erreur</Badge> : turn.fallback ? <Badge variant="outline">Fallback</Badge> : <Badge variant="secondary">OK</Badge>}</td>
                         </tr>;
                       })}
@@ -570,11 +573,12 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
                 {selectedSlowTurn && <div className="border-t bg-muted/20 p-4">
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div><p className="text-sm font-semibold">Détail du tour #{selectedSlowTurn.turnIndex ?? "?"}</p><p className="text-xs text-muted-foreground">{selectedSlowTurn.character ?? "personnage inconnu"} · {selectedSlowTurn.browser ?? "navigateur inconnu"} · id {shortId(selectedSlowTurn.turnId)}</p></div>
-                    <Badge variant="outline">{selectedSlowTurn.stt ?? "STT ?"} → {selectedSlowTurn.tts ?? "TTS ?"}</Badge>
+                    <Badge variant="outline">{selectedSlowTurn.stt ?? "STT ?"} → {selectedSlowTurn.video ?? selectedSlowTurn.tts ?? "Sortie ?"}</Badge>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
+                  {selectedSlowTurn.video && <p className="mb-3 text-xs text-muted-foreground">Vidéo : {selectedSlowTurn.video} · {selectedSlowTurn.videoModel || "modèle/avatar non renseigné"} · {selectedSlowTurn.videoStatus || "état non renseigné"}</p>}
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                     {[
-                      ["STT", selectedSlowTurn.sttMs], ["RAG", selectedSlowTurn.ragMs], ["Personnage LLM", selectedSlowTurn.maxMs], ["TTS", selectedSlowTurn.ttsMs],
+                      ["STT", selectedSlowTurn.sttMs], ["RAG", selectedSlowTurn.ragMs], ["Personnage LLM", selectedSlowTurn.maxMs], ["TTS", selectedSlowTurn.ttsMs], ["Vidéo (voix intégrée)", selectedSlowTurn.videoMs ?? null],
                       ["Texte prêt", selectedSlowTurn.responseReadyMs], ["Premier son", selectedSlowTurn.firstSoundMs], ["End-to-end", selectedSlowTurn.endToEndMs],
                     ].map(([label, value]) => <div key={String(label)} className="rounded-lg border bg-background p-3"><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-1 font-mono text-sm font-semibold">{fmtMs(value as number | null)}</p></div>)}
                   </div>

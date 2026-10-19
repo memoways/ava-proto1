@@ -10,7 +10,7 @@ const corsHeaders = {
 const CACHE_TTL_MS = 60_000;
 const cache = new Map<string, { expiresAt: number; value: unknown }>();
 const ALLOWED_PERIODS = new Set(["24h", "7d", "30d", "custom"]);
-const ALLOWED_FILTERS = new Set(["character", "model", "stt", "tts", "browser"]);
+const ALLOWED_FILTERS = new Set(["character", "model", "stt", "tts", "video", "browser"]);
 const EVENTS = [
   "voice_turn_completed",
   "prd4_gm_post_turn",
@@ -42,6 +42,10 @@ interface EventRow {
   model: string | null;
   stt: string | null;
   tts: string | null;
+  video: string | null;
+  videoModel: string | null;
+  videoStatus: string | null;
+  videoMs: number | null;
   browser: string | null;
   responseReadyMs: number | null;
   firstSoundMs: number | null;
@@ -179,6 +183,10 @@ function slowestTurns(turns: EventRow[]) {
       model: row.model,
       stt: row.stt,
       tts: row.tts,
+      video: row.video,
+      videoModel: row.videoModel,
+      videoStatus: row.videoStatus,
+      videoMs: row.videoMs,
       browser: row.browser,
       responseReadyMs: row.responseReadyMs,
       firstSoundMs: row.firstSoundMs,
@@ -224,6 +232,7 @@ function aggregate(rows: EventRow[], range: { period: string; from: Date; to: Da
       rag: percentiles(turns, "ragMs"),
       max: percentiles(turns, "maxMs"),
       tts: percentiles(turns, "ttsMs"),
+      video: percentiles(turns, "videoMs"),
       gmPost: percentiles(gmPostTurns, "gmMs"),
     },
     blockers: counts(turns.map((row) => row.blocker)),
@@ -231,6 +240,7 @@ function aggregate(rows: EventRow[], range: { period: string; from: Date; to: Da
       models: counts(turns.map((row) => row.model)),
       stt: counts(turns.map((row) => row.stt)),
       tts: counts(turns.map((row) => row.tts)),
+      video: counts(turns.map((row) => row.video)),
       browsers: counts(turns.map((row) => row.browser)),
       characters: counts(turns.map((row) => row.character)),
     },
@@ -283,6 +293,7 @@ serve(async (req) => {
     model: "max_model",
     stt: "stt_provider",
     tts: "tts_provider",
+    video: "video_provider",
     browser: "browser_family",
   };
   for (const [key, value] of Object.entries(filters)) {
@@ -300,7 +311,8 @@ serve(async (req) => {
       properties.t_rag_total_ms, properties.t_max_llm_ms,
       properties.t_tts_total_ms, coalesce(properties.t_gm_post_ms, properties.latency_ms),
       properties.blocker_step, properties.severity,
-      coalesce(properties.had_fallback, properties.skipped, false)
+      coalesce(properties.had_fallback, properties.skipped, false),
+      properties.video_provider, properties.video_model, properties.video_status, properties.t_video_wait_ms
     FROM events
     WHERE ${conditions.join(" AND ")}
     ORDER BY timestamp DESC
@@ -333,6 +345,9 @@ serve(async (req) => {
       endToEndMs: numberOrNull(row[13]),
       sttMs: numberOrNull(row[14]), ragMs: numberOrNull(row[15]), maxMs: numberOrNull(row[16]),
       ttsMs: numberOrNull(row[17]), gmMs: numberOrNull(row[18]), blocker: row[19] == null ? null : String(row[19]),
+      video: row[22] == null ? null : String(row[22]),
+      videoModel: row[23] == null ? null : String(row[23]),
+      videoStatus: row[24] == null ? null : String(row[24]), videoMs: numberOrNull(row[25]),
       severity: row[20] == null ? null : String(row[20]), fallback: row[21] === true || row[21] === 1,
     }));
     const result = aggregate(rows, range, projectId, host);

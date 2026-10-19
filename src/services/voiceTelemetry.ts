@@ -12,6 +12,7 @@ export type VoiceBlockerStep =
   | "max_llm"
   | "validator"
   | "tts_generation"
+  | "video"
   | "audio_playback"
   | "gm_post"
   | "unknown";
@@ -29,6 +30,7 @@ export interface VoiceTurnTimings {
   t_validator_ms?: number;
   t_tts_first_byte_ms?: number;
   t_tts_total_ms?: number;
+  t_video_wait_ms?: number;
   t_audio_playback_start_ms?: number;
   t_audio_playback_total_ms?: number;
   t_gm_post_ms?: number;
@@ -68,6 +70,7 @@ export interface VoiceTurnCompletedInput {
     segments_played?: number;
     segments_failed?: number;
   };
+  video?: import("./streamingAvatar/types").VideoLatencyObservation;
   browser?: Partial<BrowserDiagnostics>;
   audio_unlocked?: boolean;
   stt_trigger?: "silence" | "ptt_flush" | "manual" | "unknown";
@@ -85,6 +88,9 @@ export type VoiceTurnCompletedPayload = VoiceTurnCompletedInput &
     media_recorder_mime: string;
     tts_provider?: string;
     tts_model?: string;
+    video_provider?: string;
+    video_model?: string;
+    video_status?: import("./streamingAvatar/types").VideoLatencyObservation["status"];
     stt_provider?: string;
     stt_model?: string;
     stt_mode?: string;
@@ -124,6 +130,7 @@ const STEP_BUDGET_MS: Record<VoiceBlockerStep, number> = {
   max_llm: 1200,
   validator: 400,
   tts_generation: 800,
+  video: 800,
   audio_playback: 1800,
   gm_post: 800,
   unknown: Number.POSITIVE_INFINITY,
@@ -181,6 +188,7 @@ export function pickVoiceTurnBlocker(timings: VoiceTurnTimings, hadError = false
     { step: "max_llm", value: timings.t_max_llm_ms },
     { step: "validator", value: timings.t_validator_ms },
     { step: "tts_generation", value: timings.t_tts_total_ms },
+    { step: "video", value: timings.t_video_wait_ms },
   ];
 
   let worst: { step: VoiceBlockerStep; ratio: number } | null = null;
@@ -248,6 +256,9 @@ export function buildVoiceTurnCompletedPayload(input: VoiceTurnCompletedInput): 
     media_recorder_mime: input.browser?.selectedMimeType || "",
     tts_provider: input.tts?.provider,
     tts_model: input.tts?.model,
+    video_provider: input.video?.provider,
+    video_model: input.video?.model,
+    video_status: input.video?.status,
     stt_provider: input.stt?.provider,
     stt_model: input.stt?.model,
     stt_mode: input.stt?.mode,
@@ -368,6 +379,15 @@ function recordAvaLatencyEvents(payload: VoiceTurnCompletedPayload): void {
       model: payload.gm_model || "Unknown",
       mode: "",
     },
+    {
+      key: "video_ms",
+      label: "Vidéo (voix intégrée)",
+      duration: payload.t_video_wait_ms,
+      provider: payload.video_provider || "Unknown",
+      serviceName: payload.video_provider || "Unknown",
+      model: payload.video_model || "Unknown",
+      mode: "webrtc",
+    },
   ].filter((segment) => typeof segment.duration === "number" && Number.isFinite(segment.duration) && segment.duration >= 0);
 
   trackEvent("ava_turn_latency_summary", {
@@ -386,6 +406,10 @@ function recordAvaLatencyEvents(payload: VoiceTurnCompletedPayload): void {
     llm_model: payload.max_model || "Unknown",
     tts_provider: payload.tts_provider || "Unknown",
     tts_model: payload.tts_model || "Unknown",
+    video_provider: payload.video_provider,
+    video_model: payload.video_model,
+    video_status: payload.video_status,
+    t_video_wait_ms: payload.t_video_wait_ms,
   });
 
   for (const segment of segments) {

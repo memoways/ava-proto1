@@ -1,4 +1,6 @@
 import { createVoiceTurnV2, handleVoiceInputError, type ServiceObservation, type VoiceObserver } from "@/services/voiceTurnTelemetryV2";
+import { renderWithVideoLatency, splitOutputLatency } from "@/services/streamingAvatar/latency";
+import type { VideoLatencyObservation } from "@/services/streamingAvatar/types";
 import { getRuntimeContext } from "@/services/environmentContext";
 /**
  * IndexPRD4 — Nouveau parcours (mai 2026).
@@ -589,14 +591,19 @@ const IndexPRD4 = () => {
       characterKey,
       performance: intent,
     };
+    let videoLatency: VideoLatencyObservation | undefined;
     try {
       if (output.mode === "tts") setAudioState("max_speaking");
-      return await output.renderText(text, turnContext);
+      const result = output.mode === "streaming_avatar"
+        ? await renderWithVideoLatency(output, text, turnContext, value => { videoLatency = value; })
+        : await output.renderText(text, turnContext);
+      return videoLatency ? { ...result, videoLatency } : result;
     } catch (error) {
       if (context.signal?.aborted) {
         return {
           status: "cancelled",
           provider: output.provider,
+          videoLatency,
           firstPlaybackStartMs: 0,
           playbackTotalMs: 0,
           generatedSegments: 0,
@@ -629,11 +636,13 @@ const IndexPRD4 = () => {
       const fallback = await activateTTSFallback(message);
       if (!started) {
         setAudioState("max_speaking");
-        return fallback.renderText(text, turnContext);
+        const result = await fallback.renderText(text, turnContext);
+        return { ...result, videoLatency: videoLatency ? { ...videoLatency, fallbackUsed: true } : undefined };
       }
       return {
         status: "failed",
         provider: output.provider,
+        videoLatency,
         firstPlaybackStartMs: 0,
         playbackTotalMs: 0,
         generatedSegments: 1,
@@ -1404,7 +1413,8 @@ const IndexPRD4 = () => {
         }
         if (outputResult.status === "played") telemetry.observe("audio_end");
         if (streamedVoice && earlyFirstPlaybackAt != null) onPlaybackStart();
-        telemetry.durations(outputResult.generatedSegments > 0 ? outputResult.generationWallMs ?? null : null, outputResult.status === "played" ? outputResult.playbackTotalMs : null);
+        telemetry.durations(outputResult.generatedSegments > 0 ? outputResult.generationWallMs ?? null : null, outputResult.status === "played" ? outputResult.playbackTotalMs : null,
+          outputResult.videoLatency?.status !== "not_measured" ? outputResult.videoLatency?.waitMs : undefined);
         telemetry.finish(outputController.signal.aborted && /deadline/.test(String(outputController.signal.reason)) ? "timeout"
           : outputResult.status === "failed" ? "failed" : outputResult.status === "cancelled" ? "cancelled"
           : outputResult.started ? "completed" : "no_audio");
@@ -1413,9 +1423,12 @@ const IndexPRD4 = () => {
           void playAudioBlobRobust(rescueRef.current.get(turnCharacter)!, undefined, undefined, turnController.signal);
         }
         resumeConversationTraceSync(true);
-        const tts_ms = firstPlaybackAt == null ? undefined : Math.max(0, Math.round(firstPlaybackAt - ttsStart));
+        const outputWaitMs = firstPlaybackAt == null ? undefined : Math.max(0, Math.round(firstPlaybackAt - ttsStart));
+        const { ttsMs: tts_ms, videoMs: video_ms } = splitOutputLatency(outputWaitMs, outputResult.videoLatency);
         const voiceReadyMs = firstPlaybackAt == null ? undefined : Math.max(0, Math.round(firstPlaybackAt - inputReadyAt));
         if (maxMsg.pipeline) {
+          if (video_ms != null) maxMsg.pipeline.video_ms = video_ms;
+          if (outputResult.videoLatency) maxMsg.pipeline.video_status = outputResult.videoLatency.status;
           if (tts_ms != null && tts_ms > 0) {
             maxMsg.pipeline.tts_ms = tts_ms;
             maxMsg.pipeline.tts_first_playback_ms = tts_ms;
@@ -1428,10 +1441,17 @@ const IndexPRD4 = () => {
               : "not_measured";
           maxMsg.pipeline.segmentServices = {
             ...(maxMsg.pipeline.segmentServices || {}),
-            tts_ms: { serviceProvider: outputResult.provider, serviceName: outputResult.provider, model: outputResult.model ?? "Unknown" },
+            ...(tts_ms != null ? { tts_ms: { serviceProvider: outputResult.provider, serviceName: outputResult.provider, model: outputResult.model ?? "Unknown" } } : {}),
+            ...(outputResult.videoLatency ? { video_ms: {
+              serviceProvider: outputResult.videoLatency.provider, serviceName: outputResult.videoLatency.provider,
+              model: outputResult.videoLatency.model ?? "Unknown", mode: "webrtc", endpointType: "video",
+            } } : {}),
           };
           if ((tts_ms ?? 0) > (maxMsg.pipeline.max_ms ?? 0) && (tts_ms ?? 0) > (maxMsg.pipeline.rag_ms ?? 0)) {
             maxMsg.pipeline.blocker = "tts_ms";
+          }
+          if ((video_ms ?? 0) > Math.max(tts_ms ?? 0, maxMsg.pipeline.max_ms ?? 0, maxMsg.pipeline.rag_ms ?? 0)) {
+            maxMsg.pipeline.blocker = "video_ms";
           }
         }
 
@@ -1463,6 +1483,7 @@ const IndexPRD4 = () => {
             t_rag_total_ms: result.timings.rag_ms,
             t_max_llm_ms: result.timings.max_ms,
             t_tts_total_ms: tts_ms,
+            t_video_wait_ms: video_ms,
             t_audio_playback_total_ms: outputResult.playbackTotalMs,
             t_turn_response_ready_ms: responseReadyMs,
             t_turn_voice_ready_ms: voiceReadyMs,
@@ -1472,7 +1493,9 @@ const IndexPRD4 = () => {
             gm_model: llmSettings?.LLM_MODEL_GM,
           },
           rag: { matches_count: result.ragMatches },
-          tts: {
+          video: outputResult.videoLatency,
+          had_fallback: outputResult.videoLatency?.fallbackUsed,
+          tts: tts_ms == null ? undefined : {
             provider: outputResult.provider,
             model: outputResult.model,
             segments_count: outputResult.generatedSegments,

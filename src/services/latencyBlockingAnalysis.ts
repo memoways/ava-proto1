@@ -4,7 +4,7 @@ import { messageCharacter } from "./sessionCharacters";
 
 export const STEP_BUDGET_MS: Record<NumericTimingKey, number> = {
   stt_ms: 900, rag_ms: 250, gm_pre_ms: 400, max_ms: 800, validator_ms: 300,
-  tts_ms: 600, gm_post_ms: 200, total_ms: 2000,
+  tts_ms: 600, video_ms: 800, gm_post_ms: 200, total_ms: 2000,
 };
 const STEP_LABELS = [...PLAYER_WAIT_SEGMENT_KEYS, "gm_post_ms" as const].map(key => ({ key }));
 const serviceLatency = getPipelineServiceLatency;
@@ -72,7 +72,7 @@ export interface SessionAggregate {
   turns: TurnTiming[];
 }
 
-export type NumericTimingKey = "stt_ms" | "rag_ms" | "gm_pre_ms" | "max_ms" | "validator_ms" | "tts_ms" | "gm_post_ms" | "total_ms";
+export type NumericTimingKey = LatencySegmentKey;
 
 export function aggregateLatencySession(session: SessionRow, characterFilter: string = "all"): SessionAggregate {
   const log = Array.isArray(session.conversation_log) ? session.conversation_log : [];

@@ -141,3 +141,13 @@ describe("V2 observations without changing voice decisions", () => {
     expect(spans.snapshot().spans.map((span) => span.status)).toEqual(["ok", "failed", "failed", "failed", "failed"]);
   });
 });
+
+it("retains video wait as an additive observation without changing the total or legacy fields", () => {
+  const { turn, events } = attempt();
+  turn.observe("output_estimated", 2800);
+  turn.durations(null, 5000, 1200);
+  turn.finish("completed");
+  turn.durations(null, null, 9000); // Late updates cannot rewrite the finished turn.
+  expect(events[1].value.durations).toMatchObject({ video_wait_ms: 1200, origin_to_output_estimated_ms: 1800, playback_ms: 5000 });
+  expect(events[0].value.durations.video_wait_ms).toBeUndefined();
+});

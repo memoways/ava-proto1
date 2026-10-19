@@ -321,7 +321,7 @@ var VOICE_MILESTONES = [
 var label = z4.string().max(160).nullable();
 var duration = z4.number().finite().nonnegative().nullable();
 var serviceSchema = z4.object({
-  service: z4.enum(["stt", "llm", "tts", "rag", "gm"]),
+  service: z4.enum(["stt", "llm", "tts", "video", "rag", "gm"]),
   requested_provider: label,
   requested_model: label,
   resolved_provider: label,
@@ -358,7 +358,7 @@ var voiceTurnProjectionSchema = z4.object({
   milestones: z4.object(Object.fromEntries(VOICE_MILESTONES.map((name) => [name, z4.number().finite().nullable().default(null)]))),
   services: z4.array(serviceSchema).max(16),
   server: z4.array(spanSchema).max(8),
-  durations: z4.object({ origin_to_response_ms: duration, origin_to_output_estimated_ms: duration, t_turn_voice_ready_ms: duration, generation_total_ms: duration, playback_ms: duration }),
+  durations: z4.object({ origin_to_response_ms: duration, origin_to_output_estimated_ms: duration, t_turn_voice_ready_ms: duration, generation_total_ms: duration, playback_ms: duration, video_wait_ms: duration.optional() }),
   coverage: z4.object({ state: z4.enum(["complete", "partial"]), observed: z4.number().int().nonnegative(), expected: z4.number().int().nonnegative(), missing: z4.array(z4.enum(VOICE_MILESTONES)).max(VOICE_MILESTONES.length) }),
   output_precision: z4.enum(["software_estimate", "unavailable"]),
   critical_wait: z4.literal("coverage_incomplete"),

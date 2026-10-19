@@ -73,6 +73,16 @@ export interface ResponseOutputResult {
   services?: import("../voiceTurnTelemetryV2").ServiceObservation[];
   generationWallMs?: number;
   error?: Error;
+  videoLatency?: VideoLatencyObservation;
+}
+
+export interface VideoLatencyObservation {
+  provider: string;
+  model?: string;
+  waitMs: number;
+  status: "started" | "failed" | "cancelled" | "not_measured";
+  precision: "provider_speech_event";
+  fallbackUsed?: boolean;
 }
 
 /** Technical-only fields; never include room URLs, tokens or spoken text. */
@@ -107,6 +117,8 @@ export interface ResponseOutputCallbacks {
 export interface ResponseOutput {
   readonly mode: OutputMode;
   readonly provider: string;
+  /** Technical avatar/model identifier actually selected by this instance. */
+  readonly model?: string;
   readonly externalSessionId: string | null;
   prepare(context: ResponseOutputPrepareContext): Promise<void>;
   renderText(text: string, context?: ResponseOutputTurnContext): Promise<ResponseOutputResult>;

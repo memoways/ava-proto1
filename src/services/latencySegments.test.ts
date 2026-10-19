@@ -298,3 +298,18 @@ describe("latencySegments", () => {
     ]);
   });
 });
+
+describe("video service segments", () => {
+  it("keeps video attribution, service stats and observed total without double counting", () => {
+    const pipeline = { max_ms: 500, video_ms: 1200, total_ms: 1800,
+      latency_origin: "text_submitted" as const, first_sound_status: "measured" as const, blocker: "video_ms" };
+    const segments = buildLatencySegmentsFromPipeline({ pipeline, services: {
+      video_ms: { serviceProvider: "future-video", serviceName: "future-video", model: "avatar-2", mode: "webrtc" },
+    } });
+    expect(segments.find(s => s.key === "video_ms")).toMatchObject({ durationMs: 1200, serviceProvider: "future-video", model: "avatar-2", context: { blocked: true } });
+    expect(segments.some(s => s.key === "tts_ms")).toBe(false);
+    expect(computeSegmentServiceStats(segments).find(s => s.segmentKey === "video_ms")).toMatchObject({ p50: 1200, blockageCount: 1 });
+    expect(getPlayerWaitLatencyTotal(pipeline)).toBe(1800);
+    expect(getPipelineServiceLatency({ max_ms: 500 }, "video_ms")).toBeUndefined();
+  });
+});

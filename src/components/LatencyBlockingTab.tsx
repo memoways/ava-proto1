@@ -68,6 +68,7 @@ const STEP_LABELS: Array<{ key: NumericTimingKey; label: string; color: string }
   { key: "max_ms", label: "Personnage LLM", color: "bg-emerald-500" },
   { key: "validator_ms", label: "Validateur", color: "bg-amber-500" },
   { key: "tts_ms", label: "TTS", color: "bg-rose-500" },
+  { key: "video_ms", label: "Vidéo (voix intégrée)", color: "bg-cyan-500" },
   { key: "gm_post_ms", label: "GM post-tour (hors attente)", color: "bg-fuchsia-500" },
 ];
 const PLAYER_WAIT_STEPS = STEP_LABELS.filter((step) => step.key !== "gm_post_ms");
@@ -97,6 +98,7 @@ const STEP_HEX: Record<NumericTimingKey, string> = {
   max_ms: "#10b981",       // emerald-500
   validator_ms: "#f59e0b", // amber-500
   tts_ms: "#f43f5e",       // rose-500
+  video_ms: "#06b6d4",
   gm_post_ms: "#d946ef",   // fuchsia-500
   total_ms: "#6366f1",
 };
@@ -148,6 +150,11 @@ const STEP_HYPOTHESES: Record<NumericTimingKey, string[]> = {
     "Vérifier le délai texte → premier son audible",
     "Voice ID plus rapide ou modèle TTS turbo",
     "Pré-charger l'intro TTS pendant la phase ringing",
+  ],
+  video_ms: [
+    "Comparer le service vidéo et l'avatar effectivement utilisés",
+    "Vérifier la disponibilité du flux et le démarrage de la parole",
+    "Le délai vidéo inclut la voix du fournisseur ; le TTS de secours est séparé",
   ],
   gm_post_ms: [
     "Post-turn en background (n'attend pas avant le tour suivant)",
@@ -580,7 +587,7 @@ function LatencyVisualization({
       total: turns.length,
       failed: key === "gm_post_ms"
         ? turns.filter((turn) => turn.gmPostStatus === "failed" || turn.gmPostStatus === "invalid").length
-        : 0,
+        : key === "video_ms" ? turns.filter((turn) => turn.video_status === "failed").length : 0,
       emptyLabel: key === "gm_pre_ms" || key === "validator_ms" ? "non exécuté" : "non mesuré",
     }));
   }, [perSessionRows]);
@@ -602,7 +609,7 @@ function LatencyVisualization({
           <h3 className="text-sm font-semibold">Attente et durées des services</h3>
           <p className="text-xs text-muted-foreground">
             Le marqueur indique l’attente ; les barres cumulent les durées des services, qui peuvent se chevaucher.
-            Les anciennes sessions utilisent une estimation par cumul des segments disponibles. Les données manquantes restent non mesurées.
+            Les anciennes sessions utilisent une estimation par cumul des segments disponibles. Les données manquantes restent non mesurées. La vidéo inclut la voix intégrée du fournisseur ; son démarrage est une estimation logicielle via l’événement de parole, pas une mesure physique. En secours, l’attente vidéo et le TTS local sont séparés sans augmenter le total observé.
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground/80 flex items-center gap-1">
             <Info className="h-3 w-3" /> Survole un segment pour un aperçu, clique dessus pour ouvrir le panneau d'analyse détaillée.
@@ -1158,7 +1165,7 @@ function LatencyEvolutionPanel({
       <div>
         <h3 className="text-sm font-semibold">Évolution temporelle par service</h3>
         <p className="text-xs text-muted-foreground">
-          Compare STT, LLM personnage et TTS dans le temps. Les services peuvent être superposés ou inspectés indépendamment.
+          Compare STT, LLM personnage, TTS et vidéo dans le temps. Les services peuvent être superposés ou inspectés indépendamment.
         </p>
         {hasUnknown && (
           <p className="mt-1 text-[11px] text-muted-foreground">
@@ -1342,12 +1349,13 @@ type BlockerFilter = "all" | "with" | "without";
 type CharacterFilter = string;
 type SeverityFilter = "all" | "high" | "critical";
 type MetricMode = "p50" | "p95";
-type SegmentEvolutionKey = "stt_ms" | "max_ms" | "tts_ms";
+type SegmentEvolutionKey = "stt_ms" | "max_ms" | "tts_ms" | "video_ms";
 
 const EVOLUTION_SEGMENTS: Array<{ key: SegmentEvolutionKey; label: string; color: string }> = [
   { key: "stt_ms", label: "STT", color: STEP_HEX.stt_ms },
   { key: "max_ms", label: "Personnage LLM", color: STEP_HEX.max_ms },
   { key: "tts_ms", label: "TTS", color: STEP_HEX.tts_ms },
+  { key: "video_ms", label: "Vidéo (voix intégrée)", color: STEP_HEX.video_ms },
 ];
 
 const SERVICE_COLORS = [
@@ -1383,6 +1391,7 @@ export default function LatencyBlockingTab() {
     stt_ms: "all",
     max_ms: "all",
     tts_ms: "all",
+    video_ms: "all",
   });
   const [highlightedEvolutionSessionId, setHighlightedEvolutionSessionId] = useState<string | null>(null);
   // Recent internal conversations are sandbox sessions and carry real measurements.
@@ -1569,12 +1578,12 @@ export default function LatencyBlockingTab() {
   const serviceStats = useMemo(() => {
     const segments = selectedLatencySegments;
     return computeSegmentServiceStats(segments).filter((s) =>
-      s.segmentKey === "stt_ms" || s.segmentKey === "max_ms" || s.segmentKey === "tts_ms" || s.segmentKey === "rag_ms",
+      s.segmentKey === "stt_ms" || s.segmentKey === "max_ms" || s.segmentKey === "tts_ms" || s.segmentKey === "video_ms" || s.segmentKey === "rag_ms",
     );
   }, [selectedLatencySegments]);
   const evolutionPoints = useMemo(
     () => computeSegmentServiceEvolution(selectedLatencySegments).filter((p) =>
-      p.segmentKey === "stt_ms" || p.segmentKey === "max_ms" || p.segmentKey === "tts_ms",
+      p.segmentKey === "stt_ms" || p.segmentKey === "max_ms" || p.segmentKey === "tts_ms" || p.segmentKey === "video_ms",
     ),
     [selectedLatencySegments],
   );
