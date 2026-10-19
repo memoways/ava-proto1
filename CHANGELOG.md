@@ -4,7 +4,7 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
-## [Non publié] — 2026-10-19 — Latence des services vidéo
+## [Publié via Lovable] — 2026-10-19 — Latence des services vidéo
 
 - Qualité → Latence & blocage et Latence PostHog : segment vidéo, P50/P95,
   fournisseur/identifiant d'avatar effectifs, évolution et filtre vidéo.
