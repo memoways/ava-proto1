@@ -291,6 +291,24 @@ attente corrigée, assertions sur absence de commit et compteur conservées.
 Les tests de composant suivent la poursuite de la discussion prévue (micro
 utilisable avec une offre) ; le mock admin inclut le nouveau lecteur d'événements.
 
+Revue de `bfb8f18` : deux courses de callbacks corrigées (révision acquittée après
+watchdog conservée avant le contrôle de tour ; révocation ancienne interdite sur
+nouvelle session/tentative). La ref de recommandation devenue sans lecteur est
+retirée. Le transcript du tour, ses preuves et l'offre utilisent maintenant le
+même CAS ; les reçus et labels du tour passent aussi par ce filtre, pour ne pas
+écraser un tour avancé dans un autre onglet. Le salut après connexion utilise
+également la révision consommée. Mutation en conflit : aucun effet directeur.
+Une demande ouverte doit être confirmée defer par le GM à chaque tour ; résultat
+absent/invalide/refus/retrait la ferme, sans prolonger la borne de deux messages.
+Cette fermeture conservatrice évite de ressusciter une demande retirée. Régression
+pure dédiée et instructions GM cohérentes, sans champ JSON supplémentaire.
+Le clic ferme immédiatement les primitives de capture/sortie avant la revalidation.
+Deux reproductions E2E des anciens comportements sont rouges (snapshot préexistant
+pour le watchdog ; révocation différée puis nouvel appel), puis les trois parcours
+de revue sont verts avec le correctif. Qualité locale corrigée : 726 unitaires,
+41 intégrations, 48 régressions, typecheck/lint/build verts ; avertissement hooks
+préexistant conservé. Suite E2E complète à relancer sur cette révision.
+
 Les résultats finaux, revues et références de livraison sont ajoutés après contrôle.
 Aucun lot 3 ou 4 commencé ; aucune publication produit ni changement Cloud.
 

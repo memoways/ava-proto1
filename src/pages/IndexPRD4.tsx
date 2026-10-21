@@ -28,7 +28,6 @@ import { processPRD4Turn, streamPRD4Turn } from "@/services/prd4Orchestrator";
 import {
   createPRD4Session,
   endPRD4Session,
-  updatePRD4Conversation,
   updatePRD4Onboarding,
   updatePRD4ExperienceState,
   updatePRD4StreamingAvatar,
@@ -294,7 +293,6 @@ const IndexPRD4 = () => {
   const handoffSnapshotRef = useRef<HandoffSnapshot | null>(null);
   const handoffWriteRef = useRef<Promise<HandoffSnapshot> | null>(null);
   const handoffPhaseRef = useRef<'none' | 'validating' | 'calling' | 'switching' | 'completed' | 'failed' | 'declined' | 'revoked'>('none');
-  const handoffRecommendationRef = useRef<CharacterHandoffOffer | null>(null);
   const [handoffOffer, setHandoffOffer] = useState<CharacterHandoffOffer | null>(null);
   const handoffOfferRef = useRef<CharacterHandoffOffer | null>(null);
   const acceptedHandoffRef = useRef<CharacterHandoffOffer | null>(null);
@@ -996,7 +994,7 @@ const IndexPRD4 = () => {
     handoffSnapshotRef.current = null;
     handoffPhaseRef.current = 'none';
     handoffCountRef.current = 0;
-    handoffRecommendationRef.current = null;
+
     setCurrentHandoffOffer(null);
     setHandoffCalling(false);
     pendingGmGuidanceRef.current = null;
@@ -1208,6 +1206,11 @@ const IndexPRD4 = () => {
       let turnHandoffSnapshot: HandoffSnapshot | null = null;
       let responseMessage: ConversationMessage | null = null;
       const owningSessionId = sessionIdRef.current;
+      const persistTurnConversation = () => {
+        if (!turnHandoffSnapshot || !turnHandoffState || sessionIdRef.current !== owningSessionId) return;
+        void writeHandoffSnapshot(turnHandoffSnapshot, turnHandoffState, undefined, conversationRef.current)
+          .catch(error => { if (!(error instanceof HandoffConflictError)) console.warn('[PRD4] conversation persistence failed', error); });
+      };
       const persistReceipt = (receipt: ResponseDeliveryReceipt) => {
         responseReceipt = receipt;
         if (owningSessionId) void persistDeliveryReceipt(owningSessionId, receipt).catch(error => {
@@ -1222,7 +1225,7 @@ const IndexPRD4 = () => {
           addMessage(interrupted);
         }
         if (owningSessionId && sessionIdRef.current === owningSessionId) {
-          void updatePRD4Conversation(owningSessionId, conversationRef.current);
+          persistTurnConversation();
         }
       };
       try {
@@ -1235,9 +1238,13 @@ const IndexPRD4 = () => {
           if (expected.active_character !== turnCharacter || !expected.orchestration_version_id) throw new HandoffConflictError();
           turnHandoffState = advanceHandoffTurn(expected.pending_handoff, { sessionId: sid,
             sourceCharacter: turnCharacter, orchestrationVersionId: expected.orchestration_version_id, turnId, turnIndex });
-          turnHandoffSnapshot = await writeHandoffSnapshot(expected, turnHandoffState);
+          const write = writeHandoffSnapshot(expected, turnHandoffState, undefined, conversationRef.current).then(saved => {
+            if (sessionIdRef.current === sid) handoffSnapshotRef.current = saved;
+            return saved;
+          });
+          handoffWriteRef.current = write;
+          turnHandoffSnapshot = await write.finally(() => { if (handoffWriteRef.current === write) handoffWriteRef.current = null; });
           if (!isCurrentTurn()) return;
-          handoffSnapshotRef.current = turnHandoffSnapshot;
           handoffPhaseRef.current = 'revoked';
           if (parseHandoffState(expected.pending_handoff)?.state === 'available') void appendExperienceEvent({
             sessionId: sid, eventKey: `handoff-revoked:${turnId}`, eventType: 'handoff_revoked', turnId, turnIndex,
@@ -1264,7 +1271,7 @@ const IndexPRD4 = () => {
           : null;
         const gmGuidance = [pendingGmGuidanceRef.current, switchGuidance].filter(Boolean).join(" ") || null;
         pendingGmGuidanceRef.current = null;
-        handoffRecommendationRef.current = null;
+
         const priorConversation = sliceConversationForCharacter(
           conversationRef.current.slice(0, -1),
           activeCharacterRef.current,
@@ -1566,7 +1573,7 @@ const IndexPRD4 = () => {
 
         // Persist conversation (best effort, fire-and-forget)
         if (sessionIdRef.current) {
-          void updatePRD4Conversation(sessionIdRef.current, conversationRef.current);
+          persistTurnConversation();
         }
 
         // ---- Directeur d'expérience unique : labels, mémoire, guidance et une
@@ -1620,7 +1627,7 @@ const IndexPRD4 = () => {
                 }
               }
               if (sessionIdRef.current) {
-                void updatePRD4Conversation(sessionIdRef.current, conversationRef.current);
+                persistTurnConversation();
               }
             }
           }
@@ -1653,7 +1660,7 @@ const IndexPRD4 = () => {
           }, gmExecuted ? directorConfig : null, activeCharacterRef.current);
           const targetCharacter = decision.action.type === "handoff" ? decision.action.targetCharacter : "emma";
           const guarded = validateDirectorDecision(decision, {
-            configPublished: Boolean(ev.orchestration_version_id),
+            configPublished: Boolean(ev.orchestration_version_id && directorConfig),
             currentCharacter: activeCharacterRef.current,
             userTurn: turnIndex,
             handoffCount: handoffCountRef.current,
@@ -1693,9 +1700,8 @@ const IndexPRD4 = () => {
             const next = offerConfirmed && guarded.action.type === 'handoff' ? assessment.state
               : assessment.state.state === 'available' ? revokeHandoff(assessment.state) : assessment.state;
             try {
-              await updatePRD4Conversation(sid, conversationRef.current);
               if (!isCurrentTurn()) return;
-              const write = writeHandoffSnapshot(turnHandoffSnapshot, next).then(saved => {
+              const write = writeHandoffSnapshot(turnHandoffSnapshot, next, undefined, conversationRef.current).then(saved => {
                 if (sessionIdRef.current === sid) handoffSnapshotRef.current = saved;
                 return saved;
               });
@@ -1716,12 +1722,11 @@ const IndexPRD4 = () => {
               if (sid) void appendExperienceEvent({ sessionId: sid, eventKey: `handoff-persist-failed:${turnId}`,
                 eventType: 'handoff_blocked', turnId, turnIndex, character: turnCharacter,
                 payload: { stage: 'persistence', blockedReason: error instanceof HandoffConflictError ? 'gm_late' : 'persistence_failed' } });
+              return;
             }
           }
           if (guarded.action.type === 'handoff' && !offerConfirmed && gmExecuted
             && !['character_refused', 'character_deferred'].includes(assessment?.validation.reason ?? '')) {
-            handoffRecommendationRef.current = { reason: guarded.action.reason,
-              proposalGuidance: guarded.action.proposalGuidance, targetCharacter: guarded.action.targetCharacter };
             pendingGmGuidanceRef.current = guarded.action.proposalGuidance;
             trackEvent('prd4_handoff_recommended', { session_id: sid, turn_id: turnId, turn_index: turnIndex });
           } else if (guarded.action.type === "cinematic") {
@@ -2228,10 +2233,17 @@ const IndexPRD4 = () => {
   const revalidateCall = useCallback(async () => {
     const expected = handoffSnapshotRef.current;
     if (!expected) throw new HandoffConflictError();
+    const attempt = handoffAttemptIdRef.current;
+    const sequence = activeTurnSequenceRef.current;
+    const current = () => sessionIdRef.current === expected.id && handoffAttemptIdRef.current === attempt
+      && activeTurnSequenceRef.current === sequence && !endedRef.current;
     const validated = await revalidateHandoffCall(expected);
+    if (!current()) throw new HandoffConflictError();
     if (validated.blockedReason) {
       const revoked = revokeHandoff(validated.state!);
-      handoffSnapshotRef.current = await writeHandoffSnapshot(validated.snapshot, revoked);
+      const saved = await writeHandoffSnapshot(validated.snapshot, revoked);
+      if (!current()) throw new HandoffConflictError();
+      handoffSnapshotRef.current = saved;
       setCurrentHandoffOffer(null);
       throw new Error(`${characterDisplayName(validated.offer.targetCharacter)} n’est plus disponible pour cet appel.`);
     }
@@ -2278,7 +2290,7 @@ const IndexPRD4 = () => {
       pendingEmotionalStateRef.current = null;
       pendingPostVideoContextRef.current = null;
       gmTopicsCoveredRef.current = [];
-      handoffRecommendationRef.current = null;
+
       activeCharacterRef.current = target;
       activeCharacterContextRef.current = characterContext;
       activeVoiceIdRef.current = profile.ttsVoiceId;
@@ -2294,7 +2306,8 @@ const IndexPRD4 = () => {
       conversationRef.current = [...conversationRef.current, opening];
       addMessage(opening);
       setMaxSubtitle(openingLine);
-      if (sid) await updatePRD4Conversation(sid, conversationRef.current);
+      const withOpening = await writeHandoffSnapshot(saved, consumed, undefined, conversationRef.current);
+      if (sessionIdRef.current === sid) handoffSnapshotRef.current = withOpening;
       if (!isSwitchCurrent()) return;
       acceptedHandoffRef.current = null;
       approvedCallingTargetRef.current = null;
@@ -2344,6 +2357,9 @@ const IndexPRD4 = () => {
     if (!offer?.gmApproval || offer.targetCharacter === activeCharacterRef.current) return;
     handoffPhaseRef.current = 'validating'; // synchronous lock before the first await
     const sid = sessionIdRef.current;
+    finishInputTelemetry('cancelled');
+    cleanupAudio();
+    setAudioState('idle');
     const sequence = activeTurnSequenceRef.current;
     const eventId = crypto.randomUUID();
     handoffAttemptIdRef.current = eventId;
@@ -2353,9 +2369,6 @@ const IndexPRD4 = () => {
     try {
       await revalidateCall();
       if (endedRef.current || sessionIdRef.current !== sid || activeTurnSequenceRef.current !== sequence) return;
-      finishInputTelemetry('cancelled');
-      cleanupAudio();
-      handoffAttemptIdRef.current = eventId;
       acceptedHandoffRef.current = offer;
       setCurrentHandoffOffer(null);
       if (processingWatchdogRef.current) window.clearTimeout(processingWatchdogRef.current);
@@ -2509,7 +2522,7 @@ const IndexPRD4 = () => {
     handoffSnapshotRef.current = null;
     handoffPhaseRef.current = 'none';
     handoffCountRef.current = 0;
-    handoffRecommendationRef.current = null;
+
     startingCharacterRef.current = "max";
     setCurrentHandoffOffer(null);
     setHandoffCalling(false);

@@ -79,7 +79,7 @@ export function assessHandoffTurn(state: HandoffState, input: CharacterHandoffVa
       userText: assessment.origin.evidence, sourceCharacter: state.sourceCharacter,
       targetCharacter: assessment.targetCharacter, orchestrationVersionId: state.orchestrationVersionId };
     next.state = 'awaiting_character';
-  } else if (state.openRequest && validation.reason !== 'character_refused') {
+  } else if (state.openRequest && validation.reason === 'character_deferred') {
     next.openRequest = state.openRequest;
     next.state = 'awaiting_character';
   }

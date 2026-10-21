@@ -28,9 +28,10 @@ export async function readHandoffSnapshot(sessionId: string): Promise<HandoffSna
 
 /** One conditional UPDATE. No read-then-write emulation; a zero-row success is a conflict. */
 export async function writeHandoffSnapshot(expected: HandoffSnapshot, next: HandoffState,
-  target?: RuntimeCharacter): Promise<HandoffSnapshot> {
+  target?: RuntimeCharacter, conversation?: ConversationMessage[]): Promise<HandoffSnapshot> {
   await ensureGameAuth();
   let query = supabase.from('sessions').update({ pending_handoff: next as unknown as Json,
+    ...(conversation ? { conversation_log: JSON.parse(JSON.stringify(conversation)) as Json } : {}),
     ...(target ? { active_character: target, personnage_appele: target, handoff_count: expected.handoff_count + 1 } : {}) })
     .eq('id', expected.id).is('ended_at', null).eq('active_character', expected.active_character)
     .eq('handoff_count', expected.handoff_count);
@@ -42,6 +43,7 @@ export async function writeHandoffSnapshot(expected: HandoffSnapshot, next: Hand
   if (error) throw error;
   if (!data) throw new HandoffConflictError();
   return { ...expected, pending_handoff: next as unknown as Json,
+    ...(conversation ? { conversation_log: conversation } : {}),
     ...(target ? { active_character: target, handoff_count: expected.handoff_count + 1 } : {}) };
 }
 

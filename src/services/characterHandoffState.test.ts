@@ -81,3 +81,12 @@ it('drops an open request on the character’s refusal even when the GM action i
   refused.evaluation.action = { type: 'none' };
   expect(assessHandoffTurn(open, refused).state).toMatchObject({ state: 'none', openRequest: null });
 });
+
+it('closes an open request when the current GM no longer confirms it, including player withdrawal', () => {
+  const deferred = structuredClone(input); deferred.evaluation.handoff_assessment!.consent.stance = 'defer';
+  const open = assessHandoffTurn(advanceHandoffTurn(null, context), deferred).state;
+  const withdrawn = structuredClone(input);
+  withdrawn.userText = 'Finalement ne l’appelle pas, je reste avec toi.';
+  withdrawn.evaluation.action = { type: 'none' }; withdrawn.evaluation.handoff_assessment = null;
+  expect(assessHandoffTurn(open, withdrawn).state).toMatchObject({ state: 'none', openRequest: null, offer: null });
+});

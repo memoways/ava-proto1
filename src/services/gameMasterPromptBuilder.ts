@@ -9,6 +9,7 @@ export const CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS = `Contrat optionnel hand
   "targetEvidence": { "speaker": "user", "quote": "citation exacte qui nomme Max" },
   "consent": { "stance": "accept", "evidence": "citation exacte de l'accord du personnage", "refusalEvidence": null }
 }
+Une demande ouverte doit être reconfirmée comme en attente par une évaluation defer courante à chaque tour ; null, refus ou annulation du joueur la ferme. Ne réutilise jamais une demande retirée.
 Retourne null si aucun passage n'est évalué. Les identifiants doivent venir du contexte fourni, jamais être inventés.
 Analyse sémantiquement la réplique complète : accept|object|defer. Une demande seule ou un oui hors contexte n'est jamais une permission.
 origin.type : player_request pour la demande courante ou une demande encore ouverte explicitement fournie ; gm_proposal pour une proposition effectivement dite par le personnage au tour courant, jamais une guidance privée.
