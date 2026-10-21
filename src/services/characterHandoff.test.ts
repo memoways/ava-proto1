@@ -193,3 +193,13 @@ describe("structured consent — pure validator", () => {
     expect(input).toEqual(before);
   });
 });
+
+describe('lot 1 finalization: staying with the current character', () => {
+  it.each(['Non, je préfère que tu restes avec moi.', 'Je préfère que vous restiez avec moi.', 'Je préfère que tu restes avec moi.'])(
+    'a request to stay vetoes GM accept: %s', reply => {
+      const input = validInput();
+      input.delivery = { ...input.delivery!, generated: reply, delivered: reply };
+      input.evaluation.handoff_assessment!.consent.evidence = reply;
+      expect(validateCharacterHandoff(input).reason).toBe('character_refused');
+    });
+});

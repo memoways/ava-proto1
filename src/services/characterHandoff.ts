@@ -69,7 +69,7 @@ function explicitTransferVeto(reply: string): "character_refused" | "character_d
     || new RegExp(`(?:${pronounObject}${verb}|${verb}[- ](?:le|la|moi|nous))\\s+${refusal}`, "i").test(text)
     || new RegExp(`\\b${verb}\\s+${refusal}\\s+${namedObject}`, "i").test(text)
     || new RegExp(`\\b(?:je refuse de|pas question de)\\s+${transfer}\\b`, "i").test(text)
-    || /\b(?:enfin non|finalement non|mais non|reste[z]? avec moi)\b/.test(text)
+    || /\b(?:enfin non|finalement non|mais non|rest(?:e|es|ez|er|iez) avec moi)\b/.test(text)
     || /(?:^|[.!?…]\s*)(?:non|je refuse|pas question)\s*(?:[.!?…]|$)/.test(text);
   if (refused) return "character_refused";
   if (/(?:^|[.!?…]\s*)(?:plus tard|pas maintenant|pas encore|on verra)\s*(?:[.!?…]|$)/.test(text)

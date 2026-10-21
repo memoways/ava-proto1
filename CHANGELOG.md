@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Non publié] — 2026-10-21 — Dernier veto du lot 1
+
+- L'intégration du lot 2 révèle que « je préfère que tu restes avec moi »
+  pouvait contredire le GM sans être rejeté. Trois reproductions rouges puis
+  vertes couvrent les formes restes/restiez ; le lot 2 est mis de côté pendant
+  cette finalisation. Aucun branchement runtime ni changement Cloud.
+
 ## [Préparatoire — non activé] — 2026-10-21 — Switching Emma ↔ Max, lot 1
 
 - Contrat optionnel `handoff_assessment` : origine, personnages, tour/version,
