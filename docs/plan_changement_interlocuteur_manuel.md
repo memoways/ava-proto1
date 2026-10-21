@@ -221,7 +221,10 @@ L'intégration du lot 2 (13/14 parcours ciblés verts) révèle un refus non cou
 « Non, je préfère que tu restes avec moi. » Une offre restait possible avec le
 nouveau validateur. Travail du lot 2 préservé séparément avant de poursuivre.
 Trois tests isolés échouent sur les formulations restes/restiez, puis passent
-avec le veto conjugué. Filtres historiques, prompt actif, Cloud et UI inchangés.
+avec un veto limité au souhait affirmatif de rester. Revue : trois souhaits niés
+reproduisent un faux refus, puis passent après restriction du motif. 85 tests
+ciblés verts ; qualité locale 48 régressions, 713 unitaires, 34 intégrations
+et build verts sur la première correction ; CI finale requise sur le motif revu. Filtres historiques, prompt actif, Cloud et UI inchangés.
 CI du HEAD exact obligatoire avant fusion de cette finalisation, puis reprise
 exclusive du lot 2 depuis main réel.
 
