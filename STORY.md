@@ -84,10 +84,12 @@ Les filtres et parcours existants restent en place : le switching réel n'est
 donc pas encore corrigé. Instructions GM préparées sans activation ; aucun
 appel supplémentaire ni modification du budget vocal. Revue : un veto trop
 large sur « je refuse de croire » reproduit puis corrigé ; test conservé.
-Qualité locale : 48 régressions, 707 unitaires, 34 intégrations, typecheck,
+Qualité locale finale : 48 régressions, 710 unitaires, 34 intégrations, typecheck,
 lint sans erreur et build verts ; 45 E2E locaux et CI verts sans retry. Un échec
 WebKit initial a passé en isolation puis en relance complète, sans test modifié.
 PR #54 fusionnée dans `3d53298`, même SHA dans Lovable, preview déclarée prête.
+Finalisation #55 : trois faux refus (« passionnée », « passé un bon moment »,
+« cherche à le brusquer ») reproduits puis corrigés en exigeant un objet de transfert.
 Aucune publication produit ni recette humaine. [Plan](docs/plan_changement_interlocuteur_manuel.md)
 et [reprise lot 2](docs/prompt_reprise_switch_personnages_lot_2.md). Temps : environ
 une heure, vérifications et livraison incluses.
@@ -2763,7 +2765,7 @@ continuité d’expérience (mémoire entre tours).
 
 **2026-10-21 — Switching Emma ↔ Max, lot 1 livré sans activation**
 
-Contrat optionnel et validateur pur disponibles, 76 nouveaux tests dont deux
+Contrat optionnel et validateur pur disponibles, 79 nouveaux tests dont deux
 caractérisations des faux négatifs historiques. Qualité complète et 45 E2E
 verts ; PR #54 fusionnée dans `3d53298`, code synchronisé dans Lovable. Le
 switching réel, les offres persistées et la nouvelle pastille restent aux lots

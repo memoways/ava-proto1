@@ -179,6 +179,15 @@ assertions n'ont pas été affaiblies.
 
 **Revue :** types, nettoyage, consommateurs GM, reçu de livraison et fixtures
 relus. `REQUIRED_GM_JSON_FIELDS` inchangé ; le nouveau champ n'est jamais requis.
+Dernière revue de clôture : restreindre les vetos aux verbes avec un objet de
+transfert (pronom, nom de personnage ou téléphone/ligne). Des expressions comme
+« pas passionnée » ou « pas passé un bon moment » ne doivent pas être assimilées
+à un refus. Trois tests rouges avant correction, puis 79 tests du contrat verts (70 moteur,
+9 GM). Cette finalisation et la clôture sont réunies dans la
+[PR #55](https://github.com/memoways/ava-proto1/pull/55) ; aucune activation runtime.
+Qualité locale finale à 710 unitaires ; les 707 cités ci-dessus décrivent la
+première livraison #54. Les E2E locaux sont ceux de cette première livraison ;
+la CI de #55 rejoue tout le contrat sur son HEAD final avant fusion.
 Test du même prompt effectif, de 950 tokens / 12 s et d'un seul appel LLM.
 `GM_CODE_VERSION` incrémentée pour tracer le nettoyeur, sans changement du prompt.
 Recherche des usages : aucun appel au validateur hors tests, aucune injection

@@ -35,9 +35,16 @@ de publication ; ne pas utiliser un Supabase ou un hébergeur externe.
   48 régressions, 707 unitaires, 34 intégrations, lint/typecheck/build, 45 E2E
   sans retry. Revue des consommateurs effectuée. E2E local final : 45/45
   sans retry avec un worker, après un échec WebKit initial puis vert en isolation.
+- Finalisation issue de la dernière revue : [PR #55](https://github.com/memoways/ava-proto1/pull/55).
+  Les vetos exigent un objet de transfert : « pas passionnée », « pas passé un bon
+  moment » et « ne cherche pas à le brusquer » ne sont pas des refus de passage.
+  Trois régressions rouges avant correction puis vertes ; 79 tests du contrat
+  (dont deux caractérisations historiques), 710 unitaires au total. Vérifier
+  sa fusion et sa CI sur son HEAD exact ; si elle reste ouverte/rouge, finaliser
+  d'abord ce lot 1, sans démarrer le lot 2.
 - Départ du prochain chat : **le main réel après fetch**, sans restaurer une
   ancienne révision. `3d53298` est la référence technique livrée du lot 1 ; la
-  clôture documentaire peut ajouter des commits sans changer ce socle. Lire
+  finalisation #55 et la clôture ajoutent des commits compatibles à ce socle. Lire
   la CI post-fusion et les éventuelles PR documentaires dans GitHub avant de
   modifier. Si une régression du lot 1 subsiste, finaliser d'abord ce lot.
 - Lovable : projet `1265958d-b74e-40f2-917d-182fe05163fc`, workspace Memoways
@@ -135,7 +142,7 @@ historique si le plan suffit.
   personnage. Tests de reprise, révocation contre GM tardif, PATCH refusé puis
   repris, incident audio après commit, raccrochage pendant sonnerie et isolation.
 - Tests ciblés existants et nouveaux puis `npm run test:quality` et
-  `npm run test:e2e`. Le lot 1 a vérifié 48 régressions, 707 unitaires et
+  `npm run test:e2e`. Le lot 1 a vérifié 48 régressions, 710 unitaires et
   34 intégrations, typecheck, lint et build. Un avertissement hooks préexistant
   `finishInputTelemetry` demeure. Le teaser WebKit a échoué une fois, puis passé
   en isolation et dans les 45 E2E locaux relancés avec un worker. Les 45 E2E CI
