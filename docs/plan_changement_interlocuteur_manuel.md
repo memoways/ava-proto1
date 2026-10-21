@@ -1,7 +1,7 @@
 # Passage Emma ↔ Max : validation narrative et pastille d’appel
 
-Date du diagnostic : 19 octobre 2026. État au 21 octobre : **lots 1 et 2 livrés sur GitHub,
-code synchronisé dans Lovable ; aucune nouvelle publication produit**. Les lots 3–4 restent à réaliser.
+Date du diagnostic : 19 octobre 2026. État au 21 octobre : **lots 1, 2 et 3 livrés sur GitHub,
+code synchronisé dans Lovable ; aucune nouvelle publication produit**. Le lot 4 reste à réaliser.
 Périmètre du diagnostic du 19 octobre : analyse et plan. Le lot 1 du 21 octobre est décrit au §5 ; aucun réglage Cloud ni déploiement produit modifié.
 Base examinée : `main` / `d0f72b601680b65b50e901e61bcae92a5752addd`, également HEAD Lovable au contrôle.
 
@@ -429,6 +429,43 @@ d'affichage non bloquant, résultat ignoré si session/offre remplacée ou termi
 La reprise de l'offre teste aussi son portrait runtime. Suite complète interrompue
 pour correction (3 succès, 1 interrompu, 59 non exécutés) : pas comptée verte.
 Qualité/E2E et revues à confirmer sur la révision corrigée avant livraison.
+
+### Lot 3 — livraison vérifiée le 21 octobre 2026
+
+Correctif de reprise et variante avec offre retenue verts : l'actif est utilisable,
+Rester révoque, puis la réponse cible tardive ne réactive rien. Deux revues
+Standards/Spec finales sans constat sur `c0b15cbbf08406834618fe50f1227696b2f4306f`.
+Qualité locale corrigée : **48 régressions, 734 unitaires, 41 intégrations**,
+lint sans erreur, typecheck/build verts ; seul avertissement hooks préexistant.
+Suite locale complète corrigée : **65/65 E2E sans retry, un worker, 10,2 min**,
+Chromium, Firefox et WebKit. Aucune assertion affaiblie ni régression masquée.
+
+[PR #59](https://github.com/memoways/ava-proto1/pull/59), fusionnée à 22:05:56
+Europe/Paris dans `6860d1450f4df5db3a3d8213887d5d4bf19bc1f3`, seulement après
+[CI 39665006628](https://github.com/memoways/ava-proto1/actions/runs/39665006628)
+verte sur le **HEAD exact `c0b15cbbf08406834618fe50f1227696b2f4306f`** :
+qualité complète et **65 E2E réussis en 11 min**. La commande de fusion vérifie
+PR HEAD, SHA du run, conclusion et tous les checks, puis protège le HEAD attendu.
+Base main restée à 9f5a405 pendant les contrôles ; PR tierces préservées.
+
+Relevé après fusion : main local/distant identiques à `6860d14`, checkout propre.
+Lovable natif confirme le même SHA, workspace Memoways, projet ready et agent
+terminé. Code testé et synchronisé ; aucune nouvelle publication produit, aucun
+réglage Cloud, provider, migration ou Edge Function modifié. La [CI post-fusion 39667347427](https://github.com/memoways/ava-proto1/actions/runs/39667347427)
+est également verte sur `6860d14`, avec 65 E2E réussis. La clôture suit sur
+`codex/character-handoff-lot-3-closeout`, avec CI de son propre HEAD exact requise
+avant fusion. Dernière relecture : conserver explicitement l'assertion historique
+de visibilité du portrait pendant la sonnerie en plus de son nouveau contrôle
+src runtime. Une assertion ajoutée au test, aucun code produit changé ; la CI
+doit vérifier ce HEAD de clôture corrigé, pas une ancienne révision.
+
+Mémoire AVA Notion relue puis décision durable du lot 3 ajoutée et relue :
+Source conservée, Last updated by=Codex. CHANGELOG/STORY et le
+[prompt autonome du lot 4](prompt_reprise_switch_personnages_lot_4.md) sont
+actualisés après la fusion technique avec les références réelles. Au prochain
+chat, partir du main réel après fetch, y compris l'éventuelle clôture documentaire.
+Aucun lot 4 commencé. Restent seulement la recette humaine coordonnée, le quota
+sandbox de recette et la publication après résultat observable accepté.
 
 ## 6. Validation attendue
 

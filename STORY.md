@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-21 (lot 3 en vérification ; aucune nouvelle publication)
+> **Last Updated**: 2026-10-21 (lot 3 livré et synchronisé Lovable ; aucune nouvelle publication)
 
 ---
 
@@ -84,9 +84,13 @@ Les deux revues repèrent ensuite une dépendance indue à la fiche cible pendan
 la reprise ; une RPC retenue reproduit le blocage, puis le chargement du portrait
 devient conditionnel et non bloquant. Les sonneries, le timer et les mémoires
 restent sur le moteur précédent. Les aides admin décrivent les gardes réelles.
-Qualité complète et premiers parcours ciblés verts ; vérification finale et
-livraison en cours. La recette humaine, le quota sandbox et la publication
-restent au lot 4. [Plan](docs/plan_changement_interlocuteur_manuel.md).
+[#59](https://github.com/memoways/ava-proto1/pull/59) livre `6860d14` après CI
+verte du HEAD exact `c0b15cb` : 734 unitaires, 41 intégrations, 48 régressions
+et 65 E2E. Les 65 E2E locaux passent sans retry, les deux revues finales n'ont
+plus de constat. Main et Lovable synchronisés ; décision durable Notion relue.
+Aucune nouvelle publication. La recette humaine, le quota sandbox et la publication
+restent au lot 4. [Plan](docs/plan_changement_interlocuteur_manuel.md) et
+[prompt autonome du lot 4](docs/prompt_reprise_switch_personnages_lot_4.md).
 
 ### 2026-10-21 — Switching, lot 2 : rendre l'accord appelable
 
