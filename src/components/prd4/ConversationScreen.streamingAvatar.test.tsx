@@ -68,7 +68,7 @@ describe("ConversationScreen streaming avatar", () => {
     expect(screen.getByText("Mode voix")).toBeInTheDocument();
   });
 
-  it("asks for an explicit handoff choice and calls the selected action", () => {
+  it("allows continuing the conversation while offering an explicit handoff choice", () => {
     const onAcceptHandoff = vi.fn();
     const onRejectHandoff = vi.fn();
     render(
@@ -81,7 +81,7 @@ describe("ConversationScreen streaming avatar", () => {
     );
 
     expect(screen.getByText("Max vous propose de parler avec Emma.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Appeler Emma" }));
     fireEvent.click(screen.getByRole("button", { name: "Rester avec Max" }));
     expect(onAcceptHandoff).toHaveBeenCalledOnce();

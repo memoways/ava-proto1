@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Non publié] — 2026-10-21 — Switching Emma ↔ Max, lot 2
+
+- Le même appel GM reçoit tour, version, demande ouverte et reçu délivré. Le
+  validateur du lot 1 autorise l'offre sans les anciens filtres bloquants.
+- Offres versionnées, bornées à la prochaine soumission ; demande différée
+  limitée à deux nouveaux messages. Révocation, reprise avec preuves et PATCH
+  conditionnels empêchent les résultats tardifs et doubles consommations.
+- Clic et décroché revalidés ; sonneries existantes, persistance avant changement
+  visible, mémoires séparées, salut de retour et panne audio après commit distincte.
+  Audit GM / moteur / offre / clic / connexion dans les événements et l'admin.
+- Carte basse conservée ; poursuite de la discussion possible avant le clic.
+  Aucune nouvelle pastille, configuration Cloud, migration ou publication produit.
+  Quota sandbox de recette et validation humaine reportés au lot 4.
+- Défaut restant du lot 1 corrigé séparément par #56 avant reprise du lot 2.
+  [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md).
+
 ## [Non publié] — 2026-10-21 — Dernier veto du lot 1
 
 - L'intégration du lot 2 révèle que « je préfère que tu restes avec moi »

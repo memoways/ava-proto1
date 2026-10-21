@@ -99,7 +99,6 @@ export function validateCharacterHandoff(input: CharacterHandoffValidationInput)
   if (assessment.sourceCharacter !== input.currentCharacter || evaluation.character_key !== input.currentCharacter)
     return reject("character_mismatch");
   if (assessment.targetCharacter === input.currentCharacter) return reject("target_mismatch");
-  if (!matchingAction(evaluation.action, assessment.targetCharacter)) return reject("action_mismatch");
   if (!delivery || delivery.turnId !== input.turnId || delivery.turnIndex !== input.turnIndex
     || delivery.character !== input.currentCharacter || !delivery.generated.startsWith(delivery.delivered)
     || !delivery.delivered.trim() || delivery.status === "unknown") return reject("consent_not_delivered");
@@ -141,5 +140,6 @@ export function validateCharacterHandoff(input: CharacterHandoffValidationInput)
   }
   if (consent.stance === "object") return reject("character_refused");
   if (consent.stance === "defer") return reject("character_deferred");
+  if (!matchingAction(evaluation.action, assessment.targetCharacter)) return reject("action_mismatch");
   return { authorized: true, reason: "consent_validated", targetCharacter: assessment.targetCharacter };
 }
