@@ -308,6 +308,13 @@ pour le watchdog ; révocation différée puis nouvel appel), puis les trois par
 de revue sont verts avec le correctif. Qualité locale corrigée : 726 unitaires,
 41 intégrations, 48 régressions, typecheck/lint/build verts ; avertissement hooks
 préexistant conservé. Suite E2E complète à relancer sur cette révision.
+Revue complémentaire : la validation réseau laissait les handlers micro actifs.
+Deux E2E rouges reproduisent les ouvertures 4→6 (PTT) et 4→5 (mains libres).
+Verrou de transport vérifié synchroniquement par les handlers et reflété dans
+l'UI, fermé au clic jusqu'à la fin du salut ou à l'échec ; bouton Terminer conservé.
+Les deux parcours et le scénario de révocation/recommencement passent ensuite,
+avec deux tests de composant pour les contrôles et le clavier. Les relances
+complètes interrompues pour ces corrections ne sont pas comptées comme vertes.
 
 Les résultats finaux, revues et références de livraison sont ajoutés après contrôle.
 Aucun lot 3 ou 4 commencé ; aucune publication produit ni changement Cloud.

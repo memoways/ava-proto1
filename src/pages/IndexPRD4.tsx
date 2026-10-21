@@ -301,6 +301,7 @@ const IndexPRD4 = () => {
     setHandoffOffer(offer);
   }, []);
   const [handoffCalling, setHandoffCalling] = useState(false);
+  const [handoffInputLocked, setHandoffInputLocked] = useState(false);
   const [handoffCallingTarget, setHandoffCallingTarget] = useState<RuntimeCharacter>("emma");
   const handoffCallingRef = useRef(false);
   const approvedCallingTargetRef = useRef<RuntimeCharacter | null>(null);
@@ -388,6 +389,7 @@ const IndexPRD4 = () => {
     setApprovedCallingTarget(null);
     handoffCallingRef.current = false;
     setHandoffCalling(false);
+    setHandoffInputLocked(false);
     detectorRef.current?.stop(); detectorRef.current = null;
     acousticRef.current?.reset(); acousticVoiceRef.current = false;
     streamedVoiceRef.current = null; rescueLifetimeRef.current.abort(); rescueRef.current.clear(); handsFreeNeedsRearmRef.current = false;
@@ -1934,7 +1936,7 @@ const IndexPRD4 = () => {
   }, [endLatencySegment, finishInputTelemetry, incrementPttError, processTurn, setAudioState, teardownSTT]);
 
   const handlePTTPress = useCallback(async () => {
-    if (endedRef.current) return;
+    if (endedRef.current || ['validating', 'calling', 'switching'].includes(handoffPhaseRef.current)) return;
     // Filet anti-blocage : si le verrou est resté coincé mais que l'état audio est
     // au repos (signe que le tour précédent a bien fini), on libère le verrou.
     if (isProcessingRef.current && state.audioState === "idle") {
@@ -2044,7 +2046,7 @@ const IndexPRD4 = () => {
 
   // ---- Mains libres -----------------------------------------------------------
   useEffect(() => {
-    handsFreeBlockedRef.current = handoffCalling || Boolean(activeVideo) || state.phase !== "conversation_max";
+    handsFreeBlockedRef.current = handoffInputLocked || handoffCalling || Boolean(activeVideo) || state.phase !== "conversation_max";
     if (handsFreeBlockedRef.current) {
       finishInputTelemetry("cancelled");
       if (handsFreeTimerRef.current) clearTimeout(handsFreeTimerRef.current);
@@ -2064,7 +2066,7 @@ const IndexPRD4 = () => {
       handsFreeListeningRef.current = false;
       void rearmHandsFreeRef.current();
     }
-  }, [activeVideo, finishInputTelemetry, handoffCalling, handoffOffer, state.phase, teardownSTT]);
+  }, [activeVideo, finishInputTelemetry, handoffCalling, handoffInputLocked, handoffOffer, state.phase, teardownSTT]);
 
   /** Le joueur coupe la parole : la voix s'arrête, le tour en cours est abandonné. */
   const interruptCharacter = useCallback(() => {
@@ -2161,7 +2163,7 @@ const IndexPRD4 = () => {
   };
 
   const handleToggleHandsFree = useCallback(async () => {
-    if (endedRef.current) return;
+    if (endedRef.current || ['validating', 'calling', 'switching'].includes(handoffPhaseRef.current)) return;
     if (handsFreeListeningRef.current) {
       handsFreeNeedsRearmRef.current = false;
       if (handsFreeTimerRef.current) window.clearTimeout(handsFreeTimerRef.current);
@@ -2325,10 +2327,13 @@ const IndexPRD4 = () => {
       if (!isSwitchCurrent()) return;
       if (output.status !== 'played') throw new Error('La connexion est établie, mais sa voix est indisponible. Réactive le micro pour reprendre.');
       handoffPhaseRef.current = 'completed';
+      setHandoffInputLocked(false);
+      setHandoffCalling(false);
       setAudioState('idle');
     } catch (error) {
       if (!isSwitchCurrent()) return;
       handoffPhaseRef.current = 'failed';
+      setHandoffInputLocked(false);
       setHandoffCalling(false);
       setAudioState('idle');
       if (!committed && !(error instanceof HandoffConflictError)
@@ -2359,6 +2364,9 @@ const IndexPRD4 = () => {
     const sid = sessionIdRef.current;
     finishInputTelemetry('cancelled');
     cleanupAudio();
+    handsFreeBlockedRef.current = true;
+    setHandoffCallingTarget(offer.targetCharacter);
+    setHandoffInputLocked(true);
     setAudioState('idle');
     const sequence = activeTurnSequenceRef.current;
     const eventId = crypto.randomUUID();
@@ -2369,6 +2377,7 @@ const IndexPRD4 = () => {
     try {
       await revalidateCall();
       if (endedRef.current || sessionIdRef.current !== sid || activeTurnSequenceRef.current !== sequence) return;
+      setHandoffCalling(true);
       acceptedHandoffRef.current = offer;
       setCurrentHandoffOffer(null);
       if (processingWatchdogRef.current) window.clearTimeout(processingWatchdogRef.current);
@@ -2382,6 +2391,8 @@ const IndexPRD4 = () => {
     } catch (error) {
       if (endedRef.current || sessionIdRef.current !== sid || activeTurnSequenceRef.current !== sequence) return;
       handoffPhaseRef.current = 'failed';
+      setHandoffInputLocked(false);
+      setHandoffCalling(false);
       if (error instanceof HandoffConflictError) setCurrentHandoffOffer(null);
       toast({ title: 'Appel indisponible', description: error instanceof Error ? error.message : 'Réessaie.', variant: 'destructive' });
       if (sid) void appendExperienceEvent({ sessionId: sid, eventKey: `handoff-click-blocked:${eventId}`,
@@ -2630,6 +2641,7 @@ const IndexPRD4 = () => {
               portraitUrl={activePortraitUrl}
               handoffOffer={handoffOffer}
               handoffCalling={handoffCalling}
+              handoffInputLocked={handoffInputLocked}
               handoffCallingTarget={handoffCallingTarget}
               onAcceptHandoff={() => void handleAcceptHandoff()}
               onRejectHandoff={handleRejectHandoff}

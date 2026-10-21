@@ -1639,3 +1639,55 @@ test('lot 2 : un GM encore courant dans son onglet ne réécrit pas le transcrip
   expect(fakes.getSessionRow().conversation_log).toEqual(newLog);
   await expect(page.getByRole('button', { name: /^Appeler / })).toHaveCount(0);
 });
+
+for (const handsFree of [false, true]) {
+  test(`lot 2 : validation retardée bloque immédiatement le micro ${handsFree ? 'mains libres' : 'PTT'}`, async ({ page }) => {
+    test.setTimeout(45_000);
+    const turns = [...HANDOFF_TURNS, 'Je voudrais parler avec Max.'];
+    const fakes = await installNetworkFakes(page, turns, { handsFree, ttsSuccess: true, characterOpenings: true,
+      gmTarget: 'max', gmStance: 'accept', gmHandoffAt: 4, maxResponse: 'Je vais appeler Max.' });
+    await page.addInitScript(() => {
+      const target = window as Window & { __captureAttempts?: number };
+      const previous = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+      target.__captureAttempts = 0;
+      navigator.mediaDevices.getUserMedia = constraints => { target.__captureAttempts! += 1; return previous(constraints); };
+    });
+    let holdValidation = false;
+    let started = false;
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    await page.route(`${SUPABASE_ORIGIN}/rest/v1/rpc/get_character_runtime_readiness_for_environment`, async route => {
+      if (holdValidation && route.request().postDataJSON().p_character_key === 'max') { started = true; await held; }
+      return route.fallback();
+    });
+    await startCharacterConversation(page, 'Emma');
+    for (let i = 0; i < turns.length; i += 1) {
+      if (!handsFree) await sendHandoffTurn(page, turns[i]);
+      else {
+        await page.getByRole('button', { name: 'Activer le micro', exact: true }).click();
+        await expect.poll(fakes.getGmPostTurnCount, { timeout: 8000 }).toBe(i + 1);
+        await page.getByRole('button', { name: 'Couper le micro', exact: true }).click();
+      }
+      await page.waitForLoadState('networkidle');
+    }
+    await expect(page.getByRole('button', { name: 'Appeler Max', exact: true })).toBeVisible();
+    const before = await page.evaluate(() => (window as Window & { __captureAttempts?: number }).__captureAttempts);
+    holdValidation = true;
+    await page.evaluate(() => {
+      const buttons = [...document.querySelectorAll('button')];
+      const call = buttons.find(b => b.textContent?.trim() === 'Appeler Max')!;
+      const mic = buttons.find(b => ['Activer le micro', "Démarrer l'enregistrement"].includes(b.getAttribute('aria-label') ?? ''))!;
+      call.click();
+      // Same task, before React can commit the disabled state: exercises the synchronous guard too.
+      mic.click();
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
+    });
+    await expect.poll(() => started).toBe(true);
+    expect(await page.evaluate(() => (window as Window & { __captureAttempts?: number }).__captureAttempts)).toBe(before);
+    await expect(page.getByRole('button', { name: handsFree ? 'Activer le micro' : "Démarrer l'enregistrement", exact: true })).toBeDisabled();
+    release();
+    await expect(page.getByRole('img', { name: 'Portrait d’Max' })).toBeVisible({ timeout: 10_000 });
+    expect(fakes.getMaxTurnCount()).toBe(4);
+    expect(await page.evaluate(() => (window as Window & { __captureAttempts?: number }).__captureAttempts)).toBe(before);
+  });
+}

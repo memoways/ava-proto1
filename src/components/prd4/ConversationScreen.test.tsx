@@ -90,3 +90,16 @@ describe("ConversationScreen", () => {
       .toHaveAttribute("src", "https://portraits.example/emma-runtime.jpg");
   });
 });
+
+it.each([false, true])('locks microphone and choices during validation without hiding hangup (hands-free=%s)', handsFree => {
+  const press = vi.fn(); const toggle = vi.fn(); const accept = vi.fn(); const reject = vi.fn();
+  render(<ConversationScreen {...baseProps} activeCharacter="max" conversationLog={[]} handsFree={handsFree} handoffInputLocked
+    handoffOffer={{ reason: 'Consentement prouvé', targetCharacter: 'emma' }}
+    onPTTPress={press} onToggleHandsFree={toggle} onAcceptHandoff={accept} onRejectHandoff={reject} />);
+  expect(screen.getByRole('button', { name: handsFree ? 'Activer le micro' : "Démarrer l'enregistrement" })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Appeler Emma' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Rester avec Max' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Terminer' })).toBeEnabled();
+  fireEvent.keyDown(window, { code: 'Space' });
+  expect(press).not.toHaveBeenCalled(); expect(toggle).not.toHaveBeenCalled();
+});
