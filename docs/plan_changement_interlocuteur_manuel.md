@@ -215,6 +215,19 @@ Le [prompt autonome du lot 1](prompt_reprise_switch_personnages_lot_1.md) lance 
 
 À chaque clôture : actualiser `CHANGELOG.md`, `STORY.md` et ce plan avec les preuves et l’état réel ; vérifier la CI du HEAD avant fusion vers `main` ; produire et sauvegarder un prompt autonome du prochain lot pour un nouveau chat. Si le lot reste incomplet, le prompt doit d’abord en permettre la finalisation. Répéter ces obligations dans chaque prompt suivant. Aucun enchaînement automatique de lots ni publication produit pour le lot préparatoire. Les choix de quota et de validité d’offre du §8 n’ont pas à être activés dans le lot 1.
 
+### Finalisation supplémentaire du lot 1 — 21 octobre 2026
+
+L'intégration du lot 2 (13/14 parcours ciblés verts) révèle un refus non couvert :
+« Non, je préfère que tu restes avec moi. » Une offre restait possible avec le
+nouveau validateur. Travail du lot 2 préservé séparément avant de poursuivre.
+Trois tests isolés échouent sur les formulations restes/restiez, puis passent
+avec un veto limité au souhait affirmatif de rester. Revue : trois souhaits niés
+reproduisent un faux refus, puis passent après restriction du motif. 85 tests
+ciblés verts ; qualité locale 48 régressions, 713 unitaires, 34 intégrations
+et build verts sur la première correction ; CI finale requise sur le motif revu. Filtres historiques, prompt actif, Cloud et UI inchangés.
+CI du HEAD exact obligatoire avant fusion de cette finalisation, puis reprise
+exclusive du lot 2 depuis main réel.
+
 ## 6. Validation attendue
 
 - Unitaires : T6 différé ; T10 pronom/faux prénom contextualisé ; T11 nom explicite + accord naturel ; inquiétude émotionnelle sans refus ; refus explicites et sans « ne » ; « Je vais l’appeler… enfin non » ; extrait affirmatif choisi au milieu d’un refus ; oui hors contexte ; cible incohérente ; décision invalide/périmée ; offre révoquée et nouvelles versions.

@@ -73,6 +73,15 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
+### 2026-10-21 — Finaliser le refus de quitter le personnage
+
+Le branchement en cours du lot 2 a exposé un angle mort du contrat du lot 1 :
+« je préfère que tu restes avec moi » passait encore si le GM classait accept.
+Le lot 2 est mis de côté pour corriger ce veto séparément. Trois variantes
+sont reproduites rouges avant correction ; le moteur refuse désormais ces
+formes conjuguées, sans ouvrir d'offre ni activer le runtime du lot 2.
+
+
 ### 2026-10-21 — 🔹 Switching, lot 1 : consentement prouvé et compatible
 
 Le nouveau contrat GM optionnel conserve source, cible, origine, tour/version

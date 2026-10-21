@@ -193,3 +193,24 @@ describe("structured consent — pure validator", () => {
     expect(input).toEqual(before);
   });
 });
+
+describe('lot 1 finalization: staying with the current character', () => {
+  it.each(['Non, je préfère que tu restes avec moi.', 'Je préfère que vous restiez avec moi.', 'Je préfère que tu restes avec moi.'])(
+    'a request to stay vetoes GM accept: %s', reply => {
+      const input = validInput();
+      input.delivery = { ...input.delivery!, generated: reply, delivered: reply };
+      input.evaluation.handoff_assessment!.consent.evidence = reply;
+      expect(validateCharacterHandoff(input).reason).toBe('character_refused');
+    });
+});
+
+describe('lot 1: no invented refusal from a negated request to stay', () => {
+  it.each(['Je ne te demande pas de rester avec moi.', 'Je ne veux pas que tu restes avec moi.', 'Je ne demande pas que vous restiez avec moi.'])(
+    'keeps a clear transfer accepted after %s', prefix => {
+      const input = validInput();
+      const reply = `${prefix} Tu peux appeler Max.`;
+      input.delivery = { ...input.delivery!, generated: reply, delivered: reply };
+      input.evaluation.handoff_assessment!.consent.evidence = 'Tu peux appeler Max.';
+      expect(validateCharacterHandoff(input).authorized).toBe(true);
+    });
+});
