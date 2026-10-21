@@ -14,9 +14,12 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   du chargement du portrait cible. Gardes, voix et mémoires privées préservées.
 - Aides admin exactes : seuil appliqué aussi aux demandes explicites, quota des
   transferts exécutés. Aucun réglage Cloud ni publication produit.
-- Qualité locale : 48 régressions, 734 unitaires et 41 intégrations ; contrôles
-  ciblés mobile/desktop et deux sens verts. Revue et suite E2E complète corrigée
-  en cours avant livraison. [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md).
+- Livré par [#59](https://github.com/memoways/ava-proto1/pull/59), `6860d14`,
+  après CI verte sur le HEAD exact `c0b15cb` : 48 régressions, 734 unitaires,
+  41 intégrations et 65 E2E. Suite locale : 65/65 sans retry ; deux revues finales
+  sans constat. Code synchronisé dans Lovable, produit non publié.
+  [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md),
+  [reprise limitée au lot 4](docs/prompt_reprise_switch_personnages_lot_4.md).
 
 ## [Non publié] — 2026-10-21 — Switching Emma ↔ Max, lot 2
 
