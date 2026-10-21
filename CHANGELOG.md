@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Préparatoire — non activé] — 2026-10-21 — Switching Emma ↔ Max, lot 1
+
+- Contrat optionnel `handoff_assessment` : origine, personnages, tour/version,
+  accord et citations exactes. Ancien JSON GM toujours accepté ; champ absent
+  ou invalide sans autorisation par le nouveau moteur.
+- Validateur pur sur le reçu de livraison : refus et contradictions prioritaires,
+  preuves inventées/non entendues et résultats périmés rejetés, raisons d'audit.
+  Aucune offre, persistance ou bascule exécutée par ce module.
+- Fixtures T6/T9/T10/T11, deux faux négatifs historiques caractérisés et tests du
+  nouveau contrat. Instructions GM testables préparées séparément : prompt
+  effectif, budget, timeout et nombre d'appels inchangés.
+- Qualité locale verte : 48 régressions, 707 unitaires, 34 intégrations,
+  typecheck et build. Revue du diff et des consommateurs effectuée ; E2E et
+  livraison GitHub à compléter dans le [plan](docs/plan_changement_interlocuteur_manuel.md).
+- Runtime, interface, voix, mémoires et Cloud inchangés. Le switching réel reste
+  à brancher au lot 2 ; nouvelle pastille au lot 3. Aucune publication produit.
+
 ## [Documentation] — 2026-10-19 — Reprise du switching par petits lots
 
 - Diagnostic de l’appel Emma du 19 octobre et plan de passage Emma ↔ Max :

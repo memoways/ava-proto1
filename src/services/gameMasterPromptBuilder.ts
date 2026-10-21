@@ -1,5 +1,27 @@
 import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig, ExperienceDirectorGuardrails } from "@/types";
 
+/** Prepared for lot 2. Intentionally never appended by the live prompt builder. */
+export const CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS = `Contrat optionnel handoff_assessment (schemaVersion=1), dans le même appel GM post-tour, sans nouvel appel LLM :
+{
+  "schemaVersion": 1, "sourceCharacter": "emma", "targetCharacter": "max",
+  "turnId": "identifiant exact du tour courant", "turnIndex": 11, "orchestrationVersionId": "version épinglée exacte",
+  "origin": { "type": "player_request", "turnId": "tour de la demande", "turnIndex": 11, "evidence": "citation exacte de la demande" },
+  "targetEvidence": { "speaker": "user", "quote": "citation exacte qui nomme Max" },
+  "consent": { "stance": "accept", "evidence": "citation exacte de l'accord du personnage", "refusalEvidence": null }
+}
+Retourne null si aucun passage n'est évalué. Les identifiants doivent venir du contexte fourni, jamais être inventés.
+Analyse sémantiquement la réplique complète : accept|object|defer. Une demande seule ou un oui hors contexte n'est jamais une permission.
+origin.type : player_request pour la demande courante ou une demande encore ouverte explicitement fournie ; gm_proposal pour une proposition effectivement dite par le personnage au tour courant, jamais une guidance privée.
+sourceCharacter et targetCharacter sont distincts et concordent avec action.type=handoff et la version épinglée. Aucun autre personnage que max ou emma.
+evidence et quote sont des citations exactes, sans paraphrase, contenant le contexte nécessaire ; targetEvidence.speaker est user ou character et sa quote doit nommer explicitement la cible dans l'échange concerné.
+Résous « lui » ou « Matt » seulement si ce même échange ou la demande encore ouverte identifie Max sans ambiguïté. Aucun alias global Matt → Max ; sinon defer et clarification naturelle.
+T6 « Je peux lui demander » est différé ; T9 « Je vais lui demander de vous parler » reste ambigu.
+T10 « Je vais l’appeler. C’est Max, pas Matt. » et T11 « Je vais aller le chercher dans le salon et lui dire que vous voulez lui parler directement. » peuvent être acceptés uniquement avec cible et preuves cohérentes.
+Un refus de transfert avec ou sans « ne », « plus tard », « Je vais lui demander s’il accepte », « Je vais l’appeler… enfin non » restent object ou defer.
+Une citation affirmative isolée dans un refus ne suffit pas : renseigne refusalEvidence avec la citation contradictoire et ne classe jamais accept. Une inquiétude générale sur les sentiments de Max ne vaut pas refus de transfert.
+Le texte généré mais non entendu, incertain ou coupé avant l'accord n'est pas une preuve délivrée. Le moteur vérifiera le reçu de livraison ; n'invente aucune preuve.
+Préserve les gardes du Game Master : seuil, quota, pause, disponibilité, version et clic du joueur restent nécessaires. Aucun transfert automatique ni partage des mémoires privées.`;
+
 const TONE_LABELS: Record<ExperienceDirectorEditorConfig["tone"], string> = {
   discreet: "Discret : observe et intervient seulement lorsqu'une décision est utile.",
   balanced: "Équilibré : guide la progression sans sur-orchestrer la conversation.",

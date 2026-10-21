@@ -124,6 +124,64 @@ Corriger dans `GameMasterSettingsTab.tsx` les textes d’aide incohérents avec 
 
 ### Exécution par chats frais — consigne du 19 octobre 2026
 
+### Lot 1 — exécution du 21 octobre 2026
+
+Base vérifiée : `b113e351fad3260316942211cd806e4778a331eb`, checkout canonique propre,
+CI main `39249573270` verte, Lovable au même SHA (projet et workspace vérifiés).
+Branche : `codex/character-handoff-contract-lot-1`. Baseline ciblée : 53 tests verts.
+
+Étapes autorisées : fixtures minimales T6/T9/T10/T11 et reproduction des deux
+faux négatifs historiques ; contrat optionnel `handoff_assessment` versionné ;
+nettoyage additif ; validateur pur ; instructions GM exportées mais jamais
+concaténées au prompt effectif. Aucun consommateur runtime ne change.
+Le contrat porte la source, la cible, le tour, la version, l'origine et des
+citations exactes (demande/proposition, résolution de cible, accord et refus).
+Le validateur confronte ces citations au reçu de livraison existant et à
+l'échange courant, ou à une demande ouverte explicitement fournie et bornée
+par l'appelant. Il ne réinterprète pas les pronoms et ne crée aucun alias.
+Son autorisation narrative ne remplace jamais les gardes du directeur
+(disponibilité, seuil, pause, quota), à brancher seulement au lot 2.
+
+Confiance avant implémentation : 95 % — cause reproduite et modules vérifiés,
+pas de moteur structuré concurrent, abstractions et reçu de livraison réutilisés,
+aucune dépendance ajoutée. Références du parseur : [API Zod](https://zod.dev/api)
+et [tests objets Zod v3](https://github.com/colinhacks/zod/blob/v3/src/__tests__/object.test.ts).
+Contrôles : tests ciblés, qualité complète, E2E existants, revue des consommateurs,
+CI verte du HEAD exact avant fusion, main et synchronisation Lovable après fusion.
+Publication produit exclue. Résultats de clôture à compléter après exécution.
+
+**Réalisé localement :** `src/types/characterHandoff.ts`, champ GM optionnel,
+`cleanHandoffAssessment` et `validateCharacterHandoff` dans le nouveau module pur.
+Les citations restent exactes (pas de troncature ou reformulation), les champs
+inconnus sont retirés. Les métadonnées du GM et du reçu doivent correspondre au
+tour, à la version et à la source ; l'action GM doit viser le même personnage.
+Une ancienne demande doit être explicitement encore ouverte et porter sa borne
+de validité. Les refus du texte complet priment sur une citation affirmative.
+Un accord entièrement délivré avant interruption peut rester valide ; une
+portion incertaine, privée ou coupée avant l'accord n'autorise rien.
+Les gardes narratives restent la responsabilité du directeur, séparée du consentement.
+
+**Preuves :** rejeu des anciens filtres T10/T11 : `expected true, actual false`
+dans les deux cas, sortie 1. Ces deux échecs attendus sont conservés en
+`it.fails` comme caractérisation de l'ancien moteur, distincts des tests positifs
+du nouveau validateur. Suite nouvelle d'abord rouge (module absent), puis verte.
+Un veto émotionnel trop large a été reproduit rouge puis corrigé sans toucher
+aux filtres existants. 76 nouveaux tests dont deux caractérisations attendues.
+Qualité complète locale verte : lint 0 erreur (avertissement préexistant
+`finishInputTelemetry` dans IndexPRD4), typecheck, 48 régressions, 707 unitaires,
+34 intégrations et build. Avertissements habituels de taille de bundle conservés.
+E2E complet en cours ; teaser WebKit initialement en échec sur la sélection
+du personnage, puis vert en isolation (1/1, 3,4 s), sans modification des tests.
+
+**Revue :** types, nettoyage, consommateurs GM, reçu de livraison et fixtures
+relus. `REQUIRED_GM_JSON_FIELDS` inchangé ; le nouveau champ n'est jamais requis.
+Test du même prompt effectif, de 950 tokens / 12 s et d'un seul appel LLM.
+`GM_CODE_VERSION` incrémentée pour tracer le nettoyeur, sans changement du prompt.
+Recherche des usages : aucun appel au validateur hors tests, aucune injection
+des instructions préparées dans les builders actifs. Pas de changement dans
+IndexPRD4, UI, sessionService, director, experienceFrame ou handsFreeVoice.
+Livraison GitHub et synchronisation finale Lovable à vérifier après CI.
+
 Le [prompt autonome du lot 1](prompt_reprise_switch_personnages_lot_1.md) lance uniquement le contrat et les tests. Ce premier lot prépare types, nettoyage compatible, instructions GM testables et validateur pur ; il ne branche pas encore la nouvelle autorisation dans le runtime et ne change aucun prompt effectif publié. L’audit de décision est d’abord un résultat pur, sa persistance attend le lot 2.
 
 À chaque clôture : actualiser `CHANGELOG.md`, `STORY.md` et ce plan avec les preuves et l’état réel ; vérifier la CI du HEAD avant fusion vers `main` ; produire et sauvegarder un prompt autonome du prochain lot pour un nouveau chat. Si le lot reste incomplet, le prompt doit d’abord en permettre la finalisation. Répéter ces obligations dans chaque prompt suivant. Aucun enchaînement automatique de lots ni publication produit pour le lot préparatoire. Les choix de quota et de validité d’offre du §8 n’ont pas à être activés dans le lot 1.

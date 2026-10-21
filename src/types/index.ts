@@ -400,6 +400,8 @@ export interface PRD4PostTurnEvaluation {
     targetCharacter: "max" | "emma";
     stance: "accept" | "object" | "defer";
   } | null;
+  /** Additive, fail-closed consent contract. Not consumed by live calls in lot 1. */
+  handoff_assessment?: import("./characterHandoff").CharacterHandoffAssessment | null;
   orchestration_version_id?: string | null;
   /** Configuration publiée qui a produit cette décision, pour les garde-fous runtime. */
   orchestration_config?: ExperienceDirectorConfig | null;
