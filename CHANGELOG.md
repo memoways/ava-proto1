@@ -18,7 +18,12 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   Aucune nouvelle pastille, configuration Cloud, migration ou publication produit.
   Quota sandbox de recette et validation humaine reportés au lot 4.
 - Défaut restant du lot 1 corrigé séparément par #56 avant reprise du lot 2.
-  [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md).
+- Lot 2 livré par [#57](https://github.com/memoways/ava-proto1/pull/57),
+  `8ff0bad`, après CI verte sur `d7c2643` : 48 régressions,
+  728 unitaires, 41 intégrations et 61 E2E ; 61 E2E locaux sans retry,
+  deux revues sans constat. Code synchronisé dans Lovable, produit non publié.
+  [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md),
+  [reprise limitée au lot 3](docs/prompt_reprise_switch_personnages_lot_3.md).
 
 ## [Non publié] — 2026-10-21 — Dernier veto du lot 1
 

@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-21 (lot 2 branché localement ; contrôles et livraison en cours)
+> **Last Updated**: 2026-10-21 (lot 2 livré et synchronisé Lovable ; aucune nouvelle publication)
 
 ---
 
@@ -89,7 +89,14 @@ micro fermé. La session, le timer, le film et les mémoires privées sont prés
 Le journal distingue recommandation, validation, offre, clic et connexion.
 La carte existante reste en place : nouvelle pastille au lot 3, recette humaine,
 quota sandbox et publication au lot 4. Aucun gain de latence ou succès humain
-n'est déduit des simulations. [Plan](docs/plan_changement_interlocuteur_manuel.md).
+n'est déduit des simulations. Les revues ont aussi fermé les courses de callbacks,
+protégé le transcript contre un autre onglet et verrouillé le micro pendant la
+validation réseau. [#57](https://github.com/memoways/ava-proto1/pull/57) livre
+`8ff0bad` après CI verte du HEAD exact `d7c2643` : 48 régressions,
+728 unitaires, 41 intégrations et 61 E2E. La suite locale finale passe sans retry.
+Main et Lovable synchronisés ; aucune nouvelle publication. Décision durable
+Notion vérifiée. [Plan](docs/plan_changement_interlocuteur_manuel.md) et
+[reprise autonome du lot 3](docs/prompt_reprise_switch_personnages_lot_3.md).
 
 
 ### 2026-10-21 — Finaliser le refus de quitter le personnage
@@ -2680,7 +2687,7 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 
 | Date | Description | Impact | Plan de fix |
 |------|-------------|--------|-------------|
-| 2026-10-21 | Socle de consentement du switching préparé, pas encore branché aux appels réels | Haut pour Emma ↔ Max | Lot 2 : offres/persistance/audio ; lot 3 : pastille ; lot 4 : recette Lovable |
+| 2026-10-21 | Moteur de switching branché et testé ; pastille et recette humaine restantes | Haut pour Emma ↔ Max | Lot 3 : pastille ; lot 4 : recette Lovable et publication |
 | 2026-03-08 | Video triggers hardcodés (DEMO_TRIGGERS) au lieu de dynamiques depuis DB | Moyen | Prochaine étape |
 | 2026-03-08 | Gameplay steps vide dans Notion (0 étapes) | Moyen | Remplir dans Notion |
 | 2026-03-08 | 1 video trigger sans titre dans Notion → ignoré au sync | Bas | Corriger dans Notion |
@@ -2701,6 +2708,16 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 ---
 
 ## Contrats de session (DBC)
+
+### Session 2026-10-21 — Switching, lot 2 seulement
+
+- [x] État main/PR/CI/Lovable réel vérifié ; défaut restant du lot 1 finalisé dans #56 avant reprise.
+- [x] Même GM, preuve délivrée, offre persistée/révoquée/reprise, appels revalidés et audit branchés.
+- [x] Concurrence JSONB, transcript protégé, callbacks anciens et verrou micro PTT/HF vérifiés.
+- [x] 48 régressions, 728 unitaires, 41 intégrations, qualité complète et 61 E2E locaux sans retry.
+- [x] Deux revues sans constat ; #57 fusionnée après CI verte sur le HEAD exact `d7c2643`.
+- [x] Main propre, Lovable synchronisé ; mémoire projet Notion et documents de reprise vérifiés.
+- [ ] Pastille et recette humaine : lots 3/4, aucune nouvelle publication dans ce lot.
 
 ### Session 2026-10-21 — Switching, lot 1 seulement
 
