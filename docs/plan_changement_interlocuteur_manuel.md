@@ -359,6 +359,77 @@ pastille à réaliser au lot 3 ; recette humaine, quota sandbox et publication
 au lot 4. La synchronisation ne prouve ni conversation humaine ni publication.
 Aucun lot 3 ou 4 commencé ; aucune publication produit ni changement Cloud.
 
+### Lot 3 — démarrage du 21 octobre 2026
+
+Base réelle après fetch : `9f5a405d475d7f8c36f350515a7eae0a7a9b637f` (#58),
+main local/distant identiques, checkout propre ; CI post-fusion `39605824874`
+verte, CI #57 et #58 vertes sur leurs HEAD respectifs. Lovable même SHA,
+ready/agentFinished, workspace Memoways et Cloud `iralfqlslqndgvexixis` vérifiés.
+Identité GitHub existante `Ulrfis` confirmée par requête authentifiée hors sandbox ;
+configuration App absente (aucune identité remplacée). PR tierces préservées.
+Branche : `codex/character-handoff-pill-lot-3` dans le checkout canonique.
+Baseline du lot 2 : **105 tests ciblés verts**, dont reprise, CAS/concurrence,
+consentement, conversation et sonneries. Aucun défaut de ce moteur établi.
+La vérification clavier révèle un risque dans le raccourci Espace global :
+reproduit rouge (micro ouvert sur Espace dans Appeler), puis corrigé en laissant
+les contrôles interactifs gérer leur activation native. 27 tests de reprise,
+concurrence, état et composant repassent avant le démarrage de la pastille.
+
+Périmètre : une seule offre sous la pastille active, portrait runtime de la cible,
+action Appeler/Rester, annonce discrète, focus et cible tactile >=44 px,
+pulsation douce désactivée sous reduced-motion. Réutiliser les callbacks du lot 2.
+Acheminer le portrait runtime également dans la sonnerie ; conserver les voix,
+fiches et mémoires existantes. Corriger les deux aides admin (seuil même pour
+une demande explicite ; quota des transferts exécutés), sans changer les gardes.
+Aucune configuration Cloud, migration, publication ou recette humaine du lot 4.
+
+Seams autorisés par le prompt : DOM/callbacks de ConversationScreen, parcours
+Playwright réels avec frontières réseau simulées, état persistant et événements
+existants. Baseline → reproduction rouge → correction minimale, par tranche.
+Tests ciblés puis qualité et E2E complets ; deux revues Standards/Spec indépendantes,
+CI verte sur HEAD exact, main/Lovable vérifiés. Prompt du lot 4 seulement à la
+fin complète du lot 3, sinon reprise de finalisation de ce lot.
+Confiance préalable : 95 % (moteur unique réutilisé, cause UI localisée,
+aucune dépendance nouvelle). Références : [rendu conditionnel React](https://react.dev/learn/conditional-rendering),
+[variantes mouvement Tailwind](https://tailwindcss.com/docs/hover-focus-and-other-states#prefers-reduced-motion),
+[implémentation Tailwind v3.4.17](https://github.com/tailwindlabs/tailwindcss/blob/v3.4.17/src/corePlugins.js).
+
+### Lot 3 — réalisation et revue
+
+La carte basse est remplacée par l'unique bouton d'appel sous la pastille active,
+avec portrait de la cible et action Rester. Annonce aria-live discrète, boutons
+natifs, focus visible, cibles 48/44 px, anneau à pulsation 3 s seulement si
+motion-safe ; disponibilité lisible sans animation. Aides admin corrigées sans
+modifier seuil/quota/pause. Les profils déjà lus par le GM fournissent les portraits ;
+la revalidation au clic alimente aussi l'écran de sonnerie, sans nouvel appel LLM.
+Contrats de consentement/reprise et CAS inchangés, voix et fiches appliquées au
+commit existant, aucun changement dans experienceFrame ou handsFreeVoice.
+
+Preuves rouge/vert : Espace focalisé sur Appeler déclenchait le micro (1 appel
+indésirable), corrigé avant la pastille. Les deux tests d'emplacement/portrait
+dans le header échouaient avant remplacement, puis passent. Gardes de capture
+et contrôles bloqués pendant validation conservés. Premiers contrôles : 19 tests
+composants, puis 14 tests ConversationScreen ; typecheck et qualité complète verts
+(48 régressions, 734 unitaires, 41 intégrations). Avertissement hooks préexistant
+finishInputTelemetry et taille du bundle conservés.
+
+Quatre parcours ciblés verts : deux sens avec portrait runtime dans l'offre,
+la sonnerie et après connexion ; double clic, Espace natif, timer décroissant
+sans remise à zéro. Mobile 390 px et desktop 1280 px : choix unique sous actif,
+focus et cibles >=44 px, aucun débordement, pulsation absente sous reduced-motion,
+Rester au clavier sans ouverture micro. Captures locales inspectées visuellement :
+output/playwright/lot-3-390.png et lot-3-1280.png (simulations, pas recette humaine).
+
+Les deux revues indépendantes de dbce411 repèrent la même régression introduite :
+le profil opposé était attendu à toute reprise. Première reproduction sans tour
+persisté non concluante (appel non reprenable), puis session réelle du fixture
+avec un tour : rouge, portrait actif absent quand RPC cible retenue. Correctif :
+aucune requête cible sans offre restaurable ; pour une offre, chargement seulement
+d'affichage non bloquant, résultat ignoré si session/offre remplacée ou terminée.
+La reprise de l'offre teste aussi son portrait runtime. Suite complète interrompue
+pour correction (3 succès, 1 interrompu, 59 non exécutés) : pas comptée verte.
+Qualité/E2E et revues à confirmer sur la révision corrigée avant livraison.
+
 ## 6. Validation attendue
 
 - Unitaires : T6 différé ; T10 pronom/faux prénom contextualisé ; T11 nom explicite + accord naturel ; inquiétude émotionnelle sans refus ; refus explicites et sans « ne » ; « Je vais l’appeler… enfin non » ; extrait affirmatif choisi au milieu d’un refus ; oui hors contexte ; cible incohérente ; décision invalide/périmée ; offre révoquée et nouvelles versions.

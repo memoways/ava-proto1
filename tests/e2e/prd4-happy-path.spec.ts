@@ -34,6 +34,7 @@ interface NetworkFakeOptions {
   diagnosticAdmin?: boolean;
   blockTraceUpload?: boolean;
   characterOpenings?: boolean;
+  characterPortraits?: boolean;
   delayCharacterResponseMs?: number;
   whisperResponse?: string;
   delayWhisperResponseMs?: number;
@@ -56,6 +57,10 @@ async function installNetworkFakes(
   transcripts: string[] = TRANSCRIPTS,
   options: NetworkFakeOptions = {},
 ) {
+  if (options.characterPortraits) {
+    await page.route('https://portraits.example/*-runtime.jpg', route =>
+      route.fulfill({ path: `src/assets/characters/${route.request().url().includes('emma-') ? 'emma' : 'max'}.jpg`, contentType: 'image/jpeg' }));
+  }
   let maxTurnCount = 0;
   let labelCallCount = 0;
   let gmPostTurnCount = 0;
@@ -385,7 +390,7 @@ async function installNetworkFakes(
       const character = input.p_character_key;
       return json(route, [{ character_key: character, display_name: character === "emma" ? "Emma" : "Max", enabled: true, ready: true,
         character_id: character === "emma" ? EMMA_CHARACTER_ID : CHARACTER_ID, notion_page_id: "77777777-7777-4777-8777-777777777777", environment_id: "prod", prompt_updated_at: "2026-10-12T00:00:00Z",
-        tts_provider: options.incrementalOutput ? "gradium" : "elevenlabs", tts_voice_id: options.characterOpenings ? (character === "emma" ? "e2e-emma-voice" : "e2e-max-voice") : null, opening_line: options.characterOpenings ? `Allô, ici ${character === "emma" ? "Emma" : "Max"}.` : null, portrait_url: null, situation_summary: "Fiche E2E" }]);
+        tts_provider: options.incrementalOutput ? "gradium" : "elevenlabs", tts_voice_id: options.characterOpenings ? (character === "emma" ? "e2e-emma-voice" : "e2e-max-voice") : null, opening_line: options.characterOpenings ? `Allô, ici ${character === "emma" ? "Emma" : "Max"}.` : null, portrait_url: options.characterPortraits ? `https://portraits.example/${character}-runtime.jpg` : null, situation_summary: "Fiche E2E" }]);
     }
     if (table === "pin_current_orchestration_version") {
       return json(route, "66666666-6666-4666-8666-666666666666");
@@ -732,7 +737,7 @@ for (const [character, target] of [["Emma", "Max"], ["Max", "Emma"]] as const) {
   test(`appel GM : aucun bouton par défaut chez ${character}, accord au quatrième tour puis sonneries vers ${target}`, async ({ page }) => {
     test.setTimeout(50_000);
     const turns = [...HANDOFF_TURNS, `J'aimerais parler à ${target}, s'il te plaît.`];
-    const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+    const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true, characterPortraits: true,
       gmTarget: target.toLowerCase() as "max" | "emma", gmStance: "accept", gmHandoffAt: 4, maxResponse: "D'accord, je te la passe." });
     await startCharacterConversation(page, character);
     for (const text of turns.slice(0, 3)) {
@@ -742,13 +747,24 @@ for (const [character, target] of [["Emma", "Max"], ["Max", "Emma"]] as const) {
     }
     await sendHandoffTurn(page, turns[3]);
     await expect(page.getByRole("button", { name: `Appeler ${target}`, exact: true })).toBeVisible();
+    const call = page.getByRole('banner').getByRole('button', { name: `Appeler ${target}`, exact: true });
+    await expect(call.getByRole('img')).toHaveAttribute('src', `https://portraits.example/${target.toLowerCase()}-runtime.jpg`);
+    const beforeTimer = await page.getByLabel('Temps restant').textContent();
     expect(fakes.getExperienceEvents().filter(e => e.event_type === "handoff_executed")).toHaveLength(0);
-    await page.getByRole("button", { name: `Appeler ${target}`, exact: true }).evaluate(button => {
-      (button as HTMLButtonElement).click(); (button as HTMLButtonElement).click();
-    });
+    if (character === 'Max') {
+      await call.focus();
+      await page.keyboard.press('Space');
+    } else {
+      await call.evaluate(button => { (button as HTMLButtonElement).click(); (button as HTMLButtonElement).click(); });
+    }
     await expect(page.getByText("Appel en cours…", { exact: true })).toBeVisible();
-    await expect(page.getByRole("img", { name: target, exact: true })).toBeVisible();
+    await expect(page.getByRole("img", { name: target, exact: true })).toHaveAttribute('src', `https://portraits.example/${target.toLowerCase()}-runtime.jpg`);
     await expect(page.getByRole("img", { name: `Portrait d’${target}` })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("img", { name: `Portrait d’${target}` })).toHaveAttribute('src', `https://portraits.example/${target.toLowerCase()}-runtime.jpg`);
+    const seconds = (value: string) => value.split(':').reduce((total, part) => total * 60 + Number(part), 0);
+    const afterTimer = await page.getByLabel('Temps restant').textContent();
+    expect(seconds(afterTimer!)).toBeLessThan(seconds(beforeTimer!));
+    expect(seconds(beforeTimer!) - seconds(afterTimer!)).toBeLessThan(15);
     await expect.poll(fakes.getTtsText).toContain(`Allô, ici ${target}.`);
     await expect(page.getByText(`Allô, ici ${target}.`, { exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /^Appeler / })).toHaveCount(0);
@@ -1482,7 +1498,7 @@ test('lot 2 : raccrocher pendant la sonnerie interdit une connexion tardive', as
 
 test('lot 2 : reprise recharge seulement une offre prouvée, sans sonnerie automatique', async ({ page }) => {
   const turns = [...HANDOFF_TURNS, 'Je voudrais parler avec Max.'];
-  const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+  const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true, characterPortraits: true,
     gmTarget: 'max', gmStance: 'accept', gmHandoffAt: 4, maxResponse: 'Je vais appeler Max.' });
   await startCharacterConversation(page, 'Emma');
   for (const text of turns) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
@@ -1491,6 +1507,8 @@ test('lot 2 : reprise recharge seulement une offre prouvée, sans sonnerie autom
   await page.getByRole('button', { name: /Reprendre/ }).click();
   await expect(page.getByRole('img', { name: 'Portrait d’Emma' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Appeler Max', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Appeler Max', exact: true }).getByRole('img'))
+    .toHaveAttribute('src', 'https://portraits.example/max-runtime.jpg');
   await expect(page.getByText('Appel en cours…', { exact: true })).toHaveCount(0);
   expect(fakes.getExperienceEvents().filter(e => e.event_type === 'handoff_executed')).toHaveLength(0);
 });
@@ -1695,5 +1713,91 @@ for (const handsFree of [false, true]) {
     await expect(page.getByRole('img', { name: 'Portrait d’Max' })).toBeVisible({ timeout: 10_000 });
     expect(fakes.getMaxTurnCount()).toBe(4);
     expect(await page.evaluate(() => (window as Window & { __captureAttempts?: number }).__captureAttempts)).toBe(before);
+  });
+}
+
+
+for (const [width, reducedMotion, character, target] of [
+  [390, 'reduce', 'Emma', 'Max'], [1280, 'no-preference', 'Max', 'Emma'],
+] as const) {
+  test(`lot 3 : pastille accessible ${width}px, ${reducedMotion}, clavier et révocation`, async ({ page }) => {
+    test.setTimeout(45_000);
+    await page.setViewportSize({ width, height: 844 });
+    await page.emulateMedia({ reducedMotion });
+    const turns = [...HANDOFF_TURNS, `Je voudrais parler avec ${target}.`];
+    const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterPortraits: true,
+      gmTarget: target.toLowerCase() as 'max' | 'emma', gmStance: 'accept', gmHandoffAt: 4,
+      maxResponse: `Tu peux appeler ${target}.` });
+    await page.addInitScript(() => {
+      const targetWindow = window as Window & { __captureAttempts?: number };
+      const previous = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+      targetWindow.__captureAttempts = 0;
+      navigator.mediaDevices.getUserMedia = constraints => { targetWindow.__captureAttempts! += 1; return previous(constraints); };
+    });
+    await startCharacterConversation(page, character);
+    for (const text of turns) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+    const call = page.getByRole('button', { name: `Appeler ${target}`, exact: true });
+    await expect(call).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Appeler / })).toHaveCount(1);
+    const active = await page.getByRole('img', { name: `Portrait d’${character}` }).boundingBox();
+    const bounds = await call.boundingBox();
+    expect(bounds!.y).toBeGreaterThan(active!.y + active!.height);
+    expect(bounds!.height).toBeGreaterThanOrEqual(44);
+    expect(bounds!.x).toBeLessThan(30);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    const pulse = call.locator('[aria-hidden=true]');
+    await expect(pulse).toHaveCSS('animation-name', reducedMotion === 'reduce' ? 'none' : 'pulse');
+    await call.focus();
+    await expect(call).toBeFocused();
+    expect(await call.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
+    await page.screenshot({ path: `output/playwright/lot-3-${width}.png` });
+    await page.keyboard.press('Tab');
+    const stay = page.getByRole('button', { name: `Rester avec ${character}` });
+    await expect(stay).toBeFocused();
+    expect((await stay.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    const microphoneStarts = await page.evaluate(() => (window as Window & { __captureAttempts?: number }).__captureAttempts);
+    expect(microphoneStarts).toBeGreaterThan(0);
+    await page.keyboard.press('Space');
+    await expect(call).toHaveCount(0);
+    await expect.poll(() => fakes.getSessionRow().pending_handoff).toMatchObject({ state: 'none' });
+    expect(await page.evaluate(() => (window as Window & { __captureAttempts?: number }).__captureAttempts)).toBe(microphoneStarts);
+    expect(fakes.getExperienceEvents().filter(event => event.event_type === 'handoff_executed')).toHaveLength(0);
+    await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  });
+}
+
+
+for (const withOffer of [false, true]) {
+  test(`lot 3 : reprise ${withOffer ? 'avec' : 'sans'} offre indépendante du profil cible suspendu`, async ({ page }) => {
+    const turns = [...HANDOFF_TURNS, 'Je voudrais parler avec Max.'];
+    const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+      ...(withOffer ? { gmTarget: 'max', gmStance: 'accept', gmHandoffAt: 4, maxResponse: 'Je vais appeler Max.' } : {}) });
+    await startCharacterConversation(page, 'Emma');
+    for (const text of withOffer ? turns : turns.slice(0, 1)) {
+      await sendHandoffTurn(page, text);
+      await page.waitForLoadState('networkidle');
+    }
+    await page.reload();
+    let targetRequested = false;
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    await page.route(`${SUPABASE_ORIGIN}/rest/v1/rpc/get_character_runtime_readiness_for_environment`, async route => {
+      if (route.request().postDataJSON().p_character_key === 'max') { targetRequested = true; await held; }
+      return route.fallback();
+    });
+    try {
+      await page.getByRole('button', { name: /Reprendre/ }).click();
+      await expect(page.getByRole('img', { name: 'Portrait d’Emma' })).toBeVisible({ timeout: 3000 });
+      await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled();
+      if (withOffer) {
+        await expect.poll(() => targetRequested).toBe(true);
+        await page.getByRole('button', { name: 'Rester avec Emma' }).click();
+        await expect.poll(() => fakes.getSessionRow().pending_handoff).toMatchObject({ state: 'none' });
+      } else expect(targetRequested).toBe(false);
+    } finally { release(); }
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('button', { name: /^Appeler / })).toHaveCount(0);
+    await expect(page.getByRole('img', { name: 'Portrait d’Emma' })).toBeVisible();
   });
 }

@@ -555,7 +555,7 @@ export default function GameMasterSettingsTab() {
 
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="minimum-handoff-turn">Premier tour autorisé (GM) <Hint level="expert" text="Le Game Master ne propose pas de changer de personnage avant ce tour. Laisser par défaut." /></Label>
+                    <Label htmlFor="minimum-handoff-turn">Premier tour autorisé <Hint level="expert" text="Aucun passage avant ce tour, y compris sur demande explicite du joueur. Laisser par défaut." /></Label>
                     <Input
                       id="minimum-handoff-turn"
                       type="number"
@@ -565,10 +565,10 @@ export default function GameMasterSettingsTab() {
                       disabled={selected.status !== "draft" || !config.editor.allowHandoffs}
                       onChange={(event) => patchConfig({ minimumHandoffTurn: Number(event.target.value) })}
                     />
-                    <p className="text-xs text-muted-foreground">Ne s’applique pas à une demande explicite du joueur.</p>
+                    <p className="text-xs text-muted-foreground">S’applique aussi aux demandes explicites du joueur.</p>
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="max-handoffs">Passages max par session <Hint level="expert" text="Nombre maximum de propositions de changement de personnage dans une session." /></Label>
+                    <Label htmlFor="max-handoffs">Passages max par session <Hint level="expert" text="Nombre maximum de transferts exécutés dans une session. Les propositions seules ne sont pas comptées." /></Label>
                     <Input
                       id="max-handoffs"
                       type="number"

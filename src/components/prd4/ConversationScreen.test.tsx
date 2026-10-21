@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import ConversationScreen from "./ConversationScreen";
 import { tagSpokenWith } from "@/services/characterConversation";
@@ -103,3 +103,46 @@ it.each([false, true])('locks microphone and choices during validation without h
   fireEvent.keyDown(window, { code: 'Space' });
   expect(press).not.toHaveBeenCalled(); expect(toggle).not.toHaveBeenCalled();
 });
+
+
+it('leaves Space on a focused call button to its native activation without opening the microphone', () => {
+  const press = vi.fn();
+  render(<ConversationScreen {...baseProps} activeCharacter="emma" conversationLog={[]}
+    handoffOffer={{ reason: 'Accord prouvé', targetCharacter: 'max' }} onPTTPress={press} />);
+  const call = screen.getByRole('button', { name: 'Appeler Max' });
+  call.focus();
+  fireEvent.keyDown(call, { code: 'Space', key: ' ' });
+  expect(press).not.toHaveBeenCalled();
+});
+
+
+it.each([['emma', 'max', 'Max'], ['max', 'emma', 'Emma']] as const)(
+  'places the only call choice below %s with the runtime portrait of %s and removes it on revocation',
+  (source, target, name) => {
+    const props = { ...baseProps, activeCharacter: source, conversationLog: [],
+      handoffOffer: { reason: 'Accord prouvé', targetCharacter: target },
+      handoffPortraitUrl: `https://portraits.example/${target}-runtime.jpg` };
+    const { rerender } = render(<ConversationScreen {...props} />);
+    const header = screen.getByRole('banner');
+    const call = within(header).getByRole('button', { name: `Appeler ${name}` });
+    expect(screen.getAllByRole('button', { name: /^Appeler / })).toHaveLength(1);
+    expect(within(call).getByRole('img', { name: `Portrait de ${name}` }))
+      .toHaveAttribute('src', `https://portraits.example/${target}-runtime.jpg`);
+    expect(within(header).getByRole('button', { name: /^Rester avec/ })).toBeInTheDocument();
+    expect(screen.getByText(`${source === 'emma' ? 'Emma' : 'Max'} vous propose de parler avec ${name}.`))
+      .toHaveAttribute('aria-live', 'polite');
+    rerender(<ConversationScreen {...props} handoffOffer={null} />);
+    expect(screen.queryByRole('button', { name: /^Appeler / })).not.toBeInTheDocument();
+  });
+
+
+it.each(['mic_starting', 'user_speaking', 'user_finalizing'] as const)(
+  'blocks the offer while %s without removing it', audioState => {
+    const accept = vi.fn();
+    render(<ConversationScreen {...baseProps} audioState={audioState} activeCharacter="emma" conversationLog={[]}
+      handoffOffer={{ reason: 'Accord prouvé', targetCharacter: 'max' }} onAcceptHandoff={accept} />);
+    const call = screen.getByRole('button', { name: 'Appeler Max' });
+    expect(call).toBeDisabled();
+    fireEvent.click(call);
+    expect(accept).not.toHaveBeenCalled();
+  });
