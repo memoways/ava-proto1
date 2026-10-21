@@ -59,15 +59,21 @@ function explicitTransferVeto(reply: string): "character_refused" | "character_d
   const text = normalized(reply);
   const verb = "(?:pass\\w*|appel\\w*|contact\\w*|joind\\w*|cherch\\w*)";
   const pronouns = "(?:(?:te|le|la|lui|vous|me)\\s+|l['’]){0,3}";
-  const refused = new RegExp(`\\b(?:(?:ne|n')\\s*)?(?:(?:vais|peux|veux|voudrais|compte|souhaite)\\s+)?(?:pas|jamais|plus)\\s+${pronouns}${verb}\\b`, "i").test(text)
-    || new RegExp(`(?:\\bne\\s+|\\bn')${pronouns}${verb}\\s+(?:pas|jamais|plus)\\b`, "i").test(text)
-    || new RegExp(`\\b${verb}(?:[- ](?:le|la|moi|nous))?\\s+(?:pas|jamais|plus)\\b`, "i").test(text)
-    || new RegExp(`\\b(?:je refuse de|pas question de)\\s+${pronouns}${verb}\\b`, "i").test(text)
+  const object = "(?:max|emma|telephone|ligne)\\b";
+  const pronounObject = "(?:(?:te|vous|me)\\s+)?(?:(?:le|la|lui)\\s+|l')";
+  const namedObject = `(?:(?:a|avec|le|la)\\s+){0,2}${object}`;
+  const transfer = `(?:${pronounObject}${verb}|${pronouns}${verb}\\s+${namedObject})`;
+  const refusal = "(?:pas|jamais|plus)\\b";
+  const refused = new RegExp(`\\b${refusal}\\s+${transfer}\\b`, "i").test(text)
+    || new RegExp(`(?:\\bne\\s+|\\bn')${pronounObject}${verb}\\s+${refusal}`, "i").test(text)
+    || new RegExp(`(?:${pronounObject}${verb}|${verb}[- ](?:le|la|moi|nous))\\s+${refusal}`, "i").test(text)
+    || new RegExp(`\\b${verb}\\s+${refusal}\\s+${namedObject}`, "i").test(text)
+    || new RegExp(`\\b(?:je refuse de|pas question de)\\s+${transfer}\\b`, "i").test(text)
     || /\b(?:enfin non|finalement non|mais non|reste[z]? avec moi)\b/.test(text)
     || /(?:^|[.!?…]\s*)(?:non|je refuse|pas question)\s*(?:[.!?…]|$)/.test(text);
   if (refused) return "character_refused";
   if (/(?:^|[.!?…]\s*)(?:plus tard|pas maintenant|pas encore|on verra)\s*(?:[.!?…]|$)/.test(text)
-    || new RegExp(`\\b${verb}[^.!?…]{0,50}\\b(?:plus tard|pas maintenant|pas encore|on verra)\\b`, "i").test(text)
+    || new RegExp(`${transfer}[^.!?…]{0,50}\\b(?:plus tard|pas maintenant|pas encore|on verra)\\b`, "i").test(text)
     || /\bdemander\s+(?:s'il|si elle)\s+(?:accepte|veut|est d'accord)\b/.test(text)) return "character_deferred";
   return null;
 }

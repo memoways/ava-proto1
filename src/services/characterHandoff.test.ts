@@ -57,6 +57,13 @@ describe("structured consent — pure validator", () => {
   it("does not turn a refusal to believe Max's feelings into a transfer veto", () => {
     expect(validateCharacterHandoff(withReply("Je vais l’appeler. Je refuse de croire qu’il me déteste.", "Je vais l’appeler.")).authorized).toBe(true);
   });
+  it.each([
+    "Je ne suis pas passionnée par sa réaction.",
+    "Je n’ai pas passé un bon moment avec Max.",
+    "Je ne cherche pas à le brusquer.",
+  ])("limits transfer vetoes to actual transfer objects: %s", concern => {
+    expect(validateCharacterHandoff(withReply(`Je vais l’appeler. ${concern}`, "Je vais l’appeler.")).authorized).toBe(true);
+  });
   it("rejects an affirmative excerpt inside a refusal", () => {
     expect(validateCharacterHandoff(withReply("Je ne vais pas dire « Je vais l’appeler » : je refuse de le passer.", "Je vais l’appeler")).reason).toBe("character_refused");
   });

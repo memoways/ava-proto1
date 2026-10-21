@@ -1,7 +1,8 @@
 # Passage Emma ↔ Max : validation narrative et pastille d’appel
 
-Date : 19 octobre 2026. Statut : **diagnostic vérifié, implémentation proposée**.
-Périmètre de ce lot : analyse et plan ; aucun code produit, réglage Cloud ou déploiement modifié.
+Date du diagnostic : 19 octobre 2026. État au 21 octobre : **lot 1 livré,
+contrat préparé sans branchement runtime**. Les lots 2–4 restent à réaliser.
+Périmètre du diagnostic du 19 octobre : analyse et plan. Le lot 1 du 21 octobre est décrit au §5 ; aucun réglage Cloud ni déploiement produit modifié.
 Base examinée : `main` / `d0f72b601680b65b50e901e61bcae92a5752addd`, également HEAD Lovable au contrôle.
 
 ## 1. Résultat attendu
@@ -148,7 +149,7 @@ aucune dépendance ajoutée. Références du parseur : [API Zod](https://zod.dev
 et [tests objets Zod v3](https://github.com/colinhacks/zod/blob/v3/src/__tests__/object.test.ts).
 Contrôles : tests ciblés, qualité complète, E2E existants, revue des consommateurs,
 CI verte du HEAD exact avant fusion, main et synchronisation Lovable après fusion.
-Publication produit exclue. Résultats de clôture à compléter après exécution.
+Publication produit exclue. Résultats de clôture vérifiés ci-dessous.
 
 **Réalisé localement :** `src/types/characterHandoff.ts`, champ GM optionnel,
 `cleanHandoffAssessment` et `validateCharacterHandoff` dans le nouveau module pur.
@@ -170,17 +171,45 @@ aux filtres existants. 76 nouveaux tests dont deux caractérisations attendues.
 Qualité complète locale verte : lint 0 erreur (avertissement préexistant
 `finishInputTelemetry` dans IndexPRD4), typecheck, 48 régressions, 707 unitaires,
 34 intégrations et build. Avertissements habituels de taille de bundle conservés.
-E2E complet en cours ; teaser WebKit initialement en échec sur la sélection
-du personnage, puis vert en isolation (1/1, 3,4 s), sans modification des tests.
+Premier E2E complet : 44/45, teaser WebKit en échec sur la sélection du personnage.
+Isolation verte (1/1, 3,4 s), puis suite complète avec un worker comme la CI :
+**45/45 sans retry, 8,5 min**, sans modification des tests. CI GitHub : également
+45/45 sans retry (7,6 min). L'échec initial est conservé dans ces preuves ; les
+assertions n'ont pas été affaiblies.
 
 **Revue :** types, nettoyage, consommateurs GM, reçu de livraison et fixtures
 relus. `REQUIRED_GM_JSON_FIELDS` inchangé ; le nouveau champ n'est jamais requis.
+Dernière revue de clôture : restreindre les vetos aux verbes avec un objet de
+transfert (pronom, nom de personnage ou téléphone/ligne). Des expressions comme
+« pas passionnée » ou « pas passé un bon moment » ne doivent pas être assimilées
+à un refus. Trois tests rouges avant correction, puis 79 tests du contrat verts (70 moteur,
+9 GM). Cette finalisation et la clôture sont réunies dans la
+[PR #55](https://github.com/memoways/ava-proto1/pull/55) ; aucune activation runtime.
+Qualité locale finale à 710 unitaires ; les 707 cités ci-dessus décrivent la
+première livraison #54. Les E2E locaux sont ceux de cette première livraison ;
+la CI de #55 rejoue tout le contrat sur son HEAD final avant fusion.
 Test du même prompt effectif, de 950 tokens / 12 s et d'un seul appel LLM.
 `GM_CODE_VERSION` incrémentée pour tracer le nettoyeur, sans changement du prompt.
 Recherche des usages : aucun appel au validateur hors tests, aucune injection
 des instructions préparées dans les builders actifs. Pas de changement dans
 IndexPRD4, UI, sessionService, director, experienceFrame ou handsFreeVoice.
-Livraison GitHub et synchronisation finale Lovable à vérifier après CI.
+
+**Livraison vérifiée :** [PR #54](https://github.com/memoways/ava-proto1/pull/54),
+[CI 39574552872](https://github.com/memoways/ava-proto1/actions/runs/39574552872)
+verte sur le HEAD exact `2a48a9754fe1118076647f09fb9d6b21e43d8bba` avant fusion.
+Fusion le 21 octobre à 11:21 Europe/Zurich dans
+`3d53298962f97cc3924b13b4bff60024f9965e35`. Main local/distant identiques et
+checkout propre après fusion. Contrôle Lovable natif : même SHA, workspace
+Memoways/projet Ava corrects, `project.status=ready`, `agentFinished=true`.
+Code synchronisé ; pas de nouvelle publication produit, de réglage Cloud ou
+recette humaine. La CI post-fusion est contrôlée séparément de la CI pré-fusion.
+
+[Prompt autonome du lot 2](prompt_reprise_switch_personnages_lot_2.md) actualisé
+après la fusion avec les références réelles. Il impose de vérifier le main
+courant (les commits de clôture documentaire peuvent suivre cette référence
+technique), de finaliser le lot 1 en cas de régression et de répéter les mêmes
+obligations à chaque clôture. Lot 2 non démarré. Décision durable distillée dans
+la mémoire Notion AVA, ajout relu ; Source conservée, Last updated by = Codex.
 
 Le [prompt autonome du lot 1](prompt_reprise_switch_personnages_lot_1.md) lance uniquement le contrat et les tests. Ce premier lot prépare types, nettoyage compatible, instructions GM testables et validateur pur ; il ne branche pas encore la nouvelle autorisation dans le runtime et ne change aucun prompt effectif publié. L’audit de décision est d’abord un résultat pur, sa persistance attend le lot 2.
 

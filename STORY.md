@@ -84,9 +84,15 @@ Les filtres et parcours existants restent en place : le switching réel n'est
 donc pas encore corrigé. Instructions GM préparées sans activation ; aucun
 appel supplémentaire ni modification du budget vocal. Revue : un veto trop
 large sur « je refuse de croire » reproduit puis corrigé ; test conservé.
-Qualité locale : 48 régressions, 707 unitaires, 34 intégrations, typecheck,
-lint sans erreur et build verts. E2E et livraison détaillés dans le
-[plan](docs/plan_changement_interlocuteur_manuel.md). Temps : un lot de développement.
+Qualité locale finale : 48 régressions, 710 unitaires, 34 intégrations, typecheck,
+lint sans erreur et build verts ; 45 E2E locaux et CI verts sans retry. Un échec
+WebKit initial a passé en isolation puis en relance complète, sans test modifié.
+PR #54 fusionnée dans `3d53298`, même SHA dans Lovable, preview déclarée prête.
+Finalisation #55 : trois faux refus (« passionnée », « passé un bon moment »,
+« cherche à le brusquer ») reproduits puis corrigés en exigeant un objet de transfert.
+Aucune publication produit ni recette humaine. [Plan](docs/plan_changement_interlocuteur_manuel.md)
+et [reprise lot 2](docs/prompt_reprise_switch_personnages_lot_2.md). Temps : environ
+une heure, vérifications et livraison incluses.
 
 ### 2026-10-19 — Démarrer le switching dans des chats séparés
 
@@ -2674,7 +2680,9 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 - [x] Baseline 53 tests ; défaut T10/T11 reproduit en échec avant validation du nouveau moteur.
 - [x] Contrat additif, nettoyeur et validateur pur ; refus, fraîcheur, preuves et compatibilité testés.
 - [x] Instructions GM isolées, prompt effectif et consommateurs runtime inchangés.
-- [x] Qualité complète et revue du diff ; E2E et preuves GitHub consignés dans le plan.
+- [x] Qualité complète, 45 E2E locaux et CI, revue du diff ; preuves consignées dans le plan.
+- [x] PR #54 fusionnée après CI verte du HEAD exact ; main propre et synchronisation Lovable vérifiés.
+- [x] CHANGELOG/STORY/plan et prompt autonome du lot 2 actualisés ; décision projet Notion relue.
 - [ ] Branchement des offres, nouvelle pastille et recette humaine : lots suivants uniquement.
 
 ### Session 2026-07-15 — Sécurité + RAG + LLM unifié
@@ -2755,7 +2763,16 @@ continuité d’expérience (mémoire entre tours).
 
 ### Dernière session
 
-**2026-10-12 — Choix du film après l'intro, retrait du champ « Profondeur par niveau », conversation mains libres**
+**2026-10-21 — Switching Emma ↔ Max, lot 1 livré sans activation**
+
+Contrat optionnel et validateur pur disponibles, 79 nouveaux tests dont deux
+caractérisations des faux négatifs historiques. Qualité complète et 45 E2E
+verts ; PR #54 fusionnée dans `3d53298`, code synchronisé dans Lovable. Le
+switching réel, les offres persistées et la nouvelle pastille restent aux lots
+suivants. Aucune publication produit. Le [prompt du lot 2](docs/prompt_reprise_switch_personnages_lot_2.md)
+reprend les limites, les références et les obligations de clôture.
+
+**Session précédente — 2026-10-12 — Choix du film après l'intro, retrait du champ « Profondeur par niveau », conversation mains libres**
 
 **Avant :** regarder la vidéo d'introduction était enregistré comme « a vu le
 film » ; le resync Notion échouait sur un champ « Profondeur par niveau »

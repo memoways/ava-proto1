@@ -15,9 +15,16 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Fixtures T6/T9/T10/T11, deux faux négatifs historiques caractérisés et tests du
   nouveau contrat. Instructions GM testables préparées séparément : prompt
   effectif, budget, timeout et nombre d'appels inchangés.
-- Qualité locale verte : 48 régressions, 707 unitaires, 34 intégrations,
-  typecheck et build. Revue du diff et des consommateurs effectuée ; E2E et
-  livraison GitHub à compléter dans le [plan](docs/plan_changement_interlocuteur_manuel.md).
+- Qualité locale finale : 48 régressions, 710 unitaires, 34 intégrations,
+  typecheck et build ; 45 E2E locaux et CI verts sans retry. Revue du diff et
+  des consommateurs effectuée. [PR #54](https://github.com/memoways/ava-proto1/pull/54)
+  fusionnée dans `3d53298` après CI verte du HEAD exact ; même SHA vérifié dans
+  Lovable, preview déclarée prête. [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md)
+  et [prompt autonome du lot 2](docs/prompt_reprise_switch_personnages_lot_2.md).
+- Dernière revue : trois cas émotionnels reconnus à tort comme refus reproduits
+  puis corrigés ; les vetos exigent un objet de transfert. Finalisation et
+  clôture dans la [PR #55](https://github.com/memoways/ava-proto1/pull/55),
+  sans branchement runtime.
 - Runtime, interface, voix, mémoires et Cloud inchangés. Le switching réel reste
   à brancher au lot 2 ; nouvelle pastille au lot 3. Aucune publication produit.
 
