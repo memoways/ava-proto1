@@ -293,6 +293,7 @@ const IndexPRD4 = () => {
   const handoffSnapshotRef = useRef<HandoffSnapshot | null>(null);
   const handoffWriteRef = useRef<Promise<HandoffSnapshot> | null>(null);
   const handoffPhaseRef = useRef<'none' | 'validating' | 'calling' | 'switching' | 'completed' | 'failed' | 'declined' | 'revoked'>('none');
+  const [handoffPortraits, setHandoffPortraits] = useState<Partial<Record<RuntimeCharacter, string | null>>>({});
   const [handoffOffer, setHandoffOffer] = useState<CharacterHandoffOffer | null>(null);
   const handoffOfferRef = useRef<CharacterHandoffOffer | null>(null);
   const acceptedHandoffRef = useRef<CharacterHandoffOffer | null>(null);
@@ -840,7 +841,11 @@ const IndexPRD4 = () => {
       return;
     }
     const { configuredDurationSeconds, elapsedSeconds, remainingSeconds } = timerWindow;
-    const profile = await getCharacterRuntimeReadiness(session.active_character).catch(() => null);
+    const [profile, targetProfile] = await Promise.all([
+      getCharacterRuntimeReadiness(session.active_character).catch(() => null),
+      getCharacterRuntimeReadiness(session.active_character === "emma" ? "max" : "emma").catch(() => null),
+    ]);
+    setHandoffPortraits(targetProfile ? { [targetProfile.characterKey]: targetProfile.portraitUrl } : {});
     const characterContext = toCharacterExecutionContext(profile);
     if (!profile?.ready || !characterContext) {
       toast({
@@ -1711,6 +1716,7 @@ const IndexPRD4 = () => {
               await write.finally(() => { if (handoffWriteRef.current === write) handoffWriteRef.current = null; });
               if (!isCurrentTurn()) return;
               const offer = next.state === 'available' ? next.offer : null;
+              setHandoffPortraits({ max: maxProfile?.portraitUrl ?? null, emma: emmaProfile?.portraitUrl ?? null });
               setCurrentHandoffOffer(offer);
               if (offer) {
                 void appendExperienceEvent({ sessionId: sid, eventKey: `handoff-proposed:${turnId}`,
@@ -2375,8 +2381,9 @@ const IndexPRD4 = () => {
       eventType: 'handoff_accepted', character: activeCharacterRef.current,
       payload: { stage: 'click', targetCharacter: offer.targetCharacter, offerId: parseHandoffState(handoffSnapshotRef.current?.pending_handoff)?.revision } });
     try {
-      await revalidateCall();
+      const validated = await revalidateCall();
       if (endedRef.current || sessionIdRef.current !== sid || activeTurnSequenceRef.current !== sequence) return;
+      setHandoffPortraits({ [offer.targetCharacter]: validated.profile?.portraitUrl ?? null });
       setHandoffCalling(true);
       acceptedHandoffRef.current = offer;
       setCurrentHandoffOffer(null);
@@ -2619,7 +2626,7 @@ const IndexPRD4 = () => {
         <>
           {!activeVideo?.video_url ? (
             approvedCallingTarget ? (
-              <CallingMaxScreen character={approvedCallingTarget} onAnswered={handleApprovedCallAnswered} onHangUp={handleHangUp} />
+              <CallingMaxScreen character={approvedCallingTarget} portraitUrl={handoffPortraits[approvedCallingTarget]} onAnswered={handleApprovedCallAnswered} onHangUp={handleHangUp} />
             ) : (
             <ConversationScreen
               audioState={state.audioState}
@@ -2640,6 +2647,7 @@ const IndexPRD4 = () => {
               activeCharacter={state.selectedCharacter}
               portraitUrl={activePortraitUrl}
               handoffOffer={handoffOffer}
+              handoffPortraitUrl={handoffOffer ? handoffPortraits[handoffOffer.targetCharacter] : null}
               handoffCalling={handoffCalling}
               handoffInputLocked={handoffInputLocked}
               handoffCallingTarget={handoffCallingTarget}

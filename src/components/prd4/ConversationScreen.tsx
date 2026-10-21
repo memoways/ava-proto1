@@ -31,6 +31,7 @@ interface Props {
   activeCharacter: "max" | "emma";
   portraitUrl?: string | null;
   handoffOffer?: { reason: string; targetCharacter?: "max" | "emma" } | null;
+  handoffPortraitUrl?: string | null;
   handoffCalling?: boolean;
   handoffInputLocked?: boolean;
   handoffCallingTarget?: "max" | "emma";
@@ -55,6 +56,7 @@ const ConversationScreen = ({
   activeCharacter,
   portraitUrl = null,
   handoffOffer = null,
+  handoffPortraitUrl = null,
   handoffCalling = false,
   handoffInputLocked = false,
   handoffCallingTarget = "emma",
@@ -77,12 +79,12 @@ const ConversationScreen = ({
   }, [audioState, handoffInputBlocked, handsFree, handsFreeListening, onPTTPress, onPTTRelease, onToggleHandsFree]);
 
   useEffect(() => {
-    const isTypingTarget = (target: EventTarget | null) => {
+    const isInteractiveTarget = (target: EventTarget | null) => {
       if (!(target instanceof HTMLElement)) return false;
-      return target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+      return Boolean(target.closest("button, a, input, textarea, select, [role=button]")) || target.isContentEditable;
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.code !== "Space" || event.repeat || isTypingTarget(event.target)) return;
+      if (event.code !== "Space" || event.repeat || isInteractiveTarget(event.target)) return;
       if (handoffInputBlocked) return;
       event.preventDefault();
       handleToggleTalk();
@@ -168,6 +170,7 @@ const ConversationScreen = ({
   const backgroundPortrait = portraitUrl ?? (activeCharacter === "emma" ? emmaAvatar : maxLarge);
   const offerTarget = handoffOffer?.targetCharacter === "max" ? "max" : "emma";
   const offerTargetName = displayNameForCharacter(offerTarget);
+  const offerPortrait = handoffPortraitUrl ?? (offerTarget === "max" ? maxAvatar : emmaAvatar);
   const callingName = displayNameForCharacter(handoffCallingTarget ?? "emma");
 
   if (handoffCalling) {
@@ -233,13 +236,37 @@ const ConversationScreen = ({
       />
 
       {/* HUD top */}
-      <header className="relative z-10 flex items-start justify-between p-4 md:p-6">
+      <header className="relative z-10 flex flex-wrap items-start justify-between gap-3 p-4 md:p-6">
+        <div className="flex flex-col items-start gap-2">
         <div className="flex items-center gap-3 rounded-full border border-border/40 bg-background/60 px-3 py-2 backdrop-blur-md">
           <img src={portrait} alt={`Portrait d’${displayName}`} className="h-8 w-8 rounded-full border border-border object-cover" />
           <div className="pr-2">
             <p className="text-xs font-medium leading-none text-foreground">{displayName}</p>
             <p className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">en ligne</p>
           </div>
+        </div>
+          <span className="sr-only" aria-live="polite" aria-atomic="true">
+            {handoffOffer ? `${displayName} vous propose de parler avec ${offerTargetName}.` : ""}
+          </span>
+          {handoffOffer && (
+            <div className="flex flex-col items-start gap-1">
+              <button
+                type="button"
+                aria-label={`Appeler ${offerTargetName}`}
+                disabled={handoffInputBlocked || audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "user_speaking"}
+                onClick={onAcceptHandoff}
+                className="relative flex min-h-12 items-center gap-2 rounded-full border border-primary bg-background/90 px-3 py-2 text-sm font-medium text-foreground shadow-lg backdrop-blur-md hover:bg-primary/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-primary/40 motion-safe:animate-pulse motion-reduce:animate-none" style={{ animationDuration: "3s" }} />
+                <img src={offerPortrait} alt={`Portrait de ${offerTargetName}`} className="h-8 w-8 rounded-full border border-primary/50 object-cover" />
+                <span>Appeler {offerTargetName}</span>
+              </button>
+              <button type="button" disabled={handoffInputBlocked} onClick={onRejectHandoff}
+                className="min-h-11 rounded-full px-3 text-xs text-foreground/80 underline underline-offset-4 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50">
+                Rester avec {displayName}
+              </button>
+            </div>
+          )}
         </div>
         {streamingAvatarActive && streamingAvatarState === "connecting" && (
           <div className="flex items-center gap-2 rounded-full border border-border/40 bg-background/60 px-3 py-2 text-xs text-muted-foreground backdrop-blur-md">
@@ -283,17 +310,6 @@ const ConversationScreen = ({
             >
               « {displayedUser} »
             </p>
-          )}
-
-          {handoffOffer && (
-            <div className="w-full max-w-xl rounded-xl border border-primary/40 bg-background/90 p-4 text-center shadow-xl backdrop-blur-md">
-              <p className="font-medium">{displayName} vous propose de parler avec {offerTargetName}.</p>
-              <p className="mt-1 text-xs text-muted-foreground">{handoffOffer.reason}</p>
-              <div className="mt-3 flex flex-wrap justify-center gap-2">
-                <Button disabled={handoffInputBlocked || audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "user_speaking"} onClick={onAcceptHandoff}>Appeler {offerTargetName}</Button>
-                <Button variant="outline" disabled={handoffInputBlocked} onClick={onRejectHandoff}>Rester avec {displayName}</Button>
-              </div>
-            </div>
           )}
 
           {/* Status helper line */}
