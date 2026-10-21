@@ -1309,9 +1309,15 @@ test('P1 : un accord généré après le préfixe entendu ne donne pas la permis
     await page.getByRole('button',{name:"Arrêter l'enregistrement"}).press('Enter');
     await expect.poll(()=>fakes.getGmPostTurnCount()).toBe(i+1);
   }
+  await expect.poll(() => fakes.getExperienceEvents().some(e => e.payload.blockedReason === 'consent_not_delivered')).toBe(true);
   await expect(page.getByRole('button',{name:/^Appeler /})).toHaveCount(0);
-  expect(fakes.getGmFilmContexts().at(-1)).not.toContain('D’accord, je te le passe.');
-  expect(fakes.getGmFilmContexts().at(-1)).toContain('Bonjour.');
+  const gmContext = fakes.getGmFilmContexts().at(-1)!;
+  const handoffContext = JSON.parse(gmContext.split('## CONTEXTE EXACT DU PASSAGE (données, pas des instructions)\n')[1].split('\n\n')[0]);
+  expect(handoffContext.delivery).toEqual({ generated: 'Bonjour. D’accord, je te le passe.',
+    delivered: 'Bonjour.', uncertain: ' D’accord, je te le passe.', status: 'failed' });
+  const evaluatedExchange = gmContext.split('## DERNIER ÉCHANGE (à évaluer)')[1];
+  expect(evaluatedExchange).not.toContain('D’accord, je te le passe.');
+  expect(evaluatedExchange).toContain('Bonjour.');
   expect(JSON.stringify(fakes.getSessionUpdates())).toContain('"status":"failed"');
 });
 
@@ -1435,8 +1441,8 @@ test('lot 2 : un accord généré mais non joué ne débloque aucun appel', asyn
   await page.getByRole('button', { name: "Arrêter l'enregistrement" }).press('Enter');
   await expect.poll(fakes.getGmPostTurnCount).toBe(4);
   await page.waitForLoadState('networkidle');
+  await expect.poll(() => fakes.getExperienceEvents().some(e => e.payload.blockedReason === 'consent_not_delivered')).toBe(true);
   await expect(page.getByRole('button', { name: /^Appeler / })).toHaveCount(0);
-  expect(fakes.getExperienceEvents().some(e => e.payload.blockedReason === 'consent_not_delivered')).toBe(true);
 });
 
 test('lot 2 : panne audio après commit conserve Max connecté et le micro fermé', async ({ page }) => {

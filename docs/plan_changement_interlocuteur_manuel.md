@@ -316,6 +316,15 @@ Les deux parcours et le scénario de révocation/recommencement passent ensuite,
 avec deux tests de composant pour les contrôles et le clavier. Les relances
 complètes interrompues pour ces corrections ne sont pas comptées comme vertes.
 
+La suite complète sur `540738c` révèle deux attentes E2E à adapter au contrat :
+l'ancien test P1 interdisait l'accord incertain dans tout le contexte GM, alors
+que le lot 2 exige ses champs generated/delivered/uncertain séparés. La trace
+confirme « Bonjour. » seul délivré, accord incertain et aucun appel. L'assertion
+vérifie maintenant les quatre champs exacts du reçu et l'absence de cet accord
+dans le dernier échange évalué. L'autre test lisait l'audit avant son arrivée ;
+la trace contient bien `consent_not_delivered`. Attente conditionnelle de cet
+événement, sans changer la raison attendue ni le produit. Relance complète requise.
+
 Les résultats finaux, revues et références de livraison sont ajoutés après contrôle.
 Aucun lot 3 ou 4 commencé ; aucune publication produit ni changement Cloud.
 
