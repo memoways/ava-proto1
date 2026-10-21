@@ -1,7 +1,7 @@
 # Passage Emma ↔ Max : validation narrative et pastille d’appel
 
-Date du diagnostic : 19 octobre 2026. État au 21 octobre : **lot 1 livré,
-contrat livré ; lot 2 branché localement en vérification**. Les lots 3–4 restent à réaliser.
+Date du diagnostic : 19 octobre 2026. État au 21 octobre : **lots 1 et 2 livrés sur GitHub,
+code synchronisé dans Lovable ; aucune nouvelle publication produit**. Les lots 3–4 restent à réaliser.
 Périmètre du diagnostic du 19 octobre : analyse et plan. Le lot 1 du 21 octobre est décrit au §5 ; aucun réglage Cloud ni déploiement produit modifié.
 Base examinée : `main` / `d0f72b601680b65b50e901e61bcae92a5752addd`, également HEAD Lovable au contrôle.
 
@@ -325,7 +325,38 @@ dans le dernier échange évalué. L'autre test lisait l'audit avant son arrivé
 la trace contient bien `consent_not_delivered`. Attente conditionnelle de cet
 événement, sans changer la raison attendue ni le produit. Relance complète requise.
 
-Les résultats finaux, revues et références de livraison sont ajoutés après contrôle.
+### Lot 2 — livraison vérifiée le 21 octobre 2026
+
+Deux revues Standards/Spec sans constat restant sur les corrections finales.
+La revue Spec valide également l'adaptation des assertions de livraison partielle.
+Qualité locale complète : **48 régressions, 728 unitaires, 41 intégrations**,
+lint sans erreur, typecheck et build verts. Avertissement hooks préexistant
+`finishInputTelemetry` et avertissements de taille du bundle conservés.
+Suite locale complète finale : **61/61 E2E sans retry**, avec un worker.
+La précédente suite sur `540738c` avait 59 succès et les deux échecs d'attentes
+décrits ci-dessus ; elle n'est pas présentée comme verte.
+
+[PR #57](https://github.com/memoways/ava-proto1/pull/57) fusionnée dans
+`8ff0bad230a67123fb7f82d966a5ce1abfbeb06b` seulement après la
+[CI 39601205173](https://github.com/memoways/ava-proto1/actions/runs/39601205173)
+verte sur le **HEAD exact `d7c264348967664e747a69882536de1b8e22653c`**.
+Ce contrôle inclut qualité complète et 61 E2E. Les runs des anciens HEAD
+échoués ne servent pas de preuve de livraison. Local : main identique à origin/main,
+checkout propre au relevé après fusion. Lovable natif : même SHA, projet ready,
+agent terminé. Aucun réglage Cloud, migration, Edge Function ou fournisseur modifié.
+
+Mémoire AVA Notion relue, décision durable du lot 2 ajoutée et écriture vérifiée ;
+Source conservée, Last updated by=Codex. CHANGELOG/STORY et
+[prompt autonome du lot 3](prompt_reprise_switch_personnages_lot_3.md) actualisés
+dans une clôture documentaire après le merge technique, avec CI du HEAD exact
+requise avant sa fusion. Le prochain départ reste le main réel après fetch.
+Stash temporaire du lot 2 `7b42b9160e7672bfd2a45e3b505c3cd815a3d586`
+conservé après refus du nettoyage par le contrôle automatique ; son contenu
+antérieur aux corrections finales ne doit pas être réappliqué sur main.
+
+États : contrat préparé au lot 1, moteur branché/testé/synchronisé au lot 2,
+pastille à réaliser au lot 3 ; recette humaine, quota sandbox et publication
+au lot 4. La synchronisation ne prouve ni conversation humaine ni publication.
 Aucun lot 3 ou 4 commencé ; aucune publication produit ni changement Cloud.
 
 ## 6. Validation attendue
