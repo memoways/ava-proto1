@@ -238,13 +238,13 @@ const ConversationScreen = ({
       {/* HUD top */}
       <header className="relative z-10 flex flex-wrap items-start justify-between gap-3 p-4 md:p-6">
         <div className="flex flex-col items-start gap-2">
-        <div className="flex items-center gap-3 rounded-full border border-border/40 bg-background/60 px-3 py-2 backdrop-blur-md">
-          <img src={portrait} alt={`Portrait d’${displayName}`} className="h-8 w-8 rounded-full border border-border object-cover" />
-          <div className="pr-2">
-            <p className="text-xs font-medium leading-none text-foreground">{displayName}</p>
-            <p className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">en ligne</p>
+          <div className="flex items-center gap-3 rounded-full border border-border/40 bg-background/60 px-3 py-2 backdrop-blur-md">
+            <img src={portrait} alt={`Portrait d’${displayName}`} className="h-8 w-8 rounded-full border border-border object-cover" />
+            <div className="pr-2">
+              <p className="text-xs font-medium leading-none text-foreground">{displayName}</p>
+              <p className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">en ligne</p>
+            </div>
           </div>
-        </div>
           <span className="sr-only" aria-live="polite" aria-atomic="true">
             {handoffOffer ? `${displayName} vous propose de parler avec ${offerTargetName}.` : ""}
           </span>

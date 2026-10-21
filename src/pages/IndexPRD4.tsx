@@ -841,11 +841,7 @@ const IndexPRD4 = () => {
       return;
     }
     const { configuredDurationSeconds, elapsedSeconds, remainingSeconds } = timerWindow;
-    const [profile, targetProfile] = await Promise.all([
-      getCharacterRuntimeReadiness(session.active_character).catch(() => null),
-      getCharacterRuntimeReadiness(session.active_character === "emma" ? "max" : "emma").catch(() => null),
-    ]);
-    setHandoffPortraits(targetProfile ? { [targetProfile.characterKey]: targetProfile.portraitUrl } : {});
+    const profile = await getCharacterRuntimeReadiness(session.active_character).catch(() => null);
     const characterContext = toCharacterExecutionContext(profile);
     if (!profile?.ready || !characterContext) {
       toast({
@@ -884,10 +880,19 @@ const IndexPRD4 = () => {
     const handoffSnapshot = freshHandoff;
     handoffSnapshotRef.current = handoffSnapshot;
     const restoredState = parseHandoffState(handoffSnapshot?.pending_handoff);
-    setCurrentHandoffOffer(restoredState && handoffSnapshot?.orchestration_version_id ? restoreHandoffOffer(restoredState,
+    const restoredOffer = restoredState && handoffSnapshot?.orchestration_version_id ? restoreHandoffOffer(restoredState,
       { ...restoredState, sessionId: session.id, sourceCharacter: session.active_character,
         orchestrationVersionId: handoffSnapshot.orchestration_version_id,
-        turnIndex: safeConversationLog.filter(m => m.role === 'user').length }, safeConversationLog) : null);
+        turnIndex: safeConversationLog.filter(m => m.role === 'user').length }, safeConversationLog) : null;
+    setHandoffPortraits({});
+    setCurrentHandoffOffer(restoredOffer);
+    if (restoredOffer) {
+      // Display data must never delay resume or update a replaced offer.
+      void getCharacterRuntimeReadiness(restoredOffer.targetCharacter).then(targetProfile => {
+        if (endedRef.current || sessionIdRef.current !== session.id || handoffOfferRef.current !== restoredOffer) return;
+        setHandoffPortraits({ [restoredOffer.targetCharacter]: targetProfile?.portraitUrl ?? null });
+      }).catch(() => {});
+    }
     pendingGmGuidanceRef.current = latestGm?.execution_status === "executed"
       ? latestGm.next_turn_guidance?.trim() || null
       : null;

@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Non publié] — 2026-10-21 — Switching Emma ↔ Max, lot 3
+
+- Une pastille d'appel unique sous le personnage actif remplace la carte basse,
+  avec portrait runtime cible et choix Rester. Fonctionne dans les deux sens.
+- Clavier natif sans ouverture micro parasite, focus visible, cibles >=44 px,
+  annonce discrète ; pulsation douce désactivée avec mouvement réduit.
+- Portrait runtime conservé pendant les sonneries ; reprise active indépendante
+  du chargement du portrait cible. Gardes, voix et mémoires privées préservées.
+- Aides admin exactes : seuil appliqué aussi aux demandes explicites, quota des
+  transferts exécutés. Aucun réglage Cloud ni publication produit.
+- Qualité locale : 48 régressions, 734 unitaires et 41 intégrations ; contrôles
+  ciblés mobile/desktop et deux sens verts. Revue et suite E2E complète corrigée
+  en cours avant livraison. [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md).
+
 ## [Non publié] — 2026-10-21 — Switching Emma ↔ Max, lot 2
 
 - Le même appel GM reçoit tour, version, demande ouverte et reçu délivré. Le

@@ -394,6 +394,42 @@ aucune dépendance nouvelle). Références : [rendu conditionnel React](https://
 [variantes mouvement Tailwind](https://tailwindcss.com/docs/hover-focus-and-other-states#prefers-reduced-motion),
 [implémentation Tailwind v3.4.17](https://github.com/tailwindlabs/tailwindcss/blob/v3.4.17/src/corePlugins.js).
 
+### Lot 3 — réalisation et revue
+
+La carte basse est remplacée par l'unique bouton d'appel sous la pastille active,
+avec portrait de la cible et action Rester. Annonce aria-live discrète, boutons
+natifs, focus visible, cibles 48/44 px, anneau à pulsation 3 s seulement si
+motion-safe ; disponibilité lisible sans animation. Aides admin corrigées sans
+modifier seuil/quota/pause. Les profils déjà lus par le GM fournissent les portraits ;
+la revalidation au clic alimente aussi l'écran de sonnerie, sans nouvel appel LLM.
+Contrats de consentement/reprise et CAS inchangés, voix et fiches appliquées au
+commit existant, aucun changement dans experienceFrame ou handsFreeVoice.
+
+Preuves rouge/vert : Espace focalisé sur Appeler déclenchait le micro (1 appel
+indésirable), corrigé avant la pastille. Les deux tests d'emplacement/portrait
+dans le header échouaient avant remplacement, puis passent. Gardes de capture
+et contrôles bloqués pendant validation conservés. Premiers contrôles : 19 tests
+composants, puis 14 tests ConversationScreen ; typecheck et qualité complète verts
+(48 régressions, 734 unitaires, 41 intégrations). Avertissement hooks préexistant
+finishInputTelemetry et taille du bundle conservés.
+
+Quatre parcours ciblés verts : deux sens avec portrait runtime dans l'offre,
+la sonnerie et après connexion ; double clic, Espace natif, timer décroissant
+sans remise à zéro. Mobile 390 px et desktop 1280 px : choix unique sous actif,
+focus et cibles >=44 px, aucun débordement, pulsation absente sous reduced-motion,
+Rester au clavier sans ouverture micro. Captures locales inspectées visuellement :
+output/playwright/lot-3-390.png et lot-3-1280.png (simulations, pas recette humaine).
+
+Les deux revues indépendantes de dbce411 repèrent la même régression introduite :
+le profil opposé était attendu à toute reprise. Première reproduction sans tour
+persisté non concluante (appel non reprenable), puis session réelle du fixture
+avec un tour : rouge, portrait actif absent quand RPC cible retenue. Correctif :
+aucune requête cible sans offre restaurable ; pour une offre, chargement seulement
+d'affichage non bloquant, résultat ignoré si session/offre remplacée ou terminée.
+La reprise de l'offre teste aussi son portrait runtime. Suite complète interrompue
+pour correction (3 succès, 1 interrompu, 59 non exécutés) : pas comptée verte.
+Qualité/E2E et revues à confirmer sur la révision corrigée avant livraison.
+
 ## 6. Validation attendue
 
 - Unitaires : T6 différé ; T10 pronom/faux prénom contextualisé ; T11 nom explicite + accord naturel ; inquiétude émotionnelle sans refus ; refus explicites et sans « ne » ; « Je vais l’appeler… enfin non » ; extrait affirmatif choisi au milieu d’un refus ; oui hors contexte ; cible incohérente ; décision invalide/périmée ; offre révoquée et nouvelles versions.

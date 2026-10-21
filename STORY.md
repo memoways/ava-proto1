@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-21 (lot 2 livré et synchronisé Lovable ; aucune nouvelle publication)
+> **Last Updated**: 2026-10-21 (lot 3 en vérification ; aucune nouvelle publication)
 
 ---
 
@@ -72,6 +72,21 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-10-21 — Switching, lot 3 : rendre le passage visible en haut
+
+L'offre prouvée du lot 2 devient une pastille sous Emma ou Max, avec le portrait
+runtime de l'autre personnage. Le joueur appelle ou reste ; la carte basse
+disparaît. Le clavier révèle d'abord un défaut existant : Espace sur Appeler
+ouvrait le micro. Reproduit puis corrigé avant de déplacer l'offre. Mobile et
+mouvement réduit conservent un choix lisible et un focus visible.
+Les deux revues repèrent ensuite une dépendance indue à la fiche cible pendant
+la reprise ; une RPC retenue reproduit le blocage, puis le chargement du portrait
+devient conditionnel et non bloquant. Les sonneries, le timer et les mémoires
+restent sur le moteur précédent. Les aides admin décrivent les gardes réelles.
+Qualité complète et premiers parcours ciblés verts ; vérification finale et
+livraison en cours. La recette humaine, le quota sandbox et la publication
+restent au lot 4. [Plan](docs/plan_changement_interlocuteur_manuel.md).
 
 ### 2026-10-21 — Switching, lot 2 : rendre l'accord appelable
 
