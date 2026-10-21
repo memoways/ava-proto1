@@ -758,6 +758,7 @@ for (const [character, target] of [["Emma", "Max"], ["Max", "Emma"]] as const) {
       await call.evaluate(button => { (button as HTMLButtonElement).click(); (button as HTMLButtonElement).click(); });
     }
     await expect(page.getByText("Appel en cours…", { exact: true })).toBeVisible();
+    await expect(page.getByRole("img", { name: target, exact: true })).toBeVisible();
     await expect(page.getByRole("img", { name: target, exact: true })).toHaveAttribute('src', `https://portraits.example/${target.toLowerCase()}-runtime.jpg`);
     await expect(page.getByRole("img", { name: `Portrait d’${target}` })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole("img", { name: `Portrait d’${target}` })).toHaveAttribute('src', `https://portraits.example/${target.toLowerCase()}-runtime.jpg`);

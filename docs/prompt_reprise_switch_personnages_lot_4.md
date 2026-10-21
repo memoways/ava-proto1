@@ -53,9 +53,10 @@ de tout défaut restant du lot 3. Ne lance aucun autre chantier ni nouveau chat.
   tour persistant était non concluant ; la reproduction avec tour a bien été rouge.
 - Relevé après fusion : main local/distant `6860d1450f4df5db3a3d8213887d5d4bf19bc1f3`,
   checkout propre. La clôture sur `codex/character-handoff-lot-3-closeout` ne porte
-  que CHANGELOG/STORY/plan et ce prompt ; vérifier son merge et la CI post-fusion
-  sur le main réel. CI main technique `39667347427` démarrée au relevé, pas une
-  preuve de succès tant que sa conclusion n'est pas contrôlée.
+  que CHANGELOG/STORY/plan, ce prompt et le maintien explicite de l'assertion de
+  visibilité du portrait pendant les sonneries, en plus du src runtime. Aucun
+  code produit changé. Vérifier son merge et la CI post-fusion sur le main réel.
+  CI main technique `39667347427` verte sur `6860d14`, avec 65 E2E réussis.
 - Lovable natif après merge technique : même SHA `6860d1450f4df5db3a3d8213887d5d4bf19bc1f3`,
   projet ready, agentFinished=true, workspace Memoways vérifié. Code synchronisé,
   aucune nouvelle publication produit ni recette humaine. Aucun changement Cloud.

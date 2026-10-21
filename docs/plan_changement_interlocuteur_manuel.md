@@ -451,10 +451,13 @@ Base main restée à 9f5a405 pendant les contrôles ; PR tierces préservées.
 Relevé après fusion : main local/distant identiques à `6860d14`, checkout propre.
 Lovable natif confirme le même SHA, workspace Memoways, projet ready et agent
 terminé. Code testé et synchronisé ; aucune nouvelle publication produit, aucun
-réglage Cloud, provider, migration ou Edge Function modifié. La CI post-fusion
-`39667347427` est suivie séparément ; son démarrage ne sert pas de preuve verte.
-La clôture documentaire suit sur `codex/character-handoff-lot-3-closeout`, avec
-CI de son propre HEAD exact requise avant fusion.
+réglage Cloud, provider, migration ou Edge Function modifié. La [CI post-fusion 39667347427](https://github.com/memoways/ava-proto1/actions/runs/39667347427)
+est également verte sur `6860d14`, avec 65 E2E réussis. La clôture suit sur
+`codex/character-handoff-lot-3-closeout`, avec CI de son propre HEAD exact requise
+avant fusion. Dernière relecture : conserver explicitement l'assertion historique
+de visibilité du portrait pendant la sonnerie en plus de son nouveau contrôle
+src runtime. Une assertion ajoutée au test, aucun code produit changé ; la CI
+doit vérifier ce HEAD de clôture corrigé, pas une ancienne révision.
 
 Mémoire AVA Notion relue puis décision durable du lot 3 ajoutée et relue :
 Source conservée, Last updated by=Codex. CHANGELOG/STORY et le
