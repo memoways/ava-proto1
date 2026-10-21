@@ -14,6 +14,7 @@ import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTr
 import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
 import { normalizeMemoryText } from "@/services/conversationMemoryV1";
 import { asRuntimeCharacter } from "@/services/characterConversation";
+import { cleanHandoffAssessment } from "@/services/characterHandoff";
 import type { CharacterRelationshipPolicy, ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, ExperienceDirectorConfig, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, RelationshipStateProposal, RuntimeCharacter, TraceMessage, TurnRelationshipDirective, UserRoleProfile } from "@/types";
 import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
 import {
@@ -23,7 +24,7 @@ import {
 } from "@/services/relationshipEngine";
 
 /** Incrémenter à chaque changement de logique ou de prompt du GM (traçabilité A/B). */
-export const GM_CODE_VERSION = "gm-2026-10-14-p3";
+export const GM_CODE_VERSION = "gm-2026-10-21-handoff-contract";
 
 export interface PRD4PostTurnInput {
   onGmObserved?: (service: ServiceObservation, spans: ServerObservation) => void;
@@ -543,6 +544,7 @@ export async function evaluatePostTurnPRD4(
           input.currentCharacter,
         ),
         player_switch_request: cleanPlayerSwitchRequest((parsed as { player_switch_request?: unknown }).player_switch_request),
+        handoff_assessment: cleanHandoffAssessment(parsed.handoff_assessment),
       };
     }
     model = callRes.model || model;
@@ -602,6 +604,7 @@ export async function evaluatePostTurnPRD4(
       transition_recommended: false,
       end_recommended: false,
       player_switch_request: null,
+      handoff_assessment: null,
       memory_delta: null,
     };
   }
@@ -647,6 +650,7 @@ export async function evaluatePostTurnPRD4(
         transition_recommended: false,
         end_recommended: false,
         player_switch_request: null,
+        handoff_assessment: null,
         memory_delta: null,
         memory_after: null,
       };

@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-19 (diagnostic du switching et prompt du premier lot préparés ; implémentation à démarrer)
+> **Last Updated**: 2026-10-21 (socle de consentement du lot 1 implémenté ; activation runtime reportée au lot 2)
 
 ---
 
@@ -72,6 +72,21 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-10-21 — 🔹 Switching, lot 1 : consentement prouvé et compatible
+
+Le nouveau contrat GM optionnel conserve source, cible, origine, tour/version
+et citations. Le validateur pur exige la preuve dans le texte délivré du reçu
+existant. Il accepte les formulations naturelles T10/T11 contextualisées, mais
+rejette refus, contradictions, ambiguïtés et accord non entendu. Les anciennes
+sorties restent utilisables ; aucune nouvelle offre ne vient d'un champ absent.
+Les filtres et parcours existants restent en place : le switching réel n'est
+donc pas encore corrigé. Instructions GM préparées sans activation ; aucun
+appel supplémentaire ni modification du budget vocal. Revue : un veto trop
+large sur « je refuse de croire » reproduit puis corrigé ; test conservé.
+Qualité locale : 48 régressions, 707 unitaires, 34 intégrations, typecheck,
+lint sans erreur et build verts. E2E et livraison détaillés dans le
+[plan](docs/plan_changement_interlocuteur_manuel.md). Temps : un lot de développement.
 
 ### 2026-10-19 — Démarrer le switching dans des chats séparés
 
@@ -2631,6 +2646,7 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 
 | Date | Description | Impact | Plan de fix |
 |------|-------------|--------|-------------|
+| 2026-10-21 | Socle de consentement du switching préparé, pas encore branché aux appels réels | Haut pour Emma ↔ Max | Lot 2 : offres/persistance/audio ; lot 3 : pastille ; lot 4 : recette Lovable |
 | 2026-03-08 | Video triggers hardcodés (DEMO_TRIGGERS) au lieu de dynamiques depuis DB | Moyen | Prochaine étape |
 | 2026-03-08 | Gameplay steps vide dans Notion (0 étapes) | Moyen | Remplir dans Notion |
 | 2026-03-08 | 1 video trigger sans titre dans Notion → ignoré au sync | Bas | Corriger dans Notion |
@@ -2651,6 +2667,15 @@ Bonus : `situation_summary` (résumé factuel 100-150 mots généré par la sync
 ---
 
 ## Contrats de session (DBC)
+
+### Session 2026-10-21 — Switching, lot 1 seulement
+
+- [x] Checkout canonique propre et base `b113e35`, remote et cibles Notion/Lovable vérifiés.
+- [x] Baseline 53 tests ; défaut T10/T11 reproduit en échec avant validation du nouveau moteur.
+- [x] Contrat additif, nettoyeur et validateur pur ; refus, fraîcheur, preuves et compatibilité testés.
+- [x] Instructions GM isolées, prompt effectif et consommateurs runtime inchangés.
+- [x] Qualité complète et revue du diff ; E2E et preuves GitHub consignés dans le plan.
+- [ ] Branchement des offres, nouvelle pastille et recette humaine : lots suivants uniquement.
 
 ### Session 2026-07-15 — Sécurité + RAG + LLM unifié
 
