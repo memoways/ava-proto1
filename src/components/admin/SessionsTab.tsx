@@ -80,6 +80,34 @@ interface GmPostTurnEntry {
   topics_covered?: string[];
 }
 
+const HANDOFF_STAGES: Record<string, string> = {
+  handoff_validated: 'Moteur : consentement validé', handoff_proposed: 'Offre disponible',
+  handoff_accepted: 'Joueur : clic', handoff_executed: 'Personnage connecté',
+  handoff_refused: 'Joueur : rester', handoff_revoked: 'Offre révoquée', handoff_blocked: 'Passage bloqué',
+};
+function HandoffAuditTimeline({ sessionId }: { sessionId: string }) {
+  const [events, setEvents] = useState<Array<{ event_key: string; event_type: string; turn_index: number | null;
+    payload: { stage?: string; blockedReason?: string; gmRecommends?: boolean } }>>([]);
+  useEffect(() => {
+    let active = true;
+    setEvents([]);
+    void supabase.from('experience_events' as never).select('event_key,event_type,turn_index,payload')
+      .eq('session_id', sessionId).order('created_at', { ascending: true }).limit(500)
+      .then(({ data }) => { if (active) setEvents((data ?? []) as unknown as typeof events); });
+    return () => { active = false; };
+  }, [sessionId]);
+  const handoffs = events.filter(e => HANDOFF_STAGES[e.event_type]);
+  return <details className="mb-3 rounded border p-3 text-xs">
+    <summary>Passages entre personnages ({handoffs.length} événements)</summary>
+    <p className="my-2 text-muted-foreground">GM exécuté décrit une évaluation. Seul « Personnage connecté » atteste un transfert.</p>
+    {handoffs.map(e => <p key={e.event_key} className="my-1">
+      {e.turn_index != null ? `T${e.turn_index} · ` : ''}{HANDOFF_STAGES[e.event_type]}
+      {e.payload.gmRecommends === true ? ' · GM recommande' : ''}
+      {e.payload.stage ? ` · ${e.payload.stage}` : ''}{e.payload.blockedReason ? ` · ${e.payload.blockedReason}` : ''}
+    </p>)}
+  </details>;
+}
+
 const fmt = (d: string | null) => d ? new Date(d).toLocaleString("fr-CH") : "—";
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -704,6 +732,8 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                 </details>
               </div>
             )}
+
+            <HandoffAuditTimeline sessionId={selected.id} />
 
             {/* PRD4 — Timeline GM post-turn */}
             {Array.isArray(selected.gm_post_turn_log) && selected.gm_post_turn_log.length > 0 && (

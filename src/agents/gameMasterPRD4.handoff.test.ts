@@ -74,3 +74,21 @@ describe("GM optional structured handoff compatibility", () => {
     expect(CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS).toContain("non entendu");
   });
 });
+
+describe('live same-call handoff context', () => {
+  it('adds exact ownership, open request and delivered evidence while retaining one 950-token call', async () => {
+    const fixture = validInput();
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ content: JSON.stringify({ ...historicalJson,
+      handoff_assessment: validAssessment() }), ...llmMetadata });
+    const result = await evaluatePostTurnPRD4({ ...input, handoffContext: { turnId: fixture.turnId,
+      openRequest: null, delivery: fixture.delivery } });
+    const calls = vi.mocked(callLLMWithUsage).mock.calls;
+    const last = calls.at(-1)!;
+    expect(last[0][0].content).toContain(CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS);
+    expect(last[0][1].content).toContain('"turnId":"session:11"');
+    expect(last[0][1].content).toContain('"orchestrationVersionId":"v6"');
+    expect(last[0][1].content).toContain(JSON.stringify(fixture.delivery!.delivered));
+    expect(last[1]).toMatchObject({ max_tokens: 950, timeoutMs: 12000 });
+    expect(validateCharacterHandoff({ ...fixture, evaluation: result }).authorized).toBe(true);
+  });
+});

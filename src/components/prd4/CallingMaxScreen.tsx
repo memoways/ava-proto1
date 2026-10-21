@@ -7,6 +7,7 @@ import { displayNameForCharacter } from "@/services/characterRegistry";
 
 interface Props {
   onAnswered: () => void;
+  onHangUp?: () => void;
   character: "max" | "emma";
   situation?: string | null;
   portraitUrl?: string | null;
@@ -67,7 +68,7 @@ function encounterFrame(value: string | null | undefined, maxChars = 260): strin
   return `${(sentenceEnd > maxChars * 0.45 ? candidate.slice(0, sentenceEnd + 1) : candidate).trim()}…`;
 }
 
-const CallingMaxScreen = ({ onAnswered, character, situation, portraitUrl }: Props) => {
+const CallingMaxScreen = ({ onAnswered, onHangUp, character, situation, portraitUrl }: Props) => {
   const [ring, setRing] = useState(1);
   const [pickingUp, setPickingUp] = useState(false);
   const onAnsweredRef = useRef(onAnswered);
@@ -96,6 +97,8 @@ const CallingMaxScreen = ({ onAnswered, character, situation, portraitUrl }: Pro
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
       <div className="space-y-8">
+        {onHangUp && <button type="button" onClick={onHangUp}
+          className="rounded-full border px-5 py-3 text-sm focus-visible:outline focus-visible:outline-2">Terminer l’appel</button>}
         <div className="relative mx-auto h-44 w-44">
           <span
             className="absolute inset-0 animate-ping rounded-full border-2 border-primary/40"

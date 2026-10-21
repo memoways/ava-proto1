@@ -32,6 +32,7 @@ interface Props {
   portraitUrl?: string | null;
   handoffOffer?: { reason: string; targetCharacter?: "max" | "emma" } | null;
   handoffCalling?: boolean;
+  handoffInputLocked?: boolean;
   handoffCallingTarget?: "max" | "emma";
   onAcceptHandoff?: () => void;
   onRejectHandoff?: () => void;
@@ -55,23 +56,25 @@ const ConversationScreen = ({
   portraitUrl = null,
   handoffOffer = null,
   handoffCalling = false,
+  handoffInputLocked = false,
   handoffCallingTarget = "emma",
   onAcceptHandoff,
   onRejectHandoff,
 }: Props) => {
-  const disabled = handoffCalling || Boolean(handoffOffer) || audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "max_thinking" || audioState === "max_speaking";
+  const handoffInputBlocked = handoffCalling || handoffInputLocked;
+  const disabled = handoffInputBlocked || audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "max_thinking" || audioState === "max_speaking";
   const recording = audioState === "user_speaking";
 
   const handleToggleTalk = useCallback(() => {
     if (handsFree) {
-      if ((handoffCalling || handoffOffer) && !handsFreeListening) return;
+      if ((handoffInputBlocked) && !handsFreeListening) return;
       if (audioState !== "mic_starting") onToggleHandsFree?.();
       return;
     }
-    if (handoffCalling || handoffOffer) return;
+    if (handoffInputBlocked) return;
     if (audioState === "idle") onPTTPress();
     else if (audioState === "user_speaking") onPTTRelease();
-  }, [audioState, handoffCalling, handoffOffer, handsFree, handsFreeListening, onPTTPress, onPTTRelease, onToggleHandsFree]);
+  }, [audioState, handoffInputBlocked, handsFree, handsFreeListening, onPTTPress, onPTTRelease, onToggleHandsFree]);
 
   useEffect(() => {
     const isTypingTarget = (target: EventTarget | null) => {
@@ -80,13 +83,13 @@ const ConversationScreen = ({
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.code !== "Space" || event.repeat || isTypingTarget(event.target)) return;
-      if (handoffCalling || handoffOffer) return;
+      if (handoffInputBlocked) return;
       event.preventDefault();
       handleToggleTalk();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleToggleTalk, handoffCalling, handoffOffer]);
+  }, [handleToggleTalk, handoffInputBlocked]);
 
   // Only the user's words are displayed, scoped to the active character.
   const lastUserText = useMemo(() => {
@@ -171,6 +174,7 @@ const ConversationScreen = ({
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-background text-center">
         <div className="flex h-24 w-24 items-center justify-center rounded-full border bg-muted"><PhoneCall className="h-9 w-9 animate-pulse text-primary" /></div>
+        <Button variant="destructive" onClick={onHangUp}>Terminer</Button>
         <div><h1 className="font-serif text-3xl">{callingName === "Emma" ? "Appel d’Emma…" : "Appel de Max…"}</h1><p className="mt-2 text-sm text-muted-foreground">La session et le temps restant sont conservés · {sessionTimeRemaining}</p></div>
       </div>
     );
@@ -286,8 +290,8 @@ const ConversationScreen = ({
               <p className="font-medium">{displayName} vous propose de parler avec {offerTargetName}.</p>
               <p className="mt-1 text-xs text-muted-foreground">{handoffOffer.reason}</p>
               <div className="mt-3 flex flex-wrap justify-center gap-2">
-                <Button onClick={onAcceptHandoff}>Appeler {offerTargetName}</Button>
-                <Button variant="outline" onClick={onRejectHandoff}>Rester avec {displayName}</Button>
+                <Button disabled={handoffInputBlocked || audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "user_speaking"} onClick={onAcceptHandoff}>Appeler {offerTargetName}</Button>
+                <Button variant="outline" disabled={handoffInputBlocked} onClick={onRejectHandoff}>Rester avec {displayName}</Button>
               </div>
             </div>
           )}
@@ -315,7 +319,7 @@ const ConversationScreen = ({
               </p>
               <button
                 onClick={handleToggleTalk}
-                disabled={handoffCalling || (Boolean(handoffOffer) && !handsFreeListening) || audioState === "mic_starting"}
+                disabled={handoffInputBlocked || audioState === "mic_starting"}
                 className={cn(
                   "mt-1 flex min-h-12 items-center gap-3 rounded-full border-2 px-6 py-3 text-sm font-semibold uppercase tracking-wider backdrop-blur-md transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 tablet:min-h-14 tablet:px-8 tablet:text-base",
                   handsFreeListening

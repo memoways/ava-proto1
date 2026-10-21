@@ -1,5 +1,6 @@
 import { ResponseIntentParser, type ResponseIntent } from "./responseIntentStream";
-import { projectDeliveredConversation } from "./responseDelivery";
+import { projectDeliveredConversation, type ResponseDeliveryReceipt } from "./responseDelivery";
+import type { OpenHandoffRequest } from './characterHandoffState';
 import { observeVoice, observeService, type VoiceObserver, type ServiceObservation, type ServerObservation } from "./voiceTurnTelemetryV2";
 /**
  * PRD4 — Orchestrateur lean d'un tour de conversation.
@@ -59,6 +60,8 @@ export interface PRD4TurnInput {
   /** Internal shared execution seam; batch callers omit it. */
   streamControl?: { onToken: (text: string) => void; finishSpeech: () => string;
     delivery: Promise<string>; onFallback: (text: string) => void; hasSegments: () => boolean };
+  handoffDelivery?: Promise<ResponseDeliveryReceipt | undefined>;
+  handoffOpenRequest?: OpenHandoffRequest | null;
   onVoiceObservation?: VoiceObserver;
   onServiceObserved?: (value: ServiceObservation) => void;
   onServerObserved?: (value: ServerObservation) => void;
@@ -365,7 +368,9 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
 
   // --- GM post-turn (void) ---------------------------------------------------
   const runPostTurn = async () => {
-    const deliveredResponse = input.streamControl ? await input.streamControl.delivery : maxResponse;
+    const handoffDelivery = input.handoffDelivery ? await input.handoffDelivery : undefined;
+    const deliveredResponse = handoffDelivery ? handoffDelivery.delivered
+      : input.streamControl ? await input.streamControl.delivery : maxResponse;
     input.signal?.throwIfAborted();
     if (input.streamControl && !deliveredResponse.trim()) throw new Error("No confirmed delivery for GM");
     if (input.streamControl && diagnosticTraceEnabled && input.sessionId) {
@@ -376,6 +381,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     try {
       const directorRuntime = frameRuntime;
       return await evaluatePostTurnPRD4({
+        handoffContext: input.handoffDelivery && input.turnId ? { turnId: input.turnId,
+          openRequest: input.handoffOpenRequest ?? null, delivery: handoffDelivery ?? null } : undefined,
         onGmObserved: input.onGmObserved,
         sessionId: input.sessionId,
         conversationHistory: recentConversation,

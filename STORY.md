@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-21 (socle de consentement du lot 1 implémenté ; activation runtime reportée au lot 2)
+> **Last Updated**: 2026-10-21 (lot 2 branché localement ; contrôles et livraison en cours)
 
 ---
 
@@ -72,6 +72,25 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-10-21 — Switching, lot 2 : rendre l'accord appelable
+
+L'intégration révèle d'abord un refus restant dans le contrat du lot 1 :
+« je préfère que tu restes avec moi ». Correction isolée #56, revue, 45 E2E
+locaux et CI du HEAD exact verts avant fusion dans `a26d1e7`, synchronisé Lovable.
+Le lot 2 reprend ensuite : le même GM analyse l'accord réellement délivré,
+avec des identifiants exacts ; une demande ou un ancien stamp ne suffit plus.
+Les accords naturels T10/T11 conduisent maintenant à une offre puis à Max dans
+les parcours simulés. Une nouvelle soumission révoque l'offre, une demande
+différée expire après deux messages, et la reprise exige les preuves conservées.
+Le clic et le décroché revalident l'offre ; une écriture conditionnelle décide
+avant l'affichage. Une panne de voix après commit conserve la cible connectée,
+micro fermé. La session, le timer, le film et les mémoires privées sont préservés.
+Le journal distingue recommandation, validation, offre, clic et connexion.
+La carte existante reste en place : nouvelle pastille au lot 3, recette humaine,
+quota sandbox et publication au lot 4. Aucun gain de latence ou succès humain
+n'est déduit des simulations. [Plan](docs/plan_changement_interlocuteur_manuel.md).
+
 
 ### 2026-10-21 — Finaliser le refus de quitter le personnage
 

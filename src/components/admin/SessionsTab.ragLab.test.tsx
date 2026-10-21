@@ -7,6 +7,11 @@ const insertPinnedQuestion = vi.fn(async () => ({ error: null }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: vi.fn((table: string) => {
+      if (table === 'experience_events') {
+        const query = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
+          limit: vi.fn(async () => ({ data: [], error: null })) };
+        return query;
+      }
       if (table === "rag_lab_pinned_questions") {
         return {
           select: vi.fn(() => ({

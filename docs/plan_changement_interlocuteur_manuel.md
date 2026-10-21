@@ -1,7 +1,7 @@
 # Passage Emma ↔ Max : validation narrative et pastille d’appel
 
 Date du diagnostic : 19 octobre 2026. État au 21 octobre : **lot 1 livré,
-contrat préparé sans branchement runtime**. Les lots 2–4 restent à réaliser.
+contrat livré ; lot 2 branché localement en vérification**. Les lots 3–4 restent à réaliser.
 Périmètre du diagnostic du 19 octobre : analyse et plan. Le lot 1 du 21 octobre est décrit au §5 ; aucun réglage Cloud ni déploiement produit modifié.
 Base examinée : `main` / `d0f72b601680b65b50e901e61bcae92a5752addd`, également HEAD Lovable au contrôle.
 
@@ -225,8 +225,108 @@ avec un veto limité au souhait affirmatif de rester. Revue : trois souhaits ni�
 reproduisent un faux refus, puis passent après restriction du motif. 85 tests
 ciblés verts ; qualité locale 48 régressions, 713 unitaires, 34 intégrations
 et build verts sur la première correction ; CI finale requise sur le motif revu. Filtres historiques, prompt actif, Cloud et UI inchangés.
-CI du HEAD exact obligatoire avant fusion de cette finalisation, puis reprise
-exclusive du lot 2 depuis main réel.
+Finalisation livrée par #56 dans `a26d1e7167da3c11d68cd3d66952c0db2bcb1250`,
+CI `39594897594` verte sur le HEAD exact `970cea0d99774f4970b4a79a7a3ba38815e411f7`
+avant fusion ; deux revues finales sans constat et 45 E2E locaux sans retry.
+Lovable synchronisé sur `a26d1e7`, ready/agentFinished. Reprise du lot 2 sur ce main.
+
+### Lot 2 — périmètre engagé le 21 octobre 2026
+
+Base vérifiée : `d89a68b5d004174ce731c1e9811387ec09e0d603`, main local/distant
+identiques, checkout propre ; #54/#55 fusionnées, CI #55 `39577587425` et main
+`39579238573` vertes. Lovable au même SHA, ready/agentFinished. Baseline ciblée :
+109 tests verts. Branche : `codex/character-handoff-runtime-lot-2`.
+
+Ce lot branche uniquement le contrat, les offres et l'audio existant. Enveloppe
+JSON versionnée dans `pending_handoff`, révision unique conservée après révocation,
+comparaison atomique de l'ancien JSONB + session active + source + version + compteur.
+Zéro ligne signifie conflit. Tests Postgres/PGlite et client REST réel prévus pour
+prouver les courses (deux acceptations ; révocation contre GM tardif), sans migration.
+Au prochain message finalisé l'offre expire ; demande ouverte bornée à deux nouveaux
+messages, jamais une autorisation. La demande et les preuves restent privées au
+personnage source. Reprise : relecture des preuves dans la conversation/reçu existants,
+pas de réactivation des anciens stamps GM. Revalidation au clic et au décroché,
+persistance avant affichage de la cible ; panne audio après commit distincte.
+
+Même appel GM enrichi des identifiants exacts et du reçu disponible, sans appel LLM
+supplémentaire ni hausse du budget 950 tokens / timeout existant ; citations courtes
+et réponse compacte. Pour le batch, reçu conservateur créé après lecture complète
+confirmée ; aucune estimation partielle. L'absence de preuve reste fermée.
+L'UI basse est conservée ; nouvelle pastille et ergonomie du lot 3 exclues.
+La durée d'offre du §8 est retenue dans le périmètre demandé. Le quota sandbox 8,
+sa publication Cloud et la recette humaine attendent le lot 4 ; seuil/quota/pause
+restent ceux de la version figée (v6 : 4/1/2). Aucun provider, voix, algorithme HF,
+cadre commun, secret, Edge Function ou configuration Cloud modifié.
+
+Confiance préalable : 95 %. Cause et seams vérifiés ; pas d'état concurrent existant,
+primitives audio et tests de concurrence réutilisables. Références consultées :
+[filtres Supabase](https://supabase.com/docs/reference/javascript/eq),
+[implémentation OSS PostgREST](https://github.com/supabase/postgrest-js/blob/master/src/PostgrestFilterBuilder.ts),
+[refs React](https://react.dev/reference/react/useRef). Vérifications : tests rouges
+avant correction, ciblés, qualité complète, E2E, revue des consommateurs/persistance,
+CI sur HEAD exact avant fusion puis main/Lovable. Aucune publication produit.
+
+### Lot 2 — réalisation et premiers contrôles
+
+`characterHandoffState.ts` porte les états stables et les preuves référencées ;
+`sessionHandoff.ts` porte lecture, CAS et revalidation. `IndexPRD4` garde les
+transports validating/calling/switching/completed/failed et les primitives audio.
+Enveloppe v2 sans champs d'offre à la racine : les anciens lecteurs ne peuvent
+pas la réactiver. Reçu batch conservateur : seule une lecture intégralement
+terminée est une preuve ; GM attend la livraison, sans bloquer la voix ni ajouter
+un appel modèle. Le PATCH d'acquisition de tour précède sa génération pour
+refuser également un onglet dont l'acteur a changé ; ce coût réseau n'est pas
+présenté comme un gain de latence. Budget/timeout GM inchangés, JSON compact,
+échec fermé si résultat tronqué/invalide. Aucune mesure de latence réelle nouvelle.
+
+Preuves initiales : module d'état absent puis tests verts ; 6 tests Postgres via
+le vrai client REST Supabase prouvent les filtres JSONB, la concurrence, la
+révocation et les changements session/version/source/compteur. 14 E2E d'appel
+existants verts après la finalisation #56. T10/T11, révocation, GM tardif,
+accord non joué, reprise et panne audio après commit passent. Une classification
+accept sans action conservait à tort une demande ouverte : régression ajoutée
+et corrigée, aucune offre autorisée par cette classification. Un test de fin
+attendait Merci au lieu de l'écran intermédiaire réel « La communication se coupe » :
+attente corrigée, assertions sur absence de commit et compteur conservées.
+Les tests de composant suivent la poursuite de la discussion prévue (micro
+utilisable avec une offre) ; le mock admin inclut le nouveau lecteur d'événements.
+
+Revue de `bfb8f18` : deux courses de callbacks corrigées (révision acquittée après
+watchdog conservée avant le contrôle de tour ; révocation ancienne interdite sur
+nouvelle session/tentative). La ref de recommandation devenue sans lecteur est
+retirée. Le transcript du tour, ses preuves et l'offre utilisent maintenant le
+même CAS ; les reçus et labels du tour passent aussi par ce filtre, pour ne pas
+écraser un tour avancé dans un autre onglet. Le salut après connexion utilise
+également la révision consommée. Mutation en conflit : aucun effet directeur.
+Une demande ouverte doit être confirmée defer par le GM à chaque tour ; résultat
+absent/invalide/refus/retrait la ferme, sans prolonger la borne de deux messages.
+Cette fermeture conservatrice évite de ressusciter une demande retirée. Régression
+pure dédiée et instructions GM cohérentes, sans champ JSON supplémentaire.
+Le clic ferme immédiatement les primitives de capture/sortie avant la revalidation.
+Deux reproductions E2E des anciens comportements sont rouges (snapshot préexistant
+pour le watchdog ; révocation différée puis nouvel appel), puis les trois parcours
+de revue sont verts avec le correctif. Qualité locale corrigée : 726 unitaires,
+41 intégrations, 48 régressions, typecheck/lint/build verts ; avertissement hooks
+préexistant conservé. Suite E2E complète à relancer sur cette révision.
+Revue complémentaire : la validation réseau laissait les handlers micro actifs.
+Deux E2E rouges reproduisent les ouvertures 4→6 (PTT) et 4→5 (mains libres).
+Verrou de transport vérifié synchroniquement par les handlers et reflété dans
+l'UI, fermé au clic jusqu'à la fin du salut ou à l'échec ; bouton Terminer conservé.
+Les deux parcours et le scénario de révocation/recommencement passent ensuite,
+avec deux tests de composant pour les contrôles et le clavier. Les relances
+complètes interrompues pour ces corrections ne sont pas comptées comme vertes.
+
+La suite complète sur `540738c` révèle deux attentes E2E à adapter au contrat :
+l'ancien test P1 interdisait l'accord incertain dans tout le contexte GM, alors
+que le lot 2 exige ses champs generated/delivered/uncertain séparés. La trace
+confirme « Bonjour. » seul délivré, accord incertain et aucun appel. L'assertion
+vérifie maintenant les quatre champs exacts du reçu et l'absence de cet accord
+dans le dernier échange évalué. L'autre test lisait l'audit avant son arrivée ;
+la trace contient bien `consent_not_delivered`. Attente conditionnelle de cet
+événement, sans changer la raison attendue ni le produit. Relance complète requise.
+
+Les résultats finaux, revues et références de livraison sont ajoutés après contrôle.
+Aucun lot 3 ou 4 commencé ; aucune publication produit ni changement Cloud.
 
 ## 6. Validation attendue
 
