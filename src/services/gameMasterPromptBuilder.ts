@@ -1,21 +1,26 @@
 import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig, ExperienceDirectorGuardrails } from "@/types";
 
 /** Added to the same GM call only when the runtime supplies exact handoff context. */
-export const CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS = `Contrat optionnel handoff_assessment (schemaVersion=1), dans le même appel GM post-tour, sans nouvel appel LLM :
+export const CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS = `CONTRAT RUNTIME DE PASSAGE — prioritaire sur le schéma historique et sa règle de suggestion au tour suivant.
+Le CONTEXTE EXACT DU PASSAGE est fourni : la clé handoff_assessment est obligatoire à la racine du même objet JSON, aux côtés de labels, action et memory_delta. Le schéma historique fermé est étendu par cette clé ; ne retourne ni un second objet JSON ni les champs de la preuve à la racine.
+Exemple de la partie à fusionner dans l'objet complet (schemaVersion=1) :
 {
+ "handoff_assessment": {
   "schemaVersion": 1, "sourceCharacter": "emma", "targetCharacter": "max",
   "turnId": "identifiant exact du tour courant", "turnIndex": 11, "orchestrationVersionId": "version épinglée exacte",
   "origin": { "type": "player_request", "turnId": "tour de la demande", "turnIndex": 11, "evidence": "citation exacte de la demande" },
   "targetEvidence": { "speaker": "user", "quote": "citation exacte qui nomme Max" },
   "consent": { "stance": "accept", "evidence": "citation exacte de l'accord du personnage", "refusalEvidence": null }
+ }
 }
 Une demande ouverte doit être reconfirmée comme en attente par une évaluation defer courante à chaque tour ; null, refus ou annulation du joueur la ferme. Ne réutilise jamais une demande retirée.
-Retourne null si aucun passage n'est évalué. Les identifiants doivent venir du contexte fourni, jamais être inventés.
+Retourne handoff_assessment:null si aucun passage n'est évalué ou si la cible ne peut pas être résolue. Pour une demande ou proposition évaluée dont la cible est résolue, renseigne le contrat, y compris object/defer. Sans cible résolue, conserve action none et demande une clarification, sans inventer de preuve. Les identifiants doivent venir du contexte fourni, jamais être inventés.
+Une suggestion future ne prouve aucun accord. Lorsqu'une demande du joueur reçoit un accord effectivement délivré, évalue cet accord au tour courant : accept implique action.type=handoff vers la même cible, sans attendre une nouvelle demande ni une proposition au tour suivant. Le moteur vérifiera encore les preuves et ses gardes avant d'offrir le clic.
 Analyse sémantiquement la réplique complète : accept|object|defer. Une demande seule ou un oui hors contexte n'est jamais une permission.
 origin.type : player_request pour la demande courante ou une demande encore ouverte explicitement fournie ; gm_proposal pour une proposition effectivement dite par le personnage au tour courant, jamais une guidance privée.
 sourceCharacter et targetCharacter sont distincts et liés à la version épinglée ; pour accept, action.type=handoff vise la même cible. Aucun autre personnage que max ou emma.
 evidence et quote sont des citations exactes, sans paraphrase, contenant le contexte nécessaire ; targetEvidence.speaker est user ou character et sa quote doit nommer explicitement la cible dans l'échange concerné.
-Résous « lui » ou « Matt » seulement si ce même échange ou la demande encore ouverte identifie Max sans ambiguïté. Aucun alias global Matt → Max ; sinon defer et clarification naturelle.
+Résous « lui » ou « Matt » seulement si ce même échange ou la demande encore ouverte identifie Max sans ambiguïté. Aucun alias global Matt → Max ; sinon clarification naturelle et stance historique defer, sans fabriquer un contrat complet privé de preuve de cible.
 T6 « Je peux lui demander » est différé ; T9 « Je vais lui demander de vous parler » reste ambigu.
 T10 « Je vais l’appeler. C’est Max, pas Matt. » et T11 « Je vais aller le chercher dans le salon et lui dire que vous voulez lui parler directement. » peuvent être acceptés uniquement avec cible et preuves cohérentes.
 Un refus de transfert avec ou sans « ne », « plus tard », « Je vais lui demander s’il accepte », « Je vais l’appeler… enfin non » restent object ou defer.

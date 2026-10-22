@@ -92,3 +92,34 @@ describe('live same-call handoff context', () => {
     expect(validateCharacterHandoff({ ...fixture, evaluation: result }).authorized).toBe(true);
   });
 });
+
+
+describe("live handoff prompt contract over historical schemas", () => {
+  it.each([
+    ["builtin", null],
+    ["historical override", buildExperienceDirectorPrompt(EXPERIENCE_DIRECTOR_SYSTEM_PROMPT, DEFAULT_DIRECTOR_CONFIG)],
+  ])(
+    "requires a rooted assessment in the effective %s prompt", async (_name, systemPromptOverride) => {
+      vi.clearAllMocks();
+      const fixture = validInput();
+      vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ content: JSON.stringify({ ...historicalJson,
+        handoff_assessment: validAssessment() }), ...llmMetadata });
+      await evaluatePostTurnPRD4({ ...input, systemPromptOverride,
+        handoffContext: { turnId: fixture.turnId, openRequest: null, delivery: fixture.delivery } });
+      const [messages, options] = vi.mocked(callLLMWithUsage).mock.calls[0];
+      const system = messages[0].content;
+      const extension = system.slice(system.indexOf(CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS));
+      const start = extension.indexOf("{");
+      const end = extension.indexOf("\n}\n", start) + 2;
+      const example = JSON.parse(extension.slice(start, end));
+      // A model following the shown JSON must place the proof where the cleaner reads it.
+      expect(example).toHaveProperty("handoff_assessment.schemaVersion", 1);
+      expect(example).not.toHaveProperty("schemaVersion");
+      expect(extension).toMatch(/clé handoff_assessment est obligatoire/);
+      expect(extension).toMatch(/prioritaire sur le schéma historique/);
+      expect(extension).toMatch(/accord effectivement délivré/);
+      expect(callLLMWithUsage).toHaveBeenCalledOnce();
+      expect(options).toMatchObject({ max_tokens: 950, timeoutMs: 12000 });
+    },
+  );
+});

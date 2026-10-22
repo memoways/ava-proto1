@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-21 (lot 3 livré et synchronisé Lovable ; aucune nouvelle publication)
+> **Last Updated**: 2026-10-22 (lot 4 en préparation ; recette humaine et publication en attente)
 
 ---
 
@@ -72,6 +72,23 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-10-22 — Switching, lot 4 : préparer une preuve humaine
+
+Le main réel inclut la clôture #60 du lot 3, dont les CI pré- et post-fusion
+sont vertes ; Lovable sert la même révision synchronisée. La qualité locale
+repasse avec 734 unitaires, 41 intégrations et 48 régressions. Les 65 E2E passent sans retry, mais la recette humaine révèle une autre
+limite : Ulrich entend l'accord d'Emma, aucune pastille ne paraît ; le GM
+retourne accept/max avec action none et sans contrat exploitable. L'appel
+est clôturé sans transfert. La revue du prompt trouve une contradiction :
+objet historique fermé contre extension dite optionnelle. Deux tests rouges
+puis verts fixent ce contrat, sans assouplir le parseur ni les gardes. Comme
+le dernier échange était pronominal, ce conflit n'est pas annoncé comme sa
+cause exclusive ; une nouvelle recette diagnostiquée reste nécessaire.
+La v7 sandbox est activée à quota 8, avec seuil 4 et pause 2 conservés depuis la v6 ;
+la production narrative garde ses réglages. Aucune publication produit à ce
+stade. [Plan](docs/plan_changement_interlocuteur_manuel.md) et
+[reprise du seul lot 4](docs/prompt_reprise_switch_personnages_finalisation_lot_4.md).
 
 ### 2026-10-21 — Switching, lot 3 : rendre le passage visible en haut
 
