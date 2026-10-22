@@ -19,10 +19,10 @@ Standards/Spec finales sans constat sur ce même HEAD. Échecs PGlite et limites
 humaines conservés dans les relevés suivants ; aucune assertion ou délai changé.
 
 Main local/distant d396b63 propres après fetch/pull ; arbre identique au HEAD
-testé. CI post-fusion **39833225182 en cours au relevé** : vérifier sa fin.
+testé. CI post-fusion **39833225182 verte sur d396b63 exact**, **67 E2E en 11,3 min**.
 Lovable natif, projet/workspace attendus : même d396b63, ready/agentFinished=true.
-Preview réellement rechargée à l'accueil, bundle **index-BcBPO6Iy.js**, aucun
-appel actif. Le statut is_published préexistant ne démontre aucune publication
+Preview réellement rechargée à l'accueil avant recette, bundle **index-BcBPO6Iy.js**.
+Le statut is_published préexistant ne démontre aucune publication
 de ce correctif. V7 sandbox publiée, quota 8/seuil 4/pause 2 ; voix inchangées.
 Mémoire AVA Notion actualisée et relue : preuve référencée et sobriété demandée,
 Source conservée, Last updated by=Codex. About et Conare inchangés.
@@ -33,9 +33,21 @@ CHANGELOG/STORY/plan et ce prompt. Les commits documentaires suivent ce SHA :
 relever HEAD, statut/diff, PR/CI réels avant de continuer. Aucun travail étranger
 au relevé. Ne restaurer aucun ancien état, stash ou worktree.
 
-**Prochaine action :** attendre la disponibilité d'Ulrich au casque, déjà demandée
-après synchronisation ; ne pas lancer d'appel avant sa réponse. Puis nouvelle
-recette diagnostiquée naturelle Emma → Max → Emma, contrôle de l'annonce sobre,
+Nouvelle recette **7bed5c1b-4a48-491b-b51d-923e04a839b7**, 20:48:33–20:54:33
+Europe/Paris après disponibilité au casque confirmée : **clôturée user_hangup**,
+Max, compteur **1**, v7, film vu, rôle/posture null. T11 « Oui volontiers. » reçoit
+**« Je vous passe Max. »**. GM v2/current_user/max/accept/refusal=false/speech_0,
+preuve persistée v1 exacte, consent_validated, offre ffda5226, clic et connexion.
+Max/portrait observés ; même session/timer et contexte conservés. Mémoires et
+reçus filtrés Emma puis Max dans les traces, profils/fiches distincts, Gradium
+sans segment échoué parmi les événements complétés. **Son/sonneries/sobriété
+attendent la confirmation humaine ; retour Emma non effectué.** La session est
+close, aucun nouvel appel ouvert. Demande de confirmation de ce premier passage
+posée après constat de la fermeture ; ne pas présenter la recette complète réussie.
+
+**Prochaine action :** recueillir la confirmation du premier passage d'Ulrich,
+puis coordonner une nouvelle recette bidirectionnelle au casque, sans rouvrir
+d'appel sans sa disponibilité. Contrôler l'annonce sobre,
 accord entendu/pastille/clic/sonneries/voix/session/timer/film/rôle/posture/
 profils/compteur/mémoires. Publier uniquement via Lovable après résultat observable
 accepté, vérifier réellement servi ; sinon conserver cette reprise sans clôture

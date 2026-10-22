@@ -13,8 +13,12 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   Deux revues Standards/Spec finales sans constat sur ce même HEAD.
 - Main local/distant propres, arbre identique au HEAD testé ; Lovable même SHA,
   ready/agentFinished, preview `index-BcBPO6Iy.js` réellement servie. CI post-fusion
-  `39833225182` en cours au relevé ; résultat à vérifier. Recette humaine et
-  publication produit toujours restantes. Mémoire AVA Notion actualisée et relue.
+  `39833225182` verte sur d396b63 exact, **67 E2E en 11,3 min**.
+- Recette `7bed5c1b` clôturée user_hangup après Emma → Max : T11 « Je vous passe
+  Max. », GM référencé v2, preuve v1, offre/clic/connexion et compteur 1 persistés.
+  Portrait Max observé ; session/timer/film/rôle/posture conservés et mémoires
+  privées filtrées. Confirmation humaine son/sonneries/sobriété encore attendue ;
+  retour Emma non effectué, aucune publication. Mémoire AVA Notion actualisée et relue.
 
 - Seconde recette après #65 (`e12c75bd`) encore sans pastille : accord délivré,
   origine courante correcte mais preuve de cible recopiée d'un ancien tour.

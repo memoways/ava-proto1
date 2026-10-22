@@ -99,11 +99,21 @@ Standards/Spec sans constat sur `8b6717688ddf3bcc712ec212f8d978f8c7410923`.
 La CI `39830948642` est verte sur ce HEAD exact, avec 770/41/48 et 67 E2E
 en 10,9 min. #66 fusionnée dans `d396b63`, main propre et arbre identique au
 HEAD testé. Lovable synchronisé au même SHA, ready/agentFinished ; nouvelle
-preview `index-BcBPO6Iy.js` vérifiée à l'accueil, sans appel actif. CI post-fusion
-`39833225182` en cours au relevé. La disponibilité d'Ulrich est demandée avant
-une nouvelle recette au casque ; aucune réussite humaine ni publication déduite
-des simulations. Sobriété et provenance des preuves capitalisées dans la mémoire
+preview `index-BcBPO6Iy.js` vérifiée à l'accueil, sans appel actif à ce relevé.
+CI post-fusion `39833225182` ensuite verte sur d396b63 exact : 67 E2E en 11,3 min.
+Sobriété et provenance des preuves capitalisées dans la mémoire
 AVA existante, Source conservée et Last updated by=Codex, puis relues.
+
+Ulrich confirme sa disponibilité au casque. Session `7bed5c1b`, 20:48:33–20:54:33
+Europe/Paris : premier passage réel Emma → Max vérifié. T9 demande une reformulation,
+T10 devient gm_late à la confirmation suivante ; T11 « Oui volontiers. » reçoit
+« Je vous passe Max. ». Le GM référence speech_0, l'application matérialise une
+preuve v1 exacte, le validateur autorise, puis offre/clic/connexion sont persistés.
+Max et son portrait sont observés, compteur 1, même session/timer/film vu/rôle et
+posture null. Les mémoires et reçus exposés restent propres au personnage actif.
+La session est clôturée user_hangup après deux échanges Max tracés ; aucun retour
+Emma effectué. Son/sonneries/sobriété attendent encore la confirmation humaine,
+demandée sans rouvrir d'appel. Aucune publication et aucune clôture de lot déduite.
 
 La reprise #64 est fusionnée dans `56f6b62` après contrôle de la CI verte sur
 `90d443af` exact et deux revues indépendantes sans constat. Lovable est synchronisé.
