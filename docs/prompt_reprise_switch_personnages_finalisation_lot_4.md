@@ -14,28 +14,33 @@ produit.** Reprendre uniquement sa finalisation, sans lot 5 ni nouveau chat.
 
 ### Code et livraison à vérifier d'abord
 
-- Checkout canonique uniquement ; branche de travail
-  `codex/character-handoff-lot-4-validation-closeout`, [PR #63](https://github.com/memoways/ava-proto1/pull/63).
-  Révision du complément technique : **`6d9af383b55aaa43d571504d5ac55a40d5b7de38`**.
-  Les commits documentaires suivent ce SHA ; lire HEAD local/distant, diff,
-  statut de #63 et CI réelle avant toute action. Aucun travail étranger au relevé.
-  Ne pas restaurer un ancien main, stash, clone ou worktree.
+- Checkout canonique ; branche documentaire de reprise
+  `codex/character-handoff-lot-4-handoff`, basée sur le main technique
+  **`1d967ed465d9bc93b5d48088d917c78937e36d37`**. Aucun correctif source local
+  restant. Les commits documentaires suivent ce SHA : relever le HEAD réel,
+  le statut/diff local, les PR et les CI avant toute action. Aucun travail
+  étranger au relevé ; ne pas restaurer d'ancien main, stash, clone ou worktree.
+- [PR #63](https://github.com/memoways/ava-proto1/pull/63) **fusionnée** dans
+  `1d967ed465d9bc93b5d48088d917c78937e36d37` le 22 octobre 2026 à **14:29:48
+  Europe/Paris**, après [CI 39776598519](https://github.com/memoways/ava-proto1/actions/runs/39776598519)
+  verte sur le HEAD exact **`03f517e489b09a6fc1ae6025493a0e9ba1eea7eb`**,
+  65 E2E réussis en 10,9 min. Révision source du complément :
+  `6d9af383b55aaa43d571504d5ac55a40d5b7de38`.
+  CI post-fusion [39778810723](https://github.com/memoways/ava-proto1/actions/runs/39778810723) **verte sur le SHA exact 1d967ed465d9bc93b5d48088d917c78937e36d37**, avec 65 E2E réussis en 10,3 min.
 - #62 est fusionnée dans `019c6b5e7f044ce29f7defe538bca5aa1bc61e7f`, après
   [CI 39742163075](https://github.com/memoways/ava-proto1/actions/runs/39742163075)
-  verte sur le HEAD exact `e44e924305b750b5fad4bdd026ffc5e422f60ac3`.
+  verte sur `e44e924305b750b5fad4bdd026ffc5e422f60ac3` exact.
   [CI post-fusion 39770267137](https://github.com/memoways/ava-proto1/actions/runs/39770267137)
-  **verte à la tentative 2** sur 019c6b5. Première tentative interrompue après
-  six minutes d'installation Playwright avec retries du miroir Ubuntu Azure,
-  E2E incomplets ; elle n'est pas une preuve verte.
-- La CI de #63 [39770890936](https://github.com/memoways/ava-proto1/actions/runs/39770890936)
-  est verte sur l'ancien HEAD documentaire **0829e77** (65 E2E, 10,9 min).
-  **Elle ne valide pas le complément 6d9af38.** Vérifier la nouvelle CI du HEAD
-  exact et ne fusionner qu'après sa réussite, puis main local/distant propre,
-  CI post-fusion et synchronisation Lovable. Le main réel après fetch prévaut.
-- Dernière preview observée avant ce complément : Lovable **019c6b5**, projet ready,
-  agentFinished=true, workspace Memoways vérifié ; bundle **index-B8-jekyY.js**.
-  Après fusion de #63, recontrôler la nouvelle source et le bundle servis, sans
-  publier le produit pour sonder cet état.
+  verte à la tentative 2 sur 019c6b5 ; première tentative interrompue pendant
+  l'installation Playwright, qui ne vaut pas validation.
+- Lovable **`1d967ed465d9bc93b5d48088d917c78937e36d37`**, projet ready,
+  agentFinished=true, workspace Memoways vérifié. Preview rechargée à l'accueil,
+  bundle DOM **`index-9btHN-X9.js`**, sans appel actif. Le complément est
+  synchronisé en preview ; aucune nouvelle publication produit.
+- Les CI précédentes de #63 sur 0829e77 et ea6feea sont historiques. Toute
+  nouvelle fusion, y compris documentaire, exige sa propre CI verte sur le
+  HEAD exact, puis main propre, contrôle post-fusion et synchronisation Lovable.
+  Vérifier le statut de la PR documentaire de reprise ; ne pas la supposer fusionnée.
 
 ### Recette échouée et correctifs du même lot
 
@@ -81,14 +86,14 @@ finale : **753 unitaires, 41 intégrations, 48 régressions**, lint/typecheck/bu
 verts ; avertissements hooks/bundle préexistants. **65/65 E2E locaux sans retry en 10,3 min**.
 Deux revues indépendantes du complément : Standards sans constat, contrôle Spec
 supplémentaire de guidance contraire ajouté et vert ; revalidation finale requise
-sur tout nouveau changement. La nouvelle CI du HEAD exact prime ces preuves locales.
+sur tout nouveau changement. La CI verte de #63 porte bien sur le HEAD exact livré.
 L'ancien échec future-video reste conservé dans le plan, non reproduit et sans
 cause exclusive prétendue corrigée ; son composant/test sont inchangés.
 
 ### Prochaine action et clôture
 
-D'abord terminer/revérifier la livraison #63 : HEAD exact vert, main propre,
-CI post-fusion et Lovable synchronisé. La v7 Sandbox Ulrich existante reste
+D'abord relire la livraison réelle et la PR documentaire de reprise : CI exacte,
+main propre et Lovable synchronisé. La v7 Sandbox Ulrich existante reste
 publiée (**quota 8, seuil 4, pause 2**), v6 archivée ; production narrative v1 à
 quota 1. Ne recréer ni republier une configuration de recette sans changement.
 

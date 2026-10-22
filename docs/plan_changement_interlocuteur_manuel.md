@@ -808,6 +808,34 @@ La CI post-fusion technique 39770267137 est désormais **verte (tentative 2)** s
 019c6b5 ; la nouvelle CI de #63 doit valider son nouveau HEAD exact. Les variantes
 sonores et le transfert humain restent non validés ; pas de publication produit.
 
+### Lot 4 — livraison du complément et reprise après fusion, 22 octobre 2026
+
+[PR #63](https://github.com/memoways/ava-proto1/pull/63) fusionnée à **14:29:48
+Europe/Paris** dans **1d967ed465d9bc93b5d48088d917c78937e36d37**, après
+[CI 39776598519](https://github.com/memoways/ava-proto1/actions/runs/39776598519)
+verte sur le HEAD exact **03f517e489b09a6fc1ae6025493a0e9ba1eea7eb** : qualité
+753/41/48 et 65 E2E (10,9 min). Main local/distant propres et identiques au merge.
+CI post-fusion [39778810723](https://github.com/memoways/ava-proto1/actions/runs/39778810723) **verte sur le SHA exact 1d967ed465d9bc93b5d48088d917c78937e36d37**, avec 65 E2E réussis en 10,3 min.
+
+Lovable natif vérifié dans Memoways : même SHA **1d967ed**, ready et
+agentFinished=true. Preview rechargée à l'accueil, nouveau bundle DOM
+**index-9btHN-X9.js**, sans appel actif. Aucun nouveau déploiement produit,
+configuration Cloud ou contrôle vocal lancé pour sonder la synchronisation.
+
+Les deux revues indépendantes Standards et Spec ont revalidé le complément puis
+les quatre documents sans constat ; 65 E2E locaux sans retry en 10,3 min.
+Décision durable Notion enrichie et relue : chacun reste de son côté, procédure
+prioritaire et fermeture terminale exacte sans relâcher les gardes ; Source
+conservée, Last updated by=Codex. Aucun transcript ni état temporaire importé.
+
+Branche de sauvegarde documentaire : `codex/character-handoff-lot-4-handoff`,
+base 1d967ed. Relever son commit/PR/CI réels avant toute fusion ; ses éventuels
+commits suivent le code déjà livré. Le lot 4 reste **incomplet** : recette sonore
+et aller-retour Emma → Max → Emma non acceptés, volume non résolu. Ulrich écoutait
+sur haut-parleurs ; prochaine recette au casque pour comparer, après disponibilité
+reconfirmée. Aucune session ouverte pendant l'attente, aucune publication avant
+résultat observable accepté. Reprise autonome actualisée avec toutes ces obligations.
+
 ## 6. Validation attendue
 
 - Unitaires : T6 différé ; T10 pronom/faux prénom contextualisé ; T11 nom explicite + accord naturel ; inquiétude émotionnelle sans refus ; refus explicites et sans « ne » ; « Je vais l’appeler… enfin non » ; extrait affirmatif choisi au milieu d’un refus ; oui hors contexte ; cible incohérente ; décision invalide/périmée ; offre révoquée et nouvelles versions.

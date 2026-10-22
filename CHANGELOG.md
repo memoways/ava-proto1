@@ -71,6 +71,14 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   unitaires / 41 intégrations / 48 régressions**, lint/typecheck/build verts.
   65/65 E2E locaux sans retry en 10,3 min. Nouvelle CI verte du HEAD exact requise avant fusion ;
   la CI verte de 0829e77 décrit seulement la documentation précédente.
+- #63 fusionnée dans `1d967ed` à 14:29:48 Europe/Paris après
+  [CI 39776598519](https://github.com/memoways/ava-proto1/actions/runs/39776598519)
+  verte sur `03f517e` exact, 65 E2E en 10,9 min. Main local/distant propres ;
+  Lovable même SHA ready/agentFinished, preview `index-9btHN-X9.js` à l'accueil.
+  CI post-fusion [39778810723](https://github.com/memoways/ava-proto1/actions/runs/39778810723) **verte sur le SHA exact 1d967ed465d9bc93b5d48088d917c78937e36d37**, avec 65 E2E réussis en 10,3 min.
+- Reprise après fusion sauvegardée sur `codex/character-handoff-lot-4-handoff`.
+  Mémoire durable Notion actualisée et relue. Lot 4 incomplet : recette sonore
+  et transfert humain à refaire, volume non résolu ; aucun produit republié.
 
 ## [Non publié] — 2026-10-21 — Switching Emma ↔ Max, lot 3
 
