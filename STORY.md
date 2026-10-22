@@ -114,6 +114,9 @@ explication possible, sans correctif prétendu ni modification du fichier.
 #62 est fusionnée en `019c6b5` à 13:23:51 Europe/Paris après la CI verte
 `39742163075` sur le HEAD exact `e44e924`. Main est propre et Lovable synchronisé,
 ready/agentFinished ; CI post-fusion suivie séparément dans `39770267137`.
+La preview montre l'accueil et son nouveau bundle `index-B8-jekyY.js`, sans appel
+ouvert ; la mémoire durable est actualisée et relue dans Notion. #63 conserve
+la clôture documentaire et la reprise autonome.
 La finalisation technique est livrée. La recette humaine et la publication après
 acceptation restent ouvertes ; aucun nouvel appel n'est lancé pendant l'attente.
 [Plan](docs/plan_changement_interlocuteur_manuel.md) et

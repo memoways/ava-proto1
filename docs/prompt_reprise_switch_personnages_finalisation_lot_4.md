@@ -21,7 +21,7 @@ Main local/distant identiques et checkout propre à ce relevé. Lovable : même 
 projet **ready**, **agentFinished=true**, workspace Memoways vérifié.
 [CI post-fusion 39770267137](https://github.com/memoways/ava-proto1/actions/runs/39770267137)
 du merge technique à relire ; la clôture vérifie son résultat séparément. Branche documentaire
-`codex/character-handoff-lot-4-validation-closeout` créée depuis ce main,
+`codex/character-handoff-lot-4-validation-closeout` ([PR #63](https://github.com/memoways/ava-proto1/pull/63)) créée depuis ce main,
 uniquement CHANGELOG/STORY/plan/reprise. Les commits de sauvegarde suivent la
 révision technique ; retrouver sa PR par branche et vérifier HEAD/CI/fusion.
 Avant cette sauvegarde, aucun changement local étranger. Au prochain départ,
@@ -44,6 +44,10 @@ le main réel après fetch prévaut ; ne pas revenir à 019c6b5 si une clôture 
   publiée, quota **8**, seuil **4**, pause **2**. Par rapport à v6 archivée,
   seuls quota et mention textuelle diffèrent. Production narrative v1 à quota 1.
   Aucune nouvelle activation Cloud ni publication produit pendant cette reprise.
+- Preview native relue après synchronisation : accueil AVA/bouton Commencer,
+  bundle DOM **index-B8-jekyY.js**, paramètres env=sandbox-ulrich et diagnostic=full.
+  Ce contrôle ne prouve pas un transfert humain. Mémoire AVA Notion durable
+  actualisée et relue, Source conservée, Last updated by=Codex.
 - Aucun appel de recette ouvert pendant l'attente de disponibilité d'Ulrich.
   Ne pas réutiliser les sessions clôturées `18e7d9f8...`, `81e5fdca...`,
   `ce05527f...`. Les comptes rendus détaillés sont dans le plan.

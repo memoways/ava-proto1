@@ -702,10 +702,18 @@ agentFinished=true, workspace Memoways vérifié. Code synchronisé ; aucune
 nouvelle publication produit. [CI post-fusion 39770267137](https://github.com/memoways/ava-proto1/actions/runs/39770267137)
 lancée sur ce merge ; son résultat est contrôlé séparément avant la clôture
 finale et doit être relu au prochain départ. La branche documentaire
-`codex/character-handoff-lot-4-validation-closeout` part de ce main et ne porte
+`codex/character-handoff-lot-4-validation-closeout` ([PR #63](https://github.com/memoways/ava-proto1/pull/63)) part de ce main et ne porte
 que CHANGELOG/STORY/plan/reprise ; sa propre CI du HEAD exact reste obligatoire
 avant sa fusion. Le relevé de reprise référence le code technique, ses commits
 documentaires suivent sans restaurer une ancienne révision.
+
+Contrôle visuel après synchronisation : accueil AVA et bouton Commencer visibles
+sur la preview native du projet, bundle DOM **index-B8-jekyY.js** ; URL
+[preview Sandbox Ulrich](https://id-preview--1265958d-b74e-40f2-917d-182fe05163fc.lovable.app/?env=sandbox-ulrich&diagnostic=full).
+Aucun appel lancé ni microphone ouvert. Ce contrôle d'accueil ne prouve pas la
+pastille en conversation ni un accord humain. La mémoire AVA Notion a été relue,
+le contrat compact et la distinction relation absente/invalide intégrés à la
+décision existante, puis l'écriture vérifiée ; Source conservée, Last updated by=Codex.
 
 Relecture native Lovable Cloud : v7 sandbox-ulrich
 `98145fe3-96f1-4525-84c2-0e0a1cc5c6da` toujours publiée, source v6 archivée,

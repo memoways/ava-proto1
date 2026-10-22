@@ -51,6 +51,8 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   propres, même SHA Lovable ready/agentFinished. CI post-fusion
   [39770267137](https://github.com/memoways/ava-proto1/actions/runs/39770267137)
   à contrôler séparément de la CI pré-fusion puis à relire au prochain départ.
+- Preview relue à l'accueil avec bundle `index-B8-jekyY.js`, aucun appel ouvert.
+  Mémoire AVA Notion actualisée et écriture relue. Clôture documentaire dans #63.
 - Correctif testé/livré/synchronisé ; nouvel aller-retour humain et publication
   après acceptation toujours requis. V7 sandbox 8/4/2 relue sans modification,
   production narrative à quota 1. Reprise autonome actualisée pour ce seul lot.
