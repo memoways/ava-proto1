@@ -974,6 +974,45 @@ contrat/conversation/GM verts après cette précision, source fonctionnelle iden
 Les 67 E2E complets sont encore en cours au relevé ; nouvelle CI du HEAD exact
 obligatoire avant fusion et recette humaine toujours indispensable.
 
+**Relevé de livraison #66, 22 octobre 2026 :** **67/67 E2E locaux sans retry,
+11,2 min**, un worker ; deux revues Standards/Spec finales sans constat sur
+`8b6717688ddf3bcc712ec212f8d978f8c7410923`. [CI 39830948642](https://github.com/memoways/ava-proto1/actions/runs/39830948642)
+verte sur ce HEAD exact : 770 unitaires, 41 intégrations, 48 régressions,
+lint/typecheck/build et **67 E2E en 10,9 min**. Vérification PR ouverte,
+head/base attendus, check-runs tous success et statuts avant fusion protégée
+par SHA. [#66](https://github.com/memoways/ava-proto1/pull/66) fusionnée dans
+`d396b63b0a8e141b81126bc2cddb52698d3b44bd`. Fetch/pull : main local/distant
+identiques et propres ; diff nul entre l'arbre testé et le main fusionné.
+CI post-fusion **39833225182 verte sur d396b63 exact**, **67 E2E en 11,3 min**.
+Lovable natif : projet et workspace attendus, même d396b63, ready et
+agentFinished=true. Preview rechargée : **index-BcBPO6Iy.js**, accueil réellement
+servi, aucun appel actif. Aucun changement Cloud ni publication produit.
+V7 sandbox toujours publiée, quota 8/seuil 4/pause 2 ; v6 archivée, quota 1.
+Voix runtime Emma/Max inchangées. Mémoire AVA Notion actualisée et relue :
+contrat référencé et annonce sobre unique, Source conservée et Last updated by=Codex.
+La reprise documentaire utilise `codex/character-handoff-references-lot-4-handoff`,
+base d396b63. Résultat humain et publication restent indispensables pour clôturer.
+
+### Lot 4 — premier transfert réel constaté après #66
+
+Après disponibilité confirmée au casque, session **7bed5c1b-4a48-491b-b51d-923e04a839b7**,
+20:48:33–20:54:33 Europe/Paris, clôturée **user_hangup**. Le GM référencé est bien
+actif. T9 : demande nommée et reformulation, stance defer refusée correctement.
+T10 : proposition d'Emma devenue gm_late lors de la confirmation suivante.
+T11 : utilisateur « Oui volontiers. », délivré **« Je vous passe Max. »** ; GM
+schemaVersion=2/current_user/max/accept/refusal=false/consentRef=speech_0.
+Preuve v1 matérialisée avec origine courante exacte et cible nommée par Emma.
+Validator consent_validated, offre ffda5226-f45d-4d5f-9fab-d2d6dade5eb7 à
+20:53:19, clic à 20:53:23, connexion à 20:53:29. Max/portrait réellement observés.
+Compteur **1**, même session/timer (événement sessionPreserved/timerPreserved),
+v7/film vu/rôle et posture null conservés. Traces T11 Emma : mémoire/reçus Emma
+seuls ; T13 Max : état privé vide et reçus Max seuls ; T14 Max : état et reçus
+Max seuls. Profils/fiches Emma et Max distincts confirmés ; télémétrie Gradium,
+20 segments joués Emma et 7 Max, zéro segment échoué parmi les événements complétés.
+Ces données ne remplacent pas la confirmation auditive d'Ulrich, encore demandée.
+La session est terminée après Max, **retour Emma non effectué** ; ne pas annoncer
+un aller-retour réussi ni publier. Ne pas rouvrir d'appel sans coordination.
+
 ## 6. Validation attendue
 
 - Unitaires : T6 différé ; T10 pronom/faux prénom contextualisé ; T11 nom explicite + accord naturel ; inquiétude émotionnelle sans refus ; refus explicites et sans « ne » ; « Je vais l’appeler… enfin non » ; extrait affirmatif choisi au milieu d’un refus ; oui hors contexte ; cible incohérente ; décision invalide/périmée ; offre révoquée et nouvelles versions.

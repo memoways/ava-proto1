@@ -6,6 +6,20 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Lot 4 partiel — non publié] — 2026-10-22 — Switching Emma ↔ Max
 
+- Contrat référencé et annonce sobre livrés par [#66](https://github.com/memoways/ava-proto1/pull/66)
+  dans `d396b63b0a8e141b81126bc2cddb52698d3b44bd`, après CI `39830948642`
+  verte sur le HEAD exact `8b6717688ddf3bcc712ec212f8d978f8c7410923` :
+  770/41/48 et **67 E2E en 10,9 min**. Local : **67/67 sans retry en 11,2 min**.
+  Deux revues Standards/Spec finales sans constat sur ce même HEAD.
+- Main local/distant propres, arbre identique au HEAD testé ; Lovable même SHA,
+  ready/agentFinished, preview `index-BcBPO6Iy.js` réellement servie. CI post-fusion
+  `39833225182` verte sur d396b63 exact, **67 E2E en 11,3 min**.
+- Recette `7bed5c1b` clôturée user_hangup après Emma → Max : T11 « Je vous passe
+  Max. », GM référencé v2, preuve v1, offre/clic/connexion et compteur 1 persistés.
+  Portrait Max observé ; session/timer/film/rôle/posture conservés et mémoires
+  privées filtrées. Confirmation humaine son/sonneries/sobriété encore attendue ;
+  retour Emma non effectué, aucune publication. Mémoire AVA Notion actualisée et relue.
+
 - Seconde recette après #65 (`e12c75bd`) encore sans pastille : accord délivré,
   origine courante correcte mais preuve de cible recopiée d'un ancien tour.
   Appel clôturé, compteur 0 ; clarification de prompt insuffisante.
