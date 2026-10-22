@@ -7,6 +7,62 @@ son Supabase est fourni par Lovable. Aucun hébergeur ou Supabase externe.
 Cette demande autorise uniquement le lot 4, après vérification et finalisation
 de tout défaut restant du lot 3. Ne lance aucun autre chantier ni nouveau chat.
 
+## Reprise demandée par Ulrich — priorité à ce relevé
+
+**Le lot 4 n'est pas terminé.** Ulrich demande de continuer dans un nouveau chat
+frais. Aucun appel de recette ne reste actif ; preview à l'accueil, micro fermé.
+
+- Checkout canonique sur `codex/character-handoff-lot-4-closeout`.
+  **Révision du dernier correctif : `453f39a2e7182a6ef306174af81edf2a251391f9`.**
+  Une sauvegarde documentaire de cette reprise suit cette révision ; relever le
+  HEAD réel avec git et le comparer au HEAD distant de la [PR #62](https://github.com/memoways/ava-proto1/pull/62).
+  Les modifications ont été commitées pour la reprise ; vérifier propreté après
+  fetch. Ne restaurer ni ancien main ni stash ; continuer cette PR non fusionnée.
+- Main vérifié : `180e018714f1916ffe32df9a94df1906b1ee209b`, correctif #61.
+  [CI post-fusion 39735148175](https://github.com/memoways/ava-proto1/actions/runs/39735148175)
+  **verte**. Lovable est synchronisé sur ce main, ready/agentFinished.
+  **Les nouveaux correctifs de #62 ne sont pas encore servis dans Lovable.**
+- [CI 39736840084](https://github.com/memoways/ava-proto1/actions/runs/39736840084)
+  **rouge** sur ancien HEAD documentaire `89c8d3c` (64/65 E2E), cause de fixture
+  reproduite par trace et corrigée localement : attendre l'offre visible/persistée
+  avant de désactiver Max. Trois répétitions ciblées vertes. Cette CI ancienne
+  ne valide pas le nouveau code ; lire la nouvelle CI du HEAD exact après push.
+- **140 tests ciblés finaux verts**, six fichiers, 1,55 s : contrat personnage,
+  GM, mémoire, validateur, état, persistance. Deux revues finales source sans constat.
+  Rouge→vert conservé pour format complet/téléphone, exemple d'action réellement
+  nettoyé, relation absente et JSON tronqué. Les null/objets relationnels explicites
+  invalides restent rejetés ; le refus T6 garde sa priorité sur defer.
+- **Qualité finale non verte** : dernière commande `/tmp/ava-lot4-quality-final-compact.log`
+  = 742/744 unitaires, 48 régressions vertes, intégration/build non exécutés après
+  l'échec. Un test T6 attendait à tort defer plutôt que le refus prioritaire :
+  assertion corrigée et ciblés verts. L'autre échec est `LatencyBlockingTab.test.tsx`
+  « shows the measured video provider and avatar in comparisons and evolution »
+  (`future-video` absent). Ce fichier est inchangé ; **cause non établie**, ne pas
+  qualifier automatiquement de flaky ni masquer l'échec. Un contrôle précédent a
+  eu un timeout pagination ; fichier isolé 8/8 vert, puis qualité intermédiaire
+  739 unitaires/41 intégrations/48 régressions verte avant les derniers changements.
+- **E2E complets du nouveau code à relancer** : exécution intermédiaire arrêtée
+  après nouveaux constats, 44 passent, un interrompu, 20 non exécutés (7,4 min),
+  `/tmp/ava-lot4-e2e-final.log`. Aucun succès complet final revendiqué.
+  Les 65 E2E locaux/CI verts cités plus bas concernent le correctif #61.
+- Fichiers du dernier correctif : `src/services/characterConversation.ts` et test,
+  `src/services/gameMasterPromptBuilder.ts`, `src/agents/gameMasterPRD4.ts` et test
+  handoff, `src/services/characterHandoff.test.ts`,
+  `tests/e2e/prd4-happy-path.spec.ts`, CHANGELOG, STORY, plan et cette reprise.
+  Aucun provider, voix, capture, Edge Function, migration, secret ou réglage de
+  production changé. V7 Sandbox reste publiée ; ne pas en créer un doublon.
+
+**Prochaine étape technique** : inspecter/reproduire l'échec future-video sans
+modifier de code étranger, terminer `npm run test:quality`, puis les 65 E2E complets
+sans affaiblir les assertions. Revalider les deux revues sur tout changement.
+Actualiser la PR #62 et ses preuves. **Fusion uniquement après CI verte sur son
+HEAD exact**, puis main local/distant propre, CI post-fusion et synchronisation
+Lovable. Ensuite seulement, quand Ulrich est prêt, nouvel appel diagnostiqué
+Emma → Max → Emma ; vérifier le JSON brut complet et l'accord réellement entendu.
+Aucune nouvelle publication produit avant cette validation humaine acceptée.
+
+Les relevés ci-dessous gardent la chronologie ; celui-ci prévaut pour l'état actuel.
+
 ## Relevé vérifié du 22 octobre 2026 — lot 4 incomplet
 
 - Lot 3 et clôture #60 vérifiés sur `f01532be27840025836aee44316da5d50518defd`,
