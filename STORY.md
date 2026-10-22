@@ -106,6 +106,16 @@ Ulrich demande une reprise dans un chat frais avant la fin de ces validations.
 Les 140 ciblés et les revues source sont verts, mais la qualité complète reste
 non validée et les E2E finaux doivent être relancés. #62 reste sans fusion ;
 les derniers correctifs ne sont pas encore servis dans Lovable.
+La reprise établit ensuite la validation complète : 744 unitaires,
+41 intégrations, 48 régressions et 65 E2E locaux sans retry (10,1 min) verts ;
+deux revues indépendantes sans constat. L'ancien échec future-video n'est pas
+reproduit : son DOM montrait zéro sélection, une course de sélection reste une
+explication possible, sans correctif prétendu ni modification du fichier.
+#62 est fusionnée en `019c6b5` à 13:23:51 Europe/Paris après la CI verte
+`39742163075` sur le HEAD exact `e44e924`. Main est propre et Lovable synchronisé,
+ready/agentFinished ; CI post-fusion suivie séparément dans `39770267137`.
+La finalisation technique est livrée. La recette humaine et la publication après
+acceptation restent ouvertes ; aucun nouvel appel n'est lancé pendant l'attente.
 [Plan](docs/plan_changement_interlocuteur_manuel.md) et
 [reprise du seul lot 4](docs/prompt_reprise_switch_personnages_finalisation_lot_4.md).
 

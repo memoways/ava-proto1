@@ -40,6 +40,21 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   E2E intermédiaires interrompus, nouvelle suite complète nécessaire. Aucune
   fusion de #62 ni publication à ce stade.
 
+- Reprise technique vérifiée : 744 unitaires, 41 intégrations, 48 régressions,
+  lint/typecheck/build et **65 E2E locaux sans retry (10,1 min)** verts ; deux
+  revues indépendantes Standards/Spec sans constat. LatencyBlockingTab 8/8
+  isolés et suite complète verte ; ancien échec future-video conservé, sélection
+  encore à zéro dans son DOM, cause exclusive non établie. Aucun code ajouté.
+- #62 fusionnée en `019c6b5` le 22 octobre à 13:23:51 Europe/Paris, après
+  [CI 39742163075](https://github.com/memoways/ava-proto1/actions/runs/39742163075)
+  verte sur le HEAD exact `e44e924` (744/41/48 et 65 E2E). Main local/distant
+  propres, même SHA Lovable ready/agentFinished. CI post-fusion
+  [39770267137](https://github.com/memoways/ava-proto1/actions/runs/39770267137)
+  à contrôler séparément de la CI pré-fusion puis à relire au prochain départ.
+- Correctif testé/livré/synchronisé ; nouvel aller-retour humain et publication
+  après acceptation toujours requis. V7 sandbox 8/4/2 relue sans modification,
+  production narrative à quota 1. Reprise autonome actualisée pour ce seul lot.
+
 ## [Non publié] — 2026-10-21 — Switching Emma ↔ Max, lot 3
 
 - Une pastille d'appel unique sous le personnage actif remplace la carte basse,

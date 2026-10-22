@@ -7,7 +7,84 @@ son Supabase est fourni par Lovable. Aucun hébergeur ou Supabase externe.
 Cette demande autorise uniquement le lot 4, après vérification et finalisation
 de tout défaut restant du lot 3. Ne lance aucun autre chantier ni nouveau chat.
 
-## Reprise demandée par Ulrich — priorité à ce relevé
+## Relevé prioritaire de la reprise — 22 octobre 2026
+
+**Le lot 4 reste incomplet pour sa recette humaine et sa publication produit.**
+La finalisation technique du contrat téléphonique/JSON compact est livrée par
+[PR #62](https://github.com/memoways/ava-proto1/pull/62), fusionnée après
+[CI 39742163075](https://github.com/memoways/ava-proto1/actions/runs/39742163075)
+**verte sur le HEAD exact `e44e924305b750b5fad4bdd026ffc5e422f60ac3`**.
+
+Révision technique main après fusion :
+`019c6b5e7f044ce29f7defe538bca5aa1bc61e7f` (22 octobre, 13:23:51 Europe/Paris).
+Main local/distant identiques et checkout propre à ce relevé. Lovable : même SHA,
+projet **ready**, **agentFinished=true**, workspace Memoways vérifié.
+[CI post-fusion 39770267137](https://github.com/memoways/ava-proto1/actions/runs/39770267137)
+du merge technique à relire ; la clôture vérifie son résultat séparément. Branche documentaire
+`codex/character-handoff-lot-4-validation-closeout` créée depuis ce main,
+uniquement CHANGELOG/STORY/plan/reprise. Les commits de sauvegarde suivent la
+révision technique ; retrouver sa PR par branche et vérifier HEAD/CI/fusion.
+Avant cette sauvegarde, aucun changement local étranger. Au prochain départ,
+le main réel après fetch prévaut ; ne pas revenir à 019c6b5 si une clôture suit.
+
+- Vérifications locales de reprise : `LatencyBlockingTab` **8/8** puis qualité
+  complète séquentielle **744 unitaires, 41 intégrations, 48 régressions**,
+  lint/typecheck/build verts. **65/65 E2E locaux sans retry, un worker, Chromium/Firefox/WebKit, 10,1 min**.
+- Deux revues indépendantes Standards/Spec sur `180e018...e44e924` : **aucun
+  constat technique**. Aucun nouveau code produit changé pendant la reprise.
+- L'ancien échec future-video reste conservé. Son DOM montrait une session
+  chargée mais **0 sélectionnée**, alors que la sélection automatique arrive
+  par effet après le rendu de la liste. Course possible avec l'assertion immédiate,
+  cause exclusive non établie ; pas de correction ou d'instabilité certaine
+  prétendue. Composant et test inchangés, nouvelle suite complète verte.
+- CI e44e924 : 744 unitaires, 41 intégrations, 48 régressions et **65 E2E sans
+  retry en 11,1 min**. Les anciennes commandes rouges/interrompues décrivent
+  l'historique et ne remplacent pas ces nouvelles preuves.
+- Lovable Cloud relu : v7 Sandbox Ulrich `98145fe3-96f1-4525-84c2-0e0a1cc5c6da`
+  publiée, quota **8**, seuil **4**, pause **2**. Par rapport à v6 archivée,
+  seuls quota et mention textuelle diffèrent. Production narrative v1 à quota 1.
+  Aucune nouvelle activation Cloud ni publication produit pendant cette reprise.
+- Aucun appel de recette ouvert pendant l'attente de disponibilité d'Ulrich.
+  Ne pas réutiliser les sessions clôturées `18e7d9f8...`, `81e5fdca...`,
+  `ce05527f...`. Les comptes rendus détaillés sont dans le plan.
+
+### Prochaine action exécutable
+
+D'abord relire l'état réel main/PR/CI/Lovable : les commits documentaires suivent
+la révision technique. Ne pas restaurer un ancien hash, stash, clone ou worktree.
+Quand Ulrich confirme être prêt à parler, depuis l'admin preview sélectionner
+Sandbox Ulrich → Tester moi-même, diagnostic=full, puis **nouvel appel Emma**.
+Échanges naturels, une seule demande **nommant Max** après le minimum narratif ;
+vérifier JSON brut **complet**, accord **réellement entendu**, preuve/offre/clic,
+sonneries et Max audible. Retour Emma après pause et nouvel accord ; même session,
+timer/film/rôle/posture, compteur réel, profils/voix et mémoires privées.
+Ulrich parle et confirme le son ; l'agent contrôle les événements/persistance via
+Lovable natif. Ne pas répéter après refus ni substituer une parole synthétique.
+Fermer proprement tout appel de contrôle. En l'absence d'Ulrich disponible,
+laisser la preview à l'accueil, micro fermé et sauvegarder cette limite.
+
+Après résultat observable accepté seulement, publier le produit via Lovable puis
+vérifier ce qui est servi sans redéploiement de sondage. Si un défaut apparaît,
+baseline → test rouge → correctif minimal, ciblés puis qualité/E2E complets,
+deux revues Standards/Spec, CI verte **du HEAD exact avant chaque fusion**,
+main local/distant propre, CI post-fusion et synchronisation Lovable vérifiés.
+
+À la fin, actualiser **CHANGELOG.md, STORY.md et le plan**, puis ce prompt si
+incomplet ou `docs/prompt_cloture_switch_personnages.md` si le lot est achevé.
+Inclure branche/commit réels, modifications locales, PR/CI, Lovable,
+fait/restant, contexte/fichiers et critères ; rafraîchir après fusion.
+Relire et mettre à jour seulement les décisions durables dans l'entrée Notion
+AVA existante, Source préservée, Last updated by=Codex, puis vérifier chaque
+écriture. Aucune préférence inventée, donnée sensible, état temporaire ou
+transcript complet ; aucun accès à Gami DigiDouble ni écriture Conare.
+Appliquer `/Users/ulrich/CodeProjects/_shared/agent-context/12-task-closeout-handoff.md`.
+Donner résultat/liens/contrôles, états local/GitHub/preview/production et prompt
+prêt à copier ; une seule action précise si Ulrich doit intervenir.
+**Arrêter après ce seul lot 4, sans lot 5 ni nouveau chat automatique.**
+
+Les relevés qui suivent conservent l'historique ; ce relevé prioritaire prévaut.
+
+## Relevé historique avant cette reprise — 22 octobre 2026
 
 **Le lot 4 n'est pas terminé.** Ulrich demande de continuer dans un nouveau chat
 frais. Aucun appel de recette ne reste actif ; preview à l'accueil, micro fermé.

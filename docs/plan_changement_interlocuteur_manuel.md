@@ -654,6 +654,82 @@ Clôture à fusionner seulement après CI verte
 sur son propre HEAD exact, puis recontrôler main et synchronisation Lovable.
 Le prochain assistant part du main réel après fetch, sans restaurer ces hashes.
 
+### Lot 4 — finalisation technique reprise le 22 octobre 2026
+
+Départ vérifié dans le checkout canonique : branche
+`codex/character-handoff-lot-4-closeout`, propre, HEAD local/distant
+`e44e924305b750b5fad4bdd026ffc5e422f60ac3`, PR #62 ouverte ; main
+`180e018714f1916ffe32df9a94df1906b1ee209b`. Identité GitHub existante
+Ulrfis confirmée par requête authentifiée ; pas de GitHub App configurée,
+aucune reconnexion ni substitution. Workspace Notion canonique vérifié par
+fetch(self), About/règles/mémoire AVA et sources application/PRD consultés.
+
+Aucun nouveau changement produit n'a été nécessaire dans cette reprise.
+`npx vitest run src/components/LatencyBlockingTab.test.tsx` : **8/8 verts**.
+Puis qualité locale complète séquentielle : **744 unitaires, 41 intégrations,
+48 régressions**, lint sans erreur, typecheck et build verts. Avertissements
+hooks/bundle préexistants conservés. L'ancien log rouge est conservé : au
+moment de l'assertion future-video, la session était chargée et **0 sélectionnée**.
+La sélection automatique est appliquée dans un effet après le rendu de la liste ;
+une course entre l'attente du bouton et cette sélection est donc plausible.
+La cause exclusive n'est pas reproduite ni prétendue corrigée. Composant et test
+LatencyBlockingTab inchangés ; aucune assertion affaiblie ni échec masqué.
+Logs locaux de reprise : `/tmp/ava-lot4-latency-baseline.log`,
+`/tmp/ava-lot4-quality-reprise.log` et `/tmp/ava-lot4-e2e-reprise.log` ; ce sont
+les résultats du dépôt et de GitHub qui restent les preuves durables.
+
+**65/65 E2E locaux sans retry, un worker, Chromium/Firefox/WebKit, 10,1 min**.
+Premier lancement arrêté avant tout test par listen EPERM ; relance avec accès
+système autorisé, sans changement de configuration ni délai.
+
+Deux revues indépendantes **Standards et Spec** sur
+`180e018...e44e924` : **aucun constat technique restant**, consommateurs,
+nettoyeur, mémoire, reprise et fixture inclus. Elles confirment le contrat
+partagé de transfert téléphonique, le format complet/action proposalGuidance,
+la différence absence/proposition relationnelle invalide et le refus prioritaire.
+Elles ne prouvent pas la réponse du modèle réel ni un son entendu.
+[CI pré-fusion 39742163075](https://github.com/memoways/ava-proto1/actions/runs/39742163075)
+**verte sur le HEAD exact e44e924305b750b5fad4bdd026ffc5e422f60ac3** :
+744 unitaires, 41 intégrations, 48 régressions et **65 E2E sans retry en 11,1 min**.
+La vérification du HEAD PR, du SHA du run et de tous les checks précède la
+fusion protégée par ce SHA ; l'ancienne CI rouge n'est pas la preuve de livraison.
+
+[PR #62](https://github.com/memoways/ava-proto1/pull/62) fusionnée le
+22 octobre à **13:23:51 Europe/Paris**, merge
+`019c6b5e7f044ce29f7defe538bca5aa1bc61e7f`. Après fetch, main local/distant
+identiques et propres. Lovable natif confirme ce même SHA, projet ready,
+agentFinished=true, workspace Memoways vérifié. Code synchronisé ; aucune
+nouvelle publication produit. [CI post-fusion 39770267137](https://github.com/memoways/ava-proto1/actions/runs/39770267137)
+lancée sur ce merge ; son résultat est contrôlé séparément avant la clôture
+finale et doit être relu au prochain départ. La branche documentaire
+`codex/character-handoff-lot-4-validation-closeout` part de ce main et ne porte
+que CHANGELOG/STORY/plan/reprise ; sa propre CI du HEAD exact reste obligatoire
+avant sa fusion. Le relevé de reprise référence le code technique, ses commits
+documentaires suivent sans restaurer une ancienne révision.
+
+Relecture native Lovable Cloud : v7 sandbox-ulrich
+`98145fe3-96f1-4525-84c2-0e0a1cc5c6da` toujours publiée, source v6 archivée,
+quota **8**, seuil **4**, pause **2**. Autres champs config identiques à v6,
+seule mention du quota dans le prompt changée ; production narrative v1 toujours
+publiée à quota **1**. Aucune nouvelle configuration, migration, Edge Function,
+voix, capture, provider ou publication produit pendant cette reprise.
+
+**Reste humain du seul lot 4 :** quand Ulrich est prêt, nouvel appel Emma en
+preview, Sandbox Ulrich, diagnostic=full. Après les échanges narratifs requis,
+une demande unique nommant Max, accord réellement entendu, JSON brut complet,
+preuve délivrée, offre, clic, sonneries, Max audible ; retour Emma après pause et
+nouvel accord. Contrôler session/timer/film/rôle/posture, profils/voix, compteur
+et mémoires privées. Fermer les appels de contrôle. Aucun appel ouvert pendant
+l'attente de disponibilité. Publier le produit exclusivement via Lovable après
+résultat observable accepté, puis vérifier le frontend servi sans redéploiement
+de sondage. Les simulations vertes ne clôturent pas cette recette.
+
+CHANGELOG, STORY et [reprise autonome de finalisation du seul lot 4](prompt_reprise_switch_personnages_finalisation_lot_4.md)
+actualisés. Aucun lot 5 ni nouveau chat lancé. Les états de livraison sont
+séparés : code testé/livré/synchronisé ; expérience humaine non validée ; produit
+non republié. Les décisions durables restent dans la mémoire AVA Notion,
+Source conservée et Last updated by=Codex, sans état temporaire ni transcript.
+
 ## 6. Validation attendue
 
 - Unitaires : T6 différé ; T10 pronom/faux prénom contextualisé ; T11 nom explicite + accord naturel ; inquiétude émotionnelle sans refus ; refus explicites et sans « ne » ; « Je vais l’appeler… enfin non » ; extrait affirmatif choisi au milieu d’un refus ; oui hors contexte ; cible incohérente ; décision invalide/périmée ; offre révoquée et nouvelles versions.
