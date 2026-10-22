@@ -7,6 +7,10 @@ alwaysApply: true
 
 Règle complète : `AGENTS.md`, section « Fin de lot ». Résumé impératif :
 
+- Un seul agent actif à la fois. Avant d'agir : `git fetch --prune`, derniers commits de `main`,
+  PR et branches ouvertes. Branche ou PR d'un autre agent active depuis moins de 24 h : ne pas y
+  toucher, demander à Ulrich. Chaque agent ne fusionne et ne supprime que ses propres PR et branches.
+- Après chaque fusion : entrée CHANGELOG avec le SHA de `main` et ce qui reste à valider.
 - Une branche par lot, depuis `main` à jour. Lister branches et PR existantes avant de commencer.
 - Fusionner dans `main` seulement quand la CI est **verte sur le HEAD exact** (jamais `queued` ou
   `in_progress`). Vérifier ensuite la CI de `main`.

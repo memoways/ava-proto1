@@ -19,6 +19,10 @@ Toute modification effectuée hors de Lovable doit rester compatible avec Lovabl
 
 ## Fin de lot (règle obligatoire — détail dans `AGENTS.md`)
 
+Un seul agent actif à la fois (Codex, Claude, Cursor, Lovable) : avant d'agir, `git fetch --prune`,
+lire les derniers commits de `main` et le CHANGELOG ; ne jamais fusionner, fermer ni modifier la
+PR ou la branche d'un autre agent active depuis moins de 24 h — demander à Ulrich.
+
 Un lot n'est terminé que si : PR fusionnée dans `main` **après CI verte sur le HEAD exact**
 (jamais pendant `queued`/`in_progress`), CI de `main` verte, branche supprimée (distante + locale),
 aucune PR ni branche qui traîne. Une seule branche par lot, depuis `main` à jour ; vérifier les
