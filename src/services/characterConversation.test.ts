@@ -71,6 +71,9 @@ describe("characterConversation", () => {
       const guidance = buildSwitchRequestGuidance(source, target);
       expect(guidance).toContain("passer l'appel");
       expect(guidance).toContain("ne lui propose pas de venir");
+      expect(guidance).toContain("chacun reste de son côté");
+      expect(guidance).toContain("sans rester à côté");
+      expect(guidance).toContain("sans écouter la conversation");
       expect(guidance).toContain("accepter, objecter ou hésiter");
       expect(guidance).toContain("N'exécute pas le transfert toi-même");
     },

@@ -738,6 +738,62 @@ séparés : code testé/livré/synchronisé ; expérience humaine non validée ;
 non republié. Les décisions durables restent dans la mémoire AVA Notion,
 Source conservée et Last updated by=Codex, sans état temporaire ni transcript.
 
+### Lot 4 — nouvelle recette humaine et défauts à finaliser, 22 octobre 2026
+
+Session `98c8a4c4-b2c9-474b-8d83-d6db2e599393`, **13:41:12–13:51:07
+Europe/Paris**, preview `index-B8-jekyY.js`, v7 sandbox-ulrich, diagnostic complet,
+film vu, rôle/posture null. Clôture user_hangup relue, Emma et compteur **0** ;
+preview rendue à l'accueil, micro fermé. Ulrich confirme cinq échanges, des
+variations de volume/coupures gênant la compréhension, puis aucune pastille.
+Aucun aller-retour ni résultat audible accepté ; aucune publication produit.
+
+T7 : le GM brut est **complet**, 686 tokens sur 950. Il classe accept et recommande
+Max en citant « Je peux lui demander, si tu veux » ; targetEvidence ne cite que
+« lui ». Le validateur refuse **request_unresolved** : aucune offre. La réplique
+promet de rester près de Max. Ulrich précise explicitement la règle : **chacun
+reste de son côté, seul l'appel est transmis** ; aucune venue, présence à côté,
+écoute de l'échange opposé ni conférence. Cette précision prime toute guidance GM.
+Aucun accord forcé ni alias/pronom résolu par regex n'est autorisé.
+
+T8 : demande nommant Max, puis **échec de finalisation de réponse** avant son.
+La capture d'Ulrich montre `Incomplete response sentence or quote`. Reçu natif
+persisté : texte terminé avec ponctuation, suivi de **\n</speech>** ; delivered
+vide, playedSamples/scheduledSamples=0, statut failed. La génération personnage
+est completed à **61 tokens**, loin du budget : aucune troncature établie.
+Le parseur privé/parole laisse ce marqueur de fermeture final dans pending et
+lève l'erreur à finish. Reproduction locale à ajouter **avant** correction.
+
+Périmètre du complément : renforcer le contrat téléphonique partagé/personnage/GM
+avec la séparation physique et la confidentialité explicites, injectées dans chaque
+prompt personnage (y compris sans demande nommée ni guidance GM), en invariant de
+procédure distinct du cadre éditorial experienceFrame ; consommer uniquement
+une fermeture de protocole terminale optionnelle `</speech>` au parseur, après
+validation de phrases complètes, sans jamais envoyer ce tag au TTS. Rejeter toujours
+phrase/citation incomplète, identité étrangère, contenu structuré ou texte après
+fermeture. Aucun nouveau modèle, appel LLM, budget, provider, voix ou réglage Cloud.
+Les décisions de capture et d'interruption restent hors de ce correctif parser.
+Confiance préalable 95 % : reçu brut T8 et erreur identiques, test local de fermeture
+rouge, deux guidances de séparation rouges, parseur et constante uniques réutilisés,
+aucune API externe/dépendance nouvelle. Contrat ECMAScript natif de chaîne et
+patterns de nettoyage déjà utilisés par le parseur GM ; budget et points d'injection
+existants vérifiés. Tester aussi les quatre variantes et la guidance GM contraire.
+
+Volume : télémétrie T7 montre un candidat acoustique, atténuation à 5 691 ms,
+suspension à 5 811 ms, rejet et reprise à 7 091 ms (pause logicielle de 1 280 ms).
+Cela établit un mécanisme possible de la coupure de ce tour, **pas** une mesure de
+niveau acoustique ni la cause exclusive des variations. Ne pas modifier les seuils
+ou la capture sans reproduction et application du plan latence §3. Ce défaut
+perçu reste une limite de recette tant qu'il n'est pas diagnostiqué et accepté.
+
+La PR #63, encore ouverte, recevra ce complément du même lot, avec nouveau titre,
+preuves rouge/vert, qualité/E2E complets, deux revues indépendantes et **nouvelle CI
+verte du HEAD exact avant fusion**. Sa CI verte sur `0829e77` (65 E2E, 10,9 min)
+valide seulement l'état documentaire précédent. La CI main technique `39770267137`
+a été interrompue après des retries du miroir Ubuntu Azure pendant l'installation,
+puis relancée au même SHA ; vérifier le résultat final séparément. Aucun de ces
+contrôles ne vaut recette humaine réussie. Actualiser CHANGELOG/STORY/reprise et
+la décision durable Notion, puis arrêter après ce seul lot.
+
 ## 6. Validation attendue
 
 - Unitaires : T6 différé ; T10 pronom/faux prénom contextualisé ; T11 nom explicite + accord naturel ; inquiétude émotionnelle sans refus ; refus explicites et sans « ne » ; « Je vais l’appeler… enfin non » ; extrait affirmatif choisi au milieu d’un refus ; oui hors contexte ; cible incohérente ; décision invalide/périmée ; offre révoquée et nouvelles versions.

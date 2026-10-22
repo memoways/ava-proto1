@@ -17,6 +17,26 @@ describe('P1 private intent and safe speech', () => {
     const {p} = parser(); p.push(header + '« Une phrase.'); expect(() => p.finish()).toThrow();
     expect(() => parser().p.finish()).toThrow(); const empty = parser(); empty.p.push(header); expect(() => empty.p.finish()).toThrow();
   });
+  it('consumes an optional terminal speech closing marker at every fragment boundary', () => {
+    const speech = 'Je vous écoute.';
+    const wire = header + speech + '\n</speech>\n';
+    for (let i = 0; i <= wire.length; i++) {
+      const {p, spoken} = parser();
+      p.push(wire.slice(0, i)); p.push(wire.slice(i));
+      expect(p.finish()).toBe(speech);
+      expect(spoken).toEqual([speech]);
+      expect(p.generated.trim()).toBe(speech);
+    }
+  });
+  it.each([
+    'Une phrase incomplète\n</speech>',
+    '« Une citation non fermée.\n</speech>',
+    'Bonjour.\n</speech> Autre phrase.',
+    'Bonjour.\n</speech><speech>',
+  ])('keeps malformed speech closed with a terminal marker: %s', speech => {
+    const {p} = parser();
+    expect(() => { p.push(header + speech); p.finish(); }).toThrow();
+  });
   it('holds abbreviations, decimal numbers and open quotations across fragments', () => {
     const {p,spoken} = parser(); p.push(header + 'M.'); expect(spoken).toEqual([]); p.push(' Munz dit « Je suis Emma.'); expect(spoken).toEqual([]);
     p.push(' » Il est 3.5 heures. '); expect(spoken).toEqual(['M. Munz dit « Je suis Emma. » Il est 3.5 heures.']); p.finish();

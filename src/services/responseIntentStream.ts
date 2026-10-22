@@ -89,6 +89,9 @@ export class ResponseIntentParser {
   }
   finish() {
     if (!this.intentValue) throw new Error('Missing response intent');
+    // Some models close the opening protocol marker. Consume only this exact
+    // terminal marker; sentence, quote, identity and structured-data guards follow.
+    this.pending = this.pending.replace(/\s*<\/speech>\s*$/, '');
     this.emit(true);
     if (this.pending.trim()) throw new Error('Incomplete response sentence or quote');
     if (!this.emitted.trim()) throw new Error('Empty response speech');
