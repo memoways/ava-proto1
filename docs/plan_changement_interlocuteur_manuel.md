@@ -836,6 +836,52 @@ sur haut-parleurs ; prochaine recette au casque pour comparer, après disponibil
 reconfirmée. Aucune session ouverte pendant l'attente, aucune publication avant
 résultat observable accepté. Reprise autonome actualisée avec toutes ces obligations.
 
+### Lot 4 — reprise du 22 octobre après #64
+
+Départ propre sur `codex/character-handoff-lot-4-handoff`, HEAD local/distant
+`90d443af10c6d6381a9528f4936afe8f4f08e1c2`, main `1d967ed` après fetch.
+La [PR #64](https://github.com/memoways/ava-proto1/pull/64) a été relue : quatre
+documents uniquement, deux revues indépendantes Standards/Spec sans constat.
+[CI 39781012004](https://github.com/memoways/ava-proto1/actions/runs/39781012004)
+verte sur ce HEAD exact : 753 unitaires, 41 intégrations, 48 régressions,
+lint/typecheck/build et 65 E2E (10,2 min). Fusion protégée par SHA dans
+`56f6b6220316d6a71eb0016ba1a4b4c2af4dcd30`, puis main local/distant propres.
+Lovable natif confirme ce même SHA, ready/agentFinished, workspace Memoways.
+[CI post-fusion 39821136410](https://github.com/memoways/ava-proto1/actions/runs/39821136410)
+en cours au démarrage de la recette ; résultat à relire avant clôture.
+
+Périmètre restant inchangé : nouvel appel Emma diagnostiqué dans Sandbox Ulrich,
+aller-retour humain et vérification sonore au casque, accepté par Ulrich avant
+toute publication produit. Ulrich confirme être prêt au casque. Réutiliser v7
+publiée, quota 8 / seuil 4 / pause 2 ; v6 archivée, production quota 1, aucun
+réglage modifié. Ne pas ouvrir d'appel pendant une attente de disponibilité.
+Branche de finalisation : `codex/character-handoff-lot-4-finalisation`, base
+`56f6b62`. Aucun nouveau code ni changement Cloud prévu sans défaut reproduit.
+En cas de défaut, conserver baseline/rouge/correction minimale/ciblés/qualité et
+E2E complets/deux revues/CI du HEAD exact. En fin de recette, fermer le contrôle,
+actualiser CHANGELOG/STORY/reprise et les seuls enseignements durables Notion.
+Arrêt après ce seul lot 4, aucun nouveau chat.
+
+Recette `2b30d900-b597-42c2-8fe9-6982a9dda51d`, 19:19:06–19:24:10
+Europe/Paris : clôturée user_hangup, Emma, compteur 0, v7, film vu,
+rôle/posture null. Ulrich confirme le son parfait/stable au casque et des accords
+entendus, sans pastille. Ceci ne prouve pas la cause acoustique de l'échec précédent.
+T7 porte la demande nommant Max, mais sa réponse est interrompue sans parole
+délivrée. T8 différé cite une cible pronominale et une origine T7 non ouverte.
+T10 puis T11 inventent une origine T8 avec une citation de T7 ; tous les contextes
+exacts ont openRequest=null. T11 livre un accord complet et le GM accept/max,
+mais le refus request_unresolved est conforme au contrat : aucune preuve valide
+ne permet de ressusciter cet ancien tour. Le JSON est complet, pas de troncature.
+
+Baseline : 102 tests contrat/état/GM verts. Périmètre du complément : rendre les
+sources de preuve du GM explicites (message courant lié à son ID/index exact,
+seule ancienne demande admissible openRequest), et distinguer confirmation
+courante sémantiquement liée au transfert d'une ancienne demande réinventée.
+Ne réparer ni identifiant ni citation d'une sortie invalide ; validateur,
+durée de deux messages, CAS, capture, modèle/appel/950 tokens/timeout inchangés.
+Les tests de prompt prouvent les données/instructions envoyées, pas la prochaine
+classification du modèle ; nouvelle recette humaine nécessaire après livraison.
+
 ## 6. Validation attendue
 
 - Unitaires : T6 différé ; T10 pronom/faux prénom contextualisé ; T11 nom explicite + accord naturel ; inquiétude émotionnelle sans refus ; refus explicites et sans « ne » ; « Je vais l’appeler… enfin non » ; extrait affirmatif choisi au milieu d’un refus ; oui hors contexte ; cible incohérente ; décision invalide/périmée ; offre révoquée et nouvelles versions.
