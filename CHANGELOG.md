@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Préparation — non publié] — 2026-10-22 — Switching, lot 4
+
+- État du lot 3 revérifié : clôture #60 fusionnée, CI de son HEAD exact et
+  CI main vertes sur `f01532b`, même révision synchronisée dans Lovable.
+- Qualité locale rejouée : 734 unitaires, 41 intégrations, 48 régressions,
+  lint/typecheck/build verts. 65/65 E2E locaux sans retry, un worker, 10,3 min. Preview humaine à vérifier.
+- V7 sandbox-ulrich activée depuis la v6 : quota8, seuil4/pause2 conservés et
+  seule mention textuelle du quota alignée ; production narrative inchangée.
+- Recette réelle : voix d'Emma confirmée, accord entendu, aucune offre ; contrat
+  GM nettoyé absent. Appel clôturé proprement, aucun transfert ni publication.
+- Correction locale du prompt GM : extension de preuve explicitement prioritaire
+  sur le schéma historique fermé, clé à la racine et accord courant distinct de
+  la suggestion future. Deux tests rouges puis 114 ciblés verts ; contrôles
+  complets et nouvelle recette diagnostiquée requis. Parseur et gardes inchangés.
+  La cible pronominale de cet appel interdit d'attribuer l'échec à une cause unique.
+- [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md) et
+  [reprise de finalisation du lot 4](docs/prompt_reprise_switch_personnages_finalisation_lot_4.md).
+
 ## [Non publié] — 2026-10-21 — Switching Emma ↔ Max, lot 3
 
 - Une pastille d'appel unique sous le personnage actif remplace la carte basse,
