@@ -23,6 +23,7 @@ interface NetworkFakeOptions {
   gmStance?: "accept" | "object" | "defer";
   gmHandoffAt?: number;
   gmHandoffTurns?: number[];
+  gmReferencedAssessment?: boolean;
   failGmAt?: number;
   delayGmMs?: number;
   characterReplies?: string[];
@@ -598,7 +599,11 @@ async function installNetworkFakes(
         const target = options.gmTarget ?? (handoffContext?.sourceCharacter === 'max' ? 'emma' : 'max');
         const reply = handoffContext?.delivery?.generated ?? '';
         const isProposal = !options.gmStance && gmTurn === (options.gmHandoffAt ?? -2) + 1;
-        const assessed = handoffContext && (options.gmStance || isProposal) ? {
+        const assessed = options.gmReferencedAssessment && handoffContext ? {
+          schemaVersion: 2, requestSource: isProposal ? 'spoken_proposal' : 'current_user',
+          targetCharacter: target, stance: options.gmStance ?? 'accept', refusal: false,
+          consentRef: handoffContext.speechEvidence[0]?.ref,
+        } : handoffContext && (options.gmStance || isProposal) ? {
           schemaVersion: 1, sourceCharacter: handoffContext.sourceCharacter, targetCharacter: target,
           turnId: handoffContext.turnId, turnIndex: handoffContext.turnIndex,
           orchestrationVersionId: handoffContext.orchestrationVersionId,
@@ -734,6 +739,26 @@ async function sendHandoffTurn(page: Page, text: string) {
 }
 
 for (const [character, target] of [["Emma", "Max"], ["Max", "Emma"]] as const) {
+  test(`preuve référencée : confirmation oui, offre persistée et reprise ${character} vers ${target}`, async ({ page }) => {
+    test.setTimeout(60_000);
+    const turns = [...HANDOFF_TURNS, 'Oui, je veux bien.'];
+    const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+      gmReferencedAssessment: true, gmStance: 'accept', gmHandoffAt: 4,
+      gmTarget: target.toLowerCase() as 'max' | 'emma', maxResponse: `D’accord, je te passe ${target} au téléphone.` });
+    await startCharacterConversation(page, character);
+    for (const text of turns) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+    await expect(page.getByRole('button', { name: `Appeler ${target}`, exact: true })).toBeVisible();
+    const proof = (fakes.getSessionRow().pending_handoff as { offer: { assessment: { schemaVersion: number; origin: { evidence: string }; targetEvidence: { speaker: string } } } }).offer.assessment;
+    expect(proof).toMatchObject({ schemaVersion: 1, origin: { evidence: 'Oui, je veux bien.' }, targetEvidence: { speaker: 'character' } });
+    await page.reload();
+    await page.getByRole('button', { name: 'Reprendre' }).click();
+    await expect(page.getByRole('button', { name: `Appeler ${target}`, exact: true })).toBeVisible();
+    await page.getByRole('button', { name: `Appeler ${target}`, exact: true }).click();
+    await expect(page.getByText('Appel en cours…', { exact: true })).toBeVisible();
+    await expect(page.getByRole('img', { name: `Portrait d’${target}` })).toBeVisible({ timeout: 10_000 });
+    expect(fakes.getSessionRow().handoff_count).toBe(1);
+    expect(fakes.getSessionInsertCount()).toBe(1);
+  });
   test(`appel GM : aucun bouton par défaut chez ${character}, accord au quatrième tour puis sonneries vers ${target}`, async ({ page }) => {
     test.setTimeout(50_000);
     const turns = [...HANDOFF_TURNS, `J'aimerais parler à ${target}, s'il te plaît.`];

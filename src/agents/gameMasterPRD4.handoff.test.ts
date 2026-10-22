@@ -80,7 +80,7 @@ describe("GM optional structured handoff compatibility", () => {
     expect(callLLMWithUsage).toHaveBeenCalledOnce();
   });
   it("prepares semantic instructions as an isolated artifact", () => {
-    expect(CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS).toContain('"refusalEvidence": null');
+    expect(CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS).toContain('"refusal":false');
     expect(CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS).toContain("accept|object|defer");
     expect(CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS).toContain("Aucun alias global Matt → Max");
     expect(CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS).toContain("réplique complète");
@@ -89,6 +89,25 @@ describe("GM optional structured handoff compatibility", () => {
 });
 
 describe('live same-call handoff context', () => {
+  it('materializes the heard T8 acceptance from references instead of model-copied quotes', async () => {
+    vi.clearAllMocks();
+    const fixture = validInput();
+    const reply = 'D’accord, je te passe Max au téléphone maintenant.';
+    fixture.userText = 'Oui, je veux bien.';
+    fixture.delivery = { ...fixture.delivery!, generated: reply, delivered: reply };
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ content: JSON.stringify({ ...historicalJson,
+      handoff_assessment: { schemaVersion: 2, requestSource: 'current_user', targetCharacter: 'max', stance: 'accept', refusal: false, consentRef: 'speech_0' },
+    }), ...llmMetadata });
+    const result = await evaluatePostTurnPRD4({ ...input, userMessage: fixture.userText, maxResponse: reply,
+      handoffContext: { turnId: fixture.turnId, openRequest: null, delivery: fixture.delivery } });
+    expect(result.handoff_assessment).toMatchObject({
+      schemaVersion: 1, turnId: fixture.turnId, turnIndex: fixture.turnIndex,
+      origin: { turnId: fixture.turnId, evidence: fixture.userText },
+      targetEvidence: { speaker: 'character', quote: 'Max' },
+      consent: { stance: 'accept', evidence: reply },
+    });
+    expect(validateCharacterHandoff({ ...fixture, evaluation: result }).authorized).toBe(true);
+  });
   it.each([null, {
     turnId: 'session:10', turnIndex: 10, expiresAfterTurnIndex: 12,
     userText: 'Je voudrais parler avec Max.', sourceCharacter: 'emma' as const,
@@ -164,7 +183,7 @@ describe("live handoff prompt contract over historical schemas", () => {
     const example = JSON.parse(extension.slice(start, extension.indexOf("\n}\n", start) + 2));
     const fixture = validInput();
     vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...llmMetadata,
-      content: JSON.stringify({ ...example, handoff_assessment: validAssessment() }),
+      content: JSON.stringify(example),
     });
     const result = await evaluatePostTurnPRD4({ ...input, handoffContext: {
       turnId: fixture.turnId, openRequest: null, delivery: fixture.delivery,
@@ -191,7 +210,9 @@ describe("live handoff prompt contract over historical schemas", () => {
       const end = extension.indexOf("\n}\n", start) + 2;
       const example = JSON.parse(extension.slice(start, end));
       // A model following the shown JSON must place the proof where the cleaner reads it.
-      expect(example).toHaveProperty("handoff_assessment.schemaVersion", 1);
+      expect(example).toHaveProperty("handoff_assessment.schemaVersion", 2);
+      expect(example.handoff_assessment).toEqual({ schemaVersion: 2, requestSource: 'current_user',
+        targetCharacter: 'max', stance: 'accept', refusal: false, consentRef: 'speech_0' });
       expect(example).not.toHaveProperty("schemaVersion");
       for (const key of Object.keys(historicalJson)) expect(example).toHaveProperty(key);
       expect(Object.keys(example).indexOf("handoff_assessment"))

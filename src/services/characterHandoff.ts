@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { DirectorAction, PRD4PostTurnEvaluation, RuntimeCharacter } from "@/types";
 import type { ResponseDeliveryReceipt } from "./responseDelivery";
 import type { CharacterHandoffAssessment } from "@/types/characterHandoff";
+import { safeSentenceEnd } from './responseIntentStream';
 export type { CharacterHandoffAssessment } from "@/types/characterHandoff";
 
 const character = z.enum(["max", "emma"]);
@@ -21,6 +22,68 @@ const assessmentSchema = z.object({
 export function cleanHandoffAssessment(raw: unknown): CharacterHandoffAssessment | null {
   const parsed = assessmentSchema.safeParse(raw);
   return parsed.success ? parsed.data as CharacterHandoffAssessment : null;
+}
+
+/** Wire v2 references first-party text; the persisted proof stays v1. */
+const referenceAssessmentSchema = z.object({
+  schemaVersion: z.literal(2),
+  requestSource: z.enum(['current_user', 'open_request', 'spoken_proposal']),
+  targetCharacter: character,
+  stance: z.enum(['accept', 'object', 'defer']),
+  refusal: z.boolean(),
+  consentRef: z.string().regex(/^speech_\d+$/),
+}).strict();
+
+/** Exact, turn-local references. Segmentation never rewrites the spoken text. */
+export function handoffSpeechEvidence(delivery: ResponseDeliveryReceipt | null) {
+  if (!delivery) return [];
+  const evidence: Array<{ ref: string; text: string; delivered: boolean }> = [];
+  let offset = 0;
+  for (const match of delivery.generated.matchAll(/[.!?…]+[»”"]*(?=\s|$)/gu)) {
+    const end = match.index + match[0].length;
+    if (safeSentenceEnd(delivery.generated.slice(offset, end), true) !== end - offset) continue;
+    const text = delivery.generated.slice(offset, end).trim();
+    if (text) evidence.push({ ref: `speech_${evidence.length}`, text, delivered: delivery.delivered.includes(text) });
+    offset = end;
+  }
+  return evidence;
+}
+
+export function materializeHandoffAssessment(
+  raw: unknown,
+  context: Pick<CharacterHandoffValidationInput, 'currentCharacter' | 'turnId' | 'turnIndex'
+    | 'orchestrationVersionId' | 'userText' | 'delivery' | 'openRequest'> | null,
+): CharacterHandoffAssessment | null {
+  // Historical proofs are validated verbatim, never repaired into new evidence.
+  if (!raw || typeof raw !== 'object' || (raw as { schemaVersion?: unknown }).schemaVersion !== 2)
+    return cleanHandoffAssessment(raw);
+  const parsed = referenceAssessmentSchema.safeParse(raw);
+  if (!parsed.success || !context?.orchestrationVersionId || !context.delivery) return null;
+  const decision = parsed.data;
+  const { delivery, openRequest } = context;
+  if (delivery.turnId !== context.turnId || delivery.turnIndex !== context.turnIndex
+    || delivery.character !== context.currentCharacter || !delivery.delivered.trim()
+    || delivery.status === 'unknown' || !delivery.generated.startsWith(delivery.delivered)) return null;
+  if (decision.requestSource === 'open_request' && !openRequest) return null;
+  const consent = handoffSpeechEvidence(delivery).find(item => item.ref === decision.consentRef);
+  if (!consent) return null;
+  const proposal = decision.requestSource === 'spoken_proposal';
+  const open = decision.requestSource === 'open_request' ? openRequest : null;
+  const originText = proposal ? delivery.delivered : open?.userText ?? context.userText;
+  const name = new RegExp(`\\b${decision.targetCharacter}\\b`, 'i');
+  const userTarget = !proposal && originText.match(name);
+  const spokenTarget = delivery.delivered.match(name);
+  const targetMatch = userTarget || spokenTarget;
+  if (!targetMatch) return null;
+  return cleanHandoffAssessment({
+    schemaVersion: 1, sourceCharacter: context.currentCharacter, targetCharacter: decision.targetCharacter,
+    turnId: context.turnId, turnIndex: context.turnIndex, orchestrationVersionId: context.orchestrationVersionId,
+    origin: { type: proposal ? 'gm_proposal' : 'player_request', turnId: open?.turnId ?? context.turnId,
+      turnIndex: open?.turnIndex ?? context.turnIndex, evidence: originText },
+    targetEvidence: { speaker: userTarget ? 'user' : 'character', quote: targetMatch[0] },
+    consent: { stance: decision.stance, evidence: consent.text,
+      refusalEvidence: decision.refusal ? delivery.generated : null },
+  });
 }
 
 export interface CharacterHandoffValidationInput {

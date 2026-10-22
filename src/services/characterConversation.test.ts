@@ -74,6 +74,9 @@ describe("characterConversation", () => {
       expect(guidance).toContain("chacun reste de son côté");
       expect(guidance).toContain("sans rester à côté");
       expect(guidance).toContain("sans écouter la conversation");
+      expect(guidance).toContain('règles internes silencieuses');
+      expect(guidance).toContain('une seule annonce brève');
+      expect(guidance).toContain("Ne répète pas que tu n'écouteras pas");
       expect(guidance).toContain("accepter, objecter ou hésiter");
       expect(guidance).toContain("N'exécute pas le transfert toi-même");
     },
