@@ -133,6 +133,12 @@ acoustiques ensuite rejetés. Ulrich confirme l'écoute sur haut-parleurs : reto
 acoustique plausible, à comparer au casque. Aucun nouveau réglage ni succès
 humain prétendu.
 L'appel est clôturé user_hangup, Emma, compteur zéro ; preview à l'accueil.
+#63 est ensuite fusionnée à 14:29:48 dans `1d967ed`, après CI `39776598519`
+verte sur `03f517e` exact (65 E2E, 10,9 min). Main local/distant propres et
+Lovable même SHA ready/agentFinished ; la preview rechargée sert `index-9btHN-X9.js`
+à l'accueil, aucun appel actif. CI post-fusion [39778810723](https://github.com/memoways/ava-proto1/actions/runs/39778810723) **verte sur le SHA exact 1d967ed465d9bc93b5d48088d917c78937e36d37**, avec 65 E2E réussis en 10,3 min.
+La décision durable est sauvegardée et relue dans Notion ; la reprise après
+fusion conserve la recette restante et interdit toute publication avant acceptation.
 [Plan](docs/plan_changement_interlocuteur_manuel.md) et
 [reprise du seul lot 4](docs/prompt_reprise_switch_personnages_finalisation_lot_4.md).
 
