@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-22 (lot 4 en préparation ; recette humaine et publication en attente)
+> **Last Updated**: 2026-10-22 (lot 4 partiel ; correctif livré, recette humaine et publication en attente)
 
 ---
 
@@ -73,21 +73,24 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ## Feature Chronicle
 
-### 2026-10-22 — Switching, lot 4 : préparer une preuve humaine
+### 2026-10-22 — Switching, lot 4 : confronter les simulations à la parole
 
-Le main réel inclut la clôture #60 du lot 3, dont les CI pré- et post-fusion
-sont vertes ; Lovable sert la même révision synchronisée. La qualité locale
-repasse avec 734 unitaires, 41 intégrations et 48 régressions. Les 65 E2E passent sans retry, mais la recette humaine révèle une autre
-limite : Ulrich entend l'accord d'Emma, aucune pastille ne paraît ; le GM
-retourne accept/max avec action none et sans contrat exploitable. L'appel
-est clôturé sans transfert. La revue du prompt trouve une contradiction :
-objet historique fermé contre extension dite optionnelle. Deux tests rouges
-puis verts fixent ce contrat, sans assouplir le parseur ni les gardes. Comme
-le dernier échange était pronominal, ce conflit n'est pas annoncé comme sa
-cause exclusive ; une nouvelle recette diagnostiquée reste nécessaire.
-La v7 sandbox est activée à quota 8, avec seuil 4 et pause 2 conservés depuis la v6 ;
-la production narrative garde ses réglages. Aucune publication produit à ce
-stade. [Plan](docs/plan_changement_interlocuteur_manuel.md) et
+La clôture #60 du lot 3 est vérifiée sur main et dans Lovable ; les 65 E2E
+repassent. La v7 sandbox porte le quota à 8 en gardant seuil 4 et pause 2.
+La recette humaine révèle une limite : Ulrich entend l'accord d'Emma, mais
+aucune pastille ne paraît. Le GM renvoie accept/max, action none et aucun
+contrat exploitable. L'appel est clôturé sans transfert. L'échange final étant
+pronominal, aucune cause unique n'est affirmée.
+
+La revue du prompt établit une contradiction entre l'objet historique fermé
+et l'extension dite optionnelle. Deux tests rouges puis verts corrigent ce
+contrat, sans assouplir parseur ou gardes. La [PR #61](https://github.com/memoways/ava-proto1/pull/61)
+livre `180e018` après CI verte sur le HEAD exact `0562abe` : 736 unitaires,
+41 intégrations, 48 régressions et 65 E2E. Main et Lovable sont synchronisés ;
+la décision durable est relue dans Notion. Un nouvel appel diagnostiqué reste
+sans échange et est clôturé proprement, micro fermé. Le lot 4 reste partiel :
+recette bidirectionnelle humaine et publication après acceptation à réaliser.
+[Plan](docs/plan_changement_interlocuteur_manuel.md) et
 [reprise du seul lot 4](docs/prompt_reprise_switch_personnages_finalisation_lot_4.md).
 
 ### 2026-10-21 — Switching, lot 3 : rendre le passage visible en haut

@@ -4,23 +4,25 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
-## [Préparation — non publié] — 2026-10-22 — Switching, lot 4
+## [Lot 4 partiel — non publié] — 2026-10-22 — Switching Emma ↔ Max
 
-- État du lot 3 revérifié : clôture #60 fusionnée, CI de son HEAD exact et
-  CI main vertes sur `f01532b`, même révision synchronisée dans Lovable.
-- Qualité locale rejouée : 734 unitaires, 41 intégrations, 48 régressions,
-  lint/typecheck/build verts. 65/65 E2E locaux sans retry, un worker, 10,3 min. Preview humaine à vérifier.
-- V7 sandbox-ulrich activée depuis la v6 : quota8, seuil4/pause2 conservés et
+- Lot 3 et clôture #60 vérifiés : main `f01532b`, CI pré/post vertes,
+  même révision dans Lovable ; baseline locale et 65 E2E sans retry verts.
+- V7 sandbox-ulrich activée depuis v6 : quota 8, seuil 4/pause 2 conservés,
   seule mention textuelle du quota alignée ; production narrative inchangée.
-- Recette réelle : voix d'Emma confirmée, accord entendu, aucune offre ; contrat
-  GM nettoyé absent. Appel clôturé proprement, aucun transfert ni publication.
-- Correction locale du prompt GM : extension de preuve explicitement prioritaire
-  sur le schéma historique fermé, clé à la racine et accord courant distinct de
-  la suggestion future. Deux tests rouges puis 114 ciblés verts ; contrôles
-  complets et nouvelle recette diagnostiquée requis. Parseur et gardes inchangés.
-  La cible pronominale de cet appel interdit d'attribuer l'échec à une cause unique.
+- Recette humaine : voix d'Emma et accord entendus, aucune offre ; GM accept/max,
+  action none et contrat nettoyé null. Appel clôturé, compteur 0. Échange
+  pronominal : aucune cause exclusive affirmée.
+- Contrat du prompt GM corrigé : extension prioritaire sur le schéma historique
+  fermé, clé à la racine et accord courant distingué d'une suggestion future.
+  Parseur historique et gardes inchangés. Deux tests rouges puis 114 ciblés verts.
+- [#61](https://github.com/memoways/ava-proto1/pull/61) livre `180e018` après
+  CI verte sur le HEAD exact `0562abe` : 736 unitaires, 41 intégrations,
+  48 régressions et 65 E2E ; local 65/65 sans retry, deux revues sans constat.
+  Main synchronisé dans Lovable, nouvelle recette diagnostiquée non effectuée
+  faute d'échange ; contrôle fermé proprement. Aucun produit publié.
 - [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md) et
-  [reprise de finalisation du lot 4](docs/prompt_reprise_switch_personnages_finalisation_lot_4.md).
+  [reprise de finalisation du seul lot 4](docs/prompt_reprise_switch_personnages_finalisation_lot_4.md).
 
 ## [Non publié] — 2026-10-21 — Switching Emma ↔ Max, lot 3
 
