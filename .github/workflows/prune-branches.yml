@@ -1,0 +1,38 @@
+name: Nettoyage des branches
+
+# Règle « zéro branche qui traîne » (AGENTS.md) : à la fermeture de toute PR
+# (fusionnée ou non), chaque lundi, et à la demande, les branches terminées sont supprimées.
+# Les branches avec du travail non rattaché à une PR ne sont jamais supprimées : avertissement.
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Simulation seule (ne supprime rien)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: prune-branches
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Supprimer les branches terminées
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: .github/scripts/prune-branches.sh

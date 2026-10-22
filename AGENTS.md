@@ -26,6 +26,43 @@ Le seul dépôt distant est `https://github.com/memoways/ava-proto1`.
 - À la fin du lot, le travail va sur GitHub par la branche et la PR. Le dossier
   visible du projet reste le checkout canonique.
 
+## Fin de lot : tout va jusqu'au bout, zéro branche qui traîne (obligatoire)
+
+Décision d'Ulrich, définitive, applicable à tout agent et tout outil (Claude, Codex,
+Cursor, Lovable, autres). Ne jamais attendre qu'il la répète, ne jamais demander s'il faut
+« nettoyer après ».
+
+**Un lot n'est TERMINÉ que lorsque tout ceci est vrai et vérifié :**
+
+1. Le code est dans `main` sur GitHub, par PR, après CI **verte sur le HEAD exact**
+   de la PR. Interdit de fusionner tant que `regression-gates` est `queued`,
+   `in_progress` ou rouge : attendre, ou relancer une fois ; ne jamais fusionner « en espérant ».
+2. La CI de `main` est verte sur le commit de fusion (E2E compris). Si elle est rouge :
+   corriger tout de suite ou revenir en arrière ; ne jamais laisser `main` cassé.
+3. La branche du lot est supprimée (distante et locale) et sa PR est fermée ou fusionnée.
+   Aucune branche, aucun brouillon, aucune PR ouverte ne reste après un lot.
+4. Le compte rendu final dit, vérifié par lecture de GitHub : SHA de `main`, CI de `main`,
+   liste des branches restantes (attendu : seulement `main`).
+
+**Règles de conduite associées :**
+
+- **Une seule branche par lot, créée depuis `main` à jour.** Avant de commencer, lister les
+  branches et PR ouvertes (`git fetch --prune`, `gh pr list`) : terminer, absorber ou fermer
+  l'existant avant d'ouvrir du neuf. Pas de travail parallèle sur les mêmes fichiers.
+- **Ne jamais fermer une PR ni supprimer une branche qui contient du travail absent de
+  `main`** sans l'avoir d'abord porté dans `main` (ou sans accord explicite d'Ulrich).
+- **Ne jamais laisser une PR en brouillon « pour plus tard ».** Soit elle est finie et fusionnée,
+  soit elle est fermée avec son travail porté ailleurs.
+- **Autorisation durable :** fusionner dans `main` une PR dont la CI est verte sur le HEAD exact
+  est autorisé sans redemander. Cela ne publie pas : la **publication de production via Lovable
+  reste une étape distincte**, annoncée comme telle (local ≠ GitHub ≠ staging ≠ production).
+- **Si une étape ne peut pas être faite** (droit refusé, CI bloquée, conflit non résolu) :
+  le lot n'est PAS terminé. Le dire en tête du compte rendu, avec l'unique action précise
+  que doit faire Ulrich. Ne jamais écrire « terminé » avec des branches ou PR qui restent.
+- Filet automatique : `.github/workflows/prune-branches.yml` supprime les branches terminées
+  à la fermeture de chaque PR et chaque lundi. Il ne remplace pas la règle : l'agent supprime
+  lui-même sa branche et le vérifie.
+
 ## Documentation des plans (obligatoire)
 
 - Tout plan produit ou approuvé pour ce dépôt doit être enregistré dans `docs/`
