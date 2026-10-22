@@ -57,6 +57,21 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   après acceptation toujours requis. V7 sandbox 8/4/2 relue sans modification,
   production narrative à quota 1. Reprise autonome actualisée pour ce seul lot.
 
+- Nouvelle recette humaine `98c8a4c4` clôturée sans transfert : T7 complet mais
+  preuve de cible « lui » refusée request_unresolved ; T8 échoue sur un marqueur
+  terminal `</speech>`, 61 tokens, aucun sample joué. Variations de volume
+  signalées par Ulrich ; candidats acoustiques rejetés/repris observés, cause
+  acoustique exclusive non établie. Écoute sur haut-parleurs confirmée ; comparaison
+  au casque restante. Aucune recette sonore acceptée.
+- Complément #63, `6d9af38` : procédure « chacun reste de son côté » partagée
+  GM/personnages et toujours injectée, sans présence à côté ni écoute après
+  transfert. Le parseur consomme seulement la fermeture terminale optionnelle,
+  en conservant ses gardes. Pas de changement de capture/voix/provider/budget.
+- Trois puis huit reproductions rouges, **118 ciblés verts**, qualité **753
+  unitaires / 41 intégrations / 48 régressions**, lint/typecheck/build verts.
+  65/65 E2E locaux sans retry en 10,3 min. Nouvelle CI verte du HEAD exact requise avant fusion ;
+  la CI verte de 0829e77 décrit seulement la documentation précédente.
+
 ## [Non publié] — 2026-10-21 — Switching Emma ↔ Max, lot 3
 
 - Une pastille d'appel unique sous le personnage actif remplace la carte basse,

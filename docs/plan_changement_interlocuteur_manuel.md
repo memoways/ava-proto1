@@ -757,7 +757,7 @@ Aucun accord forcé ni alias/pronom résolu par regex n'est autorisé.
 
 T8 : demande nommant Max, puis **échec de finalisation de réponse** avant son.
 La capture d'Ulrich montre `Incomplete response sentence or quote`. Reçu natif
-persisté : texte terminé avec ponctuation, suivi de **\n</speech>** ; delivered
+persisté : texte terminé avec ponctuation, suivi de `\n</speech>` ; delivered
 vide, playedSamples/scheduledSamples=0, statut failed. La génération personnage
 est completed à **61 tokens**, loin du budget : aucune troncature établie.
 Le parseur privé/parole laisse ce marqueur de fermeture final dans pending et
@@ -767,8 +767,9 @@ Périmètre du complément : renforcer le contrat téléphonique partagé/person
 avec la séparation physique et la confidentialité explicites, injectées dans chaque
 prompt personnage (y compris sans demande nommée ni guidance GM), en invariant de
 procédure distinct du cadre éditorial experienceFrame ; consommer uniquement
-une fermeture de protocole terminale optionnelle `</speech>` au parseur, après
-validation de phrases complètes, sans jamais envoyer ce tag au TTS. Rejeter toujours
+une fermeture de protocole terminale optionnelle `</speech>` au parseur, avant
+les gardes de fin de réponse, qui exigent toujours des phrases complètes, sans
+jamais envoyer ce tag au TTS. Rejeter toujours
 phrase/citation incomplète, identité étrangère, contenu structuré ou texte après
 fermeture. Aucun nouveau modèle, appel LLM, budget, provider, voix ou réglage Cloud.
 Les décisions de capture et d'interruption restent hors de ce correctif parser.
@@ -784,6 +785,8 @@ Cela établit un mécanisme possible de la coupure de ce tour, **pas** une mesur
 niveau acoustique ni la cause exclusive des variations. Ne pas modifier les seuils
 ou la capture sans reproduction et application du plan latence §3. Ce défaut
 perçu reste une limite de recette tant qu'il n'est pas diagnostiqué et accepté.
+Ulrich confirme une écoute **sur haut-parleurs** ; un retour audio dans le micro
+est plausible, sans être prouvé. Comparer au casque avant tout réglage.
 
 La PR #63, encore ouverte, recevra ce complément du même lot, avec nouveau titre,
 preuves rouge/vert, qualité/E2E complets, deux revues indépendantes et **nouvelle CI
@@ -793,6 +796,17 @@ a été interrompue après des retries du miroir Ubuntu Azure pendant l'installa
 puis relancée au même SHA ; vérifier le résultat final séparément. Aucun de ces
 contrôles ne vaut recette humaine réussie. Actualiser CHANGELOG/STORY/reprise et
 la décision durable Notion, puis arrêter après ce seul lot.
+
+Complément préparé dans **6d9af383b55aaa43d571504d5ac55a40d5b7de38** :
+constante de procédure partagée toujours injectée dans les quatre variantes,
+prioritaire sur une guidance GM contraire ; marqueur terminal consommé au parseur,
+GM_CODE_VERSION séparée. Trois tests rouges puis huit injections rouges, **118
+ciblés verts**, qualité finale **753 unitaires, 41 intégrations, 48 régressions**,
+lint/typecheck/build verts. 65/65 E2E locaux sans retry en 10,3 min. Revues Standards sans constat ;
+contrôle Spec supplémentaire de guidance contraire ajouté, quatre variantes vertes.
+La CI post-fusion technique 39770267137 est désormais **verte (tentative 2)** sur
+019c6b5 ; la nouvelle CI de #63 doit valider son nouveau HEAD exact. Les variantes
+sonores et le transfert humain restent non validés ; pas de publication produit.
 
 ## 6. Validation attendue
 

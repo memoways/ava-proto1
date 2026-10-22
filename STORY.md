@@ -119,6 +119,20 @@ ouvert ; la mémoire durable est actualisée et relue dans Notion. #63 conserve
 la clôture documentaire et la reprise autonome.
 La finalisation technique est livrée. La recette humaine et la publication après
 acceptation restent ouvertes ; aucun nouvel appel n'est lancé pendant l'attente.
+La nouvelle recette du 22 octobre à 13:41–13:51 confirme que le lot reste
+incomplet : aucune pastille, une réponse parlant de rester à côté de Max, puis
+une erreur de finalisation. Ulrich précise que chacun reste de son côté : seul
+l'appel est transmis. Le reçu montre une réponse ponctuée suivie de `</speech>`,
+61 tokens et aucun son joué ; le marqueur explique ce rejet précis du parseur.
+Le complément 6d9af38 rend la procédure toujours présente dans les prompts et
+consomme cette fermeture terminale sans supprimer les gardes. Trois puis huit
+reproductions rouges précèdent la correction ; 118 ciblés et la qualité complète
+(753/41/48) sont verts. 65/65 E2E locaux sans retry en 10,3 min. Les variations de volume restent
+non résolues : la télémétrie montre des atténuations/suspensions de candidats
+acoustiques ensuite rejetés. Ulrich confirme l'écoute sur haut-parleurs : retour
+acoustique plausible, à comparer au casque. Aucun nouveau réglage ni succès
+humain prétendu.
+L'appel est clôturé user_hangup, Emma, compteur zéro ; preview à l'accueil.
 [Plan](docs/plan_changement_interlocuteur_manuel.md) et
 [reprise du seul lot 4](docs/prompt_reprise_switch_personnages_finalisation_lot_4.md).
 
