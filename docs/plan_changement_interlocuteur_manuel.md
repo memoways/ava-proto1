@@ -654,6 +654,160 @@ Clôture à fusionner seulement après CI verte
 sur son propre HEAD exact, puis recontrôler main et synchronisation Lovable.
 Le prochain assistant part du main réel après fetch, sans restaurer ces hashes.
 
+### Lot 4 — finalisation technique reprise le 22 octobre 2026
+
+Départ vérifié dans le checkout canonique : branche
+`codex/character-handoff-lot-4-closeout`, propre, HEAD local/distant
+`e44e924305b750b5fad4bdd026ffc5e422f60ac3`, PR #62 ouverte ; main
+`180e018714f1916ffe32df9a94df1906b1ee209b`. Identité GitHub existante
+Ulrfis confirmée par requête authentifiée ; pas de GitHub App configurée,
+aucune reconnexion ni substitution. Workspace Notion canonique vérifié par
+fetch(self), About/règles/mémoire AVA et sources application/PRD consultés.
+
+Aucun nouveau changement produit n'a été nécessaire dans cette reprise.
+`npx vitest run src/components/LatencyBlockingTab.test.tsx` : **8/8 verts**.
+Puis qualité locale complète séquentielle : **744 unitaires, 41 intégrations,
+48 régressions**, lint sans erreur, typecheck et build verts. Avertissements
+hooks/bundle préexistants conservés. L'ancien log rouge est conservé : au
+moment de l'assertion future-video, la session était chargée et **0 sélectionnée**.
+La sélection automatique est appliquée dans un effet après le rendu de la liste ;
+une course entre l'attente du bouton et cette sélection est donc plausible.
+La cause exclusive n'est pas reproduite ni prétendue corrigée. Composant et test
+LatencyBlockingTab inchangés ; aucune assertion affaiblie ni échec masqué.
+Logs locaux de reprise : `/tmp/ava-lot4-latency-baseline.log`,
+`/tmp/ava-lot4-quality-reprise.log` et `/tmp/ava-lot4-e2e-reprise.log` ; ce sont
+les résultats du dépôt et de GitHub qui restent les preuves durables.
+
+**65/65 E2E locaux sans retry, un worker, Chromium/Firefox/WebKit, 10,1 min**.
+Premier lancement arrêté avant tout test par listen EPERM ; relance avec accès
+système autorisé, sans changement de configuration ni délai.
+
+Deux revues indépendantes **Standards et Spec** sur
+`180e018...e44e924` : **aucun constat technique restant**, consommateurs,
+nettoyeur, mémoire, reprise et fixture inclus. Elles confirment le contrat
+partagé de transfert téléphonique, le format complet/action proposalGuidance,
+la différence absence/proposition relationnelle invalide et le refus prioritaire.
+Elles ne prouvent pas la réponse du modèle réel ni un son entendu.
+[CI pré-fusion 39742163075](https://github.com/memoways/ava-proto1/actions/runs/39742163075)
+**verte sur le HEAD exact e44e924305b750b5fad4bdd026ffc5e422f60ac3** :
+744 unitaires, 41 intégrations, 48 régressions et **65 E2E sans retry en 11,1 min**.
+La vérification du HEAD PR, du SHA du run et de tous les checks précède la
+fusion protégée par ce SHA ; l'ancienne CI rouge n'est pas la preuve de livraison.
+
+[PR #62](https://github.com/memoways/ava-proto1/pull/62) fusionnée le
+22 octobre à **13:23:51 Europe/Paris**, merge
+`019c6b5e7f044ce29f7defe538bca5aa1bc61e7f`. Après fetch, main local/distant
+identiques et propres. Lovable natif confirme ce même SHA, projet ready,
+agentFinished=true, workspace Memoways vérifié. Code synchronisé ; aucune
+nouvelle publication produit. [CI post-fusion 39770267137](https://github.com/memoways/ava-proto1/actions/runs/39770267137)
+lancée sur ce merge ; son résultat est contrôlé séparément avant la clôture
+finale et doit être relu au prochain départ. La branche documentaire
+`codex/character-handoff-lot-4-validation-closeout` ([PR #63](https://github.com/memoways/ava-proto1/pull/63)) part de ce main et ne porte
+que CHANGELOG/STORY/plan/reprise ; sa propre CI du HEAD exact reste obligatoire
+avant sa fusion. Le relevé de reprise référence le code technique, ses commits
+documentaires suivent sans restaurer une ancienne révision.
+
+Contrôle visuel après synchronisation : accueil AVA et bouton Commencer visibles
+sur la preview native du projet, bundle DOM **index-B8-jekyY.js** ; URL
+[preview Sandbox Ulrich](https://id-preview--1265958d-b74e-40f2-917d-182fe05163fc.lovable.app/?env=sandbox-ulrich&diagnostic=full).
+Aucun appel lancé ni microphone ouvert. Ce contrôle d'accueil ne prouve pas la
+pastille en conversation ni un accord humain. La mémoire AVA Notion a été relue,
+le contrat compact et la distinction relation absente/invalide intégrés à la
+décision existante, puis l'écriture vérifiée ; Source conservée, Last updated by=Codex.
+
+Relecture native Lovable Cloud : v7 sandbox-ulrich
+`98145fe3-96f1-4525-84c2-0e0a1cc5c6da` toujours publiée, source v6 archivée,
+quota **8**, seuil **4**, pause **2**. Autres champs config identiques à v6,
+seule mention du quota dans le prompt changée ; production narrative v1 toujours
+publiée à quota **1**. Aucune nouvelle configuration, migration, Edge Function,
+voix, capture, provider ou publication produit pendant cette reprise.
+
+**Reste humain du seul lot 4 :** quand Ulrich est prêt, nouvel appel Emma en
+preview, Sandbox Ulrich, diagnostic=full. Après les échanges narratifs requis,
+une demande unique nommant Max, accord réellement entendu, JSON brut complet,
+preuve délivrée, offre, clic, sonneries, Max audible ; retour Emma après pause et
+nouvel accord. Contrôler session/timer/film/rôle/posture, profils/voix, compteur
+et mémoires privées. Fermer les appels de contrôle. Aucun appel ouvert pendant
+l'attente de disponibilité. Publier le produit exclusivement via Lovable après
+résultat observable accepté, puis vérifier le frontend servi sans redéploiement
+de sondage. Les simulations vertes ne clôturent pas cette recette.
+
+CHANGELOG, STORY et [reprise autonome de finalisation du seul lot 4](prompt_reprise_switch_personnages_finalisation_lot_4.md)
+actualisés. Aucun lot 5 ni nouveau chat lancé. Les états de livraison sont
+séparés : code testé/livré/synchronisé ; expérience humaine non validée ; produit
+non republié. Les décisions durables restent dans la mémoire AVA Notion,
+Source conservée et Last updated by=Codex, sans état temporaire ni transcript.
+
+### Lot 4 — nouvelle recette humaine et défauts à finaliser, 22 octobre 2026
+
+Session `98c8a4c4-b2c9-474b-8d83-d6db2e599393`, **13:41:12–13:51:07
+Europe/Paris**, preview `index-B8-jekyY.js`, v7 sandbox-ulrich, diagnostic complet,
+film vu, rôle/posture null. Clôture user_hangup relue, Emma et compteur **0** ;
+preview rendue à l'accueil, micro fermé. Ulrich confirme cinq échanges, des
+variations de volume/coupures gênant la compréhension, puis aucune pastille.
+Aucun aller-retour ni résultat audible accepté ; aucune publication produit.
+
+T7 : le GM brut est **complet**, 686 tokens sur 950. Il classe accept et recommande
+Max en citant « Je peux lui demander, si tu veux » ; targetEvidence ne cite que
+« lui ». Le validateur refuse **request_unresolved** : aucune offre. La réplique
+promet de rester près de Max. Ulrich précise explicitement la règle : **chacun
+reste de son côté, seul l'appel est transmis** ; aucune venue, présence à côté,
+écoute de l'échange opposé ni conférence. Cette précision prime toute guidance GM.
+Aucun accord forcé ni alias/pronom résolu par regex n'est autorisé.
+
+T8 : demande nommant Max, puis **échec de finalisation de réponse** avant son.
+La capture d'Ulrich montre `Incomplete response sentence or quote`. Reçu natif
+persisté : texte terminé avec ponctuation, suivi de `\n</speech>` ; delivered
+vide, playedSamples/scheduledSamples=0, statut failed. La génération personnage
+est completed à **61 tokens**, loin du budget : aucune troncature établie.
+Le parseur privé/parole laisse ce marqueur de fermeture final dans pending et
+lève l'erreur à finish. Reproduction locale à ajouter **avant** correction.
+
+Périmètre du complément : renforcer le contrat téléphonique partagé/personnage/GM
+avec la séparation physique et la confidentialité explicites, injectées dans chaque
+prompt personnage (y compris sans demande nommée ni guidance GM), en invariant de
+procédure distinct du cadre éditorial experienceFrame ; consommer uniquement
+une fermeture de protocole terminale optionnelle `</speech>` au parseur, avant
+les gardes de fin de réponse, qui exigent toujours des phrases complètes, sans
+jamais envoyer ce tag au TTS. Rejeter toujours
+phrase/citation incomplète, identité étrangère, contenu structuré ou texte après
+fermeture. Aucun nouveau modèle, appel LLM, budget, provider, voix ou réglage Cloud.
+Les décisions de capture et d'interruption restent hors de ce correctif parser.
+Confiance préalable 95 % : reçu brut T8 et erreur identiques, test local de fermeture
+rouge, deux guidances de séparation rouges, parseur et constante uniques réutilisés,
+aucune API externe/dépendance nouvelle. Contrat ECMAScript natif de chaîne et
+patterns de nettoyage déjà utilisés par le parseur GM ; budget et points d'injection
+existants vérifiés. Tester aussi les quatre variantes et la guidance GM contraire.
+
+Volume : télémétrie T7 montre un candidat acoustique, atténuation à 5 691 ms,
+suspension à 5 811 ms, rejet et reprise à 7 091 ms (pause logicielle de 1 280 ms).
+Cela établit un mécanisme possible de la coupure de ce tour, **pas** une mesure de
+niveau acoustique ni la cause exclusive des variations. Ne pas modifier les seuils
+ou la capture sans reproduction et application du plan latence §3. Ce défaut
+perçu reste une limite de recette tant qu'il n'est pas diagnostiqué et accepté.
+Ulrich confirme une écoute **sur haut-parleurs** ; un retour audio dans le micro
+est plausible, sans être prouvé. Comparer au casque avant tout réglage.
+
+La PR #63, encore ouverte, recevra ce complément du même lot, avec nouveau titre,
+preuves rouge/vert, qualité/E2E complets, deux revues indépendantes et **nouvelle CI
+verte du HEAD exact avant fusion**. Sa CI verte sur `0829e77` (65 E2E, 10,9 min)
+valide seulement l'état documentaire précédent. La CI main technique `39770267137`
+a été interrompue après des retries du miroir Ubuntu Azure pendant l'installation,
+puis relancée au même SHA ; vérifier le résultat final séparément. Aucun de ces
+contrôles ne vaut recette humaine réussie. Actualiser CHANGELOG/STORY/reprise et
+la décision durable Notion, puis arrêter après ce seul lot.
+
+Complément préparé dans **6d9af383b55aaa43d571504d5ac55a40d5b7de38** :
+constante de procédure partagée toujours injectée dans les quatre variantes,
+prioritaire sur une guidance GM contraire ; marqueur terminal consommé au parseur,
+GM_CODE_VERSION séparée. Trois tests rouges puis huit injections rouges, **118
+ciblés verts**, qualité finale **753 unitaires, 41 intégrations, 48 régressions**,
+lint/typecheck/build verts. 65/65 E2E locaux sans retry en 10,3 min. Revues Standards sans constat ;
+contrôle Spec supplémentaire de guidance contraire ajouté, quatre variantes vertes.
+La CI post-fusion technique 39770267137 est désormais **verte (tentative 2)** sur
+019c6b5 ; la nouvelle CI de #63 doit valider son nouveau HEAD exact. Les variantes
+sonores et le transfert humain restent non validés ; pas de publication produit.
+
 ## 6. Validation attendue
 
 - Unitaires : T6 différé ; T10 pronom/faux prénom contextualisé ; T11 nom explicite + accord naturel ; inquiétude émotionnelle sans refus ; refus explicites et sans « ne » ; « Je vais l’appeler… enfin non » ; extrait affirmatif choisi au milieu d’un refus ; oui hors contexte ; cible incohérente ; décision invalide/périmée ; offre révoquée et nouvelles versions.

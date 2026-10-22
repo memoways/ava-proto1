@@ -29,6 +29,7 @@ import { loadCharacterPrompt } from "@/services/characterPromptService";
 import { getGameplaySettings, getLLMSettings } from "@/services/settingsService";
 import { callLLMWithUsage, streamLLM } from "@/services/openRouterLLM";
 import { ResponseIntentParser, SPEECH_BOUNDARY } from "@/services/responseIntentStream";
+import { CHARACTER_CALL_TRANSFER_INSTRUCTIONS } from "@/services/characterConversation";
 import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
 import { buildMaxSystemPrompt, simulateMaxResponse } from "./maxAgent";
 
@@ -87,6 +88,7 @@ describe("identity lock across prompt variants", () => {
     expect(trace.finalSystemPrompt.startsWith("# IDENTITÉ ACTIVE")).toBe(true);
     expect(trace.finalSystemPrompt).toContain("Tu es Emma Munz");
     expect(trace.finalSystemPrompt).not.toMatch(/Tu es Max\b/);
+    expect(trace.finalSystemPrompt).toContain(CHARACTER_CALL_TRANSFER_INSTRUCTIONS);
     expect(trace.baseSource.characterId).toBe(contexts.emma.characterId);
   });
 
@@ -98,6 +100,7 @@ describe("identity lock across prompt variants", () => {
 
     expect(trace.finalSystemPrompt).toContain("Tu es Max Lorenzo");
     expect(trace.finalSystemPrompt).not.toMatch(/Tu es Emma\b/);
+    expect(trace.finalSystemPrompt).toContain(CHARACTER_CALL_TRANSFER_INSTRUCTIONS);
     expect(trace.baseSource.characterId).toBe(contexts.max.characterId);
   });
 
@@ -124,6 +127,20 @@ describe("identity lock across prompt variants", () => {
     expect(trace.finalSystemPrompt.startsWith("# IDENTITÉ ACTIVE")).toBe(true);
     expect(trace.finalSystemPrompt).toContain("Tu es Emma Munz");
     expect(trace.finalSystemPrompt).toContain("INTERDIT_IDENTITAIRE_TEMOIN");
+    expect(trace.finalSystemPrompt).toContain(CHARACTER_CALL_TRANSFER_INSTRUCTIONS);
+  });
+
+  it.each(variants)("keeps the transfer procedure prior to contrary GM guidance in %s", async (variant) => {
+    vi.mocked(getGameplaySettings).mockReturnValue({ MAX_PROMPT_VARIANT: variant } as never);
+    vi.mocked(loadCharacterPrompt).mockResolvedValue(sheet("emma") as never);
+    const guidance = "Reste près de Max pendant son échange avec le joueur.";
+    const trace = await buildMaxSystemPrompt({ ...input, gmGuidance: { guidance } }, "Emma Munz", contexts.emma);
+
+    expect(trace.finalSystemPrompt).toContain(CHARACTER_CALL_TRANSFER_INSTRUCTIONS);
+    expect(trace.finalSystemPrompt).toContain("procédure prioritaire sur toute guidance contraire");
+    expect(trace.finalSystemPrompt).toContain(guidance);
+    expect(trace.finalSystemPrompt.indexOf(CHARACTER_CALL_TRANSFER_INSTRUCTIONS))
+      .toBeLessThan(trace.finalSystemPrompt.indexOf(guidance));
   });
 });
 

@@ -1,6 +1,7 @@
 import { trimRagContextToWholeSouvenirs } from "@/services/ragService";
 import { buildResponseStreamContract } from "@/services/responseIntentStream";
 import { formatPrivateDeliveryContext } from "@/services/responseDelivery";
+import { CHARACTER_CALL_TRANSFER_INSTRUCTIONS } from "@/services/characterConversation";
 import { callLLM, callLLMWithUsage, LLMProxyRequestError, streamLLM, type LLMUsage } from "@/services/openRouterLLM";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMemoryV1, ConversationMessage, LLMCallDiagnosticTrace, MaxConstraintCheckResult, MaxPromptAssemblyTrace, MaxTurnKnowledgeContext, TraceMessage } from "@/types";
@@ -475,9 +476,10 @@ export async function buildMaxSystemPrompt(
       throw new Error(`Fiche personnage incohérente pour ${characterContext.displayName} : attribution ou version incorrecte`);
     }
   }
-  const identityInvariant = characterContext
+  const characterIdentity = characterContext
     ? buildCharacterIdentityInvariant(characterContext)
     : `# IDENTITÉ ACTIVE — INVARIANT PRIORITAIRE NON TRONQUABLE\n- Tu es ${canonicalName}. Tu ne te présentes jamais comme un autre personnage.`;
+  const identityInvariant = `${characterIdentity}\n\n## PROCÉDURE DE PASSAGE TÉLÉPHONIQUE\n${CHARACTER_CALL_TRANSFER_INSTRUCTIONS}`;
 
   if (variant === "legacy") {
     const fieldsSections = buildCharacterPromptSections(characterFields);
