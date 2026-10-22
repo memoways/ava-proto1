@@ -19,6 +19,12 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   Aucune réparation de sortie invalide, aucun changement du validateur, durée
   d'offre, modèle, budget, capture ou voix. Deux tests de contexte rouges puis
   115 ciblés verts ; recette humaine après livraison toujours nécessaire.
+- Complément source `0cba219` : qualité complète verte (756/41/48), **65/65 E2E
+  locaux sans retry en 10,2 min**, deux revues Standards/Spec sans constat après
+  clarification de la portée player_request. CI exacte de la nouvelle PR requise
+  avant fusion. Post-fusion #64 : tentative 1 interrompue à vingt minutes pendant
+  les téléchargements Ubuntu Azure, avant E2E ; relancée au même SHA, sans masquer
+  l'interruption ni modifier le workflow.
 
 - Lot 3 et clôture #60 vérifiés : main `f01532b`, CI pré/post vertes,
   même révision dans Lovable ; baseline locale et 65 E2E sans retry verts.

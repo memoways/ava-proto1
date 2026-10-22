@@ -21,7 +21,8 @@ comparaison avec les haut-parleurs. Aucun nouvel appel ouvert en attente.
 753 unitaires / 41 intégrations / 48 régressions et 65 E2E (10,2 min), deux
 revues indépendantes sans constat. Main propre après fetch/pull, Lovable même
 SHA ready/agentFinished, workspace Memoways vérifié. CI post-fusion
-`39821136410` suivie séparément : relire son résultat exact avant clôture.
+`39821136410` : tentative 1 interrompue à vingt minutes sur les téléchargements
+Ubuntu Azure, avant E2E ; relancée au même SHA, résultat final à relire.
 
 Défaut reproduit de la recette : demande T7 interrompue sans réponse délivrée ;
 T8/10/11 reçoivent tous openRequest=null. Le GM invente pourtant une origine
@@ -30,8 +31,9 @@ GM accept/max, mais request_unresolved est le refus correct d'une preuve invalid
 Ne pas rallonger la borne de deux messages, restaurer une ancienne demande,
 réparer les identifiants/citations ou forcer une offre.
 
-Complément en validation sur `codex/character-handoff-lot-4-finalisation`, base
-`56f6b62` : currentUserMessage associe texte/turnId/turnIndex exacts dans le
+Complément source **`0cba219`**, en validation sur
+`codex/character-handoff-lot-4-finalisation`, base `56f6b62` :
+currentUserMessage associe texte/turnId/turnIndex exacts dans le
 contexte du même appel GM. Instructions : seules sources player_request =
 message courant ou openRequest non null ; une confirmation courante peut porter
 l'intention de poursuivre le transfert, selon l'analyse sémantique du GM,
@@ -39,7 +41,12 @@ sans mot de passe ni oui hors contexte. Les propositions dites par le personnage
 restent admissibles au tour courant. Aucun validateur/garde/CAS/capture/provider/
 voix/budget/modèle/timeout modifié. GM_CODE_VERSION actualisée.
 Baseline 102 verts, deux tests de données de contexte rouges, puis 115 ciblés
-verts. Qualité/E2E complets, revues et CI exacte à relever avant livraison.
+verts. Qualité complète **756 unitaires / 41 intégrations / 48 régressions**,
+lint/typecheck/build verts ; **65/65 E2E locaux sans retry en 10,2 min**.
+Deux revues indépendantes : Standards sans constat, ambiguïté Spec sur la portée
+player_request corrigée puis revalidée sans constat. CI exacte encore requise avant
+fusion, puis main propre/CI post-fusion/Lovable à vérifier. Les commits
+documentaires suivent `0cba219` : relever le HEAD réel avant toute action.
 Ces tests prouvent les données/instructions, pas la prochaine sortie du modèle.
 
 Fichiers du complément : `src/agents/gameMasterPRD4.ts` et test handoff,

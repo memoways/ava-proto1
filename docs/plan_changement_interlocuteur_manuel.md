@@ -882,6 +882,24 @@ durée de deux messages, CAS, capture, modèle/appel/950 tokens/timeout inchang�
 Les tests de prompt prouvent les données/instructions envoyées, pas la prochaine
 classification du modèle ; nouvelle recette humaine nécessaire après livraison.
 
+Complément source enregistré dans `0cba219` : deux tests rouges sur l'absence de
+liaison explicite texte/ID, puis **115 ciblés verts**, dont reprise/CAS/concurrence.
+La reproduction T11 montre le refus conservé de l'ancienne origine, l'accord
+avec une preuve courante cohérente et le rejet d'une citation ancienne même
+réétiquetée courante. Qualité finale **756 unitaires / 41 intégrations /
+48 régressions**, lint/typecheck/build verts ; avertissements hooks/bundle
+préexistants. Deux revues indépendantes : Standards sans constat ; Spec a fait
+préciser que l'absence de source de demande ne neutralise pas gm_proposal, puis
+revalidation sans constat. **65/65 E2E locaux sans retry en 10,2 min**, un worker,
+Chromium/Firefox/WebKit. CI exacte encore requise avant fusion.
+CI post-fusion #64 `39821136410` : première tentative interrompue à vingt minutes
+pendant les téléchargements Ubuntu Azure, avant E2E ; relancée au même SHA.
+Ce résultat n'est pas présenté vert, aucun workflow ou test modifié pour le masquer.
+Confiance préalable 95 % : contexte déjà sérialisé par le builder unique,
+validateur/état réutilisés sans modification, traces exactes et reproduction
+locale ; aucune dépendance ou API ajoutée. Référence de sérialisation :
+[JSON.stringify, spécification ECMAScript](https://tc39.es/ecma262/multipage/structured-data.html#sec-json.stringify).
+
 ## 6. Validation attendue
 
 - Unitaires : T6 différé ; T10 pronom/faux prénom contextualisé ; T11 nom explicite + accord naturel ; inquiétude émotionnelle sans refus ; refus explicites et sans « ne » ; « Je vais l’appeler… enfin non » ; extrait affirmatif choisi au milieu d’un refus ; oui hors contexte ; cible incohérente ; décision invalide/périmée ; offre révoquée et nouvelles versions.

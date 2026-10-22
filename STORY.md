@@ -90,6 +90,11 @@ verts ; gardes inchangées. La revue Spec clarifie la portée player_request pou
 préserver les propositions courantes du personnage. La validation du prompt ne
 garantit pas le prochain choix du modèle : recette humaine restante, aucun produit
 republié. L'appel est clôturé user_hangup et le micro fermé.
+Le complément `0cba219` passe ensuite la qualité complète (756/41/48) et les
+65 E2E locaux sans retry en 10,2 min. Les deux revues ne signalent plus de constat.
+La CI post-fusion #64 s'interrompt à vingt minutes sur les téléchargements du
+miroir Ubuntu Azure, avant les E2E ; elle est relancée au même SHA. Cet incident
+reste distinct de la nouvelle CI exigée pour le complément avant fusion.
 
 La clôture #60 du lot 3 est vérifiée sur main et dans Lovable ; les 65 E2E
 repassent. La v7 sandbox porte le quota à 8 en gardant seuil 4 et pause 2.
