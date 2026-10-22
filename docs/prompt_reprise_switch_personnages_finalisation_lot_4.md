@@ -44,7 +44,13 @@ Trois tests rouges puis 152 ciblés verts ; deux nouveaux E2E de confirmation
 « Oui », persistance/rechargement/reprise et connexion dans les deux sens verts
 (32 s). Deux revues indépendantes sans constat. Première qualité : 770 unitaires
 verts, mais timeouts d'initialisation PGlite dans trois fichiers d'intégration.
-Résultat complet et 67 E2E finaux à relever avant la PR/CI exacte/fusion/Lovable.
+Relance dédiée : 41/41 intégrations vertes, puis commande standard de qualité
+complète verte : **770 unitaires / 41 intégrations / 48 régressions**,
+lint/typecheck/build. Aucun délai modifié ; cause exclusive non établie. Source
+référencée **11ce68b97e7349588248c6602f91551f5df0a603**, annonce précisée en
+nommant une fois la personne, 141 ciblés après cette précision verts. Les commits
+suivants portent la précision et la documentation : relever le HEAD réel.
+Les 67 E2E finaux et la CI exacte restent à relever avant fusion/Lovable.
 Ne pas masquer l'échec, modifier les délais ou remplacer la recette par des mocks.
 
 Fichiers ajoutés au périmètre : characterHandoff.ts (projection de références),

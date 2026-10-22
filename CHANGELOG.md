@@ -19,6 +19,11 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   connexion des deux côtés verts. Qualité complète et 67 E2E finaux à valider.
   Première qualité : 770 unitaires verts mais timeouts d'initialisation PGlite
   sur trois fichiers d'intégration ; échec conservé, aucune assertion affaiblie.
+- Relance dédiée : 41 intégrations vertes, puis qualité standard complète verte
+  (770/41/48 et lint/typecheck/build). Aucun délai modifié ; cause exclusive des
+  timeouts non établie. Source du contrat référencé `11ce68b`, annonce précisée
+  en nommant une fois la personne ; 141 tests après cette précision verts.
+  Les 67 E2E complets et la nouvelle CI exacte restent à relever avant fusion.
 
 - Reprise #64 fusionnée dans `56f6b62` après CI `39781012004` verte sur
   `90d443af10c6d6381a9528f4936afe8f4f08e1c2` exact : 753/41/48 et 65 E2E.

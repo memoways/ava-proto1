@@ -88,6 +88,11 @@ Trois tests rouges puis 152 ciblés verts et deux nouveaux parcours E2E de
 confirmation/reprise/connexion des deux côtés passent. La première qualité
 échoue sur des initialisations PGlite trop longues, après 770 unitaires verts ;
 revalidation complète nécessaire avant livraison, sans changer les délais.
+La relance dédiée donne 41 intégrations vertes, puis la commande standard de
+qualité complète repasse : 770/41/48, lint/typecheck/build. La cause exclusive
+des timeouts n'est pas affirmée. Le contrat référencé est sauvegardé dans
+`11ce68b` ; l'annonce nomme sobrement la personne une seule fois. Les 67 E2E
+complets puis la CI du HEAD exact précèdent toute fusion et nouvelle recette.
 
 La reprise #64 est fusionnée dans `56f6b62` après contrôle de la CI verte sur
 `90d443af` exact et deux revues indépendantes sans constat. Lovable est synchronisé.

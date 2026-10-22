@@ -961,6 +961,19 @@ pendant les téléchargements Ubuntu Azure, avant E2E ; ne pas les annoncer vert
 Le main plus récent #65 possède sa propre validation complète ; aucun workflow
 n'a été modifié pour masquer ces interruptions.
 
+Première qualité du complément : 770 unitaires verts, puis initialisations
+PGlite en timeout (10 s) sur handoffConcurrency, deliveryMemory et manualCalls ;
+32 intégrations réussies, 2 échouées, 7 non exécutées. Échec conservé, aucune
+assertion, délai ou configuration modifié. Relance dédiée : 41/41 vertes.
+L'option maxWorkers de cette commande a été ignorée par npm ; ne pas la présenter
+comme une preuve d'exécution sérielle. Nouvelle commande test:quality standard
+complète : **770 unitaires / 41 intégrations / 48 régressions**,
+lint/typecheck/build verts. Aucune cause exclusive des timeouts n'est établie.
+Annonce précisée « en nommant la personne » sans formule imposée ; 141 tests
+contrat/conversation/GM verts après cette précision, source fonctionnelle identique.
+Les 67 E2E complets sont encore en cours au relevé ; nouvelle CI du HEAD exact
+obligatoire avant fusion et recette humaine toujours indispensable.
+
 ## 6. Validation attendue
 
 - Unitaires : T6 différé ; T10 pronom/faux prénom contextualisé ; T11 nom explicite + accord naturel ; inquiétude émotionnelle sans refus ; refus explicites et sans « ne » ; « Je vais l’appeler… enfin non » ; extrait affirmatif choisi au milieu d’un refus ; oui hors contexte ; cible incohérente ; décision invalide/périmée ; offre révoquée et nouvelles versions.
