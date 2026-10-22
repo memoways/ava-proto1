@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { detectPlayerSwitchRequest, hasCharacterHandoffConsent } from "./characterConversation";
 import { HANDOFF_SESSION_EXCERPTS as excerpts, validAssessment, validInput } from "./characterHandoff.fixtures";
-import { cleanHandoffAssessment, validateCharacterHandoff } from "./characterHandoff";
+import { cleanHandoffAssessment, handoffSpeechEvidence, materializeHandoffAssessment, validateCharacterHandoff } from "./characterHandoff";
 import type { CharacterHandoffAssessment, CharacterHandoffValidationInput } from "./characterHandoff";
 
 function withReply(reply: string, evidence = reply): CharacterHandoffValidationInput {
@@ -10,6 +10,67 @@ function withReply(reply: string, evidence = reply): CharacterHandoffValidationI
   input.evaluation.handoff_assessment = { ...validAssessment(), consent: { stance: "accept", evidence, refusalEvidence: null } };
   return input;
 }
+
+describe('referenced GM evidence', () => {
+  const decision = { schemaVersion: 2, requestSource: 'current_user', targetCharacter: 'max',
+    stance: 'accept', refusal: false, consentRef: 'speech_0' };
+  it.each([['emma', 'max'], ['max', 'emma']] as const)('materializes grounded confirmation %s → %s', (source, target) => {
+    const input = withReply(`D’accord, je te passe ${target === 'max' ? 'Max' : 'Emma'} au téléphone.`);
+    input.currentCharacter = source; input.evaluation.character_key = source; input.delivery!.character = source;
+    input.userText = 'Oui, je veux bien.';
+    input.evaluation.action = { type: 'handoff', targetCharacter: target, reason: 'accord', proposalGuidance: '' };
+    input.evaluation.handoff_assessment = materializeHandoffAssessment({ ...decision, targetCharacter: target }, input);
+    expect(validateCharacterHandoff(input).authorized).toBe(true);
+    expect(input.evaluation.handoff_assessment!.origin.evidence).toBe(input.userText);
+  });
+  it('rejects an agreement selected from the generated but unheard continuation', () => {
+    const input = withReply('Bonjour. Je te passe Max au téléphone.');
+    input.delivery!.delivered = 'Bonjour.'; input.delivery!.status = 'interrupted';
+    const evidence = handoffSpeechEvidence(input.delivery);
+    expect(evidence[1]).toEqual({ ref: 'speech_1', text: 'Je te passe Max au téléphone.', delivered: false });
+    input.evaluation.handoff_assessment = materializeHandoffAssessment({ ...decision, consentRef: 'speech_1' }, input);
+    expect(validateCharacterHandoff(input)).toMatchObject({ authorized: false, reason: 'consent_not_delivered' });
+  });
+  it.each([
+    { ...decision, consentRef: 'speech_99' }, { ...decision, requestSource: 'history' },
+    { ...decision, turnId: 'invented' }, { ...decision, refusal: undefined },
+    { ...decision, consentRef: undefined },
+  ])('fails closed on invalid wire references %j', raw => {
+    expect(materializeHandoffAssessment(raw, validInput())).toBeNull();
+  });
+  it('requires the actual runtime context and its matching receipt', () => {
+    expect(materializeHandoffAssessment(decision, null)).toBeNull();
+    const input = validInput(); input.delivery!.turnId = 'old';
+    expect(materializeHandoffAssessment(decision, input)).toBeNull();
+  });
+  it('cannot invent a target from an unrelated old transcript', () => {
+    const input = withReply('Oui, je te le passe.'); input.userText = 'Oui.';
+    expect(materializeHandoffAssessment(decision, input)).toBeNull();
+  });
+  it('keeps closed and expired requests closed', () => {
+    const input = validInput();
+    expect(materializeHandoffAssessment({ ...decision, requestSource: 'open_request' }, input)).toBeNull();
+    input.openRequest = { turnId: 'session:8', turnIndex: 8, expiresAfterTurnIndex: 10,
+      userText: input.userText, sourceCharacter: 'emma', targetCharacter: 'max', orchestrationVersionId: 'v6' };
+    input.evaluation.handoff_assessment = materializeHandoffAssessment({ ...decision, requestSource: 'open_request' }, input);
+    expect(validateCharacterHandoff(input).reason).toBe('request_unresolved');
+  });
+  it('retains refusal priority and deferral with referenced speech', () => {
+    const input = validInput();
+    input.evaluation.handoff_assessment = materializeHandoffAssessment({ ...decision, refusal: true }, input);
+    expect(validateCharacterHandoff(input).reason).toBe('character_refused');
+    input.evaluation.handoff_assessment = materializeHandoffAssessment({ ...decision, stance: 'defer' }, input);
+    expect(validateCharacterHandoff(input).reason).toBe('character_deferred');
+  });
+  it('does not repair an invalid historical proof into a referenced agreement', () => {
+    const input = validInput(); const proof = validAssessment(); proof.origin.turnId = 'old';
+    const before = structuredClone(proof);
+    input.evaluation.handoff_assessment = materializeHandoffAssessment(proof, input);
+    expect(input.evaluation.handoff_assessment).toEqual(before);
+    expect(proof).toEqual(before);
+    expect(validateCharacterHandoff(input).reason).toBe('request_unresolved');
+  });
+});
 
 describe("historical filters — characterization, deliberately unchanged", () => {
   it("does not globally alias Matt or resolve lui", () => {

@@ -75,6 +75,20 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ### 2026-10-22 — Switching, lot 4 : confronter les simulations à la parole
 
+Après #65 livré et synchronisé en `3fdc519`, la seconde recette montre que la
+clarification de prompt ne suffit pas : le GM classe l'accord entendu, mais cite
+un autre tour pour la cible. Le validateur refuse correctement. Ulrich demande
+de finaliser le passage et de supprimer les commentaires répétés sur l'absence
+ou l'écoute du personnage. Le correctif change la production des preuves : le
+GM choisit des références compactes ; l'application reprend les textes et
+identifiants exacts déjà fournis au même appel. Les gardes restent contrôlées par
+le validateur existant, sans réparer les anciens contrats invalides. La parole
+est une annonce brève ; la confidentialité reste une règle interne silencieuse.
+Trois tests rouges puis 152 ciblés verts et deux nouveaux parcours E2E de
+confirmation/reprise/connexion des deux côtés passent. La première qualité
+échoue sur des initialisations PGlite trop longues, après 770 unitaires verts ;
+revalidation complète nécessaire avant livraison, sans changer les délais.
+
 La reprise #64 est fusionnée dans `56f6b62` après contrôle de la CI verte sur
 `90d443af` exact et deux revues indépendantes sans constat. Lovable est synchronisé.
 La nouvelle recette de 19:19–19:24, `2b30d900`, échoue encore sans transfert.

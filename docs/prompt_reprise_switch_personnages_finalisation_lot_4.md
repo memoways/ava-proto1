@@ -7,7 +7,56 @@ son Supabase est fourni par Lovable. Aucun hébergeur ou Supabase externe.
 Cette demande autorise uniquement le lot 4, après vérification et finalisation
 de tout défaut restant du lot 3. Ne lance aucun autre chantier ni nouveau chat.
 
-## Relevé prioritaire — reprise du 22 octobre 2026 à 19 h
+## Relevé prioritaire — seconde recette et preuves référencées, 22 octobre 2026
+
+**Lot 4 incomplet, aucune publication produit.** #65 a été fusionnée dans
+`3fdc519dc209cf5a99dd36a84b9f9afd5bb345c7` à 19:56:22 Europe/Paris après
+CI `39824774671` verte sur `c3a0b1174819fb3d8294a830ae612426e4913bba` exact,
+756/41/48 et 65 E2E (10,9 min). CI post-fusion `39827021638` verte sur 3fdc519,
+65 E2E en 11,1 min. Lovable même SHA ready/agentFinished ; preview
+`index-ulEKkgDQ.js`. Post-#64 `39821136410` : deux tentatives interrompues à
+vingt minutes pendant les téléchargements Ubuntu Azure, avant E2E ; ne pas les
+présenter vertes. Le main plus récent #65 a sa propre validation complète.
+
+Recette `e12c75bd-c448-473f-888d-f2fa8bdd8363`, 19:57:53–20:07:54 Europe/Paris,
+**clôturée user_hangup**, Emma, compteur 0, v7, film vu, rôle/posture null.
+Ulrich confirme un bon échange et l'accord, aucune pastille. Nouveau contexte
+currentUserMessage et version GM source attestés. T7 gm_late lors de la
+confirmation suivante ; T8 origine courante « Oui » correcte mais cible citée
+dans l'ancien utilisateur, alors que la réplique délivrée nomme Max. Refus
+request_unresolved correct ; T9 pronominal ne nomme plus la cible. #65 n'a donc
+pas suffi à fiabiliser le passage ; ne pas annoncer l'expérience corrigée.
+
+Complément sur `codex/character-handoff-evidence-references-lot-4`, base 3fdc519 :
+le format GM v2 est référencé (requestSource, cible, stance, refus, consentRef).
+Les phrases exactes generated reçoivent des refs speech_N avec indicateur delivered,
+sans réécriture du texte. Le GM sélectionne une référence ; l'application
+matérialise la preuve v1 depuis le même contexte authentique. Les preuves
+persistées, état v2, validateur, CAS et reprise restent les existants. Accord non
+entendu, cible non nommée, référence inventée, demande expirée restent refusés ;
+aucune recherche d'ancienne demande ni réparation de contrat v1 invalide.
+Même appel/modèle/950 tokens/timeout. Aucun réglage Cloud ni capture/provider changé.
+
+Précision explicite d'Ulrich : annonce simple, sobre et unique du passage ;
+l'autre personnage est dans une autre pièce, pas besoin de réciter absence,
+confidentialité ou raccrochage. Ces protections restent internes silencieuses.
+Trois tests rouges puis 152 ciblés verts ; deux nouveaux E2E de confirmation
+« Oui », persistance/rechargement/reprise et connexion dans les deux sens verts
+(32 s). Deux revues indépendantes sans constat. Première qualité : 770 unitaires
+verts, mais timeouts d'initialisation PGlite dans trois fichiers d'intégration.
+Résultat complet et 67 E2E finaux à relever avant la PR/CI exacte/fusion/Lovable.
+Ne pas masquer l'échec, modifier les délais ou remplacer la recette par des mocks.
+
+Fichiers ajoutés au périmètre : characterHandoff.ts (projection de références),
+gameMasterPRD4.ts, gameMasterPromptBuilder.ts, characterConversation.ts et tests,
+E2E et quatre documents. Relever HEAD/diff/PR réels avant reprise. Les obligations
+complètes en fin de fichier restent applicables. Après livraison vérifiée,
+reconfirmer disponibilité d'Ulrich puis nouvel appel diagnostiqué Emma → Max → Emma,
+preuves/clic/sonneries/son/session/timer/profils/compteur/mémoires privées.
+Publication produit uniquement via Lovable après résultat observable accepté.
+Arrêt après ce seul lot 4 ; aucun nouveau chat ou lot 5.
+
+## Relevé historique — reprise du 22 octobre 2026 à 19 h
 
 **Lot 4 incomplet, aucune nouvelle publication produit.** La recette au casque
 `2b30d900-b597-42c2-8fe9-6982a9dda51d`, 19:19:06–19:24:10 Europe/Paris, est

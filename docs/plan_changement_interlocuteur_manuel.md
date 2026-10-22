@@ -900,6 +900,67 @@ validateur/état réutilisés sans modification, traces exactes et reproduction
 locale ; aucune dépendance ou API ajoutée. Référence de sérialisation :
 [JSON.stringify, spécification ECMAScript](https://tc39.es/ecma262/multipage/structured-data.html#sec-json.stringify).
 
+[PR #65](https://github.com/memoways/ava-proto1/pull/65) fusionnée dans
+`3fdc519dc209cf5a99dd36a84b9f9afd5bb345c7` après
+[CI 39824774671](https://github.com/memoways/ava-proto1/actions/runs/39824774671)
+verte sur le HEAD exact `c3a0b1174819fb3d8294a830ae612426e4913bba`, qualité
+756/41/48 et **65 E2E en 10,9 min**. Deux revues finales source/documentation
+sans constat, main local/distant propres après fetch/pull. Mémoire AVA Notion
+actualisée et relue, Source conservée et Last updated by=Codex.
+La publication et la nouvelle recette restent conditionnées à la synchronisation
+Lovable et au résultat humain observable accepté. Clôture documentaire sur
+`codex/character-handoff-lot-4-finalisation-closeout`, base `3fdc519`.
+
+### Lot 4 — correction de la production des preuves après la seconde recette
+
+La recette `e12c75bd-c448-473f-888d-f2fa8bdd8363`, commencée à 19:57:53 et
+clôturée user_hangup à 20:07:54 Europe/Paris, v7/Emma/compteur 0, échoue encore.
+Le nouveau bundle index-ulEKkgDQ.js et le GM handoff-origin-sources sont attestés
+dans les données brutes. T7 devient gm_late à la confirmation suivante ; T8
+lie correctement l'origine au message courant « Oui, je veux bien. », mais cite
+pour sa cible un ancien message utilisateur alors que sa propre parole délivrée
+nomme Max. Le refus request_unresolved est conforme. T9 ne nomme plus la cible.
+La clarification de prompt de #65 ne suffit donc pas à fiabiliser le contrat.
+
+Décision d'implémentation de ce même lot : le GM produit une évaluation sémantique
+compacte version 2 (source de demande référencée, cible, stance). L'application
+matérialise les identifiants et citations exacts depuis les sources déjà fournies
+au même appel : message courant, demande encore ouverte ou proposition dite.
+L'accord est toujours la parole réellement délivrée au tour courant ; la cible
+doit être nommée dans la source admissible ou cette parole. Aucune recherche dans
+l'historique pour ressusciter une demande, aucune réparation d'un ancien contrat
+v1 invalide. Les preuves persistées restent v1, puis passent par le même validateur,
+les mêmes vetos, fraîcheur, version, durée, CAS et gardes. Aucun appel LLM ajouté,
+modèle/budget/timeout inchangés. Nouveau format inconnu/incomplet : refus fermé.
+Prouver rouge→vert dans le vrai consommateur GM, puis état/persistance/reprise/E2E.
+
+Précision produit d'Ulrich : parole de transfert simple et sobre, annoncée une
+fois, sans répéter l'absence d'écoute ou de présence. Une mention de l'autre pièce
+suffit si utile. Garder séparation/confidentialité comme règles internes silencieuses.
+Ne pas transformer la règle technique en texte récité au joueur. Tester les deux
+sens et l'injection dans toutes les variantes, puis qualité/E2E/revues/CI exacte.
+Branche : codex/character-handoff-evidence-references-lot-4, base 3fdc519.
+
+Le format référencé inclut consentRef : les phrases exactes sont numérotées dans
+speechEvidence, avec leur statut délivré. Réutilisation de safeSentenceEnd sans
+changer le parseur ou le timing vocal ; aucune normalisation des citations.
+Le GM sélectionne la phrase justifiant la stance. Une référence d'accord généré
+mais non entendu produit toujours consent_not_delivered. Les anciens champs
+de citation erronés ne sont pas recyclés dans une v2 (schéma strict).
+Reproduction : trois tests rouges (accord T8 dans le consommateur GM et sobriété
+dans les deux sens), puis 152 ciblés verts. Deux E2E de confirmation « Oui » avec
+cible nommée par la parole, preuve persistée v1, rechargement/reprise et connexion
+dans les deux sens : **2/2 verts en 32 s**. Deux revues indépendantes sans constat ;
+qualité complète et 67 E2E à relever avant livraison. Confiance préalable 95 % :
+cause réelle reproduite, projection depuis données du runtime, validateur unique
+et segmentation existante réutilisés, aucune dépendance nouvelle ; les jugements
+sémantiques restent au GM et la recette humaine reste indispensable.
+CI post-fusion #65 `39827021638` désormais **verte sur 3fdc519 exact**, 65 E2E
+en 11,1 min. Post-#64 `39821136410` : deux tentatives interrompues à vingt minutes
+pendant les téléchargements Ubuntu Azure, avant E2E ; ne pas les annoncer vertes.
+Le main plus récent #65 possède sa propre validation complète ; aucun workflow
+n'a été modifié pour masquer ces interruptions.
+
 ## 6. Validation attendue
 
 - Unitaires : T6 différé ; T10 pronom/faux prénom contextualisé ; T11 nom explicite + accord naturel ; inquiétude émotionnelle sans refus ; refus explicites et sans « ne » ; « Je vais l’appeler… enfin non » ; extrait affirmatif choisi au milieu d’un refus ; oui hors contexte ; cible incohérente ; décision invalide/périmée ; offre révoquée et nouvelles versions.
