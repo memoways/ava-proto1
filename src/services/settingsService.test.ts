@@ -7,9 +7,9 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       select: () => ({
         eq: (column: string, key: string) => ({
-          maybeSingle: async () => {
+          in: async () => {
             if (column === "key") queriedKeys.push(key);
-            return { data: null, error: null };
+            return { data: [], error: null };
           },
         }),
       }),
