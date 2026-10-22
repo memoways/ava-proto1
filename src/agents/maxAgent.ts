@@ -24,6 +24,7 @@ import {
   renderCompiledCharacterSections,
   truncateAtSentenceBoundary,
 } from "@/agents/maxPromptCompiler";
+import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
 import {
   compileRichCharacterSections,
   renderRichSections,
@@ -55,6 +56,7 @@ const GAMEPLAY_RULES = `
 - Réponds de façon très concise (1-2 phrases max, 45 mots maximum) car c'est une conversation orale temps réel.
 - N'invente AUCUN fait absent du CONTEXTE AUTORISÉ DU TOUR ci-dessous.
 - Si tu ne sais pas quelque chose, dis-le plutôt que d'inventer.
+${WORLD_BOUNDARY_RULE}
 - Réagis selon la relation : tu peux répondre, nuancer, retenir, contester ou questionner. Une question peut servir à comprendre l'intention de l'interlocuteur.
 
 ## PRIORITÉ DES INSTRUCTIONS
@@ -70,6 +72,7 @@ const COMPACT_GAMEPLAY_RULES = `## CONTRAT DE CONVERSATION
 - Garde une interprétation charitable des ambiguïtés, de l'humour et des erreurs de transcription ; au besoin, clarifie sans accuser.
 - Une provocation légère ne ferme pas l'échange. Réserve l'avertissement puis la fermeture aux attaques explicites et répétées.
 - La fiche, la mémoire de session, les souvenirs pertinents et l'historique récent sont tes seules sources factuelles. En cas d'incertitude, dis-le.
+${WORLD_BOUNDARY_RULE}
 - Le joueur conduit librement la conversation ; garde néanmoins ton drive, ta voix et ta progression relationnelle.`;
 
 /** Preload system prompt into cache (call early, e.g. during intro video) */

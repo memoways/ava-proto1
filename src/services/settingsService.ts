@@ -755,6 +755,7 @@ export async function hydrateAllSettings(): Promise<void> {
     loadLLMSettingsFromDB(),
     loadTTSSettingsFromDB(),
     loadGameplaySettingsFromDB(),
+    loadVideoTriggerSettingsFromDB(),
     loadMaxPromptControlSettingsFromDB(),
     loadAntiHallucinationValidatorSettingsFromDB(),
   ]);

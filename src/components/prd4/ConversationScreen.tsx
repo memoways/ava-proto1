@@ -50,7 +50,7 @@ const ConversationScreen = ({
   handsFreeListening = false,
   onToggleHandsFree,
   onHangUp,
-  streamingAvatarActive = false,
+  streamingAvatarActive: streamingAvatarRequested = false,
   streamingAvatarState = "inactive",
   attachAvatarMedia,
   activeCharacter,
@@ -63,6 +63,9 @@ const ConversationScreen = ({
   onAcceptHandoff,
   onRejectHandoff,
 }: Props) => {
+  // Le flux vidéo en direct est celui de Max. Pour tout autre personnage (Emma),
+  // on n'affiche ni le flux, ni sa dernière image figée : seulement sa photo.
+  const streamingAvatarActive = streamingAvatarRequested && activeCharacter === "max";
   const handoffInputBlocked = handoffCalling || handoffInputLocked;
   const disabled = handoffInputBlocked || audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "max_thinking" || audioState === "max_speaking";
   const recording = audioState === "user_speaking";
