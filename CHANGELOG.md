@@ -19,10 +19,26 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - [#61](https://github.com/memoways/ava-proto1/pull/61) livre `180e018` après
   CI verte sur le HEAD exact `0562abe` : 736 unitaires, 41 intégrations,
   48 régressions et 65 E2E ; local 65/65 sans retry, deux revues sans constat.
-  Main synchronisé dans Lovable, nouvelle recette diagnostiquée non effectuée
-  faute d'échange ; contrôle fermé proprement. Aucun produit publié.
+  Main synchronisé dans Lovable ; premier contrôle diagnostiqué sans échange,
+  fermé proprement. Aucun produit publié.
+- Nouvelle recette réelle : demande nommant Max, réplique conditionnelle d'Emma,
+  aucune pastille. JSON GM brut incomplet à 938 tokens sur budget 950, rejeté.
+  Appel fermé, compteur 0. Ulrich précise : proposer de passer l'appel au téléphone.
+- Correction en validation dans #62 : contrat de transfert partagé personnage/GM,
+  exemple JSON complet compact avec preuve avant mémoire, delta mémoire sans
+  proposition relationnelle respecté ; proposition explicitement invalide toujours
+  rejetée. Même appel, modèle, budget, timeout et gardes de transfert.
 - [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md) et
   [reprise de finalisation du seul lot 4](docs/prompt_reprise_switch_personnages_finalisation_lot_4.md).
+- CI de clôture #62 rouge (64/65 E2E) : la fixture de révocation ancienne
+  désactivait Max avant création de l'offre. Attente explicite de l'offre visible
+  et persistée ajoutée avant la panne simulée ; assertions finales conservées.
+  Revalidation complète et CI du nouveau HEAD requises avant fusion.
+- Reprise demandée avant validation finale : 140 tests ciblés verts, deux revues
+  source sans constat ; qualité complète encore non verte (échec future-video
+  dans un fichier inchangé ; motif prioritaire T6 corrigé et ciblé vert).
+  E2E intermédiaires interrompus, nouvelle suite complète nécessaire. Aucune
+  fusion de #62 ni publication à ce stade.
 
 ## [Non publié] — 2026-10-21 — Switching Emma ↔ Max, lot 3
 

@@ -27,7 +27,7 @@ import {
 } from "@/services/relationshipEngine";
 
 /** Incrémenter à chaque changement de logique ou de prompt du GM (traçabilité A/B). */
-export const GM_CODE_VERSION = "gm-2026-10-22-handoff-prompt-contract";
+export const GM_CODE_VERSION = "gm-2026-10-22-compact-call-transfer";
 
 export interface PRD4PostTurnInput {
   onGmObserved?: (service: ServiceObservation, spans: ServerObservation) => void;
@@ -372,7 +372,9 @@ function cleanMemoryDelta(raw: unknown): ConversationMemoryDelta | null {
     openThreads: cleanList(value.openThreads, 6),
     resolvedThreadIds: cleanList(value.resolvedThreadIds, 8),
     topics: cleanList(value.topics, 6),
-    relationship: {
+    // Absence is not a proposal. Explicit null/empty/malformed proposals still
+    // reach the relationship validator and cannot authorize an action.
+    ...(Object.prototype.hasOwnProperty.call(value, "relationship") ? { relationship: {
       ...(depth ? { depth } : {}),
       ...(trust ? { trust } : {}),
       emotionalState: normalizeMemoryText(relationship.emotionalState, 160) || null,
@@ -383,7 +385,7 @@ function cleanMemoryDelta(raw: unknown): ConversationMemoryDelta | null {
       sourceTurn: Number.isFinite(Number(relationship.sourceTurn)) ? Math.floor(Number(relationship.sourceTurn)) : undefined,
       characterKey: normalizeMemoryText(relationship.characterKey, 80),
       policyVersion: normalizeMemoryText(relationship.policyVersion, 100),
-    },
+    } } : {}),
     lastExchange: normalizeMemoryText(value.lastExchange, 260) || null,
   };
 }

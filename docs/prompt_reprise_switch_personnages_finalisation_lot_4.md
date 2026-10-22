@@ -21,8 +21,12 @@ de tout défaut restant du lot 3. Ne lance aucun autre chantier ni nouveau chat.
   ready/agentFinished. [CI post-fusion 39735148175](https://github.com/memoways/ava-proto1/actions/runs/39735148175)
   à relire dans GitHub au départ, avec la CI de clôture documentaire.
 - Branche de clôture `codex/character-handoff-lot-4-closeout`, base `180e018`.
-  Modifications documentaires à la rédaction : CHANGELOG, STORY, plan, cette
-  reprise. Vérifier leur PR, sa fusion et sa CI exacte après fetch ; le départ
+  PR #62 : CHANGELOG, STORY, plan, cette reprise et préparation du test E2E de
+  révocation ancienne. CI `39736840084` rouge sur `89c8d3c` (64/65) : trace
+  confirmant la désactivation Max par la fixture avant création de l'offre.
+  Attente explicite de l'offre visible/persistée ajoutée avant la panne simulée,
+  sans affaiblir les assertions. Vérifier la revalidation et la CI du nouveau HEAD.
+  Vérifier sa fusion et sa CI exacte après fetch ; le départ
   reste le main réel, jamais une ancienne révision à restaurer. Aucun travail étranger.
 - V7 sandbox-ulrich `98145fe3-96f1-4525-84c2-0e0a1cc5c6da` publiée depuis v6
   `9217fd34-321a-45c7-8363-6a8cf0b0157c` : quota 8, seuil 4, pause 2.
@@ -49,6 +53,24 @@ de tout défaut restant du lot 3. Ne lance aucun autre chantier ni nouveau chat.
 - **Aucune nouvelle publication produit demandée ou effectuée.** La configuration
   sandbox publiée ne constitue pas une publication du frontend. Aucun succès
   humain après correction ni aller-retour réel n'est encore attesté.
+- Troisième appel réel `ce05527f-a7f5-4a1c-b914-f82227fb5419`,
+  09:08:31–09:21:55 Europe/Paris : v7, Emma, film vu, rôle/posture null,
+  compteur 0 ; **clôturé user_hangup**, micro fermé. Ulrich confirme les réponses
+  puis une demande unique nommant Max et aucune pastille. Emma répond sous
+  condition ; JSON brut GM T10 incomplet, coupé dans handoff_assessment,
+  938 tokens sur budget 950, invalid_json. Aucune autorisation ni transfert.
+- Précision d'Ulrich : proposer de **passer l'appel au téléphone**, sans venue
+  physique. #62 porte désormais les correctifs runtime en plus de la préparation
+  E2E : contrat d'action partagé personnage/GM, exemple JSON complet compact,
+  preuve avant mémoire, mémoire différentielle. Le nettoyeur préserve l'absence
+  de proposition relationnelle ; toute proposition explicitement invalide reste
+  rejetée. Même modèle/appel/950 tokens/timeout ; aucun provider, voix ou cadre
+  éditorial partagé modifié. Vérifier sa CI exacte et son état de livraison.
+- Limite sémantique : la condition « peut-être… à condition qu'il accepte »
+  doit rester defer. La probe GM accept n'est pas un veto déterministe existant ;
+  aucune regex générale n'a été ajoutée. Le test couvre GM defer comme T6/T9,
+  sans prétendre garantir une mauvaise classification. Nouvelle recette brute
+  nécessaire ; aucune réussite du correctif compact encore attestée.
 
 ## Prochaine action précise
 
@@ -58,6 +80,7 @@ Ne pas réutiliser les appels clôturés ni lancer une session pendant une atten
 de disponibilité. Échanges naturels, puis une seule demande **nommant Max**
 après le minimum narratif ; vérifier prompt et JSON bruts via Lovable Cloud,
 preuves/offre/clic/sonneries/connexion, puis retour après pause et nouvel accord.
+Vérifier d'abord les correctifs #62 sur main et synchronisés dans Lovable.
 Ulrich parle et confirme le son ; l'agent vérifie les événements et la persistance.
 Ne pas répéter après refus ou présenter une parole synthétique comme réussite humaine.
 Publier le produit uniquement via Lovable après résultat observable accepté,

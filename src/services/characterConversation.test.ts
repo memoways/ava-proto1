@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ConversationMessage } from "@/types";
 import {
+  buildSwitchRequestGuidance,
   detectPlayerSwitchRequest,
   hasSpokenWithCharacter,
   inferCharacterSwitchStance,
@@ -65,6 +66,15 @@ const log: ConversationMessage[] = [
 ];
 
 describe("characterConversation", () => {
+  it.each([["emma", "max"], ["max", "emma"]] as const)(
+    "propose de passer l'appel de %s vers %s sans venue physique", (source, target) => {
+      const guidance = buildSwitchRequestGuidance(source, target);
+      expect(guidance).toContain("passer l'appel");
+      expect(guidance).toContain("ne lui propose pas de venir");
+      expect(guidance).toContain("accepter, objecter ou hésiter");
+      expect(guidance).toContain("N'exécute pas le transfert toi-même");
+    },
+  );
   it("isole l'historique de chaque personnage, y compris au retour vers Max", () => {
     expect(sliceConversationForCharacter(log, "max").map((message) => message.content)).toEqual([
       "Allô ?",

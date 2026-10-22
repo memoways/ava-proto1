@@ -87,9 +87,25 @@ et l'extension dite optionnelle. Deux tests rouges puis verts corrigent ce
 contrat, sans assouplir parseur ou gardes. La [PR #61](https://github.com/memoways/ava-proto1/pull/61)
 livre `180e018` après CI verte sur le HEAD exact `0562abe` : 736 unitaires,
 41 intégrations, 48 régressions et 65 E2E. Main et Lovable sont synchronisés ;
-la décision durable est relue dans Notion. Un nouvel appel diagnostiqué reste
+la décision durable est relue dans Notion. Un premier contrôle diagnostiqué reste
 sans échange et est clôturé proprement, micro fermé. Le lot 4 reste partiel :
 recette bidirectionnelle humaine et publication après acceptation à réaliser.
+La CI de clôture révèle ensuite une course de préparation dans le test de
+révocation ancienne : il rend Max indisponible avant la création de l'offre.
+La trace confirme le refus correct du moteur. Le test attend désormais l'offre
+visible et persistée avant la panne simulée ; toutes ses assertions sont gardées.
+Une nouvelle recette réelle apporte enfin la trace brute : Emma répond sous
+condition, en évoquant une venue physique, et le JSON GM se coupe avant la fin
+de la preuve. Le parseur le rejette ; aucune pastille ne s'affiche. Ulrich précise
+la procédure attendue : passer l'appel au téléphone. Le correctif en validation
+partage ce contrat entre personnage et GM et demande un JSON complet compact,
+dans le même budget. Les revues corrigent aussi l'exemple d'action et la présence
+optionnelle d'une proposition relationnelle ; les propositions invalides restent
+rejetées. Une hésitation reste à interpréter par le GM, sans accord forcé.
+Ulrich demande une reprise dans un chat frais avant la fin de ces validations.
+Les 140 ciblés et les revues source sont verts, mais la qualité complète reste
+non validée et les E2E finaux doivent être relancés. #62 reste sans fusion ;
+les derniers correctifs ne sont pas encore servis dans Lovable.
 [Plan](docs/plan_changement_interlocuteur_manuel.md) et
 [reprise du seul lot 4](docs/prompt_reprise_switch_personnages_finalisation_lot_4.md).
 

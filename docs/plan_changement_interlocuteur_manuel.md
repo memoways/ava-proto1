@@ -469,6 +469,72 @@ sandbox de recette et la publication après résultat observable accepté.
 
 ### Lot 4 — préparation, recette et correctif du 22 octobre 2026
 
+Nouvelle recette réelle `ce05527f-a7f5-4a1c-b914-f82227fb5419` : demande
+explicite nommant Max, réponse d'Emma conditionnelle (« peut-être… à condition »),
+aucune offre ni transfert. Le diagnostic brut T10 établit un JSON GM incomplet,
+coupé dans `handoff_assessment` après 938 tokens de complétion (budget 950).
+Le refus `invalid_json` est conservé. Ulrich précise que le personnage doit
+proposer de **passer l'appel**, sans promettre la venue physique de l'autre.
+Appel du 22 octobre, **09:08:31–09:21:55 Europe/Paris**, v7, Emma, compteur 0,
+film vu, rôle/posture null ; trois réponses entendues confirmées par Ulrich,
+puis demande unique et absence de pastille confirmée. Session clôturée
+`user_hangup`, micro fermé, persistance relue. Aucune mémoire privée transférée.
+Correction prévue dans ce seul lot : contrat de sortie runtime complet et compact,
+preuve avant mémoire, mémoire différentielle brève ; même modèle/appel/950 tokens
+et parseur strict. Rappeler la procédure téléphonique dans la guidance de demande
+et dans l'extension GM, sans toucher au cadre éditorial partagé, au rôle/posture,
+aux preuves ou aux refus. Une hésitation reste defer ; aucun accord forcé.
+Les revues ont identifié deux prérequis de compatibilité : garder
+`action.proposalGuidance` dans l'exemple complet (sinon action neutralisée), et
+respecter l'absence de proposition relationnelle dans un delta compact.
+`ConversationMemoryDelta.relationship` est optionnel, mais son nettoyeur créait
+un objet vide même si la clé était absente, puis invalidait le GM. Correction
+bornée prévue : préserver cette absence, tout en validant et rejetant comme avant
+toute proposition relationnelle explicitement fournie mais invalide. Reproduire
+les deux cas avant correction et contrôler la conservation de la mémoire privée.
+Probe supplémentaire : demander au veto déterministe de bloquer la nouvelle phrase
+conditionnelle même avec un GM `accept` a échoué. Ce cas dépasse ses vetos étroits
+existants ; aucune regex générale « proposer/venir/condition » n'est ajoutée,
+conformément au partage sémantique GM / preuves moteur. La nouvelle fixture vérifie
+`character_deferred` avec une évaluation GM defer comme T6/T9, et le prompt classe
+explicitement cette condition en defer. Limite conservée : une fausse classification
+GM accept sur cette phrase n'est pas aujourd'hui un veto déterministe. La recette
+réelle rejetée pour JSON incomplet n'a produit aucune autorisation abusive.
+
+Complément de vérification du 22 octobre : la CI documentaire
+[39736840084](https://github.com/memoways/ava-proto1/actions/runs/39736840084)
+échoue sur le test de révocation ancienne (64 E2E passent, même échec au retry).
+La trace confirme que la fixture désactive Max avant le chargement de disponibilité
+post-GM, donc avant la création de l'offre ; le moteur refuse correctement
+`target_not_ready`. Finalisation prévue : attendre et vérifier l'offre visible
+et persistée avant de désactiver Max, puis conserver toutes les assertions de
+révocation retardée et de nouvelle session. Aucun timeout ni garde produit assoupli.
+La PR #62 reste non fusionnée jusqu'à une CI verte sur son nouveau HEAD exact.
+
+Preuves de cette finalisation : quatre vérifications rouges du format complet et
+du transfert téléphonique, puis 134 ciblées vertes ; deux constats des revues
+reproduits rouges (action sans proposalGuidance et relation absente), puis
+139 ciblées vertes avant la probe de déféré documentée ci-dessus ; **140 ciblées
+vertes** après finalisation des consommateurs et du motif prioritaire de refus T6.
+Les deux revues finales source sont sans constat restant. Un contrôle
+qualité concurrent aux E2E a rencontré un timeout de 5 s sur la pagination
+inchangée (735/736 unitaires) ; fichier isolé ensuite 8/8 vert. Aucune hausse
+de délai ni modification de ce fichier. Le contrôle qualité séquentiel suivant
+est vert (739 unitaires, 41 intégrations, 48 régressions), avant les derniers
+tests de compatibilité. La dernière qualité complète est **rouge : 742/744
+unitaires**, après 48 régressions vertes ; `LatencyBlockingTab` ne trouve pas
+`future-video` et le test T6 attendait à tort defer au lieu du refus prioritaire.
+Ce dernier motif est corrigé et revalidé dans les 140 ciblés, sans changer le
+veto produit. Le test future-video est inchangé et reste à diagnostiquer/revalider ;
+ne pas qualifier la qualité finale de verte. L'intégration et le build de cette
+dernière commande n'ont pas été exécutés après l'échec unitaire.
+L'E2E intermédiaire a été interrompu après découverte du JSON brut et des nouveaux
+correctifs : 44 passent, un interrompu, 20 non exécutés ; il ne vaut pas réussite.
+Une nouvelle exécution complète est requise sur le correctif final.
+Ulrich demande ensuite un nouveau chat frais : sauvegarder les correctifs et cette
+limite dans la branche/PR #62, sans fusion ni nouvelle publication. La reprise
+doit commencer par terminer ces validations, puis seulement la recette humaine.
+
 **État : partiel.** Correctif livré sur main et synchronisé dans Lovable ;
 aucune nouvelle publication produit. La recette humaine bidirectionnelle
 reste nécessaire. Aucun lot suivant ni nouveau chat lancé.
@@ -581,9 +647,10 @@ Ne pas répéter après refus, assouplir les gardes ou substituer une voix synth
 Publication produit exclusivement Lovable après résultat observable accepté,
 puis contrôle du frontend servi ; aucun déploiement n'a été demandé dans ce lot.
 
-Branche de clôture documentaire : `codex/character-handoff-lot-4-closeout`, base
+Branche de clôture : `codex/character-handoff-lot-4-closeout`, base
 `180e018`. CHANGELOG/STORY et le [prompt autonome de finalisation du lot 4](prompt_reprise_switch_personnages_finalisation_lot_4.md)
-sont actualisés. Clôture documentaire à fusionner seulement après CI verte
+sont actualisés, avec la correction de préparation du test de révocation ancienne.
+Clôture à fusionner seulement après CI verte
 sur son propre HEAD exact, puis recontrôler main et synchronisation Lovable.
 Le prochain assistant part du main réel après fetch, sans restaurer ces hashes.
 

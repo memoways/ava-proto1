@@ -36,10 +36,14 @@ describe("structured consent — pure validator", () => {
     };
     expect(validateCharacterHandoff(input).authorized).toBe(true);
   });
-  it.each([excerpts.t6.reply, excerpts.t9.reply])("keeps T6/T9 deferred: %s", reply => {
+  it.each([
+    [excerpts.t6.reply, "character_refused"],
+    [excerpts.t9.reply, "character_deferred"],
+    ["Je peux peut-être lui proposer de venir, à condition qu’il accepte de parler vraiment.", "character_deferred"],
+  ])("keeps a semantically deferred reply blocked: %s", (reply, reason) => {
     const input = withReply(reply);
     input.evaluation.handoff_assessment!.consent.stance = "defer";
-    expect(validateCharacterHandoff(input).authorized).toBe(false);
+    expect(validateCharacterHandoff(input)).toMatchObject({ authorized: false, reason });
   });
   it.each([
     "Je ne vais pas te le passer.", "Je vais pas te le passer.", "Je te le passe pas.",
