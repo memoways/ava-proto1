@@ -4,6 +4,9 @@ import { displayNameForCharacter } from "@/services/characterRegistry";
 
 export type CharacterSwitchStance = "accept" | "object" | "defer";
 
+/** Procedure shared with the GM; editorial frame and character willingness stay separate. */
+export const CHARACTER_CALL_TRANSFER_INSTRUCTIONS = "Pour passer à l'autre personnage, propose de passer l'appel : il s'agit d'un transfert téléphonique, ne lui propose pas de venir et ne promets ni déplacement ni conférence. Si tu acceptes, propose naturellement au joueur de lui passer l'autre personnage au téléphone ; tu peux aussi refuser ou hésiter. Le joueur déclenche le changement, sans transmission de confidences privées.";
+
 export interface CharacterHandoffOffer {
   reason: string;
   proposalGuidance: string;
@@ -128,7 +131,7 @@ export function buildSwitchRequestGuidance(
 ): string {
   const current = characterDisplayName(currentCharacter);
   const target = characterDisplayName(targetCharacter);
-  return `Le joueur demande explicitement à parler avec ${target}. Réponds in character en tant que ${current} : tu peux accepter, objecter ou hésiter. N'invente rien de ce qu'il aurait dit à ${target}. N'exécute pas le transfert toi-même.`;
+  return `Le joueur demande explicitement à parler avec ${target}. Réponds in character en tant que ${current} : tu peux accepter, objecter ou hésiter. ${CHARACTER_CALL_TRANSFER_INSTRUCTIONS} N'invente rien de ce qu'il aurait dit à ${target}. N'exécute pas le transfert toi-même.`;
 }
 
 export function inferCharacterSwitchStance(characterReply: string): CharacterSwitchStance {

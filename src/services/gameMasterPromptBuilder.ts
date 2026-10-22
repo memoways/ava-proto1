@@ -1,18 +1,28 @@
 import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig, ExperienceDirectorGuardrails } from "@/types";
+import { CHARACTER_CALL_TRANSFER_INSTRUCTIONS } from "./characterConversation";
 
 /** Added to the same GM call only when the runtime supplies exact handoff context. */
 export const CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS = `CONTRAT RUNTIME DE PASSAGE — prioritaire sur le schéma historique et sa règle de suggestion au tour suivant.
 Le CONTEXTE EXACT DU PASSAGE est fourni : la clé handoff_assessment est obligatoire à la racine du même objet JSON, aux côtés de labels, action et memory_delta. Le schéma historique fermé est étendu par cette clé ; ne retourne ni un second objet JSON ni les champs de la preuve à la racine.
-Exemple de la partie à fusionner dans l'objet complet (schemaVersion=1) :
+FORMAT COMPACT PRIORITAIRE sur l'exemple historique développé : un seul objet JSON complet, sur une ligne sans markdown. Tous les champs de premier niveau restent présents. Exemple complet (valeurs à évaluer et identifiants à recopier du contexte exact) :
 {
+ "labels":{"themes":[],"topics":[],"intentions":[]},
+ "engagement_delta":0,"confusion_detected":false,"role_usage_quality":"unknown","topics_covered":[],
+ "transition_recommended":false,"cinematic_hint":null,"next_turn_guidance":"","end_recommended":false,"moderation_flag":false,"notes":"","trigger_video_id":null,
  "handoff_assessment": {
   "schemaVersion": 1, "sourceCharacter": "emma", "targetCharacter": "max",
   "turnId": "identifiant exact du tour courant", "turnIndex": 11, "orchestrationVersionId": "version épinglée exacte",
   "origin": { "type": "player_request", "turnId": "tour de la demande", "turnIndex": 11, "evidence": "citation exacte de la demande" },
   "targetEvidence": { "speaker": "user", "quote": "citation exacte qui nomme Max" },
   "consent": { "stance": "accept", "evidence": "citation exacte de l'accord du personnage", "refusalEvidence": null }
- }
+ },
+ "action":{"type":"handoff","targetCharacter":"max","reason":"Accord de transfert.","proposalGuidance":"Propose de passer l'appel à Max."},
+ "player_switch_request":{"targetCharacter":"max","stance":"accept"},
+ "memory_delta":null
 }
+Budget de sortie 950 tokens conservé : émettre handoff_assessment avant memory_delta ; fermer l'objet entier. notes : 40 caractères maximum ; next_turn_guidance et proposalGuidance : 100 caractères chacune ; citations exactes minimales et contextualisées, de préférence moins de 80 caractères. Aucun commentaire ni justification répétée dans action.
+memory_delta : uniquement les nouveautés du dernier échange, jamais une copie de la mémoire ou de l'état relationnel courant. null si rien de nouveau ; sinon un objet différentiel avec seulement les champs utiles, au plus deux faits courts par liste et lastExchange en 20 mots maximum. N'invente ni n'efface des faits pour raccourcir. Une proposition relationship n'est utile que si elle change l'état, avec ses métadonnées et preuves exactes ; sinon l'omettre.
+Procédure de passage à rappeler aussi dans proposalGuidance : ${CHARACTER_CALL_TRANSFER_INSTRUCTIONS}
 Une demande ouverte doit être reconfirmée comme en attente par une évaluation defer courante à chaque tour ; null, refus ou annulation du joueur la ferme. Ne réutilise jamais une demande retirée.
 Retourne handoff_assessment:null si aucun passage n'est évalué ou si la cible ne peut pas être résolue. Pour une demande ou proposition évaluée dont la cible est résolue, renseigne le contrat, y compris object/defer. Sans cible résolue, conserve action none et demande une clarification, sans inventer de preuve. Les identifiants doivent venir du contexte fourni, jamais être inventés.
 Une suggestion future ne prouve aucun accord. Lorsqu'une demande du joueur reçoit un accord effectivement délivré, évalue cet accord au tour courant : accept implique action.type=handoff vers la même cible, sans attendre une nouvelle demande ni une proposition au tour suivant. Le moteur vérifiera encore les preuves et ses gardes avant d'offrir le clic.
@@ -23,7 +33,7 @@ evidence et quote sont des citations exactes, sans paraphrase, contenant le cont
 Résous « lui » ou « Matt » seulement si ce même échange ou la demande encore ouverte identifie Max sans ambiguïté. Aucun alias global Matt → Max ; sinon clarification naturelle et stance historique defer, sans fabriquer un contrat complet privé de preuve de cible.
 T6 « Je peux lui demander » est différé ; T9 « Je vais lui demander de vous parler » reste ambigu.
 T10 « Je vais l’appeler. C’est Max, pas Matt. » et T11 « Je vais aller le chercher dans le salon et lui dire que vous voulez lui parler directement. » peuvent être acceptés uniquement avec cible et preuves cohérentes.
-Un refus de transfert avec ou sans « ne », « plus tard », « Je vais lui demander s’il accepte », « Je vais l’appeler… enfin non » restent object ou defer.
+Un refus de transfert avec ou sans « ne », « plus tard », « Je vais lui demander s’il accepte », « Je peux peut-être lui proposer de venir, à condition qu’il accepte », « Je vais l’appeler… enfin non » restent object ou defer. Une absence de refus ne suffit pas à établir un accord de transfert.
 Une citation affirmative isolée dans un refus ne suffit pas : renseigne refusalEvidence avec la citation contradictoire et ne classe jamais accept. Une inquiétude générale sur les sentiments de Max ne vaut pas refus de transfert.
 Le texte généré mais non entendu, incertain ou coupé avant l'accord n'est pas une preuve délivrée. Le moteur vérifiera le reçu de livraison ; n'invente aucune preuve.
 Budget inchangé : JSON compact, notes et guidances brèves, citations minimales (idéalement moins de 100 caractères), aucune répétition inutile dans memory_delta. Le champ est une extension de l'objet JSON existant. Pour object/defer, action peut rester none ; pour accept, action doit être handoff vers la même cible.

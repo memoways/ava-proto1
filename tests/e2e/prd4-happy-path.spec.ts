@@ -1627,6 +1627,9 @@ test('lot 2 : une révocation ancienne retardée ne remplace pas la nouvelle ses
   });
   await startCharacterConversation(page, 'Emma');
   for (const text of turns.slice(0, 4)) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+  // Disable the target only after the asynchronous GM/profile work created the offer.
+  await expect(page.getByRole('button', { name: 'Appeler Max', exact: true })).toBeVisible();
+  expect(fakes.getSessionRow()).toMatchObject({ active_character: 'emma', pending_handoff: { state: 'available' } });
   disabled = true;
   await page.getByRole('button', { name: 'Appeler Max', exact: true }).click();
   await expect.poll(() => revocationStarted).toBe(true);

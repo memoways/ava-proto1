@@ -1,7 +1,7 @@
 # Passage Emma ↔ Max : validation narrative et pastille d’appel
 
 Date du diagnostic : 19 octobre 2026. État au 22 octobre : **lots 1, 2 et 3 livrés sur GitHub,
-code synchronisé dans Lovable ; lot 4 en recette, sans nouvelle publication produit**.
+code synchronisé dans Lovable ; lot 4 partiel, sans nouvelle publication produit**.
 Périmètre du diagnostic du 19 octobre : analyse et plan. Le lot 1 du 21 octobre est décrit au §5 ; aucun réglage Cloud ni déploiement produit modifié.
 Base examinée : `main` / `d0f72b601680b65b50e901e61bcae92a5752addd`, également HEAD Lovable au contrôle.
 
@@ -467,139 +467,192 @@ chat, partir du main réel après fetch, y compris l'éventuelle clôture docume
 Aucun lot 4 commencé. Restent seulement la recette humaine coordonnée, le quota
 sandbox de recette et la publication après résultat observable accepté.
 
-### Lot 4 — préparation engagée le 22 octobre 2026
+### Lot 4 — préparation, recette et correctif du 22 octobre 2026
 
-Périmètre limité à la recette coordonnée et à la livraison Lovable. Base réelle
-après fetch : `f01532be27840025836aee44316da5d50518defd`, main local/distant
-identiques, checkout initial propre. Clôture #60 fusionnée le 21 octobre à
-22:40:59 Europe/Paris : CI `39669987036` verte sur son HEAD exact
+Nouvelle recette réelle `ce05527f-a7f5-4a1c-b914-f82227fb5419` : demande
+explicite nommant Max, réponse d'Emma conditionnelle (« peut-être… à condition »),
+aucune offre ni transfert. Le diagnostic brut T10 établit un JSON GM incomplet,
+coupé dans `handoff_assessment` après 938 tokens de complétion (budget 950).
+Le refus `invalid_json` est conservé. Ulrich précise que le personnage doit
+proposer de **passer l'appel**, sans promettre la venue physique de l'autre.
+Appel du 22 octobre, **09:08:31–09:21:55 Europe/Paris**, v7, Emma, compteur 0,
+film vu, rôle/posture null ; trois réponses entendues confirmées par Ulrich,
+puis demande unique et absence de pastille confirmée. Session clôturée
+`user_hangup`, micro fermé, persistance relue. Aucune mémoire privée transférée.
+Correction prévue dans ce seul lot : contrat de sortie runtime complet et compact,
+preuve avant mémoire, mémoire différentielle brève ; même modèle/appel/950 tokens
+et parseur strict. Rappeler la procédure téléphonique dans la guidance de demande
+et dans l'extension GM, sans toucher au cadre éditorial partagé, au rôle/posture,
+aux preuves ou aux refus. Une hésitation reste defer ; aucun accord forcé.
+Les revues ont identifié deux prérequis de compatibilité : garder
+`action.proposalGuidance` dans l'exemple complet (sinon action neutralisée), et
+respecter l'absence de proposition relationnelle dans un delta compact.
+`ConversationMemoryDelta.relationship` est optionnel, mais son nettoyeur créait
+un objet vide même si la clé était absente, puis invalidait le GM. Correction
+bornée prévue : préserver cette absence, tout en validant et rejetant comme avant
+toute proposition relationnelle explicitement fournie mais invalide. Reproduire
+les deux cas avant correction et contrôler la conservation de la mémoire privée.
+Probe supplémentaire : demander au veto déterministe de bloquer la nouvelle phrase
+conditionnelle même avec un GM `accept` a échoué. Ce cas dépasse ses vetos étroits
+existants ; aucune regex générale « proposer/venir/condition » n'est ajoutée,
+conformément au partage sémantique GM / preuves moteur. La nouvelle fixture vérifie
+`character_deferred` avec une évaluation GM defer comme T6/T9, et le prompt classe
+explicitement cette condition en defer. Limite conservée : une fausse classification
+GM accept sur cette phrase n'est pas aujourd'hui un veto déterministe. La recette
+réelle rejetée pour JSON incomplet n'a produit aucune autorisation abusive.
+
+Complément de vérification du 22 octobre : la CI documentaire
+[39736840084](https://github.com/memoways/ava-proto1/actions/runs/39736840084)
+échoue sur le test de révocation ancienne (64 E2E passent, même échec au retry).
+La trace confirme que la fixture désactive Max avant le chargement de disponibilité
+post-GM, donc avant la création de l'offre ; le moteur refuse correctement
+`target_not_ready`. Finalisation prévue : attendre et vérifier l'offre visible
+et persistée avant de désactiver Max, puis conserver toutes les assertions de
+révocation retardée et de nouvelle session. Aucun timeout ni garde produit assoupli.
+La PR #62 reste non fusionnée jusqu'à une CI verte sur son nouveau HEAD exact.
+
+Preuves de cette finalisation : quatre vérifications rouges du format complet et
+du transfert téléphonique, puis 134 ciblées vertes ; deux constats des revues
+reproduits rouges (action sans proposalGuidance et relation absente), puis
+139 ciblées vertes avant la probe de déféré documentée ci-dessus ; **140 ciblées
+vertes** après finalisation des consommateurs et du motif prioritaire de refus T6.
+Les deux revues finales source sont sans constat restant. Un contrôle
+qualité concurrent aux E2E a rencontré un timeout de 5 s sur la pagination
+inchangée (735/736 unitaires) ; fichier isolé ensuite 8/8 vert. Aucune hausse
+de délai ni modification de ce fichier. Le contrôle qualité séquentiel suivant
+est vert (739 unitaires, 41 intégrations, 48 régressions), avant les derniers
+tests de compatibilité. La dernière qualité complète est **rouge : 742/744
+unitaires**, après 48 régressions vertes ; `LatencyBlockingTab` ne trouve pas
+`future-video` et le test T6 attendait à tort defer au lieu du refus prioritaire.
+Ce dernier motif est corrigé et revalidé dans les 140 ciblés, sans changer le
+veto produit. Le test future-video est inchangé et reste à diagnostiquer/revalider ;
+ne pas qualifier la qualité finale de verte. L'intégration et le build de cette
+dernière commande n'ont pas été exécutés après l'échec unitaire.
+L'E2E intermédiaire a été interrompu après découverte du JSON brut et des nouveaux
+correctifs : 44 passent, un interrompu, 20 non exécutés ; il ne vaut pas réussite.
+Une nouvelle exécution complète est requise sur le correctif final.
+Ulrich demande ensuite un nouveau chat frais : sauvegarder les correctifs et cette
+limite dans la branche/PR #62, sans fusion ni nouvelle publication. La reprise
+doit commencer par terminer ces validations, puis seulement la recette humaine.
+
+**État : partiel.** Correctif livré sur main et synchronisé dans Lovable ;
+aucune nouvelle publication produit. La recette humaine bidirectionnelle
+reste nécessaire. Aucun lot suivant ni nouveau chat lancé.
+
+#### État réel et contrôle du lot 3
+
+Base après fetch : `f01532be27840025836aee44316da5d50518defd`, main
+local/distant identiques, checkout propre. Clôture #60 fusionnée le 21 octobre
+à 22:40:59 Europe/Paris : CI `39669987036` verte sur le HEAD exact
 `ae034c668398b25037d9558f44c864754969e6a7`, puis CI main `39672418024` verte.
-Lovable natif : même SHA, ready, agentFinished ; workspace Memoways et Cloud
+Lovable au même SHA, ready/agentFinished ; workspace Memoways et Cloud
 `iralfqlslqndgvexixis` confirmés. Identité GitHub existante `Ulrfis` réutilisée.
-Branche du lot : `codex/character-handoff-recipe-lot-4`, checkout canonique.
+Branche technique : `codex/character-handoff-recipe-lot-4`, checkout canonique.
+Deux revues indépendantes du lot 3 n'identifient aucun défaut restant de son UI.
 
-Avant activation Cloud, rejouer qualité complète et les 65 E2E, puis
-vérifier le rendu en preview et les portraits runtime. Aucun défaut restant du
-lot 3 n'est établi par les contrôles initiaux ; corriger seulement un défaut
-reproduit, avec test rouge puis vert. Les preuves automatiques et humaines
-restent distinctes.
+Baseline locale : 734 unitaires, 41 intégrations, 48 régressions,
+lint/typecheck/build verts ; 65 E2E sans retry, un worker, 10,3 min.
+Premier lancement E2E empêché par EPERM avant tout test ; relance avec accès
+système autorisé. Captures simulées 390/1280 px relues : pastille conforme.
+Deux E2E isolés visant la preview sont non concluants : connexion Lovable
+avant AVA, bouton Commencer absent. Brave déjà authentifié accède à l'admin
+preview ; aucune connexion ou cookie copié pour contourner cette limite.
 
-Changement Cloud prévu et autorisé pour la recette : cloner la v6 publiée
-`9217fd34-321a-45c7-8363-6a8cf0b0157c` dans un brouillon de **sandbox-ulrich**,
-avec `maximumHandoffsPerSession=8` uniquement ; conserver seuil 4,
-pause 2 et tous les autres champs, avec la seule mention textuelle du quota
-dans le prompt GM alignée de 1 à 8. Relire le brouillon et sa différence avant
-activation par le flux existant. Ni production ni session en cours modifiée ;
-la version reste épinglée par session. L'identifiant et le numéro réellement
-créés seront consignés après lecture, jamais anticipés.
+#### Configuration sandbox préparée et activée
 
-Confiance de préparation : 95 % ; table et flux existants relus, copie du
-JSONB vérifiable champ par champ, aucun moteur ni migration ajouté.
-Référence : [opérateurs JSONB PostgreSQL](https://www.postgresql.org/docs/current/functions-json.html).
-Le connecteur Lovable Cloud est authentifié mais sa requête SQL porte le rôle
-postgres sans acteur applicatif (`auth.uid()=null`). La RPC de publication
-exige un membre admin ; conserver ce contrôle. Le brouillon est préparé par
-le connecteur natif ; son activation doit emprunter l'admin déjà authentifié
-dans Brave, sans usurpation d'identité SQL ni remplacement de la RPC.
+V7 `98145fe3-96f1-4525-84c2-0e0a1cc5c6da`, copie de la v6
+`9217fd34-321a-45c7-8363-6a8cf0b0157c`, dans **sandbox-ulrich uniquement**.
+Différence relue : maximumHandoffsPerSession de 1 à 8, et son unique mention
+textuelle « au maximum 1 fois » devenue « au maximum 8 fois ». Tous les autres
+champs config et le reste du prompt sont identiques ; seuil 4 et pause 2 conservés.
+Confiance préalable 95 % : table/flux existants, comparaison JSONB et absence de
+nouveau moteur/migration ; [référence PostgreSQL](https://www.postgresql.org/docs/current/functions-json.html).
 
-Recette : nouvel onglet preview, admin → Sandbox Ulrich → Tester moi-même,
-nouvel appel Emma. Ulrich accomplit les échanges naturels et confirme accord,
-sonneries et réponse audible ; vérifier événements et persistance via Lovable.
-Retour Emma après pause et nouvel accord. Ne pas simuler sa parole, répéter les
-demandes après refus ou publier le produit avant résultat observable accepté.
-Si ce geste humain manque, sauvegarder une reprise de finalisation du lot 4,
-actualiser CHANGELOG/STORY/plan et livrer la préparation par PR avec CI verte
-sur HEAD exact ; aucune clôture fictive ni lot 5.
+Le connecteur SQL Lovable porte postgres sans acteur applicatif ; la RPC de
+publication exige un membre admin. Brouillon préparé par le connecteur natif,
+puis activé par le bouton Publier de l'admin déjà authentifié dans Brave,
+sans usurpation SQL ni remplacement de la RPC. Activation vérifiée à 08:10:29
+Europe/Paris : v7 publiée, v6 archivée, ses 21 sessions épinglées conservées.
+Production narrative v1 toujours publiée à quota 1 ; v2 brouillon inchangée.
+**Publication de configuration sandbox distincte de publication du produit.**
+Aucune migration, Edge Function, voix, secret ou fournisseur modifié.
 
-Préparation vérifiée : brouillon v7 `98145fe3-96f1-4525-84c2-0e0a1cc5c6da`,
-source v6, environnement sandbox-ulrich ; quota8/seuil4/pause2. Lecture native
-après insertion : prompt identique et JSONB privé du seul quota identique à
-la source. Production v1 publiée et v2 brouillon toujours à quota1.
-Contrôle complémentaire avant activation : le prompt figé de la v6 contient
-« au maximum 1 fois ». Aligner cette occurrence exacte sur « au maximum 8 fois »
-dans le seul brouillon v7 ; le reste du prompt demeure strictement identique.
-Il s'agit du reflet textuel du quota de recette autorisé, pas d'un changement
-de consigne narrative ni d'un défaut du lot 3.
-Qualité locale complète verte : 734 unitaires, 41 intégrations, 48 régressions,
-lint/typecheck/build ; avertissements hooks et taille de bundle préexistants.
-Premier lancement E2E bloqué avant tout test par EPERM sur le serveur local ;
-relance avec l'accès système autorisé : **65/65 E2E sans retry**, un worker,
-10,3 min. Captures simulées 390/1280 px relues visuellement, pastille conforme.
-Deux revues indépendantes Standards/Spec ne trouvent aucun défaut restant du
-lot 3. Leur dernière revue documentaire attend les résultats finaux.
+#### Première recette humaine : échec conservé
 
-Deux scénarios d'accessibilité tentés sur la preview hébergée ont échoué
-avant l'application : contexte Playwright isolé redirigé vers la connexion
-Lovable, bouton Commencer absent. Ils sont **non concluants pour le produit**,
-sans changement de test ni contournement de connexion. Brave déjà authentifié
-accède bien à l'admin preview, compte Ulrich, Sandbox Ulrich. La vérification
-visuelle réelle et la recette humaine doivent utiliser cette session existante.
-Ulrich confirme dans ce chat sa disponibilité pour la recette ; aucun succès
-vocal n'est encore acquis.
+Admin preview → Sandbox Ulrich → Tester moi-même, onglet neuf rechargé,
+frontend `index-awa67RiN.js`. Session `18e7d9f8-e65b-425e-bc69-ca58ca6cb231`,
+08:11:15–08:16:53 Europe/Paris : Emma, v7 épinglée, film vu repris de l'appel
+historique, player_role null, compteur 0. Portrait runtime Emma chargé.
+Ulrich confirme ses échanges et la voix, puis un accord entendu après une
+seule demande de passage au tour 5. Aucune pastille : GM executed en 3174 ms,
+player_switch_request accept/max, action none, handoff_assessment nettoyé null ;
+événement handoff_blocked/assessment_missing. Micro fermé, puis Terminer,
+user_hangup vérifié. Aucun appel Max ni retour, aucun succès prétendu.
 
-Activation sandbox vérifiée le 22 octobre à 08:10:29 Europe/Paris : la v7
-`98145fe3-96f1-4525-84c2-0e0a1cc5c6da` est publiée via le bouton admin
-Publier (RPC existante), v6 archivée. Les 21 sessions épinglées v6 restent
-sur v6 ; production v1 toujours publiée à quota1 (8 sessions épinglées).
-Lecture native : seules config.quota et sa mention textuelle ont changé.
-Il s'agit de publier une **configuration sandbox**, pas le produit hébergé.
+455 tokens de sortie et état completed ne signalent pas une troncature.
+Sans diagnostic complet, null ne distingue pas omission et contrat rejeté.
+Le dernier échange est pronominal, sans Max nommé ; la preuve de cible peut
+rester indémontrable selon les gardes conservées. Aucune cause exclusive affirmée.
 
-Recette humaine engagée depuis admin preview → Sandbox Ulrich → Tester
-moi-même, onglet neuf rechargé après activation ; frontend `index-awa67RiN.js`.
-Session `18e7d9f8-e65b-425e-bc69-ca58ca6cb231`, début 08:11:15 Europe/Paris,
-Emma active, compteur0, v7 épinglée, player_role null ; film vu repris de
-l'appel de référence par l'agent. Portrait runtime Emma chargé (largeur1848),
-contrôles micro/Terminer présents. Micro initialement fermé ; Ulrich prend
-la parole pour les échanges. Aucun résultat humain encore attesté.
+#### Correction minimale du contrat effectif GM
 
-### Lot 4 — échec humain observé et correction minimale du contrat GM
+Chemins batch/streaming relus : handoffDelivery et turnId sont transmis.
+Contradiction certaine : schéma historique « EXACTEMENT cet objet » sans
+handoff_assessment, action décrite comme suggestion future, puis extension dite
+optionnelle et exemple non enveloppé. Le bloc runtime devient explicitement
+prioritaire ; son exemple place la clé à la racine du JSON existant. Sa présence
+est exigée avec contexte exact, null si aucun passage ou cible non résolue.
+Un accord déjà délivré classé accept doit viser la même cible dans action handoff.
+Aucune permission reconstruite depuis les champs historiques. Parseur toujours
+optionnel pour l'historique, preuves/gardes, même modèle, un appel, 950 tokens,
+timeout, capture, voix et mémoires conservés. GM_CODE_VERSION incrémentée.
 
-Ulrich confirme la voix d'Emma et ses trois échanges, puis un accord entendu
-après une demande unique vers Max au tour5. Aucune pastille visible : GM
-executed (3174 ms), player_switch_request accept/max, action none,
-handoff_assessment null ; événement handoff_blocked/assessment_missing.
-Compteur0, aucun appel Max ni retour. Micro fermé puis session clôturée par
-Terminer à 08:16:53 Europe/Paris, user_hangup. Aucune publication produit.
-Les 455 tokens de sortie GM et son état completed ne signalent pas de troncature.
-Sans diagnostic intégral, le null nettoyé ne distingue pas une omission du
-champ d'un contrat rejeté : aucune causalité exclusive n'est prétendue.
+Deux tests builtin/override rouges (clé d'exemple absente), puis 114 ciblés verts.
+Deux revues Standards/Spec finales sans constat après clarification de la règle
+null/cible. Relance E2E interrompue pour cette clarification non comptée verte.
+Qualité finale : **736 unitaires, 41 intégrations, 48 régressions** et
+lint/typecheck/build verts ; avertissements hooks/bundle préexistants.
+**65/65 E2E locaux sans retry en 10,0 min**, un worker ; CI 65 E2E en 10,2 min.
+Ces tests de contrat ne prouvent pas une réussite réelle du modèle.
 
-Revue ciblée du chemin réel : handoffDelivery/turnId conservés dans le batch
-et le streaming. Contradiction de prompt certaine : le schéma historique
-« EXACTEMENT cet objet » n'inclut pas handoff_assessment ; action handoff y
-désigne une suggestion au tour suivant ; l'extension runtime est dite optionnelle.
-Correction bornée prévue : rendre explicitement prioritaire cette extension,
-montrer sa clé à la racine de l'objet, exiger sa présence dès que le contexte
-exact est fourni (null seulement sans passage évalué), et distinguer proposition
-future de l'accord effectivement délivré. Ne reconstruire aucune autorisation
-depuis les seuls champs historiques ; parseur toujours optionnel et échec fermé.
-Même appel, modèle, budget950, timeout, gardes et voix inchangés.
+[PR #61](https://github.com/memoways/ava-proto1/pull/61) fusionnée à 08:37:51
+Europe/Paris dans `180e018714f1916ffe32df9a94df1906b1ee209b`, après
+[CI 39733628039](https://github.com/memoways/ava-proto1/actions/runs/39733628039)
+verte sur le **HEAD exact `0562abe37599618a39d93a4c8333b7bdf8b5d7c5`**.
+SHA du run, HEAD de PR et tous les checks relus avant fusion protégée par SHA.
+Main local/distant identiques, checkout propre après fusion ; Lovable natif
+même SHA, ready/agentFinished. [CI post-fusion 39735148175](https://github.com/memoways/ava-proto1/actions/runs/39735148175)
+contrôlée séparément ; son résultat doit être relu au départ de la reprise.
 
-Boucle de preuve : test du prompt final builtin et override historique rouge
-avant changement, puis vert ; cette preuve de contrat ne vaut pas succès LLM.
-Rejouer ciblés, qualité complète, 65 E2E et deux revues avant PR/CI exacte.
-La nouvelle recette humaine doit activer le diagnostic existant, pour vérifier
-les instructions effectivement transmises et le JSON brut sans le publier.
+Décision durable du contrat effectif relue, ajoutée à l'entrée Notion AVA
+existante et vérifiée ; Source conservée, Last updated by=Codex. Aucune préférence
+inventée, donnée sensible ou transcript importé ; About et Conare inchangés.
 
-Correction locale : bloc runtime explicitement prioritaire, exemple JSON avec
-clé handoff_assessment à la racine et présence exigée quand le contexte exact
-existe ; accept courant implique action handoff, aucune autorisation reconstruite.
-GM_CODE_VERSION passe à gm-2026-10-22-handoff-prompt-contract. Parseur historique,
-modèle, budget950, timeout, capture, voix et mémoires inchangés.
-Deux tests builtin/override échouent d'abord sur la clé de preuve absente dans
-l'exemple (undefined au lieu de schemaVersion1), puis **114 tests ciblés verts**.
-Qualité complète et 65 E2E relancés sur ce correctif. Deux revues indépendantes
-Standards/Spec sans défaut bloquant ; une phrase null/cible non résolue clarifiée.
-La suite E2E interrompue pour cette clarification n'est pas comptée verte ;
-114 ciblés repassés et contrôles complets relancés sur la formulation finale.
+#### Reprise et limite humaine
 
-Limite supplémentaire relue sur le dernier échange réel : la demande et la
-réponse restent pronominales, sans nommer Max dans ce tour. La preuve de cible
-peut donc rester indémontrable selon le contrat conservé. La correction résout
-une contradiction certaine des instructions, sans prétendre expliquer à elle
-seule cet échec ni garantir une offre. Prochaine recette : nouvel appel avec
-le diagnostic existant, une seule demande explicite vers Max après le minimum
-narratif, puis retour autorisé après pause ; aucune répétition après un refus.
+Preview corrigée `index-Ch9HRnsK.js`, diagnostic=full, session
+`81e5fdca-e3be-4fc8-b170-7c68672e9307` ouverte à 08:39:45 Europe/Paris :
+v7 épinglée, Emma, film vu, player_role null, diagnostic_trace_enabled=true.
+Aucun tour utilisateur ni transfert. Micro resté fermé ; appel clôturé par
+Terminer à **08:47:51 Europe/Paris**, user_hangup et compteur 0 relus.
+Preview laissée à l'accueil, sans appel de contrôle en cours.
+Aucun prompt/JSON brut de GM produit par ce contrôle sans échange.
+
+La recette corrigée reste à faire avec Ulrich disponible : nouvel appel
+Emma sur la preview, diagnostic=full, échanges naturels puis **une seule demande
+explicite vers Max** après le seuil ; vérifier prompt/JSON brut, preuve délivrée,
+offre, clic, sonneries et réponse audible. Retour Emma après pause et nouvel
+accord ; même session/timer/film/rôle/posture, profils/voix et mémoires privées.
+Ne pas répéter après refus, assouplir les gardes ou substituer une voix synthétique.
+Publication produit exclusivement Lovable après résultat observable accepté,
+puis contrôle du frontend servi ; aucun déploiement n'a été demandé dans ce lot.
+
+Branche de clôture : `codex/character-handoff-lot-4-closeout`, base
+`180e018`. CHANGELOG/STORY et le [prompt autonome de finalisation du lot 4](prompt_reprise_switch_personnages_finalisation_lot_4.md)
+sont actualisés, avec la correction de préparation du test de révocation ancienne.
+Clôture à fusionner seulement après CI verte
+sur son propre HEAD exact, puis recontrôler main et synchronisation Lovable.
+Le prochain assistant part du main réel après fetch, sans restaurer ces hashes.
 
 ## 6. Validation attendue
 

@@ -10,6 +10,8 @@ import { CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS, buildExperienceDirectorPromp
 import { DEFAULT_DIRECTOR_CONFIG } from "@/services/experienceOrchestration";
 import { validAssessment, validInput } from "@/services/characterHandoff.fixtures";
 import { validateCharacterHandoff } from "@/services/characterHandoff";
+import { CHARACTER_CALL_TRANSFER_INSTRUCTIONS } from "@/services/characterConversation";
+import type { CharacterRelationshipPolicy } from "@/types";
 
 const historicalJson = {
   engagement_delta: 1, confusion_detected: false, role_usage_quality: "high", topics_covered: ["max"],
@@ -66,6 +68,17 @@ describe("GM optional structured handoff compatibility", () => {
     expect(result.execution_status).toBe("invalid");
     expect(result.handoff_assessment).toBeNull();
   });
+  it("rejects an output cut inside the assessment instead of repairing an agreement", async () => {
+    const truncated = JSON.stringify({ ...historicalJson, handoff_assessment: validAssessment() }).slice(0, -20);
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ content: truncated, ...llmMetadata });
+    const result = await evaluatePostTurnPRD4({ ...input, handoffContext: {
+      turnId: validInput().turnId, openRequest: null, delivery: validInput().delivery,
+    } });
+    expect(result.execution_reason).toBe("invalid_json");
+    expect(result.handoff_assessment).toBeNull();
+    expect(validateCharacterHandoff({ ...validInput(), evaluation: result }).authorized).toBe(false);
+    expect(callLLMWithUsage).toHaveBeenCalledOnce();
+  });
   it("prepares semantic instructions as an isolated artifact", () => {
     expect(CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS).toContain('"refusalEvidence": null');
     expect(CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS).toContain("accept|object|defer");
@@ -95,6 +108,46 @@ describe('live same-call handoff context', () => {
 
 
 describe("live handoff prompt contract over historical schemas", () => {
+  it.each([undefined, null, {}])("keeps an absent relationship proposal distinct from explicit invalid %j", async relationship => {
+    vi.clearAllMocks();
+    const policy: CharacterRelationshipPolicy = {
+      schemaVersion: 1, characterKey: "emma", version: "policy-v1", source: "notion",
+      callDrive: "Écouter.", openingSignals: [], closingSignals: [], sensitiveTopics: [],
+      resistanceStyle: "Rester prudente.", initiativeStyle: "Reprendre un fil.",
+    };
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...llmMetadata, content: JSON.stringify({
+      ...historicalJson, handoff_assessment: validAssessment(), memory_delta: {
+        userFacts: ["Le joueur travaille la nuit."], ...(relationship === undefined ? {} : { relationship }),
+      },
+    }) });
+    const result = await evaluatePostTurnPRD4({ ...input, relationshipPolicy: policy });
+    if (relationship === undefined) {
+      expect(result.execution_status).toBe("executed");
+      expect(result.memory_delta?.userFacts).toEqual(["Le joueur travaille la nuit."]);
+      expect(result.memory_delta).not.toHaveProperty("relationship");
+      expect(validateCharacterHandoff({ ...validInput(), evaluation: result }).authorized).toBe(true);
+    } else {
+      expect(result.execution_reason).toBe("relationship_invalid");
+      expect(result.memory_delta).toBeNull();
+      expect(result.handoff_assessment).toBeNull();
+    }
+  });
+  it("accepts the complete compact example through the existing parser and handoff validator", async () => {
+    vi.clearAllMocks();
+    const extension = CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS;
+    const start = extension.indexOf("{");
+    const example = JSON.parse(extension.slice(start, extension.indexOf("\n}\n", start) + 2));
+    const fixture = validInput();
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...llmMetadata,
+      content: JSON.stringify({ ...example, handoff_assessment: validAssessment() }),
+    });
+    const result = await evaluatePostTurnPRD4({ ...input, handoffContext: {
+      turnId: fixture.turnId, openRequest: null, delivery: fixture.delivery,
+    } });
+    expect(result.execution_status).toBe("executed");
+    expect(result.action).toMatchObject({ type: "handoff", targetCharacter: "max" });
+    expect(validateCharacterHandoff({ ...fixture, evaluation: result }).authorized).toBe(true);
+  });
   it.each([
     ["builtin", null],
     ["historical override", buildExperienceDirectorPrompt(EXPERIENCE_DIRECTOR_SYSTEM_PROMPT, DEFAULT_DIRECTOR_CONFIG)],
@@ -115,6 +168,13 @@ describe("live handoff prompt contract over historical schemas", () => {
       // A model following the shown JSON must place the proof where the cleaner reads it.
       expect(example).toHaveProperty("handoff_assessment.schemaVersion", 1);
       expect(example).not.toHaveProperty("schemaVersion");
+      for (const key of Object.keys(historicalJson)) expect(example).toHaveProperty(key);
+      expect(Object.keys(example).indexOf("handoff_assessment"))
+        .toBeLessThan(Object.keys(example).indexOf("memory_delta"));
+      expect(JSON.stringify(example).length).toBeLessThan(1600);
+      expect(extension).toContain(CHARACTER_CALL_TRANSFER_INSTRUCTIONS);
+      expect(extension).toContain("notes : 40 caractères");
+      expect(extension).toContain("memory_delta : uniquement les nouveautés");
       expect(extension).toMatch(/clé handoff_assessment est obligatoire/);
       expect(extension).toMatch(/prioritaire sur le schéma historique/);
       expect(extension).toMatch(/accord effectivement délivré/);
