@@ -1,0 +1,17 @@
+---
+description: Un lot est fini seulement quand il est dans main (CI verte) et que sa branche est supprimée.
+alwaysApply: true
+---
+
+# Fin de lot : zéro branche qui traîne
+
+Règle complète : `AGENTS.md`, section « Fin de lot ». Résumé impératif :
+
+- Une branche par lot, depuis `main` à jour. Lister branches et PR existantes avant de commencer.
+- Fusionner dans `main` seulement quand la CI est **verte sur le HEAD exact** (jamais `queued` ou
+  `in_progress`). Vérifier ensuite la CI de `main`.
+- Supprimer la branche (distante et locale). Ne laisser ni brouillon, ni PR ouverte, ni branche.
+- Ne jamais fermer une PR ou supprimer une branche contenant du travail absent de `main`.
+- Étape bloquée : ne pas dire « terminé » ; le dire en tête du compte rendu avec l'unique
+  action à faire par Ulrich.
+- La publication de production via Lovable reste une étape distincte.

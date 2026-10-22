@@ -17,6 +17,15 @@ Expérience narrative interactive voice-to-voice. L'utilisateur parle avec "Max"
 
 Toute modification effectuée hors de Lovable doit rester compatible avec Lovable et y être ramenée avant validation ou publication. Ne pas mettre en place de build, de déploiement, de projet Supabase ou d'hébergement alternatif. Avant toute action sur le build, les variables d'environnement, les migrations, les Edge Functions ou la publication, vérifier qu'elle cible Lovable / Lovable Cloud. La règle complète commune à tous les agents est dans `AGENTS.md`.
 
+## Fin de lot (règle obligatoire — détail dans `AGENTS.md`)
+
+Un lot n'est terminé que si : PR fusionnée dans `main` **après CI verte sur le HEAD exact**
+(jamais pendant `queued`/`in_progress`), CI de `main` verte, branche supprimée (distante + locale),
+aucune PR ni branche qui traîne. Une seule branche par lot, depuis `main` à jour ; vérifier les
+branches/PR existantes avant de commencer. Si une étape est bloquée, le dire en tête du compte
+rendu avec l'unique action à faire : ne jamais annoncer « terminé » avec un reste. La publication
+Lovable reste une étape distincte.
+
 ## Stack
 
 - Plateforme : Lovable (compilation et publication)

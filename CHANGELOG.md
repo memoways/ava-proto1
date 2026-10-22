@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Process — sans impact produit] — 2026-10-22 — Fin de lot et branches
+
+- Règle « fin de lot » écrite en dur (`AGENTS.md`, `CLAUDE.md`, règle Cursor, gabarit de PR) :
+  un lot est terminé seulement s'il est dans `main` après CI verte sur le HEAD exact, avec la
+  CI de `main` verte et la branche supprimée. Plan : `docs/plan_hygiene_branches_fin_de_lot.md`.
+- Nouveau workflow `prune-branches.yml` : suppression automatique des branches terminées
+  (fermeture de PR, chaque lundi, à la demande). Aucun code produit, aucune migration.
+- Cause du déclenchement : la PR #68 a été fusionnée avec `regression-gates` encore `queued`.
+
 ## [Lot 4 partiel — non publié] — 2026-10-22 — Switching Emma ↔ Max
 
 - Contrat référencé et annonce sobre livrés par [#66](https://github.com/memoways/ava-proto1/pull/66)
