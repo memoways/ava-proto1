@@ -46,6 +46,16 @@ Cursor, Lovable, autres). Ne jamais attendre qu'il la répète, ne jamais demand
 
 **Règles de conduite associées :**
 
+- **Un seul agent actif à la fois sur ce dépôt** (Codex, Claude, Cursor, Lovable ou autre).
+  Avant toute action, regarder l'activité récente : `git fetch --prune`, derniers commits de
+  `main`, PR et branches ouvertes. Si une branche ou une PR d'un autre agent a bougé depuis
+  moins de 24 h, ne pas la fusionner, la fermer, la modifier ni la supprimer : demander à Ulrich.
+  Ne jamais ouvrir un lot qui touche les mêmes fichiers qu'une PR ouverte. Chaque agent fusionne
+  et nettoie uniquement ses propres PR et branches.
+- **Après chaque fusion dans `main`, rendre l'état lisible pour l'agent suivant** : entrée au
+  CHANGELOG avec le SHA de `main`, et ce qui reste à valider (recette humaine, publication Lovable).
+  Un agent qui reprend lit d'abord `git log origin/main` et le CHANGELOG, puis met son checkout à jour
+  (`git fetch --prune`, `git pull`) avant d'écrire une ligne.
 - **Une seule branche par lot, créée depuis `main` à jour.** Avant de commencer, lister les
   branches et PR ouvertes (`git fetch --prune`, `gh pr list`) : terminer, absorber ou fermer
   l'existant avant d'ouvrir du neuf. Pas de travail parallèle sur les mêmes fichiers.

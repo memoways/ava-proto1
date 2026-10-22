@@ -12,6 +12,18 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Nouveau workflow `prune-branches.yml` : suppression automatique des branches terminées
   (fermeture de PR, chaque lundi, à la demande). Aucun code produit, aucune migration.
 - Cause du déclenchement : la PR #68 a été fusionnée avec `regression-gates` encore `queued`.
+- Règle ajoutée : un seul agent actif à la fois ; chaque agent ne fusionne et ne supprime que ses
+  propres PR et branches ; après chaque fusion, entrée CHANGELOG avec le SHA de `main`.
+- **État de `main` à reprendre (2026-10-22, `68bfa2a`)** : après le lot 4 (#54 à #67, Codex), la PR #68
+  (Claude Code) a porté 5 correctifs restés sur des branches : reprise automatique du micro mains libres
+  (#51), refus en rôle des sujets hors-histoire côté personnages et GM (#53, `GM_CODE_VERSION`
+  `gm-2026-10-22-world-boundary`), flux vidéo de Max non affiché sur Emma (#52), plafond Gradium 0,85 et
+  hydratation des triggers vidéo. CI `regression-gates` verte sur `f0139fd` et `68bfa2a` (E2E compris) ;
+  aucune migration, aucune Edge Function, aucune configuration modifiée.
+- **Reste à valider** : recette humaine à la voix des trois changements de comportement (micro,
+  hors-sujet, Emma sans flux de Max) ; synchronisation Lovable de `main` sur `68bfa2a` et preview
+  `ready` ; décision sur la PR #24 (migration des invitations multi-usage, non appliquée).
+  Aucune publication de production faite.
 
 ## [Lot 4 partiel — non publié] — 2026-10-22 — Switching Emma ↔ Max
 
