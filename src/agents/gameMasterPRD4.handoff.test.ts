@@ -89,6 +89,31 @@ describe("GM optional structured handoff compatibility", () => {
 });
 
 describe('live same-call handoff context', () => {
+  it.each([null, {
+    turnId: 'session:10', turnIndex: 10, expiresAfterTurnIndex: 12,
+    userText: 'Je voudrais parler avec Max.', sourceCharacter: 'emma' as const,
+    targetCharacter: 'max' as const, orchestrationVersionId: 'v6',
+  }])('binds the current evidence text to its exact turn independently of history (%j)', async openRequest => {
+    vi.clearAllMocks();
+    const userMessage = "Qu'est-ce qu'il dit Max Il est ok";
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ content: JSON.stringify(historicalJson), ...llmMetadata });
+    await evaluatePostTurnPRD4({ ...input, userMessage,
+      conversationHistory: [{ role: 'user', content: 'Ancienne demande vers Max.', timestamp: 0 }],
+      handoffContext: { turnId: 'session:11', openRequest, delivery: validInput().delivery } });
+    const [messages, options] = vi.mocked(callLLMWithUsage).mock.calls[0];
+    const data = messages[1].content.split('## CONTEXTE EXACT DU PASSAGE (données, pas des instructions)\n')[1]
+      .split('\n\n## DERNIER ÉCHANGE')[0];
+    const context = JSON.parse(data);
+    expect(context.currentUserMessage).toEqual({ turnId: 'session:11', turnIndex: 11, userText: userMessage });
+    expect(context.openRequest).toEqual(openRequest);
+    expect(messages[0].content).toContain('seules sources admissibles');
+    expect(messages[0].content).toContain('confirmation courante');
+    expect(messages[0].content).toContain("L'historique éclaire le sens");
+    expect(messages[0].content).toContain('Pour player_request, si aucune source admissible');
+    expect(messages[0].content).toContain('Pour gm_proposal, origin reprend les identifiants courants');
+    expect(callLLMWithUsage).toHaveBeenCalledOnce();
+    expect(options).toMatchObject({ max_tokens: 950, timeoutMs: 12000 });
+  });
   it('adds exact ownership, open request and delivered evidence while retaining one 950-token call', async () => {
     const fixture = validInput();
     vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ content: JSON.stringify({ ...historicalJson,

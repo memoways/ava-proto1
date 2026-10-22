@@ -6,6 +6,26 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Lot 4 partiel — non publié] — 2026-10-22 — Switching Emma ↔ Max
 
+- Reprise #64 fusionnée dans `56f6b62` après CI `39781012004` verte sur
+  `90d443af10c6d6381a9528f4936afe8f4f08e1c2` exact : 753/41/48 et 65 E2E.
+  Main propre, Lovable synchronisé ; contrôle post-fusion `39821136410` séparé.
+- Nouvelle recette `2b30d900`, clôturée sans transfert : Ulrich confirme accords
+  entendus et son stable/parfait au casque, aucune pastille. Le GM fournit un
+  accord complet mais invente une origine ancienne alors que openRequest=null ;
+  refus request_unresolved conforme. Aucune cause acoustique globale déduite.
+- Complément du même lot : message courant explicitement associé à son ID/index
+  dans le contexte GM ; sources de demande limitées à ce message ou à la demande
+  encore ouverte. Une confirmation courante reste interprétée sémantiquement.
+  Aucune réparation de sortie invalide, aucun changement du validateur, durée
+  d'offre, modèle, budget, capture ou voix. Deux tests de contexte rouges puis
+  115 ciblés verts ; recette humaine après livraison toujours nécessaire.
+- Complément source `0cba219` : qualité complète verte (756/41/48), **65/65 E2E
+  locaux sans retry en 10,2 min**, deux revues Standards/Spec sans constat après
+  clarification de la portée player_request. CI exacte de la nouvelle PR requise
+  avant fusion. Post-fusion #64 : tentative 1 interrompue à vingt minutes pendant
+  les téléchargements Ubuntu Azure, avant E2E ; relancée au même SHA, sans masquer
+  l'interruption ni modifier le workflow.
+
 - Lot 3 et clôture #60 vérifiés : main `f01532b`, CI pré/post vertes,
   même révision dans Lovable ; baseline locale et 65 E2E sans retry verts.
 - V7 sandbox-ulrich activée depuis v6 : quota 8, seuil 4/pause 2 conservés,

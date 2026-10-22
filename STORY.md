@@ -75,6 +75,27 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 
 ### 2026-10-22 — Switching, lot 4 : confronter les simulations à la parole
 
+La reprise #64 est fusionnée dans `56f6b62` après contrôle de la CI verte sur
+`90d443af` exact et deux revues indépendantes sans constat. Lovable est synchronisé.
+La nouvelle recette de 19:19–19:24, `2b30d900`, échoue encore sans transfert.
+Ulrich confirme des accords entendus et un son parfait/stable au casque ; aucune
+pastille. Les demandes sont fragmentées/interrompues, puis le GM référence un
+ancien tour avec une citation d'un autre alors qu'aucune demande n'est ouverte.
+Le JSON T11 est complet et l'accord délivré ; le refus request_unresolved est
+correct. Il ne faut pas transformer cette référence invalide en permission.
+Le complément associe donc explicitement le message courant à son ID/index
+dans le contexte GM et précise les seules sources admissibles, y compris la
+confirmation courante sémantique. Deux tests de contexte rouges puis 115 ciblés
+verts ; gardes inchangées. La revue Spec clarifie la portée player_request pour
+préserver les propositions courantes du personnage. La validation du prompt ne
+garantit pas le prochain choix du modèle : recette humaine restante, aucun produit
+republié. L'appel est clôturé user_hangup et le micro fermé.
+Le complément `0cba219` passe ensuite la qualité complète (756/41/48) et les
+65 E2E locaux sans retry en 10,2 min. Les deux revues ne signalent plus de constat.
+La CI post-fusion #64 s'interrompt à vingt minutes sur les téléchargements du
+miroir Ubuntu Azure, avant les E2E ; elle est relancée au même SHA. Cet incident
+reste distinct de la nouvelle CI exigée pour le complément avant fusion.
+
 La clôture #60 du lot 3 est vérifiée sur main et dans Lovable ; les 65 E2E
 repassent. La v7 sandbox porte le quota à 8 en gardant seuil 4 et pause 2.
 La recette humaine révèle une limite : Ulrich entend l'accord d'Emma, mais

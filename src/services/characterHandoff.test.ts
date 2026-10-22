@@ -23,6 +23,23 @@ describe("historical filters — characterization, deliberately unchanged", () =
 });
 
 describe("structured consent — pure validator", () => {
+  it('keeps the real T11 acceptance blocked when GM invents an old request origin', () => {
+    const reply = 'Oui, il est d’accord. Je te le passe au téléphone maintenant ; je ne resterai pas à côté et je n’écouterai pas votre conversation.';
+    const input = withReply(reply);
+    input.userText = "Qu'est-ce qu'il dit Max Il est ok";
+    input.openRequest = null;
+    const proof = input.evaluation.handoff_assessment!;
+    proof.origin = { type: 'player_request', turnId: 'session:8', turnIndex: 8,
+      evidence: 'tu penses que ce serait possible que je parle avec Max' };
+    proof.targetEvidence = { speaker: 'user', quote: 'Max' };
+    expect(validateCharacterHandoff(input)).toMatchObject({ authorized: false, reason: 'request_unresolved' });
+    // The same acceptance needs genuinely current evidence classified by the GM;
+    // the runtime must never rewrite the invalid old origin into this one.
+    proof.origin = { type: 'player_request', turnId: input.turnId, turnIndex: input.turnIndex, evidence: input.userText };
+    expect(validateCharacterHandoff(input)).toMatchObject({ authorized: true, reason: 'consent_validated' });
+    proof.origin.evidence = 'tu penses que ce serait possible que je parle avec Max';
+    expect(validateCharacterHandoff(input)).toMatchObject({ authorized: false, reason: 'request_unresolved' });
+  });
   it("accepts T11 only with grounded current evidence", () => {
     expect(validateCharacterHandoff(validInput())).toEqual({ authorized: true, reason: "consent_validated", targetCharacter: "max" });
   });

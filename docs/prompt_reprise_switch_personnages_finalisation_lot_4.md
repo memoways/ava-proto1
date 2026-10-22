@@ -7,7 +7,59 @@ son Supabase est fourni par Lovable. Aucun hébergeur ou Supabase externe.
 Cette demande autorise uniquement le lot 4, après vérification et finalisation
 de tout défaut restant du lot 3. Ne lance aucun autre chantier ni nouveau chat.
 
-## Relevé prioritaire — après la recette du 22 octobre 2026
+## Relevé prioritaire — reprise du 22 octobre 2026 à 19 h
+
+**Lot 4 incomplet, aucune nouvelle publication produit.** La recette au casque
+`2b30d900-b597-42c2-8fe9-6982a9dda51d`, 19:19:06–19:24:10 Europe/Paris, est
+clôturée user_hangup, Emma, compteur 0, v7, film vu, rôle/posture null,
+diagnostic complet. Ulrich confirme accords entendus, son parfait/stable au
+casque et aucune pastille. Ne pas déduire une cause acoustique exclusive de la
+comparaison avec les haut-parleurs. Aucun nouvel appel ouvert en attente.
+
+#64 fusionnée dans `56f6b6220316d6a71eb0016ba1a4b4c2af4dcd30` après CI
+`39781012004` verte sur le HEAD exact `90d443af10c6d6381a9528f4936afe8f4f08e1c2`,
+753 unitaires / 41 intégrations / 48 régressions et 65 E2E (10,2 min), deux
+revues indépendantes sans constat. Main propre après fetch/pull, Lovable même
+SHA ready/agentFinished, workspace Memoways vérifié. CI post-fusion
+`39821136410` : tentative 1 interrompue à vingt minutes sur les téléchargements
+Ubuntu Azure, avant E2E ; relancée au même SHA, résultat final à relire.
+
+Défaut reproduit de la recette : demande T7 interrompue sans réponse délivrée ;
+T8/10/11 reçoivent tous openRequest=null. Le GM invente pourtant une origine
+T7 puis T8, en citant un autre message. Au T11 l'accord est complet et délivré,
+GM accept/max, mais request_unresolved est le refus correct d'une preuve invalide.
+Ne pas rallonger la borne de deux messages, restaurer une ancienne demande,
+réparer les identifiants/citations ou forcer une offre.
+
+Complément source **`0cba219`**, en validation sur
+`codex/character-handoff-lot-4-finalisation`, base `56f6b62` :
+currentUserMessage associe texte/turnId/turnIndex exacts dans le
+contexte du même appel GM. Instructions : seules sources player_request =
+message courant ou openRequest non null ; une confirmation courante peut porter
+l'intention de poursuivre le transfert, selon l'analyse sémantique du GM,
+sans mot de passe ni oui hors contexte. Les propositions dites par le personnage
+restent admissibles au tour courant. Aucun validateur/garde/CAS/capture/provider/
+voix/budget/modèle/timeout modifié. GM_CODE_VERSION actualisée.
+Baseline 102 verts, deux tests de données de contexte rouges, puis 115 ciblés
+verts. Qualité complète **756 unitaires / 41 intégrations / 48 régressions**,
+lint/typecheck/build verts ; **65/65 E2E locaux sans retry en 10,2 min**.
+Deux revues indépendantes : Standards sans constat, ambiguïté Spec sur la portée
+player_request corrigée puis revalidée sans constat. CI exacte encore requise avant
+fusion, puis main propre/CI post-fusion/Lovable à vérifier. Les commits
+documentaires suivent `0cba219` : relever le HEAD réel avant toute action.
+Ces tests prouvent les données/instructions, pas la prochaine sortie du modèle.
+
+Fichiers du complément : `src/agents/gameMasterPRD4.ts` et test handoff,
+`src/services/gameMasterPromptBuilder.ts`, `src/services/characterHandoff.test.ts`,
+CHANGELOG/STORY/plan et ce prompt. Vérifier HEAD, diff local et PR réels ; ne
+restaurer aucune ancienne révision. Le relevé ci-dessous et les obligations
+complètes en fin de document restent applicables, sauf états remplacés ici.
+Après livraison vérifiée dans Lovable, reconfirmer disponibilité d'Ulrich au
+casque puis nouvel appel Emma diagnostiqué et aller-retour. Publication produit
+uniquement après résultat observable accepté ; sinon conserver cette reprise.
+Arrêter après ce seul lot 4.
+
+## Relevé historique — après la recette de 13 h du 22 octobre 2026
 
 **Le lot 4 n'est pas terminé : recette humaine échouée, aucune nouvelle publication
 produit.** Reprendre uniquement sa finalisation, sans lot 5 ni nouveau chat.
