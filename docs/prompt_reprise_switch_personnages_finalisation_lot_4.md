@@ -7,7 +7,42 @@ son Supabase est fourni par Lovable. Aucun hébergeur ou Supabase externe.
 Cette demande autorise uniquement le lot 4, après vérification et finalisation
 de tout défaut restant du lot 3. Ne lance aucun autre chantier ni nouveau chat.
 
-## Relevé prioritaire — seconde recette et preuves référencées, 22 octobre 2026
+## Relevé prioritaire — #66 livrée en preview, 22 octobre 2026
+
+**Lot 4 toujours incomplet : recette humaine et publication restantes.**
+[#66](https://github.com/memoways/ava-proto1/pull/66) fusionnée dans
+`d396b63b0a8e141b81126bc2cddb52698d3b44bd` après CI **39830948642 verte sur
+le HEAD exact 8b6717688ddf3bcc712ec212f8d978f8c7410923** : 770 unitaires /
+41 intégrations / 48 régressions, lint/typecheck/build et **67 E2E en 10,9 min**.
+Local : **67/67 E2E sans retry, un worker, 11,2 min**. Deux revues indépendantes
+Standards/Spec finales sans constat sur ce même HEAD. Échecs PGlite et limites
+humaines conservés dans les relevés suivants ; aucune assertion ou délai changé.
+
+Main local/distant d396b63 propres après fetch/pull ; arbre identique au HEAD
+testé. CI post-fusion **39833225182 en cours au relevé** : vérifier sa fin.
+Lovable natif, projet/workspace attendus : même d396b63, ready/agentFinished=true.
+Preview réellement rechargée à l'accueil, bundle **index-BcBPO6Iy.js**, aucun
+appel actif. Le statut is_published préexistant ne démontre aucune publication
+de ce correctif. V7 sandbox publiée, quota 8/seuil 4/pause 2 ; voix inchangées.
+Mémoire AVA Notion actualisée et relue : preuve référencée et sobriété demandée,
+Source conservée, Last updated by=Codex. About et Conare inchangés.
+
+Checkout canonique ; branche de reprise documentaire
+`codex/character-handoff-references-lot-4-handoff`, base d396b63, uniquement
+CHANGELOG/STORY/plan et ce prompt. Les commits documentaires suivent ce SHA :
+relever HEAD, statut/diff, PR/CI réels avant de continuer. Aucun travail étranger
+au relevé. Ne restaurer aucun ancien état, stash ou worktree.
+
+**Prochaine action :** attendre la disponibilité d'Ulrich au casque, déjà demandée
+après synchronisation ; ne pas lancer d'appel avant sa réponse. Puis nouvelle
+recette diagnostiquée naturelle Emma → Max → Emma, contrôle de l'annonce sobre,
+accord entendu/pastille/clic/sonneries/voix/session/timer/film/rôle/posture/
+profils/compteur/mémoires. Publier uniquement via Lovable après résultat observable
+accepté, vérifier réellement servi ; sinon conserver cette reprise sans clôture
+fictive. Rafraîchir les quatre documents et les états réels après fusion.
+Arrêter après le seul lot 4, sans lot 5 ni nouveau chat.
+
+## Relevé historique — seconde recette et preuves référencées, 22 octobre 2026
 
 **Lot 4 incomplet, aucune publication produit.** #65 a été fusionnée dans
 `3fdc519dc209cf5a99dd36a84b9f9afd5bb345c7` à 19:56:22 Europe/Paris après

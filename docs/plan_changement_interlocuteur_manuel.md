@@ -974,6 +974,26 @@ contrat/conversation/GM verts après cette précision, source fonctionnelle iden
 Les 67 E2E complets sont encore en cours au relevé ; nouvelle CI du HEAD exact
 obligatoire avant fusion et recette humaine toujours indispensable.
 
+**Relevé de livraison #66, 22 octobre 2026 :** **67/67 E2E locaux sans retry,
+11,2 min**, un worker ; deux revues Standards/Spec finales sans constat sur
+`8b6717688ddf3bcc712ec212f8d978f8c7410923`. [CI 39830948642](https://github.com/memoways/ava-proto1/actions/runs/39830948642)
+verte sur ce HEAD exact : 770 unitaires, 41 intégrations, 48 régressions,
+lint/typecheck/build et **67 E2E en 10,9 min**. Vérification PR ouverte,
+head/base attendus, check-runs tous success et statuts avant fusion protégée
+par SHA. [#66](https://github.com/memoways/ava-proto1/pull/66) fusionnée dans
+`d396b63b0a8e141b81126bc2cddb52698d3b44bd`. Fetch/pull : main local/distant
+identiques et propres ; diff nul entre l'arbre testé et le main fusionné.
+CI post-fusion **39833225182 en cours**, résultat à relever séparément.
+Lovable natif : projet et workspace attendus, même d396b63, ready et
+agentFinished=true. Preview rechargée : **index-BcBPO6Iy.js**, accueil réellement
+servi, aucun appel actif. Aucun changement Cloud ni publication produit.
+V7 sandbox toujours publiée, quota 8/seuil 4/pause 2 ; v6 archivée, quota 1.
+Voix runtime Emma/Max inchangées. Mémoire AVA Notion actualisée et relue :
+contrat référencé et annonce sobre unique, Source conservée et Last updated by=Codex.
+Nouvelle disponibilité au casque demandée avant recette ; aucun appel lancé.
+La reprise documentaire utilise `codex/character-handoff-references-lot-4-handoff`,
+base d396b63. Résultat humain et publication restent indispensables pour clôturer.
+
 ## 6. Validation attendue
 
 - Unitaires : T6 différé ; T10 pronom/faux prénom contextualisé ; T11 nom explicite + accord naturel ; inquiétude émotionnelle sans refus ; refus explicites et sans « ne » ; « Je vais l’appeler… enfin non » ; extrait affirmatif choisi au milieu d’un refus ; oui hors contexte ; cible incohérente ; décision invalide/périmée ; offre révoquée et nouvelles versions.

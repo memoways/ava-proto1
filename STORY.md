@@ -94,6 +94,17 @@ des timeouts n'est pas affirmée. Le contrat référencé est sauvegardé dans
 `11ce68b` ; l'annonce nomme sobrement la personne une seule fois. Les 67 E2E
 complets puis la CI du HEAD exact précèdent toute fusion et nouvelle recette.
 
+Validation finale : **67/67 E2E locaux sans retry, 11,2 min** ; deux revues
+Standards/Spec sans constat sur `8b6717688ddf3bcc712ec212f8d978f8c7410923`.
+La CI `39830948642` est verte sur ce HEAD exact, avec 770/41/48 et 67 E2E
+en 10,9 min. #66 fusionnée dans `d396b63`, main propre et arbre identique au
+HEAD testé. Lovable synchronisé au même SHA, ready/agentFinished ; nouvelle
+preview `index-BcBPO6Iy.js` vérifiée à l'accueil, sans appel actif. CI post-fusion
+`39833225182` en cours au relevé. La disponibilité d'Ulrich est demandée avant
+une nouvelle recette au casque ; aucune réussite humaine ni publication déduite
+des simulations. Sobriété et provenance des preuves capitalisées dans la mémoire
+AVA existante, Source conservée et Last updated by=Codex, puis relues.
+
 La reprise #64 est fusionnée dans `56f6b62` après contrôle de la CI verte sur
 `90d443af` exact et deux revues indépendantes sans constat. Lovable est synchronisé.
 La nouvelle recette de 19:19–19:24, `2b30d900`, échoue encore sans transfert.
