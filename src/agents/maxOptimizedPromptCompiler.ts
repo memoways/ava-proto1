@@ -132,6 +132,9 @@ function duplicateOf(text: string, selected: CandidateUnit[]): CandidateUnit | n
   const lexicalTerms = keywords(text);
   for (const candidate of selected) {
     const other = normalizeForComparison(candidate.text);
+    // A separator normalizes to empty and is contained in every passage.
+    // Apply the same evidence threshold on both sides of the comparison.
+    if (other.length < 20) continue;
     if (other.includes(normalized) || normalized.includes(other)) return candidate;
     const otherTerms = keywords(candidate.text);
     let sharedTerms = 0;
@@ -385,14 +388,17 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
     const cappedOriginal = key === "rag_context"
       ? trimRagContextToWholeSouvenirs(original, cap)
       : capAtBoundary(original, cap);
-    const novelty = source === "static" || source === "rag"
+    // The shared frame must retain the same facts and wording as the GM's
+    // frame; lexical overlap with the character sheet is not redundancy here.
+    const sharedFrame = key === "experience_frame";
+    const novelty = sharedFrame || source === "static" || source === "rag"
       ? { text: cappedOriginal, removedChars: 0, keptBy: undefined }
       : retainNovelContent(cappedOriginal, selectedForDedup);
     const content = novelty.text;
     // Static sections are rendered from the very units already registered as
     // canonical references. Comparing the rendered block to those references
     // would incorrectly make the section a duplicate of itself.
-    const duplicate = content ? (source === "static" || source === "rag" ? null : duplicateOf(content, selectedForDedup)) : novelty.keptBy;
+    const duplicate = content ? (sharedFrame || source === "static" || source === "rag" ? null : duplicateOf(content, selectedForDedup)) : novelty.keptBy;
     const id = `${source}:${key}`;
     if (duplicate) {
       const status: UnitStatus = duplicate.source === "memory" ? "duplicate_memory" : "duplicate_static";

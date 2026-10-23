@@ -2,8 +2,38 @@ import { describe, expect, it } from "vitest";
 import { makeNotionMaxPrompt } from "./__fixtures__/maxNotionFixture";
 import { buildOptimizedPromptAssembly, OPTIMIZED_V3_LIMITS } from "./maxOptimizedPromptCompiler";
 import { mergeConversationMemory } from "@/services/conversationMemoryV1";
+import { buildExperienceFrame } from "@/services/experienceFrame";
 
 describe("optimized_v3 prompt compiler", () => {
+  it.each(["---", "***", "…", "Max"])("un fragment court %s ne supprime pas le cadre du transfert ou les faits nouveaux", (fragment) => {
+    const frame = buildExperienceFrame({ config: null, filmAnswer: "pas_vu",
+      callTransfer: { from: "emma", returning: false } }).prompt;
+    const result = buildOptimizedPromptAssembly({
+      character: makeNotionMaxPrompt({ references_intellectuelles: fragment }),
+      characterName: "Max",
+      userMessage: "Vous êtes là ?",
+      historyChars: 0,
+      experienceFrame: frame,
+      temporalContext: "Tour 8 : appel téléphonique transféré.",
+      ragCandidates: [{ id: "nouveau", rank: 1,
+        content: "Le carnet bleu est resté sous le siège arrière du Berlingo." }],
+    });
+
+    expect(result.finalSystemPrompt).toContain(frame);
+    expect(result.budget?.sections.find(section => section.key === "experience_frame")).toMatchObject({ included: true, truncated: false });
+    expect(result.finalSystemPrompt).toContain("Tour 8 : appel téléphonique transféré.");
+    expect(result.finalSystemPrompt).toContain("Le carnet bleu est resté sous le siège arrière du Berlingo.");
+  });
+
+  it("conserve le cadre partagé même lorsqu'un fait figure déjà dans la fiche", () => {
+    const frame = "Lausanne, aujourd'hui.\nCet appel t'a été passé par Emma.";
+    const result = buildOptimizedPromptAssembly({
+      character: makeNotionMaxPrompt(), characterName: "Max",
+      userMessage: "Vous êtes là ?", historyChars: 0, experienceFrame: frame,
+    });
+    expect(result.finalSystemPrompt).toContain(frame);
+  });
+
   it("respecte le budget global et conserve le message courant hors troncature", () => {
     const memory = mergeConversationMemory(null, {
       interlocutor: { name: "Alice", role: "médecin" },
