@@ -4,6 +4,40 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Lot 4 — recette acceptée et frontend publié] — 2026-10-23
+
+- Reprise sur le main réel `e2bb6f61d08ccf5140d1e01699c86952930e9505`,
+  synchronisé dans Lovable ready/agentFinished. #67 déjà fusionnée, CI verte
+  sur son HEAD exact `6925869` ; CI main `39851886975` verte, avec un E2E
+  réussi au retry (reprise offre/profil suspendu), réserve conservée dans le plan.
+- Recette humaine au casque `fcfa4f01` : **Emma → Max → Emma**, deux accords
+  délivrés et preuves exactes, offres/clics/connexions persistés, compteur **2**,
+  même session/timer/film/rôle/posture et mémoires privées par personnage.
+  Retour Emma vérifié au T19. Appel clôturé user_hangup à 08:29:33 Europe/Paris.
+- Ulrich confirme annonces sobres, pastilles, sonneries et voix correctes,
+  accepte la recette et autorise la publication Lovable. Qualité locale complète
+  verte : **784/41/48**, lint/types/build ; **67/67 E2E sans retry**, un worker,
+  **10,8 min**, dont la reprise avec offre au premier essai. La cause exclusive
+  de l'ancien échec CI n'est pas établie ; assertions et délais inchangés.
+- Publication Lovable unique `d7486ec2-1847-4681-a41e-7f945a520278`, source
+  frontend **e2bb6f6**, vérifiée le 23 octobre à 08:44:29 Europe/Paris : HTTP 200
+  et `x-deployment-id` portant ce même ID sur [le site public](https://proto1.parle-a-ava.com/).
+  Accueil réellement servi, bundle `index-Xhq-EqQS.js`, contrat référencé et
+  version GM world-boundary présents. Réponse initiale pending conservée ; la
+  lecture du déploiement servi confirme la livraison sans deuxième publication.
+  Aucun code produit, réglage narratif, migration, fonction ou secret changé.
+- Documentation livrée par [#71](https://github.com/memoways/ava-proto1/pull/71) :
+  [plan et preuves](docs/plan_changement_interlocuteur_manuel.md),
+  [clôture autonome](docs/prompt_cloture_switch_personnages.md). SHA de fusion,
+  CI exacte et CI main à lire dans le compte rendu final de cette PR ; aucune
+  fusion tant que les contrôles du HEAD courant ne sont pas verts. PR #24 préservée.
+  Limite documentaire explicite : le fichier versionné indique le main vérifié
+  avant sa propre fusion (`e2bb6f6`) ; le SHA de cette fusion ne peut être inscrit
+  dans son propre contenu. Sa valeur exacte après fusion est conservée dans le
+  compte rendu GitHub de #71 et le bilan final, sans nouvelle boucle de PR.
+- Mémoire AVA Notion actualisée et relue : faits durables de recette acceptée
+  et publication, Source/Last updated by=Codex conservés ; About et Conare inchangés.
+
 ## [Process — sans impact produit] — 2026-10-22 — Fin de lot et branches
 
 - Règle « fin de lot » écrite en dur (`AGENTS.md`, `CLAUDE.md`, règle Cursor, gabarit de PR) :
