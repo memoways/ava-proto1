@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/agents/maxAgent", () => ({ simulateMaxResponse: vi.fn() }));
+vi.mock("@/agents/maxAgent", async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/agents/maxAgent')>(), simulateMaxResponse: vi.fn(),
+}));
 vi.mock("@/agents/gameMasterPRD4", () => ({ evaluatePostTurnPRD4: vi.fn() }));
 vi.mock("@/services/experienceOrchestration", () => ({
   fetchPinnedDirectorRuntime: vi.fn(async () => ({ versionId: "gm-v1", versionNumber: 1, prompt: "DIRECTOR", config: null })),
@@ -75,6 +77,7 @@ import {
   MAX_LLM_RESPONSE_DEADLINE_MS,
   RAG_DEGRADED_MODE_DEADLINE_MS,
   TURN_RESPONSE_DEADLINE_MS,
+  TURN_RESPONSE_FINALIZATION_RESERVE_MS,
 } from "@/config/experienceRuntime";
 import type { ConversationMessage, PRD4PostTurnEvaluation } from "@/types";
 
@@ -104,6 +107,15 @@ function makeConversation(turns: number): ConversationMessage[] {
     { role: "user" as const, content: `question-${turn}`, timestamp: turn * 2 },
     { role: "max" as const, content: `response-${turn}`, timestamp: turn * 2 + 1 },
   ]);
+}
+
+// jsdom 20 predates this browser API; preserve its real cancellation semantics.
+function cancellableTurn() {
+  const controller = new AbortController();
+  Object.defineProperty(controller.signal, 'throwIfAborted', { value: () => {
+    if (controller.signal.aborted) throw controller.signal.reason;
+  } });
+  return controller;
 }
 
 const postTurnResult: PRD4PostTurnEvaluation = {
@@ -511,6 +523,108 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     await Promise.all([result.labelPromise, result.postTurnPromise]);
   });
 
+  it("retries the exact recognized text before asking the player to repeat", async () => {
+    vi.mocked(simulateMaxResponse).mockRejectedValueOnce(new Error('LLM error: 503'));
+    const text = 'Emma m’a passé votre appel, je cherche Ava.';
+    const result = await processPRD4Turn({ sessionId: 'session-soak', conversationHistory: [],
+      userMessage: text, userRole: null, timeElapsedSeconds: 60 });
+    expect(simulateMaxResponse).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(simulateMaxResponse).mock.calls.map(([input]) => input.userMessage)).toEqual([text, text]);
+    expect(result.maxResponse).toBe('Je vous écoute.');
+    await Promise.all([result.labelPromise, result.postTurnPromise]);
+  });
+
+  it("varies technical recovery by character without inventing comprehension", async () => {
+    vi.mocked(simulateMaxResponse).mockRejectedValue(new Error('LLM error: 503'));
+    const input = { sessionId: 'session-soak', conversationHistory: [], userMessage: 'Une confidence privée.',
+      userRole: null, timeElapsedSeconds: 60 };
+    const max = await processPRD4Turn(input);
+    const next = await processPRD4Turn({ ...input,
+      conversationHistory: [{ role: 'max', content: max.maxResponse, timestamp: 1 }] });
+    const emma = await processPRD4Turn({ ...input, characterContext: EMMA_CONTEXT });
+    expect(next.maxResponse).not.toBe(max.maxResponse);
+    expect(emma.maxResponse).not.toBe(max.maxResponse);
+    for (const result of [max, next, emma]) {
+      expect(result.maxResponse).not.toMatch(/ligne accroche|Une confidence privée/);
+      await Promise.all([result.labelPromise, result.postTurnPromise]);
+    }
+  });
+
+  it.each(['missing header', 'incomplete sentence'])('recovers %s with the same text and no private intent replay', async failure => {
+    const text = 'Que savez-vous de la disparition ?';
+    vi.mocked(simulateMaxResponse).mockImplementationOnce(async (_input, opts) => {
+      opts?.onSpeechToken?.(failure === 'missing header' ? 'PRIVATE_MALFORMED_HEADER' : '{"goal":"PRIVATE_INTENT","points":[]}\n<speech>\nUne phrase sans sa fin');
+      opts?.finishSpeech?.();
+      return { response: '', systemPrompt: 'system' };
+    }).mockResolvedValueOnce({ response: 'Je préfère prendre mon temps.', systemPrompt: 'same character' });
+    const events: Array<{ type: string; text?: string }> = [];
+    const result = await streamPRD4Turn({ sessionId: 'session-soak', conversationHistory: [],
+      userMessage: text, userRole: null, timeElapsedSeconds: 60, characterContext: MAX_CONTEXT },
+    event => events.push(event), Promise.resolve('Je préfère prendre mon temps.'));
+    expect(vi.mocked(simulateMaxResponse).mock.calls.map(([input]) => input.userMessage)).toEqual([text, text]);
+    expect(vi.mocked(simulateMaxResponse).mock.calls[1][1]?.onSpeechToken).toBeUndefined();
+    expect(events.filter(event => event.type === 'segment').map(event => event.text)).toEqual(['Je préfère prendre mon temps.']);
+    expect(events.some(event => event.type === 'reset')).toBe(true);
+    await Promise.all([result.labelPromise, result.postTurnPromise]);
+  });
+
+  it('never retries after a safe phrase has already been submitted', async () => {
+    vi.mocked(simulateMaxResponse).mockImplementationOnce(async (_input, opts) => {
+      opts?.onSpeechToken?.('{"goal":"Écouter","points":[]}\n<speech>\nBonjour. ');
+      throw new Error('LLM response incomplete (length)');
+    });
+    await expect(streamPRD4Turn({ sessionId: 'session-soak', conversationHistory: [], userMessage: 'Bonjour',
+      userRole: null, timeElapsedSeconds: 60, characterContext: MAX_CONTEXT }, () => {}, Promise.resolve('Bonjour.')))
+      .rejects.toThrow('incomplete');
+    expect(simulateMaxResponse).toHaveBeenCalledOnce();
+  });
+
+  it('reports the recovered speech if the consumer fails after recovery', async () => {
+    vi.mocked(simulateMaxResponse).mockRejectedValueOnce(new Error('Missing response intent'))
+      .mockResolvedValueOnce({ response: 'Je vous écoute.', systemPrompt: 'system' });
+    const failures: Array<{ generated: string; intent: unknown }> = [];
+    await expect(streamPRD4Turn({ sessionId: 'session-soak', conversationHistory: [], userMessage: 'Bonjour',
+      userRole: null, timeElapsedSeconds: 60, characterContext: MAX_CONTEXT }, event => {
+      if (event.type === 'complete') throw new Error('consumer failed');
+      if (event.type === 'failed') failures.push(event);
+    }, Promise.resolve('Je vous écoute.'))).rejects.toThrow('consumer failed');
+    expect(failures).toEqual([expect.objectContaining({ generated: 'Je vous écoute.', intent: null })]);
+  });
+
+  it('shares transfer provenance identically with character and GM without foreign confidences', async () => {
+    const history: ConversationMessage[] = [{ role: 'max', content: 'Allô.', timestamp: 1, spokenWith: 'max',
+      callTransfer: { from: 'emma', returning: false } }, ...makeConversation(12)];
+    const result = await processPRD4Turn({ sessionId: 'session-soak', conversationHistory: history,
+      userMessage: 'Bonjour', userRole: null, timeElapsedSeconds: 60 });
+    await Promise.all([result.labelPromise, result.postTurnPromise]);
+    const characterFrame = vi.mocked(simulateMaxResponse).mock.calls[0][0].experienceFrame;
+    expect(characterFrame).toContain('Emma');
+    expect(characterFrame).toContain('sans connaître ses mots');
+    expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0].experienceFrame).toBe(characterFrame);
+  });
+
+  it('bounds stalled generation and retries without cancelling the parent turn', async () => {
+    vi.useFakeTimers();
+    const parent = cancellableTurn();
+    vi.mocked(simulateMaxResponse).mockImplementationOnce(() => new Promise(() => {}));
+    const pending = processPRD4Turn({ sessionId: 'session-soak', conversationHistory: [], userMessage: 'Ma parole est transcrite.',
+      userRole: null, timeElapsedSeconds: 60, signal: parent.signal });
+    await vi.advanceTimersByTimeAsync(MAX_LLM_RESPONSE_DEADLINE_MS + 1);
+    expect(simulateMaxResponse).toHaveBeenCalledTimes(2);
+    const result = await pending;
+    expect(result.maxResponse).toBe('Je vous écoute.');
+    expect(vi.mocked(simulateMaxResponse).mock.calls[0][1]?.signal?.aborted).toBe(true);
+    expect(parent.signal.aborted).toBe(false);
+  });
+
+  it('never retries a cancelled turn', async () => {
+    const parent = cancellableTurn();
+    vi.mocked(simulateMaxResponse).mockImplementationOnce(async () => { parent.abort(); throw new DOMException('Cancelled', 'AbortError'); });
+    await expect(processPRD4Turn({ sessionId: 'session-soak', conversationHistory: [], userMessage: 'Bonjour',
+      userRole: null, timeElapsedSeconds: 60, signal: parent.signal })).rejects.toThrow();
+    expect(simulateMaxResponse).toHaveBeenCalledOnce();
+  });
+
   it("falls back after the configured stalled-RAG deadline and still answers", async () => {
     vi.useFakeTimers();
     vi.mocked(fetchSessionSummary).mockResolvedValue(null);
@@ -551,7 +665,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
 
     expect(result.maxResponse).toBe("Réponse complète de Max.");
     expect(vi.mocked(simulateMaxResponse).mock.calls[0][1]?.timeoutMs).toBe(
-      Math.min(MAX_LLM_RESPONSE_DEADLINE_MS, TURN_RESPONSE_DEADLINE_MS - RAG_DEGRADED_MODE_DEADLINE_MS),
+      Math.min(MAX_LLM_RESPONSE_DEADLINE_MS, TURN_RESPONSE_DEADLINE_MS - RAG_DEGRADED_MODE_DEADLINE_MS - TURN_RESPONSE_FINALIZATION_RESERVE_MS),
     );
     expect(result.timings.total_ms).toBeLessThanOrEqual(TURN_RESPONSE_DEADLINE_MS);
   });

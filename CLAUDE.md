@@ -15,6 +15,8 @@ Expérience narrative interactive voice-to-voice. L'utilisateur parle avec "Max"
 
 **Lovable est la plateforme de référence et l'unique chaîne de livraison.** Lovable compile le code et publie le site ; Lovable Cloud, avec Supabase fourni par Lovable, héberge le backend, les données, les Edge Functions et les secrets.
 
+Pour toute lecture SQL ou interaction avec la base Ava, utiliser le connecteur MCP **Lovable**, projet `1265958d-b74e-40f2-917d-182fe05163fc`. Aucune connexion Supabase directe : ne pas rechercher ce projet dans le connecteur Supabase générique ni demander de reconnexion. Cette exception de projet prime sur le routage personnel général (Ulrich, 23 octobre 2026).
+
 Toute modification effectuée hors de Lovable doit rester compatible avec Lovable et y être ramenée avant validation ou publication. Ne pas mettre en place de build, de déploiement, de projet Supabase ou d'hébergement alternatif. Avant toute action sur le build, les variables d'environnement, les migrations, les Edge Functions ou la publication, vérifier qu'elle cible Lovable / Lovable Cloud. La règle complète commune à tous les agents est dans `AGENTS.md`.
 
 ## Fin de lot (règle obligatoire — détail dans `AGENTS.md`)

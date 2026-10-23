@@ -11,7 +11,7 @@ export function buildResponseStreamContract(maxTokens: number): string {
   const intent = small
     ? 'goal : 4 mots maximum ; points : tableau vide []'
     : 'goal : 8 mots maximum ; points : 0 à 2 points de 4 mots maximum chacun';
-  return `\n# FORMAT DE SORTIE IMPÉRATIF\nDans cette même réponse, écris d'abord une seule ligne JSON {"goal":"objectif privé","points":[]}. Garde cet en-tête privé compact : ${intent}. Objectif ≤240 caractères, chaque point ≤160 caractères. Ce sont des intentions de communication, pas un raisonnement détaillé. Puis écris exactement la frontière \\n<speech>\\n et ton discours in character. Limite du discours : ${speechWords} mots maximum, y compris citations et questions. Le budget total de ${budget} tokens inclut le JSON et la parole : ne consomme pas la place de la parole avec l'intention. Choisis l'essentiel si la demande est large ; termine tes phrases dans cette limite. Aucun markdown, aucune autre métadonnée, aucun tag dans le discours. L'intention est privée, jamais entendue. Une intention ou une continuation privée n'est jamais une confidence déjà entendue. Respecte les mêmes limites de confidences et le canon.\n`;
+  return `\n# FORMAT DE SORTIE IMPÉRATIF\nDans cette même réponse, écris d'abord une seule ligne JSON {"goal":"objectif privé","points":[]}. Garde cet en-tête privé compact : ${intent}. Objectif ≤240 caractères, chaque point ≤160 caractères. Ce sont des intentions de communication, pas un raisonnement détaillé. Puis écris le marqueur <speech> seul sur une ligne entre le JSON et ton discours in character, avec de vrais retours à la ligne. Limite du discours : ${speechWords} mots maximum, y compris citations et questions. Le budget total de ${budget} tokens inclut le JSON et la parole : ne consomme pas la place de la parole avec l'intention. Choisis l'essentiel si la demande est large ; termine tes phrases dans cette limite. Aucun markdown, aucune autre métadonnée, aucun tag dans le discours. L'intention est privée, jamais entendue. Une intention ou une continuation privée n'est jamais une confidence déjà entendue. Respecte les mêmes limites de confidences et le canon.\n`;
 }
 
 export function normalizeResponseIntent(value: unknown): ResponseIntent | null {
@@ -60,15 +60,18 @@ export class ResponseIntentParser {
     if (this.terminal) throw new Error('Response stream already closed');
     if (!this.intentValue) {
       this.header += chunk;
-      const boundary = this.header.indexOf(SPEECH_BOUNDARY);
+      // The marker is structural. CRLF, extra whitespace or a model spelling
+      // the documented newline escapes must not discard an otherwise valid
+      // private JSON header and complete speech. JSON validation stays strict.
+      const boundary = this.header.indexOf('<speech>');
       if (boundary < 0) { if (this.header.length > 1200) throw new Error('Response intent header too large'); return; }
       if (boundary > 1100) throw new Error('Response intent header too large');
       let value: unknown;
-      try { value = JSON.parse(this.header.slice(0, boundary)); } catch { throw new Error('Invalid response intent JSON'); }
+      try { value = JSON.parse(this.header.slice(0, boundary).replace(/(?:\\[rn]|\s)+$/, '')); } catch { throw new Error('Invalid response intent JSON'); }
       const intent = normalizeResponseIntent(value);
       if (!intent) throw new Error('Invalid response intent');
       this.intentValue = intent;
-      this.pending = this.header.slice(boundary + SPEECH_BOUNDARY.length);
+      this.pending = this.header.slice(boundary + '<speech>'.length);
       this.header = '';
       this.onIntent(intent);
     } else this.pending += chunk;
@@ -76,6 +79,7 @@ export class ResponseIntentParser {
     this.emit(false);
   }
   private emit(eof: boolean) {
+    if (!this.emitted) this.pending = this.pending.replace(/^(?:\\[rn]|\s)+/, '');
     const end = safeSentenceEnd(this.pending, eof);
     if (!end) return;
     const segment = this.pending.slice(0, end);
@@ -98,4 +102,11 @@ export class ResponseIntentParser {
     this.terminal = true;
     return this.emitted.trim();
   }
+}
+
+/** Validate a complete recovery before emitting any of it; same speech guards. */
+export function validateRecoverySpeech(text: string, context: CharacterExecutionContext): string {
+  const parser = new ResponseIntentParser(context, () => {}, () => {});
+  parser.push(JSON.stringify({ goal: 'Validation de parole', points: [] }) + SPEECH_BOUNDARY + text);
+  return parser.finish();
 }

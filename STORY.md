@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-23 (lot 4 : recette bidirectionnelle acceptée et frontend publié via Lovable)
+> **Last Updated**: 2026-10-23 (fiabilisation des tours transcrits et de la continuité téléphonique en validation)
 
 ---
 
@@ -72,6 +72,33 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-10-23 — Conserver la parole, reprendre le micro et varier les accueils
+
+Ulrich rapporte des transcriptions visibles suivies du même « la ligne accroche »,
+un micro à réactiver après chaque transfert et des accueils mécaniques.
+La lecture des traces par Lovable établit que les neuf secours examinés ont bien
+envoyé le texte exact au modèle ; l'échec survient au format de sa réponse privée
+(huit en-têtes manquants, une phrase incomplète). La dernière recette contient
+quatre de ces secours pour vingt messages utilisateur. Aucun transcript recopié
+dans cette documentation ; la fréquence « une fois sur deux » reste un ressenti,
+pas une statistique établie sur l'ensemble des sessions.
+
+Les reproductions rouges couvrent ce rejet et la perte du choix mains libres au
+nettoyage du transfert. Le correctif accepte les séparateurs structurellement
+équivalents, récupère au plus une fois avant parole avec le même texte et contexte,
+et borne toute la tentative. La récupération n'invente aucune intention privée
+et garde les contrôles de phrase et d'identité. Les secours et accueils varient
+par personnage ; le transfert persiste seulement sa provenance, partagée via
+experienceFrame, sans confidences croisées. Le micro reprend après un accueil
+réussi, conformément au choix du joueur, avec les gardes de panne et de raccrochage.
+
+Rappel explicite d'Ulrich : aucune connexion Supabase directe pour Ava, la base
+vit dans Lovable Cloud et se pilote par le connecteur Lovable. Règle renforcée
+dans les points d'entrée et dans la mémoire AVA Notion existante, relue après écriture.
+
+[Plan, diagnostic et livraison](docs/plan_fiabilisation_tours_transcrits_et_transferts.md).
+Validation complète et livraison GitHub/preview/production distinguées dans ce plan.
 
 ### 2026-10-23 — Switching, lot 4 : aller-retour humain accepté
 

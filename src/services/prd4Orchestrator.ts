@@ -50,16 +50,20 @@ import {
   MAX_LLM_RESPONSE_DEADLINE_MS,
   SUMMARY_FETCH_DEADLINE_MS,
   TURN_RESPONSE_DEADLINE_MS,
+  TURN_RESPONSE_FINALIZATION_RESERVE_MS,
   getSessionMinimumClosureSeconds,
   normalizeSessionDurationSeconds,
 } from "@/config/experienceRuntime";
 import { buildExperienceFrame } from "@/services/experienceFrame";
+import { canRetryCharacterResponse, characterRecoveryLine, latestCallTransfer } from './characterConversationContinuity';
+import { validateRecoverySpeech } from './responseIntentStream';
 import type { ConversationMessage, ConversationTurnTraceV1, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 
 export interface PRD4TurnInput {
   /** Internal shared execution seam; batch callers omit it. */
   streamControl?: { onToken: (text: string) => void; finishSpeech: () => string;
-    delivery: Promise<string>; onFallback: (text: string) => void; hasSegments: () => boolean };
+    delivery: Promise<string>; onFallback: (text: string) => void; hasSegments: () => boolean;
+    onRetry: () => void; onRecovered: (text: string) => void };
   handoffDelivery?: Promise<ResponseDeliveryReceipt | undefined>;
   handoffOpenRequest?: OpenHandoffRequest | null;
   onVoiceObservation?: VoiceObserver;
@@ -89,6 +93,8 @@ export interface PRD4TurnInput {
   onLatencySegment?: (event: PRD4LatencySegmentEvent) => void;
   /** Abort when the UI has moved to a newer turn or ended the session. */
   signal?: AbortSignal;
+  /** Monotonic UI deadline, including the conditional session write before generation. */
+  responseDeadlineAt?: number;
   /** Stable correlation ID shared with voice telemetry and diagnostic persistence. */
   turnId?: string;
   /** Global user-turn index, preserved when a handoff uses an isolated history. */
@@ -138,9 +144,6 @@ export type PRD4LatencySegmentEvent =
   | { type: "start"; segment: "RAG" | "LLM" | "GM"; service: string }
   | { type: "end"; segment: "RAG" | "LLM" | "GM"; service: string; durationMs: number };
 
-const MAX_FALLBACK_RESPONSE =
-  "Je vous entends, mais la ligne accroche. Répétez juste l'essentiel, s'il vous plaît.";
-
 export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnResult> {
   assertCharacterExecutionContext(input.characterContext);
   input.signal?.throwIfAborted();
@@ -148,7 +151,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const t0 = performance.now();
   const diagnosticTraceEnabled = input.diagnosticTraceEnabled === true;
   const turnId = input.turnId || crypto.randomUUID();
-  const responseDeadlineAt = t0 + TURN_RESPONSE_DEADLINE_MS;
+  const responseDeadlineAt = Math.min(t0 + TURN_RESPONSE_DEADLINE_MS,
+    Number.isFinite(input.responseDeadlineAt) ? input.responseDeadlineAt! : Infinity) - TURN_RESPONSE_FINALIZATION_RESERVE_MS;
   const turnIndex = input.turnIndex
     ?? input.conversationHistory.filter((m) => m.role === "user").length + 1;
   const gameplay = (() => {
@@ -294,6 +298,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const experienceFrame = buildExperienceFrame({
     config: frameRuntime.config?.frame,
     filmAnswer: input.hasSeenFilm,
+    callTransfer: latestCallTransfer(activeCharacter, input.conversationHistory),
     knownAboutPlayer: [
       visibleStructuredMemory?.interlocutor?.name ? `prénom : ${visibleStructuredMemory.interlocutor.name}` : "",
       visibleStructuredMemory?.interlocutor?.role ? `statut évoqué : ${visibleStructuredMemory.interlocutor.role}` : "",
@@ -337,30 +342,67 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   try {
     const remainingMs = Math.floor(responseDeadlineAt - performance.now());
     if (remainingMs < 250) throw new Error("PRD4 response deadline exhausted after RAG");
-    maxResult = await simulateMaxResponse(maxInput, {
-      onVoiceObservation: input.onVoiceObservation,
-      onServiceObserved: input.onServiceObserved,
-      onServerObserved: input.onServerObserved,
-      characterName: input.characterContext.displayName,
-      characterContext: input.characterContext,
-      featureKey: evaluationOverrides?.featureKey ?? "prd4_chat",
-      timeoutMs: Math.min(MAX_LLM_RESPONSE_DEADLINE_MS, remainingMs),
-      signal: input.signal,
-      diagnosticTrace: diagnosticTraceEnabled,
-      llmOverrides: evaluationOverrides?.llm,
-      onSpeechToken: input.streamControl?.onToken,
-      finishSpeech: input.streamControl?.finishSpeech,
-    });
+    const generate = async (retry: boolean, timeoutMs: number) => {
+      const attempt = new AbortController();
+      const abort = () => attempt.abort(input.signal?.reason);
+      if (input.signal?.aborted) abort();
+      else input.signal?.addEventListener('abort', abort, { once: true });
+      try {
+        return await withTimeout('Character LLM response', simulateMaxResponse(maxInput, {
+          onVoiceObservation: input.onVoiceObservation,
+          onServiceObserved: input.onServiceObserved,
+          onServerObserved: input.onServerObserved,
+          characterName: input.characterContext.displayName,
+          characterContext: input.characterContext,
+          featureKey: evaluationOverrides?.featureKey ?? "prd4_chat",
+          timeoutMs,
+          signal: attempt.signal,
+          diagnosticTrace: diagnosticTraceEnabled,
+          llmOverrides: evaluationOverrides?.llm,
+          onSpeechToken: retry || !input.streamControl ? undefined : text => {
+            if (attempt.signal.aborted) throw new DOMException('Obsolete character attempt', 'AbortError');
+            input.streamControl!.onToken(text);
+          },
+          finishSpeech: retry || !input.streamControl ? undefined : () => {
+            if (attempt.signal.aborted) throw new DOMException('Obsolete character attempt', 'AbortError');
+            return input.streamControl!.finishSpeech();
+          },
+        }), timeoutMs, () => attempt.abort('character-response-timeout'));
+      } finally {
+        input.signal?.removeEventListener('abort', abort);
+        attempt.abort('character-attempt-finished');
+      }
+    };
+    try {
+      maxResult = await generate(false, Math.min(MAX_LLM_RESPONSE_DEADLINE_MS, remainingMs));
+      if (!maxResult.response.trim()) throw new Error('Empty response speech');
+    } catch (error) {
+      const retryMs = Math.floor(responseDeadlineAt - performance.now());
+      if (input.signal?.aborted || input.streamControl?.hasSegments() || retryMs < 250 || !canRetryCharacterResponse(error)) throw error;
+      console.warn('[PRD4 orchestrator] Retrying recognized turn before speech:', error);
+      input.streamControl?.onRetry();
+      // Same immutable input, model, character and context. No RAG/GM repetition,
+      // no replay once speech was submitted. Recovery drops only the private wire
+      // protocol and validates the entire answer before incremental delivery.
+      maxResult = await generate(true, Math.min(MAX_LLM_RESPONSE_DEADLINE_MS, retryMs));
+      if (!maxResult.response.trim()) throw new Error('Empty response speech');
+      if (input.streamControl) {
+        maxResult = { ...maxResult, response: validateRecoverySpeech(maxResult.response, input.characterContext) };
+        input.streamControl.onRecovered(maxResult.response);
+      }
+    }
     identityGuard = guardCharacterResponse(maxResult.response, input.characterContext);
     maxResponse = identityGuard.response;
   } catch (err) {
     if (input.signal?.aborted || input.streamControl?.hasSegments()) throw err;
-    input.streamControl?.onFallback(MAX_FALLBACK_RESPONSE);
+    const recovery = characterRecoveryLine(activeCharacter, input.conversationHistory);
+    input.streamControl?.onFallback(recovery);
     console.warn("[PRD4 orchestrator] Max LLM failed (fallback response):", err);
     maxError = err instanceof Error ? err.message : String(err);
     maxFailureDiagnostic = err instanceof SimulateMaxResponseError ? err.diagnosticContext : null;
+    maxResult = null;
     observeService(input.onServiceObserved, { service: "llm", requested_provider: "openrouter", requested_model: maxFailureDiagnostic?.requestedSettings?.model ?? null, resolved_provider: "openrouter", resolved_model: null, effective_provider: null, effective_model: null, transport: input.streamControl ? "sse" : "http_batch", fallback: true });
-    maxResponse = MAX_FALLBACK_RESPONSE;
+    maxResponse = recovery;
   } finally {
     max_ms = Math.round(performance.now() - maxStart);
     input.onLatencySegment?.({ type: "end", segment: "LLM", service: "Personnage LLM", durationMs: max_ms });
@@ -633,6 +675,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
 }
 
 export type PRD4StreamEvent =
+  | { type: "reset" }
   | { type: "intent"; intent: ResponseIntent }
   | { type: "segment"; text: string }
   | { type: "complete"; response: string }
@@ -642,6 +685,7 @@ export type PRD4StreamEvent =
 export async function streamPRD4Turn(input: PRD4TurnInput, onEvent: (event: PRD4StreamEvent) => void,
   delivery: Promise<string>): Promise<PRD4TurnResult> {
   let segments = 0;
+  let recoveryText: string | null = null;
   delivery.catch(() => {});
   const emit = (event: PRD4StreamEvent) => { input.signal?.throwIfAborted(); onEvent(event); };
   const parser = new ResponseIntentParser(input.characterContext, intent => {
@@ -653,15 +697,17 @@ export async function streamPRD4Turn(input: PRD4TurnInput, onEvent: (event: PRD4
     const result = await processPRD4Turn({ ...input, streamControl: {
       onToken: text => parser.push(text), finishSpeech: () => parser.finish(), delivery,
       hasSegments: () => segments > 0,
-      onFallback: text => emit({ type: "segment", text }),
+      onRetry: () => { recoveryText = ''; emit({ type: 'reset' }); },
+      onRecovered: text => { recoveryText = text; segments++; emit({ type: 'segment', text }); },
+      onFallback: text => { recoveryText = text; emit({ type: 'reset' }); emit({ type: "segment", text }); },
     }});
     // The consumer owns delivery; attach rejection handlers before it can cancel.
     result.postTurnPromise.catch(() => {}); result.labelPromise.catch(() => {});
     emit({ type: "complete", response: result.maxResponse });
     return result;
   } catch (error) {
-    onEvent({ type: input.signal?.aborted ? "interrupted" : "failed", intent: parser.intent,
-      generated: parser.generated.trim(), error });
+    onEvent({ type: input.signal?.aborted ? "interrupted" : "failed", intent: recoveryText === null ? parser.intent : null,
+      generated: recoveryText ?? parser.generated.trim(), error });
     throw error;
   }
 }
