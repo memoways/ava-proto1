@@ -93,6 +93,16 @@ par personnage ; le transfert persiste seulement sa provenance, partagée via
 experienceFrame, sans confidences croisées. Le micro reprend après un accueil
 réussi, conformément au choix du joueur, avec les gardes de panne et de raccrochage.
 
+Après la fusion #72 (`408da5f`, CI main 70/70 E2E sans retry), Ulrich valide
+l'aller-retour humain dans Brave : micro repris, accueils et réponses satisfaisants.
+Le contrôle des requêtes révèle néanmoins que le compilateur optimisé retire
+le cadre du personnage comme doublon d'un séparateur `---` normalisé en chaîne
+vide, alors que le GM le reçoit. Le complément applique le même seuil de preuve
+aux deux côtés de la comparaison et conserve le cadre partagé sans déduplication
+lexicale ni aplatissement des lignes, dans les budgets existants. Les quatre
+reproductions rouges puis les neuf tests ciblés verts couvrent cette cause.
+L'acceptation sonore ne remplace pas la vérification du contexte envoyé au modèle.
+
 Rappel explicite d'Ulrich : aucune connexion Supabase directe pour Ava, la base
 vit dans Lovable Cloud et se pilote par le connecteur Lovable. Règle renforcée
 dans les points d'entrée et dans la mémoire AVA Notion existante, relue après écriture.

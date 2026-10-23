@@ -6,6 +6,17 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [En validation] — 2026-10-23 — Tours transcrits et continuité téléphonique
 
+- Livraison du premier correctif par [#72](https://github.com/memoways/ava-proto1/pull/72)
+  sur main `408da5fdb9b4ffd386bf53ba78256ef8a2edc197`, CI verte et 70/70 E2E
+  sans retry ; même SHA prêt dans Lovable. Recette humaine Emma → Max → Emma
+  dans Brave acceptée par Ulrich : micro repris, accueils et réponses satisfaisants.
+- Contrôle complémentaire des traces : un séparateur `---` normalisé en chaîne
+  vide était considéré comme doublon de tout texte, supprimant le cadre courant
+  et d'autres faits du prompt optimisé. Le seuil de comparaison est maintenant
+  symétrique ; le cadre partagé conserve son bloc sans déduplication lexicale,
+  avec les plafonds existants. Qualité et CI du complément à relever dans sa PR.
+  Publication de production encore distincte de la recette.
+
 - Diagnostic par le connecteur **Lovable** sur les traces réelles : les neuf
   secours fixes examinés sur trois jours contiennent tous la transcription exacte
   dans la requête personnage ; huit rejets d'en-tête privé et une phrase incomplète.

@@ -134,3 +134,52 @@ de ce correctif à ce stade.
 Références API consultées : [React useRef](https://react.dev/reference/react/useRef),
 [useEffect](https://react.dev/reference/react/useEffect),
 [AbortSignal](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/throwIfAborted).
+
+## Livraison #72 et recette Brave du 23 octobre
+
+PR #72 fusionnée sur `408da5fdb9b4ffd386bf53ba78256ef8a2edc197` ; CI du
+HEAD exact `a90eb615710d7411716c29fbaa02a02c76450420` verte (run 39923745970),
+puis CI main verte (run 39926022186), **70/70 E2E sans retry** en 12,5 min.
+Le run de PR comporte un retry réussi d'un test antérieur sur l'offre à la reprise ;
+son intermittence reste explicite (rejeu isolé : 2/3). Branche du lot supprimée.
+Lovable MCP confirme ce même SHA prêt dans la preview, sans publication production.
+
+À la demande d'Ulrich, Computer Use dans son Brave existant, sandbox-ulrich,
+sans connexion ni mot de passe dans le navigateur intégré. Recette humaine
+acceptée explicitement : Emma → Max → Emma, micro ouvert aux deux arrivées,
+première parole captée, accueils et réponses jugés satisfaisants. Session de
+contrôle `bdfe9ea3`, maintenant clôturée : deux transferts, version épinglée et
+film `pas_vu` conservés. Les onze messages utilisateur tracés sont présents
+exactement dans chaque requête personnage ; onze réponses `source=llm`.
+Accueils distincts avec provenance minimale persistée ; aucun transcript complet
+recopié dans les preuves.
+
+## Complément nécessaire : déduplication du prompt
+
+Le contrôle des requêtes réelles après cette recette révèle que le compilateur
+`optimized_v3` retire à tort `experience_frame`, l'état courant, la directive
+relationnelle et des souvenirs : `doublon:static:references_intellectuelles:1`.
+Cette unité ne contient que `---`. Sa normalisation produit une chaîne vide,
+que toute chaîne contient ; l'inclusion textuelle la considère donc à tort comme
+une preuve de doublon. Le GM reçoit le cadre ; le personnage ne le reçoit pas.
+La recette humaine réussie ne démontre pas ce contrat interne satisfait.
+
+Plan du complément, base `408da5f` : reproduction rouge avec un séparateur et un
+fragment court dans la fiche synthétique, puis appliquer symétriquement le seuil
+minimal de comparaison déjà utilisé pour le texte entrant aux unités candidates.
+Le cadre commun est aussi exempté de déduplication lexicale et d'aplatissement
+des lignes, pour conserver le bloc produit par `experienceFrame` comme chez le GM,
+avec les plafonds de taille existants. Un fait déjà présent dans la fiche ne doit
+pas faire disparaître une partie du cadre factuel de session.
+Conserver le cadre entier, l'état du tour et un souvenir nouveau ; garder les
+tests de vrais doublons et les budgets. Aucun paramètre Cloud ou fiche éditoriale
+modifié. Qualité complète, PR séparée sur son HEAD exact puis CI main, nettoyage
+de sa seule branche et synchronisation Lovable. Une vérification runtime du cadre
+réellement reçu demeure distincte de l'acceptation sonore déjà donnée.
+
+Résultats du complément : quatre cas rouges avant correction (séparateurs et
+fragment court), neuf tests du compilateur verts ensuite, dont cadre partagé
+intégral même si un fait existe dans la fiche. Qualité locale complète verte :
+**806 unitaires, 41 intégrations, 57 régressions, lint, types et build**.
+Les contrôles de vrais doublons existants restent verts. CI exacte, fusion et
+CI main du complément seront relevées dans sa PR avant clôture.
