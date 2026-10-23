@@ -1,7 +1,8 @@
 # Passage Emma ↔ Max : validation narrative et pastille d’appel
 
-Date du diagnostic : 19 octobre 2026. État au 22 octobre : **lots 1, 2 et 3 livrés sur GitHub,
-code synchronisé dans Lovable ; lot 4 partiel, sans nouvelle publication produit**.
+Date du diagnostic : 19 octobre 2026. État au 23 octobre : **lots 1, 2 et 3 livrés ;
+recette humaine du lot 4 acceptée et frontend publié via Lovable**. La clôture
+documentaire #71 suit les contrôles du HEAD exact puis de main décrits ci-dessous.
 Périmètre du diagnostic du 19 octobre : analyse et plan. Le lot 1 du 21 octobre est décrit au §5 ; aucun réglage Cloud ni déploiement produit modifié.
 Base examinée : `main` / `d0f72b601680b65b50e901e61bcae92a5752addd`, également HEAD Lovable au contrôle.
 
@@ -1080,15 +1081,56 @@ accepte la recette et autorise explicitement la publication du frontend Lovable.
   Les traces vérifient les identités/provenances ; elles ne constituent pas
   un audit exhaustif de toutes les confidences possibles.
 - Qualité locale standard du main courant : **784 unitaires, 41 intégrations,
-  48 régressions**, lint/typecheck/build verts. E2E complets sans retry lancés
-  après la fermeture de l'appel ; résultat et publication restent à relever.
+  48 régressions**, lint/typecheck/build verts. **67/67 E2E sans retry, un worker,
+  10,8 min**, après fermeture de l'appel. La reprise avec offre/profil suspendu
+  passe au premier essai ; cause exclusive de l'ancien échec CI non établie.
   Logs temporaires : /tmp/ava-lot4-23-quality.log et /tmp/ava-lot4-23-e2e.log.
 
 Cette recette valide le switching du lot 4. Les contrôles simulés de refus,
 indisponibilité, interruption, récupération, concurrence et reprise restent
 des preuves distinctes, couvertes par la suite E2E complète ; ne pas prétendre
-avoir reproduit humainement chaque panne. Publication autorisée, pas encore
-effectuée à ce relevé. L'état final sera renseigné après publication et CI/PR.
+avoir reproduit humainement chaque panne.
+
+#### Publication et clôture documentaire du lot 4
+
+Publication native unique demandée après recette acceptée et E2E complets :
+**`d7486ec2-1847-4681-a41e-7f945a520278`**, source frontend
+**e2bb6f61d08ccf5140d1e01699c86952930e9505**. Réponse initiale pending.
+Le **23 octobre à 08:44:29 Europe/Paris**, lecture HTTP de
+https://proto1.parle-a-ava.com/ : **200**, en-tête **x-deployment-id** portant
+exactement ce nouvel ID. L'URL Lovable redirige vers ce domaine ; accueil
+« Où est Ava ? » / Commencer observé, bundle **index-Xhq-EqQS.js** servi.
+SHA-256 du bundle : `422b022af220a1e6f2385c84e824930e46f09468c379101168473c89dd05c452`.
+Contrat référencé consentRef/speechEvidence, format compact et version GM
+world-boundary présents. Cette preuve du déploiement effectivement servi
+confirme la publication ; aucun statut terminal API inventé et aucun redéploiement
+de sondage. Aucun nouvel appel ouvert en production. Le contrôle publié porte
+sur l'accueil et le bundle ; l'aller-retour humain a été accepté en preview.
+
+V7 sandbox 8/4/2 et production narrative v1 quota 1 inchangées. Aucun code,
+capture/provider/voix, migration, Edge Function, secret ou donnée d'une session
+en cours modifié dans cette reprise. Les changements de #68 sont conservés,
+sans prétendre valider ici leurs autres comportements hors switching.
+
+Branche unique de clôture : `codex/character-handoff-lot-4-recette-finale`,
+base runtime e2bb6f6, premier commit de preuves **f1cdeeed72d11a6ea504ccb62a175edd8430174f**.
+[PR #71](https://github.com/memoways/ava-proto1/pull/71) documentaire seulement.
+Deux revues Standards/Spec successives sans constat sur les quatre documents
+de recette ; relecture finale de la publication et clôture avant fusion.
+La fusion doit vérifier le HEAD exact courant et la CI correspondante, puis
+main local/distant propre, CI main, synchronisation Lovable et suppression
+de la branche du lot. Le compte rendu final de #71 consigne les SHA/runs
+après fusion, sans confondre le SHA runtime publié et le merge documentaire.
+Limite au libellé de la règle CHANGELOG : son entrée cite le main réel constaté
+avant cette PR ; le SHA du commit qui contient l'entrée ne peut se référencer
+lui-même. Le SHA final et sa CI sont donc capitalisés après fusion dans le
+compte rendu GitHub de #71 et le bilan utilisateur, sans fichier local résiduel.
+La PR étrangère **#24** et sa branche restent préservées ; les branches locales
+hors lot ne sont pas supprimées. [Clôture autonome](prompt_cloture_switch_personnages.md),
+sans lot 5 ni lancement de chat. Les relevés historiques restent datés.
+Mémoire AVA Notion relue, décision durable de recette acceptée et publication
+ajoutée à l'entrée existante, puis relue : Source et Last updated by=Codex
+conservés. About et Conare inchangés ; aucun transcript ou état temporaire importé.
 
 ## 6. Validation attendue
 

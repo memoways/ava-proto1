@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-23 (lot 4 : recette bidirectionnelle acceptée ; finalisation de livraison en cours)
+> **Last Updated**: 2026-10-23 (lot 4 : recette bidirectionnelle acceptée et frontend publié via Lovable)
 
 ---
 
@@ -88,8 +88,19 @@ au retour T19, Emma retrouve uniquement son historique, sa mémoire et ses reçu
 L'appel est clôturé user_hangup. Ulrich confirme sobriété et qualité des deux
 passages, accepte la recette et autorise explicitement la publication Lovable.
 La qualité locale du main actuel est verte (784 unitaires, 41 intégrations,
-48 régressions, lint/types/build). Les E2E finaux, la publication et la livraison
-documentaire seront vérifiés avant de déclarer ce seul lot terminé.
+48 régressions, lint/types/build), puis **67/67 E2E sans retry en 10,8 min**,
+y compris la reprise qui avait nécessité un retry en CI. Aucun délai ni test
+n'est modifié ; la cause exclusive de cet ancien échec n'est pas affirmée.
+Publication native unique `d7486ec2-1847-4681-a41e-7f945a520278`, source e2bb6f6.
+Le 23 octobre à 08:44:29 Europe/Paris, le domaine public répond HTTP 200 et
+son en-tête x-deployment-id porte exactement cet ID. L'accueil et le bundle
+index-Xhq-EqQS.js avec le contrat attendu sont réellement servis. La réponse
+initiale pending n'est pas masquée, aucune seconde publication pour sonder.
+Les réglages narratifs sandbox et production restent inchangés. La clôture
+documentaire passe par #71, CI du HEAD exact avant fusion puis CI main et
+suppression de la branche du lot ; ces preuves finales sont consignées dans la
+PR. La [clôture autonome](docs/prompt_cloture_switch_personnages.md) conserve
+le résultat et les limites de portée. Aucun lot suivant ni nouveau chat lancé.
 
 ### 2026-10-22 — Switching, lot 4 : confronter les simulations à la parole
 

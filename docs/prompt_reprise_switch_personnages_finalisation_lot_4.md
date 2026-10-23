@@ -7,7 +7,27 @@ son Supabase est fourni par Lovable. Aucun hébergeur ou Supabase externe.
 Cette demande autorise uniquement le lot 4, après vérification et finalisation
 de tout défaut restant du lot 3. Ne lance aucun autre chantier ni nouveau chat.
 
-## Relevé prioritaire — recette acceptée, 23 octobre 2026
+## Clôture du 23 octobre 2026 — recette acceptée et frontend publié
+
+La recette Emma → Max → Emma est acceptée et la publication Lovable est
+effectivement servie. **Utiliser désormais [la clôture autonome](prompt_cloture_switch_personnages.md)**
+pour connaître le résultat, les preuves, les limites et les contrôles GitHub
+finaux de #71. Ce document conserve l'historique de finalisation ; il ne demande
+plus de nouvelle recette, publication ou lot. Aucun lot 5 ni nouveau chat.
+
+Qualité locale 784/41/48, lint/types/build et **67/67 E2E sans retry en 10,8 min**.
+Publication unique **d7486ec2-1847-4681-a41e-7f945a520278**, runtime source
+**e2bb6f61d08ccf5140d1e01699c86952930e9505**. Réponse initiale pending, puis
+HTTP 200 / x-deployment-id exact et accueil/bundle **index-Xhq-EqQS.js** servis
+sur https://proto1.parle-a-ava.com/ le 23 octobre à 08:44:29 Europe/Paris.
+La clôture documentaire est portée par [#71](https://github.com/memoways/ava-proto1/pull/71),
+avec CI verte du HEAD exact obligatoire avant fusion, puis CI main, propreté,
+synchronisation Lovable et nettoyage de la branche du lot. Les SHA/runs finaux
+sont à lire dans son compte rendu après fusion. PR étrangère #24 préservée.
+
+Les relevés suivants sont historiques ; la clôture ci-dessus prévaut.
+
+## Relevé historique — recette acceptée, 23 octobre 2026
 
 **Recette bidirectionnelle acceptée par Ulrich ; publication Lovable autorisée.
 Finalisation technique/documentaire en cours : ne pas encore annoncer le lot terminé.**
