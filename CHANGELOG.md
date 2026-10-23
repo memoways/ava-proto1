@@ -4,6 +4,37 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [En validation] — 2026-10-23 — Tours transcrits et continuité téléphonique
+
+- Diagnostic par le connecteur **Lovable** sur les traces réelles : les neuf
+  secours fixes examinés sur trois jours contiennent tous la transcription exacte
+  dans la requête personnage ; huit rejets d'en-tête privé et une phrase incomplète.
+  Dans la dernière session : quatre secours sur vingt messages utilisateur.
+- Marqueur de parole reconnu indépendamment des retours à la ligne équivalents,
+  JSON privé et gardes de parole conservés. Avant toute phrase soumise à la voix,
+  une tentative de récupération répond au même texte avec le même contexte, sans
+  protocole privé ; sa parole complète reste validée avant diffusion. Aucune
+  répétition d'une réponse déjà commencée. Délais de tentative réellement bornés
+  et échéance partagée avec l'interface, sans changer les budgets configurés.
+- Secours courts distincts pour Max et Emma, variation sans répétition immédiate,
+  y compris pour l'audio préchargé. Accueil d'un premier transfert distinct de
+  l'appel initial et du retour ; provenance persistée, cadre partagé personnage/GM,
+  sans transmettre le contenu de la conversation de l'autre personnage.
+- Choix du micro mains libres conservé pendant les sonneries, reprise automatique
+  après accueil réussi et après échec avant connexion. Micro volontairement coupé,
+  raccrochage et panne audio après connexion restent respectés.
+- Règle d'accès Cloud rappelée par Ulrich et sauvegardée dans Notion, AGENTS et
+  CLAUDE : la base Supabase d'Ava se lit et se pilote **via Lovable**, sans connexion
+  Supabase directe. Aucune modification de base, fonction, secret, modèle ou voix.
+- Base main vérifiée avant le lot : `142310384aae2e33f3769f4f340122ab2bec6c4b`.
+  [Plan et preuves](docs/plan_fiabilisation_tours_transcrits_et_transferts.md).
+  Validation locale finale : **801/41/57**, lint/types/build ; **70 E2E sans retry
+  en 11,6 min** et trois nouveaux parcours sur source finale en 49,9 s. Timeouts
+  PGlite de la relance concurrente conservés dans le plan ; relances isolée puis
+  qualité standard vertes sans changement des assertions/délais.
+  CI du HEAD exact, fusion, CI main, recette vocale et production à relever séparément
+  dans le bilan de la PR. Le SHA final ne peut figurer dans son propre contenu.
+
 ## [Lot 4 — recette acceptée et frontend publié] — 2026-10-23
 
 - Reprise sur le main réel `e2bb6f61d08ccf5140d1e01699c86952930e9505`,

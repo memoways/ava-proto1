@@ -10,6 +10,14 @@ describe('P1 private intent and safe speech', () => {
       p.push(header.slice(i)); p.push('Oui. '); expect(spoken).toEqual(['Oui.']); expect(intents).toHaveLength(1); expect(p.finish()).toBe('Oui.');
     }
   });
+  it.each(['\r\n<speech>\r\n', '\\n<speech>\\n', '\n\n<speech>\n\n', '<speech>'])('accepts equivalent marker layout %j without speaking private JSON', boundary => {
+    const wire = JSON.stringify({ goal: 'PRIVATE_HEADER', points: [] }) + boundary + 'Je vous écoute.';
+    for (let i = 0; i <= wire.length; i++) {
+      const { p, spoken } = parser(); p.push(wire.slice(0, i)); p.push(wire.slice(i));
+      expect(p.finish()).toBe('Je vous écoute.');
+      expect(spoken).toEqual(['Je vous écoute.']);
+    }
+  });
   it.each(['{}', '{"goal":"x","points":[],"secret":"y"}', '{"goal":"x","points":[5]}', '```json\n{}', '{"goal":"' + 'x'.repeat(241) + '","points":[]}'])('rejects invalid intent %s before speech', value => {
     const {p,spoken} = parser(); expect(() => p.push(value + SPEECH_BOUNDARY + 'Bonjour. ')).toThrow(); expect(spoken).toEqual([]);
   });

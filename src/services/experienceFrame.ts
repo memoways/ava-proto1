@@ -7,7 +7,8 @@
  * Le cadre institutionnel (pourquoi l'appel a lieu) reste distinct de l'état
  * relationnel propre à chaque personnage (directive relationnelle).
  */
-import type { ExperienceFrameConfig, FilmAnswer } from "@/types";
+import type { ConversationMessage, ExperienceFrameConfig, FilmAnswer } from "@/types";
+import { characterDisplayName } from './characterConversation';
 
 export type ExperiencePath = "seen" | "unseen";
 
@@ -58,6 +59,7 @@ export interface ExperienceFrameInput {
   filmAnswer: FilmAnswer | string | null | undefined;
   /** Faits sur l'interlocuteur déjà acquis (prénom, statut…), issus de la mémoire. */
   knownAboutPlayer?: string[];
+  callTransfer?: ConversationMessage['callTransfer'];
 }
 
 export interface ExperienceFrame {
@@ -73,8 +75,12 @@ export function buildExperienceFrame(input: ExperienceFrameInput): ExperienceFra
   // A film answer is factual context, not an editorial frame setting. Always
   // share it identically with GM and character without enabling sandbox rules.
   const filmContext = path ? `Choix initial du joueur — film : ${input.filmAnswer}.` : "";
-  if (!config.enabled) return { enabled: false, path, prompt: filmContext };
-  const lines: string[] = filmContext ? [filmContext] : [];
+  const transfer = input.callTransfer;
+  const source = transfer && (transfer.from === 'emma' || transfer.from === 'max') ? characterDisplayName(transfer.from) : null;
+  const transferContext = source ? `CONTINUITÉ DE L'APPEL : cet appel t'a été ${transfer?.returning ? 'repassé' : 'passé'} par ${source}. Tu sais qu'une discussion était en cours : tu as seulement perçu sa voix, sans connaître ses mots ni les confidences échangées. ${transfer?.returning ? 'Reprends ta propre conversation avec cet interlocuteur et tes seuls souvenirs.' : 'Accueille cet interlocuteur comme un appel transféré, sans prétendre déjà le connaître.'} Ne rejoue pas l'accueil d'un appel initial et ne répète pas l'annonce du transfert à chaque tour.` : '';
+  const facts = [filmContext, transferContext].filter(Boolean);
+  if (!config.enabled) return { enabled: false, path, prompt: facts.join('\n') };
+  const lines: string[] = [...facts];
   if (config.frameText) lines.push(config.frameText);
   const exposure = path === "seen" ? config.exposureSeen : path === "unseen" ? config.exposureUnseen : "";
   if (exposure) lines.push(`Parcours ${path === "seen" ? "briefé (film vu)" : "découverte (film non vu)"} : ${exposure}`);

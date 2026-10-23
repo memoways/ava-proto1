@@ -6,6 +6,7 @@
 
 - Lovable compile le code et publie le site.
 - Le backend, la base de données, les Edge Functions et les secrets sont gérés dans **Lovable Cloud**, avec **Supabase fourni par Lovable**.
+- **Accès à la base : passer par le connecteur MCP Lovable du projet Ava** (`1265958d-b74e-40f2-917d-182fe05163fc`), y compris pour les lectures SQL et le diagnostic. Il n'existe pas de connexion Supabase directe pour ce projet : ne pas le chercher dans le connecteur Supabase générique et ne pas demander de reconnexion Supabase. Cette exception de projet prime sur la règle personnelle générale de routage Supabase (confirmation d'Ulrich, 23 octobre 2026).
 - Ne pas configurer ni substituer une chaîne de build, un hébergeur, un projet Supabase ou un déploiement externe (Vercel, Netlify, Supabase hors Lovable, etc.).
 - Toute modification réalisée depuis un autre environnement doit rester compatible avec Lovable et être ramenée dans le projet Lovable avant validation ou publication. Elle ne constitue pas un déploiement autonome.
 - Avant toute action qui touche au build, aux variables d'environnement, aux migrations, aux Edge Functions ou à la publication, vérifier qu'elle cible bien Lovable / Lovable Cloud.

@@ -143,6 +143,7 @@ import { appendExperienceEvent, applyTopicHandoffFallback, validateDirectorDecis
 import type { ExperienceDirectorDecisionV1, RuntimeCharacter } from "@/types";
 import { createAcousticInterruptionController, recognizedWordsChanged, withoutRejectedPrefix, endOfSpeechDelayMs, normalizeHandsFreeSettings, shouldBargeIn, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
 import { createMicRecoveryPolicy, isMicSilentlyDead, MIC_WATCHDOG_STRIKES } from "@/services/handsFreeRecovery";
+import { characterHandoffGreeting, characterRecoveryLine } from '@/services/characterConversationContinuity';
 import {
   buildSwitchRequestGuidance,
   characterDisplayName,
@@ -218,11 +219,13 @@ const IndexPRD4 = () => {
   const confirmedTextRef = useRef("");
   const activeVoiceTelemetryRef = useRef<ReturnType<typeof createVoiceTurnV2> | null>(null);
   const [voiceOnly, setVoiceOnly] = useState(false);
-  const rescueRef = useRef(new Map<RuntimeCharacter, Blob>());
+  const rescueRef = useRef(new Map<RuntimeCharacter, { text: string; blob: Blob }>());
+  const lastRescueRef = useRef(new Map<RuntimeCharacter, string>());
   const rescuePendingRef = useRef(new Set<RuntimeCharacter>());
   const voiceOnlyRef = useRef(voiceOnly); voiceOnlyRef.current = voiceOnly;
   const preloadRescueRef = useRef<(character: RuntimeCharacter, voiceId?: string, providerId?: TTSProviderId) => void>(() => {});
   const handsFreeNeedsRearmRef = useRef(false);
+  const handoffMicResumeRef = useRef(false);
   const rearmHandsFreeRef = useRef<() => Promise<void>>(async () => {});
   // Reprise automatique du micro : la conversation reste intacte, seul le flux STT est rouvert.
   const micRecoveryRef = useRef(createMicRecoveryPolicy());
@@ -236,8 +239,11 @@ const IndexPRD4 = () => {
     if (rescueLifetimeRef.current.signal.aborted) rescueLifetimeRef.current = new AbortController();
     const lifetime = rescueLifetimeRef.current;
     rescuePendingRef.current.add(character);
-    void generateSpeech("La connexion a coupé. Tu peux réessayer.", { characterKey: character, voiceId, providerId, signal: lifetime.signal })
-      .then(blob => { if (!lifetime.signal.aborted) rescueRef.current.set(character, blob); }).catch(() => {})
+    const previous = lastRescueRef.current.get(character);
+    const history = previous ? [...conversationRef.current, { role: character, content: previous, timestamp: Date.now(), spokenWith: character }] : conversationRef.current;
+    const text = characterRecoveryLine(character, history);
+    void generateSpeech(text, { characterKey: character, voiceId, providerId, signal: lifetime.signal })
+      .then(blob => { if (!lifetime.signal.aborted) rescueRef.current.set(character, { text, blob }); }).catch(() => {})
       .finally(() => rescuePendingRef.current.delete(character));
   };
 
@@ -411,6 +417,7 @@ const IndexPRD4 = () => {
     if (handsFreeTimerRef.current) window.clearTimeout(handsFreeTimerRef.current);
     handsFreeTimerRef.current = null;
     handsFreeListeningRef.current = false;
+    handoffMicResumeRef.current = false;
     setHandsFreeListening(false);
     const stt = sttRef.current;
     sttRef.current = null;
@@ -1139,6 +1146,7 @@ const IndexPRD4 = () => {
 
       // Watchdog de réponse : protège uniquement RAG/LLM. Le TTS recevra ensuite
       // sa propre fenêtre complète, indépendante des écritures diagnostiques.
+      const responseDeadlineAt = performance.now() + TURN_RESPONSE_DEADLINE_MS;
       if (processingWatchdogRef.current) window.clearTimeout(processingWatchdogRef.current);
       processingWatchdogRef.current = window.setTimeout(() => {
         if (!isCurrentTurn()) return;
@@ -1343,6 +1351,7 @@ const IndexPRD4 = () => {
           gmTopicsCovered: gmTopicsCoveredRef.current,
           onLatencySegment: handleLatencySegment,
           signal: turnController.signal,
+          responseDeadlineAt,
           turnId,
           turnIndex,
           diagnosticTraceEnabled: diagnosticTraceEnabledRef.current,
@@ -1498,7 +1507,12 @@ const IndexPRD4 = () => {
           : outputResult.started ? "completed" : "no_audio");
         if (!isCurrentTurn()) return;
         if (outputResult.status === "failed" && voiceOnly && rescueRef.current.has(turnCharacter)) {
-          void playAudioBlobRobust(rescueRef.current.get(turnCharacter)!, undefined, undefined, turnController.signal);
+          const rescue = rescueRef.current.get(turnCharacter)!;
+          rescueRef.current.delete(turnCharacter);
+          lastRescueRef.current.set(turnCharacter, rescue.text);
+          void playAudioBlobRobust(rescue.blob, undefined, undefined, turnController.signal).catch(() => {}).finally(() => {
+            if (isCurrentTurn()) preloadRescueRef.current(turnCharacter, activeVoiceIdRef.current ?? undefined, activeTTSProviderIdRef.current ?? undefined);
+          });
         }
         resumeConversationTraceSync(true);
         const outputWaitMs = firstPlaybackAt == null ? undefined : Math.max(0, Math.round(firstPlaybackAt - ttsStart));
@@ -2405,9 +2419,10 @@ const IndexPRD4 = () => {
       setSelectedCharacter(target);
       setCurrentHandoffOffer(null);
       trackEvent('prd4_handoff_executed', { session_id: sid, target_character: target, first_contact: firstContact, source: 'gm' });
-      const rawOpeningLine = firstContact ? profile.openingLine?.trim() || (target === 'max' ? OPENING_LINE : 'Allô ?') : 'Oui, je suis là.';
+      const rawOpeningLine = characterHandoffGreeting(target, from, conversationRef.current);
       const openingLine = guardCharacterResponse(rawOpeningLine, characterContext).response;
-      const opening = tagSpokenWith({ role: target, content: openingLine, timestamp: Date.now() }, target);
+      const opening = tagSpokenWith({ role: target, content: openingLine, timestamp: Date.now(),
+        callTransfer: { from, returning: !firstContact } }, target);
       conversationRef.current = [...conversationRef.current, opening];
       addMessage(opening);
       setMaxSubtitle(openingLine);
@@ -2430,12 +2445,19 @@ const IndexPRD4 = () => {
       if (!isSwitchCurrent()) return;
       if (output.status !== 'played') throw new Error('La connexion est établie, mais sa voix est indisponible. Réactive le micro pour reprendre.');
       handoffPhaseRef.current = 'completed';
+      // Restore the player's choice only after successful pickup and greeting.
+      handsFreeNeedsRearmRef.current = handoffMicResumeRef.current;
+      handsFreeListeningRef.current = handoffMicResumeRef.current;
       setHandoffInputLocked(false);
       setHandoffCalling(false);
       setAudioState('idle');
     } catch (error) {
       if (!isSwitchCurrent()) return;
       handoffPhaseRef.current = 'failed';
+      if (!committed) {
+        handsFreeNeedsRearmRef.current = handoffMicResumeRef.current;
+        handsFreeListeningRef.current = handoffMicResumeRef.current;
+      }
       setHandoffInputLocked(false);
       setHandoffCalling(false);
       setAudioState('idle');
@@ -2451,6 +2473,7 @@ const IndexPRD4 = () => {
           blockedReason: error instanceof HandoffConflictError ? 'offer_conflict' : committed ? 'audio_failed' : 'persistence_or_availability_failed' } });
     } finally {
       if (isSwitchCurrent()) {
+        handoffMicResumeRef.current = false;
         handoffCallingRef.current = false;
         approvedCallingTargetRef.current = null;
         acceptedHandoffRef.current = null;
@@ -2466,7 +2489,9 @@ const IndexPRD4 = () => {
     handoffPhaseRef.current = 'validating'; // synchronous lock before the first await
     const sid = sessionIdRef.current;
     finishInputTelemetry('cancelled');
+    const resumeMicrophone = handsFreeListeningRef.current || handsFreeNeedsRearmRef.current;
     cleanupAudio();
+    handoffMicResumeRef.current = resumeMicrophone;
     handsFreeBlockedRef.current = true;
     setHandoffCallingTarget(offer.targetCharacter);
     setHandoffInputLocked(true);
@@ -2495,6 +2520,9 @@ const IndexPRD4 = () => {
     } catch (error) {
       if (endedRef.current || sessionIdRef.current !== sid || activeTurnSequenceRef.current !== sequence) return;
       handoffPhaseRef.current = 'failed';
+      handsFreeNeedsRearmRef.current = handoffMicResumeRef.current;
+      handsFreeListeningRef.current = handoffMicResumeRef.current;
+      handoffMicResumeRef.current = false;
       setHandoffInputLocked(false);
       setHandoffCalling(false);
       if (error instanceof HandoffConflictError) setCurrentHandoffOffer(null);

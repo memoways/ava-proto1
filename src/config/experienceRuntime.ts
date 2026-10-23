@@ -27,6 +27,8 @@ export function getSessionMinimumClosureSeconds(durationSeconds: unknown): numbe
  * a real generation window instead of inheriting the small remainder.
  */
 export const TURN_RESPONSE_DEADLINE_MS = 11_000;
+/** Leave the outer watchdog time to receive a local recovery instead of racing it. */
+export const TURN_RESPONSE_FINALIZATION_RESERVE_MS = 100;
 
 /** A normal Max generation must not be mistaken for an STT/network failure. */
 export const MAX_LLM_RESPONSE_DEADLINE_MS = 8_000;

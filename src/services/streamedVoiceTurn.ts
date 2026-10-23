@@ -95,7 +95,8 @@ export function prepareStreamedVoiceTurn(context: TTSGenerateContext & { charact
         }
         return;
       }
-      if (event.type === 'intent') intent = event.intent;
+      if (event.type === 'reset' && !segments.length) intent = null;
+      else if (event.type === 'intent') intent = event.intent;
       else if (event.type === 'segment') {
         segments.push(event.text); generated = segments.join(' ');
         if (!audioError) {

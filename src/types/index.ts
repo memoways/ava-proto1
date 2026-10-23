@@ -124,6 +124,8 @@ export interface ConversationMessage {
   timestamp: number;
   /** Character whose isolated conversation this turn belongs to. */
   spokenWith?: "max" | "emma";
+  /** Factual provenance of an executed phone transfer; contains no private speech. */
+  callTransfer?: { from: "max" | "emma"; returning: boolean };
   /** Anti-hallucination validation trace, only present on Max messages that went through the validator. */
   validation?: ConversationValidationTrace;
   /** Per-step latency timings (ms) and last blocker, only on Max messages. */
