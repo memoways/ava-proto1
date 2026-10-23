@@ -1013,6 +1013,83 @@ Ces données ne remplacent pas la confirmation auditive d'Ulrich, encore demand�
 La session est terminée après Max, **retour Emma non effectué** ; ne pas annoncer
 un aller-retour réussi ni publier. Ne pas rouvrir d'appel sans coordination.
 
+### Lot 4 — reprise de finalisation du 23 octobre 2026
+
+Départ après fetch/prune : #67 déjà fusionnée dans `f46aa50`, CI
+`39836341069` verte sur son HEAD exact `6925869db32d871f2697df73244b9558473fe7f5`.
+Main réel **`e2bb6f61d08ccf5140d1e01699c86952930e9505`** après #68–70,
+CI post-fusion **39851886975 verte sur ce SHA exact**, Lovable au même SHA,
+ready/agentFinished, workspace Memoways vérifié. Checkout canonique actualisé
+par fast-forward, propre ; identité GitHub Ulrfis réutilisée sans reconnexion.
+Les correctifs #68 et règles #69–70 sont conservés ; aucun de leurs chantiers
+n'est rouvert. PR tierce #24 et sa branche préservées, dernière activité le
+11 octobre. Une seule branche pour cette finalisation :
+`codex/character-handoff-lot-4-recette-finale`, créée depuis ce main.
+
+Ulrich confirme le 23 octobre l'annonce sobre, les sonneries et la voix de Max
+du premier passage du 22 octobre (`7bed5c1b`), ainsi que sa disponibilité au
+casque pour la recette bidirectionnelle. Cela valide le son de ce premier
+passage ; le retour vers Emma reste à effectuer. Aucune publication produit.
+
+Périmètre autorisé inchangé : relire v7/v6 et profils par Lovable Cloud, puis
+nouvel appel diagnostiqué en preview Sandbox Ulrich, Emma → Max → Emma après
+échanges naturels, accords entendus et clics. Contrôler les événements, preuves,
+compteur, session/timer/contexte et isolation des mémoires ; fermer le contrôle.
+Ne modifier aucun code ou réglage sans défaut reproduit. Publier exclusivement
+via Lovable après résultat observable accepté et vérifier l'interface servie.
+En cas de limite, conserver une reprise autonome et le lot explicitement partiel.
+Lecture détaillée de la CI main : 784 unitaires, 41 intégrations, 48 régressions,
+lint/typecheck/build verts. Les 67 E2E comprennent **66 réussites au premier essai
+et un succès au retry**, reprise avec offre/profil cible suspendu, après attente
+`targetRequested` fausse à 5 s. La conclusion GitHub est success ; ce résultat
+n'est pas présenté comme 67/67 sans retry. Revalidation locale standard prévue,
+sans modifier délai ou assertion, et réserve conservée si non reproduite.
+V7/v6 relues : seul quota JSON 1→8 et mention textuelle associée différents ;
+production narrative v1 reste à quota 1. Profils Emma/Max actifs, portraits
+présents et voix Gradium distinctes, validations prompt/RAG/isolation/qualité
+vraies. Aucun changement Cloud.
+
+Actualiser CHANGELOG/STORY/plan/reprise, les seuls faits durables Notion et livrer
+la documentation par PR avec CI verte du HEAD exact, puis CI main et nettoyage
+de la seule branche du lot. Arrêter après ce seul lot.
+
+#### Recette bidirectionnelle acceptée — 23 octobre 2026
+
+Session **`fcfa4f01-d33d-4e1b-8276-9ae4f910cab5`**, **08:22:29–08:29:33
+Europe/Paris**, preview du main e2bb6f6, Sandbox Ulrich/v7, diagnostic complet.
+Clôture **user_hangup**, Emma, compteur **2**, enveloppe none. Film vu,
+rôle/posture null et version épinglée conservés. Aucun réglage ni code modifié.
+Ulrich confirme les deux annonces sobres, pastilles, sonneries et voix correctes,
+accepte la recette et autorise explicitement la publication du frontend Lovable.
+
+- **Emma → Max, T13 :** « Je peux vous passer Max maintenant, si vous êtes
+  d’accord. » délivré ; GM v2/current_user/max/accept/refusal=false/speech_1,
+  preuve v1 exacte matérialisée et consent_validated. Offre 777e04b6 à
+  08:26:51, clic à 08:26:53, connexion à **08:26:58** ; compteur 1.
+- **Max → Emma, T17 :** « Oui, je peux vous la passer. Je vous transfère Emma,
+  dans la cuisine. » délivré ; GM v2/current_user/emma/accept/refusal=false/
+  speech_0, cible nommée par la parole et preuve v1 exacte. Offre 567adfa8 à
+  08:28:32, clic à 08:28:35, connexion à **08:28:40**, firstContact=false ;
+  compteur 2. JSON bruts complets, aucune erreur GM, sorties 484/510 tokens
+  dans le budget 950. Une demande naturelle par sens, aucun son injecté par l'agent.
+- Les événements des deux connexions attestent sessionPreserved/timerPreserved.
+  Timer observé 15:44 → 11:14 → 9:05, sans remise à zéro ; durée 960 s.
+  Portraits/fiches runtime distincts observés. T13 : historique/mémoire/reçus
+  Emma ; T14 premier Max : mémoire privée vide et reçus Max ; T15–17 : Max seul ;
+  **T19 après retour : Emma seule**, avec son propre historique/mémoire/reçus.
+  Les traces vérifient les identités/provenances ; elles ne constituent pas
+  un audit exhaustif de toutes les confidences possibles.
+- Qualité locale standard du main courant : **784 unitaires, 41 intégrations,
+  48 régressions**, lint/typecheck/build verts. E2E complets sans retry lancés
+  après la fermeture de l'appel ; résultat et publication restent à relever.
+  Logs temporaires : /tmp/ava-lot4-23-quality.log et /tmp/ava-lot4-23-e2e.log.
+
+Cette recette valide le switching du lot 4. Les contrôles simulés de refus,
+indisponibilité, interruption, récupération, concurrence et reprise restent
+des preuves distinctes, couvertes par la suite E2E complète ; ne pas prétendre
+avoir reproduit humainement chaque panne. Publication autorisée, pas encore
+effectuée à ce relevé. L'état final sera renseigné après publication et CI/PR.
+
 ## 6. Validation attendue
 
 - Unitaires : T6 différé ; T10 pronom/faux prénom contextualisé ; T11 nom explicite + accord naturel ; inquiétude émotionnelle sans refus ; refus explicites et sans « ne » ; « Je vais l’appeler… enfin non » ; extrait affirmatif choisi au milieu d’un refus ; oui hors contexte ; cible incohérente ; décision invalide/périmée ; offre révoquée et nouvelles versions.

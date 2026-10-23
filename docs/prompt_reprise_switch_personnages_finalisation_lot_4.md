@@ -7,7 +7,50 @@ son Supabase est fourni par Lovable. Aucun hébergeur ou Supabase externe.
 Cette demande autorise uniquement le lot 4, après vérification et finalisation
 de tout défaut restant du lot 3. Ne lance aucun autre chantier ni nouveau chat.
 
-## Relevé prioritaire — #66 livrée en preview, 22 octobre 2026
+## Relevé prioritaire — recette acceptée, 23 octobre 2026
+
+**Recette bidirectionnelle acceptée par Ulrich ; publication Lovable autorisée.
+Finalisation technique/documentaire en cours : ne pas encore annoncer le lot terminé.**
+Checkout canonique actualisé depuis main **e2bb6f61d08ccf5140d1e01699c86952930e9505**
+après #67–70 ; branche unique `codex/character-handoff-lot-4-recette-finale`.
+Modifications de cette reprise : CHANGELOG/STORY/plan et documents de clôture,
+aucun code produit ni configuration Cloud. Relever HEAD/diff/PR réels après fetch.
+#67 déjà fusionnée, CI 39836341069 verte sur HEAD exact 6925869 ; main CI
+39851886975 verte sur e2bb6f6 exact, **66 E2E au premier essai et un au retry**
+(reprise avec offre/profil cible suspendu). Qualité CI et locale : 784/41/48,
+lint/types/build verts. E2E locaux complets sans retry lancés après la recette,
+résultat restant à relever ; ne modifier aucune assertion ou délai.
+Lovable même e2bb6f6, ready/agentFinished, workspace Memoways vérifié.
+PR étrangère #24 et sa branche préservées, aucun autre chantier ouvert.
+
+Ulrich a confirmé le son/sonneries/sobriété du premier passage du 22 octobre.
+Nouvelle session **fcfa4f01-d33d-4e1b-8276-9ae4f910cab5**, **08:22:29–08:29:33
+Europe/Paris** : Emma → Max T13 puis Max → Emma T17, deux accords délivrés,
+preuves v1 exactes matérialisées depuis v2, offres/clics/connexions attestés.
+Compteur **2**, session/timer/film vu/rôle-posture null/v7 conservés ; portraits,
+fiches et voix correctes. T19 après retour : historique/mémoire/reçus Emma seuls,
+comme Max seul à T14–17. **Clôturée user_hangup**, enveloppe none, micro fermé.
+Ulrich accepte les annonces sobres, pastilles, sonneries, voix dans les deux sens
+et autorise explicitement la publication du frontend via Lovable. Cette validation
+humaine du switching ne vaut pas nouvelle recette de chaque panne simulée ou de
+tous les changements étrangers de #68. Les gardes négatives restent vérifiées
+par tests. V7 réutilisée, quota 8/seuil 4/pause 2 ; v6 archivée, prod quota 1.
+
+**Suite de ce seul lot :** terminer les 67 E2E, traiter un échec reproduit s'il
+existe, puis publier une seule fois via Lovable le main accepté et vérifier
+l'interface réellement servie/état de publication. Mettre à jour les preuves
+réelles dans CHANGELOG/STORY/plan et `docs/prompt_cloture_switch_personnages.md`.
+Deux revues Standards/Spec indépendantes et successives ; PR du seul lot,
+fusion après CI verte sur HEAD exact, CI main, synchronisation Lovable et
+suppression de la seule branche du lot vérifiées. Ne toucher ni PR/branche
+étrangère, ni anciens stashes. Notion : décision durable de recette acceptée et
+publication réellement vérifiée seulement, Source conservée, Last updated by=Codex,
+relecture avant et après chaque écriture. Ne relancer aucun appel de contrôle
+ni demander à nouveau l'acceptation acquise. Arrêter après le seul lot 4.
+
+Les relevés ci-dessous sont historiques ; celui du 23 octobre prévaut.
+
+## Relevé historique — #66 livrée en preview, 22 octobre 2026
 
 **Lot 4 toujours incomplet : recette humaine et publication restantes.**
 [#66](https://github.com/memoways/ava-proto1/pull/66) fusionnée dans

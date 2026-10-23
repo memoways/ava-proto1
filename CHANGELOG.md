@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Lot 4 — recette acceptée, publication autorisée] — 2026-10-23
+
+- Reprise sur le main réel `e2bb6f61d08ccf5140d1e01699c86952930e9505`,
+  synchronisé dans Lovable ready/agentFinished. #67 déjà fusionnée, CI verte
+  sur son HEAD exact `6925869` ; CI main `39851886975` verte, avec un E2E
+  réussi au retry (reprise offre/profil suspendu), réserve conservée dans le plan.
+- Recette humaine au casque `fcfa4f01` : **Emma → Max → Emma**, deux accords
+  délivrés et preuves exactes, offres/clics/connexions persistés, compteur **2**,
+  même session/timer/film/rôle/posture et mémoires privées par personnage.
+  Retour Emma vérifié au T19. Appel clôturé user_hangup à 08:29:33 Europe/Paris.
+- Ulrich confirme annonces sobres, pastilles, sonneries et voix correctes,
+  accepte la recette et autorise la publication Lovable. Qualité locale complète
+  verte : **784/41/48**, lint/types/build ; E2E finaux et publication en cours
+  de finalisation. Aucun code produit ou réglage Cloud modifié dans cette reprise.
+- [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md) ; état final
+  de livraison à compléter après publication et vérification GitHub.
+
 ## [Process — sans impact produit] — 2026-10-22 — Fin de lot et branches
 
 - Règle « fin de lot » écrite en dur (`AGENTS.md`, `CLAUDE.md`, règle Cursor, gabarit de PR) :

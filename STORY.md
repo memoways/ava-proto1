@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-22 (lot 4 partiel ; correctif livré, recette humaine et publication en attente)
+> **Last Updated**: 2026-10-23 (lot 4 : recette bidirectionnelle acceptée ; finalisation de livraison en cours)
 
 ---
 
@@ -72,6 +72,24 @@ How this helps: Voice-to-voice crée une connexion émotionnelle impossible avec
 ---
 
 ## Feature Chronicle
+
+### 2026-10-23 — Switching, lot 4 : aller-retour humain accepté
+
+La reprise part du main réel `e2bb6f6` après #67–70, conservé et synchronisé
+dans Lovable. La CI main est verte ; son détail conserve un E2E de reprise
+réussi au second essai. Aucun code produit n'est modifié dans cette reprise.
+Ulrich confirme le son du premier passage du 22 octobre et se rend disponible
+au casque. La nouvelle session `fcfa4f01`, 08:22:29–08:29:33 Europe/Paris,
+réalise **Emma → Max → Emma** : demande naturelle, accord délivré, pastille,
+clic, sonneries et connexion dans chaque sens. Les preuves GM référencées sont
+matérialisées depuis les paroles exactes ; compteur final 2. Même session,
+timer, film vu, rôle/posture et version v7. Max commence avec sa mémoire propre ;
+au retour T19, Emma retrouve uniquement son historique, sa mémoire et ses reçus.
+L'appel est clôturé user_hangup. Ulrich confirme sobriété et qualité des deux
+passages, accepte la recette et autorise explicitement la publication Lovable.
+La qualité locale du main actuel est verte (784 unitaires, 41 intégrations,
+48 régressions, lint/types/build). Les E2E finaux, la publication et la livraison
+documentaire seront vérifiés avant de déclarer ce seul lot terminé.
 
 ### 2026-10-22 — Switching, lot 4 : confronter les simulations à la parole
 
