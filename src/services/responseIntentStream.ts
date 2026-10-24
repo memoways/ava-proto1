@@ -1,6 +1,6 @@
 import { guardCharacterResponse, type CharacterExecutionContext } from './characterIdentityGuard';
 
-export interface ResponseIntent { goal: string; points: string[] }
+export interface ResponseIntent { goal: string; points: string[]; parole?: string }
 export const SPEECH_BOUNDARY = '\n<speech>\n';
 /** Output guidance reserves space for the private header without raising the API budget.
  * Word bounds are conservative guidance, not a tokenizer; SSE still rejects length. */
@@ -11,16 +11,20 @@ export function buildResponseStreamContract(maxTokens: number): string {
   const intent = small
     ? 'goal : 4 mots maximum ; points : tableau vide []'
     : 'goal : 8 mots maximum ; points : 0 à 2 points de 4 mots maximum chacun';
-  return `\n# FORMAT DE SORTIE IMPÉRATIF\nDans cette même réponse, écris d'abord une seule ligne JSON {"goal":"objectif privé","points":[]}. Garde cet en-tête privé compact : ${intent}. Objectif ≤240 caractères, chaque point ≤160 caractères. Ce sont des intentions de communication, pas un raisonnement détaillé. Puis écris le marqueur <speech> seul sur une ligne entre le JSON et ton discours in character, avec de vrais retours à la ligne. Limite du discours : ${speechWords} mots maximum, y compris citations et questions. Le budget total de ${budget} tokens inclut le JSON et la parole : ne consomme pas la place de la parole avec l'intention. Choisis l'essentiel si la demande est large ; termine tes phrases dans cette limite. Aucun markdown, aucune autre métadonnée, aucun tag dans le discours. L'intention est privée, jamais entendue. Une intention ou une continuation privée n'est jamais une confidence déjà entendue. Respecte les mêmes limites de confidences et le canon.\n`;
+  return `\n# FORMAT DE SORTIE IMPÉRATIF\nDans cette même réponse, écris d'abord une seule ligne JSON {"goal":"objectif privé","points":[],"parole":"état"}. Garde cet en-tête privé compact : ${intent}. Objectif ≤240 caractères, chaque point ≤160 caractères. Ce sont des intentions de communication, pas un raisonnement détaillé. "parole" : le nom exact d'un état de « Tes états de parole » que tu joues dans cette réponse (≤40 caractères) ; omets-le si aucun ne convient. Puis écris le marqueur <speech> seul sur une ligne entre le JSON et ton discours in character, avec de vrais retours à la ligne. Limite du discours : ${speechWords} mots maximum, y compris citations et questions. Le budget total de ${budget} tokens inclut le JSON et la parole : ne consomme pas la place de la parole avec l'intention. Choisis l'essentiel si la demande est large ; termine tes phrases dans cette limite. Aucun markdown, aucune autre métadonnée, aucun tag dans le discours. L'intention est privée, jamais entendue. Une intention ou une continuation privée n'est jamais une confidence déjà entendue. Respecte les mêmes limites de confidences et le canon.\n`;
 }
 
 export function normalizeResponseIntent(value: unknown): ResponseIntent | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const raw = value as Record<string, unknown>;
-  if (Object.keys(raw).some(k => k !== 'goal' && k !== 'points') || typeof raw.goal !== 'string'
+  if (Object.keys(raw).some(k => k !== 'goal' && k !== 'points' && k !== 'parole') || typeof raw.goal !== 'string'
     || !raw.goal.trim() || raw.goal.length > 240 || !Array.isArray(raw.points) || raw.points.length > 4
     || raw.points.some(p => typeof p !== 'string' || !p.trim() || p.length > 160)) return null;
-  return { goal: raw.goal.trim(), points: raw.points.map(p => (p as string).trim()) };
+  // "parole" est déclaratif : une valeur malformée est ignorée, jamais fatale au tour.
+  const parole = typeof raw.parole === 'string' && raw.parole.trim() && raw.parole.trim().length <= 40
+    ? raw.parole.trim()
+    : undefined;
+  return { goal: raw.goal.trim(), points: raw.points.map(p => (p as string).trim()), ...(parole ? { parole } : {}) };
 }
 
 /** Closed quotes and sentence punctuation are required before any identity check/emission. */

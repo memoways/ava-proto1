@@ -361,6 +361,10 @@ export interface PRD4PostTurnEvaluation {
   transition_recommended: boolean;
   cinematic_hint: string | null;
   next_turn_guidance: string;
+  /** État de parole proposé pour le prochain tour (nom exact de la fiche, null si aucun). */
+  next_speech_state?: string | null;
+  /** État de parole déclaré par le personnage dans son en-tête privé ce tour. */
+  speech_state_played?: string | null;
   end_recommended: boolean;
   moderation_flag: boolean;
   notes: string;

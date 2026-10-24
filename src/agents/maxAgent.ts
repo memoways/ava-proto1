@@ -25,6 +25,7 @@ import {
   truncateAtSentenceBoundary,
 } from "@/agents/maxPromptCompiler";
 import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
+import { rugositySpeechDirective } from "@/services/speechRugosity";
 import {
   compileRichCharacterSections,
   renderRichSections,
@@ -108,6 +109,10 @@ export interface MaxAgentInput {
   relationshipDirective?: string;
   /** Cadre commun de l'expérience (même texte que celui reçu par le GM). */
   experienceFrame?: string;
+  /** État de parole proposé par le GM pour ce tour (validé contre la fiche). */
+  speechStateDirective?: string | null;
+  /** Rugosité de parole 0–3, épinglée à la session (0 = comportement actuel). */
+  rugosite?: number;
 }
 
 export interface MaxTemporalContext {
@@ -121,6 +126,21 @@ export interface MaxGmGuidance {
   guidance: string;
   /** Sujets déjà couverts, cumulés sur la session (dédupliqués). */
   topicsCovered?: string[];
+}
+
+/**
+ * Bloc « parole du tour » : état proposé par le GM + rugosité réglée.
+ * Rien n'est injecté quand les deux sont absents (rugosité 0 = comportement actuel).
+ */
+export function buildSpeechStateBlock(input: Pick<MaxAgentInput, "speechStateDirective" | "rugosite">): string | undefined {
+  const parts: string[] = [];
+  const directive = input.speechStateDirective?.trim();
+  if (directive) {
+    parts.push(`État de parole proposé pour ce tour : « ${directive} ». Joue-le et déclare-le dans "parole" de ton en-tête privé. Si un autre état de ta liste « Tes états de parole » convient mieux à ce que tu ressens, choisis-le à la place.`);
+  }
+  const rugosite = rugositySpeechDirective(input.rugosite ?? 0);
+  if (rugosite) parts.push(rugosite);
+  return parts.length ? parts.join("\n") : undefined;
 }
 
 /**
@@ -555,6 +575,7 @@ export async function buildMaxSystemPrompt(
       ["temporal_context", "OÙ EN EST L'APPEL", input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined],
       ["session_summary", "SOUVENIRS DE LA SESSION", input.sessionSummary],
       ["gm_guidance", "CONSEIL DE MISE EN SCÈNE", input.gmGuidance?.guidance?.trim() ? buildGmGuidanceBlock(input.gmGuidance) : undefined],
+      ["speech_state", "PAROLE DU TOUR", buildSpeechStateBlock(input)],
       ["rag_context", "CONTEXTE NARRATIF — SOURCE DE VÉRITÉ", input.ragContext],
       ["post_video", "APRÈS LA VIDÉO", input.postVideoContext],
     ];
@@ -630,9 +651,13 @@ export async function buildMaxSystemPrompt(
       ...(input.knowledgeContext?.blockedAssertions ?? []).map((value) => `Assertion interdite : ${value}`),
     ].join("\n");
     const rawGuidance = input.gmGuidance?.guidance?.trim();
-    const gmGuidance = rawGuidance && !isFallbackGmGuidance(rawGuidance) && input.gmGuidance
-      ? buildGmGuidanceBlock(input.gmGuidance)
-      : undefined;
+    const speechStateBlock = buildSpeechStateBlock(input);
+    const gmGuidance = [
+      rawGuidance && !isFallbackGmGuidance(rawGuidance) && input.gmGuidance
+        ? buildGmGuidanceBlock(input.gmGuidance)
+        : undefined,
+      speechStateBlock,
+    ].filter(Boolean).join("\n") || undefined;
     return buildOptimizedPromptAssembly({
       character: characterFields,
       characterName: canonicalName,

@@ -18,6 +18,7 @@ import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
 import { normalizeMemoryText } from "@/services/conversationMemoryV1";
 import { asRuntimeCharacter } from "@/services/characterConversation";
 import { handoffSpeechEvidence, materializeHandoffAssessment } from "@/services/characterHandoff";
+import { rugosityDirectorDirective } from "@/services/speechRugosity";
 import type { CharacterRelationshipPolicy, ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, ExperienceDirectorConfig, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, RelationshipStateProposal, RuntimeCharacter, TraceMessage, TurnRelationshipDirective, UserRoleProfile } from "@/types";
 import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
 import {
@@ -27,7 +28,7 @@ import {
 } from "@/services/relationshipEngine";
 
 /** Incrémenter à chaque changement de logique ou de prompt du GM (traçabilité A/B). */
-export const GM_CODE_VERSION = "gm-2026-10-22-world-boundary";
+export const GM_CODE_VERSION = "gm-2026-10-24-speech-states";
 
 export interface PRD4PostTurnInput {
   onGmObserved?: (service: ServiceObservation, spans: ServerObservation) => void;
@@ -61,6 +62,12 @@ export interface PRD4PostTurnInput {
   turnRelationshipDirective?: TurnRelationshipDirective;
   /** Cadre commun, identique à celui injecté chez le personnage. */
   experienceFrame?: string | null;
+  /** États de parole synchronisés depuis la fiche du personnage actif. */
+  speechStates?: Array<{ name: string; description: string }>;
+  /** Rugosité de parole 0–3 épinglée à la session (0 = comportement actuel). */
+  rugosite?: number;
+  /** État déclaré par le personnage dans son en-tête privé ce tour (trace). */
+  speechStatePlayed?: string | null;
   /** Admin draft tests set this to false so they cannot mutate live sessions. */
   persist?: boolean;
 }
@@ -83,6 +90,7 @@ const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
   transition_recommended: false,
   cinematic_hint: null,
   next_turn_guidance: "Continue la conversation naturellement.",
+  next_speech_state: null,
   end_recommended: false,
   moderation_flag: false,
   notes: "Évaluation par défaut (LLM indisponible).",
@@ -111,6 +119,7 @@ Tu retournes EXACTEMENT cet objet :
   "transition_recommended": boolean,
   "cinematic_hint": string | null,
   "next_turn_guidance": string,     // 1 phrase concise pour guider le même personnage au prochain tour
+  "next_speech_state": string | null, // nom exact d'un état de ÉTATS DE PAROLE DU PERSONNAGE pour le prochain tour ; null si aucun ne convient
   "end_recommended": boolean,
   "moderation_flag": boolean,
   "notes": string,
@@ -178,6 +187,13 @@ Règles "action" :
 - Ne recommande pas cinématique et handoff en même temps. Le handoff est prioritaire.
 - player_switch_request : renseigne-le seulement si le joueur a demandé explicitement à parler à l'autre personnage. stance=accept si le personnage actuel accepte, object s'il refuse, defer s'il hésite.
 - Pour une clôture, utilise end avec reason seulement lorsqu'une fin naturelle est justifiée.
+
+Règles "next_speech_state" :
+- Choisis dans ÉTATS DE PAROLE DU PERSONNAGE l'état le plus juste pour le prochain tour, d'après le sujet, l'émotion et le palier relationnel.
+- Recopie le nom exact, sans rien inventer. Si la liste est vide ou qu'aucun état ne convient, retourne null.
+- Arc d'espoir : au palier contact, privilégie les états retenus ou bloqués ; les états plus ouverts deviennent possibles avec la confiance. Ne promets jamais une guérison ni une solution.
+- Le personnage ne raccroche jamais de lui-même ; les silences sont autorisés. Pour Emma, ne propose jamais un état qui évoque le suicide.
+- La rugosité réglée (0 à 3, fournie dans le contexte) module tes propositions : plus elle est haute, plus les états bloqués, les ruptures et le silence sont bienvenus.
 
 Règles "end_recommended" : respecte le seuil de clôture fourni dans le contexte. Après ce seuil, true seulement si la conversation a trouvé une clôture naturelle ou échoue durablement.
 
@@ -309,6 +325,17 @@ ${input.relationshipPolicy ? JSON.stringify({
 
 ## DIRECTIVE EFFECTIVEMENT UTILISÉE POUR LA RÉPONSE DIFFUSÉE
 ${input.turnRelationshipDirective?.prompt || "(indisponible)"}
+
+## ÉTATS DE PAROLE DU PERSONNAGE (liste synchronisée depuis sa fiche)
+${input.speechStates?.length
+    ? input.speechStates.map((state) => `- ${state.name} : ${state.description}`).join("\n")
+    : "(aucun état synchronisé — retourne next_speech_state=null)"}
+
+## RUGOSITÉ DE PAROLE RÉGLÉE
+${rugosityDirectorDirective(input.rugosite ?? 0)}
+
+## ÉTAT DE PAROLE JOUÉ CE TOUR (déclaré par le personnage)
+${input.speechStatePlayed?.trim() || "(non déclaré)"}
 
 ## TEMPS ÉCOULÉ
   ${Math.floor(input.timeElapsedSeconds / 60)}min ${input.timeElapsedSeconds % 60}s sur ~${Math.round(input.sessionDurationSeconds / 60)} min configurées — clôture naturelle autorisée après ${Math.floor(input.minimumClosureSeconds / 60)}min ${input.minimumClosureSeconds % 60}s — tour #${input.turnIndex}
@@ -452,10 +479,23 @@ function cleanPlayerSwitchRequest(raw: unknown): PRD4PostTurnEvaluation["player_
 
 const REQUIRED_GM_JSON_FIELDS = [
   "engagement_delta", "confusion_detected", "role_usage_quality", "topics_covered",
-  "transition_recommended", "cinematic_hint", "next_turn_guidance", "end_recommended",
+  "transition_recommended", "cinematic_hint", "next_turn_guidance", "next_speech_state", "end_recommended",
   "moderation_flag", "notes", "trigger_video_id", "labels", "action",
   "player_switch_request", "memory_delta",
 ] as const;
+
+/**
+ * Valide la proposition du GM contre la liste synchronisée du personnage.
+ * Un état inconnu ou une liste vide retombent sur null, jamais sur une erreur.
+ */
+export function resolveNextSpeechState(
+  raw: unknown,
+  states: Array<{ name: string; description: string }> | undefined,
+): string | null {
+  if (typeof raw !== "string" || !raw.trim() || !states?.length) return null;
+  const needle = raw.trim().toLowerCase();
+  return states.find((state) => state.name.toLowerCase() === needle)?.name ?? null;
+}
 
 function isCompleteGMJson(value: unknown): value is Partial<PRD4PostTurnEvaluation> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -554,6 +594,7 @@ export async function evaluatePostTurnPRD4(
         transition_recommended: Boolean(parsed.transition_recommended),
         cinematic_hint: parsed.cinematic_hint ? String(parsed.cinematic_hint) : null,
         next_turn_guidance: String(parsed.next_turn_guidance || DEFAULT_RESULT.next_turn_guidance),
+        next_speech_state: resolveNextSpeechState(parsed.next_speech_state, input.speechStates),
         end_recommended: endRecommended,
         moderation_flag: Boolean(parsed.moderation_flag),
         notes: String(parsed.notes || ""),
@@ -648,6 +689,7 @@ export async function evaluatePostTurnPRD4(
     execution_reason: executionReason,
     orchestration_version_id: input.orchestrationVersionId ?? null,
     orchestration_config: input.orchestrationConfig ?? null,
+    speech_state_played: input.speechStatePlayed?.trim() || null,
   };
 
   if (input.sessionId && input.persist !== false) {

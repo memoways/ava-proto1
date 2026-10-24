@@ -8,7 +8,7 @@ FORMAT COMPACT PRIORITAIRE : un seul objet JSON complet, sur une ligne sans mark
 {
  "labels":{"themes":[],"topics":[],"intentions":[]},
  "engagement_delta":0,"confusion_detected":false,"role_usage_quality":"unknown","topics_covered":[],
- "transition_recommended":false,"cinematic_hint":null,"next_turn_guidance":"","end_recommended":false,"moderation_flag":false,"notes":"","trigger_video_id":null,
+ "transition_recommended":false,"cinematic_hint":null,"next_turn_guidance":"","next_speech_state":null,"end_recommended":false,"moderation_flag":false,"notes":"","trigger_video_id":null,
  "handoff_assessment":{"schemaVersion":2,"requestSource":"current_user","targetCharacter":"max","stance":"accept","refusal":false,"consentRef":"speech_0"},
  "action":{"type":"handoff","targetCharacter":"max","reason":"Accord de transfert.","proposalGuidance":"Propose de passer l'appel à Max."},
  "player_switch_request":{"targetCharacter":"max","stance":"accept"},

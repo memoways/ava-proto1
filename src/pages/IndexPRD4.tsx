@@ -295,6 +295,7 @@ const IndexPRD4 = () => {
   const pendingPostVideoContextRef = useRef<string | null>(null);
   // Boucle GM→Max : guidance produite par le post-tour N, consommée au tour N+1.
   const pendingGmGuidanceRef = useRef<string | null>(null);
+  const pendingSpeechStateRef = useRef<string | null>(null);
   const pendingEmotionalStateRef = useRef<string | null>(null);
   const gmTopicsCoveredRef = useRef<string[]>([]);
   const activeCharacterRef = useRef<RuntimeCharacter>("max");
@@ -913,6 +914,9 @@ const IndexPRD4 = () => {
     pendingGmGuidanceRef.current = latestGm?.execution_status === "executed"
       ? latestGm.next_turn_guidance?.trim() || null
       : null;
+    pendingSpeechStateRef.current = latestGm?.execution_status === "executed"
+      ? latestGm.next_speech_state ?? null
+      : null;
     pendingEmotionalStateRef.current = null;
     gmTopicsCoveredRef.current = latestGm?.topics_covered ?? [];
     endedRef.current = false;
@@ -1301,6 +1305,10 @@ const IndexPRD4 = () => {
           : null;
         const gmGuidance = [pendingGmGuidanceRef.current, switchGuidance].filter(Boolean).join(" ") || null;
         pendingGmGuidanceRef.current = null;
+        // Consommation one-shot : un état de parole périmé ne survit pas à son tour.
+        const gmSpeechState = pendingSpeechStateRef.current;
+        pendingSpeechStateRef.current = null;
+        const playedSpeechStateRef = { current: null as string | null };
 
         const priorConversation = sliceConversationForCharacter(
           conversationRef.current.slice(0, -1),
@@ -1349,6 +1357,8 @@ const IndexPRD4 = () => {
           postVideoContext,
           gmGuidance,
           gmTopicsCovered: gmTopicsCoveredRef.current,
+          gmSpeechState,
+          playedSpeechStateRef,
           onLatencySegment: handleLatencySegment,
           signal: turnController.signal,
           responseDeadlineAt,
@@ -1623,6 +1633,7 @@ const IndexPRD4 = () => {
           }
           const gmExecuted = ev.execution_status === "executed";
           pendingGmGuidanceRef.current = gmExecuted ? ev.next_turn_guidance?.trim() || null : null;
+          pendingSpeechStateRef.current = gmExecuted ? ev.next_speech_state ?? null : null;
           if (gmExecuted) {
             pendingEmotionalStateRef.current = ev.memory_after?.relationship.emotionalState
               ?? pendingEmotionalStateRef.current;

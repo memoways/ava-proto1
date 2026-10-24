@@ -170,6 +170,10 @@ export interface ConversationTurnTraceV1 {
     };
     gmGuidance: string | null;
     gmTopicsCovered: string[];
+    /** État de parole proposé par le GM pour ce tour (validé contre la fiche). */
+    gmSpeechStateProposed?: string | null;
+    /** Rugosité de parole 0–3 épinglée à la session. */
+    rugosite?: number;
     /** optimized_v3 — état structuré lu avant le tour. */
     structuredMemoryBefore?: ConversationMemoryV1 | null;
     memoryLastTurn?: number;

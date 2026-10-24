@@ -39,7 +39,7 @@ import {
   createInitialRelationshipState,
   normalizeRelationshipState,
 } from "@/services/relationshipEngine";
-import { fetchPinnedDirectorRuntime } from "@/services/experienceOrchestration";
+import { fetchCharacterRugosite, fetchPinnedDirectorRuntime } from "@/services/experienceOrchestration";
 import { withTimeout } from "@/services/asyncUtils";
 import { compactConversationTurnTrace } from "@/services/conversationTraceFormat";
 import { enqueueConversationTurnTrace, patchQueuedConversationTurnTrace } from "@/services/conversationTraceOutbox";
@@ -90,6 +90,10 @@ export interface PRD4TurnInput {
   gmGuidance?: string | null;
   /** Boucle GM→Max : sujets déjà couverts, cumulés sur la session. */
   gmTopicsCovered?: string[];
+  /** Boucle GM→Max : état de parole proposé par le post-tour précédent. */
+  gmSpeechState?: string | null;
+  /** Reçoit l'état « parole » déclaré par le personnage (flux streamé). */
+  playedSpeechStateRef?: { current: string | null };
   onLatencySegment?: (event: PRD4LatencySegmentEvent) => void;
   /** Abort when the UI has moved to a newer turn or ended the session. */
   signal?: AbortSignal;
@@ -185,6 +189,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   // Démarre avec la mémoire et le RAG. simulateMaxResponse relira la même fiche
   // depuis le cache : aucune requête supplémentaire n'est ajoutée en série.
   const characterPromptPromise = loadCharacterPrompt(input.characterContext.characterId);
+  // Rugosité épinglée à la session : lue une fois, en parallèle, jamais sur le chemin critique.
+  const rugositePromise = fetchCharacterRugosite(activeCharacter).catch(() => 0);
   const directorRuntimePromise = fetchPinnedDirectorRuntime(input.sessionId).catch(() => ({
     versionId: null,
     versionNumber: null,
@@ -265,6 +271,12 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const structuredMemory = await memoryPromise;
   const characterPrompt = await characterPromptPromise;
   if (!characterPrompt) throw new Error(`Fiche personnage absente pour ${input.characterContext.displayName}`);
+  const rugosite = await rugositePromise;
+  // La proposition du GM n'est retenue que si elle nomme un état de la fiche.
+  const speechStates = characterPrompt.speech_states ?? [];
+  const proposedSpeechState = input.gmSpeechState?.trim()
+    ? speechStates.find((state) => state.name.toLowerCase() === input.gmSpeechState!.trim().toLowerCase())?.name ?? null
+    : null;
   const visibleStructuredMemory = structuredMemory
     ? filterConversationMemoryForCharacter(structuredMemory, activeCharacter)
     : null;
@@ -330,6 +342,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       : undefined,
     relationshipDirective: relationshipDirective.prompt,
     experienceFrame: experienceFrame.prompt || undefined,
+    speechStateDirective: proposedSpeechState,
+    rugosite,
   };
   observeVoice(input.onVoiceObservation, "context_ready");
   try { input.onVersionsObserved?.(input.characterContext.promptUpdatedAt, "versionId" in frameRuntime ? frameRuntime.versionId : null); } catch { /* diagnostic only */ }
@@ -448,6 +462,9 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         relationshipPolicy,
         turnRelationshipDirective: relationshipDirective,
         experienceFrame: experienceFrame.prompt || null,
+        speechStates,
+        rugosite,
+        speechStatePlayed: input.playedSpeechStateRef?.current ?? null,
       });
     } finally {
       input.onLatencySegment?.({
@@ -509,6 +526,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         temporalContext: maxInput.temporalContext!,
         gmGuidance: maxInput.gmGuidance?.guidance ?? null,
         gmTopicsCovered: maxInput.gmGuidance?.topicsCovered ?? [],
+        gmSpeechStateProposed: proposedSpeechState,
+        rugosite,
         structuredMemoryBefore: visibleStructuredMemory,
         memoryLastTurn: visibleStructuredMemory?.lastTurn ?? 0,
       },
@@ -689,6 +708,7 @@ export async function streamPRD4Turn(input: PRD4TurnInput, onEvent: (event: PRD4
   delivery.catch(() => {});
   const emit = (event: PRD4StreamEvent) => { input.signal?.throwIfAborted(); onEvent(event); };
   const parser = new ResponseIntentParser(input.characterContext, intent => {
+    if (input.playedSpeechStateRef) input.playedSpeechStateRef.current = intent.parole ?? null;
     observeVoice(input.onVoiceObservation, "intent_ready"); emit({ type: "intent", intent });
   }, text => {
     observeVoice(input.onVoiceObservation, "safe_phrase"); segments++; emit({ type: "segment", text });
