@@ -1223,6 +1223,7 @@ export type Database = {
           branch: string | null
           campaign_id: string | null
           character_prompt_versions: Json
+          character_speech_runtime: Json
           context_type: string
           conversation_log: Json | null
           conversation_memory: Json
@@ -1275,6 +1276,7 @@ export type Database = {
           branch?: string | null
           campaign_id?: string | null
           character_prompt_versions?: Json
+          character_speech_runtime?: Json
           context_type?: string
           conversation_log?: Json | null
           conversation_memory?: Json
@@ -1327,6 +1329,7 @@ export type Database = {
           branch?: string | null
           campaign_id?: string | null
           character_prompt_versions?: Json
+          character_speech_runtime?: Json
           context_type?: string
           conversation_log?: Json | null
           conversation_memory?: Json
@@ -1700,6 +1703,19 @@ export type Database = {
           situation_summary: string
           tts_provider: string
           tts_voice_id: string
+        }[]
+      }
+      get_character_speech_runtime: {
+        Args: {
+          p_character_key: string
+          p_environment_id: string
+          p_session_id?: string
+        }
+        Returns: {
+          environment_id: string
+          recent_states: Json
+          rugosite: number
+          settings_version: string
         }[]
       }
       get_pinned_orchestration_runtime: {
