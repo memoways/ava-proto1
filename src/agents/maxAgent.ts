@@ -944,6 +944,7 @@ async function buildRichMaxSystemPrompt(
 
   appendDynamicSection("experience_frame", "CADRE DE L'APPEL — PRIORITAIRE", input.experienceFrame);
   appendDynamicSection("relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective);
+  appendDynamicSection("speech_state", "PAROLE DU TOUR", buildSpeechStateBlock(input));
   appendDynamicSection("temporal_context", "ÉTAT DE L'APPEL", input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined);
   appendDynamicSection("user_role", "RÔLE DE L'INTERLOCUTEUR", input.userRoleSummary);
   appendDynamicSection("session_summary", "MÉMOIRE DE SESSION", input.sessionSummary);

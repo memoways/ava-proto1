@@ -21,6 +21,7 @@ export const MAX_DYNAMIC_SECTION_CHARS = {
   temporal_context: 260,
   session_summary: 900,
   gm_guidance: 350,
+  speech_state: 800,
   rag_context: MAX_MAX_RAG_CONTEXT_CHARS,
   post_video: 500,
   turn_guards: 500,
