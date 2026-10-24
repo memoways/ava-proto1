@@ -6,9 +6,21 @@ function deferred<T>(){let resolve!:(v:T)=>void, reject!:(e:unknown)=>void;const
 const ctx={characterKey:'max' as const,turn_id:'t1',turn_index:1};
 const played={status:'played' as const,provider:'gradium',started:true,firstPlaybackStartMs:10,playbackTotalMs:100,generatedSegments:1,playedSegments:1,failedSegments:0};
 function setup(){const start=deferred<void>(),gen=deferred<{firstByteMs:number;totalGenMs:number;bytes:number}>(),end=deferred<{playbackTotalMs:number}>();
- const session={started:start.promise,generationDone:gen.promise,finished:end.promise,appendText:vi.fn(),finish:vi.fn(),open:vi.fn(),cancel:vi.fn(),hasAudibleOutput:false,progress:vi.fn(()=>({scheduledSamples:0,playedSamples:0,sampleRate:24000,confirmedText:''}))};fake.create.mockReturnValue(session);return {session,start,gen,end};}
+ const session={setPerformance:vi.fn(),started:start.promise,generationDone:gen.promise,finished:end.promise,appendText:vi.fn(),finish:vi.fn(),open:vi.fn(),cancel:vi.fn(),hasAudibleOutput:false,progress:vi.fn(()=>({scheduledSamples:0,playedSamples:0,sampleRate:24000,confirmedText:''}))};fake.create.mockReturnValue(session);return {session,start,gen,end};}
 describe('P1 streamed voice delivery',()=>{
  beforeEach(()=>vi.clearAllMocks());
+ it('configures state prosody before the first segment without marking it delivered',()=>{
+  const {session}=setup(),receipt=vi.fn();
+  const intent={emotion:'urgent' as const,intensity:2 as const,source:'speech_state' as const,actingNl:'fast'};
+  const resolve=vi.fn(()=>intent);
+  const t=prepareStreamedVoiceTurn({...ctx,resolveSpeechPerformance:resolve},{onReceipt:receipt,onPlaybackStart:vi.fn()});
+  t.onEvent({type:'intent',intent:{goal:'secret',points:[],parole:'La digue cède'}});
+  t.onEvent({type:'segment',text:'Je… je sais.'});t.onEvent({type:'segment',text:'Oui.'});
+  expect(resolve).toHaveBeenCalledWith('La digue cède','Je… je sais.');
+  expect(session.setPerformance).toHaveBeenCalledOnce();
+  expect(session.setPerformance.mock.invocationCallOrder[0]).toBeLessThan(session.appendText.mock.invocationCallOrder[0]);
+  expect(receipt).not.toHaveBeenCalled();t.cancel();
+ });
  it('keeps intention out of TTS and finalizes only when the samples finished',async()=>{
   const {session,start,gen,end}=setup(),receipt=vi.fn(),fallback=vi.fn(),onPlaybackStart=vi.fn();const t=prepareStreamedVoiceTurn(ctx,{onReceipt:receipt,fallback,onPlaybackStart});
   t.onEvent({type:'intent',intent:{goal:'secret',points:[]}});expect(session.appendText).not.toHaveBeenCalled();
