@@ -304,7 +304,7 @@ function punctuationSignals(text: string): { intensityBoost: PerformanceIntensit
 export function derivePerformanceIntent(input: DerivePerformanceInput): PerformanceIntent {
   const settings = input.speechSettings ?? getSpeechPerformanceSettings();
   const state = input.validSpeechStates?.find(name => name.toLocaleLowerCase('fr') === input.speechState?.toLocaleLowerCase('fr'));
-  const mapping = state ? settings.byCharacter[input.characterKey ?? '']?.[state] : undefined;
+  const mapping = state ? settings.byCharacter?.[input.characterKey ?? '']?.[state] : undefined;
   if (getActiveEnvironment() !== 'prod' && settings.enabled && mapping && (input.rugosite ?? 0) > 0) {
     const amount = clamp(input.rugosite ?? 0, 0, 3) / 3;
     const speed = Number(mapping.speed);
@@ -400,7 +400,7 @@ export function applyElevenLabsPerformance(
     urgent: { style: 0.16, stability: -0.1, speed: 0.12 },
   };
   const delta = deltas[intent.emotion];
-  const speed = intent.speedHint ?? clamp(base.speed + delta.speed * factor, 0.7, 1.2);
+  const speed = intent.source === 'speech_state' ? clamp(base.speed * (intent.speedHint ?? 1), 0.7, 1.2) : intent.speedHint ?? clamp(base.speed + delta.speed * factor, 0.7, 1.2);
   let spoken = text;
   if (base.modelId === "eleven_v3") {
     const tag = ELEVENLABS_V3_TAGS[intent.emotion];
@@ -460,7 +460,7 @@ export function applyInworldPerformance(
   return {
     instruction: intent.actingNl,
     deliveryMode: intent.intensity >= 2 ? "CREATIVE" : base.deliveryMode,
-    speakingRate: intent.speedHint
+    speakingRate: intent.source === 'speech_state' ? clamp(base.speakingRate * (intent.speedHint ?? 1), 0.5, 2) : intent.speedHint
       ? clamp(intent.speedHint, 0.5, 2)
       : base.speakingRate,
   };

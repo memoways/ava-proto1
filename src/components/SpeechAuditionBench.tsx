@@ -14,11 +14,12 @@ import { AUDITION_PROVIDERS, createAuditionCorpus, auditionCount, auditionVoice,
 import { CANONICAL_EMOTIONS, derivePerformanceIntent, applyElevenLabsPerformance } from '@/services/tts/performanceIntent';
 import { getProviderById } from '@/services/tts/registry';
 import { getTTSSettings } from '@/services/settingsService';
+import { getGradiumSettings, getHumeSettings, getInworldSettings, getCartesiaSettings } from '@/services/tts/providerSettings';
 import { prepareTextForTTS } from '@/services/tts/textPrep';
 import { prepareTextForGradium } from '@/services/tts/providers/gradium';
 import type { TTSProviderId } from '@/services/tts/types';
 interface Character { key: string; name: string; states: Array<{name:string;description:string}> }
-interface Result { key:string; character:string; state:string; level:number; provider:string; model?:string; voice:string; sourceText:string; synthText:string; firstByteMs?:number; firstSoundMs?:number; totalMs?:number; durationMs?:number; error?:string; diction:string; artifacts:string; natural:string }
+interface Result { key:string; cached?:boolean; character:string; state:string; level:number; provider:string; model?:string; voice:string; sourceText:string; synthText:string; firstByteMs?:number; firstSoundMs?:number; totalMs?:number; durationMs?:number; error?:string; diction:string; artifacts:string; natural:string }
 function exportResults(rows: Result[]) { const url=URL.createObjectURL(new Blob([JSON.stringify(rows,null,2)],{type:'application/json'})); const a=document.createElement('a');a.href=url;a.download='auditions-lot-b.json';a.click();URL.revokeObjectURL(url); }
 export default function SpeechAuditionBench() {
  const sandbox=getActiveEnvironment()!=='prod';
@@ -41,17 +42,21 @@ export default function SpeechAuditionBench() {
  if(!sandbox)return <section className="border-t pt-4"><h3 className="font-semibold">Lot B — Auditions</h3><p className="text-sm text-muted-foreground">Réservé aux environnements sandbox.</p></section>;
  const active=characters.find(c=>c.key===character),lines=corpora[character]??[];
  const line=lines[lineIndex],text=line?.variants[level-1]??'',voice=auditionVoice(voices,character,provider);
- const intent=derivePerformanceIntent({text,characterKey:character,speechState:line?.state,rugosite:level,validSpeechStates:active?.states.map(s=>s.name),speechSettings:{...settings,enabled:true}});
+ const auditionSettings={...settings,enabled:true,byCharacter:{...settings.byCharacter,[character]:Object.fromEntries((active?.states??[]).map(s=>[s.name,settings.byCharacter[character]?.[s.name]??proposeSpeechMapping(s.name,s.description)]))}};
+ const intent=derivePerformanceIntent({text,characterKey:character,speechState:line?.state,rugosite:level,validSpeechStates:active?.states.map(s=>s.name),speechSettings:auditionSettings});
  const prepared=provider==='gradium'?prepareTextForGradium(text):prepareTextForTTS(text);
  const synthText=provider==='elevenlabs'?applyElevenLabsPerformance({...getTTSSettings(),modelId:'eleven_v3'},prepared,intent).text:prepared;
  async function listen() {
   if(!voice||!text||!line?.state)return;
   stop();const abort=new AbortController();controller.current=abort;setBusy(true);
-  const key=JSON.stringify({character,provider,level,text,voice,intent,model:provider==='elevenlabs'?'eleven_v3':null});
+  const providerSettings={elevenlabs:getTTSSettings(),gradium:getGradiumSettings(),hume:getHumeSettings(),inworld:getInworldSettings(),cartesia:getCartesiaSettings()}[provider];
+  const key=JSON.stringify({character,provider,level,text,voice,intent,providerSettings,model:provider==='elevenlabs'?'eleven_v3':null});
   const row:Result={key,character,state:line.state,level,provider,voice,sourceText:text,synthText,diction:'',artifacts:'',natural:''};
   const start=performance.now();
   try {
    let blob=cache.current.get(key);
+   row.cached=Boolean(blob);
+   if(blob)row.model=results.find(r=>r.key===key)?.model;
    if(!blob){const result=await getProviderById(provider).generate(text,{characterKey:character,voiceId:voice,performance:intent,signal:abort.signal,...(provider==='elevenlabs'?{auditionModelId:'eleven_v3' as const}:{})});blob=result.blob;Object.assign(row,result.meta);cache.current.set(key,blob);}
    abort.signal.throwIfAborted();audioUrl.current=URL.createObjectURL(blob);const player=new Audio(audioUrl.current);audio.current=player;
    await new Promise<void>((resolve,reject)=>{const cancel=()=>{player.pause();reject(new DOMException('Annulé','AbortError'));};abort.signal.addEventListener('abort',cancel,{once:true});player.onplaying=()=>{row.firstSoundMs=Math.round(performance.now()-start);};player.onended=()=>{row.durationMs=Math.round(player.duration*1000);abort.signal.removeEventListener('abort',cancel);resolve();};player.onerror=()=>{abort.signal.removeEventListener('abort',cancel);reject(new Error('Lecture audio impossible'));};player.play().catch(reject);});
