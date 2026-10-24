@@ -4,7 +4,7 @@ import { resolveNextSpeechState } from '@/agents/gameMasterPRD4';
 import { buildSpeechStateBlock } from '@/agents/maxAgent';
 import { normalizeRugosite, rugositySpeechDirective } from './speechRugosity';
 
-const context = { characterKey: 'max' as const, displayName: 'Max Lorenzo', characterId: '11111111-1111-4111-8111-111111111111', notionPageId: 'x', environmentId: 'sandbox-ulrich', promptUpdatedAt: '2026-10-13T00:00:00Z' };
+const context = { characterKey: 'max' as const, displayName: 'Max Lorenzo', characterId: '11111111-1111-4111-8111-111111111111', notionPageId: '30362322e5958011ad7bffb1ed6772bc', environmentId: 'sandbox-ulrich', promptUpdatedAt: '2026-10-13T00:00:00Z' };
 
 describe('en-tête privé « parole »', () => {
   it('accepte un état de parole déclaré sans le diffuser', () => {
