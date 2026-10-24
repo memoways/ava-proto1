@@ -139,6 +139,7 @@ export default function CharacterRuntimeSettingsTab() {
         rag_validated: (auto?.ragChunks ?? 0) > 0,
         qualitative_tests_validated: profile.qualitative_tests_validated,
         knowledge_isolation_validated: profile.knowledge_isolation_validated,
+        rugosite: profile.rugosite ?? 0,
       });
       toast.success(`Profil runtime ${profile.display_name} sauvegardé`);
       await load();
@@ -237,9 +238,30 @@ export default function CharacterRuntimeSettingsTab() {
                   </Select>
                   <Input value={profile.tts_voice_id ?? ""} onChange={(event) => patchProfile(profile.id, { tts_voice_id: event.target.value || null })} placeholder="Voice ID du personnage" />
                 </div>
-                <p className="text-xs text-muted-foreground">
+                 <p className="text-xs text-muted-foreground">
                   Le provider et le Voice ID sont appliqués à la voix de ce personnage. Les réglages fins Gradium (temp, similarité, vitesse…) se règlent par personnage dans TTS Config.
                 </p>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">Rugosité de parole</label>
+                  <Select
+                    value={String(profile.rugosite ?? 0)}
+                    onValueChange={(value) => patchProfile(profile.id, { rugosite: Number(value) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">0 — Neutre (comportement actuel)</SelectItem>
+                      <SelectItem value="1">1 — Légère (quelques hésitations)</SelectItem>
+                      <SelectItem value="2">2 — Marquée (parole souvent troublée)</SelectItem>
+                      <SelectItem value="3">3 — Rugueuse (blocages, silences longs)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Module la fréquence des états bloqués, des ruptures et la tolérance au silence — jamais les faits. Épinglée à la session au premier tour.
+                  </p>
+                </div>
 
                 <div className="space-y-2 rounded bg-muted/40 p-3">
                   <label className="flex items-start gap-2 text-xs">
