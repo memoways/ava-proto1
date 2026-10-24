@@ -2,6 +2,10 @@
 
 ## En cours
 
+- Lot A parole incarnée : corriger l'accès sécurisé à la rugosité, l'épinglage réel,
+  les chemins de prompts, la variété et les traces ; compléter la grille juge.
+- Lot B : attend le texte qu'Ulrich va transmettre ; aucun changement TTS dans le lot A.
+
 - Serveur MCP de statistiques (lecture seule, protégé par connexion) : publier
   le site puis connecter Codex et vérifier un premier relevé de chiffres ;
   attend publication. Plan `docs/plan_mcp_statistiques.md`.

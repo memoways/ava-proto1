@@ -61,3 +61,18 @@ Sera aussi enregistré dans `docs/plan_parole_incarnee_personnages.md`.
   `GM_CODE_VERSION` = `gm-2026-10-24-speech-states`. 854/854 tests, build vert.
 - Reste : recette humaine en sandbox (tester rugosité 1 à 3 sur Max et Emma) et
   configuration des cinq critères dans le banc d'évaluation automatique.
+
+## Finalisation du lot A — 24.10.2026
+
+- Remplacer la lecture directe du profil protégé par une fonction runtime limitée
+  au personnage et à l'environnement autorisés ; ne pas rendre les profils publics.
+- Épingler en base la valeur et la version du réglage par session/personnage,
+  sans conserver une ancienne valeur entre deux nouvelles sessions.
+- Injecter les états dans tous les chemins de prompts, notamment rich_v2,
+  sans ajouter de style commun : le contenu éditorial reste celui de la fiche.
+- Valider l'état joué, conserver les deux derniers états propres au personnage,
+  empêcher une troisième proposition identique et tracer proposition/jeu/palier/arc/rugosité.
+- Ajouter les cinq critères au même appel juge, sans nouvel appel IA en jeu.
+- Vérifier par tests locaux et lecture authentifiée des réglages, sans session
+  ni audio synthétiques ; l'écoute Max/Emma reste une recette humaine.
+- Lot B exclu : attendre le texte fourni par Ulrich. Aucune publication production.
