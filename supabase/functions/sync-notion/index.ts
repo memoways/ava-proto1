@@ -83,6 +83,8 @@ interface SyncRequest {
    * - "rag_only"       : only re-embed page content (NO character_prompts touched)
    */
   mode?: "full" | "fields_only" | "rag_only";
+  /** Target environment for character_prompts. Defaults to 'prod' for backward compatibility. */
+  environment_id?: string;
   /** Build embeddings in this versioned profile. Defaults to the active profile. */
   rag_profile?: RagEmbeddingProfileId;
   /** Atomically activate rag_profile after every requested character was indexed successfully. */
@@ -136,6 +138,7 @@ const PROMPT_FIELD_ALIASES: Record<string, string[]> = {
   sujets_sensibles: ["Sujets sensibles"],
   references_intellectuelles: ["Références intellectuelles", "References intellectuelles"],
   timeline: ["Timeline", "Chronologie", "Historique"],
+  maniere_de_parler: ["Manière de parler", "Maniere de parler"],
 };
 
 interface MappingWarning {
@@ -200,6 +203,7 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    const targetEnvironmentId = typeof body.environment_id === 'string' && body.environment_id ? body.environment_id : 'prod';
     const mode: "full" | "fields_only" | "rag_only" = body.mode || "full";
     const doFields = mode === "full" || mode === "fields_only";
     const doRag = mode === "full" || mode === "rag_only";
@@ -626,8 +630,9 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
           .upsert(
             {
               character_id: charRow.id,
-              environment_id: 'prod',
+              environment_id: targetEnvironmentId,
               ...promptFields,
+              speech_states: parseSpeechStates(promptFields.maniere_de_parler || ''),
               situation_summary: situationSummary,
               updated_at: new Date().toISOString(),
             },
