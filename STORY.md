@@ -1,11 +1,23 @@
 # Où est Ava ? — Development Story
 
- > **Status**: 🟡 In Progress  
+> **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-23 (fiabilisation des tours transcrits et de la continuité téléphonique en validation)
+> **Last Updated**: 2026-10-24 (lot A parole incarnée : correctifs en preview, recette humaine à poursuivre)
 
 ---
+
+## Lot A — correctifs du 24 octobre 2026
+
+Le test d'Ulrich restait lisse malgré Max réglé à 3 et Emma à 2. Les chemins
+rich_v2 et optimized_v3 n'injectaient pas la nouvelle manière de parler ;
+rich_v2 omettait aussi la rugosité. Ces omissions sont corrigées, avec lecture
+autorisée du réglage, snapshot par session, variété déterministe et cinq critères
+dans le même appel juge. 863 tests verts et compilation Lovable verte.
+Pas de nouvel audio ni de session synthétique, pas de changement de voix ou de
+publication. L'écoute humaine et les latences restent non vérifiées ; GitHub
+main/CI/nettoyage indisponibles ici, aucune fusion revendiquée. Lot B attend le
+texte d'Ulrich. Plan : [parole incarnée](docs/plan_parole_incarnee_personnages.md).
 
 ## Genesis Block
 

@@ -76,3 +76,18 @@ Sera aussi enregistré dans `docs/plan_parole_incarnee_personnages.md`.
 - Vérifier par tests locaux et lecture authentifiée des réglages, sans session
   ni audio synthétiques ; l'écoute Max/Emma reste une recette humaine.
 - Lot B exclu : attendre le texte fourni par Ulrich. Aucune publication production.
+
+### Résultat vérifié
+
+- Fonction runtime appliquée dans Lovable Cloud, colonne de snapshot vérifiée.
+- Lecture connectée sans création de session : Max 3 et Emma 2, sans erreur ;
+  contrôle affiché dans la preview admin. Aucun niveau sauvegardé modifié.
+- 863/863 tests locaux verts, compilation automatique Lovable verte.
+- Manquaient réellement : champ éditorial absent de rich_v2/optimized_v3,
+  consigne absente de rich_v2/compact, lecture protégée sans accès joueur,
+  faux épinglage navigateur, déclaration batch absente, anti-répétition absent,
+  traces palier/version incomplètes et cinq critères juge non intégrés.
+- Restent : écouter de nouvelles conversations Max/Emma pour juger le naturel
+  et mesurer les latences. Pas de conversation synthétique exécutée.
+- GitHub main, CI et branches non vérifiables depuis ce sandbox ; ce lot n'est
+  pas déclaré livré sur main. Production non publiée. Lot B attend son texte.

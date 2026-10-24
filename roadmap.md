@@ -2,8 +2,8 @@
 
 ## En cours
 
-- Lot A parole incarnée : corriger l'accès sécurisé à la rugosité, l'épinglage réel,
-  les chemins de prompts, la variété et les traces ; compléter la grille juge.
+- Lot A parole incarnée : correctifs et 863 tests verts en preview ; attend écoute
+  humaine Max/Emma et mesure de latence. Livraison GitHub main/CI non vérifiable ici.
 - Lot B : attend le texte qu'Ulrich va transmettre ; aucun changement TTS dans le lot A.
 
 - Serveur MCP de statistiques (lecture seule, protégé par connexion) : publier
