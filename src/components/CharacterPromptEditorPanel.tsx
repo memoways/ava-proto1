@@ -355,6 +355,24 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
         </ScrollArea>
       </div>
 
+      <div className="space-y-2 border rounded-lg p-4 bg-muted/20">
+        <Label className="text-sm font-semibold">États de parole ({prompt.speech_states?.length || 0})</Label>
+        <p className="text-xs text-muted-foreground">
+          Lus à la synchronisation depuis la liste « Tes états de parole » du champ Manière de parler.
+        </p>
+        {prompt.speech_states?.length ? (
+          <ul className="text-xs space-y-1">
+            {prompt.speech_states.map((s) => (
+              <li key={s.name}><span className="font-semibold">{s.name}</span> : {s.description}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-destructive">Aucun état trouvé — vérifie la liste dans Notion puis relance la synchronisation.</p>
+        )}
+      </div>
+
+
+
       {relationshipPreview && (
         <div className="space-y-2 border rounded-lg p-4 bg-muted/20">
           <div className="flex flex-wrap items-center justify-between gap-2">
