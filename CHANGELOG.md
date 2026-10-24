@@ -4,6 +4,19 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [En cours] — 2026-10-24 — Parole incarnée par personnage, étapes 1 à 3
+
+- Nouveau champ Notion « Manière de parler » : colonne `character_prompts.maniere_de_parler`,
+  alias dans sync-notion, section dédiée du prompt personnage, édition dans l'admin.
+- États de parole lus à la synchronisation depuis « Tes états de parole »
+  (`- Nom : description`), stockés dans `character_prompts.speech_states` et affichés
+  dans l'admin. Aucune liste codée en dur ; `speechModes.ts` (code mort) supprimé.
+- sync-notion accepte `environment_id` (environnement actif de l'admin ; `prod` par
+  défaut pour les anciens appels). Déployé dans Lovable Cloud (source_sha256 `d4d16bc6…cf95d`).
+  Limite : RAG non séparé par environnement, utiliser « champs seulement » en sandbox.
+- Rugosité par défaut décidée : 0 (à tester). Étapes 4 à 7 restantes. Aucune publication.
+  Plan : [docs/plan_parole_incarnee_personnages.md](docs/plan_parole_incarnee_personnages.md).
+
 ## [En validation] — 2026-10-23 — Tours transcrits et continuité téléphonique
 
 - Livraison du premier correctif par [#72](https://github.com/memoways/ava-proto1/pull/72)
