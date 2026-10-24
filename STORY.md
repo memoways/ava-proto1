@@ -3023,7 +3023,16 @@ continuité d’expérience (mémoire entre tours).
 
 ### Dernière session
 
-**2026-10-21 — Switching Emma ↔ Max, lot 1 livré sans activation**
+**2026-10-24 — Parole incarnée par personnage, étapes 1 à 3 (Lovable)**
+
+Fiches Max et Emma réécrites dans Notion. Champ « Manière de parler » et états de
+parole par personnage ajoutés (base, sync, prompt, admin) ; sync-notion écrit
+désormais dans l'environnement actif et est déployé. Prochaine action : sync
+« champs seulement » en sandbox-ulrich, vérifier 5 états pour chacun. Restent :
+état joué dans l'en-tête privé, proposition GM, rugosité (défaut 0), traces et juge.
+[Plan](docs/plan_parole_incarnee_personnages.md).
+
+**Session précédente — 2026-10-21 — Switching Emma ↔ Max, lot 1 livré sans activation**
 
 Contrat optionnel et validateur pur disponibles, 79 nouveaux tests dont deux
 caractérisations des faux négatifs historiques. Qualité complète et 45 E2E
