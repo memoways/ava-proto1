@@ -4,6 +4,26 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [En cours] — 2026-10-24 — Parole incarnée par personnage, étapes 4 à 7
+
+- En-tête privé : le personnage déclare l'état joué dans `"parole"` (≤40 caractères,
+  optionnel, jamais diffusé dans `<speech>` ; une valeur malformée est ignorée sans
+  faire échouer le tour).
+- GM post-tour : nouveau champ `next_speech_state`, choisi dans la liste synchronisée
+  du personnage et validé côté moteur (état inconnu → null). Le prompt du GM reçoit
+  la liste des états, l'arc d'espoir par palier, les interdits (pas de raccrochage
+  spontané, silences autorisés, jamais « suicide » pour Emma) et la rugosité réglée.
+  `GM_CODE_VERSION` = `gm-2026-10-24-speech-states`.
+- Rugosité 0 à 3 par personnage : colonne `character_runtime_profiles.rugosite`
+  (migration `character_rugosite`), réglage dans Réglages personnages, épinglée à la
+  session au premier tour, injectée chez le personnage et le GM. 0 = aucune consigne
+  injectée (comportement actuel).
+- Boucle complète : la proposition du GM part en consigne one-shot au tour suivant
+  (consommée comme `gmGuidance`, restaurée après rafraîchissement) ; l'état joué
+  remonte dans le log GM (`speech_state_played`) et la trace du tour.
+- 854/854 tests, tsgo et build verts. Reste : recette humaine sandbox et critères
+  d'évaluation automatique à configurer dans le banc. Aucune publication.
+
 ## [En cours] — 2026-10-24 — Parole incarnée par personnage, étapes 1 à 3
 
 - Nouveau champ Notion « Manière de parler » : colonne `character_prompts.maniere_de_parler`,
