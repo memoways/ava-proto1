@@ -3,10 +3,15 @@
 ## En cours
 
 - Lot A parole incarnée : correctifs et 863 tests verts en preview ; attend écoute
-  humaine Max/Emma et mesure de latence. Livraison GitHub main/CI non vérifiable ici.
+  humaine Max/Emma et mesure de latence. Code détecté sur le site publié le 24 octobre.
 - Lot B : code et banc connecté vérifiés, 878 tests verts ; attend auditions réelles,
   sauvegarde/activation sandbox et comparaison diction/latence. Tags Gradium fermés.
-  Livraison GitHub main/CI non vérifiée ; plan `docs/plan_lot_b_rendu_vocal.md`.
+  Code détecté sur le site publié ; plan `docs/plan_lot_b_rendu_vocal.md`.
+- Clôture de livraison : main GitHub c300a1a vérifié le 24 octobre ; CI 40095526200
+  en cours au contrôle (qualité réussie, E2E en cours). Attend résultat terminal.
+  PR #24/branche étrangère préservées, décision d'Ulrich nécessaire pour leur sort.
+  Concordance exacte du déploiement et état Cloud non vérifiés faute de connecteur
+  MCP Lovable Ava accessible ; voir le relevé d'audit dans CHANGELOG.md.
 
 - Serveur MCP de statistiques (lecture seule, protégé par connexion) : publier
   le site puis connecter Codex et vérifier un premier relevé de chiffres ;

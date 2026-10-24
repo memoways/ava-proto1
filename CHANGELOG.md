@@ -4,6 +4,45 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Audit de publication — clôture non complète] — 2026-10-24
+
+- **Lecture des statuts** : les mentions « Non publié » décrivent l'état à la date
+  de chaque entrée, pas nécessairement l'état actuel. Le switching des lots 1 à 4
+  a ensuite été accepté et publié le **23 octobre** ; voir
+  [la clôture et ses preuves](docs/prompt_cloture_switch_personnages.md).
+  L'entrée partielle du 22 octobre reste une preuve historique, pas un lot
+  actuellement en attente de publication.
+- **Site réellement servi**, contrôlé le 24 octobre vers 13:05 UTC : Lovable
+  indique publié/public ; `https://proto1.parle-a-ava.com/` répond HTTP 200.
+  Le navigateur affiche « Où est Ava ? » et le contrôle d'accès par mot de passe,
+  sans erreur JavaScript observée. Aucun mot de passe soumis ni appel lancé.
+- Bundle actuel `index-Co7u4kbR.js`, SHA-256
+  `17aa07aeba7af071566347a7c6c19ff686ab0ec0f1fd716235b70b9a6bd675b9` :
+  présence de `gm-2026-10-24-speech-states`, `get_character_speech_runtime`,
+  `next_speech_state`, `speech_state_played`, `ava_speech_performance` et
+  `eleven_v3`. **Du code des lots A/B est donc déjà servi en production**,
+  contrairement à une lecture actuelle de leurs mentions « aucune publication ».
+  Ces mentions indiquent qu'aucune publication n'avait été lancée par l'agent
+  lors de leur implémentation. Ce constat ne prouve ni l'intégralité exacte du
+  déploiement par SHA source, ni l'activation du mapping sandbox, ni la recette.
+- **GitHub vérifié en lecture** : main
+  `c300a1ac8436a778996772b889fbbf65b9dc4ca7` ;
+  [CI 40095526200](https://github.com/memoways/ava-proto1/actions/runs/40095526200)
+  encore `in_progress` lors du contrôle, qualité réussie et E2E en cours.
+  #71 et #72 fusionnées. Branches distantes : `main` et
+  `agent/test-gap-invitation-validity-multi-use` ; PR #24 toujours ouverte,
+  préservée car étrangère. Ne pas annoncer « CI verte » ou « seulement main ».
+- **Ce qui reste non validé** : auditions des cinq fournisseurs, diction/latence
+  et recette humaine A/B, sauvegarde/lecture des réglages sandbox, concordance
+  complète du code source publié et état Cloud des migrations/fonctions/configs.
+  Le connecteur MCP Lovable Ava n'a pas été trouvé dans le catalogue accessible ;
+  aucun contrôle SQL ni changement Cloud effectué. La gate documentaire
+  [d'ouverture publique](docs/public_release_gate.md) reste FERMÉE : un site
+  hébergé publiquement, protégé par mot de passe, n'est pas une validation
+  d'ouverture aux testeurs externes.
+- Aucun redéploiement, changement de visibilité, activation de réglage,
+  fusion ou suppression de branche effectué pendant cet audit.
+
 ## [En validation] — 2026-10-24 — Lot B rendu vocal
 
 - Mapping déterministe par personnage/état, prioritaire sur lexique/ponctuation,
@@ -168,7 +207,11 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   `ready` ; décision sur la PR #24 (migration des invitations multi-usage, non appliquée).
   Aucune publication de production faite.
 
-## [Lot 4 partiel — non publié] — 2026-10-22 — Switching Emma ↔ Max
+## [Lot 4 partiel — non publié à cette date, publié le 23 octobre] — 2026-10-22 — Switching Emma ↔ Max
+
+> État intermédiaire historique. La recette bidirectionnelle acceptée et la
+> publication ultérieure sont documentées dans l'entrée du 23 octobre et la
+> [clôture du switching](docs/prompt_cloture_switch_personnages.md).
 
 - Contrat référencé et annonce sobre livrés par [#66](https://github.com/memoways/ava-proto1/pull/66)
   dans `d396b63b0a8e141b81126bc2cddb52698d3b44bd`, après CI `39830948642`
