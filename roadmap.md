@@ -4,8 +4,9 @@
 
 - Lot A parole incarnée : correctifs et 863 tests verts en preview ; attend écoute
   humaine Max/Emma et mesure de latence. Livraison GitHub main/CI non vérifiable ici.
-- Lot B : analyse et plan à valider avant implémentation ; audition multi-fournisseurs,
-  rendu vocal issu des états, adaptateur Gradium désactivé ; sandbox uniquement.
+- Lot B : code et banc connecté vérifiés, 878 tests verts ; attend auditions réelles,
+  sauvegarde/activation sandbox et comparaison diction/latence. Tags Gradium fermés.
+  Livraison GitHub main/CI non vérifiée ; plan `docs/plan_lot_b_rendu_vocal.md`.
 
 - Serveur MCP de statistiques (lecture seule, protégé par connexion) : publier
   le site puis connecter Codex et vérifier un premier relevé de chiffres ;

@@ -3,9 +3,20 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-24 (lot A parole incarnée : correctifs en preview, recette humaine à poursuivre)
+> **Last Updated**: 2026-10-24 (lots A/B parole incarnée : code en preview, auditions et recette humaine à poursuivre)
 
 ---
+
+## Lot B — rendu vocal du 24 octobre 2026
+
+Le mapping d'état pilote désormais les sorties TTS, avant le premier segment
+incrémental, sans nouvel appel LLM. Un banc manuel dans TTS Config compare
+Max/Emma sur dix répliques, trois rugosités et cinq fournisseurs, sans changer
+le provider live. Les tags Gradium restent fermés et Fish n'est pas intégré.
+878 tests verts ; banc connecté parcouru avec fiches réelles et sans pageerror.
+Aucune audition fournisseur réelle, sauvegarde/activation ou publication lancée.
+Le naturel, la diction et la latence restent à mesurer ; livraison GitHub non
+vérifiée. [Plan et rapport](docs/plan_lot_b_rendu_vocal.md).
 
 ## Lot A — correctifs du 24 octobre 2026
 

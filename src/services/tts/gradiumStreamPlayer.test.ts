@@ -23,6 +23,15 @@ async function socket(){await vi.waitFor(()=>expect(Socket.all).toHaveLength(1))
 describe('Gradium incremental turn',()=>{
   beforeEach(()=>{Socket.all=[]; mock.sources=[];mock.clock.currentTime=0;vi.stubGlobal('WebSocket',Socket);vi.mocked(authenticatedFunctionFetch).mockClear();});
   afterEach(()=>{vi.unstubAllGlobals();});
+  it('prepares the socket once but defers setup until the state is configured',async()=>{
+    const session=createGradiumTurnSession({...opts,deferSetup:true}),ws=await socket();
+    expect(ws.sent).toEqual([]);
+    session.configure({temp:0.5,padding_bonus:-0.6});session.appendText('Je… je sais.');
+    expect(ws.sent.map(x=>x.type)).toEqual(['setup','text']);
+    expect(ws.sent[0]).toMatchObject({json_config:{temp:0.5,padding_bonus:-0.6}});
+    session.configure({temp:1});expect(ws.sent.filter(x=>x.type==='setup')).toHaveLength(1);
+    expect(authenticatedFunctionFetch).toHaveBeenCalledTimes(1);session.cancel();
+  });
   it('prepares one setup, appends in the same voice context and sends EOS only on finish',async()=>{
     const session=createGradiumTurnSession(opts),ws=await socket(); expect(ws.sent.map(x=>x.type)).toEqual(['setup']);
     session.appendText('Bonjour.');session.appendText('Je vous écoute.');expect(ws.sent.map(x=>x.type)).toEqual(['setup','text','text']);

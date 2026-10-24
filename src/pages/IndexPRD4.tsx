@@ -42,6 +42,7 @@ import {
 import { OPENING_LINE } from "@/services/openingTTSCache";
 import type { TTSProviderId } from "@/services/tts/types";
 import { derivePerformanceIntent, logPerformanceIntent } from "@/services/tts/performanceIntent";
+import { getSpeechPerformanceSettings, loadSpeechPerformanceSettings } from '@/services/tts/speechPerformanceSettings';
 import { unlockAudioPlayback } from "@/services/audioPlayback";
 import {
   getGameplaySettings,
@@ -351,6 +352,7 @@ const IndexPRD4 = () => {
 
   useEffect(() => {
     void loadSTTSettingsFromDB();
+    void loadSpeechPerformanceSettings();
     const outputPromise = Promise.all([
       loadOutputSettingsFromDB(),
       loadStreamingAvatarSettingsFromDB(),
@@ -565,6 +567,7 @@ const IndexPRD4 = () => {
       providerId?: TTSProviderId;
       characterKey?: string;
       userMessage?: string | null;
+      speechPerformanceContext?: { state: string | null; rugosite: number; states: string[] };
       attemptId?: string;
       onVoiceObservation?: VoiceObserver;
       onServiceObserved?: (value: ServiceObservation) => void;
@@ -585,6 +588,9 @@ const IndexPRD4 = () => {
       characterKey,
       previousEmotionalState: pendingEmotionalStateRef.current,
       userMessage: context.userMessage,
+      speechState: context.speechPerformanceContext?.state,
+      rugosite: context.speechPerformanceContext?.rugosite,
+      validSpeechStates: context.speechPerformanceContext?.states,
     });
     logPerformanceIntent(intent, { turnId: context.turnId, characterKey });
     trackEvent("prd4_tts_performance", {
@@ -676,6 +682,7 @@ const IndexPRD4 = () => {
   }, [activateTTSFallback, setAudioState]);
 
   const prepareCall = useCallback(async () => {
+    void loadSpeechPerformanceSettings();
     avatarConnectStartedAtRef.current = null;
     avatarFirstFrameAtRef.current = null;
     avatarFirstSpeechAtRef.current = null;
@@ -1314,6 +1321,8 @@ const IndexPRD4 = () => {
           conversationRef.current.slice(0, -1),
           activeCharacterRef.current,
         );
+        let speechRuntimeForVoice: { rugosite: number; states: string[] } = { rugosite: 0, states: [] };
+        const speechSettingsForVoice = getSpeechPerformanceSettings();
         const incremental = incrementalOutputEnabledRef.current
           && responseOutputRef.current?.mode === 'tts'
           && (activeTTSProviderIdRef.current ?? getActiveProviderId()) === 'gradium';
@@ -1324,6 +1333,9 @@ const IndexPRD4 = () => {
           const performanceIntent = derivePerformanceIntent({ text: '', characterKey: turnCharacter,
             previousEmotionalState: pendingEmotionalStateRef.current, userMessage: userText });
           streamedVoice = prepareStreamedVoiceTurn({ characterKey: turnCharacter, voiceId,
+            resolveSpeechPerformance: (state, text) => derivePerformanceIntent({ text, characterKey: turnCharacter,
+              speechState: state, rugosite: speechRuntimeForVoice.rugosite, validSpeechStates: speechRuntimeForVoice.states,
+              speechSettings: speechSettingsForVoice, previousEmotionalState: pendingEmotionalStateRef.current }),
             performance: performanceIntent, signal: turnController.signal,
             turn_id: turnId, turn_index: turnIndex, session_id: owningSessionId,
             attempt_id: telemetry.attemptId, onVoiceObservation: telemetry.observe,
@@ -1343,6 +1355,7 @@ const IndexPRD4 = () => {
           streamedVoiceRef.current = streamedVoice;
         }
         const turnInput = {
+          onSpeechRuntimeReady: (value: { rugosite: number; states: string[] }) => { speechRuntimeForVoice = value; },
           sessionId: sessionIdRef.current,
           handoffDelivery,
           handoffOpenRequest: turnHandoffState?.openRequest ?? null,
@@ -1490,6 +1503,7 @@ const IndexPRD4 = () => {
           providerId: activeTTSProviderIdRef.current ?? undefined,
           characterKey: activeCharacterRef.current,
           userMessage: userText,
+          speechPerformanceContext: result.speechPerformanceContext,
         })).finally(() => {
           turnController.signal.removeEventListener("abort", abortOutputFromTurn);
           if (activeOutputControllerRef.current === outputController) activeOutputControllerRef.current = null;

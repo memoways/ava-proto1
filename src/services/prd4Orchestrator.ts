@@ -72,6 +72,7 @@ export interface PRD4TurnInput {
   onServerObserved?: (value: ServerObservation) => void;
   onVersionsObserved?: (prompt: string | null, config: string | null) => void;
   onGmObserved?: (service: ServiceObservation, spans: ServerObservation) => void;
+  onSpeechRuntimeReady?: (value: { rugosite: number; states: string[] }) => void;
   sessionId: string | null;
   conversationHistory: ConversationMessage[];
   userMessage: string;
@@ -126,6 +127,7 @@ export interface PRD4TurnInput {
 
 export interface PRD4TurnResult {
   maxResponse: string;
+  speechPerformanceContext?: { state: string | null; rugosite: number; states: string[] };
   timings: {
     rag_ms: number;
     max_ms: number;
@@ -278,6 +280,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const rugosite = speechRuntime.rugosite;
   // La proposition du GM n'est retenue que si elle nomme un état de la fiche.
   const speechStates = characterPrompt.speech_states ?? [];
+  input.onSpeechRuntimeReady?.({ rugosite, states: speechStates.map(state => state.name) });
   const proposedSpeechState = selectSpeechState(input.gmSpeechState, speechStates, speechRuntime.recentStates);
   const visibleStructuredMemory = structuredMemory
     ? filterConversationMemoryForCharacter(structuredMemory, activeCharacter)
@@ -688,6 +691,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
 
   return {
     maxResponse,
+    speechPerformanceContext: { state: maxResult && !identityGuard.blocked ? selectSpeechState(input.playedSpeechStateRef?.current ?? maxResult.responseIntent?.parole, speechStates) : null, rugosite, states: speechStates.map(state => state.name) },
     timings: {
       rag_ms,
       max_ms,

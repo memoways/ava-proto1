@@ -48,6 +48,7 @@ export interface GradiumStreamOptions {
   format: "pcm_24000" | "pcm_48000";
   /** temp / cfg_coef / padding_bonus / rewrite_rules / pronunciation_id */
   jsonConfig: Record<string, unknown>;
+  deferSetup?: boolean;
   /** Lab-only playback buffer choice. Omitting it preserves the current 300/200 ms behaviour. */
   bufferPreset?: GradiumBufferPreset;
   signal?: AbortSignal;
@@ -77,6 +78,7 @@ export interface GradiumAudioProgress {
   confirmedText: string;
 }
 export interface GradiumStreamSession {
+  configure(jsonConfig: Record<string, unknown>): void;
   appendText(text: string): void;
   finish(): void;
   progress(): GradiumAudioProgress;
@@ -168,6 +170,9 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
 
   let ws: WebSocket | null = null;
   let socketReady = false;
+  let setupConfigured = !opts.deferSetup;
+  let setupSent = false;
+  let jsonConfig = opts.jsonConfig;
   let finishRequested = false;
   let eosSent = false;
   const pendingText: string[] = [];
@@ -476,7 +481,11 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
   };
 
   const sendPendingText = () => {
-    if (cancelled || !socketReady || !ws) return;
+    if (cancelled || !socketReady || !ws || !setupConfigured) return;
+    if (!setupSent) {
+      ws.send(JSON.stringify({ type: 'setup', model_name: 'default', voice_id: opts.voiceId, output_format: wireFormat, json_config: jsonConfig }));
+      setupSent = true;
+    }
     for (const text of pendingText.splice(0)) {
       ws.send(JSON.stringify({ type: "text", text }));
       observeVoice(opts.onVoiceObservation, "tts_text_sent");
@@ -511,13 +520,6 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
 
     ws.onopen = () => {
       if (cancelled || !ws) return;
-      ws.send(JSON.stringify({
-        type: "setup",
-        model_name: "default",
-        voice_id: opts.voiceId,
-        output_format: wireFormat,
-        json_config: opts.jsonConfig,
-      }));
       socketReady = true;
       if (preAudioTimer) { clearTimeout(preAudioTimer); preAudioTimer = null; }
       sendPendingText();
@@ -545,6 +547,10 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
   start().catch((err) => fail(err));
 
   return {
+    configure(value: Record<string, unknown>) {
+      if (setupSent || cancelled) return;
+      jsonConfig = value; setupConfigured = true; sendPendingText();
+    },
     appendText(text: string) {
       if (cancelled) throw abortError();
       if (finishRequested) throw new Error("Gradium text after finish");

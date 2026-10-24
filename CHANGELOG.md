@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [En validation] — 2026-10-24 — Lot B rendu vocal
+
+- Mapping déterministe par personnage/état, prioritaire sur lexique/ponctuation,
+  modulé par rugosité ; production et rugosité 0 gardent le rendu existant.
+- État et version transmis au TTS batch ; setup Gradium incrémental différé
+  jusqu'à l'état privé, sur le même socket anticipé. Reçus audio inchangés.
+- Température Gradium conservée pour les états ; padding borné, débit relatif
+  pour ElevenLabs/Inworld, instruction Hume prioritaire sur description générale.
+- Banc manuel TTS Config : 10 répliques × 3 niveaux × 5 providers par personnage,
+  voix isolées, v3 limité à l'audition, arrêt/cache/export et annotations.
+- Aucun tag Gradium actif, Fish documentaire uniquement. Aucun audio réel
+  généré par l'agent, aucune configuration sauvegardée/activée ni publication.
+- 878 tests verts ; banc connecté vérifié avec états réels Max/Emma et zéro
+  pageerror. Diction, latence réelle, sauvegarde des réglages et appels fournisseurs
+  restent à valider ; GitHub main/CI/nettoyage non vérifiés.
+- [Plan et rapport détaillé](docs/plan_lot_b_rendu_vocal.md).
+
 ## [En validation] — 2026-10-24 — Finalisation du lot A
 
 - Diagnostic vérifié : sandbox Ulrich, Max = 3, Emma = 2. Les compilateurs

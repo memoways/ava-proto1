@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import SpeechAuditionBench from './SpeechAuditionBench';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -363,6 +364,7 @@ export default function TTSConfigTab() {
   return (
     <TooltipProvider delayDuration={150}>
     <div className="max-w-4xl space-y-8">
+      <SpeechAuditionBench />
       <div>
         <h2 className="text-lg font-semibold">TTS Config — Multi-providers</h2>
         <p className="text-sm text-muted-foreground">
