@@ -7,6 +7,8 @@
  */
 
 import type { TTSProviderId } from "./types";
+import { getActiveEnvironment } from '../environmentContext';
+import { getSpeechPerformanceSettings, type SpeechPerformanceSettings } from './speechPerformanceSettings';
 
 export type CanonicalEmotion =
   | "neutral"
@@ -21,7 +23,7 @@ export type CanonicalEmotion =
   | "urgent";
 
 export type PerformanceDelivery = "measured" | "whisper" | "rushed" | "cutting";
-export type PerformanceSource = "lexicon" | "gm_memory" | "manual";
+export type PerformanceSource = "lexicon" | "gm_memory" | "manual" | "speech_state";
 export type PerformanceIntensity = 0 | 1 | 2;
 
 export interface PerformanceIntent {
@@ -32,6 +34,9 @@ export interface PerformanceIntent {
   actingNl: string;
   speedHint?: number;
   source: PerformanceSource;
+  speechState?: string;
+  pauses?: 'short' | 'normal' | 'long';
+  mappingVersion?: string;
 }
 
 export interface DerivePerformanceInput {
@@ -39,6 +44,10 @@ export interface DerivePerformanceInput {
   characterKey?: string | null;
   previousEmotionalState?: string | null;
   userMessage?: string | null;
+  speechState?: string | null;
+  rugosite?: number;
+  validSpeechStates?: string[];
+  speechSettings?: SpeechPerformanceSettings;
 }
 
 export const CANONICAL_EMOTIONS: CanonicalEmotion[] = [
@@ -293,6 +302,17 @@ function punctuationSignals(text: string): { intensityBoost: PerformanceIntensit
 }
 
 export function derivePerformanceIntent(input: DerivePerformanceInput): PerformanceIntent {
+  const settings = input.speechSettings ?? getSpeechPerformanceSettings();
+  const state = input.validSpeechStates?.find(name => name.toLocaleLowerCase('fr') === input.speechState?.toLocaleLowerCase('fr'));
+  const mapping = state ? settings.byCharacter[input.characterKey ?? '']?.[state] : undefined;
+  if (getActiveEnvironment() !== 'prod' && settings.enabled && mapping && (input.rugosite ?? 0) > 0) {
+    const amount = clamp(input.rugosite ?? 0, 0, 3) / 3;
+    const speed = Number(mapping.speed);
+    return { emotion: mapping.emotion, intensity: amount < 0.5 ? 0 : amount < 1 ? 1 : 2,
+      delivery: mapping.delivery, speedHint: clamp(1 + ((Number.isFinite(speed) ? speed : 1) - 1) * amount, 0.7, 1.2),
+      actingNl: `${mapping.instruction}; ${mapping.pauses} pauses, clear diction`.slice(0, 100),
+      pauses: mapping.pauses, speechState: state, mappingVersion: settings.version, source: 'speech_state' };
+  }
   const text = input.text?.trim() || "";
   const folded = foldText(text);
   const lex = scoreLexicon(folded);
@@ -345,6 +365,7 @@ export function derivePerformanceIntent(input: DerivePerformanceInput): Performa
 }
 
 export function composeHumeDescription(baseline: string, intent?: PerformanceIntent | null): string | undefined {
+  if (intent?.source === 'speech_state') return [intent.actingNl, baseline.trim()].filter(Boolean).join('; ').slice(0, 100);
   const parts = [baseline.trim(), intent?.actingNl?.trim()].filter(Boolean);
   if (parts.length === 0) return undefined;
   return parts.join("; ").slice(0, 100);
@@ -405,6 +426,11 @@ export function applyGradiumPerformance(
   intent?: PerformanceIntent | null,
 ): GradiumPerformanceTuning {
   if (!intent) return { temp: base.temp, paddingBonus: base.paddingBonus };
+  if (intent.source === 'speech_state') {
+    const amount = (intent.intensity + 1) / 3;
+    const shift = intent.pauses === 'long' ? 0.5 : intent.pauses === 'short' ? -0.6 : 0;
+    return { temp: base.temp, paddingBonus: clamp(base.paddingBonus + shift * amount, -4, 4) };
+  }
   // Kept small: high Gradium temperatures produce hiccups, breaths and odd
   // pronunciations. Bump ≤ 0.1 and hard ceiling at 0.85.
   const tempBump = Math.min(0.1, 0.04 * intent.intensity

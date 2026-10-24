@@ -26,6 +26,10 @@ export interface TTSGenerateContext {
   characterKey?: string;
   /** Per-turn acting intent, mapped by each provider to its own API knobs. */
   performance?: import("./performanceIntent").PerformanceIntent;
+  /** Audition-only model override; runtime model settings remain untouched. */
+  auditionModelId?: 'eleven_v3';
+  /** Derive after the validated private header, before the first audio segment. */
+  resolveSpeechPerformance?: (state: string | null, text: string) => import('./performanceIntent').PerformanceIntent;
   /** Observability context propagated to PostHog/Supabase telemetry. */
   session_id?: string | null;
   turn_id?: string | null;

@@ -12,6 +12,7 @@ import { applyGradiumPerformance } from "@/services/tts/performanceIntent";
 import type { PerformanceIntent } from "@/services/tts/performanceIntent";
 import { debugLogger } from "@/services/debugLogger";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
+import { adaptGradiumEmotionalTags } from '../gradiumEmotionalTags';
 import { withTimeout } from "@/services/asyncUtils";
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { playAudioBlobRobust } from "@/services/audioPlayback";
@@ -23,7 +24,7 @@ import { createGradiumStreamSession, createGradiumTurnSession, isStreamingSuppor
  * punctuation it phrases cleanly.
  */
 export function prepareTextForGradium(text: string): string {
-  return prepareTextForTTS(text)
+  return adaptGradiumEmotionalTags(prepareTextForTTS(text), undefined, false)
     .replace(/\s*\.{3}\s*(?=[A-Za-zÀ-ÿ0-9])/g, ", ")
     .replace(/\.{3}/g, ".")
     .replace(/\s+[—–-]\s+/g, ", ")
@@ -324,8 +325,10 @@ export function createGradiumIncrementalTurn(ctx: TTSGenerateContext, onProgress
     format: s.outputFormat === "pcm_24000" ? "pcm_24000" : "pcm_48000",
     jsonConfig: buildJsonConfig(s, ctx.performance), bufferPreset: ctx.bufferPreset, signal: ctx.signal,
     onVoiceObservation: ctx.onVoiceObservation, onProgress,
+    deferSetup: Boolean(ctx.resolveSpeechPerformance),
   });
   return Object.assign(session, {
+    setPerformance: (intent: PerformanceIntent) => { ctx.performance = intent; session.configure(buildJsonConfig(s, intent)); },
     generateFallback: (text: string, signal: AbortSignal) => generateGradiumSpeech(text, { ...ctx, signal }, s),
   });
 }

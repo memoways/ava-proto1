@@ -55,15 +55,16 @@ export const elevenLabsProvider: TTSProvider = {
 
   async generate(text: string, ctx?: TTSGenerateContext): Promise<TTSGenerateResult> {
     const tts = getTTSSettings();
+    const modelId = ctx?.auditionModelId ?? tts.modelId;
     const shaped = applyElevenLabsPerformance(
-      { style: tts.style, stability: tts.stability, speed: tts.speed, modelId: tts.modelId },
+      { style: tts.style, stability: tts.stability, speed: tts.speed, modelId },
       prepareTextForTTS(text),
       ctx?.performance,
     );
 
     const body = {
       text: shaped.text,
-      modelId: tts.modelId,
+      modelId,
       stability: shaped.stability,
       similarityBoost: tts.similarityBoost,
       style: shaped.style,
@@ -112,7 +113,7 @@ export const elevenLabsProvider: TTSProvider = {
       blob,
       meta: {
         provider: "elevenlabs",
-        model: tts.modelId,
+        model: modelId,
         statusCode: response.status,
         firstByteMs: Math.round(tFirstByte - tRequest),
         totalMs: Math.round(tEnd - tRequest),
