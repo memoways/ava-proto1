@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-24 (lots A/B parole incarnée : code en preview, auditions et recette humaine à poursuivre)
+> **Last Updated**: 2026-10-24 (lots A/B parole incarnée : code en preview, tâche Notion de reprise créée, auditions et recette humaine à poursuivre)
 
 ---
 
