@@ -25,6 +25,7 @@ import {
   truncateAtSentenceBoundary,
 } from "@/agents/maxPromptCompiler";
 import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
+import { rugositySpeechDirective } from "@/services/speechRugosity";
 import {
   compileRichCharacterSections,
   renderRichSections,
@@ -650,9 +651,13 @@ export async function buildMaxSystemPrompt(
       ...(input.knowledgeContext?.blockedAssertions ?? []).map((value) => `Assertion interdite : ${value}`),
     ].join("\n");
     const rawGuidance = input.gmGuidance?.guidance?.trim();
-    const gmGuidance = rawGuidance && !isFallbackGmGuidance(rawGuidance) && input.gmGuidance
-      ? buildGmGuidanceBlock(input.gmGuidance)
-      : undefined;
+    const speechStateBlock = buildSpeechStateBlock(input);
+    const gmGuidance = [
+      rawGuidance && !isFallbackGmGuidance(rawGuidance) && input.gmGuidance
+        ? buildGmGuidanceBlock(input.gmGuidance)
+        : undefined,
+      speechStateBlock,
+    ].filter(Boolean).join("\n") || undefined;
     return buildOptimizedPromptAssembly({
       character: characterFields,
       characterName: canonicalName,
