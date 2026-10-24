@@ -3,9 +3,34 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-24 (lots A/B parole incarnée : code en preview, tâche Notion de reprise créée, auditions et recette humaine à poursuivre)
+> **Last Updated**: 2026-10-24 (audit : switching publié le 23 ; code A/B détecté sur le site servi, recette et clôture encore incomplètes)
 
 ---
+
+## Audit de publication du 24 octobre 2026
+
+Les mentions « non publié » du switching sont des états historiques : le lot 4
+partiel du 22 octobre a été suivi d'une recette acceptée et d'une publication
+Lovable le 23. Les lots précédents ne sont pas à republier individuellement.
+
+Le contrôle du site réellement servi le 24 octobre vers 13:05 UTC confirme
+HTTP 200 et l'écran « Où est Ava ? », protégé par mot de passe, sans erreur
+JavaScript observée. Le bundle `index-Co7u4kbR.js` contient la version GM des
+états de parole du 24 octobre, le runtime de rugosité et le mapping vocal A/B.
+Du code A/B est donc déjà publié ; les bilans ci-dessous décrivent ce que
+l'agent avait ou non lancé au moment de l'implémentation, pas l'état actuel
+du site. La présence du code ne vaut pas activation sandbox ni recette audible.
+
+GitHub main vérifié : `c300a1ac8436a778996772b889fbbf65b9dc4ca7` ;
+[CI 40095526200](https://github.com/memoways/ava-proto1/actions/runs/40095526200)
+encore en cours, qualité réussie, E2E en cours. #71/#72 fusionnées ; PR #24 et
+sa branche étrangère toujours présentes et préservées. Clôture complète non
+revendiquée. Réglages Cloud, migrations/fonctions, auditions, diction/latence et
+SHA source exact du déploiement restent non vérifiés dans cet audit. La gate
+d'ouverture publique reste fermée ; aucun accès externe supplémentaire autorisé.
+Aucune publication, conversation ou modification des réglages effectuée.
+Voir [le relevé détaillé](CHANGELOG.md) et
+[le plan de recette vocale](docs/plan_lot_b_rendu_vocal.md).
 
 ## Lot B — rendu vocal du 24 octobre 2026
 
@@ -29,8 +54,9 @@ autorisée du réglage, snapshot par session, variété déterministe et cinq cr
 dans le même appel juge. 863 tests verts et compilation Lovable verte.
 Pas de nouvel audio ni de session synthétique, pas de changement de voix ou de
 publication. L'écoute humaine et les latences restent non vérifiées ; GitHub
-main/CI/nettoyage indisponibles ici, aucune fusion revendiquée. Lot B attend le
-texte d'Ulrich. Plan : [parole incarnée](docs/plan_parole_incarnee_personnages.md).
+main/CI/nettoyage n'avaient pas été vérifiés lors de ce bilan ; voir l'audit
+ci-dessus pour l'état GitHub actuel. Lot B implémenté ensuite, toujours en recette.
+Plan : [parole incarnée](docs/plan_parole_incarnee_personnages.md).
 
 ## Genesis Block
 
