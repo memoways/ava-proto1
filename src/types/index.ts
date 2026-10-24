@@ -365,6 +365,10 @@ export interface PRD4PostTurnEvaluation {
   next_speech_state?: string | null;
   /** État de parole déclaré par le personnage dans son en-tête privé ce tour. */
   speech_state_played?: string | null;
+  speech_rugosite?: number;
+  speech_settings_version?: string | null;
+  speech_relationship_tier?: "contact" | "link" | "trust" | null;
+  speech_hope_arc_stage?: "contact" | "link" | "trust" | null;
   end_recommended: boolean;
   moderation_flag: boolean;
   notes: string;

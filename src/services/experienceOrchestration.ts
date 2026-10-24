@@ -431,30 +431,30 @@ export async function getCharacterRuntimeReadiness(character: "max" | "emma"): P
   };
 }
 
-const rugositeCache = new Map<string, number>();
-
-/**
- * Rugosité du personnage pour l'environnement actif, mise en cache par session
- * de navigation : la valeur lue au premier tour reste épinglée à la session.
- */
-export async function fetchCharacterRugosite(characterKey: string): Promise<number> {
-  const cacheKey = `${getActiveEnvironment()}:${characterKey}`;
-  const cached = rugositeCache.get(cacheKey);
-  if (cached !== undefined) return cached;
-  const { data, error } = await supabase
-    .from("character_runtime_profiles" as never)
-    .select("rugosite")
-    .eq("environment_id", getActiveEnvironment())
-    .eq("character_key", characterKey)
-    .maybeSingle();
-  if (error) throw error;
-  const value = normalizeRugosite((data as { rugosite?: unknown } | null)?.rugosite);
-  rugositeCache.set(cacheKey, value);
-  return value;
+export interface CharacterSpeechRuntime {
+  rugosite: number;
+  settingsVersion: string;
+  environmentId: string;
+  recentStates: Array<string | null>;
 }
 
-export function clearCharacterRugositeCache(): void {
-  rugositeCache.clear();
+/** The server authorizes the environment and persists each session's snapshot. */
+export async function fetchCharacterSpeechRuntime(characterKey: string, sessionId: string | null): Promise<CharacterSpeechRuntime> {
+  await ensureGameAuth();
+  const { data, error } = await supabase.rpc("get_character_speech_runtime", {
+    p_character_key: characterKey,
+    p_environment_id: getActiveEnvironment(),
+    ...(sessionId ? { p_session_id: sessionId } : {}),
+  });
+  if (error) throw error;
+  const row = data?.[0];
+  if (!row) throw new Error("Réglage de parole indisponible");
+  return {
+    rugosite: normalizeRugosite(row.rugosite),
+    settingsVersion: row.settings_version,
+    environmentId: row.environment_id,
+    recentStates: Array.isArray(row.recent_states) ? row.recent_states.slice(0, 2).map(value => typeof value === "string" ? value : null) : [],
+  };
 }
 
 export function clearDirectorRuntimeCache(sessionId?: string): void {
