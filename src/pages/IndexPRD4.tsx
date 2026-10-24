@@ -1360,7 +1360,6 @@ const IndexPRD4 = () => {
           handoffOpenRequest: turnHandoffState?.openRequest ?? null,
           conversationHistory: priorConversation,
           userMessage: userText,
-          speechPerformanceContext: result.speechPerformanceContext,
           userRole: userRoleRef.current,
           hasSeenFilm: hasSeenFilmRef.current,
           userPostureRaw: userPostureRef.current?.raw ?? null,
@@ -1503,6 +1502,7 @@ const IndexPRD4 = () => {
           providerId: activeTTSProviderIdRef.current ?? undefined,
           characterKey: activeCharacterRef.current,
           userMessage: userText,
+          speechPerformanceContext: result.speechPerformanceContext,
         })).finally(() => {
           turnController.signal.removeEventListener("abort", abortOutputFromTurn);
           if (activeOutputControllerRef.current === outputController) activeOutputControllerRef.current = null;
