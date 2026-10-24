@@ -3023,7 +3023,18 @@ continuité d’expérience (mémoire entre tours).
 
 ### Dernière session
 
-**2026-10-24 — Parole incarnée par personnage, étapes 1 à 3 (Lovable)**
+**2026-10-24 — Parole incarnée par personnage, étapes 4 à 7 (Lovable)**
+
+Boucle complète des états de parole : le GM propose `next_speech_state` (validé
+contre la fiche, inconnu → null), le personnage le reçoit en consigne one-shot et
+déclare l'état joué dans `"parole"` de son en-tête privé (jamais diffusé). Rugosité
+0–3 par personnage dans Réglages personnages (colonne `rugosite`, épinglée à la
+session ; 0 = comportement actuel, rien d'injecté). Traces : état proposé, état joué
+et rugosité dans le log GM et la trace du tour. 854/854 tests, build vert.
+Reste : recette humaine en sandbox et critères du banc d'évaluation.
+[Plan](docs/plan_parole_incarnee_personnages.md).
+
+**Session précédente — 2026-10-24 — Parole incarnée par personnage, étapes 1 à 3 (Lovable)**
 
 Fiches Max et Emma réécrites dans Notion. Champ « Manière de parler » et états de
 parole par personnage ajoutés (base, sync, prompt, admin) ; sync-notion écrit

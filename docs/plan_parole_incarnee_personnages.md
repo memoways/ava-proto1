@@ -51,4 +51,13 @@ Sera aussi enregistré dans `docs/plan_parole_incarnee_personnages.md`.
 - Étapes 1 à 3 faites en sandbox : colonnes `maniere_de_parler` et `speech_states` ajoutées, alias Notion « Manière de parler », sync-notion écrit dans l'environnement actif de l'admin (`environment_id`, défaut `prod` pour les anciens appels), états analysés et affichés dans l'admin, `speechModes.ts` supprimé.
 - sync-notion déployé le 24.10 (source_sha256 d4d16bc6…cf95d). Synchronisation sandbox « champs seulement » possible.
 - Limite : les embeddings RAG restent globaux (non séparés par environnement). En mode `full`, une synchronisation sandbox réindexe le RAG partagé avec la production. Pour la sandbox, utiliser « champs seulement ».
-- Étapes 4 à 7 restent à faire.
+- Étapes 4 à 7 faites le 24.10 (Lovable) : champ `"parole"` dans l'en-tête privé
+  (optionnel, ≤40 caractères, jamais diffusé, valeur malformée ignorée) ;
+  `next_speech_state` du GM validé contre la liste du personnage (inconnu → null) ;
+  rugosité 0–3 dans `character_runtime_profiles.rugosite` (migration
+  `character_rugosite`), réglable dans Réglages personnages, épinglée à la session,
+  injectée chez le personnage et le GM (0 = rien d'injecté) ; traces de l'état
+  proposé, de l'état joué (`speech_state_played` dans le log GM) et de la rugosité.
+  `GM_CODE_VERSION` = `gm-2026-10-24-speech-states`. 854/854 tests, build vert.
+- Reste : recette humaine en sandbox (tester rugosité 1 à 3 sur Max et Emma) et
+  configuration des cinq critères dans le banc d'évaluation automatique.
