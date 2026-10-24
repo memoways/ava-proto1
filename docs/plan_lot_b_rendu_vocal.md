@@ -1,6 +1,6 @@
 # Plan — Lot B : rendre les états de parole audibles
 
-Date : 24 octobre 2026. Statut : analyse réalisée, validation demandée ; aucune implémentation vocale lancée.
+Date : 24 octobre 2026. Statut : plan approuvé, code implémenté en preview ; auditions réelles et livraison finale non vérifiées.
 
 ## Résultat attendu
 
@@ -97,3 +97,38 @@ Gradium, sources de veille : https://docs.gradium.ai/guides/text-to-speech et ht
 ## Ordre proposé
 
 Mapping et tests → propagation état aux deux sorties → adaptations de texte prudentes → banc d'audition → adaptateur Gradium fermé → vérification et rapport. Aucun code vocal, migration, secret ou déploiement avant validation de ce plan.
+
+## Rapport d'implémentation — 24 octobre
+
+### Technique
+
+- `speechPerformanceSettings.ts` : clé d'environnement `ava_speech_performance`, version à la sauvegarde, mapping par personnage/état ; lecture/écriture lot B refusée en production côté service, droits Cloud existants conservés. Aucune migration ni nouvelle permission.
+- `performanceIntent.ts` : état validé + mapping prioritaire, modulation rugosité 1–3, 0 et désactivation gardent le chemin historique. Débit relatif ElevenLabs/Inworld, Hume instruction prioritaire, Gradium température de base conservée et padding borné. Aucun délai artificiel ni LLM supplémentaire.
+- `prd4Orchestrator.ts` transmet liste réelle/rugosité avant génération et état validé en résultat batch ; `IndexPRD4` relie ces informations à la synthèse. Mapping lu en cache d'environnement, chargement anticipé à l'ouverture ; aucun accès Cloud par segment.
+- `gradiumStreamPlayer.ts` conserve token/socket anticipés et diffère le seul setup jusqu'à configuration depuis le premier segment et son en-tête. Pas de socket supplémentaire, buffers et timeouts inchangés. `streamedVoiceTurn` configure avant append, conserve les reçus et règles d'interruption.
+- Le nettoyage texte historique est volontairement conservé : reprises et « euh » restent, Gradium traduit les signes risqués en ponctuation sûre. Le réglage de pauses est indicatif via acting/padding, pas un silence exact intra-phrase. Les sous-titres n'ont pas été modifiés.
+- `gradiumEmotionalTags.ts` : interface no-op, capacité false ; aucun tag même si flag manipulé. Fish : documentation seulement.
+
+### Expérience et mode d'emploi
+
+Dans **sandbox → Technique avancée → TTS Config**, nouvelle section **Lot B — Rendu par état et auditions**.
+
+1. Choisir Max ou Emma : les cinq états de leur fiche s'affichent. Ajuster débit, pauses, delivery, émotion et instruction. Les propositions ne deviennent mapping live qu'après adoption/édition et sauvegarde.
+2. Pour un nouveau test de conversation : adopter les états souhaités, activer **Rendu par état en sandbox**, puis **Sauvegarder le rendu**. Rien n'a été activé ni sauvegardé par l'agent. Rugosité du personnage reste dans Expérience → Réglages personnages ; elle est toujours épinglée à la session par le lot A.
+3. Dans le banc : choisir réplique 1–10, niveau 1–3, état et fournisseur. Les propositions sont utilisées localement pour l'audition, indépendamment de l'interrupteur live. Les voix absentes doivent être renseignées par fournisseur ; la voix configurée du profil n'est préremplie que pour son propre fournisseur.
+4. **Écouter** lance un seul appel ; **Arrêter** annule ; réécouter les mêmes paramètres utilise le cache en mémoire. Export JSON et notes diction/artefacts/naturel. Corpus et voix d'audition sont temporaires, pas sauvegardés comme canon ou voix live. Aucune série massive automatique.
+5. ElevenLabs force v3 dans cet appel seulement. Les métriques REST sont premier octet, premier démarrage logiciel du son et durée ; le rejeu est marqué cached dans l'export. Ces chiffres ne sont pas une latence voix-à-voix.
+
+### Vérifications réellement effectuées
+
+- 878 tests réussis, 136 fichiers ; nouveaux tests : priorité état sur suspensions, isolation personnage/prod, refus sauvegarde prod, rugosité 0 et modulation 1–3, température Gradium conservée, débit relatif, Hume, tags fermés, reprises intactes, matrice exacte, voix isolées et setup unique/configuration avant segment. Suites interruptions/streaming/queue existantes incluses.
+- Compilation automatique Lovable verte après changements.
+- Navigateur connecté au compte demandeur : cinq états Max chargés, matrice 150, adoption temporaire, sélection ElevenLabs v3 et niveau 3 ; Emma reçoit son texte distinct et aucune voix ElevenLabs venant de Max. Réplique modifiée relue à l'écran ; zéro pageerror. Pas de sauvegarde Cloud effectuée dans cette recette.
+- Aucun audio fournisseur ou session de jeu synthétique généré ; aucun secret, provider actif, fiche Notion ou configuration production changé ; aucune fonction Cloud déployée ni publication.
+
+### Ce qui reste non vérifié
+
+- Appels réels des cinq fournisseurs, disponibilité des voix/modèles, facturation et sauvegarde/readback Cloud du mapping.
+- Diction/naturel et latence avant/après : aucune promesse de non-régression mesurée. Le protocole Gradium setup différé est couvert localement mais demande une audition réelle sur le service.
+- Tags Gradium : format/capacité future à confirmer, désactivés dans tous les cas. Fish : qualité FR et performances non mesurées.
+- GitHub main SHA, CI exacte et suppression des branches ne sont pas accessibles dans cette chaîne agent ; lot non déclaré terminé au sens de la règle fin de lot. Production non publiée.
