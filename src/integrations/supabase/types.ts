@@ -243,6 +243,7 @@ export type Database = {
           prompt_validated: boolean
           qualitative_tests_validated: boolean
           rag_validated: boolean
+          rugosite: number
           tts_provider: string | null
           tts_voice_id: string | null
           updated_at: string
@@ -262,6 +263,7 @@ export type Database = {
           prompt_validated?: boolean
           qualitative_tests_validated?: boolean
           rag_validated?: boolean
+          rugosite?: number
           tts_provider?: string | null
           tts_voice_id?: string | null
           updated_at?: string
@@ -281,6 +283,7 @@ export type Database = {
           prompt_validated?: boolean
           qualitative_tests_validated?: boolean
           rag_validated?: boolean
+          rugosite?: number
           tts_provider?: string | null
           tts_voice_id?: string | null
           updated_at?: string
