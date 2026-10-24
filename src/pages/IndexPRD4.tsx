@@ -1320,6 +1320,8 @@ const IndexPRD4 = () => {
           conversationRef.current.slice(0, -1),
           activeCharacterRef.current,
         );
+        let speechRuntimeForVoice: { rugosite: number; states: string[] } = { rugosite: 0, states: [] };
+        const speechSettingsForVoice = getSpeechPerformanceSettings();
         const incremental = incrementalOutputEnabledRef.current
           && responseOutputRef.current?.mode === 'tts'
           && (activeTTSProviderIdRef.current ?? getActiveProviderId()) === 'gradium';
