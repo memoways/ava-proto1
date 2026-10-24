@@ -6,6 +6,7 @@ vi.mock("@/agents/maxAgent", async (importOriginal) => ({
 vi.mock("@/agents/gameMasterPRD4", () => ({ evaluatePostTurnPRD4: vi.fn() }));
 vi.mock("@/services/experienceOrchestration", () => ({
   fetchPinnedDirectorRuntime: vi.fn(async () => ({ versionId: "gm-v1", versionNumber: 1, prompt: "DIRECTOR", config: null })),
+  fetchCharacterRugosite: vi.fn(async () => 0),
 }));
 vi.mock("@/services/ragService", () => ({
   queryRAGDetailed: vi.fn(),
