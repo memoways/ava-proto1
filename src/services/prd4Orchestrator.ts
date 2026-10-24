@@ -39,7 +39,7 @@ import {
   createInitialRelationshipState,
   normalizeRelationshipState,
 } from "@/services/relationshipEngine";
-import { fetchPinnedDirectorRuntime } from "@/services/experienceOrchestration";
+import { fetchCharacterRugosite, fetchPinnedDirectorRuntime } from "@/services/experienceOrchestration";
 import { withTimeout } from "@/services/asyncUtils";
 import { compactConversationTurnTrace } from "@/services/conversationTraceFormat";
 import { enqueueConversationTurnTrace, patchQueuedConversationTurnTrace } from "@/services/conversationTraceOutbox";
