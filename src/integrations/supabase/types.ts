@@ -161,11 +161,13 @@ export type Database = {
           dynamique_conversation: string
           environment_id: string
           identite_fondamentale: string
+          maniere_de_parler: string
           politique_relationnelle: string
           profondeur_par_niveau: string
           qui_tu_es: string
           references_intellectuelles: string
           situation_summary: string
+          speech_states: Json
           sujets_sensibles: string
           timeline: string
           updated_at: string
@@ -178,11 +180,13 @@ export type Database = {
           dynamique_conversation?: string
           environment_id?: string
           identite_fondamentale?: string
+          maniere_de_parler?: string
           politique_relationnelle?: string
           profondeur_par_niveau?: string
           qui_tu_es?: string
           references_intellectuelles?: string
           situation_summary?: string
+          speech_states?: Json
           sujets_sensibles?: string
           timeline?: string
           updated_at?: string
@@ -195,11 +199,13 @@ export type Database = {
           dynamique_conversation?: string
           environment_id?: string
           identite_fondamentale?: string
+          maniere_de_parler?: string
           politique_relationnelle?: string
           profondeur_par_niveau?: string
           qui_tu_es?: string
           references_intellectuelles?: string
           situation_summary?: string
+          speech_states?: Json
           sujets_sensibles?: string
           timeline?: string
           updated_at?: string
