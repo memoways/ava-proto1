@@ -125,7 +125,7 @@ const postTurnResult: PRD4PostTurnEvaluation = {
   topics_covered: [],
   transition_recommended: false,
   cinematic_hint: null,
-  next_turn_guidance: "Continuer.",
+  next_speech_state: null, next_turn_guidance: "Continuer.",
   end_recommended: false,
   moderation_flag: false,
   notes: "test",

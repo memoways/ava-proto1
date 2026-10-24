@@ -15,7 +15,7 @@ import type { CharacterRelationshipPolicy } from "@/types";
 
 const historicalJson = {
   engagement_delta: 1, confusion_detected: false, role_usage_quality: "high", topics_covered: ["max"],
-  transition_recommended: false, cinematic_hint: null, next_turn_guidance: "Continue.", end_recommended: false,
+  transition_recommended: false, cinematic_hint: null, next_speech_state: null, next_turn_guidance: "Continue.", end_recommended: false,
   moderation_flag: false, notes: "historique", trigger_video_id: null,
   labels: { themes: [], topics: ["max"], intentions: [] }, memory_delta: null,
   action: { type: "handoff", targetCharacter: "max", reason: "accord", proposalGuidance: "Appeler Max" },
