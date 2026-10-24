@@ -27,7 +27,7 @@ import {
 } from "@/services/relationshipEngine";
 
 /** Incrémenter à chaque changement de logique ou de prompt du GM (traçabilité A/B). */
-export const GM_CODE_VERSION = "gm-2026-10-22-world-boundary";
+export const GM_CODE_VERSION = "gm-2026-10-24-speech-states";
 
 export interface PRD4PostTurnInput {
   onGmObserved?: (service: ServiceObservation, spans: ServerObservation) => void;
@@ -61,6 +61,12 @@ export interface PRD4PostTurnInput {
   turnRelationshipDirective?: TurnRelationshipDirective;
   /** Cadre commun, identique à celui injecté chez le personnage. */
   experienceFrame?: string | null;
+  /** États de parole synchronisés depuis la fiche du personnage actif. */
+  speechStates?: Array<{ name: string; description: string }>;
+  /** Rugosité de parole 0–3 épinglée à la session (0 = comportement actuel). */
+  rugosite?: number;
+  /** État déclaré par le personnage dans son en-tête privé ce tour (trace). */
+  speechStatePlayed?: string | null;
   /** Admin draft tests set this to false so they cannot mutate live sessions. */
   persist?: boolean;
 }
@@ -83,6 +89,7 @@ const DEFAULT_RESULT: PRD4PostTurnEvaluation = {
   transition_recommended: false,
   cinematic_hint: null,
   next_turn_guidance: "Continue la conversation naturellement.",
+  next_speech_state: null,
   end_recommended: false,
   moderation_flag: false,
   notes: "Évaluation par défaut (LLM indisponible).",
@@ -111,6 +118,7 @@ Tu retournes EXACTEMENT cet objet :
   "transition_recommended": boolean,
   "cinematic_hint": string | null,
   "next_turn_guidance": string,     // 1 phrase concise pour guider le même personnage au prochain tour
+  "next_speech_state": string | null, // nom exact d'un état de ÉTATS DE PAROLE DU PERSONNAGE pour le prochain tour ; null si aucun ne convient
   "end_recommended": boolean,
   "moderation_flag": boolean,
   "notes": string,
@@ -178,6 +186,13 @@ Règles "action" :
 - Ne recommande pas cinématique et handoff en même temps. Le handoff est prioritaire.
 - player_switch_request : renseigne-le seulement si le joueur a demandé explicitement à parler à l'autre personnage. stance=accept si le personnage actuel accepte, object s'il refuse, defer s'il hésite.
 - Pour une clôture, utilise end avec reason seulement lorsqu'une fin naturelle est justifiée.
+
+Règles "next_speech_state" :
+- Choisis dans ÉTATS DE PAROLE DU PERSONNAGE l'état le plus juste pour le prochain tour, d'après le sujet, l'émotion et le palier relationnel.
+- Recopie le nom exact, sans rien inventer. Si la liste est vide ou qu'aucun état ne convient, retourne null.
+- Arc d'espoir : au palier contact, privilégie les états retenus ou bloqués ; les états plus ouverts deviennent possibles avec la confiance. Ne promets jamais une guérison ni une solution.
+- Le personnage ne raccroche jamais de lui-même ; les silences sont autorisés. Pour Emma, ne propose jamais un état qui évoque le suicide.
+- La rugosité réglée (0 à 3, fournie dans le contexte) module tes propositions : plus elle est haute, plus les états bloqués, les ruptures et le silence sont bienvenus.
 
 Règles "end_recommended" : respecte le seuil de clôture fourni dans le contexte. Après ce seuil, true seulement si la conversation a trouvé une clôture naturelle ou échoue durablement.
 
