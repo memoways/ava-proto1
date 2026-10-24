@@ -9,6 +9,15 @@ export function normalizeRugosite(raw: unknown): number {
   return Number.isFinite(value) ? Math.min(3, Math.max(0, value)) : 0;
 }
 
+/** Names always come from the current character sheet, never a shared catalogue. */
+export function selectSpeechState(raw: unknown, states: Array<{ name: string }>, recent: Array<string | null> = []): string | null {
+  if (typeof raw !== "string") return null;
+  const name = states.find(state => state.name.toLocaleLowerCase("fr") === raw.trim().toLocaleLowerCase("fr"))?.name;
+  if (!name) return null;
+  const previous = recent.slice(0, 2);
+  return previous.length === 2 && previous.every(state => state === name) ? null : name;
+}
+
 /** Consigne injectée dans le prompt du personnage quand la rugosité > 0. */
 export function rugositySpeechDirective(level: number): string {
   switch (normalizeRugosite(level)) {

@@ -48,7 +48,7 @@ vi.mock("@/services/characterPromptService", () => ({
 import { callLLMWithUsage } from "@/services/openRouterLLM";
 import { loadCharacterPromptByName } from "@/services/characterPromptService";
 import { getGameplaySettings } from "@/services/settingsService";
-import { simulateMaxResponse } from "./maxAgent";
+import { buildMaxSystemPrompt, simulateMaxResponse } from "./maxAgent";
 import { RICH_V2_LIMITS } from "./maxRichPromptCompiler";
 import { makeNotionMaxPrompt } from "./__fixtures__/maxNotionFixture";
 
@@ -72,6 +72,14 @@ const FIELDS = {
 };
 
 describe("buildMaxSystemPrompt — variante rich_v2", () => {
+  it.each(["rich_v2", "optimized_v3"] as const)("%s includes the character speaking field and effective level 3", async variant => {
+    vi.mocked(getGameplaySettings).mockReturnValueOnce({ MAX_PROMPT_VARIANT: variant } as never);
+    vi.mocked(loadCharacterPromptByName).mockResolvedValue({ ...FIELDS, maniere_de_parler: "Tu parles peu, par bouts. Tes phrases raccourcissent." } as never);
+    const result = await buildMaxSystemPrompt({ conversationHistory: [], userMessage: "Et Emma ?", rugosite: 3 });
+    expect(result.budget?.sections.find(section => section.key === "speech_state")?.included).toBe(true);
+    expect(result.finalSystemPrompt).toContain("Tu parles peu, par bouts.");
+    expect(result.budget?.withinBudget).toBe(true);
+  });
   it("n'utilise que la fiche Notion, jamais characters.system_prompt", async () => {
     vi.mocked(loadCharacterPromptByName).mockResolvedValue(FIELDS as never);
     vi.mocked(callLLMWithUsage).mockResolvedValue({

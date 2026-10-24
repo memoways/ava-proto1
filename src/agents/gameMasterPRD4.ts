@@ -1,4 +1,5 @@
 import { CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS } from '@/services/gameMasterPromptBuilder';
+import { selectSpeechState } from '@/services/speechRugosity';
 import type { OpenHandoffRequest } from '@/services/characterHandoffState';
 import type { ResponseDeliveryReceipt } from '@/services/responseDelivery';
 import { createMonotonicSpans } from "../../supabase/functions/_shared/monotonicSpans";
@@ -68,6 +69,8 @@ export interface PRD4PostTurnInput {
   rugosite?: number;
   /** État déclaré par le personnage dans son en-tête privé ce tour (trace). */
   speechStatePlayed?: string | null;
+  recentSpeechStates?: Array<string | null>;
+  speechSettingsVersion?: string;
   /** Admin draft tests set this to false so they cannot mutate live sessions. */
   persist?: boolean;
 }
@@ -191,7 +194,9 @@ Règles "action" :
 Règles "next_speech_state" :
 - Choisis dans ÉTATS DE PAROLE DU PERSONNAGE l'état le plus juste pour le prochain tour, d'après le sujet, l'émotion et le palier relationnel.
 - Recopie le nom exact, sans rien inventer. Si la liste est vide ou qu'aucun état ne convient, retourne null.
-- Arc d'espoir : au palier contact, privilégie les états retenus ou bloqués ; les états plus ouverts deviennent possibles avec la confiance. Ne promets jamais une guérison ni une solution.
+- Arc d'espoir propre au personnage : contact = soulagement non dit, aucune demande ; link = questions sur ce que l'appelant sait ; trust = envie de chercher ensemble, sans répéter une formule.
+- Si l'appelant promet une guérison : le personnage peut s'accrocher, puis le doute revient vite ; personne ne sait si c'est réversible, Mona l'est restée. S'il annonce qu'il n'y a pas de solution : le personnage encaisse, craque brièvement, puis se raccroche. Le canon ne confirme ni n'exclut une guérison.
+- Jamais trois fois le même état de suite : après deux états identiques, propose un autre état pertinent de la fiche ou null ; un blocage se résout ou laisse une prise.
 - Le personnage ne raccroche jamais de lui-même ; les silences sont autorisés. Pour Emma, ne propose jamais un état qui évoque le suicide.
 - La rugosité réglée (0 à 3, fournie dans le contexte) module tes propositions : plus elle est haute, plus les états bloqués, les ruptures et le silence sont bienvenus.
 
@@ -336,6 +341,9 @@ ${rugosityDirectorDirective(input.rugosite ?? 0)}
 
 ## ÉTAT DE PAROLE JOUÉ CE TOUR (déclaré par le personnage)
 ${input.speechStatePlayed?.trim() || "(non déclaré)"}
+
+## DEUX DERNIERS ÉTATS JOUÉS (du plus récent au plus ancien)
+${JSON.stringify(input.recentSpeechStates ?? [])}
 
 ## TEMPS ÉCOULÉ
   ${Math.floor(input.timeElapsedSeconds / 60)}min ${input.timeElapsedSeconds % 60}s sur ~${Math.round(input.sessionDurationSeconds / 60)} min configurées — clôture naturelle autorisée après ${Math.floor(input.minimumClosureSeconds / 60)}min ${input.minimumClosureSeconds % 60}s — tour #${input.turnIndex}
@@ -594,7 +602,7 @@ export async function evaluatePostTurnPRD4(
         transition_recommended: Boolean(parsed.transition_recommended),
         cinematic_hint: parsed.cinematic_hint ? String(parsed.cinematic_hint) : null,
         next_turn_guidance: String(parsed.next_turn_guidance || DEFAULT_RESULT.next_turn_guidance),
-        next_speech_state: resolveNextSpeechState(parsed.next_speech_state, input.speechStates),
+        next_speech_state: selectSpeechState(parsed.next_speech_state, input.speechStates ?? [], input.recentSpeechStates),
         end_recommended: endRecommended,
         moderation_flag: Boolean(parsed.moderation_flag),
         notes: String(parsed.notes || ""),
@@ -689,7 +697,11 @@ export async function evaluatePostTurnPRD4(
     execution_reason: executionReason,
     orchestration_version_id: input.orchestrationVersionId ?? null,
     orchestration_config: input.orchestrationConfig ?? null,
-    speech_state_played: input.speechStatePlayed?.trim() || null,
+    speech_state_played: selectSpeechState(input.speechStatePlayed, input.speechStates ?? []),
+    speech_rugosite: input.rugosite ?? 0,
+    speech_settings_version: input.speechSettingsVersion ?? null,
+    speech_relationship_tier: input.turnRelationshipDirective?.tier ?? null,
+    speech_hope_arc_stage: input.turnRelationshipDirective?.tier ?? null,
   };
 
   if (input.sessionId && input.persist !== false) {

@@ -56,6 +56,7 @@ export interface OfatSelection {
 }
 
 export interface EvalJudgeScore {
+  speech_quality?: { sounds_spoken: number; no_therapeutic_language: number; non_caricatural: number; facts_understandable: number; hope_without_cure: number };
   gold_fidelity: number;
   must_include: number;
   must_not: number;
@@ -220,6 +221,9 @@ export function parseJudgeResponse(raw: string): EvalJudgeScore {
   }
   return {
     gold_fidelity: clampScore(parsed.gold_fidelity, 0, 5),
+    ...(parsed.speech_quality && typeof parsed.speech_quality === "object" ? {
+      speech_quality: Object.fromEntries(["sounds_spoken", "no_therapeutic_language", "non_caricatural", "facts_understandable", "hope_without_cure"].map(key => [key, clampScore((parsed.speech_quality as Record<string, unknown>)[key], 0, 5)])) as NonNullable<EvalJudgeScore["speech_quality"]>,
+    } : {}),
     must_include: clampScore(parsed.must_include, 0, 5),
     must_not: clampScore(parsed.must_not, 0, 5),
     tone: clampScore(parsed.tone, 0, 5),
@@ -262,6 +266,14 @@ ${item.judge_notes || "(aucune)"}
 ## RÉPONSE DE ${characterName.toLocaleUpperCase("fr")}
 ${response}
 
+## PAROLE INCARNÉE — CINQ CRITÈRES (0 à 5)
+- sounds_spoken : sonne parlé, pas rédigé ; une suspension ou une réponse incomplète pertinente est recevable.
+- no_therapeutic_language : pas de lucidité de psychologue ni d'analyse clinique artificielle.
+- non_caricatural : ni tics mécaniques ni hésitations répétées sans nécessité émotionnelle.
+- facts_understandable : les faits livrés restent compréhensibles et conformes à la cible, même si la parole est troublée.
+- hope_without_cure : l'espoir reste possible et proportionné au contexte ; aucune guérison confirmée ou exclue. N'exige pas une demande de solution dès le contact ni un arc complet sur un seul tour.
+Ces critères éclairent character_voice et overall, sans imposer des tics ni une rugosité à chaque réplique. Tu juges le texte, jamais la qualité audio.
+
 Retourne UNIQUEMENT un JSON :
 {
   "gold_fidelity": 0-5,
@@ -270,6 +282,7 @@ Retourne UNIQUEMENT un JSON :
   "tone": 0-5,
   "length_ok": true/false,
   "character_voice": 0-5,
+  "speech_quality": {"sounds_spoken": 0-5, "no_therapeutic_language": 0-5, "non_caricatural": 0-5, "facts_understandable": 0-5, "hope_without_cure": 0-5},
   "overall": 0-10,
   "rationale": "2 phrases max"
 }`;

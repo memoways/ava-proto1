@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [En validation] — 2026-10-24 — Finalisation du lot A
+
+- Diagnostic vérifié : sandbox Ulrich, Max = 3, Emma = 2. Les compilateurs
+  rich_v2/optimized_v3 omettaient « Manière de parler » ; rich_v2 omettait
+  aussi la consigne de rugosité. Les champs sont désormais sélectionnés.
+- Lecture runtime restreinte, snapshot versionné en session/personnage,
+  plus de cache partagé entre sessions ni de retour silencieux à 0.
+- Déclaration privée en batch et streaming, validation sur la fiche et parole
+  confirmée ; retrait des états après reprise/fallback, anti-troisième proposition.
+- Palier et étape contact/link/trust de l'arc tracés ; cinq critères textuels
+  ajoutés au même appel juge, anciens résultats compatibles.
+- Aucun changement de voix, TTS, fiche Notion, niveau sauvegardé ou publication.
+- Validation GitHub main/CI/branches non disponible dans cet environnement Lovable ;
+  aucune fusion prétendue. Recette humaine et latence à mesurer restent à faire.
+- Plan : [docs/plan_parole_incarnee_personnages.md](docs/plan_parole_incarnee_personnages.md).
+
 ## [En cours] — 2026-10-24 — Parole incarnée par personnage, étapes 4 à 7
 
 - En-tête privé : le personnage déclare l'état joué dans `"parole"` (≤40 caractères,

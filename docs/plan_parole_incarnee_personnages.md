@@ -61,3 +61,33 @@ Sera aussi enregistré dans `docs/plan_parole_incarnee_personnages.md`.
   `GM_CODE_VERSION` = `gm-2026-10-24-speech-states`. 854/854 tests, build vert.
 - Reste : recette humaine en sandbox (tester rugosité 1 à 3 sur Max et Emma) et
   configuration des cinq critères dans le banc d'évaluation automatique.
+
+## Finalisation du lot A — 24.10.2026
+
+- Remplacer la lecture directe du profil protégé par une fonction runtime limitée
+  au personnage et à l'environnement autorisés ; ne pas rendre les profils publics.
+- Épingler en base la valeur et la version du réglage par session/personnage,
+  sans conserver une ancienne valeur entre deux nouvelles sessions.
+- Injecter les états dans tous les chemins de prompts, notamment rich_v2,
+  sans ajouter de style commun : le contenu éditorial reste celui de la fiche.
+- Valider l'état joué, conserver les deux derniers états propres au personnage,
+  empêcher une troisième proposition identique et tracer proposition/jeu/palier/arc/rugosité.
+- Ajouter les cinq critères au même appel juge, sans nouvel appel IA en jeu.
+- Vérifier par tests locaux et lecture authentifiée des réglages, sans session
+  ni audio synthétiques ; l'écoute Max/Emma reste une recette humaine.
+- Lot B exclu : attendre le texte fourni par Ulrich. Aucune publication production.
+
+### Résultat vérifié
+
+- Fonction runtime appliquée dans Lovable Cloud, colonne de snapshot vérifiée.
+- Lecture connectée sans création de session : Max 3 et Emma 2, sans erreur ;
+  contrôle affiché dans la preview admin. Aucun niveau sauvegardé modifié.
+- 863/863 tests locaux verts, compilation automatique Lovable verte.
+- Manquaient réellement : champ éditorial absent de rich_v2/optimized_v3,
+  consigne absente de rich_v2/compact, lecture protégée sans accès joueur,
+  faux épinglage navigateur, déclaration batch absente, anti-répétition absent,
+  traces palier/version incomplètes et cinq critères juge non intégrés.
+- Restent : écouter de nouvelles conversations Max/Emma pour juger le naturel
+  et mesurer les latences. Pas de conversation synthétique exécutée.
+- GitHub main, CI et branches non vérifiables depuis ce sandbox ; ce lot n'est
+  pas déclaré livré sur main. Production non publiée. Lot B attend son texte.

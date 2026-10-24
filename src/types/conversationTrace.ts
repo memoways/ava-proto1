@@ -174,6 +174,9 @@ export interface ConversationTurnTraceV1 {
     gmSpeechStateProposed?: string | null;
     /** Rugosité de parole 0–3 épinglée à la session. */
     rugosite?: number;
+    speechSettingsVersion?: string;
+    relationshipTier?: "contact" | "link" | "trust";
+    hopeArcStage?: "contact" | "link" | "trust";
     /** optimized_v3 — état structuré lu avant le tour. */
     structuredMemoryBefore?: ConversationMemoryV1 | null;
     memoryLastTurn?: number;

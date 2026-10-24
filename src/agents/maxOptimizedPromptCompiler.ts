@@ -74,6 +74,7 @@ export interface OptimizedPromptInput {
   userRole?: string;
   temporalContext?: string;
   gmGuidance?: string;
+  speechState?: string;
   relationshipDirective?: string;
   experienceFrame?: string;
   guards?: string;
@@ -86,7 +87,7 @@ const FIELD_SPECS: Array<{
   key: keyof Pick<CharacterPrompt,
     "situation_summary" | "identite_fondamentale" | "qui_tu_es" | "dynamique_conversation" |
     "ce_que_tu_ne_fais_jamais" | "ce_que_tu_sais_utilisateur" | "timeline" |
-    "sujets_sensibles" | "references_intellectuelles">;
+    "sujets_sensibles" | "references_intellectuelles" | "maniere_de_parler">;
   title: string;
   baseScore: number;
   group: "core" | "canon";
@@ -95,6 +96,7 @@ const FIELD_SPECS: Array<{
   { key: "situation_summary", title: "PRÉSENT", baseScore: 1_000, group: "core", required: true },
   { key: "identite_fondamentale", title: "IDENTITÉ ET CONTRADICTION", baseScore: 900, group: "core", required: true },
   { key: "qui_tu_es", title: "VOIX ET POSTURE", baseScore: 820, group: "core", required: true },
+  { key: "maniere_de_parler", title: "MANIÈRE DE PARLER", baseScore: 850, group: "core" },
   { key: "dynamique_conversation", title: "MOTEUR DE L'APPEL", baseScore: 780, group: "core", required: true },
   { key: "ce_que_tu_ne_fais_jamais", title: "INVARIANTS DU PERSONNAGE", baseScore: 760, group: "canon", required: true },
   { key: "ce_que_tu_sais_utilisateur", title: "RELATION À L'INTERLOCUTEUR", baseScore: 650, group: "canon" },
@@ -436,6 +438,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   append("character_core", `NOYAU DE ${canonicalName.toLocaleUpperCase("fr")}`, core, OPTIMIZED_V3_LIMITS.staticChars, "static");
   append("experience_frame", "CADRE DE L'APPEL — PRIORITAIRE", input.experienceFrame, OPTIMIZED_V3_LIMITS.frameChars, "runtime");
   append("relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective, OPTIMIZED_V3_LIMITS.relationshipChars, "runtime");
+  append("speech_state", "PAROLE DU TOUR", input.speechState, 800, "runtime");
   const runtime = [input.userRole ? `Interlocuteur : ${input.userRole}` : "", input.temporalContext || "", input.gmGuidance ? `Orientation de jeu : ${input.gmGuidance}` : "", input.guards || ""]
     .filter(Boolean).join("\n");
   append("runtime_context", "ÉTAT DU TOUR", runtime, OPTIMIZED_V3_LIMITS.runtimeChars, "runtime");

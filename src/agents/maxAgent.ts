@@ -1,5 +1,5 @@
 import { trimRagContextToWholeSouvenirs } from "@/services/ragService";
-import { buildResponseStreamContract } from "@/services/responseIntentStream";
+import { buildResponseStreamContract, ResponseIntentParser, type ResponseIntent } from "@/services/responseIntentStream";
 import { formatPrivateDeliveryContext } from "@/services/responseDelivery";
 import { CHARACTER_CALL_TRANSFER_INSTRUCTIONS } from "@/services/characterConversation";
 import { callLLM, callLLMWithUsage, LLMProxyRequestError, streamLLM, type LLMUsage } from "@/services/openRouterLLM";
@@ -113,6 +113,7 @@ export interface MaxAgentInput {
   speechStateDirective?: string | null;
   /** Rugosité de parole 0–3, épinglée à la session (0 = comportement actuel). */
   rugosite?: number;
+  speechStateHistory?: Array<string | null>;
 }
 
 export interface MaxTemporalContext {
@@ -132,7 +133,7 @@ export interface MaxGmGuidance {
  * Bloc « parole du tour » : état proposé par le GM + rugosité réglée.
  * Rien n'est injecté quand les deux sont absents (rugosité 0 = comportement actuel).
  */
-export function buildSpeechStateBlock(input: Pick<MaxAgentInput, "speechStateDirective" | "rugosite">): string | undefined {
+export function buildSpeechStateBlock(input: Pick<MaxAgentInput, "speechStateDirective" | "rugosite" | "speechStateHistory">): string | undefined {
   const parts: string[] = [];
   const directive = input.speechStateDirective?.trim();
   if (directive) {
@@ -140,6 +141,8 @@ export function buildSpeechStateBlock(input: Pick<MaxAgentInput, "speechStateDir
   }
   const rugosite = rugositySpeechDirective(input.rugosite ?? 0);
   if (rugosite) parts.push(rugosite);
+  const repeated = input.speechStateHistory?.[0];
+  if (repeated && input.speechStateHistory?.[1] === repeated) parts.push(`Les deux derniers états joués étaient « ${repeated} ». Choisis un autre état de ta fiche ; jamais trois fois le même état de suite.`);
   return parts.length ? parts.join("\n") : undefined;
 }
 
@@ -215,6 +218,7 @@ export async function callMaxAgent(
 
 export interface SimulateMaxResult {
   response: string;
+  responseIntent?: ResponseIntent | null;
   systemPrompt: string;
   usage?: LLMUsage | null;
   latencyMs?: number;
@@ -274,6 +278,7 @@ export async function simulateMaxResponse(
     llmOverrides?: MaxLlmOverrides;
     onSpeechToken?: (text: string) => void;
     finishSpeech?: () => string;
+    recoverySpeechOnly?: boolean;
   },
 ): Promise<SimulateMaxResult> {
   const characterName = opts?.characterContext?.displayName || opts?.characterName || "Max";
@@ -284,8 +289,9 @@ export async function simulateMaxResponse(
   const maxTokens = opts?.llmOverrides?.maxTokens ?? llm.LLM_MAX_TOKENS;
   const privateContext = opts?.characterContext
     ? formatPrivateDeliveryContext(input.conversationMemory?.deliveryByCharacter?.[opts.characterContext.characterKey]) : '';
+  const privateProtocol = !opts?.recoverySpeechOnly && (Boolean(opts?.onSpeechToken) || (input.speechStateHistory !== undefined && Boolean(opts?.characterContext)));
   const systemPrompt = promptTrace.finalSystemPrompt + (privateContext ? `\n# CONTINUITÉ PRIVÉE\n${privateContext}` : '')
-    + (opts?.onSpeechToken ? buildResponseStreamContract(maxTokens) : '');
+    + (privateProtocol ? buildResponseStreamContract(maxTokens) : '');
   promptTrace.finalSystemPrompt = systemPrompt;
   const messages: TraceMessage[] = [
     { role: "system", content: systemPrompt },
@@ -344,8 +350,16 @@ export async function simulateMaxResponse(
     );
   }
 
+  let response = result.content;
+  let responseIntent: ResponseIntent | null = null;
+  if (privateProtocol && !opts?.onSpeechToken && opts?.characterContext) {
+    const parser = new ResponseIntentParser(opts.characterContext, intent => { responseIntent = intent; }, () => {});
+    parser.push(response);
+    response = parser.finish();
+  }
   return {
-    response: result.content,
+    response,
+    responseIntent,
     systemPrompt,
     usage: result.usage,
     latencyMs: result.latencyMs,
@@ -651,12 +665,10 @@ export async function buildMaxSystemPrompt(
       ...(input.knowledgeContext?.blockedAssertions ?? []).map((value) => `Assertion interdite : ${value}`),
     ].join("\n");
     const rawGuidance = input.gmGuidance?.guidance?.trim();
-    const speechStateBlock = buildSpeechStateBlock(input);
     const gmGuidance = [
       rawGuidance && !isFallbackGmGuidance(rawGuidance) && input.gmGuidance
         ? buildGmGuidanceBlock(input.gmGuidance)
         : undefined,
-      speechStateBlock,
     ].filter(Boolean).join("\n") || undefined;
     return buildOptimizedPromptAssembly({
       character: characterFields,
@@ -668,6 +680,7 @@ export async function buildMaxSystemPrompt(
       userRole: input.userRoleSummary,
       temporalContext: input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined,
       gmGuidance,
+      speechState: buildSpeechStateBlock(input),
       relationshipDirective: input.relationshipDirective,
       experienceFrame: input.experienceFrame,
       guards: guards || undefined,
@@ -763,6 +776,7 @@ export async function buildMaxSystemPrompt(
   // La directive relationnelle est réservée et injectée avant tout contexte compressible.
   appendDynamicSection("experience_frame", "CADRE DE L'APPEL — PRIORITAIRE", input.experienceFrame);
   appendDynamicSection("relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective);
+  appendDynamicSection("speech_state", "PAROLE DU TOUR", buildSpeechStateBlock(input));
   appendDynamicSection("temporal_context", "ÉTAT DE L'APPEL", input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined);
   appendDynamicSection("user_role", "RÔLE DE L'INTERLOCUTEUR", input.userRoleSummary);
   appendDynamicSection("session_summary", "MÉMOIRE DE SESSION", input.sessionSummary);
@@ -930,6 +944,7 @@ async function buildRichMaxSystemPrompt(
 
   appendDynamicSection("experience_frame", "CADRE DE L'APPEL — PRIORITAIRE", input.experienceFrame);
   appendDynamicSection("relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective);
+  appendDynamicSection("speech_state", "PAROLE DU TOUR", buildSpeechStateBlock(input));
   appendDynamicSection("temporal_context", "ÉTAT DE L'APPEL", input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined);
   appendDynamicSection("user_role", "RÔLE DE L'INTERLOCUTEUR", input.userRoleSummary);
   appendDynamicSection("session_summary", "MÉMOIRE DE SESSION", input.sessionSummary);
