@@ -4,6 +4,7 @@ import type { ExperienceDirectorConfig } from "@/types";
 import { getActiveEnvironment } from "@/services/environmentContext";
 import { normalizeExperienceFrameConfig } from "@/services/experienceFrame";
 import { AVA_CHARACTER_REGISTRY } from "@/services/characterRegistry";
+import { normalizeRugosite } from "@/services/speechRugosity";
 
 /** Personnages activables : ceux marqués actifs dans le registre central. */
 export function registryActiveCharacterKeys(): string[] {
@@ -48,6 +49,8 @@ export interface CharacterRuntimeProfile {
   rag_validated: boolean;
   qualitative_tests_validated: boolean;
   knowledge_isolation_validated: boolean;
+  /** Rugosité de parole 0–3 (0 = comportement actuel). */
+  rugosite: number;
   updated_at: string;
   environment_id: string;
 }
@@ -250,6 +253,7 @@ export async function updateCharacterRuntimeProfile(
     | "rag_validated"
     | "qualitative_tests_validated"
     | "knowledge_isolation_validated"
+    | "rugosite"
   >,
 ): Promise<void> {
   const { error } = await supabase
@@ -425,6 +429,32 @@ export async function getCharacterRuntimeReadiness(character: "max" | "emma"): P
     ttsVoiceId: typeof row.tts_voice_id === "string" ? row.tts_voice_id : null,
     situationSummary: typeof row.situation_summary === "string" ? row.situation_summary : null,
   };
+}
+
+const rugositeCache = new Map<string, number>();
+
+/**
+ * Rugosité du personnage pour l'environnement actif, mise en cache par session
+ * de navigation : la valeur lue au premier tour reste épinglée à la session.
+ */
+export async function fetchCharacterRugosite(characterKey: string): Promise<number> {
+  const cacheKey = `${getActiveEnvironment()}:${characterKey}`;
+  const cached = rugositeCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const { data, error } = await supabase
+    .from("character_runtime_profiles" as never)
+    .select("rugosite")
+    .eq("environment_id", getActiveEnvironment())
+    .eq("character_key", characterKey)
+    .maybeSingle();
+  if (error) throw error;
+  const value = normalizeRugosite((data as { rugosite?: unknown } | null)?.rugosite);
+  rugositeCache.set(cacheKey, value);
+  return value;
+}
+
+export function clearCharacterRugositeCache(): void {
+  rugositeCache.clear();
 }
 
 export function clearDirectorRuntimeCache(sessionId?: string): void {
