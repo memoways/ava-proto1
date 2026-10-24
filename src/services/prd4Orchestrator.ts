@@ -375,6 +375,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
           timeoutMs,
           signal: attempt.signal,
           diagnosticTrace: diagnosticTraceEnabled,
+          recoverySpeechOnly: retry,
           llmOverrides: evaluationOverrides?.llm,
           onSpeechToken: retry || !input.streamControl ? undefined : text => {
             if (attempt.signal.aborted) throw new DOMException('Obsolete character attempt', 'AbortError');
