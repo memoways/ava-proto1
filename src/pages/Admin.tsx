@@ -46,7 +46,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ExternalLink, Moon, ShieldCheck, Sun, UserPlus } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAdminEnvironment } from "@/contexts/AdminEnvironmentContext";
-import { ENVIRONMENTS, canSwitchEnvironments, type EnvironmentId } from "@/services/environmentContext";
+import { ENVIRONMENTS, canSwitchEnvironments, getActiveEnvironment, type EnvironmentId } from "@/services/environmentContext";
 import { trackEvent } from "@/services/posthogService";
 import {
   DEFAULT_ADMIN_TAB,
@@ -331,6 +331,7 @@ export default function Admin() {
           },
           wipe_all: !!opts.wipeAll,
           mode,
+          environment_id: getActiveEnvironment(),
         }),
         signal: controller.signal,
       });

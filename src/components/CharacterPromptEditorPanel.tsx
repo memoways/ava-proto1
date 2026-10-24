@@ -1,3 +1,4 @@
+import { getActiveEnvironment } from "@/services/environmentContext";
 import { getCachedSession } from "@/services/gameAuth";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -155,6 +156,7 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
           databases: { characters: AVA_NOTION_DATABASES.characters },
           only_notion_id: notionId,
           mode: "fields_only",
+          environment_id: getActiveEnvironment(),
         }),
       });
       if (!res.ok) {
@@ -352,6 +354,24 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
           <pre className="text-xs whitespace-pre-wrap">{prompt.situation_summary || "(vide — relance un sync)"}</pre>
         </ScrollArea>
       </div>
+
+      <div className="space-y-2 border rounded-lg p-4 bg-muted/20">
+        <Label className="text-sm font-semibold">États de parole ({prompt.speech_states?.length || 0})</Label>
+        <p className="text-xs text-muted-foreground">
+          Lus à la synchronisation depuis la liste « Tes états de parole » du champ Manière de parler.
+        </p>
+        {prompt.speech_states?.length ? (
+          <ul className="text-xs space-y-1">
+            {prompt.speech_states.map((s) => (
+              <li key={s.name}><span className="font-semibold">{s.name}</span> : {s.description}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-destructive">Aucun état trouvé — vérifie la liste dans Notion puis relance la synchronisation.</p>
+        )}
+      </div>
+
+
 
       {relationshipPreview && (
         <div className="space-y-2 border rounded-lg p-4 bg-muted/20">

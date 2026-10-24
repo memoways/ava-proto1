@@ -13,12 +13,14 @@ export interface CharacterPrompt {
   sujets_sensibles: string;
   references_intellectuelles: string;
   timeline: string;
+  maniere_de_parler?: string;
+  speech_states?: Array<{ name: string; description: string }>;
   situation_summary: string;
   updated_at?: string;
 }
 
 export const CHARACTER_PROMPT_FIELDS: Array<{
-  key: keyof Omit<CharacterPrompt, "character_id" | "name" | "situation_summary" | "updated_at">;
+  key: Exclude<keyof Omit<CharacterPrompt, "character_id" | "name" | "situation_summary" | "updated_at" | "speech_states">, never>;
   label: string;
   hint: string;
 }> = [
@@ -29,6 +31,7 @@ export const CHARACTER_PROMPT_FIELDS: Array<{
   { key: "dynamique_conversation", label: "Dynamique de la conversation", hint: "Comment la conversation se déroule, rythme, retenue." },
   { key: "sujets_sensibles", label: "Sujets sensibles", hint: "Sujets délicats et manière de les aborder ou esquiver." },
   { key: "references_intellectuelles", label: "Références intellectuelles", hint: "Références culturelles et intellectuelles du personnage, indépendantes de son degré global d’ouverture." },
+  { key: "maniere_de_parler", label: "Manière de parler", hint: "Manière de parler propre au personnage, y compris la liste « Tes états de parole » (- Nom : description)." },
   { key: "timeline", label: "Timeline", hint: "Chronologie / historique des événements marquants du personnage. Aide à situer sa mémoire par rapport au moment présent." },
 ];
 
@@ -41,6 +44,8 @@ const EMPTY: Omit<CharacterPrompt, "character_id" | "name" | "updated_at"> = {
   sujets_sensibles: "",
   references_intellectuelles: "",
   timeline: "",
+  maniere_de_parler: "",
+  speech_states: [],
   situation_summary: "",
 };
 
@@ -111,6 +116,8 @@ export async function loadCharacterPrompt(characterId: string): Promise<Characte
       sujets_sensibles: row.sujets_sensibles || "",
       references_intellectuelles: row.references_intellectuelles || "",
       timeline: row.timeline || "",
+      maniere_de_parler: row.maniere_de_parler || "",
+      speech_states: Array.isArray(row.speech_states) ? (row.speech_states as CharacterPrompt["speech_states"]) : [],
       situation_summary: row.situation_summary || "",
       updated_at: row.updated_at,
     };
@@ -216,7 +223,7 @@ export async function listCharactersWithPrompts(): Promise<CharacterListEntry[]>
   return chars.map((c) => {
     const p = byId.get(c.id);
     const len = p
-      ? [p.identite_fondamentale, p.qui_tu_es, p.ce_que_tu_ne_fais_jamais, p.ce_que_tu_sais_utilisateur, p.dynamique_conversation, p.sujets_sensibles, p.references_intellectuelles, p.timeline]
+      ? [p.identite_fondamentale, p.qui_tu_es, p.ce_que_tu_ne_fais_jamais, p.ce_que_tu_sais_utilisateur, p.dynamique_conversation, p.sujets_sensibles, p.references_intellectuelles, p.timeline, p.maniere_de_parler]
           .reduce((s: number, v: string) => s + (v?.length || 0), 0)
       : 0;
     return {
@@ -237,6 +244,7 @@ export function buildCharacterPromptSections(p: CharacterPrompt | null): string 
     ["TIMELINE (chronologie des événements marquants — repère-toi ici avant de répondre à toute question sur ton passé ou le contexte temporel)", p.timeline],
     ["IDENTITÉ FONDAMENTALE", p.identite_fondamentale],
     ["QUI TU ES", p.qui_tu_es],
+    ["MANIÈRE DE PARLER", p.maniere_de_parler],
     ["CE QUE TU NE FAIS JAMAIS", p.ce_que_tu_ne_fais_jamais],
     ["QUI T'APPELLE", p.ce_que_tu_sais_utilisateur],
     ["DYNAMIQUE DE LA CONVERSATION", p.dynamique_conversation],
