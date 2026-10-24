@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ResponseIntentParser, SPEECH_BOUNDARY } from './responseIntentStream';
 import { resolveNextSpeechState } from '@/agents/gameMasterPRD4';
 import { buildSpeechStateBlock } from '@/agents/maxAgent';
-import { normalizeRugosite, rugositySpeechDirective } from './speechRugosity';
+import { normalizeRugosite, rugositySpeechDirective, selectSpeechState } from './speechRugosity';
 
 const context = { characterKey: 'max' as const, displayName: 'Max Lorenzo', characterId: '11111111-1111-4111-8111-111111111111', notionPageId: '30362322e5958011ad7bffb1ed6772bc', environmentId: 'sandbox-ulrich', promptUpdatedAt: '2026-10-13T00:00:00Z' };
 
@@ -64,6 +64,12 @@ describe('buildSpeechStateBlock', () => {
 });
 
 describe('rugosité', () => {
+  it('refuse une troisième proposition identique, sans inventer un autre état', () => {
+    const states = [{ name: 'Bloqué' }, { name: 'Éclair' }];
+    expect(selectSpeechState('Bloqué', states, ['Bloqué', 'Bloqué'])).toBeNull();
+    expect(selectSpeechState('Éclair', states, ['Bloqué', 'Bloqué'])).toBe('Éclair');
+    expect(selectSpeechState('Bloqué', states, ['Bloqué', null])).toBe('Bloqué');
+  });
   it('borne la valeur entre 0 et 3, 0 par défaut', () => {
     expect(normalizeRugosite(undefined)).toBe(0);
     expect(normalizeRugosite(-2)).toBe(0);
