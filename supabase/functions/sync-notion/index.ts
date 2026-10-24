@@ -202,13 +202,13 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const targetEnvironmentId = typeof body.environment_id === 'string' && body.environment_id ? body.environment_id : 'prod';
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     {
       const { data: env } = await supabase.from('environments').select('id').eq('id', targetEnvironmentId).maybeSingle();
       if (!env) throw new Error(`Unknown environment_id: ${targetEnvironmentId}`);
     }
 
-    const targetEnvironmentId = typeof body.environment_id === 'string' && body.environment_id ? body.environment_id : 'prod';
     const mode: "full" | "fields_only" | "rag_only" = body.mode || "full";
     const doFields = mode === "full" || mode === "fields_only";
     const doRag = mode === "full" || mode === "rag_only";
