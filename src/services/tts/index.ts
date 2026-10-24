@@ -140,6 +140,8 @@ export async function generateSpeech(text: string, opts?: TTSOptions): Promise<B
         performance_emotion: opts?.performance?.emotion ?? null,
         performance_intensity: opts?.performance?.intensity ?? null,
         performance_source: opts?.performance?.source ?? null,
+        performance_speech_state: opts?.performance?.speechState ?? null,
+        performance_mapping_version: opts?.performance?.mappingVersion ?? null,
       },
     });
     return blob;
@@ -210,6 +212,8 @@ export function tryCreateStreamingPlayback(text: string, opts?: TTSOptions): TTS
           transport: stats.transport,
           performance_emotion: opts?.performance?.emotion ?? null,
           performance_source: opts?.performance?.source ?? null,
+          performance_speech_state: opts?.performance?.speechState ?? null,
+          performance_mapping_version: opts?.performance?.mappingVersion ?? null,
           buffer_preset: stats.bufferPreset ?? null,
           buffer_prebuffer_ms: stats.prebufferMs ?? null,
           buffer_rebuffer_ms: stats.rebufferMs ?? null,

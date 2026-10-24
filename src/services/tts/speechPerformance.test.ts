@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setActiveEnvironment } from '../environmentContext';
-import { derivePerformanceIntent, applyGradiumPerformance, composeHumeDescription } from './performanceIntent';
+import { derivePerformanceIntent, applyGradiumPerformance, composeHumeDescription, applyElevenLabsPerformance, applyInworldPerformance } from './performanceIntent';
 import { EMPTY_SPEECH_PERFORMANCE, proposeSpeechMapping, saveSpeechPerformanceSettings } from './speechPerformanceSettings';
 import { createAuditionCorpus, auditionCount, auditionVoice, AUDITION_PROVIDERS, AUDITION_LEVELS } from './speechAudition';
 import { adaptGradiumEmotionalTags } from './gradiumEmotionalTags';
@@ -17,6 +17,7 @@ describe('Lot B speech-state rules',()=>{
  it('isolates character states and rejects unknown states',()=>{expect(derivePerformanceIntent({...input,characterKey:'emma'}).source).not.toBe('speech_state');expect(derivePerformanceIntent({...input,validSpeechStates:[]}).source).not.toBe('speech_state');});
  it('scales the deviation across the three rugosity levels',()=>{expect(derivePerformanceIntent({...input,rugosite:1}).speedHint).toBeCloseTo(1.04);expect(derivePerformanceIntent({...input,rugosite:2}).speedHint).toBeCloseTo(1.08);expect(derivePerformanceIntent(input).speedHint).toBe(1.12);});
  it('keeps Gradium character temperature unchanged and modulates padding only',()=>{expect(applyGradiumPerformance({temp:0.6,paddingBonus:1},derivePerformanceIntent(input))).toEqual({temp:0.6,paddingBonus:0.4});});
+ it('modulates the saved provider speed relatively instead of replacing it',()=>{const i=derivePerformanceIntent(input);expect(applyElevenLabsPerformance({style:0.2,stability:0.5,speed:0.8,modelId:'eleven_v3'},'Je sais.',i).speed).toBeCloseTo(0.896);expect(applyInworldPerformance({deliveryMode:'BALANCED',speakingRate:0.8},i).speakingRate).toBeCloseTo(0.896);});
  it('prioritizes the state acting instructions within the Hume character limit',()=>{const i=derivePerformanceIntent(input);expect(composeHumeDescription('a'.repeat(100),i)).toContain(i.actingNl);});
  it('never emits speculative Gradium tags even when enabled',()=>{expect(adaptGradiumEmotionalTags('Je… je sais.','Bloqué',true)).toBe('Je… je sais.');});
  it('keeps words, euh, repeated words and unfinished speech for both preparations',()=>{const text='Euh… je… je — Ava';expect(prepareTextForTTS(text)).toBe('Euh... je... je — Ava');expect(prepareTextForGradium(text)).toBe('Euh, je, je, Ava');expect(prepareTextForGradium(prepareTextForGradium(text))).toBe(prepareTextForGradium(text));});

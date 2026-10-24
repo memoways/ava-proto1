@@ -682,6 +682,7 @@ const IndexPRD4 = () => {
   }, [activateTTSFallback, setAudioState]);
 
   const prepareCall = useCallback(async () => {
+    void loadSpeechPerformanceSettings();
     avatarConnectStartedAtRef.current = null;
     avatarFirstFrameAtRef.current = null;
     avatarFirstSpeechAtRef.current = null;
