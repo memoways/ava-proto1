@@ -155,6 +155,7 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
           databases: { characters: AVA_NOTION_DATABASES.characters },
           only_notion_id: notionId,
           mode: "fields_only",
+          environment_id: getActiveEnvironment(),
         }),
       });
       if (!res.ok) {

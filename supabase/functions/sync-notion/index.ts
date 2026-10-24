@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAdmin } from "../_shared/adminAuth.ts";
+import { parseSpeechStates } from "../_shared/speechStates.ts";
 import {
   getRagEmbeddingProfile,
   isRagEmbeddingProfileId,
@@ -202,6 +203,10 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    {
+      const { data: env } = await supabase.from('environments').select('id').eq('id', targetEnvironmentId).maybeSingle();
+      if (!env) throw new Error(`Unknown environment_id: ${targetEnvironmentId}`);
+    }
 
     const targetEnvironmentId = typeof body.environment_id === 'string' && body.environment_id ? body.environment_id : 'prod';
     const mode: "full" | "fields_only" | "rag_only" = body.mode || "full";

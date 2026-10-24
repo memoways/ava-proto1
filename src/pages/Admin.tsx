@@ -331,6 +331,7 @@ export default function Admin() {
           },
           wipe_all: !!opts.wipeAll,
           mode,
+          environment_id: getActiveEnvironment(),
         }),
         signal: controller.signal,
       });
