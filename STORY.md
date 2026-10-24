@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-24 (lots A/B parole incarnée : code en preview, auditions et recette humaine à poursuivre)
+> **Last Updated**: 2026-10-24 (lots A/B parole incarnée : code en preview, tâche Notion de reprise créée, auditions et recette humaine à poursuivre)
 
 ---
 
@@ -16,7 +16,9 @@ le provider live. Les tags Gradium restent fermés et Fish n'est pas intégré.
 878 tests verts ; banc connecté parcouru avec fiches réelles et sans pageerror.
 Aucune audition fournisseur réelle, sauvegarde/activation ou publication lancée.
 Le naturel, la diction et la latence restent à mesurer ; livraison GitHub non
-vérifiée. [Plan et rapport](docs/plan_lot_b_rendu_vocal.md).
+vérifiée. Une tâche Notion de reprise (« AVA — Finaliser la parole incarnée
+(lots A & B) ») recense le bilan, les tests à faire et le prompt de reprise.
+[Plan et rapport](docs/plan_lot_b_rendu_vocal.md).
 
 ## Lot A — correctifs du 24 octobre 2026
 

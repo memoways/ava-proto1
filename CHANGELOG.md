@@ -16,9 +16,10 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   voix isolées, v3 limité à l'audition, arrêt/cache/export et annotations.
 - Aucun tag Gradium actif, Fish documentaire uniquement. Aucun audio réel
   généré par l'agent, aucune configuration sauvegardée/activée ni publication.
-- 878 tests verts ; banc connecté vérifié avec états réels Max/Emma et zéro
-  pageerror. Diction, latence réelle, sauvegarde des réglages et appels fournisseurs
-  restent à valider ; GitHub main/CI/nettoyage non vérifiés.
+- Tâche Notion de reprise créée : « AVA — Finaliser la parole incarnée (lots A & B) :
+  rapport, recette et prompt de reprise » (privée, à déplacer dans la base de tâches).
+  Diction, latence réelle, sauvegarde des réglages et appels fournisseurs restent à
+  valider ; GitHub main/CI/nettoyage non vérifiés.
 - [Plan et rapport détaillé](docs/plan_lot_b_rendu_vocal.md).
 
 ## [En validation] — 2026-10-24 — Finalisation du lot A
