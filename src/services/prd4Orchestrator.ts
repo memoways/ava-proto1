@@ -691,7 +691,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
 
   return {
     maxResponse,
-    speechPerformanceContext: { state: selectSpeechState(input.playedSpeechStateRef?.current ?? maxResult?.responseIntent?.parole, speechStates), rugosite, states: speechStates.map(state => state.name) },
+    speechPerformanceContext: { state: maxResult && !identityGuard.blocked ? selectSpeechState(input.playedSpeechStateRef?.current ?? maxResult.responseIntent?.parole, speechStates) : null, rugosite, states: speechStates.map(state => state.name) },
     timings: {
       rag_ms,
       max_ms,
