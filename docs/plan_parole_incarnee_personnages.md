@@ -43,12 +43,12 @@ Sera aussi enregistré dans `docs/plan_parole_incarnee_personnages.md`.
 
 ## Questions ouvertes
 
-- La rugosité par défaut est-elle 0 pour les deux personnages ?
+- Rugosité par défaut : 0 pour Max et Emma (décision d’Ulrich, 24.10, à tester).
 - Faut-il plutôt garder la modification manuelle de « Manière de parler » dans l'admin, sachant que la prochaine synchronisation l'écrasera ?
 
 ## Avancement (24.10.2026, Lovable)
 
 - Étapes 1 à 3 faites en sandbox : colonnes `maniere_de_parler` et `speech_states` ajoutées, alias Notion « Manière de parler », sync-notion écrit dans l'environnement actif de l'admin (`environment_id`, défaut `prod` pour les anciens appels), états analysés et affichés dans l'admin, `speechModes.ts` supprimé.
-- sync-notion n'est pas encore redéployé ; la synchronisation sandbox attend ce déploiement.
+- sync-notion déployé le 24.10 (source_sha256 d4d16bc6…cf95d). Synchronisation sandbox « champs seulement » possible.
 - Limite : les embeddings RAG restent globaux (non séparés par environnement). En mode `full`, une synchronisation sandbox réindexe le RAG partagé avec la production. Pour la sandbox, utiliser « champs seulement ».
 - Étapes 4 à 7 restent à faire.
