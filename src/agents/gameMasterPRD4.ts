@@ -18,6 +18,7 @@ import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
 import { normalizeMemoryText } from "@/services/conversationMemoryV1";
 import { asRuntimeCharacter } from "@/services/characterConversation";
 import { handoffSpeechEvidence, materializeHandoffAssessment } from "@/services/characterHandoff";
+import { rugosityDirectorDirective } from "@/services/speechRugosity";
 import type { CharacterRelationshipPolicy, ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, ExperienceDirectorConfig, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, RelationshipStateProposal, RuntimeCharacter, TraceMessage, TurnRelationshipDirective, UserRoleProfile } from "@/types";
 import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
 import {
@@ -325,6 +326,17 @@ ${input.relationshipPolicy ? JSON.stringify({
 ## DIRECTIVE EFFECTIVEMENT UTILISÉE POUR LA RÉPONSE DIFFUSÉE
 ${input.turnRelationshipDirective?.prompt || "(indisponible)"}
 
+## ÉTATS DE PAROLE DU PERSONNAGE (liste synchronisée depuis sa fiche)
+${input.speechStates?.length
+    ? input.speechStates.map((state) => `- ${state.name} : ${state.description}`).join("\n")
+    : "(aucun état synchronisé — retourne next_speech_state=null)"}
+
+## RUGOSITÉ DE PAROLE RÉGLÉE
+${rugosityDirectorDirective(input.rugosite ?? 0)}
+
+## ÉTAT DE PAROLE JOUÉ CE TOUR (déclaré par le personnage)
+${input.speechStatePlayed?.trim() || "(non déclaré)"}
+
 ## TEMPS ÉCOULÉ
   ${Math.floor(input.timeElapsedSeconds / 60)}min ${input.timeElapsedSeconds % 60}s sur ~${Math.round(input.sessionDurationSeconds / 60)} min configurées — clôture naturelle autorisée après ${Math.floor(input.minimumClosureSeconds / 60)}min ${input.minimumClosureSeconds % 60}s — tour #${input.turnIndex}
 
@@ -467,10 +479,23 @@ function cleanPlayerSwitchRequest(raw: unknown): PRD4PostTurnEvaluation["player_
 
 const REQUIRED_GM_JSON_FIELDS = [
   "engagement_delta", "confusion_detected", "role_usage_quality", "topics_covered",
-  "transition_recommended", "cinematic_hint", "next_turn_guidance", "end_recommended",
+  "transition_recommended", "cinematic_hint", "next_turn_guidance", "next_speech_state", "end_recommended",
   "moderation_flag", "notes", "trigger_video_id", "labels", "action",
   "player_switch_request", "memory_delta",
 ] as const;
+
+/**
+ * Valide la proposition du GM contre la liste synchronisée du personnage.
+ * Un état inconnu ou une liste vide retombent sur null, jamais sur une erreur.
+ */
+export function resolveNextSpeechState(
+  raw: unknown,
+  states: Array<{ name: string; description: string }> | undefined,
+): string | null {
+  if (typeof raw !== "string" || !raw.trim() || !states?.length) return null;
+  const needle = raw.trim().toLowerCase();
+  return states.find((state) => state.name.toLowerCase() === needle)?.name ?? null;
+}
 
 function isCompleteGMJson(value: unknown): value is Partial<PRD4PostTurnEvaluation> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -569,6 +594,7 @@ export async function evaluatePostTurnPRD4(
         transition_recommended: Boolean(parsed.transition_recommended),
         cinematic_hint: parsed.cinematic_hint ? String(parsed.cinematic_hint) : null,
         next_turn_guidance: String(parsed.next_turn_guidance || DEFAULT_RESULT.next_turn_guidance),
+        next_speech_state: resolveNextSpeechState(parsed.next_speech_state, input.speechStates),
         end_recommended: endRecommended,
         moderation_flag: Boolean(parsed.moderation_flag),
         notes: String(parsed.notes || ""),
@@ -663,6 +689,7 @@ export async function evaluatePostTurnPRD4(
     execution_reason: executionReason,
     orchestration_version_id: input.orchestrationVersionId ?? null,
     orchestration_config: input.orchestrationConfig ?? null,
+    speech_state_played: input.speechStatePlayed?.trim() || null,
   };
 
   if (input.sessionId && input.persist !== false) {
