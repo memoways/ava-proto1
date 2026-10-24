@@ -116,6 +116,11 @@ describe("cost estimate", () => {
 });
 
 describe("judge JSON", () => {
+  it("stores five speech criteria bounded to 0–5 while preserving old results", () => {
+    const parsed = parseJudgeResponse(JSON.stringify({ speech_quality: { sounds_spoken: 9, no_therapeutic_language: 4, non_caricatural: -1, facts_understandable: 3, hope_without_cure: 5 } }));
+    expect(parsed.speech_quality).toEqual({ sounds_spoken: 5, no_therapeutic_language: 4, non_caricatural: 0, facts_understandable: 3, hope_without_cure: 5 });
+    expect(parseJudgeResponse('{}').speech_quality).toBeUndefined();
+  });
   it("extracts scores from noisy completions and clamps them", () => {
     const parsed = parseJudgeResponse(`Voici:\n{"gold_fidelity": 9, "must_include": 4, "must_not": 5, "tone": 3, "length_ok": true, "character_voice": 4, "overall": 12, "rationale": "Retenu et factuel."}\n`);
     expect(parsed.gold_fidelity).toBe(5);

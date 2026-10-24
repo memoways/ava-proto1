@@ -730,9 +730,9 @@ export async function streamPRD4Turn(input: PRD4TurnInput, onEvent: (event: PRD4
     const result = await processPRD4Turn({ ...input, streamControl: {
       onToken: text => parser.push(text), finishSpeech: () => parser.finish(), delivery,
       hasSegments: () => segments > 0,
-      onRetry: () => { recoveryText = ''; emit({ type: 'reset' }); },
+      onRetry: () => { recoveryText = ''; if (input.playedSpeechStateRef) input.playedSpeechStateRef.current = null; emit({ type: 'reset' }); },
       onRecovered: text => { recoveryText = text; segments++; emit({ type: 'segment', text }); },
-      onFallback: text => { recoveryText = text; emit({ type: 'reset' }); emit({ type: "segment", text }); },
+      onFallback: text => { recoveryText = text; if (input.playedSpeechStateRef) input.playedSpeechStateRef.current = null; emit({ type: 'reset' }); emit({ type: "segment", text }); },
     }});
     // The consumer owns delivery; attach rejection handlers before it can cancel.
     result.postTurnPromise.catch(() => {}); result.labelPromise.catch(() => {});
