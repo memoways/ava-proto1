@@ -1,6 +1,6 @@
 # Où est Ava ? — Development Story
 
-> **Status**: 🟡 In Progress  
+ > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
 > **Last Updated**: 2026-10-23 (fiabilisation des tours transcrits et de la continuité téléphonique en validation)
