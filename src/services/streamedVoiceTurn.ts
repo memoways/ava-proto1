@@ -98,6 +98,9 @@ export function prepareStreamedVoiceTurn(context: TTSGenerateContext & { charact
       if (event.type === 'reset' && !segments.length) intent = null;
       else if (event.type === 'intent') intent = event.intent;
       else if (event.type === 'segment') {
+        if (!segments.length && context.resolveSpeechPerformance) {
+          session.setPerformance(context.resolveSpeechPerformance(intent?.parole ?? null, event.text));
+        }
         segments.push(event.text); generated = segments.join(' ');
         if (!audioError) {
           try { session.appendText(prepareTextForGradium(event.text)); session.open(); }
