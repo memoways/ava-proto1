@@ -13,14 +13,14 @@ export interface CharacterPrompt {
   sujets_sensibles: string;
   references_intellectuelles: string;
   timeline: string;
-  maniere_de_parler: string;
-  speech_states: Array<{ name: string; description: string }>;
+  maniere_de_parler?: string;
+  speech_states?: Array<{ name: string; description: string }>;
   situation_summary: string;
   updated_at?: string;
 }
 
 export const CHARACTER_PROMPT_FIELDS: Array<{
-  key: keyof Omit<CharacterPrompt, "character_id" | "name" | "situation_summary" | "updated_at" | "speech_states">;
+  key: Exclude<keyof Omit<CharacterPrompt, "character_id" | "name" | "situation_summary" | "updated_at" | "speech_states">, never>;
   label: string;
   hint: string;
 }> = [
