@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ResponseIntentParser, SPEECH_BOUNDARY } from './responseIntentStream';
 import { resolveNextSpeechState } from '@/agents/gameMasterPRD4';
 import { buildSpeechStateBlock } from '@/agents/maxAgent';
-import { normalizeRugosite, rugositySpeechDirective, selectSpeechState } from './speechRugosity';
+import { normalizeRugosite, rugosityDirectorDirective, rugositySpeechDirective, selectSpeechState } from './speechRugosity';
 
 const context = { characterKey: 'max' as const, displayName: 'Max Lorenzo', characterId: '11111111-1111-4111-8111-111111111111', notionPageId: '30362322e5958011ad7bffb1ed6772bc', environmentId: 'sandbox-ulrich', promptUpdatedAt: '2026-10-13T00:00:00Z' };
 
@@ -61,14 +61,27 @@ describe('buildSpeechStateBlock', () => {
   it('ajoute la consigne de rugosité quand elle est réglée', () => {
     expect(buildSpeechStateBlock({ rugosite: 3 })).toContain('Rugosité 3/3');
   });
+  it('ne force pas une rotation après deux déclarations identiques, même à rugosité 0', () => {
+    expect(buildSpeechStateBlock({ rugosite: 0, speechStateHistory: ['Bloqué', 'Bloqué'] })).toBeUndefined();
+    const block = buildSpeechStateBlock({ rugosite: 3, speechStateDirective: 'Bloqué', speechStateHistory: ['Bloqué', 'Bloqué'] });
+    expect(block).toContain('déclencheurs');
+    expect(block).not.toMatch(/Choisis un autre|jamais trois fois|Joue-le et déclare-le/);
+  });
 });
 
 describe('rugosité', () => {
-  it('refuse une troisième proposition identique, sans inventer un autre état', () => {
+  it('valide seulement la fiche courante sans imposer de variété', () => {
     const states = [{ name: 'Bloqué' }, { name: 'Éclair' }];
-    expect(selectSpeechState('Bloqué', states, ['Bloqué', 'Bloqué'])).toBeNull();
-    expect(selectSpeechState('Éclair', states, ['Bloqué', 'Bloqué'])).toBe('Éclair');
-    expect(selectSpeechState('Bloqué', states, ['Bloqué', null])).toBe('Bloqué');
+    expect(selectSpeechState('Bloqué', states)).toBe('Bloqué');
+    expect(selectSpeechState('Éclair', states)).toBe('Éclair');
+    expect(selectSpeechState('Ancien état', states)).toBeNull();
+  });
+  it.each([1, 2, 3])('le niveau %s module les possibilités sans remplacer les déclencheurs', level => {
+    for (const directive of [rugositySpeechDirective(level), rugosityDirectorDirective(level)]) {
+      expect(directive).toContain('déclencheurs');
+      expect(directive).toContain('réponse nette');
+      expect(directive).not.toMatch(/privilégie les états bloqués|Ne cherche jamais la fluidité|propose souvent/);
+    }
   });
   it('borne la valeur entre 0 et 3, 0 par défaut', () => {
     expect(normalizeRugosite(undefined)).toBe(0);

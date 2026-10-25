@@ -1,5 +1,39 @@
 # Instructions de plateforme — Ava Proto 1
 
+## Notion Ava : workspace Gamilab (obligatoire)
+
+**Pour le projet Ava, le workspace Notion est TOUJOURS Gamilab.** Décision
+explicite d'Ulrich du 25 octobre 2026, à réutiliser entre sessions sans lui
+redemander ce choix. Cette règle de projet prime sur le routage personnel vers
+Ulrich / Ulrich Fischer (`377e8583-7838-4c05-9f76-8833a450f304`), qui concerne
+sa mémoire personnelle et ne valide pas l'accès aux sources Ava.
+
+- Base éditoriale Caractères AVA :
+  https://app.notion.com/p/gamilab-prov/30362322e59580bbb7b8dd49d516b341.
+  Max actif : `3f762322-e595-81ba-8241-c7f6b28f31fd` ;
+  Emma active : `3f762322-e595-81f9-880f-e309adec7075`.
+- Utiliser une connexion MCP native Notion ciblant Gamilab pour les lectures,
+  recherches et écritures des sources projet. Vérifier sa cible avant d'agir ;
+  consigner l'ID de Gamilab lorsqu'il sera fourni par le connecteur, sans le
+  déduire d'un ID de page ou de base.
+- Si la connexion exposée annonce Ulrich, identifier un mauvais routage pour
+  Ava. Un NOT_FOUND obtenu dans ce contexte ne prouve ni une expiration du
+  connecteur, ni un défaut de partage des pages, ni un retard de synchronisation.
+  Utiliser la connexion Gamilab si elle est exploitable ; sinon distinguer sa
+  configuration de sa disponibilité dans la session, sans demander à nouveau quel workspace choisir
+  ni faire transférer les sources dans Ulrich. Aucun contournement navigateur.
+- Réutiliser les connexions Notion et identifiants OAuth déjà enregistrés.
+  Avant de demander une réautorisation, vérifier la configuration et le client
+  actifs, le stockage OAuth depuis un contexte système autorisé et le démarrage
+  du MCP natif. Un statut inconnu en sandbox ou « OAuth authorization required »
+  dans un seul contexte ne démontre pas une expiration. Ne pas relancer
+  login/logout, supprimer ou remplacer les identifiants pour contourner un
+  problème d'accès au trousseau ou de routage de session.
+- Notion porte les prompts éditoriaux des personnages ; l'app en règle et
+  réalise le rendu. Les propositions de changement des champs Notion restent
+  séparées des réglages de l'app. Ulrich confirme leur synchronisation à jour
+  au 25 octobre 2026 ; ne pas diagnostiquer un retard depuis un refus d'accès.
+
 ## Chaîne de développement et de publication (obligatoire)
 
 **Lovable est la plateforme de référence et l'unique chaîne de livraison de ce projet.**

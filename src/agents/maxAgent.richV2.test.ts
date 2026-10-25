@@ -59,11 +59,14 @@ describe("parole sandbox — fiches Cloud exactes du 25 octobre", () => {
       vi.mocked(getGameplaySettings).mockReturnValueOnce({ MAX_PROMPT_VARIANT: variant } as never);
       vi.mocked(loadCharacterPromptByName).mockResolvedValue(sheet as never);
       const trace = await buildMaxSystemPrompt({ conversationHistory: [{ role: 'user', content: 'Et demain ? '.repeat(80), timestamp: 1 }],
-        userMessage: "Et demain ?", rugosite: 3, experienceFrame: "Cadre partagé. ".repeat(60),
+        userMessage: "Et demain ?", rugosite: sheet.name.startsWith("Max") ? 3 : 2,
+        speechStateDirective: sheet.speech_states[0].name, speechStateHistory: [sheet.speech_states[0].name, sheet.speech_states[0].name], experienceFrame: "Cadre partagé. ".repeat(60),
         relationshipDirective: "Garde ta réserve. ".repeat(60), ragContext: "Un souvenir. ".repeat(200) }, sheet.name);
       const secret = sheet.dynamique_conversation.split(/\n\s*\n/).find(block => block.startsWith("Ce que tu veux vraiment"))!;
       expect(trace.finalSystemPrompt).toContain(sheet.maniere_de_parler);
       expect(trace.finalSystemPrompt).toContain(secret);
+      expect(trace.finalSystemPrompt).toContain('phrases ou fragments');
+      expect(trace.finalSystemPrompt).not.toMatch(/jamais trois fois|Choisis un autre état/);
       expect(trace.budget?.withinBudget).toBe(true);
       expect(trace.budget!.staticChars).toBeLessThanOrEqual(trace.budget!.staticLimitChars);
       const other = speechSheets.find(other => other.character_id !== sheet.character_id)!;

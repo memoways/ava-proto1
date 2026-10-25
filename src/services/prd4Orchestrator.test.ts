@@ -229,6 +229,8 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
   it.each([MAX_CONTEXT, EMMA_CONTEXT])('$characterKey logs only the declared, validated and delivered state, never the GM suggestion', async context => {
     const sheet = speechSheets.find(sheet => sheet.name.startsWith(context.displayName))!;
     for (const declaration of [sheet.speech_states[0].name, 'ÉTAT INCONNU', undefined]) {
+      vi.mocked(fetchCharacterSpeechRuntime).mockResolvedValueOnce({ rugosite: context.characterKey === 'max' ? 3 : 2,
+        settingsVersion: 'snapshot-a1', environmentId: 'sandbox-ulrich', recentStates: [sheet.speech_states[1].name, sheet.speech_states[1].name] });
       vi.mocked(loadCharacterPrompt).mockResolvedValueOnce(sheet as never);
       const intent = { goal: 'Écouter', points: [], ...(declaration ? { parole: declaration } : {}) };
       vi.mocked(simulateMaxResponse).mockImplementationOnce(async (_input, opts) => {
@@ -242,6 +244,7 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
         conversationHistory: [], userMessage: 'Et demain ?', userRole: null, timeElapsedSeconds: 30,
         gmSpeechState: sheet.speech_states[1].name }, () => {}, delivery);
       expect(evaluatePostTurnPRD4).toHaveBeenCalledTimes(count);
+      expect(vi.mocked(simulateMaxResponse).mock.calls.at(-1)![0].speechStateDirective).toBe(sheet.speech_states[1].name);
       deliver('Je… je sais pas.'); await result.postTurnPromise;
       expect(vi.mocked(evaluatePostTurnPRD4).mock.calls.at(-1)![0]).toMatchObject({
         speechStatePlayed: declaration === sheet.speech_states[0].name ? declaration : null,

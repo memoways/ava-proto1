@@ -1,5 +1,299 @@
 # Plan — Lot B : rendre les états de parole audibles
 
+## Exécution coordonnée Notion / app — 25 octobre 2026
+
+**Statut : A1 implémenté et vérifié localement ; livraison exacte dans le bilan de sa PR. A2–A4 non commencés.** Cette section est le plan
+opérationnel courant ; elle remplace les découpages historiques ci-dessous.
+
+**Reprise après redémarrage — 25 octobre 2026 :** Ulrich travaille dans Notion
+sur les champs prompts ; la préparation app doit avancer indépendamment, sans
+édition de ces champs ni synchronisation automatique. Le
+[prompt autonome A1](prompt_reprise_parole_ouverte_lot_a1.md) est prêt pour
+l'implémentation et la livraison du premier lot. Plan, tâche éditoriale et
+instructions de routage sont conservés dans la préparation documentaire de la
+branche `codex/parole-ouverte-a1`. Aucun code app modifié pendant sa préparation.
+Le test natif Gamilab après redémarrage échoue encore à l'initialisation OAuth ;
+le plugin distinct répond pour Ulrich. A1 ne dépend pas de cette connexion.
+
+Le [plan de direction](plan_parole_incarnee_personnages.md#direction-après-écoute--25-octobre-2026)
+porte les choix de jeu validés. Le [contenu de la tâche éditoriale](tache_notion_parole_incarnee_personnages.md)
+est prêt pour la base Gamilab explicitement demandée :
+[a789687e3d57461696f134af9b766f28](https://app.notion.com/p/gamilab-prov/a789687e3d57461696f134af9b766f28?v=23a0333beea1467eae928b7470b67fef).
+**La tâche n'est pas créée** : lecture du schéma et écriture bloquées par le
+démarrage OAuth du MCP natif dans la session, malgré la connexion enregistrée.
+Ne pas substituer le workspace personnel Ulrich ni créer une tâche ailleurs.
+
+### Mécanique retenue : deux sources, un corpus, une intégration à la fois
+
+- **Notion : contenu éditorial.** Une tâche E0 pour les deux fiches ; diff par
+  propriété, validation, édition et relecture. Pas quatre copies de la même
+  psychologie dans les lots techniques. Les états et leurs déclencheurs viennent
+  des fiches ; les exemples sont des calibrations, pas des règles en dur.
+- **Dépôt : exécution technique.** Quatre lots app avec résultat observable,
+  fichiers concernés, tests adaptés et retour arrière. Un seul lot et agent
+  actifs sur le dépôt, une branche/PR par lot, aucun chantier parallèle sur les
+  mêmes fichiers. Le travail éditorial peut avancer à part sans toucher au repo.
+- **Contrat commun de recette.** Huit cas courts avec contexte autorisé,
+  personnage, état attendu si pertinent, texte de calibration et appréciation
+  humaine. Même corpus pour les propositions Notion et le banc audio existant.
+  Figer le texte pour comparer le rendu ; figer le rendu pour comparer les mots.
+- **Traçabilité minimale.** À chaque comparaison : version de fiche synchronisée,
+  variante du compilateur, rugosité épinglée, version du mapping, voix/fournisseur
+  et texte effectivement entendu. Utiliser traces et reçus existants ; pas de
+  nouveau tableau de bord ni d'appel LLM supplémentaire par tour.
+
+```mermaid
+flowchart LR
+  E0["E0 · Diff des champs Notion, validation puis édition"] --> I["Synchronisation ciblée sandbox et comparaison du prompt final"]
+  A1["A1 · Parole ouverte et contrat compatible"] --> A2["A2 · Pauses Gradium contrôlées"]
+  A2 --> A3["A3 · Réglages lisibles et auditions"]
+  A3 --> A4["A4 · Accueils et recette d'ensemble"]
+  I --> A4
+  C["8 cas de calibration communs"] --> E0
+  C --> A1
+  C --> A2
+  C --> A3
+```
+
+A1 utilise d'abord les fiches actuelles synchronisées : il ne dépend pas de
+l'édition E0. Les tests déterministes A2 et la clarification A3 peuvent aussi
+être préparés avec ces versions. L'acceptation du rendu final et la recette A4
+attendent les textes E0 approuvés et intégrés. Aucun lot ne change simultanément
+prompts, modèle, voix, température et rythme.
+
+### E0 — tâche éditoriale dans Notion Gamilab
+
+**Livrable :** champs Max/Emma proposés avant/après, puis version approuvée et
+relue. Périmètre exact dans le [corps de tâche prêt](tache_notion_parole_incarnee_personnages.md).
+Le schéma de la base doit être lu et les doublons recherchés avant création ;
+pas de responsable, échéance, statut ou relation inventés. Renvoyer l'URL réelle
+après création vérifiée. L'autorisation de créer cette tâche ne vaut pas
+autorisation d'appliquer toutes les propositions aux fiches maintenant.
+
+### A1 — laisser la pensée ouverte sans casser la réponse
+
+**Résultat observable :** « Moi, ça va. Non. J'en sais rien. Mais elle… » peut
+rester la fin voulue d'un tour ; le moteur n'exige pas une conclusion explicative
+et ne transforme pas ce fragment volontaire en panne.
+
+- Reprendre les contrats techniques dans `src/agents/maxAgent.ts`, les trois
+  compilateurs `maxPromptCompiler.ts`, `maxRichPromptCompiler.ts`,
+  `maxOptimizedPromptCompiler.ts`, et `src/services/responseIntentStream.ts`.
+  Distinguer fin technique normale et pensée inachevée ; conserver brièveté,
+  budget et en-tête privé. Les fragments sont déjà acceptés par le parseur :
+  n'élargir sa validation que si un cas précisément autorisé l'exige.
+- Examiner `src/services/speechRugosity.ts` : le niveau 3 ne doit pas remplacer
+  les déclencheurs Notion par une préférence systématique pour Bloqué. Garder
+  les cinq états propres, sans rotation imposée ni ajout automatique de tics.
+- Respecter la réserve des champs éditoriaux déjà réparée en #75. Ajouter
+  seulement les vérifications nécessaires à la compatibilité des prompts et
+  aux limites : fragment intentionnel, vrai length/abandon, citation ouverte,
+  tag privé, identité étrangère et consentement rétracté.
+
+**Validation :** replays ciblés et prompts effectifs des quatre variantes ;
+quelques sorties sur le corpus lorsque le banc le permet. La présence d'une
+consigne ne suffit pas à prouver le jeu. Vérifier le passage Max ↔ Emma sans
+changer son validateur. **Retour arrière :** revert du lot, fiches et mapping
+conservés. **Sortie :** prise de parole ouverte techniquement fiable ; aucune
+promesse de souffle ou de timbre émotionnel à ce stade.
+
+### Exécution A1 — 25 octobre 2026
+
+Base vérifiée : main `147cdfff893555ede4f903158c5506dcf586e116` (#76).
+Préparation documentaire `ca8e787` conservée sur `codex/parole-ouverte-a1`.
+La PR étrangère #24 ne recoupe aucun fichier du lot ; elle et les branches
+étrangères restent intactes. Dépôt public, CI PR et main conservées sans
+modification de workflow. Identité GitHub existante `Ulrfis` vérifiée ; aucune
+configuration GitHub App présente sur ce poste.
+
+Corrections app : fin technique normale distinguée de la pensée ouverte dans
+le contrat de sortie ; phrases ou fragments dans les quatre variantes, avec
+les mêmes plafonds. Le compilateur compact reçoit son contrat depuis maxAgent :
+aucun changement de sélection ni de réserve dans maxPromptCompiler nécessaire.
+Les niveaux 1–3 modulent les possibilités de la fiche sans priorité à Bloqué.
+La proposition GM est facultative, soumise aux déclencheurs ; ni prompt ni
+filtre n'imposent de rotation après deux états identiques. Le contrat courant
+GM s'applique aussi après le prompt publié v7, sans en modifier la version.
+La déclaration réellement livrée reste validée contre la fiche courante ;
+aucune requalification en état joué. Le parseur et les règles de passage sont
+inchangés.
+
+Reproduction avant correction : **11 échecs / 108 réussites** dans les suites
+existantes prompts/états/GM/contrat. Cas concret du filtre : la proposition
+« État propre actuel », encore pertinente après deux occurrences, devenait
+null dans le véritable évaluateur GM. L'historique forçait aussi une rotation
+même à rugosité 0. Ces deux contraintes sont retirées, sans état alternatif
+inventé. Contrôle élargi : **229/229** tests ciblés verts. `npm run test:quality`
+final vert : lint/types/build, **66 régressions, 967 unitaires, 41 intégrations**.
+Le premier passage avait rencontré un timeout de 5 s dans
+LatencyBlockingTab.test.tsx, pendant les contrôles simultanés ; rejeu isolé
+8/8 puis nouveau passage complet vert, sans modification de ce composant,
+des attentes ni des délais. Avertissements préexistants : dépendance useCallback
+et taille des chunks. `npm run test:e2e` : **78/78 verts sans retry, 14,2 minutes**,
+Chromium et contrôles média Firefox/WebKit. Passage bidirectionnel jusqu'au clic,
+refus/rétractations/différé, références invalides, résultats tardifs, persistance
+et CAS conservés. Les replays de reçu gardent delivered / uncertain / private
+séparés, sans rejeu après son ; récupération préalable toujours unique et bornée.
+
+Livraison GitHub : squash conditionné à `regression-gates` vert sur le HEAD exact,
+puis contrôle de main/E2E, synchronisation du même SHA dans Lovable et lecture
+du bundle réellement servi en preview. Les SHA, runs et branches finales sont
+relevés dans le bilan GitHub de la PR A1, sans boucle documentaire pour inscrire
+son propre SHA. Seule la branche A1 doit être supprimée ; toutes les branches
+étrangères et #24 sont conservées. Production non publiée.
+
+Snapshot de calibration conservé : fixtures Cloud Max/Emma datées du
+24 octobre, collectées le 25 (`speechSandbox20261025.json`), sans édition.
+Les prompts effectifs restent propres au personnage, avec parole et moteur
+intime entiers, sous les plafonds existants ; témoin Max 3 / Emma 2.
+Comparaison textuelle déterministe : l'ancien contrat disait « achève ta
+réponse » et imposait une rotation ; le nouveau permet une pensée ouverte et
+maintient l'état pertinent. Les textes simulés « Moi, ça va. Non. J'en sais
+rien. Mais elle… » et « Je la laisserai pas toute seule. » gardent leurs mots
+jusqu'au reçu, avec flux SSE stop + DONE. Les négatifs existants restent requis.
+Ce replay ne mesure pas une amélioration de sortie modèle ou du jeu. Le banc
+juge existant orchestre répétitions et appels personnage/GM/juge ; aucune
+campagne ni infrastructure ajoutée, aucun appel modèle/audio réel dans A1.
+
+Le seul connecteur Notion exposé vérifie `self.workspace.id` personnel
+`377e8583-7838-4c05-9f76-8833a450f304` : mauvaise cible pour Ava, aucune lecture
+ciblée ni écriture. A1 ne dépend pas de Gamilab. Ulrich garde l'édition et le
+moment d'intégration ; ni sync automatique, ni prompts Cloud écrasés, ni RAG
+reconstruit, ni tâche doublon. Capitalisation Notion projet non sauvegardée.
+
+Restent distincts : A2 pauses Gradium, A3 réglages/banc, A4 accueils et intégration
+des nouvelles fiches puis écoute humaine. A1 ne promet ni souffle ni timbre
+émotionnel, ne change aucun réglage enregistré et ne publie pas en production.
+
+### A2 — restituer les ruptures dans Gradium
+
+**Résultat observable :** une suspension choisie produit un vrai temps d'arrêt,
+avec les mêmes mots entendus et affichés, sans ralentir toute la réplique.
+
+- Périmètre : `src/services/tts/providers/gradium.ts`,
+  `src/services/tts/gradiumStreamPlayer.ts`,
+  `src/services/tts/performanceIntent.ts` et leurs tests. Réutiliser le banc
+  d'audition ; aucun nouveau moteur vocal.
+- Après validation du texte, préparer les mots puis insérer les seuls contrôles
+  de pause autorisés par l'adaptateur. Aucun tag produit par le LLM ne devient
+  accepté. Ne pas retirer globalement le nettoyage qui évitait les hoquets.
+- Déterminer les pauses depuis les ruptures explicites et le mapping validé,
+  pas depuis une virgule quelconque ni une ponctuation aléatoire. Essais bornés
+  autour de 0,25 / 0,6 / 1 seconde ; réglage final après écoute. Vérifier la
+  capacité réelle des chemins WebSocket et REST avant activation.
+- Texte des sous-titres et preuves inchangé. Contrôles TTS séparés des mots ;
+  un silence n'atteste pas la livraison du mot suivant. Garder l'échéance,
+  l'annulation et le comptage de lecture corrects pendant une pause.
+- Activation expérimentale sandbox distincte, désactivée par défaut tant que
+  l'écoute n'est pas acceptée ; réutiliser les réglages JSON existants, sans
+  migration si possible. Pas de changement production, voix ou température.
+
+**Validation :** cohérence texte entier / segments / repli REST, zéro tag
+arbitraire, aucun mot perdu/doublé, arrêt pendant silence et reprise sans rejeu.
+Conserver les décisions mains libres dans handsFreeVoice ; le silence voulu
+ne devient pas un échec réseau ou une nouvelle décision de tour. **Retour
+arrière :** désactiver les pauses expérimentales sandbox. **Sortie :** pauses
+acceptées sur le corpus, sans clic/hoquet ; voix étranglée et souffle restent
+des qualités à juger séparément, pas des capacités garanties par break.
+
+### A3 — rendre les réglages et le banc d'écoute fiables
+
+**Résultat observable :** l'admin montre ce qui est réellement envoyé au
+fournisseur ; une comparaison A/B courte est rejouable et attribuable.
+
+- Périmètre : `src/components/SpeechAuditionBench.tsx`,
+  `src/components/TTSConfigTab.tsx`, `src/services/tts/speechAudition.ts`,
+  `src/services/tts/speechPerformanceSettings.ts` et tests utiles.
+- Pour Gradium, distinguer débit global, pauses explicites, émotion/acting
+  non appliqués et capacités encore fermées. Les champs utilisables par les
+  autres fournisseurs gardent leur sens ; ne pas masquer une limitation par
+  une instruction affichée qui ne sera jamais envoyée.
+- Afficher les noms/descriptions issus de Notion, le réglage enregistré et sa
+  version, le texte source, le texte de synthèse et les paramètres appliqués.
+  Garder les mots d'acting éditoriaux dans Notion, pas dans un nouveau prompt app.
+- Utiliser huit cas au total. Première écoute A/B sur quatre textes au plus,
+  puis seulement les finalistes ; pas de génération automatique des centaines
+  de combinaisons historiques. Un appel à la demande, arrêt et cache de rejeu.
+- Séparer appréciations mots/pensée, pauses/rythme, affect/timbre et artefacts.
+  Afficher nombre d'appels et coût seulement s'il est connu. Voix de banc isolées
+  des profils de jeu. Max 3 / Emma 2 restent d'abord le témoin.
+
+**Validation :** affichage fidèle aux paramètres consommés, sauvegarde/relecture
+du seul environnement sandbox, isolation des voix, cache invalidé par les
+changements pertinents, pas d'appel lors d'un rejeu identique. **Retour arrière :**
+désactiver le rendu expérimental ; réglages précédents relus avant restauration.
+**Sortie :** comparaison exploitable et acceptée. Si le timbre reste détaché
+malgré mots/pauses justes, proposer au plus deux auditions de voix alternatives,
+sans changer automatiquement le fournisseur de jeu.
+
+### A4 — accueils et recette d'ensemble
+
+**Résultat observable :** le premier contact correspond au personnage, avec
+des entrées distinctes pour appel initial, premier transfert et retour.
+
+- Périmètre : profils d'accueil app, `src/services/characterConversationContinuity.ts`,
+  `src/services/openingTTSCache.ts` et les points d'accueil de
+  `src/pages/IndexPRD4.tsx`. Les textes sont un contenu d'accueil identifié,
+  pas une réécriture concurrente de la fiche Notion.
+- Petit répertoire validé Max/Emma sans nouvelle génération LLM à l'ouverture.
+  Sélection une fois par appel, pas de répétition immédiate quand un choix
+  existe, cache indexé sur le texte/voix/réglages pertinents.
+- Avant la recette finale : intégrer seulement les éditions E0 approuvées,
+  synchroniser les champs des deux fiches vers sandbox-ulrich, relire et
+  comparer le prompt final. Pas de rebuild RAG pour ces seules propriétés.
+- Recette courte avec Ulrich : premiers contacts, un sujet concret, une rupture,
+  un éclair d'espoir/fatalisme, puis passage Max ↔ Emma. Pas de confidence
+  forcée, pas de visite physique ou de conférence inventée.
+
+**Validation :** accueils sans confidence précoce, trois contextes conservés,
+pas de répétition/double lecture, reçus et offres toujours justes ; écoute
+humaine du rendu final après contrôle technique. Premier son mesuré séparément
+des silences voulus et de la durée totale. **Retour arrière :** répertoire et
+mapping précédents, versions de fiches antérieures documentées. **Sortie :**
+recette acceptée ou écarts précisément nommés ; publication production distincte.
+
+### Ordre de lancement et contrat de livraison
+
+1. Créer/vérifier E0 dans la base Gamilab dès que le MCP natif est exploitable.
+   Utiliser le corps prêt et conserver l'URL dans ce plan ; ne pas la fabriquer.
+2. Calibrer les huit cas avec la direction déjà validée. Notion peut travailler
+   les champs pendant qu'A1 est traité sur les versions actuelles.
+3. Implémenter et livrer A1, puis A2, A3, A4 séquentiellement. Pour chaque lot :
+   scénario rouge/vert pertinent, revue du diff, contrôles qualité/E2E du contrat
+   du dépôt, PR/CI requises, main et Lovable vérifiés, seule branche du lot
+   nettoyée. Pas de nettoyage des branches étrangères, notamment #24.
+4. Garder les fonctionnalités audibles nouvelles en sandbox jusqu'à l'écoute
+   acceptée. Ne pas confondre fusion GitHub, synchronisation Lovable, activation
+   d'un réglage, acceptation humaine et publication de production.
+5. Après chaque lot, inscrire acquis, limites et prochain lot dans ce plan et
+   le CHANGELOG. Ne pas rouvrir le diagnostic déjà établi sans nouvelle preuve.
+
+A1 est désormais implémenté ; ses contrôles et sa livraison sont consignés
+dans le bilan ci-dessus. Le lot app suivant est **A2**, distinct de l'édition
+Notion et de l'acceptation humaine du rendu final.
+
+## Direction après écoute — 25 octobre 2026
+
+Ulrich confirme le passage entre personnages, mais refuse toujours le jeu trop
+lisse. Il accepte des pensées réellement abandonnées, avec des éclairs nets ;
+souffle, silences, reprises et retenue dominent, les débordements vocaux restent
+rares. L'analyse actuelle des copies éditoriales Cloud, des réglages réellement
+épinglés et du rendu Gradium, les propositions champ par champ pour Notion et
+le plan d'audition sont centralisés dans
+[la direction après écoute](plan_parole_incarnee_personnages.md#direction-après-écoute--25-octobre-2026).
+Cette proposition remplace le prochain lot décrit ci-dessous, sans nouvelle
+implémentation ni réglage sauvegardé. Les sources Notion Ava sont toujours dans
+**Gamilab**, conformément à la correction explicite d'Ulrich et à
+[la règle permanente](../AGENTS.md#notion-ava--workspace-gamilab-obligatoire).
+Les `NOT_FOUND` précédents ont été obtenus depuis le workspace personnel
+Ulrich : ils ne démontrent aucun défaut de partage des fiches. La lecture
+directe attend une connexion native Gamilab. Ulrich confirme que les champs Notion
+sont synchronisés et à jour : aucun retard de sync n'est diagnostiqué.
+Notion garde le contenu du jeu ; l'app règle et réalise son rendu, sans
+direction éditoriale concurrente dans le code. Les réglages sandbox Max 3 / Emma 2 et
+le mapping sont déjà actifs : augmenter un curseur ne suffit pas à corriger
+le lissage textuel et les pauses converties en ponctuation.
+
 ## Suite de recette — 25 octobre 2026
 
 La recette d'Ulrich confirme une amélioration mais refuse encore les hésitations

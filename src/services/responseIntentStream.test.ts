@@ -59,7 +59,7 @@ describe('P1 private intent and safe speech', () => {
   it('never sends a repeated JSON header or tags to the synth', () => {
     const {p,spoken} = parser(); expect(() => p.push(header + '{"goal":"private"}. ')).toThrow(); expect(spoken).toEqual([]);
   });
-  it.each(['Je… je sais pas. Emma, elle… elle reste Emma. Hein ?', 'Je... non. C’est pas...', 'Max, il… bon.', 'Emma, elle —', 'Je suis Max… enfin. Je suis fatigué…', 'Elle disait « Je suis Emma… »'])('préserve les reprises et suspensions volontaires à chaque frontière : %s', speech => {
+  it.each(["Moi, ça va. Non. J'en sais rien. Mais elle…", 'Je la laisserai pas toute seule.', 'Je… je sais pas. Emma, elle… elle reste Emma. Hein ?', 'Je... non. C’est pas...', 'Max, il… bon.', 'Emma, elle —', 'Je suis Max… enfin. Je suis fatigué…', 'Elle disait « Je suis Emma… »'])('préserve les reprises et suspensions volontaires à chaque frontière : %s', speech => {
     const wire = header + speech;
     for (let split = 0; split <= wire.length; split++) {
       const { p, spoken } = parser(); p.push(wire.slice(0, split)); p.push(wire.slice(split));
@@ -75,6 +75,14 @@ describe('P1 private intent and safe speech', () => {
 
 
 describe('lot 3 — terminal closing residue', () => {
+  it('distingue fin technique et pensée ouverte dans le même budget', () => {
+    const contract = buildResponseStreamContract(220);
+    expect(contract).not.toContain('achève ta réponse');
+    expect(contract).toContain('fin technique normale');
+    expect(contract).toContain('pensée peut rester ouverte');
+    expect(contract).toContain('45 mots maximum');
+    expect(contract).toContain('goal : 8 mots maximum');
+  });
   it('forbids model-generated closing markers in the effective contract', () => {
     expect(buildResponseStreamContract(220)).toContain('Ne ferme jamais <speech>');
   });

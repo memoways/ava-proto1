@@ -1,8 +1,255 @@
 # Plan — Parole incarnée par personnage (Max, Emma)
 
+## Direction après écoute — 25 octobre 2026
+
+**Direction éditoriale conservée ; corrections app A1 vérifiées localement, livraison exacte dans le bilan de sa PR.** Ulrich confirme
+que le passage entre personnages fonctionne à nouveau, mais refuse le jeu trop
+lisse et détaché. Le lot 3 est livré par [#76](https://github.com/memoways/ava-proto1/pull/76),
+main `147cdfff893555ede4f903158c5506dcf586e116`. Ce retour valide le passage
+observé ; il ne constitue pas une nouvelle recette exhaustive bidirectionnelle.
+Le naturel vocal n'est pas accepté. Cette section remplace la proposition de
+lot 4 ci-dessous ; les bilans antérieurs restent historiques.
+
+La demande suivante d'Ulrich sépare désormais l'exécution en une
+[tâche éditoriale Notion prête à enregistrer](tache_notion_parole_incarnee_personnages.md)
+et [quatre lots app A1–A4](plan_lot_b_rendu_vocal.md#exécution-coordonnée-notion--app--25-octobre-2026).
+Leur mécanique, dépendances, validations et retours arrière sont dans ce second
+plan opérationnel. La création de la tâche dans Gamilab reste non effectuée.
+
+Après redémarrage, Ulrich confirme qu'il travaille dans Notion sur les champs
+personnages. L'exécution app commence par le
+[prompt autonome du lot A1](prompt_reprise_parole_ouverte_lot_a1.md), qui conserve
+ce plan et laisse l'édition/synchronisation à Ulrich pendant son travail.
+
+### Correction technique A1 — 25 octobre 2026
+
+Qualité locale verte (66 régressions, 967 unitaires, 41 intégrations, lint/types/build),
+78 E2E verts sans retry. Le [bilan A1 du plan opérationnel](plan_lot_b_rendu_vocal.md#exécution-a1--25-octobre-2026)
+distingue les corrections de contrat, les replays simulés et la livraison.
+Le tour doit finir normalement, mais sa pensée peut rester ouverte ; une réponse
+nette reste permise. Les plafonds et les réserves des fiches dans les quatre
+variantes sont conservés. Le niveau 3 ne privilégie plus un état bloqué et le
+filtre ne supprime plus une proposition uniquement parce qu'elle se répète.
+Le prompt personnage et le contrat GM ne forcent plus une rotation ou la
+résolution du blocage. Les noms et déclencheurs viennent de la fiche courante.
+Le parseur n'a pas été assoupli. Ces constats ne prouvent aucun gain d'acting
+sur une vraie sortie modèle ; écoute et intégration Notion restent distinctes.
+
+### Répartition confirmée : Notion et app complémentaires
+
+Ulrich précise que les champs prompts de Notion sont synchronisés et à jour.
+Cette confirmation est prise comme état du chantier ; le refus de lecture du
+connecteur actuel n'est pas une preuve de retard de synchronisation. Analyser
+les copies actives sert à comprendre leur consommation, pas à leur substituer
+une nouvelle fiche écrite dans le code.
+
+| Destination | Responsabilité | Changement proposé dans ce plan |
+| --- | --- | --- |
+| Champs prompts de la base Caractères, dans Notion | Psychologie, rapport aux événements, façon de parler, contradictions, déclencheurs et cinq états propres à chaque personnage. | Propositions éditoriales ciblées et distinctes Max/Emma, à relire et approuver dans leurs champs existants. Notion reste la source. |
+| Réglages de l'app, par environnement/personnage | Intensité de rugosité, voix/fournisseur, paramètres TTS et traduction des états Notion en capacités vocales réellement disponibles. | Conserver d'abord les valeurs actuelles pour isoler la cause ; éprouver les pauses, rendre visibles les limites du fournisseur, ajuster seulement après écoute. Pas de seconde psychologie ni de nouveaux états concurrents dans ces réglages. |
+| Code technique de l'app | Transmission complète des champs, compatibilité des consignes, validation d'une fin volontaire, segmentation et rendu des pauses, sous-titres/reçus. | Retirer les obstacles qui contredisent ou neutralisent la fiche. Aucune direction d'acteur commune ajoutée en dur, aucun exemple de dialogue injecté comme règle globale. |
+
+Les brouillons Max/Emma et les exemples plus bas sont des **propositions pour
+le contenu éditorial Notion**, pas des réglages à coller dans l'app. Le mapping
+vocal interprète les états issus de Notion ; il n'en redéfinit ni les causes ni
+le sens. Les accueils fixes sont signalés séparément : ils sont actuellement
+des contenus du profil app, pas une sortie des prompts Notion.
+
+### Direction confirmée et proposition de jeu
+
+Réponses explicites d'Ulrich : une pensée peut être abandonnée sans répondre
+à la question ; des éclairs restent très nets. Souffle, silences, reprises et
+voix qui se retient dominent ; les débordements vocaux sont rares. L'agitation
+intérieure peut être fréquente sans devenir un effondrement permanent.
+
+La parole est une tentative qui se fait pendant l'appel. Le personnage essaie
+de dire quelque chose, bute sur ce que cela implique, se corrige ou se raccroche
+à du concret. Il ne connaît pas d'avance la conclusion de sa réplique. Les
+morts et les transformations pèsent sur son présent, même quand il ne raconte
+pas ces événements. Une rupture doit avoir une cause dans la scène : un mot,
+un souvenir autorisé, une possibilité d'espoir, la peur du lien familial perdu.
+Une réponse pratique parfaitement nette reste possible.
+
+Différenciation **confirmée par Ulrich dans cet échange** : Max retient, contourne puis lâche
+brusquement ; Emma cherche à agir, enchaîne, se corrige puis perd son assurance.
+Tous deux ont de rares éclairs très nets ; des arrêts et un élan d'espoir restent
+possibles. Aucun quota
+d'hésitations, aucune rotation obligatoire des états, aucun « euh » ajouté par
+post-traitement. Ne pas confondre leur vertige avec une amnésie inventée : leur
+lieu, les événements et ce que chacun sait restent canoniques.
+
+### Ce qui a été vérifié
+
+Lectures seules, code de main et MCP Lovable du projet Ava. **Correction de
+routage explicitement donnée par Ulrich : les sources Notion Ava sont TOUJOURS
+dans Gamilab**, voir [la règle permanente](../AGENTS.md#notion-ava--workspace-gamilab-obligatoire).
+Le `fetch self` précédent confirmait le workspace personnel Ulrich : il ne
+validait donc pas la cible Ava. Les `NOT_FOUND` ont été obtenus depuis cette
+mauvaise cible et ne démontrent aucun défaut de partage des fiches ni de sync.
+Aucune lecture directe de leur version actuelle dans Gamilab n'est revendiquée ;
+Ulrich confirme les copies synchronisées à jour. Les anciens IDs des fixtures
+ne sont pas les sources des profils sandbox actuels.
+
+| Couche | Constat vérifié | Conséquence / hypothèse à tester |
+| --- | --- | --- |
+| Fiches réellement synchronisées | Max Lorenzo et Emma Munz, champs Cloud datés du 24 octobre. Manière de parler contient déjà cinq états propres, phrases cassées, reprises, non-dit et refus du vocabulaire de psy. | Ajouter encore une consigne « hésite » ne traite pas à lui seul le problème. La priorité et la mise en jeu doivent être éprouvées. |
+| Posture de Max | Qui tu es dit « Tu es dans l'acceptation de la réalité : tu ne nies rien ». | Hypothèse de lissage : formulation trop générale. Distinguer connaissance des faits et incapacité à les absorber, sans autoriser un déni factuel. |
+| Réplique réellement délivrée | Session sandbox commencée à 15:31:52 UTC, un transfert persisté ; à T13 Emma commence par « Je me sens terrifiée » et poursuit avec « J'ai besoin de ». État déclaré : Les questions en cascade. | Écart textuel établi avec la fiche, avant même le rendu audio ; le nom d'état ne prouve pas son interprétation. Pas de nouvel enregistrement ni d'écoute automatisée. |
+| Réglages actifs | Rugosité épinglée de cette session : Max 3, Emma 2 ; mapping sandbox activé, version 2026-10-25T11:39:32.000Z. | Ce n'est pas simplement une rugosité restée à zéro. Le niveau 3 du directeur privilégie les états bloqués ; il peut favoriser un jeu monotone plutôt qu'une pensée vivante. |
+| Variante et budget | Réglage sandbox optimized_v3 : une à trois phrases généralement ; contrat commun de sortie : 45 mots maximum à 220 tokens et « achève ta réponse ». Température LLM enregistrée 1,4, top_p 0,9. | Le contrat autorise déjà les fragments mais la complétude sémantique reste ambiguë. Les règles 1–2 phrases concernent d'autres variantes. Ne pas leur attribuer directement l'essai actuel. Ne pas augmenter la température pour fabriquer du jeu. |
+| Sortie sûre | Le parseur permet déjà une suspension terminale ou un tiret volontaire à EOF ; il protège citations, identité, structures privées et troncatures. | Reformuler l'obligation de finir le tour sans obliger à finir la pensée. Ne pas ouvrir le parseur à toute phrase techniquement coupée. |
+| Rendu Gradium | prepareTextForGradium remplace les ellipses internes par des virgules, les finales par des points ; les tirets espacés sont lissés. | La rupture écrite perd son effet temporel. Le nettoyage avait une raison : éviter clics et hoquets ; ne pas seulement le supprimer. |
+| Mapping vers Gradium | Pour un état de parole, applyGradiumPerformance module seulement padding_bonus depuis pauses. Les champs émotion, instruction, delivery et speed n'y deviennent pas une direction d'acteur. Setup fixé avant le texte incrémental. | Le réglage peut faire varier le débit, sans garantir souffle, voix étranglée ou changement d'affect à l'intérieur d'une réplique. L'interface doit montrer cette portée réelle. |
+| Accueil | opening_line fixe joué avant génération : Max « Bonjour, qu'est-ce qui t'amène à me contacter ? » ; Emma « Bonjour. Qui êtes vous, que me voulez-vous ? ». | La première impression demande un chantier éditorial propre ; modifier le prompt seul ne la change pas. |
+
+### Changements proposés dans les fiches Notion
+
+Sources actives : [Max Lorenzo](https://app.notion.com/p/3f762322e59581ba8241c7f6b28f31fd)
+et [Emma Munz](https://app.notion.com/p/3f762322e59581f9880fe309adec7075).
+Les propositions suivantes visent leurs propriétés existantes ; pas de nouveau
+catalogue commun ni de réécriture des souvenirs/timelines. Relire les sources
+accessibles avant toute édition pour produire un diff exact.
+
+| Propriété | Max | Emma |
+| --- | --- | --- |
+| Identité fondamentale / Qui tu es | Faire du lendemain du carnage un présent encore impossible à absorber. Remplacer l'acceptation générale par la tension entre faits connus, refus intérieur et promesse de protéger devenue intenable. | Préciser que la compétence, les convictions et l'action maternelle tiennent par intermittence ; son assentiment de principe ne lui donne aucune sérénité pour Ava, son corps ou le couple. |
+| Manière de parler | Arrêts qui évitent un mot, détour pratique, phrase brusquement nette, puis perte d'appui. Une pensée abandonnée n'a pas besoin d'une conclusion de remplacement. | Phrase lancée pour agir, question qui déborde sur une autre, correction qui change le sens, reprise d'autorité pratique ; une pensée sur elle peut rester sans retour immédiat et automatique à Ava. |
+| Dynamique de la conversation | Vouloir un contact et se soustraire à ce qu'il oblige à dire. Faire sentir le désir de retrouver la famille sans le transformer en confession analysée. | Vouloir tenir la famille tout en n'arrivant plus à savoir comment ; pouvoir repousser une consolation, s'y accrocher un instant et la laisser retomber. |
+| Ce que tu ne fais jamais | Garder les interdits factuels et de confidence ; placer les comportements anti-exposé et anti-conclusion près des consignes positives de jeu. | Même principe ; vérifier particulièrement les sorties « Je me sens… », « J'ai besoin de… », explications psychologiques et fins qui résolvent tout. |
+| Tes états de parole | Garder les cinq noms. Affiner déclencheur, obstacle et issue possible, y compris éclat clair ou abandon. | Garder ses cinq noms. Retirer l'obligation de toujours compenser une rupture par une réponse nette ou un retour automatique au même sujet. |
+
+Brouillons de direction, **à valider, pas encore inscrits dans les fiches** :
+
+Max : « Tu sais ce qui s'est passé. Par moments tu peux même le dire très
+nettement ; puis ce que ces mots veulent dire pour Emma et les enfants te
+rattrape. Tu essaies de continuer et tu n'y arrives pas toujours. Tu peux
+laisser tomber cette pensée. Ne la remplace pas par une explication de toi-même.
+Quand tu promets que tu seras là, la promesse peut être nette ; comment y
+arriver, tu n'en sais rien. »
+
+Emma : « Tu commences souvent avec des mots et une chose à faire. Puis une
+autre pensée arrive trop vite, tu changes un mot, tu retires ce que tu venais
+de dire. Parfois tu peux seulement donner une consigne très claire. Ce que tu
+crois sur le principe ne suffit plus quand il s'agit d'Ava, de ton corps, de
+Max. Tu n'as pas à rendre cette contradiction compréhensible à ton interlocuteur
+dans la même réplique. »
+
+Exemples de calibration **inventés, non canoniques**, utilisables seulement si
+le sujet et le niveau de confidence sont déjà autorisés. Les ponctuations
+indiquent ici une intention ; elles ne garantissent aucun effet acoustique :
+
+- Max, morts évoquées : « Ils sont morts. Voilà. Je peux le dire. Mais après… »
+- Max, désir de famille : « Qu'on soit tous… enfin, Mona est pas là. Je sais.
+  Je sais bien. »
+- Max, espoir qui accélère : « Attends. Chez qui ? Ils ont pu… tu sais où ils
+  sont, ces gens ? » — réponse à une piste évoquée, jamais preuve de guérison.
+- Emma, transformation évoquée : « Moi, ça va. Non. J'en sais rien. Mais elle… »
+- Emma, éclat net : « Je la laisserai pas toute seule. »
+- Emma, refus d'une consolation : « Vous dites demain. Mais demain, elle va…
+  Attendez. »
+
+### App et code : ordre du travail après accord
+
+1. **Calibrer le texte avant de toucher aux voix.** Valider les deux directions
+   et un petit corpus de huit répliques : deux accueils, un blocage/reprise,
+   un espoir ou débordement par personnage. Inclure dans ces cas les morts,
+   la transformation, le lien familial et un éclair clair. Donner le contexte
+   et le niveau de confidence ; pas de phrases à réciter dans chaque appel.
+2. **Proposer le diff des seules propriétés utiles dans Notion.** Après accord
+   éditorial et accès direct aux sources, y appliquer les changements retenus,
+   puis synchroniser ces nouveaux champs vers sandbox-ulrich. La synchronisation
+   actuelle est déjà à jour et n'est pas à réparer. Comparer source,
+   copie et prompt final ; aucun rebuild RAG nécessaire pour ces seules
+   propriétés, aucun changement production. Vérifier le rendu et les plafonds
+   des quatre compilateurs avant de grossir les blocs protégés.
+3. **Lever les obstacles techniques aux champs Notion.** Dans le contrat commun, distinguer
+   fin technique normale et pensée inachevée. Remplacer l'attente de phrase
+   complète par une courte prise de parole qui peut rester ouverte, dans le
+   budget existant, sans ajouter une direction de jeu commune dans le code.
+   Conserver l'en-tête privé compact ; il doit pouvoir représenter les intentions
+   permises par la fiche, sans exiger une explication émotionnelle ni une réponse
+   résolue. Examiner la priorité à Bloqué imposée par le niveau 3 du directeur :
+   le curseur doit moduler les possibilités de la fiche, pas remplacer ses
+   déclencheurs ou forcer une variété. Vérifier
+   les prompts effectifs et quelques sorties, pas seulement la présence des
+   bonnes consignes. Ne changer modèle ou budget que si un échec résiduel
+   précis le justifie dans une proposition distincte.
+4. **Faire des pauses un effet réellement entendu.** Adapter les suspensions
+   volontaires après validation en contrôles Gradium autorisés. Documentation
+   WebSocket : break de 0,1 à 2 secondes ; première audition proposée autour
+   de 0,25 / 0,6 / 1 seconde, valeurs à écouter, pas prescriptions universelles.
+   Pas de pause sur chaque virgule ou après chaque fragment ; des accélérations
+   doivent rester possibles. Vérifier REST, streaming, frontières de segments,
+   mapping des mots/reçus et interruption pendant une pause ; préserver les
+   décisions mains libres existantes. Un silence intentionnel n'est ni une
+   panne réseau ni un déclencheur de secours. Pas de faux souffle ajouté avec
+   des mots ni de tag émotionnel spéculatif. Les mots restent identiques dans
+   les sous-titres et les preuves ; les tags ne viennent jamais du LLM.
+5. **Réglages lisibles et auditions bornées.** Garder Max 3 / Emma 2 pour
+   isoler d'abord les effets, avec témoin actuel ; comparer Emma 3 seulement
+   ensuite si utile. Montrer dans TTS Config ce que Gradium applique réellement
+   et ce qu'il ignore. Températures et voix conservées pour la comparaison.
+   Répertoire d'accueils distincts sans appel IA supplémentaire, en respectant
+   initial / transfert / retour. Quatre textes A/B au maximum puis finalistes,
+   cache de réécoute, coût/appels visibles ; pas de matrice fournisseurs.
+6. **Décider à l'oreille puis livrer.** Tester séparément les mots, les pauses
+   et l'affect vocal. Si les mots sont justes mais le timbre demeure détaché,
+   déclarer la limite de la voix actuelle et proposer une audition isolée de
+   deux alternatives au plus via le banc existant, après validation ; aucun
+   remplacement automatique du fournisseur actif. Vérifications ciblées,
+   qualité/E2E selon le contrat du dépôt, PR et CI requises, synchronisation
+   Lovable ; recette humaine Max/Emma avant toute demande de production.
+
+La documentation actuelle de Gradium décrit padding_bonus comme contrôle de
+débit et temp comme diversité, pas comme directions « peur » ou « sanglot ».
+Elle indique aussi cfg_coef ignoré par le nouveau modèle TTS ; ce champ ne
+doit donc pas être présenté comme un levier d'émotion. Compatibilité exacte du
+modèle/proxy Ava à vérifier avant tout ajustement. Sources primaires consultées
+le 25 octobre : [pauses WebSocket](https://docs.gradium.ai/guides/text-to-speech#flushing-and-pauses),
+[réglages](https://docs.gradium.ai/guides/voice-settings),
+[REST](https://docs.gradium.ai/guides/text-to-speech-rest).
+
+### Critères d'acceptation et invariants
+
+- Une réplique peut s'arrêter avant l'explication ; les morts et transformations
+  ont un poids perceptible sans exposition forcée ni confidence anticipée.
+- Max et Emma ne partagent pas un même bégaiement. Des phrases parfaitement
+  claires contrastent avec des pensées perdues. Aucune répétition mécanique
+  d'une amorce, d'un juron ou d'un motif de pause.
+- Une déclaration privée Bloqué ou Cascade ne vaut pas preuve d'acting.
+  Ulrich doit entendre la différence avec le témoin et reconnaître la retenue,
+  le souffle et l'espoir fragile ; quelques débordements, pas de mélodrame continu.
+- Les abandons grammaticaux balisés existants restent acceptés ; vrais échecs
+  de longueur, citations ouvertes, tags/identité privés et parole incertaine
+  restent refusés. Pas de réécriture après son ni de rejeu.
+- Un conflit affectif peut rester ouvert ; un refus de transfert ou sa
+  rétractation conserve son sens. Un accord courant est clair et réellement
+  délivré avant offre/clic. Le passage désormais fonctionnel reste acquis.
+- Cadre partagé experienceFrame, lieux, timeline, mémoires privées, scènes
+  autorisées, capture et décisions handsFreeVoice conservés. Pas de nouvel
+  appel LLM systématique, de configuration production ou de publication.
+- Mesurer premier son séparément des silences voulus et de la durée de voix ;
+  aucune latence ni qualité acoustique déduite des seuls tests simulés.
+
+**État de cette préparation :** plan local proposé ; aucun code, réglage Cloud,
+prompt Notion, sync, audition payante, nouvelle branche/PR/CI ou production
+modifiés/déclenchés. La revue directe Notion attend l'utilisation effective du
+MCP natif **Gamilab**. Diagnostic corrigé : les connexions notion_gamilab et
+notion_ulrich_fischer sont déjà configurées et activées ; le CLI 0.157.0 hors
+sandbox reconnaît leur authentification OAuth enregistrée. Dans la session,
+le démarrage MCP Gamilab renvoie pourtant « OAuth authorization required » ;
+la cause précise de cette divergence reste à établir. Cela ne démontre pas
+une expiration et ne justifie pas de refaire la connexion. Le plugin Notion
+utilisé précédemment répond pour Ulrich, ce qui ne valide pas la cible Ava.
+Le choix Gamilab est enregistré dans les instructions globales et du dépôt ;
+il n'est plus à redemander. Les demandes précédentes de partager les fiches
+avec Ulrich ou de rétablir la connexion n'étaient pas justifiées. Aucun
+identifiant modifié, login/logout lancé, navigateur ou déplacement des sources
+utilisé pour contourner ce point.
+
 ## Suite après recette — proposition du 25 octobre 2026
 
-**Statut : lot 3 autorisé et en cours ; lot 4 proposé, hors périmètre.** Le lot 2
+**Historique avant livraison : lot 3 alors en cours ; lot 4 proposé.** Le lot 2
 est livré par [#75](https://github.com/memoways/ava-proto1/pull/75), main
 `5b56c0e987b04caf98f09726dae8ed62bd2d61cc`. Sa recette humaine n'est pas
 acceptée. Cette section actualise la suite ; les bilans précédents restent
