@@ -1893,6 +1893,13 @@ for (const withOffer of [false, true]) {
       await sendHandoffTurn(page, text);
       await page.waitForLoadState('networkidle');
     }
+    // Audio/network quiescence is not completion of the asynchronous GM/CAS.
+    // This scenario resumes an existing offer, so establish that precondition
+    // before reload cancels the old turn and its still-pending evaluation.
+    if (withOffer) {
+      await expect(page.getByRole('button', { name: 'Appeler Max', exact: true })).toBeVisible();
+      await expect.poll(() => fakes.getSessionRow().pending_handoff).toMatchObject({ state: 'available' });
+    }
     await page.reload();
     let targetRequested = false;
     let release!: () => void;
@@ -1945,7 +1952,8 @@ for (const source of ['Max', 'Emma'] as const) for (const incrementalOutput of [
     await startCharacterConversation(page, source);
     for (let i = 0; i < 4; i++) await send(turns[i], i + 1);
     await expect(page.getByRole('button', { name: `Appeler ${target}`, exact: true })).toHaveCount(0);
-    expect(fakes.getSessionRow()).toMatchObject({ active_character: sourceKey, handoff_count: 0,
+    // A GM request count only proves dispatch, not the persisted decision.
+    await expect.poll(fakes.getSessionRow).toMatchObject({ active_character: sourceKey, handoff_count: 0,
       pending_handoff: { state: 'awaiting_character' } });
     await send(turns[4], 5);
     await expect(page.getByRole('button', { name: `Appeler ${target}`, exact: true })).toBeVisible();

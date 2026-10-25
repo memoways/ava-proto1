@@ -20,7 +20,9 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Replays minimaux rouges puis verts, tests au vrai point d'appel, évaluation GM
   historique simulée, reçus exacts et passages bidirectionnels jusqu'au clic.
   Qualité locale verte : 66 régression, 941 unitaires, 41 intégration, lint/types/build ;
-  78 E2E complets verts (12,7 minutes).
+  78 E2E complets verts (12,7 minutes). Deux attentes E2E prématurées révélées
+  par la première CI sont corrigées : état différé persisté et offre disponible
+  avant reload, 6/6 replays ciblés. Aucun changement runtime pour ce complément.
   [Plan et preuves de validation/livraison](docs/plan_parole_incarnee_personnages.md#exécution-du-lot-3--25-octobre-2026).
 - Base main vérifiée `5b56c0e987b04caf98f09726dae8ed62bd2d61cc` (#75).
   SHA final et CI PR/main seront inscrits dans le bilan de livraison GitHub,

@@ -142,6 +142,19 @@ Aucune configuration Cloud, fiche, mapping sandbox, voix, capture, décision mai
 libres, modèle, budget 950 ou timeout GM modifiés. GM code version
 `gm-2026-10-25-safe-response-handoff`. Pas de production ni de lot 4 commencé.
 
+**Complément CI avant fusion :** premier run
+[40200403020](https://github.com/memoways/ava-proto1/actions/runs/40200403020)
+rouge : 75 E2E verts, deux échecs et un scénario réussi seulement à la relance.
+Traces examinées, sans extrapolation au runtime réel : assertion v7 à
+666099,449 ms, CAS awaiting_character à 666170,2 ms (environ 71 ms après) ;
+reload du scénario de reprise à 640176,601 ms, écriture GM à 640240,3 ms.
+La fin audio, le départ de l'appel GM et networkidle ne prouvent pas sa
+persistance. Le test de reprise doit établir l'offre avant de la recharger.
+Correction limitée aux attentes E2E : poll de l'état différé réellement persisté,
+offre visible/persistée avant reload. Aucun délai ni garde runtime modifié.
+Les trois scénarios passent chacun deux fois (6/6, 49,6 s) après cette correction.
+Nouveau HEAD et CI exacte à vérifier avant fusion, sans relance aveugle du rouge.
+
 Référence protocole : [OpenRouter — streaming](https://github.com/OpenRouterTeam/docs/blob/main/api_reference/streaming.mdx)
 et [finish_reason](https://github.com/OpenRouterTeam/docs/blob/main/api_reference/overview.mdx),
 consultés le 25 octobre 2026. Architecture existante réutilisée, aucun nouvel appel
