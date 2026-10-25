@@ -175,6 +175,8 @@ export interface ConversationTurnTraceV1 {
     /** Rugosité de parole 0–3 épinglée à la session. */
     rugosite?: number;
     speechSettingsVersion?: string;
+    /** Neutral rendering is temporary when the authorized setting cannot be read. */
+    speechRuntimeStatus?: "available" | "timeout" | "unavailable";
     relationshipTier?: "contact" | "link" | "trust";
     hopeArcStage?: "contact" | "link" | "trust";
     /** optimized_v3 — état structuré lu avant le tour. */

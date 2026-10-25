@@ -3,9 +3,21 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-24 (audit : switching publié le 23 ; code A/B détecté sur le site servi, recette et clôture encore incomplètes)
+> **Last Updated**: 2026-10-25 (correctif QA rugosité vérifié en preview ; publication et clôture encore distinctes)
 
 ---
+
+## Correctif QA — ne pas couper une réponse pour un réglage lent (25 octobre 2026)
+
+Le réglage de rugosité devenu obligatoire pouvait couper Max/Emma avant leur
+réponse après seulement 600 ms d'attente. L'orchestrateur continue désormais
+avec un rendu neutre temporaire lorsque cette lecture échoue ou dépasse son
+délai ; la lecture autorisée et les réglages sauvegardés restent inchangés.
+L'indisponibilité est signalée et tracée, sans fausse version de réglage.
+Le tour suivant relit le snapshot ; aucun cache de repli ni requête en série
+supplémentaire. Batch et streaming partagent ce comportement et le GM attend
+toujours la parole livrée. 46 tests ciblés et compilation Lovable réussis.
+Écoute réelle et publication non réalisées ; clôture GitHub non vérifiée.
 
 ## Audit de publication du 24 octobre 2026
 
