@@ -2,9 +2,9 @@
 
 ## En cours
 
-- Correctif QA du 25 octobre : protéger les tours Max/Emma contre la lecture
-  lente/échouée de rugosité ; vérifier tests batch/streaming et diagnostic.
-  Publication et livraison GitHub restent distinctes.
+- Correctif QA du 25 octobre vérifié : 46 tests ciblés verts, compilation
+  Lovable verte ; tours Max/Emma préservés si lecture de rugosité indisponible.
+  Attend écoute réelle, publication et clôture GitHub (hors de cette vérification).
 
 - Lot A parole incarnée : correctifs et 863 tests verts en preview ; attend écoute
   humaine Max/Emma et mesure de latence. Code détecté sur le site publié le 24 octobre.

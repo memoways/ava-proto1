@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Correctif vérifié en preview — non republié] — 2026-10-25 — Lecture de rugosité non bloquante
+
+- Finding QA confirmé : l'attente de 600 ms rejetait le tour Max/Emma avant
+  génération en cas de lecture lente, d'erreur RPC ou de profil absent.
+- Repli au niveau de l'orchestrateur partagé batch/streaming : rugosité neutre
+  pour ce tour, historique vide et aucune proposition d'état GM reprise sans
+  réglage disponible. La réponse continue ; aucune nouvelle tentative en série.
+- La lecture autorisée reste stricte, sans modification Cloud, migration,
+  valeur admin ou snapshot. Le repli n'est pas mis en cache ; lecture retentée
+  au tour suivant. Une réponse RPC tardive ne change pas le tour déjà lancé.
+- Avertissement explicite et statut `available`/`timeout`/`unavailable` dans
+  la trace diagnostic ; aucune version de réglage inventée ou attribuée au GM.
+- 46 tests ciblés verts : Max/Emma, erreur, limite de 600 ms, streaming livré,
+  réponse tardive ignorée et retour au réglage sauvegardé au tour suivant.
+  Compilation Lovable verte. Aucun appel fournisseur audio réel réalisé.
+- Publication et clôture GitHub non réalisées par ce correctif ; PR #24
+  étrangère vérifiée en lecture et non touchée.
+
 ## [Audit de publication — clôture non complète] — 2026-10-24
 
 - **Lecture des statuts** : les mentions « Non publié » décrivent l'état à la date
