@@ -8,32 +8,17 @@
 
 import type { TTSProvider, TTSGenerateContext, TTSGenerateResult, TTSStreamPlaybackHandle, TTSStreamGenerationStats } from "@/services/tts/types";
 import { resolveGradiumSettings, type GradiumSettings } from "@/services/tts/providerSettings";
-import { applyGradiumPerformance } from "@/services/tts/performanceIntent";
+import { applyGradiumPerformance, resolveGradiumPauseSeconds } from "@/services/tts/performanceIntent";
 import type { PerformanceIntent } from "@/services/tts/performanceIntent";
 import { debugLogger } from "@/services/debugLogger";
-import { prepareTextForTTS } from "@/services/tts/textPrep";
-import { adaptGradiumEmotionalTags } from '../gradiumEmotionalTags';
+import { createGradiumSpeechPreparer, planGradiumSpeech, prepareTextForGradium } from '../gradiumSpeech';
+import { getSpeechPerformanceSettings } from '../speechPerformanceSettings';
 import { withTimeout } from "@/services/asyncUtils";
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { playAudioBlobRobust } from "@/services/audioPlayback";
 import { createGradiumStreamSession, createGradiumTurnSession, isStreamingSupported } from "@/services/tts/gradiumStreamPlayer";
 
-/**
- * Gradium-specific cleanup: ellipses, dashes and stray quotes/parentheses are
- * read as breaths, clicks or "hiccups" by the model — turn them into plain
- * punctuation it phrases cleanly.
- */
-export function prepareTextForGradium(text: string): string {
-  return adaptGradiumEmotionalTags(prepareTextForTTS(text), undefined, false)
-    .replace(/\s*\.{3}\s*(?=[A-Za-zÀ-ÿ0-9])/g, ", ")
-    .replace(/\.{3}/g, ".")
-    .replace(/\s+[—–-]\s+/g, ", ")
-    .replace(/[«»"“”()[\]]/g, "")
-    .replace(/([,;:!?.])\s*,/g, "$1")
-    .replace(/,\s*([.!?])/g, "$1")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
+export { prepareTextForGradium } from '../gradiumSpeech';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -69,6 +54,9 @@ function resolveRestFormat(format: GradiumSettings["outputFormat"]): GradiumSett
 
 async function generateGradiumSpeech(text: string, ctx: TTSGenerateContext | undefined, s: GradiumSettings): Promise<TTSGenerateResult> {
     const preparedText = prepareTextForGradium(text);
+    const pauseSeconds = resolveGradiumPauseSeconds(ctx?.performance, ctx?.characterKey);
+    const pauseRendering = planGradiumSpeech(text, pauseSeconds).some(part => part.type === 'pause') ? 'rest_unavailable' : 'disabled';
+    if (pauseRendering === 'rest_unavailable') debugLogger.log({ service: 'tts', level: 'warn', direction: 'out', label: 'TTS-GR REST: experimental pauses unavailable; cleaned speech preserved' });
     const voiceId = ctx?.voiceId || s.voiceId;
 
     const body = {
@@ -141,6 +129,7 @@ async function generateGradiumSpeech(text: string, ctx: TTSGenerateContext | und
         statusCode: response.status,
         firstByteMs: Math.round(tFirstByte - tRequest),
         totalMs: Math.round(tEnd - tRequest),
+        pauseRendering,
       },
     };
     } finally {
@@ -180,16 +169,17 @@ function createStreamingHandleWithFallback(
   s: GradiumSettings,
   ctx?: TTSGenerateContext,
 ): TTSStreamPlaybackHandle {
-  const preparedText = prepareTextForGradium(text);
+  const pauseSeconds = resolveGradiumPauseSeconds(ctx?.performance, ctx?.characterKey);
   const t0 = performance.now();
 
-  const session = createGradiumStreamSession(preparedText, {
+  const session = createGradiumStreamSession(text, {
     voiceId: ctx?.voiceId || s.voiceId,
     format: s.streamingFormat,
     jsonConfig: buildJsonConfig(s, ctx?.performance),
     bufferPreset: ctx?.bufferPreset,
     signal: ctx?.signal,
     onVoiceObservation: ctx?.onVoiceObservation,
+    prepareText: createGradiumSpeechPreparer(() => pauseSeconds),
   });
 
   // Single state machine: "ws" until a pre-audio failure flips it to "fallback".
@@ -249,7 +239,7 @@ function createStreamingHandleWithFallback(
     session.cancel("switching to REST fallback");
     const message = err instanceof Error ? err.message : String(err);
     console.warn(`[TTS-GR] WS streaming failed before audio (${message.slice(0, 120)}); falling back to REST`);
-    provider.generate(preparedText, ctx).then(
+    provider.generate(text, ctx).then(
       (result) => {
         if (cancelled) return;
         fallbackBlob = result.blob;
@@ -320,15 +310,25 @@ function createStreamingHandleWithFallback(
 /** Freezes the existing character voice and settings at turn preparation. */
 export function createGradiumIncrementalTurn(ctx: TTSGenerateContext, onProgress?: import("../gradiumStreamPlayer").GradiumStreamOptions["onProgress"]) {
   const s = resolveGradiumSettings(ctx.characterKey);
+  const speechSettings = getSpeechPerformanceSettings();
+  let intent = ctx.performance;
+  let appended = false;
+  const prepareText = createGradiumSpeechPreparer(() => resolveGradiumPauseSeconds(intent, ctx.characterKey, speechSettings));
   const session = createGradiumTurnSession({
     voiceId: ctx.voiceId || s.voiceId,
     format: s.outputFormat === "pcm_24000" ? "pcm_24000" : "pcm_48000",
     jsonConfig: buildJsonConfig(s, ctx.performance), bufferPreset: ctx.bufferPreset, signal: ctx.signal,
     onVoiceObservation: ctx.onVoiceObservation, onProgress,
     deferSetup: Boolean(ctx.resolveSpeechPerformance),
+    prepareText,
   });
+  const append = session.appendText;
   return Object.assign(session, {
-    setPerformance: (intent: PerformanceIntent) => { ctx.performance = intent; session.configure(buildJsonConfig(s, intent)); },
+    appendText: (text: string) => { appended = true; append(text); },
+    setPerformance: (value: PerformanceIntent) => {
+      if (appended) return;
+      intent = value; ctx.performance = value; session.configure(buildJsonConfig(s, value));
+    },
     generateFallback: (text: string, signal: AbortSignal) => generateGradiumSpeech(text, { ...ctx, signal }, s),
   });
 }

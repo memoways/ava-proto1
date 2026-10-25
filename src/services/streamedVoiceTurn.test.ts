@@ -40,6 +40,21 @@ describe('P1 streamed voice delivery',()=>{
   expect(session.setPerformance.mock.invocationCallOrder[0]).toBeLessThan(session.appendText.mock.invocationCallOrder[0]);
   expect(receipt).not.toHaveBeenCalled();t.cancel();
  });
+ it('preserves words and receipts when interrupted inside a suspension before its continuation', async () => {
+  const { session, start } = setup(), controller = new AbortController(), onReceipt = vi.fn(), fallback = vi.fn();
+  session.hasAudibleOutput = true;
+  const voice = prepareStreamedVoiceTurn({ ...ctx, signal: controller.signal }, { onReceipt, fallback, onPlaybackStart: vi.fn() });
+  voice.onEvent({ type: 'segment', text: 'Oui… attends.' });
+  voice.onEvent({ type: 'segment', text: 'La suite.' });
+  expect(session.appendText).toHaveBeenNthCalledWith(1, 'Oui… attends.');
+  start.resolve(); await Promise.resolve();
+  // The clock has crossed silence, but no timestamp for "attends" has passed.
+  session.progress.mockReturnValue({ scheduledSamples: 48000, playedSamples: 24000, sampleRate: 24000, confirmedText: 'Oui' });
+  controller.abort('player-barge-in');
+  expect(onReceipt.mock.calls[0][0]).toMatchObject({ delivered: '', uncertain: 'Oui… attends. La suite.', status: 'interrupted' });
+  await expect(voice.delivery).rejects.toThrow('No confirmed');
+  expect(fallback).not.toHaveBeenCalled();
+ });
  it('keeps intention out of TTS and finalizes only when the samples finished',async()=>{
   const {session,start,gen,end}=setup(),receipt=vi.fn(),fallback=vi.fn(),onPlaybackStart=vi.fn();const t=prepareStreamedVoiceTurn(ctx,{onReceipt:receipt,fallback,onPlaybackStart});
   t.onEvent({type:'intent',intent:{goal:'secret',points:[]}});expect(session.appendText).not.toHaveBeenCalled();

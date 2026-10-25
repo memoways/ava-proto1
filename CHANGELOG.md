@@ -4,6 +4,25 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [A2 — pauses Gradium expérimentales] — 2026-10-25
+
+- Ruptures explicites de parole validée converties en breaks WS officiels,
+  séparés des mots ; commandes d'entrée filtrées et nettoyage anti-hoquet conservé.
+- Activation JSON d'environnement `gradiumPausesEnabled` absente/false par
+  défaut, prod fermée. Mapping du personnage/version exigé ; essais bornés
+  0,25/0,6/1 s, huit pauses maximum par tour. Aucun réglage sauvegardé ou activé.
+- Samples silencieux et timestamps conservent les reçus, l'annulation et la
+  reprise sans rejeu ; REST nettoyé sans pause contrôlée, différence diagnostiquée.
+- Base main A1 vérifiée : `e006db65419c70b345abbe735d783f47257e7559` (#77).
+  Qualité locale verte : lint/types/build, 66 régressions, 987 unitaires,
+  41 intégrations ; 78 E2E verts sans retry, 12,9 minutes. Livraison GitHub et
+  Lovable à vérifier dans le bilan de PR.
+  [Plan, preuves et état de livraison A2](docs/plan_lot_b_rendu_vocal.md#exécution-a2--25-octobre-2026).
+  SHA final/CI dans le bilan GitHub, sans commit circulaire pour son propre SHA.
+- Recette humaine et raccord WS du banc A3 restent distincts ; aucune audition
+  ni qualité acoustique revendiquée. Aucune publication production, fiche Notion,
+  sync, voix, modèle, température, mapping ou budget modifié.
+
 ## [A1 — pensée ouverte] — 2026-10-25
 
 - Fin technique normale distinguée de la pensée achevée ; phrases ou fragments

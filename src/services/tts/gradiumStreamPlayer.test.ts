@@ -8,6 +8,7 @@ vi.mock('@/services/audioPlayback', () => ({getSharedAudioContext: () => ({ ...m
 vi.mock('@/services/gameAuth', () => ({authenticatedFunctionFetch: vi.fn(async()=>new Response(JSON.stringify({token:'test'})))}));
 import {createGradiumTurnSession, createGradiumStreamSession} from './gradiumStreamPlayer';
 import {authenticatedFunctionFetch} from '../gameAuth';
+import { createGradiumSpeechPreparer } from './gradiumSpeech';
 class Socket {
   static all: Socket[]=[];
   sent: {type:string;text?:string;voice_id?:string}[]=[];
@@ -80,6 +81,47 @@ describe('Gradium incremental turn',()=>{
   });
   it('keeps whole-segment compatibility and rejects append after finish',async()=>{
     const session=createGradiumStreamSession('Oui.',opts),ws=await socket();expect(ws.sent.map(x=>x.type)).toEqual(['setup','text','end_of_stream']);expect(()=>session.appendText('Non.')).toThrow('after finish');session.cancel();
+  });
+  it('treats provider silence as samples, never as delivery of the following words, and resumes without replay', async () => {
+    const session = createGradiumTurnSession({ ...opts, prepareText: createGradiumSpeechPreparer(() => 1) }), ws = await socket();
+    session.appendText('Oui… attends.'); session.open(); session.finish();
+    expect(ws.sent.find(m => m.type === 'text')?.text).toBe('Oui <break time="1s" /> attends.');
+    // Simulated 0.4s speech, 1s provider silence, 0.4s continuation.
+    ws.message(audio(1.8));
+    ws.message({ type: 'text', text: 'Oui', start_s: 0, stop_s: 0.4 });
+    ws.message({ type: 'text', text: ' <break time="1s" /> ', start_s: 0.4, stop_s: 1.4 });
+    ws.message({ type: 'text', text: ' attends.', start_s: 1.4, stop_s: 1.8 });
+    ws.message({ type: 'end_of_stream' });
+    await session.started;
+    const stats = await session.generationDone;
+    expect(stats).toMatchObject({ underrunCount: 0, rebufferCount: 0 });
+    let ended = false; void session.finished.then(() => { ended = true; });
+    mock.clock.currentTime = 0.9;
+    expect(session.progress().confirmedText).toBe('Oui');
+    expect(session.progress().scheduledSamples).toBe(43200);
+    session.attenuate(); session.pause();
+    mock.clock.currentTime = 2;
+    expect(session.progress().confirmedText).toBe('Oui'); expect(ended).toBe(false);
+    expect(session.resume()).toBe(true);
+    expect(mock.sources).toHaveLength(2);
+    expect(session.progress().scheduledSamples).toBe(43200);
+    expect(ws.sent.filter(m => m.type === 'setup')).toHaveLength(1);
+    mock.clock.currentTime = 3.2; mock.sources[1].onended?.();
+    await session.finished;
+    expect(session.progress()).toMatchObject({ playedSamples: 43200, confirmedText: 'Oui attends.' });
+  });
+  it('cancels a terminal suspension with an exact frozen cursor and ignores stale callbacks', async () => {
+    const session = createGradiumTurnSession({ ...opts, prepareText: createGradiumSpeechPreparer(() => 1) }), ws = await socket();
+    session.appendText('Mais elle…'); session.finish(); session.open();
+    ws.message(audio(1.4)); ws.message({ type: 'text', text: 'Mais elle', start_s: 0, stop_s: 0.4 });
+    ws.message({ type: 'end_of_stream' }); await session.started;
+    const staleMessage = ws.onmessage, staleEnd = mock.sources[0].onended;
+    mock.clock.currentTime = 0.9; session.pause(); session.cancel('player-barge-in');
+    const frozen = session.progress(); expect(frozen.confirmedText).toBe('Mais elle');
+    expect(frozen.playedSamples).toBeLessThan(frozen.scheduledSamples);
+    mock.clock.currentTime = 8; staleEnd?.(); staleMessage?.({ data: JSON.stringify(audio(1)) } as MessageEvent);
+    expect(session.progress()).toEqual(frozen); expect(session.resume()).toBe(false);
+    await expect(session.finished).rejects.toMatchObject({ name: 'AbortError' });
   });
   it('exposes comparable buffer presets and software underrun measurements', async()=>{
     const session=createGradiumTurnSession({...opts, bufferPreset:'160'}),ws=await socket();

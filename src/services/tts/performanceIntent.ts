@@ -9,6 +9,7 @@
 import type { TTSProviderId } from "./types";
 import { getActiveEnvironment } from '../environmentContext';
 import { getSpeechPerformanceSettings, type SpeechPerformanceSettings } from './speechPerformanceSettings';
+import type { GradiumPauseSeconds } from './gradiumSpeech';
 
 export type CanonicalEmotion =
   | "neutral"
@@ -369,6 +370,17 @@ export function composeHumeDescription(baseline: string, intent?: PerformanceInt
   const parts = [baseline.trim(), intent?.actingNl?.trim()].filter(Boolean);
   if (parts.length === 0) return undefined;
   return parts.join("; ").slice(0, 100);
+}
+
+/** Only an authorized state mapping may enable the experimental WS pauses. */
+export function resolveGradiumPauseSeconds(intent: PerformanceIntent | null | undefined, characterKey?: string,
+  settings = getSpeechPerformanceSettings()): GradiumPauseSeconds | undefined {
+  if (getActiveEnvironment() === 'prod' || !settings.enabled || settings.gradiumPausesEnabled !== true
+    || intent?.source !== 'speech_state' || !intent.mappingVersion || intent.mappingVersion !== settings.version
+    || !intent.speechState || !characterKey) return undefined;
+  const mapping = settings.byCharacter?.[characterKey]?.[intent.speechState];
+  if (!mapping || mapping.pauses !== intent.pauses) return undefined;
+  return { short: 0.25, normal: 0.6, long: 1 }[mapping.pauses] as GradiumPauseSeconds | undefined;
 }
 
 export interface ElevenLabsVoiceShaping {

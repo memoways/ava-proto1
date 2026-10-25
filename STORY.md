@@ -3,9 +3,27 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-25 (A1 pensée ouverte ; qualité/E2E locaux verts, recette humaine distincte)
+> **Last Updated**: 2026-10-25 (A2 pauses WS expérimentales désactivées ; recette humaine distincte)
 
 ---
+
+## A2 — faire une place au silence (25 octobre 2026)
+
+A1 permettait déjà à la pensée de rester ouverte. Gradium recevait pourtant
+encore ses ruptures comme une ponctuation ordinaire : le nettoyage protégeait
+des hoquets, mais effaçait le temps d'arrêt. L'adaptateur peut maintenant produire
+des pauses contrôlées sur le chemin WebSocket, après validation de la parole,
+sans changer les mots conservés en session. Un silence ne prouve jamais que la
+reprise a été entendue ; il traverse le même curseur audio et peut être interrompu
+ou suspendu puis repris sans recommencer la phrase.
+
+L'expérience reste fermée par défaut. Les essais de durée sont des valeurs à
+écouter, pas du jeu vocal accepté. Le repli REST garde les mots nettoyés et
+signale l'absence de pause contrôlée ; le banc actuel fournit ce témoin, son
+raccord WS restant A3. Aucun souffle, sanglot, affect ou gain de latence n'est
+déduit des tests simulés. Voix, mapping sandbox et fiches restent inchangés.
+
+[Protocole, tests, limites et livraison A2](docs/plan_lot_b_rendu_vocal.md#exécution-a2--25-octobre-2026).
 
 ## A1 — laisser la pensée ouverte (25 octobre 2026)
 

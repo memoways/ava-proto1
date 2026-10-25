@@ -17,6 +17,7 @@ import { getSharedAudioContext } from "@/services/audioPlayback";
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { createTimeoutSignal, TimeoutError } from "@/services/asyncUtils";
 import { debugLogger } from "@/services/debugLogger";
+import { stripGradiumControlMarkup } from './gradiumSpeech';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const TOKEN_ENDPOINT = `${SUPABASE_URL}/functions/v1/proxy-tts-gradium`;
@@ -49,6 +50,8 @@ export interface GradiumStreamOptions {
   /** temp / cfg_coef / padding_bonus / rewrite_rules / pronunciation_id */
   jsonConfig: Record<string, unknown>;
   deferSetup?: boolean;
+  /** Adapter-owned compiler, called only on validated speech units. */
+  prepareText?: (text: string) => string;
   /** Lab-only playback buffer choice. Omitting it preserves the current 300/200 ms behaviour. */
   bufferPreset?: GradiumBufferPreset;
   signal?: AbortSignal;
@@ -465,7 +468,9 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
       && Number.isFinite(msg.stop_s) && msg.stop_s >= 0) {
       if (timestamps.length >= 4000) { fail(new Error("Gradium timestamp buffer exceeded")); return; }
       if (!timestamps.length || msg.stop_s >= timestamps[timestamps.length - 1].stop) {
-        timestamps.push({ text: msg.text, stop: msg.stop_s }); notifyProgress();
+        const words = stripGradiumControlMarkup(msg.text);
+        if (words.trim()) timestamps.push({ text: words, stop: msg.stop_s });
+        notifyProgress();
       }
     } else if (msg.type === "end_of_stream" || msg.type === "eos") {
       if (firstByteMs === null) {
@@ -557,7 +562,9 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
       if (!text.trim()) return;
       submittedChars += text.length;
       if (submittedChars > 12000) { fail(new Error("Gradium text buffer exceeded")); throw new Error("Gradium text buffer exceeded"); }
-      pendingText.push(text); sendPendingText();
+      const wireText = opts.prepareText ? opts.prepareText(text) : text;
+      if (wireText.trim()) pendingText.push(wireText);
+      sendPendingText();
     },
     finish() {
       if (cancelled || finishRequested) return;

@@ -21,6 +21,23 @@ personnages. L'exécution app commence par le
 [prompt autonome du lot A1](prompt_reprise_parole_ouverte_lot_a1.md), qui conserve
 ce plan et laisse l'édition/synchronisation à Ulrich pendant son travail.
 
+### Correction technique A2 — 25 octobre 2026
+
+Après A1 (#77, main `e006db65419c70b345abbe735d783f47257e7559`), l'adaptateur
+Gradium peut convertir une rupture explicite de la parole validée en un break
+WebSocket officiel. Les parties de contrôle restent à la frontière TTS ; mots,
+texte de session et reçus restent originaux. L'option JSON par environnement
+`gradiumPausesEnabled` est absente donc désactivée, et toujours refusée en prod.
+Le mapping validé fixe l'essai court/normal/long à 0,25/0,6/1 seconde, borné à
+huit pauses par tour. Les paramètres existants et le nettoyage anti-hoquet sont
+conservés. REST reste un repli nettoyé sans pause contrôlée attestée.
+
+Le [bilan opérationnel A2](plan_lot_b_rendu_vocal.md#exécution-a2--25-octobre-2026)
+documente protocole, limites, activation, simulations et livraison. Le banc
+existant REST peut préparer les témoins ; son raccord WS reste au lot A3.
+Aucune écoute ni amélioration vocale mesurée, aucune acceptation humaine,
+édition Notion, sauvegarde de réglages ou publication production dans A2.
+
 ### Correction technique A1 — 25 octobre 2026
 
 Qualité locale verte (66 régressions, 967 unitaires, 41 intégrations, lint/types/build),

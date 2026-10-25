@@ -196,6 +196,96 @@ arrière :** désactiver les pauses expérimentales sandbox. **Sortie :** pauses
 acceptées sur le corpus, sans clic/hoquet ; voix étranglée et souffle restent
 des qualités à juger séparément, pas des capacités garanties par break.
 
+### Exécution A2 — 25 octobre 2026
+
+Base A1 `e006db65419c70b345abbe735d783f47257e7559` (#77), checkout canonique
+à jour, branche unique `codex/ava-a2-audible-pauses`. PR étrangère #24 sans
+recoupement ; ses fichiers et les 16 branches locales étrangères sont conservés.
+Lovable cible vérifiée : `1265958d-b74e-40f2-917d-182fe05163fc`.
+
+**Protocole vérifié le 25 octobre.** Le [guide WebSocket Gradium](https://docs.gradium.ai/guides/text-to-speech)
+documente `<break time="1.5s" />`, borné de 0,1 à 2 secondes, entouré d'espaces.
+`<flush>` force la génération du contexte déjà envoyé, sans durée de pause :
+A2 n'en a pas besoin. Les messages texte successifs ajoutent un espace ; on
+envoie des unités validées, avec mots et ponctuation attachés, jamais des tokens
+SSE ni une ponctuation isolée. La [référence WS](https://docs.gradium.ai/api-reference/endpoint/tts-websocket)
+décrit audio PCM et timestamps texte `start_s`/`stop_s`. Le lecteur suit les
+samples, y compris le silence renvoyé, sans timer de pause applicatif ; ce
+comportement est vérifié ici sur un fournisseur simulé, sans mesure acoustique.
+L'exemple de [l'intégration libre LiveKit](https://docs.livekit.io/reference/python/livekit/plugins/gradium/)
+confirme le schéma setup/text/audio/EOS ; aucun SDK ajouté.
+
+Le [contrat REST](https://docs.gradium.ai/guides/text-to-speech-rest) distingue
+audio brut et flux JSON. Le proxy Ava utilise `only_audio=true` : pas de
+timestamps exploitables. L'équivalence des breaks avec ce chemin REST n'est
+pas suffisamment établie par les exemples consultés ; **repli sans pause
+contrôlée**, avec nettoyage historique et mêmes mots. Aucun message WS dans
+le POST. La métadonnée `pauseRendering: rest_unavailable` et un diagnostic
+explicite signalent cette différence si des ruptures étaient éligibles.
+Proxy Cloud et secrets inchangés ; aucune intervention Cloud dans A2.
+
+**Implémentation.** `gradiumSpeech.ts` sépare les parties texte et pause, retire
+les commandes provenant de l'entrée avant tout nettoyage, puis sérialise les
+seuls breaks construits par l'adaptateur. Les points de suspension et les tirets
+de rupture explicites sont éligibles ; virgules, traits d'union lexicaux et
+réponses nettes n'ajoutent rien. Essais `short=0,25`, `normal=0,6`, `long=1`
+seconde, huit pauses au maximum par tour (maximum ajouté de huit secondes),
+sans bruit aléatoire. Les ruptures supplémentaires gardent le nettoyage
+historique. Aucun ralentissement global supplémentaire, appel LLM ou socket.
+
+`performanceIntent.ts` exige une intention `speech_state`, un état et une
+version correspondant au mapping du personnage et l'activation sandbox.
+Le setup est toujours fixé avant le premier segment ; la configuration ne
+change plus après append. `streamedVoiceTurn` envoie la parole validée brute
+à l'adaptateur, conserve les textes originaux et compare les mots nettoyés aux
+timestamps audibles. Les éventuels contrôles renvoyés dans un timestamp sont
+filtrés. Silence généré ou EOS ne suffit pas pour confirmer les mots suivants.
+Les reçus restent conservateurs par unité validée, sans proportion texte/audio
+inventée. Arrêt, candidat réversible, reprise, annulation et callbacks périmés
+gardent les barrières existantes ; aucun rejeu après samples programmés.
+Buffers, bornes réseau, récupération préalable et mains libres inchangés.
+
+**Activation : désactivée, non sauvegardée.** Nouveau booléen optionnel
+`gradiumPausesEnabled` dans le JSON d'environnement `ava_speech_performance` ;
+absent/false, mapping inactif, rugosité 0, état/version invalide ou prod →
+nettoyage historique sans break. Pas de migration ni d'interface A3 ajoutée.
+Un futur essai doit modifier uniquement ce booléen dans une copie isolée des
+réglages, préserver version et mapping ; aucun essai live ni sauvegarde réalisés
+ici. Le mapping sandbox `2026-10-25T11:39:32.000Z`, Max 3 / Emma 2, les voix,
+modèles, températures et budgets 220/950 sont conservés. Tags émotionnels fermés.
+
+**Audition courte préparée, non exécutée.** Dans le banc existant : Max 3,
+« Allô ? Oui… c'est vous qui deviez… Oui. » puis Emma 2,
+« Je la laisserai pas toute seule. » et « Moi, ça va. Non. J'en sais rien.
+Mais elle… ». Exemples non canoniques, contexte à approuver, même voix et même
+mapping ; noter mots, durée de silence, clic/hoquet et naturel, une seule écoute
+à la demande. Le banc actuel utilise REST : il fournit le témoin nettoyé et ne
+peut **pas** accepter les pauses WS d'A2. Le raccord d'audition au transport WS
+reste dans A3 (hors périmètre explicite), sans nouveau banc ni matrice.
+Les simulations A2 vérifient le protocole et les samples ; aucune audition,
+durée acoustique réelle, latence réelle, souffle, sanglot ou affect n'est revendiqué.
+Cette limite n'empêche pas la livraison technique désactivée et interdit
+l'activation ou une déclaration d'acceptation humaine.
+
+**Vérifications locales.** 20 tests du compilateur/adaptateur final verts ;
+les suites lecteur/reçus couvrent aussi silence PCM simulé, EOS avant drain,
+curseur conservé, annulation et callbacks tardifs. `npm run test:quality` vert :
+lint/types/build, **66 régressions, 987 unitaires et 41 intégrations**. Les deux
+premiers échecs ciblés ont permis de corriger les ruptures adjacentes séparées
+seulement par de la ponctuation ; l'écart d'espace inter-message est normalisé
+dans la comparaison, conformément au protocole. Avertissements préexistants
+useCallback et taille des chunks. **78/78 E2E verts sans retry, 12,9 minutes**,
+sur le code final, Chromium et média Firefox/WebKit ; le premier
+lancement sandbox a été arrêté avant tout test (port local interdit), puis
+relancé avec l'accès système nécessaire sans changer le code ou les protections.
+
+**Livraison :** CI PR sur HEAD exact, squash, CI main/E2E, synchronisation du
+même SHA Lovable et preview connectée à vérifier. Les résultats exacts seront
+consignés dans le bilan GitHub ; aucune publication production.
+Notion `self` vérifie le workspace Ulrich, mauvaise cible Ava : aucune lecture
+de fiche, édition, tâche doublon, sync ou RAG ; faits durables non sauvegardés
+dans Gamilab, travail technique poursuivi conformément à la demande.
+
 ### A3 — rendre les réglages et le banc d'écoute fiables
 
 **Résultat observable :** l'admin montre ce qui est réellement envoyé au

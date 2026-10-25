@@ -103,7 +103,7 @@ export function prepareStreamedVoiceTurn(context: TTSGenerateContext & { charact
         }
         segments.push(event.text); generated = segments.join(' ');
         if (!audioError) {
-          try { session.appendText(prepareTextForGradium(event.text)); session.open(); }
+          try { session.appendText(event.text); session.open(); }
           catch (error) { audioError = error; }
         }
       } else if (event.type === 'complete') {
