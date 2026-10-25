@@ -117,6 +117,23 @@ Cursor, Lovable, autres). Ne jamais attendre qu'il la répète, ne jamais demand
   doublon.
 - Le compte rendu final doit contenir un lien direct vers le plan sauvegardé.
 
+## Prompt de reprise à chaque clôture (obligatoire)
+
+- Lorsqu'un prochain lot est identifié, livrer son prompt autonome dans le même
+  tour que la clôture : `docs/prompt_reprise_<sujet>_lot_<id>.md`.
+- Le prompt contient l'état vérifié, les sources, le périmètre, les invariants,
+  les validations, la livraison attendue et la première action exécutable.
+  Distinguer livraison technique et recette humaine ; actualiser le plan existant.
+- Donner le lien direct du prompt dans le compte rendu final. Un simple nom de
+  prochain lot ou une proposition de le préparer plus tard ne suffit pas.
+- Inclure cette même obligation dans le prompt transmis. Si aucun lot ne suit,
+  le dire explicitement. Cette passation ne lance pas le lot suivant.
+
+Les corrections strictement documentaires appliquent l'exception CI personnelle
+« ignorer les lots purement documentaires » : relire contenu, liens et diff,
+vérifier que le code est inchangé et citer sa dernière CI verte. Les contrôles
+CI sur le HEAD exact et sur main restent obligatoires pour les lots de code.
+
 - The shared experience frame (volunteer role, seen/unseen path, posture) is built only by `src/services/experienceFrame.ts` from the published orchestration config and injected identically into the character prompt and the GM prompt — why: no divergence between what GM and characters know.
 - The initial film answer is factual session context shared through the experience frame regardless of editorial frame activation; intro replay must preserve it — why: watching the project introduction does not mean watching the film.
 - Character speech runtime is resolved by the session-scoped authorized RPC; orchestration uses uncached neutral styling on a bounded lookup failure, records its unavailable/timeout status without inventing a settings version, and retries next turn; every prompt compiler selects the character's own speaking field, and only delivered, validated states enter the GM log — why: optional styling must not silence characters or misrepresent authorized snapshots.

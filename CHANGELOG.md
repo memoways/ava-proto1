@@ -4,6 +4,19 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Passation A2 → A3] — 2026-10-25
+
+- [Prompt autonome A3](docs/prompt_reprise_reglages_auditions_lot_a3.md) livré :
+  réglages fidèles, audition WS A2 isolée du live, cache/rejeu et validations.
+- Base app A2 vérifiée : `a63ee8a379dcee47346903b43efab2e627f9ed7c` (#78),
+  CI PR/main vertes, Lovable synchronisé et preview vérifiée. Rendu expérimental
+  toujours désactivé ; écoute humaine et publication production distinctes.
+- Clôture du dépôt : prompt du prochain lot obligatoire dans le même tour,
+  enregistré, lié et transmis à l'agent suivant. A3 doit livrer celui d'A4.
+- Correction exclusivement documentaire ; aucun code, réglage ou contenu
+  éditorial modifié. Exception CI documentaire appliquée, validations app A2
+  conservées et liens/reprise relus.
+
 ## [A2 — pauses Gradium expérimentales] — 2026-10-25
 
 - Ruptures explicites de parole validée converties en breaks WS officiels,
