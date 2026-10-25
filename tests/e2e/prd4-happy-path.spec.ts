@@ -1987,7 +1987,7 @@ for (const source of ['Max', 'Emma'] as const) {
     await startCharacterConversation(page, source);
     for (const text of turns.slice(0, 4)) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
     await expect(page.getByRole('button', { name: /^Appeler / })).toHaveCount(0);
-    expect(JSON.stringify(fakes.getSessionRow())).toContain('consent_reference_invalid');
+    await expect.poll(() => JSON.stringify(fakes.getSessionRow())).toContain('consent_reference_invalid');
     expect(fakes.getSessionRow()).toMatchObject({ active_character: source.toLowerCase(), handoff_count: 0 });
     await sendHandoffTurn(page, turns[4]);
     await expect(page.getByRole('button', { name: `Appeler ${target}`, exact: true })).toBeVisible();
@@ -2014,9 +2014,9 @@ for (const source of ['Max', 'Emma'] as const) {
     await sendHandoffTurn(page, turns[4]);
     await expect(page.getByRole('button', { name: `Appeler ${target}`, exact: true })).toBeVisible();
     await page.waitForLoadState('networkidle');
-    const proposed = fakes.getExperienceEvents().filter(e => e.event_type === 'handoff_proposed');
-    expect(proposed.map(e => e.turn_index)).toEqual([5]);
-    expect(fakes.getExperienceEvents().some(e => e.payload.blockedReason === 'gm_late')).toBe(true);
+    await expect.poll(() => fakes.getExperienceEvents().filter(e => e.event_type === 'handoff_proposed')
+      .map(e => e.turn_index)).toEqual([5]);
+    await expect.poll(() => fakes.getExperienceEvents().some(e => e.payload.blockedReason === 'gm_late')).toBe(true);
     expect(fakes.getSessionRow().pending_handoff).toMatchObject({ turnIndex: 5, state: 'available' });
     await page.getByRole('button', { name: `Appeler ${target}`, exact: true }).click();
     await expect(page.getByRole('img', { name: `Portrait d’${target}` })).toBeVisible({ timeout: 10_000 });

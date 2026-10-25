@@ -155,6 +155,16 @@ offre visible/persistée avant reload. Aucun délai ni garde runtime modifié.
 Les trois scénarios passent chacun deux fois (6/6, 49,6 s) après cette correction.
 Nouveau HEAD et CI exacte à vérifier avant fusion, sans relance aveugle du rouge.
 
+Le [second run 40202367382](https://github.com/memoways/ava-proto1/actions/runs/40202367382)
+a validé 77 scénarios, dont les trois attentes corrigées, mais a révélé une
+assertion T9 Max encore immédiate sur le journal GM. Le reçu et le tour étaient
+présents ; le journal asynchrone n'était pas encore écrit au point de lecture.
+Même correction pour le journal, et audit des assertions d'événements des
+nouveaux tests tardifs : attente explicite du motif consent_reference_invalid et de
+l'offre/audit courant, sans délai fixe. Quatre scénarios T9/tardif, chacun deux
+fois : **8/8 verts**, 1 minute. Complément limité aux tests et à ce bilan ;
+aucun nouveau correctif runtime ni assouplissement des résultats attendus.
+
 Référence protocole : [OpenRouter — streaming](https://github.com/OpenRouterTeam/docs/blob/main/api_reference/streaming.mdx)
 et [finish_reason](https://github.com/OpenRouterTeam/docs/blob/main/api_reference/overview.mdx),
 consultés le 25 octobre 2026. Architecture existante réutilisée, aucun nouvel appel
