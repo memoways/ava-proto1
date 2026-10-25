@@ -2,10 +2,14 @@
 
 ## Exécution coordonnée Notion / app — 25 octobre 2026
 
-**Statut : A1 implémenté et vérifié localement ; livraison exacte dans le bilan de sa PR. A2–A4 non commencés.** Cette section est le plan
+**Statut : A1 et A2 livrés ; A3 est le prochain lot, A4 reste à faire.** A2 est
+dans main `a63ee8a379dcee47346903b43efab2e627f9ed7c`, CI PR/main vertes,
+Lovable synchronisé et preview vérifiée ; pauses expérimentales désactivées.
+Le [prompt autonome A3](prompt_reprise_reglages_auditions_lot_a3.md) est livré
+pour la reprise. Cette section est le plan
 opérationnel courant ; elle remplace les découpages historiques ci-dessous.
 
-**Reprise après redémarrage — 25 octobre 2026 :** Ulrich travaille dans Notion
+**Historique de reprise A1 — 25 octobre 2026 :** Ulrich travaille dans Notion
 sur les champs prompts ; la préparation app doit avancer indépendamment, sans
 édition de ces champs ni synchronisation automatique. Le
 [prompt autonome A1](prompt_reprise_parole_ouverte_lot_a1.md) est prêt pour
@@ -279,9 +283,19 @@ sur le code final, Chromium et média Firefox/WebKit ; le premier
 lancement sandbox a été arrêté avant tout test (port local interdit), puis
 relancé avec l'accès système nécessaire sans changer le code ou les protections.
 
-**Livraison :** CI PR sur HEAD exact, squash, CI main/E2E, synchronisation du
-même SHA Lovable et preview connectée à vérifier. Les résultats exacts seront
-consignés dans le bilan GitHub ; aucune publication production.
+**Livraison vérifiée :** [PR #78](https://github.com/memoways/ava-proto1/pull/78),
+HEAD `61ad6e09aff6fd6b0312159a66b983ae8fac74bd` après
+[CI PR verte](https://github.com/memoways/ava-proto1/actions/runs/40227877871),
+78 E2E sans retry en 13,9 minutes. Squash main
+`a63ee8a379dcee47346903b43efab2e627f9ed7c`, arbre identique, puis
+[CI main verte](https://github.com/memoways/ava-proto1/actions/runs/40229327400),
+78 E2E sans retry en 14,8 minutes. Lovable : même SHA, ready/agentFinished,
+édition completed ; preview connectée sandbox Ulrich et banc chargés, bundle
+`/assets/index-BCNMaBQN.js`. Quatre messages console d'accès au stockage refusé
+observés, origine non établie ; aucune protection modifiée pour les contourner.
+Checkout propre sur main, seule branche A2 supprimée. Distantes restantes :
+main et `agent/test-gap-invitation-validity-multi-use` ; #24 et les 16 branches
+locales étrangères conservées. Aucune publication production.
 Notion `self` vérifie le workspace Ulrich, mauvaise cible Ava : aucune lecture
 de fiche, édition, tâche doublon, sync ou RAG ; faits durables non sauvegardés
 dans Gamilab, travail technique poursuivi conformément à la demande.
@@ -356,11 +370,14 @@ recette acceptée ou écarts précisément nommés ; publication production dist
    acceptée. Ne pas confondre fusion GitHub, synchronisation Lovable, activation
    d'un réglage, acceptation humaine et publication de production.
 5. Après chaque lot, inscrire acquis, limites et prochain lot dans ce plan et
-   le CHANGELOG. Ne pas rouvrir le diagnostic déjà établi sans nouvelle preuve.
+   le CHANGELOG, puis livrer le prompt autonome du lot suivant avec son lien
+   direct dans le compte rendu. Ne pas rouvrir le diagnostic déjà établi sans
+   nouvelle preuve. Le prompt transmis porte aussi cette obligation de passation.
 
-A1 est désormais implémenté ; ses contrôles et sa livraison sont consignés
-dans le bilan ci-dessus. Le lot app suivant est **A2**, distinct de l'édition
-Notion et de l'acceptation humaine du rendu final.
+A1 et A2 sont livrés ; leurs contrôles et livraisons sont consignés ci-dessus.
+Le lot app suivant est **A3**, prêt dans
+[son prompt autonome](prompt_reprise_reglages_auditions_lot_a3.md), distinct de
+l'édition Notion et de l'acceptation humaine du rendu final.
 
 ## Direction après écoute — 25 octobre 2026
 

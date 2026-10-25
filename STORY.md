@@ -24,6 +24,8 @@ raccord WS restant A3. Aucun souffle, sanglot, affect ou gain de latence n'est
 déduit des tests simulés. Voix, mapping sandbox et fiches restent inchangés.
 
 [Protocole, tests, limites et livraison A2](docs/plan_lot_b_rendu_vocal.md#exécution-a2--25-octobre-2026).
+La reprise passe par le [prompt autonome A3](docs/prompt_reprise_reglages_auditions_lot_a3.md).
+Le contrat de clôture exige désormais ce livrable dès qu'un prochain lot existe.
 
 ## A1 — laisser la pensée ouverte (25 octobre 2026)
 
