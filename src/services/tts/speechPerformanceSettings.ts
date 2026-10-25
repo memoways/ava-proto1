@@ -1,7 +1,7 @@
 import { getActiveEnvironment, loadEnvironmentSetting, saveEnvironmentSetting, readEnvironmentStorage } from '../environmentContext';
 import type { CanonicalEmotion, PerformanceDelivery } from './performanceIntent';
 export interface SpeechVoiceMapping { emotion: CanonicalEmotion; delivery: PerformanceDelivery; speed: number; pauses: 'short' | 'normal' | 'long'; instruction: string }
-export interface SpeechPerformanceSettings { enabled: boolean; version: string; gradiumTagsEnabled: boolean; byCharacter: Record<string, Record<string, SpeechVoiceMapping>> }
+export interface SpeechPerformanceSettings { enabled: boolean; version: string; gradiumTagsEnabled: boolean; /** A2, opt-in per environment after human acceptance. Missing means false. */ gradiumPausesEnabled?: boolean; byCharacter: Record<string, Record<string, SpeechVoiceMapping>> }
 export const SPEECH_PERFORMANCE_KEY = 'ava_speech_performance';
 export const EMPTY_SPEECH_PERFORMANCE: SpeechPerformanceSettings = { enabled: false, version: '', gradiumTagsEnabled: false, byCharacter: {} };
 export function getSpeechPerformanceSettings(): SpeechPerformanceSettings {

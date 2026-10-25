@@ -51,6 +51,8 @@ export interface TTSGenerateResult {
     statusCode?: number;
     firstByteMs?: number;
     totalMs?: number;
+    /** REST currently keeps cleaned words but cannot attest experimental pauses. */
+    pauseRendering?: 'disabled' | 'rest_unavailable';
   };
 }
 
