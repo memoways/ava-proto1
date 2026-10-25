@@ -1,3 +1,4 @@
+import { encodeWavPcm16 } from '../stt/audioToWav';
 import { observeVoice, type VoiceObserver } from "../voiceTurnTelemetryV2";
 /**
  * Gradium TTS WebSocket streaming — WS transport + progressive Web Audio playback.
@@ -50,6 +51,10 @@ export interface GradiumStreamOptions {
   /** temp / cfg_coef / padding_bonus / rewrite_rules / pronunciation_id */
   jsonConfig: Record<string, unknown>;
   deferSetup?: boolean;
+  /** Sandbox auditions only. Capture decoded provider samples, max 30 s. */
+  captureAudio?: boolean;
+  onSetupSent?: () => void;
+  validateContext?: () => void;
   /** Adapter-owned compiler, called only on validated speech units. */
   prepareText?: (text: string) => string;
   /** Lab-only playback buffer choice. Omitting it preserves the current 300/200 ms behaviour. */
@@ -60,6 +65,8 @@ export interface GradiumStreamOptions {
 }
 
 export interface GradiumStreamStats {
+  auditionAudio?: Blob;
+  auditionCapture?: 'complete' | 'limit_exceeded';
   /** ms from session creation to the first audio chunk. */
   firstByteMs: number;
   /** ms from session creation to upstream end_of_stream (all audio received). */
@@ -171,6 +178,9 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
   const finished = deferred<{ playbackTotalMs: number }>();
   const generationDone = deferred<GradiumStreamStats>();
 
+  const capture: Float32Array[] = [];
+  let capturedSamples = 0;
+  let captureExceeded = false;
   let ws: WebSocket | null = null;
   let socketReady = false;
   let setupConfigured = !opts.deferSetup;
@@ -235,6 +245,7 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
       try { src.stop(); } catch { /* already stopped */ }
     }
     liveSources.clear();
+    capture.length = 0;
     pendingChunks.length = 0;
     pendingText.length = 0;
     try { gain?.disconnect(); } catch { /* ignore */ }
@@ -417,7 +428,16 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
     eosReceived = true;
     if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
     closeWs();
+    let auditionAudio: Blob | undefined;
+    if (opts.captureAudio && !captureExceeded && capturedSamples > 0) {
+      const samples = new Float32Array(capturedSamples);
+      let offset = 0;
+      for (const chunk of capture) { samples.set(chunk, offset); offset += chunk.length; }
+      auditionAudio = encodeWavPcm16(samples, sampleRate, true);
+    }
+    capture.length = 0;
     generationDone.resolve({
+      ...(opts.captureAudio ? { auditionAudio, auditionCapture: captureExceeded ? 'limit_exceeded' as const : 'complete' as const } : {}),
       firstByteMs: firstByteMs ?? 0,
       totalGenMs: Math.round(performance.now() - t0),
       bytes: totalBytes,
@@ -459,6 +479,11 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
       totalBytes += msg.audio.length; // base64 length ≈ bytes × 4/3; good enough for stats
       const samples = decodePcmChunk(msg.audio, carry);
       if (samples.length === 0) return;
+      if (opts.captureAudio && !captureExceeded) {
+        capturedSamples += samples.length;
+        if (capturedSamples > sampleRate * 30) { captureExceeded = true; capture.length = 0; }
+        else capture.push(samples.slice());
+      }
       const ctx = getSharedAudioContext();
       const ahead = Math.max(0, playCursor - (ctx?.currentTime ?? 0)) + pendingDuration() + samples.length / sampleRate;
       if (ahead > 30) { fail(new Error("Gradium audio buffer exceeded 30 seconds")); return; }
@@ -488,8 +513,10 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
   const sendPendingText = () => {
     if (cancelled || !socketReady || !ws || !setupConfigured) return;
     if (!setupSent) {
+      try { opts.validateContext?.(); } catch (error) { fail(error); return; }
       ws.send(JSON.stringify({ type: 'setup', model_name: 'default', voice_id: opts.voiceId, output_format: wireFormat, json_config: jsonConfig }));
       setupSent = true;
+      opts.onSetupSent?.();
     }
     for (const text of pendingText.splice(0)) {
       ws.send(JSON.stringify({ type: "text", text }));

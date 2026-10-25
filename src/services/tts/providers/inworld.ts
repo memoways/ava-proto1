@@ -39,6 +39,7 @@ export const inworldProvider: TTSProvider = {
       ...(actingPatch.instruction ? { instruction: actingPatch.instruction } : {}),
     };
 
+    ctx?.onAuditionRequest?.({ transport: 'rest', body });
     const startTime = Date.now();
     const tRequest = performance.now();
     const debugId = debugLogger.logFetch("tts", `TTS-IW "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts-inworld`, body);

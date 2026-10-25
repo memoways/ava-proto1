@@ -34,6 +34,7 @@ export const humeProvider: TTSProvider = {
       ...(ctx?.performance?.speedHint ? { speed: ctx.performance.speedHint } : {}),
     };
 
+    ctx?.onAuditionRequest?.({ transport: 'rest', body });
     const startTime = Date.now();
     const tRequest = performance.now();
     const debugId = debugLogger.logFetch("tts", `TTS-Hume "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts-hume`, body);

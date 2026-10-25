@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { setActiveEnvironment } from '../environmentContext';
+import { setActiveEnvironment, writeEnvironmentStorage } from '../environmentContext';
 import { derivePerformanceIntent, applyGradiumPerformance, composeHumeDescription, applyElevenLabsPerformance, applyInworldPerformance } from './performanceIntent';
-import { EMPTY_SPEECH_PERFORMANCE, proposeSpeechMapping, saveSpeechPerformanceSettings } from './speechPerformanceSettings';
-import { createAuditionCorpus, auditionCount, auditionVoice, AUDITION_PROVIDERS, AUDITION_LEVELS } from './speechAudition';
+import { EMPTY_SPEECH_PERFORMANCE, proposeSpeechMapping, getSpeechPerformanceSettings, SPEECH_PERFORMANCE_KEY } from './speechPerformanceSettings';
+import { createAuditionCorpus, auditionVoice, AUDITION_PROVIDERS, AUDITION_LEVELS } from './speechAudition';
 import { adaptGradiumEmotionalTags } from './gradiumEmotionalTags';
 import { prepareTextForTTS } from './textPrep';
 import { prepareTextForGradium } from './providers/gradium';
@@ -13,6 +13,11 @@ describe('Lot B speech-state rules',()=>{
  it('lets the character state win over ellipses and lexical fragility',()=>{const i=derivePerformanceIntent(input);expect(i.source).toBe('speech_state');expect(i.delivery).toBe('rushed');expect(i.speedHint).toBe(1.12);expect(i.pauses).toBe('short');});
  it('keeps rugosity zero identical to the existing derivation',()=>{expect(derivePerformanceIntent({...input,rugosite:0})).toEqual(derivePerformanceIntent({text:input.text,characterKey:'max'}));});
  it('applies the saved state mapping in production too',()=>{setActiveEnvironment('prod');expect(derivePerformanceIntent(input).source).toBe('speech_state');});
+ it('reads the production mapping from production storage while keeping Gradium emotional tags closed',()=>{
+  setActiveEnvironment('prod');writeEnvironmentStorage(SPEECH_PERFORMANCE_KEY,JSON.stringify({...settings,gradiumTagsEnabled:true}));
+  const saved=getSpeechPerformanceSettings();expect(saved.enabled).toBe(true);expect(saved.version).toBe('v1');expect(saved.gradiumTagsEnabled).toBe(false);
+  expect(derivePerformanceIntent({...input,speechSettings:saved}).source).toBe('speech_state');
+ });
  it('isolates character states and rejects unknown states',()=>{expect(derivePerformanceIntent({...input,characterKey:'emma'}).source).not.toBe('speech_state');expect(derivePerformanceIntent({...input,validSpeechStates:[]}).source).not.toBe('speech_state');});
  it('scales the deviation across the three rugosity levels',()=>{expect(derivePerformanceIntent({...input,rugosite:1}).speedHint).toBeCloseTo(1.04);expect(derivePerformanceIntent({...input,rugosite:2}).speedHint).toBeCloseTo(1.08);expect(derivePerformanceIntent(input).speedHint).toBe(1.12);});
  it('keeps Gradium character temperature unchanged and modulates padding only',()=>{expect(applyGradiumPerformance({temp:0.6,paddingBonus:1},derivePerformanceIntent(input))).toEqual({temp:0.6,paddingBonus:0.4});});
@@ -20,6 +25,6 @@ describe('Lot B speech-state rules',()=>{
  it('prioritizes the state acting instructions within the Hume character limit',()=>{const i=derivePerformanceIntent(input);expect(composeHumeDescription('a'.repeat(100),i)).toContain(i.actingNl);});
  it('never emits speculative Gradium tags even when enabled',()=>{expect(adaptGradiumEmotionalTags('Je… je sais.','Bloqué',true)).toBe('Je… je sais.');});
  it('keeps words, euh, repeated words and unfinished speech for both preparations',()=>{const text='Euh… je… je — Ava';expect(prepareTextForTTS(text)).toBe('Euh... je... je — Ava');expect(prepareTextForGradium(text)).toBe('Euh, je, je, Ava');expect(prepareTextForGradium(prepareTextForGradium(text))).toBe(prepareTextForGradium(text));});
- it('builds exactly 10 lines x 3 levels x 5 providers per character',()=>{expect(createAuditionCorpus('max',['a','b'])).toHaveLength(10);expect(AUDITION_LEVELS).toEqual([1,2,3]);expect(AUDITION_PROVIDERS).toEqual(['gradium','hume','inworld','elevenlabs','cartesia']);expect(auditionCount(createAuditionCorpus('emma',['a']))).toBe(150);});
+ it('prepares eight proposed cases without lexical variants or automatic matrix',()=>{expect(createAuditionCorpus('max',['a','b'])).toHaveLength(4);expect(createAuditionCorpus('emma',['a'])).toHaveLength(4);expect(createAuditionCorpus('max',['a'])[0].text).toBe("Allô ? Oui… c'est vous qui deviez… Oui.");expect(AUDITION_LEVELS).toEqual([1,2,3]);expect(AUDITION_PROVIDERS).toHaveLength(5);});
  it('never reuses a voice from another provider or character',()=>{const voices={'max:gradium':'g'};expect(auditionVoice(voices,'max','gradium')).toBe('g');expect(auditionVoice(voices,'max','elevenlabs')).toBeNull();expect(auditionVoice(voices,'emma','gradium')).toBeNull();});
 });

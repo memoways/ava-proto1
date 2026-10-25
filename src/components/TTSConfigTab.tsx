@@ -808,7 +808,8 @@ export default function TTSConfigTab() {
               minLabel="Générique" maxLabel="Très fidèle" />
           </div>
 
-          <SliderRow label="Vitesse (padding_bonus)" value={grTuning.paddingBonus} min={-4} max={4} step={0.1}
+          <p className="text-xs text-muted-foreground">padding_bonus module le rythme global. Les breaks explicites WS se comparent dans le banc A3 ; REST ne les atteste pas. Émotion et instruction d’acting ne sont pas transmises à Gradium.</p>
+          <SliderRow label="Rythme global (padding_bonus)" value={grTuning.paddingBonus} min={-4} max={4} step={0.1}
             onChange={(v) => updateGrTuning({ paddingBonus: v })}
             tooltip="Ajuste la vitesse de lecture en ajoutant ou retirant du silence. Négatif = plus rapide, positif = plus lent."
             minLabel="-4 rapide" maxLabel="+4 lent" />

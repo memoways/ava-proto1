@@ -21,6 +21,30 @@ personnages. L'exécution app commence par le
 [prompt autonome du lot A1](prompt_reprise_parole_ouverte_lot_a1.md), qui conserve
 ce plan et laisse l'édition/synchronisation à Ulrich pendant son travail.
 
+### Correction technique A3 — 25 octobre 2026
+
+Le banc existant compare maintenant témoin et breaks WS A2 avec un snapshot
+temporaire explicite, isolé du mapping live et de la production. M1/M2/E1/E2
+forment la première comparaison ; les huit cas restent proposés et non canoniques.
+Même texte/voix/configuration de base en A/B, témoin Max 3 / Emma 2. Les requêtes
+effectives, contrôles séparés, paramètres et transports sont visibles et exportés.
+Le repli REST ne valide pas les pauses WS. Le rejeu utilise les samples WS
+conservés dans un WAV borné, sans appel fournisseur, avec annulation et protection
+des résultats périmés. Émotion et instruction d’acting restent non appliquées
+chez Gradium ; le réglage global `padding_bonus` est distingué des breaks.
+
+La sauvegarde du mapping reste explicite, avec compare-and-swap et relecture de
+la même sandbox ; aucun réglage n’a été sauvegardé pendant A3. La lecture Cloud
+confirme la version `2026-10-25T11:39:32.000Z`, pauses A2 absentes/désactivées et
+tags fermés. Tests simulés et technique livrée ne valent ni audition réelle ni
+acceptation du timbre. Notion Gamilab n’est toujours pas exposé dans cette session ;
+aucune modification éditoriale ni synchronisation n’est effectuée.
+
+[Résultat, validations et réserves A3](plan_lot_b_rendu_vocal.md#exécution-a3--25-octobre-2026).
+Le prochain lot suit le [prompt A4](prompt_reprise_accueils_integration_lot_a4.md),
+préparé dans le même tour sans le lancer. Les accueils et la recette après
+intégration éditoriale restent à faire, publication production distincte.
+
 ### Correction technique A2 — 25 octobre 2026
 
 Après A1 (#77, main `e006db65419c70b345abbe735d783f47257e7559`), l'adaptateur

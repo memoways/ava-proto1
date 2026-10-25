@@ -26,6 +26,10 @@ export interface TTSGenerateContext {
   characterKey?: string;
   /** Per-turn acting intent, mapped by each provider to its own API knobs. */
   performance?: import("./performanceIntent").PerformanceIntent;
+  /** Explicit temporary sandbox context; never installed as live settings. */
+  speechAudition?: import('./speechPerformanceSettings').SpeechAuditionSnapshot;
+  /** Exact request evidence, emitted by provider adapters before transport. */
+  onAuditionRequest?: (request: TTSAuditionRequest) => void;
   /** Audition-only model override; runtime model settings remain untouched. */
   auditionModelId?: 'eleven_v3';
   /** Derive after the validated private header, before the first audio segment. */
@@ -43,6 +47,11 @@ export interface TTSGenerateContext {
   bufferPreset?: import("./gradiumStreamPlayer").GradiumBufferPreset;
 }
 
+export interface TTSAuditionRequest {
+  transport: 'websocket' | 'rest';
+  body: Record<string, unknown>;
+  controls?: import('./gradiumSpeech').GradiumSpeechPart[];
+}
 export interface TTSGenerateResult {
   blob: Blob;
   meta: {
@@ -67,6 +76,10 @@ export interface TTSStreamGenerationStats {
   firstByteMs?: number;
   /** Time until all audio was generated/received (ms since handle creation). */
   totalMs?: number;
+  /** Present only for an explicit sandbox audition. */
+  auditionAudio?: Blob;
+  auditionCapture?: 'complete' | 'limit_exceeded';
+  pauseRendering?: 'disabled' | 'rest_unavailable' | 'websocket';
   bufferPreset?: import("./gradiumStreamPlayer").GradiumBufferPreset | null;
   prebufferMs?: number | null;
   rebufferMs?: number | null;

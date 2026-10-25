@@ -4,6 +4,29 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [A3 — réglages fidèles et auditions des pauses] — 2026-10-25
+
+- Banc existant relié au WS Gradium A2 par un snapshot temporaire explicite ;
+  mapping enregistré/version, noms/descriptions synchronisés, brouillon, mots,
+  contrôles et paramètres réellement envoyés distingués. REST signalé comme
+  incapable de valider les pauses ; acting/émotion Gradium non appliqués.
+- Huit cas proposés, première comparaison sur M1/M2/E1/E2, puis finalistes
+  explicites ; Max 3 / Emma 2, voix isolées, un appel à la demande. Rejeu WAV WS
+  exact depuis cache borné (30 s/capture, 16 écoutes/16 Mio), callbacks périmés
+  protégés, notes séparées et export avec transport, métriques, appels et cached.
+- Sauvegarde explicite du mapping : sandbox épinglée, version contrôlée/CAS,
+  champs non édités conservés et relecture DB avant cache local ; échec visible.
+  Aucun réglage Cloud sauvegardé, aucune activation live ni publication production.
+- Base main reprise : `46d29a573eef5e44b808c37dcef78202499edc47` (#79).
+  Qualité locale verte : lint/types/build, 66 régressions, 1 010 unitaires,
+  41 intégrations et 78 E2E sans retry (13,5 minutes). Livraison et runs exacts
+  à vérifier dans le bilan de la PR A3.
+  [Preuves, réserves et livraison](docs/plan_lot_b_rendu_vocal.md#exécution-a3--25-octobre-2026).
+  SHA final/main et runs exacts dans le bilan GitHub ; pas de commit circulaire.
+- Écoute humaine et édition Gamilab non validées ; accueils, intégration et
+  recette A4 restants. [Prompt autonome A4](docs/prompt_reprise_accueils_integration_lot_a4.md)
+  enregistré dans ce lot ; A4 non lancé. PR #24 et branches étrangères préservées.
+
 ## [Passation A2 → A3] — 2026-10-25
 
 - [Prompt autonome A3](docs/prompt_reprise_reglages_auditions_lot_a3.md) livré :
