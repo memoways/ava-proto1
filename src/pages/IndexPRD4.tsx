@@ -601,6 +601,8 @@ const IndexPRD4 = () => {
       emotion: intent.emotion,
       intensity: intent.intensity,
       source: intent.source,
+      speech_state: intent.speechState ?? null,
+      mapping_version: intent.mappingVersion ?? null,
     });
     const turnContext = {
       sessionId: sessionIdRef.current ?? undefined,
@@ -1333,9 +1335,16 @@ const IndexPRD4 = () => {
           const performanceIntent = derivePerformanceIntent({ text: '', characterKey: turnCharacter,
             previousEmotionalState: pendingEmotionalStateRef.current, userMessage: userText });
           streamedVoice = prepareStreamedVoiceTurn({ characterKey: turnCharacter, voiceId,
-            resolveSpeechPerformance: (state, text) => derivePerformanceIntent({ text, characterKey: turnCharacter,
-              speechState: state, rugosite: speechRuntimeForVoice.rugosite, validSpeechStates: speechRuntimeForVoice.states,
-              speechSettings: speechSettingsForVoice, previousEmotionalState: pendingEmotionalStateRef.current }),
+            resolveSpeechPerformance: (state, text) => {
+              const intent = derivePerformanceIntent({ text, characterKey: turnCharacter,
+                speechState: state, rugosite: speechRuntimeForVoice.rugosite, validSpeechStates: speechRuntimeForVoice.states,
+                speechSettings: speechSettingsForVoice, previousEmotionalState: pendingEmotionalStateRef.current });
+              logPerformanceIntent(intent, { turnId, characterKey: turnCharacter, mappingVersion: intent.mappingVersion });
+              trackEvent('prd4_tts_performance', { session_id: owningSessionId, turn_id: turnId, turn_index: turnIndex,
+                character: turnCharacter, emotion: intent.emotion, intensity: intent.intensity, source: intent.source,
+                speech_state: intent.speechState ?? null, mapping_version: intent.mappingVersion ?? null });
+              return intent;
+            },
             performance: performanceIntent, signal: turnController.signal,
             turn_id: turnId, turn_index: turnIndex, session_id: owningSessionId,
             attempt_id: telemetry.attemptId, onVoiceObservation: telemetry.observe,

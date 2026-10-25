@@ -3,9 +3,40 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-25 (lot 1 compatibilité GM ; résultats et livraison dans le plan)
+> **Last Updated**: 2026-10-25 (lot 2 parole incarnée ; résultats et livraison dans les plans)
 
 ---
+
+## Lot 2 — garder la voix de chaque fiche jusqu'au son (25 octobre 2026)
+
+La présence du champ dans le compilateur ne suffisait pas : sa sélection
+laissait encore le budget et la déduplication enlever les déclencheurs ou le
+non-dit. Les deux fiches sandbox réelles sont devenues des fixtures de test.
+La Manière de parler et le moteur intime passent ensemble, intégralement,
+dans chaque variante effective. Le budget rich compte aussi son identité et
+sa procédure d'appel, sans augmenter les plafonds. La peur de Max pour la
+transformation d'Emma/Ava, son amour et sa place dans la famille garde ses
+reprises et ses évitements ; elle n'est pas transformée en aveu d'ouverture.
+
+Le texte autorisé peut garder une suspension volontaire. Sa segmentation ne
+transforme plus une reprise interne en point chez Gradium ; une phrase tronquée,
+une citation ouverte, un en-tête privé ou une identité étrangère restent bloqués.
+Une suggestion du GM ne vaut toujours pas état livré. Les tests distinguent
+déclaration, validation, reçu sonore et journal du GM, et vérifient séparément
+le réglage indisponible puis retrouvé au tour suivant.
+
+Le mapping du lot B n'avait jamais été sauvegardé en Cloud. Il l'est maintenant
+dans sandbox-ulrich seulement, relu à l'identique : cinq états par fiche,
+version 2026-10-25T11:39:32.000Z, activé pour la recette. Gradium garde ses voix
+et températures ; le rythme change via son paramètre documenté. Aucun tag
+émotionnel spéculatif. Les tests batch/setup/fallback partagent ce même mapping.
+
+Ces vérifications simulées et la sauvegarde Cloud ne constituent pas une écoute
+acceptée. La recette avec Ulrich et les mesures de diction/naturel/latence restent
+distinctes ; aucune production n'est publiée par ce lot. Plans actualisés :
+[parole](docs/plan_parole_incarnee_personnages.md),
+[rendu vocal](docs/plan_lot_b_rendu_vocal.md),
+[invariants latence](docs/plan_optimisation_latence_voice_to_voice.md).
 
 ## Lot 1 — compatibilité GM et passage manuel (25 octobre 2026)
 

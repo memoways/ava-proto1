@@ -1,4 +1,5 @@
 import { guardCharacterResponse, type CharacterExecutionContext } from './characterIdentityGuard';
+import { AVA_CHARACTER_REGISTRY } from './characterRegistry';
 
 export interface ResponseIntent { goal: string; points: string[]; parole?: string }
 export const SPEECH_BOUNDARY = '\n<speech>\n';
@@ -11,7 +12,7 @@ export function buildResponseStreamContract(maxTokens: number): string {
   const intent = small
     ? 'goal : 4 mots maximum ; points : tableau vide []'
     : 'goal : 8 mots maximum ; points : 0 à 2 points de 4 mots maximum chacun';
-  return `\n# FORMAT DE SORTIE IMPÉRATIF\nDans cette même réponse, écris d'abord une seule ligne JSON {"goal":"objectif privé","points":[],"parole":"état"}. Garde cet en-tête privé compact : ${intent}. Objectif ≤240 caractères, chaque point ≤160 caractères. Ce sont des intentions de communication, pas un raisonnement détaillé. "parole" : le nom exact d'un état de « Tes états de parole » que tu joues dans cette réponse (≤40 caractères) ; omets-le si aucun ne convient. Puis écris le marqueur <speech> seul sur une ligne entre le JSON et ton discours in character, avec de vrais retours à la ligne. Limite du discours : ${speechWords} mots maximum, y compris citations et questions. Le budget total de ${budget} tokens inclut le JSON et la parole : ne consomme pas la place de la parole avec l'intention. Choisis l'essentiel si la demande est large ; termine tes phrases dans cette limite. Aucun markdown, aucune autre métadonnée, aucun tag dans le discours. L'intention est privée, jamais entendue. Une intention ou une continuation privée n'est jamais une confidence déjà entendue. Respecte les mêmes limites de confidences et le canon.\n`;
+  return `\n# FORMAT DE SORTIE IMPÉRATIF\nDans cette même réponse, écris d'abord une seule ligne JSON {"goal":"objectif privé","points":[],"parole":"état"}. Garde cet en-tête privé compact : ${intent}. Objectif ≤240 caractères, chaque point ≤160 caractères. Ce sont des intentions de communication, pas un raisonnement détaillé. "parole" : le nom exact d'un état de « Tes états de parole » que tu joues dans cette réponse (≤40 caractères) ; omets-le si aucun ne convient. Puis écris le marqueur <speech> seul sur une ligne entre le JSON et ton discours in character, avec de vrais retours à la ligne. Limite du discours : ${speechWords} mots maximum, y compris citations et questions. Le budget total de ${budget} tokens inclut le JSON et la parole : ne consomme pas la place de la parole avec l'intention. Choisis l'essentiel si la demande est large ; achève ta réponse dans cette limite. Les fragments volontaires, reprises et suspensions de ta fiche sont permis : ne les transforme pas en phrases explicatives. Aucun markdown, aucune autre métadonnée, aucun tag dans le discours. L'intention est privée, jamais entendue. Une intention ou une continuation privée n'est jamais une confidence déjà entendue. Respecte les mêmes limites de confidences et le canon.\n`;
 }
 
 export function normalizeResponseIntent(value: unknown): ResponseIntent | null {
@@ -27,7 +28,7 @@ export function normalizeResponseIntent(value: unknown): ResponseIntent | null {
   return { goal: raw.goal.trim(), points: raw.points.map(p => (p as string).trim()), ...(parole ? { parole } : {}) };
 }
 
-/** Closed quotes and sentence punctuation are required before any identity check/emission. */
+/** Closed quotes and a safe spoken unit are required before identity checks/emission. */
 export function safeSentenceEnd(text: string, eof = false): number {
   const quotes: string[] = [];
   let end = 0;
@@ -44,9 +45,18 @@ export function safeSentenceEnd(text: string, eof = false): number {
       if (quotes.at(-1) === text[j]) quotes.pop();
       j++;
     }
+    // A suspension is part of the utterance, not an incremental sentence
+    // boundary. Otherwise Gradium prepares "Je…" / "je sais" as "Je." / "je sais".
+    if (/[.…]/.test(c) && (c === '…' || text.slice(i, j).includes('..'))) {
+      if (!eof || j < text.length) { i = j - 1; continue; }
+    }
+    // A single terminal period may still become "..." in the next token.
+    if (!eof && j === text.length) { i = j - 1; continue; }
     if (!quotes.length && (j < text.length && /\s/.test(text[j]) || eof && j === text.length)) end = j;
     i = j - 1;
   }
+  if (eof && !quotes.length && /\s[—–]$/.test(text.trimEnd())) end = text.trimEnd().length;
+  if (eof && !quotes.length && /[.!?…]\s*[»”"]$/.test(text.trimEnd())) end = text.trimEnd().length;
   return end;
 }
 
@@ -88,6 +98,15 @@ export class ResponseIntentParser {
     if (!end) return;
     const segment = this.pending.slice(0, end);
     const prefix = this.emitted + segment;
+    // Do not make an interrupted self-identification pronounceable simply by
+    // adding a suspension. Full foreign claims still use the shared guard.
+    const identityText = prefix.replace(/«[^»]*»|“[^”]*”|"[^"]*"/g, ' ');
+    const interruptedClaims = [...identityText.matchAll(/\b(?:je\s+suis|(?:je|on)\s+m['’]appelle|mon\s+nom\s+est|ici|moi\s*,?\s*c['’]est|appelle[z]?[- ]moi)\s+([\p{L}-]+)\s*(?:…|\.{2,}|[—–])/giu)];
+    if (interruptedClaims.some(claim => AVA_CHARACTER_REGISTRY.entries.some(entry =>
+      entry.availability === 'active' && entry.key !== this.context.characterKey
+      && entry.displayName.toLocaleLowerCase('fr').startsWith(claim[1].toLocaleLowerCase('fr'))))) {
+      throw new Error('Incomplete identity in response stream');
+    }
     if (guardCharacterResponse(prefix, this.context).blocked) throw new Error('Foreign character identity in response stream');
     // Tags/structured payloads in speech fail closed, including a repeated private header.
     if (/[<>[\]{}]/.test(segment)) throw new Error('Structured data in speech');

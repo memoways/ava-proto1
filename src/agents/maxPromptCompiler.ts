@@ -1,5 +1,6 @@
 import type { CharacterPrompt } from "@/services/characterPromptService";
 import { MAX_MAX_RAG_CONTEXT_CHARS } from "@/services/ragBudget";
+import { characterEmbodiment, withoutCharacterEmbodiment } from '@/services/characterEmbodiment';
 
 export const MAX_SYSTEM_PROMPT_CHARS = 12_000;
 export const MAX_STATIC_PROMPT_CHARS = 7_000;
@@ -155,8 +156,10 @@ export function condenseDepthSignatures(value: string): string {
 export function compileCharacterSections(prompt: CharacterPrompt | null): CompiledCharacterSection[] {
   if (!prompt) return [];
 
-  return CHARACTER_FIELD_SPECS.flatMap((spec) => {
-    const raw = prompt[spec.key] || "";
+  const protectedSections = characterEmbodiment(prompt).map(section => ({ ...section, originalChars: section.content.length, truncated: false }));
+  const selectable = withoutCharacterEmbodiment(prompt);
+  return [...protectedSections, ...CHARACTER_FIELD_SPECS.flatMap((spec) => {
+    const raw = selectable[spec.key] || "";
     const withoutDuplicatedRules = [
       "ce_que_tu_ne_fais_jamais",
       "ce_que_tu_sais_utilisateur",
@@ -174,7 +177,7 @@ export function compileCharacterSections(prompt: CharacterPrompt | null): Compil
       originalChars: normalizePromptText(raw).length,
       truncated: content.length < normalizePromptText(raw).length,
     }];
-  });
+  })];
 }
 
 export function renderCompiledCharacterSections(sections: CompiledCharacterSection[]): string {

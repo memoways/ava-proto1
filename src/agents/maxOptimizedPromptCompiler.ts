@@ -7,6 +7,7 @@ import {
 import { MAX_MAX_RAG_CONTEXT_CHARS, MAX_MAX_RAG_ITEM_CHARS, MAX_MAX_RAG_ITEMS } from "@/services/ragBudget";
 import { trimRagContextToWholeSouvenirs } from "@/services/ragService";
 import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
+import { characterEmbodiment, withoutCharacterEmbodiment } from '@/services/characterEmbodiment';
 import type { ConversationMemoryV1, MaxPromptAssemblyTrace } from "@/types";
 
 export const OPTIMIZED_V3_LIMITS = {
@@ -245,8 +246,9 @@ function scoreText(text: string, queryTerms: Set<string>, baseScore: number, sou
 function selectStaticUnits(character: CharacterPrompt, query: string, contract: string): { selected: SelectedUnit[]; all: SelectedUnit[] } {
   const queryTerms = keywords(query);
   const candidates: CandidateUnit[] = [];
+  const selectable = withoutCharacterEmbodiment(character);
   FIELD_SPECS.forEach((spec, fieldIndex) => {
-    splitUnits(character[spec.key] || "").forEach((text, unitIndex) => {
+    splitUnits(selectable[spec.key] || "").forEach((text, unitIndex) => {
       candidates.push({
         id: `static:${spec.key}:${unitIndex}`,
         source: "static",
@@ -257,8 +259,14 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
       });
     });
   });
-  const selected: CandidateUnit[] = [];
+  const protectedUnits: SelectedUnit[] = characterEmbodiment(character).map(section => ({
+    id: `static:${section.key}:protected`, source: 'static', sourceKey: section.key,
+    title: section.title, text: section.content, score: 10_000, status: 'selected',
+    originalChars: section.content.length, removedChars: 0, reason: 'included',
+  }));
+  const selected: CandidateUnit[] = [...protectedUnits];
   const decisions = new Map<string, SelectedUnit>();
+  protectedUnits.forEach(unit => decisions.set(unit.id, unit));
   const contractReference: CandidateUnit = {
     id: "contract:conversation",
     source: "contract",
@@ -267,7 +275,8 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
     text: contract,
     score: 10_000,
   };
-  let used = 0;
+  let used = protectedUnits.reduce((sum, unit) => sum + unit.text.length, 0);
+  if (used > OPTIMIZED_V3_LIMITS.staticChars - 320) throw new Error('Parole éditoriale trop longue pour le noyau optimized_v3');
   const trySelect = (candidate: CandidateUnit) => {
     if (decisions.has(candidate.id)) return;
     const novelty = retainNovelContent(candidate.text, [contractReference]);
@@ -318,18 +327,22 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
   candidates.sort((a, b) => b.score - a.score).forEach(trySelect);
   const selectedIds = new Set(selected.map((candidate) => candidate.id));
   const selectedWithStatus = [...decisions.values()].filter((candidate) => selectedIds.has(candidate.id));
-  const all = candidates.map((candidate) => decisions.get(candidate.id) ?? {
+  const all = [...protectedUnits, ...candidates.map((candidate) => decisions.get(candidate.id) ?? {
     ...candidate,
     status: "lower_rank" as const,
     originalChars: candidate.text.length,
     removedChars: 0,
     reason: "lower_rank" as const,
-  });
+  })];
   return { selected: selectedWithStatus, all };
 }
 
 function renderGroupedStatic(units: SelectedUnit[], group: "core" | "canon", characterName: string): string {
   const blocks: string[] = [];
+  if (group === 'core') {
+    const motive = units.find(unit => unit.sourceKey === 'moteur_intime');
+    if (motive) blocks.push(`## ${motive.title}\n${motive.text}`);
+  }
   for (const spec of FIELD_SPECS.filter((item) => item.group === group)) {
     const parts = units.filter((unit) => unit.sourceKey === spec.key).map((unit) => unit.text);
     const title = spec.title === "INVARIANTS DU PERSONNAGE"

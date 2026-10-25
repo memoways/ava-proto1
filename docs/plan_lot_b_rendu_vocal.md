@@ -1,5 +1,55 @@
 # Plan — Lot B : rendre les états de parole audibles
 
+## Lot 2 — sauvegarde sandbox et contrôles Gradium, 25 octobre 2026
+
+Le diagnostic et la protection des compilateurs sont suivis dans
+[le plan de parole incarnée](plan_parole_incarnee_personnages.md#lot-2--protection-effective-et-gradium-25-octobre-2026).
+Les bilans du 24 octobre ci-dessous restent historiques.
+
+- SELECT initial MCP Lovable : aucune ligne `ava_speech_performance` dans
+  admin_settings. Les suggestions de l'admin n'étaient donc pas un réglage Cloud.
+- Sauvegarde explicite via MCP Lovable du projet Ava, seulement sandbox-ulrich,
+  puis SELECT et comparaison intégrale : enabled=true, version
+  `2026-10-25T11:39:32.000Z`, tags Gradium=false, cinq états exacts de chaque fiche.
+  Ligne créée le 25 octobre à 11:40:01 UTC ; aucune ligne production ajoutée.
+  Fixture de contrôle : `src/agents/__fixtures__/speechMappingSandbox20261025.json`.
+- Mapping différencié : cascade/digue/espoir → rythme plus vif ; blocage/décrochage
+  → retenu ; reprises et états pratiques gardent leur nuance. Chez Gradium,
+  seules les pauses short/normal/long modulent padding à ce stade (±0,6 max),
+  le débit relatif et les instructions ne sont pas des paramètres émotionnels
+  pris en charge. Ils ne sont pas présentés comme tels.
+- Réglages vocaux existants lus : Max temp 0,70/padding 0,20, Emma 0,65/0.
+  Aucun changement de voix, température, fournisseur actif ou réglage production.
+- Tests du vrai adaptateur : les dix états passent par generate batch,
+  configure incrémental et generateFallback avec les mêmes json_config et voix ;
+  version du mapping retenue par l'intention ; température conservée, texte sûr.
+  Les tests du player vérifient setup unique avant texte et reçus après audio.
+  Les segments conservant « Je… je » produisent la même préparation Gradium que
+  le texte entier, quelle que soit la frontière SSE. Aucun tag spéculatif.
+- L'événement prd4_tts_performance porte maintenant l'état validé et la version
+  du mapping dans les deux sorties, au moment de son application. Il ne prouve
+  pas à lui seul une livraison sonore ; seul le reçu de lecture fait foi.
+- Rollback sandbox : désactiver « Rendu par état en sandbox » puis sauvegarder.
+  Les sessions de rugosité 0 et la production gardent le chemin existant.
+
+Documentation officielle consultée le 25 octobre :
+[réglages Gradium](https://docs.gradium.ai/guides/voice-settings),
+[protocole et exemples SDK](https://docs.gradium.ai/guides/text-to-speech).
+padding_bonus règle la vitesse, pas une pause exacte intra-phrase ; aucun tag
+émotionnel documenté dans ces sources. La capacité reste fermée.
+
+Recette humaine encore requise : nouvelles conversations Max/Emma sur la preview
+Lovable synchronisée, au casque avec Ulrich ; comparer texte prononcé, variété,
+reprises, pauses, naturel, diction, premier son et latence voix-à-voix. Aucun
+appel fournisseur réel ni gain acoustique n'est revendiqué par les simulations.
+Aucune publication de production autorisée.
+
+Contrôle visuel connecté : compte Ulrich, environnement « Sandbox — Ulrich »,
+TTS Config ; interrupteur chargé à true, cinq états propres à Max puis Emma et
+mapping différencié visibles. Aucun bouton Sauvegarder ou Écouter activé pendant
+ce contrôle ; zéro appel audio fournisseur. Le SELECT MCP reste la preuve de
+persistance/version ; ce contrôle ne prouve pas une écoute humaine.
+
 Date : 24 octobre 2026. Statut : plan approuvé, code implémenté en preview ; auditions réelles et livraison finale non vérifiées.
 
 ## Résultat attendu

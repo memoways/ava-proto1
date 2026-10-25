@@ -61,6 +61,14 @@ La base saisie mains libres/barge-in est déjà réalisée et documentée dans [
 
 ## 3. Écoute libre et interruptions — P2
 
+Contrôle du lot parole du 25 octobre 2026 : aucun changement de capture,
+interruption, mains libres, buffers, délais, budget GM ou politique de passage.
+Les suspensions éditoriales sont groupées avec leur reprise jusqu'à une frontière
+de parole sûre ; ce maintien de contexte peut retarder un fragment qui ne forme
+pas encore une unité sûre. Aucun gain de latence n'est déduit de ce changement.
+Mapping Gradium sandbox sauvegardé/relu et tests de transports dans
+[le plan lot B](plan_lot_b_rendu_vocal.md) ; écoute et mesures humaines restantes.
+
 - Consolider le contrôleur mains libres déjà présent dans `IndexPRD4`, en conservant `handsFreeVoice.ts` comme point de décision. Séparer explicitement état d'écoute/sortie, sans réimplémenter l'activation du micro ni retirer le PTT de compatibilité.
 - Préserver la capture unique après le geste d'activation déjà disponible ; vérifier sa reprise après flush et réinitialiser réellement capture/buffers aux frontières vidéo/handoff. Déconnecter à fin de session, changement de permission ou panne réellement non récupérable.
 - Vérifier le DSP navigateur effectif et alimenter `handsFreeVoice.ts` avec une détection locale de parole sur le micro après annulation d'écho. Ce contrôleur décide des états candidat, confirmé et rejeté, pour tous les fournisseurs. La fin du tour utilisateur conserve une politique applicative distincte, fondée sur mots/timing et pauses de réflexion ; le début acoustique ne décide pas à lui seul que l'utilisateur a terminé. Les fournisseurs livrent signaux et texte, sans décider le tour par leur timer de silence.

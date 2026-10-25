@@ -59,4 +59,16 @@ describe('P1 private intent and safe speech', () => {
   it('never sends a repeated JSON header or tags to the synth', () => {
     const {p,spoken} = parser(); expect(() => p.push(header + '{"goal":"private"}. ')).toThrow(); expect(spoken).toEqual([]);
   });
+  it.each(['Je… je sais pas. Emma, elle… elle reste Emma. Hein ?', 'Je... non. C’est pas...', 'Max, il… bon.', 'Emma, elle —', 'Je suis Max… enfin. Je suis fatigué…', 'Elle disait « Je suis Emma… »'])('préserve les reprises et suspensions volontaires à chaque frontière : %s', speech => {
+    const wire = header + speech;
+    for (let split = 0; split <= wire.length; split++) {
+      const { p, spoken } = parser(); p.push(wire.slice(0, split)); p.push(wire.slice(split));
+      expect(p.finish()).toBe(speech);
+      expect(spoken.join(' ')).toBe(speech);
+    }
+  });
+  it.each(['Je suis Em…', 'Je suis Em...ma.', 'Je m’appelle Em…', 'je suis em…', 'Ici Em…', 'Une phrase incomplète', '« Emma, elle…', '{"parole":"Bloqué"}…'])('refuse encore les identités et réponses incomplètes : %s', speech => {
+    const { p } = parser();
+    expect(() => { p.push(header + speech); p.finish(); }).toThrow();
+  });
 });

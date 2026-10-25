@@ -4,6 +4,35 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Lot 2 — parole incarnée et Gradium sandbox] — 2026-10-25
+
+- Tests rouges sur les fiches Cloud exactes : sélection présente mais pertes
+  après budgets/déduplication dans les prompts effectifs. Manière de parler
+  intégrale et moteur intime sont désormais réservés, propres à Max/Emma,
+  dans legacy, compact_v1, rich_v2 et optimized_v3. Cinq états et descriptions
+  exacts conservés ; fiches et versions publiées inchangées.
+- Plafonds existants conservés ; l'identité et la procédure de passage comptent
+  maintenant dans le plafond statique rich de 12 000 caractères.
+- Suspensions internes groupées avec leur reprise avant Gradium ; tiret final
+  volontaire accepté. Phrases tronquées, citations ouvertes, structure privée
+  et identification étrangère même interrompue restent refusées. Aucun nouveau
+  LLM, modèle, budget GM, règle de preuve ou changement mains libres.
+- Mapping absent au diagnostic puis sauvegardé/relu intégralement par MCP Lovable
+  seulement sandbox-ulrich : dix états, enabled=true, version
+  `2026-10-25T11:39:32.000Z`, tags Gradium fermés. Températures et voix conservées.
+  L'état et la version appliquée sont observables dans les deux chemins TTS.
+- Vérifications : conservation littérale sous budgets réels, isolation Max/Emma,
+  déclaration/livraison distinctes, état inconnu, variété, repli neutre retenté,
+  batch/setup incrémental/fallback Gradium et reçus sans rejeu.
+  `test:quality` vert (64 régression, 882 unitaires, 41 intégration, lint/types/build),
+  72 E2E verts ; les tests simulés ne constituent pas une recette au casque.
+- Base main vérifiée `53baa8618eb388714c23612bb7154f5b5cb17491` (#74,
+  CI PR/main vertes). Résultats complets et livraison du lot dans
+  [le plan](docs/plan_parole_incarnee_personnages.md) et la PR ; SHA final et runs
+  exacts inscrits dans le bilan GitHub, sans boucle de commit documentaire.
+  Recette humaine Max/Emma au casque et mesure de latence restantes. Aucune
+  publication de production ; PR étrangère #24 et ses branches préservées.
+
 ## [Lot 1 — compatibilité GM] — 2026-10-25
 
 - Reproduction avant correction par le véritable évaluateur : le JSON historique

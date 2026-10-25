@@ -26,6 +26,7 @@ import {
 } from "@/agents/maxPromptCompiler";
 import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
 import { rugositySpeechDirective } from "@/services/speechRugosity";
+import { characterEmbodiment, withoutCharacterEmbodiment } from '@/services/characterEmbodiment';
 import {
   compileRichCharacterSections,
   renderRichSections,
@@ -519,7 +520,7 @@ export async function buildMaxSystemPrompt(
   const identityInvariant = `${characterIdentity}\n\n## PROCÉDURE DE PASSAGE TÉLÉPHONIQUE\n${CHARACTER_CALL_TRANSFER_INSTRUCTIONS}`;
 
   if (variant === "legacy") {
-    const fieldsSections = buildCharacterPromptSections(characterFields);
+    const fieldsSections = buildCharacterPromptSections(withoutCharacterEmbodiment(characterFields));
     const injectedSections: MaxPromptAssemblyTrace["injectedSections"] = [];
     let prompt = identityInvariant;
     const legacyBudgetSections: NonNullable<MaxPromptAssemblyTrace["budget"]>["sections"] = [{
@@ -530,6 +531,12 @@ export async function buildMaxSystemPrompt(
       included: true,
       truncated: false,
     }];
+    for (const section of characterEmbodiment(characterFields)) {
+      const rendered = `\n\n## ${section.title}\n${section.content}`;
+      prompt += rendered;
+      legacyBudgetSections.push({ key: section.key, title: section.title, chars: rendered.length,
+        originalChars: section.content.length, included: true, truncated: false });
+    }
     // The editorial prohibitions are part of the non-negotiable static core.
     // They are placed before the complete legacy sheet so an oversized optional
     // field can never evict them from the prompt budget.
@@ -708,6 +715,9 @@ export async function buildMaxSystemPrompt(
     for (const section of compiledFields) {
       const prefix = `\n\n## ${section.title}\n`;
       const available = MAX_STATIC_PROMPT_CHARS - COMPACT_GAMEPLAY_RULES.length - prompt.length - prefix.length - 2;
+      if ((section.key === 'maniere_de_parler' || section.key === 'moteur_intime') && section.content.length > available) {
+        throw new Error('Parole éditoriale trop longue pour le noyau compact_v1');
+      }
       const content = available > 0
         ? truncateAtSentenceBoundary(section.content, available)
         : "";
@@ -853,6 +863,7 @@ async function buildRichMaxSystemPrompt(
   identityInvariant: string,
 ): Promise<MaxPromptAssemblyTrace> {
   const compiled = compileRichCharacterSections(characterFields, {
+    staticOverheadChars: identityInvariant.length + 2,
     sessionSummary: input.sessionSummary,
     turnIndex: input.temporalContext?.turnIndex,
   });
