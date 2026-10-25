@@ -125,6 +125,7 @@ describe("structured consent — pure validator", () => {
   });
   it.each([
     "Je ne vais pas te le passer.", "Je vais pas te le passer.", "Je te le passe pas.",
+    "D'accord, mais je ne vais pas te passer Max comme ça.",
     "Tu peux pas appeler Max.", "Je peux pas te passer Max.", "N’appelle pas Max.",
     "Je ne vais pas l’appeler.", "Je vais pas l’appeler.", "Je vais l’appeler. Finalement non.", "Je vais l’appeler. Non.",
     "Je vais l’appeler plus tard.", "Plus tard.", "Je vais lui demander s’il accepte.",

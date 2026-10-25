@@ -392,9 +392,17 @@ export interface PRD4PostTurnEvaluation {
     | "client_timeout"
     | "http_error"
     | "invalid_json"
+    | "incomplete_schema"
     | "relationship_invalid"
     | "persistence_failed"
     | "runtime_error";
+  /** Bounded technical metadata only: no raw response, quotes or transcript. */
+  validation_issues?: Array<{
+    code: "json_unreadable" | "schema_incomplete" | "unknown_speech_state"
+      | "handoff_assessment_missing" | "handoff_assessment_invalid" | "handoff_proof_rejected";
+    missing_fields?: string[];
+    reason?: import("@/services/characterHandoff").CharacterHandoffAuditReason;
+  }>;
   /** Personnage du tour, attribué par le runtime et jamais par le modèle. */
   character_key?: import("./conversationMemory").RuntimeCharacter;
   /** Delta mémoire produit dans le même appel GM, sans appel LLM supplémentaire. */

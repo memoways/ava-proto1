@@ -69,6 +69,9 @@ interface AdminConversationMessage {
 }
 
 interface GmPostTurnEntry {
+  execution_status?: import("@/types").PRD4PostTurnEvaluation["execution_status"];
+  execution_reason?: import("@/types").PRD4PostTurnEvaluation["execution_reason"];
+  validation_issues?: import("@/types").PRD4PostTurnEvaluation["validation_issues"];
   turn_index?: number;
   engagement_delta?: number;
   role_usage_quality?: string;
@@ -776,6 +779,15 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                             </span>
                           )}
                         </div>
+                        {evalEntry.execution_reason && (
+                          <p className="font-mono mt-0.5">GM : {evalEntry.execution_status} / {evalEntry.execution_reason}</p>
+                        )}
+                        {evalEntry.validation_issues?.map((issue, index) => (
+                          <p key={index} className="text-amber-400 mt-0.5">
+                            {issue.code}{issue.reason ? ` : ${issue.reason}` : ""}
+                            {issue.missing_fields?.length ? ` — champs manquants : ${issue.missing_fields.join(", ")}` : ""}
+                          </p>
+                        ))}
                         {evalEntry.next_turn_guidance && (
                           <p className="text-muted-foreground mt-0.5 italic">
                             → {evalEntry.next_turn_guidance}

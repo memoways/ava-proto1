@@ -1,4 +1,5 @@
 import { CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS } from '@/services/gameMasterPromptBuilder';
+import { GM_RUNTIME_OUTPUT_INSTRUCTIONS, REQUIRED_GM_JSON_FIELDS } from '@/services/gameMasterContract';
 import { selectSpeechState } from '@/services/speechRugosity';
 import type { OpenHandoffRequest } from '@/services/characterHandoffState';
 import type { ResponseDeliveryReceipt } from '@/services/responseDelivery';
@@ -18,7 +19,7 @@ import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTr
 import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
 import { normalizeMemoryText } from "@/services/conversationMemoryV1";
 import { asRuntimeCharacter } from "@/services/characterConversation";
-import { handoffSpeechEvidence, materializeHandoffAssessment } from "@/services/characterHandoff";
+import { handoffSpeechEvidence, materializeHandoffAssessment, validateCharacterHandoff } from "@/services/characterHandoff";
 import { rugosityDirectorDirective } from "@/services/speechRugosity";
 import type { CharacterRelationshipPolicy, ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, ExperienceDirectorConfig, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, RelationshipStateProposal, RuntimeCharacter, TraceMessage, TurnRelationshipDirective, UserRoleProfile } from "@/types";
 import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
@@ -29,7 +30,7 @@ import {
 } from "@/services/relationshipEngine";
 
 /** Incrémenter à chaque changement de logique ou de prompt du GM (traçabilité A/B). */
-export const GM_CODE_VERSION = "gm-2026-10-24-speech-states";
+export const GM_CODE_VERSION = "gm-2026-10-25-compatible-contract";
 
 export interface PRD4PostTurnInput {
   onGmObserved?: (service: ServiceObservation, spans: ServerObservation) => void;
@@ -228,7 +229,7 @@ function extractJson(text: string): unknown {
   for (const candidate of jsonObjectCandidates(trimmed)) {
     try { return JSON.parse(candidate); } catch { /* try next balanced object */ }
   }
-  return null;
+  return undefined;
 }
 
 function jsonObjectCandidates(text: string): string[] {
@@ -485,13 +486,6 @@ function cleanPlayerSwitchRequest(raw: unknown): PRD4PostTurnEvaluation["player_
   return { targetCharacter, stance };
 }
 
-const REQUIRED_GM_JSON_FIELDS = [
-  "engagement_delta", "confusion_detected", "role_usage_quality", "topics_covered",
-  "transition_recommended", "cinematic_hint", "next_turn_guidance", "next_speech_state", "end_recommended",
-  "moderation_flag", "notes", "trigger_video_id", "labels", "action",
-  "player_switch_request", "memory_delta",
-] as const;
-
 /**
  * Valide la proposition du GM contre la liste synchronisée du personnage.
  * Un état inconnu ou une liste vide retombent sur null, jamais sur une erreur.
@@ -532,7 +526,8 @@ export async function evaluatePostTurnPRD4(
     : EXPERIENCE_DIRECTOR_SYSTEM_PROMPT;
   const messages: TraceMessage[] = [
     { role: "system", content: input.handoffContext
-      ? `${effectiveSystemPrompt}\n${CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS}` : effectiveSystemPrompt },
+      ? `${effectiveSystemPrompt}\n${GM_RUNTIME_OUTPUT_INSTRUCTIONS}\n${CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS}`
+      : `${effectiveSystemPrompt}\n${GM_RUNTIME_OUTPUT_INSTRUCTIONS}` },
     { role: "user", content: buildUserPrompt(input, videos) },
   ];
   let llmTrace: LLMCallDiagnosticTrace | null = null;
@@ -540,6 +535,7 @@ export async function evaluatePostTurnPRD4(
   let diagnosticError: string | null = null;
   let executionStatus: NonNullable<PRD4PostTurnEvaluation["execution_status"]> = "executed";
   let executionReason: NonNullable<PRD4PostTurnEvaluation["execution_reason"]> = "executed";
+  const validationIssues: NonNullable<PRD4PostTurnEvaluation["validation_issues"]> = [];
   try {
     const llm = getLLMSettings();
     model = input.modelOverride?.trim() || llm.LLM_MODEL_GM;
@@ -563,14 +559,22 @@ export async function evaluatePostTurnPRD4(
     ));
     llmTrace = callRes.diagnosticTrace;
     rawResponse = callRes.content;
-    const parsed = spans.runSync("gm_validation_json", () => extractJson(callRes.content)) as Partial<PRD4PostTurnEvaluation> | null;
+    const parsed = spans.runSync("gm_validation_json", () => extractJson(callRes.content));
     if (!isCompleteGMJson(parsed)) {
-      console.warn("[GM-PRD4] no JSON in response:", callRes.content.slice(0, 200));
-      result = { ...DEFAULT_RESULT, notes: "Réponse LLM non parsable (fallback)." };
-      diagnosticError = "Réponse JSON non parsable";
+      const isObject = parsed !== null && typeof parsed === "object" && !Array.isArray(parsed);
+      const missing = REQUIRED_GM_JSON_FIELDS.filter(field => !isObject || !Object.prototype.hasOwnProperty.call(parsed, field));
+      const code = parsed === undefined ? "json_unreadable" : "schema_incomplete";
+      validationIssues.push(code === "json_unreadable" ? { code } : { code, missing_fields: missing });
+      // Never log response text outside opt-in diagnostics.
+      console.warn("[GM-PRD4] validation:", code, code === "schema_incomplete" ? missing : []);
+      diagnosticError = code === "json_unreadable" ? "Réponse JSON illisible" : `Schéma GM incomplet : ${missing.join(", ")}`;
+      result = { ...DEFAULT_RESULT, notes: diagnosticError };
       executionStatus = "invalid";
-      executionReason = "invalid_json";
+      executionReason = code === "json_unreadable" ? "invalid_json" : "incomplete_schema";
     } else {
+      if (parsed.next_speech_state != null && resolveNextSpeechState(parsed.next_speech_state, input.speechStates) === null) {
+        validationIssues.push({ code: "unknown_speech_state" });
+      }
       const rawTrigger = parsed.trigger_video_id ? String(parsed.trigger_video_id) : null;
       const safeTrigger = rawTrigger && validIds.has(rawTrigger) && !triggered.has(rawTrigger) ? rawTrigger : null;
       const rawLabels = (parsed as { labels?: { themes?: unknown[]; topics?: unknown[]; intentions?: unknown[] } }).labels;
@@ -619,8 +623,14 @@ export async function evaluatePostTurnPRD4(
           currentCharacter: input.currentCharacter, turnId: input.handoffContext.turnId, turnIndex: input.turnIndex,
           orchestrationVersionId: input.orchestrationVersionId ?? null, userText: input.userMessage,
           delivery: input.handoffContext.delivery, openRequest: input.handoffContext.openRequest,
-        } : null),
+        } : null, (reason, missingFields) => validationIssues.push({
+          code: reason === "assessment_invalid" ? "handoff_assessment_invalid" : "handoff_proof_rejected",
+          reason, ...(missingFields.length ? { missing_fields: missingFields } : {}),
+        })),
       };
+      if (input.handoffContext && parsed.handoff_assessment == null && result.action?.type === "handoff") {
+        validationIssues.push({ code: "handoff_assessment_missing", missing_fields: ["handoff_assessment"] });
+      }
     }
     model = callRes.model || model;
   } catch (err) {
@@ -695,6 +705,7 @@ export async function evaluatePostTurnPRD4(
     created_at: new Date().toISOString(),
     execution_status: executionStatus,
     execution_reason: executionReason,
+    validation_issues: validationIssues,
     orchestration_version_id: input.orchestrationVersionId ?? null,
     orchestration_config: input.orchestrationConfig ?? null,
     speech_state_played: selectSpeechState(input.speechStatePlayed, input.speechStates ?? []),
@@ -703,6 +714,14 @@ export async function evaluatePostTurnPRD4(
     speech_relationship_tier: input.turnRelationshipDirective?.tier ?? null,
     speech_hope_arc_stage: input.turnRelationshipDirective?.tier ?? null,
   };
+
+  if (executionStatus === "executed" && result.handoff_assessment && input.handoffContext) {
+    const verdict = validateCharacterHandoff({ ...input.handoffContext,
+      currentCharacter: input.currentCharacter, turnIndex: input.turnIndex,
+      orchestrationVersionId: input.orchestrationVersionId ?? null,
+      userText: input.userMessage, evaluation: enriched });
+    if (!verdict.authorized) validationIssues.push({ code: "handoff_proof_rejected", reason: verdict.reason });
+  }
 
   if (input.sessionId && input.persist !== false) {
     try {

@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import publishedV7Prompt from "./fixtures/gm-published-sandbox-v7.txt?raw";
+import { advanceHandoffTurn, assessHandoffTurn } from "@/services/characterHandoffState";
+import { GM_RUNTIME_OUTPUT_INSTRUCTIONS } from "@/services/gameMasterContract";
 vi.mock("@/services/openRouterLLM", () => ({ callLLMWithUsage: vi.fn(), LLMProxyRequestError: class extends Error {} }));
 vi.mock("@/services/settingsService", () => ({ getLLMSettings: () => ({ LLM_MODEL_GM: "existing-gm", LLM_MAX_TOKENS_GM: 950 }) }));
 vi.mock("@/services/videoTriggerService", () => ({ getVideoTriggersCached: vi.fn().mockResolvedValue([]) }));
@@ -15,7 +18,7 @@ import type { CharacterRelationshipPolicy } from "@/types";
 
 const historicalJson = {
   engagement_delta: 1, confusion_detected: false, role_usage_quality: "high", topics_covered: ["max"],
-  transition_recommended: false, cinematic_hint: null, next_speech_state: null, next_turn_guidance: "Continue.", end_recommended: false,
+  transition_recommended: false, cinematic_hint: null, next_turn_guidance: "Continue.", end_recommended: false,
   moderation_flag: false, notes: "historique", trigger_video_id: null,
   labels: { themes: [], topics: ["max"], intentions: [] }, memory_delta: null,
   action: { type: "handoff", targetCharacter: "max", reason: "accord", proposalGuidance: "Appeler Max" },
@@ -30,6 +33,17 @@ const input = {
 
 describe("GM optional structured handoff compatibility", () => {
   beforeEach(() => vi.clearAllMocks());
+  it("accepts a historical JSON without next_speech_state under the actual published v7 prompt", async () => {
+    expect(publishedV7Prompt).not.toContain("next_speech_state");
+    expect(historicalJson).not.toHaveProperty("next_speech_state");
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ content: JSON.stringify(historicalJson), ...llmMetadata });
+    const result = await evaluatePostTurnPRD4({ ...input, systemPromptOverride: publishedV7Prompt });
+    expect(result.execution_status).toBe("executed");
+    expect(result.next_speech_state).toBeNull();
+    expect(result).toMatchObject(historicalJson);
+    expect(result.handoff_assessment).toBeNull();
+    expect(validateCharacterHandoff({ ...validInput(), evaluation: result }).authorized).toBe(false);
+  });
   it.each([undefined, null, {}, { schemaVersion: 2 }, { ...validAssessment(), consent: { stance: "accept", evidence: "" } }])(
     "keeps historical consumers usable when optional assessment is %j", async assessment => {
       vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ content: JSON.stringify({ ...historicalJson,
@@ -41,7 +55,7 @@ describe("GM optional structured handoff compatibility", () => {
       expect(validateCharacterHandoff({ ...validInput(), evaluation: result }).authorized).toBe(false);
     },
   );
-  it("cleans the additive contract without changing the prompt, budget or call count", async () => {
+  it("cleans the additive contract with the code-owned prompt and unchanged budget or call count", async () => {
     vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ content: JSON.stringify({ ...historicalJson,
       handoff_assessment: { ...validAssessment(), unknown: "discarded" } }), ...llmMetadata });
     const result = await evaluatePostTurnPRD4(input);
@@ -50,7 +64,7 @@ describe("GM optional structured handoff compatibility", () => {
     expect(result.action).toEqual(historicalJson.action);
     expect(validateCharacterHandoff({ ...validInput(), evaluation: result }).authorized).toBe(true);
     expect(callLLMWithUsage).toHaveBeenCalledOnce();
-    expect(vi.mocked(callLLMWithUsage).mock.calls[0][0][0].content).toBe(EXPERIENCE_DIRECTOR_SYSTEM_PROMPT);
+    expect(vi.mocked(callLLMWithUsage).mock.calls[0][0][0].content).toBe(`${EXPERIENCE_DIRECTOR_SYSTEM_PROMPT}\n${GM_RUNTIME_OUTPUT_INSTRUCTIONS}`);
     expect(vi.mocked(callLLMWithUsage).mock.calls[0][1]).toMatchObject({ max_tokens: 950, timeoutMs: 12000 });
     expect(EXPERIENCE_DIRECTOR_SYSTEM_PROMPT).not.toContain("handoff_assessment");
     expect(buildExperienceDirectorPrompt(EXPERIENCE_DIRECTOR_SYSTEM_PROMPT, DEFAULT_DIRECTOR_CONFIG)).not.toContain("handoff_assessment");
@@ -80,7 +94,7 @@ describe("GM optional structured handoff compatibility", () => {
     expect(callLLMWithUsage).toHaveBeenCalledOnce();
   });
   it("prepares semantic instructions as an isolated artifact", () => {
-    expect(CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS).toContain('"refusal":false');
+    expect(CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS).toMatch(/"refusal":\s*false/);
     expect(CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS).toContain("accept|object|defer");
     expect(CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS).toContain("Aucun alias global Matt → Max");
     expect(CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS).toContain("réplique complète");
@@ -228,4 +242,90 @@ describe("live handoff prompt contract over historical schemas", () => {
       expect(options).toMatchObject({ max_tokens: 950, timeoutMs: 12000 });
     },
   );
+});
+
+
+describe("current wire contract and bounded diagnostic reasons", () => {
+  beforeEach(() => vi.clearAllMocks());
+  it.each([undefined, null, "État absent de la fiche", "Retenue"])("ignores optional unknown state %j without dropping the proof", async state => {
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...llmMetadata, content: JSON.stringify({
+      ...historicalJson, next_speech_state: state, handoff_assessment: validAssessment(),
+    }) });
+    const result = await evaluatePostTurnPRD4({ ...input, speechStates: [{ name: "Retenue", description: "" }] });
+    expect(result.execution_status).toBe("executed");
+    expect(result.next_speech_state).toBe(state === "Retenue" ? state : null);
+    expect(result.validation_issues).toEqual(state === "État absent de la fiche" ? [{ code: "unknown_speech_state" }] : []);
+    expect(validateCharacterHandoff({ ...validInput(), evaluation: result }).authorized).toBe(true);
+    expect(result).not.toHaveProperty("diagnostic");
+  });
+  it.each(["not JSON", "null", "[]", "{}", "missing-action"])("distinguishes unreadable JSON from incomplete schemas: %s", async value => {
+    const { action: _action, ...incomplete } = historicalJson;
+    const content = value === "missing-action" ? JSON.stringify({ ...incomplete, handoff_assessment: validAssessment() }) : value;
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...llmMetadata, content });
+    const result = await evaluatePostTurnPRD4({ ...input, diagnosticTrace: true });
+    expect(result.execution_reason).toBe(value === "not JSON" ? "invalid_json" : "incomplete_schema");
+    expect(result.validation_issues?.[0].code).toBe(value === "not JSON" ? "json_unreadable" : "schema_incomplete");
+    if (value === "missing-action") expect(result.validation_issues?.[0].missing_fields).toEqual(["action"]);
+    expect(result.action).toEqual({ type: "none" });
+    expect(result.handoff_assessment).toBeNull();
+    expect(result.diagnostic?.error).toBeTruthy();
+  });
+  it("persists missing proof fields without storing raw response or quotes in metadata", async () => {
+    vi.mocked(persistPostTurnMemory).mockResolvedValueOnce(null);
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...llmMetadata, content: JSON.stringify({
+      ...historicalJson, handoff_assessment: { schemaVersion: 2, requestSource: "current_user", targetCharacter: "max", stance: "accept", refusal: false },
+    }) });
+    const result = await evaluatePostTurnPRD4({ ...input, sessionId: "session" });
+    expect(result.validation_issues).toEqual([{ code: "handoff_assessment_invalid", reason: "assessment_invalid", missing_fields: ["consentRef"] }]);
+    expect(persistPostTurnMemory).toHaveBeenCalledWith("session", expect.objectContaining({ validation_issues: result.validation_issues }), null, 11, "emma");
+    expect(result).not.toHaveProperty("diagnostic");
+    expect(result.handoff_assessment).toBeNull();
+  });
+  it.each(["speech_99", "speech_0"])("explains rejected proof reference %s", async consentRef => {
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...llmMetadata, content: JSON.stringify({ ...historicalJson,
+      handoff_assessment: { schemaVersion: 2, requestSource: "current_user", targetCharacter: "max", stance: "accept", refusal: false, consentRef },
+    }) });
+    const fixture = validInput();
+    const delivery = { ...fixture.delivery!, delivered: "Je vais", status: "interrupted" as const };
+    const result = await evaluatePostTurnPRD4({ ...input, handoffContext: {
+      turnId: fixture.turnId, openRequest: null,
+      delivery,
+    } });
+    expect(result.validation_issues).toContainEqual({ code: "handoff_proof_rejected",
+      reason: consentRef === "speech_99" ? "consent_evidence_missing" : "consent_not_delivered" });
+    expect(validateCharacterHandoff({ ...fixture, delivery, evaluation: result }).authorized).toBe(false);
+  });
+  it.each(["max", "emma"] as const)("evaluates deferred then confirmed pronoun request from %s with old JSON and published prompt", async source => {
+    const target = source === "max" ? "emma" : "max";
+    const name = target === "max" ? "Max" : "Emma";
+    const fixture = validInput();
+    let state = advanceHandoffTurn(null, { sessionId: "session", sourceCharacter: source,
+      orchestrationVersionId: "v6", turnId: "session:10", turnIndex: 10 });
+    for (const [offset, reply] of ["Je vais lui demander.", `D’accord. Je te passe ${name}.`].entries()) {
+      const index = 10 + offset;
+      const userText = offset === 0 ? `Je voudrais parler avec ${name}.` : "Oui, je veux bien lui parler.";
+      const delivery = { ...fixture.delivery!, turnId: `session:${index}`, turnIndex: index,
+        character: source, generated: reply, delivered: reply };
+      state = advanceHandoffTurn(state, { ...state, turnId: delivery.turnId, turnIndex: index });
+      const action = offset === 0 ? { type: "none" } : { type: "handoff", targetCharacter: target, reason: "Accord", proposalGuidance: "Passer l’appel" };
+      vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...llmMetadata, content: JSON.stringify({
+        ...historicalJson, action, player_switch_request: { targetCharacter: target, stance: offset ? "accept" : "defer" },
+        handoff_assessment: { schemaVersion: 2, requestSource: offset ? "open_request" : "current_user",
+          targetCharacter: target, stance: offset ? "accept" : "defer", refusal: false, consentRef: offset ? "speech_1" : "speech_0" },
+      }) });
+      const result = await evaluatePostTurnPRD4({ ...input, currentCharacter: source, turnIndex: index,
+        userMessage: userText, maxResponse: reply, systemPromptOverride: publishedV7Prompt,
+        handoffContext: { turnId: delivery.turnId, delivery, openRequest: state.openRequest } });
+      expect(result.execution_status).toBe("executed");
+      expect(result.next_speech_state).toBeNull();
+      state = assessHandoffTurn(state, { ...fixture, currentCharacter: source, turnIndex: index,
+        turnId: delivery.turnId, userText, delivery, openRequest: state.openRequest, evaluation: result }).state;
+      expect(state.state).toBe(offset ? "available" : "awaiting_character");
+      const system = vi.mocked(callLLMWithUsage).mock.calls.at(-1)![0][0].content;
+      expect(system.startsWith(publishedV7Prompt)).toBe(true);
+      expect(system.indexOf(GM_RUNTIME_OUTPUT_INSTRUCTIONS)).toBeGreaterThan(system.indexOf("EXACTEMENT cet objet"));
+    }
+    expect(callLLMWithUsage).toHaveBeenCalledTimes(2);
+    expect(state.offer?.targetCharacter).toBe(target);
+  });
 });

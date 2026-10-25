@@ -283,6 +283,7 @@ export default function GameMasterSettingsTab() {
             elapsed_ms: Math.round(performance.now() - started),
             execution_status: result.execution_status,
             execution_reason: result.execution_reason,
+            validation_issues: result.validation_issues,
             json_complete: result.diagnostic?.error == null,
             labels: result.labels,
             guidance: result.next_turn_guidance,

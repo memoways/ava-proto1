@@ -1,4 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { readFileSync } from "node:fs";
+
+const HISTORICAL_GM_PROMPT = readFileSync(new URL("../../src/agents/fixtures/gm-published-sandbox-v7.txt", import.meta.url), "utf8");
 
 const PROJECT_ID = "iralfqlslqndgvexixis";
 const SUPABASE_ORIGIN = `https://${PROJECT_ID}.supabase.co`;
@@ -25,6 +28,8 @@ interface NetworkFakeOptions {
   gmHandoffAt?: number;
   gmHandoffTurns?: number[];
   gmReferencedAssessment?: boolean;
+  historicalGmPrompt?: boolean;
+  gmDeferredAt?: number;
   failGmAt?: number;
   delayGmMs?: number;
   characterReplies?: string[];
@@ -401,7 +406,7 @@ async function installNetworkFakes(
       return json(route, [{
         version_id: "66666666-6666-4666-8666-666666666666",
         version_number: 1,
-        prompt: "builtin://experience-director-v1",
+        prompt: options.historicalGmPrompt ? HISTORICAL_GM_PROMPT : "builtin://experience-director-v1",
         config: {
           schemaVersion: 1,
           minimumHandoffTurn: 4,
@@ -600,10 +605,13 @@ async function installNetworkFakes(
         const target = options.gmTarget ?? (handoffContext?.sourceCharacter === 'max' ? 'emma' : 'max');
         const reply = handoffContext?.delivery?.generated ?? '';
         const isProposal = !options.gmStance && gmTurn === (options.gmHandoffAt ?? -2) + 1;
+        const stance = gmTurn === options.gmDeferredAt ? 'defer' : options.gmStance ?? 'accept';
         const assessed = options.gmReferencedAssessment && handoffContext ? {
-          schemaVersion: 2, requestSource: isProposal ? 'spoken_proposal' : 'current_user',
-          targetCharacter: target, stance: options.gmStance ?? 'accept', refusal: false,
-          consentRef: handoffContext.speechEvidence[0]?.ref,
+          schemaVersion: 2, requestSource: isProposal ? 'spoken_proposal'
+            : options.gmDeferredAt && handoffContext.openRequest ? 'open_request' : 'current_user',
+          targetCharacter: target, stance, refusal: false,
+          consentRef: handoffContext.speechEvidence.find((item: { text: string }) => /passe (Max|Emma)/.test(item.text))?.ref
+            ?? handoffContext.speechEvidence[0]?.ref,
         } : handoffContext && (options.gmStance || isProposal) ? {
           schemaVersion: 1, sourceCharacter: handoffContext.sourceCharacter, targetCharacter: target,
           turnId: handoffContext.turnId, turnIndex: handoffContext.turnIndex,
@@ -655,6 +663,11 @@ async function installNetworkFakes(
           return json(route, { error: "simulated_provider_failure" }, 503);
         }
         content = options.characterReplies?.[maxTurnCount - 1] ?? options.maxResponse ?? `Réponse de Max pour le tour ${maxTurnCount}.`;
+        // Batch now uses the private envelope too. Honor the requested protocol
+        // so a normal fake reply does not trigger an unintended recovery call.
+        if (!payload.stream && system.includes('# FORMAT DE SORTIE IMPÉRATIF')) {
+          content = JSON.stringify({ goal: 'PRIVATE_INTENT_CANARY', points: ['Point privé'] }) + '\n<speech>\n' + content;
+        }
       }
       if (payload.stream) {
         const response = maxTurnCount === options.malformedCharacterStreamAt
@@ -1897,5 +1910,40 @@ for (const withOffer of [false, true]) {
     await page.waitForLoadState('networkidle');
     await expect(page.getByRole('button', { name: /^Appeler / })).toHaveCount(0);
     await expect(page.getByRole('img', { name: 'Portrait d’Emma' })).toBeVisible();
+  });
+}
+
+for (const source of ['Max', 'Emma'] as const) {
+  test(`compatibilité GM v7 : ${source}, demande différée puis confirmation et connexion`, async ({ page }) => {
+    test.setTimeout(45_000);
+    const target = source === 'Max' ? 'Emma' : 'Max';
+    const sourceKey = source.toLowerCase();
+    const targetKey = target.toLowerCase();
+    const secret = `CONFIDENCE_PRIVEE_${source}_LOT1`;
+    const turns = [`Je te confie ${secret}.`, ...HANDOFF_TURNS.slice(1),
+      `Je voudrais parler avec ${target}.`, 'Oui, je veux bien lui parler.'];
+    const fakes = await installNetworkFakes(page, [...turns, 'Bonjour, je voudrais vous écouter.'], { ttsSuccess: true, characterOpenings: true,
+      historicalGmPrompt: true, gmReferencedAssessment: true, gmStance: 'accept',
+      gmDeferredAt: 4, gmHandoffTurns: [4, 5], characterReplies: ['Je t’écoute.', 'Je t’écoute.', 'Je t’écoute.',
+        'Je vais lui demander.', `D’accord. Je te passe ${target}.`, 'Je suis là.'] });
+    await startCharacterConversation(page, source);
+    for (const text of turns.slice(0, 4)) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+    await expect(page.getByRole('button', { name: `Appeler ${target}`, exact: true })).toHaveCount(0);
+    expect(fakes.getSessionRow()).toMatchObject({ active_character: sourceKey, handoff_count: 0,
+      pending_handoff: { state: 'awaiting_character' } });
+    await sendHandoffTurn(page, turns[4]);
+    await expect(page.getByRole('button', { name: `Appeler ${target}`, exact: true })).toBeVisible();
+    expect(fakes.getSessionRow()).toMatchObject({ active_character: sourceKey, handoff_count: 0,
+      pending_handoff: { state: 'available', offer: { targetCharacter: targetKey } } });
+    await page.getByRole('button', { name: `Appeler ${target}`, exact: true }).click();
+    await expect(page.getByText('Appel en cours…', { exact: true })).toBeVisible();
+    await expect(page.getByRole('img', { name: `Portrait d’${target}` })).toBeVisible({ timeout: 10_000 });
+    await sendHandoffTurn(page, 'Bonjour, je voudrais vous écouter.');
+    await page.waitForLoadState('networkidle');
+    expect(fakes.getCharacterCalls().at(-1)).not.toContain(secret);
+    expect(fakes.getSessionRow()).toMatchObject({ active_character: targetKey, handoff_count: 1, has_seen_film: 'pas_vu' });
+    expect(fakes.getSessionInsertCount()).toBe(1);
+    expect(fakes.getExperienceEvents().filter(event => event.event_type === 'handoff_executed')).toHaveLength(1);
+    await page.getByRole('button', { name: 'Terminer', exact: true }).click();
   });
 }
