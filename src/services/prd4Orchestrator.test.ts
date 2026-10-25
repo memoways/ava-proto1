@@ -72,11 +72,13 @@ import { enqueueConversationTurnTrace, patchQueuedConversationTurnTrace } from "
 import { materializeConversationTurnTrace } from "@/services/conversationTraceFormat";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { fetchConversationMemory } from "@/services/sessionConversationMemory";
+import { fetchCharacterSpeechRuntime } from "@/services/experienceOrchestration";
 import { getGameplaySettings } from "@/services/settingsService";
 import { streamPRD4Turn, processPRD4Turn as processPRD4TurnImpl, type PRD4TurnInput } from "@/services/prd4Orchestrator";
 import {
   MAX_LLM_RESPONSE_DEADLINE_MS,
   RAG_DEGRADED_MODE_DEADLINE_MS,
+  SUMMARY_FETCH_DEADLINE_MS,
   TURN_RESPONSE_DEADLINE_MS,
   TURN_RESPONSE_FINALIZATION_RESERVE_MS,
 } from "@/config/experienceRuntime";
@@ -224,6 +226,55 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it.each([MAX_CONTEXT, EMMA_CONTEXT])("continues $characterKey batch replies when speech settings are unavailable", async (characterContext) => {
+    vi.mocked(fetchCharacterSpeechRuntime).mockRejectedValueOnce(new Error("Speech profile unavailable"));
+    const result = await processPRD4Turn({ sessionId: "session-speech-error", characterContext,
+      conversationHistory: [], userMessage: "Bonjour", userRole: null, timeElapsedSeconds: 0,
+      diagnosticTraceEnabled: true, gmSpeechState: "Bloqué" });
+    expect(result.maxResponse).toBe("Je vous écoute.");
+    expect(vi.mocked(simulateMaxResponse).mock.calls[0][0]).toMatchObject({ rugosite: 0, speechStateHistory: [], speechStateDirective: null });
+    await result.postTurnPromise;
+    expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0]).toMatchObject({ currentCharacter: characterContext.characterKey, rugosite: 0, speechSettingsVersion: undefined });
+    expect(vi.mocked(enqueueConversationTurnTrace).mock.calls[0][0].memory).toMatchObject({ speechRuntimeStatus: "unavailable", rugosite: 0, speechSettingsVersion: undefined });
+  });
+
+  it.each([MAX_CONTEXT, EMMA_CONTEXT])("streams $characterKey after the 600ms speech deadline without using late settings", async (characterContext) => {
+    vi.useFakeTimers();
+    let resolveRuntime: ((value: Awaited<ReturnType<typeof fetchCharacterSpeechRuntime>>) => void) | undefined;
+    vi.mocked(fetchCharacterSpeechRuntime).mockImplementationOnce(() => new Promise(resolve => { resolveRuntime = resolve; }));
+    const events: string[] = [];
+    vi.mocked(simulateMaxResponse).mockImplementationOnce(async (_input, opts) => {
+      opts?.onSpeechToken?.('{"goal":"Écouter","points":[]}\n<speech>\nJe vous écoute. ');
+      return { response: opts?.finishSpeech?.() ?? "", systemPrompt: "system" };
+    });
+    const pending = streamPRD4Turn({ sessionId: "session-speech-slow", characterContext,
+      conversationHistory: [], userMessage: "Bonjour", userRole: null, timeElapsedSeconds: 0,
+      diagnosticTraceEnabled: true }, event => events.push(event.type), Promise.resolve("Je vous écoute."));
+    await vi.advanceTimersByTimeAsync(SUMMARY_FETCH_DEADLINE_MS - 1);
+    expect(simulateMaxResponse).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    const result = await pending;
+    expect(events).toEqual(["intent", "segment", "complete"]);
+    expect(result.maxResponse).toBe("Je vous écoute.");
+    resolveRuntime?.({ rugosite: 3, settingsVersion: "late", environmentId: "sandbox-ulrich", recentStates: ["Bloqué"] });
+    await result.postTurnPromise;
+    expect(result.speechPerformanceContext?.rugosite).toBe(0);
+    expect(vi.mocked(enqueueConversationTurnTrace).mock.calls[0][0].memory).toMatchObject({ speechRuntimeStatus: "timeout", speechSettingsVersion: undefined });
+    expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0]).toMatchObject({ maxResponse: "Je vous écoute.", rugosite: 0, speechSettingsVersion: undefined });
+  });
+
+  it("preserves the authorized speech snapshot when available on the next turn", async () => {
+    vi.mocked(fetchCharacterSpeechRuntime).mockRejectedValueOnce(new Error("denied"));
+    const input = { sessionId: "session-speech-retry", conversationHistory: [], userMessage: "Bonjour", userRole: null, timeElapsedSeconds: 0 };
+    await processPRD4Turn(input);
+    vi.mocked(fetchCharacterSpeechRuntime).mockResolvedValueOnce({ rugosite: 3, settingsVersion: "saved-v3", environmentId: "sandbox-ulrich", recentStates: ["Bloqué", null] });
+    const result = await processPRD4Turn(input);
+    await result.postTurnPromise;
+    expect(vi.mocked(simulateMaxResponse).mock.calls[1][0]).toMatchObject({ rugosite: 3, speechStateHistory: ["Bloqué", null] });
+    expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[1][0]).toMatchObject({ rugosite: 3, speechSettingsVersion: "saved-v3" });
+    expect(fetchCharacterSpeechRuntime).toHaveBeenCalledTimes(2);
   });
 
   it.each(["vu", "pas_vu"])("transmits the initial %s answer identically to the GM and character without a published frame", async (hasSeenFilm) => {

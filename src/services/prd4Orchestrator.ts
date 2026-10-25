@@ -192,10 +192,15 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   // Démarre avec la mémoire et le RAG. simulateMaxResponse relira la même fiche
   // depuis le cache : aucune requête supplémentaire n'est ajoutée en série.
   const characterPromptPromise = loadCharacterPrompt(input.characterContext.characterId);
-  // Rugosité épinglée à la session : lue une fois, en parallèle, jamais sur le chemin critique.
-  const speechRuntimePromise = withTimeout("character_speech_runtime", fetchCharacterSpeechRuntime(activeCharacter, input.sessionId), SUMMARY_FETCH_DEADLINE_MS);
-  // Attach a handler immediately; preserve the failure when awaited below.
-  void speechRuntimePromise.catch(() => {});
+  // Optional speech styling must not prevent a reply. Keep the authorized read
+  // strict, but recover here without caching or inventing a settings snapshot.
+  let speechRuntimeStatus: "available" | "timeout" | "unavailable" = "available";
+  const speechRuntimePromise = withTimeout("character_speech_runtime", fetchCharacterSpeechRuntime(activeCharacter, input.sessionId), SUMMARY_FETCH_DEADLINE_MS)
+    .catch((error: unknown) => {
+      speechRuntimeStatus = error instanceof Error && error.name === "TimeoutError" ? "timeout" : "unavailable";
+      console.warn("[PRD4 orchestrator] Speech runtime unavailable; neutral rendering for this turn:", speechRuntimeStatus);
+      return null;
+    });
   const directorRuntimePromise = fetchPinnedDirectorRuntime(input.sessionId).catch(() => ({
     versionId: null,
     versionNumber: null,
@@ -277,11 +282,12 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const characterPrompt = await characterPromptPromise;
   if (!characterPrompt) throw new Error(`Fiche personnage absente pour ${input.characterContext.displayName}`);
   const speechRuntime = await speechRuntimePromise;
-  const rugosite = speechRuntime.rugosite;
+  const rugosite = speechRuntime?.rugosite ?? 0;
+  const recentSpeechStates = speechRuntime?.recentStates ?? [];
   // La proposition du GM n'est retenue que si elle nomme un état de la fiche.
   const speechStates = characterPrompt.speech_states ?? [];
   input.onSpeechRuntimeReady?.({ rugosite, states: speechStates.map(state => state.name) });
-  const proposedSpeechState = selectSpeechState(input.gmSpeechState, speechStates, speechRuntime.recentStates);
+  const proposedSpeechState = speechRuntime ? selectSpeechState(input.gmSpeechState, speechStates, recentSpeechStates) : null;
   const visibleStructuredMemory = structuredMemory
     ? filterConversationMemoryForCharacter(structuredMemory, activeCharacter)
     : null;
@@ -349,7 +355,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     experienceFrame: experienceFrame.prompt || undefined,
     speechStateDirective: proposedSpeechState,
     rugosite,
-    speechStateHistory: speechRuntime.recentStates,
+    speechStateHistory: recentSpeechStates,
   };
   observeVoice(input.onVoiceObservation, "context_ready");
   try { input.onVersionsObserved?.(input.characterContext.promptUpdatedAt, "versionId" in frameRuntime ? frameRuntime.versionId : null); } catch { /* diagnostic only */ }
@@ -476,8 +482,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         speechStates,
         rugosite,
         speechStatePlayed: playedState,
-        recentSpeechStates: [playedState, ...speechRuntime.recentStates].slice(0, 2),
-        speechSettingsVersion: speechRuntime.settingsVersion,
+        recentSpeechStates: [playedState, ...recentSpeechStates].slice(0, 2),
+        speechSettingsVersion: speechRuntime?.settingsVersion,
       });
     } finally {
       input.onLatencySegment?.({
@@ -541,7 +547,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         gmTopicsCovered: maxInput.gmGuidance?.topicsCovered ?? [],
         gmSpeechStateProposed: proposedSpeechState,
         rugosite,
-        speechSettingsVersion: speechRuntime.settingsVersion,
+        speechSettingsVersion: speechRuntime?.settingsVersion,
+        speechRuntimeStatus,
         relationshipTier: relationshipDirective.tier,
         hopeArcStage: relationshipDirective.tier,
         structuredMemoryBefore: visibleStructuredMemory,

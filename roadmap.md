@@ -2,6 +2,10 @@
 
 ## En cours
 
+- Correctif QA du 25 octobre : protéger les tours Max/Emma contre la lecture
+  lente/échouée de rugosité ; vérifier tests batch/streaming et diagnostic.
+  Publication et livraison GitHub restent distinctes.
+
 - Lot A parole incarnée : correctifs et 863 tests verts en preview ; attend écoute
   humaine Max/Emma et mesure de latence. Code détecté sur le site publié le 24 octobre.
 - Lot B : code et banc connecté vérifiés, 878 tests verts ; attend auditions réelles,
