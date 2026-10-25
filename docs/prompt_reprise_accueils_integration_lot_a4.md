@@ -7,32 +7,22 @@ Exécute uniquement le lot A4 dans
 Un seul agent, aucun sous-agent, clone ni worktree. Ce prompt prépare la reprise ;
 sa création dans A3 ne lance pas A4.
 
-## Prérequis bloquant : terminer A3 avant A4
+## Décision production à conserver
 
-A3 est **incomplet côté livraison**, malgré ses tests locaux verts. Code conservé
-dans `cbfbeca92e8f602f64d3bbceca6cbf3c6619e52a`, branche locale
-`codex/a3-faithful-pause-auditions`, base `46d29a5`. Aucun push ni PR A3.
-Au fetch de livraison, main a avancé au commit Lovable
-`e1c92785f5f3f8f744d171e616039606df28393e` (« Leveré garde et transposé prod »),
-avec [CI verte](https://github.com/memoways/ava-proto1/actions/runs/40232402896),
-qualité et E2E compris. Lovable annonce ce même SHA, ready/agentFinished ;
-A3 est absent de sa preview et aucune validation visuelle A3 n’est revendiquée.
-Il supprime les gardes production de quatre fichiers recoupant A3 :
-`performanceIntent.ts`, `speechPerformanceSettings.ts`,
-`speechPerformance.test.ts`, `providers/gradium.speech.test.ts`.
-Le prompt A3 les exigeait fermées. La règle AGENTS sur le travail récent d’un
-autre agent empêche une résolution autonome qui rétablirait ou supprimerait ces
-changements. Main n’a pas été modifié et la branche A3 n’a pas été rebasée.
+Le main Lovable `e1c92785f5f3f8f744d171e616039606df28393e` avait levé les gardes
+production pendant A3, avec [qualité/E2E verts](https://github.com/memoways/ava-proto1/actions/runs/40232402896).
+Le recoupement a été signalé avant livraison. Ulrich a explicitement choisi :
+**conserver le rendu par état en production ; réserver les pauses expérimentales
+et les auditions à la sandbox.** Cette réponse remplace la fermeture générale de
+production du prompt A3 initial et résout le blocage de coordination.
 
-La seule intervention humaine nécessaire est la décision sur cette divergence :
-rendu par état en prod avec pauses/auditions sandbox, conservation intégrale du
-nouveau comportement Lovable avec banc seul sandbox, ou rétablissement des gardes
-A3 initiales. Après réponse, reprendre d’abord A3 sur sa même branche, intégrer
-main sans perdre l’un des deux travaux, revérifier le code final et terminer
-PR/CI/main/Lovable/nettoyage. Actualiser ce prompt avec le résultat réel et les
-SHA/runs, puis seulement lancer A4. Aucun accord n’est déduit de l’absence de
-réponse. Les états techniques décrits ci-dessous sont ceux de la branche A3
-validée localement ; la fermeture prod n’est plus celle du main concurrent.
+A3 intègre ce main : lecture/chargement du mapping et dérivation de l’intention
+restent ouverts en production ; le résolveur des breaks refuse la production
+même si `gradiumPausesEnabled=true`. Le banc, ses snapshots et sa sauvegarde sont
+réservés à la sandbox. Les tags émotionnels restent fermés partout. Ne pas
+rétablir une fermeture générale du rendu par état, ni rouvrir les pauses en
+production en interprétant le commit Lovable antérieur. Aucun mapping Cloud n’a
+été modifié par cette intégration ; les pauses live restent désactivées.
 
 ## Première action exécutable et état à reprendre
 
@@ -40,9 +30,11 @@ Commence par `git fetch --prune`, statut, `git log origin/main`, branches et PR
 ouvertes, puis lis le CHANGELOG. Mets le checkout à jour avant d’écrire. A3 part
 exactement de `46d29a573eef5e44b808c37dcef78202499edc47` (passation #79), après
 A1 #77 et A2 #78. Reprends le main réel et son bilan de livraison A3, sans revenir
-à cette base ni perdre les corrections documentaires ultérieures. Aucun SHA de fusion A3 ni run CI A3 n’existe encore ; les relever après la
-résolution et la livraison ci-dessus, sans confondre la CI Lovable concurrente
-avec une validation du lot A3.
+à cette base ni perdre les corrections documentaires ultérieures. A3 intègre
+ensuite le main Lovable `e1c9278`. Le SHA de fusion A3 et les runs exacts
+figurent dans le bilan de livraison de
+la PR A3 ; les vérifier par GitHub avant reprise, sans confondre la CI du main
+Lovable antérieur avec une validation du lot A3.
 
 État technique A3 vérifié dans le dépôt :
 
@@ -65,13 +57,15 @@ avec une validation du lot A3.
   des champs non édités, readback DB exact avant cache local, échec visible.
   Le mode A/B n’est jamais une activation live ni une sauvegarde implicite.
 - Qualité locale : lint/types/build, 66 régressions, 1 010 unitaires et
-  41 intégrations et 78 E2E verts sans retry (13,5 minutes). Livraison
-  GitHub/Lovable bloquée comme décrit ci-dessus. Un timeout LatencyBlockingTab
-  est passé au rejeu isolé 8/8 puis en qualité complète, sans changer son délai. Fournisseurs simulés pour les tests déterministes.
+  41 intégrations et 78 E2E verts sans retry après intégration de main (14,3 minutes). Livraison
+  GitHub/Lovable et runs exacts dans le bilan A3. Un timeout LatencyBlockingTab
+  est passé au rejeu isolé 8/8 puis en qualité complète, sans changer son délai.
+  Fournisseurs simulés pour les tests déterministes.
 - Lecture MCP Lovable réelle : sandbox-ulrich et prod possèdent le mapping
   `2026-10-25T11:39:32.000Z`, `gradiumPausesEnabled` absent et
-  `gradiumTagsEnabled=false`. Aucune écriture Cloud A3. Le runtime refuse A2
-  en production même si un mapping est stocké. Aucun audio réel, gain acoustique,
+  `gradiumTagsEnabled=false`. Aucune écriture Cloud A3. Le runtime conserve le
+  rendu par état en production, mais refuse les breaks expérimentaux en production
+  même si leur booléen est true. Aucun audio réel, gain acoustique,
   acting, latence matérielle ou acceptation humaine revendiqué. Production non publiée.
 
 À la reprise A3, #24 `agent/test-gap-invitation-validity-multi-use` et 16 branches
@@ -148,9 +142,10 @@ reçus delivered/uncertain/private, samples, annulation et reprise sans rejeu ap
 son ; setup avant premier segment, récupération préalable unique et bornée.
 Ne pas rallonger buffers/délais, modifier capture/STT ou décisions mains libres
 (handsFreeVoice.ts), `experienceFrame`, mémoires isolées, gardes de transfert,
-modèles/températures/voix de jeu et budgets 220 personnage / 950 GM. Pauses live
-et tags Gradium fermés tant que l’écoute/activation n’est pas explicitement
-acceptée. Aucun nouveau backend, hébergeur, secret ou publication production.
+modèles/températures/voix de jeu et budgets 220 personnage / 950 GM. Rendu par
+état conservé en production ; pauses expérimentales et auditions sandbox
+uniquement. Activation live sandbox seulement après écoute et accord explicite ;
+tags émotionnels Gradium fermés partout. Aucun nouveau backend, hébergeur, secret ou publication production.
 
 Ajouter seulement les tests manquants aux vrais points d’appel : trois contextes
 d’accueil, choix stable, absence de répétition/double lecture, cache invalidé,

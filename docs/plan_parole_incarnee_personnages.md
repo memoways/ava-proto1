@@ -21,9 +21,9 @@ personnages. L'exécution app commence par le
 [prompt autonome du lot A1](prompt_reprise_parole_ouverte_lot_a1.md), qui conserve
 ce plan et laisse l'édition/synchronisation à Ulrich pendant son travail.
 
-### Correction technique A3 locale — 25 octobre 2026
+### Correction technique A3 — 25 octobre 2026
 
-Sur la branche A3, le banc existant compare maintenant témoin et breaks WS A2 avec un snapshot
+Le banc existant compare maintenant témoin et breaks WS A2 avec un snapshot
 temporaire explicite, isolé du mapping live et de la production. M1/M2/E1/E2
 forment la première comparaison ; les huit cas restent proposés et non canoniques.
 Même texte/voix/configuration de base en A/B, témoin Max 3 / Emma 2. Les requêtes
@@ -40,10 +40,10 @@ tags fermés. Tests simulés et technique livrée ne valent ni audition réelle 
 acceptation du timbre. Notion Gamilab n’est toujours pas exposé dans cette session ;
 aucune modification éditoriale ni synchronisation n’est effectuée.
 
-Livraison A3 suspendue : le main Lovable `e1c9278` a levé les gardes production
-dans les mêmes fichiers pendant les tests. Les validations locales n’intègrent
-pas ce changement ; la décision d’Ulrich est nécessaire avant résolution, selon
-la règle du dépôt sur le travail récent d’un autre agent. Aucun push ni PR A3.
+Le main Lovable `e1c9278` a été intégré après décision explicite d’Ulrich :
+le rendu par état reste disponible en production ; seules les pauses
+expérimentales et les auditions sont réservées sandbox. Le blocage de
+coordination est résolu, sans rétablir une fermeture générale du rendu par état.
 
 [Résultat, validations et réserves A3](plan_lot_b_rendu_vocal.md#exécution-a3--25-octobre-2026).
 Le prochain lot suit le [prompt A4](prompt_reprise_accueils_integration_lot_a4.md),

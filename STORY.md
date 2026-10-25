@@ -7,7 +7,7 @@
 
 ---
 
-## A3 local — entendre ce que le réglage promet (25 octobre 2026)
+## A3 — entendre ce que le réglage promet (25 octobre 2026)
 
 Le banc annonçait des pauses longues mais appelait REST. Il compare désormais
 les breaks WS d’A2 à un témoin, sur les mêmes mots et la même voix, à partir d’un
@@ -27,10 +27,10 @@ Gamilab restent ouvertes. [Bilan A3](docs/plan_lot_b_rendu_vocal.md#exécution-a
 et [prompt A4](docs/prompt_reprise_accueils_integration_lot_a4.md) conservés ; le lot
 des accueils n’est pas lancé, la production n’est pas publiée.
 
-La livraison A3 est suspendue : un main Lovable concurrent a supprimé les
-gardes production pendant les vérifications. Le lot reste local, avec ses tests
-verts et sa passation ; la règle de coordination exige une décision d’Ulrich
-avant de résoudre ce recoupement. Aucune PR ni publication A3.
+Le main Lovable ayant levé les gardes production pendant les vérifications,
+Ulrich a choisi de garder le rendu par état en production et de réserver les
+pauses expérimentales et auditions à la sandbox. A3 intègre cette décision :
+le rendu existant reste disponible, les nouveaux breaks demeurent fermés en prod.
 
 ## A2 — faire une place au silence (25 octobre 2026)
 

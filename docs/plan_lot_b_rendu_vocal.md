@@ -2,7 +2,7 @@
 
 ## Exécution coordonnée Notion / app — 25 octobre 2026
 
-**Statut : A1/A2 livrés ; A3 implémenté et validé localement, livraison suspendue pour divergence concurrente sur main ; A4 reste à faire.** A2 est
+**Statut : A1/A2 livrés ; A3 implémenté sur le main Lovable intégré, décision production résolue ; A4 reste à faire.** A2 est
 dans main `a63ee8a379dcee47346903b43efab2e627f9ed7c`, CI PR/main vertes,
 Lovable synchronisé et preview vérifiée ; pauses expérimentales désactivées.
 La reprise courante est le [prompt autonome A4](prompt_reprise_accueils_integration_lot_a4.md),
@@ -632,31 +632,25 @@ Notion natif vérifié : workspace Ulrich, mauvais routage Ava ; aucune lecture 
 Couverture ajoutée : isolation, requêtes effectives WS/REST, capture/cache bornés,
 annulation/callbacks tardifs et sauvegarde/readback ; qualité et E2E séquentiels.
 
-### Blocage de livraison A3 — main concurrent
+### Intégration du main Lovable et décision production A3
 
-- Code A3 conservé localement dans `cbfbeca92e8f602f64d3bbceca6cbf3c6619e52a`,
-  branche `codex/a3-faithful-pause-auditions`, depuis la base `46d29a5`.
-- Au fetch de livraison, main a avancé à
-  `e1c92785f5f3f8f744d171e616039606df28393e` : commit Lovable
-  « Leveré garde et transposé prod », daté du 25 octobre à 20:47 UTC.
-  Quatre fichiers recoupent A3 : `performanceIntent.ts`,
-  `speechPerformanceSettings.ts`, `speechPerformance.test.ts` et
-  `providers/gradium.speech.test.ts`. Le nouveau main supprime les gardes
-  production du rendu par état, de la résolution de pauses et de la sauvegarde.
-- [CI main concurrente verte](https://github.com/memoways/ava-proto1/actions/runs/40232402896),
-  relevée au même SHA, avec `regression-gates`, qualité et E2E verts. Lovable
-  annonce ce même SHA, ready/agentFinished ; A3 n’est pas dans sa preview.
-  Ce résultat n’est pas une CI du lot A3.
-- Le prompt A3 demande au contraire la fermeture production. AGENTS.md interdit
-  de modifier le travail récent d’un autre agent sans décision d’Ulrich.
-  Aucun rebase, restauration de garde, push, PR ou fusion A3 n’a été effectué
-  après cette découverte. Ne pas effacer le commit Lovable ni le travail A3.
-- Décision demandée à Ulrich : choisir entre rendu par état en production mais
-  pauses/auditions sandbox, conservation intégrale du nouveau comportement
-  Lovable (banc seul en sandbox), ou rétablissement des gardes prévues dans A3.
-  Après décision seulement : intégrer main sur la même branche A3, résoudre les
-  recoupements en préservant les deux travaux, vérifier à nouveau le code final
-  puis terminer PR/CI/main/Lovable/nettoyage. A4 ne commence pas avant clôture A3.
+Pendant les vérifications, Lovable a livré
+`e1c92785f5f3f8f744d171e616039606df28393e` (« Leveré garde et transposé prod »),
+avec [qualité et E2E verts](https://github.com/memoways/ava-proto1/actions/runs/40232402896).
+Ses quatre fichiers recoupaient A3 ; le lot a été conservé localement et la
+livraison suspendue conformément à AGENTS.md. Ulrich a ensuite explicitement
+choisi : **conserver le rendu par état en production ; réserver les pauses
+expérimentales et les auditions à la sandbox.** Cette décision remplace la
+fermeture générale de production du prompt A3 initial.
+
+La branche A3 a été rebasée sur `e1c9278` sans perdre le travail Lovable :
+`getSpeechPerformanceSettings`, le chargement et la dérivation de l’intention
+continuent de lire/appliquer le mapping production. Seul le résolveur des breaks
+expérimentaux rétablit son refus explicite de production, même avec un booléen
+true. Le banc, ses snapshots et sa sauvegarde dédiée restent sandbox uniquement.
+Les tags émotionnels Gradium restent fermés partout. Aucun mapping Cloud, voix,
+fournisseur, modèle ou température n’est modifié par cette résolution.
+Les validations finales ci-dessous portent sur cet ensemble intégré.
 
 ### Résultat et limites A3
 
@@ -694,7 +688,8 @@ annulation/callbacks tardifs et sauvegarde/readback ; qualité et E2E séquentie
 - Lecture MCP Lovable réelle : `ava_speech_performance` version
   `2026-10-25T11:39:32.000Z` en sandbox-ulrich et prod ;
   `gradiumPausesEnabled` absent, `gradiumTagsEnabled=false`. Aucune écriture Cloud.
-  Le code refuse le rendu A2 en prod même si un mapping y est stocké.
+  Le code conserve le rendu par état production et refuse seulement les breaks
+  expérimentaux et les auditions en prod, conformément au choix explicite.
 - Capacité WS et PCM vérifiée contre le moteur A2, ses tests existants et la
   [documentation officielle Gradium sur le streaming](https://gradium.ai/content/how-to-stream-tts-audio-real-time-bidirectional-streaming).
   Aucune nouvelle dépendance ou implémentation de pauses concurrente.
@@ -717,8 +712,11 @@ annulation/callbacks tardifs et sauvegarde/readback ; qualité et E2E séquentie
   puis suite qualité complète verte sans modification de son délai ni du code.
 - E2E locaux : **78/78 verts sans retry**, 13,5 minutes. Le serveur local
   a requis le contexte système autorisé (EPERM en sandbox avant exécution).
-  Validations réalisées sur le code A3 issu de `46d29a5`, avant intégration
-  du main concurrent `e1c9278`. Aucune PR A3 ouverte ; livraison incomplète.
+  Un premier passage a été réalisé avant l’intégration de `e1c9278` ; les
+  validations finales après intégration : **39 tests ciblés, test:quality complet
+  (66 régressions, 1 010 unitaires, 41 intégrations, lint/types/build) et 78 E2E
+  sans retry (14,3 minutes), tous verts**. Aucun délai de test ou de lecture
+  rallongé. Livraison exacte et runs GitHub dans le bilan de PR A3.
 - Réserves : aucune écoute fournisseur réelle ni acceptation humaine ; les
   tests utilisent des fournisseurs simulés. Les pauses ne garantissent pas un
   souffle, un sanglot ou un timbre étranglé. Si mots/pauses conviennent mais pas
