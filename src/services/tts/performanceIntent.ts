@@ -306,7 +306,7 @@ export function derivePerformanceIntent(input: DerivePerformanceInput): Performa
   const settings = input.speechSettings ?? getSpeechPerformanceSettings();
   const state = input.validSpeechStates?.find(name => name.toLocaleLowerCase('fr') === input.speechState?.toLocaleLowerCase('fr'));
   const mapping = state ? settings.byCharacter?.[input.characterKey ?? '']?.[state] : undefined;
-  if (getActiveEnvironment() !== 'prod' && settings.enabled && mapping && (input.rugosite ?? 0) > 0) {
+  if (settings.enabled && mapping && (input.rugosite ?? 0) > 0) {
     const amount = clamp(input.rugosite ?? 0, 0, 3) / 3;
     const speed = Number(mapping.speed);
     return { emotion: mapping.emotion, intensity: amount < 0.5 ? 0 : amount < 1 ? 1 : 2,
@@ -375,7 +375,7 @@ export function composeHumeDescription(baseline: string, intent?: PerformanceInt
 /** Only an authorized state mapping may enable the experimental WS pauses. */
 export function resolveGradiumPauseSeconds(intent: PerformanceIntent | null | undefined, characterKey?: string,
   settings = getSpeechPerformanceSettings()): GradiumPauseSeconds | undefined {
-  if (getActiveEnvironment() === 'prod' || !settings.enabled || settings.gradiumPausesEnabled !== true
+  if (!settings.enabled || settings.gradiumPausesEnabled !== true
     || intent?.source !== 'speech_state' || !intent.mappingVersion || intent.mappingVersion !== settings.version
     || !intent.speechState || !characterKey) return undefined;
   const mapping = settings.byCharacter?.[characterKey]?.[intent.speechState];
