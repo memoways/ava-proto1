@@ -3,9 +3,41 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-25 (correctif QA rugosité vérifié en preview ; publication et clôture encore distinctes)
+> **Last Updated**: 2026-10-25 (lot 1 compatibilité GM ; résultats et livraison dans le plan)
 
 ---
+
+## Lot 1 — compatibilité GM et passage manuel (25 octobre 2026)
+
+Le contrat des états de parole avait rendu un nouveau champ obligatoire, alors
+que le prompt sandbox publié décrivait toujours un objet fermé sans ce champ.
+Un test passant par le véritable évaluateur reproduit ce rejet avec la fixture
+ancienne intacte. L'état proposé est désormais facultatif et le code ajoute son
+contrat technique après le prompt éditorial, sans réécrire les versions publiées.
+
+Un JSON syntaxiquement illisible et un schéma incomplet ont maintenant des raisons
+distinctes. L'inspecteur et l'export GM montrent aussi les champs manquants, l'état
+inconnu et la raison du rejet de preuve, sans conserver de nouvelles réponses brutes
+hors diagnostic. L'accord différé reste différé ; un accord délivré nommant la
+cible peut produire une offre persistée, puis le joueur déclenche la sonnerie et
+la connexion. Toutes les gardes et l'isolation des confidences sont conservées.
+
+La session du 25 octobre contient bien six évaluations invalid_json et aucun
+transfert. Leurs sorties brutes manquent : cette incompatibilité reproduite ne
+prouve pas la cause individuelle des six rejets. Les tests simulés restent
+séparés d'une recette au casque et d'une publication Lovable.
+
+Vérifications locales : test:quality vert, 859 tests unitaires, 41 intégration,
+62 régression et 72 E2E, dont les deux séquences v7 dans les deux sens. Les faux
+fournisseurs batch respectent maintenant le protocole privé déjà demandé ; les
+fixtures GM anciennes restent intactes.
+
+Les résultats vérifiés et références de livraison figurent dans
+[le plan existant](docs/plan_changement_interlocuteur_manuel.md).
+Le chantier de parole trop lisse reste au
+[prompt autonome du lot 2](docs/prompt_reprise_parole_incarnee_lot_2.md) : protection
+du moteur intime, cinq états exacts, fragments et mapping Gradium sauvegardé.
+Le lot 2 n'est pas démarré ici ; aucune production publiée par ce lot.
 
 ## Correctif QA — ne pas couper une réponse pour un réglage lent (25 octobre 2026)
 

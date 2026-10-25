@@ -4,6 +4,35 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Lot 1 — compatibilité GM] — 2026-10-25
+
+- Reproduction avant correction par le véritable évaluateur : le JSON historique
+  sans `next_speech_state`, avec le prompt publié sandbox v7 lu via MCP Lovable,
+  était rejeté `invalid/invalid_json`. La fixture historique n'est pas modernisée.
+- `next_speech_state` devient facultatif (null si absent/inconnu). Les champs
+  requis et exemples sont définis par le code ; le contrat technique courant
+  s'ajoute après chaque prompt effectif et prime sur les anciens schémas fermés.
+  Aucun changement aux versions publiées, snapshots, modèles, budgets ou timeout.
+- Diagnostic borné dans le journal GM, l'inspecteur Sessions et l'export du banc :
+  JSON illisible, schéma incomplet/champs manquants, état inconnu, preuve absente,
+  invalide ou rejetée (reçu, référence, fraîcheur, version, refus…). Le log console
+  d'erreur JSON ne copie plus de réponse brute hors diagnostic explicite.
+- Les preuves historiques ne sont pas réparées. Disponibilité, quota, pause,
+  fraîcheur, persistance atomique, reçus, clic et mémoires isolées restent requis.
+  Tests des accords Max ↔ Emma et du différé puis confirmation pronominale.
+- Session diagnostique revérifiée : six évaluations invalid_json, aucune preuve,
+  zéro transfert. Les réponses brutes historiques manquent : aucune attribution
+  certaine des six rejets à cette seule incompatibilité.
+- Vérifications locales : test:quality vert (62 régression, 859 unitaires,
+  41 intégration, lint/typecheck/build) ; **72 E2E verts**, dont les deux nouveaux
+  parcours v7. Faux fournisseur batch adapté au protocole privé déjà demandé.
+  Les SHA et runs de livraison sont vérifiés dans le bilan de la PR et le compte
+  rendu final ; pas de boucle documentaire pour inscrire son propre SHA.
+  Recette vocale humaine encore requise ; aucune publication de production.
+  PR étrangère #24 préservée. Base main/Lovable : `f77ad835db6b3ea2c765d0f9a781b1c775f5ca41`.
+- [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md) ;
+  [prompt autonome du lot 2](docs/prompt_reprise_parole_incarnee_lot_2.md).
+
 ## [Correctif vérifié en preview — non republié] — 2026-10-25 — Lecture de rugosité non bloquante
 
 - Finding QA confirmé : l'attente de 600 ms rejetait le tour Max/Emma avant

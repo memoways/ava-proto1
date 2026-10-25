@@ -53,20 +53,33 @@ export function materializeHandoffAssessment(
   raw: unknown,
   context: Pick<CharacterHandoffValidationInput, 'currentCharacter' | 'turnId' | 'turnIndex'
     | 'orchestrationVersionId' | 'userText' | 'delivery' | 'openRequest'> | null,
+  onRejected?: (reason: CharacterHandoffAuditReason, missingFields: string[]) => void,
 ): CharacterHandoffAssessment | null {
+  const reject = (reason: CharacterHandoffAuditReason, missingFields: string[] = []) => {
+    onRejected?.(reason, missingFields);
+    return null;
+  };
+  const missingFields = (schema: typeof assessmentSchema | typeof referenceAssessmentSchema) =>
+    Object.keys(schema.shape).filter(field => !raw || typeof raw !== 'object'
+      || !Object.prototype.hasOwnProperty.call(raw, field));
   // Historical proofs are validated verbatim, never repaired into new evidence.
-  if (!raw || typeof raw !== 'object' || (raw as { schemaVersion?: unknown }).schemaVersion !== 2)
-    return cleanHandoffAssessment(raw);
+  if (!raw || typeof raw !== 'object' || (raw as { schemaVersion?: unknown }).schemaVersion !== 2) {
+    const assessment = cleanHandoffAssessment(raw);
+    if (raw != null && !assessment) return reject('assessment_invalid', missingFields(assessmentSchema));
+    return assessment;
+  }
   const parsed = referenceAssessmentSchema.safeParse(raw);
-  if (!parsed.success || !context?.orchestrationVersionId || !context.delivery) return null;
+  if (!parsed.success) return reject('assessment_invalid', missingFields(referenceAssessmentSchema));
+  if (!context?.orchestrationVersionId) return reject('version_mismatch');
+  if (!context.delivery) return reject('consent_not_delivered');
   const decision = parsed.data;
   const { delivery, openRequest } = context;
   if (delivery.turnId !== context.turnId || delivery.turnIndex !== context.turnIndex
     || delivery.character !== context.currentCharacter || !delivery.delivered.trim()
-    || delivery.status === 'unknown' || !delivery.generated.startsWith(delivery.delivered)) return null;
-  if (decision.requestSource === 'open_request' && !openRequest) return null;
+    || delivery.status === 'unknown' || !delivery.generated.startsWith(delivery.delivered)) return reject('consent_not_delivered');
+  if (decision.requestSource === 'open_request' && !openRequest) return reject('request_unresolved');
   const consent = handoffSpeechEvidence(delivery).find(item => item.ref === decision.consentRef);
-  if (!consent) return null;
+  if (!consent) return reject('consent_evidence_missing');
   const proposal = decision.requestSource === 'spoken_proposal';
   const open = decision.requestSource === 'open_request' ? openRequest : null;
   const originText = proposal ? delivery.delivered : open?.userText ?? context.userText;
@@ -74,8 +87,8 @@ export function materializeHandoffAssessment(
   const userTarget = !proposal && originText.match(name);
   const spokenTarget = delivery.delivered.match(name);
   const targetMatch = userTarget || spokenTarget;
-  if (!targetMatch) return null;
-  return cleanHandoffAssessment({
+  if (!targetMatch) return reject('request_unresolved');
+  const assessment = cleanHandoffAssessment({
     schemaVersion: 1, sourceCharacter: context.currentCharacter, targetCharacter: decision.targetCharacter,
     turnId: context.turnId, turnIndex: context.turnIndex, orchestrationVersionId: context.orchestrationVersionId,
     origin: { type: proposal ? 'gm_proposal' : 'player_request', turnId: open?.turnId ?? context.turnId,
@@ -84,6 +97,7 @@ export function materializeHandoffAssessment(
     consent: { stance: decision.stance, evidence: consent.text,
       refusalEvidence: decision.refusal ? delivery.generated : null },
   });
+  return assessment ?? reject('assessment_invalid');
 }
 
 export interface CharacterHandoffValidationInput {

@@ -1,5 +1,84 @@
 # Passage Emma ↔ Max : validation narrative et pastille d’appel
 
+## Lot 1 — compatibilité GM et passage fiable (25 octobre 2026)
+
+Base revérifiée : `f77ad835db6b3ea2c765d0f9a781b1c775f5ca41`, main propre,
+Lovable ready/agentFinished. PR étrangère #24 préservée, aucun fichier commun.
+Branche unique : `codex/gm-compat-handoff-lot-1`. Production hors périmètre.
+
+1. Reproduire via evaluatePostTurnPRD4 avec le prompt publié sandbox v7
+   `98145fe3-96f1-4525-84c2-0e0a1cc5c6da`, lu par MCP Lovable, et un JSON ancien
+   sans next_speech_state. Conserver ces fixtures sans modernisation.
+2. Rendre ce champ réellement facultatif, centraliser le contrat technique et
+   l'ajouter après tout prompt éditorial effectif, avec priorité explicite.
+   Conserver les preuves de passage strictes, le même appel, modèle et budget.
+3. Distinguer syntaxe JSON, champs requis absents, état inconnu et preuve refusée
+   par des métadonnées bornées sans transcript ni réponse brute supplémentaires.
+4. Vérifier les accords Max ↔ Emma, différé puis confirmation pronominale,
+   offre persistée, clic, sonnerie, connexion et mémoires privées ; négatifs et
+   persistance atomique conservés. Exécuter test:quality et les E2E requis.
+5. Mettre CHANGELOG et STORY à jour ; sauvegarder le prompt autonome du lot 2.
+   Livrer par PR, attendre regression-gates vert sur son HEAD exact, squash,
+   vérifier main/E2E, supprimer uniquement la branche de ce lot, vérifier Lovable.
+
+Limite historique : six rejets invalid_json ne prouvent ni six erreurs de syntaxe
+ni une cause unique ; les sorties brutes n'étaient pas conservées. Les tests
+simulés ne remplacent pas une recette vocale humaine. Aucun changement aux fiches,
+compilateurs personnages, voix/TTS, mains libres, versions publiées ou snapshots.
+### Preuves de diagnostic et vérifications locales
+
+- SELECT MCP Lovable du 25 octobre : la version v7 publiée ne mentionne pas
+  `next_speech_state`. Copie exacte de son prompt dans
+  `src/agents/fixtures/gm-published-sandbox-v7.txt` ; aucun UPDATE Cloud.
+- Session `0f1343e4-f929-407a-b84d-dfec0319fd8f` : six évaluations invalid_json
+  (tours 2, 5, 9, 10, 12, 13), preuves nulles, active_character=max, handoff_count=0.
+  Lecture des seules métadonnées, sans exporter de transcript ni réponse brute.
+- Reproduction rouge : `npx vitest run src/agents/gameMasterPRD4.handoff.test.ts -t
+  'actual published v7'` : attendu executed, reçu invalid. Le JSON de réponse est
+  synthétique, conforme à l'ancien schéma ; ce n'est pas une sortie brute retrouvée.
+- Après correction : tests de contrat, de preuve et de machine d'état verts ;
+  champ absent/null/inconnu et état valide, appel unique/950 tokens/12 s,
+  schéma incomplet, JSON tronqué, référence inconnue, accord non délivré,
+  persistance échouée et différé puis confirmation pronominale dans les deux sens.
+- `npm run test:quality` vert : lint (un avertissement préexistant IndexPRD4),
+  typecheck, 62 tests de régression, 859 unitaires, 41 d'intégration, build.
+  L'intégration vérifie aussi le CAS mémoire/reçus et l'isolation des personnages.
+- Le premier passage E2E a révélé un faux fournisseur batch obsolète : texte simple
+  malgré le protocole privé demandé, récupération supplémentaire et compteurs
+  décalés (traces « Missing response intent »). Il est adapté au contrat demandé,
+  sans modification du runtime personnage ni des fixtures GM historiques.
+- [Documentation de validation utilisée](https://zod.dev/api) ; schémas Zod déjà
+  présents réutilisés, aucune dépendance ajoutée. Le seuil de confiance préalable
+  est satisfait par la reproduction, les invariants locaux et ces schémas existants.
+
+- `npm run test:e2e` : **72/72 verts** (10,9 min), Chromium + contrôles média
+  Firefox/WebKit. Les deux nouveaux scénarios v7 couvrent Max → Emma et Emma → Max :
+  demande nommée, différé, confirmation pronominale, accord livré nommant la cible,
+  offre visible et persistée, clic, sonnerie, connexion dans la même session et
+  absence de la confidence source dans le prompt cible.
+- Le banc teste aussi refus/condition, cible ambiguë, reçu absent/non joué, preuve
+  périmée, quotas/disponibilité, panne de persistance et courses inter-onglets.
+- CHANGELOG et STORY mis à jour ; prompt autonome du lot 2 sauvegardé dans
+  `docs/prompt_reprise_parole_incarnee_lot_2.md`. Lot 2 non démarré.
+
+### Livraison et limites
+
+Branche de ce seul lot : `codex/gm-compat-handoff-lot-1`, depuis la base main
+`f77ad835db6b3ea2c765d0f9a781b1c775f5ca41`. GitHub App existante limitée au dépôt
+réutilisée ; session personnelle conservée. Aucun workflow modifié.
+
+La PR du lot porte la version `gm-2026-10-25-compatible-contract`. Son bilan
+GitHub et le compte rendu final donnent les SHA et runs exacts : contrôle
+`regression-gates` sur HEAD avant squash, puis sur main/E2E après fusion.
+Ne pas fabriquer dans ce fichier le SHA de son propre commit final.
+
+[Historique du workflow](https://github.com/memoways/ava-proto1/actions/workflows/core-experience-quality.yml).
+Le contrôle Lovable doit vérifier source synchronisée et preview ; il ne publie
+pas la production. Les limites demeurent : recette au casque à effectuer,
+classification réelle du prochain appel non garantie par les mocks, aucune
+réparation rétrospective des six rejets et aucune publication lancée par ce lot.
+La PR étrangère #24 et sa branche restent hors périmètre.
+
 Date du diagnostic : 19 octobre 2026. État au 23 octobre : **lots 1, 2 et 3 livrés ;
 recette humaine du lot 4 acceptée et frontend publié via Lovable**. La clôture
 documentaire #71 suit les contrôles du HEAD exact puis de main décrits ci-dessous.

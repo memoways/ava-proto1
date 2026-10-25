@@ -1,19 +1,18 @@
 import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig, ExperienceDirectorGuardrails } from "@/types";
 import { CHARACTER_CALL_TRANSFER_INSTRUCTIONS } from "./characterConversation";
+import { GM_JSON_EXAMPLE } from "./gameMasterContract";
 
 /** Added to the same GM call only when the runtime supplies exact handoff context. */
 export const CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS = `CONTRAT RUNTIME DE PASSAGE — prioritaire sur le schéma historique et sa règle de suggestion au tour suivant.
 Le CONTEXTE EXACT DU PASSAGE est fourni : la clé handoff_assessment est obligatoire à la racine du même objet JSON, null si aucun passage n'est évalué. Le schéma historique fermé est étendu par cette clé.
 FORMAT COMPACT PRIORITAIRE : un seul objet JSON complet, sur une ligne sans markdown. Tous les champs de premier niveau restent présents. Exemple complet (décision à évaluer, pas une autorisation par défaut) :
-{
- "labels":{"themes":[],"topics":[],"intentions":[]},
- "engagement_delta":0,"confusion_detected":false,"role_usage_quality":"unknown","topics_covered":[],
- "transition_recommended":false,"cinematic_hint":null,"next_turn_guidance":"","next_speech_state":null,"end_recommended":false,"moderation_flag":false,"notes":"","trigger_video_id":null,
- "handoff_assessment":{"schemaVersion":2,"requestSource":"current_user","targetCharacter":"max","stance":"accept","refusal":false,"consentRef":"speech_0"},
- "action":{"type":"handoff","targetCharacter":"max","reason":"Accord de transfert.","proposalGuidance":"Propose de passer l'appel à Max."},
- "player_switch_request":{"targetCharacter":"max","stance":"accept"},
- "memory_delta":null
-}
+${JSON.stringify({ ...Object.fromEntries(Object.entries(GM_JSON_EXAMPLE).filter(([key]) => key !== "memory_delta")),
+  handoff_assessment: { schemaVersion: 2, requestSource: "current_user", targetCharacter: "max", stance: "accept", refusal: false, consentRef: "speech_0" },
+  action: { type: "handoff", targetCharacter: "max", reason: "Accord de transfert.", proposalGuidance: "Propose le passage à Max." },
+  player_switch_request: { targetCharacter: "max", stance: "accept" },
+  // Keep the proof before potentially long differential memory.
+  memory_delta: null,
+}, null, 1)}
 consentRef référence la phrase de speechEvidence qui justifie la stance ; copie uniquement son ref, sans recopier son texte. Pour accept, choisis une phrase affirmative réellement délivrée (delivered=true). Un accord seulement généré, incertain ou coupé ne suffit jamais ; ne choisis pas une salutation ou une phrase sans accord à sa place. Le moteur vérifiera sa présence dans le reçu entendu.
 Le format de preuve est désormais référencé : n'écris AUCUN identifiant, numéro de tour ou citation dans handoff_assessment. L'application les prend exactement dans la source référencée et dans le reçu de parole délivrée, puis vérifie le contrat. N'ajoute aucun autre champ aux six champs montrés ; une référence inconnue ou invalide sera refusée, jamais réparée.
 requestSource : current_user = currentUserMessage ; open_request = openRequest fourni et non null ; spoken_proposal = proposition effectivement dite par le personnage au tour courant, jamais une guidance privée. Pour player_request, les seules sources admissibles sont currentUserMessage et openRequest non null. L'historique éclaire le sens mais ne fournit aucune autre source de preuve : openRequest=null interdit toute origine ancienne.
