@@ -7,7 +7,6 @@
  */
 
 import type { TTSProviderId } from "./types";
-import { getActiveEnvironment } from '../environmentContext';
 import { getSpeechPerformanceSettings, type SpeechPerformanceSettings } from './speechPerformanceSettings';
 import type { GradiumPauseSeconds } from './gradiumSpeech';
 
