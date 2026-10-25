@@ -287,7 +287,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   // La proposition du GM n'est retenue que si elle nomme un état de la fiche.
   const speechStates = characterPrompt.speech_states ?? [];
   input.onSpeechRuntimeReady?.({ rugosite, states: speechStates.map(state => state.name) });
-  const proposedSpeechState = speechRuntime ? selectSpeechState(input.gmSpeechState, speechStates, recentSpeechStates) : null;
+  const proposedSpeechState = speechRuntime ? selectSpeechState(input.gmSpeechState, speechStates) : null;
   const visibleStructuredMemory = structuredMemory
     ? filterConversationMemoryForCharacter(structuredMemory, activeCharacter)
     : null;

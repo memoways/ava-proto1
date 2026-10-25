@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [A1 — pensée ouverte] — 2026-10-25
+
+- Fin technique normale distinguée de la pensée achevée ; phrases ou fragments
+  permis dans les quatre variantes, avec les mêmes budgets et champs protégés.
+- Rugosité 1–3 soumise aux déclencheurs de la fiche ; priorité à Bloqué et rotation
+  forcée retirées du personnage, du GM et du filtre de proposition. États livrés
+  toujours validés, sans requalification ni nouvelle psychologie dans le code.
+- Parseur, transfert, voix, mapping, réglages enregistrés et prompts Cloud conservés.
+  Replays simulés de parole ouverte/nette, SSE et reçus exacts.
+- Qualité locale verte : lint/types/build, 66 régressions, 967 unitaires,
+  41 intégrations ; 78 E2E verts sans retry (14,2 min). Timeout initial d'un test
+  LatencyBlockingTab résolu par rejeu isolé puis passage complet, sans modification.
+  SHA main final, CI PR/main et synchronisation Lovable relevés dans le bilan de
+  la PR A1 ; pas de commit circulaire pour inscrire son propre SHA. Détails dans le [plan opérationnel](docs/plan_lot_b_rendu_vocal.md#exécution-a1--25-octobre-2026).
+- Base main `147cdfff893555ede4f903158c5506dcf586e116` (#76). Préparation `ca8e787`
+  conservée. Écoute humaine et A2–A4 restantes ; aucune publication production.
+  Notion exposé cible Ulrich : capitalisation Gamilab indisponible, sans blocage A1.
+
 ## [Lot 3 — réponse sûre et passage fiable] — 2026-10-25
 
 - T2 : contrat sans fermeture ; seuls les résidus terminaux connus sont tolérés

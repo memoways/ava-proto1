@@ -33,6 +33,22 @@ const input = {
 
 describe("GM optional structured handoff compatibility", () => {
   beforeEach(() => vi.clearAllMocks());
+  it.each([{ label: 'code', prompt: undefined }, { label: 'v7 publié', prompt: publishedV7Prompt }])('conserve un état pertinent malgré deux répétitions — $label', async ({ prompt: systemPromptOverride }) => {
+    const state = 'État propre actuel';
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ content: JSON.stringify({ ...historicalJson,
+      next_speech_state: state }), ...llmMetadata });
+    const result = await evaluatePostTurnPRD4({ ...input, systemPromptOverride, rugosite: 3,
+      speechStates: [{ name: state, description: 'Déclencheur toujours présent dans la scène.' }],
+      recentSpeechStates: [state, state], speechStatePlayed: state });
+    expect(result.next_speech_state).toBe(state);
+    expect(result.speech_state_played).toBe(state);
+    const [messages, options] = vi.mocked(callLLMWithUsage).mock.calls[0];
+    expect(messages[0].content).toContain('sans rotation obligatoire');
+    expect(messages[0].content).not.toContain('Jamais un état inventé ni trois fois');
+    expect(messages[1].content).toContain('déclencheurs');
+    expect(options).toMatchObject({ max_tokens: 950, model: 'existing-gm' });
+    expect(callLLMWithUsage).toHaveBeenCalledOnce();
+  });
   it("accepts a historical JSON without next_speech_state under the actual published v7 prompt", async () => {
     expect(publishedV7Prompt).not.toContain("next_speech_state");
     expect(historicalJson).not.toHaveProperty("next_speech_state");

@@ -150,9 +150,9 @@ describe('P1 format within the selected output budget', () => {
     vi.mocked(getGameplaySettings).mockReturnValue({ MAX_PROMPT_VARIANT: 'optimized_v3' } as never);
     vi.mocked(getLLMSettings).mockReturnValue({ LLM_MODEL: 'openai/gpt-5.6-luna', LLM_MAX_TOKENS: 220, LLM_TEMPERATURE: 0.7, LLM_TOP_P: 0.9 } as never);
   });
-  it.each([
-    ['max', 220, 45], ['emma', 220, 45], ['max', 100, 22], ['emma', 100, 22],
-  ] as const)('uses one %s stream, keeping budget %s and limiting speech to %s words', async (character, maxTokens, speechWords) => {
+  it.each(variants.flatMap(variant => ([['max', 220, 45], ['emma', 220, 45], ['max', 100, 22], ['emma', 100, 22]] as const)
+    .map(([character, maxTokens, speechWords]) => ({ variant, character, maxTokens, speechWords }))))('uses one $character stream in $variant with $maxTokens tokens / $speechWords words', async ({ variant, character, maxTokens, speechWords }) => {
+    vi.mocked(getGameplaySettings).mockReturnValueOnce({ MAX_PROMPT_VARIANT: variant } as never);
     vi.mocked(loadCharacterPrompt).mockResolvedValue(sheet(character) as never);
     const speech = 'Je reste inquiet pour Ava.';
     const wire = JSON.stringify({goal:'Écouter',points:[]}) + SPEECH_BOUNDARY + speech;
@@ -166,6 +166,9 @@ describe('P1 format within the selected output budget', () => {
     expect(options).toMatchObject({model:'openai/gpt-5.6-luna', max_tokens:maxTokens});
     expect(messages[0].content).toContain(`discours : ${speechWords} mots maximum`);
     expect(messages[0].content).toContain('en-tête privé');
+    expect(messages[0].content).toContain('pensée peut rester ouverte');
+    expect(messages[0].content).toContain('phrases ou fragments');
+    expect(messages[0].content).not.toContain('achève ta réponse');
     expect(messages[0].content).toContain(`Tu es ${contexts[character].displayName}`);
     expect(result.promptTrace?.finalSystemPrompt).toBe(messages[0].content);
     expect(result.response).toBe(speech);

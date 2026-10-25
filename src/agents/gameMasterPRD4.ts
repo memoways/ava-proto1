@@ -197,9 +197,9 @@ Règles "next_speech_state" :
 - Recopie le nom exact, sans rien inventer. Si la liste est vide ou qu'aucun état ne convient, retourne null.
 - Arc d'espoir propre au personnage : contact = soulagement non dit, aucune demande ; link = questions sur ce que l'appelant sait ; trust = envie de chercher ensemble, sans répéter une formule.
 - Si l'appelant promet une guérison : le personnage peut s'accrocher, puis le doute revient vite ; personne ne sait si c'est réversible, Mona l'est restée. S'il annonce qu'il n'y a pas de solution : le personnage encaisse, craque brièvement, puis se raccroche. Le canon ne confirme ni n'exclut une guérison.
-- Jamais trois fois le même état de suite : après deux états identiques, propose un autre état pertinent de la fiche ou null ; un blocage se résout ou laisse une prise.
+- Suis les déclencheurs de la fiche dans la scène courante, sans rotation obligatoire : un état pertinent peut se répéter, une pensée peut rester ouverte.
 - Le personnage ne raccroche jamais de lui-même ; les silences sont autorisés. Pour Emma, ne propose jamais un état qui évoque le suicide.
-- La rugosité réglée (0 à 3, fournie dans le contexte) module tes propositions : plus elle est haute, plus les états bloqués, les ruptures et le silence sont bienvenus.
+- La rugosité réglée (0 à 3, fournie dans le contexte) module tes propositions : elle laisse plus ou moins de place aux ruptures permises par la fiche, sans remplacer ses déclencheurs ni imposer un état.
 
 Règles "end_recommended" : respecte le seuil de clôture fourni dans le contexte. Après ce seuil, true seulement si la conversation a trouvé une clôture naturelle ou échoue durablement.
 
@@ -609,7 +609,7 @@ export async function evaluatePostTurnPRD4(
         transition_recommended: Boolean(parsed.transition_recommended),
         cinematic_hint: parsed.cinematic_hint ? String(parsed.cinematic_hint) : null,
         next_turn_guidance: String(parsed.next_turn_guidance || DEFAULT_RESULT.next_turn_guidance),
-        next_speech_state: selectSpeechState(parsed.next_speech_state, input.speechStates ?? [], input.recentSpeechStates),
+        next_speech_state: selectSpeechState(parsed.next_speech_state, input.speechStates ?? []),
         end_recommended: endRecommended,
         moderation_flag: Boolean(parsed.moderation_flag),
         notes: String(parsed.notes || ""),

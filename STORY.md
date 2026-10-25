@@ -3,9 +3,27 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-25 (lot 3 réponse sûre et passage ; recette humaine restante)
+> **Last Updated**: 2026-10-25 (A1 pensée ouverte ; qualité/E2E locaux verts, recette humaine distincte)
 
 ---
+
+## A1 — laisser la pensée ouverte (25 octobre 2026)
+
+Le tour doit se terminer correctement sans obliger le personnage à expliquer
+jusqu'au bout ce qu'il essaie de dire. Le contrat demandait encore « achève ta
+réponse » ; les variantes comptaient des phrases et le directeur poussait les
+états bloqués. Une autre règle interdisait trois états identiques de suite,
+jusque dans le filtre : elle pouvait retirer un état toujours pertinent.
+
+Les contrats permettent maintenant les fragments dans les mêmes plafonds.
+L'intensité laisse leur place aux possibilités de la fiche et ses déclencheurs
+gardent la décision ; une parole nette et un état qui se répète restent possibles.
+Les fiches et les réserves éditoriales sont conservées. Les replays de sorties
+simulées vérifient mots, fin normale, frontières SSE et reçus ; ils ne prouvent
+pas un jeu entendu ni une amélioration de génération réelle. Qualité locale complète verte, 78 E2E sans retry ; livraison exacte dans le bilan
+de la PR A1. L'édition Notion reste à Ulrich, les pauses, le banc et les accueils à A2–A4.
+
+[Contrôles, limites et livraison A1](docs/plan_lot_b_rendu_vocal.md#exécution-a1--25-octobre-2026).
 
 ## Lot 3 — ne pas confondre protocole, passé et accord présent (25 octobre 2026)
 

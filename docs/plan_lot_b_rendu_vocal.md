@@ -2,7 +2,7 @@
 
 ## Exécution coordonnée Notion / app — 25 octobre 2026
 
-**Statut : plan proposé, aucun lot app commencé.** Cette section est le plan
+**Statut : A1 implémenté et vérifié localement ; livraison exacte dans le bilan de sa PR. A2–A4 non commencés.** Cette section est le plan
 opérationnel courant ; elle remplace les découpages historiques ci-dessous.
 
 **Reprise après redémarrage — 25 octobre 2026 :** Ulrich travaille dans Notion
@@ -96,6 +96,74 @@ consigne ne suffit pas à prouver le jeu. Vérifier le passage Max ↔ Emma sans
 changer son validateur. **Retour arrière :** revert du lot, fiches et mapping
 conservés. **Sortie :** prise de parole ouverte techniquement fiable ; aucune
 promesse de souffle ou de timbre émotionnel à ce stade.
+
+### Exécution A1 — 25 octobre 2026
+
+Base vérifiée : main `147cdfff893555ede4f903158c5506dcf586e116` (#76).
+Préparation documentaire `ca8e787` conservée sur `codex/parole-ouverte-a1`.
+La PR étrangère #24 ne recoupe aucun fichier du lot ; elle et les branches
+étrangères restent intactes. Dépôt public, CI PR et main conservées sans
+modification de workflow. Identité GitHub existante `Ulrfis` vérifiée ; aucune
+configuration GitHub App présente sur ce poste.
+
+Corrections app : fin technique normale distinguée de la pensée ouverte dans
+le contrat de sortie ; phrases ou fragments dans les quatre variantes, avec
+les mêmes plafonds. Le compilateur compact reçoit son contrat depuis maxAgent :
+aucun changement de sélection ni de réserve dans maxPromptCompiler nécessaire.
+Les niveaux 1–3 modulent les possibilités de la fiche sans priorité à Bloqué.
+La proposition GM est facultative, soumise aux déclencheurs ; ni prompt ni
+filtre n'imposent de rotation après deux états identiques. Le contrat courant
+GM s'applique aussi après le prompt publié v7, sans en modifier la version.
+La déclaration réellement livrée reste validée contre la fiche courante ;
+aucune requalification en état joué. Le parseur et les règles de passage sont
+inchangés.
+
+Reproduction avant correction : **11 échecs / 108 réussites** dans les suites
+existantes prompts/états/GM/contrat. Cas concret du filtre : la proposition
+« État propre actuel », encore pertinente après deux occurrences, devenait
+null dans le véritable évaluateur GM. L'historique forçait aussi une rotation
+même à rugosité 0. Ces deux contraintes sont retirées, sans état alternatif
+inventé. Contrôle élargi : **229/229** tests ciblés verts. `npm run test:quality`
+final vert : lint/types/build, **66 régressions, 967 unitaires, 41 intégrations**.
+Le premier passage avait rencontré un timeout de 5 s dans
+LatencyBlockingTab.test.tsx, pendant les contrôles simultanés ; rejeu isolé
+8/8 puis nouveau passage complet vert, sans modification de ce composant,
+des attentes ni des délais. Avertissements préexistants : dépendance useCallback
+et taille des chunks. `npm run test:e2e` : **78/78 verts sans retry, 14,2 minutes**,
+Chromium et contrôles média Firefox/WebKit. Passage bidirectionnel jusqu'au clic,
+refus/rétractations/différé, références invalides, résultats tardifs, persistance
+et CAS conservés. Les replays de reçu gardent delivered / uncertain / private
+séparés, sans rejeu après son ; récupération préalable toujours unique et bornée.
+
+Livraison GitHub : squash conditionné à `regression-gates` vert sur le HEAD exact,
+puis contrôle de main/E2E, synchronisation du même SHA dans Lovable et lecture
+du bundle réellement servi en preview. Les SHA, runs et branches finales sont
+relevés dans le bilan GitHub de la PR A1, sans boucle documentaire pour inscrire
+son propre SHA. Seule la branche A1 doit être supprimée ; toutes les branches
+étrangères et #24 sont conservées. Production non publiée.
+
+Snapshot de calibration conservé : fixtures Cloud Max/Emma datées du
+24 octobre, collectées le 25 (`speechSandbox20261025.json`), sans édition.
+Les prompts effectifs restent propres au personnage, avec parole et moteur
+intime entiers, sous les plafonds existants ; témoin Max 3 / Emma 2.
+Comparaison textuelle déterministe : l'ancien contrat disait « achève ta
+réponse » et imposait une rotation ; le nouveau permet une pensée ouverte et
+maintient l'état pertinent. Les textes simulés « Moi, ça va. Non. J'en sais
+rien. Mais elle… » et « Je la laisserai pas toute seule. » gardent leurs mots
+jusqu'au reçu, avec flux SSE stop + DONE. Les négatifs existants restent requis.
+Ce replay ne mesure pas une amélioration de sortie modèle ou du jeu. Le banc
+juge existant orchestre répétitions et appels personnage/GM/juge ; aucune
+campagne ni infrastructure ajoutée, aucun appel modèle/audio réel dans A1.
+
+Le seul connecteur Notion exposé vérifie `self.workspace.id` personnel
+`377e8583-7838-4c05-9f76-8833a450f304` : mauvaise cible pour Ava, aucune lecture
+ciblée ni écriture. A1 ne dépend pas de Gamilab. Ulrich garde l'édition et le
+moment d'intégration ; ni sync automatique, ni prompts Cloud écrasés, ni RAG
+reconstruit, ni tâche doublon. Capitalisation Notion projet non sauvegardée.
+
+Restent distincts : A2 pauses Gradium, A3 réglages/banc, A4 accueils et intégration
+des nouvelles fiches puis écoute humaine. A1 ne promet ni souffle ni timbre
+émotionnel, ne change aucun réglage enregistré et ne publie pas en production.
 
 ### A2 — restituer les ruptures dans Gradium
 
@@ -200,9 +268,9 @@ recette acceptée ou écarts précisément nommés ; publication production dist
 5. Après chaque lot, inscrire acquis, limites et prochain lot dans ce plan et
    le CHANGELOG. Ne pas rouvrir le diagnostic déjà établi sans nouvelle preuve.
 
-Le prochain lot app recommandé est **A1**, indépendant d'une nouvelle édition
-Notion. Cette préparation ne lance pas son implémentation : elle livre le
-découpage demandé, le contrat commun et le contenu de la tâche à enregistrer.
+A1 est désormais implémenté ; ses contrôles et sa livraison sont consignés
+dans le bilan ci-dessus. Le lot app suivant est **A2**, distinct de l'édition
+Notion et de l'acceptation humaine du rendu final.
 
 ## Direction après écoute — 25 octobre 2026
 

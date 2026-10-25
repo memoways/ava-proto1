@@ -32,6 +32,22 @@ describe('lot 3 — SSE terminal proof at the real streaming call', () => {
   const wire = header + speech + '\n</speech';
   const frame = (content: string) => `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`;
   const terminal = (reason: string) => `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: reason }] })}\n\n`;
+  it.each(["Moi, ça va. Non. J'en sais rien. Mais elle…", 'Je la laisserai pas toute seule.', 'Emma, elle —'])('préserve la prise de parole %s à toutes les frontières SSE', async speech => {
+    const wire = header + speech;
+    for (let split = 0; split <= wire.length; split++) {
+      const bytes = new TextEncoder().encode(frame(wire.slice(0, split)) + frame(wire.slice(split)) + terminal('stop') + 'data: [DONE]\n\n');
+      const body = new ReadableStream<Uint8Array>({ start(c) { for (const byte of bytes) c.enqueue(new Uint8Array([byte])); c.close(); } });
+      vi.mocked(authenticatedFunctionFetch).mockResolvedValueOnce(new Response(body));
+      const spoken: string[] = [];
+      const parser = new ResponseIntentParser(context, () => {}, text => spoken.push(text));
+      let normal = false;
+      await streamLLM([], (text, done) => { if (!done) parser.push(text); }, { onStreamComplete: reason => { normal = reason === 'stop'; } });
+      expect(normal).toBe(true);
+      expect(parser.finish(normal)).toBe(speech);
+      expect(spoken.join(' ')).toBe(speech);
+    }
+    expect(authenticatedFunctionFetch).toHaveBeenCalledTimes(wire.length + 1);
+  });
   it('accepts the known residue at all model-token splits and byte-fragmented SSE without replay', async () => {
     for (let split = 0; split <= wire.length; split++) {
       const bytes = new TextEncoder().encode(frame(wire.slice(0, split)) + frame(wire.slice(split)) + terminal('stop') + 'data: [DONE]\n\n');

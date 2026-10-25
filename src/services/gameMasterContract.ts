@@ -13,7 +13,7 @@ export const GM_JSON_EXAMPLE = { ...GM_REQUIRED_JSON_EXAMPLE, next_speech_state:
 export const GM_RUNTIME_OUTPUT_INSTRUCTIONS = `CONTRAT TECHNIQUE COURANT DU GM — prioritaire sur tout schéma historique fermé ci-dessus, y compris « EXACTEMENT cet objet ».
 Les instructions éditoriales restent applicables ; ce contrat définit le format effectif du même appel.
 Champs requis : ${REQUIRED_GM_JSON_FIELDS.join(", ")}.
-next_speech_state est facultatif pour la compatibilité historique : absent ou null = aucune proposition ; un état inconnu est ignoré. Dans les nouvelles réponses, retourne ce champ avec null ou le nom exact d'un ÉTAT DE PAROLE DU PERSONNAGE fourni. Jamais un état inventé ni trois fois le même état de suite.
+next_speech_state est facultatif pour la compatibilité historique : absent ou null = aucune proposition ; un état inconnu est ignoré. Dans les nouvelles réponses, retourne ce champ avec null ou le nom exact d'un ÉTAT DE PAROLE DU PERSONNAGE fourni. Jamais un état inventé. Le choix suit les déclencheurs de la fiche dans la scène courante, sans rotation obligatoire : un état pertinent peut se répéter, une pensée peut rester ouverte. Cette règle prime sur toute consigne historique de fréquence ou de rotation ; la rugosité module les possibilités de la fiche sans imposer un état.
 Sans CONTEXTE EXACT DU PASSAGE, aucune preuve de transfert n'est demandée. Avec ce contexte, l'extension de passage ci-dessous définit handoff_assessment à la racine.
 Un seul objet JSON complet, sans markdown. Exemple neutre complet :
 ${JSON.stringify(GM_JSON_EXAMPLE)}

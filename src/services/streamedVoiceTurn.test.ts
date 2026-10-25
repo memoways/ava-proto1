@@ -11,6 +11,23 @@ function setup(){const start=deferred<void>(),gen=deferred<{firstByteMs:number;t
  const session={setPerformance:vi.fn(),started:start.promise,generationDone:gen.promise,finished:end.promise,appendText:vi.fn(),finish:vi.fn(),open:vi.fn(),cancel:vi.fn(),hasAudibleOutput:false,progress:vi.fn(()=>({scheduledSamples:0,playedSamples:0,sampleRate:24000,confirmedText:''}))};fake.create.mockReturnValue(session);return {session,start,gen,end};}
 describe('P1 streamed voice delivery',()=>{
  beforeEach(()=>vi.clearAllMocks());
+ it.each(["Moi, ça va. Non. J'en sais rien. Mais elle…", 'Je la laisserai pas toute seule.'])('finalise le reçu exact sans compléter la pensée : %s', async speech => {
+  const { session, start, gen, end } = setup(), onReceipt = vi.fn(), fallback = vi.fn();
+  const voice = prepareStreamedVoiceTurn(ctx, { onReceipt, fallback, onPlaybackStart: vi.fn() });
+  const context = { characterKey: 'max' as const, displayName: 'Max Lorenzo', characterId: '11111111-1111-4111-8111-111111111111',
+    notionPageId: '30362322e5958011ad7bffb1ed6772bc', environmentId: 'sandbox-ulrich', promptUpdatedAt: '2026-10-25T00:00:00Z' };
+  const parser = new ResponseIntentParser(context, intent => voice.onEvent({ type: 'intent', intent }),
+    text => voice.onEvent({ type: 'segment', text }));
+  parser.push(JSON.stringify({ goal: 'PRIVATE', points: [] }) + SPEECH_BOUNDARY + speech);
+  voice.onEvent({ type: 'complete', response: parser.finish(true) });
+  start.resolve(); gen.resolve({ firstByteMs: 1, totalGenMs: 2, bytes: 100 }); end.resolve({ playbackTotalMs: 10 });
+  expect((await voice.finish()).status).toBe('played');
+  expect(await voice.delivery).toBe(speech);
+  expect(session.appendText.mock.calls.flat().join(' ')).toBe(speech);
+  expect(onReceipt).toHaveBeenCalledOnce();
+  expect(onReceipt.mock.calls[0][0]).toMatchObject({ generated: speech, delivered: speech, uncertain: '', privateContinuation: '', intent: { goal: 'PRIVATE' } });
+  expect(fallback).not.toHaveBeenCalled();
+ });
  it('configures state prosody before the first segment without marking it delivered',()=>{
   const {session}=setup(),receipt=vi.fn();
   const intent={emotion:'urgent' as const,intensity:2 as const,source:'speech_state' as const,actingNl:'fast'};

@@ -55,7 +55,7 @@ const GAMEPLAY_RULES = `
 - Parle UNIQUEMENT à la première personne, en français.
 - JAMAIS de narration ("*il soupire*"), JAMAIS de méta-commentaires.
 - Tes émotions passent par tes mots, ton rythme, tes hésitations.
-- Réponds de façon très concise (1-2 phrases max, 45 mots maximum) car c'est une conversation orale temps réel.
+- Réponds de façon très concise (1-2 phrases ou fragments max, 45 mots maximum) car c'est une conversation orale temps réel.
 - N'invente AUCUN fait absent du CONTEXTE AUTORISÉ DU TOUR ci-dessous.
 - Si tu ne sais pas quelque chose, dis-le plutôt que d'inventer.
 ${WORLD_BOUNDARY_RULE}
@@ -68,7 +68,7 @@ SUIS LA FICHE PERSONNAGE et la DIRECTIVE RELATIONNELLE DU TOUR. Prends une initi
 
 const COMPACT_GAMEPLAY_RULES = `## CONTRAT DE CONVERSATION
 - Tu es le personnage décrit dans cette fiche. Parle à la première personne, en français, sans narration ni commentaire méta.
-- Réagis à la demande présente en 1 ou 2 phrases et 45 mots maximum : répondre, nuancer, retenir, contester ou questionner sont tous possibles selon la relation.
+- Réagis à la demande présente en 1 ou 2 phrases ou fragments et 45 mots maximum : répondre, nuancer, retenir, contester ou questionner sont tous possibles selon la relation.
 - Une question doit poursuivre ton besoin ou tester l'intention de l'interlocuteur. Évite les relances réflexes et répétitives.
 - Ne rejoue pas une ouverture déjà passée et ne répète pas une information acquise.
 - Garde une interprétation charitable des ambiguïtés, de l'humour et des erreurs de transcription ; au besoin, clarifie sans accuser.
@@ -138,12 +138,10 @@ export function buildSpeechStateBlock(input: Pick<MaxAgentInput, "speechStateDir
   const parts: string[] = [];
   const directive = input.speechStateDirective?.trim();
   if (directive) {
-    parts.push(`État de parole proposé pour ce tour : « ${directive} ». Joue-le et déclare-le dans "parole" de ton en-tête privé. Si un autre état de ta liste « Tes états de parole » convient mieux à ce que tu ressens, choisis-le à la place.`);
+    parts.push(`État de parole proposé pour ce tour : « ${directive} ». Suis les déclencheurs de ta fiche pour retenir cet état ou un autre ; déclare seulement celui que tu joues dans "parole" de ton en-tête privé, ou omets-le si aucun ne convient.`);
   }
   const rugosite = rugositySpeechDirective(input.rugosite ?? 0);
   if (rugosite) parts.push(rugosite);
-  const repeated = input.speechStateHistory?.[0];
-  if (repeated && input.speechStateHistory?.[1] === repeated) parts.push(`Les deux derniers états joués étaient « ${repeated} ». Choisis un autre état de ta fiche ; jamais trois fois le même état de suite.`);
   return parts.length ? parts.join("\n") : undefined;
 }
 

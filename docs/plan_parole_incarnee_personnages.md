@@ -2,7 +2,7 @@
 
 ## Direction après écoute — 25 octobre 2026
 
-**Proposition éditoriale et technique, sans implémentation.** Ulrich confirme
+**Direction éditoriale conservée ; corrections app A1 vérifiées localement, livraison exacte dans le bilan de sa PR.** Ulrich confirme
 que le passage entre personnages fonctionne à nouveau, mais refuse le jeu trop
 lisse et détaché. Le lot 3 est livré par [#76](https://github.com/memoways/ava-proto1/pull/76),
 main `147cdfff893555ede4f903158c5506dcf586e116`. Ce retour valide le passage
@@ -20,6 +20,20 @@ Après redémarrage, Ulrich confirme qu'il travaille dans Notion sur les champs
 personnages. L'exécution app commence par le
 [prompt autonome du lot A1](prompt_reprise_parole_ouverte_lot_a1.md), qui conserve
 ce plan et laisse l'édition/synchronisation à Ulrich pendant son travail.
+
+### Correction technique A1 — 25 octobre 2026
+
+Qualité locale verte (66 régressions, 967 unitaires, 41 intégrations, lint/types/build),
+78 E2E verts sans retry. Le [bilan A1 du plan opérationnel](plan_lot_b_rendu_vocal.md#exécution-a1--25-octobre-2026)
+distingue les corrections de contrat, les replays simulés et la livraison.
+Le tour doit finir normalement, mais sa pensée peut rester ouverte ; une réponse
+nette reste permise. Les plafonds et les réserves des fiches dans les quatre
+variantes sont conservés. Le niveau 3 ne privilégie plus un état bloqué et le
+filtre ne supprime plus une proposition uniquement parce qu'elle se répète.
+Le prompt personnage et le contrat GM ne forcent plus une rotation ou la
+résolution du blocage. Les noms et déclencheurs viennent de la fiche courante.
+Le parseur n'a pas été assoupli. Ces constats ne prouvent aucun gain d'acting
+sur une vraie sortie modèle ; écoute et intégration Notion restent distinctes.
 
 ### Répartition confirmée : Notion et app complémentaires
 
