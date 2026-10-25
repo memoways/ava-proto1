@@ -4,13 +4,12 @@ export interface SpeechVoiceMapping { emotion: CanonicalEmotion; delivery: Perfo
 export interface SpeechPerformanceSettings { enabled: boolean; version: string; gradiumTagsEnabled: boolean; /** A2, opt-in per environment after human acceptance. Missing means false. */ gradiumPausesEnabled?: boolean; byCharacter: Record<string, Record<string, SpeechVoiceMapping>> }
 export const SPEECH_PERFORMANCE_KEY = 'ava_speech_performance';
 export const EMPTY_SPEECH_PERFORMANCE: SpeechPerformanceSettings = { enabled: false, version: '', gradiumTagsEnabled: false, byCharacter: {} };
+// Production guard lifted on 25 Oct 2026 (Ulrich): every environment reads its own saved mapping.
 export function getSpeechPerformanceSettings(): SpeechPerformanceSettings {
-  if (getActiveEnvironment() === 'prod') return EMPTY_SPEECH_PERFORMANCE;
-  try { const raw = readEnvironmentStorage(SPEECH_PERFORMANCE_KEY); return raw ? { ...EMPTY_SPEECH_PERFORMANCE, ...JSON.parse(raw) } : EMPTY_SPEECH_PERFORMANCE; } catch { return EMPTY_SPEECH_PERFORMANCE; }
+  try { const raw = readEnvironmentStorage(SPEECH_PERFORMANCE_KEY); return raw ? { ...EMPTY_SPEECH_PERFORMANCE, ...JSON.parse(raw), gradiumTagsEnabled: false } : EMPTY_SPEECH_PERFORMANCE; } catch { return EMPTY_SPEECH_PERFORMANCE; }
 }
-export async function loadSpeechPerformanceSettings() { if (getActiveEnvironment() === 'prod') return EMPTY_SPEECH_PERFORMANCE; return loadEnvironmentSetting(SPEECH_PERFORMANCE_KEY, EMPTY_SPEECH_PERFORMANCE); }
+export async function loadSpeechPerformanceSettings() { return loadEnvironmentSetting(SPEECH_PERFORMANCE_KEY, EMPTY_SPEECH_PERFORMANCE); }
 export async function saveSpeechPerformanceSettings(value: SpeechPerformanceSettings) {
-  if (getActiveEnvironment() === 'prod') throw new Error('Lot B réservé à la sandbox');
   const next = { ...value, version: new Date().toISOString(), gradiumTagsEnabled: false };
   await saveEnvironmentSetting(SPEECH_PERFORMANCE_KEY, next); return next;
 }
