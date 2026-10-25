@@ -1,5 +1,36 @@
 # Plan — Lot B : rendre les états de parole audibles
 
+## Suite de recette — 25 octobre 2026
+
+La recette d'Ulrich confirme une amélioration mais refuse encore les hésitations
+artificielles, le manque de ruptures émotionnelles et l'accueil sec/répétitif.
+Le plan courant et le découpage proposé sont centralisés dans
+[la suite du plan parole](plan_parole_incarnee_personnages.md#suite-après-recette--proposition-du-25-octobre-2026).
+Le lot 3 traite protocole et transfert ; son
+[exécution](plan_parole_incarnee_personnages.md#exécution-du-lot-3--25-octobre-2026)
+préserve les réglages Gradium et le mapping. Le lot 4 accueil/jeu vocal reste
+proposé, sans implémentation dans ce lot.
+
+Limite désormais établie : `prepareTextForGradium` remplace les suspensions par
+de la ponctuation ; les instructions d'acting affichées ne sont pas des commandes
+d'émotion Gradium. Les pauses short/normal/long du mapping modulent le padding,
+pas des silences intra-phrase. Ne pas annoncer des sanglots ou une voix étranglée
+comme une capacité active. Six des huit réponses livrées de la recette déclarent
+« Bloqué » ; une suggestion GM ne suffit pas à prouver le jeu ou sa variété.
+
+La [documentation officielle des pauses](https://docs.gradium.ai/guides/text-to-speech#flushing-and-pauses),
+relue le 25 octobre, décrit `<break time="1.5s" />` : durée 0,1 à 2 s,
+espaces avant/après. Cela ouvre une adaptation technique ciblée à vérifier,
+distincte des tags émotionnels dont la capacité reste fermée. Les tags de pause
+éventuels seront produits par l'adaptateur après la garde, jamais par le LLM ;
+pas d'assouplissement des tags privés ou d'identité dans le parseur de parole.
+Vérifier aussi le chemin REST réellement utilisé avant d'y activer ce format.
+
+Pour la prochaine écoute : huit textes au total Max/Emma, A/B borné puis choix
+des seuls candidats retenus. Répertoire d'accueil propre à chacun, aucun nouvel
+appel LLM d'ouverture. Pas de comparaison exhaustive des fournisseurs, de voix
+production modifiée ou d'activation de tags émotionnels spéculatifs.
+
 ## Lot 2 — sauvegarde sandbox et contrôles Gradium, 25 octobre 2026
 
 Le diagnostic et la protection des compilateurs sont suivis dans

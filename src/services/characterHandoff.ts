@@ -69,7 +69,9 @@ export function materializeHandoffAssessment(
     return assessment;
   }
   const parsed = referenceAssessmentSchema.safeParse(raw);
-  if (!parsed.success) return reject('assessment_invalid', missingFields(referenceAssessmentSchema));
+  if (!parsed.success) return reject(parsed.error.issues.some(issue => issue.path[0] === 'consentRef'
+    && raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'consentRef'))
+    ? 'consent_reference_invalid' : 'assessment_invalid', missingFields(referenceAssessmentSchema));
   if (!context?.orchestrationVersionId) return reject('version_mismatch');
   if (!context.delivery) return reject('consent_not_delivered');
   const decision = parsed.data;
@@ -118,7 +120,7 @@ export interface CharacterHandoffValidationInput {
 export type CharacterHandoffAuditReason =
   | "gm_not_executed" | "assessment_missing" | "assessment_invalid" | "gm_late"
   | "version_mismatch" | "character_mismatch" | "target_mismatch" | "action_mismatch"
-  | "request_unresolved" | "consent_evidence_missing" | "consent_not_delivered"
+  | "request_unresolved" | "consent_reference_invalid" | "consent_evidence_missing" | "consent_not_delivered"
   | "character_refused" | "character_deferred" | "consent_validated";
 
 export type CharacterHandoffValidationResult =
@@ -132,8 +134,14 @@ function normalized(text: string): string {
 /** Narrow safety vetoes on transfer itself; emotional uncertainty is not a refusal.
  * Semantic interpretation of the full reply belongs to the GM, not these patterns.
  */
-function explicitTransferVeto(reply: string): "character_refused" | "character_deferred" | null {
-  const text = normalized(reply);
+function explicitTransferVeto(reply: string, consentEvidence: string): "character_refused" | "character_deferred" | null {
+  // This anchored past-status preamble is not a refusal of the current transfer.
+  // Exclude it only before the exact, separately delivered GM proof. Every
+  // subsequent word remains subject to vetoes; this does not grant permission.
+  const retrospective = /^non\s*(?:…|\.{2,}|,)\s*pas encore\s*[.!?…]\s*/i.exec(reply);
+  const evidenceStart = reply.indexOf(consentEvidence);
+  const text = normalized(retrospective && evidenceStart >= retrospective[0].length
+    ? reply.slice(retrospective[0].length) : reply);
   const verb = "(?:pass\\w*|appel\\w*|contact\\w*|joind\\w*|cherch\\w*)";
   const pronouns = "(?:(?:te|le|la|lui|vous|me)\\s+|l['’]){0,3}";
   const object = "(?:max|emma|telephone|ligne)\\b";
@@ -150,7 +158,13 @@ function explicitTransferVeto(reply: string): "character_refused" | "character_d
     || /\bje (?:prefere|voudrais|veux|souhaite) que (?:tu restes|vous restiez) avec moi\b/.test(text)
     || /(?:^|[.!?…]\s*)(?:non|je refuse|pas question)\s*(?:[.!?…]|$)/.test(text);
   if (refused) return "character_refused";
-  if (/(?:^|[.!?…]\s*)(?:plus tard|pas maintenant|pas encore|on verra)\s*(?:[.!?…]|$)/.test(text)
+  // The player's optional click ("si tu veux") does not defer the speaker's
+  // consent. Only an exact terminal choice adjunct is excluded, never another
+  // condition such as "si tu m'expliques" or the target's future acceptance.
+  const conditionalText = text.replace(/…|\.{2,}/g, ' ')
+    .replace(/\b(?:si|quand)\s+(?:tu\s+(?:le\s+)?veux|vous\s+(?:le\s+)?voulez)(?=\s*[.!?]|$)/g, '');
+  if (new RegExp(`${transfer}[^.!?…]{0,60}\\b(?:si|a condition|quand|des que)\\b`, 'i').test(conditionalText)
+    || /(?:^|[.!?…]\s*)(?:plus tard|pas maintenant|pas encore|on verra)\s*(?:[.!?…]|$)/.test(text)
     || new RegExp(`${transfer}[^.!?…]{0,50}\\b(?:plus tard|pas maintenant|pas encore|on verra)\\b`, "i").test(text)
     || /\bdemander\s+(?:s'il|si elle)\s+(?:accepte|veut|est d'accord)\b/.test(text)) return "character_deferred";
   return null;
@@ -209,7 +223,7 @@ export function validateCharacterHandoff(input: CharacterHandoffValidationInput)
   if (!delivery.delivered.includes(consent.evidence)) return reject("consent_not_delivered");
   // Inspect the complete generated reply too: a selected affirmative quote cannot
   // hide a contradiction in its continuation, even if playback was interrupted.
-  const veto = explicitTransferVeto(delivery.generated);
+  const veto = explicitTransferVeto(delivery.generated, consent.evidence);
   if (veto) return reject(veto);
   if (consent.refusalEvidence !== null) {
     if (!delivery.generated.includes(consent.refusalEvidence)) return reject("consent_evidence_missing");

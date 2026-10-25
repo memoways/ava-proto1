@@ -657,6 +657,25 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     expect(simulateMaxResponse).toHaveBeenCalledOnce();
   });
 
+  it.each([MAX_CONTEXT, EMMA_CONTEXT])('finishes T2 for $characterKey without a second generation after submitted audio', async characterContext => {
+    const speech = 'Je vous écoute.';
+    vi.mocked(simulateMaxResponse).mockImplementationOnce(async (_input, opts) => {
+      opts?.onSpeechToken?.('{"goal":"PRIVATE","points":[]}\n<speech>\n' + speech + '\n');
+      opts?.onSpeechToken?.('</speech');
+      return { response: opts?.finishSpeech?.(true) ?? '', systemPrompt: 'system' };
+    });
+    const segments: string[] = [];
+    const result = await streamPRD4Turn({ sessionId: 'session-soak', characterContext, conversationHistory: [],
+      userMessage: 'Je voudrais comprendre.', userRole: null, timeElapsedSeconds: 60 }, event => {
+      if (event.type === 'segment') segments.push(event.text);
+    }, Promise.resolve(speech));
+    expect(result.maxResponse).toBe(speech);
+    expect(segments).toEqual([speech]);
+    expect(simulateMaxResponse).toHaveBeenCalledOnce();
+    await result.postTurnPromise;
+    expect(evaluatePostTurnPRD4).toHaveBeenCalledOnce();
+  });
+
   it('reports the recovered speech if the consumer fails after recovery', async () => {
     vi.mocked(simulateMaxResponse).mockRejectedValueOnce(new Error('Missing response intent'))
       .mockResolvedValueOnce({ response: 'Je vous écoute.', systemPrompt: 'system' });

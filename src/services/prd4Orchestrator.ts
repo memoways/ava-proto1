@@ -62,7 +62,7 @@ import type { ConversationMessage, ConversationTurnTraceV1, PRD4PostTurnEvaluati
 
 export interface PRD4TurnInput {
   /** Internal shared execution seam; batch callers omit it. */
-  streamControl?: { onToken: (text: string) => void; finishSpeech: () => string;
+  streamControl?: { onToken: (text: string) => void; finishSpeech: (normalCompletion?: boolean) => string;
     delivery: Promise<string>; onFallback: (text: string) => void; hasSegments: () => boolean;
     onRetry: () => void; onRecovered: (text: string) => void };
   handoffDelivery?: Promise<ResponseDeliveryReceipt | undefined>;
@@ -390,9 +390,9 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
             if (attempt.signal.aborted) throw new DOMException('Obsolete character attempt', 'AbortError');
             input.streamControl!.onToken(text);
           },
-          finishSpeech: retry || !input.streamControl ? undefined : () => {
+          finishSpeech: retry || !input.streamControl ? undefined : normalCompletion => {
             if (attempt.signal.aborted) throw new DOMException('Obsolete character attempt', 'AbortError');
-            return input.streamControl!.finishSpeech();
+            return input.streamControl!.finishSpeech(normalCompletion);
           },
         }), timeoutMs, () => attempt.abort('character-response-timeout'));
       } finally {
@@ -739,7 +739,7 @@ export async function streamPRD4Turn(input: PRD4TurnInput, onEvent: (event: PRD4
   });
   try {
     const result = await processPRD4Turn({ ...input, streamControl: {
-      onToken: text => parser.push(text), finishSpeech: () => parser.finish(), delivery,
+      onToken: text => parser.push(text), finishSpeech: normalCompletion => parser.finish(normalCompletion), delivery,
       hasSegments: () => segments > 0,
       onRetry: () => { recoveryText = ''; if (input.playedSpeechStateRef) input.playedSpeechStateRef.current = null; emit({ type: 'reset' }); },
       onRecovered: text => { recoveryText = text; segments++; emit({ type: 'segment', text }); },

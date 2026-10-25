@@ -1,5 +1,199 @@
 # Plan — Parole incarnée par personnage (Max, Emma)
 
+## Suite après recette — proposition du 25 octobre 2026
+
+**Statut : lot 3 autorisé et en cours ; lot 4 proposé, hors périmètre.** Le lot 2
+est livré par [#75](https://github.com/memoways/ava-proto1/pull/75), main
+`5b56c0e987b04caf98f09726dae8ed62bd2d61cc`. Sa recette humaine n'est pas
+acceptée. Cette section actualise la suite ; les bilans précédents restent
+historiques. [Prompt du premier lot](prompt_reprise_fiabilisation_recette_lot_3.md).
+
+### Ce qui est acquis et ne doit pas être refait
+
+Les quatre compilateurs conservent les unités éditoriales propres à chaque
+personnage sous leurs budgets. Le mapping sandbox a été sauvegardé et relu,
+version `2026-10-25T11:39:32.000Z`. La session réelle
+`abb58e39-763d-465e-baeb-203c3f99bae0` utilise ces protections et Gradium :
+il ne faut plus attribuer cet essai à un ancien onglet. Production non publiée.
+
+### Quatre écarts observés
+
+| Point | Preuve et limite | Résultat attendu |
+| --- | --- | --- |
+| Bug de réponse | T2 : parole ponctuée suivie de `</speech` tronqué ; rejet `Incomplete response sentence or quote`, reproduit localement. Cause amont de la fermeture tronquée inconnue. | Le protocole ne casse pas une parole complète ; les vraies troncatures, citations ouvertes, structures privées et identités étrangères restent refusées. |
+| Emma ne prend pas l'appel | T8 : décision périmée ; T9 : `consentRef=currentUserMessage` hors schéma ; T12 : accord délivré rejeté par le veto sur « Non… pas encore ». | Un accord courant réellement livré peut produire l'offre cliquable ; refus, différés et décisions périmées restent bloqués. |
+| Parole artificielle | Six des huit réponses livrées déclarent « Bloqué ». Les suspensions deviennent de la ponctuation ; l'acting libre n'est pas envoyé comme émotion Gradium. | Reprises motivées par la pensée et l'émotion, silences irréguliers, diversité justifiée ; aucun bégaiement systématique. |
+| Accueil répétitif/sec | `IndexPRD4.tsx` joue `profile.openingLine`, avant toute génération personnage. La session commence par « Bonjour, qu'est-ce qui t'amène à me contacter ? ». | Accueil varié : personnage tiré de ses pensées, surpris, qui rejoint progressivement l'appelant, sans hostilité. |
+
+Les 126 tests existants du parseur/passage passent alors que deux replays
+ciblés reproduisent les défauts : le manque porte aussi sur la couverture.
+Le validateur de passage n'a pas changé dans #75 ; ne pas présenter toute
+la panne comme une régression causée par ce lot.
+
+La télémétrie estime le premier son 4 à 8,7 s après transcription finale.
+Elle ne mesure pas isolément la connexion d'Ulrich. Les durées TTS globales
+ne sont pas toutes un temps d'attente avant son. La session contient 33
+tentatives, 24 annulées avant premier token et 23 interruptions confirmées :
+cela explique la nécessité de tester la concurrence, sans prouver un défaut
+du détecteur ou du réseau. Aucun chantier mains libres ajouté.
+
+### Lot 3 proposé — réponse sûre et transfert fiable
+
+Deux défauts techniques dans un seul lot, sans toucher au jeu vocal :
+
+1. **Reproduire avant de corriger.** Fixtures minimales de T2/T8/T9/T12,
+   sans copie de transcript ou prompt complet. Tester Max → Emma et Emma → Max.
+2. **Protocole de sortie.** Empêcher la fermeture parasite dans le contrat.
+   Définir explicitement le traitement de son éventuel résidu terminal à EOF :
+   seulement une fermeture connue, fin normale confirmée et parole déjà valide.
+   Ne jamais convertir une fin SSE `length`, un abandon ou une phrase coupée
+   en succès, ni avaler un tag arbitraire. Si cette distinction n'est pas
+   démontrable, garder le rejet sûr et corriger l'émission/récupération existante.
+   Aucun rejeu après début sonore, aucune répétition d'un segment déjà entendu.
+3. **Refus contextualisé.** Corriger le faux veto sur une négation de l'action
+   passée suivie d'un accord présent. Ne pas supprimer les vetos de véritable
+   refus ou de rétractation (« je te la passe… enfin non »). La preuve GM,
+   le reçu et toutes les gardes restent requis ; pas d'autorisation par regex seule.
+4. **Référence GM.** Rejouer la référence invalide de T9 : elle doit rester
+   invalide. Rendre le contrat compact plus clair sur `speech_N`, avec les
+   exemples au bon niveau ; ne pas réparer arbitrairement la réponse du modèle.
+   Vérifier tous les prompts publiés effectifs dans le même budget/appel GM.
+5. **Résultat tardif.** Rejouer réponse/lecture/GM/nouvelle soumission, y compris
+   interruption et reprise. Une décision périmée ne crée pas d'offre. Un accord
+   confirmé au tour courant doit pouvoir aboutir sans ressusciter l'ancien.
+   Examiner la course de persistance de T8 avant de lui attribuer une cause ;
+   ne pas bloquer la voix ou modifier capture/interruptions pour attendre le GM.
+
+**Sortie du lot :** nouveaux replays rouges puis verts sur les défauts corrigés,
+contrôles négatifs toujours rouges côté autorisation, tests d'intégration du
+vrai évaluateur et E2E de la chaîne jusqu'au clic/connexion dans les deux sens.
+`test:quality` et E2E requis ; PR/CI sur HEAD exact, main/CI/E2E, nettoyage de
+la seule branche du lot, synchronisation et preview Lovable vérifiées. Une
+recette humaine courte de transfert reste distincte. Pas de promesse de naturel
+à ce stade. Pas de production. [Détail passage](plan_changement_interlocuteur_manuel.md#suite-de-recette--25-octobre-2026).
+
+### Exécution du lot 3 — 25 octobre 2026
+
+Base `5b56c0e987b04caf98f09726dae8ed62bd2d61cc`, branche unique
+`codex/recette-lot-3-safe-response-handoff`. Quatre documents locaux reconnus et
+intégrés ; PR étrangère #24 sans recoupement de fichiers, préservée. Identité
+GitHub Ulrfis réutilisée (aucune App configurée), Lovable initialement au même SHA.
+Workspace Notion vérifié par son ID ; fiche et PRD historiques relus.
+
+**Défauts reproduits avant correction :**
+
+- Parseur + validateur : **4 rouges, 142 verts** par
+  `npx vitest run src/services/responseIntentStream.test.ts src/services/characterHandoff.test.ts`.
+  Résidu exact T2 rejeté et faux refus T12 symétrique, plus contrat d'émission.
+- Véritable évaluateur GM : référence T9 refusée sans raison spécifique et
+  annulation pendant persistance classée `persistence_failed`. Deux replays
+  supplémentaires d'adaptateurs résolus après annulation, génération/persistance,
+  retournaient encore `executed` ; ils échouent avant ajout des barrières.
+- Condition différée après suspension : « Je te la passe maintenant… si elle
+  accepte. » était acceptée malgré la condition, dans les deux sens ; désormais
+  différée. Le choix terminal du joueur « si tu veux » conserve l'accord
+  présent et le clic, avec un test symétrique ; il ne dispense jamais des preuves.
+  La sélection de preuve des tests est réellement présente, y compris
+  dans les rétractations ; ils ne passent pas seulement par preuve manquante.
+
+**Comportement implémenté :**
+
+- Le contrat commun interdit de fermer `<speech>`. Le parseur ne tolère que
+  `</speech>` ou le résidu exact `</speech`, exclusivement terminal, après `stop`
+  confirmé et `[DONE]` SSE (ou stop batch). Complétude, citations, identité et
+  absence de structure restent contrôlées ; aucun retrait arbitraire après `<`.
+  EOF sans DONE, raison absente pour ce résidu, length/error/filtrage/outils et
+  abandon restent des échecs. Le code ne requalifie pas le reçu historique T2.
+- La preuve de fin normale traverse le client, simulateMaxResponse et le vrai
+  point d'appel de l'orchestrateur ; tests à toutes les frontières de tokens
+  et octet par octet en SSE. Un résidu toléré ne déclenche aucune régénération.
+  Après son soumis, les erreurs conservent delivered/uncertain/private sans
+  fallback ni répétition. Avant son, la récupération existante reste unique et
+  bornée : même tour/contexte, aucun RAG/GM utilisateur supplémentaire.
+- Seul le préambule initial « Non… pas encore. », antérieur à la citation exacte
+  d'accord courant, est exclu des vetos locaux. Tout le reste est inspecté.
+  Aucune autorisation par mot-clé : GM, preuve délivrée, source/cible, tour/version,
+  seuil, quota, pause, persistance atomique et clic restent nécessaires.
+- Le contrat effectif ajouté après tout prompt, dont v7, exige `speech_N` pris
+  dans speechEvidence ; currentUserMessage/openRequest ne sont que les sources
+  de demande. T9 reste refusé, sans remapping, avec diagnostic persisté
+  `handoff_proof_rejected / consent_reference_invalid`, visible dans Sessions.
+- Barrières après génération et après persistance GM : un résultat résolu malgré
+  l'annulation ne transmet aucune action. Annulation pendant persistance :
+  `parent_aborted`, distinct d'une vraie `persistence_failed`. Un ancien tour
+  reste gm_late côté interface/CAS ; un nouvel accord ne reprend pas l'ancien.
+
+**Preuves Cloud minimales relues via MCP Lovable :** T2 `failed`, 0 caractère
+confirmé, 137 caractères incertains et suffixe `</speech` ; T8 GM failed /
+persistence_failed, audit gm_late, erreur diagnostique absente ; T9 référence
+currentUserMessage ; T12 preuve « Je te la passe maintenant. » et faux veto.
+Six GM persistés, zéro transfert ; versions de départ confirmées. Le prompt v7
+Cloud (10 415 caractères) et la fixture existante ont le même MD5 après retrait
+du retour final : 82f57f2ce02633dccb1fbd9f1e01feca. Cause amont de
+la fermeture et cause historique précise de l'échec T8 **non établies**. Les
+courses corrigées sont reproduites localement, sans attribution au réseau.
+
+**Validation/livraison :** qualité finale verte : lint, types, build,
+66 tests régression, 941 unitaires, 41 intégration. **78 E2E complets verts**
+sur code final (Chromium, Firefox/WebKit média, 12,7 minutes). E2E v7 batch et Gradium déjà réussis dans les deux sens,
+avec résidu T2 et accord T12 jusqu'au clic/connexion, sans partage des confidences.
+Bilan final, SHA et liens CI dans la PR de ce lot ; recette humaine restante.
+Aucune configuration Cloud, fiche, mapping sandbox, voix, capture, décision mains
+libres, modèle, budget 950 ou timeout GM modifiés. GM code version
+`gm-2026-10-25-safe-response-handoff`. Pas de production ni de lot 4 commencé.
+
+Référence protocole : [OpenRouter — streaming](https://github.com/OpenRouterTeam/docs/blob/main/api_reference/streaming.mdx)
+et [finish_reason](https://github.com/OpenRouterTeam/docs/blob/main/api_reference/overview.mdx),
+consultés le 25 octobre 2026. Architecture existante réutilisée, aucun nouvel appel
+systématique, aucune dépendance ajoutée ; défauts et contrôles reproduits avant fix.
+
+### Lot 4 proposé — accueil et parole vivante
+
+1. **Accueil sans nouvel appel IA.** Petit répertoire éditorial distinct Max/Emma,
+   choisi une fois par nouvel appel, sans répéter immédiatement la même entrée
+   lorsque plusieurs sont disponibles. Réutiliser le répertoire de transfert/
+   retour en préservant ses trois contextes, sans réécrire les fiches Notion.
+   Tester plusieurs ouvertures et l'absence de confidence précoce. Un changement
+   de script ne suffit pas à valider le ton entendu.
+2. **Pensée avant hésitation.** Préserver les mots abandonnés/repris et le non-dit
+   de chaque fiche ; éviter l'injection mécanique de « je… je » ou de « euh ».
+   Distinguer l'état déclaré/livré de la proposition GM. Diagnostiquer pourquoi
+   « Bloqué » domine, sans forcer une rotation ni relabelliser artificiellement
+   le reçu. La colère contre soi, la retenue et l'émotion doivent varier avec
+   la scène ; Max et Emma gardent leurs cinq états propres.
+3. **Pauses Gradium contrôlées.** Vérifier la capacité documentée `break` dans
+   l'adaptateur réel, batch et streaming, puis essayer des pauses sobres et
+   irrégulières sur un corpus borné. Les contrôles sont créés seulement à la
+   frontière TTS après validation ; aucun tag LLM accepté dans la parole.
+   Les sous-titres et preuves gardent les mots, aucune pause technique ne devient
+   une confidence. Pas de changement de température pour simuler l'émotion.
+4. **Écoute courte avant généralisation.** Huit textes proposés : par personnage,
+   deux accueils, une reprise interrompue puis continuée, une émotion qui monte
+   sans explication psychologique. Comparaison A/B sur quatre textes au plus,
+   puis seulement les candidats retenus ; pas de matrice fournisseurs ou de
+   session synthétique massive. Réécoute depuis cache et coût visible si connu.
+   Ulrich juge mots entendus, tics, pauses, accueil et émotion. Si Gradium ne
+   rend pas la voix étranglée crédible, déclarer cette limite et proposer une
+   audition séparée, sans changer le fournisseur de jeu ni la production.
+
+**Sortie du lot :** accueil varié testé, rendu batch/streaming cohérent,
+sécurité et reçus conservés, réglages sandbox sauvegardés/relus si modifiés,
+comparaison audible acceptée puis un parcours Max/Emma. Premier son et latence
+voix-à-voix mesurés séparément ; aucune performance revendiquée sans mesures.
+[Détail vocal](plan_lot_b_rendu_vocal.md#suite-de-recette--25-octobre-2026).
+
+### Organisation pour éviter de recommencer
+
+- Deux lots, une branche par lot ; livrer le lot 3 avant de commencer le lot 4.
+- Pendant la préparation présente : documents locaux seulement, pas de code,
+  Cloud, PR ni nouvelle CI. Les documents seront intégrés à la branche du lot 3.
+- Lire d'abord les preuves présentes ; nouvelle enquête seulement si l'état a
+  changé ou si elle départage une cause encore inconnue. Aucun nouveau contrôle
+  de connexion GitHub si l'identité authentifiée existante fonctionne.
+- Donner une seule URL de recette avec SHA et environnement vérifiés. Ne pas
+  prendre un lien reçu pour une acceptation. Réserver l'écoute humaine aux
+  points qu'une simulation ne peut pas trancher.
+
 ## Lot 2 — protection effective et Gradium, 25 octobre 2026
 
 Base vérifiée : main `53baa8618eb388714c23612bb7154f5b5cb17491`, PR #74,

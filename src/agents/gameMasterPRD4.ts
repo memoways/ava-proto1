@@ -30,7 +30,7 @@ import {
 } from "@/services/relationshipEngine";
 
 /** Incrémenter à chaque changement de logique ou de prompt du GM (traçabilité A/B). */
-export const GM_CODE_VERSION = "gm-2026-10-25-compatible-contract";
+export const GM_CODE_VERSION = "gm-2026-10-25-safe-response-handoff";
 
 export interface PRD4PostTurnInput {
   onGmObserved?: (service: ServiceObservation, spans: ServerObservation) => void;
@@ -557,6 +557,9 @@ export async function evaluatePostTurnPRD4(
         onServiceObserved: (observed) => { service = observed; },
       },
     ));
+    // An adapter/body read may resolve after its cancellation signal. Never
+    // interpret that stale reply as a current evaluation.
+    if (input.signal?.aborted) throw new DOMException('Obsolete GM evaluation', 'AbortError');
     llmTrace = callRes.diagnosticTrace;
     rawResponse = callRes.content;
     const parsed = spans.runSync("gm_validation_json", () => extractJson(callRes.content));
@@ -733,12 +736,13 @@ export async function evaluatePostTurnPRD4(
         input.currentCharacter,
         ...(input.signal ? [input.signal] as const : []),
       ));
+      if (input.signal?.aborted) throw new DOMException('Obsolete GM evaluation', 'AbortError');
       enriched = { ...enriched, memory_after: memoryAfter };
     } catch (err) {
       console.warn("[GM-PRD4] persist failed:", err);
       if (executionStatus === "executed") {
         executionStatus = "failed";
-        executionReason = "persistence_failed";
+        executionReason = input.signal?.aborted ? "parent_aborted" : "persistence_failed";
       }
       enriched = {
         ...enriched,

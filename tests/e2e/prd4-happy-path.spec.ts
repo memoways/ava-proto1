@@ -28,6 +28,8 @@ interface NetworkFakeOptions {
   gmHandoffAt?: number;
   gmHandoffTurns?: number[];
   gmReferencedAssessment?: boolean;
+  gmConsentRefs?: Record<number, string>;
+  closingResidueAt?: number;
   historicalGmPrompt?: boolean;
   gmDeferredAt?: number;
   failGmAt?: number;
@@ -88,7 +90,7 @@ async function installNetworkFakes(
   const characterCalls: string[] = [];
   const sessionUpdates: unknown[] = [];
   let sessionInsertCount = 0;
-  const experienceEvents: Array<{ event_type: string; event_key: string; payload: Record<string, unknown> }> = [];
+  const experienceEvents: Array<{ event_type: string; event_key: string; turn_index?: number; payload: Record<string, unknown> }> = [];
   const voiceEvents: Array<Record<string, unknown>> = [];
   const gmFilmContexts: string[] = [];
   let sessionMemory: Record<string, unknown> = {};
@@ -389,7 +391,8 @@ async function installNetworkFakes(
 
     if (table === 'persist_conversation_memory_v4') {
       const payload=request.postDataJSON();sessionMemory=payload.p_next_memory;memoryLastTurn=payload.p_next_last_turn??memoryLastTurn;
-      sessionUpdates.push({conversation_memory:sessionMemory});
+      sessionRow.gm_post_turn_log = payload.p_post_turn_log;
+      sessionUpdates.push({conversation_memory:sessionMemory,gm_post_turn_log:payload.p_post_turn_log});
       return json(route,{conversation_memory:sessionMemory,memory_last_turn:memoryLastTurn});
     }
     if (table === "get_character_runtime_readiness_for_environment") {
@@ -527,9 +530,9 @@ async function installNetworkFakes(
     }
     if (table === 'sessions' && request.method() === 'GET' && url.searchParams.get('select')?.includes('pending_handoff'))
       return json(route, sessionRow.id && !sessionRow.ended_at ? sessionRow : []);
-    if (table === "sessions" && options.incrementalOutput && request.method() === "GET"
+    if (table === "sessions" && request.method() === "GET"
       && !url.searchParams.has('ended_at')) {
-      return json(route, { conversation_memory: sessionMemory, memory_last_turn: memoryLastTurn, gm_post_turn_log: [] });
+      return json(route, { conversation_memory: sessionMemory, memory_last_turn: memoryLastTurn, gm_post_turn_log: sessionRow.gm_post_turn_log ?? [] });
     }
     return json(route, [], request.method() === "POST" ? 201 : 200);
   });
@@ -610,7 +613,7 @@ async function installNetworkFakes(
           schemaVersion: 2, requestSource: isProposal ? 'spoken_proposal'
             : options.gmDeferredAt && handoffContext.openRequest ? 'open_request' : 'current_user',
           targetCharacter: target, stance, refusal: false,
-          consentRef: handoffContext.speechEvidence.find((item: { text: string }) => /passe (Max|Emma)/.test(item.text))?.ref
+          consentRef: options.gmConsentRefs?.[gmTurn] ?? handoffContext.speechEvidence.find((item: { text: string }) => /passe (Max|Emma)/.test(item.text))?.ref
             ?? handoffContext.speechEvidence[0]?.ref,
         } : handoffContext && (options.gmStance || isProposal) ? {
           schemaVersion: 1, sourceCharacter: handoffContext.sourceCharacter, targetCharacter: target,
@@ -663,6 +666,7 @@ async function installNetworkFakes(
           return json(route, { error: "simulated_provider_failure" }, 503);
         }
         content = options.characterReplies?.[maxTurnCount - 1] ?? options.maxResponse ?? `Réponse de Max pour le tour ${maxTurnCount}.`;
+        if (maxTurnCount === options.closingResidueAt) content += '\n</speech';
         // Batch now uses the private envelope too. Honor the requested protocol
         // so a normal fake reply does not trigger an unintended recovery call.
         if (!payload.stream && system.includes('# FORMAT DE SORTIE IMPÉRATIF')) {
@@ -675,12 +679,12 @@ async function installNetworkFakes(
           : JSON.stringify({goal:'PRIVATE_INTENT_CANARY',points:['Point privé']}) + '\n<speech>\n' + content;
         const chunks = [response.slice(0, 12),response.slice(12, 45),response.slice(45)];
         return route.fulfill({ status:200,contentType:'text/event-stream',body:chunks.map(text =>
-          `data: ${JSON.stringify({id:`generation-${maxTurnCount}`,model:'e2e-model',choices:[{delta:{content:text}}]})}\n\n`).join('') + 'data: [DONE]\n\n' });
+          `data: ${JSON.stringify({id:`generation-${maxTurnCount}`,model:'e2e-model',choices:[{delta:{content:text}}]})}\n\n`).join('') + 'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n' });
       }
       return json(route, {
         id: `generation-${maxTurnCount}`,
         model: "e2e-model",
-        choices: [{ message: { content } }],
+        choices: [{ message: { content }, finish_reason: "stop" }],
         usage: { prompt_tokens: 10, completion_tokens: 8, total_tokens: 18 },
       });
     }
@@ -1913,8 +1917,8 @@ for (const withOffer of [false, true]) {
   });
 }
 
-for (const source of ['Max', 'Emma'] as const) {
-  test(`compatibilité GM v7 : ${source}, demande différée puis confirmation et connexion`, async ({ page }) => {
+for (const source of ['Max', 'Emma'] as const) for (const incrementalOutput of [false, true]) {
+  test(`lot 3 v7 : ${source}, ${incrementalOutput ? 'Gradium' : 'batch'}, différé puis T12 et connexion`, async ({ page }) => {
     test.setTimeout(45_000);
     const target = source === 'Max' ? 'Emma' : 'Max';
     const sourceKey = source.toLowerCase();
@@ -1923,27 +1927,91 @@ for (const source of ['Max', 'Emma'] as const) {
     const turns = [`Je te confie ${secret}.`, ...HANDOFF_TURNS.slice(1),
       `Je voudrais parler avec ${target}.`, 'Oui, je veux bien lui parler.'];
     const fakes = await installNetworkFakes(page, [...turns, 'Bonjour, je voudrais vous écouter.'], { ttsSuccess: true, characterOpenings: true,
+      incrementalOutput, closingResidueAt: 5, gmConsentRefs: { 5: 'speech_3' },
       historicalGmPrompt: true, gmReferencedAssessment: true, gmStance: 'accept',
       gmDeferredAt: 4, gmHandoffTurns: [4, 5], characterReplies: ['Je t’écoute.', 'Je t’écoute.', 'Je t’écoute.',
-        'Je vais lui demander.', `D’accord. Je te passe ${target}.`, 'Je suis là.'] });
+        'Je vais lui demander.', 'Non… pas encore. J’ai dit que j’allais lui annoncer. Je te la passe maintenant.', 'Je suis là.'] });
+    const send = async (text: string, count: number) => {
+      if (!incrementalOutput) await sendHandoffTurn(page, text);
+      else {
+        await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled();
+        await page.getByRole('button', { name: "Démarrer l'enregistrement" }).click();
+        await expect(page.getByText(text, { exact: false })).toBeVisible();
+        await page.getByRole('button', { name: "Arrêter l'enregistrement" }).press('Enter');
+      }
+      await expect.poll(fakes.getGmPostTurnCount).toBe(count);
+      await page.waitForLoadState('networkidle');
+    };
     await startCharacterConversation(page, source);
-    for (const text of turns.slice(0, 4)) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+    for (let i = 0; i < 4; i++) await send(turns[i], i + 1);
     await expect(page.getByRole('button', { name: `Appeler ${target}`, exact: true })).toHaveCount(0);
     expect(fakes.getSessionRow()).toMatchObject({ active_character: sourceKey, handoff_count: 0,
       pending_handoff: { state: 'awaiting_character' } });
-    await sendHandoffTurn(page, turns[4]);
+    await send(turns[4], 5);
     await expect(page.getByRole('button', { name: `Appeler ${target}`, exact: true })).toBeVisible();
     expect(fakes.getSessionRow()).toMatchObject({ active_character: sourceKey, handoff_count: 0,
       pending_handoff: { state: 'available', offer: { targetCharacter: targetKey } } });
     await page.getByRole('button', { name: `Appeler ${target}`, exact: true }).click();
     await expect(page.getByText('Appel en cours…', { exact: true })).toBeVisible();
     await expect(page.getByRole('img', { name: `Portrait d’${target}` })).toBeVisible({ timeout: 10_000 });
-    await sendHandoffTurn(page, 'Bonjour, je voudrais vous écouter.');
+    await send('Bonjour, je voudrais vous écouter.', 6);
     await page.waitForLoadState('networkidle');
     expect(fakes.getCharacterCalls().at(-1)).not.toContain(secret);
     expect(fakes.getSessionRow()).toMatchObject({ active_character: targetKey, handoff_count: 1, has_seen_film: 'pas_vu' });
     expect(fakes.getSessionInsertCount()).toBe(1);
+    expect(fakes.getMaxTurnCount()).toBe(6);
+    expect(fakes.getGmPostTurnCount()).toBe(6);
+    expect(JSON.stringify(fakes.getSessionRow())).not.toContain('</speech');
     expect(fakes.getExperienceEvents().filter(event => event.event_type === 'handoff_executed')).toHaveLength(1);
     await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  });
+}
+
+for (const source of ['Max', 'Emma'] as const) {
+  test(`lot 3 : ${source}, T9 invalide puis accord courant T12 sans réparation`, async ({ page }) => {
+    const target = source === 'Max' ? 'Emma' : 'Max';
+    const turns = [...HANDOFF_TURNS, `Oui, annonce-lui que je veux parler à ${target}.`, `Tu as pu me passer ${target} ou pas ?`];
+    const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+      historicalGmPrompt: true, gmReferencedAssessment: true, gmStance: 'accept', gmHandoffTurns: [4, 5],
+      gmConsentRefs: { 4: 'currentUserMessage', 5: 'speech_3' },
+      characterReplies: ['Je t’écoute.', 'Je t’écoute.', 'Je t’écoute.', 'D’accord… je vais lui dire. Un instant.',
+        'Non… pas encore. J’ai dit que j’allais lui annoncer. Je te la passe maintenant.'] });
+    await startCharacterConversation(page, source);
+    for (const text of turns.slice(0, 4)) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+    await expect(page.getByRole('button', { name: /^Appeler / })).toHaveCount(0);
+    expect(JSON.stringify(fakes.getSessionRow())).toContain('consent_reference_invalid');
+    expect(fakes.getSessionRow()).toMatchObject({ active_character: source.toLowerCase(), handoff_count: 0 });
+    await sendHandoffTurn(page, turns[4]);
+    await expect(page.getByRole('button', { name: `Appeler ${target}`, exact: true })).toBeVisible();
+    const pending = fakes.getSessionRow().pending_handoff as { turnIndex: number; offer: { assessment: { consent: { evidence: string } } } };
+    expect(pending.turnIndex).toBe(5);
+    expect(pending.offer.assessment.consent.evidence).toBe('Je te la passe maintenant.');
+    expect(fakes.getMaxTurnCount()).toBe(5);
+    expect(fakes.getGmPostTurnCount()).toBe(5);
+    await page.getByRole('button', { name: `Appeler ${target}`, exact: true }).click();
+    await expect(page.getByRole('img', { name: `Portrait d’${target}` })).toBeVisible({ timeout: 10_000 });
+    expect(fakes.getSessionRow()).toMatchObject({ active_character: target.toLowerCase(), handoff_count: 1 });
+  });
+
+  test(`lot 3 : ${source}, GM tardif ignoré puis nouvelle confirmation utilisable`, async ({ page }) => {
+    const target = source === 'Max' ? 'Emma' : 'Max';
+    const turns = [...HANDOFF_TURNS, `Je voudrais parler avec ${target}.`, `Tu peux me passer ${target} maintenant ?`];
+    const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+      historicalGmPrompt: true, gmReferencedAssessment: true, gmStance: 'accept', gmHandoffTurns: [4, 5],
+      delayGmMs: 1500, maxResponse: `Je te passe ${target} maintenant.` });
+    await startCharacterConversation(page, source);
+    for (const text of turns.slice(0, 3)) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+    await sendHandoffTurn(page, turns[3]);
+    await expect.poll(fakes.getGmPostTurnCount).toBe(4);
+    await sendHandoffTurn(page, turns[4]);
+    await expect(page.getByRole('button', { name: `Appeler ${target}`, exact: true })).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    const proposed = fakes.getExperienceEvents().filter(e => e.event_type === 'handoff_proposed');
+    expect(proposed.map(e => e.turn_index)).toEqual([5]);
+    expect(fakes.getExperienceEvents().some(e => e.payload.blockedReason === 'gm_late')).toBe(true);
+    expect(fakes.getSessionRow().pending_handoff).toMatchObject({ turnIndex: 5, state: 'available' });
+    await page.getByRole('button', { name: `Appeler ${target}`, exact: true }).click();
+    await expect(page.getByRole('img', { name: `Portrait d’${target}` })).toBeVisible({ timeout: 10_000 });
+    expect(fakes.getSessionRow()).toMatchObject({ active_character: target.toLowerCase(), handoff_count: 1 });
   });
 }

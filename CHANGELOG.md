@@ -4,6 +4,31 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Lot 3 — réponse sûre et passage fiable] — 2026-10-25
+
+- T2 : contrat sans fermeture ; seuls les résidus terminaux connus sont tolérés
+  sur stop + DONE, après validation de la parole. Longueur, abandon, structure,
+  citation ouverte, identité étrangère et mot coupé restent refusés. Fin normale
+  propagée au vrai appel ; aucun rejeu après son, récupération préalable existante.
+- T12 : « Non… pas encore » rétrospectif ne bloque plus une preuve courante
+  réellement entendue. Refus, rétractations et conditions restent prioritaires.
+- T9 : speech_N clarifié dans tous les prompts effectifs, v7 compris ; référence
+  currentUserMessage toujours rejetée, motif consent_reference_invalid observable.
+- GM : résultats annulés après génération/persistance neutralisés, annulation
+  diagnostiquée parent_aborted. Cause historique exacte de T8 et cause amont de
+  la fermeture T2 non prouvées ; aucune attribution au réseau ou au lot 2.
+- Replays minimaux rouges puis verts, tests au vrai point d'appel, évaluation GM
+  historique simulée, reçus exacts et passages bidirectionnels jusqu'au clic.
+  Qualité locale verte : 66 régression, 941 unitaires, 41 intégration, lint/types/build ;
+  78 E2E complets verts (12,7 minutes).
+  [Plan et preuves de validation/livraison](docs/plan_parole_incarnee_personnages.md#exécution-du-lot-3--25-octobre-2026).
+- Base main vérifiée `5b56c0e987b04caf98f09726dae8ed62bd2d61cc` (#75).
+  SHA final et CI PR/main seront inscrits dans le bilan de livraison GitHub,
+  sans boucle de commit documentaire pour inscrire son propre SHA.
+  Recette humaine sandbox restante ; aucune publication de production,
+  aucun changement de fiches, voix, mapping, accueil ou décisions mains libres.
+  PR étrangère #24 et branches étrangères conservées.
+
 ## [Lot 2 — parole incarnée et Gradium sandbox] — 2026-10-25
 
 - Tests rouges sur les fiches Cloud exactes : sélection présente mais pertes

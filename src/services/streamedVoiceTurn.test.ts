@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 const fake = vi.hoisted(()=>({create:vi.fn()}));
 vi.mock('./tts/providers/gradium',()=>({createGradiumIncrementalTurn:fake.create,prepareTextForGradium:(s:string)=>s}));
+import { ResponseIntentParser, SPEECH_BOUNDARY } from './responseIntentStream';
+import { consumeLLMSse } from './llmSse';
 import {prepareStreamedVoiceTurn} from './streamedVoiceTurn';
 function deferred<T>(){let resolve!:(v:T)=>void, reject!:(e:unknown)=>void;const promise=new Promise<T>((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};}
 const ctx={characterKey:'max' as const,turn_id:'t1',turn_index:1};
@@ -70,5 +72,42 @@ describe('P1 streamed voice delivery',()=>{
  });
  it('cancellation before sound rejects delivery and late promises do not reanimate output',async()=>{
   const {start,gen,end}=setup(),controller=new AbortController(),receipt=vi.fn(),play=vi.fn(),fallback=vi.fn();const t=prepareStreamedVoiceTurn({...ctx,signal:controller.signal},{onReceipt:receipt,fallback,onPlaybackStart:play});controller.abort('session-end');start.resolve();gen.resolve({firstByteMs:1,totalGenMs:2,bytes:1});end.resolve({playbackTotalMs:5});await expect(t.delivery).rejects.toThrow();await t.finish();expect(play).not.toHaveBeenCalled();expect(fallback).not.toHaveBeenCalled();expect(receipt).toHaveBeenCalledTimes(1);
+ });
+});
+
+
+describe('lot 3 — unsafe terminal after audible output', () => {
+ it.each(['length', 'eof', 'aborted'] as const)('preserves exact receipt without fallback or replay on %s', async failure => {
+  const { session, start, gen, end } = setup();
+  session.cancel.mockImplementation(() => { gen.reject(new Error('cancelled')); end.reject(new Error('cancelled')); });
+  session.hasAudibleOutput = true;
+  session.progress.mockReturnValue({ scheduledSamples: 1000, playedSamples: 500, sampleRate: 24000, confirmedText: 'Bonjour.' });
+  const onReceipt = vi.fn(), fallback = vi.fn(), onPlaybackStart = vi.fn();
+  const voice = prepareStreamedVoiceTurn(ctx, { onReceipt, fallback, onPlaybackStart });
+  const context = { characterKey: 'max' as const, displayName: 'Max Lorenzo', characterId: '11111111-1111-4111-8111-111111111111',
+    notionPageId: '30362322e5958011ad7bffb1ed6772bc', environmentId: 'sandbox-ulrich', promptUpdatedAt: '2026-10-25T00:00:00Z' };
+  const parser = new ResponseIntentParser(context, intent => voice.onEvent({ type: 'intent', intent }),
+    text => voice.onEvent({ type: 'segment', text }));
+  const wire = JSON.stringify({ goal: 'PRIVATE', points: [] }) + SPEECH_BOUNDARY + 'Bonjour. Je te la passe maintenant.\n</speech';
+  const controller = new AbortController();
+  const bytes = new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: wire } }] })}\n\n`
+    + (failure === 'length' ? 'data: {"choices":[{"finish_reason":"length"}]}\n\ndata: [DONE]\n\n' : ''));
+  const body = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(bytes); c.close(); } });
+  start.resolve(); await Promise.resolve();
+  try {
+    await consumeLLMSse(body, text => { parser.push(text); if (failure === 'aborted') controller.abort(); },
+      { timeoutMs: 1000, signal: controller.signal });
+    throw new Error('unexpected transport success');
+  } catch (error) {
+    voice.onEvent({ type: 'failed', intent: parser.intent, generated: parser.generated.trim(), error });
+  }
+  await voice.finish();
+  expect(session.appendText.mock.calls).toEqual([['Bonjour. Je te la passe maintenant.']]);
+  // One parser segment was submitted as a whole; without full alignment its
+  // whole audio remains uncertain, never a fabricated delivered proportion.
+  expect(onReceipt.mock.calls.at(-1)?.[0]).toMatchObject({ status: 'failed', delivered: '',
+    uncertain: 'Bonjour. Je te la passe maintenant.', privateContinuation: '\n</speech', intent: { goal: 'PRIVATE' } });
+  expect(fallback).not.toHaveBeenCalled();
+  expect(session.open).toHaveBeenCalledOnce();
  });
 });

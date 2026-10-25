@@ -47,7 +47,7 @@ describe("Game Master PRD4 — memory_delta", () => {
     expect(result.execution_status).toBe("failed");
     expect(result.execution_reason).toBe(kind === "timeout" ? "client_timeout" : "parent_aborted");
     expect(result.memory_delta).toBeNull();
-    expect(result.memory_after).toEqual(before);
+    expect(result.memory_after).toEqual(kind === "parent-abort" ? null : before);
     expect(result.action).toEqual({ type: "none" });
     expect(result.player_switch_request).toBeNull();
     expect(result.trigger_video_id).toBeNull();
