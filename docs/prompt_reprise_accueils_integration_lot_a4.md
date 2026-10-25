@@ -7,15 +7,42 @@ Exécute uniquement le lot A4 dans
 Un seul agent, aucun sous-agent, clone ni worktree. Ce prompt prépare la reprise ;
 sa création dans A3 ne lance pas A4.
 
+## Prérequis bloquant : terminer A3 avant A4
+
+A3 est **incomplet côté livraison**, malgré ses tests locaux verts. Code conservé
+dans `cbfbeca92e8f602f64d3bbceca6cbf3c6619e52a`, branche locale
+`codex/a3-faithful-pause-auditions`, base `46d29a5`. Aucun push ni PR A3.
+Au fetch de livraison, main a avancé au commit Lovable
+`e1c92785f5f3f8f744d171e616039606df28393e` (« Leveré garde et transposé prod »),
+avec [CI verte](https://github.com/memoways/ava-proto1/actions/runs/40232402896),
+qualité et E2E compris. Lovable annonce ce même SHA, ready/agentFinished ;
+A3 est absent de sa preview et aucune validation visuelle A3 n’est revendiquée.
+Il supprime les gardes production de quatre fichiers recoupant A3 :
+`performanceIntent.ts`, `speechPerformanceSettings.ts`,
+`speechPerformance.test.ts`, `providers/gradium.speech.test.ts`.
+Le prompt A3 les exigeait fermées. La règle AGENTS sur le travail récent d’un
+autre agent empêche une résolution autonome qui rétablirait ou supprimerait ces
+changements. Main n’a pas été modifié et la branche A3 n’a pas été rebasée.
+
+La seule intervention humaine nécessaire est la décision sur cette divergence :
+rendu par état en prod avec pauses/auditions sandbox, conservation intégrale du
+nouveau comportement Lovable avec banc seul sandbox, ou rétablissement des gardes
+A3 initiales. Après réponse, reprendre d’abord A3 sur sa même branche, intégrer
+main sans perdre l’un des deux travaux, revérifier le code final et terminer
+PR/CI/main/Lovable/nettoyage. Actualiser ce prompt avec le résultat réel et les
+SHA/runs, puis seulement lancer A4. Aucun accord n’est déduit de l’absence de
+réponse. Les états techniques décrits ci-dessous sont ceux de la branche A3
+validée localement ; la fermeture prod n’est plus celle du main concurrent.
+
 ## Première action exécutable et état à reprendre
 
 Commence par `git fetch --prune`, statut, `git log origin/main`, branches et PR
 ouvertes, puis lis le CHANGELOG. Mets le checkout à jour avant d’écrire. A3 part
 exactement de `46d29a573eef5e44b808c37dcef78202499edc47` (passation #79), après
 A1 #77 et A2 #78. Reprends le main réel et son bilan de livraison A3, sans revenir
-à cette base ni perdre les corrections documentaires ultérieures. Le SHA de
-fusion et les runs exacts de CI sont ceux du bilan de la PR A3 référencée dans
-le plan opérationnel ; les vérifier par GitHub avant d’affirmer leur état.
+à cette base ni perdre les corrections documentaires ultérieures. Aucun SHA de fusion A3 ni run CI A3 n’existe encore ; les relever après la
+résolution et la livraison ci-dessus, sans confondre la CI Lovable concurrente
+avec une validation du lot A3.
 
 État technique A3 vérifié dans le dépôt :
 
@@ -39,7 +66,8 @@ le plan opérationnel ; les vérifier par GitHub avant d’affirmer leur état.
   Le mode A/B n’est jamais une activation live ni une sauvegarde implicite.
 - Qualité locale : lint/types/build, 66 régressions, 1 010 unitaires et
   41 intégrations et 78 E2E verts sans retry (13,5 minutes). Livraison
-  GitHub/Lovable et runs exacts à relire dans le bilan A3. Fournisseurs simulés pour les tests déterministes.
+  GitHub/Lovable bloquée comme décrit ci-dessus. Un timeout LatencyBlockingTab
+  est passé au rejeu isolé 8/8 puis en qualité complète, sans changer son délai. Fournisseurs simulés pour les tests déterministes.
 - Lecture MCP Lovable réelle : sandbox-ulrich et prod possèdent le mapping
   `2026-10-25T11:39:32.000Z`, `gradiumPausesEnabled` absent et
   `gradiumTagsEnabled=false`. Aucune écriture Cloud A3. Le runtime refuse A2

@@ -4,7 +4,7 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
-## [A3 — réglages fidèles et auditions des pauses] — 2026-10-25
+## [A3 local — livraison suspendue] — 2026-10-25
 
 - Banc existant relié au WS Gradium A2 par un snapshot temporaire explicite ;
   mapping enregistré/version, noms/descriptions synchronisés, brouillon, mots,
@@ -23,6 +23,11 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   à vérifier dans le bilan de la PR A3.
   [Preuves, réserves et livraison](docs/plan_lot_b_rendu_vocal.md#exécution-a3--25-octobre-2026).
   SHA final/main et runs exacts dans le bilan GitHub ; pas de commit circulaire.
+- Livraison suspendue : main Lovable concurrent
+  `e1c92785f5f3f8f744d171e616039606df28393e` lève les gardes production dans
+  quatre fichiers recoupant A3 ; décision d’Ulrich requise avant intégration,
+  conformément à AGENTS.md. Code A3 local `cbfbeca`, aucun push/PR A3.
+  La CI verte du main concurrent (run 40232402896) n’est pas une CI A3.
 - Écoute humaine et édition Gamilab non validées ; accueils, intégration et
   recette A4 restants. [Prompt autonome A4](docs/prompt_reprise_accueils_integration_lot_a4.md)
   enregistré dans ce lot ; A4 non lancé. PR #24 et branches étrangères préservées.
