@@ -12,7 +12,7 @@ describe('Lot B speech-state rules',()=>{
  beforeEach(()=>{setActiveEnvironment('sandbox-ulrich');});
  it('lets the character state win over ellipses and lexical fragility',()=>{const i=derivePerformanceIntent(input);expect(i.source).toBe('speech_state');expect(i.delivery).toBe('rushed');expect(i.speedHint).toBe(1.12);expect(i.pauses).toBe('short');});
  it('keeps rugosity zero identical to the existing derivation',()=>{expect(derivePerformanceIntent({...input,rugosite:0})).toEqual(derivePerformanceIntent({text:input.text,characterKey:'max'}));});
- it('production no longer refuses saving the mapping, and tags stay off',async()=>{setActiveEnvironment('prod');await expect(saveSpeechPerformanceSettings({...settings,gradiumTagsEnabled:true} as never)).resolves.not.toThrow?.();});
+ it('applies the saved state mapping in production too',()=>{setActiveEnvironment('prod');expect(derivePerformanceIntent(input).source).toBe('speech_state');});
  it('isolates character states and rejects unknown states',()=>{expect(derivePerformanceIntent({...input,characterKey:'emma'}).source).not.toBe('speech_state');expect(derivePerformanceIntent({...input,validSpeechStates:[]}).source).not.toBe('speech_state');});
  it('scales the deviation across the three rugosity levels',()=>{expect(derivePerformanceIntent({...input,rugosite:1}).speedHint).toBeCloseTo(1.04);expect(derivePerformanceIntent({...input,rugosite:2}).speedHint).toBeCloseTo(1.08);expect(derivePerformanceIntent(input).speedHint).toBe(1.12);});
  it('keeps Gradium character temperature unchanged and modulates padding only',()=>{expect(applyGradiumPerformance({temp:0.6,paddingBonus:1},derivePerformanceIntent(input))).toEqual({temp:0.6,paddingBonus:0.4});});
