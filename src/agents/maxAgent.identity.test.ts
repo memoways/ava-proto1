@@ -180,4 +180,28 @@ describe('P1 format within the selected output budget', () => {
     expect(callLLMWithUsage).toHaveBeenCalledWith(expect.any(Array),expect.objectContaining({max_tokens:220}));
     expect(streamLLM).not.toHaveBeenCalled();
   });
+  it.each(['max', 'emma'] as const)('passes normal transport proof to the %s parser in streaming and batch', async character => {
+    vi.mocked(loadCharacterPrompt).mockResolvedValue(sheet(character) as never);
+    const wire = JSON.stringify({ goal: 'privé', points: [] }) + SPEECH_BOUNDARY + 'Je vous écoute.\n</speech';
+    vi.mocked(streamLLM).mockImplementationOnce(async (_messages, onChunk, options) => {
+      onChunk(wire, false); options?.onStreamComplete?.('stop'); return wire;
+    });
+    const spoken: string[] = [];
+    const parser = new ResponseIntentParser(contexts[character], () => {}, text => spoken.push(text));
+    const result = await simulateMaxResponse(input, { characterContext: contexts[character], onSpeechToken: t => parser.push(t),
+      finishSpeech: normal => parser.finish(normal) });
+    expect(result.response).toBe('Je vous écoute.');
+    expect(spoken).toEqual(['Je vous écoute.']);
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ content: wire, finishReason: 'stop', usage: null,
+      generationId: null, model: 'existing-model', latencyMs: 1, diagnosticTrace: null });
+    const batch = await simulateMaxResponse({ ...input, speechStateHistory: [] }, { characterContext: contexts[character] });
+    expect(batch.response).toBe('Je vous écoute.');
+  });
+  it.each(['length', 'error', 'content_filter'])('rejects %s batch even with punctuated speech, also during recovery', async finishReason => {
+    vi.mocked(loadCharacterPrompt).mockResolvedValue(sheet('max') as never);
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ content: 'Je vous écoute.', finishReason, usage: null,
+      generationId: null, model: 'existing-model', latencyMs: 1, diagnosticTrace: null });
+    await expect(simulateMaxResponse(input, { characterContext: contexts.max, recoverySpeechOnly: true })).rejects.toThrow(`incomplete (${finishReason})`);
+  });
+
 });

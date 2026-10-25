@@ -278,7 +278,7 @@ export async function simulateMaxResponse(
     diagnosticTrace?: boolean;
     llmOverrides?: MaxLlmOverrides;
     onSpeechToken?: (text: string) => void;
-    finishSpeech?: () => string;
+    finishSpeech?: (normalCompletion?: boolean) => string;
     recoverySpeechOnly?: boolean;
   },
 ): Promise<SimulateMaxResult> {
@@ -333,8 +333,11 @@ export async function simulateMaxResponse(
     };
     if (opts?.onSpeechToken) {
       const started = performance.now();
-      const content = await streamLLM(messages, (text, done) => { if (!done) opts.onSpeechToken?.(text); }, options);
-      result = { content: opts.finishSpeech?.() ?? content, usage: null, generationId: null, model, latencyMs: performance.now() - started, diagnosticTrace: null };
+      let normalCompletion = false;
+      const content = await streamLLM(messages, (text, done) => { if (!done) opts.onSpeechToken?.(text); }, {
+        ...options, onStreamComplete: reason => { normalCompletion = reason === 'stop'; },
+      });
+      result = { content: opts.finishSpeech?.(normalCompletion) ?? content, usage: null, generationId: null, model, latencyMs: performance.now() - started, diagnosticTrace: null };
     } else result = await callLLMWithUsage(messages, options);
   } catch (error) {
     if (!opts?.diagnosticTrace) throw error;
@@ -351,12 +354,14 @@ export async function simulateMaxResponse(
     );
   }
 
+  // A punctuated response is not proof of completion, including batch recovery.
+  if (result.finishReason && result.finishReason !== 'stop') throw new Error(`LLM response incomplete (${result.finishReason})`);
   let response = result.content;
   let responseIntent: ResponseIntent | null = null;
   if (privateProtocol && !opts?.onSpeechToken && opts?.characterContext) {
     const parser = new ResponseIntentParser(opts.characterContext, intent => { responseIntent = intent; }, () => {});
     parser.push(response);
-    response = parser.finish();
+    response = parser.finish(result.finishReason === 'stop');
   }
   return {
     response,

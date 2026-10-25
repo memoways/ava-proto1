@@ -5,6 +5,7 @@ vi.mock('./settingsService', () => ({ isReasoningEnabledForModel: () => false })
 vi.mock('./debugLogger', () => ({ debugLogger: { logFetch: vi.fn(), logResponse: vi.fn() } }));
 import { authenticatedFunctionFetch } from './gameAuth';
 import { trackLLMCall } from './llmUsageTracker';
+import { ResponseIntentParser, SPEECH_BOUNDARY } from './responseIntentStream';
 import { streamLLM } from './openRouterLLM';
 afterEach(() => vi.clearAllMocks());
 describe('P1 failed stream evidence', () => {
@@ -19,5 +20,44 @@ describe('P1 failed stream evidence', () => {
     expect(chunk.mock.calls).toEqual([['Bonjour.', false]]);
     expect(authenticatedFunctionFetch).toHaveBeenCalledTimes(1);
     expect(trackLLMCall).toHaveBeenCalledWith(expect.objectContaining({ generation_id: 'gen-failed', status: 'error', completion_tokens: 220, metadata: expect.objectContaining({ finish_reason: reason }) }));
+  });
+});
+
+
+describe('lot 3 — SSE terminal proof at the real streaming call', () => {
+  const context = { characterKey: 'max' as const, displayName: 'Max Lorenzo', characterId: '11111111-1111-4111-8111-111111111111',
+    notionPageId: '30362322e5958011ad7bffb1ed6772bc', environmentId: 'sandbox-ulrich', promptUpdatedAt: '2026-10-25T00:00:00Z' };
+  const header = JSON.stringify({ goal: 'PRIVATE', points: [] }) + SPEECH_BOUNDARY;
+  const speech = 'Max, il… bon. Emma, elle reste Emma. Hein ?';
+  const wire = header + speech + '\n</speech';
+  const frame = (content: string) => `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`;
+  const terminal = (reason: string) => `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: reason }] })}\n\n`;
+  it('accepts the known residue at all model-token splits and byte-fragmented SSE without replay', async () => {
+    for (let split = 0; split <= wire.length; split++) {
+      const bytes = new TextEncoder().encode(frame(wire.slice(0, split)) + frame(wire.slice(split)) + terminal('stop') + 'data: [DONE]\n\n');
+      const body = new ReadableStream<Uint8Array>({ start(c) { for (const byte of bytes) c.enqueue(new Uint8Array([byte])); c.close(); } });
+      vi.mocked(authenticatedFunctionFetch).mockResolvedValueOnce(new Response(body));
+      const spoken: string[] = [];
+      const parser = new ResponseIntentParser(context, () => {}, text => spoken.push(text));
+      let normal = false;
+      await streamLLM([], (text, done) => { if (!done) parser.push(text); }, { onStreamComplete: reason => { normal = reason === 'stop'; } });
+      expect(parser.finish(normal)).toBe(speech);
+      expect(spoken.join(' ')).toBe(speech);
+      expect(spoken.join(' ')).not.toMatch(/PRIVATE|speech/);
+    }
+    expect(authenticatedFunctionFetch).toHaveBeenCalledTimes(wire.length + 1);
+  });
+  it.each(['length', 'error', 'content_filter', 'tool_calls', 'eof', 'missing_reason'])('does not rescue terminal %s after an emitted phrase', async reason => {
+    vi.mocked(authenticatedFunctionFetch).mockResolvedValueOnce(new Response(frame(wire)
+      + (reason === 'eof' ? '' : (reason === 'missing_reason' ? '' : terminal(reason)) + 'data: [DONE]\n\n')));
+    const spoken: string[] = [];
+    const parser = new ResponseIntentParser(context, () => {}, text => spoken.push(text));
+    let normal = false;
+    await expect((async () => {
+      await streamLLM([], (text, done) => { if (!done) parser.push(text); }, { onStreamComplete: r => { normal = r === 'stop'; } });
+      return parser.finish(normal);
+    })()).rejects.toThrow();
+    expect(authenticatedFunctionFetch).toHaveBeenCalledOnce();
+    expect(spoken.join(' ')).toBe(speech);
   });
 });

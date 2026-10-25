@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ResponseIntentParser, SPEECH_BOUNDARY } from './responseIntentStream';
+import { ResponseIntentParser, SPEECH_BOUNDARY, buildResponseStreamContract } from './responseIntentStream';
 const context = { characterKey: 'max' as const, displayName: 'Max Lorenzo', characterId: '11111111-1111-4111-8111-111111111111', notionPageId: '30362322e5958011ad7bffb1ed6772bc', environmentId: 'sandbox-ulrich', promptUpdatedAt: '2026-10-13T00:00:00Z' };
 const header = JSON.stringify({ goal: 'Rassurer sans divulguer', points: ['Écouter'] }) + SPEECH_BOUNDARY;
 function parser() { const spoken: string[] = []; const intents: unknown[] = []; return { spoken, intents, p: new ResponseIntentParser(context, i => intents.push(i), s => spoken.push(s)) }; }
@@ -31,7 +31,7 @@ describe('P1 private intent and safe speech', () => {
     for (let i = 0; i <= wire.length; i++) {
       const {p, spoken} = parser();
       p.push(wire.slice(0, i)); p.push(wire.slice(i));
-      expect(p.finish()).toBe(speech);
+      expect(p.finish(true)).toBe(speech);
       expect(spoken).toEqual([speech]);
       expect(p.generated.trim()).toBe(speech);
     }
@@ -63,12 +63,42 @@ describe('P1 private intent and safe speech', () => {
     const wire = header + speech;
     for (let split = 0; split <= wire.length; split++) {
       const { p, spoken } = parser(); p.push(wire.slice(0, split)); p.push(wire.slice(split));
-      expect(p.finish()).toBe(speech);
+      expect(p.finish(true)).toBe(speech);
       expect(spoken.join(' ')).toBe(speech);
     }
   });
   it.each(['Je suis Em…', 'Je suis Em...ma.', 'Je m’appelle Em…', 'je suis em…', 'Ici Em…', 'Une phrase incomplète', '« Emma, elle…', '{"parole":"Bloqué"}…'])('refuse encore les identités et réponses incomplètes : %s', speech => {
     const { p } = parser();
     expect(() => { p.push(header + speech); p.finish(); }).toThrow();
+  });
+});
+
+
+describe('lot 3 — terminal closing residue', () => {
+  it('forbids model-generated closing markers in the effective contract', () => {
+    expect(buildResponseStreamContract(220)).toContain('Ne ferme jamais <speech>');
+  });
+  it('accepts only the known T2 residue after confirmed normal completion at every token boundary', () => {
+    const speech = 'Je vous écoute.';
+    const wire = header + speech + '\n</speech';
+    for (let split = 0; split <= wire.length; split++) {
+      const { p, spoken } = parser();
+      p.push(wire.slice(0, split)); p.push(wire.slice(split));
+      expect(p.finish(true)).toBe(speech);
+      expect(spoken).toEqual([speech]);
+      expect(p.generated.trim()).toBe(speech);
+    }
+  });
+  it.each(['Une phrase coupée', '« Une citation.', 'Je suis Em…', 'Je suis Emma.', '{"goal":"privé"}.'])('never rescues unsafe speech %s', speech => {
+    const { p } = parser();
+    expect(() => { p.push(header + speech + '\n</speech'); p.finish(true); }).toThrow();
+  });
+  it.each(['</spe', '</speech x', '</other>', '</speech> Autre phrase.', '</speech><speech>'])('rejects other residues %s', residue => {
+    const { p } = parser();
+    expect(() => { p.push(header + 'Bonjour.\n' + residue); p.finish(true); }).toThrow();
+  });
+  it('requires a normal upstream completion for a truncated closing marker', () => {
+    const { p } = parser(); p.push(header + 'Bonjour.\n</speech');
+    expect(() => p.finish(false)).toThrow();
   });
 });

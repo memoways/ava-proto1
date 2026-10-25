@@ -3,9 +3,33 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-25 (lot 2 parole incarnée ; résultats et livraison dans les plans)
+> **Last Updated**: 2026-10-25 (lot 3 réponse sûre et passage ; recette humaine restante)
 
 ---
+
+## Lot 3 — ne pas confondre protocole, passé et accord présent (25 octobre 2026)
+
+La recette réelle utilisait le lot 2. Le résidu </speech de T2 cassait encore
+une réponse ponctuée ; T12 disait « Non… pas encore » sur l'action passée, puis
+acceptait le transfert présent, mais le veto local bloquait sur Non. Les replays
+ont reproduit ces deux défauts avant correction, dans les deux sens. Le parseur
+ne consomme maintenant qu'une fermeture terminale connue sur fin normale
+attestée ; la parole et le reçu restent contrôlés. Le veto exclut ce seul
+préambule lorsqu'une preuve courante livrée suit, sans accorder de permission
+par les mots seuls. Refus et condition après suspension restent bloquants.
+
+La référence fautive T9 n'est pas réparée : elle reste refusée, avec une raison
+spécifique visible. Le même GM reçoit un contrat plus explicite après le prompt
+publié v7, sans changer son snapshot ni son budget. Une course reproduite a
+montré qu'un adaptateur résolu après annulation pouvait encore rendre executed ;
+des barrières neutralisent ce résultat après génération et persistance. Une
+annulation n'est plus nommée panne de persistance. Les données historiques de
+T8 ne suffisent pas à établir laquelle de ces courses s'est produite ce jour-là.
+
+Tests, versions, limites et livraison dans
+[le plan existant](docs/plan_parole_incarnee_personnages.md#exécution-du-lot-3--25-octobre-2026).
+La recette au casque reste distincte des tests simulés. Accueil et jeu vocal
+attendent le lot suivant ; aucune publication de production dans ce lot.
 
 ## Lot 2 — garder la voix de chaque fiche jusqu'au son (25 octobre 2026)
 

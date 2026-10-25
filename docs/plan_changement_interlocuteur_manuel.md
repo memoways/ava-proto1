@@ -1,5 +1,51 @@
 # Passage Emma ↔ Max : validation narrative et pastille d’appel
 
+## Suite de recette — 25 octobre 2026
+
+Proposition actuelle : [lot 3 de fiabilisation de la recette](plan_parole_incarnee_personnages.md#lot-3-proposé--réponse-sûre-et-transfert-fiable),
+puis accueil/jeu vocal séparés. [Prompt de reprise](prompt_reprise_fiabilisation_recette_lot_3.md).
+Lot 3 implémenté ; qualité locale et 78 E2E complets verts, livraison GitHub
+en cours.
+[Exécution et preuves](plan_parole_incarnee_personnages.md#exécution-du-lot-3--25-octobre-2026).
+
+La session sandbox `abb58e39-763d-465e-baeb-203c3f99bae0` utilise bien le lot 2
+de parole sur main `5b56c0e987b04caf98f09726dae8ed62bd2d61cc`, le GM compatible
+et la version publiée v7 `98145fe3-96f1-4525-84c2-0e0a1cc5c6da`.
+Zéro transfert, huit traces causales, six évaluations persistées dans le log GM.
+
+- T8 : demande de parler à Emma ; réponse « Je… oui, peut-être. Attends. J’ai
+  du mal à me concentrer, mais je peux lui passer l’appel. Je lui annonce que
+  tu veux lui parler ? ». Audit `gm_late`, échec de persistance GM enregistré.
+  Ne pas affirmer que le réseau personnel explique cette course sans preuve.
+- T9 : « Oui, oui, annonce-lui, ouais, que je veux lui parler, ouais. » →
+  « D’accord… je vais lui dire. Un instant. ». Le GM recommande Emma mais émet
+  `consentRef: "currentUserMessage"`, alors que le contrat exige `speech_N`.
+  Rejet correct du schéma, puis `assessment_missing` au validateur. Une annonce
+  future ne doit pas être réparée arbitrairement en accord immédiat.
+- T12 : « comment, enfin, tu as pu me passer Emma ou pas » → « Non… pas encore.
+  J’ai dit que j’allais lui annoncer. Je te la passe maintenant. ». Le GM produit
+  une preuve courante sur « Je te la passe maintenant. », effectivement livrée.
+  Le veto local répond `character_refused` sur le « Non » initial : faux refus
+  reproduit avec le validateur pur. Sans le préfixe, la même preuve est acceptée.
+
+Le diff #74 → #75 ne modifie pas `characterHandoff.ts`. Ces résultats révèlent
+une fragilité du contrat/validateur et des cas concurrents ; ils ne démontrent
+pas que le lot de parole a régressé le code du passage. Les 92 tests passage
+et 34 tests parseur existants passent, sans couvrir cette négation rétrospective.
+
+Couverture ajoutée au lot 3 : replay des formulations exactes avec une preuve valide dans
+les deux sens, refus/rétractations toujours bloqués, référence invalide toujours
+refusée, course voix/GM/nouveau tour et absence d'offre tardive. Ne pas retirer
+fraîcheur, version, reçu, preuve, gardes, persistance atomique ou clic. Ne pas
+attendre le GM en fermant le micro ni reconstruire une autorisation ancienne.
+
+Résultat local : préambule rétrospectif de T12 accepté seulement avec sa preuve
+courante ; refus/condition/rétractation conservés. T9 toujours rejeté avec
+consent_reference_invalid visible dans le journal GM. Annulation après retour
+LLM ou persistance neutralisée ; parent_aborted distinct de persistence_failed.
+Les replays ne démontrent pas la cause exacte de l'échec historique T8.
+Aucun snapshot v7 ni réglage sandbox modifié ; recette humaine restante.
+
 ## Lot 1 — compatibilité GM et passage fiable (25 octobre 2026)
 
 Base revérifiée : `f77ad835db6b3ea2c765d0f9a781b1c775f5ca41`, main propre,

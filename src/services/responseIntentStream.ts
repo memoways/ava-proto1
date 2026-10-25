@@ -12,7 +12,7 @@ export function buildResponseStreamContract(maxTokens: number): string {
   const intent = small
     ? 'goal : 4 mots maximum ; points : tableau vide []'
     : 'goal : 8 mots maximum ; points : 0 à 2 points de 4 mots maximum chacun';
-  return `\n# FORMAT DE SORTIE IMPÉRATIF\nDans cette même réponse, écris d'abord une seule ligne JSON {"goal":"objectif privé","points":[],"parole":"état"}. Garde cet en-tête privé compact : ${intent}. Objectif ≤240 caractères, chaque point ≤160 caractères. Ce sont des intentions de communication, pas un raisonnement détaillé. "parole" : le nom exact d'un état de « Tes états de parole » que tu joues dans cette réponse (≤40 caractères) ; omets-le si aucun ne convient. Puis écris le marqueur <speech> seul sur une ligne entre le JSON et ton discours in character, avec de vrais retours à la ligne. Limite du discours : ${speechWords} mots maximum, y compris citations et questions. Le budget total de ${budget} tokens inclut le JSON et la parole : ne consomme pas la place de la parole avec l'intention. Choisis l'essentiel si la demande est large ; achève ta réponse dans cette limite. Les fragments volontaires, reprises et suspensions de ta fiche sont permis : ne les transforme pas en phrases explicatives. Aucun markdown, aucune autre métadonnée, aucun tag dans le discours. L'intention est privée, jamais entendue. Une intention ou une continuation privée n'est jamais une confidence déjà entendue. Respecte les mêmes limites de confidences et le canon.\n`;
+  return `\n# FORMAT DE SORTIE IMPÉRATIF\nDans cette même réponse, écris d'abord une seule ligne JSON {"goal":"objectif privé","points":[],"parole":"état"}. Garde cet en-tête privé compact : ${intent}. Objectif ≤240 caractères, chaque point ≤160 caractères. Ce sont des intentions de communication, pas un raisonnement détaillé. "parole" : le nom exact d'un état de « Tes états de parole » que tu joues dans cette réponse (≤40 caractères) ; omets-le si aucun ne convient. Puis écris le marqueur <speech> seul sur une ligne entre le JSON et ton discours in character, avec de vrais retours à la ligne. Ne ferme jamais <speech> : aucun marqueur de fermeture, même en fin de réponse. Termine directement après les mots prononcés. Limite du discours : ${speechWords} mots maximum, y compris citations et questions. Le budget total de ${budget} tokens inclut le JSON et la parole : ne consomme pas la place de la parole avec l'intention. Choisis l'essentiel si la demande est large ; achève ta réponse dans cette limite. Les fragments volontaires, reprises et suspensions de ta fiche sont permis : ne les transforme pas en phrases explicatives. Aucun markdown, aucune autre métadonnée, aucun tag dans le discours. L'intention est privée, jamais entendue. Une intention ou une continuation privée n'est jamais une confidence déjà entendue. Respecte les mêmes limites de confidences et le canon.\n`;
 }
 
 export function normalizeResponseIntent(value: unknown): ResponseIntent | null {
@@ -114,11 +114,12 @@ export class ResponseIntentParser {
     this.pending = this.pending.slice(end);
     this.onSegment(segment.trim());
   }
-  finish() {
+  finish(normalCompletion = false) {
     if (!this.intentValue) throw new Error('Missing response intent');
-    // Some models close the opening protocol marker. Consume only this exact
-    // terminal marker; sentence, quote, identity and structured-data guards follow.
-    this.pending = this.pending.replace(/\s*<\/speech>\s*$/, '');
+    // Compatibility for known terminal markers only, after upstream stop + DONE
+    // (or a batch stop). Never infer transport completion from punctuation.
+    // No arbitrary tag/prefix stripping: </spe, attributes and trailing text fail.
+    if (normalCompletion) this.pending = this.pending.replace(/\s*<\/speech>?\s*$/, '');
     this.emit(true);
     if (this.pending.trim()) throw new Error('Incomplete response sentence or quote');
     if (!this.emitted.trim()) throw new Error('Empty response speech');

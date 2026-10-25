@@ -329,3 +329,98 @@ describe("current wire contract and bounded diagnostic reasons", () => {
     expect(state.offer?.targetCharacter).toBe(target);
   });
 });
+
+
+describe('lot 3 — historical references and GM lifetime', () => {
+  beforeEach(() => vi.clearAllMocks());
+  it.each([['builtin', undefined], ['v7', publishedV7Prompt]])('rejects the actual T9 reference without repair under effective prompt %s', async (_name, systemPromptOverride) => {
+    const fixture = validInput();
+    const reply = 'D’accord… je vais lui dire. Un instant.';
+    const delivery = { ...fixture.delivery!, generated: reply, delivered: reply };
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...llmMetadata, content: JSON.stringify({ ...historicalJson,
+      handoff_assessment: { schemaVersion: 2, requestSource: 'current_user', targetCharacter: 'max',
+        stance: 'accept', refusal: false, consentRef: 'currentUserMessage' } }) });
+    const result = await evaluatePostTurnPRD4({ ...input, maxResponse: reply, systemPromptOverride,
+      handoffContext: { turnId: fixture.turnId, delivery, openRequest: null } });
+    expect(result.handoff_assessment).toBeNull();
+    expect(result.validation_issues).toContainEqual({ code: 'handoff_proof_rejected', reason: 'consent_reference_invalid' });
+    const system = vi.mocked(callLLMWithUsage).mock.calls[0][0][0].content;
+    expect(system).toContain('speech_N');
+    expect(system).toContain('JAMAIS des consentRef');
+    expect(validateCharacterHandoff({ ...fixture, delivery, evaluation: result }).authorized).toBe(false);
+    expect(callLLMWithUsage).toHaveBeenCalledOnce();
+    expect(vi.mocked(callLLMWithUsage).mock.calls[0][1]).toMatchObject({ max_tokens: 950, timeoutMs: 12000 });
+  });
+  it.each([['max', 'emma'], ['emma', 'max']] as const)('evaluates delivered T12 evidence through v7 %s → %s', async (source, target) => {
+    const fixture = validInput();
+    const reply = 'Non… pas encore. J’ai dit que j’allais lui annoncer. Je te la passe maintenant.';
+    const userMessage = `Tu as pu me passer ${target} ou pas ?`;
+    const delivery = { ...fixture.delivery!, character: source, generated: reply, delivered: reply };
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...llmMetadata, content: JSON.stringify({ ...historicalJson,
+      action: { type: 'handoff', targetCharacter: target, reason: 'Accord courant', proposalGuidance: 'Propose le passage.' },
+      handoff_assessment: { schemaVersion: 2, requestSource: 'current_user', targetCharacter: target,
+        stance: 'accept', refusal: false, consentRef: 'speech_3' } }) });
+    const result = await evaluatePostTurnPRD4({ ...input, currentCharacter: source, userMessage, maxResponse: reply,
+      systemPromptOverride: publishedV7Prompt, handoffContext: { turnId: fixture.turnId, delivery, openRequest: null } });
+    expect(result.validation_issues).toEqual([]);
+    expect(result.handoff_assessment?.consent.evidence).toBe('Je te la passe maintenant.');
+    expect(validateCharacterHandoff({ ...fixture, currentCharacter: source, userText: userMessage, delivery, evaluation: result }).authorized).toBe(true);
+  });
+  it('classifies cancellation during GM persistence without calling it an unexplained persistence failure', async () => {
+    const controller = new AbortController();
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...llmMetadata,
+      content: JSON.stringify({ ...historicalJson, handoff_assessment: validAssessment() }) });
+    vi.mocked(persistPostTurnMemory).mockImplementationOnce(async () => {
+      controller.abort('new-user-turn'); throw new DOMException('Obsolete GM persistence', 'AbortError');
+    });
+    const result = await evaluatePostTurnPRD4({ ...input, sessionId: 'session', signal: controller.signal });
+    expect(result.execution_reason).toBe('parent_aborted');
+    expect(result.handoff_assessment).toBeNull();
+    expect(result.action).toEqual({ type: 'none' });
+  });
+});
+
+
+describe('lot 3 — late evaluation cannot supply the next turn agreement', () => {
+  it.each(['generation', 'persistence'] as const)('ignores an adapter that resolves after abort during %s; the fresh turn can confirm', async phase => {
+    vi.clearAllMocks();
+    const controller = new AbortController();
+    let release!: () => void;
+    let entered!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const fixture = validInput();
+    const oldReply = 'Je te passe Max.';
+    const oldDelivery = { ...fixture.delivery!, generated: oldReply, delivered: oldReply };
+    const raw = { ...historicalJson, handoff_assessment: { schemaVersion: 2, requestSource: 'current_user',
+      targetCharacter: 'max', stance: 'accept', refusal: false, consentRef: 'speech_0' } };
+    vi.mocked(callLLMWithUsage).mockImplementationOnce(async () => {
+      if (phase === 'generation') { entered(); await gate; }
+      return { ...llmMetadata, content: JSON.stringify(raw) };
+    });
+    vi.mocked(persistPostTurnMemory).mockImplementationOnce(async () => {
+      if (phase === 'persistence') { entered(); await gate; }
+      return null;
+    });
+    const pending = evaluatePostTurnPRD4({ ...input, sessionId: 'session', signal: controller.signal,
+      maxResponse: oldReply, handoffContext: { turnId: fixture.turnId, delivery: oldDelivery, openRequest: null } });
+    await started;
+    controller.abort('new-user-turn'); release();
+    const late = await pending;
+    expect(late.execution_reason).toBe('parent_aborted');
+    expect(late.handoff_assessment).toBeNull();
+    expect(late.action).toEqual({ type: 'none' });
+    const currentTurn = { currentCharacter: 'emma' as const, turnId: 'session:12', turnIndex: 12,
+      orchestrationVersionId: 'v6', userText: 'Tu as pu me passer Max ou pas ?' };
+    const state = advanceHandoffTurn(null, { sessionId: 'session', sourceCharacter: 'emma', ...currentTurn });
+    expect(assessHandoffTurn(state, { ...fixture, delivery: oldDelivery, evaluation: late }).validation.reason).toBe('gm_late');
+    const reply = 'Non… pas encore. Je te le passe maintenant.';
+    const delivery = { ...oldDelivery, turnId: currentTurn.turnId, turnIndex: currentTurn.turnIndex, generated: reply, delivered: reply };
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...llmMetadata,
+      content: JSON.stringify({ ...raw, handoff_assessment: { ...raw.handoff_assessment, consentRef: 'speech_2' } }) });
+    const current = await evaluatePostTurnPRD4({ ...input, turnIndex: 12, userMessage: currentTurn.userText,
+      maxResponse: reply, handoffContext: { turnId: currentTurn.turnId, delivery, openRequest: null } });
+    expect(assessHandoffTurn(state, { ...currentTurn, delivery, evaluation: current }).state.state).toBe('available');
+    expect(callLLMWithUsage).toHaveBeenCalledTimes(2);
+  });
+});

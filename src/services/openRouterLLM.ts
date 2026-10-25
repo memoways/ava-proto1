@@ -16,6 +16,8 @@ interface Message {
 }
 
 interface LLMOptions {
+  /** Called only after strict SSE completion; preserves the upstream reason. */
+  onStreamComplete?: (finishReason: string | null) => void;
   onVoiceObservation?: VoiceObserver;
   onServiceObserved?: (value: ServiceObservation) => void;
   onServerObserved?: (value: ServerObservation) => void;
@@ -145,6 +147,7 @@ export async function streamLLM(
     }});
     if (controller.signal.aborted) throw new DOMException('LLM cancelled', 'AbortError');
     observeVoice(options?.onVoiceObservation, "llm_response");
+    options?.onStreamComplete?.(finishReason);
     onChunk(fullText, true);
     const finalUsage = usage as LLMUsagePayload | null;
     trackLLMCall({ session_id: options?.session_id, feature_key: featureKey, model,
@@ -173,6 +176,7 @@ export interface LLMUsage {
 }
 
 export interface LLMCallResult {
+  finishReason?: string | null;
   content: string;
   usage: LLMUsage | null;
   generationId: string | null;
@@ -287,6 +291,7 @@ export async function callLLMWithUsage(
   });
 
   return {
+    finishReason: typeof data.choices?.[0]?.finish_reason === 'string' ? data.choices[0].finish_reason : null,
     content,
     usage,
     generationId,

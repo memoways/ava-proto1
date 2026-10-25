@@ -4,6 +4,18 @@ Date : 23 octobre 2026. Demande : Ulrich, dans le chat « Fiabiliser transcripti
 Base : `142310384aae2e33f3769f4f340122ab2bec6c4b`, checkout canonique, branche unique
 `codex/voice-turn-continuity`. PR étrangère #24 préservée.
 
+## Complément lot 3 — 25 octobre 2026
+
+Le [lot de réponse sûre et passage](plan_parole_incarnee_personnages.md#exécution-du-lot-3--25-octobre-2026)
+interdit la fermeture du protocole à l'émission. La compatibilité terminale
+accepte uniquement </speech> ou le résidu exact </speech après fin normale
+attestée, jamais sur longueur/abandon/EOF seul. Le texte doit encore passer les
+gardes de complétude, citation et identité. Les cas avant son réutilisent la
+récupération ci-dessous ; après parole soumise, aucun rejeu ni nouvelle génération.
+Les tests font passer le résidu dans la vraie chaîne et contrôlent séparément
+le reçu sonore : livré, incertain, privé. T2 historique reste failed, sans
+réécriture de son reçu. Le protocole ne prouve pas le naturel ou la latence.
+
 ## Résultat attendu
 
 - Une transcription finalisée est transmise intégralement au personnage actif.

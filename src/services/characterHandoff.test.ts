@@ -297,3 +297,53 @@ describe('lot 1: no invented refusal from a negated request to stay', () => {
       expect(validateCharacterHandoff(input).authorized).toBe(true);
     });
 });
+
+
+describe('lot 3 — retrospective negation and current proof', () => {
+  it.each([['max', 'emma'], ['emma', 'max']] as const)('accepts T12 only with the current heard proof %s → %s', (source, target) => {
+    const reply = 'Non… pas encore. J’ai dit que j’allais lui annoncer. Je te la passe maintenant.';
+    const input = withReply(reply, 'Je te la passe maintenant.');
+    input.currentCharacter = source; input.evaluation.character_key = source; input.delivery!.character = source;
+    input.userText = `Tu as pu me passer ${target} ou pas ?`;
+    input.evaluation.action = { type: 'handoff', targetCharacter: target, reason: 'accord', proposalGuidance: '' };
+    input.evaluation.handoff_assessment = { ...validAssessment(), sourceCharacter: source, targetCharacter: target,
+      origin: { type: 'player_request', turnId: input.turnId, turnIndex: input.turnIndex, evidence: input.userText },
+      targetEvidence: { speaker: 'user', quote: target },
+      consent: { stance: 'accept', evidence: 'Je te la passe maintenant.', refusalEvidence: null } };
+    expect(validateCharacterHandoff(input)).toMatchObject({ authorized: true });
+    input.delivery!.delivered = 'Non… pas encore.';
+    expect(validateCharacterHandoff(input)).toMatchObject({ authorized: false, reason: 'consent_not_delivered' });
+  });
+  it.each([['max', 'emma'], ['emma', 'max']] as const)('keeps the player click optional after a present agreement %s → %s', (source, target) => {
+    const name = target === 'max' ? 'Max' : 'Emma';
+    const reply = `Tu peux appeler ${name} si tu veux.`;
+    const input = withReply(reply);
+    input.currentCharacter = source; input.evaluation.character_key = source; input.delivery!.character = source;
+    input.userText = `Je voudrais parler à ${name}.`;
+    input.evaluation.action = { type: 'handoff', targetCharacter: target, reason: 'accord', proposalGuidance: '' };
+    const proof = input.evaluation.handoff_assessment!;
+    proof.sourceCharacter = source; proof.targetCharacter = target;
+    proof.origin.evidence = input.userText; proof.targetEvidence = { speaker: 'user', quote: name };
+    expect(validateCharacterHandoff(input).authorized).toBe(true);
+  });
+  for (const [source, target] of [['max', 'emma'], ['emma', 'max']] as const) it.each([
+    'Non. Je te la passe maintenant.',
+    'Je te la passe maintenant… enfin non.',
+    'Ne lui passe pas la ligne. Je te la passe maintenant.',
+    'Je te la passe maintenant. Non… pas encore.',
+    'Pas encore. Je te la passe maintenant.',
+    'Je te la passe maintenant. Je te la passe si elle accepte.',
+    'Je te la passe maintenant… si elle accepte.',
+    'Je te la passe maintenant si tu me donnes une explication.',
+    'Je te la passe maintenant. Je te la passe plus tard.',
+  ])(`${source} → ${target} keeps refusal priority despite a selected affirmative quote: %s`, reply => {
+    const input = withReply(reply, 'Je te la passe maintenant');
+    input.currentCharacter = source; input.evaluation.character_key = source; input.delivery!.character = source;
+    input.userText = `Je veux parler à ${target}.`;
+    input.evaluation.action = { type: 'handoff', targetCharacter: target, reason: 'accord', proposalGuidance: '' };
+    const proof = input.evaluation.handoff_assessment!;
+    proof.sourceCharacter = source; proof.targetCharacter = target;
+    proof.origin.evidence = input.userText; proof.targetEvidence = { speaker: 'user', quote: target };
+    expect(validateCharacterHandoff(input).reason).toMatch(/^character_(refused|deferred)$/);
+  });
+});

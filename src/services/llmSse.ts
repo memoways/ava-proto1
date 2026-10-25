@@ -18,7 +18,7 @@ export async function consumeLLMSse(body: ReadableStream<Uint8Array>, onToken: (
     options.onMetadata?.(value);
     if (value.error) throw new Error(`LLM SSE error: ${value.error.message ?? 'upstream failure'}`);
     const choice = value.choices?.[0];
-    if (choice?.finish_reason === 'error' || choice?.finish_reason === 'length') throw new Error(`LLM response incomplete (${choice.finish_reason})`);
+    if (typeof choice?.finish_reason === 'string' && choice.finish_reason !== 'stop') throw new Error(`LLM response incomplete (${choice.finish_reason})`);
     const content = choice?.delta?.content;
     if (typeof content === 'string' && content) { text += content; onToken(content); }
   };
