@@ -1,0 +1,81 @@
+{
+  "enabled": true,
+  "version": "2026-10-25T11:39:32.000Z",
+  "gradiumTagsEnabled": false,
+  "byCharacter": {
+    "max": {
+      "Bloqué": {
+        "emotion": "fragile",
+        "delivery": "measured",
+        "speed": 0.9,
+        "pauses": "long",
+        "instruction": "Broken, hesitant speech; keep restarts and clear diction"
+      },
+      "Tu tournes autour": {
+        "emotion": "tense",
+        "delivery": "measured",
+        "speed": 0.96,
+        "pauses": "normal",
+        "instruction": "Guarded, practical speech; occasional self-correction"
+      },
+      "La digue cède": {
+        "emotion": "urgent",
+        "delivery": "rushed",
+        "speed": 1.12,
+        "pauses": "short",
+        "instruction": "Fast, overflowing remorse; stop abruptly, clear diction"
+      },
+      "Éclair": {
+        "emotion": "tense",
+        "delivery": "cutting",
+        "speed": 1,
+        "pauses": "long",
+        "instruction": "One sharp, self-directed phrase; then hold back"
+      },
+      "L'espoir revient": {
+        "emotion": "urgent",
+        "delivery": "rushed",
+        "speed": 1.08,
+        "pauses": "short",
+        "instruction": "Quicker practical questions; hope interrupted by doubt"
+      }
+    },
+    "emma": {
+      "Les questions en cascade": {
+        "emotion": "scared",
+        "delivery": "rushed",
+        "speed": 1.1,
+        "pauses": "short",
+        "instruction": "Rapid short questions about Ava, clear diction"
+      },
+      "Tu te reprends": {
+        "emotion": "fragile",
+        "delivery": "measured",
+        "speed": 0.96,
+        "pauses": "normal",
+        "instruction": "Correct your own words; interrupt the analysis"
+      },
+      "Tu décroches": {
+        "emotion": "fragile",
+        "delivery": "measured",
+        "speed": 0.9,
+        "pauses": "long",
+        "instruction": "Suspend the phrase, then return to Ava; clear diction"
+      },
+      "La mère qui tient debout": {
+        "emotion": "tense",
+        "delivery": "cutting",
+        "speed": 1,
+        "pauses": "normal",
+        "instruction": "Short, practical, firm phrases; clear diction"
+      },
+      "L'espoir revient": {
+        "emotion": "urgent",
+        "delivery": "rushed",
+        "speed": 1.08,
+        "pauses": "short",
+        "instruction": "Seize the possibility for Ava; doubt catches up"
+      }
+    }
+  }
+}

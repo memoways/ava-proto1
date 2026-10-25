@@ -73,6 +73,8 @@ import { materializeConversationTurnTrace } from "@/services/conversationTraceFo
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { fetchConversationMemory } from "@/services/sessionConversationMemory";
 import { fetchCharacterSpeechRuntime } from "@/services/experienceOrchestration";
+import { loadCharacterPrompt } from '@/services/characterPromptService';
+import speechSheets from '@/agents/__fixtures__/speechSandbox20261025.json';
 import { getGameplaySettings } from "@/services/settingsService";
 import { streamPRD4Turn, processPRD4Turn as processPRD4TurnImpl, type PRD4TurnInput } from "@/services/prd4Orchestrator";
 import {
@@ -222,6 +224,30 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       conversationHistory: [], userMessage: 'Bonjour', userRole: null, timeElapsedSeconds: 30 }, ()=>{}, delivery);
     await expect(result.postTurnPromise).rejects.toThrow('No confirmed delivery');
     expect(evaluatePostTurnPRD4).not.toHaveBeenCalled();
+  });
+
+  it.each([MAX_CONTEXT, EMMA_CONTEXT])('$characterKey logs only the declared, validated and delivered state, never the GM suggestion', async context => {
+    const sheet = speechSheets.find(sheet => sheet.name.startsWith(context.displayName))!;
+    for (const declaration of [sheet.speech_states[0].name, 'ÉTAT INCONNU', undefined]) {
+      vi.mocked(loadCharacterPrompt).mockResolvedValueOnce(sheet as never);
+      const intent = { goal: 'Écouter', points: [], ...(declaration ? { parole: declaration } : {}) };
+      vi.mocked(simulateMaxResponse).mockImplementationOnce(async (_input, opts) => {
+        opts?.onSpeechToken?.(JSON.stringify(intent) + '\n<speech>\nJe… je sais pas. ');
+        return { response: opts?.finishSpeech?.() ?? '', responseIntent: intent, systemPrompt: 'system' };
+      });
+      let deliver!: (text: string) => void;
+      const delivery = new Promise<string>(resolve => { deliver = resolve; });
+      const count = vi.mocked(evaluatePostTurnPRD4).mock.calls.length;
+      const result = await streamPRD4Turn({ sessionId: 'speech-delivery', characterContext: context,
+        conversationHistory: [], userMessage: 'Et demain ?', userRole: null, timeElapsedSeconds: 30,
+        gmSpeechState: sheet.speech_states[1].name }, () => {}, delivery);
+      expect(evaluatePostTurnPRD4).toHaveBeenCalledTimes(count);
+      deliver('Je… je sais pas.'); await result.postTurnPromise;
+      expect(vi.mocked(evaluatePostTurnPRD4).mock.calls.at(-1)![0]).toMatchObject({
+        speechStatePlayed: declaration === sheet.speech_states[0].name ? declaration : null,
+        currentCharacter: context.characterKey,
+      });
+    }
   });
 
   afterEach(() => {

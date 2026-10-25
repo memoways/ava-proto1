@@ -51,6 +51,27 @@ import { getGameplaySettings } from "@/services/settingsService";
 import { buildMaxSystemPrompt, simulateMaxResponse } from "./maxAgent";
 import { RICH_V2_LIMITS } from "./maxRichPromptCompiler";
 import { makeNotionMaxPrompt } from "./__fixtures__/maxNotionFixture";
+import speechSheets from "./__fixtures__/speechSandbox20261025.json";
+
+describe("parole sandbox — fiches Cloud exactes du 25 octobre", () => {
+  it.each(["legacy", "compact_v1", "rich_v2", "optimized_v3"] as const)("%s conserve intégralement parole et moteur intime dans le prompt effectif", async variant => {
+    for (const sheet of speechSheets) {
+      vi.mocked(getGameplaySettings).mockReturnValueOnce({ MAX_PROMPT_VARIANT: variant } as never);
+      vi.mocked(loadCharacterPromptByName).mockResolvedValue(sheet as never);
+      const trace = await buildMaxSystemPrompt({ conversationHistory: [{ role: 'user', content: 'Et demain ? '.repeat(80), timestamp: 1 }],
+        userMessage: "Et demain ?", rugosite: 3, experienceFrame: "Cadre partagé. ".repeat(60),
+        relationshipDirective: "Garde ta réserve. ".repeat(60), ragContext: "Un souvenir. ".repeat(200) }, sheet.name);
+      const secret = sheet.dynamique_conversation.split(/\n\s*\n/).find(block => block.startsWith("Ce que tu veux vraiment"))!;
+      expect(trace.finalSystemPrompt).toContain(sheet.maniere_de_parler);
+      expect(trace.finalSystemPrompt).toContain(secret);
+      expect(trace.budget?.withinBudget).toBe(true);
+      expect(trace.budget!.staticChars).toBeLessThanOrEqual(trace.budget!.staticLimitChars);
+      const other = speechSheets.find(other => other.character_id !== sheet.character_id)!;
+      expect(trace.finalSystemPrompt).not.toContain(other.maniere_de_parler);
+      for (const state of sheet.speech_states) expect(trace.finalSystemPrompt).toContain(`- ${state.name} : ${state.description}`);
+    }
+  });
+});
 
 const FIELDS = {
   character_id: "max-id",

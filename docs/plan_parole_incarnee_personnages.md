@@ -1,5 +1,90 @@
 # Plan — Parole incarnée par personnage (Max, Emma)
 
+## Lot 2 — protection effective et Gradium, 25 octobre 2026
+
+Base vérifiée : main `53baa8618eb388714c23612bb7154f5b5cb17491`, PR #74,
+CI PR puis main/E2E vertes (runs 40185859015 et 40187022790), Lovable synchronisé
+et ready. PR étrangère #24 sans recouvrement, préservée avec toutes ses branches.
+Checkout canonique, branche `codex/parole-incarnee-lot-2`, aucun autre agent.
+
+1. Figer comme fixtures les deux fiches éditoriales sandbox lues par MCP Lovable ;
+   reproduire les pertes dans les quatre prompts effectifs. La sélection dans
+   legacy/rich/optimized existe déjà ; elle ne garantit pas la conservation.
+2. Réserver un bloc atomique pour « Manière de parler » intégrale et le paragraphe
+   « Ce que tu veux vraiment, sans le savoir », propre à la fiche. Réallouer les
+   budgets existants, sans catalogue commun ni réécriture Cloud des fiches.
+   La peur de Max pour Emma/Ava, l'amour, le couple et l'identité restent sous
+   la surface ; aucune confession parfaitement analysée imposée à l'ouverture.
+3. Protéger les suspensions et reprises aux frontières incrémentales, sans
+   accepter une réponse tronquée, citation ouverte, structure ou identité étrangère.
+   Contrôler déclaration privée, états inconnus, reçus et variété ; vérifier
+   séparément le repli neutre temporaire du runtime autorisé.
+4. Aucun mapping `ava_speech_performance` présent lors du SELECT initial :
+   sauvegarder puis relire seulement sandbox-ulrich avec ses dix états exacts.
+   Vérifier paramètres Gradium batch/incrémental et version ; aucune voix prod.
+   Documentation officielle relue : padding = rythme, pas pause intra-phrase
+   garantie ; aucun tag émotionnel documenté/activé.
+5. Tests ciblés avant/après, test:quality, E2E, revue du diff, PR/CI sur HEAD exact,
+   squash, CI main/E2E puis suppression de la seule branche du lot. Vérifier
+   main/preview Lovable ; recette au casque Max/Emma avec Ulrich distincte des
+   simulations. Aucune publication production autorisée.
+
+Sources Gradium : https://docs.gradium.ai/guides/text-to-speech et
+https://docs.gradium.ai/guides/voice-settings (consultées le 25 octobre).
+Invariants du plan latence conservés : experienceFrame, mémoire privée, capture,
+interruptions, mains libres, budget GM, preuve/gardes/clic de passage inchangés.
+
+### Résultats du diagnostic et corrections
+
+- Fixtures : les deux fiches sandbox réellement lues le 25 octobre, sans
+  modernisation. Max : Manière de parler 1 835 caractères, moteur intime 765 ;
+  Emma : 1 556 et 926. Les cinq noms et descriptions sont vérifiés littéralement
+  dans chaque prompt final ; aucun texte de l'autre fiche n'y est injecté.
+- Avant : quatre variantes en échec dans le test des prompts effectifs.
+  rich_v2 sélectionnait déjà le champ mais son plafond 1 800 coupait Max ;
+  priorités/réserve pouvaient omettre des unités. optimized_v3 sélectionnait
+  déjà le champ au score 850, mais la déduplication et le budget 4 500 en
+  supprimaient des unités. Le moteur intime était aussi éligible à omission.
+  compact_v1 n'avait pas ce champ ; legacy pouvait l'évincer derrière la fiche.
+- Après : deux unités éditoriales atomiques, réservées avant sélection/déduplication
+  dans les quatre chemins ; aucun prompt commun inventé ni fiche Cloud modifiée.
+  Les plafonds restent 7 000/12 000 compact, 12 000/18 000 rich,
+  4 500/11 000 optimized et 20 000/24 000 legacy. Le header identité/passage
+  est désormais déduit du budget statique rich : le test a révélé un dépassement
+  réel à 12 892 caractères avant cette comptabilité.
+- Les suspensions internes restent avec leur reprise jusqu'à une frontière sûre,
+  pour ne pas transformer « Je… je » en deux segments « Je. » / « je » chez
+  Gradium. Une suspension terminale ou un tiret volontaire reste possible à EOF,
+  mais une phrase non ponctuée, citation ouverte, structure ou identification
+  interrompue reste refusée. SSE tronqué reste une erreur ; aucun rejeu après son.
+- Contrôles séparés conservés : déclaration privée facultative, état inconnu →
+  null, jamais trois propositions identiques, reçu réellement livré avant GM.
+  Échec/timeout du réglage autorisé : rugosité 0 pour le seul tour, pas de version
+  inventée, réponse tardive ignorée, nouvelle lecture au tour suivant.
+- Les suggestions GM ne sont jamais une preuve de l'état joué. Le mapping
+  Gradium n'invente pas une émotion audible ; il garde température/voix et module
+  le rythme documenté. Diction, naturel et latence réels restent non mesurés.
+
+Confiance avant correction : reproduction rouge, chemins et doublons examinés,
+architecture existante conservée, documentation et exemples officiels Gradium
+consultés ; aucune dépendance ni appel LLM ajouté.
+
+### Vérifications locales du lot 2
+
+- `npm run test:quality` vert : lint (avertissement useCallback préexistant),
+  typecheck, **64 régression, 882 unitaires, 41 intégration**, build.
+- `npm run test:e2e` : **72/72 verts**, 10,6 minutes, Chromium et contrôles média
+  Firefox/WebKit. Les dernières extensions de la garde de fragments sont couvertes
+  par les unitaires et un rejeu E2E ciblé P1 Max/Emma sur le code final.
+- Tests rouges avant/après conservés : quatre prompts effectifs en perte avant
+  réservation ; contrôles de tiret volontaire et d'identité interrompue en échec
+  avant correction. Reprises/suspensions/citations testées à chaque frontière SSE.
+- Le SELECT de contrôle et l'admin connecté confirment le mapping activé en sandbox,
+  dix états exacts, version `2026-10-25T11:39:32.000Z`. Aucun audio réel généré.
+- Recette humaine encore requise : aucun verdict de naturel/diction ni p50/p95
+  acoustique. Aucune publication production. La livraison GitHub/CI/Lovable est
+  rapportée avec ses identifiants vérifiés dans la PR et le compte rendu final.
+
 Sera aussi enregistré dans `docs/plan_parole_incarnee_personnages.md`.
 
 ## Compréhension

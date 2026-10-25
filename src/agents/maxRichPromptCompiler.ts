@@ -1,6 +1,7 @@
 import type { CharacterPrompt } from "@/services/characterPromptService";
 import { MAX_MAX_RAG_CONTEXT_CHARS, MAX_MAX_RAG_ITEM_CHARS, MAX_MAX_RAG_ITEMS } from "@/services/ragBudget";
 import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
+import { characterEmbodiment, withoutCharacterEmbodiment } from '@/services/characterEmbodiment';
 
 /**
  * rich_v2 — compilation déterministe de la fiche Notion du personnage actif.
@@ -108,6 +109,8 @@ export interface RichCompileResult {
 }
 
 export interface RichCompileOptions {
+  /** Identity/transfer header rendered by the caller, within the same 12k cap. */
+  staticOverheadChars?: number;
   /** Mémoire de session : sert à choisir le niveau de profondeur ancré. */
   sessionSummary?: string;
   /** Index du tour courant (jamais utilisé pour déclencher le niveau bonus). */
@@ -649,7 +652,6 @@ const RICH_FIELD_SPECS: RichFieldSpec[] = [
   { key: "situation_summary", title: "PRÉSENT", order: 1, maxChars: 900, reservedChars: 500 },
   { key: "identite_fondamentale", title: "IDENTITÉ ET DRIVE", order: 2, maxChars: 1_100, reservedChars: 600, boost: ["contradiction", "drive", "père", "journaliste"] },
   { key: "qui_tu_es", title: "POSTURE, VOIX ET TRAITS", order: 3, maxChars: 1_900, reservedChars: 700, boost: ["voix", "contradiction", "masque", "contrôle", "protecteur"] },
-  { key: "maniere_de_parler", title: "MANIÈRE DE PARLER", order: 3.5, maxChars: 1_800, reservedChars: 1_000, boost: ["états", "parole", "reprises", "silences"] },
   { key: "ce_que_tu_ne_fais_jamais", title: "INVARIANTS", order: 4, maxChars: 1_000, reservedChars: 500 },
   { key: "ce_que_tu_sais_utilisateur", title: "RELATION À L'INTERLOCUTEUR", order: 5, maxChars: 1_200, reservedChars: 500, boost: ["rôle", "prénom", "ouverture", "hostilité"] },
   { key: "dynamique_conversation", title: "DYNAMIQUE", order: 6, maxChars: 1_400, reservedChars: 500, boost: ["concret", "urgence", "positionner"] },
@@ -718,20 +720,27 @@ export function compileRichCharacterSections(
 
   // Le budget du corps déduit l'en-tête et le contrat, comptés dans le noyau.
   const bodyBudget = RICH_V2_LIMITS.staticMaxChars
+    - Math.max(0, options.staticOverheadChars ?? 0)
     - RICH_V2_CORE_HEADER.length
     - RICH_V2_CONVERSATION_CONTRACT.length
     - 2;
   const specs = [...RICH_FIELD_SPECS].sort((a, b) => a.order - b.order);
   const reservedTotal = specs.reduce((sum, spec) => sum + spec.reservedChars, 0);
 
-  let remaining = bodyBudget;
+  const protectedSections: RichCompiledSection[] = characterEmbodiment(prompt).map(section => ({
+    ...section, originalChars: section.content.length, includedChars: section.content.length,
+    subpartsDetected: 1, subparts: [{ label: section.title, priority: 0, chars: section.content.length, included: true }],
+  }));
+  let remaining = bodyBudget - protectedSections.reduce((sum, section) => sum + richSectionCost(section.title, section.content), 0);
+  if (remaining < 0) throw new Error('Parole éditoriale trop longue pour le noyau rich_v2');
+  const selectable = withoutCharacterEmbodiment(prompt);
   let reservedRemaining = reservedTotal;
-  const sections: RichCompiledSection[] = [];
+  const sections: RichCompiledSection[] = [...protectedSections];
   let timelineEvents: string[] = [];
   const depthSelection: RichDepthSelection | null = null;
 
   for (const spec of specs) {
-    const raw = (prompt[spec.key] as string | undefined) ?? "";
+    const raw = (selectable[spec.key] as string | undefined) ?? "";
     const originalChars = normalize(raw).length;
     reservedRemaining -= spec.reservedChars;
     if (!originalChars) continue;
