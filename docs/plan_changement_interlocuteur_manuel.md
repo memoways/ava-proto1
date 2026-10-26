@@ -33,10 +33,16 @@ Décisions explicitement confirmées dans ce chat le 26 octobre :
 - Un nouvel appel conserve l'expérience, le contexte commun et les souvenirs
   propres à chaque personnage. Il ne donne pas accès aux confidences de l'autre.
 
-Questions supplémentaires envoyées : maintien du bouton après « merci » ou une
-brève continuation ; suspension du temps sur la grille. Leur réponse doit être
-intégrée avant implémentation ; les recommandations ci-dessous sont signalées
-comme propositions tant qu'elles ne sont pas confirmées.
+Décisions complémentaires explicitement confirmées par Ulrich le 26 octobre :
+
+- Une fois l'accord donné et l'offre validée, le bouton reste disponible jusqu'au
+  clic, à « Rester » ou à un changement explicite de demande. Dire « merci » ou
+  continuer brièvement la conversation ne révoque ni la demande ni l'offre.
+- Le temps de l'expérience est suspendu pendant l'affichage de la grille et
+  reprend au prochain appel, avec le temps restant conservé.
+
+Ces deux questions produit sont tranchées ; ne pas les redemander à la reprise.
+Les choix techniques de réalisation ci-dessous restent à mettre en œuvre.
 
 ### Sources et état vérifié
 
@@ -181,9 +187,12 @@ restent explicites dans le protocole de réalisation. Un état disponible doit
 
 **Propriété et cohérence.** Une demande porte session/expérience, appel source,
 requestId, cible, version, révision, origine et preuve. Une prise de parole sans
-retrait n'est pas automatiquement une nouvelle demande. Le nouveau cycle de
-vie sera validé avec les réponses finales d'Ulrich. La fraîcheur porte sur la
-demande et l'appel : un callback d'une demande révoquée ou d'un ancien appel
+retrait n'est pas automatiquement une nouvelle demande. Le maintien de l'offre
+après acquiescement ou continuation est confirmé par Ulrich ; seuls le clic,
+« Rester » ou un changement explicite de demande terminent cette disponibilité
+ordinaire. Les invalidations techniques nécessaires (appel clos, cible devenue
+indisponible, conflit de révision) restent explicites et récupérables.
+La fraîcheur porte sur la demande et l'appel : un callback d'une demande révoquée ou d'un ancien appel
 reste rejeté. Ne jamais réinterpréter une preuve historique invalide comme une
 preuve courante pour contourner la fraîcheur.
 
@@ -253,7 +262,10 @@ Séparer les actions `closeCall` et `endExperience`. La première :
 La clôture définitive (timeout/fin explicite) reste distincte. Questionnaire
 éventuel uniquement dans un parcours de retour d'expérience explicite, hors
 raccrochage ordinaire. Ne pas simplement laisser une session ouverte sans règle
-d'expiration. La politique du timer entre appels est une question envoyée.
+d'expiration. **Timer confirmé : suspendu sur la grille, repris au prochain
+appel à partir du temps restant.** Une recharge ou un changement de personnage
+ne doit ni remettre le budget à zéro ni décompter l'attente passée sur la grille.
+Distinguer ce temps d'expérience de l'expiration technique de reprise.
 Une migration éventuelle de suivi des appels passe seulement par Lovable Cloud,
 avec autorisation par session, RLS, reprise et compatibilité des anciens clients.
 
@@ -270,8 +282,8 @@ et vérifier la disponibilité de l'offre après correction. Ne pas qualifier T1
 de cause entièrement démontrée avant ce replay.
 
 **F2 — Cycle d'appels et retour grille.** Mettre en œuvre closeCall, rappel dans
-la même expérience, timer selon décision, souvenirs cloisonnés, métriques appel
-et fin d'expérience. S'appuyer sur les primitives de transfert ; ne pas copier
+la même expérience, timer suspendu sur la grille, souvenirs cloisonnés, métriques
+par appel et fin d'expérience. S'appuyer sur les primitives de transfert ; ne pas copier
 handleAnswered et ses réinitialisations. Test : Max → raccrochage → grille →
 Emma → raccrochage → Max, avec même expérience et souvenirs Max retrouvés.
 
@@ -298,14 +310,15 @@ plan et prompt de reprise dans le même tour. Aucun autre hébergeur ni Supabase
   lents/indisponibles ; échec relationnel indépendant ; erreur persistante de
   stockage. **Chaque demande finit en offre utilisable ou erreur visible**.
 - « Merci », silence, nouveau sujet, retrait explicite, nouvelle cible,
-  rechargement et deux onglets : attentes conformes au cycle décidé, sans
-  autorisation périmée ni disparition silencieuse.
+  rechargement et deux onglets : l'offre demeure après « merci » ou continuation ;
+  retrait explicite, nouvelle cible et « Rester » la révoquent. Préserver les gardes de reprise/deux onglets,
+  sans autorisation périmée ni disparition silencieuse.
 - Reçu partiel/interrompu, audio en échec, raccrochage pendant GM/sonnerie,
   double clic, cible désactivée après offre et commit concurrent : ni transfert
   fantôme, ni double compteur, ni micro rouvert par un ancien callback.
-- Retour grille immédiat après raccrochage ; même expérience et timer selon
-  décision ; retour vers chaque personnage avec sa mémoire seule ; aucune
-  réouverture d'une expérience définitivement expirée ou terminée.
+- Retour grille immédiat après raccrochage ; même expérience, timer suspendu sur la
+  grille puis repris sans reset ; retour vers chaque personnage avec sa mémoire
+  seule ; aucune réouverture d'une expérience définitivement expirée ou terminée.
 - Replays déterministes indépendants des formulations exactes d'un fournisseur ;
   sorties GM réalistes valides et malformées, pas uniquement les JSON idéaux.
   Recette réelle complémentaire : aucun test simulé ne prétend prouver l'audio.
