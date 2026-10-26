@@ -1,6 +1,8 @@
 # Reprise Codex → assistant suivant — fiabilité des passages, F1
 
-Date : 26 octobre 2026. **Prompt préparé, lot F1 non lancé.**
+Date : 26 octobre 2026. **Prompt F1 exécuté : code livré par PR #88, main `5bf1bd51617adc5ae06c656767ea02b29aca3371` ; CI PR et main vertes, E2E compris ; Lovable synchronisé et prêt.**
+
+Ne pas relancer F1 comme un nouveau lot. Voir le [bilan canonique](plan_changement_interlocuteur_manuel.md#livraison-f1-vérifiée--26-octobre-2026) et la [reprise F2 préparée](prompt_reprise_fiabilite_passage_personnages_lot_f2.md) pour le prochain lot, non lancé. Le corps ci-dessous conserve le contrat exécuté.
 Ce prompt, lorsqu'il est donné à l'assistant pour exécution, autorise la
 réalisation et la livraison complète du seul lot F1 : correctif, tests,
 commit/push, PR, squash-merge après contrôles, nettoyage et synchronisation
