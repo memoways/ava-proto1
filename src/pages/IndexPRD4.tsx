@@ -132,8 +132,10 @@ import {
   latestPostTurnForCharacter,
   type ResumablePRD4Session,
 } from "@/services/sessionConversationMemory";
+import { withLegacyCallMarker, callTime, currentCall, newCall, sourceCallId, freshCallState, closedCallHistory,
+  TECHNICAL_RESUME_SECONDS, savePendingCallClose, readPendingCallClose, clearPendingCallClose, canApplyPendingClose } from '@/services/callCycle';
 import { resolveResumeTimerWindow } from "@/services/resumeTimer";
-import { getCharacterRuntimeReadiness, type CharacterRuntimeReadiness } from "@/services/experienceOrchestration";
+import { fetchPinnedDirectorRuntime, getCharacterRuntimeReadiness, type CharacterRuntimeReadiness } from "@/services/experienceOrchestration";
 import {
   guardCharacterResponse,
   responseClaimsForeignIdentity,
@@ -144,7 +146,7 @@ import { appendExperienceEvent, applyTopicHandoffFallback, validateDirectorDecis
 import type { ExperienceDirectorDecisionV1, RuntimeCharacter } from "@/types";
 import { createAcousticInterruptionController, recognizedWordsChanged, withoutRejectedPrefix, endOfSpeechDelayMs, normalizeHandsFreeSettings, shouldBargeIn, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
 import { createMicRecoveryPolicy, isMicSilentlyDead, MIC_WATCHDOG_STRIKES } from "@/services/handsFreeRecovery";
-import { characterHandoffGreeting, characterRecoveryLine, createInitialGreetingSelector, greetingDelivery } from '@/services/characterConversationContinuity';
+import { characterRecallGreeting, characterHandoffGreeting, characterRecoveryLine, createInitialGreetingSelector, greetingDelivery } from '@/services/characterConversationContinuity';
 import {
   buildSwitchRequestGuidance,
   characterDisplayName,
@@ -181,9 +183,12 @@ const IndexPRD4 = () => {
     setSelectedCharacter,
   } = useExperienceState();
 
+  const phaseRef = useRef(state.phase);
+  phaseRef.current = state.phase;
   const [userSubtitle, setUserSubtitle] = useState("");
   const [maxSubtitle, setMaxSubtitle] = useState("");
   const [resumableSession, setResumableSession] = useState<ResumablePRD4Session | null>(null);
+  const [technicalExpiresAt, setTechnicalExpiresAt] = useState<number | null>(null);
   const [resumeLoading, setResumeLoading] = useState(true);
   const [privacyPreferences, setPrivacyPreferences] = useState<PrivacyPreferences | null>(() => getPrivacyPreferences());
   const initialSessionDuration = normalizeSessionDurationSeconds(getGameplaySettings().TIMEOUT_SECONDS);
@@ -252,6 +257,12 @@ const IndexPRD4 = () => {
   const outputSettingsRef = useRef<OutputSettings>(getOutputSettings());
   const avatarSettingsRef = useRef<StreamingAvatarSettings>(getStreamingAvatarSettings());
   const outputSettingsLoadRef = useRef<Promise<[OutputSettings, StreamingAvatarSettings]> | null>(null);
+  const callGenerationRef = useRef(0);
+  const openingCommitRef = useRef<Promise<HandoffSnapshot> | null>(null);
+  const gridCallRef = useRef(false);
+  const gridSelectionLockRef = useRef(false);
+  const closeWriteRef = useRef<Promise<void> | null>(null);
+  const [callSaveIssue, setCallSaveIssue] = useState<string | null>(null);
   const callPreparationRef = useRef<Promise<void> | null>(null);
   const expectedAvatarTextRef = useRef(new Map<string, string>());
   const avatarConnectStartedAtRef = useRef<number | null>(null);
@@ -311,6 +322,12 @@ const IndexPRD4 = () => {
   const [handoffIssue, setHandoffIssue] = useState<{ phase: 'preparing' | 'error'; reason: string; retryText: string; reload?: boolean } | null>(null);
   const handoffSnapshotRef = useRef<HandoffSnapshot | null>(null);
   const handoffWriteRef = useRef<Promise<HandoffSnapshot> | null>(null);
+  const persistHandoffChange = useCallback((...args: Parameters<typeof writeHandoffSnapshot>) => {
+    const write = writeHandoffSnapshot(...args);
+    handoffWriteRef.current = write;
+    void write.finally(() => { if (handoffWriteRef.current === write) handoffWriteRef.current = null; }).catch(() => {});
+    return write;
+  }, []);
   const handoffPhaseRef = useRef<'none' | 'validating' | 'calling' | 'switching' | 'completed' | 'failed' | 'declined' | 'revoked'>('none');
   const [handoffPortraits, setHandoffPortraits] = useState<Partial<Record<RuntimeCharacter, string | null>>>({});
   const [handoffOffer, setHandoffOffer] = useState<CharacterHandoffOffer | null>(null);
@@ -329,6 +346,8 @@ const IndexPRD4 = () => {
   const [approvedCallingTarget, setApprovedCallingTarget] = useState<RuntimeCharacter | null>(null);
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
   const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
+  const activeVideoRef = useRef(activeVideo);
+  activeVideoRef.current = activeVideo;
   const [teaserPlayerReady, setTeaserPlayerReady] = useState(false);
   const [activePortraitUrl, setActivePortraitUrl] = useState<string | null>(null);
   // Chrono onboarding (mesure du time-to-first-Max-response)
@@ -404,7 +423,17 @@ const IndexPRD4 = () => {
 
   // ---- Helpers conversation -------------------------------------------------
   const cleanupAudio = useCallback(() => {
+    callGenerationRef.current += 1;
     handoffCoordinatorRef.current.invalidate();
+    cinematicPlayerRef.current?.stop();
+    callPreparationRef.current = null;
+    if (micRecoveryTimerRef.current) window.clearTimeout(micRecoveryTimerRef.current);
+    micRecoveryTimerRef.current = null;
+    inputTelemetryRef.current?.finish('cancelled'); inputTelemetryRef.current = null;
+    activeVoiceTelemetryRef.current?.finish('cancelled'); activeVoiceTelemetryRef.current = null;
+    isProcessingRef.current = false;
+    if (processingWatchdogRef.current) window.clearTimeout(processingWatchdogRef.current);
+    processingWatchdogRef.current = null;
     setHandoffIssue(null);
     initialGreetingRef.current?.abort('experience-cleanup');
     initialGreetingRef.current = null;
@@ -443,22 +472,32 @@ const IndexPRD4 = () => {
 
   const finalizeAndEnd = useCallback(
     async (reason: string) => {
+      endedRef.current = true;
+      timerRef.current.pause();
       cleanupAudio();
       const sid = sessionIdRef.current;
       const configuredDuration = configuredSessionDurationRef.current;
-      const duration = configuredDuration - (timerRef.current?.remaining ?? configuredDuration);
+      const duration = configuredDuration - (timerRef.current?.snapshot() ?? configuredDuration);
       sessionDurationRef.current = duration;
+      endExperience(reason);
+      setTechnicalExpiresAt(null);
+      if (sid) clearPendingCallClose(sid);
       if (sid) {
-        await endPRD4Session(sid, reason, conversationRef.current, duration).catch((e) =>
+        await withTimeout('end_experience', endPRD4Session(sid, reason, conversationRef.current, duration), HANDOFF_DEPENDENCY_TIMEOUT_MS).catch((e) =>
           console.warn("[PRD4] endSession failed:", e),
         );
       }
       trackEvent("prd4_session_ended", { reason, duration_s: duration, turns: conversationRef.current.filter((m) => m.role === "user").length });
-      endExperience(reason);
     },
     [cleanupAudio, endExperience],
   );
 
+
+  useEffect(() => {
+    if (technicalExpiresAt === null) return;
+    const id = window.setTimeout(() => void finalizeAndEnd('resume_expired'), Math.max(0, technicalExpiresAt - Date.now()));
+    return () => window.clearTimeout(id);
+  }, [technicalExpiresAt, finalizeAndEnd]);
 
   // ---- Welcome / Film / Teaser ----------------------------------------------
   const unlockCinematicPlayback = useCallback(() => {
@@ -530,11 +569,13 @@ const IndexPRD4 = () => {
     [setFilmAnswer, setPhase],
   );
   const handleTeaserContinue = useCallback(() => {
+    if (phaseRef.current !== 'teaser') return;
     if (!introductionReviewRef.current) markTeaserSeen(false);
     setPhase(introductionReviewRef.current ? "character_select" : "film_question");
     introductionReviewRef.current = false;
   }, [setPhase, markTeaserSeen]);
   const handleTeaserSkip = useCallback(() => {
+    if (phaseRef.current !== 'teaser') return;
     if (!introductionReviewRef.current) markTeaserSeen(true);
     setPhase(introductionReviewRef.current ? "character_select" : "film_question");
     introductionReviewRef.current = false;
@@ -542,12 +583,15 @@ const IndexPRD4 = () => {
 
   // ---- Character select / Calling -------------------------------------------
   const activateTTSFallback = useCallback(async (reason: string) => {
+    const generation = callGenerationRef.current;
     const previous = responseOutputRef.current;
     if (previous?.mode === "tts") return previous;
     responseOutputRef.current = null;
     await previous?.dispose().catch(() => {});
+    if (endedRef.current || callGenerationRef.current !== generation) throw new DOMException('Call closed', 'AbortError');
     const fallback = new LocalTTSOutput();
     if (sessionIdRef.current) await fallback.prepare({ sessionId: sessionIdRef.current });
+    if (endedRef.current || callGenerationRef.current !== generation) { await fallback.dispose(); throw new DOMException('Call closed', 'AbortError'); }
     responseOutputRef.current = fallback;
     setStreamingAvatarState("failed");
     const sid = sessionIdRef.current;
@@ -582,10 +626,13 @@ const IndexPRD4 = () => {
       onServiceObserved?: (value: ServiceObservation) => void;
     } = {},
   ): Promise<ResponseOutputResult> => {
+    context.signal?.throwIfAborted();
+    const generation = callGenerationRef.current;
     let output = responseOutputRef.current;
     if (!output) {
       output = new LocalTTSOutput();
       if (sessionIdRef.current) await output.prepare({ sessionId: sessionIdRef.current });
+      if (context.signal?.aborted || endedRef.current || callGenerationRef.current !== generation) { await output.dispose(); throw new DOMException('Call closed', 'AbortError'); }
       responseOutputRef.current = output;
     }
     if (output.mode === "streaming_avatar" && context.turnId) {
@@ -694,6 +741,8 @@ const IndexPRD4 = () => {
   }, [activateTTSFallback, setAudioState]);
 
   const prepareCall = useCallback(async () => {
+    const generation = callGenerationRef.current;
+    const current = () => callGenerationRef.current === generation && !endedRef.current;
     void loadSpeechPerformanceSettings();
     avatarConnectStartedAtRef.current = null;
     avatarFirstFrameAtRef.current = null;
@@ -725,6 +774,7 @@ const IndexPRD4 = () => {
     handsFreeSettingsRef.current = normalizeHandsFreeSettings(pinnedGameplay.VOICE_HANDS_FREE);
     setHandsFreeEnabled(handsFreeSettingsRef.current.enabled);
     setVoiceOnly(pinnedGameplay.VOICE_ONLY_UI === true);
+    const technicalExpiry = Date.now() + TECHNICAL_RESUME_SECONDS * 1000;
     const sid = await createPRD4Session(
       state.userRoleProfile,
       startingCharacter,
@@ -733,13 +783,13 @@ const IndexPRD4 = () => {
         output_mode: outputMode,
         streaming_avatar_provider:
           outputMode === "streaming_avatar" ? avatarSettings.activeProvider : null,
-        resume_expires_at: new Date(
-          Date.now() + (configuredSessionDurationRef.current + 300) * 1_000,
-        ).toISOString(),
+        resume_expires_at: new Date(technicalExpiry).toISOString(),
         active_character: startingCharacter,
       } as never,
     );
+    if (!current()) { void endPRD4Session(sid, 'abandoned_before_answer', [], 0); return; }
     sessionIdRef.current = sid;
+    setTechnicalExpiresAt(technicalExpiry);
     identifyUser(sid, { experience: "prd4", character: startingCharacter });
     trackEvent("prd4_session_started", {
       session_id: sid,
@@ -763,11 +813,12 @@ const IndexPRD4 = () => {
       mode: outputMode,
       avatarSettings,
       callbacks: {
-        onConnectionStateChange: setStreamingAvatarState,
+        onConnectionStateChange: value => { if (current()) setStreamingAvatarState(value); },
         onMediaDiagnostics: diagnostics => trackEvent("prd4_streaming_avatar_media", {
           session_id: sid, provider: avatarSettings.activeProvider, ...diagnostics,
         }),
         onStreamReady: () => {
+          if (!current()) return;
           avatarFirstFrameAtRef.current = performance.now();
           setStreamingAvatarState("ready");
           const connectStart = avatarConnectStartedAtRef.current;
@@ -779,10 +830,12 @@ const IndexPRD4 = () => {
           });
         },
         onDisconnected: (reason) => {
+          if (!current()) return;
           setStreamingAvatarState("disconnected");
           void activateTTSFallback(reason || "provider_disconnected");
         },
         onSpeakStart: () => {
+          if (!current()) return;
           setStreamingAvatarState("speaking");
           setAudioState("max_speaking");
           if (avatarFirstSpeechAtRef.current === null) {
@@ -795,8 +848,9 @@ const IndexPRD4 = () => {
             });
           }
         },
-        onSpeakEnd: () => setStreamingAvatarState("ready"),
+        onSpeakEnd: () => { if (current()) setStreamingAvatarState("ready"); },
         onTranscript: (text, turnId) => {
+          if (!current()) return;
           const expected = turnId ? expectedAvatarTextRef.current.get(turnId) : undefined;
           if (expected !== undefined && text !== expected) {
             trackEvent("prd4_streaming_avatar_transcript_mismatch", {
@@ -810,6 +864,7 @@ const IndexPRD4 = () => {
         },
       },
     });
+    if (!current()) { await output.dispose(); return; }
     responseOutputRef.current = output;
     setStreamingAvatarActive(output.mode === "streaming_avatar");
     if (output.mode === "streaming_avatar") avatarConnectStartedAtRef.current = performance.now();
@@ -833,6 +888,7 @@ const IndexPRD4 = () => {
     } catch (error) {
       // Le repli TTS ne doit pas désactiver la trace diagnostique : la session
       // reste traçable, seul le rendu de sortie change.
+      if (!current()) return;
       await activateTTSFallback(error instanceof Error ? error.message : String(error));
     }
   }, [
@@ -844,6 +900,10 @@ const IndexPRD4 = () => {
   ]);
 
   const handleSelectCharacter = useCallback((character: RuntimeCharacter, profile: CharacterRuntimeReadiness | null) => {
+    if (gridSelectionLockRef.current || closeWriteRef.current || callSaveIssue) return;
+    gridSelectionLockRef.current = true;
+    gridCallRef.current = Boolean(sessionIdRef.current);
+    endedRef.current = false;
     startingCharacterRef.current = character;
     activeCharacterRef.current = character;
     activeCharacterContextRef.current = null;
@@ -851,11 +911,12 @@ const IndexPRD4 = () => {
     setActivePortraitUrl(profile?.portraitUrl ?? null);
     setSelectedCharacter(character);
     setPhase("calling_max");
+    if (gridCallRef.current) return;
     callPreparationRef.current = prepareCall().catch((error) => {
       console.error("[PRD4] call preparation failed", error);
       throw error;
     });
-  }, [prepareCall, setPhase, setSelectedCharacter]);
+  }, [callSaveIssue, prepareCall, setPhase, setSelectedCharacter]);
 
   const handleResumeCall = useCallback(async () => {
     if (!resumableSession) return;
@@ -864,7 +925,23 @@ const IndexPRD4 = () => {
       toast({ title: 'Reprise indisponible', description: 'Recharge l’appel pour vérifier son état.', variant: 'destructive' });
       return;
     }
-    const session = { ...resumableSession, ...freshHandoff };
+    if (Date.parse(resumableSession.resume_expires_at) <= Date.now()) {
+      setResumableSession(null); toast({ title: 'Le délai de reprise est expiré' }); return;
+    }
+    let resumedSnapshot = freshHandoff;
+    const pendingClose = readPendingCallClose(resumableSession.id);
+    if (pendingClose && !currentCall(freshHandoff.conversation_log)?.callClose) {
+      if (!canApplyPendingClose(freshHandoff, pendingClose)) {
+        toast({ title: 'La session a changé', description: 'Recharge la page pour vérifier son état.', variant: 'destructive' }); return;
+      }
+      try {
+        resumedSnapshot = await writeHandoffSnapshot(freshHandoff,
+          freshCallState(freshHandoff, freshHandoff.active_character, pendingClose.callId), undefined,
+          closedCallHistory(freshHandoff.conversation_log, pendingClose));
+        clearPendingCallClose(resumableSession.id);
+      } catch { toast({ title: 'Fermeture non sauvegardée', description: 'Réessaie la reprise quand le réseau revient.', variant: 'destructive' }); return; }
+    }
+    const session = { ...resumableSession, ...resumedSnapshot };
     incrementalOutputEnabledRef.current = session.conversation_memory.incrementalOutputEnabled === true;
     const preset = session.conversation_memory.voicePreset;
     handsFreeSettingsRef.current = normalizeHandsFreeSettings(preset?.handsFree ?? { ...getGameplaySettings().VOICE_HANDS_FREE, interruptionStrategy: "text" });
@@ -872,7 +949,11 @@ const IndexPRD4 = () => {
     setVoiceOnly(preset?.voiceOnly === true);
     cleanupAudio();
     const now = Date.now();
-    const timerWindow = resolveResumeTimerWindow(session.started_at, session.resume_expires_at, now);
+    const cycleTime = callTime(session.conversation_log, now);
+    if (currentCall(session.conversation_log) && !cycleTime) {
+      toast({ title: 'Reprise indisponible', description: 'Le temps de cet appel ne peut pas être vérifié.', variant: 'destructive' }); return;
+    }
+    const timerWindow = cycleTime ?? resolveResumeTimerWindow(session.started_at, session.resume_expires_at, now);
     if (!timerWindow) {
       setResumableSession(null);
       return;
@@ -896,11 +977,12 @@ const IndexPRD4 = () => {
       : null;
     const latestGm = latestPostTurnForCharacter(session.gm_post_turn_log, session.active_character);
 
-    const safeConversationLog = session.conversation_log.filter((message, index, messages) =>
+    const safeConversationLog = withLegacyCallMarker(resumedSnapshot, configuredDurationSeconds, remainingSeconds, now).filter((message, index, messages) =>
       message.role === "user"
       || !responseClaimsForeignIdentity(message.content, inferSpokenWith(messages, index, session.active_character))
     );
     sessionIdRef.current = session.id;
+    setTechnicalExpiresAt(Date.parse(session.resume_expires_at));
     diagnosticTraceEnabledRef.current = session.diagnostic_trace_enabled;
     conversationRef.current = safeConversationLog;
     configuredSessionDurationRef.current = configuredDurationSeconds;
@@ -914,7 +996,7 @@ const IndexPRD4 = () => {
     handoffCountRef.current = session.handoff_count;
     startingCharacterRef.current = session.active_character;
     setSelectedCharacter(session.active_character);
-    const handoffSnapshot = freshHandoff;
+    const handoffSnapshot = resumedSnapshot;
     handoffSnapshotRef.current = handoffSnapshot;
     const restoredState = parseHandoffState(handoffSnapshot?.pending_handoff);
     const restoredOffer = restoredState && handoffSnapshot?.orchestration_version_id ? restoreHandoffOffer(restoredState,
@@ -945,7 +1027,9 @@ const IndexPRD4 = () => {
     setActiveVideo(null);
     setSessionDurationSeconds(configuredDurationSeconds);
     timer.reset(remainingSeconds);
-    timer.start();
+    if (!cycleTime?.paused) timer.start();
+    gridSelectionLockRef.current = false;
+    gridCallRef.current = false;
     restoreConversation({
       conversationLog: safeConversationLog,
       userRoleProfile: session.player_role,
@@ -961,20 +1045,28 @@ const IndexPRD4 = () => {
     const lastUser = [...activeConversationLog].reverse().find((message) => message.role === "user");
     setMaxSubtitle(lastCharacterReply?.content ?? "");
     setUserSubtitle(lastUser?.content ?? "");
+    if (cycleTime?.paused) {
+      endedRef.current = true;
+      setCurrentHandoffOffer(null);
+      setPhase('character_select');
+    }
+    if (remainingSeconds <= 0) { void finalizeAndEnd('timeout_configured_duration'); return; }
     setResumableSession(null);
     trackEvent("prd4_session_resumed", {
       session_id: session.id,
       remaining_seconds: remainingSeconds,
       turns: safeConversationLog.filter((message) => message.role === "user").length,
     });
-  }, [cleanupAudio, restoreConversation, resumableSession, setCurrentHandoffOffer, setSelectedCharacter, timer]);
+  }, [cleanupAudio, finalizeAndEnd, restoreConversation, resumableSession, setCurrentHandoffOffer, setSelectedCharacter, setPhase, timer]);
   const handleLockedClick = useCallback(
     (id: "emma" | "ava" | "leo") => trackEvent("prd4_character_locked_clicked", { character: id }),
     [],
   );
 
+  const answerGridCallRef = useRef<() => Promise<void>>(async () => {});
   // ---- Calling → conversation ------------------------------------------------
   const handleAnswered = useCallback(async () => {
+    if (gridCallRef.current) { await answerGridCallRef.current(); return; }
     if (initialGreetingRef.current || endedRef.current) return;
     const controller = new AbortController();
     initialGreetingRef.current = controller; // synchronous lock, before any await
@@ -1050,6 +1142,7 @@ const IndexPRD4 = () => {
       });
       setPhase("calling_max");
       initialGreetingRef.current = null;
+      gridSelectionLockRef.current = false;
       return;
     }
     activeCharacterRef.current = startingCharacter;
@@ -1090,7 +1183,31 @@ const IndexPRD4 = () => {
         delivery: greetingDelivery(openingTurnId, 0, startingCharacter, opening) },
       startingCharacter,
     );
+    const call = newCall(configuredDuration);
+    openingMsg.callStart = call;
+    try {
+      const snapshot = await readHandoffSnapshot(sessionIdRef.current!);
+      if (!isCurrent()) return;
+      const commit = writeHandoffSnapshot(snapshot, freshCallState(snapshot, startingCharacter, call.id), undefined, [openingMsg]);
+      openingCommitRef.current = commit;
+      handoffSnapshotRef.current = await commit;
+    } catch {
+      if (!isCurrent()) return;
+      initialGreetingRef.current = null;
+      gridSelectionLockRef.current = false;
+      cleanupAudio(); endedRef.current = true; timer.pause();
+      if (sessionIdRef.current) void endPRD4Session(sessionIdRef.current, 'opening_persistence_failed', [], 0);
+      sessionIdRef.current = null; handoffSnapshotRef.current = null; openingCommitRef.current = null;
+      setTechnicalExpiresAt(null);
+      setPhase('character_select');
+      toast({ title: 'Appel non ouvert', description: 'La sauvegarde est indisponible. Réessaie quand le réseau revient.', variant: 'destructive' });
+      return;
+    }
+    if (!isCurrent()) return;
+    timer.reset(configuredDuration); timer.start();
+    openingCommitRef.current = null;
     conversationRef.current = [openingMsg];
+    gridSelectionLockRef.current = false;
     addMessage(openingMsg);
     setAudioState(
       responseOutputRef.current?.mode === "streaming_avatar"
@@ -1147,6 +1264,7 @@ const IndexPRD4 = () => {
   }, [
     activateTTSFallback,
     addMessage,
+    cleanupAudio,
     prepareCall,
     renderResponseText,
     setAudioState,
@@ -1248,7 +1366,7 @@ const IndexPRD4 = () => {
       );
       turnController.signal.addEventListener("abort", finishAborted, { once: true });
       const configuredDuration = configuredSessionDurationRef.current;
-      const elapsed = configuredDuration - (timerRef.current?.remaining ?? configuredDuration);
+      const elapsed = configuredDuration - (timerRef.current?.snapshot() ?? configuredDuration);
       const llmSettings = (() => { try { return getLLMSettings(); } catch { return null; } })();
       const ttsService = getConfiguredTTSServiceInfo(activeTTSProviderIdRef.current ?? undefined);
       const ragService = getConfiguredRAGServiceInfo();
@@ -1297,13 +1415,16 @@ const IndexPRD4 = () => {
       const heldEvents: Parameters<ReturnType<typeof prepareStreamedVoiceTurn>['onEvent']>[0][] = [];
       let responseMessage: ConversationMessage | null = null;
       const owningSessionId = sessionIdRef.current;
+      const owningCallGeneration = callGenerationRef.current;
       const persistTurnConversation = () => {
-        if (!turnHandoffSnapshot || !turnHandoffState || sessionIdRef.current !== owningSessionId) return;
+        if (!turnHandoffSnapshot || !turnHandoffState || sessionIdRef.current !== owningSessionId
+          || endedRef.current || callGenerationRef.current !== owningCallGeneration) return;
         void writeHandoffSnapshot(handoffSnapshotRef.current ?? turnHandoffSnapshot,
           parseHandoffState(handoffSnapshotRef.current?.pending_handoff) ?? turnHandoffState, undefined, conversationRef.current)
           .catch(error => { if (!(error instanceof HandoffConflictError)) console.warn('[PRD4] conversation persistence failed', error); });
       };
       const persistReceipt = (receipt: ResponseDeliveryReceipt) => {
+        if (endedRef.current || callGenerationRef.current !== owningCallGeneration) return;
         responseReceipt = receipt;
         if (owningSessionId) void persistDeliveryReceipt(owningSessionId, receipt).catch(error => {
           console.error('[P1 delivery] Receipt persistence failed; local receipt retained', error);
@@ -1330,7 +1451,7 @@ const IndexPRD4 = () => {
           if (expected.active_character !== turnCharacter || !expected.orchestration_version_id) throw new HandoffConflictError();
           turnHandoffState = advanceHandoffTurn(expected.pending_handoff, { sessionId: sid,
             sourceCharacter: turnCharacter, orchestrationVersionId: expected.orchestration_version_id, turnId, turnIndex }, userText);
-          turnHandoffState.sourceCallId ??= `${sid}:${expected.handoff_count}`;
+          turnHandoffState.sourceCallId ??= sourceCallId(expected);
           handoffLease = handoffCoordinatorRef.current.bind(sid, turnHandoffState.sourceCallId, turnCharacter,
             expected.orchestration_version_id, turnHandoffState.requestId ?? turnHandoffState.revision);
           heldOutput = (turnHandoffState.state !== 'available' && Boolean(turnHandoffState.openRequest)) || needsHandoffPreparation(userText);
@@ -1338,7 +1459,7 @@ const IndexPRD4 = () => {
             phase: 'preparing', reason: 'Préparation du passage…', retryText: userText });
           if (turnHandoffState.state !== 'available') setCurrentHandoffOffer(null);
           const write = writeHandoffSnapshot(expected, turnHandoffState, undefined, conversationRef.current).then(saved => {
-            if (sessionIdRef.current === sid) handoffSnapshotRef.current = saved;
+            if (isCurrentTurn()) handoffSnapshotRef.current = saved;
             return saved;
           });
           handoffWriteRef.current = write;
@@ -2492,11 +2613,174 @@ const IndexPRD4 = () => {
     micRecoveryTimerRef.current = null;
   }, []);
 
+  const persistClosedCall = useCallback(async () => {
+    const generation = callGenerationRef.current;
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    const pending = readPendingCallClose(sid);
+    if (!pending) return;
+    const expected = handoffSnapshotRef.current ?? await readHandoffSnapshot(sid);
+    if (currentCall(expected.conversation_log)?.callClose?.at === pending.at) {
+      clearPendingCallClose(sid); setCallSaveIssue(null); return;
+    }
+    if (!canApplyPendingClose(expected, pending)) throw new HandoffConflictError();
+    const history = closedCallHistory(conversationRef.current, pending);
+    const saved = await writeHandoffSnapshot(expected,
+      freshCallState(expected, expected.active_character, pending.callId), undefined, history);
+    if (generation !== callGenerationRef.current || sid !== sessionIdRef.current) return;
+    handoffSnapshotRef.current = saved;
+    conversationRef.current = history;
+    clearPendingCallClose(sid);
+    setCallSaveIssue(null);
+    void appendExperienceEvent({ sessionId: sid, eventKey: `call-closed:${pending.callId}`,
+      eventType: 'call_closed', character: expected.active_character, orchestrationVersionId: saved.orchestration_version_id,
+      payload: { callId: pending.callId, reason: pending.reason, remainingSeconds: pending.remainingSeconds,
+        durationSeconds: Math.max(0, Math.floor((pending.at - (currentCall(history)?.callStart?.startedAt ?? pending.at)) / 1000)) } });
+  }, []);
+
+  const retryClosedCall = useCallback(() => {
+    if (closeWriteRef.current) return;
+    const write = persistClosedCall().catch(error => {
+      setCallSaveIssue(error instanceof HandoffConflictError ? 'La session a changé. Recharge la page pour vérifier son état.'
+        : 'La fermeture n’est pas sauvegardée. Réessaie quand le réseau revient.');
+    }).finally(() => { if (closeWriteRef.current === write) closeWriteRef.current = null; });
+    closeWriteRef.current = write;
+  }, [persistClosedCall]);
+
   const handleHangUp = useCallback(() => {
     if (endedRef.current) return;
-    endedRef.current = true;
-    void finalizeAndEnd("user_hangup");
-  }, [finalizeAndEnd]);
+    endedRef.current = true; // retire all async owners before stopping providers
+    const remaining = timerRef.current.pause();
+    const snapshot = handoffSnapshotRef.current;
+    const call = currentCall(conversationRef.current);
+    cleanupAudio();
+    setActiveVideo(null);
+    setCurrentHandoffOffer(null);
+    setUserSubtitle(''); setMaxSubtitle(''); setAudioState('idle');
+    gridSelectionLockRef.current = false;
+    gridCallRef.current = false;
+    setPhase('character_select'); // immediate, independent of network
+    const generation = callGenerationRef.current;
+    const openingCommit = openingCommitRef.current;
+    const pendingHandoffWrite = handoffWriteRef.current;
+    if ((!call?.callStart || call.callClose || !snapshot) && !openingCommit) {
+      if (!call && sessionIdRef.current) {
+        void endPRD4Session(sessionIdRef.current, 'abandoned_before_answer', [], 0);
+        sessionIdRef.current = null;
+      }
+      return;
+    }
+    const sid = snapshot?.id ?? sessionIdRef.current!;
+    let close = { callId: call?.callStart?.id ?? '', at: Date.now(), remainingSeconds: remaining,
+      reason: 'user_hangup', revision: parseHandoffState(snapshot?.pending_handoff)?.revision ?? null };
+    try { if (!openingCommit) savePendingCallClose(sid, close); }
+    catch { setCallSaveIssue('La sauvegarde locale est indisponible. Garde cette page ouverte et réessaie.'); return; }
+    setCallSaveIssue('Sauvegarde de la fermeture…');
+    // A voice-turn CAS already sent may finish after cleanup. Settle it before
+    // closing; never let its old owner republish UI or a snapshot afterwards.
+    const write = (async () => {
+      const opened = await openingCommit?.catch(() => null);
+      if (generation !== callGenerationRef.current || sid !== sessionIdRef.current) return;
+      if (opened) {
+        handoffSnapshotRef.current = opened;
+        conversationRef.current = opened.conversation_log;
+        const started = currentCall(opened.conversation_log)?.callStart;
+        if (started) close = { ...close, callId: started.id, remainingSeconds: started.remainingSeconds };
+      }
+      openingCommitRef.current = null;
+      const inFlight = await pendingHandoffWrite?.catch(() => null);
+      if (generation !== callGenerationRef.current || sid !== sessionIdRef.current) return;
+      if (!opened && inFlight) handoffSnapshotRef.current = inFlight;
+      const expected = handoffSnapshotRef.current!;
+      if (!expected || !close.callId) throw new HandoffConflictError();
+      savePendingCallClose(sid, { ...close, revision: parseHandoffState(expected.pending_handoff)?.revision ?? null });
+      await persistClosedCall();
+    })().catch(error => {
+      if (generation !== callGenerationRef.current || sid !== sessionIdRef.current) return;
+      setCallSaveIssue(error instanceof HandoffConflictError ? 'La session a changé. Recharge la page pour vérifier son état.'
+        : 'La fermeture n’est pas sauvegardée. Réessaie quand le réseau revient.');
+    }).finally(() => { if (closeWriteRef.current === write) closeWriteRef.current = null; });
+    closeWriteRef.current = write;
+  }, [cleanupAudio, persistClosedCall, setAudioState, setCurrentHandoffOffer, setPhase]);
+
+  answerGridCallRef.current = async () => {
+    if (initialGreetingRef.current || endedRef.current || !sessionIdRef.current) return;
+    const controller = new AbortController();
+    initialGreetingRef.current = controller;
+    const sequence = activeTurnSequenceRef.current;
+    const sid = sessionIdRef.current;
+    const target = startingCharacterRef.current;
+    const current = () => !endedRef.current && !controller.signal.aborted && initialGreetingRef.current === controller
+      && activeTurnSequenceRef.current === sequence && sessionIdRef.current === sid;
+    let committed = false;
+    try {
+      const [snapshot, profile, runtime] = await withTimeout('grid_call', Promise.all([
+        readHandoffSnapshot(sid), getCharacterRuntimeReadiness(target), fetchPinnedDirectorRuntime(sid),
+      ]), HANDOFF_DEPENDENCY_TIMEOUT_MS);
+      if (!current()) return;
+      const time = callTime(snapshot.conversation_log);
+      const context = toCharacterExecutionContext(profile);
+      if (!profile?.enabled || !profile.ready || !context || !runtime.config?.activeCharacters.includes(target)
+        || runtime.versionId !== snapshot.orchestration_version_id) throw new Error('Ce personnage est indisponible pour cette expérience.');
+      if (!time?.paused || readPendingCallClose(sid)) throw new HandoffConflictError();
+      if (time.remainingSeconds <= 0) { void finalizeAndEnd('timeout_configured_duration'); return; }
+      await activateTTSFallback('grid_call');
+      if (!current()) return;
+      const call = newCall(time.configuredDurationSeconds, time.remainingSeconds);
+      const text = guardCharacterResponse(characterRecallGreeting(target, snapshot.conversation_log, profile.openingLine), context).response;
+      const turnIndex = snapshot.conversation_log.filter(m => m.role === 'user').length;
+      const turnId = `${call.id}:opening`;
+      const opening = tagSpokenWith({ role: target, content: text, timestamp: Date.now(), callStart: call,
+        delivery: greetingDelivery(turnId, turnIndex, target, text) }, target);
+      const history = [...snapshot.conversation_log, opening];
+      const next = freshCallState(snapshot, target, call.id);
+      const commit = writeHandoffSnapshot(snapshot, next, undefined, history, undefined, target);
+      openingCommitRef.current = commit;
+      const saved = await commit;
+      committed = true;
+      if (!current()) return;
+      openingCommitRef.current = null;
+      handoffSnapshotRef.current = saved;
+      conversationRef.current = history;
+      activeCharacterRef.current = target; activeCharacterContextRef.current = context;
+      activeVoiceIdRef.current = profile.ttsVoiceId; activeTTSProviderIdRef.current = asTTSProviderId(profile.ttsProvider);
+      setActivePortraitUrl(profile.portraitUrl); setSelectedCharacter(target);
+      pendingGmGuidanceRef.current = null; pendingSpeechStateRef.current = null;
+      pendingEmotionalStateRef.current = null; pendingPostVideoContextRef.current = null;
+      gmTopicsCoveredRef.current = []; handoffPhaseRef.current = 'none'; setCurrentHandoffOffer(null);
+      addMessage(opening); setUserSubtitle(''); setMaxSubtitle(text);
+      setPhase('conversation_max'); setAudioState('max_speaking');
+      timerRef.current.reset(time.remainingSeconds); timerRef.current.start();
+      void appendExperienceEvent({ sessionId: sid, eventKey: `call-opened:${call.id}`, eventType: 'call_opened',
+        character: target, orchestrationVersionId: saved.orchestration_version_id,
+        payload: { callId: call.id, source: 'grid', remainingSeconds: time.remainingSeconds,
+          returning: hasSpokenWithCharacter(snapshot.conversation_log, target) } });
+      activeOutputControllerRef.current = controller;
+      const output = await renderResponseText(text, { turnId, turnIndex, characterKey: target,
+        voiceId: profile.ttsVoiceId ?? undefined, providerId: asTTSProviderId(profile.ttsProvider) ?? undefined,
+        signal: controller.signal, cacheOpening: true });
+      if (!current()) return;
+      opening.delivery = greetingDelivery(turnId, turnIndex, target, text, output);
+      handoffSnapshotRef.current = await writeHandoffSnapshot(saved, next, undefined, history, controller.signal);
+      if (!current()) return;
+      setAudioState('idle');
+      if (output.status !== 'played') toast({ title: 'Voix indisponible', description: 'L’appel est ouvert. Tu peux réactiver le micro.', variant: 'destructive' });
+    } catch (error) {
+      if (!current()) return;
+      if (committed) {
+        setAudioState('idle');
+        toast({ title: 'Appel ouvert, sauvegarde à vérifier', description: 'Recharge la page avant de poursuivre.', variant: 'destructive' });
+      } else {
+        openingCommitRef.current = null;
+        cleanupAudio(); endedRef.current = true; timerRef.current.pause(); setPhase('character_select');
+        toast({ title: 'Appel indisponible', description: error instanceof Error ? error.message : 'Réessaie dans un instant.', variant: 'destructive' });
+      }
+    } finally {
+      if (initialGreetingRef.current === controller) initialGreetingRef.current = null;
+      if (activeOutputControllerRef.current === controller) activeOutputControllerRef.current = null;
+      gridSelectionLockRef.current = false;
+    }
+  };
 
   const revalidateCall = useCallback(async () => {
     const expected = handoffSnapshotRef.current;
@@ -2509,14 +2793,14 @@ const IndexPRD4 = () => {
     if (!current()) throw new HandoffConflictError();
     if (validated.blockedReason) {
       const revoked = revokeHandoff(validated.state!);
-      const saved = await writeHandoffSnapshot(validated.snapshot, revoked);
+      const saved = await persistHandoffChange(validated.snapshot, revoked);
       if (!current()) throw new HandoffConflictError();
       handoffSnapshotRef.current = saved;
       setCurrentHandoffOffer(null);
       throw new Error(`${characterDisplayName(validated.offer.targetCharacter)} n’est plus disponible pour cet appel.`);
     }
     return validated;
-  }, [setCurrentHandoffOffer]);
+  }, [persistHandoffChange, setCurrentHandoffOffer]);
 
   const switchToCharacter = useCallback(async (target: RuntimeCharacter) => {
     if (endedRef.current || handoffCallingRef.current || activeCharacterRef.current === target
@@ -2546,14 +2830,21 @@ const IndexPRD4 = () => {
       if (!isSwitchCurrent()) return;
       const firstContact = !hasSpokenWithCharacter(conversationRef.current, target);
       // The CAS consumes this exact offer and increments the counter once.
-      const consumed = { ...revokeHandoff(savedState), sourceCharacter: target, sourceCallId: `${sid}:${snapshot.handoff_count + 1}`, requestId: crypto.randomUUID() };
-      const saved = await writeHandoffSnapshot(snapshot, consumed, target);
+      const transferredCall = newCall(configuredSessionDurationRef.current, timerRef.current.snapshot());
+      const previousCall = currentCall(snapshot.conversation_log);
+      if (previousCall?.callStart) transferredCall.deadlineAt = previousCall.callStart.deadlineAt;
+      const closedPrevious = previousCall ? closedCallHistory(snapshot.conversation_log, {
+        at: transferredCall.startedAt, remainingSeconds: transferredCall.remainingSeconds, reason: 'gm_handoff',
+      }) : snapshot.conversation_log;
+      const consumed = { ...revokeHandoff(savedState), sourceCharacter: target, sourceCallId: transferredCall.id, requestId: crypto.randomUUID() };
+      const saved = await persistHandoffChange(snapshot, consumed, target, closedPrevious);
       committed = true;
       if (sid) void appendExperienceEvent({ sessionId: sid, eventKey: `handoff-executed:${eventSuffix}`,
         eventType: 'handoff_executed', character: target, orchestrationVersionId: saved.orchestration_version_id,
         payload: { stage: 'connected', offerId: savedState.revision, timerPreserved: true, sessionPreserved: true, firstContact, source: 'gm' } });
       if (!isSwitchCurrent()) return;
       handoffSnapshotRef.current = saved;
+      conversationRef.current = closedPrevious;
       pendingGmGuidanceRef.current = null;
       pendingEmotionalStateRef.current = null;
       pendingPostVideoContextRef.current = null;
@@ -2574,11 +2865,11 @@ const IndexPRD4 = () => {
       const openingTurnIndex = conversationRef.current.filter(m => m.role === 'user').length;
       const opening = tagSpokenWith({ role: target, content: openingLine, timestamp: Date.now(),
         delivery: greetingDelivery(openingTurnId, openingTurnIndex, target, openingLine),
-        callTransfer: { from, returning: !firstContact } }, target);
+        callStart: transferredCall, callTransfer: { from, returning: !firstContact } }, target);
       conversationRef.current = [...conversationRef.current, opening];
       addMessage(opening);
       setMaxSubtitle(openingLine);
-      const withOpening = await writeHandoffSnapshot(saved, consumed, undefined, conversationRef.current);
+      const withOpening = await persistHandoffChange(saved, consumed, undefined, conversationRef.current);
       if (sessionIdRef.current === sid) handoffSnapshotRef.current = withOpening;
       if (!isSwitchCurrent()) return;
       acceptedHandoffRef.current = null;
@@ -2601,7 +2892,7 @@ const IndexPRD4 = () => {
         { ...output, started: output.started || openingStarted });
       if (activeOutputControllerRef.current === openingController) activeOutputControllerRef.current = null;
       if (!isSwitchCurrent()) return;
-      const deliveredOpening = await writeHandoffSnapshot(withOpening, consumed, undefined, conversationRef.current);
+      const deliveredOpening = await persistHandoffChange(withOpening, consumed, undefined, conversationRef.current);
       if (!isSwitchCurrent()) return;
       handoffSnapshotRef.current = deliveredOpening;
       if (output.status !== 'played') throw new Error('La connexion est établie, mais sa voix est indisponible. Réactive le micro pour reprendre.');
@@ -2640,7 +2931,7 @@ const IndexPRD4 = () => {
         acceptedHandoffRef.current = null;
       }
     }
-  }, [activateTTSFallback, addMessage, renderResponseText, revalidateCall, setAudioState, setCurrentHandoffOffer, setSelectedCharacter]);
+  }, [activateTTSFallback, addMessage, persistHandoffChange, renderResponseText, revalidateCall, setAudioState, setCurrentHandoffOffer, setSelectedCharacter]);
 
   const handleAcceptHandoff = useCallback(async () => {
     if (endedRef.current || isProcessingRef.current || ['mic_starting', 'user_finalizing', 'user_speaking'].includes(state.audioState)
@@ -2705,11 +2996,20 @@ const IndexPRD4 = () => {
     const savedState = parseHandoffState(expected?.pending_handoff);
     if (!expected || !savedState?.offer) return;
     handoffCoordinatorRef.current.invalidate();
+    cinematicPlayerRef.current?.stop();
+    callPreparationRef.current = null;
+    if (micRecoveryTimerRef.current) window.clearTimeout(micRecoveryTimerRef.current);
+    micRecoveryTimerRef.current = null;
+    inputTelemetryRef.current?.finish('cancelled'); inputTelemetryRef.current = null;
+    activeVoiceTelemetryRef.current?.finish('cancelled'); activeVoiceTelemetryRef.current = null;
+    isProcessingRef.current = false;
+    if (processingWatchdogRef.current) window.clearTimeout(processingWatchdogRef.current);
+    processingWatchdogRef.current = null;
     setHandoffIssue(null);
     handoffPhaseRef.current = 'validating';
     setCurrentHandoffOffer(null);
     try {
-      const saved = await writeHandoffSnapshot(expected, revokeHandoff(savedState));
+      const saved = await persistHandoffChange(expected, revokeHandoff(savedState));
       if (sessionIdRef.current !== expected.id) return;
       handoffSnapshotRef.current = saved;
       handoffPhaseRef.current = 'declined';
@@ -2722,7 +3022,7 @@ const IndexPRD4 = () => {
       if (!(error instanceof HandoffConflictError)) setCurrentHandoffOffer(savedState.offer);
       toast({ title: 'Choix non enregistré', description: error instanceof Error ? error.message : 'Réessaie.', variant: 'destructive' });
     }
-  }, [setCurrentHandoffOffer]);
+  }, [persistHandoffChange, setCurrentHandoffOffer]);
 
   // Cleanup au démontage
   useEffect(() => () => { cleanupAudio(); }, [cleanupAudio]);
@@ -2810,6 +3110,9 @@ const IndexPRD4 = () => {
   const handleRestart = useCallback(() => {
     cleanupAudio();
     reset();
+    setTechnicalExpiresAt(null); setCallSaveIssue(null);
+    gridSelectionLockRef.current = false; gridCallRef.current = false;
+    closeWriteRef.current = null; openingCommitRef.current = null;
     introductionReviewRef.current = false;
     setUserSubtitle("");
     setMaxSubtitle("");
@@ -2844,7 +3147,7 @@ const IndexPRD4 = () => {
   }, [cleanupAudio, reset, setCurrentHandoffOffer]);
 
   const finishActiveVideo = useCallback((skipped: boolean) => {
-    if (!activeVideo) return;
+    if (!activeVideo || activeVideoRef.current !== activeVideo || endedRef.current || phaseRef.current !== 'conversation_max') return;
     pendingPostVideoContextRef.current = activeVideo.context || activeVideo.post_video_context || null;
     trackEvent("prd4_video_completed", {
       session_id: sessionIdRef.current,
@@ -2899,15 +3202,22 @@ const IndexPRD4 = () => {
       break;
     case "character_select":
       screen = (
+        <>
+        {callSaveIssue ? <div role="status" className="fixed top-4 left-4 right-4 z-50 rounded bg-background p-4 text-center">
+          <p>{callSaveIssue}</p>
+          <button className="underline" onClick={retryClosedCall}>Réessayer la fermeture</button>
+        </div> : null}
         <CharacterSelectScreen
           onSelect={handleSelectCharacter}
           onLockedClick={handleLockedClick}
           onReviewIntroduction={handleIntroductionReview}
         />
+        {sessionIdRef.current ? <button className="fixed bottom-4 right-4 underline" onClick={() => void finalizeAndEnd('user_end_experience')}>Terminer l’expérience</button> : null}
+        </>
       );
       break;
     case "calling_max":
-      screen = <CallingMaxScreen character={startingCharacterRef.current} situation={selectedEncounterFrameRef.current} portraitUrl={activePortraitUrl} onAnswered={handleAnswered} />;
+      screen = <CallingMaxScreen character={startingCharacterRef.current} situation={selectedEncounterFrameRef.current} portraitUrl={activePortraitUrl} onAnswered={handleAnswered} onHangUp={gridCallRef.current ? handleHangUp : undefined} />;
       break;
     case "conversation_max":
       screen = (

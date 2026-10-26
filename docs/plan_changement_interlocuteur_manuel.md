@@ -1,3 +1,99 @@
+## F2 — cycle des appels — 26 octobre 2026
+
+Base vérifiée `debea012d115110fb7fd308fa00901e9a5099792`, checkout canonique propre,
+une branche `codex/ava-call-cycle-f2`, un agent. PR #24 et branches historiques préservées.
+Notion natif get-self Gamilab `7e1a9a09-09cb-4deb-a306-83a29b831bc2`, tâche/application
+lues. Lovable Ava/Memoways au même SHA, ready, agentFinished=true ; Cloud activé.
+
+### Contrat et réalisation prévue avant code
+
+- Séparer fermeture d'appel et fin d'expérience. Raccrocher coupe immédiatement
+  capture, sorties, vidéos et callbacks, suspend le budget et affiche la grille.
+  Les appels suivants réutilisent la session et la version épinglée ; aucun reset
+  du film, rôle/posture, mémoire, historique, vidéos ou quota de transferts.
+- Enregistrer dans le JSONB conversation_log existant un marqueur explicite
+  `callStart` sur chaque accueil (ID, budget, temps restant, échéance active), puis
+  `callClose` sur cet accueil (motif, instant, temps restant). Ces métadonnées
+  ne sont pas une confidence et ne sont pas injectées comme texte au modèle.
+  Le CAS existant renouvelle pending_handoff et atomise marqueur + transcript.
+  Un nouvel appel grille renouvelle sourceCallId même en rappelant le même acteur.
+  L'accueil ne compte jamais comme échange complet. Le compteur global est conservé.
+- La grille conserve le temps restant ; les sonneries du rappel ne le consomment
+  pas. Une recharge pendant un appel retire le temps écoulé depuis son échéance ;
+  une recharge sur grille retrouve sa pause. Expiration technique fixe de reprise
+  distincte (4 h depuis création), non prolongée par les rappels. Les anciens
+  clients/sessions sans marqueur conservent la reprise historique.
+- Préparer et revalider fiche + garde admin au décroché ; verrou synchrone des
+  sélections/décrochés. Après fermeture, seul un CAS acquitté permet le prochain
+  appel ; panne/conflit visibles et récupérables, jamais de dialogue d'une cible
+  non persistée. Les callbacks tardifs ne peuvent ni réarmer micro ni écrire
+  dans l'appel suivant. Préserver intégralement coordinateur et replays F1.
+- Réutiliser JSONB/CAS/RLS existants : aucune migration/Edge attendue. Vérifier
+  Cloud séparément ; si l'inspection impose un changement, le documenter avant
+  application exclusivement via Lovable. Pas de publication production.
+
+### Vérifications et livraison prévues
+
+Tests ciblés compteur/marqueurs/reprise/expiration et timer ; E2E Max → grille →
+Emma → grille → Max (session, film/version, souvenirs séparés, retour), réseau,
+double clic, ancien STT/GM/audio, PTT et mains libres ; replays F1, test:quality,
+E2E complets. PR/CI HEAD exact avant squash, CI main E2E, nettoyage de notre seule
+branche, Lovable synchronisé/prêt, tâche Notion relue après écriture. Recette
+humaine et production réservées à F3 ; prompt autonome F3 livré dans le dépôt
+et prêt à copier dans la réponse, ou reprise de finalisation si F2 incomplet.
+
+Confidence Check : 95 %. Cause et points de reset identifiés ; primitives
+existantes réutilisées, pas de dépendance. Références vérifiées :
+[cycles React](https://react.dev/reference/react/useEffect),
+[AbortSignal officiel](https://supabase.com/docs/reference/javascript/using-modifiers-abortsignal),
+[source OSS PostgREST](https://github.com/supabase/supabase-js/blob/master/packages/core/postgrest-js/src/PostgrestBuilder.ts).
+
+### Réalisation et preuves locales F2
+
+- `callCycle.ts` porte le budget par appel, l’identité source et les marqueurs
+  `callStart`/`callClose`. Les fermetures et les ouvertures sont écrites avec le
+  CAS existant, dans la même ligne autorisée de session. La grille ne nécessite
+  ni consentement narratif ni consommation d’un quota de transfert GM ; elle
+  revalide la disponibilité admin et la version épinglée au décroché.
+- Raccrocher arrête immédiatement capture, détecteur, sorties, vidéo, watchdogs
+  et propriétaires asynchrones ; retour grille avant l’écriture réseau. Le
+  rappel attend l’acquittement. Une intention de fermeture locale conserve
+  uniquement identifiants/révision/motif/temps (aucun transcript) et se rejoue
+  après recharge seulement sur l’appel et la révision attendus. Un conflit
+  d’onglet reste explicite, sans adoption d’une révision étrangère.
+- Le rappel possède son accueil de retour, sans inventer que l’autre personnage
+  a passé la ligne. Aucun reset d’expérience/mémoire/film/contexte/version/
+  vidéos/quota ; seule la nouvelle frontière d’appel remet ses échanges à zéro.
+  Le transfert GM garde son CAS, ses gardes et son séquencement F1 ; ses marqueurs
+  consignent aussi le motif de fin et conservent exactement l’échéance active.
+- Le timer actif utilise une échéance murale ; pause immédiate, reprise du même
+  restant et lecture du marqueur à la recharge. Expiration de budget à zéro
+  (`timeout_configured_duration`) distincte de `resume_expired` à quatre heures.
+  La RLS Cloud « Participant update own active session » a été lue : propriétaire
+  courant et session créée depuis moins de quatre heures. Aucune règle changée.
+  Les sessions historiques sans marqueur sont enrichies sur leur accueil
+  existant, avec la même identité source, sans perdre leurs échanges ni offre.
+- Tests ciblés verts : cycle Max/grille/Emma/grille/Max, film/version/session,
+  prompt Max avec son souvenir sans secret Emma et réciproquement, doubles clics,
+  fermeture hors réseau puis recharge/réessai, reprise à budget expiré, expiration
+  technique sur grille, STT tardif PTT/mains libres et réponse LLM quittée.
+  La première passe E2E complète a été invalidée par des modifications locales
+  pendant son exécution ; une nouvelle passe sur code figé est lancée avant PR.
+  Le test d’expiration technique a d’abord échoué car l’horloge simulée était
+  installée après le timer natif ; installé avant navigation, il passe. Pas de
+  délai produit modifié pour satisfaire cette simulation.
+- Qualité locale complète verte : 67 régressions, 1 037 unitaires, 41 intégrations,
+  lint (0 erreur, avertissement historique), typage et build. E2E complets et CI
+  de livraison en cours : ne pas confondre les succès ciblés avec cette porte.
+- Cloud inspecté par Lovable Ava uniquement : JSONB et RLS existants suffisent.
+  Aucune migration, Edge, secret, flag, réglage de production ou publication.
+  Le scénario transfert F1 → grille → rappel du même acteur vérifie aussi que
+  les promesses CAS terminées ne remplacent pas le snapshot du nouvel appel.
+  La synchronisation finale Lovable et les SHA/CI restent à compléter après fusion.
+
+
+---
+
 # Passage Emma ↔ Max : validation narrative et pastille d’appel
 
 ## Exécution F1 — 26 octobre 2026

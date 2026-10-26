@@ -1,3 +1,4 @@
+import { sourceCallId } from './callCycle';
 import { completedCallExchanges, HANDOFF_DEPENDENCY_TIMEOUT_MS } from './handoffCoordinator';
 import { withTimeout } from './asyncUtils';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,6 +9,7 @@ import type { HandoffState } from './characterHandoffState';
 
 export interface HandoffSnapshot {
   id: string;
+  resume_expires_at?: string;
   active_character: RuntimeCharacter;
   orchestration_version_id: string | null;
   handoff_count: number;
@@ -20,9 +22,10 @@ export class HandoffConflictError extends Error {
 export async function readHandoffSnapshot(sessionId: string): Promise<HandoffSnapshot> {
   await ensureGameAuth();
   const { data, error } = await supabase.from('sessions')
-    .select('id,active_character,orchestration_version_id,handoff_count,pending_handoff,conversation_log')
+    .select('id,active_character,orchestration_version_id,handoff_count,pending_handoff,conversation_log,resume_expires_at')
     .eq('id', sessionId).is('ended_at', null).abortSignal(AbortSignal.timeout(HANDOFF_DEPENDENCY_TIMEOUT_MS)).single();
   if (error) throw error;
+  if (data?.resume_expires_at && Date.parse(data.resume_expires_at) <= Date.now()) throw new Error('Le délai technique de reprise est expiré.');
   if (!data || (data.active_character !== 'max' && data.active_character !== 'emma')) throw new HandoffConflictError();
   return { ...data, active_character: data.active_character, handoff_count: data.handoff_count ?? 0,
     conversation_log: Array.isArray(data.conversation_log) ? data.conversation_log as unknown as ConversationMessage[] : [] };
@@ -45,13 +48,15 @@ export function matchesHandoffWrite(actual: HandoffSnapshot, expected: HandoffSn
 
 /** One conditional UPDATE. No read-then-write emulation; a zero-row success is a conflict. */
 export async function writeHandoffSnapshot(expected: HandoffSnapshot, next: HandoffState,
-  target?: RuntimeCharacter, conversation?: ConversationMessage[], signal?: AbortSignal): Promise<HandoffSnapshot> {
+  target?: RuntimeCharacter, conversation?: ConversationMessage[], signal?: AbortSignal, gridTarget?: RuntimeCharacter): Promise<HandoffSnapshot> {
   await ensureGameAuth();
   let query = supabase.from('sessions').update({ pending_handoff: next as unknown as Json,
+    ...(gridTarget ? { active_character: gridTarget, personnage_appele: gridTarget } : {}),
     ...(conversation ? { conversation_log: JSON.parse(JSON.stringify(conversation)) as Json } : {}),
     ...(target ? { active_character: target, personnage_appele: target, handoff_count: expected.handoff_count + 1 } : {}) })
     .eq('id', expected.id).is('ended_at', null).eq('active_character', expected.active_character)
     .eq('handoff_count', expected.handoff_count);
+  if (expected.resume_expires_at) query = query.gt('resume_expires_at', new Date().toISOString());
   query = expected.orchestration_version_id === null ? query.is('orchestration_version_id', null)
     : query.eq('orchestration_version_id', expected.orchestration_version_id);
   query = expected.pending_handoff === null ? query.is('pending_handoff', null)
@@ -60,12 +65,14 @@ export async function writeHandoffSnapshot(expected: HandoffSnapshot, next: Hand
   if (error) {
     if (!signal?.aborted) {
       const acknowledged = await readHandoffSnapshot(expected.id).catch(() => null);
-      if (acknowledged && matchesHandoffWrite(acknowledged, expected, next, target)) return acknowledged;
+      if (acknowledged && matchesHandoffWrite(acknowledged, { ...expected, active_character: gridTarget ?? expected.active_character }, next, target)
+        && (!conversation || JSON.stringify(orderedJson(acknowledged.conversation_log)) === JSON.stringify(orderedJson(conversation)))) return acknowledged;
     }
     throw error;
   }
   if (!data) throw new HandoffConflictError();
   return { ...expected, pending_handoff: next as unknown as Json,
+    ...(gridTarget ? { active_character: gridTarget } : {}),
     ...(conversation ? { conversation_log: conversation } : {}),
     ...(target ? { active_character: target, handoff_count: expected.handoff_count + 1 } : {}) };
 }
@@ -80,7 +87,7 @@ export async function revalidateHandoffCall(expected: HandoffSnapshot) {
   const [current, runtime, profile] = await withTimeout('handoff_revalidation', Promise.all([readHandoffSnapshot(expected.id),
     fetchPinnedDirectorRuntime(expected.id), getCharacterRuntimeReadiness(state.offer.targetCharacter)]), HANDOFF_DEPENDENCY_TIMEOUT_MS);
   const actual = parseHandoffState(current.pending_handoff);
-  if ((state.sourceCallId && state.sourceCallId !== `${current.id}:${current.handoff_count}`)
+  if ((state.sourceCallId && state.sourceCallId !== sourceCallId(current))
     || actual?.revision !== state.revision || current.active_character !== state.sourceCharacter
     || current.handoff_count !== expected.handoff_count || current.orchestration_version_id !== state.orchestrationVersionId
     || runtime.versionId !== state.orchestrationVersionId) throw new HandoffConflictError();

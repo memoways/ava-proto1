@@ -29,4 +29,19 @@ describe("useTimer — durée pilotée par l'admin", () => {
 
     expect(result.current.formatted).toBe("15:30");
   });
+  it('freezes on grid and survives settings refresh, resumes without resetting and expires once', async () => {
+    vi.useFakeTimers();
+    const timeout = vi.fn();
+    const { result, rerender } = renderHook(({ duration }) => useTimer(duration, timeout), { initialProps: { duration: 20 } });
+    act(() => result.current.start());
+    await act(async () => vi.advanceTimersByTimeAsync(5000));
+    act(() => { expect(result.current.pause()).toBe(15); });
+    rerender({ duration: 999 });
+    await act(async () => vi.advanceTimersByTimeAsync(60000));
+    expect(result.current.remaining).toBe(15); expect(timeout).not.toHaveBeenCalled();
+    act(() => result.current.start());
+    await act(async () => vi.advanceTimersByTimeAsync(15000));
+    expect(result.current.remaining).toBe(0); expect(timeout).toHaveBeenCalledOnce();
+  });
+
 });
