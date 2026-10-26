@@ -1,6 +1,10 @@
 # Reprise Codex → assistant suivant — fiabilité des passages, F1
 
 Date : 26 octobre 2026. **Prompt préparé, lot F1 non lancé.**
+Complément documentaire : choix bouton/timer confirmés après l'audit #85 ; base
+main `d38e7f5fd6d6487f5c767ea4fdbf2565397aea91` à cette mise à jour. Les évolutions
+étrangères de sandbox Julien et de fournisseur TTS sont préservées ; aucun
+rejeu du diagnostic ou test produit de ces évolutions n'est revendiqué ici.
 
 ## Première action exécutable
 
@@ -75,9 +79,14 @@ zéro transfert, fin user_hangup. Version prod épinglée v8
 - Transfert direct après accord du personnage, validation GM et clic joueur.
 - En cas de refus, raccrochage puis choix libre dans la grille ; même expérience,
   souvenirs séparés. Ce cycle d'appels complet appartient à F2.
-- Deux questions complémentaires figurent dans le plan : durée de vie du bouton
-  après continuation et timer sur la grille. Lire les réponses enregistrées dans
-  le plan ; si elles restent ouvertes, clarifier avant de coder leurs effets.
+- Décision complémentaire confirmée le 26 octobre : le bouton validé reste
+  disponible après « merci » ou une continuation, jusqu'au clic, à « Rester »
+  ou à un changement explicite de demande. Un nouveau message n'est pas une
+  révocation implicite. Conserver les invalidations techniques nécessaires.
+- Timer confirmé : suspendu pendant la grille, repris au prochain appel avec
+  le même temps restant ; ni reset ni décompte du temps passé sur la grille.
+  Distinguer temps d'expérience et expiration technique de reprise (F2).
+- Ces deux choix sont tranchés : ne pas les redemander à Ulrich.
 
 ## Travail F1
 

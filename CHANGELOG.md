@@ -4,6 +4,21 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Passages — bouton persistant et timer suspendu confirmés] — 2026-10-26
+
+- Depuis main `d38e7f5fd6d6487f5c767ea4fdbf2565397aea91`, décisions explicites
+  d'Ulrich : le bouton reste après acquiescement/continuation jusqu'au clic,
+  à « Rester » ou à un changement explicite de demande ; timer suspendu sur
+  la grille, repris au prochain appel avec le temps restant.
+- [Plan](docs/plan_changement_interlocuteur_manuel.md) et
+  [reprise F1](docs/prompt_reprise_fiabilite_passage_personnages_lot_f1.md)
+  actualisés ; ces choix ne sont plus à redemander. Réalisation F1/F2 restante.
+- Documentation seule, aucun code/workflow/Cloud ni publication modifié.
+  Dernière [CI complète verte vérifiée](https://github.com/memoways/ava-proto1/actions/runs/40298606848)
+  sur `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec` ; la CI du code étranger
+  d38e7f5 était en cours à la préparation. Aucun test produit relancé pour ce
+  complément de décisions.
+
 ## [Audit passages — contrat à fiabiliser] — 2026-10-26
 
 - Base main `7e36e94476dc541c9f3f371b9a92d6b09ad8abd4` (#84).
