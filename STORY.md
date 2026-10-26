@@ -7,6 +7,26 @@
 
 ---
 
+## Les accords ne possédaient pas leur bouton (26 octobre 2026)
+
+La démonstration de 15:04 remet en cause la fiabilité du passage. Les données
+Cloud confirment trois annonces de Max sans transfert : T15 est autorisable
+mais sans offre attestée ; T17 perd la cible devenue pronom ; T21 est neutralisé
+par une validation relationnelle. La nouvelle capture chevauche le GM T15,
+mais la trace ne prouve pas l'instruction exacte qui a abandonné le résultat.
+
+Les tests existants passent aussi parce qu'ils exigent l'annulation du passage
+quand le joueur reparle. Ils sécurisent la fraîcheur, sans garantir la continuité
+attendue de l'accord. Le [plan existant](docs/plan_changement_interlocuteur_manuel.md)
+conserve ces protections et propose de donner à chaque demande sa propre durée
+de vie, avec confirmation et opération synchronisées.
+
+Ulrich confirme quatre échanges complets par appel et une règle identique pour
+les personnages. Le raccrochage doit fermer seulement l'appel et rendre la
+grille libre, avec l'expérience et les souvenirs cloisonnés conservés. Le
+[prompt F1](docs/prompt_reprise_fiabilite_passage_personnages_lot_f1.md) prépare
+la réalisation ; cet audit n'a modifié ni produit, ni Cloud, ni production.
+
 ## A4R — les textes étaient déjà là (26 octobre 2026)
 
 Gamilab reconnecté, la lecture directe révèle que les IDs de reprise sont

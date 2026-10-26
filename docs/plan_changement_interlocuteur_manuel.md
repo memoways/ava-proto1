@@ -1,5 +1,340 @@
 # Passage Emma ↔ Max : validation narrative et pastille d’appel
 
+## Audit de production et nouveau contrat — 26 octobre 2026
+
+**Statut : audit et plan, sans correctif produit ni publication.** Cette section
+prime sur les anciennes propositions de durée de vie des offres. Les lots
+historiques restent conservés comme preuves de ce qui a été réalisé, et non
+comme garantie que la mécanique actuelle répond au nouveau contrat.
+
+### Demande, décisions et périmètre
+
+Ulrich signale la session Production du 26/10 à 15:04, Max, 27 messages joueur,
+fin `user_hangup`. Il demande un audit profond, une explication des récidives,
+un plan fiable et des questions avant le prochain développement.
+
+Décisions explicitement confirmées dans ce chat le 26 octobre :
+
+- Règle commune à Max, Emma et aux futurs personnages ; seuls Max et Emma
+  restent joignables aujourd'hui. Les restrictions particulières d'Ava feront
+  l'objet d'un autre lot ; ne pas activer Ava ou Léo.
+- Transfert direct : le personnage accepte, le GM valide et l'application
+  présente un bouton d'appel ; le joueur clique. Aucune bascule automatique.
+- Le minimum du back-office reste applicable : **quatre échanges complets dans
+  l'appel courant**, comptés sur des réponses effectivement délivrées au joueur,
+  et non quatre fragments de transcription dans toute l'expérience. L'accueil
+  initial ne compte pas. Une réponse interrompue ne compte pas comme échange
+  complet ; une réponse affichée sans voix ne doit pas compter implicitement.
+- Une réticence ne doit pas emprisonner le joueur. Le transfert direct requiert
+  l'accord ; en cas de refus, le joueur peut raccrocher puis appeler librement
+  l'autre personnage depuis la grille, dans la même expérience.
+- Raccrocher termine **l'appel**, revient directement aux quatre portraits
+  (Max/Emma actifs, Ava/Léo indisponibles), sans questionnaire imposé.
+- Un nouvel appel conserve l'expérience, le contexte commun et les souvenirs
+  propres à chaque personnage. Il ne donne pas accès aux confidences de l'autre.
+
+Questions supplémentaires envoyées : maintien du bouton après « merci » ou une
+brève continuation ; suspension du temps sur la grille. Leur réponse doit être
+intégrée avant implémentation ; les recommandations ci-dessous sont signalées
+comme propositions tant qu'elles ne sont pas confirmées.
+
+### Sources et état vérifié
+
+- Checkout canonique et GitHub : `memoways/ava-proto1`, main de départ
+  `7e36e94476dc541c9f3f371b9a92d6b09ad8abd4`, propre et actualisé.
+  PR étrangère #24 et ses fichiers préservés ; aucun agent parallèle lancé.
+- Lovable natif : projet `1265958d-b74e-40f2-917d-182fe05163fc`, workspace
+  Memoways `5glbtPltldwz9tgNwIi4`, ready, agentFinished=true, même SHA que main.
+  Cela identifie la source de preview ; ce SHA n'est pas attribué au site public.
+- Production HTTP relue : `https://proto1.parle-a-ava.com/`, HTTP 200, bundle
+  `/assets/index-BhfS0uYD.js`, le 26/10 à 16:25 Europe/Paris. Aucun déploiement.
+- Lovable Cloud, lectures SQL uniquement : session
+  `2dc01921-c517-4e4e-b88f-6c5bb1b5bb8d`, début 14:04:07 UTC = **15:04:07
+  Europe/Paris**, fin 15:10:01 locale, durée enregistrée 342 s, Max actif,
+  27 messages joueur, zéro transfert, 12 entrées GM. Le nombre de messages
+  inclut des fragments sans réponse et ne signifie pas 27 échanges complets.
+- Version épinglée prod v8 `74450a74-d1dc-47e6-9f06-4a177a7c5f6a` : seuil 4,
+  maximum 8 transferts, pause 2, Max/Emma actifs, transferts autorisés. Ni le
+  seuil ni le quota épuisé n'expliquent à eux seuls T15. Aucun réglage modifié.
+- `gm_code_version=gm-2026-10-25-safe-response-handoff`. Diagnostic détaillé
+  désactivé ; des événements voix structurés restent présents. La session
+  annonce push-to-talk dans ses métadonnées, mais les tours 15–17 portent
+  hands_free / micro_ouvert dans les événements : utiliser la modalité par tour.
+- Notion Gamilab confirmé via get-self : `7e1a9a09-09cb-4deb-a306-83a29b831bc2`.
+  [Application](https://app.notion.com/p/97462322e595822ca21601814e915159),
+  [tâche existante passages/GM](https://app.notion.com/p/1c498377edb94cfea4d4bae8728e8c7f),
+  [PRD historique](https://app.notion.com/p/31c62322e5958026bd87e55eed4af635).
+  Ce PRD de mars est historique ; les décisions du présent chat prévalent.
+
+### Ce qui échoue réellement dans cette conversation
+
+**T15 : l'accord est valide, mais aucune offre n'est attestée.**
+
+Demande : « j'aimerais bien en parler avec elle […] tu peux me la passer ».
+Réponse : « Oui. Je te la passe. Emma est dans la cuisine. ». Le reçu indique
+`completed`, generated=delivered ; le GM recommande Emma et conserve une preuve
+exacte « Je te la passe. », cible explicitement ancrée dans « Emma ».
+Le rejeu de cette évaluation et du reçu dans `validateCharacterHandoff` retourne
+`authorized: true`. Aucun événement `handoff_validated`, `handoff_proposed`,
+`handoff_accepted` ou de persistance ratée n'est enregistré pour T15. Ne pas
+conclure que le bouton a été créé, ni qu'une panne de base est démontrée.
+
+Chronologie des événements serveur : fin de sortie T15 vers 15:07:48.33 ;
+début de capture T16 vers 15:07:50.02 ; résultat GM T15 vers 15:07:51.93.
+Sa génération dure 3 159 ms et sa persistance 391 ms environ. Le message joueur
+T16 est horodaté côté client à 15:07:51.797. **La reprise de parole chevauche
+la validation du transfert**. Les horloges client/serveur ne sont pas une preuve
+à la milliseconde près de la branche JavaScript exécutée.
+
+Le consommateur UI attend ensuite profils Max/Emma et vidéos, revérifie
+`isCurrentTurn()` et peut revenir silencieusement si un nouveau tour a pris la
+main. Le signal d'annulation du tour vocal est également celui du GM. Ce chemin
+explique structurellement une perte d'offre après accord ; il est reproduit
+par les E2E existants de GM tardif. L'endroit exact où **ce** T15 est sorti reste
+à isoler par un replay intégré avec retards contrôlés. Les traces actuelles ne
+permettent pas de choisir définitivement entre annulation, attente auxiliaire
+et rejet après retour. Une absence d'événement n'est pas une preuve de la cause.
+
+**T17 : la demande perd sa cible en devenant pronominale.**
+
+Réponse pleinement délivrée : « Oui. Je te la passe maintenant. ». Le GM
+recommande encore Emma mais la matérialisation de preuve échoue avec
+`handoff_proof_rejected / request_unresolved`, puis le consommateur affiche
+`assessment_missing`. Ni la demande courante ni la réponse ne nomment Emma.
+La cible de T15 n'a pas été gardée comme demande en attente : l'état
+`openRequest` ne se conserve actuellement que pour un consentement différé
+valide, pas pour un accord accepté dont l'offre n'a pas abouti. La conversation
+humaine garde son sens ; la machine ne possède plus le lien autorisé vers Emma.
+Il faut conserver une demande typée, pas inventer une cible depuis tout le log.
+
+**T21 : un contrôle relationnel neutralise le transfert.**
+
+Réponse pleinement délivrée : « D'accord. Je te passe Emma. ». L'évaluation GM
+est `invalid / relationship_invalid`, et l'événement dit `gm_not_executed`.
+Le code remplace alors l'action par `none` et supprime la preuve de transfert.
+Cela ne démontre ni un refus de Max ni une preuve de transfert valide avant
+neutralisation : le journal conservé ne contient plus cette sous-décision.
+En revanche, le couplage est certain : une proposition relationnelle incorrecte
+annule actuellement toutes les actions de l'évaluation, même indépendantes.
+
+**Raccrochage : le code ferme l'expérience entière.**
+
+`handleHangUp → finalizeAndEnd → endPRD4Session` écrit ended_at puis
+`endExperience` impose `end_session`. Continuer mène à `questionnaire` ou
+`thanks`. Revenir seulement à `character_select` ne suffirait pas :
+`handleAnswered` réinitialise historique, compteur, timer et état d'appel ;
+le parcours de nouvel appel doit être distinct du premier appel.
+
+### Pourquoi les corrections successives n'ont pas stabilisé le système
+
+1. **Deux vérités non transactionnelles.** Le personnage annonce un transfert
+   avant la décision GM et avant l'offre persistée. Une phrase entendue peut
+   donc annoncer une opération que l'application n'a jamais préparée.
+2. **Mauvais propriétaire de durée de vie.** L'accord métier dépend du tour
+   vocal courant. Le joueur peut reparler après la fin audio pendant les
+   quelque 3,5 s de GM ; cela peut annuler le processus. Toute nouvelle
+   soumission révoque aussi l'offre existante, même un simple acquiescement.
+3. **Chaîne de dépendances trop large.** L'affichage dépend aussi d'une liste
+   de vidéos et des deux profils. Une erreur relationnelle du GM désactive
+   le passage. Ces dépendances ajoutent des pannes sans changer le sens de
+   l'accord. Ne pas confondre découplage et suppression des contrôles nécessaires.
+4. **Contrat de preuve fragile au langage naturel.** Des références strictes
+   empêchent des transferts inventés, mais ne représentent pas durablement une
+   demande résolue ; les pronoms naturels deviennent alors inexécutables.
+5. **Les tests protègent aussi l'ancienne règle.** Les tests de nouveau message
+   attendent explicitement zéro bouton ; ceux de succès utilisent des JSON
+   simulés conformes et attendent souvent networkidle. Ils ne prouvent pas la
+   stabilité d'un GM réel et d'une conversation libre. Les régressions citées
+   sont des lacunes de contrat/couverture démontrées ; aucun commit récent
+   précis n'est accusé sans bisection reproductible.
+6. **Observabilité incomplète.** Un tour sans intention de transfert est marqué
+   `handoff_blocked / assessment_missing`, ce qui noie les véritables incidents.
+   Certains retours après attente ne produisent aucun motif terminal, comme
+   l'illustre T15. Une CI verte ne comble pas ce trou de preuve.
+7. **Seuil portant sur les mauvais événements.** Le code compte les messages
+   user du log global ; il n'applique pas les quatre échanges complets par appel
+   confirmés aujourd'hui. Une longue conversation peut contenir plusieurs
+   fragments STT pour une seule réponse.
+
+### Architecture proposée : un seul coordinateur de passage
+
+Réutiliser `characterHandoffState`, `sessionHandoff`, le garde du directeur et
+les reçus de sortie. Extraire la coordination de `IndexPRD4` dans un service
+unique ; aucune seconde implémentation dans les composants ou les prompts.
+
+```mermaid
+stateDiagram-v2
+  [*] --> requested: demande résolue, requestId
+  requested --> awaiting_validation: candidat du personnage
+  awaiting_validation --> available: GM valide + éligibilité + persistance + reçu
+  awaiting_validation --> recoverable_error: délai ou dépendance indisponible
+  recoverable_error --> awaiting_validation: réessayer la même demande
+  available --> calling: clic joueur + revalidation
+  calling --> connected: commit atomique du personnage actif
+  available --> revoked: Rester, retrait ou nouvelle cible explicite
+  requested --> revoked: refus ou retrait
+```
+
+Le schéma expose les événements métier ; les sous-états de préparation audio
+restent explicites dans le protocole de réalisation. Un état disponible doit
+être prouvé, pas déduit d'un changement de couleur du bouton.
+
+**Propriété et cohérence.** Une demande porte session/expérience, appel source,
+requestId, cible, version, révision, origine et preuve. Une prise de parole sans
+retrait n'est pas automatiquement une nouvelle demande. Le nouveau cycle de
+vie sera validé avec les réponses finales d'Ulrich. La fraîcheur porte sur la
+demande et l'appel : un callback d'une demande révoquée ou d'un ancien appel
+reste rejeté. Ne jamais réinterpréter une preuve historique invalide comme une
+preuve courante pour contourner la fraîcheur.
+
+**Accord et opération synchronisés.** Le personnage fournit un candidat ; le
+GM conserve la validation narrative ; le moteur autorise l'opération. Pour
+promettre « je te le passe » de manière fiable, préparer l'offre avant de laisser
+sortir la confirmation définitive. Une piste à prototyper est de retenir la
+clause de transfert, faire valider le candidat par le même appel GM, préparer
+l'offre, puis diffuser la confirmation ; activer le bouton quand son reçu de
+livraison est confirmé. Les réponses ordinaires restent en streaming.
+C'est un changement de séquencement réservé aux transferts, avec attente bornée,
+à mesurer ; il ne faut pas prétendre conserver exactement leur latence actuelle.
+Ni regex seule ni repli silencieux ne doivent accorder le passage sans le GM.
+
+**Échec visible et récupérable.** Le GM peut échouer ou le réseau couper : une
+fiabilité honnête signifie alors « préparation en cours », puis motif/action
+réessayer ou retour grille ; jamais une promesse suivie de rien. Le bouton ne
+prétend pas être disponible tant que la source de vérité ne l'autorise pas.
+Délai proposé : état d'attente visible immédiatement, échec récupérable au plus
+tard au timeout configuré ; valeur chiffrée fixée et testée dans le premier lot.
+La conversation ordinaire ne ferme pas son micro pour attendre le GM.
+
+**Validation par responsabilité.** Séparer statut JSON global inutilisable,
+statut de passage, statut de relation et statut de mémoire. Une proposition de
+relation rejetée garde la relation précédente et ne valide aucune relation
+inventée ; elle ne doit pas invalider une preuve de transfert séparément valide.
+Un résultat sans identité, version ou preuve requise reste non autorisant.
+Même appel GM ; aucune dépendance aux vidéos pour matérialiser une offre.
+
+**Cible conversationnelle.** Conserver requestId/cible dès qu'ils sont résolus,
+pour que « elle », « tu peux me la passer » et « oui » répondent à cette demande
+seulement. Nouvelle cible, ambiguïté réelle ou révocation : clarification ou
+nouvelle demande. Ne pas rouvrir toutes les demandes anciennes du transcript.
+
+**Contrôles avant la promesse.** Seuil par appel, autorisation admin, quota,
+pause, cible active et prête doivent être évalués avant d'accepter un candidat.
+Quota/pause restent réglés dans le back-office ; une restriction doit être
+visible et interdire au personnage de promettre une opération impossible.
+La sélection libre après raccrochage ne dépend pas du consentement du personnage
+quitté ; distinguer ses statistiques d'un transfert direct validé.
+
+**Persistance et transport.** Garder les compare-and-swap et la revalidation au
+clic/décroché. Un seul clic consomme une offre ; double clic/retry ne crée pas
+un second transfert. L'échec avant commit garde la source ; après commit garde
+la cible et permet de relancer sa sortie audio. Les opérations sont bornées,
+annulables par demande/appel, et journalisées avec un résultat terminal.
+
+**Personnages extensibles.** Le registre et les profils déterminent les cibles.
+Le runtime actuel reste binaire (`RuntimeCharacter`, schémas Zod et certaines
+RPC) : ne pas annoncer « tous personnages supportés » grâce au seul registre.
+Le prochain lot doit isoler ces dépendances et prouver le contrat avec un
+registre fictif de trois personnages ; toute extension réelle DB/sécurité et
+l'activation d'Ava/Léo restent un lot futur distinct.
+
+### Raccrocher n'est plus terminer l'expérience
+
+Séparer les actions `closeCall` et `endExperience`. La première :
+
+- arrête micro, STT, TTS/avatar, vidéos et callbacks de l'appel quitté ;
+- conserve l'identifiant d'expérience, film, rôle/posture, version et mémoires
+  privées ; enregistre le motif et la durée de chaque appel ;
+- revient directement à la grille et ouvre un nouvel appel du personnage choisi,
+  avec un compteur d'échanges de cet appel remis à zéro ;
+- retrouve les souvenirs du personnage rappelé et utilise son accueil de retour,
+  sans rejouer le premier onboarding et sans réinitialiser toute la mémoire.
+
+La clôture définitive (timeout/fin explicite) reste distincte. Questionnaire
+éventuel uniquement dans un parcours de retour d'expérience explicite, hors
+raccrochage ordinaire. Ne pas simplement laisser une session ouverte sans règle
+d'expiration. La politique du timer entre appels est une question envoyée.
+Une migration éventuelle de suivi des appels passe seulement par Lovable Cloud,
+avec autorisation par session, RLS, reprise et compatibilité des anciens clients.
+
+### Lots proposés et portes de validation
+
+**F1 — Contrat, replay intégré et coordinateur.** Avant correctif, conserver un
+replay minimal de T15 avec audio terminé, GM accepté, nouvelle capture et profils
+retardés ; le test du contrat nouveau doit être rouge. Rejouer T17 pronominal et
+l'indépendance relation/transfert de T21. Définir les états, les compteurs par
+appel, l'identité de demande et les motifs terminaux. Intégrer le séquencement
+confirmation/offre ; mettre à jour les aides du back-office et retirer l'ancienne
+règle d'expiration au prochain message. Un même scénario doit expliquer le refus
+et vérifier la disponibilité de l'offre après correction. Ne pas qualifier T15
+de cause entièrement démontrée avant ce replay.
+
+**F2 — Cycle d'appels et retour grille.** Mettre en œuvre closeCall, rappel dans
+la même expérience, timer selon décision, souvenirs cloisonnés, métriques appel
+et fin d'expérience. S'appuyer sur les primitives de transfert ; ne pas copier
+handleAnswered et ses réinitialisations. Test : Max → raccrochage → grille →
+Emma → raccrochage → Max, avec même expérience et souvenirs Max retrouvés.
+
+**F3 — Validation réelle et publication distincte.** Recette sandbox Max → Emma
+→ Max, mains libres et PTT, conversations longues avec fragments et demandes
+pronominales. Puis acceptation humaine explicite, publication Lovable autorisée
+et vérification de l'interface réellement servie. La CI/preview ne vaut pas
+recette humaine ; le présent audit ne lance aucun de ces lots.
+
+Chaque lot de code passe ses tests ciblés, test:quality, E2E complets, PR avec CI
+verte sur HEAD exact puis main vert selon AGENTS. Une seule branche de lot,
+nettoyée après livraison ; PR #24 étrangère préservée. Livrer CHANGELOG/STORY,
+plan et prompt de reprise dans le même tour. Aucun autre hébergeur ni Supabase.
+
+### Contrat de tests qui empêchera une récidive
+
+- Avant 4 échanges complets dans l'appel : aucun transfert direct ; au 4e,
+  éligibilité selon règles admin. Dix fragments d'une prise de parole comptent
+  comme un seul échange. Après changement de personnage, compteur d'appel à zéro.
+- Accord sémantique Max → Emma et Emma → Max, réponse brève, pronoms et
+  demande différée ; refus/demande ambiguë restent distincts. Future cible
+  fictive de registre : même comportement, sans activer Ava.
+- Même scénario avec GM immédiat, 500 ms, 3,5 s, timeout ; profil et vidéo
+  lents/indisponibles ; échec relationnel indépendant ; erreur persistante de
+  stockage. **Chaque demande finit en offre utilisable ou erreur visible**.
+- « Merci », silence, nouveau sujet, retrait explicite, nouvelle cible,
+  rechargement et deux onglets : attentes conformes au cycle décidé, sans
+  autorisation périmée ni disparition silencieuse.
+- Reçu partiel/interrompu, audio en échec, raccrochage pendant GM/sonnerie,
+  double clic, cible désactivée après offre et commit concurrent : ni transfert
+  fantôme, ni double compteur, ni micro rouvert par un ancien callback.
+- Retour grille immédiat après raccrochage ; même expérience et timer selon
+  décision ; retour vers chaque personnage avec sa mémoire seule ; aucune
+  réouverture d'une expérience définitivement expirée ou terminée.
+- Replays déterministes indépendants des formulations exactes d'un fournisseur ;
+  sorties GM réalistes valides et malformées, pas uniquement les JSON idéaux.
+  Recette réelle complémentaire : aucun test simulé ne prétend prouver l'audio.
+
+La matrice de retards doit vérifier les deux sens, chaque résultat terminal et
+l'absence de fuite mémoire ; répéter des tests qui passent déjà sans nouvelles
+entrées n'est pas une preuve supplémentaire de fiabilité.
+
+### Vérifications effectivement réalisées dans cet audit
+
+- Harness Vitest temporaire sur les trois évaluations/réponses réelles, appelant
+  le validateur produit : T15 accepté ; assertions « accord délivré ⇒ autorisable »
+  rouges sur T17 (`assessment_missing`) et T21 (`gm_not_executed`). Commande
+  exécutée : `npx vitest run src/services/auditHandoffProductionTemporary.test.ts`,
+  1 vert / 2 rouges attendus, 1,16 s. Harness supprimé ; aucun transcript complet
+  enregistré dans le dépôt. Ce rejeu ne reproduit pas l'écran ni la course T15.
+- `npx vitest run src/services/characterHandoff.test.ts src/services/characterHandoffState.test.ts src/agents/gameMasterPRD4.handoff.test.ts src/services/experienceDirector.test.ts src/services/sessionHandoffResume.test.ts` : **176/176 verts**.
+- `npx playwright test tests/e2e/prd4-happy-path.spec.ts --project=chromium --workers=1 --grep 'lot 2 : un GM du tour précédent arrive après une nouvelle soumission sans ouvrir d’offre|lot 3 : Max, GM tardif ignoré puis nouvelle confirmation utilisable'` : **2/2 verts, 24,6 s**, sans retry. Les tests prouvent le comportement actuel de perte/reconfirmation ; ils ne démontrent pas la conformité au nouveau contrat.
+- Relecture SQL, chaîne de code et historique des plans ; aucun nouvel appel
+  LLM/TTS, aucune nouvelle session réelle, aucune écriture Cloud ni publication.
+- Lot livré exclusivement documentaire : dernière CI complète du code
+  [40298606848](https://github.com/memoways/ava-proto1/actions/runs/40298606848),
+  code `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec`. Les nouveaux replays rouges
+  ne sont pas une régression introduite par ce lot.
+
+[Prompt autonome F1](prompt_reprise_fiabilite_passage_personnages_lot_f1.md).
+
+---
+
 ## Suite de recette — 25 octobre 2026
 
 Proposition actuelle : [lot 3 de fiabilisation de la recette](plan_parole_incarnee_personnages.md#lot-3-proposé--réponse-sûre-et-transfert-fiable),

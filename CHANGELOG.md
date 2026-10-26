@@ -4,6 +4,25 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Audit passages — contrat à fiabiliser] — 2026-10-26
+
+- Base main `7e36e94476dc541c9f3f371b9a92d6b09ad8abd4` (#84).
+  Session prod de 15:04 identifiée : accord/GM valides T15 sans offre attestée,
+  preuve pronominale perdue T17, neutralisation relationnelle T21.
+  La course T15 est étayée, pas intégralement reproduite à la frontière UI.
+- Décisions Ulrich : même règle pour Max/Emma/futurs personnages, quatre échanges
+  complets par appel ; accord puis bouton/clic ; refus contournable par retour
+  grille, même expérience et souvenirs privés conservés. Ava/Léo restent fermés.
+- [Plan canonique](docs/plan_changement_interlocuteur_manuel.md) actualisé avec
+  diagnostic, limites, architecture et validation F1–F3 ;
+  [prompt F1](docs/prompt_reprise_fiabilite_passage_personnages_lot_f1.md) prêt.
+  176 tests existants et deux E2E verts ; harness réel 1 vert/2 rouges attendus,
+  supprimé après analyse. Aucune correction produit revendiquée.
+- Documentation seule : sources applicatives et workflows inchangés, dernière
+  [CI complète du code verte](https://github.com/memoways/ava-proto1/actions/runs/40298606848)
+  sur `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec`. Aucun réglage Cloud,
+  aucune session réelle créée et aucune publication ; F1 non lancé.
+
 ## [A4R — copies E0 vérifiées, écoute restante] — 2026-10-26
 
 - Base de reprise #83, main `5b9a5c107c2f2c103ad310afcdcde78220ccf73d`.
