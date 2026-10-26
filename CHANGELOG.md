@@ -10,6 +10,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   Coordinateur de demande/appel, cible pronominale conservée, offre maintenue
   après continuation et révocation explicite. Révision CAS renouvelée pour
   protéger le transcript, revalidations clic/décroché et verrou double clic conservés.
+- Recommandations GM sans accord : guidance du tour suivant préservée sous les gardes, sans offre anticipée ; non-régression refus/accord verrouillée.
 - Même GM : analyse du candidat non encore parlé, préparation persistée avant
   confirmation, offre disponible après reçu complet. Catalogue vidéo retiré de
   ce chemin, relation invalide séparée du transfert, erreurs/réessais visibles.

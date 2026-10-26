@@ -1,4 +1,4 @@
-import { HandoffCoordinator, prepareCharacterHandoff, finalizeCharacterHandoff, needsHandoffPreparation, HANDOFF_DEPENDENCY_TIMEOUT_MS } from '@/services/handoffCoordinator';
+import { HandoffCoordinator, prepareCharacterHandoff, finalizeCharacterHandoff, completedCallExchanges, needsHandoffPreparation, HANDOFF_DEPENDENCY_TIMEOUT_MS } from '@/services/handoffCoordinator';
 import { createVoiceTurnV2, handleVoiceInputError, type ServiceObservation, type VoiceObserver } from "@/services/voiceTurnTelemetryV2";
 import { renderWithVideoLatency, splitOutputLatency } from "@/services/streamingAvatar/latency";
 import type { VideoLatencyObservation } from "@/services/streamingAvatar/types";
@@ -1853,18 +1853,26 @@ const IndexPRD4 = () => {
           if (!isCurrentTurn()) return;
           const settings = videoTriggerSettingsRef.current;
           const directorConfig = ev.orchestration_config;
-          // Handoffs are coordinated above; this branch owns ordinary next-turn/cinematic effects only.
-          const currentAction = ev.action?.type === 'handoff' ? { type: 'none' as const } : ev.action ?? { type: 'none' as const };
+          // Offer creation is owned above. Unconfirmed GM recommendations still guide the next turn.
+          const coordinatedHandoff = Boolean(preparedState || turnHandoffState?.state === 'available');
+          const currentAction = coordinatedHandoff && ev.action?.type === 'handoff'
+            ? { type: 'none' as const } : ev.action ?? { type: 'none' as const };
           const decision: ExperienceDirectorDecisionV1 = applyTopicHandoffFallback({
             labels: gmExecuted ? ev.labels ?? { themes: [], topics: [], intentions: [] } : { themes: [], topics: [], intentions: [] },
             nextTurnGuidance: gmExecuted ? ev.next_turn_guidance || null : null,
             memoryDelta: gmExecuted ? ev.memory_delta ?? null : null,
             action: gmExecuted ? currentAction : { type: 'none' },
-          }, gmExecuted ? directorConfig : null, activeCharacterRef.current);
+          }, gmExecuted && !coordinatedHandoff ? directorConfig : null, activeCharacterRef.current);
+          const proposalTarget = decision.action.type === 'handoff' ? decision.action.targetCharacter : null;
+          const proposalProfile = proposalTarget
+            ? await withTimeout('handoff_recommendation', getCharacterRuntimeReadiness(proposalTarget), HANDOFF_DEPENDENCY_TIMEOUT_MS).catch(() => null)
+            : null;
+          if (!isCurrentTurn()) return;
           const guarded = validateDirectorDecision(decision, {
             configPublished: Boolean(ev.orchestration_version_id && directorConfig),
             currentCharacter: activeCharacterRef.current,
             userTurn: turnIndex,
+            completedExchanges: completedCallExchanges(conversationRef.current, turnCharacter),
             handoffCount: handoffCountRef.current,
             handoffPending: Boolean(handoffOfferRef.current),
             lastHandoffTurn: lastHandoffUserTurn(conversationRef.current),
@@ -1872,7 +1880,8 @@ const IndexPRD4 = () => {
             minimumHandoffTurn: directorConfig?.minimumHandoffTurn ?? 4,
             maximumHandoffsPerSession: directorConfig?.maximumHandoffsPerSession ?? 1,
             minimumTurnsBetweenHandoffs: directorConfig?.minimumTurnsBetweenHandoffs ?? 2,
-            targetReady: false,
+            targetReady: proposalProfile?.enabled === true && proposalProfile.ready === true
+              && Boolean(proposalTarget && directorConfig?.activeCharacters.includes(proposalTarget)),
             playedVideoIds: triggeredVideoIdsRef.current,
             availableVideoIds: videos.filter((video) => Boolean(video.video_url)).map((video) => video.id),
             lastVideoTurn: Number.isFinite(lastVideoTurnRef.current) ? lastVideoTurnRef.current : null,
@@ -1897,7 +1906,10 @@ const IndexPRD4 = () => {
             });
           }
 
-          if (guarded.action.type === "cinematic") {
+          if (guarded.action.type === 'handoff') {
+            // Guidance is a proposal to the character, never permission or a UI offer.
+            pendingGmGuidanceRef.current = guarded.action.proposalGuidance;
+          } else if (guarded.action.type === "cinematic") {
             const cinematic = guarded.action;
             const video = videos.find((candidate) => candidate.id === cinematic.videoId && candidate.video_url) ?? null;
             if (video) {

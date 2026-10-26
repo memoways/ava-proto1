@@ -964,6 +964,7 @@ for (const consent of [false, true]) {
     await sendHandoffTurn(page, turns[4]);
     await page.waitForLoadState("networkidle");
     await expect(page.getByRole("button", { name: /^Appeler / })).toHaveCount(consent ? 1 : 0);
+    expect(fakes.getCharacterCalls()[4]).toContain("Propose le transfert si tu es d'accord.");
     if (consent) {
       await page.getByRole("button", { name: "Rester avec Emma", exact: true }).click();
       await expect(page.getByRole("button", { name: /^Appeler / })).toHaveCount(0);
