@@ -21,7 +21,7 @@ export function getConfiguredTTSServiceInfo(providerId?: import("./tts/types").T
       return {
         serviceProvider: "Fish Audio",
         serviceName: "fish",
-        model: "octave",
+        model: settings.model,
         mode: settings.format,
       };
     }
