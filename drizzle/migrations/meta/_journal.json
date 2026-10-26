@@ -71,6 +71,13 @@
       "when": 1793029126313,
       "tag": "0009_replace_hume_with_fish_rate_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793035593301,
+      "tag": "0010_seed_sandbox_from_prod",
+      "breakpoints": true
     }
   ]
 }
