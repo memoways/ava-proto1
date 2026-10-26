@@ -1,5 +1,25 @@
 ## F2 — cycle des appels — 26 octobre 2026
 
+**F2 livré techniquement : CI PR et main vertes, E2E compris ; Lovable synchronisé et prêt.** [PR #90](https://github.com/memoways/ava-proto1/pull/90),
+main code `d59d51055222d46508e598cedcfb00886412e524`. [CI PR verte](https://github.com/memoways/ava-proto1/actions/runs/40382029766)
+sur HEAD exact `146f2f66a7bd2ffa16d3371e183d3ee1d8b4d274`, qualité complète et 99/99 E2E
+sans retry (19,3 min). [CI main du commit de fusion](https://github.com/memoways/ava-proto1/actions/runs/40385670472)
+verte sur ce SHA exact : 98 E2E sans retry et T11 vert au retry (18,7 min).
+Son assertion immédiate interroge le journal `handoff_validated` avant l’arrivée
+asynchrone de l’événement, alors que le bouton est déjà visible ; même cas
+historique qu’en F1, aucune absence d’offre produit attestée. E2E locaux finaux :
+99/99 sans retry (17 min), même commit de code.
+
+Lovable natif Ava/Memoways : SHA `d59d51055222d46508e598cedcfb00886412e524`, ready,
+agentFinished=true ; `src/services/callCycle.ts` relu à ce ref et comparé intégralement
+au fichier local : identique (SHA-256 `bcceb68a53a06a3727baf077878bdb8d0495c4ba8295e9b101c77fec75a3dd52`).
+Aucune opération Cloud additionnelle requise, aucune migration/Edge ni publication.
+La branche de code F2 locale/distante a été supprimée après fusion ; même nom réutilisé
+uniquement pour cette clôture documentaire. PR #24 et seize branches locales
+historiques conservées. Le SHA final documentaire sera vérifié dans GitHub/Notion.
+[Prompt F3 autonome](prompt_reprise_fiabilite_passage_personnages_lot_f3.md), préparé
+sans lancer F3 ; recette humaine et autorisation de publication restent distinctes.
+
 Base vérifiée `debea012d115110fb7fd308fa00901e9a5099792`, checkout canonique propre,
 une branche `codex/ava-call-cycle-f2`, un agent. PR #24 et branches historiques préservées.
 Notion natif get-self Gamilab `7e1a9a09-09cb-4deb-a306-83a29b831bc2`, tâche/application
@@ -83,13 +103,17 @@ existantes réutilisées, pas de dépendance. Références vérifiées :
   installée après le timer natif ; installé avant navigation, il passe. Pas de
   délai produit modifié pour satisfaire cette simulation.
 - Qualité locale complète verte : 67 régressions, 1 037 unitaires, 41 intégrations,
-  lint (0 erreur, avertissement historique), typage et build. E2E complets et CI
-  de livraison en cours : ne pas confondre les succès ciblés avec cette porte.
+  lint (0 erreur, avertissement historique), typage et build. Passe complète sur
+  code figé : 99/99 E2E locaux sans retry ; CI PR complète verte sur le HEAD exact,
+  99/99 E2E sans retry. CI main verte : 98 sans retry + T11 vert au retry sur
+  son assertion de journal asynchrone (bouton déjà visible), distingué ci-dessus.
 - Cloud inspecté par Lovable Ava uniquement : JSONB et RLS existants suffisent.
   Aucune migration, Edge, secret, flag, réglage de production ou publication.
   Le scénario transfert F1 → grille → rappel du même acteur vérifie aussi que
   les promesses CAS terminées ne remplacent pas le snapshot du nouvel appel.
-  La synchronisation finale Lovable et les SHA/CI restent à compléter après fusion.
+  Lovable synchronisé et prêt sur le SHA de fusion, source du cycle comparée
+  identique. CI main verte vérifiée sur le SHA de fusion ; clôture documentaire
+  seule ensuite, avec exception CI Markdown et référence à cette dernière CI code.
 
 
 ---
