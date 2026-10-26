@@ -2,7 +2,11 @@
 
 ## Direction après écoute — 25 octobre 2026
 
-**Direction éditoriale conservée ; corrections app A1 vérifiées localement, livraison exacte dans le bilan de sa PR.** Ulrich confirme
+**État actualisé le 26 octobre : direction éditoriale conservée ; app A1–A4
+livrée dans main, intégration E0 et recette humaine non achevées.** Le bilan
+exact A4 et le prérequis Notion sont dans le
+[plan opérationnel](plan_lot_b_rendu_vocal.md#exécution-a4--26-octobre-2026) et le
+[prompt A4R](prompt_reprise_integration_recette_lot_a4r.md). Ulrich confirme
 que le passage entre personnages fonctionne à nouveau, mais refuse le jeu trop
 lisse et détaché. Le lot 3 est livré par [#76](https://github.com/memoways/ava-proto1/pull/76),
 main `147cdfff893555ede4f903158c5506dcf586e116`. Ce retour valide le passage
@@ -22,6 +26,13 @@ personnages. L'exécution app commence par le
 ce plan et laisse l'édition/synchronisation à Ulrich pendant son travail.
 
 ### Accueils A4 — 26 octobre 2026
+
+Livraison vérifiée : [#81](https://github.com/memoways/ava-proto1/pull/81),
+main `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec`, CI PR/main vertes et E2E
+compris ; Lovable au même SHA, prêt. Après le redémarrage d'Ulrich, le MCP exposé
+confirme toujours son workspace personnel et les deux connexions natives ne
+chargent aucun outil (`notLoggedIn`). Aucune source Ava n'a été consultée par
+cette connexion personnelle ; capitalisation Gamilab non effectuée.
 
 Le répertoire app approuvé reste lié à la phrase de référence du profil et à
 sandbox-ulrich ; chaque appel fixe son texte,
@@ -66,9 +77,10 @@ expérimentales et les auditions sont réservées sandbox. Le blocage de
 coordination est résolu, sans rétablir une fermeture générale du rendu par état.
 
 [Résultat, validations et réserves A3](plan_lot_b_rendu_vocal.md#exécution-a3--25-octobre-2026).
-Le prochain lot suit le [prompt A4](prompt_reprise_accueils_integration_lot_a4.md),
-préparé dans le même tour sans le lancer. Les accueils et la recette après
-intégration éditoriale restent à faire, publication production distincte.
+À la clôture A3, le prochain lot suivait le [prompt A4](prompt_reprise_accueils_integration_lot_a4.md).
+Les accueils sont maintenant livrés ; la suite courante est
+[A4R](prompt_reprise_integration_recette_lot_a4r.md), pour l'intégration
+éditoriale et la recette humaine. Publication production distincte.
 
 ### Correction technique A2 — 25 octobre 2026
 

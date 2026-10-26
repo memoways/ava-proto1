@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Clôture documentaire A4 et reprise A4R] — 2026-10-26
+
+- Livraison A4 vérifiée par lecture GitHub : [#81 fusionnée](https://github.com/memoways/ava-proto1/pull/81),
+  main `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec` ;
+  [CI PR verte sur le HEAD exact](https://github.com/memoways/ava-proto1/actions/runs/40296314456)
+  et [CI main verte sur la fusion](https://github.com/memoways/ava-proto1/actions/runs/40298606848),
+  qualité et E2E compris. Lovable relu au même SHA, prêt, agent terminé.
+- CHANGELOG, STORY, les deux plans et le [prompt A4R](docs/prompt_reprise_integration_recette_lot_a4r.md)
+  actualisés : la technique A4 est livrée, E0 et la recette humaine restent ouverts.
+  Aucun audio réel, gain acoustique ou publication production revendiqué.
+- Après redémarrage, le connecteur Notion exposé confirme le workspace Ulrich ;
+  le contrôle natif retourne `notLoggedIn` et zéro outil pour les deux connexions
+  configurées. Gamilab, l'intégration E0 et la capitalisation projet restent
+  indisponibles. La reprise conserve ce prérequis sans relancer OAuth.
+- Correction exclusivement documentaire, code applicatif et workflow inchangés ;
+  exception CI documentaire appliquée et dernière CI du code citée ci-dessus.
+  Branche A4 supprimée ; PR #24 et 16 branches locales étrangères préservées.
+
 ## [A4 — accueils choisis et lecture protégée] — 2026-10-26
 
 - Répertoire app initial lié à la référence du profil et à sandbox-ulrich, sélection stable par appel,
@@ -21,9 +39,10 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   [CI main verte](https://github.com/memoways/ava-proto1/actions/runs/40279854111).
   [Plan A4, preuves et limites](docs/plan_lot_b_rendu_vocal.md#exécution-a4--26-octobre-2026).
   Qualité locale verte : 66 régressions, 1 019 unitaires, 41 intégrations,
-  lint/types/build ; premier passage de 81 E2E sans retry (12,8 min), puis
-  revalidation du format compatible et résultat final dans le bilan. SHA de fusion et CI exactes
-  dans le bilan GitHub de livraison A4.
+  lint/types/build ; **81 E2E finaux sans retry (12,9 min)** après correction du
+  format compatible. Fusion A4 `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec` ;
+  CI exactes et [bilan de livraison](https://github.com/memoways/ava-proto1/pull/81#issuecomment-6412874906)
+  relus dans la clôture documentaire ci-dessus.
 - CI de livraison : miroir APT officiel Ubuntu pour éviter les téléchargements
   Azure ralentis, mêmes contrôles et trois navigateurs ; concurrence, cache Node 22
   et exception documentaire. Délai 20 min et artefacts échec/7 jours conservés.

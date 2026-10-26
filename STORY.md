@@ -3,11 +3,18 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-26 (A4 accueils sandbox approuvés ; intégration E0 et recette humaine restantes)
+> **Last Updated**: 2026-10-26 (A4 technique livrée et vérifiée ; Gamilab, E0 et recette humaine restants)
 
 ---
 
 ## A4 — décrocher une seule fois (26 octobre 2026)
+
+La livraison technique est désormais vérifiée : [#81](https://github.com/memoways/ava-proto1/pull/81)
+est fusionnée dans main `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec`, avec
+CI verte sur le HEAD exact puis sur la fusion, qualité et E2E compris. Lovable
+annonce encore ce même SHA après redémarrage, prêt et agent terminé. Cela rend
+les accueils disponibles dans la preview ; aucune publication production n'a
+été effectuée par ce lot.
 
 Le premier accueil venait d'un unique texte de profil. Les transferts savaient
 déjà distinguer premier contact et retour ; l'app ajoute un petit répertoire
@@ -22,8 +29,13 @@ tous les paramètres correspondent ; le streaming Gradium garde son propre chemi
 L'accueil commencé puis interrompu reste incertain, sans inventer les mots entendus.
 
 Les tests simulés et l'approbation des textes restent distincts de l'écoute au
-casque. E0 attend ses éditions approuvées et le connecteur natif Gamilab ; les
-textes de production sont conservés. [Plan et état A4](docs/plan_lot_b_rendu_vocal.md#exécution-a4--26-octobre-2026)
+casque. E0 attend la comparaison des éditions réellement approuvées et le
+connecteur natif Gamilab. Le redémarrage n'a pas rétabli cet accès : le connecteur
+exposé identifie Ulrich, tandis que les deux connexions du client natif échouent
+à s'authentifier et ne chargent aucun outil. Leur configuration persistante ne
+prouve pas leur disponibilité. Aucune lecture ou capitalisation Gamilab, sync
+éditoriale ou recette audio n'a été effectuée. Les textes de production sont
+conservés. [Plan et état A4](docs/plan_lot_b_rendu_vocal.md#exécution-a4--26-octobre-2026)
 et [reprise A4R](docs/prompt_reprise_integration_recette_lot_a4r.md) enregistrés.
 
 ## A3 — entendre ce que le réglage promet (25 octobre 2026)
@@ -44,7 +56,8 @@ Les simulations vérifient ces contrats ; aucune audition réelle ni améliorati
 acoustique n’est revendiquée. La recette au casque et les sources éditoriales
 Gamilab restent ouvertes. [Bilan A3](docs/plan_lot_b_rendu_vocal.md#exécution-a3--25-octobre-2026)
 et [prompt A4](docs/prompt_reprise_accueils_integration_lot_a4.md) conservés ; le lot
-des accueils n’est pas lancé, la production n’est pas publiée.
+des accueils n'était pas lancé à la clôture A3 ; sa livraison A4 est relatée
+ci-dessus. A3 n'a effectué aucune publication production.
 
 Le main Lovable ayant levé les gardes production pendant les vérifications,
 Ulrich a choisi de garder le rendu par état en production et de réserver les
