@@ -18,7 +18,9 @@ La demande suivante d'Ulrich sépare désormais l'exécution en une
 [tâche éditoriale Notion prête à enregistrer](tache_notion_parole_incarnee_personnages.md)
 et [quatre lots app A1–A4](plan_lot_b_rendu_vocal.md#exécution-coordonnée-notion--app--25-octobre-2026).
 Leur mécanique, dépendances, validations et retours arrière sont dans ce second
-plan opérationnel. La création de la tâche dans Gamilab reste non effectuée.
+plan opérationnel. La proposition E0 n'a pas été créée comme nouvelle tâche ;
+la [tâche éditoriale existante](https://app.notion.com/p/f3944bc8e9ce48138f2b309db223035d)
+est maintenant accessible par Gamilab natif et doit être réutilisée après comparaison.
 
 Après redémarrage, Ulrich confirme qu'il travaille dans Notion sur les champs
 personnages. L'exécution app commence par le
@@ -29,10 +31,10 @@ ce plan et laisse l'édition/synchronisation à Ulrich pendant son travail.
 
 Livraison vérifiée : [#81](https://github.com/memoways/ava-proto1/pull/81),
 main `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec`, CI PR/main vertes et E2E
-compris ; Lovable au même SHA, prêt. Après le redémarrage d'Ulrich, le MCP exposé
-confirme toujours son workspace personnel et les deux connexions natives ne
-chargent aucun outil (`notLoggedIn`). Aucune source Ava n'a été consultée par
-cette connexion personnelle ; capitalisation Gamilab non effectuée.
+compris ; Lovable au même SHA, prêt. La reconnexion Gamilab ultérieure à #82
+a réussi : ID `7e1a9a09-09cb-4deb-a306-83a29b831bc2` confirmé par `get-self`,
+Max/Emma et tâche existante lus nativement, 66 outils sur deux démarrages.
+La source personnelle n'a pas été utilisée pour les données Ava.
 
 Le répertoire app approuvé reste lié à la phrase de référence du profil et à
 sandbox-ulrich ; chaque appel fixe son texte,
@@ -48,8 +50,8 @@ pour sandbox-ulrich dans le chat du 26 octobre. Le
 restent dans le plan opérationnel. Les deux phrases de référence Cloud ont été
 sauvegardées et relues le 26 octobre à 08:41:44 UTC, une seule par profil pour
 préserver les clients publiés ; les autres champs et les profils prod sont conservés.
-Ce choix app ne valide aucune proposition E0. Le connecteur Notion exposé
-cible Ulrich, pas Gamilab ; aucune lecture ciblée ni sync éditoriale effectuée.
+Ce choix app ne valide aucune proposition E0. Gamilab est désormais lisible ;
+la comparaison et toute éventuelle sync des éditions approuvées restent à faire.
 Recette au casque, intégration E0 et publication production restent distinctes.
 
 ### Correction technique A3 — 25 octobre 2026

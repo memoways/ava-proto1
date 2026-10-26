@@ -14,8 +14,10 @@ sa mémoire personnelle et ne valide pas l'accès aux sources Ava.
   Emma active : `3f762322-e595-81f9-880f-e309adec7075`.
 - Utiliser une connexion MCP native Notion ciblant Gamilab pour les lectures,
   recherches et écritures des sources projet. Vérifier sa cible avant d'agir ;
-  consigner l'ID de Gamilab lorsqu'il sera fourni par le connecteur, sans le
-  déduire d'un ID de page ou de base.
+  l'ID confirmé par `get-self` le 26 octobre 2026 est
+  **`7e1a9a09-09cb-4deb-a306-83a29b831bc2`**. La connexion native
+  `notion_gamilab` est rétablie ; Max et Emma ont été lus par ce connecteur.
+  Comparer l'ID retourné à cette référence, sans le déduire d'une page ou base.
 - Si la connexion exposée annonce Ulrich, identifier un mauvais routage pour
   Ava. Un NOT_FOUND obtenu dans ce contexte ne prouve ni une expiration du
   connecteur, ni un défaut de partage des pages, ni un retard de synchronisation.

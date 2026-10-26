@@ -1,12 +1,15 @@
-# Tâche à créer dans Notion — Ava : parole sous le choc
+# Proposition E0 à comparer dans Notion — Ava : parole sous le choc
 
-Préparée le 25 octobre 2026. **NON CRÉÉE dans Notion.** Cible explicitement
-demandée : workspace Gamilab, base
+Préparée le 25 octobre 2026 ; état revérifié le 26 octobre. **Aucune nouvelle
+tâche créée par l'agent.** La tâche existante
+[Rendre les dialogues de tous les personnages moins écrits et moins lisses](https://app.notion.com/p/f3944bc8e9ce48138f2b309db223035d)
+a été retrouvée et lue par MCP natif Gamilab, dans la base demandée :
 [a789687e3d57461696f134af9b766f28](https://app.notion.com/p/gamilab-prov/a789687e3d57461696f134af9b766f28?v=23a0333beea1467eae928b7470b67fef).
-Le schéma, les tâches existantes et les propriétés ne sont pas encore lisibles
-depuis le MCP de cette session. Ne pas inventer de statut, relation, responsable
-ou échéance. Après accès natif : vérifier Gamilab, lire la base, rechercher un
-doublon, créer ou enrichir la tâche puis relire l'écriture et conserver son URL.
+Gamilab est confirmé par `get-self`, workspace
+`7e1a9a09-09cb-4deb-a306-83a29b831bc2` ; les deux fiches actives sont lisibles.
+Comparer cette proposition aux sections et arbitrages de la tâche existante
+avant tout enrichissement. Conserver son statut et ses relations ; aucune
+approbation E0 ou sync Cloud n'est déduite de ce seul accès. Éviter le doublon.
 
 Le texte ci-dessous est autonome et destiné au corps de la tâche.
 
@@ -36,8 +39,8 @@ une seconde définition du jeu des personnages.
   conservées dans le dépôt ava-proto1, docs/plan_parole_incarnee_personnages.md.
 
 Relire les propriétés actuelles avant de proposer un diff. Les copies Cloud
-ont été analysées ; aucune lecture directe récente des sources Gamilab n'est
-revendiquée à ce stade. Les fiches possèdent déjà une manière de parler et cinq
+ont été analysées ; les deux sources Gamilab ont maintenant été lues nativement,
+sans modification. Les fiches possèdent déjà une manière de parler et cinq
 états propres : compléter et affiner ces champs plutôt que tout réécrire.
 
 ## Direction validée par Ulrich

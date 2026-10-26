@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-26 (A4 technique livrée et vérifiée ; Gamilab, E0 et recette humaine restants)
+> **Last Updated**: 2026-10-26 (A4 technique livrée ; Gamilab natif reconnecté et vérifié ; E0 et recette humaine restants)
 
 ---
 
@@ -29,13 +29,14 @@ tous les paramètres correspondent ; le streaming Gradium garde son propre chemi
 L'accueil commencé puis interrompu reste incertain, sans inventer les mots entendus.
 
 Les tests simulés et l'approbation des textes restent distincts de l'écoute au
-casque. E0 attend la comparaison des éditions réellement approuvées et le
-connecteur natif Gamilab. Le redémarrage n'a pas rétabli cet accès : le connecteur
-exposé identifie Ulrich, tandis que les deux connexions du client natif échouent
-à s'authentifier et ne chargent aucun outil. Leur configuration persistante ne
-prouve pas leur disponibilité. Aucune lecture ou capitalisation Gamilab, sync
-éditoriale ou recette audio n'a été effectuée. Les textes de production sont
-conservés. [Plan et état A4](docs/plan_lot_b_rendu_vocal.md#exécution-a4--26-octobre-2026)
+casque. La reconnexion Gamilab a finalement réussi avec le CLI stable : le
+connecteur natif confirme le bon workspace, lit Max et Emma et conserve ses
+66 outils sur deux démarrages indépendants. Le redémarrage seul n'avait pas
+suffi. La tâche éditoriale existante a également été retrouvée ; E0 demande
+encore de comparer les éditions réellement approuvées avant toute intégration.
+Aucune fiche n'a été modifiée, aucune sync éditoriale ou recette audio effectuée.
+Les textes de production sont conservés.
+[Plan et état A4](docs/plan_lot_b_rendu_vocal.md#exécution-a4--26-octobre-2026)
 et [reprise A4R](docs/prompt_reprise_integration_recette_lot_a4r.md) enregistrés.
 
 ## A3 — entendre ce que le réglage promet (25 octobre 2026)

@@ -9,6 +9,9 @@ main `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec` par
 E2E compris. Lovable annonce le même SHA, `ready`, agent terminé ; la preview
 connectée a été vérifiée à la livraison. Aucune publication production par A4 ;
 pauses expérimentales désactivées. Voir le bilan exact ci-dessous.
+**Accès Gamilab rétabli et vérifié le 26 octobre :** workspace natif
+`7e1a9a09-09cb-4deb-a306-83a29b831bc2`, fiches Max/Emma lisibles,
+66 outils sur deux démarrages indépendants. E0 et recette humaine restent ouverts.
 La reprise restante est le [prompt autonome A4R](prompt_reprise_integration_recette_lot_a4r.md),
 qui ne lance pas l’intégration E0 ni la recette humaine. Cette section est le plan
 opérationnel courant ; elle remplace les découpages historiques ci-dessous.
@@ -27,9 +30,11 @@ Le [plan de direction](plan_parole_incarnee_personnages.md#direction-après-éco
 porte les choix de jeu validés. Le [contenu de la tâche éditoriale](tache_notion_parole_incarnee_personnages.md)
 est prêt pour la base Gamilab explicitement demandée :
 [a789687e3d57461696f134af9b766f28](https://app.notion.com/p/gamilab-prov/a789687e3d57461696f134af9b766f28?v=23a0333beea1467eae928b7470b67fef).
-**La tâche n'est pas créée** : lecture du schéma et écriture bloquées par le
-démarrage OAuth du MCP natif dans la session, malgré la connexion enregistrée.
-Ne pas substituer le workspace personnel Ulrich ni créer une tâche ailleurs.
+La proposition E0 locale n'a pas été créée comme nouvelle tâche par l'agent.
+L'accès natif rétabli a permis de retrouver la tâche existante
+[Rendre les dialogues de tous les personnages moins écrits et moins lisses](https://app.notion.com/p/f3944bc8e9ce48138f2b309db223035d),
+dans cette base. La relire et comparer la proposition E0 avant tout ajout ;
+ne pas créer de doublon ou substituer le workspace personnel Ulrich.
 
 ### Mécanique retenue : deux sources, un corpus, une intégration à la fois
 
@@ -338,6 +343,20 @@ sans changer automatiquement le fournisseur de jeu.
 
 #### Exécution A4 — 26 octobre 2026
 
+**Mise à jour Gamilab après #82 :** renouvellement officiel réussi avec le CLI
+stable 0.164.0. `notion_gamilab` est chargé dans ce chat ; `get-self` confirme
+Gamilab `7e1a9a09-09cb-4deb-a306-83a29b831bc2`. Les fiches Max et Emma et la
+tâche éditoriale existante ont été lues. Deux démarrages natifs indépendants
+(client intégré puis CLI stable) conservent OAuth et 66 outils. Le blocage
+d'accès ci-dessous est historique et levé pour Gamilab. La connexion native
+Ulrich reste `notLoggedIn` ; son plugin séparé reste exploitable. Aucune
+restauration globale de tous les workspaces n'est revendiquée.
+
+Le routage vérifié est consigné dans AGENTS et la fiche projet Notion existante.
+Aucune édition de personnage, intégration E0, sync Cloud ou recette humaine
+effectuée par cette reconnexion. Reprendre A4R directement par les sources
+actuelles et la tâche existante, sans nouvelle autorisation Gamilab.
+
 **Clôture technique relue le 26 octobre 2026 :**
 
 - [PR #81 fusionnée](https://github.com/memoways/ava-proto1/pull/81), main
@@ -368,8 +387,8 @@ sans changer automatiquement le fournisseur de jeu.
   sont conservées. La présente correction est documentaire : aucun code,
   réglage Cloud ou contenu de personnage modifié ; CI lourde non relancée.
 
-**Reste :** accès natif Gamilab et capitalisation projet, comparaison des éditions
-E0 effectivement approuvées puis intégration ciblée si nécessaire, recette au
+**Reste :** comparaison des éditions E0 effectivement approuvées puis intégration
+ciblée si nécessaire, complément de capitalisation des lots vocaux, recette au
 casque avec Ulrich et décision distincte sur une publication production.
 Les accueils app approuvés ne valent ni approbation E0 ni acceptation acoustique.
 Le [prompt A4R](prompt_reprise_integration_recette_lot_a4r.md) est actualisé ;
@@ -506,8 +525,8 @@ recette acceptée ou écarts précisément nommés ; publication production dist
 
 ### Ordre de lancement et contrat de livraison
 
-1. Créer/vérifier E0 dans la base Gamilab dès que le MCP natif est exploitable.
-   Utiliser le corps prêt et conserver l'URL dans ce plan ; ne pas la fabriquer.
+1. Vérifier E0 dans la tâche Gamilab existante désormais accessible, comparer
+   le corps préparé et enrichir seulement les éléments validés sans doublon.
 2. Calibrer les huit cas avec la direction déjà validée. Notion peut travailler
    les champs pendant qu'A1 est traité sur les versions actuelles.
 3. Implémenter et livrer A1, puis A2, A3, A4 séquentiellement. Pour chaque lot :
