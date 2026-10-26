@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Passages — démarrage F1 et continuité entre lots] — 2026-10-26
+
+- Base main `885e38987ad299be120fcb8746e47fb652a69ae2` (#86). Plan canonique
+  et reprise F1 renforcés à la demande d'Ulrich : connexion Notion vérifiée à
+  chaque lot, commit/push/PR/squash/main et CI, synchronisation Lovable, action
+  Cloud explicite si nécessaire, puis prochain prompt livré dans le chat et
+  dans le dépôt. Aucun nouveau lot lancé automatiquement.
+- Notion natif Gamilab et sources relus ; Lovable au même SHA, prêt. Dernière
+  [CI complète du code verte](https://github.com/memoways/ava-proto1/actions/runs/40351585507)
+  vérifiée sur `d38e7f5fd6d6487f5c767ea4fdbf2565397aea91`.
+- Lot documentaire seul, liens/contenu/diff vérifiés ; exception CI appliquée.
+  Aucun correctif de passage, réglage Cloud ou publication production effectué.
+  [Premier prompt F1](docs/prompt_reprise_fiabilite_passage_personnages_lot_f1.md).
+
 ## [Passages — bouton persistant et timer suspendu confirmés] — 2026-10-26
 
 - Depuis main `d38e7f5fd6d6487f5c767ea4fdbf2565397aea91`, décisions explicites
