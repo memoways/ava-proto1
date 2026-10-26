@@ -4,7 +4,7 @@ import {
   applyElevenLabsPerformance,
   applyGradiumPerformance,
   applyInworldPerformance,
-  composeFish AudioDescription,
+  applyFishPerformance,
   derivePerformanceIntent,
   intentFromManualEmotion,
   PROVIDER_ACTING_SUPPORT,
@@ -88,11 +88,11 @@ describe("derivePerformanceIntent", () => {
 describe("provider adapters", () => {
   const angry = intentFromManualEmotion("angry", 2);
 
-  it("composes Fish Audio description from admin baseline + per-turn acting", () => {
-    expect(composeFish AudioDescription("voix grave, posée", angry)).toMatch(/voix grave/);
-    expect(composeFish AudioDescription("voix grave, posée", angry)).toMatch(/angry/);
-    expect(composeFish AudioDescription("", angry)?.length).toBeLessThanOrEqual(100);
-    expect(composeFish AudioDescription("", null)).toBeUndefined();
+  it("injects the Fish emotion tag from the turn state and strips LLM tags", () => {
+    const base = { speed: 1, emotionTags: true, defaultEmotion: "" };
+    expect(applyFishPerformance(base, "(happy) Va-t'en.", angry).text).toBe("(angry) Va-t'en.");
+    expect(applyFishPerformance({ ...base, emotionTags: false }, "(happy) Va-t'en.", angry).text).toBe("Va-t'en.");
+    expect(applyFishPerformance(base, "Bonjour.", null).text).toBe("Bonjour.");
   });
 
   it("raises ElevenLabs style and prepends v3 tags only on eleven_v3", () => {
