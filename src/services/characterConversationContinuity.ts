@@ -106,3 +106,11 @@ export function canRetryCharacterResponse(error: unknown): boolean {
   if (/identity|identit|Structured data|Fiche personnage|context|\b(?:400|401|403|404)\b/i.test(message)) return false;
   return /LLM|fetch|network|timeout|timed out|Missing response|Invalid response|Incomplete response|Empty response|Response intent/i.test(message);
 }
+
+/** Direct grid calls never invent a transfer by the previous character. */
+export function characterRecallGreeting(character: RuntimeCharacter, history: ConversationMessage[], openingLine: string | null): string {
+  if (!hasSpokenWithCharacter(history, character)) return initialGreetingLines(character, openingLine)[0];
+  return unusedLine(character === 'max'
+    ? ['Oui, c’est de nouveau Max. Je vous écoute.', 'Me revoilà. Nous en étions où ?']
+    : ['Oui… c’est de nouveau Emma. Je vous écoute.', 'Me revoilà… On peut reprendre.'], character, history);
+}

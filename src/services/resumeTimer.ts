@@ -24,6 +24,6 @@ export function resolveResumeTimerWindow(
   return {
     configuredDurationSeconds,
     elapsedSeconds: Math.min(configuredDurationSeconds, elapsedSeconds),
-    remainingSeconds: Math.max(1, configuredDurationSeconds - elapsedSeconds),
+    remainingSeconds: Math.max(0, configuredDurationSeconds - elapsedSeconds),
   };
 }

@@ -3,9 +3,26 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-26 (F1 livré, CI PR/main et Lovable vérifiés ; F2 non lancé)
+> **Last Updated**: 2026-10-26 (F2 réalisé localement, livraison en cours ; F3 non lancé)
 
 ---
+
+## F2 — pouvoir raccrocher et reprendre (26 octobre 2026)
+
+L’appel possède maintenant une fin distincte de l’expérience. Raccrocher rend la
+grille immédiatement et suspend son temps. Un rappel ouvre un nouvel appel dans
+la même session ; Max retrouve les paroles qui lui ont été confiées, Emma les
+siennes. L’accueil de retour ne prétend pas que l’autre personnage a passé la ligne.
+
+Chaque accueil et fermeture porte une identité et le budget restant. Le journal
+et le CAS existants rendent cette frontière persistante sans migration. Une panne
+réseau bloque le rappel jusqu’à sauvegarde et laisse une reprise possible après
+recharge ; un ancien callback ne peut réarmer le micro ni parler dans le nouvel
+appel. Les offres narratives continuent de suivre le contrat F1.
+
+Qualité locale et scénarios F2 ciblés verts ; E2E complets et livraison GitHub/
+Lovable en cours. [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md).
+Recette humaine et publication distinctes en F3, non lancé.
 
 ## F1 — préparer avant de promettre (26 octobre 2026)
 

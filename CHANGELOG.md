@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [F2 — cycle des appels] — 2026-10-26
+
+- Raccrocher ferme l’appel et revient immédiatement à la grille Max/Emma,
+  Ava/Léo indisponibles ; fin d’expérience explicite distincte, aucun questionnaire
+  imposé au raccrochage. Les rappels conservent session, film, version, contexte
+  commun et souvenirs cloisonnés, avec leur accueil de retour.
+- Marqueurs d’appel explicites et renouvellement CAS ; échanges complets remis à
+  zéro pour chaque nouvel appel, quotas et historique conservés. Micro, sorties,
+  vidéos et callbacks de l’ancien appel neutralisés. Les gardes et replays F1
+  restent applicables au transfert accord + GM + clic.
+- Timer suspendu sur grille, repris au même restant, y compris après recharge ;
+  budget actif et expiration technique de quatre heures séparés. Fermeture réseau
+  réessayable avec intention locale limitée aux IDs/révision/temps, sans transcript.
+  Sessions historiques compatibles ; aucune migration ni Edge requise.
+- [Plan et preuves F2](docs/plan_changement_interlocuteur_manuel.md#f2--cycle-des-appels--26-octobre-2026).
+  Qualité locale verte (1 037 unitaires, 41 intégrations, 67 régressions, lint,
+  typage/build) ; E2E et livraison GitHub/Lovable en cours. Production inchangée.
+
 ## [F1 — préparer le passage avant la confirmation] — 2026-10-26
 
 - [PR #88 fusionnée](https://github.com/memoways/ava-proto1/pull/88), main code `5bf1bd51617adc5ae06c656767ea02b29aca3371` ; [CI PR verte](https://github.com/memoways/ava-proto1/actions/runs/40370058542) sur HEAD exact `7afdb7e`. [CI main](https://github.com/memoways/ava-proto1/actions/runs/40374094704) verte sur ce commit de fusion, 91/91 E2E sans retry.

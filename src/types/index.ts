@@ -125,6 +125,8 @@ export interface ConversationMessage {
   /** Character whose isolated conversation this turn belongs to. */
   spokenWith?: "max" | "emma";
   /** Factual provenance of an executed phone transfer; contains no private speech. */
+  callStart?: import('@/services/callCycle').CallStart;
+  callClose?: import('@/services/callCycle').CallClose;
   callTransfer?: { from: "max" | "emma"; returning: boolean };
   /** Anti-hallucination validation trace, only present on Max messages that went through the validator. */
   validation?: ConversationValidationTrace;

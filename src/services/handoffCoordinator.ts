@@ -28,13 +28,13 @@ export function completedCallExchanges(history: ConversationMessage[], character
   let pendingUser = false;
   const seen = new Set<string>();
   history.forEach((message, index) => {
-    if (message.callTransfer || inferSpokenWith(history, index) !== character) {
+    if (message.callStart || message.callTransfer || inferSpokenWith(history, index) !== character) {
       count = 0; pendingUser = false; seen.clear();
     }
     if (inferSpokenWith(history, index) !== character) return;
     if (message.role === 'user') { pendingUser = true; return; }
     const r = message.delivery;
-    if (!pendingUser || message.callTransfer || !r || seen.has(r.turnId)) return;
+    if (!pendingUser || message.callStart || message.callTransfer || !r || seen.has(r.turnId)) return;
     pendingUser = false;
     seen.add(r.turnId);
     if (r.character === character && r.status === 'completed' && r.generated.trim()

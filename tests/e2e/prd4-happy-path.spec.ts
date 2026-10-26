@@ -1027,6 +1027,7 @@ test("capture remplacée : un démarrage rejeté après recommencement laisse le
   await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
   await expect(page.getByText("Micro en cours d'ouverture…", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Terminer", exact: true }).click();
+  await page.getByRole('button', { name: 'Terminer l’expérience', exact: true }).click();
   await page.getByRole("button", { name: "Continuer", exact: true }).click();
   await page.getByRole("button", { name: /Recommencer/ }).click();
   await page.getByRole("button", { name: "Commencer" }).click();
@@ -1601,10 +1602,10 @@ test('lot 2 : raccrocher pendant la sonnerie interdit une connexion tardive', as
   await page.getByRole('button', { name: 'Appeler Max', exact: true }).click();
   await expect(page.getByText('Appel en cours…', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Terminer l’appel', exact: true }).click();
-  await expect(page.getByText('La communication se coupe.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toBeVisible();
   await page.waitForTimeout(5500); // longer than all three existing rings + pickup
   expect(fakes.getSessionRow()).toMatchObject({ active_character: 'emma', handoff_count: 0 });
-  expect(fakes.getSessionRow().ended_at).toBeTruthy();
+  expect(fakes.getSessionRow().ended_at).toBeNull();
   expect(fakes.getExperienceEvents().filter(e => e.event_type === 'handoff_executed')).toHaveLength(0);
 });
 
@@ -1815,6 +1816,7 @@ test('lot 2 : une révocation ancienne retardée ne remplace pas la nouvelle ses
   await page.getByRole('button', { name: 'Appeler Max', exact: true }).click();
   await expect.poll(() => revocationStarted).toBe(true);
   await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  await page.getByRole('button', { name: 'Terminer l’expérience', exact: true }).click();
   await page.getByRole('button', { name: 'Continuer', exact: true }).click();
   await page.getByRole('button', { name: /Recommencer/ }).click();
   disabled = false;
@@ -2212,3 +2214,170 @@ for (const delay of [500, 3500]) {
     }
   });
 }
+
+
+test('F2 : Max → grille → Emma → grille → Max conserve expérience, budget et mémoires propres', async ({ page }) => {
+  test.setTimeout(90000);
+  const fakes = await installNetworkFakes(page, ['SECRET_MAX_F2', 'SECRET_EMMA_F2', 'Nous reprenons notre échange.'],
+    { ttsSuccess: true, characterOpenings: true });
+  await startCharacterConversation(page, 'Max');
+  await sendHandoffTurn(page, 'SECRET_MAX_F2');
+  await page.waitForLoadState('networkidle');
+  const first = structuredClone(fakes.getSessionRow());
+  await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Ava indisponible' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Léo indisponible' })).toBeVisible();
+  await expect.poll(() => (fakes.getSessionRow().conversation_log as Array<{callClose?: unknown}>).some(m => m.callClose)).toBe(true);
+  expect(fakes.getSessionRow().ended_at).toBeNull();
+  await expect(page.getByRole('button', { name: 'Continuer', exact: true })).not.toBeVisible();
+  const closed = structuredClone(fakes.getSessionRow());
+  await page.waitForTimeout(2000);
+  await page.getByRole('button', { name: 'Appeler Emma', exact: true }).dblclick();
+  await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 15000 });
+  const second = structuredClone(fakes.getSessionRow());
+  const log = second.conversation_log as Array<{callStart?: {id:string;remainingSeconds:number};callClose?:{remainingSeconds:number}}>;
+  expect(log.at(-1)?.callStart?.remainingSeconds).toBe((closed.conversation_log as typeof log).find(m => m.callClose)?.callClose?.remainingSeconds);
+  await sendHandoffTurn(page, 'SECRET_EMMA_F2');
+  await page.waitForLoadState('networkidle');
+  expect(fakes.getCharacterCalls().at(-1)).not.toContain('SECRET_MAX_F2');
+  await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  await expect.poll(() => (fakes.getSessionRow().conversation_log as typeof log).filter(m => m.callClose).length).toBe(2);
+  await page.getByRole('button', { name: 'Appeler Max', exact: true }).click();
+  await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 15000 });
+  await sendHandoffTurn(page, 'Nous reprenons notre échange.');
+  await page.waitForLoadState('networkidle');
+  const maxInput = fakes.getCharacterCalls().at(-1)!;
+  expect(maxInput).toContain('SECRET_MAX_F2'); expect(maxInput).not.toContain('SECRET_EMMA_F2');
+  expect(fakes.getSessionInsertCount()).toBe(1);
+  expect(fakes.getSessionRow()).toMatchObject({ id: first.id, orchestration_version_id: first.orchestration_version_id,
+    has_seen_film: 'pas_vu', handoff_count: first.handoff_count, ended_at: null });
+  const ids = (fakes.getSessionRow().conversation_log as typeof log).filter(m => m.callStart).map(m => m.callStart!.id);
+  expect(ids).toHaveLength(3); expect(new Set(ids).size).toBe(3);
+  await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  await expect.poll(() => (fakes.getSessionRow().conversation_log as typeof log).filter(m => m.callClose).length).toBe(3);
+  await page.reload();
+  await page.getByRole('button', { name: /Reprendre/ }).click();
+  await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toBeVisible();
+  expect(fakes.getSessionInsertCount()).toBe(1);
+});
+
+
+test('F2 : fermeture hors réseau, recharge puis réessai avant rappel sans perdre la pause', async ({ page }) => {
+  const fakes = await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true });
+  let offline = false;
+  await page.route(`${SUPABASE_ORIGIN}/rest/v1/sessions**`, async route => {
+    const patch = route.request().method() === 'PATCH' ? route.request().postDataJSON() : null;
+    if (offline && patch?.conversation_log?.some((m: {callClose?: unknown}) => m.callClose)) return route.abort('failed');
+    return route.fallback();
+  });
+  await startCharacterConversation(page, 'Max');
+  await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled();
+  offline = true;
+  await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toBeVisible();
+  await expect(page.getByText('La fermeture n’est pas sauvegardée. Réessaie quand le réseau revient.', {exact:true})).toBeVisible();
+  await page.getByRole('button', { name: 'Appeler Emma', exact: true }).click();
+  expect(fakes.getSessionRow().active_character).toBe('max'); expect(fakes.getSessionInsertCount()).toBe(1);
+  await page.waitForTimeout(1200);
+  offline = false;
+  await page.reload();
+  await page.getByRole('button', { name: /Reprendre/ }).click();
+  await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toBeVisible();
+  const log = fakes.getSessionRow().conversation_log as Array<{callStart?:{remainingSeconds:number};callClose?:{remainingSeconds:number}}>;
+  expect(log[0].callClose?.remainingSeconds).toBeGreaterThan(920);
+  await page.getByRole('button', { name: 'Appeler Emma', exact: true }).click();
+  await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled({timeout:15000});
+  expect(fakes.getSessionInsertCount()).toBe(1);
+});
+
+test('F2 : recharge active consomme le budget, expiration technique reste distincte', async ({ page }) => {
+  const fakes = await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true });
+  await startCharacterConversation(page, 'Max');
+  await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled();
+  const row = fakes.getSessionRow();
+  const log = structuredClone(row.conversation_log) as Array<{callStart?:{deadlineAt:number}}>;
+  log[0].callStart!.deadlineAt = Date.now() - 1000;
+  fakes.changeSessionRow({ conversation_log: log });
+  await page.reload();
+  await page.getByRole('button', { name: /Reprendre/ }).click();
+  await expect(page.getByText('La communication se coupe.', { exact: true })).toBeVisible();
+  await expect.poll(() => fakes.getSessionRow().game_over_reason).toBe('timeout_configured_duration');
+});
+
+for (const handsFree of [false, true]) {
+  test(`F2 : ${handsFree ? 'mains libres' : 'PTT'}, STT abandonné ne reparle pas après grille et rappel`, async ({ page }) => {
+    const fakes = await installNetworkFakes(page, ['OLD_CALL_PRIVATE_F2'], { ttsSuccess: true, characterOpenings: true,
+      handsFree, delayFirstSTTFinalMs: 10000 });
+    await startCharacterConversation(page, 'Max');
+    if (handsFree) await page.getByRole('button', { name: 'Activer le micro' }).click();
+    else await page.getByRole('button', { name: "Démarrer l'enregistrement" }).click();
+    await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toBeVisible();
+    await expect(page.getByText('Sauvegarde de la fermeture…', {exact:true})).toHaveCount(0);
+    await page.getByRole('button', { name: 'Appeler Emma', exact: true }).click();
+    await expect(page.getByRole('button', { name: handsFree ? 'Activer le micro' : "Démarrer l'enregistrement" })).toBeEnabled({timeout:15000});
+    await page.waitForTimeout(6500);
+    expect(fakes.getMaxTurnCount()).toBe(0);
+    expect(JSON.stringify(fakes.getSessionRow().conversation_log)).not.toContain('OLD_CALL_PRIVATE_F2');
+    expect(fakes.getSessionInsertCount()).toBe(1);
+  });
+}
+
+
+test('F2 : expiration technique sur grille ferme l’expérience sans dépenser son budget', async ({ page }) => {
+  const fakes = await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true });
+  await page.clock.install();
+  await startCharacterConversation(page, 'Max');
+  await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled();
+  await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  await expect(page.getByText('Sauvegarde de la fermeture…', {exact:true})).toHaveCount(0);
+  const before = (fakes.getSessionRow().conversation_log as Array<{callClose?:{remainingSeconds:number}}>)[0].callClose!.remainingSeconds;
+  await page.clock.fastForward(4 * 60 * 60 * 1000 + 1000);
+  await expect(page.getByText('La communication se coupe.', {exact:true})).toBeVisible();
+  await expect.poll(() => fakes.getSessionRow().game_over_reason).toBe('resume_expired');
+  expect(fakes.getSessionRow().duration_seconds).toBe(930 - before);
+});
+
+test('F2 : réponse LLM quittée ne réapparaît ni sur grille ni dans le rappel', async ({ page }) => {
+  test.setTimeout(45000);
+  const fakes = await installNetworkFakes(page, ['QUESTION_OLD_F2'], { ttsSuccess: true, characterOpenings: true,
+    delayCharacterResponseMs: 7000, maxResponse: 'LATE_ANSWER_OLD_F2' });
+  await startCharacterConversation(page, 'Max');
+  await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled();
+  await page.getByRole('button', { name: "Démarrer l'enregistrement" }).click();
+  await expect(page.getByText('QUESTION_OLD_F2', {exact:false})).toBeVisible();
+  await page.getByRole('button', { name: "Arrêter l'enregistrement" }).press('Enter');
+  await expect.poll(fakes.getMaxTurnCount).toBe(1);
+  await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  await expect(page.getByText('Sauvegarde de la fermeture…', {exact:true})).toHaveCount(0);
+  await page.getByRole('button', { name: 'Appeler Emma', exact: true }).click();
+  await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled({timeout:15000});
+  await page.waitForTimeout(2500);
+  await expect(page.getByText('LATE_ANSWER_OLD_F2', {exact:false})).toHaveCount(0);
+  expect(JSON.stringify(fakes.getSessionRow().conversation_log)).not.toContain('LATE_ANSWER_OLD_F2');
+  expect(fakes.getGmPostTurnCount()).toBe(0);
+  expect(fakes.getSessionRow().active_character).toBe('emma');
+  expect(fakes.getSessionInsertCount()).toBe(1);
+});
+
+test('F2 : après transfert F1, grille puis rappel du même personnage se ferment sans CAS périmé', async ({ page }) => {
+  test.setTimeout(60000);
+  const turns = [...HANDOFF_TURNS, 'Je voudrais parler avec Max.'];
+  const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+    gmTarget: 'max', gmStance: 'accept', gmHandoffAt: 4, maxResponse: 'Je vais appeler Max.' });
+  await startCharacterConversation(page, 'Emma');
+  for (const text of turns) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+  await page.getByRole('button', { name: 'Appeler Max', exact: true }).click();
+  await expect(page.getByRole('img', { name: 'Portrait d’Max' })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled();
+  await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  await expect(page.getByText('Sauvegarde de la fermeture…', {exact:true})).toHaveCount(0);
+  await page.getByRole('button', { name: 'Appeler Max', exact: true }).click();
+  await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled({timeout:15000});
+  await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  await expect.poll(() => (fakes.getSessionRow().conversation_log as Array<{callClose?:unknown}>).filter(m => m.callClose).length).toBe(3);
+  expect(fakes.getSessionRow()).toMatchObject({ active_character: 'max', handoff_count: 1, ended_at: null });
+  expect(fakes.getSessionInsertCount()).toBe(1);
+  await expect(page.getByText(/fermeture n’est pas sauvegardée|session a changé/)).toHaveCount(0);
+});
