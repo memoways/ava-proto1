@@ -137,7 +137,7 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] Query rewriting LLM (`rewrite-query` edge function) — reformulation autonome avant RAG
 - [x] Mémoire de session compressée (`summarize-session` + table `session_summaries`) injectée dans le prompt Max
 - [x] Affichage banc d'essai : étape Query rewrite, badge provider d'embedding, par chunk `character_id`/`rerank_score`/retrieval brut
-- [x] **TTS multi-providers** : façade `src/services/tts/` + ElevenLabs / Inworld / Hume / Gradium / Cartesia ; sélection d'un provider par environnement depuis Admin → TTS Config ; intention de jeu par tour
+- [x] **TTS multi-providers** : façade `src/services/tts/` + ElevenLabs / Inworld / Fish Audio / Gradium / Cartesia ; sélection d'un provider par environnement depuis Admin → TTS Config ; intention de jeu par tour
 - [x] **Dashboard « Consommation Voix »** : compteurs, taux de succès, latences p50/p95 (first-byte + total), codes HTTP et erreurs récentes par provider
 - [x] **Robustesse voix multi-navigateurs** : sélection MIME STT à l'exécution, timeouts critiques, audio unlock, erreurs TTS/STT trackées et état conversationnel récupérable
 - [x] **Preset voix basse latence** : réglage `realtime_conversation` pour tests voice-to-voice rapides (`eleven_turbo_v2_5`, MP3 64 kbps, `optimizeStreamingLatency=1`)
@@ -151,7 +151,7 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 - [x] **Emma joignable + switch Max ↔ Emma** : démarrage avec Max ou Emma dès qu’Orchestration les active ; demande joueur ou suggestion GM ; mémoire / résumé / sous-titres isolés par personnage (`spokenWith`) ; Ava et Léo restent verrouillés. Plan : [`docs/plan_emma_conversation_switch.md`](docs/plan_emma_conversation_switch.md)
 - [x] **Appel Max ↔ Emma proposé par le GM** : bouton uniquement après recommandation validée du GM et accord du personnage ; choix Appeler/Rester, coupure du micro, trois sonneries puis réponse. Session et temps restant conservés. Plan et livraison : [`docs/plan_changement_interlocuteur_manuel.md`](docs/plan_changement_interlocuteur_manuel.md).
 - [x] **Gradium TTS par personnage** : réglages fins distincts Max / Emma dans TTS Config ; le runtime envoie `characterKey`. Plan : [`docs/plan_gradium_tts_par_personnage.md`](docs/plan_gradium_tts_par_personnage.md)
-- [x] **Pilotage émotionnel TTS** : `PerformanceIntent` par tour (lexique FR + mémoire GM N−1) mappé vers Hume, Inworld, ElevenLabs, Gradium et Cartesia ; audition admin + labels d’utilisabilité. Plan : [`docs/plan_tts_pilotage_emotionnel.md`](docs/plan_tts_pilotage_emotionnel.md)
+- [x] **Pilotage émotionnel TTS** : `PerformanceIntent` par tour (lexique FR + mémoire GM N−1) mappé vers Fish Audio, Inworld, ElevenLabs, Gradium et Cartesia ; audition admin + labels d’utilisabilité. Plan : [`docs/plan_tts_pilotage_emotionnel.md`](docs/plan_tts_pilotage_emotionnel.md)
 - [x] **Lisibilité** : textes back-office et expérience en blanc pur `#FFFFFF`. Plan : [`docs/plan_textes_blanc_lisibilite.md`](docs/plan_textes_blanc_lisibilite.md)
 - [x] **PRD4 — Nouveau questionnaire (10 questions)** : film vu, teaser utile, clarté création rôle, justesse résumé, clarté/frustration PTT, Max reconnaît rôle, Max crédible, envie autres personnages, prochain personnage souhaité, durée ressentie, feedback ouvert + email + 2 opt-ins ; métriques techniques calculées automatiquement
 - [x] **PRD4 — Sync Notion avec noms exacts (accents)** : `sync-questionnaire` détecte `version: "prd4"` et écrit dans les propriétés Notion accentuées (`PRD4 Rôle création clarté`, `PRD4 Résumé personnage justesse`, `PRD4 Max reconnaît rôle`, `PRD4 Personnage souhaité prochain`, `PRD4 Durée ressentie`, `PRD4 Rôle JSON`, `PRD4 Être tenu au courant`, `PRD4 Contact feedback détaillé`…), filtrage côté serveur des propriétés absentes via `fetchDatabaseProperties()` (`skipped_props` logué)
@@ -169,12 +169,12 @@ Le chantier en cours suit le plan `documents/plan_implementation_max.md` pour mi
 |-----------|-------------|
 | Frontend | React + Vite + Tailwind + TypeScript (Lovable) |
 | Backend | Lovable Cloud (Supabase Postgres + pgvector) |
-| Edge Functions | proxy-llm, proxy-stt, proxy-tts, **proxy-tts-inworld**, **proxy-tts-hume**, **proxy-tts-cartesia**, sync-notion, **sync-eval-items**, query-rag, sync-questionnaire, rewrite-query, summarize-session |
+| Edge Functions | proxy-llm, proxy-stt, proxy-tts, **proxy-tts-inworld**, **proxy-tts-fish**, **proxy-tts-cartesia**, sync-notion, **sync-eval-items**, query-rag, sync-questionnaire, rewrite-query, summarize-session |
 | Video | Gumlet (hébergement + embed player) |
 | Cost Tracking | OpenRouter generation API (tokens + USD per call) |
 | LLM | OpenRouter API — Multi-modèles. Chemin live optimisé sur **Gemini 2.0 Flash** par défaut ; modèles plus lourds réservés aux tests/qualité depuis l'admin (dont banc **LLM as judge**). |
 | STT | Deepgram (WebSocket streaming + VAD) avec sélection MIME `MediaRecorder` à l'exécution et timeouts token/micro/WebSocket |
-| TTS | **Multi-providers** via façade `src/services/tts/` — ElevenLabs, **Inworld**, **Hume**, **Gradium**, **Cartesia** ; intention de jeu par tour (`PerformanceIntent`) ; Gradium réglable Max/Emma séparément. Provider actif dans Admin → TTS Config. |
+| TTS | **Multi-providers** via façade `src/services/tts/` — ElevenLabs, **Inworld**, **Fish Audio**, **Gradium**, **Cartesia** ; intention de jeu par tour (`PerformanceIntent`) ; Gradium réglable Max/Emma séparément. Provider actif dans Admin → TTS Config. |
 | Embeddings | Profils versionnés : **Voyage `voyage-4-large` → `voyage-4-lite` (1024D recommandé)**, `voyage-context-4` canary, Voyage 3/OpenAI legacy explicites |
 | Reranker | **Voyage `rerank-2.5-lite`** par défaut live ; `rerank-2.5` pour les comparaisons qualité |
 | Données | Notion (source de vérité) → Supabase fourni par Lovable (miroir + index parallèles) |

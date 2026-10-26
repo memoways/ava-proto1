@@ -19,10 +19,10 @@ import {
   loadInworldSettingsFromDB,
   saveInworldSettingsToDB,
   resetInworldSettings,
-  getHumeSettings,
-  loadHumeSettingsFromDB,
-  saveHumeSettingsToDB,
-  resetHumeSettings,
+  getFishSettings,
+  loadFishSettingsFromDB,
+  saveFishSettingsToDB,
+  resetFishSettings,
   getGradiumSettings,
   loadGradiumSettingsFromDB,
   saveGradiumSettingsToDB,
@@ -38,7 +38,7 @@ import {
   CARTESIA_MODELS,
 
   type InworldSettings,
-  type HumeSettings,
+  type FishSettings,
   type GradiumSettings,
   type GradiumVoiceTuning,
   type CartesiaSettings,
@@ -61,7 +61,7 @@ import {
 } from "@/services/tts/performanceIntent";
 
 const TEST_PHRASE = "Écoute, je ne sais pas qui tu es... mais si tu sais quelque chose sur Ava, il faut me le dire maintenant. Je n'ai plus beaucoup de temps.";
-/** Intensity 2 so Hume / Inworld acting instructions are actually audible in admin tests. */
+/** Intensity 2 so Fish Audio / Inworld acting instructions are actually audible in admin tests. */
 const AUDITION_INTENSITY = 2 as const;
 const GRADIUM_CHARACTER_ORDER = ["max", "emma"];
 const AUDITION_EMOTION_LABELS: Record<CanonicalEmotion, string> = {
@@ -123,10 +123,10 @@ export default function TTSConfigTab() {
   const [iwSaved, setIwSaved] = useState<InworldSettings>(getInworldSettings());
   const [savingIw, setSavingIw] = useState(false);
 
-  // Hume settings
-  const [huSettings, setHuSettings] = useState<HumeSettings>(getHumeSettings());
-  const [huSaved, setHuSaved] = useState<HumeSettings>(getHumeSettings());
-  const [savingHu, setSavingHu] = useState(false);
+  // Fish Audio settings
+  const [fishSettings, setFishSettings] = useState<FishSettings>(getFishSettings());
+  const [fishSaved, setFishSaved] = useState<FishSettings>(getFishSettings());
+  const [savingFish, setSavingFish] = useState(false);
 
   // Gradium settings
   const [grSettings, setGrSettings] = useState<GradiumSettings>(getGradiumSettings());
@@ -154,7 +154,7 @@ export default function TTSConfigTab() {
     loadActiveProviderFromDB().then(setActiveProviderState);
     loadTTSSettingsFromDB().then((s) => { setElSettings(s); setElSaved(s); });
     loadInworldSettingsFromDB().then((s) => { setIwSettings(s); setIwSaved(s); });
-    loadHumeSettingsFromDB().then((s) => { setHuSettings(s); setHuSaved(s); });
+    loadFishSettingsFromDB().then((s) => { setFishSettings(s); setFishSaved(s); });
     loadGradiumSettingsFromDB().then((s) => { setGrSettings(s); setGrSaved(s); });
     loadCartesiaSettingsFromDB().then((s) => { setCaSettings(s); setCaSaved(s); });
     listCharacterRuntimeProfiles()
@@ -175,7 +175,7 @@ export default function TTSConfigTab() {
 
   const elHasChanges = JSON.stringify(elSettings) !== JSON.stringify(elSaved);
   const iwHasChanges = JSON.stringify(iwSettings) !== JSON.stringify(iwSaved);
-  const huHasChanges = JSON.stringify(huSettings) !== JSON.stringify(huSaved);
+  const fishHasChanges = JSON.stringify(fishSettings) !== JSON.stringify(fishSaved);
   const grHasChanges = JSON.stringify(grSettings) !== JSON.stringify(grSaved);
   const caHasChanges = JSON.stringify(caSettings) !== JSON.stringify(caSaved);
 
@@ -292,23 +292,23 @@ export default function TTSConfigTab() {
     toast.success("Inworld réinitialisé");
   }
 
-  // Hume helpers
-  function updateHu(patch: Partial<HumeSettings>) {
-    const current = { ...huSettings, ...patch };
-    writeEnvironmentStorage("ava_tts_settings_hume", JSON.stringify(current));
-    setHuSettings(current);
+  // Fish Audio helpers
+  function updateFish(patch: Partial<FishSettings>) {
+    const current = { ...fishSettings, ...patch };
+    writeEnvironmentStorage("ava_tts_settings_fish", JSON.stringify(current));
+    setFishSettings(current);
   }
-  async function saveHu() {
-    setSavingHu(true);
-    await saveHumeSettingsToDB(huSettings);
-    setHuSaved(huSettings);
-    toast.success("Hume sauvegardé ✓");
-    setSavingHu(false);
+  async function saveFish() {
+    setSavingFish(true);
+    await saveFishSettingsToDB(fishSettings);
+    setFishSaved(fishSettings);
+    toast.success("Fish Audio sauvegardé ✓");
+    setSavingFish(false);
   }
-  function resetHu() {
-    const d = resetHumeSettings();
-    setHuSettings(d); setHuSaved(d);
-    toast.success("Hume réinitialisé");
+  function resetFish() {
+    const d = resetFishSettings();
+    setFishSettings(d); setFishSaved(d);
+    toast.success("Fish Audio réinitialisé");
   }
 
   // Gradium helpers
@@ -368,7 +368,7 @@ export default function TTSConfigTab() {
       <div>
         <h2 className="text-lg font-semibold">TTS Config — Multi-providers</h2>
         <p className="text-sm text-muted-foreground">
-          Compare les services TTS. Le provider <strong>actif</strong> est utilisé dans le jeu ; les autres restent disponibles pour les tests. Les puces d'intention ne jouent pas l'audio : clique <strong>Écouter Hume</strong> ou <strong>Écouter Inworld</strong> (seuls ces deux services rendent l'acting vraiment audible).
+          Compare les services TTS. Le provider <strong>actif</strong> est utilisé dans le jeu ; les autres restent disponibles pour les tests. Les puces d'intention ne jouent pas l'audio : clique <strong>Écouter Fish Audio</strong> ou <strong>Écouter Inworld</strong> (seuls ces deux services rendent l'acting vraiment audible).
         </p>
         <p className="text-sm text-muted-foreground">
           Les <strong>Voice ID</strong> se règlent par personnage dans Expérience → Orchestration. Gradium a des réglages fins distincts par personnage dans le panneau ci-dessous.
@@ -402,7 +402,7 @@ export default function TTSConfigTab() {
           <p className="text-xs text-amber-300/90 mt-3">
             En jeu, {TTS_PROVIDER_LIST.find((p) => p.id === activeProvider)?.label} est actif :
             l'intention y est {PROVIDER_ACTING_SUPPORT[activeProvider].labelFr.toLowerCase()}.
-            Hume et Inworld ci-dessous servent à l'audition, pas à l'appel.
+            Fish Audio et Inworld ci-dessous servent à l'audition, pas à l'appel.
           </p>
         )}
       </section>
@@ -430,8 +430,8 @@ export default function TTSConfigTab() {
           ))}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => testProvider("hume")} disabled={testing !== null}>
-            {testing === "hume" ? "..." : "🔊 Écouter Hume"}
+          <Button size="sm" onClick={() => testProvider("fish")} disabled={testing !== null}>
+            {testing === "fish" ? "..." : "🔊 Écouter Fish Audio"}
           </Button>
           <Button size="sm" variant="outline" onClick={() => testProvider("inworld")} disabled={testing !== null}>
             {testing === "inworld" ? "..." : "🔊 Écouter Inworld"}
@@ -657,75 +657,117 @@ export default function TTSConfigTab() {
           minLabel="Déterministe" maxLabel="Très expressif" />
       </section>
 
-      {/* ===== Hume Octave panel ===== */}
+      {/* ===== Fish Audio panel ===== */}
       <section className="border rounded-lg p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-base">🎙️ Hume AI Octave</h3>
-            <p className="text-xs text-muted-foreground">Très expressif, contrôle via description prosodique</p>
-            <ActingNote providerId="hume" />
+            <h3 className="font-semibold text-base">🎙️ Fish Audio</h3>
+            <p className="text-xs text-muted-foreground">Émotions (S1), vitesse, température — clé API côté serveur</p>
+            <ActingNote providerId="fish" />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={resetHu}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
-            <Button size="sm" onClick={() => testProvider("hume")} disabled={testing === "hume"}>
-              {testing === "hume" ? "..." : "🔊 Tester"}
+            <Button variant="outline" size="sm" onClick={resetFish}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
+            <Button size="sm" onClick={() => testProvider("fish")} disabled={testing === "fish"}>
+              {testing === "fish" ? "..." : "🔊 Tester"}
             </Button>
-            <Button size="sm" onClick={saveHu} disabled={savingHu || !huHasChanges}
-              className={huHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
-              <Save className="w-3 h-3 mr-1" />{savingHu ? "..." : "Sauver"}
+            <Button size="sm" onClick={saveFish} disabled={savingFish || !fishHasChanges}
+              className={fishHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
+              <Save className="w-3 h-3 mr-1" />{savingFish ? "..." : "Sauver"}
             </Button>
           </div>
         </div>
 
-        {huHasChanges && (
+        {fishHasChanges && (
           <div className="bg-yellow-900/30 border border-yellow-700/50 rounded px-3 py-1 text-xs text-yellow-300">
-            ⚠️ Modifications Hume non sauvegardées
+            ⚠️ Modifications Fish Audio non sauvegardées
           </div>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-
-
           <label className="space-y-1 text-sm">
-            <span className="font-medium text-muted-foreground">Provider de voix</span>
-            <select value={huSettings.voiceProvider}
-              onChange={(e) => updateHu({ voiceProvider: e.target.value as HumeSettings["voiceProvider"] })}
+            <span className="font-medium text-muted-foreground">ID de voix (reference_id)</span>
+            <input value={fishSettings.referenceId}
+              onChange={(e) => updateFish({ referenceId: e.target.value.trim() })}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="ex: 7f92f8afb8ec43bf81429cc1c9199cb1" />
+            <span className="block text-xs text-muted-foreground/60">Modèle de voix Fish Audio. La voix du personnage, si définie, est prioritaire.</span>
+          </label>
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-muted-foreground">Modèle</span>
+            <select value={fishSettings.model}
+              onChange={(e) => updateFish({ model: e.target.value as FishSettings["model"] })}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm">
-              <option value="HUME_AI">HUME_AI (catalogue public)</option>
-              <option value="CUSTOM_VOICE">CUSTOM_VOICE (voix clonée)</option>
+              <option value="s1">S1 (émotions)</option>
+              <option value="speech-1.6">speech-1.6</option>
+              <option value="speech-1.5">speech-1.5</option>
             </select>
           </label>
-        </div>
-
-        <label className="space-y-1 text-sm block">
-          <span className="font-medium text-muted-foreground">Description prosodique (optionnel)</span>
-          <textarea value={huSettings.description}
-            onChange={(e) => updateHu({ description: e.target.value })}
-            rows={2}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-            placeholder="ex: voix grave, posée, légèrement inquiète, rythme lent" />
-          <span className="block text-xs text-muted-foreground/60">Octave utilise cette description pour moduler la prosodie.</span>
-        </label>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-muted-foreground">Latence</span>
+            <select value={fishSettings.latency}
+              onChange={(e) => updateFish({ latency: e.target.value as FishSettings["latency"] })}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm">
+              <option value="balanced">Équilibrée (plus rapide)</option>
+              <option value="normal">Normale (meilleure qualité)</option>
+            </select>
+          </label>
           <label className="space-y-1 text-sm">
             <span className="font-medium text-muted-foreground">Format audio</span>
-            <select value={huSettings.format}
-              onChange={(e) => updateHu({ format: e.target.value as HumeSettings["format"] })}
+            <select value={fishSettings.format}
+              onChange={(e) => updateFish({ format: e.target.value as FishSettings["format"] })}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm">
               <option value="mp3">MP3</option>
               <option value="wav">WAV</option>
+              <option value="opus">Opus</option>
               <option value="pcm">PCM</option>
             </select>
-            <span className="block text-xs text-muted-foreground/60">MP3 = compact, WAV = non compressé, PCM = brut.</span>
           </label>
-
           <label className="space-y-1 text-sm">
-            <span className="font-medium text-muted-foreground">Langue</span>
-            <input value={huSettings.languageCode}
-              onChange={(e) => updateHu({ languageCode: e.target.value.trim().toLowerCase() || "fr" })}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="fr" />
-            <span className="block text-xs text-muted-foreground/60">Code ISO 639-1 (fr, en, es…) pour guider la prononciation.</span>
+            <span className="font-medium text-muted-foreground">Débit MP3</span>
+            <select value={fishSettings.mp3Bitrate} disabled={fishSettings.format !== "mp3"}
+              onChange={(e) => updateFish({ mp3Bitrate: Number(e.target.value) as FishSettings["mp3Bitrate"] })}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm">
+              <option value={64}>64 kbps</option>
+              <option value={128}>128 kbps</option>
+              <option value={192}>192 kbps</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm pt-6">
+            <input type="checkbox" checked={fishSettings.normalize}
+              onChange={(e) => updateFish({ normalize: e.target.checked })} />
+            <span className="text-muted-foreground">Normaliser le texte (nombres, dates)</span>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <SliderRow label="Température" value={fishSettings.temperature} min={0} max={1} step={0.05}
+            onChange={(v) => updateFish({ temperature: v })}
+            tooltip="Expressivité et variabilité. Bas = stable ; haut = plus vivant, moins prévisible." minLabel="Stable" maxLabel="Expressif" />
+          <SliderRow label="Top-p" value={fishSettings.topP} min={0} max={1} step={0.05}
+            onChange={(v) => updateFish({ topP: v })}
+            tooltip="Diversité du rendu. Bas = plus conservateur." minLabel="Conservateur" maxLabel="Varié" />
+          <SliderRow label="Vitesse de base" value={fishSettings.speed} min={0.5} max={2} step={0.05}
+            onChange={(v) => updateFish({ speed: v })}
+            tooltip="Multipliée à chaque tour par l'intention de jeu (état de parole)." minLabel="0.5 lent" maxLabel="2 rapide" />
+          <SliderRow label="Volume (dB)" value={fishSettings.volume} min={-10} max={10} step={1}
+            onChange={(v) => updateFish({ volume: v })}
+            tooltip="Décalage de volume en décibels." minLabel="-10" maxLabel="+10" />
+          <SliderRow label="Longueur de segment" value={fishSettings.chunkLength} min={100} max={300} step={10}
+            onChange={(v) => updateFish({ chunkLength: v })}
+            tooltip="Taille des morceaux de texte traités par Fish. Plus court = démarrage plus rapide." minLabel="100" maxLabel="300" />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={fishSettings.emotionTags}
+              onChange={(e) => updateFish({ emotionTags: e.target.checked })} />
+            <span className="text-muted-foreground">Émotions automatiques depuis l'état du tour (ex. (sad), (whispering))</span>
+          </label>
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-muted-foreground">Émotion par défaut (tour neutre)</span>
+            <input value={fishSettings.defaultEmotion}
+              onChange={(e) => updateFish({ defaultEmotion: e.target.value })}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="ex: (calm) — vide = aucune" />
+            <span className="block text-xs text-muted-foreground/60">Ajoutée par l'app, jamais par le modèle de langage.</span>
           </label>
         </div>
       </section>

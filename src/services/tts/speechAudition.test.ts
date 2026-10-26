@@ -11,9 +11,9 @@ const settings = { ...EMPTY_SPEECH_PERFORMANCE, version: 'saved-v1', byCharacter
 const states = [{ name: 'Retenu', description: 'silence' }];
 const blob = new Blob(['audio']);
 const play = vi.fn(async (_blob: Blob) => ({ status: 'played' as const, playbackTotalMs: 250 }));
-const provider: TTSProvider = { id: 'hume', label: '', description: '', generate: vi.fn(async (_text, ctx) => {
+const provider: TTSProvider = { id: 'fish', label: '', description: '', generate: vi.fn(async (_text, ctx) => {
  ctx?.onAuditionRequest?.({ transport: 'rest', body: { voiceId: ctx.voiceId } });
- return { blob, meta: { provider: 'hume' as const, model: 'octave', firstByteMs: 12 } };
+ return { blob, meta: { provider: 'fish' as const, model: 'octave', firstByteMs: 12 } };
 }) };
 describe('A3 — audition isolated snapshots and exact-audio cache', () => {
  beforeEach(() => { localStorage.clear(); setActiveEnvironment('sandbox-ulrich'); vi.clearAllMocks(); });
@@ -83,7 +83,7 @@ describe('A3 — audition isolated snapshots and exact-audio cache', () => {
  it('evicts by bytes as well as count without retaining an oversized blob', async () => {
   const runner = new SpeechAuditionRunner(play);
   const large = new Blob([new Uint8Array(9 * 1024 * 1024)]);
-  const batch = { ...provider, generate: vi.fn(async () => ({ blob: large, meta: { provider: 'hume' as const } })) };
+  const batch = { ...provider, generate: vi.fn(async () => ({ blob: large, meta: { provider: 'fish' as const } })) };
   await runner.listen('a', 'Oui', batch, {}); await runner.listen('b', 'Oui', batch, {}); await runner.listen('a', 'Oui', batch, {});
   expect(batch.generate).toHaveBeenCalledTimes(3);
  });
@@ -95,9 +95,9 @@ describe('A3 — audition isolated snapshots and exact-audio cache', () => {
   const old = runner.listen('old', 'Old', slow, {}); const rejected = expect(old).rejects.toMatchObject({ name: 'AbortError' });
   await runner.listen('new', 'New', provider, {});
   oldContext?.onAuditionRequest?.({ transport: 'rest', body: { text: 'stale' } });
-  resolve({ blob, meta: { provider: 'hume' } }); await rejected;
+  resolve({ blob, meta: { provider: 'fish' } }); await rejected;
   expect(play).toHaveBeenCalledOnce(); expect(runner.providerCalls).toBe(1);
   const stopPending = runner.listen('stopped', 'Old', slow, {}); const stopRejected = expect(stopPending).rejects.toMatchObject({ name: 'AbortError' });
-  runner.stop(); resolve({ blob, meta: { provider: 'hume' } }); await stopRejected; expect(play).toHaveBeenCalledOnce();
+  runner.stop(); resolve({ blob, meta: { provider: 'fish' } }); await stopRejected; expect(play).toHaveBeenCalledOnce();
  });
 });

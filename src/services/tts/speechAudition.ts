@@ -4,7 +4,7 @@ import { derivePerformanceIntent } from './performanceIntent';
 import { resolveGradiumSettings } from './providerSettings';
 import { proposeSpeechMapping, validateSpeechAudition, type SpeechAuditionSnapshot, type SpeechPerformanceSettings } from './speechPerformanceSettings';
 import type { TTSAuditionRequest, TTSGenerateContext, TTSProvider, TTSProviderId, TTSStreamGenerationStats } from './types';
-export const AUDITION_PROVIDERS: TTSProviderId[] = ['gradium', 'hume', 'inworld', 'elevenlabs', 'cartesia'];
+export const AUDITION_PROVIDERS: TTSProviderId[] = ['gradium', 'fish', 'inworld', 'elevenlabs', 'cartesia'];
 export const AUDITION_LEVELS = [1, 2, 3] as const;
 export interface AuditionLine { id: string; context: string; state: string; text: string }
 const CORPUS: Record<string, Array<[string, string, string]>> = {

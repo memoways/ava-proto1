@@ -21,12 +21,12 @@ import type { TTSProviderId } from "@/services/tts/types";
  * Coût estimé par 1000 caractères TTS (USD).
  * Tarifs publics de référence — à ajuster selon le plan réel souscrit.
  *  - ElevenLabs : ~$0.30/1k chars (plan Creator pay-as-you-go)
- *  - Hume Octave : ~$0.20/1k chars
+ *  - Fish Audio : ~$0.20/1k chars
  *  - Inworld : $5 / 1M chars = $0.005/1k chars
  */
 const COST_PER_1K_CHARS_USD: Record<TTSProviderId, number> = {
   elevenlabs: 0.30,
-  hume: 0.20,
+  fish: 0.20,
   inworld: 0.005,
   gradium: 0.15,
   cartesia: 0.15,
@@ -183,7 +183,7 @@ export default function VoiceUsageTab() {
       </div>
       <p className="text-[11px] text-muted-foreground -mt-3">
         Coûts estimés à partir du nombre de caractères synthétisés et des tarifs publics indicatifs
-        (ElevenLabs {fmtUsd(COST_PER_1K_CHARS_USD.elevenlabs)}/1k · Hume {fmtUsd(COST_PER_1K_CHARS_USD.hume)}/1k ·
+        (ElevenLabs {fmtUsd(COST_PER_1K_CHARS_USD.elevenlabs)}/1k · Fish Audio {fmtUsd(COST_PER_1K_CHARS_USD.fish)}/1k ·
         Inworld {fmtUsd(COST_PER_1K_CHARS_USD.inworld)}/1k). Total période (tous appels) : {fmtUsd(totalCostUsd)}.
       </p>
 

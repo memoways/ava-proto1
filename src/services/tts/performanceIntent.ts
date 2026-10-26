@@ -2,7 +2,7 @@
  * Canonical acting intent for per-turn TTS, plus provider adapters.
  *
  * Derived from the spoken line (no extra LLM). Providers map this to their
- * own knobs: Hume `description`, Inworld `instruction`, ElevenLabs sliders /
+ * own knobs: Fish Audio emotion markers, Inworld `instruction`, ElevenLabs sliders /
  * v3 tags, Gradium temp/padding, Cartesia generation_config.
  */
 
@@ -31,7 +31,7 @@ export interface PerformanceIntent {
   emotion: CanonicalEmotion;
   intensity: PerformanceIntensity;
   delivery?: PerformanceDelivery;
-  /** English, ≤100 chars — Hume / Inworld acting instructions. */
+  /** English, ≤100 chars — Inworld acting instructions. */
   actingNl: string;
   speedHint?: number;
   source: PerformanceSource;
@@ -76,10 +76,10 @@ export interface ProviderActingSupport {
 }
 
 export const PROVIDER_ACTING_SUPPORT: Record<TTSProviderId, ProviderActingSupport> = {
-  hume: {
+  fish: {
     usability: "audible",
     labelFr: "Oui — audible",
-    detailFr: "Description d'acting envoyée à chaque tour. C'est ici que les puces d'intention se font entendre.",
+    detailFr: "Marqueur d'émotion Fish (ex. (sad), (whispering)) ajouté par l'app depuis l'état du tour, plus vitesse.",
   },
   inworld: {
     usability: "audible",
@@ -365,11 +365,44 @@ export function derivePerformanceIntent(input: DerivePerformanceInput): Performa
   };
 }
 
-export function composeHumeDescription(baseline: string, intent?: PerformanceIntent | null): string | undefined {
-  if (intent?.source === 'speech_state') return [intent.actingNl, baseline.trim()].filter(Boolean).join('; ').slice(0, 100);
-  const parts = [baseline.trim(), intent?.actingNl?.trim()].filter(Boolean);
-  if (parts.length === 0) return undefined;
-  return parts.join("; ").slice(0, 100);
+/** Fish Audio emotion markers (S1 vocabulary) for each canonical emotion. */
+export const FISH_EMOTION_TAGS: Record<CanonicalEmotion, string> = {
+  neutral: "",
+  tense: "(nervous)",
+  angry: "(angry)",
+  sad: "(sad)",
+  scared: "(scared)",
+  fragile: "(hesitating)",
+  warm: "(empathetic)",
+  accusatory: "(disdainful)",
+  sarcastic: "(sarcastic)",
+  urgent: "(in a hurry tone)",
+};
+
+const FISH_DELIVERY_TAGS: Partial<Record<PerformanceDelivery, string>> = {
+  whisper: "(whispering)",
+  rushed: "(in a hurry tone)",
+};
+
+export interface FishVoiceShaping { text: string; speed: number; tag: string }
+
+/**
+ * Adapter-side Fish emotion injection: the tag comes from the turn state only.
+ * Any parenthesised marker already present at the start of the LLM text is
+ * stripped first so the model can never pick the voice emotion itself.
+ */
+export function applyFishPerformance(
+  base: { speed: number; emotionTags: boolean; defaultEmotion: string },
+  text: string,
+  intent?: PerformanceIntent | null,
+): FishVoiceShaping {
+  const clean = text.replace(/^\s*(\([^)]{1,40}\)\s*)+/, "");
+  const speed = Math.min(2, Math.max(0.5, base.speed * (intent?.speedHint ?? 1)));
+  if (!base.emotionTags) return { text: clean, speed, tag: "" };
+  const emotionTag = intent && intent.intensity > 0 ? FISH_EMOTION_TAGS[intent.emotion] : "";
+  const deliveryTag = intent?.delivery ? FISH_DELIVERY_TAGS[intent.delivery] ?? "" : "";
+  const tag = [emotionTag || base.defaultEmotion.trim(), deliveryTag].filter((t, i, all) => t && all.indexOf(t) === i).join(" ");
+  return { text: tag ? `${tag} ${clean}` : clean, speed, tag };
 }
 
 /** Only an authorized state mapping may enable the experimental WS pauses. */

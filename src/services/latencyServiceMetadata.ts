@@ -1,7 +1,7 @@
 import type { LatencySegmentKey, LatencyServiceInfo } from "@/services/latencySegments";
 import { getLLMSettings, getTTSSettings } from "@/services/settingsService";
 import { getSTTProvider, getSTTProviderDefinition } from "@/services/stt";
-import { getActiveProviderId, getCartesiaSettings, getGradiumSettings, getHumeSettings, getInworldSettings } from "@/services/tts/providerSettings";
+import { getActiveProviderId, getCartesiaSettings, getGradiumSettings, getFishSettings, getInworldSettings } from "@/services/tts/providerSettings";
 import { DEEPGRAM_DEFAULT_MODEL } from "../../supabase/functions/_shared/deepgramDefaults";
 
 export function getConfiguredTTSServiceInfo(providerId?: import("./tts/types").TTSProviderId): LatencyServiceInfo {
@@ -16,12 +16,12 @@ export function getConfiguredTTSServiceInfo(providerId?: import("./tts/types").T
         mode: settings.deliveryMode,
       };
     }
-    if (provider === "hume") {
-      const settings = getHumeSettings();
+    if (provider === "fish") {
+      const settings = getFishSettings();
       return {
-        serviceProvider: "Hume",
-        serviceName: "hume",
-        model: "octave",
+        serviceProvider: "Fish Audio",
+        serviceName: "fish",
+        model: settings.model,
         mode: settings.format,
       };
     }
