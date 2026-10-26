@@ -24,6 +24,9 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   lint/types/build ; premier passage de 81 E2E sans retry (12,8 min), puis
   revalidation du format compatible et résultat final dans le bilan. SHA de fusion et CI exactes
   dans le bilan GitHub de livraison A4.
+- CI de livraison : miroir APT officiel Ubuntu pour éviter les téléchargements
+  Azure ralentis, mêmes contrôles et trois navigateurs ; concurrence, cache Node 22
+  et exception documentaire. Délai 20 min et artefacts échec/7 jours conservés.
 - Intégration E0 et recette humaine non validées ; Notion exposé cible Ulrich,
   Gamilab indisponible dans la session. Production non publiée et textes prod
   conservés. [Reprise A4R](docs/prompt_reprise_integration_recette_lot_a4r.md)

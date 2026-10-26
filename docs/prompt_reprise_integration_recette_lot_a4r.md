@@ -66,7 +66,14 @@ Oui… je suis là. Vous vouliez me parler ?
   41 intégrations verts après correction de compatibilité. Premier passage complet :
   81 E2E verts sans retry (12,8 minutes), puis 3 E2E A4 ciblés verts sur le format
   compatible et revalidation complète lancée ; résultat final et CI exactes dans
-  le bilan de livraison de la PR #81, à lire avant reprise. Fournisseurs simulés ; aucun gain
+  le bilan de livraison de la PR #81, à lire avant reprise. Le code applicatif
+  compatible a finalement passé les 81 E2E sans retry (12,9 minutes).
+- CI A4 : téléchargements APT Azure ralentis avant les E2E, un rejeu du même HEAD
+  puis correction du miroir vers archive.ubuntu.com, sans changer les paquets,
+  contrôles, trois navigateurs ou plafond 20 minutes. Concurrence, cache npm Node 22
+  et exception documentaire appliqués ; CI PR/main conservées (dépôt public).
+  Résultat des runs finaux dans le bilan de livraison ; ne pas confondre un run
+  annulé avant E2E avec une validation. Fournisseurs simulés ; aucun gain
   acoustique, latence matérielle ou acceptation humaine déduit des tests.
 
 ## Reste E0 : sources et intégration

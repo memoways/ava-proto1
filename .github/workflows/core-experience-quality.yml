@@ -2,8 +2,14 @@ name: Core experience quality
 
 on:
   pull_request:
+    paths-ignore: ['**/*.md', 'docs/**']
   push:
     branches: [main]
+    paths-ignore: ['**/*.md', 'docs/**']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   regression-gates:
@@ -14,10 +20,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-node22-v1
       - run: npm ci
       - run: npm run test:quality
-      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Install all Playwright browsers and dependencies
+        run: |
+          # Same signed Ubuntu packages; avoid the stalled Azure mirror.
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          fi
+          npx playwright install --with-deps chromium firefox webkit
       - run: npm run test:e2e
       - name: Upload Playwright failure artifacts
         if: failure()

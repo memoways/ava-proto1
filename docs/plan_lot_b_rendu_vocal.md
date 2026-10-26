@@ -412,6 +412,22 @@ session membre simulée ; la garde publique refuse toujours un simple `?env=`
 anonyme. Rejeu E2E complet du code compatible lancé ; son résultat final et les
 CI du HEAD exact puis main sont consignés dans le bilan de livraison de la PR #81
 avant clôture technique.
+Incident CI de livraison : sur `5e335ed`, qualité GitHub verte mais
+installation Playwright ralentie par les téléchargements de paquets Ubuntu
+sur `azure.archive.ubuntu.com` (142 Mio annoncés ; archives de quelques Mio
+prenant plus d’une minute, une archive ignorée/retentée dans le log). Tentative 1
+annulée puis un rejeu du même HEAD ; ce rejeu reste sur l’installation. Aucune
+fusion sur ces contrôles incomplets. Le workflow garde Ubuntu, npm/Node 22,
+la qualité complète et Chromium/Firefox/WebKit, avec son plafond de 20 minutes.
+La source de paquets du runner passe au miroir officiel `archive.ubuntu.com`,
+avec les mêmes signatures APT ; aucune protection ni contrôle retiré.
+Mise en conformité associée : concurrence annulant les anciens HEAD, cache npm
+indexé sur Node 22 (pas le lockfile), lots purement documentaires ignorés.
+Une installation et un build par passage, artefacts uniquement en échec/7 jours
+conservés. Dépôt public : CI PR et main maintenues. Le code applicatif reste celui
+des **81 E2E finaux verts sans retry (12,9 min)** ; YAML et shell du workflow
+vérifiés séparément avant sa CI finale. Aucune chaîne de publication substituée.
+
 Le premier son d'accueil est maintenant horodaté sur le callback de lecture,
 séparément de la fin de lecture. Le reçu ne déclare aucun préfixe aligné pour
 une lecture partielle : toute la phrase commencée reste incertaine.
