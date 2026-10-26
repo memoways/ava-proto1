@@ -556,7 +556,7 @@ export default function GameMasterSettingsTab() {
 
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="minimum-handoff-turn">Premier tour autorisé <Hint level="expert" text="Aucun passage avant ce tour, y compris sur demande explicite du joueur. Laisser par défaut." /></Label>
+                    <Label htmlFor="minimum-handoff-turn">Échanges complets par appel <Hint level="expert" text="Minimum de réponses entièrement délivrées dans l’appel courant, accueil exclu. Les fragments STT et réponses interrompues ne comptent pas. Quatre par défaut." /></Label>
                     <Input
                       id="minimum-handoff-turn"
                       type="number"

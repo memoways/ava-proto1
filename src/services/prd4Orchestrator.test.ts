@@ -199,6 +199,21 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     vi.mocked(patchQueuedConversationTurnTrace).mockResolvedValue();
   });
 
+  it('F1: ordinary continuation with an open request returns before GM, with one existing call', async () => {
+    let finish!: (value: PRD4PostTurnEvaluation) => void;
+    vi.mocked(evaluatePostTurnPRD4).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    const prepareHandoff = vi.fn();
+    const result = await processPRD4Turn({ sessionId: 'session', conversationHistory: [], userMessage: 'Merci.',
+      userRole: null, timeElapsedSeconds: 10, prepareHandoff,
+      handoffOpenRequest: { turnId: 'session:1', turnIndex: 1, expiresAfterTurnIndex: Number.MAX_SAFE_INTEGER,
+        sourceCharacter: 'max', targetCharacter: 'emma', orchestrationVersionId: 'gm-v1', userText: 'Je veux parler avec Emma.' } });
+    expect(result.maxResponse).toBe('Je vous écoute.');
+    expect(prepareHandoff).not.toHaveBeenCalled();
+    expect(evaluatePostTurnPRD4).toHaveBeenCalledOnce();
+    finish(postTurnResult);
+    await result.postTurnPromise;
+  });
+
   it("streams with the shared Emma frame and waits for delivered text before GM", async () => {
     let deliver!: (text: string) => void;
     const delivery = new Promise<string>(resolve => { deliver = resolve; });

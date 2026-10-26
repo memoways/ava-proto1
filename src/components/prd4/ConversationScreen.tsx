@@ -30,6 +30,8 @@ interface Props {
   attachAvatarMedia?: (element: HTMLMediaElement | null) => void;
   activeCharacter: "max" | "emma";
   portraitUrl?: string | null;
+  handoffIssue?: { phase: 'preparing' | 'error'; reason: string; reload?: boolean } | null;
+  onRetryHandoff?: () => void;
   handoffOffer?: { reason: string; targetCharacter?: "max" | "emma" } | null;
   handoffPortraitUrl?: string | null;
   handoffCalling?: boolean;
@@ -55,6 +57,8 @@ const ConversationScreen = ({
   attachAvatarMedia,
   activeCharacter,
   portraitUrl = null,
+  handoffIssue = null,
+  onRetryHandoff,
   handoffOffer = null,
   handoffPortraitUrl = null,
   handoffCalling = false,
@@ -251,6 +255,13 @@ const ConversationScreen = ({
           <span className="sr-only" aria-live="polite" aria-atomic="true">
             {handoffOffer ? `${displayName} vous propose de parler avec ${offerTargetName}.` : ""}
           </span>
+          {handoffIssue && !handoffOffer && (
+            <div aria-live="polite" data-testid="handoff-state" className="max-w-xs rounded-xl bg-background/90 p-3 text-sm">
+              <p>{handoffIssue.reason}</p>
+              {handoffIssue.phase === 'error' && <button type="button" onClick={onRetryHandoff}
+                disabled={handoffInputBlocked || audioState !== 'idle'} className="min-h-11 underline disabled:opacity-50">{handoffIssue.reload ? 'Recharger l’appel' : 'Réessayer le passage'}</button>}
+            </div>
+          )}
           {handoffOffer && (
             <div className="flex flex-col items-start gap-1">
               <button

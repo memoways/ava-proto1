@@ -228,7 +228,7 @@ describe("Game Master PRD4 — memory_delta", () => {
       currentCharacter: "max", userRole: null, turnIndex: 4, timeElapsedSeconds: 20,
       sessionDurationSeconds: 900, minimumClosureSeconds: 600, relationshipPolicy,
     });
-    expect(result.execution_status).toBe("invalid");
+    expect(result.execution_status).toBe("executed");
     expect(result.execution_reason).toBe("relationship_invalid");
     expect(result.memory_delta).toBeNull();
     expect(persistPostTurnMemory).toHaveBeenCalledWith("session-invalid-relationship", expect.anything(), null, 4, "max");

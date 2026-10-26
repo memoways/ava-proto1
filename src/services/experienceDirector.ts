@@ -28,6 +28,7 @@ export interface DirectorGuardContext {
   configPublished: boolean;
   currentCharacter: "max" | "emma";
   userTurn: number;
+  completedExchanges?: number;
   handoffCount: number;
   handoffPending: boolean;
   lastHandoffTurn: number | null;
@@ -112,7 +113,7 @@ export function validateDirectorDecision(
   if (decision.action.type === "handoff") {
     if (!context.handoffsEnabled || context.maximumHandoffsPerSession <= 0) return blocked("handoff_disabled");
     if (decision.action.targetCharacter === context.currentCharacter) return blocked("handoff_same_character");
-    if (context.userTurn < context.minimumHandoffTurn) return blocked("handoff_before_minimum_turn");
+    if ((context.completedExchanges ?? context.userTurn) < context.minimumHandoffTurn) return blocked("handoff_before_minimum_turn");
     if (context.handoffCount >= context.maximumHandoffsPerSession) return blocked("handoff_limit_reached");
     if (
       context.lastHandoffTurn != null
