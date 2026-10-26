@@ -17,6 +17,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   sans seconde mutation ni adoption d'un état étranger.
 - Seuil du back-office : échanges complets de l'appel courant, accueil,
   fragments et réponses interrompues exclus ; aide admin corrigée.
+- CI : plafond du job porté de 20 à 30 min après expiration attestée pendant les E2E ; tous les contrôles et navigateurs conservés, CI PR/main du dépôt public maintenues.
 - Quatre replays UI T15/T17/T21 rouges avant correctif puis verts ; risques
   d'audio partiel, retards GM/profils, stockage, reprise, deux onglets et mémoire
   isolée couverts. Validation complète et livraison en cours ; aucune publication.

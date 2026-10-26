@@ -22,7 +22,11 @@ Rouge effectivement observé avant correctif : `npx playwright test tests/e2e/pr
 - Erreurs durables dans l'interface, réessai explicite ; conflit d'onglet avec rechargement de l'appel. Les CAS, revalidations clic/décroché, verrou double clic et états avant/après commit restent actifs. Aucun retour grille ou changement de timer ajouté.
 - Lovable Cloud lu via le connecteur Ava : colonnes `pending_handoff`/`conversation_log` déjà JSONB, compteur et personnage existants. Aucune migration, Edge Function, secret, fournisseur ou réglage production modifié ; aucun déploiement Cloud additionnel requis par ce diff.
 
-Validation complète et livraison GitHub/Lovable : en cours de vérification ; ne pas assimiler les premiers replays verts à une clôture technique.
+Validation locale complète : `VITEST_MAX_FORKS=2 VITEST_MIN_FORKS=1 npm run test:quality` vert (67 régressions, 1 031 unitaires, 41 intégrations, lint/typage/build) ; `npm run test:e2e` : 91/91 verts, aucun retry, 15,4 min.
+
+La première CI PR [40363778865](https://github.com/memoways/ava-proto1/actions/runs/40363778865) a validé toute la qualité puis 80 E2E sans rouge avant annulation. L'annotation GitHub confirme « The job has exceeded the maximum execution time of 20m0s ». Le plafond de `regression-gates` passe de 20 à 30 minutes pour laisser terminer les 91 E2E séquentiels CI. Aucun contrôle ni navigateur retiré, aucune installation/build supplémentaire, outil/hébergement/budget/facturation inchangés. Dépôt public confirmé par API : CI PR et main conservées. [Syntaxe officielle du délai](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idtimeout-minutes). Cette modification du workflow appelle une nouvelle CI sur son HEAD exact ; ne pas fusionner le premier résultat annulé.
+
+Livraison GitHub/Lovable : en cours de vérification ; aucune publication production.
 
 ## Audit de production et nouveau contrat — 26 octobre 2026
 
