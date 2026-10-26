@@ -1,5 +1,54 @@
 import type { ConversationMessage, RuntimeCharacter } from '@/types';
 import { characterDisplayName, hasSpokenWithCharacter, sliceConversationForCharacter } from './characterConversation';
+import type { ResponseDeliveryReceipt } from './responseDelivery';
+import type { ResponseOutputResult } from './streamingAvatar/types';
+
+/** Scripted audio has no word alignment: partial playback stays uncertain. */
+export function greetingDelivery(turnId: string, turnIndex: number, character: RuntimeCharacter, text: string,
+  output?: Pick<ResponseOutputResult, 'status' | 'started'>): ResponseDeliveryReceipt {
+  const complete = output?.status === 'played';
+  const uncertain = !complete && output?.started ? text : '';
+  return { turnId, turnIndex, character, intent: null, generated: text,
+    delivered: complete ? text : '', uncertain, privateContinuation: complete || uncertain ? '' : text,
+    status: complete ? 'completed' : output?.status === 'cancelled' ? 'cancelled' : output?.status === 'failed' ? 'failed' : 'unknown',
+    scheduledSamples: null, playedSamples: null, sampleRate: null };
+}
+
+/** App greeting content approved by Ulrich on 2026-10-26, sandbox-ulrich only. */
+const approvedSandboxGreetings: Record<RuntimeCharacter, readonly string[]> = {
+  max: ['Allô. Max à l’appareil. Je vous écoute.', 'Oui, c’est Max. Qu’est-ce qui vous amène ?'],
+  emma: ['Allô… c’est Emma. À qui je parle ?', 'Oui… je suis là. Vous vouliez me parler ?'],
+};
+
+export function initialGreetingLines(character: RuntimeCharacter, openingLine: string | null, environment = 'prod'): readonly string[] {
+  const line = openingLine?.trim();
+  const approved = approvedSandboxGreetings[character];
+  // The profile remains a single line for already published clients. An author
+  // changing that reference always takes precedence over this approved repertoire.
+  if (environment === 'sandbox-ulrich' && line === approved[0]) return approved;
+  return [line || (character === 'max' ? 'Hallo... à qui ai-je affaire ?' : 'Allô ?')];
+}
+
+/** Kept by the experience across calls, with bounded memory and no private history. */
+export function createInitialGreetingSelector() {
+  const calls = new Map<string, string>();
+  const last = new Map<string, string>();
+  return (callId: string, environment: string, character: RuntimeCharacter, openingLine: string | null): string => {
+    const owner = JSON.stringify([environment, character]);
+    const key = JSON.stringify([callId, environment, character]);
+    const selected = calls.get(key);
+    if (selected !== undefined) return selected;
+    const lines = initialGreetingLines(character, openingLine, environment);
+    const alternatives = lines.filter(line => line !== last.get(owner));
+    const available = alternatives.length ? alternatives : lines;
+    const line = available[Math.floor(Math.random() * available.length)];
+    calls.set(key, line);
+    last.set(owner, line);
+    if (calls.size > 16) calls.delete(calls.keys().next().value!);
+    if (last.size > 16) last.delete(last.keys().next().value!);
+    return line;
+  };
+}
 
 const recoveryLines: Record<RuntimeCharacter, readonly string[]> = {
   max: [

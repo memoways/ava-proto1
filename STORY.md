@@ -3,9 +3,28 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-25 (A3 auditions WS isolées ; pauses live désactivées, recette humaine distincte)
+> **Last Updated**: 2026-10-26 (A4 accueils sandbox approuvés ; intégration E0 et recette humaine restantes)
 
 ---
+
+## A4 — décrocher une seule fois (26 octobre 2026)
+
+Le premier accueil venait d'un unique texte de profil. Les transferts savaient
+déjà distinguer premier contact et retour ; l'app ajoute un petit répertoire
+approuvé lié à la phrase initiale du profil, choisi une fois par appel. Ulrich a validé
+deux formulations par personnage pour sa sandbox. Elles ouvrent la conversation
+sans confidence prématurée ni scénario physique ajouté.
+
+Le choix reste stable pendant l'appel. Une attente de fiche qui se termine après
+le raccrochage ne doit plus relancer la voix, et un second déclenchement ne lit
+pas un second accueil. Les blobs REST complets peuvent être réutilisés lorsque
+tous les paramètres correspondent ; le streaming Gradium garde son propre chemin.
+L'accueil commencé puis interrompu reste incertain, sans inventer les mots entendus.
+
+Les tests simulés et l'approbation des textes restent distincts de l'écoute au
+casque. E0 attend ses éditions approuvées et le connecteur natif Gamilab ; les
+textes de production sont conservés. [Plan et état A4](docs/plan_lot_b_rendu_vocal.md#exécution-a4--26-octobre-2026)
+et [reprise A4R](docs/prompt_reprise_integration_recette_lot_a4r.md) enregistrés.
 
 ## A3 — entendre ce que le réglage promet (25 octobre 2026)
 

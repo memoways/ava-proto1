@@ -19,11 +19,18 @@ import type {
 } from "@/services/tts/types";
 import { recordAudioLatency } from "@/services/latencyTelemetry";
 import { playAudioBlobRobust, type PlaybackResult } from "@/services/audioPlayback";
+import { getOpeningTTSBlob, openingTTSCacheKey } from '../openingTTSCache';
+import { getActiveEnvironment } from '../environmentContext';
+import { getTTSSettings } from '../settingsService';
+import { getCartesiaSettings, getHumeSettings, getInworldSettings, resolveGradiumSettings } from './providerSettings';
+import type { ServiceObservation } from '../voiceTurnTelemetryV2';
 
 export { prepareTextForTTS } from "@/services/tts/textPrep";
 export { chunkTextForTTS, extractSentences } from "@/services/tts/textChunking";
 
 export interface TTSOptions extends TTSGenerateContext {
+  /** Explicit scripted greeting only; live WS always bypasses the blob cache. */
+  cacheOpening?: boolean;
   /** Force a specific provider for this call (ignored by TTSQueue). */
   providerId?: TTSProviderId;
   characterOverride?: boolean;
@@ -108,10 +115,37 @@ async function generateWithBoundedRetry(
 /** Generate speech using the active provider (or `opts.providerId` if forced). */
 export async function generateSpeech(text: string, opts?: TTSOptions): Promise<Blob> {
   const provider = opts?.providerId ? getProviderById(opts.providerId) : getActiveProvider();
+  if (!opts?.cacheOpening || opts.speechAudition || opts.auditionModelId || opts.onAuditionRequest) return generateUncachedSpeech(provider, text, opts);
+  const settings = provider.id === 'gradium' ? resolveGradiumSettings(opts.characterKey)
+    : provider.id === 'inworld' ? getInworldSettings()
+    : provider.id === 'hume' ? getHumeSettings()
+    : provider.id === 'cartesia' ? getCartesiaSettings() : getTTSSettings();
+  const key = openingTTSCacheKey({ environmentId: getActiveEnvironment(), text, providerId: provider.id,
+    voiceId: opts.voiceId, characterKey: opts.characterKey, settings, performance: opts.performance,
+    previousText: opts.previousText, nextText: opts.nextText });
+  const result = await getOpeningTTSBlob(key, async () => {
+    let service: ServiceObservation | undefined;
+    const blob = await generateUncachedSpeech(provider, text, { ...opts, onServiceObserved: value => {
+      service = value;
+      observeService(opts.onServiceObserved, value);
+    } });
+    return { blob, service };
+  }, opts.signal);
+  if (opts.signal?.aborted) throw createAbortError();
+  if (result.cached) {
+    // No fabricated provider generation timing on a replay; playback is measured anew.
+    if (result.service) observeService(opts.onServiceObserved, { ...result.service, transport: 'cache', retry_count: 0 });
+    observeVoice(opts.onVoiceObservation, 'audio_blob_ready');
+  }
+  return result.blob;
+}
+
+async function generateUncachedSpeech(provider: TTSProvider, text: string, opts?: TTSOptions): Promise<Blob> {
   const tRequest = performance.now();
   observeVoice(opts?.onVoiceObservation, "tts_text_sent", tRequest);
   try {
     const { result: { blob, meta }, retryCount } = await generateWithBoundedRetry(provider, text, opts);
+    if (opts?.signal?.aborted) throw createAbortError();
     const totalElapsedMs = Math.round(performance.now() - tRequest);
     observeService(opts?.onServiceObserved, {
       service: "tts", requested_provider: opts?.providerId ?? provider.id, requested_model: meta.model ?? null,

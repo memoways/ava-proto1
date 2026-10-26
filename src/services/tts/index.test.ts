@@ -27,12 +27,16 @@ vi.mock("@/services/audioPlayback", () => ({
 
 import { generateSpeech } from "@/services/tts";
 import { parseElevenLabsErrorDetails } from "@/services/tts/providers/elevenlabs";
+import { resetOpeningTTSCache } from '../openingTTSCache';
+import { setActiveEnvironment } from '../environmentContext';
 
 describe("ElevenLabs transient TTS recovery", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.spyOn(Math, "random").mockReturnValue(0);
     vi.clearAllMocks();
+    resetOpeningTTSCache();
+    setActiveEnvironment('prod');
   });
 
   afterEach(() => {
@@ -89,5 +93,20 @@ describe("ElevenLabs transient TTS recovery", () => {
 
     await expect(generateSpeech("Bonjour Max.")).rejects.toThrow("insufficient_credits");
     expect(mocks.generate).toHaveBeenCalledOnce();
+  });
+  it('reuses an explicit opening with cache provenance and no new generation timing, isolated by environment/voice', async () => {
+    mocks.generate.mockResolvedValue({ blob: new Blob(['audio']), meta: { provider: 'elevenlabs', model: 'eleven-v1' } });
+    const observed = vi.fn();
+    const opts = { cacheOpening: true, characterKey: 'max', voiceId: 'v1', onServiceObserved: observed };
+    await generateSpeech('Allô.', opts);
+    await generateSpeech('Allô.', opts);
+    expect(mocks.generate).toHaveBeenCalledOnce();
+    expect(mocks.recordAudioLatency).toHaveBeenCalledOnce();
+    expect(observed).toHaveBeenLastCalledWith(expect.objectContaining({ transport: 'cache', effective_model: 'eleven-v1' }));
+    setActiveEnvironment('sandbox-ulrich');
+    await generateSpeech('Allô.', opts);
+    await generateSpeech('Allô.', { ...opts, voiceId: 'v2' });
+    await generateSpeech('Allô.', { ...opts, cacheOpening: false });
+    expect(mocks.generate).toHaveBeenCalledTimes(4);
   });
 });
