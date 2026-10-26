@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-26 (A4 livrée ; Gamilab et copies E0 vérifiés ; écoute humaine restante)
+> **Last Updated**: 2026-10-26 (F1 livré, CI PR/main et Lovable vérifiés ; F2 non lancé)
 
 ---
 
@@ -22,8 +22,8 @@ la mémoire et les états joués. Une panne devient visible et récupérable. Le
 fragments STT. Les validations globales invalides et les confidences croisées
 restent bloquées. [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md#réalisation-et-preuves-f1).
 
-Livraison et validation complète encore en cours ; F2 (cycle d'appels, grille et
-timer suspendu) n'est pas démarré. Aucune publication production.
+Code livré par [PR #88](https://github.com/memoways/ava-proto1/pull/88), main `5bf1bd51617adc5ae06c656767ea02b29aca3371` ; CI PR verte, qualité complète et 91 E2E locaux verts. Lovable au même SHA, prêt, fichier du coordinateur identique. [CI main verte](https://github.com/memoways/ava-proto1/actions/runs/40374094704), 91/91 E2E sans retry. Clôture documentaire seule, sans changement applicatif. F2 (cycle d'appels, grille et timer suspendu) non lancé ; aucune publication production.
+
 
 ## Les accords ne possédaient pas leur bouton (26 octobre 2026)
 

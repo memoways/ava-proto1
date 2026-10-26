@@ -6,6 +6,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [F1 — préparer le passage avant la confirmation] — 2026-10-26
 
+- [PR #88 fusionnée](https://github.com/memoways/ava-proto1/pull/88), main code `5bf1bd51617adc5ae06c656767ea02b29aca3371` ; [CI PR verte](https://github.com/memoways/ava-proto1/actions/runs/40370058542) sur HEAD exact `7afdb7e`. [CI main](https://github.com/memoways/ava-proto1/actions/runs/40374094704) verte sur ce commit de fusion, 91/91 E2E sans retry.
 - Départ main `25142b338e0f1082e0675aab26cbe102cf4d5f33` (#87).
   Coordinateur de demande/appel, cible pronominale conservée, offre maintenue
   après continuation et révocation explicite. Révision CAS renouvelée pour
@@ -21,7 +22,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - CI : plafond du job porté de 20 à 30 min après expiration attestée pendant les E2E ; tous les contrôles et navigateurs conservés, CI PR/main du dépôt public maintenues.
 - Quatre replays UI T15/T17/T21 rouges avant correctif puis verts ; risques
   d'audio partiel, retards GM/profils, stockage, reprise, deux onglets et mémoire
-  isolée couverts. Validation complète et livraison en cours ; aucune publication.
+  isolée couverts. Qualité verte : 1 031 unitaires, 41 intégrations, 67 régressions, lint/typage/build ; 91 E2E locaux sans retry. CI PR : un retry d’assertion de journal asynchrone, bouton déjà visible ; CI main sans retry. Lovable au SHA de fusion, prêt, source du coordinateur relue identique. Aucune publication.
 - [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md#réalisation-et-preuves-f1),
   [reprise F2 préparée, non lancée](docs/prompt_reprise_fiabilite_passage_personnages_lot_f2.md).
   Aucune migration ni Edge Function requise, aucun réglage Cloud modifié.

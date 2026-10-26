@@ -2,7 +2,7 @@
 
 ## Exécution F1 — 26 octobre 2026
 
-Lot en cours, branche `codex/handoff-reliability-f1`, base `25142b338e0f1082e0675aab26cbe102cf4d5f33`.
+Code F1 fusionné par [PR #88](https://github.com/memoways/ava-proto1/pull/88), main `5bf1bd51617adc5ae06c656767ea02b29aca3371`. **F1 livré techniquement : CI PR et main vertes, E2E compris ; Lovable synchronisé et prêt.** Base initiale `25142b338e0f1082e0675aab26cbe102cf4d5f33`.
 Contrôles : Notion natif get-self Gamilab `7e1a9a09-09cb-4deb-a306-83a29b831bc2`, tâche/application lues ; Git actualisé, PR étrangère #24 hors périmètre ; Lovable Ava/Memoways au même SHA, ready et agentFinished=true. Un seul agent.
 
 Ordre d'exécution : replays rouges intégrés T15/T17/T21 ; coordinateur à durée de vie métier et preuve candidate distincte du reçu livré ; préparation persistée avant confirmation et disponibilité après reçu complet ; comptage des échanges complets par appel ; tests ciblés, qualité et E2E complets ; PR/CI HEAD exact/main, nettoyage, vérification Lovable et capitalisation. F2 et production exclus.
@@ -23,15 +23,45 @@ Rouge effectivement observé avant correctif : `npx playwright test tests/e2e/pr
 - Erreurs durables dans l'interface, réessai explicite ; conflit d'onglet avec rechargement de l'appel. Les CAS, revalidations clic/décroché, verrou double clic et états avant/après commit restent actifs. Aucun retour grille ou changement de timer ajouté.
 - Lovable Cloud lu via le connecteur Ava : colonnes `pending_handoff`/`conversation_log` déjà JSONB, compteur et personnage existants. Aucune migration, Edge Function, secret, fournisseur ou réglage production modifié ; aucun déploiement Cloud additionnel requis par ce diff.
 
-Validation locale complète : `VITEST_MAX_FORKS=2 VITEST_MIN_FORKS=1 npm run test:quality` vert (67 régressions, 1 031 unitaires, 41 intégrations, lint/typage/build) ; `npm run test:e2e` : 91/91 verts, aucun retry, 15,4 min.
+Validation locale complète : `VITEST_MAX_FORKS=2 VITEST_MIN_FORKS=1 npm run test:quality` vert (67 régressions, 1 031 unitaires, 41 intégrations, lint/typage/build) ; `npm run test:e2e` : 91/91 verts sur le HEAD final, aucun retry, 15,2 min.
 
-La première CI PR [40363778865](https://github.com/memoways/ava-proto1/actions/runs/40363778865) a validé toute la qualité puis 80 E2E sans rouge avant annulation. L'annotation GitHub confirme « The job has exceeded the maximum execution time of 20m0s ». Le plafond de `regression-gates` passe de 20 à 30 minutes pour laisser terminer les 91 E2E séquentiels CI. Aucun contrôle ni navigateur retiré, aucune installation/build supplémentaire, outil/hébergement/budget/facturation inchangés. Dépôt public confirmé par API : CI PR et main conservées. [Syntaxe officielle du délai](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idtimeout-minutes). Cette modification du workflow appelle une nouvelle CI sur son HEAD exact ; ne pas fusionner le premier résultat annulé.
+La première CI PR [40363778865](https://github.com/memoways/ava-proto1/actions/runs/40363778865) a validé toute la qualité puis 80 E2E sans rouge avant annulation. L'annotation GitHub confirme « The job has exceeded the maximum execution time of 20m0s ». Le plafond de `regression-gates` passe de 20 à 30 minutes pour laisser terminer les 91 E2E séquentiels CI. Aucun contrôle ni navigateur retiré, aucune installation/build supplémentaire, outil/hébergement/budget/facturation inchangés. Dépôt public confirmé par API : CI PR et main conservées. [Syntaxe officielle du délai](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idtimeout-minutes). Une nouvelle CI a été exécutée sur le HEAD exact final, puis vérifiée verte avant fusion ; le résultat annulé n'a pas servi à autoriser la fusion.
 
-Livraison GitHub/Lovable : en cours de vérification ; aucune publication production.
+### Livraison F1 vérifiée — 26 octobre 2026
+
+- [PR #88 fusionnée](https://github.com/memoways/ava-proto1/pull/88), HEAD `7afdb7ed44ddb7a6e797d25fad32fe92c0118c1c`, main code `5bf1bd51617adc5ae06c656767ea02b29aca3371`.
+- [CI PR verte sur ce HEAD exact](https://github.com/memoways/ava-proto1/actions/runs/40370058542), qualité complète et E2E compris. 90 E2E sans retry + T11 vert au retry : son assertion immédiate a interrogé le journal avant l'arrivée de l'événement asynchrone `handoff_validated`, alors que le bouton était présent. Aucune absence d'offre produit attestée par ce retry.
+- [CI main du commit de fusion](https://github.com/memoways/ava-proto1/actions/runs/40374094704) : **verte sur ce SHA exact**, qualité complète et 91/91 E2E sans retry (17,9 min).
+- Lovable natif Ava/Memoways : SHA `5bf1bd51617adc5ae06c656767ea02b29aca3371`, `ready`, `agentFinished=true`. `src/services/handoffCoordinator.ts` relu à ce ref par le connecteur et comparé intégralement au fichier local : identique.
+- Diff propre à F1 (`78510f6..5bf1bd51617adc5ae06c656767ea02b29aca3371`) : aucune migration ni Edge Function. Le plan vocal et la migration `0010_seed_sandbox_from_prod` ajoutés par Lovable pendant l'attente sont hors F1 et préservés sans modification ni application par ce lot. La source GitHub/Lovable n'est pas une preuve d'application de cette migration étrangère.
+- Branche de code F1 supprimée localement/distante après fusion ; même nom réutilisé uniquement pour la clôture documentaire. Cette dernière ne change que cinq fichiers Markdown et applique l’exception CI documentaire : code inchangé, dernière CI code main verte ci-dessus. Le nettoyage final et le SHA documentaire sont revérifiés dans la tâche Notion et le compte rendu après sa fusion. PR étrangère #24 préservée. Distant hors clôture : `main`, `agent/test-gap-invitation-validity-multi-use`. Seize branches locales étrangères conservées selon AGENTS, inventaire ci-dessous.
+- Aucune opération Cloud supplémentaire requise pour F1, donc aucun prompt d'intervention Lovable nécessaire. Aucune publication production, recette humaine acoustique restante en F3. F2 non lancé ; [prompt autonome F2](prompt_reprise_fiabilite_passage_personnages_lot_f2.md).
+
+Branches locales étrangères préservées :
+
+```text
+agent/test-gap-invitation-validity-multi-use
+agent/test-gap-posthog-internal-comparison
+codex/bug-scan-gradium-temp-cap
+codex/character-handoff-contract-lot-1
+codex/character-handoff-lot-1-closeout
+codex/character-handoff-lot-2-closeout
+codex/character-handoff-lot-3-closeout
+codex/character-handoff-lot1-prompt
+codex/character-handoff-pill-lot-3
+codex/character-handoff-runtime-lot-2
+codex/handoff-veto-lot-1-finalization
+codex/plan-character-handoff
+codex/test-gap-settings-hydration
+codex/video-latency-metrics
+codex/video-latency-publication-record
+cursor/d5d2099b
+```
+
 
 ## Audit de production et nouveau contrat — 26 octobre 2026
 
-**Statut : audit et plan, sans correctif produit ni publication.** Cette section
+**État historique lors de l'audit : plan sans correctif produit ni publication.** Le bilan F1 en tête décrit la livraison actuelle. Cette section
 prime sur les anciennes propositions de durée de vie des offres. Les lots
 historiques restent conservés comme preuves de ce qui a été réalisé, et non
 comme garantie que la mécanique actuelle répond au nouveau contrat.
