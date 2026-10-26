@@ -2,7 +2,7 @@
  * Canonical acting intent for per-turn TTS, plus provider adapters.
  *
  * Derived from the spoken line (no extra LLM). Providers map this to their
- * own knobs: Fish Audio `description`, Inworld `instruction`, ElevenLabs sliders /
+ * own knobs: Fish Audio emotion markers, Inworld `instruction`, ElevenLabs sliders /
  * v3 tags, Gradium temp/padding, Cartesia generation_config.
  */
 
