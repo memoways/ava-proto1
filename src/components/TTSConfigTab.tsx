@@ -19,10 +19,10 @@ import {
   loadInworldSettingsFromDB,
   saveInworldSettingsToDB,
   resetInworldSettings,
-  getHumeSettings,
-  loadHumeSettingsFromDB,
-  saveHumeSettingsToDB,
-  resetHumeSettings,
+  getFishSettings,
+  loadFishSettingsFromDB,
+  saveFishSettingsToDB,
+  resetFishSettings,
   getGradiumSettings,
   loadGradiumSettingsFromDB,
   saveGradiumSettingsToDB,
@@ -38,7 +38,7 @@ import {
   CARTESIA_MODELS,
 
   type InworldSettings,
-  type HumeSettings,
+  type FishSettings,
   type GradiumSettings,
   type GradiumVoiceTuning,
   type CartesiaSettings,
@@ -61,7 +61,7 @@ import {
 } from "@/services/tts/performanceIntent";
 
 const TEST_PHRASE = "Écoute, je ne sais pas qui tu es... mais si tu sais quelque chose sur Ava, il faut me le dire maintenant. Je n'ai plus beaucoup de temps.";
-/** Intensity 2 so Hume / Inworld acting instructions are actually audible in admin tests. */
+/** Intensity 2 so Fish Audio / Inworld acting instructions are actually audible in admin tests. */
 const AUDITION_INTENSITY = 2 as const;
 const GRADIUM_CHARACTER_ORDER = ["max", "emma"];
 const AUDITION_EMOTION_LABELS: Record<CanonicalEmotion, string> = {
@@ -123,10 +123,10 @@ export default function TTSConfigTab() {
   const [iwSaved, setIwSaved] = useState<InworldSettings>(getInworldSettings());
   const [savingIw, setSavingIw] = useState(false);
 
-  // Hume settings
-  const [huSettings, setHuSettings] = useState<HumeSettings>(getHumeSettings());
-  const [huSaved, setHuSaved] = useState<HumeSettings>(getHumeSettings());
-  const [savingHu, setSavingHu] = useState(false);
+  // Fish Audio settings
+  const [fishSettings, setFishSettings] = useState<FishSettings>(getFishSettings());
+  const [fishSaved, setFishSaved] = useState<FishSettings>(getFishSettings());
+  const [savingFish, setSavingFish] = useState(false);
 
   // Gradium settings
   const [grSettings, setGrSettings] = useState<GradiumSettings>(getGradiumSettings());
@@ -154,7 +154,7 @@ export default function TTSConfigTab() {
     loadActiveProviderFromDB().then(setActiveProviderState);
     loadTTSSettingsFromDB().then((s) => { setElSettings(s); setElSaved(s); });
     loadInworldSettingsFromDB().then((s) => { setIwSettings(s); setIwSaved(s); });
-    loadHumeSettingsFromDB().then((s) => { setHuSettings(s); setHuSaved(s); });
+    loadFishSettingsFromDB().then((s) => { setFishSettings(s); setFishSaved(s); });
     loadGradiumSettingsFromDB().then((s) => { setGrSettings(s); setGrSaved(s); });
     loadCartesiaSettingsFromDB().then((s) => { setCaSettings(s); setCaSaved(s); });
     listCharacterRuntimeProfiles()
@@ -175,7 +175,7 @@ export default function TTSConfigTab() {
 
   const elHasChanges = JSON.stringify(elSettings) !== JSON.stringify(elSaved);
   const iwHasChanges = JSON.stringify(iwSettings) !== JSON.stringify(iwSaved);
-  const huHasChanges = JSON.stringify(huSettings) !== JSON.stringify(huSaved);
+  const fishHasChanges = JSON.stringify(fishSettings) !== JSON.stringify(fishSaved);
   const grHasChanges = JSON.stringify(grSettings) !== JSON.stringify(grSaved);
   const caHasChanges = JSON.stringify(caSettings) !== JSON.stringify(caSaved);
 
@@ -292,23 +292,23 @@ export default function TTSConfigTab() {
     toast.success("Inworld réinitialisé");
   }
 
-  // Hume helpers
-  function updateHu(patch: Partial<HumeSettings>) {
-    const current = { ...huSettings, ...patch };
+  // Fish Audio helpers
+  function updateFish(patch: Partial<FishSettings>) {
+    const current = { ...fishSettings, ...patch };
     writeEnvironmentStorage("ava_tts_settings_hume", JSON.stringify(current));
-    setHuSettings(current);
+    setFishSettings(current);
   }
-  async function saveHu() {
-    setSavingHu(true);
-    await saveHumeSettingsToDB(huSettings);
-    setHuSaved(huSettings);
-    toast.success("Hume sauvegardé ✓");
-    setSavingHu(false);
+  async function saveFish() {
+    setSavingFish(true);
+    await saveFishSettingsToDB(fishSettings);
+    setFishSaved(fishSettings);
+    toast.success("Fish Audio sauvegardé ✓");
+    setSavingFish(false);
   }
-  function resetHu() {
-    const d = resetHumeSettings();
-    setHuSettings(d); setHuSaved(d);
-    toast.success("Hume réinitialisé");
+  function resetFish() {
+    const d = resetFishSettings();
+    setFishSettings(d); setFishSaved(d);
+    toast.success("Fish Audio réinitialisé");
   }
 
   // Gradium helpers
@@ -368,7 +368,7 @@ export default function TTSConfigTab() {
       <div>
         <h2 className="text-lg font-semibold">TTS Config — Multi-providers</h2>
         <p className="text-sm text-muted-foreground">
-          Compare les services TTS. Le provider <strong>actif</strong> est utilisé dans le jeu ; les autres restent disponibles pour les tests. Les puces d'intention ne jouent pas l'audio : clique <strong>Écouter Hume</strong> ou <strong>Écouter Inworld</strong> (seuls ces deux services rendent l'acting vraiment audible).
+          Compare les services TTS. Le provider <strong>actif</strong> est utilisé dans le jeu ; les autres restent disponibles pour les tests. Les puces d'intention ne jouent pas l'audio : clique <strong>Écouter Fish Audio</strong> ou <strong>Écouter Inworld</strong> (seuls ces deux services rendent l'acting vraiment audible).
         </p>
         <p className="text-sm text-muted-foreground">
           Les <strong>Voice ID</strong> se règlent par personnage dans Expérience → Orchestration. Gradium a des réglages fins distincts par personnage dans le panneau ci-dessous.
@@ -402,7 +402,7 @@ export default function TTSConfigTab() {
           <p className="text-xs text-amber-300/90 mt-3">
             En jeu, {TTS_PROVIDER_LIST.find((p) => p.id === activeProvider)?.label} est actif :
             l'intention y est {PROVIDER_ACTING_SUPPORT[activeProvider].labelFr.toLowerCase()}.
-            Hume et Inworld ci-dessous servent à l'audition, pas à l'appel.
+            Fish Audio et Inworld ci-dessous servent à l'audition, pas à l'appel.
           </p>
         )}
       </section>
@@ -430,8 +430,8 @@ export default function TTSConfigTab() {
           ))}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => testProvider("hume")} disabled={testing !== null}>
-            {testing === "hume" ? "..." : "🔊 Écouter Hume"}
+          <Button size="sm" onClick={() => testProvider("fish")} disabled={testing !== null}>
+            {testing === "fish" ? "..." : "🔊 Écouter Fish Audio"}
           </Button>
           <Button size="sm" variant="outline" onClick={() => testProvider("inworld")} disabled={testing !== null}>
             {testing === "inworld" ? "..." : "🔊 Écouter Inworld"}
@@ -657,29 +657,29 @@ export default function TTSConfigTab() {
           minLabel="Déterministe" maxLabel="Très expressif" />
       </section>
 
-      {/* ===== Hume Octave panel ===== */}
+      {/* ===== Fish Audio panel ===== */}
       <section className="border rounded-lg p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-base">🎙️ Hume AI Octave</h3>
+            <h3 className="font-semibold text-base">🎙️ Fish Audio</h3>
             <p className="text-xs text-muted-foreground">Très expressif, contrôle via description prosodique</p>
-            <ActingNote providerId="hume" />
+            <ActingNote providerId="fish" />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={resetHu}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
-            <Button size="sm" onClick={() => testProvider("hume")} disabled={testing === "hume"}>
-              {testing === "hume" ? "..." : "🔊 Tester"}
+            <Button variant="outline" size="sm" onClick={resetFish}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
+            <Button size="sm" onClick={() => testProvider("fish")} disabled={testing === "fish"}>
+              {testing === "fish" ? "..." : "🔊 Tester"}
             </Button>
-            <Button size="sm" onClick={saveHu} disabled={savingHu || !huHasChanges}
-              className={huHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
-              <Save className="w-3 h-3 mr-1" />{savingHu ? "..." : "Sauver"}
+            <Button size="sm" onClick={saveFish} disabled={savingFish || !fishHasChanges}
+              className={fishHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
+              <Save className="w-3 h-3 mr-1" />{savingFish ? "..." : "Sauver"}
             </Button>
           </div>
         </div>
 
-        {huHasChanges && (
+        {fishHasChanges && (
           <div className="bg-yellow-900/30 border border-yellow-700/50 rounded px-3 py-1 text-xs text-yellow-300">
-            ⚠️ Modifications Hume non sauvegardées
+            ⚠️ Modifications Fish Audio non sauvegardées
           </div>
         )}
 
@@ -688,8 +688,8 @@ export default function TTSConfigTab() {
 
           <label className="space-y-1 text-sm">
             <span className="font-medium text-muted-foreground">Provider de voix</span>
-            <select value={huSettings.voiceProvider}
-              onChange={(e) => updateHu({ voiceProvider: e.target.value as HumeSettings["voiceProvider"] })}
+            <select value={fishSettings.voiceProvider}
+              onChange={(e) => updateFish({ voiceProvider: e.target.value as FishSettings["voiceProvider"] })}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm">
               <option value="HUME_AI">HUME_AI (catalogue public)</option>
               <option value="CUSTOM_VOICE">CUSTOM_VOICE (voix clonée)</option>
@@ -699,8 +699,8 @@ export default function TTSConfigTab() {
 
         <label className="space-y-1 text-sm block">
           <span className="font-medium text-muted-foreground">Description prosodique (optionnel)</span>
-          <textarea value={huSettings.description}
-            onChange={(e) => updateHu({ description: e.target.value })}
+          <textarea value={fishSettings.description}
+            onChange={(e) => updateFish({ description: e.target.value })}
             rows={2}
             className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             placeholder="ex: voix grave, posée, légèrement inquiète, rythme lent" />
@@ -710,8 +710,8 @@ export default function TTSConfigTab() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="space-y-1 text-sm">
             <span className="font-medium text-muted-foreground">Format audio</span>
-            <select value={huSettings.format}
-              onChange={(e) => updateHu({ format: e.target.value as HumeSettings["format"] })}
+            <select value={fishSettings.format}
+              onChange={(e) => updateFish({ format: e.target.value as FishSettings["format"] })}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm">
               <option value="mp3">MP3</option>
               <option value="wav">WAV</option>
@@ -722,8 +722,8 @@ export default function TTSConfigTab() {
 
           <label className="space-y-1 text-sm">
             <span className="font-medium text-muted-foreground">Langue</span>
-            <input value={huSettings.languageCode}
-              onChange={(e) => updateHu({ languageCode: e.target.value.trim().toLowerCase() || "fr" })}
+            <input value={fishSettings.languageCode}
+              onChange={(e) => updateFish({ languageCode: e.target.value.trim().toLowerCase() || "fr" })}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="fr" />
             <span className="block text-xs text-muted-foreground/60">Code ISO 639-1 (fr, en, es…) pour guider la prononciation.</span>
           </label>

@@ -79,7 +79,7 @@ const STEPS: Step[] = [
     id: "tts",
     label: "TTS (façade multi-providers)",
     role: "Lecture audio streaming",
-    provider: "ElevenLabs (défaut) · Hume · Inworld · Gradium",
+    provider: "ElevenLabs (défaut) · Fish Audio · Inworld · Gradium",
     color: "bg-muted text-foreground border-border",
   },
   {
@@ -118,7 +118,7 @@ const PROVIDER_SUMMARY = [
   { title: "LLM utilitaires", detail: "Lovable AI Gateway — query rewrite RAG + résumé de session post-jeu." },
   { title: "Embeddings + rerank", detail: "Profil actif côté serveur (Voyage 4 temps réel recommandé) + rerank-2.5-lite ou rerank-2.5. Les anciens profils restent disponibles pour rollback explicite." },
   { title: "STT", detail: "Façade multi-providers (src/services/stt) — Deepgram par défaut, Whisper / AssemblyAI / Gradium / Gamilab sélectionnables." },
-  { title: "TTS", detail: "Façade multi-providers (src/services/tts) — ElevenLabs par défaut, Hume / Inworld / Gradium sélectionnables." },
+  { title: "TTS", detail: "Façade multi-providers (src/services/tts) — ElevenLabs par défaut, Fish Audio / Inworld / Gradium sélectionnables." },
 ];
 
 export default function PipelineSchema() {

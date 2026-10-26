@@ -22,7 +22,7 @@ import { playAudioBlobRobust, type PlaybackResult } from "@/services/audioPlayba
 import { getOpeningTTSBlob, openingTTSCacheKey } from '../openingTTSCache';
 import { getActiveEnvironment } from '../environmentContext';
 import { getTTSSettings } from '../settingsService';
-import { getCartesiaSettings, getHumeSettings, getInworldSettings, resolveGradiumSettings } from './providerSettings';
+import { getCartesiaSettings, getFishSettings, getInworldSettings, resolveGradiumSettings } from './providerSettings';
 import type { ServiceObservation } from '../voiceTurnTelemetryV2';
 
 export { prepareTextForTTS } from "@/services/tts/textPrep";
@@ -118,7 +118,7 @@ export async function generateSpeech(text: string, opts?: TTSOptions): Promise<B
   if (!opts?.cacheOpening || opts.speechAudition || opts.auditionModelId || opts.onAuditionRequest) return generateUncachedSpeech(provider, text, opts);
   const settings = provider.id === 'gradium' ? resolveGradiumSettings(opts.characterKey)
     : provider.id === 'inworld' ? getInworldSettings()
-    : provider.id === 'hume' ? getHumeSettings()
+    : provider.id === 'fish' ? getFishSettings()
     : provider.id === 'cartesia' ? getCartesiaSettings() : getTTSSettings();
   const key = openingTTSCacheKey({ environmentId: getActiveEnvironment(), text, providerId: provider.id,
     voiceId: opts.voiceId, characterKey: opts.characterKey, settings, performance: opts.performance,

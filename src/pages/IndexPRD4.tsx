@@ -160,7 +160,7 @@ import {
 const TEASER_VIDEO_URL = "https://video.gumlet.io/673f29f4a5e1bf70aa645cb7/6acc8341689a80cf2e4a427d/main.m3u8";
 
 function asTTSProviderId(value: string | null | undefined): TTSProviderId | null {
-  return value === "elevenlabs" || value === "inworld" || value === "hume" || value === "gradium" || value === "cartesia" ? value : null;
+  return value === "elevenlabs" || value === "inworld" || value === "fish" || value === "gradium" || value === "cartesia" ? value : null;
 }
 
 const IndexPRD4 = () => {

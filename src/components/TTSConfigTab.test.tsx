@@ -8,7 +8,7 @@ vi.mock("@/services/tts/providerSettings", async (importOriginal) => {
     ...actual,
     loadActiveProviderFromDB: vi.fn(async () => actual.getActiveProviderId()),
     loadInworldSettingsFromDB: vi.fn(async () => actual.getInworldSettings()),
-    loadHumeSettingsFromDB: vi.fn(async () => actual.getHumeSettings()),
+    loadFishSettingsFromDB: vi.fn(async () => actual.getFishSettings()),
     loadGradiumSettingsFromDB: vi.fn(async () => actual.getGradiumSettings()),
     loadCartesiaSettingsFromDB: vi.fn(async () => actual.getCartesiaSettings()),
   };
@@ -148,7 +148,7 @@ describe("TTSConfigTab Gradium character selector", { timeout: 15_000 }, () => {
   it("lists which providers can actually perform the acting intent", async () => {
     await renderTTSConfigTab();
     expect(screen.getByText("Où l'intention est réellement utilisée")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Écouter Hume/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Écouter Fish Audio/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Écouter Inworld/ })).toBeInTheDocument();
     expect(screen.getAllByText(/Oui — audible/).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/Volume \/ vitesse en FR/).length).toBeGreaterThanOrEqual(1);
@@ -159,14 +159,14 @@ describe("TTSConfigTab Gradium character selector", { timeout: 15_000 }, () => {
     expect(screen.getByText(/En jeu,.*l'intention y est/)).toBeInTheDocument();
   });
 
-  it("plays Hume when Écouter Hume is clicked with the selected emotion", async () => {
+  it("plays Fish Audio when Écouter Fish Audio is clicked with the selected emotion", async () => {
     await renderTTSConfigTab();
     fireEvent.click(screen.getByRole("button", { name: "Colère" }));
-    fireEvent.click(screen.getByRole("button", { name: /Écouter Hume/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Écouter Fish Audio/ }));
     await waitFor(() => expect(generateSpeech).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
-        providerId: "hume",
+        providerId: "fish",
         performance: expect.objectContaining({ emotion: "angry", intensity: 2 }),
       }),
     ));

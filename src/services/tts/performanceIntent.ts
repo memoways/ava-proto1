@@ -2,7 +2,7 @@
  * Canonical acting intent for per-turn TTS, plus provider adapters.
  *
  * Derived from the spoken line (no extra LLM). Providers map this to their
- * own knobs: Hume `description`, Inworld `instruction`, ElevenLabs sliders /
+ * own knobs: Fish Audio `description`, Inworld `instruction`, ElevenLabs sliders /
  * v3 tags, Gradium temp/padding, Cartesia generation_config.
  */
 
@@ -31,7 +31,7 @@ export interface PerformanceIntent {
   emotion: CanonicalEmotion;
   intensity: PerformanceIntensity;
   delivery?: PerformanceDelivery;
-  /** English, ≤100 chars — Hume / Inworld acting instructions. */
+  /** English, ≤100 chars — Fish Audio / Inworld acting instructions. */
   actingNl: string;
   speedHint?: number;
   source: PerformanceSource;
@@ -76,7 +76,7 @@ export interface ProviderActingSupport {
 }
 
 export const PROVIDER_ACTING_SUPPORT: Record<TTSProviderId, ProviderActingSupport> = {
-  hume: {
+  fish: {
     usability: "audible",
     labelFr: "Oui — audible",
     detailFr: "Description d'acting envoyée à chaque tour. C'est ici que les puces d'intention se font entendre.",
@@ -365,7 +365,7 @@ export function derivePerformanceIntent(input: DerivePerformanceInput): Performa
   };
 }
 
-export function composeHumeDescription(baseline: string, intent?: PerformanceIntent | null): string | undefined {
+export function composeFish AudioDescription(baseline: string, intent?: PerformanceIntent | null): string | undefined {
   if (intent?.source === 'speech_state') return [intent.actingNl, baseline.trim()].filter(Boolean).join('; ').slice(0, 100);
   const parts = [baseline.trim(), intent?.actingNl?.trim()].filter(Boolean);
   if (parts.length === 0) return undefined;

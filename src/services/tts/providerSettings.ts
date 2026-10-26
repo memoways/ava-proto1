@@ -62,9 +62,9 @@ export function resetInworldSettings(): InworldSettings {
   return { ...inworldDefaults };
 }
 
-// ---------------- Hume Octave ----------------
+// ---------------- Fish Audio ----------------
 
-export interface HumeSettings {
+export interface FishSettings {
   voiceName: string;
   voiceProvider: "HUME_AI" | "CUSTOM_VOICE";
   /** Optional prompt-style description shaping prosody (Octave-specific) */
@@ -75,7 +75,7 @@ export interface HumeSettings {
 
 const HUME_KEY = "ava_tts_settings_hume";
 
-const humeDefaults: HumeSettings = {
+const humeDefaults: FishSettings = {
   voiceName: "Male English Actor",
   voiceProvider: "HUME_AI",
   description: "",
@@ -83,7 +83,7 @@ const humeDefaults: HumeSettings = {
   languageCode: "fr",
 };
 
-export function getHumeSettings(): HumeSettings {
+export function getFishSettings(): FishSettings {
   try {
     const stored = readEnvironmentStorage(HUME_KEY);
     if (stored) return { ...humeDefaults, ...JSON.parse(stored) };
@@ -91,15 +91,15 @@ export function getHumeSettings(): HumeSettings {
   return { ...humeDefaults };
 }
 
-export async function loadHumeSettingsFromDB(): Promise<HumeSettings> {
+export async function loadFishSettingsFromDB(): Promise<FishSettings> {
   return loadFromDB(HUME_KEY, humeDefaults);
 }
 
-export async function saveHumeSettingsToDB(settings: HumeSettings): Promise<void> {
+export async function saveFishSettingsToDB(settings: FishSettings): Promise<void> {
   await saveToDB(HUME_KEY, settings);
 }
 
-export function resetHumeSettings(): HumeSettings {
+export function resetFishSettings(): FishSettings {
   removeEnvironmentStorage(HUME_KEY);
   void deleteEnvironmentSetting(HUME_KEY).catch(() => {});
   return { ...humeDefaults };
@@ -322,7 +322,7 @@ import type { TTSProviderId } from "@/services/tts/types";
 const ACTIVE_KEY = "ava_tts_active_provider";
 const DEFAULT_PROVIDER: TTSProviderId = "elevenlabs";
 
-const VALID_PROVIDERS: TTSProviderId[] = ["elevenlabs", "inworld", "hume", "gradium", "cartesia"];
+const VALID_PROVIDERS: TTSProviderId[] = ["elevenlabs", "inworld", "fish", "gradium", "cartesia"];
 
 export function getActiveProviderId(): TTSProviderId {
   try {

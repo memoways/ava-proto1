@@ -4,7 +4,7 @@ import {
   applyElevenLabsPerformance,
   applyGradiumPerformance,
   applyInworldPerformance,
-  composeHumeDescription,
+  composeFish AudioDescription,
   derivePerformanceIntent,
   intentFromManualEmotion,
   PROVIDER_ACTING_SUPPORT,
@@ -88,11 +88,11 @@ describe("derivePerformanceIntent", () => {
 describe("provider adapters", () => {
   const angry = intentFromManualEmotion("angry", 2);
 
-  it("composes Hume description from admin baseline + per-turn acting", () => {
-    expect(composeHumeDescription("voix grave, posée", angry)).toMatch(/voix grave/);
-    expect(composeHumeDescription("voix grave, posée", angry)).toMatch(/angry/);
-    expect(composeHumeDescription("", angry)?.length).toBeLessThanOrEqual(100);
-    expect(composeHumeDescription("", null)).toBeUndefined();
+  it("composes Fish Audio description from admin baseline + per-turn acting", () => {
+    expect(composeFish AudioDescription("voix grave, posée", angry)).toMatch(/voix grave/);
+    expect(composeFish AudioDescription("voix grave, posée", angry)).toMatch(/angry/);
+    expect(composeFish AudioDescription("", angry)?.length).toBeLessThanOrEqual(100);
+    expect(composeFish AudioDescription("", null)).toBeUndefined();
   });
 
   it("raises ElevenLabs style and prepends v3 tags only on eleven_v3", () => {
@@ -142,8 +142,8 @@ describe("provider adapters", () => {
 });
 
 describe("PROVIDER_ACTING_SUPPORT", () => {
-  it("marks Hume and Inworld as the audible acting surfaces", () => {
-    expect(PROVIDER_ACTING_SUPPORT.hume.usability).toBe("audible");
+  it("marks Fish Audio and Inworld as the audible acting surfaces", () => {
+    expect(PROVIDER_ACTING_SUPPORT.fish.usability).toBe("audible");
     expect(PROVIDER_ACTING_SUPPORT.inworld.usability).toBe("audible");
     expect(PROVIDER_ACTING_SUPPORT.elevenlabs.usability).toBe("weak");
     expect(PROVIDER_ACTING_SUPPORT.gradium.usability).toBe("speed_only");

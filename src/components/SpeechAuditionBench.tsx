@@ -11,7 +11,7 @@ import { AUDITION_PROVIDERS, createAuditionCorpus, auditionVoice, createAudition
 import { CANONICAL_EMOTIONS, resolveGradiumPauseSeconds } from '@/services/tts/performanceIntent';
 import { getProviderById } from '@/services/tts/registry';
 import { getTTSSettings } from '@/services/settingsService';
-import { getHumeSettings, getInworldSettings, getCartesiaSettings } from '@/services/tts/providerSettings';
+import { getFishSettings, getInworldSettings, getCartesiaSettings } from '@/services/tts/providerSettings';
 import { buildGradiumJsonConfig } from '@/services/tts/providers/gradium';
 import { planGradiumSpeech, prepareTextForGradium } from '@/services/tts/gradiumSpeech';
 import type { TTSProviderId } from '@/services/tts/types';
@@ -78,7 +78,7 @@ export default function SpeechAuditionBench() {
  const intent = snapshot && line?.state ? auditionIntent(snapshot, text, line.state, level) : null;
  const parts = planGradiumSpeech(text, snapshot && intent ? resolveGradiumPauseSeconds(intent, character, snapshot.settings) : undefined);
  const parameters = provider === 'gradium' ? snapshot?.gradium : provider === 'elevenlabs' ? getTTSSettings()
-  : provider === 'hume' ? getHumeSettings() : provider === 'inworld' ? getInworldSettings() : getCartesiaSettings();
+  : provider === 'fish' ? getFishSettings() : provider === 'inworld' ? getInworldSettings() : getCartesiaSettings();
  const eligible = phase === 'initial' ? lineIndex < 2 : finalists.includes(line?.id ?? '');
  const changed = auditionKey(saved) !== auditionKey(draft);
  const patchMapping = (state: string, patch: Partial<SpeechVoiceMapping>) => {
