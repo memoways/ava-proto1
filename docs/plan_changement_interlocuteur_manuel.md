@@ -1,3 +1,49 @@
+## F3 — recette humaine engagée, publication en attente
+
+F3 démarré à la demande d’Ulrich. Préparation documentaire uniquement à ce stade :
+aucune écoute F3 attestée, aucun résultat humain accepté, aucune publication.
+Le [protocole de recette](recette_humaine_ava_f3.md) porte les parcours PTT et mains
+libres et les résultats à renseigner avec Ulrich. Les simulations F1/F2 restent
+des preuves techniques distinctes.
+
+### État vérifié au démarrage
+
+- `git fetch --prune`, log, statut, branches et PR lus avant action ; main propre
+  `b642e406c660418a30a90b064073761078c9c4e2`, `git pull --ff-only` sans changement.
+  Remote unique GitHub memoways/ava-proto1. PR étrangère #24 et seize branches
+  locales historiques préservées ; aucun autre agent ni worktree créé.
+- Notion Gamilab confirmé par get-self : `7e1a9a09-09cb-4deb-a306-83a29b831bc2` ;
+  tâche `1c498377edb94cfea4d4bae8728e8c7f` et application
+  `97462322e595822ca21601814e915159` lues. Aucun prompt éditorial modifié.
+- Lovable Ava `1265958d-b74e-40f2-917d-182fe05163fc`, workspace Memoways
+  `5glbtPltldwz9tgNwIi4`, synchronisé au même SHA, ready, agentFinished=true.
+  Cloud activé ; lectures SQL exclusivement par ce connecteur, aucune mutation.
+- Sandbox Ulrich vérifiée : v7 publiée
+  `98145fe3-96f1-4525-84c2-0e0a1cc5c6da`, Max/Emma actifs, seuil 4,
+  pause 2, quota 8. Aucun nouveau snapshot ni réglage requis pour démarrer.
+- Dernière CI complète du code [40385670472](https://github.com/memoways/ava-proto1/actions/runs/40385670472)
+  relue verte sur `d59d51055222d46508e598cedcfb00886412e524` ; la clôture #91
+  ne change que Markdown. L’exception documentaire s’applique à cette préparation.
+- Dernière session sandbox lue : `6120f397-19e5-4213-a75a-b5b64f57a006`, clôturée
+  avant F3 ; aucune nouvelle session de recette F3 attestée. Aucun transcript copié.
+
+### Portes de sortie
+
+1. Ulrich écoute réellement les deux modalités et renseigne les observations du
+   protocole ; Codex rapproche ces observations des traces de la session ciblée.
+2. Tout défaut nécessaire est documenté avant correction puis livré selon le
+   contrat complet code/tests/PR/CI/main/Lovable ; les prompts Notion restent hors
+   correction par défaut. Aucun ajustement de réglage pour forcer un résultat.
+3. L’acceptation humaine F3 est explicite. L’autorisation de publier la production
+   est une décision séparée ; une simple recette verte ne la donne pas.
+4. Après autorisation seulement : publication via Lovable, contrôle de l’interface
+   servie et des parcours autorisés. Sinon, conserver la production.
+
+Une seule branche documentaire `codex/ava-recette-humaine-f3` prépare cette recette.
+La [reprise de finalisation F3](prompt_reprise_fiabilite_passage_personnages_lot_f3_finalisation.md)
+et le [prompt Lovable de recette](prompt_lovable_recette_humaine_f3.md) sont fournis
+dans le même lot. Aucun prochain lot ni nouveau chat lancé automatiquement.
+
 ## F2 — cycle des appels — 26 octobre 2026
 
 **F2 livré techniquement : CI PR et main vertes, E2E compris ; Lovable synchronisé et prêt.** [PR #90](https://github.com/memoways/ava-proto1/pull/90),
