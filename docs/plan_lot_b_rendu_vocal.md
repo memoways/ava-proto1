@@ -2,9 +2,13 @@
 
 ## Exécution coordonnée Notion / app — 25 octobre 2026
 
-**Statut : A1/A2/A3 livrés ; A4 technique en validation, accueils sandbox approuvés ; intégration E0 et recette humaine restantes.** A2 est
-dans main `a63ee8a379dcee47346903b43efab2e627f9ed7c`, CI PR/main vertes,
-Lovable synchronisé et preview vérifiée ; pauses expérimentales désactivées.
+**Statut vérifié le 26 octobre 2026 : A1/A2/A3/A4 techniquement livrés ;
+A4 reste incomplet pour l'intégration E0 et la recette humaine.** A4 est dans
+main `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec` par
+[#81](https://github.com/memoways/ava-proto1/pull/81), CI PR/main vertes,
+E2E compris. Lovable annonce le même SHA, `ready`, agent terminé ; la preview
+connectée a été vérifiée à la livraison. Aucune publication production par A4 ;
+pauses expérimentales désactivées. Voir le bilan exact ci-dessous.
 La reprise restante est le [prompt autonome A4R](prompt_reprise_integration_recette_lot_a4r.md),
 qui ne lance pas l’intégration E0 ni la recette humaine. Cette section est le plan
 opérationnel courant ; elle remplace les découpages historiques ci-dessous.
@@ -334,6 +338,43 @@ sans changer automatiquement le fournisseur de jeu.
 
 #### Exécution A4 — 26 octobre 2026
 
+**Clôture technique relue le 26 octobre 2026 :**
+
+- [PR #81 fusionnée](https://github.com/memoways/ava-proto1/pull/81), main
+  `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec`. [Bilan détaillé de livraison](https://github.com/memoways/ava-proto1/pull/81#issuecomment-6412874906).
+- HEAD exact `4e35dc70f1d025776f04764aa3fa481bbfcde0e5` :
+  [CI PR verte](https://github.com/memoways/ava-proto1/actions/runs/40296314456).
+  [CI main verte](https://github.com/memoways/ava-proto1/actions/runs/40298606848)
+  sur le SHA de fusion, qualité et E2E tous deux réussis. Résultat local final :
+  81 E2E sans retry, 12,9 minutes ; 66 régressions, 1 019 unitaires,
+  41 intégrations, lint/types/build verts. Fournisseurs simulés.
+- MCP Lovable relu après le redémarrage signalé par Ulrich : projet Ava
+  `1265958d-b74e-40f2-917d-182fe05163fc`, même SHA, `ready`,
+  `agentFinished=true`. La vérification visuelle connectée reste celle du bilan
+  #81 ; aucun nouveau contrôle audio ou visuel revendiqué. Les messages de
+  preview « Access to storage is not allowed from this context. » restent
+  d'origine non établie et à recouper si la recette reproduit un problème.
+- Notion revérifié après redémarrage : `fetch("self")` du connecteur exposé
+  confirme Ulrich `377e8583-7838-4c05-9f76-8833a450f304`. Le diagnostic du
+  client MCP natif retourne `notLoggedIn`, zéro outil pour `notion_gamilab`
+  et `notion_ulrich_fischer`. La restauration de toutes les connexions natives
+  n'est donc pas validée. Aucun accès ciblé ou écriture Gamilab effectué.
+  Le diagnostic antérieur avait établi un refus de renouvellement puis une
+  erreur d'écriture du Trousseau ; ne pas relancer OAuth en boucle sur le seul
+  résultat de ce nouveau contrôle. Reprise préalable détaillée dans A4R.
+- Branche A4 supprimée localement et à distance. GitHub conserve `main` et
+  `agent/test-gap-invitation-validity-multi-use` ; seule PR ouverte : #24,
+  étrangère, inchangée depuis le 11 octobre. Les 16 branches locales étrangères
+  sont conservées. La présente correction est documentaire : aucun code,
+  réglage Cloud ou contenu de personnage modifié ; CI lourde non relancée.
+
+**Reste :** accès natif Gamilab et capitalisation projet, comparaison des éditions
+E0 effectivement approuvées puis intégration ciblée si nécessaire, recette au
+casque avec Ulrich et décision distincte sur une publication production.
+Les accueils app approuvés ne valent ni approbation E0 ni acceptation acoustique.
+Le [prompt A4R](prompt_reprise_integration_recette_lot_a4r.md) est actualisé ;
+ce bilan ne lance pas sa réalisation.
+
 Base réelle : `1b0fcd4340f79b4c8184c7100b0e96840bf4c938`, A3 #80.
 [Bilan A3 et CI exactes](https://github.com/memoways/ava-proto1/pull/80#issuecomment-6409951717) relus ;
 Lovable annonce le même SHA, prêt, agent terminé. Checkout propre avant A4,
@@ -482,9 +523,10 @@ recette acceptée ou écarts précisément nommés ; publication production dist
    nouvelle preuve. Le prompt transmis porte aussi cette obligation de passation.
 
 A1 et A2 sont livrés ; leurs contrôles et livraisons sont consignés ci-dessus.
-Après le bilan A3 ci-dessous, le lot app suivant est **A4**, préparé dans
-[son prompt autonome](prompt_reprise_accueils_integration_lot_a4.md), distinct de
-l'édition Notion et de l'acceptation humaine du rendu final.
+A3 et A4 sont également livrés techniquement. Le reste opérationnel courant est
+**A4R**, dans [son prompt autonome](prompt_reprise_integration_recette_lot_a4r.md) :
+intégration éditoriale E0 et acceptation humaine du rendu final. Les propositions
+et bilans datés ci-dessous conservent leur contexte historique.
 
 ## Direction après écoute — 25 octobre 2026
 

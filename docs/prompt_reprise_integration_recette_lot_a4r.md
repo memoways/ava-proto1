@@ -1,6 +1,8 @@
 # Prompt autonome — Ava, A4R : intégration E0 et recette humaine
 
-Reprendre uniquement le reste A4, sans lancer un nouveau chantier de code.
+État revérifié le 26 octobre 2026, après redémarrage de Codex par Ulrich.
+La livraison technique A4 est faite ; E0 et la recette humaine restent ouverts.
+Reprendre uniquement ce reste A4, sans lancer un nouveau chantier de code.
 Checkout unique `/Users/ulrich/CodeProjects/memoways/ava-proto1`, remote unique
 `https://github.com/memoways/ava-proto1`. Lire AGENTS.md, le document partagé
 `/Users/ulrich/CodeProjects/_shared/agent-context/12-task-closeout-handoff.md`,
@@ -11,15 +13,76 @@ clone ou worktree. La préparation de ce prompt ne lance pas A4R.
 
 Exécuter `git fetch --prune`, statut, `git log origin/main`, branches et PR
 ouvertes ; lire CHANGELOG et le bilan de livraison de la PR A4 avant `git pull`.
-Le lot A4 part de `1b0fcd4340f79b4c8184c7100b0e96840bf4c938` (#80) ;
-ne jamais revenir à cette base. Le SHA de fusion A4, ses runs exacts et l'état
-Lovable doivent être repris du bilan GitHub, sans substituer la CI A3.
-La branche propre A4 doit avoir été nettoyée après livraison ; traiter tout
-blocage de livraison signalé avant d'ouvrir une branche concurrente.
+La base de code livrée A4 est `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec`,
+[#81 fusionnée](https://github.com/memoways/ava-proto1/pull/81),
+[bilan exact](https://github.com/memoways/ava-proto1/pull/81#issuecomment-6412874906).
+La [CI PR](https://github.com/memoways/ava-proto1/actions/runs/40296314456) est
+verte sur `4e35dc70f1d025776f04764aa3fa481bbfcde0e5` ; la
+[CI main](https://github.com/memoways/ava-proto1/actions/runs/40298606848) est
+verte sur le SHA de fusion, qualité et E2E compris. Lovable a été relu à ce même
+SHA après redémarrage : projet Ava, `ready`, `agentFinished=true`.
+Le main de reprise peut contenir la clôture documentaire ultérieure : le lire
+et l'intégrer, sans revenir à A3 ou au SHA A4. Aucune suite lourde à relancer
+pour cette seule documentation. La branche propre A4 est supprimée localement
+et à distance ; vérifier également la livraison de la clôture documentaire.
 
 À l'ouverture A4, #24 `agent/test-gap-invitation-validity-multi-use` et 16
 branches locales étrangères existaient. Elles sont hors périmètre, à préserver
 avec leurs SHA ; vérifier l'activité réelle et les fichiers avant toute écriture.
+Le dernier contrôle GitHub conserve seulement `main` et cette branche distante ;
+#24 est inchangée depuis le 11 octobre et ne recoupe pas les documents A4.
+
+## Prérequis Notion natif : ne pas confondre redémarrage et restauration
+
+Après le redémarrage signalé par Ulrich, le connecteur Notion exposé a répondu
+à `fetch("self")` : **Ulrich**, workspace
+`377e8583-7838-4c05-9f76-8833a450f304`. C'est un connecteur utilisable pour ce
+workspace personnel, pas pour les sources Ava. Les namespaces natifs Gamilab
+et Ulrich Fischer n'étaient toujours pas exposés dans le chat.
+
+Le contrôle indépendant via le client Codex natif a retourné `notLoggedIn` et
+zéro outil pour **les deux connexions configurées** `notion_gamilab` et
+`notion_ulrich_fischer`. Cela ne permet pas d'annoncer tous les workspaces
+restaurés. Le workspace Gamilab réel doit encore être identifié via `self` ;
+ne pas déduire son ID du nom du serveur ou d'une page.
+
+Réparation globale déjà effectuée hors dépôt Ava : CLI 0.164.0, coordination
+du renouvellement active, stockage OAuth dans le Trousseau, deux serveurs
+explicitement activés et attente de chargement des catalogues. Aucune copie
+de jeton en clair. Un renouvellement natif Gamilab antérieur a atteint le
+retour local, puis a échoué à l'écriture sécurisée macOS (« The user name or
+passphrase you entered is not correct. »). Le Trousseau annoncé déverrouillé
+n'a pas suffi. Ce bilan ne prouve pas une nouvelle expiration après redémarrage.
+
+Première vérification locale exécutable, sans relancer OAuth :
+
+```bash
+python3 /Users/ulrich/.codex/scripts/notion-native-check.py
+```
+
+Cet outil ne sort que noms/statuts/nombres d'outils ; il ne vérifie pas à lui
+seul l'identité des workspaces. S'il réussit, charger les connecteurs natifs et
+lire `get-self` ou `fetch("self")` pour chacun avant tout accès ciblé. Confirmer
+Gamilab pour Ava et l'ID personnel ci-dessus pour Ulrich. Vérifier la persistance
+sur deux démarrages indépendants, puis la disponibilité effective dans le chat.
+
+Si le blocage persiste, lire le diagnostic local existant
+`/Users/ulrich/.codex/diagnostics/notion-native-20261026.json`, vérifier le client
+et la configuration actifs, sans afficher de secret. Ne pas répéter les flux
+OAuth depuis le même contexte en échec. L'intervention humaine préparée utilise
+le skill wizard et le client officiel dans Terminal :
+
+```bash
+/Users/ulrich/.codex/scripts/restaurer-notion-native.command
+```
+
+Ce parcours renouvelle Gamilab puis Ulrich dans le Trousseau et contrôle deux
+démarrages ; il ne garantit pas la réussite d'une écriture que macOS refuse.
+L'utilisateur valide les éventuelles demandes système, jamais en donnant son
+mot de passe au chat. Ne pas recréer les identifiants, supprimer l'historique,
+basculer les jetons vers un fichier, ni ajouter des workspaces par supposition.
+Inventorier les connexions effectivement enregistrées si d'autres sont annoncées,
+et vérifier chacune séparément. Aucun navigateur pour lire les données Notion.
 
 ## Réalisé et autorisé
 
@@ -65,9 +128,8 @@ Oui… je suis là. Vous vouliez me parler ?
 - Qualité locale A4 : lint/types/build, 66 régressions, 1 019 unitaires et
   41 intégrations verts après correction de compatibilité. Premier passage complet :
   81 E2E verts sans retry (12,8 minutes), puis 3 E2E A4 ciblés verts sur le format
-  compatible et revalidation complète lancée ; résultat final et CI exactes dans
-  le bilan de livraison de la PR #81, à lire avant reprise. Le code applicatif
-  compatible a finalement passé les 81 E2E sans retry (12,9 minutes).
+  compatible. Le code applicatif compatible a finalement passé les 81 E2E sans
+  retry (12,9 minutes). Les deux CI finales relues sont liées ci-dessus.
 - CI A4 : téléchargements APT Azure ralentis avant les E2E, un rejeu du même HEAD
   puis correction du miroir vers archive.ubuntu.com, sans changer les paquets,
   contrôles, trois navigateurs ou plafond 20 minutes. Concurrence, cache npm Node 22
@@ -78,15 +140,13 @@ Oui… je suis là. Vous vouliez me parler ?
 
 ## Reste E0 : sources et intégration
 
-Notion Ava est TOUJOURS **Gamilab**, sans redemander le choix. Le connecteur
-exposé pendant A4 annonce Ulrich `377e8583-7838-4c05-9f76-8833a450f304` :
-mauvais routage pour Ava. La connexion native Gamilab est configurée et activée
-dans Codex, mais ses outils ne sont pas exposés dans cette session. La connexion
-Ulrich n'a permis aucune lecture ciblée ni capitalisation
-Gamilab. Vérifier le workspace via MCP natif avant de lire ou écrire ; réutiliser
-la connexion Gamilab si disponible. Ne pas relancer OAuth ni conclure à un défaut
-de partage, expiration ou synchronisation sur ce seul constat. Aucun navigateur
-Notion ni déplacement des sources vers Ulrich. Gami DigiDouble reste exclu.
+Notion Ava est TOUJOURS **Gamilab**, sans redemander le choix. Le contrôle après
+redémarrage et le prérequis de restauration sont consignés ci-dessus. Aucun
+accès ciblé ou capitalisation Gamilab effectué par le connecteur Ulrich.
+Vérifier le workspace via MCP natif avant de lire ou écrire ; réutiliser Gamilab
+si disponible. Ne pas conclure à un défaut de partage ou de synchronisation
+depuis le mauvais routage. Aucun navigateur Notion ni déplacement des sources
+vers Ulrich. Gami DigiDouble reste exclu.
 
 Sources : base Caractères AVA `30362322e59580bbb7b8dd49d516b341`, Max
 `3f762322-e595-81ba-8241-c7f6b28f31fd`, Emma
@@ -111,7 +171,8 @@ voix ou réglages en sauvegardant les accueils ; CAS et readback exact requis.
 
 ## Recette humaine après intégration
 
-Preview Lovable authentifiée déjà ouverte : réutiliser le navigateur connecté,
+La preview authentifiée a été vérifiée lors de la livraison #81. Inventorier les
+onglets actuels avant de supposer qu'elle est encore ouverte ; réutiliser le navigateur connecté,
 sans transférer de cookies ni modifier ses protections. Vérifier le SHA annoncé
 par MCP, la source synchronisée et la preview affichée séparément. Aucun appel
 audio fournisseur automatique : les écoutes réelles se font avec Ulrich.
