@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-26 (F2 réalisé localement, livraison en cours ; F3 non lancé)
+> **Last Updated**: 2026-10-26 (F2 livré, CI PR/main et Lovable vérifiés ; F3 non lancé)
 
 ---
 
@@ -20,9 +20,14 @@ réseau bloque le rappel jusqu’à sauvegarde et laisse une reprise possible ap
 recharge ; un ancien callback ne peut réarmer le micro ni parler dans le nouvel
 appel. Les offres narratives continuent de suivre le contrat F1.
 
-Qualité locale et scénarios F2 ciblés verts ; E2E complets et livraison GitHub/
-Lovable en cours. [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md).
-Recette humaine et publication distinctes en F3, non lancé.
+[PR #90 fusionnée](https://github.com/memoways/ava-proto1/pull/90), main code
+`d59d51055222d46508e598cedcfb00886412e524`. Qualité et 99 E2E locaux sans retry,
+CI PR verte sur HEAD exact avec 99/99 E2E sans retry. Lovable synchronisé/prêt,
+source du cycle relue identique ; CI main verte (98 E2E sans retry + T11 vert au
+retry sur son assertion de journal asynchrone, bouton déjà visible).
+[Plan et preuves](docs/plan_changement_interlocuteur_manuel.md).
+Recette humaine et publication distinctes en F3, non lancé ;
+[prompt autonome préparé](docs/prompt_reprise_fiabilite_passage_personnages_lot_f3.md).
 
 ## F1 — préparer avant de promettre (26 octobre 2026)
 

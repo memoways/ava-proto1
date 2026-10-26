@@ -6,6 +6,10 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [F2 — cycle des appels] — 2026-10-26
 
+- [PR #90 fusionnée](https://github.com/memoways/ava-proto1/pull/90), main code
+  `d59d51055222d46508e598cedcfb00886412e524` ; [CI PR verte](https://github.com/memoways/ava-proto1/actions/runs/40382029766)
+  sur HEAD exact `146f2f6`, 99/99 E2E sans retry. [CI main verte](https://github.com/memoways/ava-proto1/actions/runs/40385670472) : 98 E2E sans retry + T11 vert au retry (journal asynchrone, bouton déjà visible).
+
 - Raccrocher ferme l’appel et revient immédiatement à la grille Max/Emma,
   Ava/Léo indisponibles ; fin d’expérience explicite distincte, aucun questionnaire
   imposé au raccrochage. Les rappels conservent session, film, version, contexte
@@ -20,7 +24,9 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   Sessions historiques compatibles ; aucune migration ni Edge requise.
 - [Plan et preuves F2](docs/plan_changement_interlocuteur_manuel.md#f2--cycle-des-appels--26-octobre-2026).
   Qualité locale verte (1 037 unitaires, 41 intégrations, 67 régressions, lint,
-  typage/build) ; E2E et livraison GitHub/Lovable en cours. Production inchangée.
+  typage/build), 99/99 E2E locaux sans retry. Lovable au SHA de fusion, prêt,
+  source du cycle relue identique. Clôture documentaire seule après code validé ; production inchangée.
+  [Prompt F3 préparé, non lancé](docs/prompt_reprise_fiabilite_passage_personnages_lot_f3.md).
 
 ## [F1 — préparer le passage avant la confirmation] — 2026-10-26
 
