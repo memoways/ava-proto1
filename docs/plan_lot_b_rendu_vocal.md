@@ -347,7 +347,7 @@ L'accueil initial n'a pas de verrou synchrone avant ses attentes ni de signal
 d'annulation propre. Les transferts ont déjà un verrou et une provenance.
 
 Travail technique indépendant implémenté : conserver le champ app existant en acceptant
-un répertoire explicite (une alternative par ligne), choisir une fois par appel,
+un répertoire app approuvé, lié à la phrase de référence du profil et à sandbox-ulrich, choisir une fois par appel,
 éviter le dernier choix lorsque plusieurs textes sont disponibles, et empêcher
 les doubles lectures/callbacks périmés. Réutiliser la sortie et la queue existantes ;
 cache borné des blobs REST complets seulement, clé texte/personnage/environnement/
@@ -355,9 +355,19 @@ fournisseur/voix/modèle/réglages/intention/stitching. Le streaming WS garde so
 chemin A2, sans capture live nouvelle ni changement de buffers ou de pauses.
 Tests aux points d'appel, puis qualité et E2E séquentiels ; aucun audio réel automatique.
 
-**Diff éditorial approuvé par Ulrich dans ce chat le 26 octobre 2026, écriture Cloud encore à vérifier :** lecture Cloud MCP
+Contrôle de compatibilité avant toute écriture Cloud : deux lignes dans le champ
+existant seraient toutes deux lues par les anciens clients publiés, même en
+sandbox. Ce format est donc abandonné avant activation. Le champ garde une seule
+référence ; le répertoire approuvé est affiché dans l’admin A4 et ne s’applique
+que lorsque environnement, personnage et référence correspondent. CI initiale
+`40292294076` annulée sur le HEAD remplacé, sans fusion ; validations relancées
+sur le code compatible final. Aucune donnée Cloud multiligne écrite.
+
+**Diff éditorial approuvé par Ulrich dans ce chat le 26 octobre 2026, écriture Cloud effectuée et relue :** lecture Cloud MCP
 Lovable le 26 octobre ; cible Ava vérifiée. Remplacer seulement `opening_line`
-de sandbox-ulrich, après validation, par deux alternatives séparées par une ligne :
+de sandbox-ulrich par la première formulation approuvée ci-dessous, sur une seule
+ligne. Le code A4 propose la seconde uniquement dans sandbox-ulrich et tant que
+la référence du profil correspond. Une édition ultérieure du profil prime toujours :
 
 | Personnage | Avant (sandbox) | Après approuvé (2 choix) |
 | --- | --- | --- |
@@ -379,14 +389,29 @@ est exploitable. Ne pas confondre configuration et disponibilité, ni relancer O
 La réponse explicite « Valider les quatre formulations en sandbox » autorise
 uniquement ces deux propriétés app de sandbox-ulrich ; elle ne valide pas E0.
 
+Écriture native MCP Lovable à **2026-10-26 08:41:44.724487 UTC**, transaction
+conditionnée aux deux profils attendus et à leurs versions/textes précédents :
+Max `Allô. Max à l’appareil. Je vous écoute.` ; Emma
+`Allô… c’est Emma. À qui je parle ?`. Une seule phrase par profil, aucune donnée
+multiligne. Deux lignes mises à jour puis relecture exacte des quatre profils
+Max/Emma sandbox/prod : empreintes de tous les autres champs identiques, voix
+et fournisseurs conservés ; les deux profils prod sont intégralement inchangés.
+Le code A4 fournit le second choix approuvé dans la preview après livraison.
+Aucune édition de fiche, sync Notion, reconstruction RAG, activation de pauses
+ou publication de production effectuée.
+
 Vérifications ciblées : 19 tests unitaires verts ; 7 E2E Chromium verts
 (premier contact Max/Emma avec une seule alternative et zéro appel LLM/GM,
 fiche arrivée après raccrochage, reprise après format invalide, aller-retour,
 provenance et mémoire isolée). Fournisseurs simulés. Qualité complète verte : lint/types/build,
 66 régressions, 1 019 unitaires et 41 intégrations ; un avertissement lint
-préexistant, aucune erreur. E2E complets : **81/81 verts sans retry**, 12,8 minutes
-sur le code final. CI du HEAD exact de la PR puis main et Lovable restent à
-vérifier avant clôture technique.
+préexistant, aucune erreur. Premier passage E2E complet : **81/81 verts sans retry**,
+12,8 minutes. Après l’ajustement de compatibilité du format Cloud : qualité
+complète verte et 3 E2E A4 ciblés verts, forçant la seconde variante avec une
+session membre simulée ; la garde publique refuse toujours un simple `?env=`
+anonyme. Rejeu E2E complet du code compatible lancé ; son résultat final et les
+CI du HEAD exact puis main sont consignés dans le bilan de livraison de la PR #81
+avant clôture technique.
 Le premier son d'accueil est maintenant horodaté sur le callback de lecture,
 séparément de la fin de lecture. Le reçu ne déclare aucun préfixe aligné pour
 une lecture partielle : toute la phrase commencée reste incertaine.

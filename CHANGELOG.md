@@ -6,10 +6,12 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [A4 — accueils choisis et lecture protégée] — 2026-10-26
 
-- Répertoire app initial : une alternative par ligne, sélection stable par appel,
+- Répertoire app initial lié à la référence du profil et à sandbox-ulrich, sélection stable par appel,
   pas de répétition immédiate si plusieurs choix ; transferts et retours conservés.
   Quatre formulations Max/Emma approuvées explicitement pour sandbox-ulrich ;
-  écriture Cloud et relecture suivies dans le plan.
+  phrases de référence Cloud sauvegardées/relues le 26 octobre à 08:41:44 UTC,
+  une seule ligne par profil pour les clients publiés ; tous les autres champs
+  et les profils prod conservés.
 - Ouverture initiale verrouillée avant ses attentes, annulable et protégée des
   callbacks tardifs ; reçus prudents des accueils et premier son horodaté sur lecture.
 - Ancien cache singleton inutilisé remplacé par des blobs REST complets bornés
@@ -19,7 +21,8 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   [CI main verte](https://github.com/memoways/ava-proto1/actions/runs/40279854111).
   [Plan A4, preuves et limites](docs/plan_lot_b_rendu_vocal.md#exécution-a4--26-octobre-2026).
   Qualité locale verte : 66 régressions, 1 019 unitaires, 41 intégrations,
-  lint/types/build et 81 E2E sans retry (12,8 min). SHA de fusion et CI exactes
+  lint/types/build ; premier passage de 81 E2E sans retry (12,8 min), puis
+  revalidation du format compatible et résultat final dans le bilan. SHA de fusion et CI exactes
   dans le bilan GitHub de livraison A4.
 - Intégration E0 et recette humaine non validées ; Notion exposé cible Ulrich,
   Gamilab indisponible dans la session. Production non publiée et textes prod

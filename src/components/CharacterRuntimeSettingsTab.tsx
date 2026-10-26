@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
+import { initialGreetingLines } from '@/services/characterConversationContinuity';
+import { getActiveEnvironment } from '@/services/environmentContext';
 import {
   fetchCharacterAutoReadiness,
   listCharacterRuntimeProfiles,
@@ -177,6 +179,8 @@ export default function CharacterRuntimeSettingsTab() {
           const checks = readiness(profile, auto);
           const blockers = checks.filter((check) => !check.ok);
           const ready = blockers.length === 0;
+          const greetings = profile.character_key === 'max' || profile.character_key === 'emma'
+            ? initialGreetingLines(profile.character_key, profile.opening_line, getActiveEnvironment()) : [];
           return (
             <div key={profile.id} className="rounded border p-3">
               <div className="flex items-center justify-between gap-2">
@@ -201,8 +205,12 @@ export default function CharacterRuntimeSettingsTab() {
                 </ul>
               )}
               <div className="mt-4 space-y-2 border-t pt-3">
-                <Textarea aria-label={`Accueils de ${profile.display_name}`} value={profile.opening_line ?? ""} onChange={(event) => patchProfile(profile.id, { opening_line: event.target.value || null })} placeholder="Une alternative d’accueil par ligne" className="min-h-20" />
-                <p className="text-xs text-muted-foreground">Une alternative par ligne. Un seul accueil est choisi au début de l’appel, sans répéter le précédent si un autre choix existe.</p>
+                <Textarea aria-label={`Accueil de ${profile.display_name}`} value={profile.opening_line ?? ""} onChange={(event) => patchProfile(profile.id, { opening_line: event.target.value || null })} placeholder="Phrase d’ouverture" className="min-h-20" />
+                {greetings.length > 1 && <div className="text-xs text-muted-foreground">
+                  <p>Accueils validés pour cette sandbox : un seul choix par appel, sans répétition immédiate.</p>
+                  <ul className="mt-1 list-disc pl-4">{greetings.map(line => <li key={line}>{line}</li>)}</ul>
+                  <p className="mt-1">Modifier la phrase de référence remplace ce répertoire par votre texte.</p>
+                </div>}
                 <div className="flex items-center gap-2">
                   {profile.portrait_url && (
                     <img src={profile.portrait_url} alt={`Portrait de ${profile.display_name}`} className="h-12 w-12 rounded object-cover" />

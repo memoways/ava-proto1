@@ -7,8 +7,10 @@ import type { ConversationMessage } from '@/types';
 describe('character call continuity', () => {
   it.each(['max', 'emma'] as const)('selects one %s profile alternative per call without immediate repetition across new calls', character => {
     const select = createInitialGreetingSelector();
-    const profile = ' Allô. \r\n\nJe vous écoute.\nAllô. ';
-    expect(initialGreetingLines(character, profile)).toEqual(['Allô.', 'Je vous écoute.']);
+    const profile = character === 'max' ? 'Allô. Max à l’appareil. Je vous écoute.' : 'Allô… c’est Emma. À qui je parle ?';
+    expect(initialGreetingLines(character, profile, 'sandbox-ulrich')).toHaveLength(2);
+    expect(initialGreetingLines(character, profile, 'prod')).toEqual([profile]);
+    expect(initialGreetingLines(character, 'Édition du profil.', 'sandbox-ulrich')).toEqual(['Édition du profil.']);
     const first = select('call1', 'sandbox-ulrich', character, profile);
     expect(select('call1', 'sandbox-ulrich', character, 'Texte modifié après sélection.')).toBe(first);
     const next = select('call2', 'sandbox-ulrich', character, profile);

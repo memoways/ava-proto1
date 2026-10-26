@@ -14,10 +14,19 @@ export function greetingDelivery(turnId: string, turnIndex: number, character: R
     scheduledSamples: null, playedSamples: null, sampleRate: null };
 }
 
-/** App profile content, not a character prompt. One alternative per line. */
-export function initialGreetingLines(character: RuntimeCharacter, openingLine: string | null): string[] {
-  const lines = [...new Set((openingLine ?? '').split(/\r?\n/).map(line => line.trim()).filter(Boolean))];
-  return lines.length ? lines : [character === 'max' ? 'Hallo... à qui ai-je affaire ?' : 'Allô ?'];
+/** App greeting content approved by Ulrich on 2026-10-26, sandbox-ulrich only. */
+const approvedSandboxGreetings: Record<RuntimeCharacter, readonly string[]> = {
+  max: ['Allô. Max à l’appareil. Je vous écoute.', 'Oui, c’est Max. Qu’est-ce qui vous amène ?'],
+  emma: ['Allô… c’est Emma. À qui je parle ?', 'Oui… je suis là. Vous vouliez me parler ?'],
+};
+
+export function initialGreetingLines(character: RuntimeCharacter, openingLine: string | null, environment = 'prod'): readonly string[] {
+  const line = openingLine?.trim();
+  const approved = approvedSandboxGreetings[character];
+  // The profile remains a single line for already published clients. An author
+  // changing that reference always takes precedence over this approved repertoire.
+  if (environment === 'sandbox-ulrich' && line === approved[0]) return approved;
+  return [line || (character === 'max' ? 'Hallo... à qui ai-je affaire ?' : 'Allô ?')];
 }
 
 /** Kept by the experience across calls, with bounded memory and no private history. */
@@ -29,7 +38,7 @@ export function createInitialGreetingSelector() {
     const key = JSON.stringify([callId, environment, character]);
     const selected = calls.get(key);
     if (selected !== undefined) return selected;
-    const lines = initialGreetingLines(character, openingLine);
+    const lines = initialGreetingLines(character, openingLine, environment);
     const alternatives = lines.filter(line => line !== last.get(owner));
     const available = alternatives.length ? alternatives : lines;
     const line = available[Math.floor(Math.random() * available.length)];

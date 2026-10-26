@@ -10,8 +10,8 @@
 ## A4 — décrocher une seule fois (26 octobre 2026)
 
 Le premier accueil venait d'un unique texte de profil. Les transferts savaient
-déjà distinguer premier contact et retour ; l'app étend maintenant le champ
-initial à de petites alternatives, choisies une fois par appel. Ulrich a validé
+déjà distinguer premier contact et retour ; l'app ajoute un petit répertoire
+approuvé lié à la phrase initiale du profil, choisi une fois par appel. Ulrich a validé
 deux formulations par personnage pour sa sandbox. Elles ouvrent la conversation
 sans confidence prématurée ni scénario physique ajouté.
 

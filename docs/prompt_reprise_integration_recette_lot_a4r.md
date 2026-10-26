@@ -23,22 +23,28 @@ avec leurs SHA ; vérifier l'activité réelle et les fichiers avant toute écri
 
 ## Réalisé et autorisé
 
-- Le champ app `character_runtime_profiles.opening_line` accepte une alternative
-  par ligne. Choix stable par appel, sans répétition immédiate quand une autre
+- Le champ app `character_runtime_profiles.opening_line` conserve une seule phrase
+  de référence, compatible avec les clients déjà publiés. Le répertoire approuvé
+  est du contenu app A4 lié à cette référence exacte et à sandbox-ulrich ; une
+  édition ultérieure du profil prime et désactive ces alternatives. Choix stable par appel, sans répétition immédiate quand une autre
   alternative existe ; premier transfert et retour restent distincts et gardent
   leurs répertoires, la provenance et les mémoires isolées.
 - Ulrich a explicitement validé dans le chat A4 du 26 octobre les quatre textes
   ci-dessous, **seulement pour sandbox-ulrich**. Lire le bilan A4 et la DB native
   Lovable avant toute écriture : ne pas réappliquer une modification déjà faite.
+  Les deux phrases de référence ont été sauvegardées et relues exactement par
+  MCP Lovable le 26 octobre à 08:41:44.724487 UTC ; autres champs des profils
+  et profils prod inchangés. Ne pas stocker les deux choix dans `opening_line` :
+  les anciens clients les prononceraient tous les deux.
 
-Max, deux lignes :
+Max, deux choix app (seulement la première ligne dans `opening_line`) :
 
 ```text
 Allô. Max à l’appareil. Je vous écoute.
 Oui, c’est Max. Qu’est-ce qui vous amène ?
 ```
 
-Emma, deux lignes :
+Emma, deux choix app (seulement la première ligne dans `opening_line`) :
 
 ```text
 Allô… c’est Emma. À qui je parle ?
@@ -57,8 +63,10 @@ Oui… je suis là. Vous vouliez me parler ?
   sans fausse mesure de génération fournisseur. WS conserve A2, sans cache ni
   capture live nouvelle ; le cache WAV du banc A3 reste isolé.
 - Qualité locale A4 : lint/types/build, 66 régressions, 1 019 unitaires et
-  41 intégrations verts ; **81 E2E complets verts sans retry** (12,8 minutes).
-  7 E2E ciblés verts au contrôle initial ; CI exactes dans le bilan A4. Fournisseurs simulés ; aucun gain
+  41 intégrations verts après correction de compatibilité. Premier passage complet :
+  81 E2E verts sans retry (12,8 minutes), puis 3 E2E A4 ciblés verts sur le format
+  compatible et revalidation complète lancée ; résultat final et CI exactes dans
+  le bilan de livraison de la PR #81, à lire avant reprise. Fournisseurs simulés ; aucun gain
   acoustique, latence matérielle ou acceptation humaine déduit des tests.
 
 ## Reste E0 : sources et intégration

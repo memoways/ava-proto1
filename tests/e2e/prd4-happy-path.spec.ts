@@ -738,8 +738,8 @@ const HANDOFF_TURNS = [
   "Je suis là pour écouter sans te juger.",
 ];
 
-async function startCharacterConversation(page: Page, character: "Max" | "Emma") {
-  await page.goto("/");
+async function startCharacterConversation(page: Page, character: "Max" | "Emma", path = '/') {
+  await page.goto(path);
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
   await answerFilmQuestion(page);
@@ -762,12 +762,20 @@ async function sendHandoffTurn(page: Page, text: string) {
 for (const character of ['Max', 'Emma'] as const) {
   test(`A4 : un seul accueil ${character} du profil, sans génération LLM`, async ({ page }) => {
     const key = character.toLowerCase() as 'max' | 'emma';
-    const choices = [`Allô, c’est ${character}.`, `Oui, ${character} à l’appareil.`];
-    const fakes = await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true,
-      openingLines: { [key]: choices.join('\n') } });
-    await startCharacterConversation(page, character);
+    const choices = character === 'Max'
+      ? ['Allô. Max à l’appareil. Je vous écoute.', 'Oui, c’est Max. Qu’est-ce qui vous amène ?']
+      : ['Allô… c’est Emma. À qui je parle ?', 'Oui… je suis là. Vous vouliez me parler ?'];
+    const fakes = await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true, diagnosticAdmin: true,
+      openingLines: { [key]: choices[0] } });
+    await page.addInitScript(() => { Math.random = () => 0.99; });
+    // Obtain the fake member session before PublicAccessGate resolves the env.
+    // An unauthenticated ?env= is correctly kept in production by the real gate.
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Commencer' }).click();
+    await expect(page.getByRole('button', { name: /Passer/ })).toBeVisible();
+    await startCharacterConversation(page, character, '/?env=sandbox-ulrich');
     await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled();
-    expect(choices.map(text => text.normalize('NFKC'))).toContain(fakes.getTtsText());
+    expect(fakes.getTtsText()).toBe(choices[1].normalize('NFKC').replace(/\s+([?!])/g, '$1'));
     expect(fakes.getTtsCallCount()).toBe(1);
     expect(fakes.getMaxTurnCount()).toBe(0);
     expect(fakes.getGmPostTurnCount()).toBe(0);
