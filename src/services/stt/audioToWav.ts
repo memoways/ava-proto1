@@ -42,7 +42,7 @@ export async function blobToWav16kMono(blob: Blob): Promise<Blob> {
   return encodeWavPcm16(pcm, TARGET_SAMPLE_RATE);
 }
 
-function encodeWavPcm16(samples: Float32Array, sampleRate: number): Blob {
+export function encodeWavPcm16(samples: Float32Array, sampleRate: number, decodedPcm16 = false): Blob {
   const bytesPerSample = 2;
   const blockAlign = bytesPerSample; // mono
   const byteRate = sampleRate * blockAlign;
@@ -67,7 +67,7 @@ function encodeWavPcm16(samples: Float32Array, sampleRate: number): Blob {
   let offset = 44;
   for (let i = 0; i < samples.length; i++, offset += 2) {
     const s = Math.max(-1, Math.min(1, samples[i]));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    view.setInt16(offset, decodedPcm16 ? Math.round(s * 0x8000) : s < 0 ? s * 0x8000 : s * 0x7fff, true);
   }
   return new Blob([buffer], { type: "audio/wav" });
 }

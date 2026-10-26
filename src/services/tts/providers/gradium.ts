@@ -12,7 +12,7 @@ import { applyGradiumPerformance, resolveGradiumPauseSeconds } from "@/services/
 import type { PerformanceIntent } from "@/services/tts/performanceIntent";
 import { debugLogger } from "@/services/debugLogger";
 import { createGradiumSpeechPreparer, planGradiumSpeech, prepareTextForGradium } from '../gradiumSpeech';
-import { getSpeechPerformanceSettings } from '../speechPerformanceSettings';
+import { validateSpeechAudition, getSpeechPerformanceSettings } from '../speechPerformanceSettings';
 import { withTimeout } from "@/services/asyncUtils";
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { playAudioBlobRobust } from "@/services/audioPlayback";
@@ -22,7 +22,7 @@ export { prepareTextForGradium } from '../gradiumSpeech';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
-function buildJsonConfig(s: GradiumSettings, performance?: PerformanceIntent | null): Record<string, number | string> {
+export function buildGradiumJsonConfig(s: GradiumSettings, performance?: PerformanceIntent | null): Record<string, number | string> {
   const tuned = applyGradiumPerformance(
     { temp: s.temp, paddingBonus: s.paddingBonus },
     performance,
@@ -35,6 +35,21 @@ function buildJsonConfig(s: GradiumSettings, performance?: PerformanceIntent | n
   if (s.rewriteRules.trim()) jsonConfig.rewrite_rules = s.rewriteRules.trim();
   if (s.pronunciationId.trim()) jsonConfig.pronunciation_id = s.pronunciationId.trim();
   return jsonConfig;
+}
+
+function auditionSnapshot(ctx?: TTSGenerateContext) {
+  if (!ctx?.speechAudition) return undefined;
+  const snapshot = validateSpeechAudition(ctx.speechAudition, ctx.characterKey);
+  if (!snapshot.validStates.includes(ctx.performance?.speechState ?? '') || ctx.performance?.source !== 'speech_state') {
+    throw new Error('État audition non validé pour ce personnage');
+  }
+  return snapshot;
+}
+function effectiveSettings(ctx?: TTSGenerateContext) {
+  return auditionSnapshot(ctx)?.gradium ?? resolveGradiumSettings(ctx?.characterKey);
+}
+function pauseForContext(ctx?: TTSGenerateContext) {
+  return resolveGradiumPauseSeconds(ctx?.performance, ctx?.characterKey, auditionSnapshot(ctx)?.settings);
 }
 
 let oggOpusPlayable: boolean | null = null;
@@ -53,8 +68,9 @@ function resolveRestFormat(format: GradiumSettings["outputFormat"]): GradiumSett
 }
 
 async function generateGradiumSpeech(text: string, ctx: TTSGenerateContext | undefined, s: GradiumSettings): Promise<TTSGenerateResult> {
+    if (ctx?.signal?.aborted) throw new DOMException('Annulé', 'AbortError');
     const preparedText = prepareTextForGradium(text);
-    const pauseSeconds = resolveGradiumPauseSeconds(ctx?.performance, ctx?.characterKey);
+    const pauseSeconds = pauseForContext(ctx);
     const pauseRendering = planGradiumSpeech(text, pauseSeconds).some(part => part.type === 'pause') ? 'rest_unavailable' : 'disabled';
     if (pauseRendering === 'rest_unavailable') debugLogger.log({ service: 'tts', level: 'warn', direction: 'out', label: 'TTS-GR REST: experimental pauses unavailable; cleaned speech preserved' });
     const voiceId = ctx?.voiceId || s.voiceId;
@@ -63,9 +79,10 @@ async function generateGradiumSpeech(text: string, ctx: TTSGenerateContext | und
       text: preparedText,
       voiceId,
       outputFormat: resolveRestFormat(s.outputFormat),
-      jsonConfig: buildJsonConfig(s, ctx?.performance),
+      jsonConfig: buildGradiumJsonConfig(s, ctx?.performance),
     };
 
+    ctx?.onAuditionRequest?.({ transport: 'rest', body });
     const startTime = Date.now();
     const tRequest = performance.now();
     const debugId = debugLogger.logFetch("tts", `TTS-GR "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts-gradium`, body);
@@ -146,13 +163,13 @@ export const gradiumProvider: TTSProvider = {
   description: "TTS Gradium (WebSocket streaming + REST fallback). Voix naturelles, 237 voix.",
 
   async generate(text: string, ctx?: TTSGenerateContext): Promise<TTSGenerateResult> {
-    return generateGradiumSpeech(text, ctx, resolveGradiumSettings(ctx?.characterKey));
+    return generateGradiumSpeech(text, ctx, effectiveSettings(ctx));
   },
 
   createStreamingPlayback(text: string, ctx?: TTSGenerateContext): TTSStreamPlaybackHandle | null {
-    const s = resolveGradiumSettings(ctx?.characterKey);
-    if (!s.streamingEnabled || !isStreamingSupported()) return null;
-    return createStreamingHandleWithFallback(this, text, s, ctx);
+    const s = effectiveSettings(ctx);
+    if ((!ctx?.speechAudition && !s.streamingEnabled) || !isStreamingSupported()) return null;
+    return createStreamingHandleWithFallback(text, s, ctx);
   },
 };
 
@@ -164,18 +181,26 @@ export const gradiumProvider: TTSProvider = {
  * audio started are surfaced as-is (no fallback: no partial replays).
  */
 function createStreamingHandleWithFallback(
-  provider: TTSProvider,
   text: string,
   s: GradiumSettings,
   ctx?: TTSGenerateContext,
 ): TTSStreamPlaybackHandle {
-  const pauseSeconds = resolveGradiumPauseSeconds(ctx?.performance, ctx?.characterKey);
+  const pauseSeconds = pauseForContext(ctx);
   const t0 = performance.now();
 
+  const parts = planGradiumSpeech(text, pauseSeconds);
+  const observeSetup = () => ctx?.onAuditionRequest?.({ transport: 'websocket', controls: parts, body: {
+    model_name: 'default', voice_id: ctx?.voiceId || s.voiceId,
+    output_format: s.streamingFormat === 'pcm_48000' ? 'pcm' : s.streamingFormat,
+    json_config: buildGradiumJsonConfig(s, ctx?.performance),
+  } });
   const session = createGradiumStreamSession(text, {
+    captureAudio: Boolean(ctx?.speechAudition),
+    onSetupSent: observeSetup,
+    validateContext: () => { auditionSnapshot(ctx); },
     voiceId: ctx?.voiceId || s.voiceId,
     format: s.streamingFormat,
-    jsonConfig: buildJsonConfig(s, ctx?.performance),
+    jsonConfig: buildGradiumJsonConfig(s, ctx?.performance),
     bufferPreset: ctx?.bufferPreset,
     signal: ctx?.signal,
     onVoiceObservation: ctx?.onVoiceObservation,
@@ -207,6 +232,9 @@ function createStreamingHandleWithFallback(
         provider: "gradium",
         model: "gradium-tts",
         transport: "websocket",
+        auditionAudio: stats.auditionAudio,
+        auditionCapture: stats.auditionCapture,
+        pauseRendering: parts.some(part => part.type === 'pause') ? 'websocket' : 'disabled',
         statusCode: 200,
         firstByteMs: stats.firstByteMs,
         totalMs: stats.totalGenMs,
@@ -239,7 +267,7 @@ function createStreamingHandleWithFallback(
     session.cancel("switching to REST fallback");
     const message = err instanceof Error ? err.message : String(err);
     console.warn(`[TTS-GR] WS streaming failed before audio (${message.slice(0, 120)}); falling back to REST`);
-    provider.generate(text, ctx).then(
+    generateGradiumSpeech(text, ctx, s).then(
       (result) => {
         if (cancelled) return;
         fallbackBlob = result.blob;
@@ -247,6 +275,8 @@ function createStreamingHandleWithFallback(
           provider: "gradium",
           model: result.meta.model,
           transport: "rest_fallback",
+          auditionAudio: ctx?.speechAudition ? result.blob : undefined,
+          pauseRendering: result.meta.pauseRendering,
           statusCode: result.meta.statusCode,
           firstByteMs: Math.round(performance.now() - t0),
           totalMs: Math.round(performance.now() - t0),
@@ -317,7 +347,7 @@ export function createGradiumIncrementalTurn(ctx: TTSGenerateContext, onProgress
   const session = createGradiumTurnSession({
     voiceId: ctx.voiceId || s.voiceId,
     format: s.outputFormat === "pcm_24000" ? "pcm_24000" : "pcm_48000",
-    jsonConfig: buildJsonConfig(s, ctx.performance), bufferPreset: ctx.bufferPreset, signal: ctx.signal,
+    jsonConfig: buildGradiumJsonConfig(s, ctx.performance), bufferPreset: ctx.bufferPreset, signal: ctx.signal,
     onVoiceObservation: ctx.onVoiceObservation, onProgress,
     deferSetup: Boolean(ctx.resolveSpeechPerformance),
     prepareText,
@@ -327,7 +357,7 @@ export function createGradiumIncrementalTurn(ctx: TTSGenerateContext, onProgress
     appendText: (text: string) => { appended = true; append(text); },
     setPerformance: (value: PerformanceIntent) => {
       if (appended) return;
-      intent = value; ctx.performance = value; session.configure(buildJsonConfig(s, value));
+      intent = value; ctx.performance = value; session.configure(buildGradiumJsonConfig(s, value));
     },
     generateFallback: (text: string, signal: AbortSignal) => generateGradiumSpeech(text, { ...ctx, signal }, s),
   });

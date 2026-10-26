@@ -7,6 +7,7 @@
  */
 
 import type { TTSProviderId } from "./types";
+import { getActiveEnvironment } from '../environmentContext';
 import { getSpeechPerformanceSettings, type SpeechPerformanceSettings } from './speechPerformanceSettings';
 import type { GradiumPauseSeconds } from './gradiumSpeech';
 
@@ -374,7 +375,7 @@ export function composeHumeDescription(baseline: string, intent?: PerformanceInt
 /** Only an authorized state mapping may enable the experimental WS pauses. */
 export function resolveGradiumPauseSeconds(intent: PerformanceIntent | null | undefined, characterKey?: string,
   settings = getSpeechPerformanceSettings()): GradiumPauseSeconds | undefined {
-  if (!settings.enabled || settings.gradiumPausesEnabled !== true
+  if (getActiveEnvironment() === 'prod' || !settings.enabled || settings.gradiumPausesEnabled !== true
     || intent?.source !== 'speech_state' || !intent.mappingVersion || intent.mappingVersion !== settings.version
     || !intent.speechState || !characterKey) return undefined;
   const mapping = settings.byCharacter?.[characterKey]?.[intent.speechState];

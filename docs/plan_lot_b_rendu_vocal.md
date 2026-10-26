@@ -2,11 +2,11 @@
 
 ## Exécution coordonnée Notion / app — 25 octobre 2026
 
-**Statut : A1 et A2 livrés ; A3 est le prochain lot, A4 reste à faire.** A2 est
+**Statut : A1/A2 livrés ; A3 implémenté sur le main Lovable intégré, décision production résolue ; A4 reste à faire.** A2 est
 dans main `a63ee8a379dcee47346903b43efab2e627f9ed7c`, CI PR/main vertes,
 Lovable synchronisé et preview vérifiée ; pauses expérimentales désactivées.
-Le [prompt autonome A3](prompt_reprise_reglages_auditions_lot_a3.md) est livré
-pour la reprise. Cette section est le plan
+La reprise courante est le [prompt autonome A4](prompt_reprise_accueils_integration_lot_a4.md),
+qui ne lance pas ce prochain lot. Cette section est le plan
 opérationnel courant ; elle remplace les découpages historiques ci-dessous.
 
 **Historique de reprise A1 — 25 octobre 2026 :** Ulrich travaille dans Notion
@@ -375,8 +375,8 @@ recette acceptée ou écarts précisément nommés ; publication production dist
    nouvelle preuve. Le prompt transmis porte aussi cette obligation de passation.
 
 A1 et A2 sont livrés ; leurs contrôles et livraisons sont consignés ci-dessus.
-Le lot app suivant est **A3**, prêt dans
-[son prompt autonome](prompt_reprise_reglages_auditions_lot_a3.md), distinct de
+Après le bilan A3 ci-dessous, le lot app suivant est **A4**, préparé dans
+[son prompt autonome](prompt_reprise_accueils_integration_lot_a4.md), distinct de
 l'édition Notion et de l'acceptation humaine du rendu final.
 
 ## Direction après écoute — 25 octobre 2026
@@ -614,3 +614,122 @@ Dans **sandbox → Technique avancée → TTS Config**, nouvelle section **Lot B
 - Diction/naturel et latence avant/après : aucune promesse de non-régression mesurée. Le protocole Gradium setup différé est couvert localement mais demande une audition réelle sur le service.
 - Tags Gradium : format/capacité future à confirmer, désactivés dans tous les cas. Fish : qualité FR et performances non mesurées.
 - GitHub main SHA, CI exacte et suppression des branches ne sont pas accessibles dans cette chaîne agent ; lot non déclaré terminé au sens de la règle fin de lot. Production non publiée.
+
+## Exécution A3 — 25 octobre 2026
+
+Base `46d29a573eef5e44b808c37dcef78202499edc47`, checkout canonique, branche
+`codex/a3-faithful-pause-auditions`. PR étrangère #24 sans recoupement conservée.
+Frontière retenue : snapshot d’audition temporaire de l’environnement courant,
+mapping/version enregistrés conservés, activation des pauses seulement dans ce
+contexte ; configuration Gradium figée avant setup et repli. Moteur A2 et lecteur
+existants réutilisés ; capture PCM bornée pour rejeu WAV sans appel fournisseur.
+Huit cas proposés, première sélection M1/M2/E1/E2 (quatre textes), puis finalistes
+explicitement sélectionnés ; témoin Max 3/Emma 2, mots/voix/base identiques en A/B.
+Sauvegarde séparée : geste explicite, version contrôlée, lecture DB exacte du
+même environnement après écriture ; aucune sauvegarde ni audition automatique.
+Notion natif vérifié : workspace Ulrich, mauvais routage Ava ; aucune lecture ou
+écriture Gamilab possible dans cette session. Lovable vérifié au SHA de base, ready.
+Couverture ajoutée : isolation, requêtes effectives WS/REST, capture/cache bornés,
+annulation/callbacks tardifs et sauvegarde/readback ; qualité et E2E séquentiels.
+
+### Intégration du main Lovable et décision production A3
+
+Pendant les vérifications, Lovable a livré
+`e1c92785f5f3f8f744d171e616039606df28393e` (« Leveré garde et transposé prod »),
+avec [qualité et E2E verts](https://github.com/memoways/ava-proto1/actions/runs/40232402896).
+Ses quatre fichiers recoupaient A3 ; le lot a été conservé localement et la
+livraison suspendue conformément à AGENTS.md. Ulrich a ensuite explicitement
+choisi : **conserver le rendu par état en production ; réserver les pauses
+expérimentales et les auditions à la sandbox.** Cette décision remplace la
+fermeture générale de production du prompt A3 initial.
+
+La branche A3 a été rebasée sur `e1c9278` sans perdre le travail Lovable :
+`getSpeechPerformanceSettings`, le chargement et la dérivation de l’intention
+continuent de lire/appliquer le mapping production. Seul le résolveur des breaks
+expérimentaux rétablit son refus explicite de production, même avec un booléen
+true. Le banc, ses snapshots et sa sauvegarde dédiée restent sandbox uniquement.
+Les tags émotionnels Gradium restent fermés partout. Aucun mapping Cloud, voix,
+fournisseur, modèle ou température n’est modifié par cette résolution.
+Les validations finales ci-dessous portent sur cet ensemble intégré.
+
+### Résultat et limites A3
+
+- Le banc existant utilise `createStreamingPlayback` Gradium et le compilateur A2.
+  `SpeechAuditionSnapshot` transporte seulement l’environnement, le personnage,
+  ses états synchronisés, le mapping temporaire et les paramètres Gradium figés.
+  La version enregistrée n’est jamais remplacée par une version inventée ; la
+  différence A/B est `gradiumPausesEnabled` dans le seul snapshot. La production
+  et les contextes étrangers restent refusés, y compris avant setup après token.
+- Huit cas proposés fidèles à la tâche, sans variantes lexicales automatiques ;
+  sélection initiale M1/M2/E1/E2, puis finalistes cochés explicitement. Max 3 et
+  Emma 2 au départ, mêmes mots/voix/configuration de base entre témoin et pauses.
+  Aucun appel de série, audio réel, changement de voix ou fournisseur de jeu.
+- Les preuves enregistrent la requête de setup WS effectivement envoyée et les
+  corps REST à la frontière fournisseur, les contrôles séparés, le transport et
+  le repli éventuel. `padding_bonus` est un rythme global ; émotion, delivery et
+  instruction ne deviennent pas un acting Gradium. Aucun tag émotionnel ajouté.
+- Capture opt-in des samples WS dans le lecteur existant, 30 secondes maximum ;
+  encodeur WAV existant réutilisé avec conservation exacte du PCM16 décodé.
+  L’annulation libère la capture ; un dépassement supprime sa conservation, sans
+  prolonger buffers/délais. Cache mémoire borné à 16 écoutes et 16 Mio, sans
+  persistance. Clé par contenu complet : texte, état/rugosité, personnage, voix,
+  fournisseur/modèle, environnement, snapshot/version, paramètres et transport
+  demandé. Le rejeu garde la provenance WS/REST et n’appelle pas le fournisseur.
+  Les métriques de génération conservées sont celles de l’appel original ;
+  premier son/durée de lecture sont mesurés à nouveau au rejeu.
+- Un seul propriétaire d’écoute, arrêt sur changement, génération et résultats
+  périmés ignorés. Quatre notes séparées : mots/pensée, pauses/rythme, affect/timbre,
+  clics/hoquets. Export JSON avec preuves, métriques, `cached`, appels réels
+  (repli compris) ; coût inconnu, aucun prix estimé affiché.
+- Sauvegarde distincte et explicite : lecture DB exacte de la sandbox, refus de
+  version obsolète, compare-and-swap, conservation des champs non édités, relecture
+  DB exacte avant publication du cache local. Un échec de stockage/relecture reste
+  visible ; le mode A/B ne peut pas activer les pauses live par cette sauvegarde.
+- Lecture MCP Lovable réelle : `ava_speech_performance` version
+  `2026-10-25T11:39:32.000Z` en sandbox-ulrich et prod ;
+  `gradiumPausesEnabled` absent, `gradiumTagsEnabled=false`. Aucune écriture Cloud.
+  Le code conserve le rendu par état production et refuse seulement les breaks
+  expérimentaux et les auditions en prod, conformément au choix explicite.
+- Capacité WS et PCM vérifiée contre le moteur A2, ses tests existants et la
+  [documentation officielle Gradium sur le streaming](https://gradium.ai/content/how-to-stream-tts-audio-real-time-bidirectional-streaming).
+  Aucune nouvelle dépendance ou implémentation de pauses concurrente.
+- Contrat du client de sauvegarde vérifié dans les docs officielles
+  [update/select](https://supabase.com/docs/reference/javascript/update) et
+  [maybeSingle](https://supabase.com/docs/reference/javascript/maybesingle),
+  changelog relu ; aucune mise à niveau nécessaire au lot. Lecture des politiques
+  via MCP Lovable : les membres admin disposent de SELECT et UPDATE sur
+  `admin_settings`, avec USING et WITH CHECK conservés. Aucun droit modifié.
+
+### Vérifications A3
+
+- 34 tests ciblés verts : snapshots isolés, requêtes effectives A/B et REST,
+  caractères/états propres, callbacks tardifs, arrêt, cache sans appel, éviction
+  par nombre/octets, samples WAV exacts, capture bornée et sauvegarde simulée.
+- `npm run test:quality` vert : lint (un avertissement préexistant IndexPRD4),
+  types, 66 régressions, 1 010 unitaires, 41 intégrations et build.
+- La vérification finale de la copie a rencontré un timeout de 5 s dans le
+  test inchangé `LatencyBlockingTab` (déjà observé en A1) ; rejeu isolé 8/8,
+  puis suite qualité complète verte sans modification de son délai ni du code.
+- E2E locaux : **78/78 verts sans retry**, 13,5 minutes. Le serveur local
+  a requis le contexte système autorisé (EPERM en sandbox avant exécution).
+  Un premier passage a été réalisé avant l’intégration de `e1c9278` ; les
+  validations finales après intégration : **39 tests ciblés, test:quality complet
+  (66 régressions, 1 010 unitaires, 41 intégrations, lint/types/build) et 78 E2E
+  sans retry (14,3 minutes), tous verts**. Aucun délai de test ou de lecture
+  rallongé. Livraison exacte et runs GitHub dans le bilan de PR A3.
+- Réserves : aucune écoute fournisseur réelle ni acceptation humaine ; les
+  tests utilisent des fournisseurs simulés. Les pauses ne garantissent pas un
+  souffle, un sanglot ou un timbre étranglé. Si mots/pauses conviennent mais pas
+  le timbre, proposer au plus deux voix isolées à écouter ultérieurement.
+- Gamilab non exposé : ni lecture éditoriale récente ni capitalisation Notion
+  revendiquée. Notion Ulrich ne permet pas de conclure sur la synchronisation Ava.
+- Aucun accueil, prompt Cloud, RAG, budget, capture/STT, contrôleur mains libres,
+  mapping live ou production modifié.
+
+### Reprise après A3
+
+[Prompt autonome A4 — accueils et intégration éditoriale](prompt_reprise_accueils_integration_lot_a4.md).
+La livraison technique désactivée ne vaut pas recette humaine. A4 ne commence
+pas dans ce lot. Le SHA final et les runs exacts de livraison sont conservés
+dans le bilan de la PR A3 (source GitHub), sans commit circulaire pour inscrire
+le SHA du commit contenant cette même ligne.

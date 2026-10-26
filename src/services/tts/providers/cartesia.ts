@@ -32,6 +32,7 @@ export const cartesiaProvider: TTSProvider = {
       generationConfig,
     };
 
+    ctx?.onAuditionRequest?.({ transport: 'rest', body });
     const startTime = Date.now();
     const tRequest = performance.now();
     const debugId = debugLogger.logFetch("tts", `TTS-CA "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts-cartesia`, body);

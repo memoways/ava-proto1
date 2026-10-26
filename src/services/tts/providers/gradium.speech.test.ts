@@ -39,7 +39,7 @@ describe('Gradium — mapping sandbox sur les deux transports effectifs', () => 
     const neutral = derivePerformanceIntent({ text: 'Oui…', characterKey: 'max', speechState: 'Bloqué',
       validSpeechStates: ['Bloqué'], rugosite: 0, speechSettings: settings });
     expect(resolveGradiumPauseSeconds(neutral, 'max', settings)).toBeUndefined();
-    setActiveEnvironment('prod'); expect(resolveGradiumPauseSeconds(intent, 'max', { ...settings, gradiumPausesEnabled: false })).toBeUndefined();
+    setActiveEnvironment('prod'); expect(resolveGradiumPauseSeconds(intent, 'max', settings)).toBeUndefined();
   });
   it('compiles the validated raw speech after performance setup and keeps REST explicitly clean', async () => {
     const settings = { ...mapping, gradiumPausesEnabled: true } as SpeechPerformanceSettings;

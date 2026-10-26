@@ -80,6 +80,7 @@ export const elevenLabsProvider: TTSProvider = {
       ...(ctx?.nextText ? { nextText: prepareTextForTTS(ctx.nextText) } : {}),
     };
 
+    ctx?.onAuditionRequest?.({ transport: 'rest', body });
     const startTime = Date.now();
     const tRequest = performance.now();
     const debugId = debugLogger.logFetch("tts", `TTS-EL "${shaped.text.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts`, body);

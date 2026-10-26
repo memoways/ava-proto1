@@ -24,6 +24,36 @@ async function socket(){await vi.waitFor(()=>expect(Socket.all).toHaveLength(1))
 describe('Gradium incremental turn',()=>{
   beforeEach(()=>{Socket.all=[]; mock.sources=[];mock.clock.currentTime=0;vi.stubGlobal('WebSocket',Socket);vi.mocked(authenticatedFunctionFetch).mockClear();});
   afterEach(()=>{vi.unstubAllGlobals();});
+  it('captures complete WS samples for an exact bounded WAV replay, and does not capture live turns', async () => {
+    const session = createGradiumStreamSession('Oui…', { ...opts, captureAudio: true }), ws = await socket();
+    session.open();
+    const pcm = new Uint8Array([0, 128, 255, 127, 1, 0, 255, 255]);
+    // Odd-byte chunks exercise the same decoder carry as real streaming.
+    ws.message({ type: 'audio', audio: btoa(String.fromCharCode(...pcm.slice(0, 3))) });
+    ws.message({ type: 'audio', audio: btoa(String.fromCharCode(...pcm.slice(3))) });
+    ws.message({ type: 'end_of_stream' });
+    const stats = await session.generationDone;
+    expect(stats.auditionCapture).toBe('complete'); expect(stats.auditionAudio?.type).toBe('audio/wav');
+    const bytes = await new Promise<ArrayBuffer>((resolve) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result as ArrayBuffer); reader.readAsArrayBuffer(stats.auditionAudio!); });
+    expect(new Uint8Array(bytes).slice(44)).toEqual(pcm);
+    expect(new DataView(bytes).getUint32(24, true)).toBe(24000);
+    session.cancel(); Socket.all = [];
+    const live = createGradiumStreamSession('Oui', opts), ws2 = await socket();
+    ws2.message(audio(0.4)); ws2.message({ type: 'end_of_stream' });
+    expect(await live.generationDone).not.toHaveProperty('auditionAudio'); live.cancel();
+  });
+  it('clears an audition capture above 30 seconds without extending the playback buffer or accepting stale audio', async () => {
+    const session = createGradiumStreamSession('Oui', { ...opts, captureAudio: true }), ws = await socket(); session.open();
+    for (let i = 0; i < 31; i++) { mock.clock.currentTime = i + 1; ws.message(audio(1)); }
+    ws.message({ type: 'end_of_stream' });
+    expect(await session.generationDone).toMatchObject({ auditionCapture: 'limit_exceeded', auditionAudio: undefined });
+    session.cancel();
+  });
+  it('validates the audition environment again before setup after asynchronous token loading', async () => {
+    const validateContext = vi.fn(() => { throw new Error('environment changed'); });
+    const session = createGradiumStreamSession('Oui', { ...opts, validateContext }), ws = await socket();
+    await expect(session.finished).rejects.toThrow('environment changed'); expect(ws.sent).toEqual([]);
+  });
   it('prepares the socket once but defers setup until the state is configured',async()=>{
     const session=createGradiumTurnSession({...opts,deferSetup:true}),ws=await socket();
     expect(ws.sent).toEqual([]);
