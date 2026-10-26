@@ -1,6 +1,6 @@
 # Prompt autonome — Ava, A4R : intégration E0 et recette humaine
 
-État revérifié le 26 octobre 2026, après redémarrage de Codex par Ulrich.
+État revérifié le 26 octobre 2026, après reconnexion native Gamilab réussie.
 La livraison technique A4 est faite ; E0 et la recette humaine restent ouverts.
 Reprendre uniquement ce reste A4, sans lancer un nouveau chantier de code.
 Checkout unique `/Users/ulrich/CodeProjects/memoways/ava-proto1`, remote unique
@@ -32,57 +32,36 @@ avec leurs SHA ; vérifier l'activité réelle et les fichiers avant toute écri
 Le dernier contrôle GitHub conserve seulement `main` et cette branche distante ;
 #24 est inchangée depuis le 11 octobre et ne recoupe pas les documents A4.
 
-## Prérequis Notion natif : ne pas confondre redémarrage et restauration
+## Accès natif Gamilab rétabli et sources vérifiées
 
-Après le redémarrage signalé par Ulrich, le connecteur Notion exposé a répondu
-à `fetch("self")` : **Ulrich**, workspace
-`377e8583-7838-4c05-9f76-8833a450f304`. C'est un connecteur utilisable pour ce
-workspace personnel, pas pour les sources Ava. Les namespaces natifs Gamilab
-et Ulrich Fischer n'étaient toujours pas exposés dans le chat.
+Le renouvellement officiel a réussi avec le CLI stable Codex 0.164.0. La connexion
+`notion_gamilab` est chargée et utilisable dans ce chat. `get-self` confirme
+**Gamilab**, workspace **`7e1a9a09-09cb-4deb-a306-83a29b831bc2`**, utilisateur
+Ulrich Fischer. Les fiches Max `3f762322-e595-81ba-8241-c7f6b28f31fd` et Emma
+`3f762322-e595-81f9-880f-e309adec7075` ont été lues par MCP natif, sans édition.
+Deux démarrages indépendants du client (intégré puis CLI stable) conservent
+OAuth et 66 outils. Les refus d'accès décrits à la clôture #82 sont historiques.
 
-Le contrôle indépendant via le client Codex natif a retourné `notLoggedIn` et
-zéro outil pour **les deux connexions configurées** `notion_gamilab` et
-`notion_ulrich_fischer`. Cela ne permet pas d'annoncer tous les workspaces
-restaurés. Le workspace Gamilab réel doit encore être identifié via `self` ;
-ne pas déduire son ID du nom du serveur ou d'une page.
+Au début de la reprise, appeler `get-self` sur cette connexion et comparer l'ID.
+Si l'ID correspond, lire les sources directement ; aucune nouvelle connexion
+Gamilab n'est nécessaire. La configuration persistante et le Trousseau sont
+conservés ; aucun jeton n'a été copié dans un fichier.
 
-Réparation globale déjà effectuée hors dépôt Ava : CLI 0.164.0, coordination
-du renouvellement active, stockage OAuth dans le Trousseau, deux serveurs
-explicitement activés et attente de chargement des catalogues. Aucune copie
-de jeton en clair. Un renouvellement natif Gamilab antérieur a atteint le
-retour local, puis a échoué à l'écriture sécurisée macOS (« The user name or
-passphrase you entered is not correct. »). Le Trousseau annoncé déverrouillé
-n'a pas suffi. Ce bilan ne prouve pas une nouvelle expiration après redémarrage.
+La connexion native `notion_ulrich_fischer` reste `notLoggedIn`, tandis que le
+plugin personnel Ulrich répond pour `377e8583-7838-4c05-9f76-8833a450f304`.
+Cette limite distincte ne bloque plus Ava. La reconnexion Gamilab ne démontre pas
+la restauration de tous les workspaces ; ne pas changer son routage pour réparer
+un autre workspace. En cas de nouvel échec, vérifier le client, le réseau et le
+Trousseau dans un contexte autorisé avant de conclure à une expiration.
 
-Première vérification locale exécutable, sans relancer OAuth :
-
-```bash
-python3 /Users/ulrich/.codex/scripts/notion-native-check.py
-```
-
-Cet outil ne sort que noms/statuts/nombres d'outils ; il ne vérifie pas à lui
-seul l'identité des workspaces. S'il réussit, charger les connecteurs natifs et
-lire `get-self` ou `fetch("self")` pour chacun avant tout accès ciblé. Confirmer
-Gamilab pour Ava et l'ID personnel ci-dessus pour Ulrich. Vérifier la persistance
-sur deux démarrages indépendants, puis la disponibilité effective dans le chat.
-
-Si le blocage persiste, lire le diagnostic local existant
-`/Users/ulrich/.codex/diagnostics/notion-native-20261026.json`, vérifier le client
-et la configuration actifs, sans afficher de secret. Ne pas répéter les flux
-OAuth depuis le même contexte en échec. L'intervention humaine préparée utilise
-le skill wizard et le client officiel dans Terminal :
-
-```bash
-/Users/ulrich/.codex/scripts/restaurer-notion-native.command
-```
-
-Ce parcours renouvelle Gamilab puis Ulrich dans le Trousseau et contrôle deux
-démarrages ; il ne garantit pas la réussite d'une écriture que macOS refuse.
-L'utilisateur valide les éventuelles demandes système, jamais en donnant son
-mot de passe au chat. Ne pas recréer les identifiants, supprimer l'historique,
-basculer les jetons vers un fichier, ni ajouter des workspaces par supposition.
-Inventorier les connexions effectivement enregistrées si d'autres sont annoncées,
-et vérifier chacune séparément. Aucun navigateur pour lire les données Notion.
+La tâche existante à réutiliser est
+[Rendre les dialogues de tous les personnages moins écrits et moins lisses](https://app.notion.com/p/f3944bc8e9ce48138f2b309db223035d),
+dans la base Tâches Storygami demandée. Elle a été lue : comparer ses sections,
+arbitrages et propriétés à la proposition E0 locale avant toute écriture ;
+aucune tâche nouvelle n'est justifiée par l'ancien refus d'accès. La fiche
+[Prototype 1 AVA](https://app.notion.com/p/97462322e595822ca21601814e915159)
+conserve le routage et les preuves de cette reconnexion. Les personnages et
+la tâche éditoriale n'ont pas été modifiés pendant ce rétablissement.
 
 ## Réalisé et autorisé
 
@@ -140,9 +119,9 @@ Oui… je suis là. Vous vouliez me parler ?
 
 ## Reste E0 : sources et intégration
 
-Notion Ava est TOUJOURS **Gamilab**, sans redemander le choix. Le contrôle après
-redémarrage et le prérequis de restauration sont consignés ci-dessus. Aucun
-accès ciblé ou capitalisation Gamilab effectué par le connecteur Ulrich.
+Notion Ava est TOUJOURS **Gamilab**, sans redemander le choix. Le routage et les
+lectures natives vérifiées sont consignés ci-dessus. Aucun accès ciblé Gamilab
+effectué par le connecteur Ulrich.
 Vérifier le workspace via MCP natif avant de lire ou écrire ; réutiliser Gamilab
 si disponible. Ne pas conclure à un défaut de partage ou de synchronisation
 depuis le mauvais routage. Aucun navigateur Notion ni déplacement des sources
@@ -156,8 +135,8 @@ Les champs sont annoncés synchronisés par Ulrich au 25 octobre ; ne pas invent
 un retard depuis un refus d'accès. Aucune nouvelle édition E0 approuvée n'était
 fournie dans A4. L'approbation des accueils app ne valide pas ces propositions.
 
-Dès que Gamilab est exploitable, lire les sources actuelles et l'édition
-réellement approuvée. Distinguer E0 approuvé/proposé. Si une validation manque,
+Gamilab étant exploitable, lire les sources actuelles, la tâche existante et
+l'édition réellement approuvée. Distinguer E0 approuvé/proposé. Si une validation manque,
 préparer le diff par champ dans le plan existant, puis demander uniquement cette
 décision indispensable. L'édition des fiches appartient à Ulrich ; aucune
 réécriture automatique. Intégrer les seuls champs approuvés, synchronisation

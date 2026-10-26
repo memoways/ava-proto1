@@ -4,6 +4,26 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Gamilab — connexion native rétablie] — 2026-10-26
+
+- Renouvellement officiel réussi avec le CLI stable Codex 0.164.0. Le connecteur
+  natif chargé dans ce chat confirme Gamilab, ID
+  `7e1a9a09-09cb-4deb-a306-83a29b831bc2` ; fiches Max et Emma lues avec succès.
+  Deux démarrages indépendants, client intégré puis CLI stable : 66 outils,
+  authentification OAuth disponible. Ce résultat remplace le blocage Notion de
+  la clôture documentaire #82 ; aucune reconnexion Gamilab supplémentaire requise.
+- Routage AGENTS, STORY, plans et reprise A4R actualisés. La tâche existante
+  [Rendre les dialogues de tous les personnages moins écrits et moins lisses](https://app.notion.com/p/f3944bc8e9ce48138f2b309db223035d)
+  est retrouvée ; la proposition E0 locale doit être comparée à cette source
+  avant tout ajout. Aucune nouvelle tâche ni édition de fiche créée.
+- Intégration E0 et recette humaine toujours non exécutées. La connexion native
+  Ulrich reste non authentifiée ; le plugin Ulrich séparé répond correctement.
+  La restauration Gamilab ne vaut pas restauration de tous les workspaces.
+- Lot documentaire uniquement : code, workflow et réglages Cloud inchangés ;
+  dernière [CI du code verte](https://github.com/memoways/ava-proto1/actions/runs/40298606848)
+  sur `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec`, E2E compris.
+  Aucune publication production ni écoute fournisseur.
+
 ## [Clôture documentaire A4 et reprise A4R] — 2026-10-26
 
 - Livraison A4 vérifiée par lecture GitHub : [#81 fusionnée](https://github.com/memoways/ava-proto1/pull/81),
