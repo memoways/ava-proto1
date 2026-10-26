@@ -298,6 +298,34 @@ verte sur HEAD exact puis main vert selon AGENTS. Une seule branche de lot,
 nettoyée après livraison ; PR #24 étrangère préservée. Livrer CHANGELOG/STORY,
 plan et prompt de reprise dans le même tour. Aucun autre hébergeur ni Supabase.
 
+### Continuité et livraison à chaque lot — rappel explicite du 26 octobre
+
+Le plan est la référence conservée dans le projet. À l'ouverture de chaque lot,
+le relire, contrôler Notion Gamilab par get-self puis lecture de la tâche et
+actualiser le plan avant implémentation. Les décisions déjà tranchées restent
+acquises, y compris le bouton persistant et le timer suspendu sur la grille.
+
+Chaque lot de code va jusqu'à commit/push, PR, CI verte du HEAD exact,
+squash-merge sur main, CI main verte et nettoyage de sa branche. Vérifier ensuite
+la synchronisation et l'état prêt de Lovable ; vérifier séparément toute migration
+ou Edge Function nécessaire. La publication production reste une étape distincte
+qu'Ulrich pourra autoriser après la recette.
+
+Si une action dans Lovable reste à faire par Ulrich, sauvegarder dans docs un
+prompt Lovable spécifique au lot et au SHA livré, avec environnement, actions
+exactes et vérifications ; le donner prêt à copier dans le compte rendu. Si rien
+n'est nécessaire, le préciser. Ne pas annoncer un lot technique complet si une
+intégration indispensable reste à faire.
+
+À chaque clôture, même partielle, actualiser ce plan et Notion, sauvegarder la
+reprise du prochain lot (ou la finalisation du lot incomplet), puis **donner le
+prompt prêt à copier dans la réponse finale avec son lien**. La reprise comprend
+la vérification Notion, les sources, les invariants, les tests, le parcours GitHub/
+Lovable complet et cette même obligation de passation. Elle ne lance pas le lot
+suivant. À la fin du chantier, produire une clôture autonome sans lot inventé.
+
+[Démarrage autonome du lot F1](prompt_reprise_fiabilite_passage_personnages_lot_f1.md).
+
 ### Contrat de tests qui empêchera une récidive
 
 - Avant 4 échanges complets dans l'appel : aucun transfert direct ; au 4e,

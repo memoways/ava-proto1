@@ -1,10 +1,12 @@
 # Reprise Codex → assistant suivant — fiabilité des passages, F1
 
 Date : 26 octobre 2026. **Prompt préparé, lot F1 non lancé.**
-Complément documentaire : choix bouton/timer confirmés après l'audit #85 ; base
-main `d38e7f5fd6d6487f5c767ea4fdbf2565397aea91` à cette mise à jour. Les évolutions
-étrangères de sandbox Julien et de fournisseur TTS sont préservées ; aucun
-rejeu du diagnostic ou test produit de ces évolutions n'est revendiqué ici.
+Ce prompt, lorsqu'il est donné à l'assistant pour exécution, autorise la
+réalisation et la livraison complète du seul lot F1 : correctif, tests,
+commit/push, PR, squash-merge après contrôles, nettoyage et synchronisation
+Lovable. Il ne lance pas F2 et n'autorise pas la publication de production.
+Le plan canonique doit être relu et actualisé à chaque lot ; aucun chantier
+ne doit dépendre de la mémoire du chat précédent.
 
 ## Première action exécutable
 
@@ -21,7 +23,7 @@ fiabilité par des replays intégrés des incidents T15/T17/T21 du 26 octobre.
 Un accord doit aboutir à un bouton réellement utilisable ou à une erreur
 visible et récupérable ; jamais une promesse sans effet. Ne pas lancer F2,
 activer Ava/Léo, publier en production ou créer un nouveau chat par ce prompt.
-L'exécution de ce prompt est une demande future distincte du présent audit.
+La préparation de ce document ne vaut pas démarrage de F1.
 
 ## Contexte obligatoire
 
@@ -29,9 +31,12 @@ L'exécution de ce prompt est une demande future distincte du présent audit.
 - [Plan canonique, audit du 26 octobre](plan_changement_interlocuteur_manuel.md#audit-de-production-et-nouveau-contrat--26-octobre-2026).
 - [Tâche Notion existante](https://app.notion.com/p/1c498377edb94cfea4d4bae8728e8c7f),
   [application](https://app.notion.com/p/97462322e595822ca21601814e915159).
-- Notion natif Gamilab uniquement : get-self doit confirmer
-  `7e1a9a09-09cb-4deb-a306-83a29b831bc2`. Ne pas utiliser Ulrich, le navigateur
-  ou un autre workspace pour les sources Ava ; Gami DigiDouble exclu.
+- À chaque lot, vérifier réellement la connexion Notion native Gamilab :
+  get-self doit confirmer `7e1a9a09-09cb-4deb-a306-83a29b831bc2`, puis lire la
+  tâche et l'application ci-dessus. Une connexion configurée ne suffit pas.
+  Si l'accès échoue, diagnostiquer la connexion existante conformément à AGENTS,
+  signaler le blocage précis sans contourner par navigateur ni autre workspace.
+  Ne pas prétendre la capitalisation faite. Gami DigiDouble exclu.
 - Données uniquement par MCP Lovable, projet
   `1265958d-b74e-40f2-917d-182fe05163fc`, workspace Memoways
   `5glbtPltldwz9tgNwIi4`. Aucun connecteur Supabase générique.
@@ -40,16 +45,20 @@ L'exécution de ce prompt est une demande future distincte du présent audit.
 
 ## État vérifié à la préparation
 
-Base audit : main `7e36e94476dc541c9f3f371b9a92d6b09ad8abd4`, propre,
-Lovable au même SHA et ready. La PR documentaire qui contient ce prompt peut
-avoir avancé main : lire son état GitHub réel, ne pas restaurer cette base.
-Branche documentaire de préparation : `codex/audit-handoff-fiabilite-20261026`.
-Sa fusion et son nettoyage se vérifient dans CHANGELOG et le compte rendu de PR.
-Aucun code, workflow, donnée Cloud, prompt de personnage ou production modifié
-par l'audit. Source publique HTTP observée : bundle index-BhfS0uYD.js ; ne pas
-en déduire le SHA de publication. Dernière CI complète du code :
-[40298606848](https://github.com/memoways/ava-proto1/actions/runs/40298606848),
-code `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec`.
+Au contrôle de préparation du prompt : main local/distant
+`885e38987ad299be120fcb8746e47fb652a69ae2`, checkout propre ; plan et décisions
+livrés par #85/#86, branches correspondantes supprimées. Lovable natif au même
+SHA, ready, agentFinished=true. Notion Gamilab get-self et lecture de tâche
+fonctionnels. Dernière CI complète du code vérifiée verte :
+[40351585507](https://github.com/memoways/ava-proto1/actions/runs/40351585507),
+code `d38e7f5fd6d6487f5c767ea4fdbf2565397aea91`. #85/#86 sont documentaires.
+
+Lire le main réel au démarrage : cette préparation documentaire peut l'avoir
+avancé. Ne pas restaurer une ancienne révision. Les évolutions étrangères de
+sandbox Julien et de fournisseur TTS sont préservées ; les tests de l'audit
+ci-dessous précèdent ces évolutions. Aucun correctif de passage ou publication
+production effectué par les lots documentaires. Le bundle public observé lors
+de l'audit ne doit pas être assimilé au SHA de preview.
 
 Incident : session prod `2dc01921-c517-4e4e-b88f-6c5bb1b5bb8d`,
 26/10/2026 15:04 Europe/Paris, Max, 27 messages joueur incluant fragments,
@@ -141,3 +150,43 @@ Lire le registre et les types avant toute généralisation.
   cette même obligation dans le prompt. Ne pas lancer F2 automatiquement.
 - Rapporter séparément local/GitHub/preview/production et recette humaine.
   Publication production distincte après validation humaine, jamais déduite de CI.
+
+## Intégration Lovable et clôture de chaque lot — obligation de reprise
+
+1. Aller jusqu'à commit, push, PR, CI verte sur son HEAD exact, squash-merge
+   dans main et CI main verte E2E compris, selon AGENTS. Supprimer uniquement
+   sa branche locale/distante et vérifier le checkout. Une CI queued,
+   in_progress ou rouge n'autorise pas la fusion d'un lot de code. Les lots
+   exclusivement documentaires gardent leur exception explicite.
+2. Vérifier par MCP Lovable le projet, le SHA synchronisé et son état prêt.
+   Distinguer synchronisation des sources, compilation/preview, migrations,
+   Edge Functions et publication de production. Une fusion GitHub ne prouve
+   pas qu'une migration ou une fonction Cloud est appliquée. Ne pas modifier
+   les fournisseurs voix ou l'éditorial pour contourner un échec de passage.
+3. Si le lot exige une opération Lovable/Cloud, la réaliser avec les outils
+   natifs dans le périmètre autorisé puis vérifier le résultat. Si Ulrich doit
+   intervenir, enregistrer un prompt exact, spécifique au diff livré, dans
+   `docs/prompt_lovable_passages_lot_f1.md` : projet, SHA, fichiers/migrations/
+   fonctions concernés, environnement, action attendue, vérifications et retour
+   arrière. Le fournir aussi prêt à copier dans la réponse finale, avec une
+   seule action précise. Ne pas créer un prompt générique demandant à Lovable
+   de refaire le code. Si aucune opération n'est requise, le dire explicitement.
+   Une intégration indispensable non faite laisse le lot technique incomplet.
+4. Actualiser plan, CHANGELOG/STORY et tâche Notion existante avec faits, raisons,
+   sources, dates et tests ; conserver Source, actualiser Last updated by et
+   relire chaque écriture. Notion inaccessible : nommer ce qui n'est pas sauvé,
+   garder la reprise dans le dépôt et signaler cette limite sans inventer de succès.
+5. **À la fin de chaque lot, préparer le rebond dans le même tour.** Si F1 est
+   complet, enregistrer `docs/prompt_reprise_fiabilite_passage_personnages_lot_f2.md`.
+   S'il est partiel, fournir plutôt sa reprise de finalisation, sans lancer F2.
+   Inclure état Git réel, fait/restant, décisions, sources Notion et contrôle de
+   connexion, cible Lovable, invariants, tests, livraison attendue et première
+   action exécutable. Reporter cette même obligation dans chaque prompt suivant.
+   À la fin du chantier, produire une clôture autonome et dire explicitement
+   qu'aucun lot ne suit, plutôt qu'inventer du travail.
+6. La réponse finale contient résultat et limites, liens vers plan/PR/Notion,
+   SHA main et CI vérifiés, branches restantes, états local/GitHub/preview/
+   production, éventuelle action Lovable, **puis le prochain prompt prêt à
+   copier et le lien vers son fichier**. Ne pas se contenter de dire « prompt
+   disponible » ni proposer de le préparer plus tard. Ne pas ouvrir de nouveau
+   chat ou lancer le lot suivant automatiquement.
