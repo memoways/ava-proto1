@@ -341,6 +341,78 @@ sans changer automatiquement le fournisseur de jeu.
 
 ### A4 — accueils et recette d'ensemble
 
+#### Vérification A4R — 26 octobre 2026
+
+**E0 est déjà synchronisé ; aucune resynchronisation exécutée.** Ce contrôle
+remplace les hypothèses d'intégration restante des bilans A4 et #83. La recette
+humaine demeure ouverte. Base documentaire reprise :
+`5b9a5c107c2f2c103ad310afcdcde78220ccf73d`, #83. L'autre chat a terminé sa
+livraison avant toute écriture A4R ; aucun travail étranger modifié.
+
+**Sources natives.** `get-self` confirme Gamilab
+`7e1a9a09-09cb-4deb-a306-83a29b831bc2`. La
+[tâche E0](https://app.notion.com/p/40462322e59580ca98a4d6148d8ce406)
+contient le rapport d'édition sur validation explicite d'Ulrich du 25 octobre,
+avec avant/après par propriété. Elle complète la
+[tâche générale](https://app.notion.com/p/f3944bc8e9ce48138f2b309db223035d).
+Aucune nouvelle tâche nécessaire. Les fiches indiquées actives dans l'ancien
+prompt sont devenues Backup ; la requête de la base confirme deux nouvelles
+fiches « En cours » :
+
+| Personnage | Page active | Dernière modification source UTC | Copie sandbox UTC |
+| --- | --- | --- | --- |
+| Max | [ef4cfaa6…](https://app.notion.com/p/ef4cfaa670e34e879b9e079815fd0cd9) | 2026-10-25 17:30:48.186 | 2026-10-25 17:35:07.189 |
+| Emma | [dfcc15f8…](https://app.notion.com/p/dfcc15f89d3745f78c84d0c24a4288cf) | 2026-10-25 17:30:48.329 | 2026-10-25 17:35:13.983 |
+
+**Comparaison source/copie.** Lecture SQL uniquement par MCP Lovable Ava,
+projet `1265958d-b74e-40f2-917d-182fe05163fc`, base activée vérifiée.
+`characters.notion_id` porte déjà les nouveaux IDs. Décodage de la présentation
+MCP : `br` vers sauts de ligne, retrait des balises de mise en forme,
+échappements Markdown décodés, extrémités nettoyées ; aucun changement des mots,
+de la ponctuation ou des espaces intérieurs. Dix-huit propriétés concordent
+en sandbox-ulrich :
+
+| Propriété | Max, caractères | Emma, caractères | Résultat sandbox |
+| --- | ---: | ---: | --- |
+| Identité fondamentale | 2918 | 2974 | égales aux sources |
+| Qui tu es | 3449 | 3604 | égales aux sources |
+| Manière de parler | 2647 | 2756 | égales aux sources |
+| Dynamique de la conversation | 7836 | 8407 | égales aux sources |
+| Ce que tu ne fais jamais | 3122 | 3419 | égales aux sources |
+| Qui t'appelle | 3313 | 3331 | égales aux sources |
+| Sujets sensibles | 4176 | 3827 | égales aux sources |
+| Références intellectuelles | 8820 | 4340 | égales aux sources |
+| Timeline | 9822 | 10834 | égales aux sources |
+
+Les cinq états de chaque fiche sont présents en DB et dans la preview, avec
+leurs descriptions propres. Les mêmes 18 propriétés sont déjà présentes dans
+la base prod (Max : 25 octobre 18:38:05.050 UTC ; Emma : 18:38:11.072 UTC).
+Ce constat préexiste à A4R ; aucune écriture production, et aucune publication
+du frontend déduite de ces dates. RAG, doublons d'index et caches d'une session
+déjà ouverte ne sont pas réaudités ; aucun changement d'index nécessaire ici.
+
+**Rendu vérifié sans génération.** Preview authentifiée dans Brave, environnement
+Sandbox — Ulrich. Fiches Max/Emma et cinq états affichés, versions de copie
+ci-dessus. Aperçus `rich_v2` : Max 11 893 caractères statiques, manière de
+parler 2647/2647 et moteur intime 793/793 ; Emma 11 917, manière de parler
+2756/2756 et moteur intime 954/954. Sections injectées Emma relues : pensée
+sans réparation et absence de retour imposé à Ava présentes. Ce sont des aperçus
+admin ; aucun nouveau prompt live envoyé au LLM ni conclusion sur le jeu entendu.
+Les accueils A4 sandbox correspondent aux phrases approuvées ; ceux de prod
+gardent leurs valeurs antérieures. Aucun profil sauvegardé.
+
+**Livraison et reste.** Code applicatif et workflow inchangés ; diff et liens
+documentaires vérifiés, suites lourdes non rejouées. Dernière
+[CI qualité/E2E du code](https://github.com/memoways/ava-proto1/actions/runs/40298606848)
+verte sur `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec` ; exception documentaire.
+SHA documentaire final et résultat de livraison dans le bilan de PR, pour éviter
+une boucle de commit du propre SHA. Aucun appel fournisseur audio, sync,
+réécriture de fiche/prompt Cloud, activation live ou publication production.
+Restent la recette au casque et la vérification du comportement effectif des
+sessions neuves avec Ulrich. Une pause n'atteste ni souffle ni sanglot ;
+l'acceptation exige son retour explicite. La
+[reprise A4R](prompt_reprise_integration_recette_lot_a4r.md) porte ce seul reste.
+
 #### Exécution A4 — 26 octobre 2026
 
 **Mise à jour Gamilab après #82 :** renouvellement officiel réussi avec le CLI

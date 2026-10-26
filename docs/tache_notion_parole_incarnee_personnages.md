@@ -1,4 +1,4 @@
-# Proposition E0 à comparer dans Notion — Ava : parole sous le choc
+# Référence E0 — Ava : parole sous le choc
 
 Préparée le 25 octobre 2026 ; état revérifié le 26 octobre. **Aucune nouvelle
 tâche créée par l'agent.** La tâche existante
@@ -7,11 +7,22 @@ a été retrouvée et lue par MCP natif Gamilab, dans la base demandée :
 [a789687e3d57461696f134af9b766f28](https://app.notion.com/p/gamilab-prov/a789687e3d57461696f134af9b766f28?v=23a0333beea1467eae928b7470b67fef).
 Gamilab est confirmé par `get-self`, workspace
 `7e1a9a09-09cb-4deb-a306-83a29b831bc2` ; les deux fiches actives sont lisibles.
-Comparer cette proposition aux sections et arbitrages de la tâche existante
-avant tout enrichissement. Conserver son statut et ses relations ; aucune
-approbation E0 ou sync Cloud n'est déduite de ce seul accès. Éviter le doublon.
+Cette tâche générale donne le contexte ; la tâche spécifique E0 retrouvée
+ci-dessous porte la preuve d'édition. Conserver leurs statuts et relations.
 
-Le texte ci-dessous est autonome et destiné au corps de la tâche.
+**Mise à jour A4R :** la tâche spécifique
+[Ava : parole sous le choc](https://app.notion.com/p/40462322e59580ca98a4d6148d8ce406)
+existe déjà et contient le rapport d'édition du 25 octobre, réalisé sur validation
+explicite d'Ulrich. Les fiches actives sont Max
+`ef4cfaa6-70e3-4e87-9b9e-079815fd0cd9` et Emma
+`dfcc15f8-9d37-45f7-8c84-d0c24a4288cf` ; les anciens IDs sont des Backup.
+Les neuf champs de chaque fiche concordent avec les copies sandbox-ulrich
+et prod relues par MCP Lovable le 26 octobre. Aucune sync ni édition répétée.
+Le [bilan A4R](plan_lot_b_rendu_vocal.md#vérification-a4r--26-octobre-2026)
+précise les versions et les limites ; l'écoute humaine reste ouverte.
+
+Le texte ci-dessous conserve la proposition préparatoire ; le rapport Notion
+existant décrit l'édition réellement réalisée et ne doit pas être recréé.
 
 ## Titre
 
@@ -33,8 +44,8 @@ une seconde définition du jeu des personnages.
 ## Sources à relire
 
 - [Base Caractères AVA](https://app.notion.com/p/gamilab-prov/30362322e59580bbb7b8dd49d516b341).
-- [Max Lorenzo actif](https://app.notion.com/p/3f762322e59581ba8241c7f6b28f31fd).
-- [Emma Munz active](https://app.notion.com/p/3f762322e59581f9880fe309adec7075).
+- [Max Lorenzo actif](https://app.notion.com/p/ef4cfaa670e34e879b9e079815fd0cd9).
+- [Emma Munz active](https://app.notion.com/p/dfcc15f89d3745f78c84d0c24a4288cf).
 - Demande et réponses explicites d'Ulrich du 25 octobre 2026 ; propositions
   conservées dans le dépôt ava-proto1, docs/plan_parole_incarnee_personnages.md.
 
