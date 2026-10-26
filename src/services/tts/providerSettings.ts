@@ -64,45 +64,71 @@ export function resetInworldSettings(): InworldSettings {
 
 // ---------------- Fish Audio ----------------
 
+export type FishModel = "s1" | "speech-1.6" | "speech-1.5";
+
 export interface FishSettings {
-  voiceName: string;
-  voiceProvider: "HUME_AI" | "CUSTOM_VOICE";
-  /** Optional prompt-style description shaping prosody (Octave-specific) */
-  description: string;
-  format: "mp3" | "wav" | "pcm";
-  languageCode: string;
+  /** Fish Audio voice model id (reference_id). Empty = Fish default voice. */
+  referenceId: string;
+  model: FishModel;
+  format: "mp3" | "wav" | "pcm" | "opus";
+  mp3Bitrate: 64 | 128 | 192;
+  /** "balanced" lowers latency, "normal" favours quality. */
+  latency: "normal" | "balanced";
+  /** 0–1 — expressiveness / variability. */
+  temperature: number;
+  /** 0–1 — nucleus sampling. */
+  topP: number;
+  /** 0.5–2 — base speaking rate (per-turn intent multiplies it). */
+  speed: number;
+  /** Volume offset in dB (−10 … +10). */
+  volume: number;
+  normalize: boolean;
+  /** 100–300 — text chunk length used by Fish. */
+  chunkLength: number;
+  /** Inject Fish emotion markers, e.g. "(sad)", derived from the turn state. Never written by the LLM. */
+  emotionTags: boolean;
+  /** Emotion marker applied when the turn is neutral (empty = none). */
+  defaultEmotion: string;
 }
 
-const HUME_KEY = "ava_tts_settings_hume";
+const FISH_KEY = "ava_tts_settings_fish";
 
-const humeDefaults: FishSettings = {
-  voiceName: "Male English Actor",
-  voiceProvider: "HUME_AI",
-  description: "",
+export const fishDefaults: FishSettings = {
+  referenceId: "",
+  model: "s1",
   format: "mp3",
-  languageCode: "fr",
+  mp3Bitrate: 128,
+  latency: "balanced",
+  temperature: 0.7,
+  topP: 0.7,
+  speed: 1,
+  volume: 0,
+  normalize: true,
+  chunkLength: 200,
+  emotionTags: true,
+  defaultEmotion: "",
 };
 
 export function getFishSettings(): FishSettings {
   try {
-    const stored = readEnvironmentStorage(HUME_KEY);
-    if (stored) return { ...humeDefaults, ...JSON.parse(stored) };
+    const stored = readEnvironmentStorage(FISH_KEY);
+    if (stored) return { ...fishDefaults, ...JSON.parse(stored) };
   } catch { /* ignore */ }
-  return { ...humeDefaults };
+  return { ...fishDefaults };
 }
 
 export async function loadFishSettingsFromDB(): Promise<FishSettings> {
-  return loadFromDB(HUME_KEY, humeDefaults);
+  return loadFromDB(FISH_KEY, fishDefaults);
 }
 
 export async function saveFishSettingsToDB(settings: FishSettings): Promise<void> {
-  await saveToDB(HUME_KEY, settings);
+  await saveToDB(FISH_KEY, settings);
 }
 
 export function resetFishSettings(): FishSettings {
-  removeEnvironmentStorage(HUME_KEY);
-  void deleteEnvironmentSetting(HUME_KEY).catch(() => {});
-  return { ...humeDefaults };
+  removeEnvironmentStorage(FISH_KEY);
+  void deleteEnvironmentSetting(FISH_KEY).catch(() => {});
+  return { ...fishDefaults };
 }
 
 // ---------------- Gradium ----------------
