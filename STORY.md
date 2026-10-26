@@ -3,9 +3,26 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-26 (F2 livré, CI PR/main et Lovable vérifiés ; F3 non lancé)
+> **Last Updated**: 2026-10-26 (F3 engagé ; écoute humaine et publication encore en attente)
 
 ---
+
+## F3 — écouter les appels avec Ulrich
+
+La base technique F2 est relue sur main `b642e406` ; Gamilab et Lovable Ava sont
+accessibles dans les workspaces attendus. La preview est prête et la sandbox v7
+conserve les réglages nécessaires aux allers-retours. Aucun réglage n’a été modifié.
+
+Le [protocole F3](docs/recette_humaine_ava_f3.md) prépare une vraie écoute en PTT
+puis en mains libres : consentement, clic, voix, retours grille et souvenirs propres.
+Tous les résultats humains restent à renseigner. Une CI verte et des fournisseurs
+simulés ne permettent pas de dire que les pauses ou le timbre ont été acceptés.
+
+Cette préparation documentaire ne publie rien. Après l’écoute et son acceptation,
+Ulrich devra encore autoriser explicitement la publication via Lovable.
+[Plan](docs/plan_changement_interlocuteur_manuel.md) et
+[reprise de finalisation](docs/prompt_reprise_fiabilite_passage_personnages_lot_f3_finalisation.md)
+conservent cette séparation ; aucun prochain lot lancé automatiquement.
 
 ## F2 — pouvoir raccrocher et reprendre (26 octobre 2026)
 

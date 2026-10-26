@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [F3 — préparation de la recette humaine] — 2026-10-26
+
+- F3 engagé depuis main `b642e406c660418a30a90b064073761078c9c4e2` (#91).
+  [Protocole PTT/mains libres](docs/recette_humaine_ava_f3.md) enregistré :
+  transferts consentis, rappels depuis la grille, souvenirs isolés, seuil/fragments,
+  pronoms, refus, offre persistante, timer/recharge, sonneries et annulations.
+- Notion natif Gamilab et Lovable Ava/Memoways vérifiés ; preview ready au SHA
+  de démarrage. Sandbox v7, seuil 4, pause 2, quota 8 relus via Lovable Cloud.
+  Aucune nouvelle session F3 attestée, aucune écoute humaine validée.
+- Documentation seule ; code et workflows inchangés, dernière
+  [CI complète verte](https://github.com/memoways/ava-proto1/actions/runs/40385670472)
+  sur `d59d51055222d46508e598cedcfb00886412e524`. Aucun test simulé relancé,
+  aucun changement Cloud/Edge/migration, aucune publication production.
+  [Plan](docs/plan_changement_interlocuteur_manuel.md),
+  [prompt Lovable de recette](docs/prompt_lovable_recette_humaine_f3.md) et
+  [finalisation F3](docs/prompt_reprise_fiabilite_passage_personnages_lot_f3_finalisation.md).
+  F3 reste en cours ; #24 et les branches historiques sont préservées.
+
 ## [F2 — cycle des appels] — 2026-10-26
 
 - [PR #90 fusionnée](https://github.com/memoways/ava-proto1/pull/90), main code
