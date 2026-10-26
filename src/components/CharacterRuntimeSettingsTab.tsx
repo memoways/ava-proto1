@@ -201,7 +201,8 @@ export default function CharacterRuntimeSettingsTab() {
                 </ul>
               )}
               <div className="mt-4 space-y-2 border-t pt-3">
-                <Textarea value={profile.opening_line ?? ""} onChange={(event) => patchProfile(profile.id, { opening_line: event.target.value || null })} placeholder="Phrase d’ouverture" className="min-h-20" />
+                <Textarea aria-label={`Accueils de ${profile.display_name}`} value={profile.opening_line ?? ""} onChange={(event) => patchProfile(profile.id, { opening_line: event.target.value || null })} placeholder="Une alternative d’accueil par ligne" className="min-h-20" />
+                <p className="text-xs text-muted-foreground">Une alternative par ligne. Un seul accueil est choisi au début de l’appel, sans répéter le précédent si un autre choix existe.</p>
                 <div className="flex items-center gap-2">
                   {profile.portrait_url && (
                     <img src={profile.portrait_url} alt={`Portrait de ${profile.display_name}`} className="h-12 w-12 rounded object-cover" />

@@ -4,6 +4,28 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [A4 — accueils choisis et lecture protégée] — 2026-10-26
+
+- Répertoire app initial : une alternative par ligne, sélection stable par appel,
+  pas de répétition immédiate si plusieurs choix ; transferts et retours conservés.
+  Quatre formulations Max/Emma approuvées explicitement pour sandbox-ulrich ;
+  écriture Cloud et relecture suivies dans le plan.
+- Ouverture initiale verrouillée avant ses attentes, annulable et protégée des
+  callbacks tardifs ; reçus prudents des accueils et premier son horodaté sur lecture.
+- Ancien cache singleton inutilisé remplacé par des blobs REST complets bornés
+  (16 / 8 Mio), indexés sur contexte de génération et environnement. Le streaming
+  WS A2 reste inchangé ; aucune capture live ni pré-génération automatique ajoutée.
+- Base main A3 `1b0fcd4340f79b4c8184c7100b0e96840bf4c938`, #80,
+  [CI main verte](https://github.com/memoways/ava-proto1/actions/runs/40279854111).
+  [Plan A4, preuves et limites](docs/plan_lot_b_rendu_vocal.md#exécution-a4--26-octobre-2026).
+  Qualité locale verte : 66 régressions, 1 019 unitaires, 41 intégrations,
+  lint/types/build et 81 E2E sans retry (12,8 min). SHA de fusion et CI exactes
+  dans le bilan GitHub de livraison A4.
+- Intégration E0 et recette humaine non validées ; Notion exposé cible Ulrich,
+  Gamilab indisponible dans la session. Production non publiée et textes prod
+  conservés. [Reprise A4R](docs/prompt_reprise_integration_recette_lot_a4r.md)
+  enregistrée sans lancer ce reste. PR #24 et branches étrangères préservées.
+
 ## [A3 — réglages fidèles et auditions des pauses] — 2026-10-25
 
 - Banc existant relié au WS Gradium A2 par un snapshot temporaire explicite ;

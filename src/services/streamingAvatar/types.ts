@@ -42,6 +42,8 @@ export interface ResponseOutputPrepareContext {
 }
 
 export interface ResponseOutputTurnContext {
+  /** Scripted greeting, eligible for completed REST audio caching. */
+  cacheOpening?: boolean;
   sessionId?: string;
   turnId?: string;
   turnIndex?: number;

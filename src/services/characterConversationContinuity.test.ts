@@ -1,9 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import { characterHandoffGreeting, characterRecoveryLine, latestCallTransfer } from './characterConversationContinuity';
+import { characterHandoffGreeting, characterRecoveryLine, latestCallTransfer, createInitialGreetingSelector, initialGreetingLines, greetingDelivery } from './characterConversationContinuity';
+import { projectDeliveredConversation } from './responseDelivery';
 import { buildExperienceFrame } from './experienceFrame';
 import type { ConversationMessage } from '@/types';
 
 describe('character call continuity', () => {
+  it.each(['max', 'emma'] as const)('selects one %s profile alternative per call without immediate repetition across new calls', character => {
+    const select = createInitialGreetingSelector();
+    const profile = ' Allô. \r\n\nJe vous écoute.\nAllô. ';
+    expect(initialGreetingLines(character, profile)).toEqual(['Allô.', 'Je vous écoute.']);
+    const first = select('call1', 'sandbox-ulrich', character, profile);
+    expect(select('call1', 'sandbox-ulrich', character, 'Texte modifié après sélection.')).toBe(first);
+    const next = select('call2', 'sandbox-ulrich', character, profile);
+    expect(next).not.toBe(first);
+    expect(select('call3', 'sandbox-ulrich', character, profile)).toBe(first);
+    expect(select('call1', 'prod', character, 'Texte production.')).toBe('Texte production.');
+    expect(select('single1', 'sandbox-ulrich', character, 'Unique.')).toBe('Unique.');
+    expect(select('single2', 'sandbox-ulrich', character, 'Unique.')).toBe('Unique.');
+  });
+  it('keeps the three contexts distinct and excludes unplayed greeting words from shared evidence', () => {
+    const text = 'Allô. Je vous écoute.';
+    const initial = greetingDelivery('s:opening', 0, 'max', text);
+    expect(projectDeliveredConversation([{ role: 'max', content: text, timestamp: 0, delivery: initial }])).toEqual([]);
+    expect(greetingDelivery('s:opening', 0, 'max', text, { status: 'played', started: true }))
+      .toMatchObject({ delivered: text, uncertain: '', privateContinuation: '', status: 'completed' });
+    expect(greetingDelivery('s:opening', 0, 'max', text, { status: 'cancelled', started: true }))
+      .toMatchObject({ delivered: '', uncertain: text, privateContinuation: '', status: 'cancelled' });
+    expect(greetingDelivery('s:opening', 0, 'max', text, { status: 'failed', started: false }))
+      .toMatchObject({ delivered: '', uncertain: '', privateContinuation: text });
+    const firstTransfer = characterHandoffGreeting('emma', 'max', []);
+    const returning = characterHandoffGreeting('emma', 'max', [{ role: 'emma', content: firstTransfer, timestamp: 0 }]);
+    expect(firstTransfer).not.toBe(text);
+    expect(returning).not.toBe(firstTransfer);
+  });
   it.each(['max', 'emma'] as const)('varies %s recoveries and transfer greetings without another character’s words', character => {
     const from = character === 'max' ? 'emma' : 'max';
     const history: ConversationMessage[] = [];

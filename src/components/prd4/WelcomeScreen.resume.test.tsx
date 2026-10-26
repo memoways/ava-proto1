@@ -3,11 +3,11 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@hcaptcha/react-hcaptcha", () => ({ default: () => null }));
-vi.mock("@/services/openingTTSCache", () => ({ prefetchOpeningTTS: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/services/tts", () => ({ generateSpeech: vi.fn() }));
 vi.mock("@/services/privacyConsent", () => ({ isPrivacyNoticeEnabled: () => false }));
 
 import WelcomeScreen from "./WelcomeScreen";
-import { prefetchOpeningTTS } from "@/services/openingTTSCache";
+import { generateSpeech } from "@/services/tts";
 
 const baseProps = {
   onStart: vi.fn().mockResolvedValue(true),
@@ -23,7 +23,7 @@ describe("WelcomeScreen — reprise", () => {
         <WelcomeScreen {...baseProps} resumeLoading resumeAvailable={false} onResume={onResume} />
       </MemoryRouter>,
     );
-    expect(prefetchOpeningTTS).not.toHaveBeenCalled();
+    expect(generateSpeech).not.toHaveBeenCalled();
 
     view.rerender(
       <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -33,6 +33,6 @@ describe("WelcomeScreen — reprise", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reprendre l’appel" }));
     await waitFor(() => expect(onResume).toHaveBeenCalledOnce());
     expect(baseProps.onStart).not.toHaveBeenCalled();
-    expect(prefetchOpeningTTS).not.toHaveBeenCalled();
+    expect(generateSpeech).not.toHaveBeenCalled();
   });
 });

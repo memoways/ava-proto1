@@ -2,11 +2,11 @@
 
 ## Exécution coordonnée Notion / app — 25 octobre 2026
 
-**Statut : A1/A2 livrés ; A3 implémenté sur le main Lovable intégré, décision production résolue ; A4 reste à faire.** A2 est
+**Statut : A1/A2/A3 livrés ; A4 technique en validation, accueils sandbox approuvés ; intégration E0 et recette humaine restantes.** A2 est
 dans main `a63ee8a379dcee47346903b43efab2e627f9ed7c`, CI PR/main vertes,
 Lovable synchronisé et preview vérifiée ; pauses expérimentales désactivées.
-La reprise courante est le [prompt autonome A4](prompt_reprise_accueils_integration_lot_a4.md),
-qui ne lance pas ce prochain lot. Cette section est le plan
+La reprise restante est le [prompt autonome A4R](prompt_reprise_integration_recette_lot_a4r.md),
+qui ne lance pas l’intégration E0 ni la recette humaine. Cette section est le plan
 opérationnel courant ; elle remplace les découpages historiques ci-dessous.
 
 **Historique de reprise A1 — 25 octobre 2026 :** Ulrich travaille dans Notion
@@ -331,6 +331,72 @@ malgré mots/pauses justes, proposer au plus deux auditions de voix alternatives
 sans changer automatiquement le fournisseur de jeu.
 
 ### A4 — accueils et recette d'ensemble
+
+#### Exécution A4 — 26 octobre 2026
+
+Base réelle : `1b0fcd4340f79b4c8184c7100b0e96840bf4c938`, A3 #80.
+[Bilan A3 et CI exactes](https://github.com/memoways/ava-proto1/pull/80#issuecomment-6409951717) relus ;
+Lovable annonce le même SHA, prêt, agent terminé. Checkout propre avant A4,
+main mis à jour ; PR étrangère #24 sans recoupement, branches étrangères préservées.
+Un seul agent, branche `codex/accueils-integration-a4`.
+
+Diagnostic : l'accueil initial lit `character_runtime_profiles.opening_line` ;
+les transferts/retours utilisent déjà des répertoires distincts. L'ancien cache
+singleton n'est plus appelé par le parcours et ne distingue ni voix ni environnement.
+L'accueil initial n'a pas de verrou synchrone avant ses attentes ni de signal
+d'annulation propre. Les transferts ont déjà un verrou et une provenance.
+
+Travail technique indépendant implémenté : conserver le champ app existant en acceptant
+un répertoire explicite (une alternative par ligne), choisir une fois par appel,
+éviter le dernier choix lorsque plusieurs textes sont disponibles, et empêcher
+les doubles lectures/callbacks périmés. Réutiliser la sortie et la queue existantes ;
+cache borné des blobs REST complets seulement, clé texte/personnage/environnement/
+fournisseur/voix/modèle/réglages/intention/stitching. Le streaming WS garde son
+chemin A2, sans capture live nouvelle ni changement de buffers ou de pauses.
+Tests aux points d'appel, puis qualité et E2E séquentiels ; aucun audio réel automatique.
+
+**Diff éditorial approuvé par Ulrich dans ce chat le 26 octobre 2026, écriture Cloud encore à vérifier :** lecture Cloud MCP
+Lovable le 26 octobre ; cible Ava vérifiée. Remplacer seulement `opening_line`
+de sandbox-ulrich, après validation, par deux alternatives séparées par une ligne :
+
+| Personnage | Avant (sandbox) | Après approuvé (2 choix) |
+| --- | --- | --- |
+| Max | Bonjour, qu'est-ce qui t'amène à me contacter ? | Allô. Max à l’appareil. Je vous écoute. / Oui, c’est Max. Qu’est-ce qui vous amène ? |
+| Emma | Bonjour. Qui êtes vous, que me voulez-vous ? | Allô… c’est Emma. À qui je parle ? / Oui… je suis là. Vous vouliez me parler ? |
+
+Les répertoires existants de premier transfert et retour restent proposés à la
+recette, sans réécriture automatique. Aucun des huit cas du banc n'est promu
+en accueil canonique. Production inchangée : Max conserve son texte actuel,
+Emma « Salut, je suis Emma - tu es... qui ? ».
+
+E0 : aucune version approuvée fournie dans la demande. Le MCP Notion exposé
+annonce encore Ulrich `377e8583-7838-4c05-9f76-8833a450f304`, mauvais routage
+pour Ava. Aucune lecture ciblée Gamilab, aucune sync, RAG ou édition de prompt
+Cloud ; intégration E0 et recette humaine restent distinctes de cette livraison.
+La configuration Codex contient une connexion native Gamilab activée, mais
+aucun de ses outils n’est exposé dans cette session ; seule la connexion Ulrich
+est exploitable. Ne pas confondre configuration et disponibilité, ni relancer OAuth.
+La réponse explicite « Valider les quatre formulations en sandbox » autorise
+uniquement ces deux propriétés app de sandbox-ulrich ; elle ne valide pas E0.
+
+Vérifications ciblées : 19 tests unitaires verts ; 7 E2E Chromium verts
+(premier contact Max/Emma avec une seule alternative et zéro appel LLM/GM,
+fiche arrivée après raccrochage, reprise après format invalide, aller-retour,
+provenance et mémoire isolée). Fournisseurs simulés. Qualité complète verte : lint/types/build,
+66 régressions, 1 019 unitaires et 41 intégrations ; un avertissement lint
+préexistant, aucune erreur. E2E complets : **81/81 verts sans retry**, 12,8 minutes
+sur le code final. CI du HEAD exact de la PR puis main et Lovable restent à
+vérifier avant clôture technique.
+Le premier son d'accueil est maintenant horodaté sur le callback de lecture,
+séparément de la fin de lecture. Le reçu ne déclare aucun préfixe aligné pour
+une lecture partielle : toute la phrase commencée reste incertaine.
+
+Retour arrière : revert de la PR A4 et remise des deux anciens `opening_line`
+ci-dessus dans sandbox-ulrich. Aucun autre champ app ni propriété Notion à
+restaurer. La reprise restante est [A4R : intégration E0 et recette humaine](prompt_reprise_integration_recette_lot_a4r.md),
+enregistrée dans ce tour sans lancer ce reste.
+Le cache est mémoire uniquement (16 entrées / 8 Mio), sans préfetch
+spéculatif ; le WS ne lui confie aucun sample ni contrôle A2.
 
 **Résultat observable :** le premier contact correspond au personnage, avec
 des entrées distinctes pour appel initial, premier transfert et retour.

@@ -39,7 +39,6 @@ import {
   prefetchGamilabSDK,
   type STTSession,
 } from "@/services/stt";
-import { OPENING_LINE } from "@/services/openingTTSCache";
 import type { TTSProviderId } from "@/services/tts/types";
 import { derivePerformanceIntent, logPerformanceIntent } from "@/services/tts/performanceIntent";
 import { getSpeechPerformanceSettings, loadSpeechPerformanceSettings } from '@/services/tts/speechPerformanceSettings';
@@ -144,7 +143,7 @@ import { appendExperienceEvent, applyTopicHandoffFallback, validateDirectorDecis
 import type { ExperienceDirectorDecisionV1, RuntimeCharacter } from "@/types";
 import { createAcousticInterruptionController, recognizedWordsChanged, withoutRejectedPrefix, endOfSpeechDelayMs, normalizeHandsFreeSettings, shouldBargeIn, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
 import { createMicRecoveryPolicy, isMicSilentlyDead, MIC_WATCHDOG_STRIKES } from "@/services/handsFreeRecovery";
-import { characterHandoffGreeting, characterRecoveryLine } from '@/services/characterConversationContinuity';
+import { characterHandoffGreeting, characterRecoveryLine, createInitialGreetingSelector, greetingDelivery } from '@/services/characterConversationContinuity';
 import {
   buildSwitchRequestGuidance,
   characterDisplayName,
@@ -276,6 +275,8 @@ const IndexPRD4 = () => {
   const processingWatchdogRef = useRef<number | null>(null);
   const activeTurnControllerRef = useRef<AbortController | null>(null);
   const activeOutputControllerRef = useRef<AbortController | null>(null);
+  const initialGreetingRef = useRef<AbortController | null>(null);
+  const selectInitialGreetingRef = useRef(createInitialGreetingSelector());
   const activeTurnSequenceRef = useRef(0);
   const endedRef = useRef(false);
   const userRoleRef = useRef(state.userRoleProfile);
@@ -400,6 +401,8 @@ const IndexPRD4 = () => {
 
   // ---- Helpers conversation -------------------------------------------------
   const cleanupAudio = useCallback(() => {
+    initialGreetingRef.current?.abort('experience-cleanup');
+    initialGreetingRef.current = null;
     approvedCallingTargetRef.current = null;
     acceptedHandoffRef.current = null;
     handoffAttemptIdRef.current = null;
@@ -562,6 +565,7 @@ const IndexPRD4 = () => {
       turnId?: string;
       turnIndex?: number;
       signal?: AbortSignal;
+      cacheOpening?: boolean;
       onPlaybackStart?: () => void;
       voiceId?: string;
       providerId?: TTSProviderId;
@@ -612,6 +616,7 @@ const IndexPRD4 = () => {
       onVoiceObservation: context.onVoiceObservation,
       onServiceObserved: context.onServiceObserved,
       signal: context.signal,
+      cacheOpening: context.cacheOpening,
       onPlaybackStart: context.onPlaybackStart,
       voiceId: context.voiceId,
       providerId: context.providerId,
@@ -963,6 +968,12 @@ const IndexPRD4 = () => {
 
   // ---- Calling → conversation ------------------------------------------------
   const handleAnswered = useCallback(async () => {
+    if (initialGreetingRef.current || endedRef.current) return;
+    const controller = new AbortController();
+    initialGreetingRef.current = controller; // synchronous lock, before any await
+    const sequence = activeTurnSequenceRef.current;
+    const isCurrent = () => initialGreetingRef.current === controller && !controller.signal.aborted
+      && !endedRef.current && activeTurnSequenceRef.current === sequence;
     // La lecture démarre au montage et ne peut retarder l'ouverture de l'appel
     // de plus de 800 ms. En cas de réseau lent, le dernier réglage admin mis en
     // cache reste préférable à une interface bloquée.
@@ -971,6 +982,7 @@ const IndexPRD4 = () => {
       gameplaySettingsLoadRef.current ?? loadGameplaySettingsFromDB(),
       800,
     ).catch(() => getGameplaySettings());
+    if (!isCurrent()) return;
     const configuredDuration = normalizeSessionDurationSeconds(gameplaySettings.TIMEOUT_SECONDS);
     configuredSessionDurationRef.current = configuredDuration;
     showQuestionnaireRef.current = gameplaySettings.SHOW_QUESTIONNAIRE;
@@ -994,6 +1006,7 @@ const IndexPRD4 = () => {
         ),
       );
     } catch (error) {
+      if (!isCurrent()) return;
       const message = error instanceof Error ? error.message : String(error);
       console.warn("[PRD4] call preparation unavailable:", error);
       if (!sessionIdRef.current) {
@@ -1003,10 +1016,12 @@ const IndexPRD4 = () => {
           variant: "destructive",
         });
         setPhase("calling_max");
+        initialGreetingRef.current = null;
         return;
       }
       await activateTTSFallback(message);
     }
+    if (!isCurrent()) return;
 
     setPhase("conversation_max");
     endedRef.current = false;
@@ -1018,6 +1033,7 @@ const IndexPRD4 = () => {
     pendingPostVideoContextRef.current = null;
     const startingCharacter = startingCharacterRef.current;
     const profile = await getCharacterRuntimeReadiness(startingCharacter).catch(() => null);
+    if (!isCurrent()) return;
     const characterContext = toCharacterExecutionContext(profile);
     if (!profile?.ready || !characterContext) {
       toast({
@@ -1026,6 +1042,7 @@ const IndexPRD4 = () => {
         variant: "destructive",
       });
       setPhase("calling_max");
+      initialGreetingRef.current = null;
       return;
     }
     activeCharacterRef.current = startingCharacter;
@@ -1055,12 +1072,15 @@ const IndexPRD4 = () => {
     trackEvent("prd4_session_duration_loaded", { duration_seconds: configuredDuration });
 
     // Réplique d'ouverture du personnage actif (scriptée pour amorcer)
-    const rawOpening = profile?.openingLine?.trim() || (startingCharacter === "max" ? OPENING_LINE : "Allô ?");
+    const rawOpening = selectInitialGreetingRef.current(sessionIdRef.current ?? 'local',
+      getRuntimeContext().environmentId, startingCharacter, profile.openingLine);
     const opening = guardCharacterResponse(rawOpening, characterContext).response;
     preloadRescueRef.current(startingCharacter, activeVoiceIdRef.current ?? undefined, activeTTSProviderIdRef.current ?? undefined);
     setMaxSubtitle(opening);
+    const openingTurnId = `${sessionIdRef.current ?? 'local'}:opening`;
     const openingMsg: ConversationMessage = tagSpokenWith(
-      { role: startingCharacter, content: opening, timestamp: Date.now() },
+      { role: startingCharacter, content: opening, timestamp: Date.now(),
+        delivery: greetingDelivery(openingTurnId, 0, startingCharacter, opening) },
       startingCharacter,
     );
     conversationRef.current = [openingMsg];
@@ -1071,34 +1091,50 @@ const IndexPRD4 = () => {
         : "max_speaking",
     );
 
+    let openingStarted = false;
+    const markOpeningPlayback = () => {
+      openingStarted = true;
+      if (!isCurrent()) return;
+      // Marque le first_max_response et calcule la durée onboarding
+      if (!firstMaxResponseAtRef.current) {
+        firstMaxResponseAtRef.current = Date.now();
+        const startedAt = onboardingStartedAtRef.current;
+        const durationMs = startedAt ? firstMaxResponseAtRef.current - startedAt : null;
+        trackEvent("prd4_first_max_response", {
+          session_id: sessionIdRef.current,
+          duration_ms: durationMs,
+        });
+        if (sessionIdRef.current) {
+          void updatePRD4Onboarding(sessionIdRef.current, {
+            first_max_response_at: new Date(firstMaxResponseAtRef.current).toISOString(),
+            onboarding_duration_ms: durationMs,
+          });
+        }
+      }
+    };
+
     try {
-      await renderResponseText(opening, {
-        turnId: `${sessionIdRef.current ?? "local"}:opening`,
+      activeOutputControllerRef.current = controller;
+      const output = await renderResponseText(opening, {
+        turnId: openingTurnId,
         turnIndex: 0,
+        onPlaybackStart: markOpeningPlayback,
         voiceId: activeVoiceIdRef.current ?? undefined,
         providerId: activeTTSProviderIdRef.current ?? undefined,
         characterKey: startingCharacter,
+        signal: controller.signal,
+        cacheOpening: true,
       });
+      openingMsg.delivery = greetingDelivery(openingTurnId, 0, startingCharacter, opening,
+        { ...output, started: output.started || openingStarted });
     } catch (err) {
+      openingMsg.delivery = greetingDelivery(openingTurnId, 0, startingCharacter, opening,
+        { status: controller.signal.aborted ? 'cancelled' : 'failed', started: openingStarted });
       console.warn("[PRD4] opening output failed:", err);
+    } finally {
+      if (activeOutputControllerRef.current === controller) activeOutputControllerRef.current = null;
     }
-
-    // Marque le first_max_response et calcule la durée onboarding
-    if (!firstMaxResponseAtRef.current) {
-      firstMaxResponseAtRef.current = Date.now();
-      const startedAt = onboardingStartedAtRef.current;
-      const durationMs = startedAt ? firstMaxResponseAtRef.current - startedAt : null;
-      trackEvent("prd4_first_max_response", {
-        session_id: sessionIdRef.current,
-        duration_ms: durationMs,
-      });
-      if (sessionIdRef.current) {
-        void updatePRD4Onboarding(sessionIdRef.current, {
-          first_max_response_at: new Date(firstMaxResponseAtRef.current).toISOString(),
-          onboarding_duration_ms: durationMs,
-        });
-      }
-    }
+    if (!isCurrent()) return;
 
     setAudioState("idle");
   }, [
@@ -2455,7 +2491,10 @@ const IndexPRD4 = () => {
       trackEvent('prd4_handoff_executed', { session_id: sid, target_character: target, first_contact: firstContact, source: 'gm' });
       const rawOpeningLine = characterHandoffGreeting(target, from, conversationRef.current);
       const openingLine = guardCharacterResponse(rawOpeningLine, characterContext).response;
+      const openingTurnId = `${sid ?? 'local'}:${target}-opening:${eventSuffix}`;
+      const openingTurnIndex = conversationRef.current.filter(m => m.role === 'user').length;
       const opening = tagSpokenWith({ role: target, content: openingLine, timestamp: Date.now(),
+        delivery: greetingDelivery(openingTurnId, openingTurnIndex, target, openingLine),
         callTransfer: { from, returning: !firstContact } }, target);
       conversationRef.current = [...conversationRef.current, opening];
       addMessage(opening);
@@ -2470,13 +2509,22 @@ const IndexPRD4 = () => {
       preloadRescueRef.current(target, profile.ttsVoiceId ?? undefined, asTTSProviderId(profile.ttsProvider) ?? undefined);
       const openingController = new AbortController();
       activeOutputControllerRef.current = openingController;
+      let openingStarted = false;
       const output = await renderResponseText(openingLine, {
-        turnId: `${sid ?? 'local'}:${target}-opening:${eventSuffix}`,
-        turnIndex: conversationRef.current.filter(m => m.role === 'user').length,
+        turnId: openingTurnId,
+        turnIndex: openingTurnIndex,
         voiceId: profile.ttsVoiceId ?? undefined, providerId: asTTSProviderId(profile.ttsProvider) ?? undefined,
         characterKey: target, signal: openingController.signal,
+        cacheOpening: true,
+        onPlaybackStart: () => { openingStarted = true; },
       });
+      opening.delivery = greetingDelivery(openingTurnId, openingTurnIndex, target, openingLine,
+        { ...output, started: output.started || openingStarted });
+      if (activeOutputControllerRef.current === openingController) activeOutputControllerRef.current = null;
       if (!isSwitchCurrent()) return;
+      const deliveredOpening = await writeHandoffSnapshot(withOpening, consumed, undefined, conversationRef.current);
+      if (!isSwitchCurrent()) return;
+      handoffSnapshotRef.current = deliveredOpening;
       if (output.status !== 'played') throw new Error('La connexion est établie, mais sa voix est indisponible. Réactive le micro pour reprendre.');
       handoffPhaseRef.current = 'completed';
       // Restore the player's choice only after successful pickup and greeting.

@@ -21,6 +21,23 @@ personnages. L'exécution app commence par le
 [prompt autonome du lot A1](prompt_reprise_parole_ouverte_lot_a1.md), qui conserve
 ce plan et laisse l'édition/synchronisation à Ulrich pendant son travail.
 
+### Accueils A4 — 26 octobre 2026
+
+Le champ d'accueil app accepte un choix par ligne ; chaque appel fixe son texte,
+sans répétition immédiate lorsqu'une alternative existe. Premier transfert et
+retour conservent leur provenance et leurs répertoires distincts. L'ouverture
+est protégée des doubles exécutions et réponses tardives après raccrochage.
+Un reçu distingue lecture complète, portion incertaine et texte privé ; le
+premier son est horodaté séparément de la fin de lecture.
+
+Ulrich a explicitement approuvé les quatre formulations initiales Max/Emma
+pour sandbox-ulrich dans le chat du 26 octobre. Le
+[diff exact et les preuves techniques](plan_lot_b_rendu_vocal.md#exécution-a4--26-octobre-2026)
+restent dans le plan opérationnel, avec l'état de leur écriture Cloud.
+Ce choix app ne valide aucune proposition E0. Le connecteur Notion exposé
+cible Ulrich, pas Gamilab ; aucune lecture ciblée ni sync éditoriale effectuée.
+Recette au casque, intégration E0 et publication production restent distinctes.
+
 ### Correction technique A3 — 25 octobre 2026
 
 Le banc existant compare maintenant témoin et breaks WS A2 avec un snapshot

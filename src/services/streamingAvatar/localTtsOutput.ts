@@ -34,7 +34,8 @@ export class LocalTTSOutput implements ResponseOutput {
     });
     this.queue = queue;
     const cancel = () => queue.cancel();
-    context?.signal?.addEventListener("abort", cancel, { once: true });
+    if (context?.signal?.aborted) cancel();
+    else context?.signal?.addEventListener("abort", cancel, { once: true });
     for (const chunk of chunkTextForTTS(text, chunkOptions(providerId))) {
       queue.enqueue(chunk, {
         session_id: context?.sessionId,
@@ -48,6 +49,7 @@ export class LocalTTSOutput implements ResponseOutput {
         onServiceObserved: context?.onServiceObserved,
         characterKey: context?.characterKey,
         performance: context?.performance,
+        cacheOpening: context?.cacheOpening,
       });
     }
     const result = await queue.drain().finally(() => {

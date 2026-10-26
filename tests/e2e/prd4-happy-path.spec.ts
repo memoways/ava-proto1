@@ -43,6 +43,7 @@ interface NetworkFakeOptions {
   diagnosticAdmin?: boolean;
   blockTraceUpload?: boolean;
   characterOpenings?: boolean;
+  openingLines?: Partial<Record<'max' | 'emma', string>>;
   characterPortraits?: boolean;
   delayCharacterResponseMs?: number;
   whisperResponse?: string;
@@ -400,7 +401,7 @@ async function installNetworkFakes(
       const character = input.p_character_key;
       return json(route, [{ character_key: character, display_name: character === "emma" ? "Emma" : "Max", enabled: true, ready: true,
         character_id: character === "emma" ? EMMA_CHARACTER_ID : CHARACTER_ID, notion_page_id: "77777777-7777-4777-8777-777777777777", environment_id: "prod", prompt_updated_at: "2026-10-12T00:00:00Z",
-        tts_provider: options.incrementalOutput ? "gradium" : "elevenlabs", tts_voice_id: options.characterOpenings ? (character === "emma" ? "e2e-emma-voice" : "e2e-max-voice") : null, opening_line: options.characterOpenings ? `Allô, ici ${character === "emma" ? "Emma" : "Max"}.` : null, portrait_url: options.characterPortraits ? `https://portraits.example/${character}-runtime.jpg` : null, situation_summary: "Fiche E2E" }]);
+        tts_provider: options.incrementalOutput ? "gradium" : "elevenlabs", tts_voice_id: options.characterOpenings ? (character === "emma" ? "e2e-emma-voice" : "e2e-max-voice") : null, opening_line: options.openingLines?.[character as 'max' | 'emma'] ?? (options.characterOpenings ? `Allô, ici ${character === "emma" ? "Emma" : "Max"}.` : null), portrait_url: options.characterPortraits ? `https://portraits.example/${character}-runtime.jpg` : null, situation_summary: "Fiche E2E" }]);
     }
     if (table === "pin_current_orchestration_version") {
       return json(route, "66666666-6666-4666-8666-666666666666");
@@ -757,6 +758,52 @@ async function sendHandoffTurn(page: Page, text: string) {
   await expect.poll(() => page.evaluate(() =>
     (window as Window & { __e2eAudioState?: { ended: number } }).__e2eAudioState?.ended ?? 0)).toBeGreaterThan(before);
 }
+
+for (const character of ['Max', 'Emma'] as const) {
+  test(`A4 : un seul accueil ${character} du profil, sans génération LLM`, async ({ page }) => {
+    const key = character.toLowerCase() as 'max' | 'emma';
+    const choices = [`Allô, c’est ${character}.`, `Oui, ${character} à l’appareil.`];
+    const fakes = await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true,
+      openingLines: { [key]: choices.join('\n') } });
+    await startCharacterConversation(page, character);
+    await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled();
+    expect(choices.map(text => text.normalize('NFKC'))).toContain(fakes.getTtsText());
+    expect(fakes.getTtsCallCount()).toBe(1);
+    expect(fakes.getMaxTurnCount()).toBe(0);
+    expect(fakes.getGmPostTurnCount()).toBe(0);
+    // Unrelated renders never select or read a second greeting.
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+    expect(fakes.getTtsCallCount()).toBe(1);
+  });
+}
+
+test('A4 : une fiche initiale arrivée après raccrochage ne prononce aucun accueil', async ({ page }) => {
+  const fakes = await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true });
+  let hold = false;
+  let release!: () => void;
+  let requested!: () => void;
+  const waiting = new Promise<void>(resolve => { requested = resolve; });
+  const blocked = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/rest/v1/rpc/get_character_runtime_readiness_for_environment', async route => {
+    if (hold) { requested(); await blocked; }
+    await route.fallback();
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Commencer' }).click();
+  await page.getByRole('button', { name: /Passer/ }).click();
+  await answerFilmQuestion(page);
+  await expect(page.getByRole('button', { name: 'Appeler Max', exact: true })).toBeEnabled();
+  hold = true;
+  await page.getByRole('button', { name: 'Appeler Max', exact: true }).click();
+  await waiting;
+  await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  release();
+  await page.waitForLoadState('networkidle');
+  expect(fakes.getTtsCallCount()).toBe(0);
+  expect(fakes.getMaxTurnCount()).toBe(0);
+  await expect(page.getByRole('button', { name: 'Démarrer l’enregistrement' })).toHaveCount(0);
+});
 
 for (const [character, target] of [["Emma", "Max"], ["Max", "Emma"]] as const) {
   test(`preuve référencée : confirmation oui, offre persistée et reprise ${character} vers ${target}`, async ({ page }) => {
