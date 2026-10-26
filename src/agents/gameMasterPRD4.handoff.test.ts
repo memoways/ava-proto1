@@ -7,8 +7,9 @@ vi.mock("@/services/settingsService", () => ({ getLLMSettings: () => ({ LLM_MODE
 vi.mock("@/services/videoTriggerService", () => ({ getVideoTriggersCached: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/services/sessionConversationMemory", () => ({ persistPostTurnMemory: vi.fn().mockResolvedValue(null) }));
 import { callLLMWithUsage } from "@/services/openRouterLLM";
+import { getVideoTriggersCached } from "@/services/videoTriggerService";
 import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
-import { evaluatePostTurnPRD4, EXPERIENCE_DIRECTOR_SYSTEM_PROMPT } from "./gameMasterPRD4";
+import { evaluatePostTurnPRD4, commitHandoffCandidate, EXPERIENCE_DIRECTOR_SYSTEM_PROMPT } from "./gameMasterPRD4";
 import { CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS, buildExperienceDirectorPrompt } from "@/services/gameMasterPromptBuilder";
 import { DEFAULT_DIRECTOR_CONFIG } from "@/services/experienceOrchestration";
 import { validAssessment, validInput } from "@/services/characterHandoff.fixtures";
@@ -203,7 +204,8 @@ describe("live handoff prompt contract over historical schemas", () => {
     } else {
       expect(result.execution_reason).toBe("relationship_invalid");
       expect(result.memory_delta).toBeNull();
-      expect(result.handoff_assessment).toBeNull();
+      expect(validateCharacterHandoff({ ...validInput(), evaluation: result }).authorized).toBe(true);
+      expect(result.relationship_transition?.accepted).toBe(false);
     }
   });
   it("accepts the complete compact example through the existing parser and handoff validator", async () => {
@@ -439,4 +441,38 @@ describe('lot 3 — late evaluation cannot supply the next turn agreement', () =
     expect(assessHandoffTurn(state, { ...currentTurn, delivery, evaluation: current }).state.state).toBe('available');
     expect(callLLMWithUsage).toHaveBeenCalledTimes(2);
   });
+});
+
+
+it('F1 T21: preserves independently valid handoff when relationship is invalid', async () => {
+  vi.clearAllMocks();
+  const policy: CharacterRelationshipPolicy = { schemaVersion: 1, characterKey: 'emma', version: 'policy-v1', source: 'notion',
+    callDrive: 'Écouter.', openingSignals: [], closingSignals: [], sensitiveTopics: [], resistanceStyle: 'Prudente.', initiativeStyle: 'Écouter.' };
+  vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...llmMetadata, content: JSON.stringify({ ...historicalJson,
+    handoff_assessment: validAssessment(), memory_delta: { relationship: {} } }) });
+  const result = await evaluatePostTurnPRD4({ ...input, relationshipPolicy: policy });
+  expect(result.memory_delta).toBeNull();
+  expect(result.relationship_transition?.accepted).toBe(false);
+  expect(validateCharacterHandoff({ ...validInput(), evaluation: result }).authorized).toBe(true);
+});
+
+
+it('F1: un candidat ne devient ni souvenir ni état joué avant le reçu réel', async () => {
+  vi.clearAllMocks();
+  const fixture = validInput();
+  vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...llmMetadata, content: JSON.stringify({ ...historicalJson,
+    handoff_assessment: validAssessment(), next_speech_state: 'Attente', memory_delta: { userFacts: ['Fait candidat'] } }) });
+  const result = await evaluatePostTurnPRD4({ ...input, persist: false, sessionId: 'session', speechStatePlayed: null,
+    handoffContext: { turnId: fixture.turnId, openRequest: null, delivery: null, candidateText: fixture.delivery!.generated } });
+  expect(persistPostTurnMemory).not.toHaveBeenCalled();
+  expect(getVideoTriggersCached).not.toHaveBeenCalled();
+  expect(result.speech_state_played).toBeNull();
+  const committed = await commitHandoffCandidate({ sessionId: 'session', userText: fixture.userText, openRequest: null },
+    result, { ...fixture.delivery!, delivered: '', status: 'interrupted' }, true);
+  expect(committed.handoff_assessment).toBeNull();
+  expect(committed.memory_delta).toBeNull();
+  expect(committed.speech_state_played).toBeNull();
+  expect(committed.next_speech_state).toBeNull();
+  expect(persistPostTurnMemory).toHaveBeenCalledWith('session', expect.anything(), null, 11, 'emma', expect.any(AbortSignal));
+  expect(callLLMWithUsage).toHaveBeenCalledOnce();
 });

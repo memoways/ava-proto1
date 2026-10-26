@@ -4,6 +4,28 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [F1 — préparer le passage avant la confirmation] — 2026-10-26
+
+- Départ main `25142b338e0f1082e0675aab26cbe102cf4d5f33` (#87).
+  Coordinateur de demande/appel, cible pronominale conservée, offre maintenue
+  après continuation et révocation explicite. Révision CAS renouvelée pour
+  protéger le transcript, revalidations clic/décroché et verrou double clic conservés.
+- Recommandations GM sans accord : guidance du tour suivant préservée sous les gardes, sans offre anticipée ; non-régression refus/accord verrouillée.
+- Même GM : analyse du candidat non encore parlé, préparation persistée avant
+  confirmation, offre disponible après reçu complet. Catalogue vidéo retiré de
+  ce chemin, relation invalide séparée du transfert, erreurs/réessais visibles.
+  Délais bornés et reconnaissance d'un CAS exact dont l'accusé HTTP est perdu,
+  sans seconde mutation ni adoption d'un état étranger.
+- Seuil du back-office : échanges complets de l'appel courant, accueil,
+  fragments et réponses interrompues exclus ; aide admin corrigée.
+- CI : plafond du job porté de 20 à 30 min après expiration attestée pendant les E2E ; tous les contrôles et navigateurs conservés, CI PR/main du dépôt public maintenues.
+- Quatre replays UI T15/T17/T21 rouges avant correctif puis verts ; risques
+  d'audio partiel, retards GM/profils, stockage, reprise, deux onglets et mémoire
+  isolée couverts. Validation complète et livraison en cours ; aucune publication.
+- [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md#réalisation-et-preuves-f1),
+  [reprise F2 préparée, non lancée](docs/prompt_reprise_fiabilite_passage_personnages_lot_f2.md).
+  Aucune migration ni Edge Function requise, aucun réglage Cloud modifié.
+
 ## [Passages — démarrage F1 et continuité entre lots] — 2026-10-26
 
 - Base main `885e38987ad299be120fcb8746e47fb652a69ae2` (#86). Plan canonique

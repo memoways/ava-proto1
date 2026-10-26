@@ -1,5 +1,34 @@
 # Passage Emma ↔ Max : validation narrative et pastille d’appel
 
+## Exécution F1 — 26 octobre 2026
+
+Lot en cours, branche `codex/handoff-reliability-f1`, base `25142b338e0f1082e0675aab26cbe102cf4d5f33`.
+Contrôles : Notion natif get-self Gamilab `7e1a9a09-09cb-4deb-a306-83a29b831bc2`, tâche/application lues ; Git actualisé, PR étrangère #24 hors périmètre ; Lovable Ava/Memoways au même SHA, ready et agentFinished=true. Un seul agent.
+
+Ordre d'exécution : replays rouges intégrés T15/T17/T21 ; coordinateur à durée de vie métier et preuve candidate distincte du reçu livré ; préparation persistée avant confirmation et disponibilité après reçu complet ; comptage des échanges complets par appel ; tests ciblés, qualité et E2E complets ; PR/CI HEAD exact/main, nettoyage, vérification Lovable et capitalisation. F2 et production exclus.
+
+### Réalisation et preuves F1
+
+Confidence Check : 95 %, recherche des primitives existantes, architecture/RLS/CAS réutilisée, API AbortSignal vérifiée dans la documentation officielle Supabase et les sources postgrest-js, causes reproduites avant correction. Pas de nouvelle dépendance. Références : [AbortSignal](https://supabase.com/docs/reference/javascript/using-modifiers-abortsignal), [implémentation PostgREST](https://github.com/supabase/supabase-js/blob/master/packages/core/postgrest-js/src/PostgrestBuilder.ts), [cycles React](https://react.dev/reference/react/useEffect).
+
+Rouge effectivement observé avant correctif : `npx playwright test tests/e2e/prd4-happy-path.spec.ts --project=chromium --workers=1 --grep 'F1 T15'` : 2 échecs, bouton absent ; même commande ciblant `F1 T17|F1 T21` : 2 échecs. Test GM T21 : 44 verts/1 rouge. Ces replays démontrent le mécanisme reproductible du code, sans attribuer à une instruction précise le T15 historique.
+
+- `handoffCoordinator` porte la préparation/finalisation, la durée de vie de la demande et le comptage des échanges complets. Les baux sont testés avec trois identités fictives ; le runtime déployable reste Max/Emma seulement.
+- Identité persistée `requestId`/`sourceCallId`, version et révision CAS. Une continuation conserve l'offre et sa preuve initiale, mais renouvelle la révision CAS du transcript. Un accusé HTTP perdu ne provoque jamais une seconde écriture : une lecture bornée peut reconnaître uniquement le JSON complet émis, avec session/version/personnage/compteur exacts (ordre des clés JSONB indifférent). Un autre état reste un conflit. Le retrait explicite, « Rester », l'appel/version changé ou un conflit ne réutilisent pas l'accord. Les états historiques restent lisibles et ne gagnent pas de droits implicites.
+- Les références candidates sont déclarées comme non encore prononcées dans le contexte GM. Un seul appel GM ; aucune mutation mémoire ni état joué avant le reçu réel. Le catalogue vidéo n'est pas lu sur ce chemin. La confirmation est retenue pendant la préparation persistée `prepared`, puis le bouton est créé après reçu complet et finalisation CAS. `prepared` seul ne permet ni reprise d'offre ni appel.
+- Préparation GM/dépendances : 16 000 ms au total ; cible et chaque requête de persistance : 3 000 ms ; en cas d’accusé HTTP ambigu, une lecture de reconnaissance supplémentaire est bornée à 3 000 ms, toujours dans les 16 000 ms de préparation. Annulation réelle des écritures et du GM ; les lectures de profil qui dépassent leur borne peuvent terminer leur transport, mais leur résultat est ignoré avant toute mutation. Attente propre au passage journalisée par `handoff_prepared.preparationMs` ; les délais réseau simulés ne sont pas une mesure de latence fournisseur réelle.
+- Les recommandations GM sans accord conservent leur guidance pour le tour suivant, après gardes et lecture bornée de la cible ; elles ne créent jamais une offre. Deux assertions UI ajoutées ont été rouges avant restauration, puis vertes sur refus/accord. La préparation et l’offre ne dépendent pas de cette lecture auxiliaire.
+- Une mutation relationnelle incorrecte conserve son audit de rejet et aucun delta ; elle ne supprime plus une preuve de transfert indépendamment valide. Un JSON globalement incomplet/illisible, une preuve absente ou une persistance GM en échec restent neutralisés.
+- Quatre réponses entièrement délivrées de l'appel courant, accueil exclu ; fragments STT regroupés, réponse interrompue exclue, remise à zéro au transfert. Le réglage existant est conservé, aide admin corrigée. Le compteur utilise les reçus et marqueurs d'appels existants ; F2 devra fournir le marqueur de nouvel appel après grille.
+- Erreurs durables dans l'interface, réessai explicite ; conflit d'onglet avec rechargement de l'appel. Les CAS, revalidations clic/décroché, verrou double clic et états avant/après commit restent actifs. Aucun retour grille ou changement de timer ajouté.
+- Lovable Cloud lu via le connecteur Ava : colonnes `pending_handoff`/`conversation_log` déjà JSONB, compteur et personnage existants. Aucune migration, Edge Function, secret, fournisseur ou réglage production modifié ; aucun déploiement Cloud additionnel requis par ce diff.
+
+Validation locale complète : `VITEST_MAX_FORKS=2 VITEST_MIN_FORKS=1 npm run test:quality` vert (67 régressions, 1 031 unitaires, 41 intégrations, lint/typage/build) ; `npm run test:e2e` : 91/91 verts, aucun retry, 15,4 min.
+
+La première CI PR [40363778865](https://github.com/memoways/ava-proto1/actions/runs/40363778865) a validé toute la qualité puis 80 E2E sans rouge avant annulation. L'annotation GitHub confirme « The job has exceeded the maximum execution time of 20m0s ». Le plafond de `regression-gates` passe de 20 à 30 minutes pour laisser terminer les 91 E2E séquentiels CI. Aucun contrôle ni navigateur retiré, aucune installation/build supplémentaire, outil/hébergement/budget/facturation inchangés. Dépôt public confirmé par API : CI PR et main conservées. [Syntaxe officielle du délai](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idtimeout-minutes). Cette modification du workflow appelle une nouvelle CI sur son HEAD exact ; ne pas fusionner le premier résultat annulé.
+
+Livraison GitHub/Lovable : en cours de vérification ; aucune publication production.
+
 ## Audit de production et nouveau contrat — 26 octobre 2026
 
 **Statut : audit et plan, sans correctif produit ni publication.** Cette section

@@ -108,6 +108,7 @@ function aliasToCharacter(raw: string): RuntimeCharacter | null {
 export function detectPlayerSwitchRequest(
   userText: string,
   currentCharacter: RuntimeCharacter,
+  includeCurrent = false,
 ): RuntimeCharacter | null {
   const text = normalizeSwitchText(userText);
   if (!text.trim()) return null;
@@ -120,7 +121,7 @@ export function detectPlayerSwitchRequest(
   for (const pattern of patterns) {
     const match = userText.match(pattern) ?? text.match(pattern);
     const target = match?.[1] ? aliasToCharacter(match[1]) : null;
-    if (target && target !== currentCharacter) return target;
+    if (target && (includeCurrent || target !== currentCharacter)) return target;
   }
   return null;
 }
@@ -194,4 +195,16 @@ export function parseGmApprovedHandoffOffer(
   if (!offer?.gmApproval || !orchestrationVersionId
     || offer.gmApproval.orchestrationVersionId !== orchestrationVersionId) return null;
   return offer;
+}
+
+export function withdrawsHandoff(text: string): boolean {
+  const s = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/’/g, "'").toLowerCase();
+  const negativeRequest = /\b(?:ne veux|veux plus|veux pas|ne souhaite|souhaite pas|ne voudrais|voudrais pas)\b/.test(s)
+    && (/(?:parler|discuter)\s+(?:a|avec)\s+(?:max|emma|elle|lui)\b/.test(s)
+      || /(?:appeler|passer|joindre)\s+(?:max|emma)\b/.test(s)
+      || /(?:l'|(?:le|la)\s+)(?:appeler|passer|joindre)\b/.test(s));
+  return negativeRequest
+    || /\b(?:finalement|plutot|je prefere|je veux|je voudrais|on va)\b.{0,45}\b(?:reste\w*|continu\w*)\b/.test(s)
+    || /\b(?:ne\s+)?(?:(?:me|le|la)\s+)*(?:l'appelle|l'appelez|appelle|appelez|passe|passez)\s+(?:surtout\s+)?(?:pas|plus)\b/.test(s)
+    || /\b(?:annul\w*|laisse tomber|je reste avec toi|restons|reste avec moi)\b/.test(s);
 }

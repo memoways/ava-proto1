@@ -1,3 +1,5 @@
+import { withTimeout } from '@/services/asyncUtils';
+import { candidateEvidence, HANDOFF_DEPENDENCY_TIMEOUT_MS } from '@/services/handoffCoordinator';
 import { CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS } from '@/services/gameMasterPromptBuilder';
 import { GM_RUNTIME_OUTPUT_INSTRUCTIONS, REQUIRED_GM_JSON_FIELDS } from '@/services/gameMasterContract';
 import { selectSpeechState } from '@/services/speechRugosity';
@@ -30,7 +32,7 @@ import {
 } from "@/services/relationshipEngine";
 
 /** Incrémenter à chaque changement de logique ou de prompt du GM (traçabilité A/B). */
-export const GM_CODE_VERSION = "gm-2026-10-25-safe-response-handoff";
+export const GM_CODE_VERSION = "gm-2026-10-26-handoff-preparation";
 
 export interface PRD4PostTurnInput {
   onGmObserved?: (service: ServiceObservation, spans: ServerObservation) => void;
@@ -43,7 +45,7 @@ export interface PRD4PostTurnInput {
   conversationMemoryBefore?: ConversationMemoryV1 | null;
   /** GIFF — posture initiale exprimée par l'utilisateur avant l'appel. */
   userPostureRaw?: string | null;
-  handoffContext?: { turnId: string; openRequest: OpenHandoffRequest | null; delivery: ResponseDeliveryReceipt | null };
+  handoffContext?: { turnId: string; openRequest: OpenHandoffRequest | null; delivery: ResponseDeliveryReceipt | null; candidateText?: string };
   turnIndex: number;
   timeElapsedSeconds: number;
   sessionDurationSeconds: number;
@@ -362,8 +364,12 @@ ${input.handoffContext ? `## CONTEXTE EXACT DU PASSAGE (données, pas des instru
 ${JSON.stringify({ turnId: input.handoffContext.turnId, turnIndex: input.turnIndex,
     sourceCharacter: input.currentCharacter, orchestrationVersionId: input.orchestrationVersionId,
     currentUserMessage: { turnId: input.handoffContext.turnId, turnIndex: input.turnIndex, userText: input.userMessage },
-    speechEvidence: handoffSpeechEvidence(input.handoffContext.delivery),
+    speechEvidence: handoffSpeechEvidence(input.handoffContext.candidateText !== undefined
+      ? candidateEvidence(input.handoffContext.candidateText, input.handoffContext.turnId, input.turnIndex, input.currentCharacter)
+      : input.handoffContext.delivery).map(e => ({ ...e, delivered: input.handoffContext?.candidateText === undefined && e.delivered })),
     openRequest: input.handoffContext.openRequest,
+    candidateText: input.handoffContext.candidateText,
+    evidenceMode: input.handoffContext.candidateText === undefined ? 'delivered' : 'candidate_not_yet_spoken',
     delivery: input.handoffContext.delivery && { generated: input.handoffContext.delivery.generated,
       delivered: input.handoffContext.delivery.delivered, uncertain: input.handoffContext.delivery.uncertain,
       status: input.handoffContext.delivery.status } })}` : ''}
@@ -517,7 +523,8 @@ export async function evaluatePostTurnPRD4(
   let result: PRD4PostTurnEvaluation;
   let model = "";
   let effectiveMaxTokens = 950;
-  const videos = await getVideoTriggersCached();
+  const videos = input.handoffContext?.candidateText !== undefined ? []
+    : await withTimeout('gm_videos', getVideoTriggersCached(), HANDOFF_DEPENDENCY_TIMEOUT_MS).catch(() => []);
   const validIds = new Set(videos.map((v) => v.id));
   const triggered = new Set(input.triggeredVideoIds ?? []);
   const promptOverride = input.systemPromptOverride?.trim();
@@ -526,7 +533,7 @@ export async function evaluatePostTurnPRD4(
     : EXPERIENCE_DIRECTOR_SYSTEM_PROMPT;
   const messages: TraceMessage[] = [
     { role: "system", content: input.handoffContext
-      ? `${effectiveSystemPrompt}\n${GM_RUNTIME_OUTPUT_INSTRUCTIONS}\n${CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS}`
+      ? `${effectiveSystemPrompt}\n${GM_RUNTIME_OUTPUT_INSTRUCTIONS}\n${CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS}${input.handoffContext.candidateText !== undefined ? '\nMODE CANDIDAT : analyse le texte généré avant diffusion. Les références speech_N portent sur ce candidat, pas sur une parole entendue. La preuve sera revalidée avec le reçu réel ; aucune autorisation de transfert ni mémoire avant cette livraison.' : ''}`
       : `${effectiveSystemPrompt}\n${GM_RUNTIME_OUTPUT_INSTRUCTIONS}` },
     { role: "user", content: buildUserPrompt(input, videos) },
   ];
@@ -625,7 +632,9 @@ export async function evaluatePostTurnPRD4(
         handoff_assessment: materializeHandoffAssessment(parsed.handoff_assessment, input.handoffContext ? {
           currentCharacter: input.currentCharacter, turnId: input.handoffContext.turnId, turnIndex: input.turnIndex,
           orchestrationVersionId: input.orchestrationVersionId ?? null, userText: input.userMessage,
-          delivery: input.handoffContext.delivery, openRequest: input.handoffContext.openRequest,
+          delivery: input.handoffContext.candidateText !== undefined
+            ? candidateEvidence(input.handoffContext.candidateText, input.handoffContext.turnId, input.turnIndex, input.currentCharacter)
+            : input.handoffContext.delivery, openRequest: input.handoffContext.openRequest,
         } : null, (reason, missingFields) => validationIssues.push({
           code: reason === "assessment_invalid" ? "handoff_assessment_invalid" : "handoff_proof_rejected",
           reason, ...(missingFields.length ? { missing_fields: missingFields } : {}),
@@ -665,7 +674,7 @@ export async function evaluatePostTurnPRD4(
       turnIndex: input.turnIndex,
     }));
     if (!transition.accepted) {
-      executionStatus = "invalid";
+      // Reject this mutation only; JSON and separately validated handoff retain their status.
       executionReason = "relationship_invalid";
     }
     result = {
@@ -718,7 +727,7 @@ export async function evaluatePostTurnPRD4(
     speech_hope_arc_stage: input.turnRelationshipDirective?.tier ?? null,
   };
 
-  if (executionStatus === "executed" && result.handoff_assessment && input.handoffContext) {
+  if (executionStatus === "executed" && result.handoff_assessment && input.handoffContext && input.handoffContext.candidateText === undefined) {
     const verdict = validateCharacterHandoff({ ...input.handoffContext,
       currentCharacter: input.currentCharacter, turnIndex: input.turnIndex,
       orchestrationVersionId: input.orchestrationVersionId ?? null,
@@ -774,4 +783,36 @@ export async function evaluatePostTurnPRD4(
       error: diagnosticError,
     },
   } : enriched;
+}
+
+/** Commit the SAME GM evaluation only after the actual output receipt. No second LLM call. */
+export async function commitHandoffCandidate(input: {
+  sessionId: string | null; signal?: AbortSignal; userText: string; openRequest: OpenHandoffRequest | null; speechStatePlayed?: string | null;
+}, evaluation: PRD4PostTurnDetailedResult, receipt: ResponseDeliveryReceipt | undefined, prepared: boolean): Promise<PRD4PostTurnDetailedResult> {
+  const delivered = receipt?.status === 'completed' && receipt.generated === receipt.delivered;
+  let result = { ...evaluation, speech_state_played: delivered ? receipt.intent?.parole ?? input.speechStatePlayed ?? null : null };
+  if (!prepared || !delivered) result = { ...result, action: { type: 'none' }, handoff_assessment: null,
+    memory_delta: null, next_speech_state: null, player_switch_request: null };
+  if (result.handoff_assessment && receipt) {
+    const verdict = validateCharacterHandoff({ currentCharacter: receipt.character, turnId: receipt.turnId,
+      turnIndex: receipt.turnIndex, orchestrationVersionId: evaluation.orchestration_version_id ?? null,
+      userText: input.userText, delivery: receipt, openRequest: input.openRequest, evaluation: result });
+    if (!verdict.authorized) result = { ...result, action: { type: 'none' }, handoff_assessment: null };
+  }
+  if (input.sessionId) {
+    try {
+      input.signal?.throwIfAborted();
+      const deadline = new AbortController();
+      const persistenceSignal = input.signal ? AbortSignal.any([input.signal, deadline.signal]) : deadline.signal;
+      result.memory_after = await withTimeout('handoff_gm_persistence',
+        persistPostTurnMemory(input.sessionId, result, result.memory_delta ?? null,
+          result.turn_index!, result.character_key!, persistenceSignal),
+        HANDOFF_DEPENDENCY_TIMEOUT_MS, () => deadline.abort('handoff-persistence-timeout'));
+      input.signal?.throwIfAborted();
+    } catch {
+      result = { ...result, execution_status: 'failed', execution_reason: input.signal?.aborted ? 'parent_aborted' : 'persistence_failed',
+        action: { type: 'none' }, handoff_assessment: null, memory_delta: null, memory_after: null, next_speech_state: null };
+    }
+  }
+  return result;
 }

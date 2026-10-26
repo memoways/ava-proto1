@@ -7,6 +7,24 @@
 
 ---
 
+## F1 — préparer avant de promettre (26 octobre 2026)
+
+Les replays intégrés rendent visibles les trois incidents T15/T17/T21 avant le
+correctif : course avec la parole suivante, cible pronominale perdue et transfert
+neutralisé par une proposition relationnelle incorrecte. Le coordinateur donne
+à la demande une identité et une durée de vie liées à l'appel. Une continuation
+ne retire plus le bouton ; une nouvelle révision CAS protège toujours le transcript.
+
+La confirmation vocale attend une opération préparée et persistée. Le même appel
+GM analyse le candidat avant diffusion ; seul le reçu réel permet sa finalisation,
+la mémoire et les états joués. Une panne devient visible et récupérable. Les quatre
+échanges complets se comptent dans l'appel courant, sans compter l'accueil ou les
+fragments STT. Les validations globales invalides et les confidences croisées
+restent bloquées. [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md#réalisation-et-preuves-f1).
+
+Livraison et validation complète encore en cours ; F2 (cycle d'appels, grille et
+timer suspendu) n'est pas démarré. Aucune publication production.
+
 ## Les accords ne possédaient pas leur bouton (26 octobre 2026)
 
 La démonstration de 15:04 remet en cause la fiabilité du passage. Les données

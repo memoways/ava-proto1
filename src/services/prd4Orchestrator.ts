@@ -9,10 +9,11 @@ import { observeVoice, observeService, type VoiceObserver, type ServiceObservati
  *  - Pas de GM pré-tour LLM (rapport coût/bénéfice trop faible en live).
  *  - Pas de validateur anti-hallucination (gardé pour le banc d'essai).
  *  - Injecte le `summary_for_max` historique du profil joueur dans le prompt du personnage actif.
- *  - Fire-and-forget : évaluation PRD4 post-tour (jamais bloquante pour le TTS).
+ *  - Post-tour ordinaire asynchrone ; candidat de passage préparé avant sa confirmation vocale.
  */
 import { SimulateMaxResponseError, simulateMaxResponse, type MaxAgentInput, type SimulateMaxDiagnosticContext } from "@/agents/maxAgent";
-import { evaluatePostTurnPRD4 } from "@/agents/gameMasterPRD4";
+import { candidateEvidence, needsHandoffPreparation, HANDOFF_PREPARATION_TIMEOUT_MS } from "./handoffCoordinator";
+import { evaluatePostTurnPRD4, commitHandoffCandidate, type PRD4PostTurnDetailedResult } from "@/agents/gameMasterPRD4";
 import type { PRD4LabelResult } from "@/agents/gameMasterLabelPRD4";
 import {
   buildKnowledgeContextFromRAG,
@@ -65,6 +66,9 @@ export interface PRD4TurnInput {
   streamControl?: { onToken: (text: string) => void; finishSpeech: (normalCompletion?: boolean) => string;
     delivery: Promise<string>; onFallback: (text: string) => void; hasSegments: () => boolean;
     onRetry: () => void; onRecovered: (text: string) => void };
+  handoffRequested?: boolean;
+  postTurnSignal?: AbortSignal;
+  prepareHandoff?: (evaluation: PRD4PostTurnEvaluation, text: string, signal: AbortSignal, startedAt: number) => Promise<boolean>;
   handoffDelivery?: Promise<ResponseDeliveryReceipt | undefined>;
   handoffOpenRequest?: OpenHandoffRequest | null;
   onVoiceObservation?: VoiceObserver;
@@ -437,16 +441,18 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   }
 
   // --- GM post-turn (void) ---------------------------------------------------
-  const runPostTurn = async () => {
-    const handoffDelivery = input.handoffDelivery ? await input.handoffDelivery : undefined;
+  const candidateText = maxResponse;
+  const runPostTurn = async (candidate = false, candidateSignal?: AbortSignal) => {
+    const handoffDelivery = candidate ? candidateEvidence(candidateText, input.turnId!, turnIndex, activeCharacter)
+      : input.handoffDelivery ? await input.handoffDelivery : undefined;
     const deliveredResponse = handoffDelivery ? handoffDelivery.delivered
       : input.streamControl ? await input.streamControl.delivery : maxResponse;
     const playedState = deliveredResponse.trim() && !identityGuard.blocked && maxResult
       ? selectSpeechState(input.playedSpeechStateRef?.current ?? maxResult.responseIntent?.parole, speechStates)
       : null;
-    input.signal?.throwIfAborted();
+    (input.postTurnSignal ?? input.signal)?.throwIfAborted();
     if (input.streamControl && !deliveredResponse.trim()) throw new Error("No confirmed delivery for GM");
-    if (input.streamControl && diagnosticTraceEnabled && input.sessionId) {
+    if (!candidate && input.streamControl && diagnosticTraceEnabled && input.sessionId) {
       void patchQueuedConversationTurnTrace(input.sessionId, turnIndex, ["response", "deliveredResponse"], deliveredResponse).catch(() => {});
     }
     const gmStart = performance.now();
@@ -455,7 +461,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       const directorRuntime = frameRuntime;
       return await evaluatePostTurnPRD4({
         handoffContext: input.handoffDelivery && input.turnId ? { turnId: input.turnId,
-          openRequest: input.handoffOpenRequest ?? null, delivery: handoffDelivery ?? null } : undefined,
+          openRequest: input.handoffOpenRequest ?? null, delivery: candidate ? null : handoffDelivery ?? null,
+          ...(candidate ? { candidateText } : {}) } : undefined,
         onGmObserved: input.onGmObserved,
         sessionId: input.sessionId,
         conversationHistory: recentConversation,
@@ -469,7 +476,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         sessionDurationSeconds,
         minimumClosureSeconds,
         triggeredVideoIds: input.triggeredVideoIds,
-        signal: input.signal,
+        signal: candidateSignal ?? input.postTurnSignal ?? input.signal,
+        persist: candidate ? false : undefined,
         diagnosticTrace: diagnosticTraceEnabled,
         systemPromptOverride: directorRuntime.prompt,
         orchestrationVersionId: directorRuntime.versionId,
@@ -481,7 +489,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         experienceFrame: experienceFrame.prompt || null,
         speechStates,
         rugosite,
-        speechStatePlayed: playedState,
+        speechStatePlayed: candidate ? null : playedState,
         recentSpeechStates: [playedState, ...recentSpeechStates].slice(0, 2),
         speechSettingsVersion: speechRuntime?.settingsVersion,
       });
@@ -494,9 +502,41 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       });
     }
   };
+  // Transfers alone await preparation. Ordinary turns keep their streaming path.
+  let candidateResult: PRD4PostTurnDetailedResult | null = null;
+  let candidateReleased = false;
+  if (input.prepareHandoff && (needsHandoffPreparation(maxResponse) || input.handoffRequested
+    || (input.handoffOpenRequest && /^(?:oui|d[’']accord|ok(?:ay)?|bien s[uû]r)[ .!…]*$/i.test(maxResponse.trim())))) {
+    const preparationStartedAt = performance.now();
+    const controller = new AbortController();
+    const parent = input.postTurnSignal ?? input.signal;
+    const signal = parent ? AbortSignal.any([parent, controller.signal]) : controller.signal;
+    try {
+      await withTimeout('handoff_preparation', (async () => {
+        const evaluated = await runPostTurn(true, signal);
+        signal.throwIfAborted();
+        candidateResult = evaluated;
+        candidateReleased = await input.prepareHandoff!(candidateResult, maxResponse, signal, preparationStartedAt);
+      })(), HANDOFF_PREPARATION_TIMEOUT_MS, () => controller.abort('handoff-deadline'));
+    } catch {
+      candidateReleased = false;
+      candidateResult = { engagement_delta: 0, confusion_detected: false, role_usage_quality: 'unknown',
+        topics_covered: [], transition_recommended: false, cinematic_hint: null, next_turn_guidance: '',
+        end_recommended: false, moderation_flag: false, notes: 'Préparation indisponible', action: { type: 'none' },
+        execution_status: 'failed', execution_reason: 'client_timeout', character_key: activeCharacter, turn_index: turnIndex,
+        orchestration_version_id: frameRuntime.versionId };
+    }
+    if (!candidateReleased) maxResponse = "Le passage n’est pas prêt. Tu peux réessayer ou continuer avec moi.";
+  }
+  const finishPostTurn = () => candidateResult
+    ? (input.handoffDelivery ?? Promise.resolve(undefined)).then(receipt => commitHandoffCandidate({
+      sessionId: input.sessionId, signal: input.postTurnSignal ?? input.signal,
+      userText: input.userMessage, openRequest: input.handoffOpenRequest ?? null,
+      speechStatePlayed: selectSpeechState(input.playedSpeechStateRef?.current ?? maxResult?.responseIntent?.parole, speechStates) }, candidateResult!, receipt, candidateReleased))
+    : runPostTurn();
   // En diagnostic, le post-tour (qui prépare la suite et écrit son propre log)
   // ne démarre qu'après la mise en file locale durable de la réponse.
-  let rawPostTurnPromise = diagnosticTraceEnabled ? null : runPostTurn();
+  let rawPostTurnPromise = diagnosticTraceEnabled ? null : finishPostTurn();
 
   const summaryEvery = gameplay?.RAG_SUMMARY_EVERY_N_TURNS ?? 4;
   const lastSummarizedTurn = summaryRecord?.last_turn ?? 0;
@@ -637,10 +677,10 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     void patchQueuedConversationTurnTrace(input.sessionId, turnIndex, ["timings"], compactTrace.timings).catch((error) => {
       console.warn("[PRD4 orchestrator] Deferred diagnostic timing patch failed", error);
     });
-    rawPostTurnPromise = runPostTurn();
+    rawPostTurnPromise = finishPostTurn();
   }
 
-  rawPostTurnPromise ??= runPostTurn();
+  rawPostTurnPromise ??= finishPostTurn();
 
   const postTurnPromise = rawPostTurnPromise.then(async (result) => {
     if (diagnosticTraceEnabled && input.sessionId) {

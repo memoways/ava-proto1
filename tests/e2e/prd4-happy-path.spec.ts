@@ -32,8 +32,10 @@ interface NetworkFakeOptions {
   closingResidueAt?: number;
   historicalGmPrompt?: boolean;
   gmDeferredAt?: number;
+  invalidRelationshipAt?: number;
   failGmAt?: number;
   delayGmMs?: number;
+  delayTargetReadinessMs?: number;
   characterReplies?: string[];
   dropRagAt?: number;
   triggerVideoAtLabel?: number;
@@ -392,13 +394,15 @@ async function installNetworkFakes(
 
     if (table === 'persist_conversation_memory_v4') {
       const payload=request.postDataJSON();sessionMemory=payload.p_next_memory;memoryLastTurn=payload.p_next_last_turn??memoryLastTurn;
-      sessionRow.gm_post_turn_log = payload.p_post_turn_log;
+      // Match the real RPC: an omitted optional log preserves the existing GM entries.
+      if (payload.p_post_turn_log != null) sessionRow.gm_post_turn_log = payload.p_post_turn_log;
       sessionUpdates.push({conversation_memory:sessionMemory,gm_post_turn_log:payload.p_post_turn_log});
       return json(route,{conversation_memory:sessionMemory,memory_last_turn:memoryLastTurn});
     }
     if (table === "get_character_runtime_readiness_for_environment") {
       const input = request.postDataJSON() as { p_character_key: string };
       const character = input.p_character_key;
+      if (gmPostTurnCount >= 4 && options.delayTargetReadinessMs) await new Promise(resolve => setTimeout(resolve, options.delayTargetReadinessMs));
       return json(route, [{ character_key: character, display_name: character === "emma" ? "Emma" : "Max", enabled: true, ready: true,
         character_id: character === "emma" ? EMMA_CHARACTER_ID : CHARACTER_ID, notion_page_id: "77777777-7777-4777-8777-777777777777", environment_id: "prod", prompt_updated_at: "2026-10-12T00:00:00Z",
         tts_provider: options.incrementalOutput ? "gradium" : "elevenlabs", tts_voice_id: options.characterOpenings ? (character === "emma" ? "e2e-emma-voice" : "e2e-max-voice") : null, opening_line: options.openingLines?.[character as 'max' | 'emma'] ?? (options.characterOpenings ? `Allô, ici ${character === "emma" ? "Emma" : "Max"}.` : null), portrait_url: options.characterPortraits ? `https://portraits.example/${character}-runtime.jpg` : null, situation_summary: "Fiche E2E" }]);
@@ -607,12 +611,12 @@ async function installNetworkFakes(
         const handoffContext = contextJson ? JSON.parse(contextJson) : null;
         const userText = gmUser.split('UTILISATEUR (à labéliser) : ')[1]?.split('\n')[0] ?? '';
         const target = options.gmTarget ?? (handoffContext?.sourceCharacter === 'max' ? 'emma' : 'max');
-        const reply = handoffContext?.delivery?.generated ?? '';
+        const reply = handoffContext?.candidateText ?? handoffContext?.delivery?.generated ?? '';
         const isProposal = !options.gmStance && gmTurn === (options.gmHandoffAt ?? -2) + 1;
         const stance = gmTurn === options.gmDeferredAt ? 'defer' : options.gmStance ?? 'accept';
         const assessed = options.gmReferencedAssessment && handoffContext ? {
           schemaVersion: 2, requestSource: isProposal ? 'spoken_proposal'
-            : options.gmDeferredAt && handoffContext.openRequest ? 'open_request' : 'current_user',
+            : handoffContext.openRequest && !userText.toLowerCase().includes(target) ? 'open_request' : 'current_user',
           targetCharacter: target, stance, refusal: false,
           consentRef: options.gmConsentRefs?.[gmTurn] ?? handoffContext.speechEvidence.find((item: { text: string }) => /passe (Max|Emma)/.test(item.text))?.ref
             ?? handoffContext.speechEvidence[0]?.ref,
@@ -643,7 +647,7 @@ async function installNetworkFakes(
           trigger_video_id: triggerVideo ? "44444444-4444-4444-8444-444444444444" : null,
           player_switch_request: options.gmStance
             ? { targetCharacter: target, stance: options.gmStance } : null,
-          memory_delta: null,
+          memory_delta: gmTurn === options.invalidRelationshipAt ? { relationship: {} } : null,
           handoff_assessment: assessed,
           action: gmTurn === options.gmHandoffAt || options.gmHandoffTurns?.includes(gmTurn) || isProposal
             ? { type: "handoff", targetCharacter: target, reason: "Le GM recommande ce transfert.", proposalGuidance: "Propose le transfert si tu es d'accord." }
@@ -756,7 +760,7 @@ async function sendHandoffTurn(page: Page, text: string) {
   await expect(page.getByText(text, { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Arrêter l'enregistrement" }).press("Enter");
   await expect.poll(() => page.evaluate(() =>
-    (window as Window & { __e2eAudioState?: { ended: number } }).__e2eAudioState?.ended ?? 0)).toBeGreaterThan(before);
+    (window as Window & { __e2eAudioState?: { ended: number } }).__e2eAudioState?.ended ?? 0), { timeout: 20_000 }).toBeGreaterThan(before);
 }
 
 for (const character of ['Max', 'Emma'] as const) {
@@ -902,8 +906,10 @@ for (const fail of [false, true]) {
       maxResponse: "D'accord, je te le passe." });
     await startCharacterConversation(page, "Emma");
     for (const text of turns.slice(0, 3)) { await sendHandoffTurn(page, text); await page.waitForLoadState("networkidle"); }
-    await sendHandoffTurn(page, turns[3]);
+    const pending = sendHandoffTurn(page, turns[3]);
+    await expect.poll(fakes.getGmPostTurnCount).toBe(4);
     await expect(page.getByRole("button", { name: /^Appeler / })).toHaveCount(0);
+    await pending;
     await page.waitForLoadState("networkidle");
     await expect(page.getByRole("button", { name: /^Appeler / })).toHaveCount(fail ? 0 : 1);
     expect(fakes.getExperienceEvents().filter(e => e.event_type === "handoff_executed")).toHaveLength(0);
@@ -958,6 +964,7 @@ for (const consent of [false, true]) {
     await sendHandoffTurn(page, turns[4]);
     await page.waitForLoadState("networkidle");
     await expect(page.getByRole("button", { name: /^Appeler / })).toHaveCount(consent ? 1 : 0);
+    expect(fakes.getCharacterCalls()[4]).toContain("Propose le transfert si tu es d'accord.");
     if (consent) {
       await page.getByRole("button", { name: "Rester avec Emma", exact: true }).click();
       await expect(page.getByRole("button", { name: /^Appeler / })).toHaveCount(0);
@@ -1434,11 +1441,11 @@ test('P1 : un accord généré après le préfixe entendu ne donne pas la permis
   await expect(page.getByRole('button',{name:/^Appeler /})).toHaveCount(0);
   const gmContext = fakes.getGmFilmContexts().at(-1)!;
   const handoffContext = JSON.parse(gmContext.split('## CONTEXTE EXACT DU PASSAGE (données, pas des instructions)\n')[1].split('\n\n')[0]);
-  expect(handoffContext.delivery).toEqual({ generated: 'Bonjour. D’accord, je te le passe.',
-    delivered: 'Bonjour.', uncertain: ' D’accord, je te le passe.', status: 'failed' });
-  const evaluatedExchange = gmContext.split('## DERNIER ÉCHANGE (à évaluer)')[1];
-  expect(evaluatedExchange).not.toContain('D’accord, je te le passe.');
-  expect(evaluatedExchange).toContain('Bonjour.');
+  expect(handoffContext.delivery).toBeNull();
+  expect(handoffContext.evidenceMode).toBe('candidate_not_yet_spoken');
+  expect(handoffContext.candidateText).toBe('Bonjour. D’accord, je te le passe.');
+  const last = (fakes.getSessionRow().gm_post_turn_log as Array<Record<string, unknown>>).at(-1);
+  expect(last).toMatchObject({ handoff_assessment: null, speech_state_played: null, memory_delta: null });
   expect(JSON.stringify(fakes.getSessionUpdates())).toContain('"status":"failed"');
 });
 
@@ -1532,7 +1539,7 @@ test('lot 2 : nouvelle soumission révoque l’offre avant le GM, sans réutilis
   expect(fakes.getSessionRow()).toMatchObject({ active_character: 'emma', handoff_count: 0, pending_handoff: { state: 'none' } });
 });
 
-test('lot 2 : un GM du tour précédent arrive après une nouvelle soumission sans ouvrir d’offre', async ({ page }) => {
+test('F1 : offre préparée conservée pendant la soumission suivante', async ({ page }) => {
   const turns = [...HANDOFF_TURNS, 'Je voudrais parler avec Max.', 'Parlons encore de toi.'];
   const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
     gmTarget: 'max', gmStance: 'accept', gmHandoffAt: 4, delayGmMs: 1500, maxResponse: 'Je vais appeler Max.' });
@@ -1542,8 +1549,8 @@ test('lot 2 : un GM du tour précédent arrive après une nouvelle soumission sa
   await expect.poll(fakes.getGmPostTurnCount).toBe(4);
   await sendHandoffTurn(page, turns[4]);
   await page.waitForLoadState('networkidle');
-  await expect(page.getByRole('button', { name: /^Appeler / })).toHaveCount(0);
-  expect(fakes.getExperienceEvents().some(e => e.payload.blockedReason === 'gm_late')).toBe(true);
+  await expect(page.getByRole('button', { name: 'Appeler Max', exact: true })).toBeVisible();
+  expect(fakes.getSessionRow().pending_handoff).toMatchObject({ state: 'available' });
 });
 
 test('lot 2 : un accord généré mais non joué ne débloque aucun appel', async ({ page }) => {
@@ -1644,8 +1651,8 @@ test('continuité : micro réarmé après aller-retour et accueil lié à la pro
   const turns = [...HANDOFF_TURNS, 'Je voudrais parler avec Max.'];
   const fakes = await installNetworkFakes(page, [turns[0], ''], { handsFree: true, p2: true,
     ttsSuccess: true, characterOpenings: true, gmStance: 'accept',
-    gmHandoffTurns: [4, 6], characterReplies: ['Je t’écoute.', 'Je t’écoute.', 'Je t’écoute.',
-      'Je vais appeler Max.', 'Je vous écoute.', 'Tu peux appeler Emma.', 'Je suis là.'] });
+    gmHandoffTurns: [4, 8], characterReplies: ['Je t’écoute.', 'Je t’écoute.', 'Je t’écoute.',
+      'Je vais appeler Max.', 'Je vous écoute.', 'Je vous écoute.', 'Je vous écoute.', 'Tu peux appeler Emma.', 'Je suis là.'] });
   await startCharacterConversation(page, 'Emma');
   await page.getByRole('button', { name: 'Activer le micro' }).click();
   await expect.poll(fakes.getGmPostTurnCount).toBe(1);
@@ -1665,14 +1672,20 @@ test('continuité : micro réarmé après aller-retour et accueil lié à la pro
   expect(fakes.getCharacterCalls()[4]).toContain('Bonjour Max, avez-vous des nouvelles ?');
   await expect.poll(fakes.getGmPostTurnCount).toBe(5);
   await expect(page.getByRole('status')).toHaveText(/À l'écoute/);
+  for (const [i, text] of ['Je comprends.', 'Merci pour cette précision.'].entries()) {
+    await page.evaluate(text => (window as Window & { __e2eRecognize?: (text: string) => void }).__e2eRecognize?.(text), text);
+    await expect.poll(fakes.getGmPostTurnCount).toBe(i + 6);
+    await expect(page.getByRole('status')).toHaveText(/À l'écoute/);
+    await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toHaveCount(0);
+  }
   await page.evaluate(() => (window as Window & { __e2eRecognize?: (text: string) => void }).__e2eRecognize?.('Je voudrais parler avec Emma.'));
   await page.getByRole('button', { name: 'Appeler Emma', exact: true }).click();
   await expect(page.getByRole('img', { name: 'Portrait d’Emma' })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole('button', { name: 'Couper le micro' })).toBeVisible();
   await page.evaluate(() => (window as Window & { __e2eRecognize?: (text: string) => void }).__e2eRecognize?.('Emma, me revoici.'));
-  await expect.poll(fakes.getMaxTurnCount).toBe(7);
-  expect(fakes.getCharacterCalls()[6]).toContain('Emma, me revoici.');
-  expect(fakes.getCharacterCalls()[6]).not.toContain('Bonjour Max, avez-vous des nouvelles ?');
+  await expect.poll(fakes.getMaxTurnCount).toBe(9);
+  expect(fakes.getCharacterCalls()[8]).toContain('Emma, me revoici.');
+  expect(fakes.getCharacterCalls()[8]).not.toContain('Bonjour Max, avez-vous des nouvelles ?');
   expect(fakes.getSessionRow()).toMatchObject({ active_character: 'emma', handoff_count: 2 });
   await page.getByRole('button', { name: 'Terminer' }).click();
 });
@@ -1681,10 +1694,10 @@ test('lot 2 : retour autorisé après pause, mémoire isolée et salut de repris
   test.setTimeout(45_000);
   const secret = 'CONFIDENCE_PRIVEE_EMMA_26';
   const turns = [`Je te confie ${secret}.`, ...HANDOFF_TURNS.slice(1), 'Je voudrais parler avec Max.',
-    'Bonjour Max, je suis là pour écouter.', 'Je voudrais parler avec Emma.'];
+    'Bonjour Max, je suis là pour écouter.', 'Je comprends.', 'Merci pour cette précision.', 'Je voudrais parler avec Emma.'];
   const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
-    gmStance: 'accept', gmHandoffTurns: [4, 6], characterReplies: ['Je t’écoute.', 'Je t’écoute.', 'Je t’écoute.',
-      'Je vais appeler Max.', 'Je vous écoute.', 'Tu peux appeler Emma.'] });
+    gmStance: 'accept', gmHandoffTurns: [4, 8], characterReplies: ['Je t’écoute.', 'Je t’écoute.', 'Je t’écoute.',
+      'Je vais appeler Max.', 'Je vous écoute.', 'Je vous écoute.', 'Je vous écoute.', 'Tu peux appeler Emma.'] });
   await startCharacterConversation(page, 'Emma');
   for (const text of turns.slice(0, 4)) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
   await page.getByRole('button', { name: 'Appeler Max', exact: true }).click();
@@ -1760,11 +1773,13 @@ test('lot 2 : un CAS accepté après le watchdog ne bloque pas le tour suivant',
   await page.getByRole('button', { name: "Démarrer l'enregistrement" }).click();
   await expect(page.getByText(turns[1], { exact: false })).toBeVisible();
   await page.getByRole('button', { name: "Arrêter l'enregistrement" }).press('Enter');
-  await expect(page.getByText('Le tour a pris trop de temps', { exact: true })).toBeVisible({ timeout: 15_000 });
+  // The HTTP acknowledgement is still held; the bounded read recognizes only our exact emitted revision.
+  await expect.poll(fakes.getMaxTurnCount, { timeout: 8_000 }).toBe(2);
+  await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled();
   release();
   await sendHandoffTurn(page, turns[2]);
   await page.waitForLoadState('networkidle');
-  expect(fakes.getMaxTurnCount()).toBe(2);
+  expect(fakes.getMaxTurnCount()).toBe(3);
   expect(fakes.getSessionRow()).toMatchObject({ active_character: 'emma', pending_handoff: { turnIndex: 3 } });
 });
 
@@ -1821,15 +1836,16 @@ test('lot 2 : un GM encore courant dans son onglet ne réécrit pas le transcrip
     gmTarget: 'max', gmStance: 'accept', gmHandoffAt: 4, delayGmMs: 1500, maxResponse: 'Je vais appeler Max.' });
   await startCharacterConversation(page, 'Emma');
   for (const text of turns.slice(0, 3)) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
-  await sendHandoffTurn(page, turns[3]);
+  const pending = sendHandoffTurn(page, turns[3]);
   await expect.poll(fakes.getGmPostTurnCount).toBe(4);
   const row = fakes.getSessionRow();
   const t5 = { role: 'user', content: 'Tour cinq finalisé dans un autre onglet.', timestamp: Date.now(), spokenWith: 'emma' };
   const newLog = [...row.conversation_log as unknown[], t5];
   fakes.changeSessionRow({ conversation_log: newLog,
     pending_handoff: { ...row.pending_handoff as object, revision: 'other-window-t5', turnId: 'other:5', turnIndex: 5 } });
+  await pending;
   await page.waitForLoadState('networkidle');
-  await expect.poll(() => fakes.getExperienceEvents().some(e => e.payload.blockedReason === 'gm_late')).toBe(true);
+  await expect.poll(() => fakes.getExperienceEvents().some(e => e.payload.blockedReason === 'offer_conflict')).toBe(true);
   expect(fakes.getSessionRow().conversation_log).toEqual(newLog);
   await expect(page.getByRole('button', { name: /^Appeler / })).toHaveCount(0);
 });
@@ -2056,7 +2072,7 @@ for (const source of ['Max', 'Emma'] as const) {
     expect(fakes.getSessionRow()).toMatchObject({ active_character: target.toLowerCase(), handoff_count: 1 });
   });
 
-  test(`lot 3 : ${source}, GM tardif ignoré puis nouvelle confirmation utilisable`, async ({ page }) => {
+  test(`lot 3 : ${source}, GM retardé, accord conservé et confirmation suivante utilisable`, async ({ page }) => {
     const target = source === 'Max' ? 'Emma' : 'Max';
     const turns = [...HANDOFF_TURNS, `Je voudrais parler avec ${target}.`, `Tu peux me passer ${target} maintenant ?`];
     const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
@@ -2070,11 +2086,129 @@ for (const source of ['Max', 'Emma'] as const) {
     await expect(page.getByRole('button', { name: `Appeler ${target}`, exact: true })).toBeVisible();
     await page.waitForLoadState('networkidle');
     await expect.poll(() => fakes.getExperienceEvents().filter(e => e.event_type === 'handoff_proposed')
-      .map(e => e.turn_index)).toEqual([5]);
-    await expect.poll(() => fakes.getExperienceEvents().some(e => e.payload.blockedReason === 'gm_late')).toBe(true);
-    expect(fakes.getSessionRow().pending_handoff).toMatchObject({ turnIndex: 5, state: 'available' });
+      .map(e => e.turn_index)).toEqual([4]);
+    expect(fakes.getSessionRow().pending_handoff).toMatchObject({ turnIndex: 4, state: 'available' });
     await page.getByRole('button', { name: `Appeler ${target}`, exact: true }).click();
     await expect(page.getByRole('img', { name: `Portrait d’${target}` })).toBeVisible({ timeout: 10_000 });
     expect(fakes.getSessionRow()).toMatchObject({ active_character: target.toLowerCase(), handoff_count: 1 });
+  });
+}
+
+
+for (const source of ['Max', 'Emma'] as const) {
+  test(`F1 T15 ${source}: accord conservé après course GM et continuation`, async ({ page }) => {
+    const target = source === 'Max' ? 'Emma' : 'Max';
+    const turns = [...HANDOFF_TURNS, `Je voudrais parler avec ${target}.`, 'Merci, je comprends.'];
+    const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+      gmReferencedAssessment: true, gmStance: 'accept', gmHandoffAt: 4, delayGmMs: 1500,
+      characterReplies: ['Je t’écoute.', 'Je t’écoute.', 'Je t’écoute.', `Oui. Je te passe ${target}.`, 'Je comprends.'] });
+    await startCharacterConversation(page, source);
+    for (const text of turns.slice(0, 3)) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+    await sendHandoffTurn(page, turns[3]);
+    await expect.poll(fakes.getGmPostTurnCount).toBe(4);
+    await sendHandoffTurn(page, turns[4]);
+    await expect(page.getByRole('button', { name: `Appeler ${target}`, exact: true })).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: `Appeler ${target}`, exact: true }).click();
+    await expect(page.getByRole('img', { name: `Portrait d’${target}` })).toBeVisible({ timeout: 10_000 });
+    expect(fakes.getSessionRow()).toMatchObject({ active_character: target.toLowerCase(), handoff_count: 1 });
+  });
+}
+
+
+test('F1 T17: cible typée conservée après preuve rejetée puis accord pronominal', async ({ page }) => {
+  const turns = [...HANDOFF_TURNS, 'Je voudrais parler avec Emma.', 'Tu peux me la passer ?'];
+  const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+    gmReferencedAssessment: true, gmStance: 'accept', gmHandoffTurns: [4, 5],
+    gmConsentRefs: { 4: 'currentUserMessage', 5: 'speech_1' },
+    characterReplies: ['Je t’écoute.', 'Je t’écoute.', 'Je t’écoute.', 'Je vais lui demander.', 'Oui. Je te la passe maintenant.'] });
+  await startCharacterConversation(page, 'Max');
+  for (const text of turns) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+  await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toBeVisible();
+  expect(fakes.getSessionRow().pending_handoff).toMatchObject({ state: 'available', offer: { targetCharacter: 'emma' } });
+});
+
+test('F1 T21: relation incorrecte et preuve de passage indépendamment valide', async ({ page }) => {
+  const turns = [...HANDOFF_TURNS, 'Je voudrais parler avec Emma.'];
+  const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+    gmReferencedAssessment: true, gmStance: 'accept', gmHandoffAt: 4, invalidRelationshipAt: 4,
+    characterReplies: ['Je t’écoute.', 'Je t’écoute.', 'Je t’écoute.', 'D’accord. Je te passe Emma.'] });
+  await startCharacterConversation(page, 'Max');
+  for (const text of turns) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+  await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toBeVisible();
+  expect(fakes.getSessionRow().pending_handoff).toMatchObject({ state: 'available' });
+});
+
+for (const delay of [0, 500, 3500]) {
+  test(`F1: confirmation retenue avant persistance, GM ${delay} ms`, async ({ page }) => {
+    test.setTimeout(45_000);
+    const turns = [...HANDOFF_TURNS, 'Je voudrais parler avec Emma.'];
+    const acceptance = 'Oui. Je te passe Emma.';
+    const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+      gmReferencedAssessment: true, gmStance: 'accept', gmHandoffAt: 4, delayGmMs: delay,
+      characterReplies: ['Je t’écoute.', 'Je t’écoute.', 'Je t’écoute.', acceptance] });
+    await startCharacterConversation(page, 'Max');
+    for (const text of turns.slice(0, 3)) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+    let entered = false;
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    await page.route(`${SUPABASE_ORIGIN}/rest/v1/sessions?**`, async route => {
+      if (route.request().method() === 'PATCH' && route.request().postDataJSON()?.pending_handoff?.state === 'prepared') {
+        entered = true; await gate;
+      }
+      return route.fallback();
+    });
+    const turn = sendHandoffTurn(page, turns[3]);
+    await expect.poll(() => entered, { timeout: 10_000 }).toBe(true);
+    expect(fakes.getTtsText()).not.toContain(acceptance);
+    await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toHaveCount(0);
+    release(); await turn;
+    await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toBeVisible();
+    expect(fakes.getTtsText()).toContain(acceptance);
+    expect(fakes.getExperienceEvents().find(e => e.event_type === 'handoff_prepared')?.payload.preparationMs).toBeLessThan(16_000);
+  });
+}
+
+test('F1: persistance refusée, aucune promesse jouée, erreur puis réessai utilisable', async ({ page }) => {
+  const turns = [...HANDOFF_TURNS, 'Je voudrais parler avec Emma.'];
+  const acceptance = 'Oui. Je te passe Emma.';
+  const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+    gmReferencedAssessment: true, gmStance: 'accept', gmHandoffTurns: [4, 5],
+    characterReplies: ['Je t’écoute.', 'Je t’écoute.', 'Je t’écoute.', acceptance, acceptance] });
+  await startCharacterConversation(page, 'Max');
+  let failed = false;
+  await page.route(`${SUPABASE_ORIGIN}/rest/v1/sessions?**`, route => {
+    if (!failed && route.request().method() === 'PATCH' && route.request().postDataJSON()?.pending_handoff?.state === 'prepared') {
+      failed = true; return json(route, { message: 'simulated persistence failure' }, 503);
+    }
+    return route.fallback();
+  });
+  for (const text of turns) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+  expect(fakes.getTtsText()).not.toContain(acceptance);
+  await expect(page.getByRole('button', { name: 'Réessayer le passage' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Réessayer le passage' }).click();
+  await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toBeVisible();
+  expect(fakes.getMaxTurnCount()).toBe(5);
+  expect(fakes.getGmPostTurnCount()).toBe(5); // same GM call, no extra serial evaluation
+});
+
+
+for (const delay of [500, 3500]) {
+  test(`F1: disponibilité cible retardée ${delay} ms, résultat terminal visible`, async ({ page }) => {
+    const turns = [...HANDOFF_TURNS, 'Je voudrais parler avec Emma.'];
+    const acceptance = 'Oui. Je te passe Emma.';
+    const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+      gmReferencedAssessment: true, gmStance: 'accept', gmHandoffAt: 4, delayTargetReadinessMs: delay,
+      characterReplies: ['Je t’écoute.', 'Je t’écoute.', 'Je t’écoute.', acceptance] });
+    await startCharacterConversation(page, 'Max');
+    for (const text of turns) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+    if (delay < 3000) await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toBeVisible();
+    else {
+      await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Réessayer le passage' })).toBeEnabled();
+      expect(fakes.getTtsText()).not.toContain(acceptance);
+      expect(fakes.getExperienceEvents().some(e => e.event_type === 'handoff_blocked' && e.payload.stage === 'preparation')).toBe(true);
+    }
   });
 }
