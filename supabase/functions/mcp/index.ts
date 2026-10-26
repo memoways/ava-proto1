@@ -161,7 +161,7 @@ var get_usage_overview_default = defineTool({
   description: "Session statistics for the AVA experience: sessions played, durations, characters called, film seen or not seen, endings, handoffs and voice modes, grouped by environment and by day. Reads session metadata only, never conversation content.",
   inputSchema: {
     days: z2.number().int().min(1).max(365).default(30).describe("Number of past days to include."),
-    environment: z2.string().min(1).optional().describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed.")
+    environment: z2.string().min(1).optional().describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed, sandbox-julien.")
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ days, environment }, ctx) => {
@@ -498,7 +498,7 @@ var get_voice_latencies_default = defineTool({
     offset: z5.number().int().min(0).max(3e3).default(0),
     limit: z5.number().int().min(1).max(300).default(100),
     days: z5.number().int().min(1).max(365).default(30).describe("Number of past days to include."),
-    environment: z5.string().min(1).optional().describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed.")
+    environment: z5.string().min(1).optional().describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed, sandbox-julien.")
   },
   outputSchema: z5.object({ summary: z5.object({
     windowDays: z5.number(),
@@ -599,7 +599,7 @@ var list_sessions_default = defineTool({
   description: "Most recent game sessions as a metadata list: start and end, duration, environment, character called, film seen or not seen, voice modality, ending reason and handoff count. Conversation content is never returned.",
   inputSchema: {
     days: z6.number().int().min(1).max(365).default(30).describe("Number of past days to include."),
-    environment: z6.string().min(1).optional().describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed."),
+    environment: z6.string().min(1).optional().describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed, sandbox-julien."),
     limit: z6.number().int().min(1).max(MAX_LIMIT).default(25).describe("Maximum sessions to return, up to 100."),
     offset: z6.number().int().min(0).default(0).describe("Skip this many sessions, for paging.")
   },

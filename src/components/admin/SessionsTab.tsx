@@ -469,6 +469,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
               <SelectItem value="sandbox-ulrich">Sandbox — Ulrich</SelectItem>
               <SelectItem value="sandbox-romed">Sandbox — Romed</SelectItem>
               <SelectItem value="sandbox-benoit">Sandbox — Benoît</SelectItem>
+              <SelectItem value="sandbox-julien">Sandbox — Julien</SelectItem>
             </SelectContent>
           </Select>
           <Select value={contextFilter} onValueChange={setContextFilter}>

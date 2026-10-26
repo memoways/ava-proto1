@@ -5,6 +5,7 @@ const ENV_LABELS: Record<string, string> = {
   "sandbox-ulrich": "Ulrich",
   "sandbox-benoit": "Benoît",
   "sandbox-romed": "Romed",
+  "sandbox-julien": "Julien",
 };
 
 interface TitleInput extends SessionCharacterInput {

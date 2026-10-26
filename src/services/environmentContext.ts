@@ -6,6 +6,7 @@ export const ENVIRONMENT_IDS = [
   "sandbox-ulrich",
   "sandbox-romed",
   "sandbox-benoit",
+  "sandbox-julien",
 ] as const;
 
 export type EnvironmentId = (typeof ENVIRONMENT_IDS)[number];
@@ -22,6 +23,7 @@ export const ENVIRONMENTS: readonly EnvironmentDefinition[] = [
   { id: "sandbox-ulrich", label: "Ulrich", type: "sandbox" },
   { id: "sandbox-romed", label: "Romed", type: "sandbox" },
   { id: "sandbox-benoit", label: "Benoît", type: "sandbox" },
+  { id: "sandbox-julien", label: "Julien", type: "sandbox" },
 ];
 
 export interface AdminUserProfile {

@@ -34,7 +34,7 @@ export default defineTool({
       .string()
       .min(1)
       .optional()
-      .describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed."),
+      .describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed, sandbox-julien."),
   },
   outputSchema: z.object({ summary: z.object({
     windowDays: z.number(), window: z.object({ from: z.string(), to: z.string() }),

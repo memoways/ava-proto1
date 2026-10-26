@@ -72,7 +72,7 @@ export function clearCharacterPromptCache(characterId?: string) {
     return;
   }
   promptCacheEpoch += 1;
-  for (const environmentId of ["prod", "sandbox-ulrich", "sandbox-romed", "sandbox-benoit"] as EnvironmentId[]) {
+  for (const environmentId of ["prod", "sandbox-ulrich", "sandbox-romed", "sandbox-benoit", "sandbox-julien"] as EnvironmentId[]) {
     const key = environmentCacheKey(characterId, environmentId);
     const existing = byIdCache.get(key);
     byIdCache.delete(key);

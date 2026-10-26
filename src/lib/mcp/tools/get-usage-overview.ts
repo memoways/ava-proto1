@@ -23,7 +23,7 @@ export default defineTool({
       .string()
       .min(1)
       .optional()
-      .describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed."),
+      .describe("Optional environment id: prod, sandbox-ulrich, sandbox-benoit, sandbox-romed, sandbox-julien."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ days, environment }, ctx) => {
