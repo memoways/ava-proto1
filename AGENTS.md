@@ -10,8 +10,12 @@ sa mémoire personnelle et ne valide pas l'accès aux sources Ava.
 
 - Base éditoriale Caractères AVA :
   https://app.notion.com/p/gamilab-prov/30362322e59580bbb7b8dd49d516b341.
-  Max actif : `3f762322-e595-81ba-8241-c7f6b28f31fd` ;
-  Emma active : `3f762322-e595-81f9-880f-e309adec7075`.
+  Max actif : `ef4cfaa6-70e3-4e87-9b9e-079815fd0cd9` ;
+  Emma active : `dfcc15f8-9d37-45f7-8c84-d0c24a4288cf`.
+  Vérifiés le 26 octobre 2026 : statut « En cours », copies Lovable concordantes.
+  Les anciennes pages `3f762322-e595-81ba-8241-c7f6b28f31fd` et
+  `3f762322-e595-81f9-880f-e309adec7075` sont des Backup depuis le 25 octobre.
+  Rapport éditorial : https://app.notion.com/p/40462322e59580ca98a4d6148d8ce406.
 - Utiliser une connexion MCP native Notion ciblant Gamilab pour les lectures,
   recherches et écritures des sources projet. Vérifier sa cible avant d'agir ;
   l'ID confirmé par `get-self` le 26 octobre 2026 est

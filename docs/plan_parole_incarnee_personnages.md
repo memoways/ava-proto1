@@ -3,7 +3,7 @@
 ## Direction après écoute — 25 octobre 2026
 
 **État actualisé le 26 octobre : direction éditoriale conservée ; app A1–A4
-livrée dans main, intégration E0 et recette humaine non achevées.** Le bilan
+livrée dans main, copies E0 vérifiées ; recette humaine non achevée.** Le bilan
 exact A4 et le prérequis Notion sont dans le
 [plan opérationnel](plan_lot_b_rendu_vocal.md#exécution-a4--26-octobre-2026) et le
 [prompt A4R](prompt_reprise_integration_recette_lot_a4r.md). Ulrich confirme
@@ -14,13 +14,17 @@ observé ; il ne constitue pas une nouvelle recette exhaustive bidirectionnelle.
 Le naturel vocal n'est pas accepté. Cette section remplace la proposition de
 lot 4 ci-dessous ; les bilans antérieurs restent historiques.
 
-La demande suivante d'Ulrich sépare désormais l'exécution en une
-[tâche éditoriale Notion prête à enregistrer](tache_notion_parole_incarnee_personnages.md)
+La demande d'Ulrich séparait l'exécution en une
+[référence éditoriale E0](tache_notion_parole_incarnee_personnages.md)
 et [quatre lots app A1–A4](plan_lot_b_rendu_vocal.md#exécution-coordonnée-notion--app--25-octobre-2026).
 Leur mécanique, dépendances, validations et retours arrière sont dans ce second
-plan opérationnel. La proposition E0 n'a pas été créée comme nouvelle tâche ;
-la [tâche éditoriale existante](https://app.notion.com/p/f3944bc8e9ce48138f2b309db223035d)
-est maintenant accessible par Gamilab natif et doit être réutilisée après comparaison.
+plan opérationnel. La [tâche E0 déjà réalisée dans Notion](https://app.notion.com/p/40462322e59580ca98a4d6148d8ce406)
+porte le rapport d'édition validée du 25 octobre ; elle complète la
+[tâche générale des dialogues](https://app.notion.com/p/f3944bc8e9ce48138f2b309db223035d).
+La comparaison A4R du 26 octobre confirme les neuf champs de chaque nouvelle
+fiche active dans sandbox-ulrich et les cinq états propres ; aucune sync à répéter.
+Les aperçus admin sont vérifiés, le jeu live reste à écouter. Voir le
+[bilan A4R](plan_lot_b_rendu_vocal.md#vérification-a4r--26-octobre-2026).
 
 Après redémarrage, Ulrich confirme qu'il travaille dans Notion sur les champs
 personnages. L'exécution app commence par le

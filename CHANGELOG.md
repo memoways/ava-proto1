@@ -4,6 +4,26 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [A4R — copies E0 vérifiées, écoute restante] — 2026-10-26
+
+- Base de reprise #83, main `5b9a5c107c2f2c103ad310afcdcde78220ccf73d`.
+  Gamilab natif confirmé ; rapport E0 existant retrouvé, aucune tâche créée.
+  Les IDs auparavant indiqués actifs sont des Backup ; AGENTS et reprise
+  désignent désormais les nouvelles fiches Max/Emma « En cours ».
+- Neuf propriétés par personnage comparées : 18/18 concordantes en sandbox-ulrich,
+  cinq états propres conservés ; les mêmes contenus sont déjà en base prod.
+  Accueils A4 sandbox relus exactement, accueils prod conservés.
+  Aucune écriture Cloud, sync, reconstruction RAG ou publication effectuée.
+- Preview authentifiée sandbox vérifiée : fiches et états présents ; les aperçus
+  rich_v2 gardent intégralement Manière de parler et le moteur intime.
+  Aucun appel LLM/TTS, aucune nouvelle session live ni acceptation acoustique.
+- [Bilan et preuves A4R](docs/plan_lot_b_rendu_vocal.md#vérification-a4r--26-octobre-2026),
+  deux plans, STORY et [reprise pour l'écoute](docs/prompt_reprise_integration_recette_lot_a4r.md)
+  actualisés. Code et workflow inchangés : dernière
+  [CI qualité/E2E verte](https://github.com/memoways/ava-proto1/actions/runs/40298606848)
+  du code `26cfc2caf5812e1907d3a2d4db1730ed8f8948ec` conservée,
+  exception documentaire appliquée. Recette humaine restante.
+
 ## [Gamilab — connexion native rétablie] — 2026-10-26
 
 - Renouvellement officiel réussi avec le CLI stable Codex 0.164.0. Le connecteur

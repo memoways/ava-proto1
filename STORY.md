@@ -3,9 +3,26 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-26 (A4 technique livrée ; Gamilab natif reconnecté et vérifié ; E0 et recette humaine restants)
+> **Last Updated**: 2026-10-26 (A4 livrée ; Gamilab et copies E0 vérifiés ; écoute humaine restante)
 
 ---
+
+## A4R — les textes étaient déjà là (26 octobre 2026)
+
+Gamilab reconnecté, la lecture directe révèle que les IDs de reprise sont
+devenus des Backup. La tâche « Ava : parole sous le choc » contient déjà le
+rapport d'édition validée et les deux nouvelles fiches actives. Lovable utilise
+ces nouveaux IDs : les neuf champs de Max et les neuf champs d'Emma concordent
+avec Notion en sandbox. Les mêmes textes sont déjà en base production depuis
+le 25 octobre ; ce constat ne vaut pas publication du frontend.
+
+Il n'y a donc rien à resynchroniser. La preview connectée affiche les cinq
+états et les accueils approuvés ; ses aperçus rich conservent les manières de
+parler entières. Aucun audio n'a été lancé. Le reste est une écoute avec Ulrich,
+pour juger mots, pauses et timbre et éprouver les deux allers-retours. Le
+[bilan A4R](docs/plan_lot_b_rendu_vocal.md#vérification-a4r--26-octobre-2026)
+et le [prompt de recette](docs/prompt_reprise_integration_recette_lot_a4r.md)
+distinguent ces preuves des validations encore humaines.
 
 ## A4 — décrocher une seule fois (26 octobre 2026)
 
