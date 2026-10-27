@@ -6,6 +6,20 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [F3 — restauration urgente de la continuité vocale] — 2026-10-27
 
+- Continuité d’entrée mains libres acceptée par Ulrich après relecture réelle :
+  garde acoustique rétablie (`acoustic_confirmed`) avec interruptions toujours
+  désactivées ; fin de parole 2 000 ms, hésitation 700 ms. Le repli text/900 ms
+  avait retiré cette garde et pouvait fermer le tour pendant la parole.
+  Session 373833d0 du 27 octobre 12:03 Paris, flags relus ; réglage durablement
+  enregistré dans Sandbox Ulrich uniquement. Aucun nouveau code, production inchangée.
+
+
+- Livré par [PR #98](https://github.com/memoways/ava-proto1/pull/98) dans main
+  `0170ac5e5d324b08c8a154a2aa393c2e4ead7c42`, après CI PR verte sur HEAD exact
+  `941bd50` : qualité complète et 109 E2E sans retry. Lovable synchronisé/prêt,
+  cinq fichiers de code relus identiques ; branche de code supprimée.
+  CI main 40491618695 verte, 109 E2E sans retry, nouvelle écoute humaine demandée ; pas de publication.
+
 - Preview Sandbox Ulrich seulement : Max reprend sa référence Gradium de prod ;
   Emma inchangée. Sortie incrémentale, transport Gradium streaming et interruptions
   automatiques désactivés ; mains libres conservé. Relecture exacte des différences,

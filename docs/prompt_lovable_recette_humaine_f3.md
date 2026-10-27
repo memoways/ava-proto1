@@ -1,10 +1,20 @@
 ## Priorité urgente du 27 octobre — relire avant les instructions historiques
 
+PR #98 fusionnée dans main `0170ac5e5d324b08c8a154a2aa393c2e4ead7c42`.
+Lovable ready au même SHA, cinq sources relues identiques ; CI PR 109 E2E verts
+sans retry, CI main 40491618695 verte, 109 E2E sans retry. Ne pas lancer de nouvel agent/code :
+il reste l’écoute humaine et sa décision, puis une autorisation de publication
+distincte. Les sources finales sont dans le plan canonique.
+
 Preview Sandbox Ulrich uniquement. Conserver les passages Max ↔ Emma ; retirer
 les messages techniques et pastilles animées, garder les actions texte et la grille.
 Les réglages Cloud sont déjà restaurés : Max Gradium b5ioHAR7JuHVLskk, Emma
 Gradium JReEQbhiZbfpeMYy ; sortie incrémentale=false, interruptions=false,
-stratégie=text, transport Gradium streaming=false ; mains libres=true.
+stratégie finale=acoustic_confirmed, endOfSpeechMs=2 000,
+hesitationExtraMs=700, transport Gradium streaming=false dans Cloud ; mains libres=true.
+Ce réglage d’entrée est déjà enregistré et accepté par Ulrich (« plus de coupures »),
+session 373833d0 du 27 octobre 12:03 Paris. Ne pas rétablir text/900 ms ni
+réimplémenter le contrôleur sans nouvelle régression ; bargeIn=false reste impératif.
 Ne pas les réactiver pour une recette. Aucune publication production autorisée.
 Vérifier le main et le SHA Lovable réels selon le
 [prompt autonome à jour](prompt_reprise_fiabilite_passage_personnages_lot_f3_finalisation.md).

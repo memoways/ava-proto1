@@ -1,5 +1,21 @@
 ## Urgence continuité vocale — 27 octobre, retour Cineforom
 
+Dernier résultat humain : **continuité d’entrée acceptée** (« oui maintenant il
+n’y a plus de coupures, donc implémenter ça ! »). Session
+373833d0-4ed0-4613-9a6c-b33c3c9460b6, 12:03:29 Paris, Max. Flags relus :
+acoustic_confirmed, bargeIn=false, endOfSpeechMs=2 000, hesitationExtraMs=700,
+incremental=false. Le réglage Cloud est déjà durablement enregistré. L’essai
+précédent 749a65e6 à 11:52 était text/900 ms et coupait une parole continue.
+Cette correction est une remise en état des réglages existants, pas un nouveau
+contrôleur. Acceptation limitée à ce critère : la matrice entière et la
+publication ne sont pas implicitement acceptées.
+
+
+Correctif disponible : PR #98 fusionnée dans main `0170ac5`, CI PR verte sur HEAD
+exact `941bd50`, 109 E2E sans retry ; Lovable ready au même SHA et cinq sources
+relues identiques. Nouvelle écoute demandée après rechargement/Commencer ;
+résultat positif sur la continuité d’entrée ci-dessus. CI main 40491618695 verte, 109 E2E sans retry.
+
 Recette refusée sur la preview Sandbox Ulrich : échange de 10:33,
 session 4e018bd3-71d8-4967-b4fb-2d5d72c1da48, phrases hachées/voix variables
 chez Max puis Emma. Statuts interrompus confirmés ; grille utilisée, pas un
@@ -10,7 +26,9 @@ de ton. Ce n’est pas une acceptation du rétablissement.
 
 Restauration Cloud sandbox effectuée et relue : voix de référence Gradium pour
 Max et Emma, sortie progressive et interruptions automatiques désactivées,
-transport Gradium complet ; mains libres reste actif. Production inchangée.
+streaming Gradium désactivé dans les réglages Cloud ; mains libres reste actif.
+La capture cliente montre encore un transport websocket : ne pas présenter le
+transport réellement utilisé comme prouvé par le seul réglage Cloud. Production inchangée.
 Le plan contient les valeurs précédentes et les preuves. Changement de code
 complémentaire : préserver la réponse normale, ne préparer qu’une vraie annonce
 de transfert, supprimer messages techniques/pastilles en conservant actions texte,

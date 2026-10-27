@@ -3,11 +3,25 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-27 (première écoute F3 ; correction du faux message, acceptation et publication en attente)
+> **Last Updated**: 2026-10-27 (continuité vocale F3 restaurée sur preview ; écoute humaine et publication distinctes)
 
 ---
 
 ## F3 — restaurer la continuité pour la présentation
+
+La nouvelle écoute révèle ensuite une entrée coupée pendant qu’Ulrich parle
+encore. Le repli en stratégie texte avait aussi retiré la garde acoustique de
+fin de parole. La correction réutilise le réglage existant : garde acoustique
+active, interruptions de Max désactivées, silence 2 000 ms. Ulrich confirme sur
+une nouvelle expérience qu’il n’y a plus de coupures et demande de le conserver.
+La base et les flags de cette session sont relus ; aucune réécriture du contrôleur
+ni nouvelle campagne de tests n’est nécessaire. La production reste inchangée.
+
+
+Le rétablissement est fusionné par PR #98 dans main `0170ac5`, après CI verte
+sur son HEAD exact avec 109 E2E sans retry. Lovable est prêt au même SHA ; cinq
+fichiers ont été comparés intégralement identiques. Ulrich reçoit une demande
+d’écoute courte dans une nouvelle expérience. La CI main est verte, 109 E2E sans retry ; aucune acceptation ni publication n’est déduite de la livraison.
 
 Le retour Cineforom de 10:33 révèle des phrases hachées et des voix variables.
 La sandbox employait Fish pour Max alors que sa référence prod est Gradium.
