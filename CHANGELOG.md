@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Bilan F3 et reprise orientée résultat] — 2026-10-27
+
+- Compare PRD1/PRD4, contrat F1–F3, corrections demandées par Ulrich et état
+  réellement validé. Mesure 75 min 49 s de CI pour les trois passages du correctif
+  urgent #98 ; distingue erreurs évitables, contrôles utiles et répétition sur main.
+- Remplace le prompt de reprise par un accord préalable sur l’objectif et une
+  condition d’arrêt ; conserve l’entrée vocale acceptée, gèle les réglages stables
+  et distingue démo courte proposée / recette F3 complète / optimisation CI.
+- Protocole aligné sur barge-in désactivé ; historique préservé. Aucun code,
+  réglage Cloud, workflow, règle AGENTS ou publication modifié. Source de départ
+  main ccd3414, dernier code 0170ac5, CI main 40491618695 verte (109 E2E sans retry).
+- [Bilan et objectifs proposés](docs/plan_changement_interlocuteur_manuel.md),
+  [prompt révisé](docs/prompt_reprise_fiabilite_passage_personnages_lot_f3_finalisation.md).
+
 ## [F3 — restauration urgente de la continuité vocale] — 2026-10-27
 
 - Continuité d’entrée mains libres acceptée par Ulrich après relecture réelle :

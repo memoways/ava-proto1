@@ -1,3 +1,18 @@
+## Lecture actuelle — 27 octobre 2026
+
+Ce document conserve un protocole F3 complet et son historique ; il ne doit pas
+être réinitialisé ni imposé intégralement pour chaque correction. Le
+[point de décision](plan_changement_interlocuteur_manuel.md) distingue la démo
+courte proposée de la qualification complète. Objectif prioritaire encore à
+convenir avec Ulrich ; aucun nouveau parcours lancé par ce document.
+
+La continuité d’entrée de la session 373833d0 (12:03:29 Paris) est déjà acceptée
+sur le réglage final. Conserver cette preuve. Barge-in=false est intentionnel :
+aucune interruption volontaire de Max n’est requise pour qualifier cette version.
+Les anciennes consignes demandant de relivrer #93/#94, affirmant qu’aucun réglage
+Cloud n’a été modifié, ou décrivant text/900 ms sont historiques ; l’état courant
+est dans le bilan et la section suivante. Ne pas réactiver la sortie incrémentale.
+
 ## Urgence continuité vocale — 27 octobre, retour Cineforom
 
 Dernier résultat humain : **continuité d’entrée acceptée** (« oui maintenant il
@@ -116,7 +131,7 @@ ne remplit pas automatiquement chaque critère ni les deux modalités.
 | Recharge en appel | Recharger pendant un appel ; temps actif écoulé correctement retiré, reprise explicite cohérente, aucun ancien audio concurrent. | À faire | À faire |
 | Annulation sonnerie | Annuler avant décroché puis attendre ; aucune voix cible, connexion ni capture tardive. Grille réutilisable. | À faire | À faire |
 | Arrêt et callbacks | Raccrocher pendant une réponse ou son attente ; micro, audio et vidéo source arrêtés, aucune réponse tardive dans le nouvel appel. | À faire | À faire |
-| Écoute libre | En mains libres : silences, prise de parole et interruption volontaire compréhensibles ; aucun micro réarmé depuis l’ancien appel. En PTT : relâchement/annulation propres. | À faire | À faire |
+| Écoute libre | Paroles entières, aucun micro réarmé depuis l’ancien appel. En PTT : relâchement/annulation propres. Interruption volontaire hors périmètre de la version actuelle (bargeIn=false). | À qualifier | Continuité d’entrée acceptée le 27/10 ; autres cas non observés |
 | Fin explicite | Distinguer fin d’expérience et raccrochage ; zéro budget termine l’expérience selon configuration. Ne pas altérer la durée pour forcer un succès. | À faire | À faire |
 
 L’expiration technique de reprise à quatre heures est distincte du budget actif.
