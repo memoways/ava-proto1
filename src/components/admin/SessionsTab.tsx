@@ -7,10 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { displayNameForCharacter } from "@/services/characterRegistry";
 import { autoSessionTitle } from "./sessionTitle";
+import { prepareSessionsMarkdown, downloadSessionMarkdown } from "@/services/sessionMarkdownDownload";
 import { sessionCharacterLabel, sessionCharacterMetadata, sessionCharacterOptions } from "@/services/sessionCharacters";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity, ScanSearch, FlaskConical } from "lucide-react";
+import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity, ScanSearch, FlaskConical, Download, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { isQuestionLike } from "@/services/ragQuestionCorpus";
 import { adminTabPath } from "@/services/adminNavigation";
@@ -381,6 +382,27 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [armedBulk, setArmedBulk] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [preparedExport, setPreparedExport] = useState<{ blob: Blob; filename: string } | null>(null);
+  const selectionKey = [...checkedIds].sort().join(",");
+  useEffect(() => { setPreparedExport(null); }, [selectionKey]);
+  async function exportChecked() {
+    if (preparedExport) {
+      await downloadSessionMarkdown(preparedExport.blob, preparedExport.filename);
+      return;
+    }
+    const selection = sessions.filter(session => checkedIds.has(session.id));
+    if (!selection.length) return;
+    setExporting(true);
+    try {
+      const result = await prepareSessionsMarkdown(selection);
+      setPreparedExport(result);
+      if (result.warningCount) toast.warning("Export prêt ; certains diagnostics sont indisponibles et signalés dans le document.");
+      else toast.success("Export Markdown prêt à télécharger");
+    } catch (error) {
+      toast.error(`Export impossible : ${error instanceof Error ? error.message : String(error)}`);
+    } finally { setExporting(false); }
+  }
   function toggleChecked(id: string, on: boolean) {
     setCheckedIds((prev) => {
       const next = new Set(prev);
@@ -435,7 +457,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
       toast.error("Erreur: " + error.message);
     } else {
       toast.success("Nom mis à jour");
-      if (selected?.id === id) setSelected({ ...selected!, name: nameInput || null });
+      if (selected?.id === id) setSelected({ ...selected, name: nameInput || null });
       onRefresh();
     }
     setEditingName(null);
@@ -447,7 +469,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
       toast.error("Erreur: " + error.message);
     } else {
       toast.success("Note mise à jour");
-      if (selected?.id === id) setSelected({ ...selected!, admin_note: noteInput || null });
+      if (selected?.id === id) setSelected({ ...selected, admin_note: noteInput || null });
       onRefresh();
     }
     setEditingNote(null);
@@ -500,17 +522,22 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
           </Select>
         </div>
         <p className="mb-2 text-xs text-muted-foreground">{visibleSessions.length} sessions affichées sur {sessions.length} chargées.</p>
-        <div className="mb-2 flex items-center gap-3 text-sm">
+        <div className="mb-2 flex flex-wrap items-center gap-3 text-sm">
           <Checkbox
             aria-label="Tout sélectionner"
+            disabled={exporting}
             checked={visibleSessions.length > 0 && visibleSessions.every((s) => checkedIds.has(s.id))}
             onCheckedChange={(v) => setCheckedIds(v === true ? new Set(visibleSessions.map((s) => s.id)) : new Set())}
           />
           <span className="text-muted-foreground">{checkedIds.size} sélectionnée(s)</span>
+          <Button size="sm" variant="outline" disabled={checkedIds.size === 0 || exporting || bulkDeleting} onClick={() => void exportChecked()}>
+            {exporting ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Download className="mr-1 h-3 w-3" />}
+            {exporting ? "Préparation…" : preparedExport ? "Télécharger Markdown" : "Exporter en Markdown"}
+          </Button>
           <Button
             size="sm"
             variant={armedBulk ? "destructive" : "outline"}
-            disabled={checkedIds.size === 0 || bulkDeleting}
+            disabled={checkedIds.size === 0 || bulkDeleting || exporting}
             onClick={deleteChecked}
           >
             <Trash2 className="mr-1 h-3 w-3" />
@@ -534,6 +561,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                   <div onClick={(e) => e.stopPropagation()} className="pt-0.5">
                     <Checkbox
                       aria-label="Sélectionner la session"
+                      disabled={exporting}
                       checked={checkedIds.has(s.id)}
                       onCheckedChange={(v) => toggleChecked(s.id, v === true)}
                     />

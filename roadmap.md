@@ -2,6 +2,10 @@
 
 ## En cours
 
+- Export Markdown des sessions sélectionnées : réalisé et téléchargement réel vérifié
+  en preview ; livraison GitHub/CI non clôturée (opérations Git gérées par Lovable).
+  Production non publiée. Plan `docs/plan_export_sessions_markdown_2026-10-27.md`.
+
 - Correctif QA du 25 octobre vérifié : 46 tests ciblés verts, compilation
   Lovable verte ; tours Max/Emma préservés si lecture de rugosité indisponible.
   Attend écoute réelle, publication et clôture GitHub (hors de cette vérification).
