@@ -806,7 +806,7 @@ export type Database = {
           {
             foreignKeyName: "external_test_access_grants_invitation_id_fkey"
             columns: ["invitation_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "external_test_invitations"
             referencedColumns: ["id"]
           },

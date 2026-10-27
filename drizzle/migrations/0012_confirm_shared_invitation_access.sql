@@ -1,0 +1,1 @@
+COMMENT ON FUNCTION private.current_external_test_access() IS 'Runtime test access; shared (multi_use) invitations accept every browser grant (see migration 0011).';
