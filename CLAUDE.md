@@ -29,7 +29,9 @@ Un lot n'est terminé que si : PR fusionnée dans `main` **après CI verte sur l
 (jamais pendant `queued`/`in_progress`), CI de `main` verte, branche supprimée (distante + locale),
 aucune PR ni branche qui traîne. Une seule branche par lot, depuis `main` à jour ; vérifier les
 branches/PR existantes avant de commencer. Si une étape est bloquée, le dire en tête du compte
-rendu avec l'unique action à faire : ne jamais annoncer « terminé » avec un reste. La publication
+rendu avec l'unique action à faire : ne jamais annoncer « terminé » avec un reste.
+Toujours pousser jusqu'à `main` avant de rendre la main : attendre la CI, fusionner, puis seulement
+livrer un prompt Lovable (avec le SHA de `main`) ; tout commiter avant le premier push. La publication
 Lovable reste une étape distincte.
 
 ## Stack
