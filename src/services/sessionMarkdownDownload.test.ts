@@ -5,7 +5,8 @@ import { prepareSessionsMarkdown } from "./sessionMarkdownDownload";
 
 function query(data: unknown, error: unknown = null) {
   const q = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), gt: vi.fn().mockReturnThis(),
-    limit: vi.fn(async () => ({ data, error })), single: vi.fn(async () => ({ data, error })) };
+    limit: vi.fn().mockReturnThis(), single: vi.fn(async () => ({ data, error })),
+    then: vi.fn((resolve: (value: unknown) => unknown) => Promise.resolve({ data, error }).then(resolve)) };
   return q;
 }
 describe("authorized session export preparation", () => {
@@ -32,7 +33,8 @@ describe("authorized session export preparation", () => {
   it("paginates telemetry instead of silently truncating at the first page", async () => {
     const rows = Array.from({ length: 500 }, (_, i) => ({ id: `row-${i}` }));
     const paged = query(rows);
-    paged.limit.mockResolvedValueOnce({ data: rows, error: null }).mockResolvedValueOnce({ data: [], error: null });
+    paged.then.mockImplementationOnce(resolve => Promise.resolve({ data: rows, error: null }).then(resolve))
+      .mockImplementationOnce(resolve => Promise.resolve({ data: [], error: null }).then(resolve));
     from.mockImplementation(table => table === "sessions" ? query({ id: "s1" }) : table === "voice_turn_events" ? paged : query([]));
     await prepareSessionsMarkdown([{ id: "s1" }]);
     expect(paged.gt).toHaveBeenCalledWith("id", "row-499");
