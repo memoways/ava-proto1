@@ -1891,7 +1891,7 @@ for (const handsFree of [false, true]) {
     holdValidation = true;
     await page.evaluate(() => {
       const buttons = [...document.querySelectorAll('button')];
-      const call = buttons.find(b => b.textContent?.trim() === 'Appeler Max')!;
+      const call = buttons.find(b => b.getAttribute('aria-label') === 'Appeler Max')!;
       const mic = buttons.find(b => ['Activer le micro', "Démarrer l'enregistrement"].includes(b.getAttribute('aria-label') ?? ''))!;
       call.click();
       // Same task, before React can commit the disabled state: exercises the synchronous guard too.
@@ -1912,7 +1912,7 @@ for (const handsFree of [false, true]) {
 for (const [width, reducedMotion, character, target] of [
   [390, 'reduce', 'Emma', 'Max'], [1280, 'no-preference', 'Max', 'Emma'],
 ] as const) {
-  test(`lot 3 : action texte accessible ${width}px, ${reducedMotion}, clavier et révocation`, async ({ page }) => {
+  test(`lot 3 : capsule accessible ${width}px, ${reducedMotion}, clavier et révocation`, async ({ page }) => {
     test.setTimeout(45_000);
     await page.setViewportSize({ width, height: 844 });
     await page.emulateMedia({ reducedMotion });
@@ -1931,15 +1931,20 @@ for (const [width, reducedMotion, character, target] of [
     const call = page.getByRole('button', { name: `Appeler ${target}`, exact: true });
     await expect(call).toBeVisible();
     await expect(page.getByRole('button', { name: /^Appeler / })).toHaveCount(1);
-    const active = await page.getByRole('img', { name: `Portrait d’${character}` }).boundingBox();
+    const active = await page.locator('[data-character-capsule=current]').boundingBox();
     const bounds = await call.boundingBox();
     expect(bounds!.y).toBeGreaterThan(active!.y + active!.height);
     expect(bounds!.height).toBeGreaterThanOrEqual(44);
+    expect(bounds!.height).toBe(active!.height);
+    expect(bounds!.width).toBe(active!.width);
     expect(bounds!.x).toBeLessThan(30);
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
-    const pulse = call.locator('[aria-hidden=true]');
-    await expect(pulse).toHaveCount(0);
+    await expect(call.locator('img')).toBeVisible();
+    await expect(call).toHaveAttribute('data-state', 'ready');
+    await expect(call).toHaveText('Appeler ' + target + 'Disponible');
+    expect(await call.evaluate(element => getComputedStyle(element).animationName))
+      .toBe(reducedMotion === 'reduce' ? 'none' : 'handoff-ready');
     await call.focus();
     await expect(call).toBeFocused();
     expect(await call.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
@@ -1952,6 +1957,7 @@ for (const [width, reducedMotion, character, target] of [
     expect(microphoneStarts).toBeGreaterThan(0);
     await page.keyboard.press('Space');
     await expect(call).toHaveCount(0);
+    await expect(page.getByRole('button', { name: `Passage vers ${target} — indisponible` })).toBeDisabled();
     await expect.poll(() => fakes.getSessionRow().pending_handoff).toMatchObject({ state: 'none' });
     expect(await page.evaluate(() => (window as Window & { __captureAttempts?: number }).__captureAttempts)).toBe(microphoneStarts);
     expect(fakes.getExperienceEvents().filter(event => event.event_type === 'handoff_executed')).toHaveLength(0);

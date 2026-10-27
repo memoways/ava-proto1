@@ -7,6 +7,20 @@
 
 ---
 
+## F3 — passage réussi puis retour de la capsule
+
+Ulrich a discuté avec Max puis a demandé Emma : le passage a fonctionné et son
+retour est positif. La session sandbox 043712a6 du 27 octobre 20:50 Paris confirme
+préparation, validation, clic et exécution ; mains libres sur le réglage déjà
+accepté. Il demande ensuite de remplacer le lien souligné par une capsule portrait
+identique au personnage courant, avec états explicites et clignotement disponible.
+Le lot réutilise les états existants et conserve les voix et le moteur de passage.
+Le retour par grille et l’acceptation explicite de la démo restent à recueillir
+après livraison visuelle ; l’objectif est alors de geler cette version. Aucune
+qualification exhaustive ni publication déduite du seul passage réussi.
+[Plan courant](docs/plan_changement_interlocuteur_manuel.md) et
+[prompt de finalisation](docs/prompt_reprise_fiabilite_passage_personnages_lot_f3_finalisation.md).
+
 ## Point demandé par Ulrich — retrouver un objectif fini
 
 Ulrich demande pourquoi le développement et les tests prennent autant de temps

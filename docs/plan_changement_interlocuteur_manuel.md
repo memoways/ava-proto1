@@ -1,6 +1,64 @@
+## Reprise démo et capsule de passage — 27 octobre 2026
+
+Référence courante, avant le bilan historique ci-dessous. Ulrich rapporte un
+nouvel échange prolongé avec Max puis un passage vers Emma réussi : « pour le
+moment, tout va bien ». Cette observation valide ce passage, pas encore le retour
+par grille ni toute la matrice F3. La continuité d’entrée déjà acceptée reste acquise.
+
+Preuve native Lovable : session sandbox `043712a6-27e5-4364-8b5f-1174b8befdc0`,
+27 octobre 20:50:40 Paris ; préparation à 20:53:50, validation à 20:53:57,
+clic à 20:54:13, exécution à 20:54:19, puis appel fermé à 20:55:15.
+`handoff_count=1`, personnage Emma. Flags épinglés : mains libres=true,
+acoustic_confirmed, bargeIn=false, fin 2 000 ms, hésitation 700 ms,
+incremental=false. La colonne historique modalite_voix=push_to_talk ne suffit
+pas à classer cet essai comme PTT. Aucune confidence ni transcript conservé.
+
+**Lot autorisé : restaurer la capsule de passage.** La demande actuelle remplace
+le choix précédent d’une action texte sans pastille. Même largeur, hauteur,
+portrait et forme que la capsule du personnage en ligne, juste en dessous :
+
+- Indisponible : capsule visible, atténuée, bouton désactivé, sans clignotement.
+- En préparation : capsule désactivée avec indicateur et libellé explicites,
+  reflétant la préparation réelle ; aucune progression temporelle inventée.
+- Disponible : « Appeler Max/Emma », contraste renforcé et clignotement doux du
+  contour ; seul l’accord final autorisé rend le clic possible. Pendant la prise
+  de parole ou la validation du clic, libellé d’attente et bouton désactivé.
+- Rester retire l’offre ; capsule à nouveau indisponible. Navigation clavier,
+  petits écrans et préférence de mouvement réduit préservés.
+
+Périmètre : présentation de ConversationScreen, styles et assertions liées.
+Réutiliser handoffIssue/handoffOffer ; aucun changement de voix, prompt, seuil,
+GM, persistance ou configuration Cloud. Aucun fournisseur, contrôleur ou refactor
+supplémentaire. Base : main/Lovable `4871d9861617f715d78d340f1dd984e14592bbbc`,
+CI 40563547468 verte, checkout propre, PR historique #24 préservée.
+
+Validation : tests existants adaptés avant push, états désactivés/préparation/
+disponibilité/révocation et clic réels couverts ; replays navigateur des deux
+sens, largeur identique mobile/desktop, clavier et mouvement réduit ; qualité
+locale puis CI PR sur HEAD exact, fusion, CI main et synchronisation Lovable.
+Tout code, preuve et prompt de finalisation sont préparés avant le premier push.
+Les tests simulés ne rejouent pas la validation acoustique déjà acquise.
+
+Vérifications locales terminées avant push : 21 tests du composant ; six E2E
+ciblés sans retry (1 min 12 s) couvrant dimensions identiques 160 × 56 px sur
+390/1280 px, deux sens, clavier/Rester, mouvement réduit et verrous PTT/mains
+libres ; captures relues dans output/playwright/lot-3-390.png et lot-3-1280.png.
+`npm run test:quality` vert : 71 régressions, 1 083 unitaires, 42 intégrations,
+typage et build ; lint sans erreur, avertissement React préexistant.
+CI PR/main et synchronisation Lovable restent à vérifier avant annonce de livraison.
+Références d’implémentation : [bouton natif désactivé](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/disabled),
+[mouvement réduit](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion),
+composant shadcn existant ; aucune nouvelle dépendance.
+
+Reste démo après livraison : inspection de la capsule puis raccrochage → grille
+→ rappel Max dans la même expérience, et acceptation explicite de la démo pour
+la geler. Qualification exhaustive et optimisation CI restent séparées ; publication
+Lovable seulement sur autorisation explicite distincte. Le prompt de finalisation
+est actualisé dans le même lot ; aucun lot suivant lancé automatiquement.
+
 ## Point de décision — 27 octobre 2026
 
-Ce résumé est la référence courante. L’historique qui suit conserve les preuves
+Ce bilan précédait la reprise résumée ci-dessus. L’historique conserve les preuves
 et les anciennes propositions ; il n’est pas une liste de travaux à relancer.
 Objectif de ce tour : expliquer les délais et réviser la reprise, **documentation
 seule**. Aucun code, réglage Cloud, workflow CI, contrat AGENTS ou publication modifié.
