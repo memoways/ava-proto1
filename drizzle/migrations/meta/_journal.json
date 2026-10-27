@@ -85,6 +85,13 @@
       "when": 1793089375452,
       "tag": "0011_external_test_invitations_shared_access",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793091755449,
+      "tag": "0012_confirm_shared_invitation_access",
+      "breakpoints": true
     }
   ]
 }
