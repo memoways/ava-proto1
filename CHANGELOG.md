@@ -4,8 +4,29 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [F3 — garder la mécanique hors de la voix] — 2026-10-27
+
+- Nouvelle recette PTT `fb0e8b40-432d-4aab-8564-ec88f96e4e66`, début 08:34:41
+  Europe/Paris, mains libres épinglées false après le choix d'Ulrich. Il a posé
+  une demande directe d'Emma ; accueil/réponses audibles, mais une phrase technique
+  injectée par l'app est entendue et rejetée. Aucun transfert ni acceptation F3.
+- Complément en cours : recherche de solution distinguée de recherche du personnage,
+  repli vocal dans la scène et état explicite pour retenir la promesse originale
+  en progressif. Aucun seuil de confiance supplémentaire ni fiche Notion modifiée.
+- Qualité complète locale verte (1 056 unitaires, 41 intégrations, 69 régressions,
+  lint/typage/build) et 109 E2E sans retry sur code figé. Quatre reproductions
+  unitaires et huit E2E rouges sur le code précédent ; 55 ciblés, huit E2E et
+  quatre contrôles du reçu/journal GM verts après correction. Livraison CI/Lovable
+  du complément et nouvelle écoute humaine à vérifier ; aucune publication.
+
 ## [F3 — question sur un échange passé] — 2026-10-27
 
+- [PR #93](https://github.com/memoways/ava-proto1/pull/93) fusionnée sur main code
+  `e38b189d080457ba2090882ea3cb43e453183a31` après
+  [CI PR verte](https://github.com/memoways/ava-proto1/actions/runs/40464406310)
+  sur HEAD exact `52fd04352417c10cbe0541ec6cfd6047fe497c5d`, 101 E2E sans retry.
+  [CI main verte](https://github.com/memoways/ava-proto1/actions/runs/40466999897), 101 E2E sans retry.
+  Lovable synchronisé/prêt sur ce SHA, fichier corrigé relu identique.
 - Première session réelle retrouvée : `d770e7af-9404-45b5-bbfe-c8cade3259df`,
   Chrome, sandbox v7, Max → Emma exécuté à 07:30:18 Europe/Paris après accord,
   GM et clic. Ulrich ne rapporte ni blocage ni coupure/répétition audible.
@@ -23,7 +44,9 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   Qualité locale verte : 1 048 unitaires, 41 intégrations, 67 régressions, lint,
   typage et build ; 101 E2E sans retry. Premier timeout d'un test de tableau de
   latence inchangé, puis vert isolément et dans la qualité complète sans correction.
-  Livraison GitHub/CI/Lovable à vérifier ; aucune publication.
+  Recette PTT dédiée puis matrice mains libres et acceptation restent à faire ;
+  aucune publication. Le mode PTT a été choisi par Ulrich dans sa sandbox et
+  relu natif enabled=false ; aucun autre réglage modifié par Codex.
 
 ## [F3 — préparation de la recette humaine] — 2026-10-26
 

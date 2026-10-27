@@ -9,6 +9,14 @@
 
 ## F3 — écouter les appels avec Ulrich
 
+Le nouvel essai PTT est audible, mais révèle une vraie rupture de personnage :
+Max prononce une indication technique de préparation. Ulrich précise sa question,
+une demande directe de parler à Emma. La trace montre que l'app remplace une
+réponse narrative normale après avoir confondu recherche de solution et recherche
+de l'autre personnage. Le complément F3 corrige ce garde, garde un repli vocal
+dans la scène et sépare son état technique de ses mots. Aucun seuil artificiel de
+confiance ni changement de fiche Notion ; nouvelle écoute requise après livraison.
+
 Ulrich a réellement échangé avec Max puis Emma le 27 octobre vers 7 h 30,
 sans blocage ni coupure ou répétition remarquée. Le transfert GM a réussi dans
 la même expérience. Les captures ont révélé une fausse demande locale : une
@@ -22,6 +30,14 @@ Ce retour est partiel : le libellé initial PTT et les traces Micro ouvert ne
 prouvent pas deux recettes distinctes. Le protocole complet reste à parcourir
 et à accepter ; la production reste inchangée. La livraison du correctif est
 suivie dans le plan avant une nouvelle écoute sur preview.
+
+[PR #93](https://github.com/memoways/ava-proto1/pull/93) fusionnée en
+`e38b189d080457ba2090882ea3cb43e453183a31`, CI PR verte sur HEAD exact,
+101 E2E sans retry, Lovable synchronisé/prêt et source relue identique.
+CI main verte avec 101 E2E sans retry. Ulrich a réglé la sandbox en PTT avant la
+nouvelle expérience dédiée ; enabled=false relu dans Lovable. Aucun réglage Cloud
+changé par Codex ; le protocole et le prompt de reprise gardent les preuves réelles
+et cette prochaine action humaine.
 
 ### Préparation du 26 octobre
 

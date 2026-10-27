@@ -1,5 +1,90 @@
 ## F3 — recette humaine engagée, publication en attente
 
+### Second retour réel PTT — frontière personnage / mécanique
+
+Ulrich a demandé « Est-ce que je peux parler avec Emma ? », et non la question
+sur un échange passé proposée pour le premier correctif. Session PTT dédiée
+`fb0e8b40-432d-4aab-8564-ec88f96e4e66`, début 08:34:41 Europe/Paris,
+sandbox-ulrich v7, handsFree épinglé false, zéro transfert. Accueil et réponses
+audibles sans autre gêne rapportée. T2 a entièrement délivré la phrase technique
+« Le passage n'est pas prêt… », jugée inacceptable dans la voix par Ulrich.
+Ce test ne valide pas humainement le cas de question passée corrigé par #93.
+
+Cause vérifiée : phrase injectée par l'application dans prd4Orchestrator, pas une
+sortie du personnage à corriger dans sa fiche Notion. La sortie LLM initiale
+restait dans la scène ; une recherche de solution, avec une mention de l'autre
+personnage dans une autre phrase, déclenche le garde lexical de préparation.
+Le GM ne recommande aucun passage ; la préparation échoue assessment_missing,
+puis l'app remplace la réponse par son message technique. Le consommateur
+progressif distingue ce repli par égalité exacte de chaîne, à remplacer par un
+état explicite pour conserver la retenue de toute promesse non préparée.
+
+Complément F3 autorisé : conserver les réponses narratives sans faux candidat
+de transfert (chercher une solution n'est pas chercher l'autre personnage),
+utiliser un repli vocal dans la scène lorsque la préparation reste indisponible,
+et garder les motifs/réessais techniques dans l'interface. Le repli demande le
+motif de la demande sans prétendre qu'une confiance est acquise, sans inventer
+un refus de l'autre personnage ni une panne audio. Aucun nouveau seuil chiffré
+de confiance, aucune permission implicite, aucune modification éditoriale Notion.
+Accord, preuve GM, seuil d'échanges, reçu complet, CAS et clic restent nécessaires.
+Le seuil technique de quatre échanges n'est pas une confiance acquise et n'oblige
+jamais à accepter. Le personnage répond selon la relation et le motif réellement
+connus ; il peut demander pourquoi l'interlocuteur veut parler à l'autre.
+
+Reproductions avant code : chercher une solution ne doit pas créer un besoin
+de passage ; un candidat réellement bloqué ne doit jamais prononcer la mécanique
+ni libérer sa promesse initiale. Couvrir Max/Emma et batch/progressif, parole
+réellement envoyée au TTS, mémoire/reçu/GM fondés sur le seul repli délivré.
+Puis qualité et E2E complets, PR/CI HEAD exact/main, synchronisation Lovable.
+Même branche F3 réutilisée ; la clôture documentaire en préparation est absorbée
+dans ce complément. Recette humaine et publication restent non acceptées.
+
+Confiance avant correction : 95 %. Quatre reproductions unitaires rouges et huit
+replays E2E rouges sur le code précédent, dans le vrai chemin TTS des deux sorties.
+Le premier collecteur E2E était erroné ; le replay avant/après a été refait avec
+les collecteurs HTTP/PCM existants et les reçus de livraison. Après correction :
+55 tests ciblés verts et huit E2E verts, puis quatre contrôles supplémentaires
+du reçu/journal GM verts. Le texte narratif demeure intact ; le repli ne révèle
+pas la mécanique et ne laisse entendre aucune promesse retenue. Le candidat
+remplacé ne fournit plus son état de parole au repli ; la trace porte source=fallback.
+Le statut `handoffPreparationBlocked` remplace l'égalité de chaîne dans le
+consommateur progressif. Aucun nouvel appel LLM, fournisseur ou algorithme vocal.
+Qualité complète du complément verte : 1 056 unitaires, 41 intégrations,
+69 régressions, lint/typage/build. 109 E2E complets verts sans retry (18,2 min),
+code figé pendant ces validations. PR/CI HEAD exact/main et synchronisation
+Lovable du complément restent à vérifier avant nouvelle écoute.
+
+### Livraison du correctif F3 — 27 octobre
+
+[PR #93](https://github.com/memoways/ava-proto1/pull/93) fusionnée dans main
+`e38b189d080457ba2090882ea3cb43e453183a31`, après
+[CI PR 40464406310](https://github.com/memoways/ava-proto1/actions/runs/40464406310)
+verte sur HEAD exact `52fd04352417c10cbe0541ec6cfd6047fe497c5d` : qualité
+complète et 101/101 E2E sans retry (19,9 min pour les E2E).
+[CI main 40466999897](https://github.com/memoways/ava-proto1/actions/runs/40466999897)
+verte sur ce commit de fusion : qualité complète et 101 E2E sans retry (19,0 min).
+Branche de code supprimée localement et à distance après fusion ; même nom
+réutilisé pour le complément vocal F3 et sa clôture. PR #24 sans chevauchement
+et branches historiques préservées.
+
+Lovable Ava/Memoways : SHA `e38b189d080457ba2090882ea3cb43e453183a31`, ready,
+agentFinished=true. `src/services/characterConversation.ts` relu à ce ref par
+le connecteur natif et comparé intégralement au fichier local : identique.
+Aucune migration, Edge, secret, fiche éditoriale ni publication.
+
+Préparation de la recette : première lecture native de `ava_gameplay_settings` dans
+sandbox-ulrich, `VOICE_HANDS_FREE.enabled=true`, sortie progressive et interface
+voix seule activées. La modalité est épinglée au démarrage et restaurée à la
+reprise : une nouvelle expérience est nécessaire pour la recette PTT. Le choix
+PTT s'effectue dans admin preview → Sandbox Ulrich → Expérience → Orchestration,
+désactiver « Conversation mains libres », puis Enregistrer. Une action humaine
+précise a été effectuée par Ulrich (« fait ») : la relecture native confirme
+`VOICE_HANDS_FREE.enabled=false`, sortie progressive/interface voix seule toujours
+activées. La nouvelle expérience PTT est observée plus haut : Ulrich a posé une
+demande directe d'Emma, pas la question sur un échange passé. Aucun réglage Cloud modifié par Codex. Le
+contrôle mains libres se fera ensuite dans une autre expérience, après activation
+de ce mode. Ne pas changer les seuils, quotas ou fiches pour forcer les résultats.
+
 ### Retour réel du 27 octobre — correction du faux message
 
 Ulrich confirme avoir parlé avec Max puis Emma sans blocage du passage et sans
@@ -46,7 +131,8 @@ Après correction : 212 tests ciblés verts ; qualité complète verte (1 048 un
 retry, 17,1 min. Premier passage qualité : timeout à 5 s d'un test inchangé du
 tableau de latence, puis 8/8 verts isolément et qualité complète verte sans aucune
 modification. Le code est resté figé pendant les contrôles complets.
-PR et CI sur HEAD exact/main, puis synchronisation Lovable restent à vérifier.
+La livraison PR/main/Lovable est suivie dans la section précédente ; l'écoute
+humaine de la preview corrigée reste à réaliser et à accepter.
 
 ### Préparation historique du 26 octobre
 

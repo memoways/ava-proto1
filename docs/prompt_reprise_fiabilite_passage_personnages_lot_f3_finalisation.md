@@ -10,13 +10,20 @@ Lire AGENTS.md, CHANGELOG.md, STORY.md, docs/plan_changement_interlocuteur_manue
 docs/recette_humaine_ava_f3.md, docs/prompt_lovable_recette_humaine_f3.md et
 /Users/ulrich/CodeProjects/_shared/agent-context/12-task-closeout-handoff.md.
 
-État de départ vérifié : main 3b20b90288ee73824f235de7fcf79b2c96c1a656 (#92),
-code F2 d59d51055222d46508e598cedcfb00886412e524 (#90). La préparation documentaire
+État vérifié : correctif F3 dans main e38b189d080457ba2090882ea3cb43e453183a31 (#93),
+préparation précédente 3b20b90288ee73824f235de7fcf79b2c96c1a656 (#92),
+code F2 historique d59d51055222d46508e598cedcfb00886412e524 (#90). La clôture documentaire
 F3 peut avoir avancé main ; lire le SHA réel, ne restaurer aucune ancienne révision.
-Dernière CI complète du code 40385670472 verte (98 E2E sans retry + T11 au retry,
+CI PR F3 40464406310 verte sur HEAD exact 52fd04352417c10cbe0541ec6cfd6047fe497c5d,
+101 E2E sans retry (19,9 min). CI main F3 40466999897 verte sur e38b189,
+101 E2E sans retry (19,0 min).
+Lovable synchronisé/prêt au même SHA, fichier characterConversation.ts relu
+intégralement identique. Branche de code supprimée ; même nom réutilisé pour
+le complément vocal F3 décrit ci-dessous. Vérifier les preuves finales dans le plan.
+Baseline F2 : CI 40385670472 verte (98 E2E sans retry + T11 au retry,
 assertion de journal asynchrone, bouton déjà visible). CI PR F2 40382029766 verte
 sur HEAD exact 146f2f6, 99/99 sans retry. Qualité locale F2 : 1 037 unitaires,
-41 intégrations, 67 régressions et 99 E2E sans retry. Aucun test simulé F3 relancé.
+41 intégrations, 67 régressions et 99 E2E sans retry.
 
 F3 est en cours. Session réelle d770e7af-9404-45b5-bbfe-c8cade3259df,
 27 octobre 2026 à 07:27:41 Europe/Paris, Chrome, sandbox v7. Ulrich confirme
@@ -61,12 +68,40 @@ v7 98145fe3-96f1-4525-84c2-0e0a1cc5c6da : Max/Emma, seuil 4, pause 2, quota 8
 vérifiés, aucun changement requis pour démarrer. Preview :
 https://id-preview--1265958d-b74e-40f2-917d-182fe05163fc.lovable.app/?env=sandbox-ulrich&diagnostic=full
 
-Prochaine action technique : terminer/vérifier la livraison du correctif F3
-mentionnée dans le plan, CI et synchronisation Lovable, avant nouvelle écoute.
-Prochaine action humaine après preview synchronisée : démarrer une nouvelle
-expérience PTT explicite avec Max, contrôler la question sur un échange passé
-sans faux message, puis demander réellement Emma après le seuil. Confirmer
-l’accueil audible et fournir l’ID session si disponible.
+Second essai humain : Ulrich n'a PAS posé la question sur un échange passé, mais
+une demande directe de parler avec Emma. Session PTT fb0e8b40-432d-4aab-8564-ec88f96e4e66,
+08:34:41 Europe/Paris, v7, handsFree épinglé false, zéro transfert. Accueil et
+réponses audibles, mais une phrase technique de préparation est entendue et
+explicitement rejetée. Ce critère F3 est rouge jusqu'à correction et nouvelle écoute.
+La phrase provient de l'app, pas de la fiche Notion : une réponse LLM normale
+parlant de chercher une solution est prise pour un candidat de transfert, puis
+remplacée par l'orchestrateur. La restitution progressive repose sur une égalité
+de chaîne avec cette phrase. Complément sur la même branche : garde de recherche
+du personnage plus précis, repli vocal dans la scène sans mécanique ni confiance
+inventée, état explicite handoffPreparationBlocked, état de parole du candidat
+non joué retiré et trace source=fallback. Aucun nouvel appel LLM ni changement
+éditorial ou seuil de confiance. Quatre unitaires et huit E2E rouges sur le code
+précédent ; 55 ciblés, huit E2E et quatre contrôles de reçu/GM verts après.
+Le collecteur E2E initial a été corrigé puis la preuve avant/après refaite.
+Qualité complète locale verte : 1 056 unitaires, 41 intégrations, 69 régressions,
+lint/typage/build ; 109 E2E sans retry (18,2 min) sur code figé.
+Vérifier la livraison complète de ce complément dans le plan avant toute recette.
+
+Prochaine action technique : terminer/vérifier le complément vocal F3 et les
+preuves dans le plan. La sandbox était mains libres ; ce mode est épinglé au
+démarrage. Ulrich a effectué l'action demandée : désactiver « Conversation mains
+libres » puis Enregistrer dans l'admin Sandbox Ulrich. Relecture native :
+enabled=false, sortie progressive et interface voix seule toujours activées.
+Ne pas lui redemander ce choix. Aucun changement de réglage Cloud par Codex.
+Conserver tous les autres réglages. Ne pas faire reprendre un appel mains libres
+pour le comptabiliser comme PTT. Après synchronisation du complément corrigé,
+démarrer une nouvelle expérience PTT avec Max : écoute de l'accueil, puis demande
+directe précoce de parler à Emma, sans faire prononcer ni préparation, ni seuil,
+ni réessai technique. Le personnage peut demander le motif ou rester réservé,
+sans inventer qu'il fait confiance. Rejouer séparément une question sur un échange
+passé pour le correctif #93. Puis quatre échanges complets et demande naturelle,
+accord/GM/bouton/clic. Confirmer l'écoute et l'ID session ; ne pas déduire une
+acceptation globale de l'accès ou d'une seule réponse.
 Accompagner ensuite le protocole PTT puis mains libres : Max → Emma → Max par
 accord/GM/clic, puis Max → grille → Emma → grille → Max, souvenirs isolés,
 quatre échanges complets par appel, fragments/pronoms/refus/repli, merci et
