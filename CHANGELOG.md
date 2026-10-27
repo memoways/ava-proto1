@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Invitations de test « Plusieurs testeurs »] — 2026-10-27
+
+- Le mot de passe d'une invitation partagée (`multi_use`) était refusé : la contrainte
+  historique `external_test_invitations_check1` exigeait un navigateur lié dès l'activation,
+  l'unicité des accès par invitation et le contrôle runtime bloquaient les testeurs suivants.
+  Migration `0011_external_test_invitations_shared_access` (rejouable) ; invitations
+  mono-navigateur inchangées. Test d'intégration rouge avant, vert après.
+- [PR #95](https://github.com/memoways/ava-proto1/pull/95) fusionnée en `c09b0b9` après
+  [CI PR verte](https://github.com/memoways/ava-proto1/actions/runs/40474143476) sur HEAD exact
+  `051901e`. CI main de `c09b0b9` annulée par le push suivant ;
+  [CI main verte](https://github.com/memoways/ava-proto1/actions/runs/40477874691) sur `aafafa7`
+  qui la contient. Lovable a appliqué la migration (types : accès non plus 1-pour-1) et ajouté
+  `0012` (commentaire). Recette humaine du lien et publication : en cours côté Lovable
+  ([prompt](docs/prompt_lovable_invitations_multi_testeurs.md)).
+- Règle « fusionner dans main avant de rendre la main » ajoutée à AGENTS.md/CLAUDE.md (#96).
+
 ## [F3 — garder la mécanique hors de la voix] — 2026-10-27
 
 - Nouvelle recette PTT `fb0e8b40-432d-4aab-8564-ec88f96e4e66`, début 08:34:41
