@@ -1,5 +1,16 @@
 ## Lecture actuelle — 27 octobre 2026
 
+**Reprise réelle :** Ulrich confirme un passage Max → Emma réussi, session
+043712a6 du 27 octobre 20:50 Paris ; événements préparation/validation/clic/
+exécution relus. Il confirme ensuite que le rappel de Max depuis la grille
+n’a pas encore été essayé. La capsule demandée est livrée par PR #102 dans
+main code bf24b37, CI PR et main vertes (109 E2E sans retry chacune ; main après
+une relance d’un test de latence préexistant), Lovable synchronisé/prêt.
+Reste court : observer la capsule, raccrocher → grille → rappeler Max dans la
+même expérience, puis accepter explicitement la démo pour la geler.
+L’entrée déjà acceptée reste acquise ; ne pas imposer toute la matrice ci-dessous.
+Aucune publication F3 ni portage des réglages production par ce lot.
+
 Ce document conserve un protocole F3 complet et son historique ; il ne doit pas
 être réinitialisé ni imposé intégralement pour chaque correction. Le
 [point de décision](plan_changement_interlocuteur_manuel.md) distingue la démo

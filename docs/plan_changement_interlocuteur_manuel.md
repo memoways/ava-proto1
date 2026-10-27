@@ -4,6 +4,8 @@ Référence courante, avant le bilan historique ci-dessous. Ulrich rapporte un
 nouvel échange prolongé avec Max puis un passage vers Emma réussi : « pour le
 moment, tout va bien ». Cette observation valide ce passage, pas encore le retour
 par grille ni toute la matrice F3. La continuité d’entrée déjà acceptée reste acquise.
+Ulrich confirme ensuite explicitement « Non, pas encore » au rappel de Max
+depuis la grille : ce complément reste à faire, sans recommencer les critères acquis.
 
 Preuve native Lovable : session sandbox `043712a6-27e5-4364-8b5f-1174b8befdc0`,
 27 octobre 20:50:40 Paris ; préparation à 20:53:50, validation à 20:53:57,
@@ -45,7 +47,35 @@ ciblés sans retry (1 min 12 s) couvrant dimensions identiques 160 × 56 px sur
 libres ; captures relues dans output/playwright/lot-3-390.png et lot-3-1280.png.
 `npm run test:quality` vert : 71 régressions, 1 083 unitaires, 42 intégrations,
 typage et build ; lint sans erreur, avertissement React préexistant.
-CI PR/main et synchronisation Lovable restent à vérifier avant annonce de livraison.
+Livraison code : [PR #102](https://github.com/memoways/ava-proto1/pull/102),
+main `bf24b3765733d555fabdac88aed02d02827800e7`, après
+[CI PR 40574690336](https://github.com/memoways/ava-proto1/actions/runs/40574690336)
+verte sur HEAD exact `dfb1edc5bd3e2954b04527592487b91a218051d8` : 109 E2E
+sans retry, 20,9 min. Branche propre supprimée localement et à distance ; Lovable
+Ava/Memoways ready au même SHA, composant et CSS comparés intégralement identiques.
+[CI main 40578598650](https://github.com/memoways/ava-proto1/actions/runs/40578598650) :
+première tentative arrêtée avant E2E par LatencyBlockingTab.test.tsx:108,
+assertion immédiate de `/future-video/` après chargement asynchrone (1082/1083
+unitaires). Fichier inchangé par ce lot ; vert en local et sur la PR. Les huit
+tests ciblés du tableau repassent localement ; unique relance du même SHA **verte** :
+qualité complète et 109 E2E sans retry (20,2 min), fin à 21:57:33 Paris.
+Aucun code modifié pour cette relance. Livraison technique de la capsule validée ;
+recette visuelle/rappel et acceptation de la démo encore attendues, aucune publication.
+
+Inventaire vérifié après livraison : branches distantes `main` et
+`agent/test-gap-invitation-validity-multi-use` (PR historique #24) ; branche
+`codex/handoff-capsule-states` supprimée localement et à distance. Les seize
+branches locales historiques étrangères sont préservées :
+`agent/test-gap-invitation-validity-multi-use`, `agent/test-gap-posthog-internal-comparison`,
+`codex/bug-scan-gradium-temp-cap`, `codex/character-handoff-contract-lot-1`,
+`codex/character-handoff-lot-1-closeout`, `codex/character-handoff-lot-2-closeout`,
+`codex/character-handoff-lot-3-closeout`, `codex/character-handoff-lot1-prompt`,
+`codex/character-handoff-pill-lot-3`, `codex/character-handoff-runtime-lot-2`,
+`codex/handoff-veto-lot-1-finalization`, `codex/plan-character-handoff`,
+`codex/test-gap-settings-hydration`, `codex/video-latency-metrics`,
+`codex/video-latency-publication-record`, `cursor/d5d2099b`.
+La clôture documentaire n’altère pas le code et applique l’exception CI Markdown ;
+elle cite la dernière CI code verte, sans nouvelle campagne lourde.
 Références d’implémentation : [bouton natif désactivé](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/disabled),
 [mouvement réduit](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion),
 composant shadcn existant ; aucune nouvelle dépendance.

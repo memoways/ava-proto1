@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-27 (continuité vocale F3 restaurée sur preview ; écoute humaine et publication distinctes)
+> **Last Updated**: 2026-10-27 (capsule de passage livrée sur preview ; rappel par grille et gel humain encore attendus)
 
 ---
 
@@ -15,6 +15,11 @@ préparation, validation, clic et exécution ; mains libres sur le réglage déj
 accepté. Il demande ensuite de remplacer le lien souligné par une capsule portrait
 identique au personnage courant, avec états explicites et clignotement disponible.
 Le lot réutilise les états existants et conserve les voix et le moteur de passage.
+Livré par PR #102 dans main code bf24b37 ; CI PR verte sur HEAD exact dfb1edc,
+109 E2E sans retry, puis CI main 40578598650 verte, 109 E2E sans retry après
+une relance pour une assertion asynchrone inchangée du tableau de latence.
+Lovable synchronisé/prêt, composant et CSS comparés identiques ; branche propre
+supprimée, historique étranger conservé. Aucune publication.
 Le retour par grille et l’acceptation explicite de la démo restent à recueillir
 après livraison visuelle ; l’objectif est alors de geler cette version. Aucune
 qualification exhaustive ni publication déduite du seul passage réussi.
