@@ -6,6 +6,10 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Bilan F3 et reprise orientée résultat] — 2026-10-27
 
+- Choix reçu et enregistré : **démo fiable Max/Emma d’abord**. Le prompt conserve
+  cette priorité, ne la redemande plus et sépare la CI ultérieure. Enregistrement
+  documentaire seulement ; aucune recette, modification fonctionnelle ou publication lancée.
+
 - Compare PRD1/PRD4, contrat F1–F3, corrections demandées par Ulrich et état
   réellement validé. Mesure 75 min 49 s de CI pour les trois passages du correctif
   urgent #98 ; distingue erreurs évitables, contrôles utiles et répétition sur main.

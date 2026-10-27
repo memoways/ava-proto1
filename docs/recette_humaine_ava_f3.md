@@ -3,8 +3,9 @@
 Ce document conserve un protocole F3 complet et son historique ; il ne doit pas
 être réinitialisé ni imposé intégralement pour chaque correction. Le
 [point de décision](plan_changement_interlocuteur_manuel.md) distingue la démo
-courte proposée de la qualification complète. Objectif prioritaire encore à
-convenir avec Ulrich ; aucun nouveau parcours lancé par ce document.
+courte de la qualification complète. Ulrich a validé la démo fiable Max/Emma
+comme priorité le 27 octobre ; ne pas redemander ce choix. Aucun nouveau parcours
+n’est lancé par cet enregistrement.
 
 La continuité d’entrée de la session 373833d0 (12:03:29 Paris) est déjà acceptée
 sur le réglage final. Conserver cette preuve. Barge-in=false est intentionnel :

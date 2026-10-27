@@ -110,9 +110,9 @@ d’arbres identiques après squash ; son utilité doit être discutée, pas sup
 Le dépôt est public, main non protégée selon GitHub : le sujet immédiat est le
 délai, pas une limite de minutes privées. Aucun contrôle n’est retiré ici.
 
-### Objectifs proposés — accord d’Ulrich encore attendu
+### Objectif prioritaire validé par Ulrich — 27 octobre 2026
 
-**A — Recommandé : figer une démonstration fiable Max/Emma.** Une qualification
+**A — Validé : figer une démonstration fiable Max/Emma.** Une qualification
 réelle courte (cible 10–15 minutes, pas une attente imposée), dans Sandbox Ulrich,
 couvre cohérence des voix, absence de mécanique dans les répliques, un passage
 accepté GM/clic et un retour par grille. Conserver la preuve d’entrée déjà acceptée.
@@ -134,10 +134,12 @@ reprise/timer/annulations selon protocole. Publication Lovable seulement après
 acceptation humaine du périmètre choisi ET autorisation distincte. Préparer alors
 le portage explicite des réglages prod ; ne pas prétendre qu’ils sont déjà identiques.
 
-Une question unique a été posée dans ce tour : A (démo), C (F3 complet), ou B (CI)
-en premier, sans lancement automatique. Sans réponse, A reste une recommandation,
-pas une décision acquise. Le prompt révisé doit commencer par cet accord et
-s’arrêter si aucun défaut précis ni objectif d’exécution n’est autorisé.
+Ulrich a répondu : « Démo fiable Max/Emma d’abord (recommandé) ». La priorité A
+est donc acquise et ne doit plus être redemandée. L’optimisation CI reste séparée
+et ultérieure. La question précisait « pour la reprise, sans la lancer maintenant » :
+cette réponse valide l’objectif, pas le démarrage immédiat de la recette ou du
+développement, ni une publication. Le prompt reprend cet accord ; aucun nouveau
+lot fonctionnel n’est lancé par son enregistrement.
 
 Sources : [PRD1 canonique](https://app.notion.com/p/31c62322e5958026bd87e55eed4af635),
 [PRD4 local](PRD_4_prototype_mai_2026.md), décisions du 26 octobre dans l’historique
