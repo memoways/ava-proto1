@@ -42,4 +42,12 @@ describe("session Markdown report", () => {
     expect(md).toContain("Aucun échange enregistré.");
     expect(md).toContain("2026-10-27T18:44:00Z");
   });
+  it("identifies a user message with no recorded response without claiming a technical cause", () => {
+    const data = fixture();
+    (data.session.conversation_log as unknown[]).push({ role: "user", content: "Tu m’entends ?" });
+    const md = buildSessionMarkdown(data);
+    expect(md).toContain("aucune réponse personnage enregistrée");
+    expect(md).toContain("Cause indéterminée");
+    expect(md).toContain("Tu m’entends ?");
+  });
 });
