@@ -4,6 +4,21 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [F3 — capsule de passage et essai Max → Emma] — 2026-10-27
+
+- Ulrich confirme un passage Max → Emma réussi ; session 043712a6 relue via
+  Lovable : préparation, accord final, clic puis exécution, mains libres sur les
+  réglages acceptés. Le retour/rappel et le gel explicite de la démo restent à valider.
+- Capsule portrait rétablie sous le personnage courant, même largeur/hauteur :
+  indisponible désactivée, préparation visible, puis Appeler/Disponible avec
+  clignotement doux du contour. Mouvement réduit, clavier, Rester et gardes de
+  capture/validation préservés. Aucun changement de voix, GM ou Cloud.
+- [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md),
+  [prompt de finalisation humaine](docs/prompt_reprise_fiabilite_passage_personnages_lot_f3_finalisation.md).
+  Qualité locale verte : 71 régressions, 1 083 unitaires, 42 intégrations,
+  lint/typage/build ; six E2E ciblés sans retry, captures 390/1280 px relues.
+  Livraison technique et CI suivies par la PR du lot ; publication distincte.
+
 ## [Export Markdown des sessions — preview, non publié] — 2026-10-27
 
 - Données → Sessions : préparation puis téléchargement de la sélection, une ou

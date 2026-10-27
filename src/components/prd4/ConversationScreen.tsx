@@ -1,5 +1,5 @@
 /** PRD4 — Écran 8 : Conversation avec Max (toggle-to-talk, fond Max plein écran) */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Mic, Square, PhoneOff, Loader2, VideoOff, PhoneCall } from "lucide-react";
 import maxLarge from "@/assets/characters/max-large.jpg";
 import maxAvatar from "@/assets/characters/max.jpg";
@@ -41,6 +41,8 @@ interface Props {
   onRejectHandoff?: () => void;
 }
 
+const characterCapsuleClass = "flex min-h-14 w-full items-center gap-3 rounded-full border bg-background/60 px-3 py-2 text-left backdrop-blur-md";
+
 const ConversationScreen = ({
   audioState,
   userSubtitle,
@@ -57,13 +59,16 @@ const ConversationScreen = ({
   attachAvatarMedia,
   activeCharacter,
   portraitUrl = null,
+  handoffIssue = null,
   handoffOffer = null,
+  handoffPortraitUrl = null,
   handoffCalling = false,
   handoffInputLocked = false,
   handoffCallingTarget = "emma",
   onAcceptHandoff,
   onRejectHandoff,
 }: Props) => {
+  const handoffStatusId = useId();
   // Le flux vidéo en direct est celui de Max. Pour tout autre personnage (Emma),
   // on n'affiche ni le flux, ni sa dernière image figée : seulement sa photo.
   const streamingAvatarActive = streamingAvatarRequested && activeCharacter === "max";
@@ -172,8 +177,15 @@ const ConversationScreen = ({
   const displayName = displayNameForCharacter(activeCharacter);
   const portrait = portraitUrl ?? (activeCharacter === "emma" ? emmaAvatar : maxAvatar);
   const backgroundPortrait = portraitUrl ?? (activeCharacter === "emma" ? emmaAvatar : maxLarge);
-  const offerTarget = handoffOffer?.targetCharacter === "max" ? "max" : "emma";
+  const offerTarget = handoffOffer?.targetCharacter ?? (activeCharacter === "max" ? "emma" : "max");
   const offerTargetName = displayNameForCharacter(offerTarget);
+  const offerPortrait = handoffPortraitUrl ?? (offerTarget === "max" ? maxAvatar : emmaAvatar);
+  const handoffPreparing = !handoffOffer && handoffIssue?.phase === "preparing";
+  const handoffCaptureBusy = audioState === "mic_starting" || audioState === "user_finalizing" || recording;
+  const handoffReady = Boolean(handoffOffer) && !handoffInputBlocked && !handoffCaptureBusy;
+  const handoffStatus = handoffInputBlocked ? "Connexion…"
+    : handoffOffer ? (handoffCaptureBusy ? "Parole en cours" : "Disponible")
+    : handoffPreparing ? "En préparation…" : "Indisponible";
   const callingName = displayNameForCharacter(handoffCallingTarget ?? "emma");
 
   if (handoffCalling) {
@@ -240,8 +252,8 @@ const ConversationScreen = ({
 
       {/* HUD top */}
       <header className="relative z-10 flex flex-wrap items-start justify-between gap-3 p-4 md:p-6">
-        <div className="flex flex-col items-start gap-2">
-          <div className="flex items-center gap-3 rounded-full border border-border/40 bg-background/60 px-3 py-2 backdrop-blur-md">
+        <div className="flex w-40 max-w-full flex-col items-stretch gap-2">
+          <div data-character-capsule="current" className={cn(characterCapsuleClass, "border-border/40")}>
             <img src={portrait} alt={`Portrait d’${displayName}`} className="h-8 w-8 rounded-full border border-border object-cover" />
             <div className="pr-2">
               <p className="text-xs font-medium leading-none text-foreground">{displayName}</p>
@@ -249,24 +261,37 @@ const ConversationScreen = ({
             </div>
           </div>
           <span className="sr-only" aria-live="polite" aria-atomic="true">
-            {handoffOffer ? `${displayName} vous propose de parler avec ${offerTargetName}.` : ""}
+            {handoffOffer ? `${displayName} vous propose de parler avec ${offerTargetName}.`
+              : handoffPreparing ? `Passage vers ${offerTargetName} en préparation.` : ""}
           </span>
+          <button
+            type="button"
+            data-character-capsule="handoff"
+            data-state={handoffReady ? "ready" : handoffOffer ? "busy" : handoffPreparing ? "preparing" : "unavailable"}
+            aria-label={handoffOffer ? `Appeler ${offerTargetName}` : `Passage vers ${offerTargetName} — ${handoffPreparing ? "en préparation" : "indisponible"}`}
+            aria-describedby={handoffStatusId}
+            disabled={!handoffReady}
+            onClick={onAcceptHandoff}
+            className={cn(characterCapsuleClass,
+              "transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent disabled:cursor-not-allowed",
+              handoffReady ? "animate-handoff-ready border-accent bg-accent/15 text-foreground hover:bg-accent/25"
+                : handoffPreparing || handoffOffer ? "border-border/70 text-foreground/80" : "border-dashed border-border/60 text-foreground/60",
+            )}
+          >
+            <img src={offerPortrait} alt="" className={cn("h-8 w-8 shrink-0 rounded-full border border-border object-cover", !handoffOffer && "opacity-60")} />
+            <span className="min-w-0 pr-1">
+              <span className="block text-xs font-medium leading-none">{handoffOffer ? `Appeler ${offerTargetName}` : offerTargetName}</span>
+              <span id={handoffStatusId} className={cn("mt-1 flex items-center gap-1 text-[10px]", handoffReady && "font-semibold text-accent")}>
+                {(handoffPreparing || handoffInputBlocked) && <Loader2 aria-hidden="true" className="h-3 w-3 shrink-0 animate-spin motion-reduce:animate-none" />}
+                {handoffStatus}
+              </span>
+            </span>
+          </button>
           {handoffOffer && (
-            <div className="flex flex-col items-start gap-1">
-              <button
-                type="button"
-                aria-label={`Appeler ${offerTargetName}`}
-                disabled={handoffInputBlocked || audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "user_speaking"}
-                onClick={onAcceptHandoff}
-                className="min-h-12 px-3 py-2 text-sm font-medium text-foreground underline underline-offset-4 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <span>Appeler {offerTargetName}</span>
-              </button>
               <button type="button" disabled={handoffInputBlocked} onClick={onRejectHandoff}
                 className="min-h-11 rounded-full px-3 text-xs text-foreground/80 underline underline-offset-4 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50">
                 Rester avec {displayName}
               </button>
-            </div>
           )}
         </div>
         {streamingAvatarActive && streamingAvatarState === "connecting" && (

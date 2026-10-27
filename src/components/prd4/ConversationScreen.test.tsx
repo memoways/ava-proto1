@@ -24,10 +24,13 @@ describe("ConversationScreen", () => {
     expect(screen.getByRole("button", { name: "Terminer" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Appeler Emma" })).toBeInTheDocument();expect(screen.getByRole("button", { name: "Rester avec Max" })).toBeInTheDocument();
   });
-  it.each(["emma", "max"] as const)("has no default call button while talking to %s", (activeCharacter) => {
+  it.each(["emma", "max"] as const)("shows an unavailable capsule, never a default call, while talking to %s", (activeCharacter) => {
     render(<ConversationScreen {...baseProps} activeCharacter={activeCharacter}
       audioState="max_speaking" conversationLog={[]} onAcceptHandoff={vi.fn()} />);
     expect(screen.queryByRole("button", { name: /^Appeler / })).not.toBeInTheDocument();
+    const capsule = screen.getByRole("button", { name: /Passage vers/ });
+    expect(capsule).toBeDisabled();
+    expect(capsule).toHaveTextContent("Indisponible");
   });
 
   it("shows a bidirectional GM offer and hides the other character's last line", () => {
@@ -117,7 +120,7 @@ it('leaves Space on a focused call button to its native activation without openi
 
 
 it.each([['emma', 'max', 'Max'], ['max', 'emma', 'Emma']] as const)(
-  'keeps a plain call action below %s toward %s and removes it on revocation',
+  'shows the target portrait in a capsule from %s toward %s and disables it on revocation',
   (source, target, name) => {
     const props = { ...baseProps, activeCharacter: source, conversationLog: [],
       handoffOffer: { reason: 'Accord prouvé', targetCharacter: target },
@@ -126,13 +129,16 @@ it.each([['emma', 'max', 'Max'], ['max', 'emma', 'Emma']] as const)(
     const header = screen.getByRole('banner');
     const call = within(header).getByRole('button', { name: `Appeler ${name}` });
     expect(screen.getAllByRole('button', { name: /^Appeler / })).toHaveLength(1);
-    expect(within(call).queryByRole('img')).not.toBeInTheDocument();
-    expect(call.querySelector('[class*="animate-pulse"]')).toBeNull();
+    expect(call.querySelector('img')).toHaveAttribute('src', props.handoffPortraitUrl);
+    expect(call).toHaveClass('animate-handoff-ready');
+    expect(call).toBeEnabled();
+    expect(call).toHaveTextContent('Disponible');
     expect(within(header).getByRole('button', { name: /^Rester avec/ })).toBeInTheDocument();
     expect(screen.getByText(`${source === 'emma' ? 'Emma' : 'Max'} vous propose de parler avec ${name}.`))
       .toHaveAttribute('aria-live', 'polite');
     rerender(<ConversationScreen {...props} handoffOffer={null} />);
     expect(screen.queryByRole('button', { name: /^Appeler / })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Passage vers/ })).toBeDisabled();
   });
 
 
@@ -143,6 +149,33 @@ it.each(['mic_starting', 'user_speaking', 'user_finalizing'] as const)(
       handoffOffer={{ reason: 'Accord prouvé', targetCharacter: 'max' }} onAcceptHandoff={accept} />);
     const call = screen.getByRole('button', { name: 'Appeler Max' });
     expect(call).toBeDisabled();
+    expect(call).toHaveTextContent('Parole en cours');
+    expect(call).not.toHaveClass('animate-handoff-ready');
     fireEvent.click(call);
     expect(accept).not.toHaveBeenCalled();
   });
+
+it('keeps preparation and failure disabled until an authorized offer, then locks during connection', () => {
+  const accept = vi.fn();
+  const props = { ...baseProps, activeCharacter: 'max' as const, conversationLog: [], onAcceptHandoff: accept };
+  const { rerender } = render(<ConversationScreen {...props} handoffIssue={{ phase: 'preparing', reason: 'Diagnostic interne' }} />);
+  const preparing = screen.getByRole('button', { name: 'Passage vers Emma — en préparation' });
+  expect(preparing).toBeDisabled();
+  expect(preparing).toHaveTextContent('En préparation…');
+  expect(preparing).not.toHaveClass('animate-handoff-ready');
+  expect(screen.queryByText('Diagnostic interne')).not.toBeInTheDocument();
+  fireEvent.click(preparing);
+  expect(accept).not.toHaveBeenCalled();
+  rerender(<ConversationScreen {...props} handoffIssue={{ phase: 'error', reason: 'Diagnostic interne' }} />);
+  expect(screen.getByRole('button', { name: 'Passage vers Emma — indisponible' })).toBeDisabled();
+  const handoffOffer = { targetCharacter: 'emma' as const, reason: 'Accord prouvé' };
+  rerender(<ConversationScreen {...props} handoffOffer={handoffOffer} />);
+  const ready = screen.getByRole('button', { name: 'Appeler Emma' });
+  expect(ready).toBeEnabled();
+  fireEvent.click(ready);
+  expect(accept).toHaveBeenCalledOnce();
+  rerender(<ConversationScreen {...props} handoffOffer={handoffOffer} handoffInputLocked />);
+  expect(ready).toBeDisabled();
+  expect(ready).toHaveTextContent('Connexion…');
+  expect(ready).not.toHaveClass('animate-handoff-ready');
+});
