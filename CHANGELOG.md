@@ -14,6 +14,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   est indisponible. Aucun changement des voix, du gameplay ou de Lovable Cloud.
 - Vérification en preview connecté : deux sessions réelles, fichier de 813 487
   octets, deux rapports, statistiques présentes, aucune erreur navigateur.
+- Sélection unique également téléchargée ; 24 tests ciblés verts, compilation verte.
 - Fusion/CI GitHub non réalisées par cet environnement : état de livraison non
   clôturé. La PR étrangère #24 est préservée. Production non publiée.
 - [Plan](docs/plan_export_sessions_markdown_2026-10-27.md).

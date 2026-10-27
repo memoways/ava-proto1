@@ -27,3 +27,11 @@ Tests du calcul des moyennes, attribution Max/Emma et autres personnages, incide
 sélection unique/multiple et absence de télémétrie. Vérification du téléchargement
 depuis l'écran admin avec sessions réelles quand une session autorisée est disponible.
 La livraison GitHub et la publication restent distinctes de la validation locale.
+
+## Résultat vérifié
+- 24 tests ciblés verts, compilation Lovable verte.
+- Téléchargements depuis l'admin connecté avec données réelles : sélection de deux
+  sessions puis d'une seule ; rapports et statistiques présents, aucune erreur navigateur.
+- Aucune publication lancée. Livraison GitHub et CI non clôturées par cette session,
+  les opérations Git étant gérées par la plateforme. Aucun prochain lot de développement
+  identifié ; les travaux vocaux existants restent hors périmètre.
