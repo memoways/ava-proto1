@@ -1,5 +1,121 @@
 ## F3 — restauration urgente de la sandbox, 27 octobre 2026
 
+### Entrée utilisateur — réglage corrigé et accepté
+
+Ulrich confirme après le nouveau réglage : « oui maintenant il n’y a plus de
+coupures, donc implémenter ça ! ». Réglage déjà enregistré durablement, conservé
+sans nouvelle modification de code : mains libres=true, bargeIn=false,
+interruptionStrategy=acoustic_confirmed, endOfSpeechMs=2 000,
+hesitationExtraMs=700. Session nouvelle `373833d0-4ed0-4613-9a6c-b33c3c9460b6`,
+début **12:03:29 Paris**, neuf entrées, Max ; les flags épinglés relus correspondent
+exactement au réglage accepté, sortie incrémentale=false. Comparaison par
+clé/environnement des JSON Cloud : seuls ces deux champs diffèrent de la première
+restauration ; production inchangée. Trois tests existants de handsFreeVoice
+verts, dont bargeIn=false et temporisation. Pas de nouvelle implémentation de
+contrôleur ni de nouvelle CI de code à lancer.
+Cette acceptation vise les coupures d’entrée ; elle ne remplit pas toute la
+matrice PTT/mains libres et n’autorise aucune publication production.
+
+Historique du défaut et de sa résolution :
+
+Retour d’Ulrich après la preview corrigée : le temps de réponse de Max convient,
+mais la parole utilisateur est tronquée ; sa seconde moitié est envoyée au tour
+suivant. Reproductible selon Ulrich, capture reçue. Session nouvelle identifiée
+`749a65e6-f21b-4848-9f68-7dede3a41332`, début 11:52:31 Paris, mains libres,
+sortie incrémentale=false, bargeIn=false, stratégie=text, fin de parole=900 ms.
+Cinq réponses Max Gradium completed ; la réception complète de chaque entrée
+n’est pas démontrée par ces statuts. À ce stade, la continuité d’entrée était refusée.
+
+Diagnostic source : en stratégie text, aucun détecteur acoustique n’est attaché ;
+la clôture dépend du temps depuis le dernier changement de mots reconnus, pas
+de la parole micro en cours. Même en stratégie acoustique, le garde ne vérifie
+que voiced à l’instant de clôture, sans conserver une pleine pause après la
+dernière activité. Deepgram flush envoie la queue audio puis remet les buffers à
+zéro ; la capture reprise peut reporter des mots sur l’énoncé suivant. Ne pas
+attribuer sans audio la coupure précise à une pause ou à un retard fournisseur.
+
+Rétablissement immédiat effectué : sandbox seule, fin de parole 2 000 ms (tempo
+historique de Deepgram automatique), hésitation 700 ms conservée ; autres flags,
+voix, production et passages inchangés. Valeur antérieure 900 ms conservée pour
+retour arrière ; nouvelle expérience requise pour ce réglage épinglé.
+Ulrich précise ensuite qu’il parlait encore, sans pause. Le repli text appliqué
+par Codex avait aussi retiré la garde acoustique existante, ce qui expose la
+clôture au retard STT. Correction minimale appliquée et acceptée : rétablir
+interruptionStrategy=acoustic_confirmed, en conservant bargeInEnabled=false,
+sortie incrémentale=false et les voix restaurées. Le détecteur écoute ainsi le
+micro et le garde existant diffère flush tant que la voix continue ; aucun
+output réversible ne lui est fourni et Max ne peut pas être interrompu.
+Fin de parole=2 000 ms appliquée et relue. Relecture après changement de stratégie
+et nouvelle écoute effectuées avant toute nouvelle implémentation.
+
+Piste conditionnelle NON implémentée, sans nouveau travail à lancer puisque le réglage est accepté : la décision reste dans handsFreeVoice.ts ; prendre en compte
+le dernier texte nouveau ET la dernière activité micro, indépendamment du droit
+d’interrompre Max. Ne pas couper pendant la parole ou envoyer une portion tardive
+au tour suivant. Préserver l’accumulation de tous les segments et la frontière de
+flush, le PTT, les buffers acoustiques réversibles et la capture unique.
+Lire la section 3 du plan de latence (effectué) et reproduire uniquement parole
+continue avec retard STT et reprise pendant finalisation avant livraison.
+La clôture documentaire en préparation est absorbée dans ce complément F3 sur
+codex/ava-f3-input-continuity ; aucun autre lot lancé.
+
+
+### Branches préservées à la clôture
+
+Après suppression de la branche de code F3, branches distantes vérifiées :
+`main` et `agent/test-gap-invitation-validity-multi-use` (PR #24, travail historique
+non fusionné, hors périmètre). Aucune branche distante étrangère supprimée.
+La branche de clôture courante est uniquement documentaire et sera supprimée
+après fusion ; la liste ci-dessous l’exclut explicitement.
+
+Branches locales historiques à préserver (avec main) :
+
+```text
+agent/test-gap-invitation-validity-multi-use
+agent/test-gap-posthog-internal-comparison
+codex/bug-scan-gradium-temp-cap
+codex/character-handoff-contract-lot-1
+codex/character-handoff-lot-1-closeout
+codex/character-handoff-lot-2-closeout
+codex/character-handoff-lot-3-closeout
+codex/character-handoff-lot1-prompt
+codex/character-handoff-pill-lot-3
+codex/character-handoff-runtime-lot-2
+codex/handoff-veto-lot-1-finalization
+codex/plan-character-handoff
+codex/test-gap-settings-hydration
+codex/video-latency-metrics
+codex/video-latency-publication-record
+cursor/d5d2099b
+main
+```
+
+La vérification finale de GitHub/du checkout doit confirmer la suppression de
+la seule branche propre de clôture ; aucune autorisation de nettoyer ces branches
+historiques n’est déduite du lot F3.
+
+### Livraison technique du rétablissement — vérifiée
+
+[PR #98](https://github.com/memoways/ava-proto1/pull/98) fusionnée le 27 octobre
+à 11:50:42 Paris dans `main` **0170ac5e5d324b08c8a154a2aa393c2e4ead7c42**.
+[CI PR 40488269434](https://github.com/memoways/ava-proto1/actions/runs/40488269434)
+verte sur HEAD exact `941bd50d36754c24fbec4284319c7a54c94c440b` : 1 072 unitaires,
+42 intégrations, 71 régressions, lint/typage/build, **109 E2E sans retry** (21,0 min).
+Les cinq échecs de la première CI restent documentés plus bas ; ils ne sont pas
+masqués par une simple relance du même code. Branche de code supprimée à distance
+et localement après comparaison exacte des arbres du squash.
+
+Lovable Ava/Memoways : même SHA `0170ac5`, ready, agentFinished=true. Cinq fichiers
+de code modifiés relus au ref natif et comparés octet par octet au checkout :
+ConversationScreen, IndexPRD4, characterConversation, handoffCoordinator et
+prd4Orchestrator identiques. Réglages et profils Cloud restaurés relus de nouveau :
+identiques à la restauration prévue, production et autres champs conservés.
+
+[CI main 40491618695](https://github.com/memoways/ava-proto1/actions/runs/40491618695)
+en cours sur `0170ac5`. Aucune publication production. Recette humaine encore
+ouverte ; Ulrich a reçu la preview corrigée avec une seule demande de rechargement
+et nouvelle expérience. Ne pas valider le son depuis la seule CI ou une ancienne
+session. La clôture documentaire ne change aucun code. Le complément d’entrée ci-dessus ajuste seulement les deux réglages Cloud acceptés.
+
 Demande explicite d’Ulrich : restaurer la continuité et les voix pour la
 présentation, sans nouvelle expérimentation ni longue campagne locale ; retirer
 les messages techniques et les pastilles de passage. Cible confirmée : preview
