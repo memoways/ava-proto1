@@ -225,8 +225,10 @@ export default function TestInvitationsTab() {
           </Button>
           <p className="text-xs text-muted-foreground">
             Le lien ne fonctionne que pendant la période choisie (du début de la première journée à
-            la fin de la dernière). Une fois activé, un seul navigateur peut lancer plusieurs
-            sessions jusqu’à la fin de la période.
+            la fin de la dernière).{" "}
+            {multiUse
+              ? "Chaque navigateur qui saisit le mot de passe peut lancer plusieurs sessions jusqu’à la fin de la période."
+              : "Une fois activé, un seul navigateur peut lancer plusieurs sessions jusqu’à la fin de la période."}
           </p>
         </CardContent>
       </Card>

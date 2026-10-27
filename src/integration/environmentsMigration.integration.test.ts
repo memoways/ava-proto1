@@ -130,6 +130,16 @@ describe("v0.26 environments migration", () => {
     const invitationsMigration = await readFile(invitationsMigrationUrl, "utf8");
     await db.exec(invitationsMigration);
     await db.exec(invitationsMigration);
+    // Later invitation changes live in the Lovable Cloud (Drizzle) migration chain.
+    for (const file of [
+      "0000_external_test_invitations_validity_period.sql",
+      "0001_external_test_invitations_multi_use.sql",
+      "0011_external_test_invitations_shared_access.sql",
+    ]) {
+      const sql = await readFile(new URL(`../../drizzle/migrations/${file}`, import.meta.url), "utf8");
+      await db.exec(sql);
+      await db.exec(sql);
+    }
   }, 30_000);
 
   afterEach(async () => db.close());
@@ -332,6 +342,76 @@ describe("v0.26 environments migration", () => {
     await expect(db.exec(`
       insert into public.sessions (test_invitation_id)
       values ('44444444-4444-4444-8444-444444444444')
+    `)).rejects.toThrow("active external test invitation required");
+  });
+
+  it("lets every tester of a shared invitation in during its validity period", async () => {
+    await db.exec(`
+      insert into auth.users (id, email, is_anonymous) values
+        ('${TESTER_USER}', null, true),
+        ('${SECOND_TESTER_USER}', null, true);
+      insert into public.admin_settings (key, value, environment_id) values
+        ('ava_test_invitation_setting', '{"source":"sandbox-benoit"}', 'sandbox-benoit');
+      insert into public.external_test_invitations (
+        id, environment_id, created_by_user_id, tester_label, code_hash, valid_from, expires_at, multi_use
+      ) values (
+        '55555555-5555-4555-8555-555555555555', 'sandbox-benoit', '${PROD_USER}',
+        'Groupe pilote', repeat('b', 64), clock_timestamp() + interval '1 hour',
+        clock_timestamp() + interval '2 days', true
+      );
+    `);
+    const redeem = (user: string) => db.query(`
+      select * from public.redeem_external_test_invitation(
+        '55555555-5555-4555-8555-555555555555', repeat('b', 64), '${user}'
+      )
+    `);
+
+    expect((await redeem(TESTER_USER)).rows).toHaveLength(0);
+    await db.exec(`
+      update public.external_test_invitations
+      set valid_from = clock_timestamp() - interval '1 hour'
+      where id = '55555555-5555-4555-8555-555555555555';
+    `);
+    expect((await redeem(TESTER_USER)).rows).toHaveLength(1);
+    expect((await redeem(SECOND_TESTER_USER)).rows).toHaveLength(1);
+    expect((await redeem(TESTER_USER)).rows).toHaveLength(1);
+
+    await db.exec(`
+      select set_config('request.jwt.claim.sub', '${SECOND_TESTER_USER}', false);
+      select set_config(
+        'request.jwt.claims',
+        '{"sub":"${SECOND_TESTER_USER}","is_anonymous":true}',
+        false
+      );
+      set role authenticated;
+    `);
+    const visibleSettings = await db.query<{ environment_id: string }>(`
+      select environment_id from public.admin_settings
+      where key = 'ava_test_invitation_setting'
+    `);
+    expect(visibleSettings.rows).toEqual([{ environment_id: "sandbox-benoit" }]);
+    await db.exec("reset role");
+
+    const attributed = await db.query<{ environment_id: string; context_type: string; tester_label: string }>(`
+      insert into public.sessions (test_invitation_id)
+      values ('55555555-5555-4555-8555-555555555555')
+      returning environment_id, context_type, tester_label
+    `);
+    expect(attributed.rows[0]).toEqual({
+      environment_id: "sandbox-benoit",
+      context_type: "user_test",
+      tester_label: "Groupe pilote",
+    });
+
+    await db.exec(`
+      update public.external_test_invitations
+      set revoked_at = now()
+      where id = '55555555-5555-4555-8555-555555555555'
+    `);
+    expect((await redeem(TESTER_USER)).rows).toHaveLength(0);
+    await expect(db.exec(`
+      insert into public.sessions (test_invitation_id)
+      values ('55555555-5555-4555-8555-555555555555')
     `)).rejects.toThrow("active external test invitation required");
   });
 });
