@@ -1,6 +1,6 @@
-# Reprise F3 — convenir du résultat, puis exécuter seulement ce résultat
+# Reprise F3 — démo fiable Max/Emma, objectif validé
 
-## 1. Première action : vérifier, puis fixer l’objectif
+## 1. Première action : vérifier l’état, conserver l’objectif convenu
 
 Projet : /Users/ulrich/CodeProjects/memoways/ava-proto1.
 Remote unique : https://github.com/memoways/ava-proto1.
@@ -10,13 +10,14 @@ Lire ensuite **seulement le résumé courant en tête** de
 `docs/plan_changement_interlocuteur_manuel.md`, jusqu’à « Historique conservé ».
 Les anciennes sections sont des preuves, pas des tâches à réimplémenter.
 
-Lire les dernières réponses d’Ulrich avant toute question. Le bilan du 27 octobre
-propose : **A, démo fiable Max/Emma d’abord** (recommandé), **B, réduction du délai
-CI**, **C, qualification F3 complète**. L’accord sur cette priorité est encore
-attendu au moment de rédaction ; ne pas présenter A comme acquis. Si aucune
-réponse n’est disponible, exposer ces trois objectifs et demander une seule
-priorité, sans commencer du code ou une nouvelle campagne de tests.
-Aucun lot suivant ne démarre par la simple lecture de ce prompt.
+**Décision d’Ulrich du 27 octobre 2026 : « Démo fiable Max/Emma d’abord ».**
+La priorité A est validée ; ne pas redemander de choisir entre démo, CI et F3
+complet. L’optimisation CI reste un chantier distinct ultérieur ; la qualification
+exhaustive ne doit pas être imposée à la démonstration.
+Le choix a été demandé « pour la reprise, sans la lancer maintenant » : ce tour
+l’enregistre seulement. Lorsqu’Ulrich lancera explicitement la reprise, préparer
+le parcours court ci-dessous ; aucun code par défaut, aucune publication implicite.
+Lire les dernières réponses pour éviter de refaire des validations déjà acquises.
 
 ## 2. État à préserver
 
@@ -43,9 +44,9 @@ Aucun lot suivant ne démarre par la simple lecture de ce prompt.
 - Ava/Léo, sortie incrémentale et interruption volontaire ne sont pas à activer
   pour finir la démo. Une fonction volontairement désactivée n’est pas un test « à faire ».
 
-## 3. Objectif A proposé : une version de démonstration, pas une nouvelle architecture
+## 3. Objectif A validé : une version de démonstration fiable
 
-Après accord sur A, demander un seul parcours réel court dans Sandbox Ulrich
+Lors du lancement explicite de la reprise, demander un seul parcours réel court dans Sandbox Ulrich
 (cible 10–15 minutes, pas un délai à attendre) : Max, mention d’Ava/Emma, passage
 accepté vers Emma, puis retour par grille. Observer les voix, les paroles entières,
 l’absence de mécanique technique et la continuité. Un refus naturel est légitime ;

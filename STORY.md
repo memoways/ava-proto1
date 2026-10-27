@@ -16,8 +16,9 @@ Codex, le couplage mal compris entre stratégie texte et garde d’entrée, et l
 75 min 49 s de CI du dernier correctif (dont deux passages après correction).
 Le prompt n’est plus une reprise de l’historique : il commence par l’accord sur
 un résultat, conserve les validations humaines et impose un arrêt après succès.
-Démo fiable, qualification complète et réduction du délai CI sont trois objectifs
-séparés à prioriser avec Ulrich. Aucun nouveau développement n’est lancé.
+Ulrich choisit ensuite « Démo fiable Max/Emma d’abord ». La priorité est actée ;
+l’optimisation CI reste séparée et ultérieure. Le prompt ne redemande plus ce
+choix. Aucun nouveau développement ou parcours de recette n’est lancé.
 
 ## F3 — restaurer la continuité pour la présentation
 
