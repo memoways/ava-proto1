@@ -42,3 +42,6 @@ réglages sandbox visibles, session attribuée, révocation effective.
 Livraison : la migration doit être appliquée par Lovable Cloud (aucune
 connexion Supabase directe). Les invitations partagées déjà générées
 redeviennent utilisables après application, sans régénération.
+
+Prompt Lovable de finalisation et publication :
+[prompt_lovable_invitations_multi_testeurs.md](prompt_lovable_invitations_multi_testeurs.md).
