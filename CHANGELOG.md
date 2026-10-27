@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Export Markdown des sessions — preview, non publié] — 2026-10-27
+
+- Données → Sessions : préparation puis téléchargement de la sélection, une ou
+  plusieurs conversations dans un fichier `.md`. Contexte, horodatages, compte,
+  testeur, moyennes/médiane/P95/max avec effectifs et origines distinctes,
+  incidents connus puis échanges chronologiques et métadonnées historiques.
+- Lectures admin seules, pagination des diagnostics, avertissement si une source
+  est indisponible. Aucun changement des voix, du gameplay ou de Lovable Cloud.
+- Vérification en preview connecté : deux sessions réelles, fichier de 813 487
+  octets, deux rapports, statistiques présentes, aucune erreur navigateur.
+- Fusion/CI GitHub non réalisées par cet environnement : état de livraison non
+  clôturé. La PR étrangère #24 est préservée. Production non publiée.
+- [Plan](docs/plan_export_sessions_markdown_2026-10-27.md).
+
 ## [Bilan F3 et reprise orientée résultat] — 2026-10-27
 
 - Choix reçu et enregistré : **démo fiable Max/Emma d’abord**. Le prompt conserve

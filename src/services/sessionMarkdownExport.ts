@@ -64,6 +64,14 @@ export function buildSessionMarkdown({ session, telemetry, warnings }: SessionEx
   let incidents = 0;
   function incident(label: string, value: unknown) { incidents++; lines.push(`- ${label} : ${cell(value)}`); }
   for (const warning of warnings) incident("Diagnostic incomplet", warning);
+  for (let index = 0; index < messages.length; index++) {
+    if (messages[index].role !== "user") continue;
+    const following: ExportRecord[] = [];
+    for (let next = index + 1; next < messages.length && messages[next].role !== "user"; next++) following.push(messages[next]);
+    if (!following.some(m => messageCharacter(m as { role?: string; spokenWith?: string }) && typeof m.content === "string" && m.content.trim())) {
+      incident(`Message utilisateur ${index + 1} — aucune réponse personnage enregistrée`, "Cause indéterminée : session en cours, raccrochage ou incident possible.");
+    }
+  }
   let turn = 0;
   for (const m of messages) {
     if (m.role === "user") turn++;
