@@ -39,8 +39,14 @@ chantier séparé ultérieur ; aucune qualification exhaustive imposée à la d�
   disponibilité clairement distinctes ; clignotement doux uniquement cliquable.
   Cette décision remplace l’ancienne présentation en lien texte sans capsule.
 - Base de ce lot visuel : main/Lovable 4871d9861617f715d78d340f1dd984e14592bbbc,
-  CI 40563547468 verte. La livraison de la capsule est à vérifier dans le résumé
-  courant du plan/CHANGELOG et GitHub avant tout nouvel essai.
+  CI 40563547468 verte. Capsule livrée par PR #102 dans main code
+  bf24b3765733d555fabdac88aed02d02827800e7, CI PR 40574690336 verte sur HEAD
+  exact dfb1edc5bd3e2954b04527592487b91a218051d8 (109 E2E sans retry), CI main
+  40578598650 verte (109 E2E sans retry) après une relance unique pour une
+  assertion asynchrone préexistante du tableau de latence. Aucun code modifié
+  pour la relance. Lovable synchronisé/prêt, composant et CSS relus identiques,
+  branche du lot supprimée. La clôture Markdown peut avancer main sans changer
+  ce code ; vérifier l’état courant avant tout nouvel essai.
 
 ## Invariants
 
@@ -65,6 +71,8 @@ puis raccrocher → grille → rappeler Max dans la même expérience. Le passag
 Max → Emma déjà réussi n’est pas à requalifier intégralement. Si besoin d’un
 nouveau passage pour voir la capsule, ne forcer ni seuil ni accord. Un refus
 naturel est légitime et ne doit pas bloquer la grille.
+Ulrich a confirmé « Non, pas encore » à la question du rappel depuis la grille ;
+ne pas le tenir pour acquis ni lui redemander si cet ancien essai le couvrait.
 Preview : https://id-preview--1265958d-b74e-40f2-917d-182fe05163fc.lovable.app/?env=sandbox-ulrich
 
 Ulrich juge ce qu’il entend et voit ; Codex relit les métadonnées de la session.

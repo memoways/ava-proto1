@@ -17,7 +17,16 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   [prompt de finalisation humaine](docs/prompt_reprise_fiabilite_passage_personnages_lot_f3_finalisation.md).
   Qualité locale verte : 71 régressions, 1 083 unitaires, 42 intégrations,
   lint/typage/build ; six E2E ciblés sans retry, captures 390/1280 px relues.
-  Livraison technique et CI suivies par la PR du lot ; publication distincte.
+  [PR #102](https://github.com/memoways/ava-proto1/pull/102) fusionnée dans main
+  `bf24b3765733d555fabdac88aed02d02827800e7` après CI PR 40574690336 verte sur
+  HEAD exact `dfb1edc` : 109 E2E sans retry (20,9 min). Branche propre supprimée,
+  Lovable synchronisé/prêt, composant et CSS relus identiques. CI main 40578598650 :
+  première tentative arrêtée avant E2E par l’assertion asynchrone préexistante de
+  LatencyBlockingTab (1082/1083 unitaires) ; unique relance **verte**, qualité
+  complète et 109 E2E sans retry (20,2 min). Huit tests ciblés du tableau verts
+  localement, aucun code modifié pour la relance. Ulrich confirme que le rappel
+  depuis la grille n’a pas encore été essayé : ce complément et l’acceptation
+  de la capsule/démo restent à recueillir ; aucune publication.
 
 ## [Export Markdown des sessions — preview, non publié] — 2026-10-27
 
