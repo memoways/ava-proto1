@@ -1625,7 +1625,7 @@ test('lot 2 : reprise recharge seulement une offre prouvée, sans sonnerie autom
   await expect(page.getByRole('img', { name: 'Portrait d’Emma' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Appeler Max', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Appeler Max', exact: true }).getByRole('img'))
-    .toHaveAttribute('src', 'https://portraits.example/max-runtime.jpg');
+    .toHaveCount(0);
   await expect(page.getByText('Appel en cours…', { exact: true })).toHaveCount(0);
   expect(fakes.getExperienceEvents().filter(e => e.event_type === 'handoff_executed')).toHaveLength(0);
 });
@@ -1912,7 +1912,7 @@ for (const handsFree of [false, true]) {
 for (const [width, reducedMotion, character, target] of [
   [390, 'reduce', 'Emma', 'Max'], [1280, 'no-preference', 'Max', 'Emma'],
 ] as const) {
-  test(`lot 3 : pastille accessible ${width}px, ${reducedMotion}, clavier et révocation`, async ({ page }) => {
+  test(`lot 3 : action texte accessible ${width}px, ${reducedMotion}, clavier et révocation`, async ({ page }) => {
     test.setTimeout(45_000);
     await page.setViewportSize({ width, height: 844 });
     await page.emulateMedia({ reducedMotion });
@@ -1939,7 +1939,7 @@ for (const [width, reducedMotion, character, target] of [
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     const pulse = call.locator('[aria-hidden=true]');
-    await expect(pulse).toHaveCSS('animation-name', reducedMotion === 'reduce' ? 'none' : 'pulse');
+    await expect(pulse).toHaveCount(0);
     await call.focus();
     await expect(call).toBeFocused();
     expect(await call.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');

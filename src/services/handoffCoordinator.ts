@@ -20,7 +20,8 @@ export function needsHandoffPreparation(text: string): boolean {
   // Hold an actual offer by the current speaker, never a name, a past event,
   // or an unrelated verb in another sentence. GM still validates consent.
   return s.split(/[.!?;\n]+/).some(clause =>
-    /\bje\s+(?:(?:vais|peux|pourrais|pourrai)\s+)?(?:te|vous)\s+(?:(?:le|la|les)\s+)?(?:passe|passer|transfere|transferer|connecte|connecter)\b/.test(clause)
+    /\bje\s+(?:(?:vais|peux|pourrais|pourrai)\s+(?:aller\s+)?)?(?:(?:le|la|les)\s+|l')(?:appel(?:le|er)|cherche(?:r)?|joins|joindre|contacte(?:r)?|passe(?:r)?|transfere(?:r)?)\b/.test(clause)
+    || /\bje\s+(?:(?:vais|peux|pourrais|pourrai)\s+)?(?:te|vous)\s+(?:(?:le|la|les)\s+)?(?:passe|passer|transfere|transferer|connecte|connecter)\b/.test(clause)
     || /\bje\s+(?:vais|peux|pourrais|pourrai)\s+(?:(?:le|la|les)\s+)?(?:appeler|joindre|contacter|chercher)\s*(?:max|emma|pour\s+(?:toi|vous))?\s*$/.test(clause.trim())
     || /\bje\s+(?:vais|peux|pourrais|pourrai)\s+(?:appeler|joindre|contacter|chercher)\s+(?:max|emma)\b/.test(clause)
     || /\bje\s+(?:(?:vais|peux|pourrais)\s+)?(?:te|vous)\s+(?:mets|mettre)\s+(?:en\s+relation|en\s+ligne)\b/.test(clause)

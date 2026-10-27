@@ -29,6 +29,14 @@ Ne pas restaurer tout le dépôt à une ancienne version. Lire le plan et GitHub
 pour le SHA réellement livré depuis : ce prompt est commité AVANT la CI du
 correctif urgent, branche codex/ava-f3-voice-restore.
 
+La PR urgente est #98. Première CI 40484077097 sur 83ca585 : qualité verte
+(1 070 unitaires, 42 intégrations, 71 régressions), mais cinq échecs E2E sur
+109. Ne pas fusionner ce HEAD rouge. Complément sur la même branche : préserver
+les annonces réelles « je vais l’appeler » et « je vais aller le chercher » ;
+adapter trois assertions de l’ancienne pastille au choix texte sans animation.
+137 tests ciblés verts après correction ; vérifier dans le plan la nouvelle CI
+et les cinq replays ciblés, puis fusionner seulement le HEAD exact vert.
+
 Retour Cineforom : session 4e018bd3-71d8-4967-b4fb-2d5d72c1da48,
 27 octobre 10:33:53 Paris. 12 entrées ; deux tours Max completed, puis
 Max interrupted/cancelled et Emma interrupted/interrupted/cancelled.

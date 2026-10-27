@@ -19,6 +19,8 @@ describe('F1 request lifetime and delivered exchanges', () => {
   });
   it.each(['Je vais la chercher.', 'Je vais chercher Emma.', 'Je vais chercher Max.',
     'Je te passe Emma.', 'D’accord, je te la passe.', 'Je vais appeler Max.',
+    'Je vais l’appeler. C’est Max, pas Matt.',
+    'Je vais aller le chercher dans le salon et lui dire que vous voulez lui parler directement.',
     'Tu peux appeler Emma.', 'Je peux te mettre en relation avec Emma.'])('still holds an actual transfer candidate: %s', text => {
     expect(needsHandoffPreparation(text)).toBe(true);
   });

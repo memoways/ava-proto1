@@ -65,6 +65,22 @@ corrigée dans la fixture ; un démarrage Vite a été refusé par la sandbox, r
 avec autorisation système. Pas de modification d’algorithme audio ni de nouvelle
 campagne E2E complète locale. Livraison PR/CI puis main/synchronisation à vérifier.
 
+Première CI urgente [40484077097](https://github.com/memoways/ava-proto1/actions/runs/40484077097)
+sur `83ca58544f170f00b2f8b64dd20315abf9f889ae` : qualité verte (1 070 unitaires,
+42 intégrations, 71 régressions, lint/typage/build), mais 104 E2E verts et cinq
+échecs. Deux vraies formulations de passage ont été trop resserrées :
+« je vais l’appeler » et « je vais aller le chercher » ; trois contrôles
+attendaient encore le portrait/pulse retirés par demande humaine. Corriger la
+garde pour conserver ces annonces avec pronoms et adapter les assertions
+de présentation, sans enlever accès clavier, révocation ou reprise de l’offre.
+Rejouer les cinq échecs sur code figé avant le push correctif ; ne pas présenter
+ce premier passage rouge comme livré. Pas de fusion ni de publication sur ce HEAD.
+Après correction : typage vert, 137 tests ciblés verts et les cinq E2E identifiés
+verts sans retry sur code figé (56,4 s). Une faute initiale de variante
+appeler/appelle a été repérée par le test ciblé T10 et corrigée avant ce replay.
+Les deux vrais transferts, la reprise et les actions clavier/révocation restent
+vérifiés ; code prêt pour la CI du nouveau HEAD de la même PR #98.
+
 ## F3 — recette humaine engagée, publication en attente
 
 ### Second retour réel PTT — frontière personnage / mécanique
