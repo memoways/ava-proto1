@@ -2,6 +2,9 @@
 
 ## En cours
 
+- Export Markdown des sessions sélectionnées : contexte complet, moyennes de latence,
+  conversation chronologique et incidents enregistrés ; vérifier téléchargement et tests.
+
 - Correctif QA du 25 octobre vérifié : 46 tests ciblés verts, compilation
   Lovable verte ; tours Max/Emma préservés si lecture de rugosité indisponible.
   Attend écoute réelle, publication et clôture GitHub (hors de cette vérification).
