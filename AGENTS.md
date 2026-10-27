@@ -107,6 +107,13 @@ Cursor, Lovable, autres). Ne jamais attendre qu'il la répète, ne jamais demand
 - **Autorisation durable :** fusionner dans `main` une PR dont la CI est verte sur le HEAD exact
   est autorisé sans redemander. Cela ne publie pas : la **publication de production via Lovable
   reste une étape distincte**, annoncée comme telle (local ≠ GitHub ≠ staging ≠ production).
+- **Pousser jusqu'à `main` avant de rendre la main (Ulrich, 27 octobre 2026).** À la fin
+  d'un développement, l'agent pousse, attend lui-même la CI dans la même session et
+  fusionne dans `main` dès qu'elle est verte. Il ne livre jamais à Ulrich ni à Lovable
+  un prompt, un test ou une action qui dépend d'une PR non fusionnée : un prompt Lovable
+  cite le SHA de `main` qui contient le correctif. Tout ce que le lot doit contenir
+  (code, tests, plan, prompts) est commité **avant** le premier push : un commit ajouté
+  pendant que la CI tourne la relance et retarde la livraison d'environ 20 minutes.
 - **Si une étape ne peut pas être faite** (droit refusé, CI bloquée, conflit non résolu) :
   le lot n'est PAS terminé. Le dire en tête du compte rendu, avec l'unique action précise
   que doit faire Ulrich. Ne jamais écrire « terminé » avec des branches ou PR qui restent.
