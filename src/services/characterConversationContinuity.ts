@@ -80,6 +80,13 @@ export function characterRecoveryLine(character: RuntimeCharacter, history: Conv
   return unusedLine(recoveryLines[character], character, history);
 }
 
+/** A withheld transfer stays in the scene: no technical status, invented consent or audio outage. */
+export function characterHandoffPauseLine(character: RuntimeCharacter, history: ConversationMessage[]): string {
+  return unusedLine(character === 'max'
+    ? ['Attendez. Qu’est-ce que vous voudriez lui dire ?', 'De quoi voulez-vous lui parler, au juste ?']
+    : ['Attendez… Qu’est-ce que vous voulez lui dire ?', 'Qu’est-ce qui vous amène à vouloir lui parler ?'], character, history);
+}
+
 export function characterHandoffGreeting(target: RuntimeCharacter, from: RuntimeCharacter, history: ConversationMessage[]): string {
   const source = characterDisplayName(from);
   const returning = hasSpokenWithCharacter(history, target);

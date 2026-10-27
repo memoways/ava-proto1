@@ -723,6 +723,9 @@ async function installNetworkFakes(
     getGmFilmContexts: () => gmFilmContexts,
     getTtsCallCount: () => ttsCallCount,
     getTtsText: () => ttsTexts.join(" "),
+    getTtsSubmittedText: async () => options.incrementalOutput
+      ? page.evaluate(() => (window as Window & { __e2eGradiumTexts?: string[] }).__e2eGradiumTexts?.join(' ') ?? '')
+      : ttsTexts.join(' '),
     getPosthogRequestCount: () => posthogRequestCount,
     getTraceUploadStarted: () => traceUploadStarted,
     getTraceUploadCompleted: () => traceUploadCompleted,
@@ -752,13 +755,14 @@ async function startCharacterConversation(page: Page, character: "Max" | "Emma",
   await expect(page.getByRole("button", { name: /^Appeler / })).toHaveCount(0);
 }
 
-async function sendHandoffTurn(page: Page, text: string) {
+async function sendHandoffTurn(page: Page, text: string, incrementalOutput = false) {
   await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
   const before = await page.evaluate(() =>
     (window as Window & { __e2eAudioState?: { ended: number } }).__e2eAudioState?.ended ?? 0);
   await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
   await expect(page.getByText(text, { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Arrêter l'enregistrement" }).press("Enter");
+  if (incrementalOutput) return; // PCM playback is verified by its delivery receipt, not HTMLAudioElement.ended.
   await expect.poll(() => page.evaluate(() =>
     (window as Window & { __e2eAudioState?: { ended: number } }).__e2eAudioState?.ended ?? 0), { timeout: 20_000 }).toBeGreaterThan(before);
 }
@@ -2117,6 +2121,50 @@ for (const source of ['Max', 'Emma'] as const) {
   });
 }
 
+
+for (const source of ['Max', 'Emma'] as const) for (const incrementalOutput of [false, true]) {
+  test(`F3 ${source} ${incrementalOutput ? 'progressif' : 'batch'}: une recherche de solution reste une réponse dans la scène`, async ({ page }) => {
+    const target = source === 'Max' ? 'Emma' : 'Max';
+    const question = `Est-ce que je peux parler avec ${target} ?`;
+    const reply = `Je cherchais une solution. ${target} ne sait plus quoi en penser.`;
+    const fakes = await installNetworkFakes(page, [question], { ttsSuccess: true,
+      characterOpenings: true, incrementalOutput, characterReplies: [reply] });
+    await startCharacterConversation(page, source);
+    await sendHandoffTurn(page, question, incrementalOutput);
+    await expect.poll(fakes.getTtsSubmittedText).toContain(reply);
+    await expect.poll(() => fakes.getSessionRow().conversation_log).toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: source.toLowerCase(), content: reply,
+        delivery: expect.objectContaining({ status: 'completed', generated: reply, delivered: reply }) }),
+    ]));
+    expect(await fakes.getTtsSubmittedText()).not.toMatch(/passage|réessayer|pas prêt|game master/i);
+    await expect(page.getByRole('button', { name: /^Appeler / })).toHaveCount(0);
+    expect(fakes.getSessionRow().handoff_count).toBe(0);
+  });
+
+  test(`F3 ${source} ${incrementalOutput ? 'progressif' : 'batch'}: une préparation bloquée ne fait entendre ni mécanique ni promesse`, async ({ page }) => {
+    const target = source === 'Max' ? 'Emma' : 'Max';
+    const question = `Je voudrais parler avec ${target}.`;
+    const promise = `Je te passe ${target}.`;
+    const fakes = await installNetworkFakes(page, [question], { ttsSuccess: true,
+      characterOpenings: true, incrementalOutput, gmReferencedAssessment: true,
+      gmStance: 'accept', gmHandoffAt: 1, characterReplies: [promise] });
+    await startCharacterConversation(page, source);
+    await sendHandoffTurn(page, question, incrementalOutput);
+    await expect.poll(fakes.getTtsSubmittedText).toMatch(/\?/);
+    const spoken = await fakes.getTtsSubmittedText();
+    expect(spoken).not.toContain(promise);
+    expect(spoken).not.toMatch(/passage|réessayer|pas prêt|game master|seuil|quota/i);
+    expect(spoken).toContain('?');
+    await expect.poll(() => fakes.getSessionRow().conversation_log).toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: source.toLowerCase(), content: expect.stringMatching(/\?/),
+        delivery: expect.objectContaining({ status: 'completed' }) }),
+    ]));
+    await expect.poll(() => (fakes.getSessionRow().gm_post_turn_log as Array<Record<string, unknown>> | undefined)?.at(-1))
+      .toMatchObject({ action: { type: 'none' }, handoff_assessment: null, speech_state_played: null, memory_delta: null });
+    await expect(page.getByRole('button', { name: /^Appeler / })).toHaveCount(0);
+    expect(fakes.getSessionRow().handoff_count).toBe(0);
+  });
+}
 
 for (const source of ['Max', 'Emma'] as const) {
   test(`F3 ${source}: une question sur un échange passé ne prépare pas de transfert`, async ({ page }) => {

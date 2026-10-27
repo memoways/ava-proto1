@@ -57,7 +57,7 @@ import {
   normalizeSessionDurationSeconds,
 } from "@/config/experienceRuntime";
 import { buildExperienceFrame } from "@/services/experienceFrame";
-import { canRetryCharacterResponse, characterRecoveryLine, latestCallTransfer } from './characterConversationContinuity';
+import { canRetryCharacterResponse, characterRecoveryLine, characterHandoffPauseLine, latestCallTransfer } from './characterConversationContinuity';
 import { validateRecoverySpeech } from './responseIntentStream';
 import type { ConversationMessage, ConversationTurnTraceV1, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 
@@ -131,6 +131,8 @@ export interface PRD4TurnInput {
 
 export interface PRD4TurnResult {
   maxResponse: string;
+  /** The original candidate must stay withheld; consumers render only maxResponse. */
+  handoffPreparationBlocked: boolean;
   speechPerformanceContext?: { state: string | null; rugosite: number; states: string[] };
   timings: {
     rag_ms: number;
@@ -505,6 +507,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   // Transfers alone await preparation. Ordinary turns keep their streaming path.
   let candidateResult: PRD4PostTurnDetailedResult | null = null;
   let candidateReleased = false;
+  let handoffPreparationBlocked = false;
   if (input.prepareHandoff && (needsHandoffPreparation(maxResponse) || input.handoffRequested
     || (input.handoffOpenRequest && /^(?:oui|d[’']accord|ok(?:ay)?|bien s[uû]r)[ .!…]*$/i.test(maxResponse.trim())))) {
     const preparationStartedAt = performance.now();
@@ -526,13 +529,17 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         execution_status: 'failed', execution_reason: 'client_timeout', character_key: activeCharacter, turn_index: turnIndex,
         orchestration_version_id: frameRuntime.versionId };
     }
-    if (!candidateReleased) maxResponse = "Le passage n’est pas prêt. Tu peux réessayer ou continuer avec moi.";
+    if (!candidateReleased) {
+      handoffPreparationBlocked = true;
+      maxResponse = characterHandoffPauseLine(activeCharacter, input.conversationHistory);
+      if (input.playedSpeechStateRef) input.playedSpeechStateRef.current = null;
+    }
   }
   const finishPostTurn = () => candidateResult
     ? (input.handoffDelivery ?? Promise.resolve(undefined)).then(receipt => commitHandoffCandidate({
       sessionId: input.sessionId, signal: input.postTurnSignal ?? input.signal,
       userText: input.userMessage, openRequest: input.handoffOpenRequest ?? null,
-      speechStatePlayed: selectSpeechState(input.playedSpeechStateRef?.current ?? maxResult?.responseIntent?.parole, speechStates) }, candidateResult!, receipt, candidateReleased))
+      speechStatePlayed: candidateReleased ? selectSpeechState(input.playedSpeechStateRef?.current ?? maxResult?.responseIntent?.parole, speechStates) : null }, candidateResult!, receipt, candidateReleased))
     : runPostTurn();
   // En diagnostic, le post-tour (qui prépare la suite et écrit son propre log)
   // ne démarre qu'après la mise en file locale durable de la réponse.
@@ -635,7 +642,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       response: {
         rawLlmResponse: maxResult?.response ?? null,
         deliveredResponse: input.streamControl ? "" : maxResponse,
-        source: identityGuard.blocked ? "identity_guard" : maxResult ? "llm" : "fallback",
+        source: identityGuard.blocked ? "identity_guard" : handoffPreparationBlocked ? "fallback" : maxResult ? "llm" : "fallback",
         identityGuardReason: identityGuard.reason,
       },
       gm: {
@@ -738,7 +745,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
 
   return {
     maxResponse,
-    speechPerformanceContext: { state: maxResult && !identityGuard.blocked ? selectSpeechState(input.playedSpeechStateRef?.current ?? maxResult.responseIntent?.parole, speechStates) : null, rugosite, states: speechStates.map(state => state.name) },
+    handoffPreparationBlocked,
+    speechPerformanceContext: { state: maxResult && !identityGuard.blocked && !handoffPreparationBlocked ? selectSpeechState(input.playedSpeechStateRef?.current ?? maxResult.responseIntent?.parole, speechStates) : null, rugosite, states: speechStates.map(state => state.name) },
     timings: {
       rag_ms,
       max_ms,

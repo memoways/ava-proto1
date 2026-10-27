@@ -17,8 +17,12 @@ export function candidateEvidence(text: string, turnId: string, turnIndex: numbe
 /** A conservative OUTPUT HOLD, never a grant of consent. GM still decides semantics. */
 export function needsHandoffPreparation(text: string): boolean {
   const s = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  return /\b(?:pass\w*|appel\w*|joind\w*|contact\w*|cherch\w*|transfer\w*|connect\w*|met\w*.{0,24}(?:relation|ligne))\b/.test(s)
+  const contact = /\b(?:pass\w*|appel\w*|joind\w*|contact\w*|transfer\w*|connect\w*|met\w*.{0,24}(?:relation|ligne))\b/.test(s)
     && /\b(?:max|emma|telephone|ligne|le|la|lui|il|elle)\b/.test(s);
+  // Searching for a solution is ordinary dialogue, even if another sentence
+  // mentions Emma/Max. Searching for the person still holds the output.
+  const fetchingPerson = /\b(?:(?:le|la|les)\s+cherch\w*|cherch\w*\s+(?:max|emma))\b/.test(s);
+  return contact || fetchingPerson;
 }
 export { withdrawsHandoff } from './characterConversation';
 

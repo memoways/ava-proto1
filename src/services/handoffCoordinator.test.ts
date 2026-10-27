@@ -1,10 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { ConversationMessage } from '@/types';
-import { HandoffCoordinator, completedCallExchanges, candidateEvidence, withdrawsHandoff } from './handoffCoordinator';
+import { HandoffCoordinator, completedCallExchanges, candidateEvidence, withdrawsHandoff, needsHandoffPreparation } from './handoffCoordinator';
 import { advanceHandoffTurn, assessHandoffTurn, restoreHandoffOffer } from './characterHandoffState';
 import { validInput } from './characterHandoff.fixtures';
 
 describe('F1 request lifetime and delivered exchanges', () => {
+  it.each([
+    'Je cherchais une solution. Elle m’a demandé de la laisser tranquille.',
+    'Je cherche une réponse. Max est inquiet.',
+  ])('does not mistake an ordinary search for a transfer: %s', text => {
+    expect(needsHandoffPreparation(text)).toBe(false);
+  });
+  it.each(['Je vais la chercher.', 'Je vais chercher Emma.', 'Je vais chercher Max.',
+    'Je te passe Emma.'])('still holds an actual transfer candidate: %s', text => {
+    expect(needsHandoffPreparation(text)).toBe(true);
+  });
   it('uses the same lease for any registry member and rejects a replaced request/call/version', () => {
     const coordinator = new HandoffCoordinator<'one' | 'two' | 'three'>();
     for (const character of ['one', 'two', 'three'] as const) {

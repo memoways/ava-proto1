@@ -24,6 +24,22 @@ Référence : [plan canonique](plan_changement_interlocuteur_manuel.md).
 
 ## Conduite de la recette
 
+Le correctif F3 est fusionné par [PR #93](https://github.com/memoways/ava-proto1/pull/93)
+en `e38b189d080457ba2090882ea3cb43e453183a31` ; CI PR verte (101 E2E sans retry),
+CI main verte (101 E2E sans retry), Lovable synchronisé/prêt et source relue identique.
+Un complément vocal est maintenant requis après l'échec humain PTT ci-dessous ;
+vérifier sa livraison avant de refaire une recette sur la preview.
+La sandbox était mains libres selon lecture native Lovable. Pour le
+PTT dédié : admin preview → vérifier Sandbox Ulrich → Expérience → Orchestration →
+désactiver « Conversation mains libres » → Enregistrer. Démarrer ensuite une
+nouvelle expérience : la reprise d'un ancien appel restaure sa modalité épinglée.
+Ulrich confirme ce choix effectué (« fait »), et la relecture native confirme
+enabled=false, sortie progressive/interface voix seule toujours activées. Une
+nouvelle expérience PTT avec Max a été faite : Ulrich a formulé une demande
+directe d'Emma, pas la question sur un échange passé. Codex n'a modifié aucun réglage Cloud.
+Conserver tous les autres réglages. Réactiver les mains libres
+avant l'expérience dédiée suivante.
+
 Commencer par une expérience PTT avec Max, puis refaire la matrice dans une
 nouvelle expérience mains libres. Chaque expérience garde son ID, son choix de
 film et sa version entre tous ses appels. Noter pour chaque modalité : heure,
@@ -87,8 +103,17 @@ ne pas désactiver de personnage ni modifier les réglages partagés pour la rec
   zéro segment échoué. Premier son mesuré 18 251 ms après transcript final.
   Contenu initial non conservé dans la trace finale, cause amont non démontrée.
   Aucun défaut audible remarqué par Ulrich ; pas de correction spéculative du parseur.
-- Correction ciblée du faux déclenchement Max/Emma en cours de livraison ;
-  recette à reprendre sur la nouvelle preview après synchronisation vérifiée.
+- Premier correctif Max/Emma fusionné et synchronisé ; CI main verte, 101 E2E
+  sans retry. Le cas de question passée n'a pas encore été rejoué humainement.
+- Session PTT dédiée `fb0e8b40-432d-4aab-8564-ec88f96e4e66`, début 08:34:41
+  Europe/Paris, v7, handsFree épinglé false. Accueil et réponses audibles,
+  mais T2 prononce une indication technique de préparation rejetée par Ulrich.
+  Il avait demandé à parler à Emma. Zéro transfert ; aucun critère de consentement
+  validé. La trace confirme une réponse narrative normale remplacée par l'app,
+  après confusion entre recherche de solution et recherche de l'autre personnage.
+  **Échec de la frontière personnage/mécanique**, complément F3 à livrer puis
+  nouvelle écoute requise. Le personnage ne doit pas traiter quatre échanges
+  comme une confiance acquise ni exposer seuil, préparation ou réessai technique.
 - Acceptation humaine F3 : en attente d’Ulrich, après observations des deux modalités.
 - Autorisation explicite de publication : absente. Production inchangée par F3.
 

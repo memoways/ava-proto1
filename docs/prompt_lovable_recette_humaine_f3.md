@@ -13,8 +13,10 @@ F3 seulement : aider Ulrich à accéder à la recette humaine sandbox-ulrich.
 Base documentaire au démarrage : main 3b20b90288ee73824f235de7fcf79b2c96c1a656,
 code F2 d59d51055222d46508e598cedcfb00886412e524 (#90), préparation #92.
 Le correctif F3 de faux transfert après une question sur un échange passé est
-suivi dans docs/plan_changement_interlocuteur_manuel.md. Vérifier sa livraison
-et le SHA courant ; ne pas demander d'écoute sur un ancien frontend.
+fusionné par PR #93 en e38b189d080457ba2090882ea3cb43e453183a31 ; CI PR verte,
+CI main verte, Lovable synchronisé/prêt et source corrigée identique. Vérifier
+les preuves finales dans docs/plan_changement_interlocuteur_manuel.md et le SHA
+courant ; ne pas demander d'écoute sur un ancien frontend.
 Lire le main réel actuel : une clôture documentaire F3 peut l’avoir avancé.
 Ne restaurer aucune ancienne révision. Vérifier que Lovable est synchronisé
 sur main et ready, puis ouvrir sa preview avec env=sandbox-ulrich&diagnostic=full.
@@ -22,7 +24,21 @@ Accès alternatif authentifié : admin → Sandbox Ulrich → Tester moi-même.
 
 Vérifier le badge sandbox-ulrich et la version épinglée v7
 98145fe3-96f1-4525-84c2-0e0a1cc5c6da (Max/Emma, seuil 4, pause 2, quota 8).
-Ne changer aucun réglage, prompt éditorial, secret, migration ou Edge Function.
+Ulrich a désactivé « Conversation mains libres » puis Enregistrer dans
+admin preview → Sandbox Ulrich → Expérience → Orchestration. Relecture native :
+enabled=false, sortie progressive et interface voix seule toujours activées.
+Ne pas lui redemander ce choix. La session PTT fb0e8b40-432d-4aab-8564-ec88f96e4e66
+est audible mais a fait prononcer par Max une phrase technique de préparation,
+rejetée par Ulrich. Il avait demandé directement Emma, pas posé la question sur
+un échange passé. Complément vocal F3 en cours : le terminer/vérifier dans le
+plan, puis synchroniser la preview avant nouvelle recette. Ne modifier aucune
+fiche Notion pour masquer cette phrase injectée par l'app. Après correction,
+nouvelle expérience PTT et demande précoce d'Emma : réponse dans le personnage,
+aucune mécanique prononcée, aucune promesse non préparée. Rejouer ensuite le cas
+de question passée séparément. Vérifier les réponses récentes avant de redemander.
+La reprise restaure l'ancien mode épinglé. Garder les autres réglages inchangés ; réactiver les
+mains libres pour l'expérience dédiée suivante. Aucune mutation Cloud par Codex.
+Ne changer aucun prompt éditorial, secret, migration ou Edge Function.
 Ne pas publier la production. Si un écart empêche l’accès, le rapporter avant
 toute correction. Aucun second agent ni nouveau chat automatique.
 

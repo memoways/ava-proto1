@@ -1622,7 +1622,7 @@ const IndexPRD4 = () => {
 
         if (!isCurrentTurn()) return;
         if (heldOutput && streamedVoice) {
-          if (result.maxResponse === 'Le passage n’est pas prêt. Tu peux réessayer ou continuer avec moi.') {
+          if (result.handoffPreparationBlocked) {
             streamedVoice.onEvent({ type: 'reset' });
             streamedVoice.onEvent({ type: 'segment', text: result.maxResponse });
             streamedVoice.onEvent({ type: 'complete', response: result.maxResponse });

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/agents/maxAgent", async (importOriginal) => ({
   ...await importOriginal<typeof import('@/agents/maxAgent')>(), simulateMaxResponse: vi.fn(),
 }));
-vi.mock("@/agents/gameMasterPRD4", () => ({ evaluatePostTurnPRD4: vi.fn() }));
+vi.mock("@/agents/gameMasterPRD4", () => ({ evaluatePostTurnPRD4: vi.fn(), commitHandoffCandidate: vi.fn() }));
 vi.mock("@/services/experienceOrchestration", () => ({
   fetchPinnedDirectorRuntime: vi.fn(async () => ({ versionId: "gm-v1", versionNumber: 1, prompt: "DIRECTOR", config: null })),
   fetchCharacterSpeechRuntime: vi.fn(async () => ({ rugosite: 0, settingsVersion: "test-v1", environmentId: "sandbox-ulrich", recentStates: [] })),
@@ -66,7 +66,7 @@ vi.mock("@/services/characterPromptService", () => ({
 }));
 
 import { simulateMaxResponse } from "@/agents/maxAgent";
-import { evaluatePostTurnPRD4 } from "@/agents/gameMasterPRD4";
+import { evaluatePostTurnPRD4, commitHandoffCandidate } from "@/agents/gameMasterPRD4";
 import { queryRAGDetailed } from "@/services/ragService";
 import { enqueueConversationTurnTrace, patchQueuedConversationTurnTrace } from "@/services/conversationTraceOutbox";
 import { materializeConversationTurnTrace } from "@/services/conversationTraceFormat";
@@ -194,9 +194,28 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     });
     vi.mocked(simulateMaxResponse).mockResolvedValue({ response: "Je vous écoute.", systemPrompt: "system" });
     vi.mocked(evaluatePostTurnPRD4).mockResolvedValue(postTurnResult);
+    vi.mocked(commitHandoffCandidate).mockResolvedValue({ ...postTurnResult, action: { type: 'none' }, handoff_assessment: null });
     vi.mocked(summarizeSessionAsync).mockResolvedValue();
     vi.mocked(enqueueConversationTurnTrace).mockResolvedValue({ durable: true, enqueueMs: 3 });
     vi.mocked(patchQueuedConversationTurnTrace).mockResolvedValue();
+  });
+
+  it.each([MAX_CONTEXT, EMMA_CONTEXT])('F3 $characterKey never speaks technical preparation mechanics', async characterContext => {
+    const promise = characterContext.characterKey === 'max' ? 'Je te passe Emma.' : 'Je te passe Max.';
+    const playedSpeechStateRef = { current: 'Bloqué' as string | null };
+    vi.mocked(simulateMaxResponse).mockResolvedValueOnce({ response: promise, systemPrompt: 'system',
+      responseIntent: { goal: 'Passer l’appel', points: [], parole: 'Bloqué' } });
+    const result = await processPRD4Turn({ sessionId: 'session', characterContext,
+      conversationHistory: [], userMessage: 'Je peux lui parler ?', userRole: null,
+      timeElapsedSeconds: 10, handoffRequested: true, playedSpeechStateRef, prepareHandoff: async () => false });
+    expect(result.maxResponse).not.toMatch(/passage|prêt|réessay|mécanique|game master|seuil|quota/i);
+    expect(result.maxResponse).not.toBe(promise);
+    expect(result.maxResponse).toContain('?');
+    expect(result).toMatchObject({ handoffPreparationBlocked: true });
+    expect(playedSpeechStateRef.current).toBeNull();
+    expect(result.speechPerformanceContext?.state).toBeNull();
+    await result.postTurnPromise;
+    expect(commitHandoffCandidate).toHaveBeenCalledWith(expect.anything(), expect.anything(), undefined, false);
   });
 
   it('F1: ordinary continuation with an open request returns before GM, with one existing call', async () => {
