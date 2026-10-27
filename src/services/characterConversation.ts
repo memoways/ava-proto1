@@ -112,8 +112,11 @@ export function detectPlayerSwitchRequest(
 ): RuntimeCharacter | null {
   const text = normalizeSwitchText(userText);
   if (!text.trim()) return null;
+  // Accent folding turns "parlé" into "parle". That isolated conjugated form
+  // also describes a past conversation, so it cannot seed a transfer request.
+  // Keep the infinitive and the explicit player requests/commands below.
   const patterns = [
-    /(?:parler|parle|parlez|discuter|appeler|appelle|appelez|joindre|passer|passe|passez|contacter|contacte)\s+(?:a|à|avec|au)\s+(emma|max|papa|pere|père)/i,
+    /(?:parler|parlez|discuter|appeler|appelle|appelez|joindre|passer|passe|passez|contacter|contacte)\s+(?:a|à|avec|au)\s+(emma|max|papa|pere|père)/i,
     /(?:je (?:veux|voudrais|aimerais)|j['’]aimerais|on (?:peut|pourrait))\s+(?:(?:bien|juste)\s+)?(?:parler|discuter|appeler).{0,24}(emma|max|papa|pere|père)/i,
     /(?:passe[- ]moi|file[- ]moi|donne[- ]moi)\s+(emma|max|papa|pere|père)/i,
     /(?:je (?:veux|voudrais)|j['’]aimerais)\s+(?:voir|avoir)\s+(emma|max|papa|pere|père)/i,

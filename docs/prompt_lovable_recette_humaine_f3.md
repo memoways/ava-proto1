@@ -10,8 +10,11 @@ Workspace Memoways : 5glbtPltldwz9tgNwIi4.
 Repo unique : https://github.com/memoways/ava-proto1.
 F3 seulement : aider Ulrich à accéder à la recette humaine sandbox-ulrich.
 
-Base vérifiée au démarrage : main b642e406c660418a30a90b064073761078c9c4e2,
-code F2 d59d51055222d46508e598cedcfb00886412e524 (#90), clôture #91.
+Base documentaire au démarrage : main 3b20b90288ee73824f235de7fcf79b2c96c1a656,
+code F2 d59d51055222d46508e598cedcfb00886412e524 (#90), préparation #92.
+Le correctif F3 de faux transfert après une question sur un échange passé est
+suivi dans docs/plan_changement_interlocuteur_manuel.md. Vérifier sa livraison
+et le SHA courant ; ne pas demander d'écoute sur un ancien frontend.
 Lire le main réel actuel : une clôture documentaire F3 peut l’avoir avancé.
 Ne restaurer aucune ancienne révision. Vérifier que Lovable est synchronisé
 sur main et ready, puis ouvrir sa preview avec env=sandbox-ulrich&diagnostic=full.
@@ -24,6 +27,9 @@ Ne pas publier la production. Si un écart empêche l’accès, le rapporter ava
 toute correction. Aucun second agent ni nouveau chat automatique.
 
 Suivre docs/recette_humaine_ava_f3.md avec Ulrich, d’abord PTT puis mains libres.
+Ulrich a déjà parlé avec Max puis Emma le 27 octobre sans gêne audible remarquée
+(session d770e7af-9404-45b5-bbfe-c8cade3259df). Ce retour partiel, à modalité
+initiale PTT mais traces Micro ouvert, ne remplit pas les deux recettes.
 Ulrich écoute réellement les accueils et voix ; les simulations ne valident pas
 l’acoustique. Conserver seulement IDs/version/métadonnées et observations utiles,
 sans transcript complet ni secret. L’acceptation F3 et l’autorisation explicite

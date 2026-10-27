@@ -3,11 +3,27 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-26 (F3 engagé ; écoute humaine et publication encore en attente)
+> **Last Updated**: 2026-10-27 (première écoute F3 ; correction du faux message, acceptation et publication en attente)
 
 ---
 
 ## F3 — écouter les appels avec Ulrich
+
+Ulrich a réellement échangé avec Max puis Emma le 27 octobre vers 7 h 30,
+sans blocage ni coupure ou répétition remarquée. Le transfert GM a réussi dans
+la même expérience. Les captures ont révélé une fausse demande locale : une
+question sur ce que Max avait déjà dit à Emma devenait une demande de passage
+après suppression des accents. La correction retire cette ambiguïté du détecteur,
+avec des reproductions rouges puis vertes dans les deux sens. La relance chez
+Emma a récupéré une réponse valide avant toute parole ; son premier résultat
+amont n'est pas conservé, aucune cause précise n'est inventée.
+
+Ce retour est partiel : le libellé initial PTT et les traces Micro ouvert ne
+prouvent pas deux recettes distinctes. Le protocole complet reste à parcourir
+et à accepter ; la production reste inchangée. La livraison du correctif est
+suivie dans le plan avant une nouvelle écoute sur preview.
+
+### Préparation du 26 octobre
 
 La base technique F2 est relue sur main `b642e406` ; Gamilab et Lovable Ava sont
 accessibles dans les workspaces attendus. La preview est prête et la sandbox v7

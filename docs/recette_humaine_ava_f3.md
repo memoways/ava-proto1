@@ -1,7 +1,7 @@
 # Recette humaine Ava F3 — PTT et mains libres
 
-État : préparée, exécution et acceptation humaines en attente. Aucun résultat
-acoustique F3 attesté. Les résultats F1/F2 simulés ne remplissent aucune case.
+État : première écoute réelle rapportée le 27 octobre, recette complète et
+acceptation humaines en attente. Les résultats F1/F2 simulés ne remplissent aucune case.
 Référence : [plan canonique](plan_changement_interlocuteur_manuel.md).
 
 ## Cible et preuves de départ
@@ -34,7 +34,8 @@ Ulrich juge ce qu’il entend ; Codex vérifie ensuite les métadonnées et les
 événements de ces sessions via Lovable. Un reçu de livraison TTS ne prouve pas
 l’écoute ni la qualité audible. Une réponse « prêt » valide seulement le début.
 
-Tous les résultats ci-dessous sont **à faire** dans les deux modalités.
+La matrice complète ci-dessous reste à faire. Le retour partiel détaillé plus bas
+ne remplit pas automatiquement chaque critère ni les deux modalités.
 
 | Contrôle | Geste et résultat attendu | PTT | Mains libres |
 |---|---|---|---|
@@ -67,9 +68,27 @@ ne pas désactiver de personnage ni modifier les réglages partagés pour la rec
 
 ## Résultats et décisions
 
-- PTT : ID session non fourni ; écoute non réalisée/rapportée ; aucune acceptation.
-- Mains libres : ID session non fourni ; écoute non réalisée/rapportée ; aucune acceptation.
-- Traces F3 : aucune nouvelle session attestée lors de la préparation.
+- Session réelle `d770e7af-9404-45b5-bbfe-c8cade3259df`, 27 octobre 2026 à
+  07:27:41 Europe/Paris, Chrome, sandbox-ulrich v7, film vu. Ulrich confirme
+  Max puis Emma sans blocage ni coupure ou répétition remarquée. Il n'a pas dû
+  utiliser le bouton de réessai. Ce retour ne vaut pas acceptation globale.
+- Modalité : sessions.modalite_voix indique push_to_talk, mais les huit événements
+  vocaux terminés indiquent micro_ouvert / STT silence ; l'interface des captures
+  affiche Micro ouvert. Observation partielle compatible mains libres ; PTT
+  dédié et matrice mains libres complète restent à attester séparément.
+- Max T4 : faux message après une question sur un échange passé avec Emma,
+  demande locale ouverte à tort ; preuve GM invalide rejetée sans offre.
+  T5 : préparation à 07:29:59, validation à 07:30:10, clic à 07:30:12,
+  connexion Emma à 07:30:18, même expérience/film/version, nouvel ID d'appel,
+  handoff_count=1. T5 est le quatrième échange complet ; T2 n'a pas de réponse
+  délivrée. Retour Emma → Max, souvenirs, grille et budget non observés ici.
+- Emma T9 : première tentative sans intention privée reconnue, relance avant
+  parole soumise ; réponse finale de 209 caractères, completed, un segment lu,
+  zéro segment échoué. Premier son mesuré 18 251 ms après transcript final.
+  Contenu initial non conservé dans la trace finale, cause amont non démontrée.
+  Aucun défaut audible remarqué par Ulrich ; pas de correction spéculative du parseur.
+- Correction ciblée du faux déclenchement Max/Emma en cours de livraison ;
+  recette à reprendre sur la nouvelle preview après synchronisation vérifiée.
 - Acceptation humaine F3 : en attente d’Ulrich, après observations des deux modalités.
 - Autorisation explicite de publication : absente. Production inchangée par F3.
 
