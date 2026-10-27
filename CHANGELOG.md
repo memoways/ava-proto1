@@ -4,6 +4,27 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [F3 — question sur un échange passé] — 2026-10-27
+
+- Première session réelle retrouvée : `d770e7af-9404-45b5-bbfe-c8cade3259df`,
+  Chrome, sandbox v7, Max → Emma exécuté à 07:30:18 Europe/Paris après accord,
+  GM et clic. Ulrich ne rapporte ni blocage ni coupure/répétition audible.
+  Libellé initial PTT et événements micro_ouvert distingués dans le protocole.
+- Corrige le faux message de passage indisponible après une question sur une
+  conversation passée : « parlé » normalisé en « parle » ouvrait une demande.
+  Les demandes explicites, preuves GM et clic gardent les mêmes contrôles.
+  Reproductions unitaires et deux E2E rouges avant correction, puis vertes.
+- L'avertissement Emma T9 correspond à une récupération avant parole ; réponse
+  finale entièrement délivrée, pas de gêne remarquée. Trace de la première
+  tentative indisponible ; aucun parseur, réglage Cloud ou fournisseur changé.
+  [Preuves et limites](docs/recette_humaine_ava_f3.md),
+  [plan](docs/plan_changement_interlocuteur_manuel.md) et
+  [finalisation F3](docs/prompt_reprise_fiabilite_passage_personnages_lot_f3_finalisation.md).
+  Qualité locale verte : 1 048 unitaires, 41 intégrations, 67 régressions, lint,
+  typage et build ; 101 E2E sans retry. Premier timeout d'un test de tableau de
+  latence inchangé, puis vert isolément et dans la qualité complète sans correction.
+  Livraison GitHub/CI/Lovable à vérifier ; aucune publication.
+
 ## [F3 — préparation de la recette humaine] — 2026-10-26
 
 - F3 engagé depuis main `b642e406c660418a30a90b064073761078c9c4e2` (#91).

@@ -8,6 +8,11 @@ const context = { sessionId: 'session', sourceCharacter: 'emma' as const, orches
 const history: ConversationMessage[] = [...Array.from({ length: 10 }, () => ({ role: 'user' as const, content: 'Contexte', timestamp: 0 })), { role: 'user' as const, content: input.userText, timestamp: 1, spokenWith: 'emma' as const },
   { role: 'emma' as const, content: input.delivery!.generated, timestamp: 2, spokenWith: 'emma' as const, delivery: input.delivery! }];
 describe('handoff state ownership and lifetime', () => {
+  it.each(['Tu as parlé avec Emma ?', 'Tu as parle avec Emma ?'])('does not open a transfer for a past conversation: %s', userText => {
+    const state = advanceHandoffTurn(null, { ...context, sourceCharacter: 'max' }, userText);
+    expect(state).toMatchObject({ state: 'none', openRequest: null, offer: null });
+  });
+
   it('requires delivered evidence and a current recommendation, without legacy regex', () => {
     const state = advanceHandoffTurn(null, context);
     const assessed = assessHandoffTurn(state, input);

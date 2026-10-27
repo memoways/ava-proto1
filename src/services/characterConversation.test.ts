@@ -120,6 +120,20 @@ describe("characterConversation", () => {
     expect(detectPlayerSwitchRequest("Je veux parler à Max", "max")).toBeNull();
   });
 
+  it.each([
+    ['max', 'Tu as parlé avec Emma ?'],
+    ['max', 'Tu as parle avec Emma ?'],
+    ['emma', 'Vous avez parlé à Max ?'],
+    ['emma', 'Vous avez parle a Max ?'],
+  ] as const)('ne transforme pas un contact passé en demande chez %s : %s', (character, text) => {
+    expect(detectPlayerSwitchRequest(text, character)).toBeNull();
+  });
+
+  it.each(['Je voudrais parler à Emma.', 'Est-ce que je peux parler avec Emma ?',
+    'Parler avec Emma, ce serait possible ?', 'Passe-moi Emma.', 'Je veux appeler Emma.'])('conserve la demande du joueur : %s', text => {
+    expect(detectPlayerSwitchRequest(text, 'max')).toBe('emma');
+  });
+
   it("classe l'acceptation ou l'objection du personnage", () => {
     expect(inferCharacterSwitchStance("D'accord, je te la passe.")).toBe("accept");
     expect(inferCharacterSwitchStance("Pas maintenant. Reste avec moi.")).toBe("object");

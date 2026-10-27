@@ -2118,6 +2118,24 @@ for (const source of ['Max', 'Emma'] as const) {
 }
 
 
+for (const source of ['Max', 'Emma'] as const) {
+  test(`F3 ${source}: une question sur un échange passé ne prépare pas de transfert`, async ({ page }) => {
+    const target = source === 'Max' ? 'Emma' : 'Max';
+    const question = `Tu as parlé avec ${target} ?`;
+    const fakes = await installNetworkFakes(page, [question], { ttsSuccess: true,
+      characterOpenings: true, characterReplies: ['Oui, nous avons discuté.'] });
+    await startCharacterConversation(page, source);
+    await sendHandoffTurn(page, question);
+    await expect.poll(fakes.getGmPostTurnCount).toBe(1);
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('button', { name: 'Réessayer le passage' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Appeler / })).toHaveCount(0);
+    await expect.poll(() => fakes.getSessionRow().pending_handoff).toMatchObject({ state: 'none', openRequest: null });
+    expect(fakes.getCharacterCalls()[0]).not.toContain('Le joueur demande explicitement à parler avec');
+    expect(fakes.getExperienceEvents().some(event => event.event_type.startsWith('handoff_'))).toBe(false);
+  });
+}
+
 test('F1 T17: cible typée conservée après preuve rejetée puis accord pronominal', async ({ page }) => {
   const turns = [...HANDOFF_TURNS, 'Je voudrais parler avec Emma.', 'Tu peux me la passer ?'];
   const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,

@@ -1,6 +1,56 @@
 ## F3 — recette humaine engagée, publication en attente
 
-F3 démarré à la demande d’Ulrich. Préparation documentaire uniquement à ce stade :
+### Retour réel du 27 octobre — correction du faux message
+
+Ulrich confirme avoir parlé avec Max puis Emma sans blocage du passage et sans
+réponse coupée ou répétée remarquée. Deux captures ont motivé les contrôles.
+Session `d770e7af-9404-45b5-bbfe-c8cade3259df`, démarrée à 07:27:41
+Europe/Paris, Chrome, sandbox-ulrich v7. Le libellé initial est push_to_talk,
+mais les huit tours vocaux terminés portent micro_ouvert et un déclenchement STT
+silence ; ne pas la comptabiliser comme une double recette.
+
+- Max T4 : preuve GM rejetée `consent_reference_invalid` (openRequest à la place
+  de speech_N), puis `handoff_blocked/assessment_missing`. Aucun accord valide
+  attesté sur ce tour. Une question sur un échange passé avec Emma est prise à
+  tort pour une demande de transfert par le détecteur local après normalisation
+  des accents ; elle ouvre une demande et l'alerte à tort.
+- Max T5 : quatrième échange complet (T2 est un fragment sans réponse délivrée),
+  préparation, reçu complet, validation, clic puis transfert GM à 07:30:18.
+  Même expérience/film/version, nouvel appel Emma, compteur de transfert 1.
+- Emma T9 : `Missing response intent` sur la première tentative, récupération
+  avant toute parole soumise, réponse finale de 209 caractères, reçu completed,
+  un segment lu et zéro segment échoué. Premier son mesuré 18 251 ms après le
+  transcript final. La trace finale ne conserve que la génération récupérée :
+  le contenu exact de la première tentative reste inconnu. Ulrich ne rapporte
+  aucune gêne audible ; ne pas inventer une coupure ni modifier le parseur strict.
+
+Correction F3 sur `codex/ava-f3-past-contact` : reproduction rouge du faux positif
+dans le détecteur, l'état de demande et les deux parcours navigateur. Le détecteur
+ne reconnaît plus le seul verbe conjugué « parle », confondu avec « parlé » après
+suppression des accents ; infinitif, demande explicite et « Passe-moi » restent
+reconnus. Conserver les demandes
+explicites, limites d'appel, preuves GM, reçu complet, CAS et clic. Aucun changement
+éditorial, fournisseur, réglage Cloud ou publication. Validation : tests rouges
+avant correction, ciblés, E2E du faux message, qualité complète, E2E complets,
+PR/CI HEAD exact/main et synchronisation Lovable. Recette humaine F3 à reprendre
+après livraison ; acceptation et autorisation de publier absentes.
+
+Confiance avant correction : 95 %, cause locale reproduite, point de détection
+unique et architecture existante conservés ; tests existants de demande et de
+preuve GM réutilisés, sans dépendance ajoutée. Références :
+[normalisation Unicode MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize),
+[expressions régulières MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Regular_expressions/Word_boundary_assertion).
+Les six reproductions unitaires pertinentes et deux E2E sont rouges avant code.
+Après correction : 212 tests ciblés verts ; qualité complète verte (1 048 unitaires,
+41 intégrations, 67 régressions, lint, typage et build), 101/101 E2E locaux sans
+retry, 17,1 min. Premier passage qualité : timeout à 5 s d'un test inchangé du
+tableau de latence, puis 8/8 verts isolément et qualité complète verte sans aucune
+modification. Le code est resté figé pendant les contrôles complets.
+PR et CI sur HEAD exact/main, puis synchronisation Lovable restent à vérifier.
+
+### Préparation historique du 26 octobre
+
+F3 démarré à la demande d’Ulrich. Préparation documentaire uniquement à cette date :
 aucune écoute F3 attestée, aucun résultat humain accepté, aucune publication.
 Le [protocole de recette](recette_humaine_ava_f3.md) porte les parcours PTT et mains
 libres et les résultats à renseigner avec Ulrich. Les simulations F1/F2 restent
