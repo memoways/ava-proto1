@@ -125,6 +125,8 @@ describe("characterConversation", () => {
     ['max', 'Tu as parle avec Emma ?'],
     ['emma', 'Vous avez parlé à Max ?'],
     ['emma', 'Vous avez parle a Max ?'],
+    ['max', 'Ava a envie de parler avec Emma.'],
+    ['max', 'Emma voulait parler à Max.'],
   ] as const)('ne transforme pas un contact passé en demande chez %s : %s', (character, text) => {
     expect(detectPlayerSwitchRequest(text, character)).toBeNull();
   });

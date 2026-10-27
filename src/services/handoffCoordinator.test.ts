@@ -8,11 +8,18 @@ describe('F1 request lifetime and delivered exchanges', () => {
   it.each([
     'Je cherchais une solution. Elle m’a demandé de la laisser tranquille.',
     'Je cherche une réponse. Max est inquiet.',
+    'Ava a envie de parler avec toi.',
+    'Je t’appelle parce qu’Emma est inquiète.',
+    'Emma m’a appelé hier. Elle ne comprend pas.',
+    'Il s’est passé quelque chose avec Emma.',
+    'Je vais chercher une solution. Emma attend.',
+    'Pourquoi voulez-vous parler avec Emma ?',
   ])('does not mistake an ordinary search for a transfer: %s', text => {
     expect(needsHandoffPreparation(text)).toBe(false);
   });
   it.each(['Je vais la chercher.', 'Je vais chercher Emma.', 'Je vais chercher Max.',
-    'Je te passe Emma.'])('still holds an actual transfer candidate: %s', text => {
+    'Je te passe Emma.', 'D’accord, je te la passe.', 'Je vais appeler Max.',
+    'Tu peux appeler Emma.', 'Je peux te mettre en relation avec Emma.'])('still holds an actual transfer candidate: %s', text => {
     expect(needsHandoffPreparation(text)).toBe(true);
   });
   it('uses the same lease for any registry member and rejects a replaced request/call/version', () => {

@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [F3 — restauration urgente de la continuité vocale] — 2026-10-27
+
+- Preview Sandbox Ulrich seulement : Max reprend sa référence Gradium de prod ;
+  Emma inchangée. Sortie incrémentale, transport Gradium streaming et interruptions
+  automatiques désactivés ; mains libres conservé. Relecture exacte des différences,
+  production et autres réglages/profils inchangés. Pas de publication.
+- Une demande de passage ne remplace plus la réponse narrative normale du
+  personnage. Détection des annonces de transfert resserrée ; mentions de tiers,
+  appels passés et formulations ordinaires ne suffisent plus. Passages GM, preuves,
+  clic et navigation par grille conservés. Aucun nouvel algorithme vocal.
+- Messages techniques de passage masqués et pastilles animées remplacées par
+  les actions texte existantes. Acceptation sonore réelle encore attendue.
+- [Plan et preuves](docs/plan_changement_interlocuteur_manuel.md),
+  [recette](docs/recette_humaine_ava_f3.md),
+  [prompt autonome de finalisation](docs/prompt_reprise_fiabilite_passage_personnages_lot_f3_finalisation.md).
+  Livraison suivie par la PR du correctif urgent ; ne pas assimiler local et preview.
+
 ## [Invitations de test « Plusieurs testeurs »] — 2026-10-27
 
 - Le mot de passe d'une invitation partagée (`multi_use`) était refusé : la contrainte

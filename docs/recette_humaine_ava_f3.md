@@ -1,3 +1,28 @@
+## Urgence continuité vocale — 27 octobre, retour Cineforom
+
+Recette refusée sur la preview Sandbox Ulrich : échange de 10:33,
+session 4e018bd3-71d8-4967-b4fb-2d5d72c1da48, phrases hachées/voix variables
+chez Max puis Emma. Statuts interrompus confirmés ; grille utilisée, pas un
+transfert GM malgré le libellé de l’admin. Session suivante 4b0112b8-5904-4d8f-89fe-7f821818b4c0
+à 10:41 conserve encore les flags expérimentaux épinglés. Dernier retour humain :
+voix plutôt stables, mais la mention d’un tiers déclenche message et changement
+de ton. Ce n’est pas une acceptation du rétablissement.
+
+Restauration Cloud sandbox effectuée et relue : voix de référence Gradium pour
+Max et Emma, sortie progressive et interruptions automatiques désactivées,
+transport Gradium complet ; mains libres reste actif. Production inchangée.
+Le plan contient les valeurs précédentes et les preuves. Changement de code
+complémentaire : préserver la réponse normale, ne préparer qu’une vraie annonce
+de transfert, supprimer messages techniques/pastilles en conservant actions texte,
+GM/consentement/reçu/clic et grille. Ulrich exige de conserver les passages.
+
+Priorité après livraison et synchronisation : recharger, Commencer une nouvelle
+expérience, écouter la continuité et les mentions d’Ava/Emma avec Max puis Emma.
+Relire l’ID et les flags épinglés avant d’interpréter le retour. La recette PTT
+puis mains libres et l’acceptation restent ouvertes ; aucune publication autorisée.
+Les paragraphes historiques ci-dessous décrivent les anciens réglages au moment
+des essais et ne doivent pas réactiver la sortie progressive pour la présentation.
+
 # Recette humaine Ava F3 — PTT et mains libres
 
 État : première écoute réelle rapportée le 27 octobre, recette complète et

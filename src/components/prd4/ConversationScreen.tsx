@@ -57,10 +57,7 @@ const ConversationScreen = ({
   attachAvatarMedia,
   activeCharacter,
   portraitUrl = null,
-  handoffIssue = null,
-  onRetryHandoff,
   handoffOffer = null,
-  handoffPortraitUrl = null,
   handoffCalling = false,
   handoffInputLocked = false,
   handoffCallingTarget = "emma",
@@ -177,7 +174,6 @@ const ConversationScreen = ({
   const backgroundPortrait = portraitUrl ?? (activeCharacter === "emma" ? emmaAvatar : maxLarge);
   const offerTarget = handoffOffer?.targetCharacter === "max" ? "max" : "emma";
   const offerTargetName = displayNameForCharacter(offerTarget);
-  const offerPortrait = handoffPortraitUrl ?? (offerTarget === "max" ? maxAvatar : emmaAvatar);
   const callingName = displayNameForCharacter(handoffCallingTarget ?? "emma");
 
   if (handoffCalling) {
@@ -255,13 +251,6 @@ const ConversationScreen = ({
           <span className="sr-only" aria-live="polite" aria-atomic="true">
             {handoffOffer ? `${displayName} vous propose de parler avec ${offerTargetName}.` : ""}
           </span>
-          {handoffIssue && !handoffOffer && (
-            <div aria-live="polite" data-testid="handoff-state" className="max-w-xs rounded-xl bg-background/90 p-3 text-sm">
-              <p>{handoffIssue.reason}</p>
-              {handoffIssue.phase === 'error' && <button type="button" onClick={onRetryHandoff}
-                disabled={handoffInputBlocked || audioState !== 'idle'} className="min-h-11 underline disabled:opacity-50">{handoffIssue.reload ? 'Recharger l’appel' : 'Réessayer le passage'}</button>}
-            </div>
-          )}
           {handoffOffer && (
             <div className="flex flex-col items-start gap-1">
               <button
@@ -269,10 +258,8 @@ const ConversationScreen = ({
                 aria-label={`Appeler ${offerTargetName}`}
                 disabled={handoffInputBlocked || audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "user_speaking"}
                 onClick={onAcceptHandoff}
-                className="relative flex min-h-12 items-center gap-2 rounded-full border border-primary bg-background/90 px-3 py-2 text-sm font-medium text-foreground shadow-lg backdrop-blur-md hover:bg-primary/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+                className="min-h-12 px-3 py-2 text-sm font-medium text-foreground underline underline-offset-4 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-primary/40 motion-safe:animate-pulse motion-reduce:animate-none" style={{ animationDuration: "3s" }} />
-                <img src={offerPortrait} alt={`Portrait de ${offerTargetName}`} className="h-8 w-8 rounded-full border border-primary/50 object-cover" />
                 <span>Appeler {offerTargetName}</span>
               </button>
               <button type="button" disabled={handoffInputBlocked} onClick={onRejectHandoff}

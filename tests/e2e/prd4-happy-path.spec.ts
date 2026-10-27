@@ -856,7 +856,7 @@ for (const [character, target] of [["Emma", "Max"], ["Max", "Emma"]] as const) {
     await sendHandoffTurn(page, turns[3]);
     await expect(page.getByRole("button", { name: `Appeler ${target}`, exact: true })).toBeVisible();
     const call = page.getByRole('banner').getByRole('button', { name: `Appeler ${target}`, exact: true });
-    await expect(call.getByRole('img')).toHaveAttribute('src', `https://portraits.example/${target.toLowerCase()}-runtime.jpg`);
+    await expect(call.getByRole('img')).toHaveCount(0);
     const beforeTimer = await page.getByLabel('Temps restant').textContent();
     expect(fakes.getExperienceEvents().filter(e => e.event_type === "handoff_executed")).toHaveLength(0);
     if (character === 'Max') {
@@ -2237,8 +2237,8 @@ for (const delay of [0, 500, 3500]) {
   });
 }
 
-test('F1: persistance refusée, aucune promesse jouée, erreur puis réessai utilisable', async ({ page }) => {
-  const turns = [...HANDOFF_TURNS, 'Je voudrais parler avec Emma.'];
+test('F1: persistance refusée, aucune promesse jouée ni message technique, nouvelle demande utilisable', async ({ page }) => {
+  const turns = [...HANDOFF_TURNS, 'Je voudrais parler avec Emma.', 'Je voudrais parler avec Emma.'];
   const acceptance = 'Oui. Je te passe Emma.';
   const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
     gmReferencedAssessment: true, gmStance: 'accept', gmHandoffTurns: [4, 5],
@@ -2251,11 +2251,11 @@ test('F1: persistance refusée, aucune promesse jouée, erreur puis réessai uti
     }
     return route.fallback();
   });
-  for (const text of turns) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+  for (const text of turns.slice(0, 4)) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
   expect(fakes.getTtsText()).not.toContain(acceptance);
-  await expect(page.getByRole('button', { name: 'Réessayer le passage' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Réessayer le passage' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Réessayer le passage' }).click();
+  await sendHandoffTurn(page, turns[4]);
   await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toBeVisible();
   expect(fakes.getMaxTurnCount()).toBe(5);
   expect(fakes.getGmPostTurnCount()).toBe(5); // same GM call, no extra serial evaluation
@@ -2274,7 +2274,7 @@ for (const delay of [500, 3500]) {
     if (delay < 3000) await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toBeVisible();
     else {
       await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Réessayer le passage' })).toBeEnabled();
+      await expect(page.getByRole('button', { name: 'Réessayer le passage' })).toHaveCount(0);
       expect(fakes.getTtsText()).not.toContain(acceptance);
       expect(fakes.getExperienceEvents().some(e => e.event_type === 'handoff_blocked' && e.payload.stage === 'preparation')).toBe(true);
     }

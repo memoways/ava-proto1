@@ -1,3 +1,18 @@
+## Priorité urgente du 27 octobre — relire avant les instructions historiques
+
+Preview Sandbox Ulrich uniquement. Conserver les passages Max ↔ Emma ; retirer
+les messages techniques et pastilles animées, garder les actions texte et la grille.
+Les réglages Cloud sont déjà restaurés : Max Gradium b5ioHAR7JuHVLskk, Emma
+Gradium JReEQbhiZbfpeMYy ; sortie incrémentale=false, interruptions=false,
+stratégie=text, transport Gradium streaming=false ; mains libres=true.
+Ne pas les réactiver pour une recette. Aucune publication production autorisée.
+Vérifier le main et le SHA Lovable réels selon le
+[prompt autonome à jour](prompt_reprise_fiabilite_passage_personnages_lot_f3_finalisation.md).
+Le correctif conserve la réponse narrative, au lieu de la remplacer à la seule
+mention d’un tiers ou demande de passage. Nouvelle expérience après rechargement.
+Les consignes historiques ci-dessous restent des preuves passées, pas une demande
+de rejouer des tests longs avant de rendre une preview audible à Ulrich.
+
 # Prompt Lovable — accès à la recette F3, sans publication
 
 À copier uniquement si une intervention dans Lovable est nécessaire pour accéder

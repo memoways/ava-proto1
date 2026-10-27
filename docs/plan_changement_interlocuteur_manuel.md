@@ -1,3 +1,70 @@
+## F3 — restauration urgente de la sandbox, 27 octobre 2026
+
+Demande explicite d’Ulrich : restaurer la continuité et les voix pour la
+présentation, sans nouvelle expérimentation ni longue campagne locale ; retirer
+les messages techniques et les pastilles de passage. Cible confirmée : preview
+Lovable, Sandbox Ulrich, échange « Testeur Cineforom 27 octobre », 10:33.
+Production et correctifs d’invitations hors de cette restauration.
+
+Session retrouvée : `4e018bd3-71d8-4967-b4fb-2d5d72c1da48`, début
+09:33:53 UTC / 10:33:53 Paris, 12 entrées de conversation. Les événements
+confirment Max puis Emma par raccrochage/grille, pas un transfert validé
+(`handoff_count=0`). Deux tours Max completed, puis Max interrupted/cancelled et
+Emma interrupted/interrupted/cancelled. Le ressenti humain prime : phrases
+hachées et variations de voix, recette refusée. Ces statuts prouvent les
+interruptions, pas leur cause acoustique exacte.
+
+Écart de configuration vérifié : Max sandbox utilise Fish depuis le 26 octobre
+16:34 UTC, alors que la référence prod est Gradium `b5ioHAR7JuHVLskk` ; Emma
+reste Gradium `JReEQbhiZbfpeMYy`. Sortie incrémentale, transport Gradium streaming
+et interruptions acoustiques sont actifs. Restauration réversible autorisée,
+uniquement sandbox : Max reprend sa voix Gradium de référence ; conserver Emma ;
+désactiver `VOICE_INCREMENTAL_OUTPUT`, `VOICE_HANDS_FREE.bargeInEnabled` et
+`ava_tts_settings_gradium.streamingEnabled`, revenir à la stratégie `text`.
+Conserver mains libres activé, délais, modèles narratifs, mapping expressif et
+réglages propres à chaque personnage. Relire après écriture avec comparaison des
+champs non concernés. Nouvelle expérience nécessaire : l’ancienne épingle les
+réglages défectueux.
+
+Retour arrière de ces seuls réglages si nécessaire : Max fish / référence
+`4f9c9d8df44847049a8a281f1fdf52dd`, incremental=true, bargeInEnabled=true,
+interruptionStrategy=acoustic_confirmed, Gradium streamingEnabled=true. Ne pas
+restaurer le dépôt entier ni les anciennes sessions. Aucune publication.
+
+Ulrich précise ensuite : conserver les passages entre personnages, corriger
+leur influence excessive sur la voix. Aucune désactivation d’orchestration
+n’a été appliquée. La cause locale identifiée : `handoffRequested` imposait une
+préparation et remplaçait même une réponse normale du personnage ; le détecteur
+de sortie associait aussi n’importe quel mot en pass*/appel* à un pronom ou nom,
+sans sujet ni proximité. Corriger ces deux déclenchements : seule une annonce
+de transfert du personnage prépare l’opération (ou son accord bref à une demande
+ouverte), jamais la demande du joueur à elle seule ; garder le texte et son état
+de parole originaux dans les autres cas. Une envie d’Ava/Emma de parler à un
+tiers ne constitue pas non plus une demande du joueur. Accord/GM/reçu/clic
+conservés, configuration d’orchestration v7 inchangée, pas de nouveau seuil.
+
+Interface : supprimer les messages techniques de préparation/échec ; remplacer
+la pastille animée et le portrait de transfert par les actions texte simples
+existantes, en conservant consentement/clic/gardes et navigation par grille.
+Contrôles ciblés de typage et rendu, puis CI de livraison imposée par le dépôt ;
+pas de nouvelle suite expérimentale ni modification d’algorithme vocal.
+Confiance 95 % sur l’isolation de cette restauration par les mécanismes déjà
+présents ; son résultat acoustique demande une nouvelle écoute réelle.
+
+Restauration Cloud effectuée et relue : comparaison canonique des JSON avant /
+après égale aux seules modifications annoncées ; production identique et tous
+les autres profils identiques. Le mapping expressif et la v7 restent inchangés.
+Révision de départ `97f3a79`, dernière CI main complète verte
+`40477874691` sur `aafafa7`. Les correctifs #94 et invitations sont donc conservés.
+Validation locale ciblée : typage vert, 135 tests sur sept fichiers verts,
+lint sans erreur (un avertissement de dépendance React déjà présent), build vert.
+Trois E2E ciblés couvrent persistance refusée et disponibilité retardée : absence
+de message technique, nouvelle demande utilisable, aucune promesse libérée avant
+préparation. Un premier collecteur de nouvelle demande avait une entrée undefined,
+corrigée dans la fixture ; un démarrage Vite a été refusé par la sandbox, relancé
+avec autorisation système. Pas de modification d’algorithme audio ni de nouvelle
+campagne E2E complète locale. Livraison PR/CI puis main/synchronisation à vérifier.
+
 ## F3 — recette humaine engagée, publication en attente
 
 ### Second retour réel PTT — frontière personnage / mécanique

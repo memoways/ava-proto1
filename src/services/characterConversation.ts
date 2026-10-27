@@ -116,7 +116,7 @@ export function detectPlayerSwitchRequest(
   // also describes a past conversation, so it cannot seed a transfer request.
   // Keep the infinitive and the explicit player requests/commands below.
   const patterns = [
-    /(?:parler|parlez|discuter|appeler|appelle|appelez|joindre|passer|passe|passez|contacter|contacte)\s+(?:a|à|avec|au)\s+(emma|max|papa|pere|père)/i,
+    /(?:^|[.!?]\s*|\b(?:je|on|nous)\s+(?:peux|peut|pourrais|pourrait|pouvons|voudrais|veux|souhaite|aimerais)\s+)(?:parler|parlez|discuter|appeler|appelle|appelez|joindre|passer|passe|passez|contacter|contacte)\s+(?:a|à|avec|au)\s+(emma|max|papa|pere|père)/i,
     /(?:je (?:veux|voudrais|aimerais)|j['’]aimerais|on (?:peut|pourrait))\s+(?:(?:bien|juste)\s+)?(?:parler|discuter|appeler).{0,24}(emma|max|papa|pere|père)/i,
     /(?:passe[- ]moi|file[- ]moi|donne[- ]moi)\s+(emma|max|papa|pere|père)/i,
     /(?:je (?:veux|voudrais)|j['’]aimerais)\s+(?:voir|avoir)\s+(emma|max|papa|pere|père)/i,
