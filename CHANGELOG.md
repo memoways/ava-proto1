@@ -18,7 +18,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   `0170ac5e5d324b08c8a154a2aa393c2e4ead7c42`, après CI PR verte sur HEAD exact
   `941bd50` : qualité complète et 109 E2E sans retry. Lovable synchronisé/prêt,
   cinq fichiers de code relus identiques ; branche de code supprimée.
-  CI main 40491618695 en cours, nouvelle écoute humaine demandée ; pas de publication.
+  CI main 40491618695 verte, 109 E2E sans retry, nouvelle écoute humaine demandée ; pas de publication.
 
 - Preview Sandbox Ulrich seulement : Max reprend sa référence Gradium de prod ;
   Emma inchangée. Sortie incrémentale, transport Gradium streaming et interruptions

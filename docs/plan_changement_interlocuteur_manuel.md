@@ -111,7 +111,7 @@ prd4Orchestrator identiques. Réglages et profils Cloud restaurés relus de nouv
 identiques à la restauration prévue, production et autres champs conservés.
 
 [CI main 40491618695](https://github.com/memoways/ava-proto1/actions/runs/40491618695)
-en cours sur `0170ac5`. Aucune publication production. Recette humaine encore
+verte sur `0170ac5` : qualité complète et 109 E2E sans retry (20,9 min). Aucune publication production. Recette humaine encore
 ouverte ; Ulrich a reçu la preview corrigée avec une seule demande de rechargement
 et nouvelle expérience. Ne pas valider le son depuis la seule CI ou une ancienne
 session. La clôture documentaire ne change aucun code. Le complément d’entrée ci-dessus ajuste seulement les deux réglages Cloud acceptés.

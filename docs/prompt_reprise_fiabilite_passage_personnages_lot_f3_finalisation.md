@@ -25,7 +25,7 @@ utilisable avec voix continues, timbre cohérent, personnages dans leur rôle.
 verte sur HEAD exact **941bd50d36754c24fbec4284319c7a54c94c440b** : 1 072
 unitaires, 42 intégrations, 71 régressions, lint/typage/build, **109 E2E sans retry**.
 [CI main 40491618695](https://github.com/memoways/ava-proto1/actions/runs/40491618695)
-en cours sur 0170ac5 ; lire le plan pour son résultat final.
+verte sur 0170ac5 : qualité complète et 109 E2E sans retry (20,9 min).
 La clôture documentaire peut avancer main sans changer le code : lire le SHA réel.
 
 Lovable Ava au même SHA 0170ac5, ready, agentFinished=true. Les cinq fichiers de
@@ -33,7 +33,7 @@ code modifiés ont été relus au ref natif et comparés octet par octet identiq
 ConversationScreen, IndexPRD4, characterConversation, handoffCoordinator,
 prd4Orchestrator. Branche de code codex/ava-f3-voice-restore supprimée localement
 et à distance après comparaison des arbres. Clôture documentaire seule sur
-codex/ava-f3-input-continuity, à fusionner/nettoyer si encore présente.
+codex/ava-f3-input-continuity, portée par PR #99 ; vérifier sa suppression dans le compte rendu final.
 Invitations Claude #95 et correctifs Lovable présents dans le main de départ
 97f3a79 sont conservés. Ne restaurer aucune ancienne révision complète du dépôt.
 

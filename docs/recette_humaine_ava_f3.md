@@ -14,7 +14,7 @@ publication ne sont pas implicitement acceptées.
 Correctif disponible : PR #98 fusionnée dans main `0170ac5`, CI PR verte sur HEAD
 exact `941bd50`, 109 E2E sans retry ; Lovable ready au même SHA et cinq sources
 relues identiques. Nouvelle écoute demandée après rechargement/Commencer ;
-résultat positif sur la continuité d’entrée ci-dessus. CI main 40491618695 en cours.
+résultat positif sur la continuité d’entrée ci-dessus. CI main 40491618695 verte, 109 E2E sans retry.
 
 Recette refusée sur la preview Sandbox Ulrich : échange de 10:33,
 session 4e018bd3-71d8-4967-b4fb-2d5d72c1da48, phrases hachées/voix variables

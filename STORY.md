@@ -21,8 +21,7 @@ ni nouvelle campagne de tests n’est nécessaire. La production reste inchangé
 Le rétablissement est fusionné par PR #98 dans main `0170ac5`, après CI verte
 sur son HEAD exact avec 109 E2E sans retry. Lovable est prêt au même SHA ; cinq
 fichiers ont été comparés intégralement identiques. Ulrich reçoit une demande
-d’écoute courte dans une nouvelle expérience. La CI main continue pendant cette
-recette ; aucune acceptation ni publication n’est déduite de la livraison.
+d’écoute courte dans une nouvelle expérience. La CI main est verte, 109 E2E sans retry ; aucune acceptation ni publication n’est déduite de la livraison.
 
 Le retour Cineforom de 10:33 révèle des phrases hachées et des voix variables.
 La sandbox employait Fish pour Max alors que sa référence prod est Gradium.

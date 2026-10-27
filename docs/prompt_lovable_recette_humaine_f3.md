@@ -2,7 +2,7 @@
 
 PR #98 fusionnée dans main `0170ac5e5d324b08c8a154a2aa393c2e4ead7c42`.
 Lovable ready au même SHA, cinq sources relues identiques ; CI PR 109 E2E verts
-sans retry, CI main 40491618695 en cours. Ne pas lancer de nouvel agent/code :
+sans retry, CI main 40491618695 verte, 109 E2E sans retry. Ne pas lancer de nouvel agent/code :
 il reste l’écoute humaine et sa décision, puis une autorisation de publication
 distincte. Les sources finales sont dans le plan canonique.
 
