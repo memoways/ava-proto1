@@ -1,144 +1,103 @@
-# Finaliser uniquement F3 — continuité vocale, recette et publication distincte
+# Reprise F3 — convenir du résultat, puis exécuter seulement ce résultat
 
-## Première action et périmètre
+## 1. Première action : vérifier, puis fixer l’objectif
 
-Travaille dans /Users/ulrich/CodeProjects/memoways/ava-proto1, remote unique
-https://github.com/memoways/ava-proto1. Première action exécutable :
-`git fetch --prune`, `git status`, `git log origin/main -8 --oneline`, puis
-`gh pr list --repo memoways/ava-proto1`. Lire AGENTS.md, CHANGELOG.md, STORY.md,
-le plan `docs/plan_changement_interlocuteur_manuel.md`, le protocole
-`docs/recette_humaine_ava_f3.md` et le contrat partagé
-`/Users/ulrich/CodeProjects/_shared/agent-context/12-task-closeout-handoff.md`.
+Projet : /Users/ulrich/CodeProjects/memoways/ava-proto1.
+Remote unique : https://github.com/memoways/ava-proto1.
+Lire AGENTS.md ; exécuter `git fetch --prune`, `git status`,
+`git log origin/main -6 --oneline`, `gh pr list --repo memoways/ava-proto1`.
+Lire ensuite **seulement le résumé courant en tête** de
+`docs/plan_changement_interlocuteur_manuel.md`, jusqu’à « Historique conservé ».
+Les anciennes sections sont des preuves, pas des tâches à réimplémenter.
 
-Un agent actif, checkout canonique seul ; aucun clone/worktree adjacent, aucun
-prochain lot/chat automatique. Préserver la PR #24 et les branches historiques.
-Mettre main à jour par fast-forward s’il est propre avant toute écriture.
-Le présent prompt poursuit F3 ; il ne demande pas de recommencer les corrections
-ou une campagne de tests. La priorité d’Ulrich est une présentation rapidement
-utilisable avec voix continues, timbre cohérent, personnages dans leur rôle.
+Lire les dernières réponses d’Ulrich avant toute question. Le bilan du 27 octobre
+propose : **A, démo fiable Max/Emma d’abord** (recommandé), **B, réduction du délai
+CI**, **C, qualification F3 complète**. L’accord sur cette priorité est encore
+attendu au moment de rédaction ; ne pas présenter A comme acquis. Si aucune
+réponse n’est disponible, exposer ces trois objectifs et demander une seule
+priorité, sans commencer du code ou une nouvelle campagne de tests.
+Aucun lot suivant ne démarre par la simple lecture de ce prompt.
 
-## Livraison technique vérifiée
+## 2. État à préserver
 
-[PR #98](https://github.com/memoways/ava-proto1/pull/98) fusionnée le 27 octobre
-2026 à 11:50:42 Paris dans main **0170ac5e5d324b08c8a154a2aa393c2e4ead7c42**.
-[CI PR 40488269434](https://github.com/memoways/ava-proto1/actions/runs/40488269434)
-verte sur HEAD exact **941bd50d36754c24fbec4284319c7a54c94c440b** : 1 072
-unitaires, 42 intégrations, 71 régressions, lint/typage/build, **109 E2E sans retry**.
-[CI main 40491618695](https://github.com/memoways/ava-proto1/actions/runs/40491618695)
-verte sur 0170ac5 : qualité complète et 109 E2E sans retry (20,9 min).
-La clôture documentaire peut avancer main sans changer le code : lire le SHA réel.
+- Base vérifiée : main `ccd34143df4cec59b8f4be0418c2ad5c897a434a` (#99),
+  Lovable au même SHA ready ; la présente mise au point Markdown peut l’avancer.
+  Code #98 : `0170ac5`, CI PR 40488269434 et main 40491618695 vertes,
+  109 E2E sans retry. Branches F3 précédentes supprimées, PR #24 historique préservée.
+- Max et Emma sont actifs. Passages : accord du personnage, GM, reçu complet,
+  minimum de quatre échanges complets par appel, bouton texte puis clic.
+  Pas de bascule automatique, seuil technique distinct de la confiance narrative.
+- Raccrochage → grille, même expérience, budget suspendu et souvenirs privés.
+  Une offre validée survit à merci/continuation ; Rester ou un changement explicite
+  la révoque. Aucun retour aux messages techniques ni à la pastille animée.
+- **Entrée vocale déjà acceptée** : session 373833d0-4ed0-4613-9a6c-b33c3c9460b6,
+  27 octobre 12:03:29 Paris. Ulrich : « plus de coupures, donc implémenter ça ».
+  Réglage enregistré : mains libres=true, acoustic_confirmed, bargeIn=false,
+  endOfSpeechMs=2 000, hesitationExtraMs=700, incremental=false.
+  Ne pas refaire ce test après une modification documentaire.
+- Identités vocales : Max Gradium b5ioHAR7JuHVLskk, Emma Gradium JReEQbhiZbfpeMYy.
+  Ne changer ni voix, prosodie, prompt éditorial ou fournisseur pour réparer un passage.
+- La stratégie text retirait aussi la garde acoustique de fin de parole : ne pas
+  y revenir comme simple repli pour désactiver les interruptions. Le réglage
+  actuel garde l’écoute et désactive seulement l’interruption de Max.
+- Ava/Léo, sortie incrémentale et interruption volontaire ne sont pas à activer
+  pour finir la démo. Une fonction volontairement désactivée n’est pas un test « à faire ».
 
-Lovable Ava au même SHA 0170ac5, ready, agentFinished=true. Les cinq fichiers de
-code modifiés ont été relus au ref natif et comparés octet par octet identiques :
-ConversationScreen, IndexPRD4, characterConversation, handoffCoordinator,
-prd4Orchestrator. Branche de code codex/ava-f3-voice-restore supprimée localement
-et à distance après comparaison des arbres. Clôture documentaire seule sur
-codex/ava-f3-input-continuity, portée par PR #99 ; vérifier sa suppression dans le compte rendu final.
-Invitations Claude #95 et correctifs Lovable présents dans le main de départ
-97f3a79 sont conservés. Ne restaurer aucune ancienne révision complète du dépôt.
+## 3. Objectif A proposé : une version de démonstration, pas une nouvelle architecture
 
-Premier passage CI 40484077097 rouge sur 83ca585 : qualité verte, 104/109 E2E.
-Deux annonces pronominales avaient été trop resserrées (« je vais l’appeler »,
-« je vais aller le chercher »), trois assertions attendaient encore la pastille.
-Ces cinq cas ont été corrigés, rejoués verts sans retry (56,4 s), puis les 109 E2E
-complets ont passé sur le nouveau HEAD ci-dessus. Les preuves rouges sont
-conservées dans le plan ; ne pas les confondre avec l’état final vert de la PR.
-137 tests locaux ciblés verts ; aucune nouvelle campagne complète locale ajoutée.
+Après accord sur A, demander un seul parcours réel court dans Sandbox Ulrich
+(cible 10–15 minutes, pas un délai à attendre) : Max, mention d’Ava/Emma, passage
+accepté vers Emma, puis retour par grille. Observer les voix, les paroles entières,
+l’absence de mécanique technique et la continuité. Un refus naturel est légitime ;
+il ne doit pas bloquer la grille. Ne forcer ni confiance, ni seuil, ni accord.
 
-## Restauration Cloud effective — sandbox seulement
+Conserver les preuves déjà valides. Si le parcours fonctionne et qu’Ulrich
+l’accepte comme démo : **geler cette version et s’arrêter**. Ne pas transformer
+cette acceptation en validation exhaustive PTT/mains libres ou en publication.
+Si Ulrich choisit C, utiliser le protocole complet et distinguer ses résultats
+observés/non observés, sans réactiver barge-in ni effacer les validations antérieures.
 
-Cible confirmée par Ulrich : PREVIEW Lovable, Sandbox Ulrich. Projet
-1265958d-b74e-40f2-917d-182fe05163fc, workspace Memoways
-5glbtPltldwz9tgNwIi4. Seul MCP natif Lovable pour SQL/Cloud ; aucun Supabase
-générique, autre hébergeur ou chaîne de livraison. Relectures exactes confirmées :
+Si un défaut précis apparaît : noter attendu/observé, session, mode et réglages ;
+reproduire le cas avant de choisir une correction. Une hypothèse, un changement
+minimal réversible ; identifier les réglages couplés avant de les modifier.
+Rejouer le défaut et les formulations/cas voisins avant le premier push.
+Aucun nouveau contrôleur, refactor ou support de fournisseur par défaut.
 
-- Max : Gradium / b5ioHAR7JuHVLskk, référence prod ; auparavant Fish /
-  4f9c9d8df44847049a8a281f1fdf52dd depuis le 26 octobre 16:34 UTC.
-- Emma inchangée : Gradium / JReEQbhiZbfpeMYy.
-- ava_gameplay_settings : VOICE_INCREMENTAL_OUTPUT=false,
-  VOICE_HANDS_FREE.bargeInEnabled=false, interruptionStrategy=acoustic_confirmed,
-  endOfSpeechMs=2 000, hesitationExtraMs=700, mains libres enabled=true.
-  Autres champs conservés. Ces valeurs finales ont été acceptées humainement.
-- ava_tts_settings_gradium.streamingEnabled=false ; autres champs conservés.
+## 4. Tests et livraison : rendre le temps visible
 
-Production, autres profils, mapping expressif, fiches Notion et orchestration
-publiée v7 restent inchangés. Comparaison canonique avant/après et nouvelle
-relecture après fusion : seuls les champs annoncés ont changé. La première restauration utilisait encore
-text/900 ms ; Ulrich a alors révélé des entrées coupées en parlant sans pause.
-Ce repli text retirait aussi le détecteur qui garde flush pendant une voix active.
-Le retour acoustic_confirmed avec bargeIn=false rétablit cette garde sans
-interrompre Max ; 2 000 ms rétablit le tempo historique de Deepgram automatique.
-Retour arrière éventuel limité aux anciennes valeurs ci-dessus : incremental /
-bargeIn / streaming=true, strategy=acoustic_confirmed, Max Fish ; ne pas le faire
-sans nouveau diagnostic. Ne pas modifier les anciennes sessions pour forcer un test.
+Les 109 scénarios navigateur prennent environ 21 minutes, contre ~2 min 20 s
+pour toute la qualité hors E2E. Le correctif #98 a consommé 75 min 49 s de CI
+(échec, correction, répétition sur main). Sources et erreurs évitables sont dans le bilan.
 
-**Conserver les passages entre personnages** : correction explicite d’Ulrich
-après la proposition de les désactiver, non appliquée. Les messages techniques et
-pastilles animées sont retirés ; les actions texte Appeler/Rester, le GM,
-consentement, reçu complet, CAS et clic restent actifs, ainsi que la grille.
-Une demande du joueur ne remplace plus une réponse narrative normale. Seule une
-annonce réelle de transfert ou un accord bref à une demande ouverte prépare
-l’opération. Les verbes ordinaires et mentions de tiers ne doivent pas changer
-la parole ni son état. Aucun nouvel algorithme audio ou seuil de confiance.
+Ne lancer une campagne complète que sur un code figé, après les replays ciblés.
+Adapter aussi les anciennes assertions de présentation avant de pousser.
+Préparer code, preuves et prompt ensemble. Ne pas relancer pour une modification
+Markdown ou rejouer des cas déjà acceptés sans modification pertinente.
+Le contrat actuel exige toujours CI PR puis CI main pour le code ; il reste
+applicable. Le bilan propose d’en discuter le doublon et de réduire les temps
+sans perdre les contrôles : **objectif B séparé, pas une modification autorisée ici**.
+Une CI verte prouve les contrats simulés ; elle ne prouve pas la qualité acoustique.
 
-## Preuves humaines et prochaine action
+## 5. Cibles et clôture
 
-Recette Cineforom refusée : session 4e018bd3-71d8-4967-b4fb-2d5d72c1da48,
-27 octobre 10:33:53 Paris, phrases hachées et voix variables chez Max puis Emma.
-Deux tours Max completed, puis Max interrupted/cancelled et Emma
-interrupted/interrupted/cancelled. Passage par grille, handoff_count=0 : le
-libellé admin « 1 changement » ne prouve pas un transfert GM. Cause acoustique
-exacte non démontrée. Session suivante 4b0112b8-5904-4d8f-89fe-7f821818b4c0 à
-10:41 conserve les anciens flags épinglés. Ulrich décrit ensuite des voix plutôt
-stables, mais rejette le changement de ton après mention d’Ava/Emma : aucune
-acceptation F3 déduite. Les essais PTT précédents et leurs limites sont dans le
-protocole ; ne pas les compter comme deux recettes complètes.
+Un seul agent, checkout canonique seul, aucune branche étrangère modifiée.
+Lovable seul : projet 1265958d-b74e-40f2-917d-182fe05163fc, workspace Memoways
+5glbtPltldwz9tgNwIi4. SQL/Cloud par MCP Lovable natif, pas de Supabase générique.
+Preview : https://id-preview--1265958d-b74e-40f2-917d-182fe05163fc.lovable.app/?env=sandbox-ulrich
+Notion natif Gamilab : vérifier get-self = 7e1a9a09-09cb-4deb-a306-83a29b831bc2 ;
+relire la tâche https://app.notion.com/p/1c498377edb94cfea4d4bae8728e8c7f avant
+édition. Conserver Source, Last updated by=Codex, vérifier les écritures.
+Gami DigiDouble exclu ; aucun navigateur de repli ou transcript complet sauvegardé.
 
-Nouvelle validation effective après réglage : session
-373833d0-4ed0-4613-9a6c-b33c3c9460b6 à 12:03:29 Paris, flags finaux relus
-exactement. Ulrich confirme : « oui maintenant il n’y a plus de coupures, donc
-implémenter ça ! ». Le réglage est déjà sauvegardé en base et conservé. Aucun
-nouveau contrôleur ni code à implémenter, aucun test long à rejouer. Cette
-acceptation de la continuité d’entrée ne vaut ni matrice F3 complète ni publication.
+Production différente : bargeIn=true, endOfSpeechMs=900, incremental=true lors du
+bilan. Publier le code ne copierait pas les réglages sandbox. Aucune publication
+F3 ni portage Cloud implicite : acceptation humaine du périmètre, puis autorisation
+explicite distincte de publier ; identifier version servie et retour arrière.
 
-La preview corrigée a été remise à Ulrich après fusion. Demande humaine historique déjà
-émise : recharger puis « Commencer » une NOUVELLE expérience, parler à Max en
-mentionnant Ava/Emma, puis rejoindre Emma ; vérifier timbre, phrases entières,
-absence de messages techniques, et un passage accepté. Lire la validation ci-dessus avant de redemander cet essai. Ne pas reprendre une ancienne expérience : les
-flags vocaux sont épinglés. La CI ne prouve ni le son physique ni son acceptation.
-
-Preview :
-https://id-preview--1265958d-b74e-40f2-917d-182fe05163fc.lovable.app/?env=sandbox-ulrich
-Priorité immédiate acceptée sur les coupures d’entrée ; conserver ce réglage pour la présentation. Compléter
-PTT et mains libres dans deux nouvelles expériences selon le protocole, en
-conservant bargeIn=false, incremental=false et la garde acoustic_confirmed /
-2 000 ms validée. Ne pas modifier seuils/fiches pour forcer un passage.
-Préserver contexte commun, souvenirs privés, budget/timer sur grille, nouvel ID
-et accueil par appel. Aucun transcript complet à sauvegarder.
-
-## Clôture attendue
-
-Lire d’abord les réponses arrivées depuis ce prompt. Vérifier CI main, état
-GitHub et Lovable réels, finir uniquement la documentation/nettoyage propres à
-F3 si nécessaire. Aucune correction spéculative, réécriture de fin de parole ou nouveau lot automatique.
-Une correction réellement requise suit le contrat et des contrôles ciblés ; les
-lots purement Markdown utilisent l’exception CI documentaire, code inchangé et
-sa dernière CI verte citée. Ne pas laisser de branche ou PR propre ouverte.
-
-Notion natif Gamilab obligatoire : vérifier get-self workspace
-7e1a9a09-09cb-4deb-a306-83a29b831bc2. Relire puis actualiser la tâche existante
-https://app.notion.com/p/1c498377edb94cfea4d4bae8728e8c7f et si pertinent
-l’application https://app.notion.com/p/97462322e595822ca21601814e915159.
-Conserver Source, Last updated by=Codex, vérifier chaque écriture. Pas de
-workspace personnel, de navigateur de repli ou de Gami DigiDouble.
-
-**Aucune publication production effectuée ou autorisée.** Attendre acceptation
-humaine ET autorisation explicite distincte de publier. Avant publication via
-Lovable seulement, vérifier la version servie et le retour arrière possible.
-Ne pas propager les réglages sandbox vers prod implicitement.
-
-À chaque clôture complète ou partielle : actualiser plan, preuves, CHANGELOG,
-STORY, Notion ; distinguer local/GitHub/preview/production, donner SHA/CI et
-branches restantes vérifiées. Fournir dans le même tour avec lien un prompt
-autonome de finalisation ou du prochain lot, contenant cette même obligation.
-Ne jamais le lancer automatiquement. Si aucun lot ne suit, le dire explicitement.
+À la clôture : actualiser le résumé du plan, les preuves pertinentes, CHANGELOG,
+STORY et la tâche Notion ; vérifier main/CI, Lovable et suppression des seules
+branches propres. Documentation seule : exception CI Markdown, dernier code vert
+cité. Distinguer livré, entendu, accepté et publié. Livrer avec lien le prompt
+autonome de finalisation ou du prochain lot dans le même tour, sans le lancer,
+et y conserver cette obligation. Ne pas déclarer F3 entièrement accepté tant
+que le périmètre de recette convenu ne l’est pas.

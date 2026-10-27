@@ -7,6 +7,18 @@
 
 ---
 
+## Point demandé par Ulrich — retrouver un objectif fini
+
+Ulrich demande pourquoi le développement et les tests prennent autant de temps
+et pourquoi la complexité n’empêche pas les régressions. Le bilan compare les
+objectifs de mars/mai au contrat enrichi d’octobre. Il reconnaît les erreurs de
+Codex, le couplage mal compris entre stratégie texte et garde d’entrée, et les
+75 min 49 s de CI du dernier correctif (dont deux passages après correction).
+Le prompt n’est plus une reprise de l’historique : il commence par l’accord sur
+un résultat, conserve les validations humaines et impose un arrêt après succès.
+Démo fiable, qualification complète et réduction du délai CI sont trois objectifs
+séparés à prioriser avec Ulrich. Aucun nouveau développement n’est lancé.
+
 ## F3 — restaurer la continuité pour la présentation
 
 La nouvelle écoute révèle ensuite une entrée coupée pendant qu’Ulrich parle

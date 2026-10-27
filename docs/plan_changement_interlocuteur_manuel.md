@@ -1,3 +1,151 @@
+## Point de décision — 27 octobre 2026
+
+Ce résumé est la référence courante. L’historique qui suit conserve les preuves
+et les anciennes propositions ; il n’est pas une liste de travaux à relancer.
+Objectif de ce tour : expliquer les délais et réviser la reprise, **documentation
+seule**. Aucun code, réglage Cloud, workflow CI, contrat AGENTS ou publication modifié.
+
+### Du plan initial à l’état présent
+
+- **Mars, PRD1 « Parle à Max »** : démontrer STT → LLM → TTS, contexte Notion/RAG
+  et GM/triggers vidéo avec Max seul sur desktop. C’était un prototype de mécanique.
+- **Mai, PRD4** : valider une scène crédible de 3–5 minutes avec Max, rôle libre,
+  rappel du film et PTT. Emma/Ava/Léo visibles mais initialement indisponibles.
+  La crédibilité du personnage et la fluidité vocale étaient déjà des objectifs.
+- **Octobre, contrat de passage enrichi avec Ulrich** : Max et Emma actifs ;
+  accord du personnage + validation GM + clic, pas de transfert automatique ;
+  au moins quatre échanges complets par appel ; offre conservée après merci ;
+  raccrochage vers la grille, même expérience, budget suspendu et souvenirs privés.
+  Ces extensions demandent un véritable état d’appel et une persistance cohérente.
+- **F1 et F2** : livrés techniquement, PR #88/#90, preuves automatisées conservées.
+  **F3** devait qualifier réellement le parcours et préparer une publication
+  distincte ; il a absorbé les correctifs #93, #94 et #98 puis les réglages vocaux.
+  Le code livré ne suffit donc pas à déclarer F3 accepté humainement.
+
+### État vérifié aujourd’hui
+
+Main de départ de ce bilan : `ccd34143df4cec59b8f4be0418c2ad5c897a434a` (#99),
+checkout propre ; Lovable Ava/Memoways au même SHA, ready. Code #98 en `0170ac5`,
+CI PR 40488269434 et CI main 40491618695 vertes, 109 E2E sans retry ; #99 est
+Markdown seulement. PR #24 et branches historiques hors périmètre, à préserver.
+
+- **Disponible sur preview** : Max/Emma, passages directs autorisés et clic,
+  retour grille/rappel dans la même expérience, gardes de contexte et mémoire.
+  Pastille animée et messages techniques retirés ; actions texte conservées.
+- **Accepté humainement** : fin de parole non tronquée en mains libres, essai
+  `373833d0-4ed0-4613-9a6c-b33c3c9460b6`, 27 octobre à 12:03:29 Paris.
+  Ulrich confirme « plus de coupures ». Cette preuve est conservée ; un changement
+  documentaire n’impose pas de refaire cet essai.
+- **À qualifier, sans prétendre à un nouveau bug** : parcours complet Max → Emma
+  → Max et grille, qualité audible des deux personnages sur ce réglage final,
+  souvenirs isolés en réel et PTT dédié. Les essais antérieurs restent partiels.
+  L’interruption volontaire de Max est délibérément désactivée : elle ne constitue
+  pas un critère de validation de la version de démonstration actuelle.
+- **Inactifs volontairement** : Ava/Léo, sortie incrémentale et barge-in dans
+  Sandbox Ulrich. Ils ne sont pas à réactiver pour « terminer » F3.
+- **Production** : ne pas confondre site déjà publié et publication de F3.
+  Aucune publication F3 par ce travail, ni autorisation distincte reçue.
+  La révision du frontend effectivement servi en production n’est pas auditée ici.
+
+Réglages live relus par MCP Lovable pendant ce bilan : mêmes identités Gradium
+pour Max/Emma dans les deux environnements. Sandbox : acoustic_confirmed,
+bargeIn=false, fin de parole 2 000 ms, hésitation 700 ms, incremental=false.
+Production : acoustic_confirmed, bargeIn=true, fin de parole 900 ms,
+incremental=true. Une publication de code ne copierait pas automatiquement les
+réglages validés de la sandbox. Leur éventuel portage doit être explicite.
+Le streaming Gradium est désactivé dans Cloud sandbox ; un log client a montré
+websocket : ne pas annoncer REST effectif sans observation du transport réellement utilisé.
+
+### Ce que les retours d’Ulrich ont corrigé
+
+1. **Passage réellement disponible après accord** : F1 conserve la demande,
+   l’offre et ses preuves malgré une nouvelle prise de parole ou un pronom.
+2. **Raccrocher sans perdre l’expérience** : F2 sépare appel et expérience,
+   permet la grille, le rappel, le budget restant et les souvenirs propres.
+3. **Le personnage reste dans son rôle** : le repli technique prononcé par Max
+   venait de l’app ; #94 puis #98 limitent la préparation et conservent les
+   réponses narratives ordinaires. Une mention d’Ava/Emma n’est pas un transfert.
+4. **Conserver le changement de personnage** : Ulrich a refusé de désactiver
+   les passages pour contourner les problèmes. Cette désactivation n’a pas été appliquée.
+5. **Présentation discrète** : suppression des messages de passage et de la
+   pastille animée ; cette demande remplace l’ancienne proposition visuelle du plan.
+6. **Stabilité vocale** : Max sandbox a repris sa référence Gradium de prod ;
+   Emma est conservée. Barge-in et sortie incrémentale restent désactivés.
+7. **Parole utilisateur entière** : le repli text choisi par Codex retirait aussi
+   la garde acoustique de fin de parole. Retour acoustic_confirmed, bargeIn=false
+   et silence 2 000 ms : réglage existant enregistré et accepté, aucun nouveau contrôleur.
+
+### Pourquoi cela a pris trop de temps — mesures et responsabilité
+
+Dernier correctif urgent #98, durées des jobs GitHub, somme sans compter
+les intervalles de correction ni les tests locaux :
+
+- [40484077097](https://github.com/memoways/ava-proto1/actions/runs/40484077097) :
+  **26 min 34 s**, rouge ; cinq échecs (deux formulations trop restreintes et
+  trois assertions de l’ancien portrait/pulse non adaptées).
+- [40488269434](https://github.com/memoways/ava-proto1/actions/runs/40488269434) :
+  **25 min 04 s**, correctif vert, 109 E2E.
+- [40491618695](https://github.com/memoways/ava-proto1/actions/runs/40491618695) :
+  **24 min 11 s**, même code rejoué sur main, vert.
+
+Total : **75 min 49 s de CI**, dont **64 min 47 s d’E2E navigateur**.
+L’étape complète lint/typage/régression/unitaires/intégration/build prend environ
+2 min 20 s par passage. Le nombre d’unitaires ne désigne donc pas le principal
+poste d’attente. Playwright est configuré avec un worker CI et des scénarios
+séquentiels ; les 109 cas occupent environ 21 minutes sur une exécution verte.
+
+Les tests ont eu une utilité réelle : ils ont empêché de fusionner deux annonces
+naturelles de passage cassées. Mais le premier passage rouge était évitable :
+Codex avait trop resserré la détection et n’avait pas adapté toutes les assertions
+visuelles avant le push. Le repli text a également couplé une correction de sortie
+à la garde d’entrée. Ces erreurs ne sont pas un coût nécessaire de la qualité.
+Les tests simulent le réseau et l’audio : ils prouvent des contrats logiciels,
+pas le timbre, la perception d’une coupure ou une conversation libre réelle.
+F3 a aussi mélangé qualification, réparation et expérimentation de voix.
+
+L’exécution complète sur PR puis sur main est imposée par le contrat actuel et
+le workflow : elle n’a pas été supprimée pendant ce bilan. Sa seconde exécution
+apporte une couverture peu différente dans le cas contrôlé d’un agent unique et
+d’arbres identiques après squash ; son utilité doit être discutée, pas supposée.
+Le dépôt est public, main non protégée selon GitHub : le sujet immédiat est le
+délai, pas une limite de minutes privées. Aucun contrôle n’est retiré ici.
+
+### Objectifs proposés — accord d’Ulrich encore attendu
+
+**A — Recommandé : figer une démonstration fiable Max/Emma.** Une qualification
+réelle courte (cible 10–15 minutes, pas une attente imposée), dans Sandbox Ulrich,
+couvre cohérence des voix, absence de mécanique dans les répliques, un passage
+accepté GM/clic et un retour par grille. Conserver la preuve d’entrée déjà acceptée.
+Un refus naturel est légitime ; il ne doit ni provoquer une fausse promesse ni
+empêcher le recours à la grille. Le seuil de quatre échanges n’est pas de la confiance.
+Fin observable : Ulrich accepte explicitement ce parcours comme version de démonstration.
+Si ça fonctionne, gel : pas de nouvelle optimisation/extension ou nouveau test exhaustif.
+Ne pas qualifier cette acceptation de validation exhaustive de toute la matrice F3.
+
+**B — Ensuite, si retenu : réduire le délai de livraison CI.** Mesurer les doublons
+et étudier la répartition des scénarios indépendants sans perdre leur couverture.
+Discuter explicitement si le second passage complet sur main reste requis.
+Toute modification de workflow ou du contrat AGENTS/ADR est un lot distinct,
+à convenir ; ni réduction de contrôle implicite ni changement d’hébergeur.
+
+**C — Plus tard ou en priorité si Ulrich le choisit : qualification F3 complète
+et publication.** Parcours PTT/mains libres plus large, confidences isolées,
+reprise/timer/annulations selon protocole. Publication Lovable seulement après
+acceptation humaine du périmètre choisi ET autorisation distincte. Préparer alors
+le portage explicite des réglages prod ; ne pas prétendre qu’ils sont déjà identiques.
+
+Une question unique a été posée dans ce tour : A (démo), C (F3 complet), ou B (CI)
+en premier, sans lancement automatique. Sans réponse, A reste une recommandation,
+pas une décision acquise. Le prompt révisé doit commencer par cet accord et
+s’arrêter si aucun défaut précis ni objectif d’exécution n’est autorisé.
+
+Sources : [PRD1 canonique](https://app.notion.com/p/31c62322e5958026bd87e55eed4af635),
+[PRD4 local](PRD_4_prototype_mai_2026.md), décisions du 26 octobre dans l’historique
+ci-dessous, [tâche Gamilab](https://app.notion.com/p/1c498377edb94cfea4d4bae8728e8c7f),
+GitHub Jobs, configuration Playwright, lectures Cloud et retours humains de ce chat.
+
+## Historique conservé — ne pas exécuter comme une nouvelle feuille de route
+
 ## F3 — restauration urgente de la sandbox, 27 octobre 2026
 
 ### Entrée utilisateur — réglage corrigé et accepté
