@@ -1454,7 +1454,7 @@ const IndexPRD4 = () => {
           turnHandoffState.sourceCallId ??= sourceCallId(expected);
           handoffLease = handoffCoordinatorRef.current.bind(sid, turnHandoffState.sourceCallId, turnCharacter,
             expected.orchestration_version_id, turnHandoffState.requestId ?? turnHandoffState.revision);
-          heldOutput = (turnHandoffState.state !== 'available' && Boolean(turnHandoffState.openRequest)) || needsHandoffPreparation(userText);
+          heldOutput = turnHandoffState.state !== 'available' && Boolean(turnHandoffState.openRequest);
           if (turnHandoffState.openRequest && turnHandoffState.state !== 'available') setHandoffIssue({
             phase: 'preparing', reason: 'Préparation du passage…', retryText: userText });
           if (turnHandoffState.state !== 'available') setCurrentHandoffOffer(null);
@@ -1580,7 +1580,7 @@ const IndexPRD4 = () => {
           onSpeechRuntimeReady: (value: { rugosite: number; states: string[] }) => { speechRuntimeForVoice = value; },
           sessionId: sessionIdRef.current,
           handoffDelivery,
-          handoffRequested: Boolean(requestedSwitch) || needsHandoffPreparation(userText),
+          handoffRequested: Boolean(requestedSwitch),
           postTurnSignal: handoffLease?.signal,
           prepareHandoff,
           handoffOpenRequest: turnHandoffState?.openRequest ?? null,

@@ -16,13 +16,16 @@ export function candidateEvidence(text: string, turnId: string, turnIndex: numbe
 
 /** A conservative OUTPUT HOLD, never a grant of consent. GM still decides semantics. */
 export function needsHandoffPreparation(text: string): boolean {
-  const s = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  const contact = /\b(?:pass\w*|appel\w*|joind\w*|contact\w*|transfer\w*|connect\w*|met\w*.{0,24}(?:relation|ligne))\b/.test(s)
-    && /\b(?:max|emma|telephone|ligne|le|la|lui|il|elle)\b/.test(s);
-  // Searching for a solution is ordinary dialogue, even if another sentence
-  // mentions Emma/Max. Searching for the person still holds the output.
-  const fetchingPerson = /\b(?:(?:le|la|les)\s+cherch\w*|cherch\w*\s+(?:max|emma))\b/.test(s);
-  return contact || fetchingPerson;
+  const s = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/’/g, "'").toLowerCase();
+  // Hold an actual offer by the current speaker, never a name, a past event,
+  // or an unrelated verb in another sentence. GM still validates consent.
+  return s.split(/[.!?;\n]+/).some(clause =>
+    /\bje\s+(?:(?:vais|peux|pourrais|pourrai)\s+(?:aller\s+)?)?(?:(?:le|la|les)\s+|l')(?:appel(?:le|er)|cherche(?:r)?|joins|joindre|contacte(?:r)?|passe(?:r)?|transfere(?:r)?)\b/.test(clause)
+    || /\bje\s+(?:(?:vais|peux|pourrais|pourrai)\s+)?(?:te|vous)\s+(?:(?:le|la|les)\s+)?(?:passe|passer|transfere|transferer|connecte|connecter)\b/.test(clause)
+    || /\bje\s+(?:vais|peux|pourrais|pourrai)\s+(?:(?:le|la|les)\s+)?(?:appeler|joindre|contacter|chercher)\s*(?:max|emma|pour\s+(?:toi|vous))?\s*$/.test(clause.trim())
+    || /\bje\s+(?:vais|peux|pourrais|pourrai)\s+(?:appeler|joindre|contacter|chercher)\s+(?:max|emma)\b/.test(clause)
+    || /\bje\s+(?:(?:vais|peux|pourrais)\s+)?(?:te|vous)\s+(?:mets|mettre)\s+(?:en\s+relation|en\s+ligne)\b/.test(clause)
+    || /\b(?:tu\s+peux|vous\s+pouvez)\s+(?:appeler|joindre|contacter)\s+(?:max|emma)\b/.test(clause));
 }
 export { withdrawsHandoff } from './characterConversation';
 

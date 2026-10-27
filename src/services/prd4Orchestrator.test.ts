@@ -200,6 +200,19 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     vi.mocked(patchQueuedConversationTurnTrace).mockResolvedValue();
   });
 
+  it.each([MAX_CONTEXT, EMMA_CONTEXT])('F3 $characterKey keeps its own reply and speech state when a request is not accepted', async characterContext => {
+    const response = 'Pourquoi voulez-vous parler avec Emma ? Je voudrais comprendre.';
+    const prepareHandoff = vi.fn(async () => false);
+    vi.mocked(simulateMaxResponse).mockResolvedValueOnce({ response, systemPrompt: 'system' });
+    const result = await processPRD4Turn({ sessionId: 'session', characterContext,
+      conversationHistory: [], userMessage: 'Je peux parler avec Emma ?', userRole: null,
+      timeElapsedSeconds: 10, handoffRequested: true, prepareHandoff });
+    expect(result.maxResponse).toBe(response);
+    expect(result.handoffPreparationBlocked).toBe(false);
+    expect(prepareHandoff).not.toHaveBeenCalled();
+    await result.postTurnPromise;
+  });
+
   it.each([MAX_CONTEXT, EMMA_CONTEXT])('F3 $characterKey never speaks technical preparation mechanics', async characterContext => {
     const promise = characterContext.characterKey === 'max' ? 'Je te passe Emma.' : 'Je te passe Max.';
     const playedSpeechStateRef = { current: 'Bloqué' as string | null };

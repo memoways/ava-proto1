@@ -7,6 +7,22 @@
 
 ---
 
+## F3 — restaurer la continuité pour la présentation
+
+Le retour Cineforom de 10:33 révèle des phrases hachées et des voix variables.
+La sandbox employait Fish pour Max alors que sa référence prod est Gradium.
+La restauration sandbox reprend cette voix, conserve Emma et suspend la sortie
+progressive et les interruptions automatiques. Les comparaisons Cloud confirment
+que la production et les autres réglages sont conservés. Ulrich précise que les
+passages doivent rester possibles : aucune désactivation d’orchestration appliquée.
+
+Une cause de rupture supplémentaire est identifiée : une demande du joueur
+pouvait remplacer une réponse narrative normale par un repli. Seule une annonce
+réelle de transfert doit être préparée. Les simples mentions et verbes ordinaires
+ne doivent pas détourner Max ou Emma de leur voix. Messages techniques et pastilles
+animées retirés, choix texte et grille conservés. Validation audible finale encore
+attendue ; [état et preuves](docs/plan_changement_interlocuteur_manuel.md).
+
 ## F3 — écouter les appels avec Ulrich
 
 Le nouvel essai PTT est audible, mais révèle une vraie rupture de personnage :

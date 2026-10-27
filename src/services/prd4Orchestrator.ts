@@ -508,7 +508,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   let candidateResult: PRD4PostTurnDetailedResult | null = null;
   let candidateReleased = false;
   let handoffPreparationBlocked = false;
-  if (input.prepareHandoff && (needsHandoffPreparation(maxResponse) || input.handoffRequested
+  if (input.prepareHandoff && (needsHandoffPreparation(maxResponse)
     || (input.handoffOpenRequest && /^(?:oui|d[’']accord|ok(?:ay)?|bien s[uû]r)[ .!…]*$/i.test(maxResponse.trim())))) {
     const preparationStartedAt = performance.now();
     const controller = new AbortController();

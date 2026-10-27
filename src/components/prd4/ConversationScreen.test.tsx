@@ -117,7 +117,7 @@ it('leaves Space on a focused call button to its native activation without openi
 
 
 it.each([['emma', 'max', 'Max'], ['max', 'emma', 'Emma']] as const)(
-  'places the only call choice below %s with the runtime portrait of %s and removes it on revocation',
+  'keeps a plain call action below %s toward %s and removes it on revocation',
   (source, target, name) => {
     const props = { ...baseProps, activeCharacter: source, conversationLog: [],
       handoffOffer: { reason: 'Accord prouvé', targetCharacter: target },
@@ -126,8 +126,8 @@ it.each([['emma', 'max', 'Max'], ['max', 'emma', 'Emma']] as const)(
     const header = screen.getByRole('banner');
     const call = within(header).getByRole('button', { name: `Appeler ${name}` });
     expect(screen.getAllByRole('button', { name: /^Appeler / })).toHaveLength(1);
-    expect(within(call).getByRole('img', { name: `Portrait de ${name}` }))
-      .toHaveAttribute('src', `https://portraits.example/${target}-runtime.jpg`);
+    expect(within(call).queryByRole('img')).not.toBeInTheDocument();
+    expect(call.querySelector('[class*="animate-pulse"]')).toBeNull();
     expect(within(header).getByRole('button', { name: /^Rester avec/ })).toBeInTheDocument();
     expect(screen.getByText(`${source === 'emma' ? 'Emma' : 'Max'} vous propose de parler avec ${name}.`))
       .toHaveAttribute('aria-live', 'polite');
