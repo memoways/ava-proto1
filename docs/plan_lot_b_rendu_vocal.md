@@ -1,5 +1,83 @@
 # Plan — Lot B : rendre les états de parole audibles
 
+## Atelier de parole AP1–AP6 — contrat courant, 28 octobre 2026
+
+Direction demandée par Ulrich : rendre les réglages existants compréhensibles,
+comparer puis conserver des variantes, et éprouver la crédibilité au fil de
+l'interaction. Max d'abord ; écoutes identiques puis conversations guidées ;
+séances accompagnées de 10–15 minutes, une hypothèse et deux variantes maximum.
+Réglages app et retouches Notion dans des passes séparées. Variantes et avis
+persistants dans le back-office ; audio exact seulement pendant la séance.
+
+**État : plan enregistré et prompt AP1 préparé, aucun lot AP implémenté.**
+Cette section est le contrat de la nouvelle série ; les sections datées
+ci-dessous décrivent les livraisons précédentes. A4R confirme les copies E0
+le 26 octobre, mais ni A4R ni F4 ne valent acceptation du naturel vocal.
+La recette F4 reste distincte ; aucun gel de démo ni publication implicite.
+
+| Lot | Périmètre et résultat observable | Dépendance / sortie | Statut |
+| --- | --- | --- | --- |
+| AP1 | Atelier lisible, réglages expliqués et écoute A/B fidèle au transport actuel ; réemploi du banc | Livraison technique vérifiée ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap1.md) | Préparé, non lancé |
+| AP2 | Variantes nommées, différences, appréciations, décision et export ; retrouvables après reconnexion | AP1 livré ; stockage sandbox strict et relecture | Planifié |
+| AP3 | Première séance Max, deux répliques initiales, une hypothèse et deux variantes | AP2 livré ; bilan humain, référence et prochain défaut observé | Recette à organiser |
+| AP4 | Conversations courtes guidées, nouvelle session par essai, références et versions réellement utilisées | Bilan AP3 ; états proposés/déclarés/livrés et coupures distingués | Planifié |
+| AP5 | Affiner Max par passes : Notion, GM effectif, LLM ou restitution ; une couche par comparaison | Observations humaines ; sous-lots AP5.1… définis avant leur exécution | Itératif, non lancé |
+| AP6 | Emma avec ses propres états, puis Max ↔ Emma et conversation plus longue | Méthode éprouvée sur Max ; bilan distinct par personnage | Planifié |
+
+### Bonne pratique obligatoire pour cette série
+
+- Un lot actif, un agent et une branche/PR par lot de code. Avant l'exécution,
+  inscrire objectif, périmètre, dépendances, sortie observable, vérifications et
+  retour arrière. Aucun lot futur n'est réputé livré avec son seul plan.
+- Enchaîner les développements déjà cadrés et autorisés sans redemander l'accord
+  à chaque étape ; le présent tour livre seulement le prompt AP1, sans lancement.
+  L'exécution d'AP1 reste bornée à AP1 ; préparer AP2 à sa clôture. Une reprise
+  ne lance pas le prochain lot. Les écoutes requises restent des décisions
+  humaines ; aucune préférence artistique inventée pour poursuivre AP5.
+- Séparer les statuts technique et humain. Une CI verte ne prouve pas la
+  crédibilité ; une écoute réussie ne remplace pas les contrôles de livraison.
+- Réutiliser les contrôles, adaptateurs, cache et traces existants. Pas de
+  nouveau paramètre de jeu, catalogue d'états commun, juge LLM ni réglage vocal
+  ajouté pour ce chantier. Les presets capturent des réglages, pas un état figé.
+- AP2 réutilise des enregistrements dédiés dans `admin_settings`, sans migration
+  pour ce lot, avec types, lecture sandbox stricte, conflit détecté et readback.
+  Pas de stockage audio durable, transcript complet ou copie du prompt intégral.
+- Clôture code : qualité locale et garde de livraison, CI PR/HEAD exact contenant
+  main, garde versionnée, arbre/parent fusionnés vérifiés, seule branche du lot
+  nettoyée, synchronisation Lovable contrôlée. Aucune seconde campagne complète
+  sur main ; le contrat AGENTS/ADR CT1 prime sur les anciennes consignes ci-dessous.
+- Avant le premier push : plan, CHANGELOG et prompt autonome du prochain lot
+  identifiés et committés avec le code. Donner leurs liens dans le bilan ;
+  aucun commit circulaire pour inscrire le futur SHA de fusion. Après fusion,
+  reçu et faits durables dans la tâche Notion existante, écritures relues.
+- Suivi minimal : lot, résultat, preuves, limites, recette humaine, local/GitHub/
+  preview/production et prochaine action. Lot bloqué : reste exact et seule
+  action humaine indispensable, sans déléguer l'attente de CI à Ulrich.
+- Mesure CT2 par lot de code : préparation, premier push, qualité locale, run/job,
+  installation navigateurs, E2E, retries/annulations et fusion ; travail et attente
+  distincts. #104 (46 min 42 s de jobs) reste une référence descriptive ; aucune
+  moyenne de lots hétérogènes ni conclusion sur la vitesse du modèle.
+
+### Sources et état de départ vérifiés
+
+Le 28 octobre : main et Lovable concordent sur CT1 #107,
+`10e1bfaeff6c3ed1007c2d55c91c73c21ba00a07`,
+[CI PR verte 40683839668](https://github.com/memoways/ava-proto1/actions/runs/40683839668).
+Lire le main réel au démarrage, sans restaurer cette révision.
+Gamilab natif confirmé `7e1a9a09-09cb-4deb-a306-83a29b831bc2` ;
+[tâche générale](https://app.notion.com/p/f3944bc8e9ce48138f2b309db223035d),
+[rapport éditorial](https://app.notion.com/p/40462322e59580ca98a4d6148d8ce406).
+Fiches actives : Max `ef4cfaa6-70e3-4e87-9b9e-079815fd0cd9`,
+Emma `dfcc15f8-9d37-45f7-8c84-d0c24a4288cf` ; leur jeu ne demande pas de
+bégaiement systématique. Le prompt GM publié et le prompt de base du code
+sont distincts : vérifier l'effectif, ne pas diagnostiquer sur le seul code.
+
+Lecture native Lovable Ava : sandbox-ulrich, Max rugosité 3 / Emma 2, Gradium,
+`streamingEnabled=false`, pauses expérimentales absentes donc inactives, tags
+fermés, mapping actif `2026-10-25T11:39:32.000Z`. Le banc A3 force actuellement
+WS si disponible : AP1 corrige cette différence de comparaison sans activer WS
+dans le jeu. Ces valeurs sont des observations, pas des réglages à restaurer.
+
 ## Exécution coordonnée Notion / app — 25 octobre 2026
 
 **Statut vérifié le 26 octobre 2026 : A1/A2/A3/A4 techniquement livrés ;

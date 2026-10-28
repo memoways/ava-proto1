@@ -38,6 +38,12 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
-[CT2 — mesurer un lot comparable](prompt_reprise_contexte_travail_lot_ct2.md),
-sans lancement automatique. F4 peut être choisi séparément ; aucune campagne
-vocale réelle n'est requise pour qualifier une correction de contexte.
+**Premier lot fonctionnel choisi : AP1 — atelier de parole Max.**
+[Prompt autonome à exécuter](prompt_reprise_atelier_parole_lot_ap1.md),
+[découpage AP1–AP6 et contrat de suivi](plan_lot_b_rendu_vocal.md#atelier-de-parole-ap1ap6--contrat-courant-28-octobre-2026).
+Plan/prompt préparés ; aucune implémentation AP ni écoute lancée. Réemploi des
+réglages existants, compréhension et comparaison fidèle avant persistance AP2
+et recette AP3 ; ajustements Notion séparés. Livrer le prompt suivant dès chaque
+clôture, sans attendre une nouvelle demande. Code, voix et Cloud inchangés.
+[CT2](prompt_reprise_contexte_travail_lot_ct2.md) mesure les lots de code AP.
+F4 reste une recette distincte, aucune publication production implicite.
