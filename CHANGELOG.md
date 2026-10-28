@@ -4,6 +4,21 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Audit du contexte de travail] — 2026-10-28
+
+- [Audit sourcé](docs/audit_contexte_travail_2026-10-28.md) : 160 runs qualité
+  du 14 au 28 octobre ; 46 min 42 s pour les deux jobs du dernier correctif,
+  dont 40 min 28 s d'E2E. Sépare les répétitions, les erreurs évitables, les
+  limites des simulations et les problèmes d'exposition/authentification/routage.
+- Instructions, skills et scripts audités ; propositions seulement, aucun
+  changement de configuration, workflow ou application. GitHub CLI existant
+  et les deux cibles Notion vérifiés. Pas de reconnexion ni de publication.
+- Base main `0445a4f4954c0ae7472e1e7b40ce2661b93dc78b` ; code identique au
+  dernier code vert `9adabdce5b5a4f9be6f6fdc6545868659cb4120a`,
+  CI main 40661278202 verte. Lot exclusivement Markdown, sans nouvelle CI.
+  [Plan](docs/plan_audit_contexte_travail.md),
+  [suite CT1 proposée, non lancée](docs/prompt_reprise_contexte_travail_lot_ct1.md).
+
 ## [Présent canonique Max/Emma] — 2026-10-28
 
 - optimized_v3 conservait la parole éditoriale mais pouvait omettre la situation
