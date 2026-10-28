@@ -25,6 +25,10 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   réglage live, prompt Notion/GM ou publication production modifié.
 - [Plan et preuves](docs/plan_lot_b_rendu_vocal.md#exécution-ap2--28-octobre-2026),
   [prompt AP3 autonome](docs/prompt_reprise_atelier_parole_lot_ap3.md), non lancé.
+- Livraison AP2 interrompue avant push réussi : aucune PR/CI/fusion ou nouvelle
+  preview. [Reprise exacte](docs/prompt_reprise_atelier_parole_lot_ap2_livraison.md).
+  Décision explicite d’Ulrich : accès GitHub indépendant du Trousseau macOS,
+  interdiction inscrite dans AGENTS ; voie dédiée préparée sans provisionnement.
 
 ## [AP2 — clarification demandée après AP1] — 2026-10-28
 

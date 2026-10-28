@@ -4,6 +4,11 @@ Exécute uniquement AP3, une recette humaine de 10–15 minutes. Ce prompt prép
 par AP2 ne lance ni écoute, ni conversation, ni publication. Ne pas déduire la
 compréhension d’Ulrich ou la crédibilité vocale d’une CI verte.
 
+**AP2 n’est pas encore livré : reprendre d’abord**
+[prompt AP2 livraison](prompt_reprise_atelier_parole_lot_ap2_livraison.md). Aucun
+accès au Trousseau macOS, aucune demande de déverrouillage/reconnexion personnelle.
+Ne démarrer AP3 qu’après livraison et recette technique AP2 vérifiées.
+
 ## Première action exécutable
 
 Dans `/Users/ulrich/CodeProjects/memoways/ava-proto1`, lire `git status`, AGENTS.md,

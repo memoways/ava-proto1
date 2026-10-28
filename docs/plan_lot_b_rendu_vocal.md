@@ -1222,7 +1222,7 @@ régénération. Cache exact uniquement mémoire, mêmes limites et propriétair
 La décision préférée/rejetée reste une appréciation, jamais une activation du jeu.
 
 Tests ciblés : 8 persistance (absence/erreur/admin/sandbox/CAS/readback/extensions,
-confidentialité et exports), 9 UI (étapes, identité A/B, reprise et notes,
+confidentialité et exports), 10 UI (étapes, identité A/B, reprise et notes,
 conflit, accès avancés, repli/annulation, production, lecture indisponible),
 2 TTS Config (voix distinctes, aucun lecteur). Services/adaptateurs existants
 REST/WS/cache/retards inchangés et recouverts par la qualité complète.
@@ -1260,3 +1260,30 @@ IndexPRD4 préexistant), typage, **71 régressions, 1 130 unitaires, 42 intégra
 et build verts. E2E ciblé final : 5,1 s d’exécution / 6,6 s avec démarrage,
 sans retry automatique. Garde : 23/23 verts. Les horodatages GitHub et le reçu
 postfusion restent dans le bilan/Notion, sans deuxième PR documentaire.
+
+Dernière revue : changement de sandbox pendant une sauvegarde testé explicitement ;
+snapshots, avis et document précédents invalidés, résultat tardif ignoré, interface
+nouvelle sandbox disponible sans confirmation mensongère de l’ancienne écriture.
+
+
+### Livraison AP2 interrompue — accès GitHub
+
+Premier commit `6e3e50e`, première tentative de push 17:43:22 UTC refusée avant
+création de branche distante ou de PR. Fin de revue locale : contexte sandbox
+pendant une sauvegarde sécurisé et testé ; qualité complète finale 17:46:41 →
+17:47:44 UTC, 71 régressions, 1 131 unitaires, 42 intégrations et build verts.
+Aucune installation locale supplémentaire, aucun retry automatique E2E.
+Ni campagne PR AP2, ni run/job, ni installation navigateurs CI, ni E2E CI, ni
+fusion à mesurer : ces étapes n’ont pas eu lieu. Pas de campagne main.
+
+Ulrich interdit explicitement le Trousseau macOS à partir de ce refus. Aucune
+commande de déverrouillage, aucun login/refresh/logout ou remplacement d’identifiant
+exécuté. Les lectures diagnostiques antérieures sont arrêtées ; aucun lien causal
+avec les incidents Outlook rapportés n’est établi dans ce lot. Interdiction
+inscrite dans AGENTS ; [voie dédiée préparée](plan_authentification_github_sans_trousseau.md).
+
+[Reprise AP2 exacte](prompt_reprise_atelier_parole_lot_ap2_livraison.md) enregistrée.
+Local seulement, branche AP2 à conserver ; GitHub main/preview inchangés, production
+non publiée. La recette authentifiée du nouveau code reste à faire après livraison.
+La compréhension et l’écoute humaines ne sont pas revendiquées. Le prompt AP3
+existe déjà, sa préparation ne lance aucune écoute.

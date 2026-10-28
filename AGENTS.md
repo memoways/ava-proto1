@@ -118,6 +118,21 @@ rendu et Notion. Aucune seconde PR documentaire pour inscrire un futur SHA dans
 son propre contenu. Le bilan donne SHA main, CI PR/HEAD, arbre vérifié, absence
 attendue de campagne main, branches restantes et ce qui reste à valider.
 
+## GitHub — accès sans Trousseau (décision d’Ulrich, 28 octobre 2026)
+
+Pour GitHub, utiliser une identité de livraison dédiée hors Trousseau macOS.
+Ulrich interdit tout recours à l’app Trousseaux d’accès et aux commandes/API
+qui lisent, déverrouillent, réparent ou modifient ce stockage. Ne jamais lui
+redemander de le déverrouiller ni relancer une sonde de lecture après un refus.
+Cette décision remplace les anciennes consignes de diagnostic du trousseau.
+
+Git/gh restent autorisés avec un jeton temporaire fourni explicitement par une
+voie indépendante et vérifiée ; neutraliser les helpers implicites pour ces
+processus. Sans cette identité, conserver le lot local et sa reprise exacte,
+sans lancer gh/git qui consultent les identifiants personnels par défaut.
+[Voie dédiée préparée et prérequis](docs/plan_authentification_github_sans_trousseau.md).
+Aucune reconnexion personnelle ni changement système pour débloquer une livraison.
+
 ## Connexions — diagnostic borné
 
 Une sonde d'identité puis une lecture de ressource suffisent au premier diagnostic.

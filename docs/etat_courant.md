@@ -62,3 +62,14 @@ PR et Notion ; ne pas confondre implémentation et publication.
 M1/M2, une hypothèse et deux versions. Compréhension et préférence vocales sont
 validées par Ulrich ; aucune acceptation humaine revendiquée par les tests AP2.
 F4 reste distincte. Aucune publication production implicite.
+
+## AP2 — livraison interrompue, état local conservé
+
+Push refusé avant toute création de PR ; aucune CI AP2, fusion ni nouvelle preview.
+Qualité finale locale : 71 régressions, 1 131 unitaires, 42 intégrations et build
+verts ; garde 23/23, E2E ciblé simulé vert. Branche AP2, main non modifié.
+[Reprise exacte de livraison](prompt_reprise_atelier_parole_lot_ap2_livraison.md).
+Décision explicite d’Ulrich : **plus aucun recours au Trousseau macOS**.
+[Voie d’accès dédiée préparée, non configurée](plan_authentification_github_sans_trousseau.md).
+L’interdiction est dans AGENTS ; ne pas redemander un déverrouillage ou une
+reconnexion personnelle. AP3 reste préparé sans lancement.

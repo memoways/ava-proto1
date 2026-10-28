@@ -155,6 +155,22 @@ describe('AP2 — one guided workshop and saved comparisons', () => {
   expect(screen.getByText('Réservé aux environnements sandbox.')).toBeInTheDocument();
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
  });
+ it('invalidates prepared snapshots and pending writes when the environment changes', async () => {
+  vi.spyOn(SpeechAuditionRunner.prototype, 'listen').mockResolvedValue(evidence);
+  let finish!: (value: Awaited<ReturnType<typeof saveWorkshopComparison>>) => void;
+  vi.mocked(saveWorkshopComparison).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const mounted = await ready(); choose(); await current(); await trial();
+  fireEvent.change(screen.getByLabelText('Nom de la comparaison'), { target: { value: 'Ancienne sandbox' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer la comparaison et mon avis' }));
+  await waitFor(() => expect(saveWorkshopComparison).toHaveBeenCalledOnce());
+  setActiveEnvironment('sandbox-romed');
+  mounted.rerender(<MemoryRouter><SpeechAuditionBench /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByLabelText('État de la réplique')).toHaveValue(''));
+  await act(async () => finish({ schemaVersion: 1, environment: 'sandbox-ulrich', version: 'late', comparisons: [vi.mocked(saveWorkshopComparison).mock.calls[0][0]] }));
+  expect(screen.queryByText(/Comparaison enregistrée et relue/)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Recharger les variantes' })).toBeEnabled();
+  expect(screen.getByLabelText('Étape courante')).toHaveTextContent('Étape 1');
+ });
  it('keeps read failures distinct from an empty library and never saves in that state', async () => {
   vi.mocked(readWorkshop).mockRejectedValue(new Error('Lecture de l’atelier indisponible'));
   await ready(); expect(screen.getByRole('alert')).toHaveTextContent('indisponible');
