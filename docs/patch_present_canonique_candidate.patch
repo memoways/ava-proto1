@@ -1,0 +1,42 @@
+--- a/src/agents/maxOptimizedPromptCompiler.ts
++++ b/src/agents/maxOptimizedPromptCompiler.ts
+@@ -13,7 +13,7 @@
+ export const OPTIMIZED_V3_LIMITS = {
+   generatedContextChars: 11_000,
+   normalTotalMessageChars: 12_000,
+-  staticChars: 4_500,
++  staticChars: 5_500,
+   runtimeChars: 800,
+   memoryChars: 1_200,
+   ragChars: MAX_MAX_RAG_CONTEXT_CHARS,
+@@ -248,6 +248,7 @@
+   const candidates: CandidateUnit[] = [];
+   const selectable = withoutCharacterEmbodiment(character);
+   FIELD_SPECS.forEach((spec, fieldIndex) => {
++    if (spec.key === "situation_summary") return;
+     splitUnits(selectable[spec.key] || "").forEach((text, unitIndex) => {
+       candidates.push({
+         id: `static:${spec.key}:${unitIndex}`,
+@@ -259,7 +260,12 @@
+       });
+     });
+   });
+-  const protectedUnits: SelectedUnit[] = characterEmbodiment(character).map(section => ({
++  const present = character.situation_summary.trim();
++  const mandatorySections = [
++    ...(present ? [{ key: "situation_summary", title: "PRÉSENT CANONIQUE — SOURCE ÉDITORIALE", content: present }] : []),
++    ...characterEmbodiment(character),
++  ];
++  const protectedUnits: SelectedUnit[] = mandatorySections.map(section => ({
+     id: `static:${section.key}:protected`, source: 'static', sourceKey: section.key,
+     title: section.title, text: section.content, score: 10_000, status: 'selected',
+     originalChars: section.content.length, removedChars: 0, reason: 'included',
+@@ -516,6 +522,8 @@
+   append("rag_context", "SOUVENIRS COMPLÉMENTAIRES", ragBlocks.join("\n\n"), OPTIMIZED_V3_LIMITS.ragChars, "rag");
+   append("post_video", "CONTEXTE POST-VIDÉO", input.postVideoContext, 500, "runtime");
+ 
++  const present = input.character.situation_summary.trim();
++  if (present && !prompt.includes(present)) throw new Error("Présent canonique absent du contexte : génération interdite");
+   const staticRendered = [core, canon].filter(Boolean).join("\n\n");
+   const staticChars = budgetSections.filter((section) => section.key === "character_core" || section.key === "character_canon").reduce((sum, section) => sum + section.chars, 0);
+   const totalMessageChars = prompt.length + input.historyChars + input.userMessage.length;

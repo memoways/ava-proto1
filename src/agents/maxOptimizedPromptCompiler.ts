@@ -13,7 +13,7 @@ import type { ConversationMemoryV1, MaxPromptAssemblyTrace } from "@/types";
 export const OPTIMIZED_V3_LIMITS = {
   generatedContextChars: 11_000,
   normalTotalMessageChars: 12_000,
-  staticChars: 4_500,
+  staticChars: 5_500,
   runtimeChars: 800,
   memoryChars: 1_200,
   ragChars: MAX_MAX_RAG_CONTEXT_CHARS,
@@ -243,11 +243,21 @@ function scoreText(text: string, queryTerms: Set<string>, baseScore: number, sou
   return baseScore + overlap * 90 + recentTimelineBoost;
 }
 
-function selectStaticUnits(character: CharacterPrompt, query: string, contract: string): { selected: SelectedUnit[]; all: SelectedUnit[] } {
+function protectedCharacterSections(character: CharacterPrompt) {
+  const present = character.situation_summary.trim();
+  return [
+    ...(present ? [{ key: 'situation_summary', title: 'PRÉSENT', content: present }] : []),
+    ...characterEmbodiment(character),
+  ];
+}
+
+function selectStaticUnits(character: CharacterPrompt, query: string, contract: string, canonicalName: string): { selected: SelectedUnit[]; all: SelectedUnit[] } {
   const queryTerms = keywords(query);
   const candidates: CandidateUnit[] = [];
   const selectable = withoutCharacterEmbodiment(character);
   FIELD_SPECS.forEach((spec, fieldIndex) => {
+    // The current scene is one atomic editorial unit, never a relevance candidate.
+    if (spec.key === 'situation_summary') return;
     splitUnits(selectable[spec.key] || "").forEach((text, unitIndex) => {
       candidates.push({
         id: `static:${spec.key}:${unitIndex}`,
@@ -259,7 +269,7 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
       });
     });
   });
-  const protectedUnits: SelectedUnit[] = characterEmbodiment(character).map(section => ({
+  const protectedUnits: SelectedUnit[] = protectedCharacterSections(character).map(section => ({
     id: `static:${section.key}:protected`, source: 'static', sourceKey: section.key,
     title: section.title, text: section.content, score: 10_000, status: 'selected',
     originalChars: section.content.length, removedChars: 0, reason: 'included',
@@ -275,8 +285,16 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
     text: contract,
     score: 10_000,
   };
-  let used = protectedUnits.reduce((sum, unit) => sum + unit.text.length, 0);
-  if (used > OPTIMIZED_V3_LIMITS.staticChars - 320) throw new Error('Parole éditoriale trop longue pour le noyau optimized_v3');
+  // Account for the exact rendered headings as well as editorial text.
+  const staticSize = (units: CandidateUnit[]) => {
+    const core = renderGroupedStatic(units, 'core', canonicalName);
+    const canon = renderGroupedStatic(units, 'canon', canonicalName);
+    return (core ? `\n\n# NOYAU DE ${canonicalName.toLocaleUpperCase('fr')}\n${core}`.length : 0)
+      + (canon ? `\n\n# CANON PERTINENT\n${canon}`.length : 0);
+  };
+  if (staticSize(selected) > OPTIMIZED_V3_LIMITS.staticChars) {
+    throw new Error('Présent canonique et parole éditoriale trop longs pour le noyau optimized_v3 : génération interdite');
+  }
   const trySelect = (candidate: CandidateUnit) => {
     if (decisions.has(candidate.id)) return;
     const novelty = retainNovelContent(candidate.text, [contractReference]);
@@ -297,14 +315,11 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
       decisions.set(candidate.id, { ...effective, status: "duplicate_static", keptBy: duplicate.id, originalChars: candidate.text.length, removedChars: candidate.text.length, reason: "duplicate" });
       return;
     }
-    // Reserve formatting overhead (group headings and section prefixes) inside
-    // the declared static budget instead of hiding it from the trace.
-    if (used + effective.text.length > OPTIMIZED_V3_LIMITS.staticChars - 320) {
+    if (staticSize([...selected, effective]) > OPTIMIZED_V3_LIMITS.staticChars) {
       decisions.set(candidate.id, { ...effective, status: "budget", originalChars: candidate.text.length, removedChars: novelty.removedChars, reason: "budget" });
       return;
     }
     selected.push(effective);
-    used += effective.text.length;
     decisions.set(candidate.id, {
       ...effective,
       status: "selected",
@@ -337,7 +352,7 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
   return { selected: selectedWithStatus, all };
 }
 
-function renderGroupedStatic(units: SelectedUnit[], group: "core" | "canon", characterName: string): string {
+function renderGroupedStatic(units: CandidateUnit[], group: "core" | "canon", characterName: string): string {
   const blocks: string[] = [];
   if (group === 'core') {
     const motive = units.find(unit => unit.sourceKey === 'moteur_intime');
@@ -364,7 +379,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   const contract = conversationContract(canonicalName, input.identityInvariant);
   const memory = normalizeConversationMemory(input.conversationMemory);
   const query = [input.userMessage, ...memorySearchTerms(memory)].join(" ");
-  const staticSelection = selectStaticUnits(input.character, query, contract);
+  const staticSelection = selectStaticUnits(input.character, query, contract, canonicalName);
   const core = renderGroupedStatic(staticSelection.selected, "core", canonicalName);
   if (!core) throw new Error("Fiche personnage incohérente : noyau éditorial vide");
   const canon = renderGroupedStatic(staticSelection.selected, "canon", canonicalName);
@@ -400,7 +415,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
       budgetSections.push({ key, title, chars: 0, originalChars: 0, included: false, truncated: false, omissionReason: "section_vide" });
       return "";
     }
-    const cappedOriginal = key === "rag_context"
+    const cappedOriginal = source === 'static' ? original : key === "rag_context"
       ? trimRagContextToWholeSouvenirs(original, cap)
       : capAtBoundary(original, cap);
     // The shared frame must retain the same facts and wording as the GM's
@@ -424,7 +439,12 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
     const prefix = `\n\n# ${title}\n`;
     const systemLimit = Math.max(2_000, OPTIMIZED_V3_LIMITS.generatedContextChars - input.historyChars);
     const remaining = systemLimit - prompt.length - prefix.length;
-    const bounded = key === "rag_context"
+    // All protected editorial units are in the core. Never normalize, shorten
+    // or silently omit it, even when a long conversation consumes its room.
+    if (key === 'character_core' && content.length > remaining) {
+      throw new Error('Présent canonique et parole éditoriale hors budget de contexte : génération interdite');
+    }
+    const bounded = key === 'character_core' ? content : key === "rag_context"
       ? trimRagContextToWholeSouvenirs(content, Math.max(0, remaining))
       : capAtBoundary(content, Math.max(0, remaining));
     if (!bounded) {
@@ -516,6 +536,10 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   append("rag_context", "SOUVENIRS COMPLÉMENTAIRES", ragBlocks.join("\n\n"), OPTIMIZED_V3_LIMITS.ragChars, "rag");
   append("post_video", "CONTEXTE POST-VIDÉO", input.postVideoContext, 500, "runtime");
 
+  const deliveredCore = injectedSections.find(section => section.key === 'character_core')?.content ?? '';
+  if (protectedCharacterSections(input.character).some(section => !deliveredCore.includes(section.content))) {
+    throw new Error('Présent canonique ou parole éditoriale incomplets : génération interdite');
+  }
   const staticRendered = [core, canon].filter(Boolean).join("\n\n");
   const staticChars = budgetSections.filter((section) => section.key === "character_core" || section.key === "character_canon").reduce((sum, section) => sum + section.chars, 0);
   const totalMessageChars = prompt.length + input.historyChars + input.userMessage.length;

@@ -4,6 +4,25 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Présent canonique Max/Emma — livraison en cours] — 2026-10-28
+
+- optimized_v3 conservait la parole éditoriale mais pouvait omettre la situation
+  actuelle pour budget : un souvenir de J−2 restait alors sans son présent.
+  Situation entière désormais protégée, réserve statique explicite de 5 500
+  caractères avec titres exacts, plafond global inchangé à 11 000 ; refus avant
+  modèle si le noyau obligatoire ne tient plus. Aucun fait codé en dur, voix,
+  fiche Notion, workflow ou paramètre Cloud modifié.
+- 24 reproductions synthétiques rouges avant, vertes après ; 99 ciblés verts.
+  Qualité locale verte : 71 régressions, 1 115 unitaires, 42 intégrations,
+  lint/typage/build. Un test asynchrone inchangé d'outbox a nécessité une
+  nouvelle passe, réussie sans modification de son code.
+- Connecteur GitHub natif toujours `Unknown tool` ; Ulrich autorise les autres
+  accès. `git`/`gh` validés dans le contexte système avec l'identité existante,
+  sans reconnexion. [Erreurs exactes et commandes](docs/diagnostic_github_connecteur_2026-10-28.md).
+- Livraison PR/CI/main et synchronisation Lovable à vérifier ; aucune production.
+  [Plan](docs/plan_optimisation_payload_max.md),
+  [prompt de recette courte F4](docs/prompt_reprise_present_canonique_lot_f4_recette.md).
+
 ## [F3 — capsule de passage et essai Max → Emma] — 2026-10-27
 
 - Ulrich confirme un passage Max → Emma réussi ; session 043712a6 relue via

@@ -3,8 +3,58 @@ import { makeNotionMaxPrompt } from "./__fixtures__/maxNotionFixture";
 import { buildOptimizedPromptAssembly, OPTIMIZED_V3_LIMITS } from "./maxOptimizedPromptCompiler";
 import { mergeConversationMemory } from "@/services/conversationMemoryV1";
 import { buildExperienceFrame } from "@/services/experienceFrame";
+import { makeCanonicalPresentFixture } from './__fixtures__/canonicalPresentFixture';
 
 describe("optimized_v3 prompt compiler", () => {
+  const presentCases = (['max', 'emma'] as const).flatMap(character =>
+    ['Comment va Max ce matin ?', 'Il est parti avec Anne ?', 'Non, vous êtes rentrés hier.'].flatMap(userMessage =>
+      [0, 1_800].flatMap(historyChars => [false, true].map(oldMemory => ({ character, userMessage, historyChars, oldMemory })))));
+
+  it.each(presentCases)('garde le présent entier de $character avec $historyChars caractères et souvenir ancien=$oldMemory : $userMessage', ({ character, userMessage, historyChars, oldMemory }) => {
+    const sheet = makeCanonicalPresentFixture(character);
+    const result = buildOptimizedPromptAssembly({
+      character: sheet, characterName: sheet.name!, userMessage, historyChars,
+      ragCandidates: oldMemory ? [{ id: 'hotel', rank: 1, content: "Il y a deux jours, le néon grésillait dans le hall de l'hôtel pendant que Max cherchait Anne." }] : [],
+    });
+    // The entire editorial scene, including its last paragraph, must reach the model.
+    expect(result.finalSystemPrompt).toContain(sheet.situation_summary);
+    expect(result.finalSystemPrompt).toContain(sheet.maniere_de_parler);
+    expect(result.finalSystemPrompt).toContain(sheet.dynamique_conversation);
+    if (oldMemory) expect(result.finalSystemPrompt).toContain("Il y a deux jours, le néon grésillait dans le hall de l'hôtel pendant que Max cherchait Anne.");
+    expect(result.budget?.withinBudget).toBe(true);
+    expect(result.budget?.staticChars).toBeLessThanOrEqual(result.budget!.staticLimitChars);
+  });
+
+  it('conserve les paragraphes du présent malgré une timeline lexicalement voisine', () => {
+    const sheet = makeCanonicalPresentFixture('emma');
+    sheet.timeline = sheet.situation_summary + '\n\nIl y a deux jours, le départ vers un hôtel.';
+    sheet.situation_summary += '\n\nPrécision actuelle : le téléphone attend sur la table.  Emma reste là.';
+    const result = buildOptimizedPromptAssembly({ character: sheet, characterName: sheet.name!, userMessage: 'Où êtes-vous ?', historyChars: 3_000 });
+    expect(result.finalSystemPrompt).toContain(sheet.situation_summary);
+    expect(result.budget?.withinBudget).toBe(true);
+    const core = result.injectedSections.find(section => section.key === 'character_core')!;
+    expect(core.content).toContain(sheet.situation_summary);
+    expect(result.budget?.units?.filter(unit => unit.sourceKey === 'situation_summary')).toEqual([
+      expect.objectContaining({ status: 'selected', chars: sheet.situation_summary.length, removedChars: 0 }),
+    ]);
+    const staticSections = result.budget!.sections.filter(section => ['character_core', 'character_canon'].includes(section.key));
+    expect(staticSections.reduce((sum, section) => sum + section.chars, 0)).toBe(result.budget!.staticChars);
+  });
+
+  it.each(['présent', 'parole'] as const)('refuse un %s obligatoire trop grand plutôt que le tronquer', field => {
+    const sheet = makeCanonicalPresentFixture('emma');
+    if (field === 'présent') sheet.situation_summary = 'Un fait actuel. '.repeat(500);
+    else sheet.maniere_de_parler = 'Un état de parole. '.repeat(500);
+    expect(() => buildOptimizedPromptAssembly({ character: sheet, characterName: sheet.name!, userMessage: 'Bonjour', historyChars: 0 }))
+      .toThrow(/canonique.*parole éditoriale.*génération interdite/i);
+  });
+
+  it('refuse de perdre le noyau lorsque l’historique épuise le budget global', () => {
+    const sheet = makeCanonicalPresentFixture('emma');
+    expect(() => buildOptimizedPromptAssembly({ character: sheet, characterName: sheet.name!, userMessage: 'Et ce matin ?', historyChars: 7_000 }))
+      .toThrow(/hors budget de contexte.*génération interdite/i);
+  });
+
   it.each(["---", "***", "…", "Max"])("un fragment court %s ne supprime pas le cadre du transfert ou les faits nouveaux", (fragment) => {
     const frame = buildExperienceFrame({ config: null, filmAnswer: "pas_vu",
       callTransfer: { from: "emma", returning: false } }).prompt;
