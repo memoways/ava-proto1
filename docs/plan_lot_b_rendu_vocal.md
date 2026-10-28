@@ -19,7 +19,7 @@ La recette F4 reste distincte ; aucun gel de démo ni publication implicite.
 | Lot | Périmètre et résultat observable | Dépendance / sortie | Statut |
 | --- | --- | --- | --- |
 | AP1 | Atelier lisible, réglages expliqués et écoute A/B fidèle au transport actuel ; réemploi du banc | Livraison technique vérifiée ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap1.md) | Implémenté ; vérifications et reçu ci-dessous |
-| AP2 | Atelier unique et parcours simple ; retrait du banc de TTS Config ; variantes/avis nommés et retrouvables | Correction UX prioritaire, puis stockage sandbox strict et relecture | Préparé, non lancé |
+| AP2 | Atelier unique et parcours simple ; retrait du banc de TTS Config ; variantes/avis nommés et retrouvables | Correction UX prioritaire, puis stockage sandbox strict et relecture | Implémenté ; livraison et recette de clôture ci-dessous |
 | AP3 | Première séance Max, deux répliques initiales, une hypothèse et deux variantes | AP2 livré ; bilan humain, référence et prochain défaut observé | Recette à organiser |
 | AP4 | Conversations courtes guidées, nouvelle session par essai, références et versions réellement utilisées | Bilan AP3 ; états proposés/déclarés/livrés et coupures distingués | Planifié |
 | AP5 | Affiner Max par passes : Notion, GM effectif, LLM ou restitution ; une couche par comparaison | Observations humaines ; sous-lots AP5.1… définis avant leur exécution | Itératif, non lancé |
@@ -1167,3 +1167,96 @@ La livraison technique désactivée ne vaut pas recette humaine. A4 ne commence
 pas dans ce lot. Le SHA final et les runs exacts de livraison sont conservés
 dans le bilan de la PR A3 (source GitHub), sans commit circulaire pour inscrire
 le SHA du commit contenant cette même ligne.
+
+## Exécution AP2 — 28 octobre 2026
+
+Objectif : un seul atelier guidé dans Expérience, puis comparaisons nommées et
+avis retrouvables dans la même sandbox. Branche `codex/ap2-atelier-unique-variantes`
+depuis main `54e7bfa818f7db04b61be7068e145535e412d695` ; #24 et branches
+historiques préservées, aucun recouvrement. Gamilab et Lovable Ava/Memoways
+confirmés nativement ; GitHub natif Unknown tool, repli gh authentifié Ulrfis.
+Début préparation observé 17:24 UTC, branche créée 17:25:33 UTC.
+
+Périmètre autorisé : retrait de toutes les auditions de TTS Config ; même banc et
+propriétaire audio, étapes choisir → version actuelle → essai → avis/enregistrer ;
+options avancées pour Emma/fournisseurs, références et mapping persistant explicite.
+Documents dédiés `speech_workshop_documents` (hors préfixe runtime `ava_`) dans `admin_settings`, schéma versionné,
+partition sandbox stricte, CAS et relecture exacte ; jamais une activation du jeu.
+Lecture absente/indisponible/conflit/relecture distincts. Aucun audio durable ni
+prompt intégral, aucune audition réelle automatique ou publication.
+
+Vérifications prévues : tests service de persistance et confidentialité, parcours
+UI simulé et fermeture/reconnexion, zéro écriture/audio au chargement, identité
+texte/état/voix et seule différence, conservation contrôles avancés ; desktop,
+clavier et 390 px, qualité/delivery, campagne PR/HEAD puis garde arbre/parent.
+Recette preview authentifiée après synchronisation ; compréhension et écoute
+humaine restent distinctes. Retour arrière : revert du squash AP2 en nouveau lot
+contrôlé ; documents dédiés conservés, aucun réglage live à restaurer.
+
+
+### Résultat et contrôles AP2
+
+TTS Config ne contient plus aucun banc ni bouton de génération. Les réglages
+fournisseurs/voix/modèles/paramètres restent en place ; déplacement du buffer
+expérimental et des auditions vers le seul `SpeechAuditionBench` dans Expérience.
+Parcours guidé en quatre étapes ; Emma et tous les fournisseurs, corpus et
+finalistes, transports/buffer, familles et preuves accessibles dans des détails
+fermés. Mapping du jeu dans un panneau avancé distinct avec sauvegarde explicite ;
+son déplacement ne sauvegarde rien et ne modifie pas les valeurs persistantes.
+
+Snapshots de la paire, texte court édité, état choisi, nom/hypothèse, différence,
+transport demandé, références connues/inconnues, preuves de paramètres filtrées,
+notes séparées et décision humaine sont conservés dans le document dédié.
+Clé hors préfixe `ava_` décidée après lecture native des politiques Cloud : les
+politiques testeur invité lisent les clés runtime préfixées dans leur sandbox.
+Droits admin existants réutilisés ; aucune migration, fonction, droit ou secret.
+CAS sur JSONB complet avec version unique et comparaison exacte de relecture ;
+autres entrées/extensions conservées. Format inconnu refusé sans migration
+implicite. Aucune écriture du cache runtime pour les variantes.
+
+Charger une comparaison ne joue rien et ne sauvegarde rien ; preuves antérieures
+conservées pour une modification d’avis seule, sans prétendre à une nouvelle
+écoute. Références anciennes et actuelles visibles à la demande. Si des paramètres
+non-Gradium changent, préparation explicite d’une nouvelle paire requise avant
+régénération. Cache exact uniquement mémoire, mêmes limites et propriétaire audio.
+La décision préférée/rejetée reste une appréciation, jamais une activation du jeu.
+
+Tests ciblés : 8 persistance (absence/erreur/admin/sandbox/CAS/readback/extensions,
+confidentialité et exports), 9 UI (étapes, identité A/B, reprise et notes,
+conflit, accès avancés, repli/annulation, production, lecture indisponible),
+2 TTS Config (voix distinctes, aucun lecteur). Services/adaptateurs existants
+REST/WS/cache/retards inchangés et recouverts par la qualité complète.
+E2E ciblé vert, desktop puis 390 px, parcours clavier, brouillon sauvegardé/rechargé,
+deux générations simulées de WAV silencieux, notes sauvegardées/rechargées, zéro
+appel fournisseur réel. Un premier échec venait du faux endpoint de test qui ne
+lisait pas la clé dans un INSERT ; fixture corrigée, aucun garde applicatif retiré.
+Une tentative initiale du serveur Vite refusée par sandbox (EPERM), avant test ;
+contexte système autorisé ensuite. Le test unitaire REST a également explicité
+son transport : les défauts chargés en test avaient correctement demandé WS.
+
+Qualité locale finale, campagne PR/HEAD exact et reçu arbre/parent seront précisés
+dans le bilan GitHub/Notion après livraison. `test:delivery` : 23/23 verts.
+Preview authentifiée à vérifier après synchronisation Lovable ; la recette
+technique ne vaut pas validation de la compréhension ni préférence vocale d’Ulrich.
+Production non publiée. Aucun prompt/voix/mapping live, capture/STT/mains libres,
+transfert, budget ou état narratif du jeu modifié.
+
+[Prompt AP3 autonome](prompt_reprise_atelier_parole_lot_ap3.md) enregistré avec
+ce lot avant le premier push : première écoute accompagnée Max, non lancée.
+
+### Mesure CT2 AP2 (avant livraison)
+
+Préparation/branche : 17:24 UTC / 17:25:33 UTC le 28 octobre 2026. Dépendances
+et navigateurs locaux déjà présents, aucune installation. Une passe qualité
+complète initiale verte (71 régressions, 1 128 unitaires, 42 intégrations,
+lint/typage/build), une seconde après protection des références rechargées, puis
+passe finale avant push avec les finitions de focus et d’avis non enregistrés.
+Horodatages précis qualité finale, premier push/run/job, installation CI/E2E,
+retries/annulations et fusion dans le bilan de livraison et Notion. Séparer
+travail actif, attente CI et recette preview ; aucun second passage complet main.
+
+Qualité finale avant push : `2026-10-28T17:42:16Z` → `2026-10-28T17:42:59Z`, lint (un avertissement
+IndexPRD4 préexistant), typage, **71 régressions, 1 130 unitaires, 42 intégrations**
+et build verts. E2E ciblé final : 5,1 s d’exécution / 6,6 s avec démarrage,
+sans retry automatique. Garde : 23/23 verts. Les horodatages GitHub et le reçu
+postfusion restent dans le bilan/Notion, sans deuxième PR documentaire.

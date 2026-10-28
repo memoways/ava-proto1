@@ -46,12 +46,19 @@ transport actuel respecté et preuves effectives lisibles ; aucun réglage live.
 Lire la PR AP1 et son reçu GitHub/Notion pour les SHA/run finaux ; ce document
 est committé avant le squash. Lovable/production restent des étapes distinctes.
 
-**Suite AP2 préparée, non lancée : simplifier et dédoublonner d’abord.**
-Retirer le banc A3/auditions de TTS Config ; un seul atelier dans Expérience,
-parcours court et détails experts repliés, puis variantes et avis persistants.
-Le doublon et la clarté sont des critères de sortie obligatoires d’AP2.
-[prompt autonome — variantes et avis persistants](prompt_reprise_atelier_parole_lot_ap2.md).
-AP3 organise ensuite l’écoute humaine de Max ; aucune écoute réelle ni acceptation
-vocale revendiquée par AP1. [Contrat AP1–AP6](plan_lot_b_rendu_vocal.md#atelier-de-parole-ap1ap6--contrat-courant-28-octobre-2026).
-[CT2](prompt_reprise_contexte_travail_lot_ct2.md) mesure la livraison de ce lot.
-F4 reste une recette distincte, aucune publication production implicite.
+**AP2 implémenté : atelier unique et comparaisons persistantes.**
+TTS Config ne lance plus d’audio. Dans l’atelier : réplique/état explicite → version
+actuelle → un réglage différent → avis nommé et sauvegarde confirmée par relecture.
+Emma, fournisseurs et contrôles experts dans les options avancées du même banc.
+Documents admin/sandbox `speech_workshop_documents` (hors `ava_` pour conserver
+l’isolation RLS), CAS du document et relecture exacte. Charger reste un brouillon,
+aucun audio automatique ni activation du jeu. Audio exact uniquement en mémoire.
+[Résultat et limites AP2](plan_lot_b_rendu_vocal.md#exécution-ap2--28-octobre-2026).
+Livraison GitHub/CI et preview sont vérifiées à la clôture, avec reçu réel dans la
+PR et Notion ; ne pas confondre implémentation et publication.
+
+**Suite AP3 préparée, non lancée : première écoute accompagnée Max.**
+[Prompt autonome AP3](prompt_reprise_atelier_parole_lot_ap3.md) : 10–15 minutes,
+M1/M2, une hypothèse et deux versions. Compréhension et préférence vocales sont
+validées par Ulrich ; aucune acceptation humaine revendiquée par les tests AP2.
+F4 reste distincte. Aucune publication production implicite.
