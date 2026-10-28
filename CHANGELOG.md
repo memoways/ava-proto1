@@ -4,6 +4,19 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Atelier de parole — découpage et prompt AP1] — 2026-10-28
+
+- [Plan courant AP1–AP6](docs/plan_lot_b_rendu_vocal.md) enregistré : Max d'abord,
+  écoutes puis conversations guidées, variantes/avis persistants, séances de
+  10–15 minutes et passes app/Notion séparées. Contrat de suivi, preuves et
+  prompt du prochain lot dès chaque clôture, sans nouvelle demande.
+- [Prompt autonome AP1](docs/prompt_reprise_atelier_parole_lot_ap1.md) : atelier
+  lisible et A/B fidèle au transport effectif ; réemploi du banc, aucun audio
+  automatique, réglage live ou publication. AP1 préparé, non implémenté.
+- Lot exclusivement documentaire ; code, workflows, voix et Cloud inchangés.
+  Dernière CI code/qualité verte : PR CT1 #107, run 40683839668 sur HEAD
+  `29e247d23ead2e5fc244c1c67671bc34d690ac7c`. Pas de nouvelle campagne complète.
+
 ## [CT1 — contexte et CI proportionnés] — 2026-10-28
 
 - Trois décisions approuvées : campagne complète sur PR/HEAD exact contenant main,
