@@ -1,0 +1,11 @@
+# Ava only. Global vexp is disabled to avoid indexing a different repository.
+[mcp_servers.vexp]
+enabled = true
+command = "/Users/ulrich/.nvm/versions/node/v24.16.0/lib/node_modules/vexp-cli/node_modules/@vexp/core-darwin-arm64/bin/vexp-core"
+args = ["mcp", "--workspace", "/Users/ulrich/CodeProjects/memoways/ava-proto1"]
+cwd = "/Users/ulrich/CodeProjects/memoways/ava-proto1"
+tool_timeout_sec = 120
+
+[mcp_servers.vexp.env]
+VEXP_WORKSPACE = "/Users/ulrich/CodeProjects/memoways/ava-proto1"
+VEXP_HOME = "/Users/ulrich"

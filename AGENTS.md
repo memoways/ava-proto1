@@ -67,59 +67,68 @@ Le seul dépôt distant est `https://github.com/memoways/ava-proto1`.
 - À la fin du lot, le travail va sur GitHub par la branche et la PR. Le dossier
   visible du projet reste le checkout canonique.
 
-## Fin de lot : tout va jusqu'au bout, zéro branche qui traîne (obligatoire)
+## Démarrage et contexte courant
 
-Décision d'Ulrich, définitive, applicable à tout agent et tout outil (Claude, Codex,
-Cursor, Lovable, autres). Ne jamais attendre qu'il la répète, ne jamais demander s'il faut
-« nettoyer après ».
+Lire `docs/etat_courant.md`, `git status`, les six derniers commits de
+`origin/main` et le début du CHANGELOG. Consulter STORY et les plans historiques
+seulement pour le domaine touché. Un seul workflow pertinent par tâche ; charger
+un skill lourd sur demande ou si son livrable est réellement nécessaire.
 
-**Un lot n'est TERMINÉ que lorsque tout ceci est vrai et vérifié :**
+Un seul agent actif sur Ava. Avant d'écrire : vérifier les chats actifs, le remote
+unique, les branches et PR ouvertes, `git fetch --prune`, puis main propre par
+`git pull --ff-only`. Une branche du lot depuis ce main. Préserver les PR/branches
+étrangères ; si elles ont bougé depuis moins de 24 h, demander à Ulrich avant toute
+intervention. Aucun recouvrement de fichiers avec une PR ouverte. La PR historique
+#24 et les branches locales antérieures sont des exceptions à signaler, pas à purger.
 
-1. Le code est dans `main` sur GitHub, par PR, après CI **verte sur le HEAD exact**
-   de la PR. Interdit de fusionner tant que `regression-gates` est `queued`,
-   `in_progress` ou rouge : attendre, ou relancer une fois ; ne jamais fusionner « en espérant ».
-2. La CI de `main` est verte sur le commit de fusion (E2E compris). Si elle est rouge :
-   corriger tout de suite ou revenir en arrière ; ne jamais laisser `main` cassé.
-3. La branche du lot est supprimée (distante et locale) et sa PR est fermée ou fusionnée.
-   Aucune branche, aucun brouillon, aucune PR ouverte ne reste après un lot.
-4. Le compte rendu final dit, vérifié par lecture de GitHub : SHA de `main`, CI de `main`,
-   liste des branches restantes (attendu : seulement `main`).
+## Livraison — CI complète sur PR une fois
 
-**Règles de conduite associées :**
+Décision approuvée par Ulrich le 28 octobre 2026 ; justification et limites :
+[ADR CT1](docs/adr_ci_complete_sur_pr.md). Cette règle remplace explicitement
+l'obligation précédente de rejouer les E2E sur main après chaque fusion.
 
-- **Un seul agent actif à la fois sur ce dépôt** (Codex, Claude, Cursor, Lovable ou autre).
-  Avant toute action, regarder l'activité récente : `git fetch --prune`, derniers commits de
-  `main`, PR et branches ouvertes. Si une branche ou une PR d'un autre agent a bougé depuis
-  moins de 24 h, ne pas la fusionner, la fermer, la modifier ni la supprimer : demander à Ulrich.
-  Ne jamais ouvrir un lot qui touche les mêmes fichiers qu'une PR ouverte. Chaque agent fusionne
-  et nettoie uniquement ses propres PR et branches.
-- **Après chaque fusion dans `main`, rendre l'état lisible pour l'agent suivant** : entrée au
-  CHANGELOG avec le SHA de `main`, et ce qui reste à valider (recette humaine, publication Lovable).
-  Un agent qui reprend lit d'abord `git log origin/main` et le CHANGELOG, puis met son checkout à jour
-  (`git fetch --prune`, `git pull`) avant d'écrire une ligne.
-- **Une seule branche par lot, créée depuis `main` à jour.** Avant de commencer, lister les
-  branches et PR ouvertes (`git fetch --prune`, `gh pr list`) : terminer, absorber ou fermer
-  l'existant avant d'ouvrir du neuf. Pas de travail parallèle sur les mêmes fichiers.
-- **Ne jamais fermer une PR ni supprimer une branche qui contient du travail absent de
-  `main`** sans l'avoir d'abord porté dans `main` (ou sans accord explicite d'Ulrich).
-- **Ne jamais laisser une PR en brouillon « pour plus tard ».** Soit elle est finie et fusionnée,
-  soit elle est fermée avec son travail porté ailleurs.
-- **Autorisation durable :** fusionner dans `main` une PR dont la CI est verte sur le HEAD exact
-  est autorisé sans redemander. Cela ne publie pas : la **publication de production via Lovable
-  reste une étape distincte**, annoncée comme telle (local ≠ GitHub ≠ staging ≠ production).
-- **Pousser jusqu'à `main` avant de rendre la main (Ulrich, 27 octobre 2026).** À la fin
-  d'un développement, l'agent pousse, attend lui-même la CI dans la même session et
-  fusionne dans `main` dès qu'elle est verte. Il ne livre jamais à Ulrich ni à Lovable
-  un prompt, un test ou une action qui dépend d'une PR non fusionnée : un prompt Lovable
-  cite le SHA de `main` qui contient le correctif. Tout ce que le lot doit contenir
-  (code, tests, plan, prompts) est commité **avant** le premier push : un commit ajouté
-  pendant que la CI tourne la relance et retarde la livraison d'environ 20 minutes.
-- **Si une étape ne peut pas être faite** (droit refusé, CI bloquée, conflit non résolu) :
-  le lot n'est PAS terminé. Le dire en tête du compte rendu, avec l'unique action précise
-  que doit faire Ulrich. Ne jamais écrire « terminé » avec des branches ou PR qui restent.
-- Filet automatique : `.github/workflows/prune-branches.yml` supprime les branches terminées
-  à la fermeture de chaque PR et chaque lundi. Il ne remplace pas la règle : l'agent supprime
-  lui-même sa branche et le vérifie.
+1. Reproduction ciblée et validations locales adaptées ; pour un lot de code,
+   `npm run test:quality` et `npm run test:delivery` verts avant push. Tout le lot
+   (code, tests, plan, prompts, CHANGELOG) est commité avant le premier push.
+2. La CI `Core experience quality` teste le HEAD exact de la PR, contenant main
+   à jour. Attendre run **et** job `regression-gates` verts, jamais queued,
+   in_progress, skipped ou rouge. Une relance bornée est permise après diagnostic ;
+   si le code ou la base change, obtenir la CI du nouveau HEAD.
+3. Fusion squash autorisée sans redemander, uniquement via la garde versionnée :
+   `node .github/scripts/ship-pr.mjs --pr NUMERO --head SHA_COMPLET --merge`.
+   Elle attend la CI, revérifie HEAD/base, fournit le SHA attendu à GitHub et
+   compare arbre et parent du commit fusionné. `git-ship` doit déléguer à cette
+   garde sur Ava ; aucun merge direct ni auto-merge qui saute ces vérifications.
+4. Après fusion, vérifier main sur GitHub : arbre identique au HEAD testé et
+   parent égal à la base vérifiée. **Aucune seconde campagne complète sur main.**
+   Un arbre/parent différent laisse le lot ouvert : diagnostiquer et corriger ou
+   revenir au dernier état validé avant de conclure. La garde ne protège pas le
+   serveur contre un merge manuel qui la contourne ; ne pas la présenter ainsi.
+5. Supprimer notre seule branche distante puis locale après mise à jour du
+   checkout main. Vérifier sa PR fusionnée, main propre et branches restantes.
+   Ne jamais fermer une PR ni supprimer du travail absent de main sans accord.
+6. Vérifier Lovable Ava/Memoways synchronisé ; séparer livraison GitHub,
+   preview/staging et production. Une fusion ne publie pas : publication Lovable
+   sur autorisation distincte. Si une étape bloque, annoncer le lot incomplet
+   avec l'unique action d'Ulrich indispensable, sans lui déléguer l'attente de CI.
+
+Le CHANGELOG décrit le lot avant push et référence la PR une fois connue dans le
+compte rendu ; le SHA final de main et le reçu de la garde sont dans ce compte
+rendu et Notion. Aucune seconde PR documentaire pour inscrire un futur SHA dans
+son propre contenu. Le bilan donne SHA main, CI PR/HEAD, arbre vérifié, absence
+attendue de campagne main, branches restantes et ce qui reste à valider.
+
+## Connexions — diagnostic borné
+
+Une sonde d'identité puis une lecture de ressource suffisent au premier diagnostic.
+Classer : outil absent/Unknown tool, réseau/sandbox, stockage sécurisé, mauvais
+workspace ou refus distant. Un échec isolé ne prouve pas une expiration OAuth.
+GitHub natif en priorité ; si son outil est indisponible, repli `git`/`gh` autorisé
+par Ulrich, identité existante et remote exact vérifiés depuis le contexte système
+autorisé. Ne pas répéter les sondes identiques ni réinstaller/réauthentifier.
+Notion reste sur le connecteur natif du workspace voulu ; si indisponible, signaler
+les lectures/écritures non faites, poursuivre les travaux indépendants autorisés,
+sans navigateur ni transfert de sources. Détails d'identité dans le routage ci-dessus.
 
 ## Documentation des plans (obligatoire)
 
@@ -144,8 +153,8 @@ Cursor, Lovable, autres). Ne jamais attendre qu'il la répète, ne jamais demand
 
 Les corrections strictement documentaires appliquent l'exception CI personnelle
 « ignorer les lots purement documentaires » : relire contenu, liens et diff,
-vérifier que le code est inchangé et citer sa dernière CI verte. Les contrôles
-CI sur le HEAD exact et sur main restent obligatoires pour les lots de code.
+vérifier que le code est inchangé et citer sa dernière CI verte. Les lots de code suivent le contrôle PR/HEAD exact et la comparaison de l’arbre
+fusionné décrits ci-dessus, sans seconde campagne complète sur main.
 
 - The shared experience frame (volunteer role, seen/unseen path, posture) is built only by `src/services/experienceFrame.ts` from the published orchestration config and injected identically into the character prompt and the GM prompt — why: no divergence between what GM and characters know.
 - The initial film answer is factual session context shared through the experience frame regardless of editorial frame activation; intro replay must preserve it — why: watching the project introduction does not mean watching the film.
