@@ -55,3 +55,21 @@ Le prompt AP3 est déjà enregistré dans
 accompagnée Max sans la lancer. **Donner son lien direct à la clôture AP2**.
 En cas de nouveau blocage, actualiser cette reprise exacte dans le même tour.
 Chaque clôture d’un lot futur doit enregistrer et lier son prompt suivant.
+
+
+Mise à jour accès : CLI officielle 1Password 2.41.0 installée, seule intégration CLI
+activée après accord explicite ; compte Fischers confirmé. Lanceur Ava et broker
+App sont préparés, 30 tests de livraison verts. Aucune App créée ni token réel
+configuré : GitHub Mobile non reçu/expiré, confirmation sudo avec remplissage
+1Password à effectuer dans l’onglet GitHub ouvert. Ulrich a autorisé la création
+et l’installation de l’App privée limitée à Ava (Contents/PR write, Actions read)
+et sa clé dans 1Password, ainsi que cette seule opération d’interface GitHub.
+Les scripts partagés n’ont pas été modifiés : revue automatique défavorable
+à l’impact sur les autres projets. Ne pas utiliser leurs anciens replis.
+Qualité complète répétée après ajout des scripts : une passe a rencontré des
+hooks Postgres dépassant 10 s ; les 42 intégrations sont revenues vertes sans
+modification, puis qualité complète à nouveau verte. Aucun contrôle retiré.
+
+Dernier E2E ciblé final : 5,8 s / 8,5 s avec serveur, sans retry. Le dernier
+commit local inclut les cinq scripts/tests 1Password et la documentation de
+l’activation CLI autorisée. Vérifier son SHA par git rev-parse HEAD.

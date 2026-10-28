@@ -25,6 +25,9 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   réglage live, prompt Notion/GM ou publication production modifié.
 - [Plan et preuves](docs/plan_lot_b_rendu_vocal.md#exécution-ap2--28-octobre-2026),
   [prompt AP3 autonome](docs/prompt_reprise_atelier_parole_lot_ap3.md), non lancé.
+- Accès GitHub isolé via 1Password préparé : CLI officielle et seule option CLI
+  activées avec accord, lanceur local sans repli personnel et broker App en
+  mémoire, 30 tests de livraison. Aucune App ou token réel encore configurés.
 - Livraison AP2 interrompue avant push réussi : aucune PR/CI/fusion ou nouvelle
   preview. [Reprise exacte](docs/prompt_reprise_atelier_parole_lot_ap2_livraison.md).
   Décision explicite d’Ulrich : accès GitHub indépendant du Trousseau macOS,

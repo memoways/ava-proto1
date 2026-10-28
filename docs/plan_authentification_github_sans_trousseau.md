@@ -19,13 +19,54 @@ d’identifiant effectué. Aucun réglage d’Outlook modifié.
 
 La configuration SSH existante cible l’agent 1Password. Une sonde avec
 `UseKeychain=no`, `AddKeysToAgent=no` et `BatchMode=yes` n’a trouvé aucune identité
-chargée ; arrêt de la sonde en attente. CLI `op` absent. Ne pas répéter les
+chargée ; arrêt de la sonde en attente. CLI `op` absente lors de cette sonde, puis version officielle 2.41.0 installée
+via Homebrew dans ce lot, sans changement du Trousseau ni de la configuration gh. Ne pas répéter les
 sondes. La GitHub App de livraison n’est pas configurée : fichier attendu
 `~/.config/git-ship/github-app.env` absent. Ne pas annoncer cette voie disponible.
 
-## Cible préparée — pas encore provisionnée
+## Intégration 1Password demandée ensuite par Ulrich
 
-GitHub App privée dédiée à Ava, installée uniquement sur
+Ulrich confirme que 1Password peut servir de voie indépendante pour GitHub.
+App 1Password « Fischers » ouverte par Ulrich ; option CLI observée désactivée.
+Son activation est un nouvel accès aux secrets : validation explicite demandée
+sur cette seule option, avant tout clic ; SDK/MCP restent désactivés. Aucun
+élément secret GitHub encore sélectionné ou lu à ce stade.
+
+La CLI officielle 2.41.0 est installée. Lanceur local préparé :
+`.github/scripts/github-1password.sh`, avec référence non secrète fournie dans
+`AVA_GITHUB_TOKEN_REFERENCE`. Exemple générique, à remplacer par la référence
+exacte d’un identifiant GitHub existant et autorisé :
+
+```sh
+AVA_GITHUB_TOKEN_REFERENCE='op://COFFRE/ELEMENT/CHAMP' \
+  bash .github/scripts/github-1password.sh gh api user --jq .login
+```
+
+Le lanceur remet à zéro les helpers Git pour ce seul processus, utilise son helper
+limité au chemin HTTPS exact Ava, crée une configuration gh temporaire vide,
+la nettoie à la sortie et demande à `op run` de transmettre le jeton en mémoire.
+La référence reste une référence, jamais une copie du secret. Aucun alias, login,
+refresh, logout ou configuration utilisateur globale modifié. Un identifiant absent,
+1Password indisponible, un mauvais remote ou un secret qui n’est pas un jeton
+arrête l’exécution ; aucun repli implicite. Le lanceur refuse les commandes `gh auth`.
+
+Quatre tests déterministes passent avec un faux `op`, un faux `gh` et des secrets
+fictifs : refus initial, coffre indisponible/secret invalide, isolation et nettoyage
+du processus, helper Git limité au seul dépôt et sans stockage. `test:delivery`
+exécute ces tests en plus des 23 tests de garde. Aucun jeton réel utilisé dans
+ces tests. L’intégration n’est opérationnelle qu’après autorisation CLI, sélection
+d’un identifiant adapté, identité/dépôt vérifiés et un push réussi.
+
+Réutiliser d’abord un identifiant GitHub adapté déjà présent dans 1Password.
+Le plugin GitHub officiel utilise un jeton d’accès, pas le mot de passe du compte.
+Ne pas importer l’ancien identifiant depuis le Trousseau. Si seul un mot de passe
+ou une clé SSH est présent, cela ne suffit pas à l’API PR/CI : déclarer ce prérequis,
+ne pas fabriquer une réussite. Une nouvelle autorisation GitHub exige des droits
+limités et une validation explicite de leur portée.
+
+## Option dédiée GitHub App — pas encore provisionnée
+
+Option de livraison durable : GitHub App privée dédiée à Ava, installée uniquement sur
 `memoways/ava-proto1`. Permissions nécessaires à valider à l’installation :
 Contents lecture/écriture pour Git, Pull requests lecture/écriture pour la PR et
 la fusion, Actions lecture pour attendre les runs/jobs ; Metadata lecture implicite.
@@ -76,3 +117,58 @@ réussis, pas après l’existence d’un fichier de configuration.
 - [Permissions minimales d’une GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app).
 - [Authentification comme installation et jetons limités](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation).
 - [Reprise exacte AP2](prompt_reprise_atelier_parole_lot_ap2_livraison.md).
+
+- [CLI 1Password, installation officielle](https://www.1password.dev/cli/get-started).
+- [Secrets transmis aux processus par op run](https://www.1password.dev/cli/secrets-scripts).
+- [Intégration GitHub officielle et nécessité d’un jeton](https://www.1password.dev/cli/shell-plugins/github).
+
+
+## Activation autorisée et préparation de l’App
+
+Ulrich a autorisé puis fait vérifier l’activation de la seule option CLI dans
+1Password. SDK et MCP restent désactivés. Le compte desktop Fischers correspond
+au compte CLI fischer-geneve.1password.com. Session CLI autorisée ; les recherches
+restent ciblées sur GitHub. Une lecture de métadonnées large et une lecture JSON
+complète d’un login ont été refusées par la vérification automatique, sans
+contournement ; aucun mot de passe, passkey ou code de secours n’est nécessaire
+au mécanisme de livraison préparé.
+
+Ulrich autorise ensuite explicitement la création/installation dans son navigateur
+de l’App privée Ava delivery, pour le seul dépôt Ava, avec Contents/Pull requests
+write et Actions read, clé conservée dans 1Password. Cette exception navigateur
+porte uniquement sur la mise en place de l’accès, pas sur les opérations GitHub
+courantes. GitHub a confirmé l’identité Ulrfis et demandé une confirmation sudo
+via GitHub Mobile ; aucune authentification macOS n’est lancée.
+
+Le broker `.github/scripts/github-1password-app.mjs` est préparé/testé avec une clé
+RSA fictive. La clé réelle serait résolue par `op run`, signée en mémoire pour le
+JWT, puis retirée de l’environnement des commandes Git/gh. Jeton d’installation
+limité à Ava et aux permissions minimales ; aucune réponse de jeton sur disque.
+Deux tests supplémentaires vérifient signature/limitation et les refus d’accès.
+`test:delivery` comprend désormais 30 tests. Aucun nouveau contrôle CI supprimé.
+
+Configuration locale non secrète prévue :
+`~/.config/git-ship/ava-1password.env`, champs App ID, installation ID, référence
+op:// de la clé et compte 1Password. Aucun jeton/PEM dans ce fichier. Le lanceur
+la charge comme données, sans l’exécuter comme script. Aucun fallback personnel.
+Ne déclarer l’App opérationnelle qu’après token/référentiel/push réels vérifiés.
+
+
+## Borne actuelle et limites de portée
+
+La demande GitHub Mobile n’a pas été reçue par Ulrich et a expiré. L’onglet
+GitHub Confirm access du compte Ulrfis est passé sur la confirmation par mot de
+passe avec l’extension 1Password disponible. Remplissage/confirmation directement
+par Ulrich demandés ; aucun mot de passe dans le chat. L’App n’est toujours pas
+créée et aucun identifiant de livraison réel n’a été installé.
+
+Une protection des scripts partagés github-auth-check et git-ship a été préparée
+hors dépôt et testée sur six scénarios simulés. Son application a été refusée
+par la vérification automatique, car sa portée aurait affecté les autres projets.
+**Aucun de ces deux scripts partagés n’a été modifié.** Leur changement exige une
+autorisation explicite de cette portée globale et reste hors de l’intégration Ava
+actuelle. Les sauvegardes et patches prévus n’ont pas été appliqués. Pour Ava,
+utiliser uniquement le lanceur du dépôt ; ne pas exécuter directement les anciens
+helpers. Avec l’App fournie par ce lanceur, les marqueurs App évitent le repli
+personnel du helper existant. Les autres projets doivent suivre l’interdiction
+générale du Trousseau enregistrée dans la mémoire personnelle.

@@ -73,3 +73,12 @@ Décision explicite d’Ulrich : **plus aucun recours au Trousseau macOS**.
 [Voie d’accès dédiée préparée, non configurée](plan_authentification_github_sans_trousseau.md).
 L’interdiction est dans AGENTS ; ne pas redemander un déverrouillage ou une
 reconnexion personnelle. AP3 reste préparé sans lancement.
+
+
+Accès alternatif préparé dans le même lot : CLI officielle 1Password installée,
+seule option CLI activée avec accord, lanceur Ava et broker App sans stockage
+personnel, 30 tests de livraison. GitHub App privée approuvée par Ulrich, mais
+**création non effectuée** : demande Mobile non reçue/expirée, confirmation
+administrateur GitHub avec remplissage 1Password encore attendue. Aucun token
+réel installé. Ne pas annoncer une intégration opérationnelle. Scripts partagés
+inchangés (leur modification globale a été refusée par la revue automatique).

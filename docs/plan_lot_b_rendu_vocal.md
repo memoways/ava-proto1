@@ -1287,3 +1287,28 @@ Local seulement, branche AP2 à conserver ; GitHub main/preview inchangés, prod
 non publiée. La recette authentifiée du nouveau code reste à faire après livraison.
 La compréhension et l’écoute humaines ne sont pas revendiquées. Le prompt AP3
 existe déjà, sa préparation ne lance aucune écoute.
+
+
+### Suite demandée — intégration GitHub par 1Password
+
+Ulrich demande une intégration GitHub isolée et accepte d’explorer 1Password.
+CLI officielle 2.41.0 installée ; app ouverte par Ulrich. Lanceur isolé et helper
+Ava préparés/testés (4 contrôles simulés), sans accès au Trousseau, sans alias ou
+configuration globale, sans aucun secret copié. L’option d’intégration CLI de
+1Password était désactivée ; activation soumise à sa validation explicite avant
+accès aux secrets. État réel et prérequis dans le plan d’accès dédié. Pas de push
+réussi ni de nouvelle PR à ce stade ; ne pas confondre préparation et connexion.
+
+
+Dernière qualité complète après préparation de l’accès : verte (71 régressions,
+1 131 unitaires, 42 intégrations et build). Tests de livraison : 30/30 verts,
+dont échange App en mémoire et absence d’héritage de la clé privée dans Git/gh.
+GitHub App approuvée mais non créée : confirmation sudo GitHub avec 1Password
+attendue après expiration de Mobile non reçu. Ni token, ni push/PR/CI, ni
+recette authentifiée du nouveau code à ce stade. Scripts partagés non modifiés
+après refus de la revue automatique sur leur portée globale. La reprise locale
+reste la source exécutable avant toute livraison ; aucune publication implicite.
+
+Dernier E2E ciblé, après toutes les finitions de contexte : 5,8 s / 8,5 s
+avec serveur, vert sans retry. Fournisseurs et sauvegarde simulés ; aucune
+recette de compréhension par Ulrich ni écoute fournisseur réelle.
