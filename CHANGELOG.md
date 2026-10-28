@@ -4,6 +4,25 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [CT1 — contexte et CI proportionnés] — 2026-10-28
+
+- Trois décisions approuvées : campagne complète sur PR/HEAD exact contenant main,
+  garde de fusion avec SHA attendu et comparaison arbre/parent après squash ;
+  **retrait explicite du second passage complet sur main**. Contrats AGENTS/CLAUDE
+  et template PR alignés. Aucun contrôle E2E ni navigateur supprimé.
+- État courant court, historiques à la demande, diagnostic borné et repli git/gh
+  authentifié. Sur le poste : doublon visual-plan archivé, trois skills lourds
+  sur demande explicite, confidence-check sans score arbitraire, vexp global
+  désactivé et override Ava, git-ship délégué à la garde pour Ava seulement.
+- 23 tests de garde verts, défaut git-ship reproduit sur transports simulés avant
+  correction ; qualité locale : 71 régressions, 1 115 unitaires, 42 intégrations,
+  lint/typage/build. Code applicatif, voix, Cloud et production inchangés.
+- [ADR](docs/adr_ci_complete_sur_pr.md), [plan](docs/plan_audit_contexte_travail.md),
+  [validations et changements du poste](docs/livraison_contexte_travail_ct1.md).
+  Le SHA final, la CI PR et le reçu d'arbre fusionné sont livrés dans le compte
+  rendu/Notion après fusion ; aucune PR supplémentaire pour réinscrire ce SHA.
+  [Suite CT2 préparée](docs/prompt_reprise_contexte_travail_lot_ct2.md), non lancée.
+
 ## [Audit du contexte de travail] — 2026-10-28
 
 - [Audit sourcé](docs/audit_contexte_travail_2026-10-28.md) : 160 runs qualité

@@ -1,78 +1,52 @@
-# CLAUDE.md — Ava Proto 1 ("Où est Ava ?")
+# CLAUDE.md — Ava Proto 1
 
-> Lis d'abord : STORY.md, README.md
-> Contexte MemoWays : ~/CodeProjects/_shared/agent-context/00-memoways-context.md
+Lire `AGENTS.md` (contrat commun), `docs/etat_courant.md`, `git status`, les six
+commits récents de main et le début du CHANGELOG. STORY, README et les grands
+plans se consultent uniquement pour le domaine touché, pas en entier à chaque reprise.
 
-## Contexte projet
+## Livraison
 
-Expérience narrative interactive voice-to-voice. L'utilisateur parle avec "Max" (personnage fictif, **père d'Ava** qui a disparu — ~55 ans, vit à Lausanne avec Emma). Pipeline STT → LLM → TTS. Prototype technique pour valider la mécanique avant production vidéo complète.
+Un seul agent actif sur Ava ; checkout canonique uniquement, remote
+`https://github.com/memoways/ava-proto1`. Vérifier activité/chats, branches et PR,
+puis actualiser main propre avant une branche du lot. Préserver PR #24 et travail
+étranger ; les détails de coordination d'AGENTS s'appliquent.
 
-- Statut : 🟡 En cours (session 23 — 2026-05-24)
-- Équipe : Ulrich Fischer / Memoways
-- Démarré : 2026-03-07
+CI complète **une fois sur PR**, HEAD exact contenant main à jour. Tout commiter
+avant push ; qualité locale et tests de garde verts. Attendre le run et le job
+`regression-gates` verts, puis passer obligatoirement par :
+`node .github/scripts/ship-pr.mjs --pr NUMERO --head SHA_COMPLET --merge`.
+Le git-ship personnel délègue à cette garde pour Ava. Elle bloque avant CI verte,
+protège le HEAD attendu et vérifie arbre/parent après squash. Aucun second passage
+complet sur main ; [ADR](docs/adr_ci_complete_sur_pr.md). Supprimer notre branche
+seulement, actualiser main, vérifier GitHub et la synchronisation Lovable.
+SHA final et preuve de livraison dans le compte rendu/Notion ; pas de PR de clôture
+pour réinscrire ce SHA dans le CHANGELOG. Préparer la reprise suivante avant push.
 
-## Plateforme de build et publication (règle obligatoire)
+## Plateforme et sources
 
-**Lovable est la plateforme de référence et l'unique chaîne de livraison.** Lovable compile le code et publie le site ; Lovable Cloud, avec Supabase fourni par Lovable, héberge le backend, les données, les Edge Functions et les secrets.
+Lovable est l'unique chaîne de livraison. Backend/SQL/Edge/secrets via MCP Lovable
+Ava `1265958d-b74e-40f2-917d-182fe05163fc`, workspace Memoways
+`5glbtPltldwz9tgNwIi4` ; aucun Supabase direct ni hébergement alternatif.
+Production distincte et soumise à autorisation. Notion Ava : Gamilab natif,
+get-self `7e1a9a09-09cb-4deb-a306-83a29b831bc2` ; autres IDs dans AGENTS.
+Gami DigiDouble exclu, aucun animal affiché.
 
-Pour toute lecture SQL ou interaction avec la base Ava, utiliser le connecteur MCP **Lovable**, projet `1265958d-b74e-40f2-917d-182fe05163fc`. Aucune connexion Supabase directe : ne pas rechercher ce projet dans le connecteur Supabase générique ni demander de reconnexion. Cette exception de projet prime sur le routage personnel général (Ulrich, 23 octobre 2026).
+GitHub natif d'abord, repli git/gh autorisé si outil indisponible, identité et
+remote vérifiés. Diagnostic identité/ressource borné, distinguer sandbox/trousseau,
+routage et OAuth ; pas de login/refresh/logout. Notion reste natif.
 
-Toute modification effectuée hors de Lovable doit rester compatible avec Lovable et y être ramenée avant validation ou publication. Ne pas mettre en place de build, de déploiement, de projet Supabase ou d'hébergement alternatif. Avant toute action sur le build, les variables d'environnement, les migrations, les Edge Functions ou la publication, vérifier qu'elle cible Lovable / Lovable Cloud. La règle complète commune à tous les agents est dans `AGENTS.md`.
+## Invariants utiles au développement
 
-## Fin de lot (règle obligatoire — détail dans `AGENTS.md`)
+- React/TypeScript ; façade `src/services/stt` seule entrée STT.
+- Secrets côté serveur uniquement. L'accès anon dépend des RLS ; un SELECT bloqué
+  peut rendre zéro ligne sans erreur. Résumé via cache de `sessionMemoryService`.
+- Prompts éditoriaux dans Notion ; défauts de `settingsService.ts` peuvent être
+  surchargés par admin_settings/localStorage. Vérifier les sources avant changement.
+- Activation Gamilab STT en production à valider avec Nicolas Goy.
+- Invariants expérience/parole/mains libres/export : fin d'AGENTS ; les lire avant
+  de toucher ces modules. Les scripts disponibles sont dans package.json.
 
-Un seul agent actif à la fois (Codex, Claude, Cursor, Lovable) : avant d'agir, `git fetch --prune`,
-lire les derniers commits de `main` et le CHANGELOG ; ne jamais fusionner, fermer ni modifier la
-PR ou la branche d'un autre agent active depuis moins de 24 h — demander à Ulrich.
-
-Un lot n'est terminé que si : PR fusionnée dans `main` **après CI verte sur le HEAD exact**
-(jamais pendant `queued`/`in_progress`), CI de `main` verte, branche supprimée (distante + locale),
-aucune PR ni branche qui traîne. Une seule branche par lot, depuis `main` à jour ; vérifier les
-branches/PR existantes avant de commencer. Si une étape est bloquée, le dire en tête du compte
-rendu avec l'unique action à faire : ne jamais annoncer « terminé » avec un reste.
-Toujours pousser jusqu'à `main` avant de rendre la main : attendre la CI, fusionner, puis seulement
-livrer un prompt Lovable (avec le SHA de `main`) ; tout commiter avant le premier push. La publication
-Lovable reste une étape distincte.
-
-## Stack
-
-- Plateforme : Lovable (compilation et publication)
-- Frontend : React + TypeScript + Tailwind + shadcn/ui
-- Backend : Lovable Cloud avec Supabase fourni par Lovable (BDD, Edge Functions, pgvector)
-- STT : Deepgram (provider par défaut + VAD) — façade multi-providers dans `src/services/stt`
-- LLM : OpenRouter (multi-modèles : Qwen, Claude, Grok, Llama, Gemini)
-- TTS : ElevenLabs (voix custom de Max)
-- STT alternatif : Gamilab Browser SDK (préparé, pas actif), Whisper/AssemblyAI (préparés)
-- Déploiement : Lovable (hébergement intégré)
-
-## Architecture clé
-
-- Game Master IA orchestre l'expérience (confiance, triggers vidéo, game over)
-- Config STT globale persistée via `ava_stt_settings` (onglet Admin `STT Config`)
-- Façade STT dans `src/services/stt` — ne pas bypass pour appels directs Deepgram
-- Secrets STT exposés via Edge Function de statut uniquement (pas côté client)
-- Gamilab Provider préparé via Browser SDK — coordonner avec Nicolas (CTO Gamilab) avant activation
-
-## Règles projet
-
-- La façade `src/services/stt` est le seul point d'entrée STT — ne jamais appeler Deepgram directement depuis les composants
-- Les secrets API ne s'exposent jamais côté client — passer par les Edge Functions Supabase
-- Avant d'activer Gamilab STT en prod, valider avec Nicolas Goy (kuon)
-- Le joueur est **anonyme** : toute table lue au runtime doit avoir une policy RLS lisible par `anon` — un SELECT bloqué par RLS renvoie 0 ligne **sans erreur** (piège : `session_summaries` a cassé la mémoire de Max en silence, cf. `docs/analyse-coherence-max.md`). Le résumé de session se lit via le cache mémoire de `sessionMemoryService`, pas en BDD
-- Le canon du personnage vit dans **Notion** (tables `characters`/`character_prompts`), pas dans le repo — vérifier la fiche avant de modifier les prompts hardcodés
-- Les défauts de prompts dans `settingsService.ts` sont surchargés par `admin_settings`/localStorage : modifier un défaut n'a d'effet qu'après reset de la clé concernée dans l'admin
-- Voir STORY.md §Dernière session pour l'état courant exact
-
-## Agent skills
-
-### Issue tracker
-
-Issues and specs are tracked in GitHub Issues. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-The default five-role triage vocabulary is used. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Domain documentation uses a single-context layout. See `docs/agents/domain.md`.
+Skills lourds seulement sur invocation pertinente ; une demande d'implémentation
+déjà approuvée ne recrée pas une étape d'approbation du plan. Plans dans docs et
+passation selon AGENTS. Référence équipe au besoin :
+`~/CodeProjects/_shared/agent-context/00-memoways-context.md`.
