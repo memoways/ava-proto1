@@ -1312,3 +1312,15 @@ reste la source exécutable avant toute livraison ; aucune publication implicite
 Dernier E2E ciblé, après toutes les finitions de contexte : 5,8 s / 8,5 s
 avec serveur, vert sans retry. Fournisseurs et sauvegarde simulés ; aucune
 recette de compréhension par Ulrich ni écoute fournisseur réelle.
+
+
+### Accès dédié — installation GitHub, 28 octobre 2026
+
+Confirmation administrateur réalisée par Ulrich. App privée Ava delivery créée
+(ID 5515307), puis installation 176291841 vérifiée sur le seul dépôt Ava :
+Contents/Pull requests write et Actions/Metadata read. Pas de webhook ni OAuth
+utilisateur. Une clé a été téléchargée temporairement en 0600 ; enregistrement
+dans le coffre Privé Fischers encore en attente de validation Touch ID 1Password.
+Aucun appel App API ni push réel vérifié. Le détail de la première clé non
+récupérée et la reprise sûre sont dans le plan d’authentification ; ne pas
+recommencer l’installation. AP2 reste local, AP3 non lancé, production inchangée.

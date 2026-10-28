@@ -64,7 +64,7 @@ ou une clé SSH est présent, cela ne suffit pas à l’API PR/CI : déclarer ce
 ne pas fabriquer une réussite. Une nouvelle autorisation GitHub exige des droits
 limités et une validation explicite de leur portée.
 
-## Option dédiée GitHub App — pas encore provisionnée
+## Option dédiée GitHub App
 
 Option de livraison durable : GitHub App privée dédiée à Ava, installée uniquement sur
 `memoways/ava-proto1`. Permissions nécessaires à valider à l’installation :
@@ -73,8 +73,8 @@ la fusion, Actions lecture pour attendre les runs/jobs ; Metadata lecture implic
 Aucun accès aux autres dépôts, aux secrets Actions, à la facturation ou aux
 paramètres de compte. Pas d’autorisation OAuth personnelle pour l’exécution.
 
-Clé privée hors du dépôt et hors Trousseau, fichier appartenant à Ulrich,
-permissions 0600, emplacement dédié. Les jetons d’installation sont limités au
+Clé privée conservée dans 1Password, hors du dépôt et hors Trousseau. Son téléchargement
+initial reste temporaire, permissions 0600, jusqu’à vérification du stockage chiffré. Les jetons d’installation sont limités au
 seul dépôt et aux droits utiles, durent au plus une heure et restent dans la
 mémoire du processus. Ni clé ni jeton dans un chat, log, URL Git, commit ou
 fichier temporaire persistant.
@@ -159,8 +159,7 @@ Ne déclarer l’App opérationnelle qu’après token/référentiel/push réels
 La demande GitHub Mobile n’a pas été reçue par Ulrich et a expiré. L’onglet
 GitHub Confirm access du compte Ulrfis est passé sur la confirmation par mot de
 passe avec l’extension 1Password disponible. Remplissage/confirmation directement
-par Ulrich demandés ; aucun mot de passe dans le chat. L’App n’est toujours pas
-créée et aucun identifiant de livraison réel n’a été installé.
+par Ulrich demandés ; aucun mot de passe dans le chat. Cette confirmation a ensuite été effectuée par Ulrich ; voir l’étape vérifiée ci-dessous.
 
 Une protection des scripts partagés github-auth-check et git-ship a été préparée
 hors dépôt et testée sur six scénarios simulés. Son application a été refusée
@@ -172,3 +171,26 @@ utiliser uniquement le lanceur du dépôt ; ne pas exécuter directement les anc
 helpers. Avec l’App fournie par ce lanceur, les marqueurs App évitent le repli
 personnel du helper existant. Les autres projets doivent suivre l’interdiction
 générale du Trousseau enregistrée dans la mémoire personnelle.
+
+
+## Installation GitHub vérifiée — 28 octobre 2026, 18:54 UTC
+
+Confirmation administrateur effectuée par Ulrich. App privée `ava-delivery`,
+App ID `5515307`, propriétaire `memoways`, créée puis installée :
+[installation 176291841](https://github.com/organizations/memoways/settings/installations/176291841).
+Sélection vérifiée : un seul dépôt `memoways/ava-proto1`. Permissions effectives :
+Actions/Metadata read, Contents/Pull requests write. Webhooks désactivés ;
+aucune autorisation OAuth utilisateur, aucun droit organisation/compte ajouté.
+
+Deux clés ont été générées : la première tentative de téléchargement a été bloquée
+par Brave ; la seconde, via l’événement de téléchargement prévu par l’outil, a
+remis le fichier temporaire. Ne pas générer une troisième clé. Le fichier obtenu
+est restreint en 0600 ; ni son contenu ni un jeton ne sont dans le dépôt ou les logs.
+La première clé non récupérée reste enregistrée côté GitHub ; sa révocation
+éventuelle nécessite une confirmation distincte avant suppression irréversible.
+
+L’enregistrement de la seconde clé dans le coffre Privé Fischers n’est pas encore
+effectué. La CLI demande une validation Touch ID « Autoriser ChatGPT pour obtenir
+un accès CLI » ; sa première attente a expiré. Attendre la réponse d’Ulrich, puis
+reprendre cette autorisation 1Password si nécessaire, sans réactiver d’option et
+sans utiliser le Trousseau. Aucun jeton App/API/push réel n’est encore vérifié.

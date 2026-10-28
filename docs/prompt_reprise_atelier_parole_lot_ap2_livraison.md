@@ -59,9 +59,10 @@ Chaque clôture d’un lot futur doit enregistrer et lier son prompt suivant.
 
 Mise à jour accès : CLI officielle 1Password 2.41.0 installée, seule intégration CLI
 activée après accord explicite ; compte Fischers confirmé. Lanceur Ava et broker
-App sont préparés, 30 tests de livraison verts. Aucune App créée ni token réel
-configuré : GitHub Mobile non reçu/expiré, confirmation sudo avec remplissage
-1Password à effectuer dans l’onglet GitHub ouvert. Ulrich a autorisé la création
+App sont préparés, 30 tests de livraison verts. App privée créée ID 5515307 et installation 176291841 vérifiée sur le seul
+dépôt Ava, permissions exactes approuvées. Clé téléchargée temporairement, 0600 ;
+stockage 1Password en attente de validation Touch ID, aucun token API réel vérifié.
+Ne pas recréer l’App ni générer de nouvelle clé ; lire la borne du plan d’accès. Ulrich a autorisé la création
 et l’installation de l’App privée limitée à Ava (Contents/PR write, Actions read)
 et sa clé dans 1Password, ainsi que cette seule opération d’interface GitHub.
 Les scripts partagés n’ont pas été modifiés : revue automatique défavorable

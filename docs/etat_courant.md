@@ -75,10 +75,11 @@ L’interdiction est dans AGENTS ; ne pas redemander un déverrouillage ou une
 reconnexion personnelle. AP3 reste préparé sans lancement.
 
 
-Accès alternatif préparé dans le même lot : CLI officielle 1Password installée,
-seule option CLI activée avec accord, lanceur Ava et broker App sans stockage
-personnel, 30 tests de livraison. GitHub App privée approuvée par Ulrich, mais
-**création non effectuée** : demande Mobile non reçue/expirée, confirmation
-administrateur GitHub avec remplissage 1Password encore attendue. Aucun token
-réel installé. Ne pas annoncer une intégration opérationnelle. Scripts partagés
-inchangés (leur modification globale a été refusée par la revue automatique).
+Accès alternatif : seule option CLI 1Password activée avec accord ; lanceur et
+broker App sans stockage personnel, 30 tests de livraison verts. App privée
+`ava-delivery` créée (ID 5515307) et installée (176291841) sur le seul dépôt Ava :
+Contents/PR write, Actions/Metadata read. Clé téléchargée temporairement en 0600 ;
+stockage 1Password encore en attente de validation Touch ID. Aucun token API ni
+push réel vérifié : intégration encore incomplète. Scripts partagés inchangés
+(leur modification globale a été refusée par la revue automatique). Détail et
+clé initiale non récupérée à traiter dans le plan d’accès, sans nouveau secret ici.
