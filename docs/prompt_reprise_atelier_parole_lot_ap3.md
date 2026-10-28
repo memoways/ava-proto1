@@ -4,9 +4,10 @@ Exécute uniquement AP3, une recette humaine de 10–15 minutes. Ce prompt prép
 par AP2 ne lance ni écoute, ni conversation, ni publication. Ne pas déduire la
 compréhension d’Ulrich ou la crédibilité vocale d’une CI verte.
 
-**AP2 n’est pas encore livré : reprendre d’abord**
-[prompt AP2 livraison](prompt_reprise_atelier_parole_lot_ap2_livraison.md). Aucun
-accès au Trousseau macOS, aucune demande de déverrouillage/reconnexion personnelle.
+**Vérifier d’abord le reçu de livraison AP2** dans sa PR et la tâche Gamilab.
+Ce prompt est committé avant la fusion : il ne contient pas son futur SHA.
+Si la livraison reste incomplète, utiliser la [reprise AP2](prompt_reprise_atelier_parole_lot_ap2_livraison.md).
+Aucun accès au Trousseau macOS, aucune demande de déverrouillage/reconnexion personnelle.
 Ne démarrer AP3 qu’après livraison et recette technique AP2 vérifiées.
 
 ## Première action exécutable
@@ -50,7 +51,7 @@ Max actif `ef4cfaa6-70e3-4e87-9b9e-079815fd0cd9`, Emma active
 Lovable Ava `1265958d-b74e-40f2-917d-182fe05163fc`, Memoways
 `5glbtPltldwz9tgNwIi4` : seule chaîne Cloud/build/preview/publication. SQL uniquement
 par MCP Lovable ; aucun connecteur Supabase générique. GitHub natif prioritaire,
-repli git/gh autorisé si Unknown tool, identité existante/remote vérifiés sans login.
+repli git/gh autorisé si Unknown tool, via le lanceur 1Password d’AGENTS exclusivement.
 
 ## Périmètre de la séance
 

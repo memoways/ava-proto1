@@ -25,16 +25,13 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   réglage live, prompt Notion/GM ou publication production modifié.
 - [Plan et preuves](docs/plan_lot_b_rendu_vocal.md#exécution-ap2--28-octobre-2026),
   [prompt AP3 autonome](docs/prompt_reprise_atelier_parole_lot_ap3.md), non lancé.
-- Accès GitHub isolé via 1Password préparé : CLI officielle et seule option CLI
-  activées avec accord, lanceur local sans repli personnel et broker App en
-  mémoire, 30 tests de livraison. App privée créée et installée sur le seul dépôt
-  Ava ; stockage de sa clé dans 1Password en attente de validation Touch ID,
-  aucun token API réel vérifié.
-- Livraison AP2 interrompue avant push réussi : aucune PR/CI/fusion ou nouvelle
-  preview. [Reprise exacte](docs/prompt_reprise_atelier_parole_lot_ap2_livraison.md).
-  Décision explicite d’Ulrich : accès GitHub indépendant du Trousseau macOS,
-  interdiction inscrite dans AGENTS ; voie dédiée installée côté GitHub,
-  validation complète restant à effectuer.
+- Accès GitHub dédié hors Trousseau : App privée installée sur le seul dépôt Ava,
+  clé dans 1Password Fischers, lanceur local isolant Git/gh et broker App en mémoire.
+  Réutilisation documentée, aucun repli personnel ni modification des scripts
+  partagés ; 31 tests de livraison, dont compatibilité du format stateless GitHub.
+  [Plan d’accès](docs/plan_authentification_github_sans_trousseau.md).
+- Livraison via la seule CI PR/HEAD puis garde de fusion et vérification arbre/parent ;
+  reçu réel dans la PR et Notion après fusion. [Reprise](docs/prompt_reprise_atelier_parole_lot_ap2_livraison.md).
 
 ## [AP2 — clarification demandée après AP1] — 2026-10-28
 

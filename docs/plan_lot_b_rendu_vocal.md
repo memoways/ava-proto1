@@ -1324,3 +1324,17 @@ dans le coffre Privé Fischers encore en attente de validation Touch ID 1Passwor
 Aucun appel App API ni push réel vérifié. Le détail de la première clé non
 récupérée et la reprise sûre sont dans le plan d’authentification ; ne pas
 recommencer l’installation. AP2 reste local, AP3 non lancé, production inchangée.
+
+### Accès débloqué et validation finale locale
+
+La validation 1Password a été effectuée par Ulrich. Le stockage de la clé Ava
+est confirmé dans le coffre Privé Fischers ; configuration de références non
+secrètes créée, copie PEM temporaire supprimée après accès API réel depuis
+1Password. Réponse GitHub 201 avec un seul dépôt et droits exacts, puis lecture
+installation/repositories 200, seul Ava. Correction du contrôle de jeton pour
+le format stateless actuel, sans décodage ni contrainte de longueur. 31 tests de
+livraison verts. Qualité complète répétée après cette correction : 71 régressions,
+1 131 unitaires, 42 intégrations, lint/typage/build verts. Main 54e7bfa toujours
+ancêtre ; seule PR ouverte #24, préservée. Reçu GitHub/CI/fusion et recette preview
+à consigner dans la PR et Notion après exécution ; aucune seconde PR documentaire
+pour inscrire le futur SHA du squash. Aucun changement aux scripts partagés.

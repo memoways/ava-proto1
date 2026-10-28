@@ -18,7 +18,9 @@ export async function installationToken({ appId, installationId, privateKey }, f
  });
  if (response.status !== 201) throw new Error(`Accès GitHub App refusé (${response.status}) ; aucun repli personnel.`);
  const data = await response.json();
- if (!/^ghs_[A-Za-z0-9_]+$/.test(data.token ?? '') || !Array.isArray(data.repositories) || data.repositories.length !== 1 || data.repositories[0].full_name !== 'memoways/ava-proto1') throw new Error('Jeton GitHub App hors du dépôt Ava ; exécution refusée.');
+ // GitHub installation tokens are opaque; the current stateless format contains dots.
+ // Trust the authenticated issuer and explicit repository scope, not legacy token syntax.
+ if (typeof data.token !== 'string' || !data.token.startsWith('ghs_') || data.token.length <= 4 || /[\s\x00-\x1f\x7f]/.test(data.token) || !Array.isArray(data.repositories) || data.repositories.length !== 1 || data.repositories[0].full_name !== 'memoways/ava-proto1') throw new Error('Jeton GitHub App hors du dépôt Ava ; exécution refusée.');
  return data.token;
 }
 export function deliveryEnvironment(source, token) {

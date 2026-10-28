@@ -30,3 +30,12 @@ test('delivery child cannot inherit the App private key and cannot trigger perso
  assert.equal(env.GIT_SHIP_GITHUB_APP_ACTIVE, '1'); assert.equal(env.GIT_SHIP_1PASSWORD_ACTIVE, '1');
  assert.equal(env.GIT_SHIP_GITHUB_APP_REPOSITORY, 'memoways/ava-proto1');
 });
+
+test('stateless installation tokens remain opaque while malformed credential values fail', async () => {
+ const token = `ghs_123_${'a'.repeat(220)}.${'b'.repeat(220)}.synthetic-signature`;
+ const response = value => async () => ({ status: 201, json: async () => ({ token: value, repositories: [{ full_name: 'memoways/ava-proto1' }] }) });
+ assert.equal(await installationToken(config, response(token)), token);
+ for (const invalid of ['', 'ghs_', 'ghp_personal', 'ghs_bad\nheader', 'ghs_bad\u0000value', null, 42]) {
+  await assert.rejects(installationToken(config, response(invalid)), /exécution refusée/);
+ }
+});

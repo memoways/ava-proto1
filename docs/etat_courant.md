@@ -63,23 +63,20 @@ M1/M2, une hypothèse et deux versions. Compréhension et préférence vocales s
 validées par Ulrich ; aucune acceptation humaine revendiquée par les tests AP2.
 F4 reste distincte. Aucune publication production implicite.
 
-## AP2 — livraison interrompue, état local conservé
+## Livraison AP2 et accès dédié
 
-Push refusé avant toute création de PR ; aucune CI AP2, fusion ni nouvelle preview.
-Qualité finale locale : 71 régressions, 1 131 unitaires, 42 intégrations et build
-verts ; garde 23/23, E2E ciblé simulé vert. Branche AP2, main non modifié.
-[Reprise exacte de livraison](prompt_reprise_atelier_parole_lot_ap2_livraison.md).
-Décision explicite d’Ulrich : **plus aucun recours au Trousseau macOS**.
-[Voie d’accès dédiée préparée, non configurée](plan_authentification_github_sans_trousseau.md).
-L’interdiction est dans AGENTS ; ne pas redemander un déverrouillage ou une
-reconnexion personnelle. AP3 reste préparé sans lancement.
+Qualité locale : 71 régressions, 1 131 unitaires, 42 intégrations, lint/typage/build ;
+31 tests de livraison, dont jeton App stateless ; E2E ciblé simulé clavier/390 px.
+Le reçu PR/HEAD, CI et arbre/parent fusionnés est consigné après livraison dans
+la PR et la tâche Gamilab ; ce fichier est committé avant la fusion.
+[Procédure de reprise AP2](prompt_reprise_atelier_parole_lot_ap2_livraison.md).
 
-
-Accès alternatif : seule option CLI 1Password activée avec accord ; lanceur et
-broker App sans stockage personnel, 30 tests de livraison verts. App privée
-`ava-delivery` créée (ID 5515307) et installée (176291841) sur le seul dépôt Ava :
-Contents/PR write, Actions/Metadata read. Clé téléchargée temporairement en 0600 ;
-stockage 1Password encore en attente de validation Touch ID. Aucun token API ni
-push réel vérifié : intégration encore incomplète. Scripts partagés inchangés
-(leur modification globale a été refusée par la revue automatique). Détail et
-clé initiale non récupérée à traiter dans le plan d’accès, sans nouveau secret ici.
+App privée `ava-delivery` créée (5515307) et installée (176291841) sur le seul dépôt
+Ava : Contents/PR write, Actions/Metadata read. Clé dans le coffre Privé Fischers,
+configuration locale de références non secrètes, jetons en mémoire, aucun repli
+personnel. Accès API authentifié vérifié avec un seul dépôt retourné ; copie
+PEM temporaire supprimée. Utiliser le lanceur versionné d’AGENTS à chaque reprise.
+[Plan d’accès et limites](plan_authentification_github_sans_trousseau.md).
+Scripts partagés inchangés ; une clé initiale non récupérée reste côté GitHub,
+suppression distincte non effectuée. Aucun accès au Trousseau ni reconnexion
+GitHub personnelle. AP3 préparé sans lancement ; aucune publication production.
