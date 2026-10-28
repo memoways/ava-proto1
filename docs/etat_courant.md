@@ -38,12 +38,17 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
-**Premier lot fonctionnel choisi : AP1 — atelier de parole Max.**
-[Prompt autonome à exécuter](prompt_reprise_atelier_parole_lot_ap1.md),
-[découpage AP1–AP6 et contrat de suivi](plan_lot_b_rendu_vocal.md#atelier-de-parole-ap1ap6--contrat-courant-28-octobre-2026).
-Plan/prompt préparés ; aucune implémentation AP ni écoute lancée. Réemploi des
-réglages existants, compréhension et comparaison fidèle avant persistance AP2
-et recette AP3 ; ajustements Notion séparés. Livrer le prompt suivant dès chaque
-clôture, sans attendre une nouvelle demande. Code, voix et Cloud inchangés.
-[CT2](prompt_reprise_contexte_travail_lot_ct2.md) mesure les lots de code AP.
+**AP1 — Atelier de parole Max implémenté.**
+Accès admin sandbox : Expérience → Atelier de parole,
+`/admin/experience/atelier-de-parole`. A/B temporaire, état explicite par cas,
+transport actuel respecté et preuves effectives lisibles ; aucun réglage live.
+[Résultat et validations AP1](plan_lot_b_rendu_vocal.md#exécution-ap1--28-octobre-2026).
+Lire la PR AP1 et son reçu GitHub/Notion pour les SHA/run finaux ; ce document
+est committé avant le squash. Lovable/production restent des étapes distinctes.
+
+**Suite AP2 préparée, non lancée :**
+[prompt autonome — variantes et avis persistants](prompt_reprise_atelier_parole_lot_ap2.md).
+AP3 organise ensuite l’écoute humaine de Max ; aucune écoute réelle ni acceptation
+vocale revendiquée par AP1. [Contrat AP1–AP6](plan_lot_b_rendu_vocal.md#atelier-de-parole-ap1ap6--contrat-courant-28-octobre-2026).
+[CT2](prompt_reprise_contexte_travail_lot_ct2.md) mesure la livraison de ce lot.
 F4 reste une recette distincte, aucune publication production implicite.

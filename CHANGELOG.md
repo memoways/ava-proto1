@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [AP1 — Atelier de parole Max] — 2026-10-28
+
+- Expérience → Atelier de parole : cinq familles expliquées, références chargées
+  et replis signalés, parcours préparer A/B → écouter → apprécier. Même banc et
+  lecteur, accès TTS Config conservé, aucun audio automatique.
+- A figée sur les réglages courants, B temporaire avec une variation vocale à
+  la fois, diff et paramètres préparés/effectivement envoyés distincts. M1/M2
+  d’abord ; état de la fiche choisi explicitement pour chaque cas.
+- REST direct selon la sandbox ; WS/pauses A2 séparés, repli visible, cache par
+  transport demandé et provenance effective conservée. Mapping absent/inactif
+  et rugosité zéro préservés ; tags Gradium fermés.
+- Bootstrap de l’atelier en lecture seule, y compris normalisation LLM ; tests
+  simulés de zéro écriture/audio, A/B, transports, cache, annulation et mobile.
+  Avis/export temporaires clairement annoncés ; aucune adoption live.
+- [Plan et preuves](docs/plan_lot_b_rendu_vocal.md#exécution-ap1--28-octobre-2026),
+  [reprise AP2 autonome](docs/prompt_reprise_atelier_parole_lot_ap2.md), non lancée.
+  Ni fiche Notion, voix, réglage Cloud, STT/mains libres ni production modifiés.
+
 ## [Atelier de parole — découpage et prompt AP1] — 2026-10-28
 
 - [Plan courant AP1–AP6](docs/plan_lot_b_rendu_vocal.md) enregistré : Max d'abord,

@@ -316,10 +316,10 @@ export function getLLMSettings(): LLMSettings {
 }
 
 /** Async load from DB (call on admin page load) */
-export async function loadLLMSettingsFromDB(): Promise<LLMSettings> {
+export async function loadLLMSettingsFromDB(options: { readOnly?: boolean } = {}): Promise<LLMSettings> {
   const loaded = await loadFromDB(LLM_STORAGE_KEY, llmDefaults);
   const normalized = normalizeLLMSettings(loaded);
-  if (JSON.stringify(loaded) !== JSON.stringify(normalized)) {
+  if (!options.readOnly && JSON.stringify(loaded) !== JSON.stringify(normalized)) {
     await saveToDB(LLM_STORAGE_KEY, normalized);
   }
   return normalized;
@@ -750,9 +750,9 @@ export function resetAntiHallucinationValidatorSettings(): AntiHallucinationVali
 
 // ===== Hydrate all settings from DB on app start =====
 
-export async function hydrateAllSettings(): Promise<void> {
+export async function hydrateAllSettings(options: { readOnly?: boolean } = {}): Promise<void> {
   await Promise.all([
-    loadLLMSettingsFromDB(),
+    loadLLMSettingsFromDB(options),
     loadTTSSettingsFromDB(),
     loadGameplaySettingsFromDB(),
     loadVideoTriggerSettingsFromDB(),

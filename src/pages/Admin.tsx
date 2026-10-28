@@ -13,6 +13,7 @@ import { clearSystemPromptCache } from "@/agents/maxAgent";
 import { hydrateAllSettings } from "@/services/settingsService";
 import LLMConfigTab from "@/components/LLMConfigTab";
 import RAGConfigTab from "@/components/RAGConfigTab";
+import SpeechAuditionBench from '@/components/SpeechAuditionBench';
 import TTSConfigTab from "@/components/TTSConfigTab";
 import STTConfigTab from "@/components/STTConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
@@ -146,6 +147,7 @@ export default function Admin() {
   const defaultLocation = findAdminTab(DEFAULT_ADMIN_TAB)!;
   const activeGroup = requestedLocation?.group.id ?? pathLocation?.group ?? defaultLocation.group.id;
   const activeTab = requestedLocation?.tab.id ?? pathLocation?.tab ?? defaultLocation.tab.id;
+  const initialAdminTab = useRef(activeTab);
   const selectedSessionId = activeTab === "sessions" ? pathLocation?.sessionId ?? null : null;
   const [outputMode, setOutputMode] = useState<OutputMode>(() => getOutputSettings().mode);
   const legacyVisible = searchParams.get("legacy") === "1"
@@ -221,7 +223,7 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
-    hydrateAllSettings(); // Load all settings from DB into localStorage
+    void hydrateAllSettings({ readOnly: initialAdminTab.current === "speech-workshop" });
     void loadOutputSettingsFromDB().then((settings) => setOutputMode(settings.mode));
     loadEmbeddings();
     loadCharacters();
@@ -616,6 +618,10 @@ export default function Admin() {
           </TabsContent>
 
           {/* ==================== EXPÉRIENCE ==================== */}
+          <TabsContent value="speech-workshop">
+            {activeTab === "speech-workshop" && <SpeechAuditionBench workshop />}
+          </TabsContent>
+
           <TabsContent value="architecture">
             <ExperienceArchitectureTab />
           </TabsContent>
@@ -681,7 +687,7 @@ export default function Admin() {
 
           {/* ==================== TTS CONFIG ==================== */}
           <TabsContent value="voice">
-            <TTSConfigTab />
+            {activeTab === "voice" && <TTSConfigTab />}
           </TabsContent>
 
           <TabsContent value="streaming-avatar">
