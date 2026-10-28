@@ -9,7 +9,8 @@ séances accompagnées de 10–15 minutes, une hypothèse et deux variantes maxi
 Réglages app et retouches Notion dans des passes séparées. Variantes et avis
 persistants dans le back-office ; audio exact seulement pendant la séance.
 
-**État : AP1 implémenté le 28 octobre 2026 ; persistance AP2 préparée, non lancée.**
+**État : AP1 livré techniquement ; utilisabilité rejetée par Ulrich le 28 octobre.
+AP2 doit d’abord simplifier et supprimer le doublon TTS, puis conserver les essais.**
 Cette section est le contrat de la nouvelle série ; les sections datées
 ci-dessous décrivent les livraisons précédentes. A4R confirme les copies E0
 le 26 octobre, mais ni A4R ni F4 ne valent acceptation du naturel vocal.
@@ -18,11 +19,37 @@ La recette F4 reste distincte ; aucun gel de démo ni publication implicite.
 | Lot | Périmètre et résultat observable | Dépendance / sortie | Statut |
 | --- | --- | --- | --- |
 | AP1 | Atelier lisible, réglages expliqués et écoute A/B fidèle au transport actuel ; réemploi du banc | Livraison technique vérifiée ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap1.md) | Implémenté ; vérifications et reçu ci-dessous |
-| AP2 | Variantes nommées, différences, appréciations, décision et export ; retrouvables après reconnexion | AP1 livré ; stockage sandbox strict et relecture | Planifié |
+| AP2 | Atelier unique et parcours simple ; retrait du banc de TTS Config ; variantes/avis nommés et retrouvables | Correction UX prioritaire, puis stockage sandbox strict et relecture | Préparé, non lancé |
 | AP3 | Première séance Max, deux répliques initiales, une hypothèse et deux variantes | AP2 livré ; bilan humain, référence et prochain défaut observé | Recette à organiser |
 | AP4 | Conversations courtes guidées, nouvelle session par essai, références et versions réellement utilisées | Bilan AP3 ; états proposés/déclarés/livrés et coupures distingués | Planifié |
 | AP5 | Affiner Max par passes : Notion, GM effectif, LLM ou restitution ; une couche par comparaison | Observations humaines ; sous-lots AP5.1… définis avant leur exécution | Itératif, non lancé |
 | AP6 | Emma avec ses propres états, puis Max ↔ Emma et conversation plus longue | Méthode éprouvée sur Max ; bilan distinct par personnage | Planifié |
+
+### Retour d’Ulrich après AP1 — correction AP2 obligatoire
+
+Le 28 octobre, Ulrich juge le parcours incompréhensible et inutilisable, avec du
+bruit et un doublon entre TTS Config (« A3 — Réglages fidèles et auditions ») et
+Expérience → Atelier de parole. Les tests et la livraison AP1 restent acquis ;
+l’objectif de lisibilité n’est pas accepté. Le plan précédent ne garantissait
+pas le retrait de ce doublon : il est maintenant explicitement inclus dans AP2.
+
+TTS Config conserve la configuration technique (fournisseurs, modèles, voix,
+paramètres). Tout le banc d’audition A3/lot B, corpus, comparaisons, notes et
+exports disparaît de cet onglet au profit d’un lien vers **l’unique atelier**.
+Préserver les capacités existantes et les valeurs enregistrées ; les accès Emma,
+autres fournisseurs et commandes expertes sont regroupés, sans second banc.
+
+L’atelier présente un parcours court : choisir une réplique et son état, écouter
+la version actuelle, écouter l’essai avec une seule différence, noter/enregistrer.
+Une action principale par étape, vocabulaire courant, première action visible.
+Les familles, versions, mappings, preuves/JSON et options techniques sont repliés.
+La persistance vient ensuite dans le même lot AP2, sans ajouter une couche à
+l’écran actuel. L’absence de doublon et la compréhension du parcours sont des
+critères de sortie explicites, avec recette visuelle desktop/mobile/clavier ;
+la compréhension par Ulrich reste distincte de la validation technique.
+
+[Prompt AP2 mis à jour](prompt_reprise_atelier_parole_lot_ap2.md). Décision de
+périmètre enregistrée seulement : aucune implémentation AP2 lancée dans ce tour.
 
 ### Bonne pratique obligatoire pour cette série
 
