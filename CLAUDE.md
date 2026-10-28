@@ -32,8 +32,11 @@ get-self `7e1a9a09-09cb-4deb-a306-83a29b831bc2` ; autres IDs dans AGENTS.
 Gami DigiDouble exclu, aucun animal affiché.
 
 GitHub natif d'abord, repli git/gh autorisé si outil indisponible, identité et
-remote vérifiés. Diagnostic identité/ressource borné, distinguer sandbox/trousseau,
-routage et OAuth ; pas de login/refresh/logout. Notion reste natif.
+remote vérifiés. Diagnostic identité/ressource borné ; appliquer la décision « GitHub — accès
+sans Trousseau » d’AGENTS avant tout git/gh. Une session 1Password par lot,
+réutilisée en mémoire ; aucun appel au coffre commande par commande, aucun retry
+automatique après refus/expiration. Aucun accès au Trousseau, aucune
+demande de déverrouillage ou reconnexion personnelle. Notion reste natif.
 
 ## Invariants utiles au développement
 

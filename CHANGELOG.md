@@ -4,6 +4,42 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [AP2 — atelier unique et comparaisons retrouvables] — 2026-10-28
+
+- Toutes les auditions sont réunies dans Expérience → Atelier de parole. TTS
+  Config conserve les réglages techniques et un lien ; suppression du banc A3,
+  des tests audio indépendants et du sélecteur de buffer déplacé dans l’atelier.
+- Parcours en quatre étapes avec une action principale : choisir réplique/état,
+  écouter la version actuelle, modifier un réglage/écouter l’essai, noter et
+  enregistrer. Références, JSON, Emma, fournisseurs et contrôles experts repliés.
+- Comparaisons nommées, hypothèse, snapshots, différence, preuves filtrées,
+  appréciations et décision humaine conservées dans `admin_settings`, clé
+  `speech_workshop_documents` hors préfixe runtime `ava_`, sans migration.
+  Lecture admin/sandbox stricte, CAS complet et relecture exacte avant confirmation ;
+  absence, indisponibilité, format inconnu, conflit et relecture distingués.
+- Rechargement en brouillon sans audio/activation, références changées signalées,
+  export texte/JSON et coût inconnu. Aucun son durable, transcript ou prompt
+  intégral ; cache/arrêt/repli REST et gardes WS existants conservés.
+- Tests simulés de parcours, persistance, refus d’accès/conflit/readback,
+  confidentialité et clavier/mobile. Aucun fournisseur réel, avis humain,
+  réglage live, prompt Notion/GM ou publication production modifié.
+- [Plan et preuves](docs/plan_lot_b_rendu_vocal.md#exécution-ap2--28-octobre-2026),
+  [prompt AP3 autonome](docs/prompt_reprise_atelier_parole_lot_ap3.md), non lancé.
+- Accès GitHub dédié hors Trousseau : App privée installée sur le seul dépôt Ava,
+  clé dans 1Password Fischers, lanceur local isolant Git/gh et broker App en mémoire.
+  Réutilisation documentée, aucun repli personnel ni modification des scripts
+  partagés ; 35 tests de livraison, dont compatibilité du format stateless GitHub.
+  [Plan d’accès](docs/plan_authentification_github_sans_trousseau.md).
+- Session de livraison bornée : un accès initial 1Password pour plusieurs commandes,
+  clé/jetons en mémoire, reprise après erreur sans nouvelle autorisation au coffre,
+  renouvellement interne du jeton et refus explicite sans repli personnel. 35 tests
+  de livraison ; suivi CI espacé à une minute.
+- Fixture audio AP2 indépendante du périphérique/politique du runner ; refus de
+  lecture explicitement testé sans progression automatique. Chromium, Firefox et
+  WebKit conservés ; aucune modification du lecteur audio de production.
+- Livraison via la seule CI PR/HEAD puis garde de fusion et vérification arbre/parent ;
+  reçu réel dans la PR et Notion après fusion. [Reprise](docs/prompt_reprise_atelier_parole_lot_ap2_livraison.md).
+
 ## [AP2 — clarification demandée après AP1] — 2026-10-28
 
 - Retour d’Ulrich : AP1 est techniquement livré mais le parcours est jugé

@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/services/experienceOrchestration', () => ({ listCharacterRuntimeProfiles: vi.fn(async () => [
  { character_key: 'max', display_name: 'Max', rugosite: 3, tts_provider: 'gradium', tts_voice_id: 'voice-max' },
- { character_key: 'emma', display_name: 'Emma', tts_provider: 'gradium', tts_voice_id: 'voice-emma' },
+ { character_key: 'emma', display_name: 'Emma', rugosite: 2, tts_provider: 'gradium', tts_voice_id: 'voice-emma' },
 ]) }));
 vi.mock('@/services/tts/speechWorkshop', async importOriginal => ({
  ...await importOriginal<typeof import('@/services/tts/speechWorkshop')>(),
@@ -23,118 +23,157 @@ import { setActiveEnvironment } from '@/services/environmentContext';
 import { SpeechAuditionRunner } from '@/services/tts/speechAudition';
 import { saveSpeechPerformanceSettings } from '@/services/tts/speechPerformanceSettings';
 import SpeechAuditionBench from './SpeechAuditionBench';
-const evidence = { requests: [{ transport: 'websocket' as const, body: { json_config: { temp: 0.7, padding_bonus: 0.5 } } }], transport: 'websocket' as const, cached: false, providerCalls: 1, pauseRendering: 'websocket' };
-async function ready() { render(<SpeechAuditionBench/>); await waitFor(() => expect(screen.getByLabelText('État de la réplique').querySelector('option[value=""]')?.nextElementSibling).toBeTruthy()); fireEvent.change(screen.getByLabelText('État de la réplique'), { target: { value: 'Retenu' } }); }
-describe('A3 — existing audition bench', () => {
- beforeEach(() => { localStorage.clear(); setActiveEnvironment('sandbox-ulrich'); vi.clearAllMocks(); });
- it('loads proposed cases without calls or saves, limits initial audition and keeps Max/Emma levels and voices distinct', async () => {
-  const listen = vi.spyOn(SpeechAuditionRunner.prototype, 'listen').mockResolvedValue(evidence);
-  await ready(); expect(listen).not.toHaveBeenCalled(); expect(saveSpeechPerformanceSettings).not.toHaveBeenCalled();
-  expect(screen.getByLabelText('Rugosité du banc')).toHaveValue('3');
-  fireEvent.change(screen.getByLabelText('Réplique du banc'), { target: { value: '2' } }); expect(screen.getByRole('button', { name: 'Écouter / rejouer' })).toBeDisabled();
-  fireEvent.change(screen.getByLabelText('Étape audition'), { target: { value: 'finalists' } }); fireEvent.click(screen.getByLabelText('Finaliste M3'));
-  fireEvent.change(screen.getByLabelText('État de la réplique'), { target: { value: 'Retenu' } }); expect(screen.getByRole('button', { name: 'Écouter / rejouer' })).toBeEnabled();
-  fireEvent.change(screen.getByLabelText('Personnage du banc'), { target: { value: 'emma' } });
-  expect(screen.getByLabelText('Rugosité du banc')).toHaveValue('2'); expect(screen.getByLabelText('Voix emma gradium')).toHaveValue('voice-emma');
-  expect(screen.getByLabelText('État de la réplique')).toHaveValue(''); expect(screen.getByText('Cherche à agir')).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText('Voix emma gradium'), { target: { value: 'emma-audition' } });
-  fireEvent.change(screen.getByLabelText('Personnage du banc'), { target: { value: 'max' } }); expect(screen.getByLabelText('Voix max gradium')).toHaveValue('voice-max');
- });
- it('uses identical words, voice and base parameters for A/B, and exposes actual fallback evidence', async () => {
-  const listen = vi.spyOn(SpeechAuditionRunner.prototype, 'listen').mockResolvedValue(evidence);
-  await ready(); const button = screen.getByRole('button', { name: 'Écouter / rejouer' });
-  fireEvent.click(button); await waitFor(() => expect(listen).toHaveBeenCalledTimes(1)); await waitFor(() => expect(button).toBeEnabled());
-  const a = listen.mock.calls[0]; expect(a[3]).toMatchObject({ characterKey: 'max', voiceId: 'voice-max', speechAudition: { settings: { gradiumPausesEnabled: false, version: 'saved-v1' } } });
-  fireEvent.change(screen.getByLabelText('Mode de pauses audition'), { target: { value: 'pauses' } });
-  expect(screen.getByLabelText('Contrôles préparés')).toHaveTextContent('1');
-  listen.mockResolvedValue({ ...evidence, transport: 'rest_fallback', pauseRendering: 'rest_unavailable' });
-  fireEvent.click(button); await waitFor(() => expect(listen).toHaveBeenCalledTimes(2));
-  const b = listen.mock.calls[1]; expect(b[1]).toBe(a[1]); expect(b[3].voiceId).toBe(a[3].voiceId); expect(b[3].performance).toEqual(a[3].performance);
-  expect(b[3].speechAudition?.gradium).toEqual(a[3].speechAudition?.gradium);
-  expect(screen.getByText(/Repli REST : cette écoute/)).toBeInTheDocument();
-  expect(screen.getAllByText(/Mots \/ pensée/).length).toBeGreaterThan(0); expect(saveSpeechPerformanceSettings).not.toHaveBeenCalled();
- });
- it('stops on changes and ignores a late result instead of replacing a newer audition', async () => {
-  let resolve!: (value: typeof evidence) => void;
-  const listen = vi.spyOn(SpeechAuditionRunner.prototype, 'listen').mockImplementationOnce(() => new Promise(r => { resolve = r; })).mockResolvedValue(evidence);
-  const stop = vi.spyOn(SpeechAuditionRunner.prototype, 'stop');
-  await ready(); fireEvent.click(screen.getByRole('button', { name: 'Écouter / rejouer' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Arrêter' }));
-  fireEvent.change(screen.getByLabelText('Personnage du banc'), { target: { value: 'emma' } });
-  fireEvent.change(screen.getByLabelText('État de la réplique'), { target: { value: 'Action' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Écouter / rejouer' })); await waitFor(() => expect(listen).toHaveBeenCalledTimes(2));
-  await act(async () => { resolve(evidence); });
-  expect(screen.getByText(/emma · Action · gradium/)).toBeInTheDocument(); expect(screen.queryByText(/max · Retenu · gradium/)).not.toBeInTheDocument(); expect(stop).toHaveBeenCalled();
- });
- it('shows save failures and never treats a draft as saved', async () => {
-  vi.mocked(saveSpeechPerformanceSettings).mockRejectedValue(new Error('Relecture impossible'));
-  await ready(); fireEvent.change(screen.getByLabelText('Pauses Retenu'), { target: { value: 'short' } });
-  expect(saveSpeechPerformanceSettings).not.toHaveBeenCalled(); fireEvent.click(screen.getByRole('button', { name: 'Sauvegarder le mapping sandbox et relire', hidden: true }));
-  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Relecture impossible'));
-  expect(saveSpeechPerformanceSettings).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ version: 'saved-v1' }), 'sandbox-ulrich');
- });
+import { readWorkshop, saveWorkshopComparison } from '@/services/tts/speechWorkshopStore';
+vi.mock('@/services/tts/providerSettings', async original => {
+ const actual = await original<typeof import('@/services/tts/providerSettings')>();
+ return { ...actual, loadFishSettingsFromDB: vi.fn(async () => ({})), loadInworldSettingsFromDB: vi.fn(async () => ({})), loadCartesiaSettingsFromDB: vi.fn(async () => ({})) };
 });
+vi.mock('@/services/tts/speechWorkshopStore', async original => ({ ...await original<typeof import('@/services/tts/speechWorkshopStore')>(), readWorkshop: vi.fn(async () => null), saveWorkshopComparison: vi.fn() }));
 
-
-describe('AP1 — Atelier de parole Max', () => {
- beforeEach(() => { localStorage.clear(); setActiveEnvironment('sandbox-ulrich'); vi.clearAllMocks(); });
- async function workshopReady() {
-  render(<MemoryRouter><SpeechAuditionBench workshop /></MemoryRouter>);
-  await waitFor(() => expect(screen.getByText(/copy-v1/)).toBeInTheDocument());
- }
- it('explains five families, requires a state and never calls audio or saves while preparing', async () => {
+const evidence = { requests: [{ transport: 'rest' as const, body: { json_config: { temp: 0.7, padding_bonus: 0.5 } } }], transport: 'rest' as const, cached: false, providerCalls: 1, pauseRendering: 'disabled' };
+async function ready() {
+ const mounted = render(<MemoryRouter><SpeechAuditionBench /></MemoryRouter>);
+ await waitFor(() => expect(screen.getByText(/copy-v1/)).toBeInTheDocument());
+ return mounted;
+}
+function choose() { fireEvent.change(screen.getByLabelText('État de la réplique'), { target: { value: 'Retenu' } }); fireEvent.click(screen.getByRole('button', { name: 'Continuer vers la version actuelle' })); }
+async function current() { fireEvent.click(screen.getByRole('button', { name: 'Écouter la version actuelle' })); await screen.findByRole('button', { name: 'Écouter l’essai' }); }
+async function trial() { fireEvent.click(screen.getByRole('button', { name: 'Écouter l’essai' })); await screen.findByRole('button', { name: 'Enregistrer la comparaison et mon avis' }); }
+describe('AP2 — one guided workshop and saved comparisons', () => {
+ beforeEach(() => { localStorage.clear(); setActiveEnvironment('sandbox-ulrich'); vi.clearAllMocks(); vi.mocked(readWorkshop).mockResolvedValue(null); vi.mocked(saveWorkshopComparison).mockImplementation(async (value, _baseline, environment) => ({ schemaVersion: 1, version: 'saved-1', environment, comparisons: [value] })); });
+ it('opens with one main action, explicit state, closed details and no audio or writes', async () => {
   const listen = vi.spyOn(SpeechAuditionRunner.prototype, 'listen').mockResolvedValue(evidence);
-  await workshopReady();
-  for (const title of ['Fiche Notion — jeu et déclencheurs', 'Rugosité — place des ruptures', 'GM — orientation du prochain tour', 'LLM — production des mots', 'Synthèse — restitution sonore']) expect(screen.getByText(title)).toBeInTheDocument();
+  await ready();
+  expect(screen.getByRole('button', { name: 'Continuer vers la version actuelle' })).toBeDisabled();
   expect(screen.getByLabelText('État de la réplique')).toHaveValue('');
-  expect(screen.getByRole('button', { name: 'Écouter / rejouer' })).toBeDisabled();
-  expect(screen.queryByText('Sauvegarder le mapping sandbox et relire')).not.toBeInTheDocument();
-  expect(screen.queryByLabelText('Personnage du banc')).not.toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText('Valeur B'), { target: { value: '-0.4' } });
-  expect(listen).not.toHaveBeenCalled(); expect(saveSpeechPerformanceSettings).not.toHaveBeenCalled();
-  expect(screen.getByRole('link', { name: /TTS Config/ })).toHaveAttribute('href', '/admin/technique/configuration-tts');
+  expect(screen.queryByRole('button', { name: 'Écouter la version actuelle' })).not.toBeInTheDocument();
+  for (const summary of screen.getAllByText(/Options avancées|Références et différences|Preuves et JSON|Configuration persistante du jeu/)) expect(summary.closest('details')).not.toHaveAttribute('open');
+  choose(); expect(screen.getByRole('button', { name: 'Écouter la version actuelle' })).toBeEnabled();
+  expect(listen).not.toHaveBeenCalled(); expect(saveSpeechPerformanceSettings).not.toHaveBeenCalled(); expect(saveWorkshopComparison).not.toHaveBeenCalled();
  });
- it('freezes A, varies only one bounded vocal value in B and keeps words, voice, state and transport identical', async () => {
-  const listen = vi.spyOn(SpeechAuditionRunner.prototype, 'listen').mockResolvedValue({ ...evidence, transport: 'rest' });
-  await workshopReady();
-  fireEvent.change(screen.getByLabelText('Transport audition'), { target: { value: 'rest' } });
-  fireEvent.change(screen.getByLabelText('État de la réplique'), { target: { value: 'Retenu' } });
-  const button = screen.getByRole('button', { name: 'Écouter / rejouer' });
-  fireEvent.click(button); await waitFor(() => expect(listen).toHaveBeenCalledTimes(1)); await waitFor(() => expect(button).toBeEnabled());
-  const a = listen.mock.calls[0];
-  fireEvent.change(screen.getByLabelText('Variante à écouter'), { target: { value: 'B' } });
-  fireEvent.change(screen.getByLabelText('Valeur B'), { target: { value: '-0.4' } });
-  fireEvent.click(button); await waitFor(() => expect(listen).toHaveBeenCalledTimes(2));
-  const b = listen.mock.calls[1];
+ it('compares identical words, state, voice and transport with only one bounded change', async () => {
+  const listen = vi.spyOn(SpeechAuditionRunner.prototype, 'listen').mockResolvedValue(evidence);
+  await ready(); fireEvent.change(screen.getByLabelText('Transport audition'), { target: { value: 'rest' } }); choose(); await current();
+  expect(screen.getByLabelText('Différence comparée')).toHaveTextContent('version actuelle');
+  fireEvent.change(screen.getByLabelText('Valeur de l’essai'), { target: { value: '-0.4' } });
+  await trial(); expect(listen).toHaveBeenCalledTimes(2);
+  const [a, b] = listen.mock.calls;
   expect(b[1]).toEqual(a[1]); expect(b[3].voiceId).toEqual(a[3].voiceId); expect(b[3].performance).toEqual(a[3].performance);
   expect(b[3].speechAudition).toEqual({ ...a[3].speechAudition, gradium: { ...a[3].speechAudition!.gradium, paddingBonus: -0.4 } });
   expect(a[4]).toBe('rest'); expect(b[4]).toBe('rest');
-  expect(a[3].speechAudition?.gradium.paddingBonus).not.toBe(-0.4);
-  fireEvent.change(screen.getByLabelText('Paramètre B'), { target: { value: 'temp' } });
-  fireEvent.change(screen.getByLabelText('Valeur B'), { target: { value: '90' } });
-  expect(screen.getByLabelText('Valeur B')).toHaveValue(1.4);
-  fireEvent.change(screen.getByLabelText('Réplique du banc'), { target: { value: '1' } });
-  expect(button).toBeDisabled(); expect(screen.getByLabelText('État de la réplique')).toHaveValue('');
+  fireEvent.click(screen.getByRole('button', { name: 'Réécouter ou modifier l’essai' }));
+  fireEvent.change(screen.getByLabelText('Réglage testé'), { target: { value: 'temp' } });
+  fireEvent.change(screen.getByLabelText('Valeur de l’essai'), { target: { value: '90' } }); expect(screen.getByLabelText('Valeur de l’essai')).toHaveValue(1.4);
  });
- it('separates A2 pauses into WS with the same vocal parameters and displays fallback limits', async () => {
+ it('saves notes explicitly, reloads after closing and restores only a draft with changed references warning', async () => {
+  const listen = vi.spyOn(SpeechAuditionRunner.prototype, 'listen').mockResolvedValue(evidence);
+  const mounted = await ready(); choose(); await current(); await trial();
+  fireEvent.change(screen.getByLabelText('Nom de la comparaison'), { target: { value: 'Max moins lent' } });
+  fireEvent.change(screen.getByLabelText('Pauses / rythme'), { target: { value: 'plus naturel' } });
+  fireEvent.change(screen.getByLabelText('Décision humaine'), { target: { value: 'preferred' } });
+  expect(saveWorkshopComparison).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer la comparaison et mon avis' }));
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('enregistrée et relue'));
+  expect(saveWorkshopComparison).toHaveBeenCalledWith(expect.objectContaining({ name: 'Max moins lent', notes: expect.objectContaining({ rhythm: 'plus naturel' }), decision: 'preferred', cost: null }), null, 'sandbox-ulrich');
+  const value = vi.mocked(saveWorkshopComparison).mock.calls[0][0];
+  const stored = { schemaVersion: 1 as const, environment: 'sandbox-ulrich', version: 'saved-1', comparisons: [{ ...value, references: { ...value.references, copy: 'ancienne copie' } }] };
+  mounted.unmount(); vi.mocked(readWorkshop).mockResolvedValue(stored); await ready();
+  fireEvent.click(screen.getByText(/Max moins lent · max/));
+  fireEvent.click(screen.getByRole('button', { name: 'Charger comme brouillon' }));
+  expect(listen).toHaveBeenCalledTimes(2); expect(saveWorkshopComparison).toHaveBeenCalledOnce();
+  expect(screen.getByText(/Les références actuelles diffèrent/)).toBeInTheDocument();
+  expect(screen.getByText(/Brouillon chargé sans audio/)).toBeInTheDocument(); expect(screen.getByLabelText('État de la réplique')).toHaveValue('Retenu');
+  expect(saveSpeechPerformanceSettings).not.toHaveBeenCalled();
+ });
+ it('keeps failed persistence unconfirmed and reloads the baseline while preserving the draft', async () => {
+  vi.spyOn(SpeechAuditionRunner.prototype, 'listen').mockResolvedValue(evidence);
+  vi.mocked(saveWorkshopComparison).mockRejectedValue(new Error('Modification concurrente : écriture refusée.'));
+  await ready(); choose(); await current(); await trial();
+  fireEvent.change(screen.getByLabelText('Nom de la comparaison'), { target: { value: 'Brouillon intact' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer la comparaison et mon avis' }));
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('concurrente'));
+  expect(screen.queryByText(/Comparaison enregistrée et relue/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Recharger les variantes' }));
+  await waitFor(() => expect(readWorkshop).toHaveBeenCalledTimes(2)); expect(screen.getByLabelText('Nom de la comparaison')).toHaveValue('Brouillon intact');
+ });
+ it('keeps Emma, other providers, isolated voices, finalists and explicit live mapping in the same advanced workshop', async () => {
+  const listen = vi.spyOn(SpeechAuditionRunner.prototype, 'listen').mockResolvedValue(evidence);
+  await ready(); fireEvent.change(screen.getByLabelText('Personnage du banc'), { target: { value: 'emma' } });
+  expect(screen.getByLabelText('Rugosité du banc')).toHaveValue('2'); expect(screen.getByLabelText('Voix emma gradium')).toHaveValue('voice-emma');
+  expect(screen.getByLabelText('État de la réplique')).toHaveValue('');
+  fireEvent.change(screen.getByLabelText('Fournisseur du banc'), { target: { value: 'fish' } });
+  fireEvent.change(screen.getByLabelText('Voix emma fish'), { target: { value: 'isolated-fish' } });
+  fireEvent.change(screen.getByLabelText('Réplique du banc'), { target: { value: '2' } });
+  fireEvent.change(screen.getByLabelText('État de la réplique'), { target: { value: 'Action' } });
+  expect(screen.getByRole('button', { name: 'Continuer vers la version actuelle' })).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Étape audition'), { target: { value: 'finalists' } }); fireEvent.click(screen.getByLabelText('Finaliste E3'));
+  expect(screen.getByRole('button', { name: 'Continuer vers la version actuelle' })).toBeEnabled();
+  expect(listen).not.toHaveBeenCalled(); expect(saveSpeechPerformanceSettings).not.toHaveBeenCalled();
+  vi.mocked(saveSpeechPerformanceSettings).mockRejectedValue(new Error('Relecture impossible'));
+  fireEvent.change(screen.getByLabelText('Pauses Action'), { target: { value: 'long' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Sauvegarder le mapping du jeu sandbox et relire', hidden: true }));
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Relecture impossible'));
+  expect(saveWorkshopComparison).not.toHaveBeenCalled();
+ });
+ it('separates A2 pauses, preserves WS fallback evidence and stops late callbacks on edits', async () => {
   const listen = vi.spyOn(SpeechAuditionRunner.prototype, 'listen').mockResolvedValue({ ...evidence, transport: 'rest_fallback' });
-  await workshopReady();
-  fireEvent.change(screen.getByLabelText('État de la réplique'), { target: { value: 'Retenu' } });
-  fireEvent.change(screen.getByLabelText('Type de comparaison'), { target: { value: 'pauses' } });
+  await ready(); fireEvent.change(screen.getByLabelText('Type de comparaison'), { target: { value: 'pauses' } });
   expect(screen.getByLabelText('Transport audition')).toHaveValue('websocket'); expect(screen.getByLabelText('Transport audition')).toBeDisabled();
-  fireEvent.change(screen.getByLabelText('Variante à écouter'), { target: { value: 'B' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Écouter / rejouer' }));
-  await waitFor(() => expect(listen).toHaveBeenCalledOnce());
-  expect(listen.mock.calls[0][3].speechAudition?.settings.gradiumPausesEnabled).toBe(true);
-  expect(screen.getByText(/Repli REST : cette écoute/)).toBeInTheDocument();
+  choose(); await current(); await trial();
+  expect(listen.mock.calls[0][3].speechAudition?.settings.gradiumPausesEnabled).toBe(false);
+  expect(listen.mock.calls[1][3].speechAudition?.settings.gradiumPausesEnabled).toBe(true);
+  expect(screen.getAllByText(/Repli REST : cette écoute/)).toHaveLength(2);
+  let resolve!: (value: typeof evidence) => void;
+  listen.mockImplementationOnce(() => new Promise(r => { resolve = r; }));
+  fireEvent.click(screen.getByRole('button', { name: 'Réécouter la version actuelle' })); fireEvent.click(screen.getByRole('button', { name: 'Écouter la version actuelle' }));
+  fireEvent.change(screen.getByLabelText('Personnage du banc'), { target: { value: 'emma' } });
+  await act(async () => resolve(evidence)); expect(screen.getByLabelText('Étape courante')).toHaveTextContent('Étape 1');
+  expect(screen.queryByRole('button', { name: 'Enregistrer la comparaison et mon avis' })).not.toBeInTheDocument();
  });
- it('closes production and clears the existing owner when unmounted', async () => {
+ it('auditions another provider with an isolated voice and only an emotion change in the trial', async () => {
+  const listen = vi.spyOn(SpeechAuditionRunner.prototype, 'listen').mockResolvedValue(evidence);
+  await ready(); fireEvent.change(screen.getByLabelText('Fournisseur du banc'), { target: { value: 'fish' } });
+  fireEvent.change(screen.getByLabelText('Voix max fish'), { target: { value: 'isolated-fish' } });
+  choose(); await current();
+  fireEvent.change(screen.getByLabelText('Réglage de l’intention'), { target: { value: 'emotion' } });
+  fireEvent.change(screen.getByLabelText('Intention de l’essai'), { target: { value: 'angry' } });
+  await trial();
+  expect(listen).toHaveBeenCalledTimes(2);
+  expect(listen.mock.calls[0][3].voiceId).toBe('isolated-fish');
+  expect(listen.mock.calls[1][3].performance).toMatchObject({ emotion: 'angry', speechState: 'Retenu' });
+  fireEvent.change(screen.getByLabelText('Nom de la comparaison'), { target: { value: 'Émotion isolée' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer la comparaison et mon avis' }));
+  await waitFor(() => expect(saveWorkshopComparison).toHaveBeenCalledOnce());
+  const c = vi.mocked(saveWorkshopComparison).mock.calls[0][0];
+  expect(c.b).toEqual({ ...c.a, settings: { ...c.a.settings, byCharacter: { max: { Retenu: { ...c.a.settings.byCharacter.max.Retenu, emotion: 'angry' } } } } });
+  expect(c.references.requestedParameters).not.toContain('secret'); expect(saveSpeechPerformanceSettings).not.toHaveBeenCalled();
+ });
+ it('blocks production and clears the shared audio owner on unmount', async () => {
   const clear = vi.spyOn(SpeechAuditionRunner.prototype, 'clear');
-  const mounted = render(<MemoryRouter><SpeechAuditionBench workshop /></MemoryRouter>);
-  await waitFor(() => expect(screen.getByText(/copy-v1/)).toBeInTheDocument());
-  mounted.unmount(); expect(clear).toHaveBeenCalled();
-  setActiveEnvironment('prod'); render(<MemoryRouter><SpeechAuditionBench workshop /></MemoryRouter>);
+  const mounted = await ready(); mounted.unmount(); expect(clear).toHaveBeenCalled();
+  setActiveEnvironment('prod'); render(<MemoryRouter><SpeechAuditionBench /></MemoryRouter>);
   expect(screen.getByText('Réservé aux environnements sandbox.')).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Écouter / rejouer' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+ });
+ it('invalidates prepared snapshots and pending writes when the environment changes', async () => {
+  vi.spyOn(SpeechAuditionRunner.prototype, 'listen').mockResolvedValue(evidence);
+  let finish!: (value: Awaited<ReturnType<typeof saveWorkshopComparison>>) => void;
+  vi.mocked(saveWorkshopComparison).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const mounted = await ready(); choose(); await current(); await trial();
+  fireEvent.change(screen.getByLabelText('Nom de la comparaison'), { target: { value: 'Ancienne sandbox' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer la comparaison et mon avis' }));
+  await waitFor(() => expect(saveWorkshopComparison).toHaveBeenCalledOnce());
+  setActiveEnvironment('sandbox-romed');
+  mounted.rerender(<MemoryRouter><SpeechAuditionBench /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByLabelText('État de la réplique')).toHaveValue(''));
+  await act(async () => finish({ schemaVersion: 1, environment: 'sandbox-ulrich', version: 'late', comparisons: [vi.mocked(saveWorkshopComparison).mock.calls[0][0]] }));
+  expect(screen.queryByText(/Comparaison enregistrée et relue/)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Recharger les variantes' })).toBeEnabled();
+  expect(screen.getByLabelText('Étape courante')).toHaveTextContent('Étape 1');
+ });
+ it('keeps read failures distinct from an empty library and never saves in that state', async () => {
+  vi.mocked(readWorkshop).mockRejectedValue(new Error('Lecture de l’atelier indisponible'));
+  await ready(); expect(screen.getByRole('alert')).toHaveTextContent('indisponible');
+  expect(screen.queryByText('Aucune comparaison enregistrée dans cette sandbox.')).not.toBeInTheDocument(); expect(saveWorkshopComparison).not.toHaveBeenCalled();
  });
 });

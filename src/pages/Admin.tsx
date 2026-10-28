@@ -619,7 +619,7 @@ export default function Admin() {
 
           {/* ==================== EXPÉRIENCE ==================== */}
           <TabsContent value="speech-workshop">
-            {activeTab === "speech-workshop" && <SpeechAuditionBench workshop />}
+            {activeTab === "speech-workshop" && <SpeechAuditionBench />}
           </TabsContent>
 
           <TabsContent value="architecture">

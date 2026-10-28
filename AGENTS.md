@@ -118,6 +118,36 @@ rendu et Notion. Aucune seconde PR documentaire pour inscrire un futur SHA dans
 son propre contenu. Le bilan donne SHA main, CI PR/HEAD, arbre vérifié, absence
 attendue de campagne main, branches restantes et ce qui reste à valider.
 
+## GitHub — accès sans Trousseau (décision d’Ulrich, 28 octobre 2026)
+
+Pour GitHub, utiliser une identité de livraison dédiée hors Trousseau macOS.
+Ulrich interdit tout recours à l’app Trousseaux d’accès et aux commandes/API
+qui lisent, déverrouillent, réparent ou modifient ce stockage. Ne jamais lui
+redemander de le déverrouiller ni relancer une sonde de lecture après un refus.
+Cette décision remplace les anciennes consignes de diagnostic du trousseau.
+
+Git/gh restent autorisés avec un jeton temporaire fourni explicitement par une
+voie indépendante et vérifiée ; neutraliser les helpers implicites pour ces
+processus. Sans cette identité, conserver le lot local et sa reprise exacte,
+sans lancer gh/git qui consultent les identifiants personnels par défaut.
+Voie Ava installée : App privée `ava-delivery`, clé dans 1Password Fischers.
+Pour un lot, ouvrir **une seule session** par
+`bash .github/scripts/github-1password.sh session`, puis transmettre les commandes
+Git/gh/garde dans ce même processus (protocole du plan ci-dessous). Ne pas appeler
+`op run` ou le lanceur séparément pour chaque commande : Ulrich interdit les
+rafales de demandes 1Password. Réutiliser la session après un échec de commande.
+Session bornée à deux heures, clé/jetons en mémoire, sans daemon ni secret sur
+disque ; un refus d’accès ou une expiration arrête la session sans réouverture
+automatique du coffre. Une validation initiale éventuelle ne peut pas être promise
+absente. Les lectures publiques de statut peuvent rester anonymes, sans coffre.
+Une livraison déjà préparée peut aussi être groupée par le lanceur avec `git-ship`.
+La fusion reste exclusivement la garde versionnée. Configuration non secrète :
+`~/.config/git-ship/ava-1password.env`. Réutiliser cette installation, ne pas recréer
+d’App, clé ou identité par session/worktree. Échec explicite sans repli personnel ;
+ne pas lancer directement les anciens helpers partagés.
+[Voie dédiée et diagnostic borné](docs/plan_authentification_github_sans_trousseau.md).
+Aucune reconnexion personnelle ni changement système pour débloquer une livraison.
+
 ## Connexions — diagnostic borné
 
 Une sonde d'identité puis une lecture de ressource suffisent au premier diagnostic.

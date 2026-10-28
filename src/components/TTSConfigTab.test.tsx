@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -113,62 +113,14 @@ describe("TTSConfigTab Gradium character selector", { timeout: 15_000 }, () => {
     expect(screen.getByRole("button", { name: "Réglages Gradium Emma" })).toBeInTheDocument();
   });
 
-  it("tests Gradium with the selected character voice", async () => {
+  it("contains only technical configuration and a link to the sole workshop", async () => {
     await renderTTSConfigTab();
     fireEvent.click(screen.getByRole("button", { name: "Réglages Gradium Emma" }));
-    fireEvent.click(screen.getByRole("button", { name: /Tester REST/ }));
-    await waitFor(() => expect(generateSpeech).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        providerId: "gradium",
-        characterKey: "emma",
-        performance: expect.objectContaining({ emotion: "tense", source: "manual" }),
-      }),
-    ));
-  });
-
-  it("sends the selected audition emotion on a provider test", async () => {
-    await renderTTSConfigTab();
-    fireEvent.click(screen.getByRole("button", { name: "Colère" }));
-    fireEvent.click(screen.getByRole("button", { name: /Tester REST/ }));
-    await waitFor(() => expect(generateSpeech).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        performance: expect.objectContaining({ emotion: "angry", source: "manual", intensity: 2 }),
-      }),
-    ));
-  });
-
-  it("does not play audio when an audition chip is clicked", async () => {
-    await renderTTSConfigTab();
-    fireEvent.click(screen.getByRole("button", { name: "Colère" }));
+    expect(screen.getByRole("link", { name: /Ouvrir l’atelier de parole/ })).toHaveAttribute("href", "/admin/experience/atelier-de-parole");
+    expect(screen.queryByRole("button", { name: /Tester|Écouter/ })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Banc d'audition lot B")).not.toBeInTheDocument();
+    expect(screen.queryByText("Intention de jeu (audition)")).not.toBeInTheDocument();
     expect(generateSpeech).not.toHaveBeenCalled();
-  });
-
-  it("lists which providers can actually perform the acting intent", async () => {
-    await renderTTSConfigTab();
-    expect(screen.getByText("Où l'intention est réellement utilisée")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Écouter Fish Audio/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Écouter Inworld/ })).toBeInTheDocument();
     expect(screen.getAllByText(/Oui — audible/).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText(/Volume \/ vitesse en FR/).length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("warns when the in-game provider cannot perform acting audibly", async () => {
-    await renderTTSConfigTab();
-    expect(screen.getByText(/En jeu,.*l'intention y est/)).toBeInTheDocument();
-  });
-
-  it("plays Fish Audio when Écouter Fish Audio is clicked with the selected emotion", async () => {
-    await renderTTSConfigTab();
-    fireEvent.click(screen.getByRole("button", { name: "Colère" }));
-    fireEvent.click(screen.getByRole("button", { name: /Écouter Fish Audio/ }));
-    await waitFor(() => expect(generateSpeech).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        providerId: "fish",
-        performance: expect.objectContaining({ emotion: "angry", intensity: 2 }),
-      }),
-    ));
   });
 });

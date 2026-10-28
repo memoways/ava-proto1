@@ -4,7 +4,7 @@
   "version": "0.26.0",
   "type": "module",
   "scripts": {
-    "test:delivery": "node --test .github/scripts/ship-pr.test.mjs",
+    "test:delivery": "node --test .github/scripts/ship-pr.test.mjs .github/scripts/github-1password.test.mjs .github/scripts/github-1password-app.test.mjs .github/scripts/github-1password-session.test.mjs",
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",

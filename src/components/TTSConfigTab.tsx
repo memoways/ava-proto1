@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import SpeechAuditionBench from './SpeechAuditionBench';
+import { useState, useEffect } from "react";
+import { adminTabPath } from '@/services/adminNavigation';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -7,10 +7,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner";
 import { writeEnvironmentStorage } from "@/services/environmentContext";
 import { Save, RotateCcw, CheckCircle2, HelpCircle } from "lucide-react";
-import { generateSpeech, playAudioBlob, tryCreateStreamingPlayback } from "@/services/tts";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
 import type { TTSProviderId } from "@/services/tts/types";
-import { GRADIUM_BUFFER_PRESETS, type GradiumBufferPreset } from "@/services/tts/gradiumStreamPlayer";
 import {
   getActiveProviderId,
   loadActiveProviderFromDB,
@@ -53,29 +51,8 @@ import {
   type TTSSettings,
 } from "@/services/settingsService";
 import { listCharacterRuntimeProfiles } from "@/services/experienceOrchestration";
-import {
-  CANONICAL_EMOTIONS,
-  PROVIDER_ACTING_SUPPORT,
-  intentFromManualEmotion,
-  type CanonicalEmotion,
-} from "@/services/tts/performanceIntent";
-
-const TEST_PHRASE = "Écoute, je ne sais pas qui tu es... mais si tu sais quelque chose sur Ava, il faut me le dire maintenant. Je n'ai plus beaucoup de temps.";
-/** Intensity 2 so Fish Audio / Inworld acting instructions are actually audible in admin tests. */
-const AUDITION_INTENSITY = 2 as const;
+import { PROVIDER_ACTING_SUPPORT } from "@/services/tts/performanceIntent";
 const GRADIUM_CHARACTER_ORDER = ["max", "emma"];
-const AUDITION_EMOTION_LABELS: Record<CanonicalEmotion, string> = {
-  neutral: "Neutre",
-  tense: "Tendu",
-  angry: "Colère",
-  sad: "Tristesse",
-  scared: "Peur",
-  fragile: "Fragile",
-  warm: "Chaleureux",
-  accusatory: "Accusateur",
-  sarcastic: "Sarcasme",
-  urgent: "Urgent",
-};
 
 function ActingNote({
   providerId,
@@ -134,21 +111,11 @@ export default function TTSConfigTab() {
   const [savingGr, setSavingGr] = useState(false);
   const [grCharacters, setGrCharacters] = useState<GradiumCharacterOption[]>(FALLBACK_GRADIUM_CHARACTERS);
   const [grCharacterKey, setGrCharacterKey] = useState("max");
-  const grCharacterKeyRef = useRef(grCharacterKey);
-  grCharacterKeyRef.current = grCharacterKey;
 
   // Cartesia settings
   const [caSettings, setCaSettings] = useState<CartesiaSettings>(getCartesiaSettings());
   const [caSaved, setCaSaved] = useState<CartesiaSettings>(getCartesiaSettings());
   const [savingCa, setSavingCa] = useState(false);
-
-  // Test
-  const [testing, setTesting] = useState<TTSProviderId | null>(null);
-  const [testingStream, setTestingStream] = useState(false);
-  const [gradiumBufferPreset, setGradiumBufferPreset] = useState<GradiumBufferPreset>("current");
-  const [auditionEmotion, setAuditionEmotion] = useState<CanonicalEmotion>("tense");
-  const auditionEmotionRef = useRef(auditionEmotion);
-  auditionEmotionRef.current = auditionEmotion;
 
   useEffect(() => {
     loadActiveProviderFromDB().then(setActiveProviderState);
@@ -184,67 +151,6 @@ export default function TTSConfigTab() {
     await setActiveProvider(id);
     toast.success(`Provider actif : ${TTS_PROVIDER_LIST.find((p) => p.id === id)?.label}`);
   }
-
-  const testProvider = useCallback(async (id: TTSProviderId) => {
-    setTesting(id);
-    try {
-      const blob = await generateSpeech(TEST_PHRASE, {
-        providerId: id,
-        performance: intentFromManualEmotion(auditionEmotionRef.current, AUDITION_INTENSITY),
-      });
-      await playAudioBlob(blob);
-      toast.success(`Test ${id} · ${AUDITION_EMOTION_LABELS[auditionEmotionRef.current]}`);
-    } catch (err) {
-      console.error(`TTS test error (${id}):`, err);
-      toast.error(`Erreur test ${id}: ${err instanceof Error ? err.message.slice(0, 120) : "inconnu"}`);
-    } finally {
-      setTesting(null);
-    }
-  }, []);
-
-  const testGradium = useCallback(async (mode: "rest" | "stream") => {
-    const character = grCharacters.find((option) => option.character_key === grCharacterKeyRef.current) ?? grCharacters[0];
-    const opts = {
-      providerId: "gradium" as const,
-      characterKey: character?.character_key,
-      voiceId: character?.tts_voice_id ?? undefined,
-      performance: intentFromManualEmotion(auditionEmotionRef.current, AUDITION_INTENSITY),
-      ...(mode === "stream" && gradiumBufferPreset !== "current" ? { bufferPreset: gradiumBufferPreset } : {}),
-    };
-    if (mode === "rest") {
-      setTesting("gradium");
-      try {
-        const blob = await generateSpeech(TEST_PHRASE, opts);
-        await playAudioBlob(blob);
-        toast.success(`Test REST ${character?.display_name ?? "Gradium"} terminé`);
-      } catch (err) {
-        console.error("TTS test error (gradium):", err);
-        toast.error(`Erreur test REST: ${err instanceof Error ? err.message.slice(0, 120) : "inconnu"}`);
-      } finally {
-        setTesting(null);
-      }
-      return;
-    }
-    setTestingStream(true);
-    try {
-      const handle = tryCreateStreamingPlayback(TEST_PHRASE, opts);
-      if (!handle) {
-        toast.error("Streaming indisponible (désactivé ou non supporté par ce navigateur)");
-        return;
-      }
-      const t0 = performance.now();
-      handle.open();
-      await handle.started;
-      const firstAudioMs = Math.round(performance.now() - t0);
-      await handle.finished;
-      toast.success(`Test streaming ${character?.display_name ?? ""} — premier son en ${firstAudioMs}ms`);
-    } catch (err) {
-      console.error("TTS streaming test error (gradium):", err);
-      toast.error(`Erreur test streaming: ${err instanceof Error ? err.message.slice(0, 120) : "inconnu"}`);
-    } finally {
-      setTestingStream(false);
-    }
-  }, [grCharacters, gradiumBufferPreset]);
 
   // ElevenLabs helpers
   function updateEl(patch: Partial<TTSSettings>) {
@@ -364,11 +270,11 @@ export default function TTSConfigTab() {
   return (
     <TooltipProvider delayDuration={150}>
     <div className="max-w-4xl space-y-8">
-      <SpeechAuditionBench />
+      <a className="inline-block underline" href={adminTabPath("speech-workshop")}>Ouvrir l’atelier de parole — auditions et comparaisons</a>
       <div>
         <h2 className="text-lg font-semibold">TTS Config — Multi-providers</h2>
         <p className="text-sm text-muted-foreground">
-          Compare les services TTS. Le provider <strong>actif</strong> est utilisé dans le jeu ; les autres restent disponibles pour les tests. Les puces d'intention ne jouent pas l'audio : clique <strong>Écouter Fish Audio</strong> ou <strong>Écouter Inworld</strong> (seuls ces deux services rendent l'acting vraiment audible).
+          Configure les fournisseurs, modèles et paramètres utilisés dans le jeu. Les auditions se font dans Expérience → Atelier de parole.
         </p>
         <p className="text-sm text-muted-foreground">
           Les <strong>Voice ID</strong> se règlent par personnage dans Expérience → Orchestration. Gradium a des réglages fins distincts par personnage dans le panneau ci-dessous.
@@ -402,56 +308,9 @@ export default function TTSConfigTab() {
           <p className="text-xs text-amber-300/90 mt-3">
             En jeu, {TTS_PROVIDER_LIST.find((p) => p.id === activeProvider)?.label} est actif :
             l'intention y est {PROVIDER_ACTING_SUPPORT[activeProvider].labelFr.toLowerCase()}.
-            Fish Audio et Inworld ci-dessous servent à l'audition, pas à l'appel.
+            Les essais temporaires sont disponibles dans l’atelier de parole.
           </p>
         )}
-      </section>
-
-      <section className="border rounded-lg p-4 space-y-3">
-        <h3 className="font-semibold text-sm">Intention de jeu (audition)</h3>
-        <p className="text-xs text-muted-foreground">
-          Les puces <strong>sélectionnent</strong> une émotion — elles ne jouent rien. Tous les boutons Tester (et Écouter ci-dessous) envoient cette intention. En jeu, l'émotion est dérivée de la réplique (plus le personnage et la mémoire GM).
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {CANONICAL_EMOTIONS.map((emotion) => (
-            <button
-              key={emotion}
-              type="button"
-              onClick={() => {
-                auditionEmotionRef.current = emotion;
-                setAuditionEmotion(emotion);
-              }}
-              className={`px-2 py-1.5 border rounded text-xs ${
-                auditionEmotion === emotion ? "bg-primary/10 border-primary" : "hover:bg-accent/50"
-              }`}
-            >
-              {AUDITION_EMOTION_LABELS[emotion]}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => testProvider("fish")} disabled={testing !== null}>
-            {testing === "fish" ? "..." : "🔊 Écouter Fish Audio"}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => testProvider("inworld")} disabled={testing !== null}>
-            {testing === "inworld" ? "..." : "🔊 Écouter Inworld"}
-          </Button>
-        </div>
-        <div className="rounded-md border bg-accent/20 p-3 space-y-1.5">
-          <p className="text-xs font-medium">Où l'intention est réellement utilisée</p>
-          <ul className="text-xs text-muted-foreground space-y-1">
-            {TTS_PROVIDER_LIST.map((provider) => {
-              const support = PROVIDER_ACTING_SUPPORT[provider.id];
-              return (
-                <li key={provider.id}>
-                  <span className="font-medium text-foreground">{provider.label}</span>
-                  {" — "}
-                  {support.labelFr}. {support.detailFr}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
       </section>
 
       {/* ===== ElevenLabs panel ===== */}
@@ -471,9 +330,6 @@ export default function TTSConfigTab() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetEl}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
-            <Button size="sm" onClick={() => testProvider("elevenlabs")} disabled={testing === "elevenlabs"}>
-              {testing === "elevenlabs" ? "..." : "🔊 Tester"}
-            </Button>
             <Button size="sm" onClick={saveEl} disabled={savingEl || !elHasChanges}
               className={elHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
               <Save className="w-3 h-3 mr-1" />{savingEl ? "..." : "Sauver"}
@@ -563,9 +419,6 @@ export default function TTSConfigTab() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetIw}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
-            <Button size="sm" onClick={() => testProvider("inworld")} disabled={testing === "inworld"}>
-              {testing === "inworld" ? "..." : "🔊 Tester"}
-            </Button>
             <Button size="sm" onClick={saveIw} disabled={savingIw || !iwHasChanges}
               className={iwHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
               <Save className="w-3 h-3 mr-1" />{savingIw ? "..." : "Sauver"}
@@ -667,9 +520,6 @@ export default function TTSConfigTab() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetFish}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
-            <Button size="sm" onClick={() => testProvider("fish")} disabled={testing === "fish"}>
-              {testing === "fish" ? "..." : "🔊 Tester"}
-            </Button>
             <Button size="sm" onClick={saveFish} disabled={savingFish || !fishHasChanges}
               className={fishHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
               <Save className="w-3 h-3 mr-1" />{savingFish ? "..." : "Sauver"}
@@ -782,12 +632,6 @@ export default function TTSConfigTab() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetGr}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
-            <Button size="sm" onClick={() => void testGradium("rest")} disabled={testing === "gradium"}>
-              {testing === "gradium" ? "..." : "🔊 Tester REST"}
-            </Button>
-            <Button size="sm" onClick={() => void testGradium("stream")} disabled={testingStream}>
-              {testingStream ? "..." : "🔊 Tester streaming"}
-            </Button>
             <Button size="sm" onClick={saveGr} disabled={savingGr || !grHasChanges}
               className={grHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
               <Save className="w-3 h-3 mr-1" />{savingGr ? "..." : "Sauver"}
@@ -813,7 +657,6 @@ export default function TTSConfigTab() {
                   aria-label={`Réglages Gradium ${character.display_name}`}
                   aria-pressed={selected}
                   onClick={() => {
-                    grCharacterKeyRef.current = character.character_key;
                     setGrCharacterKey(character.character_key);
                   }}
                   className={`text-left p-3 border rounded-lg transition-colors ${
@@ -833,7 +676,7 @@ export default function TTSConfigTab() {
             })}
           </div>
           <p className="text-xs text-muted-foreground mt-2">
-            Les tests REST et streaming utilisent la Voice ID Orchestration de {grCharacter?.display_name ?? "ce personnage"} et les réglages affichés ici.
+            La Voice ID de {grCharacter?.display_name ?? "ce personnage"} est définie dans Orchestration. Les auditions sont regroupées dans l’atelier de parole.
           </p>
         </div>
 
@@ -850,7 +693,7 @@ export default function TTSConfigTab() {
               minLabel="Générique" maxLabel="Très fidèle" />
           </div>
 
-          <p className="text-xs text-muted-foreground">padding_bonus module le rythme global. Les breaks explicites WS se comparent dans le banc A3 ; REST ne les atteste pas. Émotion et instruction d’acting ne sont pas transmises à Gradium.</p>
+          <p className="text-xs text-muted-foreground">padding_bonus module le rythme global. Les breaks explicites WS se comparent dans l’atelier de parole ; REST ne les atteste pas. Émotion et instruction d’acting ne sont pas transmises à Gradium.</p>
           <SliderRow label="Rythme global (padding_bonus)" value={grTuning.paddingBonus} min={-4} max={4} step={0.1}
             onChange={(v) => updateGrTuning({ paddingBonus: v })}
             tooltip="Ajuste la vitesse de lecture en ajoutant ou retirant du silence. Négatif = plus rapide, positif = plus lent."
@@ -911,18 +754,7 @@ export default function TTSConfigTab() {
             <span className="block text-xs text-muted-foreground/60">PCM brut envoyé sur le WebSocket. 24 kHz = moitié moins de données ; 48 kHz = qualité native.</span>
           </label>
 
-          <label className="space-y-1 text-sm">
-            <span className="font-medium text-muted-foreground">Preset buffer — banc streaming</span>
-            <select value={gradiumBufferPreset}
-              onChange={(e) => setGradiumBufferPreset(e.target.value as GradiumBufferPreset)}
-              disabled={!grSettings.streamingEnabled}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-50">
-              {Object.entries(GRADIUM_BUFFER_PRESETS).map(([id, preset]) => (
-                <option key={id} value={id}>{id} · {preset.prebufferMs}/{preset.rebufferMs} ms</option>
-              ))}
-            </select>
-            <span className="block text-xs text-muted-foreground/60">Banc admin uniquement ; le chemin live conserve toujours `current`.</span>
-          </label>
+
         </div>
 
       </section>
@@ -947,9 +779,6 @@ export default function TTSConfigTab() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetCa}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
-            <Button size="sm" onClick={() => testProvider("cartesia")} disabled={testing === "cartesia"}>
-              {testing === "cartesia" ? "..." : "🔊 Tester"}
-            </Button>
             <Button size="sm" onClick={saveCa} disabled={savingCa || !caHasChanges}
               className={caHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
               <Save className="w-3 h-3 mr-1" />{savingCa ? "..." : "Sauver"}

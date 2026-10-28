@@ -19,7 +19,7 @@ La recette F4 reste distincte ; aucun gel de démo ni publication implicite.
 | Lot | Périmètre et résultat observable | Dépendance / sortie | Statut |
 | --- | --- | --- | --- |
 | AP1 | Atelier lisible, réglages expliqués et écoute A/B fidèle au transport actuel ; réemploi du banc | Livraison technique vérifiée ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap1.md) | Implémenté ; vérifications et reçu ci-dessous |
-| AP2 | Atelier unique et parcours simple ; retrait du banc de TTS Config ; variantes/avis nommés et retrouvables | Correction UX prioritaire, puis stockage sandbox strict et relecture | Préparé, non lancé |
+| AP2 | Atelier unique et parcours simple ; retrait du banc de TTS Config ; variantes/avis nommés et retrouvables | Correction UX prioritaire, puis stockage sandbox strict et relecture | Implémenté ; livraison et recette de clôture ci-dessous |
 | AP3 | Première séance Max, deux répliques initiales, une hypothèse et deux variantes | AP2 livré ; bilan humain, référence et prochain défaut observé | Recette à organiser |
 | AP4 | Conversations courtes guidées, nouvelle session par essai, références et versions réellement utilisées | Bilan AP3 ; états proposés/déclarés/livrés et coupures distingués | Planifié |
 | AP5 | Affiner Max par passes : Notion, GM effectif, LLM ou restitution ; une couche par comparaison | Observations humaines ; sous-lots AP5.1… définis avant leur exécution | Itératif, non lancé |
@@ -1167,3 +1167,199 @@ La livraison technique désactivée ne vaut pas recette humaine. A4 ne commence
 pas dans ce lot. Le SHA final et les runs exacts de livraison sont conservés
 dans le bilan de la PR A3 (source GitHub), sans commit circulaire pour inscrire
 le SHA du commit contenant cette même ligne.
+
+## Exécution AP2 — 28 octobre 2026
+
+Objectif : un seul atelier guidé dans Expérience, puis comparaisons nommées et
+avis retrouvables dans la même sandbox. Branche `codex/ap2-atelier-unique-variantes`
+depuis main `54e7bfa818f7db04b61be7068e145535e412d695` ; #24 et branches
+historiques préservées, aucun recouvrement. Gamilab et Lovable Ava/Memoways
+confirmés nativement ; GitHub natif Unknown tool, repli gh authentifié Ulrfis.
+Début préparation observé 17:24 UTC, branche créée 17:25:33 UTC.
+
+Périmètre autorisé : retrait de toutes les auditions de TTS Config ; même banc et
+propriétaire audio, étapes choisir → version actuelle → essai → avis/enregistrer ;
+options avancées pour Emma/fournisseurs, références et mapping persistant explicite.
+Documents dédiés `speech_workshop_documents` (hors préfixe runtime `ava_`) dans `admin_settings`, schéma versionné,
+partition sandbox stricte, CAS et relecture exacte ; jamais une activation du jeu.
+Lecture absente/indisponible/conflit/relecture distincts. Aucun audio durable ni
+prompt intégral, aucune audition réelle automatique ou publication.
+
+Vérifications prévues : tests service de persistance et confidentialité, parcours
+UI simulé et fermeture/reconnexion, zéro écriture/audio au chargement, identité
+texte/état/voix et seule différence, conservation contrôles avancés ; desktop,
+clavier et 390 px, qualité/delivery, campagne PR/HEAD puis garde arbre/parent.
+Recette preview authentifiée après synchronisation ; compréhension et écoute
+humaine restent distinctes. Retour arrière : revert du squash AP2 en nouveau lot
+contrôlé ; documents dédiés conservés, aucun réglage live à restaurer.
+
+
+### Résultat et contrôles AP2
+
+TTS Config ne contient plus aucun banc ni bouton de génération. Les réglages
+fournisseurs/voix/modèles/paramètres restent en place ; déplacement du buffer
+expérimental et des auditions vers le seul `SpeechAuditionBench` dans Expérience.
+Parcours guidé en quatre étapes ; Emma et tous les fournisseurs, corpus et
+finalistes, transports/buffer, familles et preuves accessibles dans des détails
+fermés. Mapping du jeu dans un panneau avancé distinct avec sauvegarde explicite ;
+son déplacement ne sauvegarde rien et ne modifie pas les valeurs persistantes.
+
+Snapshots de la paire, texte court édité, état choisi, nom/hypothèse, différence,
+transport demandé, références connues/inconnues, preuves de paramètres filtrées,
+notes séparées et décision humaine sont conservés dans le document dédié.
+Clé hors préfixe `ava_` décidée après lecture native des politiques Cloud : les
+politiques testeur invité lisent les clés runtime préfixées dans leur sandbox.
+Droits admin existants réutilisés ; aucune migration, fonction, droit ou secret.
+CAS sur JSONB complet avec version unique et comparaison exacte de relecture ;
+autres entrées/extensions conservées. Format inconnu refusé sans migration
+implicite. Aucune écriture du cache runtime pour les variantes.
+
+Charger une comparaison ne joue rien et ne sauvegarde rien ; preuves antérieures
+conservées pour une modification d’avis seule, sans prétendre à une nouvelle
+écoute. Références anciennes et actuelles visibles à la demande. Si des paramètres
+non-Gradium changent, préparation explicite d’une nouvelle paire requise avant
+régénération. Cache exact uniquement mémoire, mêmes limites et propriétaire audio.
+La décision préférée/rejetée reste une appréciation, jamais une activation du jeu.
+
+Tests ciblés : 8 persistance (absence/erreur/admin/sandbox/CAS/readback/extensions,
+confidentialité et exports), 10 UI (étapes, identité A/B, reprise et notes,
+conflit, accès avancés, repli/annulation, production, lecture indisponible),
+2 TTS Config (voix distinctes, aucun lecteur). Services/adaptateurs existants
+REST/WS/cache/retards inchangés et recouverts par la qualité complète.
+E2E ciblé vert, desktop puis 390 px, parcours clavier, brouillon sauvegardé/rechargé,
+deux générations simulées de WAV silencieux, notes sauvegardées/rechargées, zéro
+appel fournisseur réel. Un premier échec venait du faux endpoint de test qui ne
+lisait pas la clé dans un INSERT ; fixture corrigée, aucun garde applicatif retiré.
+Une tentative initiale du serveur Vite refusée par sandbox (EPERM), avant test ;
+contexte système autorisé ensuite. Le test unitaire REST a également explicité
+son transport : les défauts chargés en test avaient correctement demandé WS.
+
+Qualité locale finale, campagne PR/HEAD exact et reçu arbre/parent seront précisés
+dans le bilan GitHub/Notion après livraison. `test:delivery` : 23/23 verts.
+Preview authentifiée à vérifier après synchronisation Lovable ; la recette
+technique ne vaut pas validation de la compréhension ni préférence vocale d’Ulrich.
+Production non publiée. Aucun prompt/voix/mapping live, capture/STT/mains libres,
+transfert, budget ou état narratif du jeu modifié.
+
+[Prompt AP3 autonome](prompt_reprise_atelier_parole_lot_ap3.md) enregistré avec
+ce lot avant le premier push : première écoute accompagnée Max, non lancée.
+
+### Mesure CT2 AP2 (avant livraison)
+
+Préparation/branche : 17:24 UTC / 17:25:33 UTC le 28 octobre 2026. Dépendances
+et navigateurs locaux déjà présents, aucune installation. Une passe qualité
+complète initiale verte (71 régressions, 1 128 unitaires, 42 intégrations,
+lint/typage/build), une seconde après protection des références rechargées, puis
+passe finale avant push avec les finitions de focus et d’avis non enregistrés.
+Horodatages précis qualité finale, premier push/run/job, installation CI/E2E,
+retries/annulations et fusion dans le bilan de livraison et Notion. Séparer
+travail actif, attente CI et recette preview ; aucun second passage complet main.
+
+Qualité finale avant push : `2026-10-28T17:42:16Z` → `2026-10-28T17:42:59Z`, lint (un avertissement
+IndexPRD4 préexistant), typage, **71 régressions, 1 130 unitaires, 42 intégrations**
+et build verts. E2E ciblé final : 5,1 s d’exécution / 6,6 s avec démarrage,
+sans retry automatique. Garde : 23/23 verts. Les horodatages GitHub et le reçu
+postfusion restent dans le bilan/Notion, sans deuxième PR documentaire.
+
+Dernière revue : changement de sandbox pendant une sauvegarde testé explicitement ;
+snapshots, avis et document précédents invalidés, résultat tardif ignoré, interface
+nouvelle sandbox disponible sans confirmation mensongère de l’ancienne écriture.
+
+
+### Livraison AP2 interrompue — accès GitHub
+
+Premier commit `6e3e50e`, première tentative de push 17:43:22 UTC refusée avant
+création de branche distante ou de PR. Fin de revue locale : contexte sandbox
+pendant une sauvegarde sécurisé et testé ; qualité complète finale 17:46:41 →
+17:47:44 UTC, 71 régressions, 1 131 unitaires, 42 intégrations et build verts.
+Aucune installation locale supplémentaire, aucun retry automatique E2E.
+Ni campagne PR AP2, ni run/job, ni installation navigateurs CI, ni E2E CI, ni
+fusion à mesurer : ces étapes n’ont pas eu lieu. Pas de campagne main.
+
+Ulrich interdit explicitement le Trousseau macOS à partir de ce refus. Aucune
+commande de déverrouillage, aucun login/refresh/logout ou remplacement d’identifiant
+exécuté. Les lectures diagnostiques antérieures sont arrêtées ; aucun lien causal
+avec les incidents Outlook rapportés n’est établi dans ce lot. Interdiction
+inscrite dans AGENTS ; [voie dédiée préparée](plan_authentification_github_sans_trousseau.md).
+
+[Reprise AP2 exacte](prompt_reprise_atelier_parole_lot_ap2_livraison.md) enregistrée.
+Local seulement, branche AP2 à conserver ; GitHub main/preview inchangés, production
+non publiée. La recette authentifiée du nouveau code reste à faire après livraison.
+La compréhension et l’écoute humaines ne sont pas revendiquées. Le prompt AP3
+existe déjà, sa préparation ne lance aucune écoute.
+
+
+### Suite demandée — intégration GitHub par 1Password
+
+Ulrich demande une intégration GitHub isolée et accepte d’explorer 1Password.
+CLI officielle 2.41.0 installée ; app ouverte par Ulrich. Lanceur isolé et helper
+Ava préparés/testés (4 contrôles simulés), sans accès au Trousseau, sans alias ou
+configuration globale, sans aucun secret copié. L’option d’intégration CLI de
+1Password était désactivée ; activation soumise à sa validation explicite avant
+accès aux secrets. État réel et prérequis dans le plan d’accès dédié. Pas de push
+réussi ni de nouvelle PR à ce stade ; ne pas confondre préparation et connexion.
+
+
+Dernière qualité complète après préparation de l’accès : verte (71 régressions,
+1 131 unitaires, 42 intégrations et build). Tests de livraison : 30/30 verts,
+dont échange App en mémoire et absence d’héritage de la clé privée dans Git/gh.
+GitHub App approuvée mais non créée : confirmation sudo GitHub avec 1Password
+attendue après expiration de Mobile non reçu. Ni token, ni push/PR/CI, ni
+recette authentifiée du nouveau code à ce stade. Scripts partagés non modifiés
+après refus de la revue automatique sur leur portée globale. La reprise locale
+reste la source exécutable avant toute livraison ; aucune publication implicite.
+
+Dernier E2E ciblé, après toutes les finitions de contexte : 5,8 s / 8,5 s
+avec serveur, vert sans retry. Fournisseurs et sauvegarde simulés ; aucune
+recette de compréhension par Ulrich ni écoute fournisseur réelle.
+
+
+### Accès dédié — installation GitHub, 28 octobre 2026
+
+Confirmation administrateur réalisée par Ulrich. App privée Ava delivery créée
+(ID 5515307), puis installation 176291841 vérifiée sur le seul dépôt Ava :
+Contents/Pull requests write et Actions/Metadata read. Pas de webhook ni OAuth
+utilisateur. Une clé a été téléchargée temporairement en 0600 ; enregistrement
+dans le coffre Privé Fischers encore en attente de validation Touch ID 1Password.
+Aucun appel App API ni push réel vérifié. Le détail de la première clé non
+récupérée et la reprise sûre sont dans le plan d’authentification ; ne pas
+recommencer l’installation. AP2 reste local, AP3 non lancé, production inchangée.
+
+### Accès débloqué et validation finale locale
+
+La validation 1Password a été effectuée par Ulrich. Le stockage de la clé Ava
+est confirmé dans le coffre Privé Fischers ; configuration de références non
+secrètes créée, copie PEM temporaire supprimée après accès API réel depuis
+1Password. Réponse GitHub 201 avec un seul dépôt et droits exacts, puis lecture
+installation/repositories 200, seul Ava. Correction du contrôle de jeton pour
+le format stateless actuel, sans décodage ni contrainte de longueur. 31 tests de
+livraison verts. Qualité complète répétée après cette correction : 71 régressions,
+1 131 unitaires, 42 intégrations, lint/typage/build verts. Main 54e7bfa toujours
+ancêtre ; seule PR ouverte #24, préservée. Reçu GitHub/CI/fusion et recette preview
+à consigner dans la PR et Notion après exécution ; aucune seconde PR documentaire
+pour inscrire le futur SHA du squash. Aucun changement aux scripts partagés.
+
+
+### Correctif après le premier run et demandes 1Password répétées
+
+Run #111 `40751731709`, HEAD `df25a6b4c1b297731a22c3248ab354a94e64b317` :
+job 19:09:29–19:35:34 UTC (26 min 05 s), 111 E2E verts et seul AP2 Firefox rouge,
+avec un retry. Aucune fusion. Traces : `OnMediaSinkAudioError` / erreur de sortie
+média du runner ; atelier maintenu en étape 2, sans preuve de lecture inventée.
+Reproduction locale du même symptôme en Firefox strict (8,3 s), puis fixture
+locale de sortie audio rendue déterministe pour ce parcours déjà simulé ; cas
+média indisponible ET autorisation refusée explicitement couverts. Trois
+navigateurs verts, sans retry (16,1 s total), aucune suppression de contrôle ou
+modification du lecteur de production. Nouvelle CI requise sur le HEAD corrigé.
+
+Ulrich interdit les rafales de demandes d’accès 1Password. Mode `session` ajouté
+au lanceur : une résolution du coffre au démarrage, commandes/erreurs successives
+sur la clé/les jetons en mémoire, renouvellement interne avec marge pour la garde,
+expiration bornée sans retry du coffre. 35 tests de livraison verts ; faux coffre
+compté une fois pour cinq commandes, erreurs/renouvellement/expiration et absence
+de clé dans les enfants testés. Réels : après une autorisation expirée non relancée,
+une seule ouverture quand Ulrich est prêt, téléchargement des traces puis fetch
+sur cette session. Aucun changement des réglages de sécurité 1Password. Git/gh
+isolés, askpass/SSH neutralisés ; suivi CI à une minute. Source : retour direct
+d’Ulrich, tests locaux et traces CI. Plan d’accès mis à jour ; reçu final dans
+PR/Notion après fusion, sans deuxième campagne complète sur main.

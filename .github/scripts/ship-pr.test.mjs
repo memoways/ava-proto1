@@ -44,7 +44,8 @@ test('waits through queued and in_progress; merges once with the expected SHA', 
   const { state, io } = fixture();
   state.status = 'queued';
   let waits = 0;
-  const receipt = await ship(options, io, async () => {
+  const receipt = await ship(options, io, async (delayMs) => {
+    assert.equal(delayMs, 60_000);
     assert.equal(state.calls.length, 0);
     state.status = ++waits === 1 ? 'in_progress' : 'completed';
   }, () => {});
