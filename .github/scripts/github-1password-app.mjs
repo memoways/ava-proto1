@@ -1,6 +1,7 @@
 import { sign } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { runDeliverySession } from './github-1password-session.mjs';
 
 /** Exchange an in-memory 1Password App key for one Ava-scoped installation token. */
 export async function installationToken({ appId, installationId, privateKey }, fetcher = fetch, now = Date.now()) {
@@ -34,6 +35,13 @@ async function main() {
  delete process.env.AVA_GITHUB_APP_PRIVATE_KEY;
  delete process.env.AVA_GITHUB_APP_KEY_REFERENCE;
  try {
+  if (process.argv[2] === '--session') {
+   process.exitCode = await runDeliverySession({
+    issuer: () => installationToken({ appId: process.env.AVA_GITHUB_APP_ID, installationId: process.env.AVA_GITHUB_APP_INSTALLATION_ID, privateKey }),
+    environment: token => deliveryEnvironment(process.env, token),
+   });
+   return;
+  }
   const token = await installationToken({ appId: process.env.AVA_GITHUB_APP_ID, installationId: process.env.AVA_GITHUB_APP_INSTALLATION_ID, privateKey });
   const [command, ...args] = process.argv.slice(2);
   if (!command) throw new Error('Commande Ava manquante.');

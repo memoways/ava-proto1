@@ -2,6 +2,28 @@ import { expect, test } from '@playwright/test';
 
 // Isolated authenticated admin and settings. No remote writes or provider audio.
 test('AP2 : atelier unique, parcours clavier et comparaisons retrouvables sans audio automatique', async ({ page }) => {
+ // This contract tests the workshop, not the CI machine's sound device/autoplay policy.
+ // Keep real provider requests intercepted below and model both playout and denial.
+ await page.addInitScript(() => {
+  const fixture = { plays: 0, denyNext: false, failNext: false };
+  Object.assign(window, { __workshopAudio: fixture });
+  class WorkshopAudio {
+   onended: (() => void) | null = null;
+   onplaying: (() => void) | null = null;
+   ontimeupdate: (() => void) | null = null;
+   onerror: (() => void) | null = null;
+   private timer?: ReturnType<typeof setTimeout>;
+   pause() { clearTimeout(this.timer); }
+   async play() {
+    fixture.plays++;
+    if (fixture.failNext) { fixture.failNext = false; this.onerror?.(); return; }
+    if (fixture.denyNext) { fixture.denyNext = false; throw new DOMException('Lecture refusée par le navigateur simulé', 'NotAllowedError'); }
+    this.onplaying?.();
+    this.timer = setTimeout(() => this.onended?.(), 10);
+   }
+  }
+  Object.defineProperty(window, 'Audio', { configurable: true, value: WorkshopAudio });
+ });
  const user = { id: '33333333-3333-4333-8333-333333333333', email: 'workshop@example.test', aud: 'authenticated', role: 'authenticated', is_anonymous: false, app_metadata: { provider: 'email', providers: ['email'] }, user_metadata: {}, identities: [], created_at: '2026-01-01T00:00:00Z' };
  const session = { access_token: 'ap1-simulated-token', refresh_token: 'ap1-simulated-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, expires_in: 3600, token_type: 'bearer', user };
  await page.addInitScript(value => localStorage.setItem('sb-iralfqlslqndgvexixis-auth-token', JSON.stringify(value)), session);
@@ -76,6 +98,7 @@ test('AP2 : atelier unique, parcours clavier et comparaisons retrouvables sans a
  await expect(page.getByLabel('Transport audition')).toHaveValue('rest');
  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
  expect(audioCalls).toBe(0); expect(writes).toHaveLength(1); expect(errors).toEqual([]);
+ expect(await page.evaluate(() => (window as unknown as { __workshopAudio: { plays: number } }).__workshopAudio.plays)).toBe(0);
  await first.click();
  await page.getByRole('button', { name: 'Écouter la version actuelle' }).click();
  await expect(page.getByRole('button', { name: 'Écouter l’essai' })).toBeEnabled();
@@ -85,14 +108,28 @@ test('AP2 : atelier unique, parcours clavier et comparaisons retrouvables sans a
  await page.getByRole('button', { name: 'Enregistrer la comparaison et mon avis' }).click();
  await expect(page.getByRole('status')).toContainText('enregistrée et relue');
  expect(audioCalls).toBe(2);
+ expect(await page.evaluate(() => (window as unknown as { __workshopAudio: { plays: number } }).__workshopAudio.plays)).toBe(2);
  expect(requests[0].text).toBe(requests[1].text); expect(requests[0].voiceId).toBe(requests[1].voiceId);
  expect({ ...requests[0], jsonConfig: { ...(requests[0].jsonConfig as object), padding_bonus: (requests[1].jsonConfig as Record<string, unknown>).padding_bonus } }).toEqual(requests[1]);
  await page.reload();
  await page.getByText(/AP2 comparaison simulée · max/).click();
  await expect(page.getByText('Pauses / rythme : Avis simulé de test', { exact: true })).toBeVisible();
+ await page.getByRole('button', { name: 'Charger comme brouillon' }).click();
+ await first.click();
+ for (const failure of ['device', 'permission']) {
+  await page.evaluate(mode => {
+   const fixture = (window as unknown as { __workshopAudio: { denyNext: boolean; failNext: boolean } }).__workshopAudio;
+   fixture.denyNext = mode === 'permission'; fixture.failNext = mode === 'device';
+  }, failure);
+  await page.getByRole('button', { name: 'Écouter la version actuelle' }).click();
+  await expect(page.getByRole('alert')).toContainText(failure === 'device' ? 'Audio playback failed' : 'Lecture refusée');
+  await expect(page.getByLabel('Étape courante')).toContainText('Étape 2');
+  await expect(page.getByRole('button', { name: 'Écouter l’essai' })).toHaveCount(0);
+ }
+ expect(audioCalls).toBe(4);
  await page.goto('/admin/technique/configuration-tts');
  await expect(page.getByRole('link', { name: /Ouvrir l’atelier de parole/ })).toBeVisible();
  await expect(page.getByRole('button', { name: /Écouter|Tester/ })).toHaveCount(0);
  await expect(page.getByText('A3 — Réglages fidèles et auditions')).toHaveCount(0);
- expect(audioCalls).toBe(2);
+ expect(audioCalls).toBe(4);
 });

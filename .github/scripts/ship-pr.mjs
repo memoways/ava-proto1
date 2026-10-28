@@ -87,7 +87,7 @@ export async function ship({ number, head, merge = false, timeoutMs = 35 * 60_00
     }
     if (!quality.ready || pr.mergeable === null) {
       log(quality.reason ?? 'Waiting for GitHub mergeability');
-      await wait(20_000);
+      await wait(60_000);
       continue;
     }
     const tree = io.git('rev-parse', `${head}^{tree}`);

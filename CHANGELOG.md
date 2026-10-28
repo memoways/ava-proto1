@@ -28,8 +28,15 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Accès GitHub dédié hors Trousseau : App privée installée sur le seul dépôt Ava,
   clé dans 1Password Fischers, lanceur local isolant Git/gh et broker App en mémoire.
   Réutilisation documentée, aucun repli personnel ni modification des scripts
-  partagés ; 31 tests de livraison, dont compatibilité du format stateless GitHub.
+  partagés ; 35 tests de livraison, dont compatibilité du format stateless GitHub.
   [Plan d’accès](docs/plan_authentification_github_sans_trousseau.md).
+- Session de livraison bornée : un accès initial 1Password pour plusieurs commandes,
+  clé/jetons en mémoire, reprise après erreur sans nouvelle autorisation au coffre,
+  renouvellement interne du jeton et refus explicite sans repli personnel. 35 tests
+  de livraison ; suivi CI espacé à une minute.
+- Fixture audio AP2 indépendante du périphérique/politique du runner ; refus de
+  lecture explicitement testé sans progression automatique. Chromium, Firefox et
+  WebKit conservés ; aucune modification du lecteur audio de production.
 - Livraison via la seule CI PR/HEAD puis garde de fusion et vérification arbre/parent ;
   reçu réel dans la PR et Notion après fusion. [Reprise](docs/prompt_reprise_atelier_parole_lot_ap2_livraison.md).
 

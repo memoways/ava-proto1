@@ -66,7 +66,7 @@ F4 reste distincte. Aucune publication production implicite.
 ## Livraison AP2 et accès dédié
 
 Qualité locale : 71 régressions, 1 131 unitaires, 42 intégrations, lint/typage/build ;
-31 tests de livraison, dont jeton App stateless ; E2E ciblé simulé clavier/390 px.
+35 tests de livraison, dont session à un seul accès au coffre et jeton App stateless ; E2E ciblé simulé clavier/390 px.
 Le reçu PR/HEAD, CI et arbre/parent fusionnés est consigné après livraison dans
 la PR et la tâche Gamilab ; ce fichier est committé avant la fusion.
 [Procédure de reprise AP2](prompt_reprise_atelier_parole_lot_ap2_livraison.md).
@@ -80,3 +80,12 @@ PEM temporaire supprimée. Utiliser le lanceur versionné d’AGENTS à chaque r
 Scripts partagés inchangés ; une clé initiale non récupérée reste côté GitHub,
 suppression distincte non effectuée. Aucun accès au Trousseau ni reconnexion
 GitHub personnelle. AP3 préparé sans lancement ; aucune publication production.
+
+PR AP2 #111 ouverte ; première CI 40751731709 rouge : seul le parcours AP2 Firefox
+échoue après refus de lecture, 111 autres E2E verts. Garde : fusion refusée.
+Correction locale : fixture audio déterministe + refus explicite ; trois navigateurs
+et Firefox strict verts. Mode session pour éviter les demandes 1Password répétées,
+suivi CI à une minute, aucun nouveau paramétrage 1Password. La première demande a expiré, sans relance ; après réponse « prêt » d’Ulrich,
+une session réelle a été ouverte, puis traces CI et fetch effectués avec cette
+même clé en mémoire. Les traces confirment OnMediaSinkAudioError sur le runner.
+Nouveau HEAD/CI/fusion/preview encore à vérifier dans le reçu final.

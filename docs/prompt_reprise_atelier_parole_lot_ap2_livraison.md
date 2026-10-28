@@ -28,16 +28,16 @@ relecture exacte, reprise en brouillon, export, aucune activation live. Contexte
 réinitialisé au changement de sandbox et résultats tardifs ignorés.
 
 Qualité complète locale finale verte : 71 régressions, 1 131 unitaires,
-42 intégrations, lint/typage/build. Livraison 31/31, dont format stateless GitHub.
+42 intégrations, lint/typage/build. Livraison 35/35, dont format stateless GitHub.
 E2E ciblé final vert, 5,8 s / 8,5 s avec serveur, sans retry, clavier et 390 px,
 audio/données simulés. Aucune écoute réelle ni compréhension humaine acceptée.
 
 App privée `ava-delivery` ID 5515307, installation 176291841 sur le seul dépôt
 Ava, Contents/PR write et Actions/Metadata read. Clé dans 1Password Privé Fischers ;
 API réelle vérifiée, copie PEM temporaire supprimée. Configuration de références
-non secrètes `~/.config/git-ship/ava-1password.env`. **Toujours utiliser**
-`bash .github/scripts/github-1password.sh COMMANDE ARGUMENTS…` pour Git/gh
-et la garde. Aucun Trousseau, reconnexion personnelle ou helper partagé direct.
+non secrètes `~/.config/git-ship/ava-1password.env`. **Ouvrir une seule session**
+`bash .github/scripts/github-1password.sh session` puis y transmettre les commandes
+JSON, pour Git/gh et la garde. Ne pas résoudre le coffre commande par commande. Aucun Trousseau, reconnexion personnelle ou helper partagé direct.
 Ne pas recréer l’App ni générer une clé. Une clé initiale non récupérée reste
 côté GitHub ; révocation distincte non effectuée, voir plan d’accès.
 
@@ -71,3 +71,16 @@ Le [prompt AP3](prompt_reprise_atelier_parole_lot_ap3.md) prépare la première 
 accompagnée Max sans la lancer. **Donner son lien direct à la clôture AP2.**
 Chaque prochain lot doit enregistrer et lier son propre prompt suivant dans le même
 tour. En cas de blocage, actualiser cette reprise exacte et le plan d’accès.
+
+
+Borne de diagnostic après le premier run : #111 non fusionnée, CI 40751731709
+rouge (AP2 Firefox, 111 autres E2E verts). Fixture audio locale corrigée, trois
+navigateurs et Firefox strict verts ; session de livraison ajoutée/testée avec un
+faux coffre compté une seule fois pour cinq commandes. Suivi CI à une minute.
+Lire le HEAD/statut réels : ces finitions sont à committer avant le prochain push.
+La première ouverture réelle a expiré, sans relance. Après réponse « prêt »
+d’Ulrich, une session a abouti, traces CI et fetch sur la même clé en mémoire.
+Ne pas créer une rafale d’autorisations ; réutiliser la session tant qu’elle est
+active. Si elle est terminée, une seule ouverture quand Ulrich est disponible.
+Après autorisation, réutiliser cette session pour diagnostic/PR/CI/garde/nettoyage,
+sans nouvel op par commande. Faire valider le nouveau HEAD par CI avant fusion.

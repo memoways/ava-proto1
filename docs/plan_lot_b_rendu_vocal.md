@@ -1338,3 +1338,28 @@ livraison verts. Qualité complète répétée après cette correction : 71 rég
 ancêtre ; seule PR ouverte #24, préservée. Reçu GitHub/CI/fusion et recette preview
 à consigner dans la PR et Notion après exécution ; aucune seconde PR documentaire
 pour inscrire le futur SHA du squash. Aucun changement aux scripts partagés.
+
+
+### Correctif après le premier run et demandes 1Password répétées
+
+Run #111 `40751731709`, HEAD `df25a6b4c1b297731a22c3248ab354a94e64b317` :
+job 19:09:29–19:35:34 UTC (26 min 05 s), 111 E2E verts et seul AP2 Firefox rouge,
+avec un retry. Aucune fusion. Traces : `OnMediaSinkAudioError` / erreur de sortie
+média du runner ; atelier maintenu en étape 2, sans preuve de lecture inventée.
+Reproduction locale du même symptôme en Firefox strict (8,3 s), puis fixture
+locale de sortie audio rendue déterministe pour ce parcours déjà simulé ; cas
+média indisponible ET autorisation refusée explicitement couverts. Trois
+navigateurs verts, sans retry (16,1 s total), aucune suppression de contrôle ou
+modification du lecteur de production. Nouvelle CI requise sur le HEAD corrigé.
+
+Ulrich interdit les rafales de demandes d’accès 1Password. Mode `session` ajouté
+au lanceur : une résolution du coffre au démarrage, commandes/erreurs successives
+sur la clé/les jetons en mémoire, renouvellement interne avec marge pour la garde,
+expiration bornée sans retry du coffre. 35 tests de livraison verts ; faux coffre
+compté une fois pour cinq commandes, erreurs/renouvellement/expiration et absence
+de clé dans les enfants testés. Réels : après une autorisation expirée non relancée,
+une seule ouverture quand Ulrich est prêt, téléchargement des traces puis fetch
+sur cette session. Aucun changement des réglages de sécurité 1Password. Git/gh
+isolés, askpass/SSH neutralisés ; suivi CI à une minute. Source : retour direct
+d’Ulrich, tests locaux et traces CI. Plan d’accès mis à jour ; reçu final dans
+PR/Notion après fusion, sans deuxième campagne complète sur main.
