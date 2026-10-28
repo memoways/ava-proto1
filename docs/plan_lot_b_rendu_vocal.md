@@ -9,7 +9,7 @@ séances accompagnées de 10–15 minutes, une hypothèse et deux variantes maxi
 Réglages app et retouches Notion dans des passes séparées. Variantes et avis
 persistants dans le back-office ; audio exact seulement pendant la séance.
 
-**État : plan enregistré et prompt AP1 préparé, aucun lot AP implémenté.**
+**État : AP1 implémenté le 28 octobre 2026 ; persistance AP2 préparée, non lancée.**
 Cette section est le contrat de la nouvelle série ; les sections datées
 ci-dessous décrivent les livraisons précédentes. A4R confirme les copies E0
 le 26 octobre, mais ni A4R ni F4 ne valent acceptation du naturel vocal.
@@ -17,7 +17,7 @@ La recette F4 reste distincte ; aucun gel de démo ni publication implicite.
 
 | Lot | Périmètre et résultat observable | Dépendance / sortie | Statut |
 | --- | --- | --- | --- |
-| AP1 | Atelier lisible, réglages expliqués et écoute A/B fidèle au transport actuel ; réemploi du banc | Livraison technique vérifiée ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap1.md) | Préparé, non lancé |
+| AP1 | Atelier lisible, réglages expliqués et écoute A/B fidèle au transport actuel ; réemploi du banc | Livraison technique vérifiée ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap1.md) | Implémenté ; vérifications et reçu ci-dessous |
 | AP2 | Variantes nommées, différences, appréciations, décision et export ; retrouvables après reconnexion | AP1 livré ; stockage sandbox strict et relecture | Planifié |
 | AP3 | Première séance Max, deux répliques initiales, une hypothèse et deux variantes | AP2 livré ; bilan humain, référence et prochain défaut observé | Recette à organiser |
 | AP4 | Conversations courtes guidées, nouvelle session par essai, références et versions réellement utilisées | Bilan AP3 ; états proposés/déclarés/livrés et coupures distingués | Planifié |
@@ -77,6 +77,95 @@ Lecture native Lovable Ava : sandbox-ulrich, Max rugosité 3 / Emma 2, Gradium,
 fermés, mapping actif `2026-10-25T11:39:32.000Z`. Le banc A3 force actuellement
 WS si disponible : AP1 corrige cette différence de comparaison sans activer WS
 dans le jeu. Ces valeurs sont des observations, pas des réglages à restaurer.
+
+## Exécution AP1 — 28 octobre 2026
+
+Objectif et périmètre du prompt AP1 conservés : Expérience → Atelier de parole,
+Max et son fournisseur courant, explication des cinq familles puis préparation,
+écoute et appréciation. AP2 est préparé séparément ; aucune persistance ajoutée.
+Branche `codex/ap1-atelier-parole-max`, base main
+`c425771d663978cf8ec3785d443969a04dfd24db`. PR #24 et branches historiques
+préservées, un seul agent. Retour arrière : revert du squash AP1 via un lot
+contrôlé ; aucun rollback Cloud nécessaire puisqu’aucun réglage n’est écrit.
+
+### Résultat applicatif
+
+- Route `/admin/experience/atelier-de-parole`, mêmes droits admin/sandbox ; banc
+  `SpeechAuditionBench` réutilisé, TTS Config conservé. Un seul banc monté à la
+  fois, arrêt et nettoyage du propriétaire audio à la fermeture/navigation.
+- Fiche/copie, états propres, rugosité, orchestration publiée, compilateur,
+  modèles/paramètres LLM, mapping/version, voix et paramètres vocaux lisibles.
+  Références en lecture seule, dates/copies inconnues et replis distingués ;
+  metadata seules pour la copie et l’orchestration, sans prompts intégraux.
+- A capture les réglages chargés, y compris mapping désactivé/absent et rugosité
+  zéro. B modifie un seul contrôle vocal borné : padding, température ou fidélité.
+  Proposition initiale : padding actuel contre zéro, ou pas de 0,2 si déjà nul.
+  Diff lisible, hypothèse sans préférence artistique inventée ni adoption live.
+- M1/M2 de Max d’abord, autres cas explicitement cochés. Chaque cas attend une
+  sélection d’état propre à la fiche ; mêmes mots éditables, état, voix,
+  rugosité et transport entre A et B. Le parcours historique garde Emma et les
+  autres fournisseurs. Aucun état attribué silencieusement au corpus.
+- Gradium chargé avant capture du snapshot ; REST direct si streaming désactivé,
+  WS explicitement choisi sinon. Pauses A2 en comparaison séparée. Le cache est
+  indexé aussi par transport demandé ; requêtes et transport effectif/repli sont
+  conservés. Rejeu exact sans appel, cache 16 écoutes / 16 Mio et capture bornée
+  réutilisés. Le repli REST ne valide pas les pauses WS.
+- Paramètres préparés séparés des requêtes attestées ; padding de base, modulation
+  par état et valeur effectivement envoyée lisibles, JSON/preuves repliés. Acting,
+  émotion/delivery/instruction/débit relatif Gradium non appliqués, tags fermés.
+- Avis/export temporaires, disparition après fermeture annoncée ; régénérer
+  après fermeture n’est pas rejouer l’audio exact. Aucun bouton d’adoption.
+- Le test admin a révélé une écriture préexistante de normalisation LLM au
+  chargement. Mode de bootstrap `readOnly` ajouté pour l’atelier uniquement ;
+  les autres parcours conservent leur comportement. Le test injecte un ancien
+  modèle invalide et vérifie zéro écriture, zéro audio, clavier et largeur 390 px.
+
+### Preuves et limites
+
+32 tests ciblés initiaux verts, puis couverture de normalisation en lecture
+seule ajoutée. Test navigateur AP1 ciblé vert, fournisseurs et compte admin
+simulés ; aucun audio fournisseur réel. L’assertion mobile a d’abord révélé un
+select débordant, corrigé. Une assertion diagnostique intermédiaire comptait
+également les onglets volontairement défilants ; le contrôle final porte sur
+la largeur du document. Le test de zéro écriture a ensuite révélé et fait
+corriger le bootstrap LLM décrit ci-dessus. Pas de contrôle retiré.
+
+`npm run test:quality` final vert : lint (un avertissement IndexPRD4 préexistant),
+typage, 71 régressions, 1 126 unitaires, 42 intégrations et build.
+`npm run test:delivery` : 23/23 verts. Run/job PR, SHA HEAD/main et reçu arbre/parent sont consignés
+dans le compte rendu de PR et la tâche Notion après fusion, sans commit circulaire.
+La preview authentifiée est vérifiée après synchronisation Lovable. Une seule
+campagne complète sur PR ; aucune seconde campagne complète sur main.
+
+Lecture native Lovable le 28 octobre : sandbox-ulrich, Max Gradium / rugosité 3,
+base padding 0,2, température 0,7, fidélité 2, streaming désactivé, mapping actif
+`2026-10-25T11:39:32.000Z`, pauses A2 absentes, tags fermés. Valeurs observées,
+aucune restauration ni sauvegarde. Gamilab confirmé et tâche/fiche/rapport lus.
+Fiches Notion, prompt GM effectif, voix, budgets, capture/STT, mains libres,
+transferts, backend et publication production préservés.
+
+La crédibilité vocale reste une recette humaine ouverte : ce lot ne revendique
+ni écoute réelle, ni acceptation du timbre ou des pauses, ni latence voix-à-voix.
+[Prompt autonome AP2](prompt_reprise_atelier_parole_lot_ap2.md) enregistré dans
+ce même lot, à fournir directement à la clôture ; AP2 et AP3 non lancés.
+
+### Mesure CT2 AP1
+
+Début de chat observé : 28 octobre 2026, 16:27:58 UTC (17:27:58 Europe/Zurich).
+Branche AP1 créée à 16:28:42 UTC. Préparation documentaire préalable #108
+séparée de cette mesure. Dépendances et navigateurs déjà installés en local ;
+pas d’installation supplémentaire. Une tentative de lancement du serveur E2E
+bloquée par EPERM en sandbox avant tout test ; contexte système autorisé ensuite.
+Qualité locale finale : 16:38:23–16:39:21 UTC (57.9 s). Trois passes
+locales complètes vertes au fil des corrections ; la dernière couvre tout le code
+final. Test de garde : 23/23, 0,52 s. E2E ciblé final vert : 2,4 s
+d’exécution (4,0 s avec démarrage). Quatre exécutions ciblées rouges pendant le
+diagnostic (mobile, instrumentation des onglets, puis écriture de normalisation),
+avant cette réussite ; aucun retry automatique local.
+Horodatages premier push/run/job/installation/E2E/fusion et durées
+travail/attente complétés dans le bilan de PR/Notion après livraison. Pas de
+moyenne avec #104 ni d’attribution à la vitesse du modèle. Référence descriptive
+#104 : 22 min 26 s PR + 24 min 16 s main, dont 40 min 28 s E2E.
 
 ## Exécution coordonnée Notion / app — 25 octobre 2026
 

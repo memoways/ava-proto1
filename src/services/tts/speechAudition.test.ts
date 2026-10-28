@@ -101,3 +101,22 @@ describe('A3 — audition isolated snapshots and exact-audio cache', () => {
   runner.stop(); resolve({ blob, meta: { provider: 'fish' } }); await stopRejected; expect(play).toHaveBeenCalledOnce();
  });
 });
+
+describe('AP1 — transport and current baseline', () => {
+ beforeEach(() => { localStorage.clear(); setActiveEnvironment('sandbox-ulrich'); vi.clearAllMocks(); });
+ it('keeps disabled/missing mappings and rugosity zero faithful to the current path', () => {
+  const snapshot = createAuditionSnapshot('max', states, { ...settings, enabled: false, byCharacter: {} }, false, true);
+  expect(snapshot.settings.enabled).toBe(false); expect(snapshot.settings.byCharacter.max).toEqual({});
+  expect(auditionIntent(snapshot, 'Oui…', 'Retenu', 0).source).not.toBe('speech_state');
+  expect(auditionIntent(snapshot, 'Oui…', 'Retenu', 0).speechState).toBe('Retenu');
+ });
+ it('calls REST directly when requested, caches its own audio and separates WS and fallback', async () => {
+  const batch = { ...provider, id: 'gradium' as const, createStreamingPlayback: vi.fn(() => null) };
+  const runner = new SpeechAuditionRunner(play);
+  expect(await runner.listen('same-input', 'Oui', batch, {}, 'rest')).toMatchObject({ requestedTransport: 'rest', transport: 'rest' });
+  expect(batch.createStreamingPlayback).not.toHaveBeenCalled();
+  expect(await runner.listen('same-input', 'Oui', batch, {}, 'rest')).toMatchObject({ cached: true, transport: 'rest' });
+  expect(await runner.listen('same-input', 'Oui', batch, {}, 'websocket')).toMatchObject({ cached: false, requestedTransport: 'websocket', transport: 'rest_fallback' });
+  expect(batch.createStreamingPlayback).toHaveBeenCalledOnce(); expect(batch.generate).toHaveBeenCalledTimes(2);
+ });
+});

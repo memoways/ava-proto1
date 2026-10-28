@@ -40,7 +40,7 @@ export function buildGradiumJsonConfig(s: GradiumSettings, performance?: Perform
 function auditionSnapshot(ctx?: TTSGenerateContext) {
   if (!ctx?.speechAudition) return undefined;
   const snapshot = validateSpeechAudition(ctx.speechAudition, ctx.characterKey);
-  if (!snapshot.validStates.includes(ctx.performance?.speechState ?? '') || ctx.performance?.source !== 'speech_state') {
+  if (!snapshot.validStates.includes(ctx.performance?.speechState ?? '')) {
     throw new Error('État audition non validé pour ce personnage');
   }
   return snapshot;

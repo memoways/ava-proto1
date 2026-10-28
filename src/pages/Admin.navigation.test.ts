@@ -32,6 +32,7 @@ describe("Admin navigation invariants", () => {
 
   it("separates Expérience and Qualité without merging latency sources", () => {
     expect(TAB_GROUPS.find((group) => group.id === "experience")?.tabs.map((tab) => tab.id)).toEqual([
+      "speech-workshop",
       "gamemaster",
       "gm-settings",
       "character-runtime",
@@ -60,6 +61,7 @@ describe("Admin navigation invariants", () => {
     expect(new Set(pages).size).toBe(pages.length);
     expect(pages.every((path) => path.startsWith("/admin/") && !path.includes("?tab="))).toBe(true);
     expect(adminTabPath("sessions")).toBe("/admin/donnees/sessions");
+    expect(adminTabPath("speech-workshop")).toBe("/admin/experience/atelier-de-parole");
     expect(adminTabPath("llm")).toBe("/admin/technique/configuration-llm");
     expect(adminTabPath("latency")).toBe("/admin/qualite/latence-et-blocages");
     expect(adminTabPath("eval-judge")).toBe("/admin/qualite/llm-as-judge");

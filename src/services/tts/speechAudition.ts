@@ -21,35 +21,39 @@ const CORPUS: Record<string, Array<[string, string, string]>> = {
   ['E4', 'L’interlocuteur vient de proposer d’attendre demain', 'Vous dites demain. Mais demain, elle va… Attendez.'],
  ],
 };
-export function createAuditionCorpus(character: string, states: string[]): AuditionLine[] {
- return (CORPUS[character] ?? []).map(([id, context, text]) => ({ id, context, text, state: states[0] ?? '' }));
+export function createAuditionCorpus(character: string, _states: string[]): AuditionLine[] {
+ return (CORPUS[character] ?? []).map(([id, context, text]) => ({ id, context, text, state: '' }));
 }
 export function auditionVoice(voices: Record<string, string>, character: string, provider: TTSProviderId): string | null {
  return voices[`${character}:${provider}`]?.trim() || null;
 }
 export function createAuditionSnapshot(character: string, states: Array<{ name: string; description: string }>,
- draft: SpeechPerformanceSettings, pauses: boolean): SpeechAuditionSnapshot {
+ draft: SpeechPerformanceSettings, pauses: boolean, preserveCurrent = false): SpeechAuditionSnapshot {
  const snapshot: SpeechAuditionSnapshot = {
   kind: 'speech_audition', environment: getActiveEnvironment(), character, validStates: states.map(s => s.name),
-  settings: { ...structuredClone(draft), enabled: true, gradiumTagsEnabled: false, gradiumPausesEnabled: pauses,
+  settings: { ...structuredClone(draft), enabled: preserveCurrent ? draft.enabled : true, gradiumTagsEnabled: false, gradiumPausesEnabled: pauses,
    byCharacter: { [character]: Object.fromEntries(states.map(s => [s.name, structuredClone(draft.byCharacter[character]?.[s.name] ?? proposeSpeechMapping(s.name, s.description))])) } },
   gradium: structuredClone(resolveGradiumSettings(character)),
  };
+ if (preserveCurrent) snapshot.settings.byCharacter = { [character]: structuredClone(draft.byCharacter[character] ?? {}) };
  validateSpeechAudition(snapshot, character);
  return snapshot;
 }
 export function auditionIntent(snapshot: SpeechAuditionSnapshot, text: string, state: string, level: number) {
  validateSpeechAudition(snapshot, snapshot.character);
  if (!snapshot.validStates.includes(state)) throw new Error('État absent de la fiche du personnage');
- return derivePerformanceIntent({ text, characterKey: snapshot.character, speechState: state, rugosite: level,
+ const intent = derivePerformanceIntent({ text, characterKey: snapshot.character, speechState: state, rugosite: level,
   validSpeechStates: snapshot.validStates, speechSettings: snapshot.settings });
+ return { ...intent, speechState: state };
 }
 /** Sorted content identity includes the entire draft, saved version and intended transport. */
 export function auditionKey(value: unknown): string {
  return JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
   ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
 }
+export type AuditionTransport = 'rest' | 'websocket';
 export interface AuditionEvidence {
+ requestedTransport?: AuditionTransport;
  requests: TTSAuditionRequest[]; transport: 'websocket' | 'rest_fallback' | 'rest';
  model?: string; firstByteMs?: number; totalMs?: number; firstSoundMs?: number; durationMs?: number;
  pauseRendering?: string; auditionCapture?: string; cached: boolean; providerCalls: number;
@@ -75,13 +79,16 @@ export class SpeechAuditionRunner {
   }
   this.cache.set(key, audio); this.bytes += audio.blob.size;
  }
- async listen(key: string, text: string, provider: TTSProvider, context: TTSGenerateContext): Promise<AuditionEvidence> {
+ async listen(key: string, text: string, provider: TTSProvider, context: TTSGenerateContext, transport: AuditionTransport = 'websocket'): Promise<AuditionEvidence> {
   this.stop();
   const controller = new AbortController(); this.controller = controller;
   const signal = controller.signal;
   const start = performance.now();
   const evidence: AuditionEvidence = { requests: [], transport: 'rest', cached: false, providerCalls: 0 };
+  // Transport remains part of identity even when a caller reuses its key.
+  key = auditionKey({ key, transport });
   const cached = this.cache.get(key);
+  evidence.requestedTransport = transport;
   const current = () => {
    if (signal.aborted || this.controller !== controller) throw new DOMException('Écoute périmée', 'AbortError');
    if (context.speechAudition) validateSpeechAudition(context.speechAudition, context.characterKey);
@@ -98,7 +105,7 @@ export class SpeechAuditionRunner {
      if (signal.aborted || this.controller !== controller) return;
      evidence.requests.push(structuredClone(request)); evidence.providerCalls++; this.calls++;
     } };
-    const handle = provider.id === 'gradium' ? provider.createStreamingPlayback?.(text, ctx) : null;
+    const handle = provider.id === 'gradium' && transport === 'websocket' ? provider.createStreamingPlayback?.(text, ctx) : null;
     if (handle) {
      const cancel = () => handle.cancel(); signal.addEventListener('abort', cancel, { once: true });
      try {
@@ -113,7 +120,7 @@ export class SpeechAuditionRunner {
     } else {
      const result = await provider.generate(text, ctx); current();
      blob = result.blob; Object.assign(evidence, result.meta);
-     if (provider.id === 'gradium') evidence.transport = 'rest_fallback';
+     if (provider.id === 'gradium') evidence.transport = transport === 'websocket' ? 'rest_fallback' : 'rest';
     }
    }
    current();
