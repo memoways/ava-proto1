@@ -11,8 +11,12 @@ Première action exécutable : dans le checkout canonique Ava, lire `AGENTS.md`,
 faire `git fetch --prune`, lire `git log origin/main -6` et la première entrée
 du CHANGELOG. Contrôler par GitHub la fusion du correctif, son SHA et la CI main,
 puis vérifier le même SHA dans Lovable avant de proposer la recette humaine.
-L'état final et les preuves de livraison sont à compléter dans ce document
-après la fusion ; tant qu'ils manquent, ne pas annoncer la livraison terminée.
+La PR #104 est fusionnée dans main `9adabdce5b5a4f9be6f6fdc6545868659cb4120a`
+après [CI PR verte](https://github.com/memoways/ava-proto1/actions/runs/40658393339)
+sur HEAD exact `8f4ddff17d9e5b8e500b85ebc2fbfe9839fd3b2d`, 109 E2E verts.
+[CI main 40661278202](https://github.com/memoways/ava-proto1/actions/runs/40661278202)
+verte, 109 E2E. Lovable Ava/Memoways ready au
+même SHA, source du compilateur relue strictement identique. Aucune publication.
 
 ## Sources et accès
 

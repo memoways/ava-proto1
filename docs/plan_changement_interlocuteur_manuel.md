@@ -4,8 +4,9 @@ Reprise effective après demande d'Ulrich de tester les autres connexions :
 `git`/`gh` fonctionnent avec Ulrfis depuis le contexte système autorisé. Le
 connecteur natif échoue toujours ; ce défaut ne bloque plus le lot.
 Correctif du présent canonique implémenté et vérifié localement (24 scénarios
-rouges avant/verts après, 99 ciblés, qualité complète verte), livraison PR/CI
-en cours. [État courant](plan_optimisation_payload_max.md),
+rouges avant/verts après, 99 ciblés, qualité complète verte). PR #104 fusionnée
+dans main `9adabdce5b5a4f9be6f6fdc6545868659cb4120a`, CI PR verte et 109 E2E ;
+CI main 40661278202 verte, 109 E2E. Lovable ready au même SHA, compilateur relu identique. [État courant](plan_optimisation_payload_max.md),
 [diagnostic d'accès exact](diagnostic_github_connecteur_2026-10-28.md),
 [prompt autonome de recette F4](prompt_reprise_present_canonique_lot_f4_recette.md).
 

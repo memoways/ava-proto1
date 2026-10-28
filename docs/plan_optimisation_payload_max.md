@@ -1,6 +1,6 @@
 # Plan révisé d’optimisation du payload conversationnel de Max
 
-## Correctif local vérifié — 28 octobre 2026
+## Correctif fusionné — 28 octobre 2026
 
 L'accès GitHub par `git`/`gh` est rétabli et autorisé par Ulrich ; le défaut
 du connecteur natif ne bloque plus la livraison. Le présent entier est protégé
@@ -27,10 +27,14 @@ le même cadre d'expérience depuis son service unique ; aucun fait de scène ou
 nouveau prompt concurrent n'a été ajouté dans son parcours. Les validations
 réelles des réponses narratives restent distinctes des contrôles de compilation.
 
-Livraison GitHub/CI/Lovable à vérifier après push. Recette humaine et production
-non effectuées. [Recette autonome F4](prompt_reprise_present_canonique_lot_f4_recette.md).
+[PR #104](https://github.com/memoways/ava-proto1/pull/104) fusionnée dans main
+`9adabdce5b5a4f9be6f6fdc6545868659cb4120a` après [CI PR verte](https://github.com/memoways/ava-proto1/actions/runs/40658393339)
+sur HEAD exact `8f4ddff17d9e5b8e500b85ebc2fbfe9839fd3b2d`, 109 E2E verts.
+[CI main 40661278202](https://github.com/memoways/ava-proto1/actions/runs/40661278202)
+verte, 109 E2E. Lovable Ava/Memoways ready au même SHA, source du compilateur
+relue identique (29 001 caractères). Recette humaine et production non effectuées. [Recette autonome F4](prompt_reprise_present_canonique_lot_f4_recette.md).
 
-## Référence courante — 28 octobre 2026 : présent canonique perdu
+## Diagnostic initial — 28 octobre 2026 : présent canonique perdu (historique)
 
 **Priorité d’Ulrich : continuer le développement, sans geler la démo.** Le gel
 prévu le 27 octobre est abandonné. Corriger la cohérence factuelle de Max/Emma
@@ -80,7 +84,7 @@ les paramètres résolus ne sont pas récupérables depuis ces seules données.
 Le rejeu prouve la perte du présent par le compilateur sur les sources/version
 observées ; il ne prouve pas à lui seul le détail du raisonnement du modèle.
 
-### Correction candidate vérifiée hors de l’application
+### Prototype initial vérifié hors de l’application — historique
 
 [Patch candidat, non appliqué](patch_present_canonique_candidate.patch) :
 
@@ -105,7 +109,7 @@ payante, aucune modification des voix, du Cloud ou des fiches Notion.
 Ces vérifications portent sur l’assemblage ; aucune qualité sonore ni absence
 générale d’hallucination ne peut être déduite d’un test de compilation.
 
-### État de livraison et reste
+### État initial de livraison et reste — historique
 
 Retest natif du 28 octobre 2026 à 09:17 Europe/Paris : `get_profile`, `get_repo`
 et `search_prs` échouent encore avec `-32001: Unknown tool`. L'inventaire natif
@@ -1046,3 +1050,47 @@ Plan d'exécution du correctif :
    fusion, CI main, suppression de notre branche, relecture de la source Lovable.
 5. Livrer les erreurs exactes du connecteur, la voie CLI vérifiée et un prompt
    autonome de recette courte sur main. Publication production distincte.
+
+## Clôture technique vérifiée — 28 octobre 2026
+
+Le correctif est dans main par PR #104, SHA code
+`9adabdce5b5a4f9be6f6fdc6545868659cb4120a`. CI PR 40658393339
+verte sur HEAD exact `8f4ddff17d9e5b8e500b85ebc2fbfe9839fd3b2d`,
+109 E2E ; CI main 40661278202 verte sur le SHA de fusion, 109 E2E.
+Lovable Ava/Memoways est ready au même SHA, agentFinished=true ; le fichier
+du compilateur a été comparé identique (29 001 caractères). Aucune opération
+Cloud ni publication production. La clôture suivante est exclusivement Markdown ;
+le code reste identique à ce SHA vert, sans nouvelle CI complète selon AGENTS.md.
+
+La branche unique `codex/protect-character-present` est réutilisée pour
+consigner ces preuves, puis doit être supprimée localement et à distance après
+la fusion documentaire. Le compte rendu final doit vérifier ce nettoyage.
+La PR historique #24 et les branches étrangères sont préservées :
+branches distantes historiques au contrôle : `main`,
+`agent/test-gap-invitation-validity-multi-use`. Branches locales historiques
+conservées, en plus de `main` :
+
+```text
+agent/test-gap-invitation-validity-multi-use
+agent/test-gap-posthog-internal-comparison
+codex/bug-scan-gradium-temp-cap
+codex/character-handoff-contract-lot-1
+codex/character-handoff-lot-1-closeout
+codex/character-handoff-lot-2-closeout
+codex/character-handoff-lot-3-closeout
+codex/character-handoff-lot1-prompt
+codex/character-handoff-pill-lot-3
+codex/character-handoff-runtime-lot-2
+codex/handoff-veto-lot-1-finalization
+codex/plan-character-handoff
+codex/test-gap-settings-hydration
+codex/video-latency-metrics
+codex/video-latency-publication-record
+cursor/d5d2099b
+```
+
+Recette humaine courte encore à faire selon le
+[prompt F4](prompt_reprise_present_canonique_lot_f4_recette.md) ; son exécution
+et une publication production nécessitent des étapes distinctes. Aucun lot de
+code suivant lancé. Diagnostic GitHub et consigne de communication enregistrés ;
+Notion projet doit recevoir les preuves finales et être relu après écriture.

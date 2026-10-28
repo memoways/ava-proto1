@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-28 (développement poursuivi ; présent canonique Max/Emma protégé localement, livraison en cours)
+> **Last Updated**: 2026-10-28 (développement poursuivi ; présent canonique Max/Emma fusionné, CI main verte)
 
 ---
 
@@ -16,8 +16,11 @@ compilateur peut perdre la situation actuelle sous le poids de la parole
 Le correctif protège le présent complet avec parole et moteur intime, dans
 une réserve statique explicite et le même plafond global. Les requêtes simulées
 batch/stream conservent la scène lors des rappels ; un budget impossible arrête
-la génération avant le modèle. Qualité locale complète verte, livraison GitHub
-et Lovable à vérifier. La recette humaine et la publication restent distinctes.
+la génération avant le modèle. Qualité locale complète verte ; PR #104 fusionnée
+sur main `9adabdce5b5a4f9be6f6fdc6545868659cb4120a`, CI PR verte sur HEAD exact
+`8f4ddff` et 109 E2E verts. CI main 40661278202 verte, 109 E2E. Lovable ready au
+même SHA, source du compilateur comparée identique. La recette humaine et la
+publication restent distinctes.
 Le connecteur GitHub natif est défaillant, mais l'accès CLI existant fonctionne
 depuis le contexte système autorisé ; Ulrich a explicitement autorisé ce repli.
 [Plan](docs/plan_optimisation_payload_max.md),
