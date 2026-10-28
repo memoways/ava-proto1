@@ -7,6 +7,15 @@ cohérence narrative. Ne pas redemander ce choix ni refaire les validations acqu
 
 ## Première action exécutable
 
+**Correctif repris et fusionné dans main par PR #104** :
+`9adabdce5b5a4f9be6f6fdc6545868659cb4120a`, après CI PR verte sur HEAD exact
+`8f4ddff` et 109 E2E. CI main 40661278202 verte, 109 E2E ; Lovable ready au même
+SHA et source du compilateur relue identique. La suite est la
+[recette courte F4](prompt_reprise_present_canonique_lot_f4_recette.md),
+à proposer à Ulrich. Aucun support à contacter pour débloquer le lot.
+
+### Reprise par accès CLI — historique de ce lot
+
 **Accès alternatif rétabli à la demande explicite d'Ulrich le 28 octobre.**
 `gh api user`, lecture du dépôt exact et des PR, `git fetch --prune` et
 `git pull --ff-only` réussissent depuis le contexte système autorisé avec

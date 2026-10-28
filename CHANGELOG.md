@@ -4,7 +4,7 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
-## [Présent canonique Max/Emma — livraison en cours] — 2026-10-28
+## [Présent canonique Max/Emma] — 2026-10-28
 
 - optimized_v3 conservait la parole éditoriale mais pouvait omettre la situation
   actuelle pour budget : un souvenir de J−2 restait alors sans son présent.
@@ -19,7 +19,12 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Connecteur GitHub natif toujours `Unknown tool` ; Ulrich autorise les autres
   accès. `git`/`gh` validés dans le contexte système avec l'identité existante,
   sans reconnexion. [Erreurs exactes et commandes](docs/diagnostic_github_connecteur_2026-10-28.md).
-- Livraison PR/CI/main et synchronisation Lovable à vérifier ; aucune production.
+- [PR #104](https://github.com/memoways/ava-proto1/pull/104) fusionnée dans main
+  `9adabdce5b5a4f9be6f6fdc6545868659cb4120a` après [CI PR verte](https://github.com/memoways/ava-proto1/actions/runs/40658393339)
+  sur HEAD exact `8f4ddff17d9e5b8e500b85ebc2fbfe9839fd3b2d`, 109 E2E verts.
+  [CI main verte](https://github.com/memoways/ava-proto1/actions/runs/40661278202), 109 E2E.
+  Lovable Ava/Memoways ready sur ce même SHA, source du compilateur relue
+  identique au code fusionné. Aucune publication production.
   [Plan](docs/plan_optimisation_payload_max.md),
   [prompt de recette courte F4](docs/prompt_reprise_present_canonique_lot_f4_recette.md).
 
