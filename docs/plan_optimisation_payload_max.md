@@ -1,5 +1,146 @@
 # Plan révisé d’optimisation du payload conversationnel de Max
 
+## Correctif local vérifié — 28 octobre 2026
+
+L'accès GitHub par `git`/`gh` est rétabli et autorisé par Ulrich ; le défaut
+du connecteur natif ne bloque plus la livraison. Le présent entier est protégé
+dans optimized_v3, hors pertinence et déduplication, avec parole et moteur intime.
+Réserve statique explicite de 5 500 caractères, titres rendus compris ; plafond
+global inchangé à 11 000. Noyau rendu sans normalisation ni troncature ; refus
+avant LLM si les unités obligatoires ne tiennent plus. Le patch candidat du
+diagnostic reste une preuve historique : l'implémentation compte les titres
+exactement au lieu d'une marge fixe et vérifie le noyau réellement injecté.
+
+Reproduction : 24 scénarios synthétiques rouges avant, verts après. 99 tests
+ciblés verts, dont requête batch/stream, rappel Emma → Max → Emma, correction
+du joueur, souvenir ancien conservé et zéro appel modèle si budget impossible.
+Qualité complète locale verte : 71 régressions, 1 115 unitaires, 42 intégrations,
+lint/typage/build. Premier passage interrompu par le test asynchrone inchangé
+conversationTraceOutbox (Labels encore pending) ; les cinq tests isolés puis
+la nouvelle passe complète sont verts, sans modifier ce module. Un avertissement
+lint préexistant dans IndexPRD4 et les avertissements de taille du build subsistent.
+
+Lectures MCP Lovable en prod/sandbox : présent Emma 789/842 caractères, parole
+2 768, moteur 1 048 ; Max 920/738, parole 2 683, moteur 793. Ces unités tiennent
+dans la réserve sans modifier les sources éditoriales. Le GM continue à recevoir
+le même cadre d'expérience depuis son service unique ; aucun fait de scène ou
+nouveau prompt concurrent n'a été ajouté dans son parcours. Les validations
+réelles des réponses narratives restent distinctes des contrôles de compilation.
+
+Livraison GitHub/CI/Lovable à vérifier après push. Recette humaine et production
+non effectuées. [Recette autonome F4](prompt_reprise_present_canonique_lot_f4_recette.md).
+
+## Référence courante — 28 octobre 2026 : présent canonique perdu
+
+**Priorité d’Ulrich : continuer le développement, sans geler la démo.** Le gel
+prévu le 27 octobre est abandonné. Corriger la cohérence factuelle de Max/Emma
+avant toute nouvelle acceptation générale ou publication. Les sections plus
+anciennes ci-dessous restent des preuves historiques, pas l’état courant du lot.
+
+### Incident et continuité vérifiés
+
+- Session Sandbox Ulrich `0f88fbde-5f9a-4e27-ba0f-0644e2682dc3`, début
+  28 octobre 07:36:42 Europe/Paris, même frontend main/Lovable `c7df835`.
+- Dès sa première réponse générée, Emma situe le départ de Max avec Anne à
+  l’hôtel « ce matin ». La même affirmation revient trois fois, malgré une
+  correction du joueur. Le départ existe dans le canon, mais à **J−2**, pas aujourd’hui.
+- Fiche Notion Emma active `dfcc15f8-9d37-45f7-8c84-d0c24a4288cf` et copie
+  Lovable : Lausanne, Emma cuisine, Max salon, retour de montagne hier. La
+  session référence bien la copie du 26 octobre 15:45:14 UTC. Pas de défaut de
+  synchronisation démontré, aucune modification éditoriale proposée par défaut.
+- Même session pour Emma puis Max : appel Emma `4c473e62-b128-409e-85e0-e0171a625b81`
+  fermé à 07:40:46, appel Max `fc7e603b-28aa-4c61-b77f-0c57a3c3ad45` ouvert
+  à 07:40:53, budget restant repris exactement à 722 s ; puis fermé à 07:43:24,
+  571 s restants. Passage par grille, `handoff_count=0`, pas de transfert GM.
+  Le joueur dit lui-même à Max qu’il vient de parler avec Emma : la référence
+  de Max à cet échange ne prouve donc aucune fuite de confidences.
+- Flags épinglés : mains libres, acoustic_confirmed, bargeIn=false,
+  fin de parole 2 000 ms, hésitation 700 ms, incremental=false. Ces réglages
+  acceptés sont conservés.
+
+### Cause applicative reproduite
+
+La variante configurée est `optimized_v3`. Le compilateur réserve 4 500 caractères
+statiques, dont 320 de marge. Chez Emma, les unités éditoriales protégées prennent
+déjà 3 816 caractères (manière de parler : 2 768 ; moteur intime : 1 048).
+La sélection de timeline passe ensuite avant les champs dits `required`.
+Ces champs ne sont pas réellement garantis : `trySelect` peut refuser leur meilleur
+paragraphe pour budget et la boucle continue sans erreur.
+
+Rejeu local avec la fiche Cloud relue : les trois variantes de « comment va Max
+ce matin ? », dont la transcription de l’essai, excluent **tous les paragraphes
+de situation_summary**, marqués `budget`. Les repères Lausanne/cuisine/salon
+disparaissent. La protection d’identité contrôle l’identité du locuteur, pas
+ces contradictions temporelles. La dérive apparaît dès le début de l’appel ;
+un long historique n’est donc pas nécessaire à sa reproduction.
+
+Limite de preuve : `diagnostic_trace_enabled=false`, aucune ligne de trace
+causale pour cet essai. La requête exacte, les souvenirs RAG réellement reçus et
+les paramètres résolus ne sont pas récupérables depuis ces seules données.
+Le rejeu prouve la perte du présent par le compilateur sur les sources/version
+observées ; il ne prouve pas à lui seul le détail du raisonnement du modèle.
+
+### Correction candidate vérifiée hors de l’application
+
+[Patch candidat, non appliqué](patch_present_canonique_candidate.patch) :
+
+1. Faire du `situation_summary` existant une unité canonique entière protégée,
+   en tête des faits de la fiche ; aucune ville ni chronologie codée en dur.
+2. La soustraire à la sélection par pertinence et à la déduplication approximative.
+   Conserver les protections de parole et du moteur intime.
+3. Réserver explicitement la place nécessaire : prototype à 5 500 caractères
+   statiques, plafond global de contexte généré toujours 11 000 caractères.
+   Cette répartition doit encore être validée par les contrats de budget et les
+   profils réels, sans troncature cachée ni hausse du plafond global.
+4. Vérifier avant l’appel modèle que ce présent a été conservé intégralement ;
+   si le contexte ne le permet plus, échouer explicitement avant la génération.
+
+Boucle exécutée : `node_modules/.bin/vite-node --config vite.config.ts
+/tmp/ava-scene-probe.ts` (prototype temporaire, nettoyé à la clôture).
+24 scénarios : Max/Emma × trois questions × historique 0/1 800 caractères ×
+avec/sans souvenir ancien sur l’hôtel. Avant : 24 omissions du présent complet.
+Prototype : zéro omission, zéro dépassement du plafond global. Trois replays
+supplémentaires du cas Emma passent du rouge au vert. Aucune requête LLM/TTS
+payante, aucune modification des voix, du Cloud ou des fiches Notion.
+Ces vérifications portent sur l’assemblage ; aucune qualité sonore ni absence
+générale d’hallucination ne peut être déduite d’un test de compilation.
+
+### État de livraison et reste
+
+Retest natif du 28 octobre 2026 à 09:17 Europe/Paris : `get_profile`, `get_repo`
+et `search_prs` échouent encore avec `-32001: Unknown tool`. L'inventaire natif
+annonce pourtant GitHub installé et activé. Notion Gamilab est confirmé par
+get-self avec l'ID attendu. Le correctif Emma reste suspendu avant toute branche
+ou modification applicative ; l'état distant et les PR n'ont pas été revérifiés.
+La reprise détaille les erreurs à transmettre au support de l'app. Aucun nouvel
+élément ne démontre une expiration OAuth ou ne justifie de changer les identifiants.
+
+**Diagnostic et prototype seulement. Aucun correctif appliqué à src, aucun push,
+aucune PR ni publication dans ce lot.** Le connecteur GitHub annoncé renvoie
+`Unknown tool` pour get_profile, get_repo et search_prs. L’identité n’est pas
+déclarée expirée ; le routage est défaillant. Ulrich confirme que le plugin est
+installé/activé mais que la cause exacte du routage reste à établir. Aucun
+contournement par gh ou navigateur ; identifiants conservés. L’inventaire des PR
+et la livraison attendent le rétablissement du connecteur natif.
+
+Après rétablissement : vérifier les PR/branches, appliquer et minimiser le patch
+sur une branche unique ; écrire la régression sur un fixture synthétique de
+mêmes contraintes de budget, puis tester présent canonique, fait ancien,
+correction utilisateur, contexte long/limite et retour d’appel, pour Max et Emma.
+Vérifier le chemin complet jusqu’à la requête modèle et le profil GM sans
+introduire de faits divergents. Qualité locale, CI PR sur HEAD exact, fusion,
+CI main, nettoyage et Lovable restent obligatoires. Recette courte ciblée ensuite.
+Pas de gel ; publication sur autorisation distincte. Optimisation CI, auditions
+et qualification exhaustive sont des chantiers séparés, sans masquer ce défaut.
+
+Sources : demande et essai d’Ulrich du 28 octobre ; Notion natif Gamilab confirmé
+`7e1a9a09-09cb-4deb-a306-83a29b831bc2` ; fiches actives Max/Emma ; lectures
+MCP Lovable Ava/Memoways des métadonnées, répliques ciblées et événements ; code
+`src/agents/maxOptimizedPromptCompiler.ts`, `src/services/characterEmbodiment.ts`,
+`src/services/characterIdentityGuard.ts`. Aucun transcript complet conservé.
+
+## Historique du plan d’optimisation
+
 > Statut : implémentation `compact_v1` terminée, mais jugée trop destructive pour la richesse éditoriale de Max ; variante `rich_v2` à finaliser dans Lovable avant mise à jour Notion et canary.
 >
 > Révision : 2026-07-30
@@ -878,3 +1019,30 @@ Hypothèses recommandées pour la canary :
 - aucun nouveau backend, projet Supabase, hébergeur ou pipeline ;
 - build, Edge Functions, secrets, publication et tests en environnement réel
   restent exclusivement dans Lovable / Lovable Cloud.
+
+## Reprise autorisée par accès GitHub alternatif — 28 octobre 2026
+
+Ulrich demande explicitement de tester les autres connexions et d'apporter des
+solutions concrètes. Le connecteur natif conserve ses trois erreurs `Unknown tool`,
+mais `gh` exécuté depuis le contexte système autorisé utilise la session existante
+Ulrfis avec succès : profil, dépôt exact, droits push et PR relus. La GitHub App
+n'est pas configurée sur ce poste. Aucun identifiant modifié, aucun login/refresh.
+`git fetch --prune` puis `git pull --ff-only` réussissent ; main reste c7df835.
+Seule PR ouverte : #24, historique depuis le 11 octobre, hors périmètre et préservée.
+Branche unique du lot : `codex/protect-character-present`. Lovable Ava/Memoways
+est ready sur c7df835 avant développement. Ce repli est autorisé par la demande
+actuelle ; il ne remplace pas les règles générales des connecteurs.
+
+Plan d'exécution du correctif :
+1. Reproduction rouge synthétique sur le compilateur effectif, avec le volume
+   de parole/moteur observé, présent multi-paragraphes et souvenir J−2.
+2. Protéger le présent complet hors scoring/déduplication, conserver la parole
+   et le moteur intime, réserver explicitement 5 500 caractères statiques au
+   maximum et garder le plafond global de 11 000. Contrôler la taille réellement
+   rendue ; refuser avant LLM si une unité obligatoire ne tient plus.
+3. Tester Max/Emma, premier appel et rappel, correction utilisateur, souvenir
+   ancien, historique long/limite, vraie requête LLM et absence d'appel si refus.
+4. Geler code/tests/docs avant push ; qualité locale, CI PR sur HEAD exact,
+   fusion, CI main, suppression de notre branche, relecture de la source Lovable.
+5. Livrer les erreurs exactes du connecteur, la voie CLI vérifiée et un prompt
+   autonome de recette courte sur main. Publication production distincte.

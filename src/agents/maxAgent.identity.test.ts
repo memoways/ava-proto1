@@ -32,6 +32,7 @@ import { ResponseIntentParser, SPEECH_BOUNDARY } from "@/services/responseIntent
 import { CHARACTER_CALL_TRANSFER_INSTRUCTIONS } from "@/services/characterConversation";
 import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
 import { buildMaxSystemPrompt, simulateMaxResponse } from "./maxAgent";
+import { makeCanonicalPresentFixture } from './__fixtures__/canonicalPresentFixture';
 
 const variants = ["legacy", "compact_v1", "rich_v2", "optimized_v3"] as const;
 
@@ -120,7 +121,10 @@ describe("identity lock across prompt variants", () => {
 
   it.each(variants)("keeps identity and Notion prohibitions ahead of oversized optional content in %s", async (variant) => {
     vi.mocked(getGameplaySettings).mockReturnValue({ MAX_PROMPT_VARIANT: variant } as never);
-    vi.mocked(loadCharacterPrompt).mockResolvedValue(sheet("emma", 350) as never);
+    const oversized = sheet("emma", 350);
+    // Only optional text is oversized; optimized_v3 now protects the entire scene.
+    if (variant === 'optimized_v3') oversized.situation_summary = sheet('emma').situation_summary;
+    vi.mocked(loadCharacterPrompt).mockResolvedValue(oversized as never);
 
     const trace = await buildMaxSystemPrompt(input, "Emma Munz", contexts.emma);
 
@@ -141,6 +145,56 @@ describe("identity lock across prompt variants", () => {
     expect(trace.finalSystemPrompt).toContain(guidance);
     expect(trace.finalSystemPrompt.indexOf(CHARACTER_CALL_TRANSFER_INSTRUCTIONS))
       .toBeLessThan(trace.finalSystemPrompt.indexOf(guidance));
+  });
+});
+
+describe('présent canonique dans la requête effective', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getGameplaySettings).mockReturnValue({ MAX_PROMPT_VARIANT: 'optimized_v3' } as never);
+    vi.mocked(getLLMSettings).mockReturnValue({ LLM_MODEL: 'openai/gpt-5.6-luna', LLM_MAX_TOKENS: 220, LLM_TEMPERATURE: 0.7, LLM_TOP_P: 0.9 } as never);
+    vi.mocked(loadCharacterPrompt).mockImplementation(async id => {
+      const character = id === contexts.emma.characterId ? 'emma' : 'max';
+      return { ...makeCanonicalPresentFixture(character), character_id: id, updated_at: contexts[character].promptUpdatedAt };
+    });
+  });
+
+  it.each([false, true])('conserve chaque fiche lors d’un rappel Emma → Max → Emma, stream=%s', async streaming => {
+    for (const character of ['emma', 'max', 'emma'] as const) {
+      const context = contexts[character];
+      const current = 'Non, vous êtes rentrés hier. Où êtes-vous maintenant ?';
+      const history = [
+        { role: 'user' as const, content: 'Qui est parti à l’hôtel ?', timestamp: 1 },
+        { role: character, content: 'Ce matin, Max est parti avec Anne.', timestamp: 2 },
+      ];
+      if (streaming) vi.mocked(streamLLM).mockResolvedValueOnce('Je suis à la maison.');
+      else vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ content: 'Je suis à la maison.', usage: null, generationId: null, model: 'openai/gpt-5.6-luna', latencyMs: 1, diagnosticTrace: null });
+      const result = await simulateMaxResponse({ conversationHistory: history, userMessage: current,
+        ragCandidates: [{ id: 'hotel', rank: 1, content: 'Il y a deux jours, Anne avait attendu dans un hall éclairé au néon.' }],
+        experienceFrame: 'Cet appel reprend dans la même expérience.' },
+      { characterContext: context, diagnosticTrace: true, ...(streaming ? { onSpeechToken: vi.fn() } : {}) });
+      const requests = streaming ? vi.mocked(streamLLM).mock.calls : vi.mocked(callLLMWithUsage).mock.calls;
+      const messages = requests.at(-1)![0];
+      expect(messages[0].content).toContain(makeCanonicalPresentFixture(character).situation_summary);
+      expect(messages[0].content).toContain(makeCanonicalPresentFixture(character).maniere_de_parler);
+      expect(messages[0].content).toContain(`Tu es ${context.displayName}`);
+      expect(messages[0].content).toContain('Cet appel reprend dans la même expérience.');
+      expect(messages[1].content).toBe(history[0].content);
+      expect(messages[2].content).toBe(history[1].content);
+      expect(messages.at(-1)!.content).toBe(current);
+      expect(result.promptTrace?.finalSystemPrompt).toBe(messages[0].content);
+    }
+  });
+
+  it.each([false, true])('ne contacte aucun modèle si le présent ne tient pas, stream=%s', async streaming => {
+    const context = contexts.emma;
+    vi.mocked(loadCharacterPrompt).mockResolvedValueOnce({ ...makeCanonicalPresentFixture('emma'),
+      character_id: context.characterId, updated_at: context.promptUpdatedAt,
+      situation_summary: 'Un fait actuel indispensable. '.repeat(500) });
+    await expect(simulateMaxResponse(input, { characterContext: context,
+      ...(streaming ? { onSpeechToken: vi.fn() } : {}) })).rejects.toThrow(/génération interdite/);
+    expect(callLLMWithUsage).not.toHaveBeenCalled();
+    expect(streamLLM).not.toHaveBeenCalled();
   });
 });
 

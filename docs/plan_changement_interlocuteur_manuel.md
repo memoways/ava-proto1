@@ -1,4 +1,39 @@
-## Reprise démo et capsule de passage — 27 octobre 2026
+## Reprise du développement — 28 octobre 2026
+
+Reprise effective après demande d'Ulrich de tester les autres connexions :
+`git`/`gh` fonctionnent avec Ulrfis depuis le contexte système autorisé. Le
+connecteur natif échoue toujours ; ce défaut ne bloque plus le lot.
+Correctif du présent canonique implémenté et vérifié localement (24 scénarios
+rouges avant/verts après, 99 ciblés, qualité complète verte), livraison PR/CI
+en cours. [État courant](plan_optimisation_payload_max.md),
+[diagnostic d'accès exact](diagnostic_github_connecteur_2026-10-28.md),
+[prompt autonome de recette F4](prompt_reprise_present_canonique_lot_f4_recette.md).
+
+**Décision d’Ulrich : ne pas geler la démo ; poursuivre le développement.**
+La priorité immédiate est la cohérence du présent canonique de Max/Emma.
+Le gel et la fin de chantier proposés plus bas sont historiques et ne sont plus
+à exécuter. Les validations vocales et passages acquis restent conservés.
+
+Nouvel essai `0f88fbde-5f9a-4e27-ba0f-0644e2682dc3` : Emma invoque au présent
+un départ de Max avec Anne à l’hôtel, événement canonique de J−2. Le compilateur
+optimized_v3 écarte la situation actuelle pour budget ; omission reproduite.
+Un prototype hors application protège le présent complet dans 24 cas Max/Emma,
+sans dépasser le plafond global. Il n’est pas livré : l’accès GitHub natif échoue
+sur `Unknown tool`, sans preuve d’une expiration d’identité. Aucun contournement.
+[Diagnostic, preuves, correction candidate et livraison restante](plan_optimisation_payload_max.md).
+
+Le retour grille Emma → Max est maintenant **observé dans la même session** :
+appel Emma fermé à 07:40:46 Paris, Max ouvert à 07:40:53, 722 secondes restantes
+conservées. C’est un nouvel appel, pas une nouvelle expérience ni un transfert GM.
+Le joueur informe Max de son échange avec Emma ; ne pas confondre cette continuité
+avec le partage des souvenirs privés.
+
+État technique connu : main/Lovable `c7df835`, dernière CI code vérifiée verte
+sur `bf24b37` (40578598650, 109 E2E). Ce dernier contrôle date du 27 octobre ;
+aucune CI nouvelle ni correction frontend publiée le 28 par ce diagnostic.
+[Prompt de reprise actualisé](prompt_reprise_fiabilite_passage_personnages_lot_f3_finalisation.md).
+
+## Historique — reprise démo et capsule de passage — 27 octobre 2026
 
 Référence courante, avant le bilan historique ci-dessous. Ulrich rapporte un
 nouvel échange prolongé avec Max puis un passage vers Emma réussi : « pour le

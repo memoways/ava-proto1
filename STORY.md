@@ -3,9 +3,26 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-27 (capsule de passage livrée sur preview ; rappel par grille et gel humain encore attendus)
+> **Last Updated**: 2026-10-28 (développement poursuivi ; présent canonique Max/Emma protégé localement, livraison en cours)
 
 ---
+
+## Présent canonique Max/Emma — 28 octobre 2026
+
+Ulrich demande de continuer à améliorer le projet, sans gel de la démo. Son
+essai révèle qu'Emma situe aujourd'hui un départ à l'hôtel daté de J−2. Le
+compilateur peut perdre la situation actuelle sous le poids de la parole
+éditoriale ; 24 reproductions synthétiques montrent cette omission.
+Le correctif protège le présent complet avec parole et moteur intime, dans
+une réserve statique explicite et le même plafond global. Les requêtes simulées
+batch/stream conservent la scène lors des rappels ; un budget impossible arrête
+la génération avant le modèle. Qualité locale complète verte, livraison GitHub
+et Lovable à vérifier. La recette humaine et la publication restent distinctes.
+Le connecteur GitHub natif est défaillant, mais l'accès CLI existant fonctionne
+depuis le contexte système autorisé ; Ulrich a explicitement autorisé ce repli.
+[Plan](docs/plan_optimisation_payload_max.md),
+[erreurs exactes](docs/diagnostic_github_connecteur_2026-10-28.md) et
+[reprise de recette](docs/prompt_reprise_present_canonique_lot_f4_recette.md).
 
 ## F3 — passage réussi puis retour de la capsule
 
