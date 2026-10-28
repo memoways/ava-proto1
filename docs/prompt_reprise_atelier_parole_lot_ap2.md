@@ -1,9 +1,50 @@
-# Ava — AP2 : retrouver les variantes et appréciations de l’atelier de parole
+# Ava — AP2 : un atelier simple et unique, puis des variantes retrouvables
 
 Exécute uniquement **AP2**, dans `/Users/ulrich/CodeProjects/memoways/ava-proto1`,
 remote unique `https://github.com/memoways/ava-proto1`. Ce prompt prépare le lot
 suivant ; son enregistrement ne lance ni AP2 ni une écoute. Le périmètre AP2 est
 cadré dans le plan courant, ne pas refaire la planification.
+
+## Correction prioritaire approuvée — retour d’Ulrich du 28 octobre 2026
+
+Ulrich juge AP1 incompréhensible, inutilisable et en double avec le banc A3 de
+TTS Config. La livraison technique AP1 ne vaut donc **pas acceptation de
+l’utilisabilité**. AP2 ne doit pas se limiter à ajouter de la persistance sur
+l’interface actuelle : résoudre d’abord le doublon et le parcours trop chargé.
+
+- **Un seul atelier, dans Expérience → Atelier de parole.** Retirer de TTS
+  Config le bloc « A3 — Réglages fidèles et auditions » / banc lot B et tous ses
+  parcours d’audition, corpus, A/B, notes et exports. TTS Config conserve la
+  configuration technique des fournisseurs, modèles, voix et paramètres ; un
+  lien vers l’atelier suffit pour les auditions. Supprimer le doublon visuel,
+  sans perdre les réglages persistants utiles ni leurs valeurs.
+- Réunir dans cet atelier les capacités d’audition existantes : Max en parcours
+  principal ; Emma et les autres fournisseurs restent accessibles dans un
+  accès avancé clairement nommé. Ne pas les laisser dans un second banc TTS.
+  Les commandes de configuration persistante réellement utiles ont un seul
+  emplacement avancé, distinct des variantes d’essai ; aucune application live
+  implicite. Déplacer une commande ne doit pas modifier les réglages enregistrés.
+- Au premier niveau, un **parcours court avec une action principale par étape** :
+  choisir la réplique et explicitement son état → écouter la version actuelle →
+  écouter un essai ne changeant qu’un réglage → donner son avis et enregistrer
+  la comparaison. Désigner A/B en mots courants (« version actuelle », « essai »).
+  Dire à chaque étape quoi faire maintenant et ce qui se passera au clic.
+- Replier les cinq familles détaillées, versions, mappings, JSON, preuves,
+  transports expérimentaux et contrôles experts dans des références/options
+  avancées accessibles à la demande. Garder au premier niveau le réglage testé,
+  sa différence, le contexte utile et les limites qui changent le sens de l’essai.
+  Ajouter de l’explication ne doit pas produire un nouveau mur d’informations.
+- **Critères de sortie obligatoires :** aucun banc dans TTS Config ; un seul
+  parcours d’audition ; première action identifiable dès l’ouverture ; même
+  texte/état/voix entre les deux écoutes ; différence compréhensible ; avis et
+  variantes retrouvables ; aucun besoin de lire le JSON pour réaliser l’essai.
+  Vérifier desktop, mobile et clavier sur la preview authentifiée. Séparer
+  contrôles techniques et validation de la compréhension par Ulrich ; ne plus
+  déduire l’utilisabilité d’une CI verte.
+
+Cette correction est incluse dans **le prochain lot AP2**, avant les ajouts de
+persistance. Ne pas la repousser à AP3 ni à une amélioration ultérieure non cadrée.
+L’enregistrement de ce prompt ne lance pas AP2 et ne modifie pas l’application.
 
 ## Première action et contexte
 
@@ -35,7 +76,8 @@ Aucune écoute humaine, génération fournisseur réelle ni publication dans AP1
 
 ## Résultat observable et périmètre
 
-Ulrich retrouve après fermeture/reconnexion ses variantes **nommées**, leurs
+Ulrich trouve un atelier unique et compréhensible dès l’ouverture, puis retrouve
+après fermeture/reconnexion ses variantes **nommées**, leurs
 différences, appréciations, décision et export, dans la même sandbox. Conserver
 la méthode Max : une hypothèse et deux variantes, séance de 10–15 minutes.
 
@@ -65,7 +107,8 @@ la méthode Max : une hypothèse et deux variantes, séance de 10–15 minutes.
   effectives et avis humains. Aucun bouton « retenir » ambigu avec l’application
   au jeu. Ne pas lancer AP3, conversation ou audition réelle automatiquement.
 
-Points d’entrée : `src/components/SpeechAuditionBench.tsx`,
+Points d’entrée : `src/components/TTSConfigTab.tsx`,
+`src/components/SpeechAuditionBench.tsx`,
 `src/services/tts/speechAudition.ts`, `speechWorkshop.ts`,
 `speechPerformanceSettings.ts` et leurs tests. Le `saveSpeechPerformanceSettings`
 existant montre CAS/readback mais sauvegarde le mapping live : ne pas l’utiliser
@@ -98,7 +141,9 @@ Le navigateur sert à la validation visuelle ; aucun animal affiché.
 
 ## Vérifications et livraison
 
-Couvrir : sauvegarde explicite, fermeture/reconnexion, isolation sandbox/admin,
+Couvrir d’abord : retrait du banc de TTS Config, absence de second atelier,
+parcours court, action principale et options avancées repliées ; puis sauvegarde
+explicite, fermeture/reconnexion, isolation sandbox/admin,
 refus prod et contexte étranger, migration de schéma locale si nécessaire,
 conflit et readback, absence de changement live/audio automatique, export,
 provenance inconnue et références devenues différentes. Conserver REST/WS/repli,

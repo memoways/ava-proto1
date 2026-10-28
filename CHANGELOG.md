@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [AP2 — clarification demandée après AP1] — 2026-10-28
+
+- Retour d’Ulrich : AP1 est techniquement livré mais le parcours est jugé
+  incompréhensible et en double avec le banc A3 de TTS Config.
+- [Reprise AP2](docs/prompt_reprise_atelier_parole_lot_ap2.md) et plan actualisés :
+  retirer le banc d’audition de TTS Config, réunir les auditions dans un seul
+  atelier, guider les actions et replier les détails experts avant la persistance.
+- Documentation uniquement ; application inchangée, AP2 non lancé. Dernière CI
+  code verte : run 40728203944, HEAD af813cc3339e803c9a808cfe8bce96a6427a6c65,
+  110 E2E sans retry. Pas de nouvelle campagne complète pour cette clarification.
+
 ## [AP1 — Atelier de parole Max] — 2026-10-28
 
 - Expérience → Atelier de parole : cinq familles expliquées, références chargées

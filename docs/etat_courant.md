@@ -38,7 +38,7 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
-**AP1 — Atelier de parole Max implémenté.**
+**AP1 livré techniquement ; utilisabilité rejetée par Ulrich.**
 Accès admin sandbox : Expérience → Atelier de parole,
 `/admin/experience/atelier-de-parole`. A/B temporaire, état explicite par cas,
 transport actuel respecté et preuves effectives lisibles ; aucun réglage live.
@@ -46,7 +46,10 @@ transport actuel respecté et preuves effectives lisibles ; aucun réglage live.
 Lire la PR AP1 et son reçu GitHub/Notion pour les SHA/run finaux ; ce document
 est committé avant le squash. Lovable/production restent des étapes distinctes.
 
-**Suite AP2 préparée, non lancée :**
+**Suite AP2 préparée, non lancée : simplifier et dédoublonner d’abord.**
+Retirer le banc A3/auditions de TTS Config ; un seul atelier dans Expérience,
+parcours court et détails experts repliés, puis variantes et avis persistants.
+Le doublon et la clarté sont des critères de sortie obligatoires d’AP2.
 [prompt autonome — variantes et avis persistants](prompt_reprise_atelier_parole_lot_ap2.md).
 AP3 organise ensuite l’écoute humaine de Max ; aucune écoute réelle ni acceptation
 vocale revendiquée par AP1. [Contrat AP1–AP6](plan_lot_b_rendu_vocal.md#atelier-de-parole-ap1ap6--contrat-courant-28-octobre-2026).
