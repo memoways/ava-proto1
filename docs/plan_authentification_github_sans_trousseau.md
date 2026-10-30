@@ -1,5 +1,32 @@
 # GitHub Ava — livraison indépendante du Trousseau
 
+## Décision du 30 octobre 2026 — voie directe, 1Password en secours
+
+Ulrich refuse les validations 1Password répétées : elles l’obligent à surveiller
+chaque livraison. Il maintient l’interdiction du Trousseau. Cause constatée :
+le lanceur partagé `github-delivery-exec` excluait explicitement Ava depuis le
+28 octobre, alors que l’App locale `ulrich-local-git-ship` (clé fichier 0600,
+configuration `~/.config/git-ship/apps/memoways/ava-proto1/github-app.env`)
+restait valide pour Ava.
+
+Changements appliqués avec l’accord d’Ulrich :
+
+- exclusion Ava retirée du lanceur partagé (fichier local du poste) ;
+- `.git/config` du checkout canonique : `credential.helper` remis à zéro, puis
+  `github-app-exec` + `github-app-credential-helper` avec la configuration Ava,
+  `credential.useHttpPath=true`. Les worktrees partagent cette configuration.
+
+Vérifié le 30 octobre, sans aucune demande ni Trousseau : jeton émis, dépôt,
+PR et runs lisibles, `git fetch` et `git push --dry-run` acceptés. Une trace Git
+montre que seul le helper App est appelé, jamais `osxkeychain`.
+
+Limite assumée : la clé fichier est lisible par tout programme lancé sous le
+compte d’Ulrich, comme une clé SSH. Chaque jeton reste limité à une heure et au
+seul dépôt Ava (Contents et Pull requests en écriture). Retour arrière : retirer
+les trois réglages locaux et rétablir l’exclusion. La session 1Password
+ci-dessous reste disponible en secours, sans changement.
+
+
 Décision explicite d’Ulrich du 28 octobre 2026 : aucun recours à l’app Trousseaux
 d’accès ni aux commandes/API qui lisent, déverrouillent, réparent ou modifient ce
 stockage. Aucune reconnexion GitHub personnelle. Ulrich rapporte des perturbations
