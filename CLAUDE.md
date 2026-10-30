@@ -31,12 +31,11 @@ Production distincte et soumise à autorisation. Notion Ava : Gamilab natif,
 get-self `7e1a9a09-09cb-4deb-a306-83a29b831bc2` ; autres IDs dans AGENTS.
 Gami DigiDouble exclu, aucun animal affiché.
 
-GitHub natif d'abord, repli git/gh autorisé si outil indisponible, identité et
-remote vérifiés. Diagnostic identité/ressource borné ; appliquer la décision « GitHub — accès
-sans Trousseau » d’AGENTS avant tout git/gh. Une session 1Password par lot,
-réutilisée en mémoire ; aucun appel au coffre commande par commande, aucun retry
-automatique après refus/expiration. Aucun accès au Trousseau, aucune
-demande de déverrouillage ou reconnexion personnelle. Notion reste natif.
+GitHub : voie directe sans demande, App locale à clé fichier (décision
+« GitHub — accès direct » d’AGENTS). `git` nu fonctionne dans Ava ; `gh` et la
+garde passent par `~/CodeProjects/_shared/scripts/github-delivery-exec`, jamais
+`gh` nu. 1Password seulement en secours, une session par lot. Aucun accès au
+Trousseau, aucune demande de déverrouillage ou reconnexion personnelle. Notion reste natif.
 
 ## Invariants utiles au développement
 
