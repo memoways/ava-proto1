@@ -1,7 +1,8 @@
 # Ava — AP5 : comparer les fournisseurs avec les voix custom de Max
 
 Exécute uniquement AP5, dans un chat neuf. Ce prompt a été préparé à la
-clôture d’AP4-bis, le 30 octobre 2026, et ne lance rien. Il remplace l’ancien
+clôture d’AP4-bis, le 30 octobre 2026, et mis à jour à la clôture d’AP4-ter
+(ElevenLabs sur `eleven_v4`). Il ne lance rien. Il remplace l’ancien
 AP5 (séance accompagnée), déjà fait par Ulrich. AP5 est une **recette
 humaine** : une CI verte ou une capture ne prouve pas la crédibilité vocale.
 Seules les notes qu’Ulrich donne à l’oreille comptent.
@@ -32,13 +33,19 @@ Seules les notes qu’Ulrich donne à l’oreille comptent.
   varient ; `cfg_coef` déprécié). La carte le dit. Trois options ont été
   présentées à Ulrich à la clôture d’AP4-bis, aucune codée : voix Gradium
   clonées dans plusieurs registres, comparaisons d’émotion centrées sur Fish,
-  ElevenLabs v3 et Inworld, ou `temp` plus haut dans l’atelier seulement.
+  ElevenLabs v4 et Inworld, ou `temp` plus haut dans l’atelier seulement.
+- AP4-ter : `proxy-tts` n’envoie plus les paramètres refusés par v3/v4 ; la
+  carte ElevenLabs de l’atelier utilise `eleven_v4` (choix d’Ulrich, balises
+  d’émotion actives). Avant AP5, vérifier que la recette humaine d’AP4-ter a eu
+  lieu (la carte ElevenLabs joue sans 400) ; sinon la faire passer en premier.
+  Si v4 est refusé par le compte, repasser `ELEVENLABS_EXPRESSIVE_MODEL` à
+  `eleven_v3` (une constante, `supabase/functions/_shared/elevenLabsModels.ts`).
 - Aucun son réel n’a été généré en développement. Publication production : non.
 
 ## Sources
 
 AGENTS.md, `docs/etat_courant.md`, début du CHANGELOG,
-`docs/plan_lot_b_rendu_vocal.md` (contrat AP1–AP8, exécutions AP4 et AP4-bis),
+`docs/plan_lot_b_rendu_vocal.md` (contrat AP1–AP8, exécutions AP4, AP4-bis et AP4-ter),
 tâche Gamilab https://app.notion.com/p/f3944bc8e9ce48138f2b309db223035d (relire
 avant toute édition). Notion Ava : Gamilab natif, get-self attendu
 `7e1a9a09-09cb-4deb-a306-83a29b831bc2`. Lovable Ava

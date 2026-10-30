@@ -91,6 +91,15 @@ d’Ulrich. La séance accompagnée de l’ancien AP5 est faite.
 fournisseurs avec les voix custom de Max, non lancé. Reçu PR/CI/fusion dans la
 PR et Notion. F4 reste distincte. Aucune publication production implicite.
 
+**AP4-ter implémenté le 30 octobre : ElevenLabs corrigé, v4 par défaut dans l’atelier.**
+Le 400 `unsupported_model` venait très probablement de `optimize_streaming_latency`
+(déprécié) et du contexte de phrases, envoyés à v3/v4 ; `proxy-tts` ne les envoie
+plus que là où ils sont acceptés, les Turbo dépréciés sont lus comme Flash v2.5,
+TTS Config liste les modèles actuels. Défaut expressif de l’atelier : `eleven_v4`
+(choix d’Ulrich). Cause non confirmée par logs ni appel réel ; la recette humaine
+après déploiement Lovable reste à faire.
+[Exécution AP4-ter](plan_lot_b_rendu_vocal.md#exécution-ap4-ter--30-octobre-2026).
+
 ## Livraison AP2 et accès dédié
 
 Qualité locale : 71 régressions, 1 131 unitaires, 42 intégrations, lint/typage/build ;

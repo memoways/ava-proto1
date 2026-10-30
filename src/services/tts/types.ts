@@ -31,7 +31,7 @@ export interface TTSGenerateContext {
   /** Exact request evidence, emitted by provider adapters before transport. */
   onAuditionRequest?: (request: TTSAuditionRequest) => void;
   /** Audition-only model override; runtime model settings remain untouched. */
-  auditionModelId?: 'eleven_v3';
+  auditionModelId?: string;
   /** Derive after the validated private header, before the first audio segment. */
   resolveSpeechPerformance?: (state: string | null, text: string) => import('./performanceIntent').PerformanceIntent;
   /** Observability context propagated to PostHog/Supabase telemetry. */

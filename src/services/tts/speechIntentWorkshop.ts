@@ -2,6 +2,7 @@ import {
  applyCartesiaGenerationConfig, applyElevenLabsPerformance, applyFishPerformance, applyGradiumPerformance, applyInworldPerformance,
  type CanonicalEmotion, type PerformanceDelivery, type PerformanceIntent,
 } from './performanceIntent';
+import { ELEVENLABS_EXPRESSIVE_MODEL } from '../../../supabase/functions/_shared/elevenLabsModels';
 import type { TTSProviderId } from './types';
 
 /**
@@ -66,8 +67,8 @@ export interface ProviderBaseSettings {
  inworld: { deliveryMode: 'STABLE' | 'BALANCED' | 'CREATIVE'; speakingRate: number; modelId?: string };
  cartesia: { language: string; modelId?: string };
 }
-/** ElevenLabs v3 is the workshop model (as in AP2); the game keeps its own model. */
-export const ELEVENLABS_WORKSHOP_MODEL = 'eleven_v3' as const;
+/** The expressive ElevenLabs model is the workshop default (v4, chosen by Ulrich on 30 Oct 2026); the game keeps its own model. */
+export const ELEVENLABS_WORKSHOP_MODEL = ELEVENLABS_EXPRESSIVE_MODEL;
 export interface ProviderPlan { model?: string; parameters: Array<{ label: string; value: string | number }>; ignored: string[]; note?: string }
 const round = (value: number) => Number(value.toFixed(2));
 /** Planned native parameters, computed by the same adapters the providers use at request time. */

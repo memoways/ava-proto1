@@ -95,7 +95,7 @@ describe("provider adapters", () => {
     expect(applyFishPerformance(base, "Bonjour.", null).text).toBe("Bonjour.");
   });
 
-  it("raises ElevenLabs style and prepends v3 tags only on eleven_v3", () => {
+  it("raises ElevenLabs style and prepends audio tags only on tag-capable models (v3, v4)", () => {
     const v2 = applyElevenLabsPerformance(
       { style: 0.18, stability: 0.5, speed: 1, modelId: "eleven_multilingual_v2" },
       "Écoute-moi.",
