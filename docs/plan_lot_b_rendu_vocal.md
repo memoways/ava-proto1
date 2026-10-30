@@ -12,8 +12,10 @@ persistants dans le back-office ; audio exact seulement pendant la séance.
 **État au 30 octobre : AP1 et AP2 livrés techniquement. AP3 a été mené : Ulrich
 comprend le parcours mais refuse ce qu’on lui fait régler. La série est
 réorientée vers des intentions de jeu. AP4 (atelier par intention) est
-implémenté après validation des textes et intentions ; AP5 est la séance
-d’écoute humaine.**
+implémenté après validation des textes et intentions. Après l’essai d’Ulrich,
+AP4-bis corrige la reprise d’un test, les voix des personnages par fournisseur
+et la compacité ; AP5 compare ensuite les fournisseurs avec les voix custom de
+Max. La séance accompagnée de l’ancien AP5 est faite.**
 Cette section est le contrat de la nouvelle série ; les sections datées
 ci-dessous décrivent les livraisons précédentes. A4R confirme les copies E0
 le 26 octobre, mais ni A4R ni F4 ne valent acceptation du naturel vocal.
@@ -25,7 +27,8 @@ La recette F4 reste distincte ; aucun gel de démo ni publication implicite.
 | AP2 | Atelier unique et parcours simple ; retrait du banc de TTS Config ; variantes/avis nommés et retrouvables | Correction UX prioritaire, puis stockage sandbox strict et relecture | Livré #111, main `f855bf3` |
 | AP3 | Première séance Max, deux répliques initiales, une hypothèse et deux variantes | AP2 livré ; bilan humain, référence et prochain défaut observé | Fait le 29 octobre : parcours compris, réglages bruts et répliques trop courtes refusés ; aucune écoute ni comparaison enregistrée |
 | AP4 | Atelier par intention de jeu : passage de 2–3 phrases longues, émotion choisie dans une liste, recette traduite pour chaque fournisseur avec paramètres visibles, comparaison côte à côte entre fournisseurs, note de 1 à 5 par fournisseur | Retour AP3 ; textes et liste d’intentions validés par Ulrich avant le code ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap4.md) | Étape 0 validée le 30 octobre ; [implémenté](#exécution-ap4--30-octobre-2026), livraison dans le bilan |
-| AP5 | Séance accompagnée : Max, deux passages × trois intentions, comparés sur les fournisseurs disponibles | AP4 livré ; tableau intention × fournisseur noté à l’oreille ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap5.md) | Prêt, non lancé |
+| AP4-bis | Nouveau test sans changer d’onglet ; Voice ID des 4 personnages × 5 fournisseurs saisis une fois dans TTS Config et repris partout ; atelier compact ; carte Gradium honnête | Retour d’Ulrich après l’essai AP4 ; [prompt](prompt_reprise_atelier_parole_lot_ap4bis.md) | [Implémenté](#exécution-ap4-bis--30-octobre-2026), livraison dans le bilan |
+| AP5 | Comparer les fournisseurs avec les voix custom de Max saisies dans TTS Config ; tableau intention × fournisseur noté à l’oreille | AP4-bis livré ; voix de Max saisies par Ulrich ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap5.md) | Prêt, non lancé (l’ancienne séance accompagnée est faite) |
 | AP6 | Choisir le fournisseur pour la suite, relier les 5 états de Max à des intentions validées, puis conversations courtes guidées (ancien AP4) | Notes AP5 ; décision humaine sur le fournisseur | Planifié |
 | AP7 | Passes sur le texte : Notion, GM effectif, LLM ; une couche par comparaison (ancien AP5) | Observations humaines ; sous-lots définis avant leur exécution | Itératif, non lancé |
 | AP8 | Emma avec ses propres états, puis Max ↔ Emma (ancien AP6) ; audit séparé de la voix des avatars vidéo | Méthode éprouvée sur Max | Planifié |
@@ -411,6 +414,77 @@ IndexPRD4 préexistant), typage, **71 régressions, 1 145 unitaires,
 42 intégrations**, build ; `test:delivery` 35/35 ; E2E ciblé Chromium 7,4 s.
 Horodatages push/CI/fusion dans le bilan de livraison et Notion, sans PR
 documentaire supplémentaire.
+
+### Exécution AP4-bis — 30 octobre 2026
+
+**Retour d’Ulrich après l’essai AP4.** (1) Après écoute et note, aucun bouton
+ne relance un test : il faut changer d’onglet. (2) Gradium : de « moyennement »
+à « très dramatique », rien ne change, voix monocorde. (3) Les autres
+fournisseurs jouent leur voix par défaut, pas celle de Max ; les Voice ID des
+quatre personnages par fournisseur doivent se saisir une seule fois dans
+Technique avancée → Configuration TTS, et les réglages des personnages doivent
+les reprendre. (4) Écran trop long sur desktop. (5) La séance accompagnée de
+l’ancien AP5 est faite ; la suite est la comparaison avec les bonnes voix.
+
+**Diagnostic.** Gradium (docs voice-settings et text-to-speech) n’a aucun
+réglage d’émotion, de style ni d’instruction : seulement `temp` (0–1,4),
+`padding_bonus` (−4 à 4), `rewrite_rules` et les balises `<break>`/`<flush>`.
+`cfg_coef` est déprécié et ignoré. Notre adaptateur borne `temp` à +0,1
+(plafond 0,85) : c’est une limite du fournisseur, pas un bug. Côté voix,
+`character_runtime_profiles` ne porte qu’un fournisseur et une voix par
+personnage et environnement ; le jeu lit `tts_voice_id`.
+
+**Réalisé.**
+- Catalogue `ava_tts_character_voices` dans `admin_settings` par environnement,
+  sans migration (`src/services/tts/characterVoices.ts`) :
+  `{personnage: {fournisseur: id}}`, 4 personnages × 5 fournisseurs, ID nettoyés,
+  refusés avec espace ou au-delà de 200 caractères, relus après écriture
+  (relecture différente = erreur affichée, rien n’est supposé enregistré).
+- Technique → Configuration TTS : panneau « Voix des personnages par
+  fournisseur », seul endroit de saisie. Au premier affichage, les voix déjà
+  utilisées par le jeu préremplissent les cases vides. À l’enregistrement,
+  après relecture, seuls les profils dont le fournisseur choisi a un ID
+  différent reçoivent le nouveau `tts_voice_id` (`updateCharacterRuntimeVoice`,
+  voix seule). Le jeu continue de lire le profil.
+- Expérience → réglages des personnages : la saisie du Voice ID disparaît.
+  L’ID du fournisseur choisi est affiché en lecture seule, avec un lien vers
+  TTS Config s’il manque et un avertissement si le jeu utilise encore un autre
+  ID. Sauvegarder le profil applique l’ID du catalogue.
+- Atelier : la voix de Max vient du catalogue pour chaque fournisseur, puis de
+  la voix du jeu ; une voix par défaut reste annoncée « pas la voix de Max ».
+  La saisie de « voix d’atelier » disparaît. Les anciens essais `workshop` se
+  relisent toujours (`voiceSource` étendu à `catalogue`).
+- Après l’enregistrement : « Même texte, autre émotion » ou « Autre texte » ;
+  « Recommencer un test » visible dès l’étape 2. L’audio déjà entendu reste
+  rejouable pendant la séance.
+- Compacité : intentions sur 2–3 colonnes, fournisseurs sur 2–3 colonnes,
+  cartes sur 3 colonnes dès `lg`, détails des cartes en petit corps, recette
+  dupliquée retirée des cartes (elle est rappelée au-dessus) ; 390 px conservé.
+- Carte Gradium : « Gradium ne joue pas d’émotion par réglage » ; `cfg_coef`
+  listé comme déprécié et ignoré au lieu d’apparaître comme paramètre.
+
+**Options Gradium à décider par Ulrich (aucune codée).**
+1. Cloner sur Gradium plusieurs voix de Max enregistrées dans des registres
+   différents (posé, tendu, brisé) et choisir la voix selon l’intention.
+2. Concentrer les comparaisons d’émotion sur Fish, ElevenLabs v3 et Inworld,
+   qui ont de vrais leviers ; garder Gradium pour le timbre et la latence.
+3. Tester une variabilité `temp` plus haute dans l’atelier seulement, au risque
+   d’artefacts, sans toucher au jeu.
+
+**Vérifications.** Unitaires : catalogue (nettoyage, ID invalides, relecture
+différente, préremplissage, synchronisation limitée), panneau TTS Config,
+réglages des personnages (ID repris, avertissement si manquant ou différent,
+sauvegarde), atelier (voix du catalogue envoyée, nouveau test, carte Gradium).
+E2E `speech-workshop.spec.ts` étendu : voix Fish de Max reprise du catalogue,
+fournisseurs et trois cartes sur une ligne à 1280 px, nouveau test sans changer
+d’onglet, 390 px sans défilement horizontal, catalogue prérempli dans TTS
+Config (Chromium, 9,2 s). `test:quality` vert : lint (avertissement IndexPRD4
+préexistant), typage, 71 régressions, 1 153 unitaires, 42 intégrations,
+build ; `test:delivery` 35/35.
+
+**Limites.** Aucun son réel généré en développement. Les voix custom de Max
+chez Fish, ElevenLabs, Inworld et Cartesia ne sont pas encore saisies : c’est
+la première action d’AP5. Aucune production publiée.
 
 ### Retour d’Ulrich après AP1 — correction AP2 obligatoire
 

@@ -68,7 +68,7 @@ export interface ProviderBaseSettings {
 }
 /** ElevenLabs v3 is the workshop model (as in AP2); the game keeps its own model. */
 export const ELEVENLABS_WORKSHOP_MODEL = 'eleven_v3' as const;
-export interface ProviderPlan { model?: string; parameters: Array<{ label: string; value: string | number }>; ignored: string[] }
+export interface ProviderPlan { model?: string; parameters: Array<{ label: string; value: string | number }>; ignored: string[]; note?: string }
 const round = (value: number) => Number(value.toFixed(2));
 /** Planned native parameters, computed by the same adapters the providers use at request time. */
 export function providerPlan(provider: TTSProviderId, intent: WorkshopIntent, base: ProviderBaseSettings): ProviderPlan {
@@ -77,8 +77,9 @@ export function providerPlan(provider: TTSProviderId, intent: WorkshopIntent, ba
  const pauses = 'Pauses de la recette';
  if (provider === 'gradium') {
   const tuned = applyGradiumPerformance(base.gradium, performance);
-  return { parameters: [{ label: 'Variabilité (temp)', value: round(tuned.temp) }, { label: 'Rythme global (padding_bonus)', value: round(tuned.paddingBonus) }, { label: 'Fidélité à la voix (cfg_coef, inchangée)', value: base.gradium.cfgCoef }],
-   ignored: ['Émotion nommée (balises Gradium fermées)', 'Chuchotement', 'Instruction de jeu', `${pauses} (réservées au mapping d’état du jeu)`, 'Débit exact (seul le rythme global change)'] };
+  return { parameters: [{ label: 'Variabilité (temp)', value: round(tuned.temp) }, { label: 'Rythme global (padding_bonus)', value: round(tuned.paddingBonus) }],
+   ignored: ['Émotion (Gradium n’a aucun réglage d’émotion)', 'Chuchotement', 'Instruction de jeu', `${pauses} (réservées au mapping d’état du jeu)`, 'Débit exact (seul le rythme global change)', 'Fidélité à la voix (cfg_coef) : dépréciée et ignorée par Gradium'],
+   note: 'Gradium ne joue pas d’émotion par réglage : seuls la voix clonée et le texte portent le jeu. Deux intentions proches sonneront pareil.' };
  }
  if (provider === 'fish') {
   const shaped = applyFishPerformance(base.fish, '', performance);
@@ -106,11 +107,11 @@ export function providerPlan(provider: TTSProviderId, intent: WorkshopIntent, ba
  return { model: base.cartesia.modelId, parameters: [{ label: 'Vitesse', value: round(config.speed) }, { label: 'Volume', value: round(config.volume) }, ...(config.emotion ? [{ label: 'Émotion', value: config.emotion }] : [])], ignored };
 }
 
-export type VoiceSource = 'game' | 'workshop' | 'provider_default';
+export type VoiceSource = 'catalogue' | 'game' | 'workshop' | 'provider_default';
 export interface CardVoice { voice: string | null; source: VoiceSource | null; label: string }
-/** Max has a game voice only on his game provider; others need a workshop voice or say they use a default. */
-export function resolveCardVoice(provider: TTSProviderId, game: { provider: TTSProviderId | null; voice: string | null }, workshop: string | undefined, providerDefault: string | null): CardVoice {
- if (workshop?.trim()) return { voice: workshop.trim(), source: 'workshop', label: 'Voix d’atelier pour Max' };
+/** Technique → Configuration TTS first; then Max's game voice; a provider default is never presented as Max. */
+export function resolveCardVoice(provider: TTSProviderId, game: { provider: TTSProviderId | null; voice: string | null }, catalogue: string | null | undefined, providerDefault: string | null): CardVoice {
+ if (catalogue?.trim()) return { voice: catalogue.trim(), source: 'catalogue', label: 'Voix de Max (configuration TTS)' };
  if (game.provider === provider && game.voice?.trim()) return { voice: game.voice.trim(), source: 'game', label: 'Voix de Max (jeu)' };
  if (provider === 'elevenlabs') return { voice: null, source: 'provider_default', label: 'Voix par défaut du serveur ElevenLabs — pas la voix de Max' };
  if (providerDefault?.trim()) return { voice: providerDefault.trim(), source: 'provider_default', label: 'Voix par défaut du fournisseur — pas la voix de Max' };

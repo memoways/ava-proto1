@@ -76,10 +76,20 @@ fournisseur exportable. Essais dans `speech_workshop_documents` (`intentTrials`)
 sans migration ; banc AP2 replié en options avancées. Seul Gradium a la voix
 de Max dans `sandbox-ulrich` ; les autres demandent une voix d’atelier.
 Aucun son réel généré en développement.
-[Exécution AP4](plan_lot_b_rendu_vocal.md#exécution-ap4--30-octobre-2026) ·
-[Prompt autonome AP5](prompt_reprise_atelier_parole_lot_ap5.md), séance
-accompagnée, non lancée. Reçu PR/CI/fusion dans la PR et Notion.
-F4 reste distincte. Aucune publication production implicite.
+[Exécution AP4](plan_lot_b_rendu_vocal.md#exécution-ap4--30-octobre-2026).
+
+**AP4-bis implémenté le 30 octobre : voix par fournisseur et atelier compact.**
+Après l’essai d’Ulrich : Voice ID des 4 personnages × 5 fournisseurs saisis
+une seule fois dans Technique → Configuration TTS (`ava_tts_character_voices`),
+repris par les réglages des personnages et l’atelier ; la voix du jeu ne suit
+que l’ID du fournisseur déjà choisi, à l’enregistrement. « Faire un autre
+test » sans changer d’onglet, écran sur 2–3 colonnes. Gradium n’a aucun
+réglage d’émotion : la carte le dit, trois options attendent la décision
+d’Ulrich. La séance accompagnée de l’ancien AP5 est faite.
+[Exécution AP4-bis](plan_lot_b_rendu_vocal.md#exécution-ap4-bis--30-octobre-2026) ·
+[Prompt autonome AP5](prompt_reprise_atelier_parole_lot_ap5.md) : comparer les
+fournisseurs avec les voix custom de Max, non lancé. Reçu PR/CI/fusion dans la
+PR et Notion. F4 reste distincte. Aucune publication production implicite.
 
 ## Livraison AP2 et accès dédié
 

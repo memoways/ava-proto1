@@ -4,6 +4,31 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [AP4-bis — voix des personnages par fournisseur et atelier compact] — 2026-10-30
+
+- Technique → Configuration TTS : nouveau panneau « Voix des personnages par
+  fournisseur », seul endroit où saisir les Voice ID des 4 personnages pour
+  les 5 fournisseurs (`ava_tts_character_voices`, `admin_settings` par
+  environnement, sans migration). Préremplissage avec les voix déjà utilisées
+  par le jeu, ID invalides refusés, relecture après écriture.
+- À l’enregistrement, la voix du jeu (`tts_voice_id`) ne change que pour les
+  personnages dont le fournisseur choisi a un ID différent.
+- Réglages des personnages : plus de saisie du Voice ID ; l’ID du fournisseur
+  choisi est repris en lecture seule, avec lien vers TTS Config s’il manque et
+  avertissement s’il diffère de la voix du jeu.
+- Atelier de parole : voix de Max reprise du catalogue pour chaque
+  fournisseur ; « Même texte, autre émotion » / « Autre texte » après
+  l’enregistrement et « Recommencer un test » à chaque étape ; intentions,
+  fournisseurs et cartes sur 2–3 colonnes en desktop, 390 px conservé.
+- Carte Gradium honnête : aucun réglage d’émotion chez Gradium, `cfg_coef`
+  déclaré déprécié et ignoré. Options Gradium présentées, aucune codée.
+- Tests unitaires (catalogue, panneau, réglages des personnages, atelier) et
+  E2E étendu (voix du catalogue, colonnes desktop, nouveau test sans changer
+  d’onglet, 390 px).
+  [Plan](docs/plan_lot_b_rendu_vocal.md#exécution-ap4-bis--30-octobre-2026),
+  [prompt AP5](docs/prompt_reprise_atelier_parole_lot_ap5.md) remplacé par la
+  comparaison avec les voix custom de Max, non lancé.
+
 ## [AP4 — atelier de parole par intention de jeu] — 2026-10-30
 
 - Étape 0 validée par Ulrich sans correction : trois passages de Max

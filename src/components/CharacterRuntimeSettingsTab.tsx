@@ -10,6 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
 import { initialGreetingLines } from '@/services/characterConversationContinuity';
 import { getActiveEnvironment } from '@/services/environmentContext';
+import { adminTabPath } from '@/services/adminNavigation';
+import { characterVoice, loadCharacterVoicesFromDB, seedFromProfiles, type CharacterVoiceCatalogue } from '@/services/tts/characterVoices';
+import type { TTSProviderId } from '@/services/tts/types';
 import {
   fetchCharacterAutoReadiness,
   listCharacterRuntimeProfiles,
@@ -61,7 +64,7 @@ function readiness(
       ok: Boolean(profile.tts_provider && profile.tts_voice_id),
       hint: profile.tts_provider && profile.tts_voice_id
         ? `${profile.tts_provider} · ${profile.tts_voice_id}`
-        : "Renseigner le provider et le Voice ID (voir TTS Config)",
+        : "Choisir le provider ; le Voice ID vient de Technique → Configuration TTS",
     },
     {
       label: "Tests qualitatifs",
@@ -87,6 +90,7 @@ export default function CharacterRuntimeSettingsTab() {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [uploadingPortrait, setUploadingPortrait] = useState<string | null>(null);
+  const [voices, setVoices] = useState<CharacterVoiceCatalogue>({});
 
   const load = async () => {
     setLoading(true);
@@ -96,6 +100,8 @@ export default function CharacterRuntimeSettingsTab() {
         (a, b) => KEY_ORDER.indexOf(a.character_key) - KEY_ORDER.indexOf(b.character_key),
       );
       setProfiles(nextProfiles);
+      // Same prefill as TTS Config: a voice the game already uses counts until the catalogue has one.
+      setVoices(seedFromProfiles(await loadCharacterVoicesFromDB(), nextProfiles));
       try {
         setAutoReadiness(await fetchCharacterAutoReadiness(nextProfiles.map((profile) => profile.display_name)));
       } catch {
@@ -136,7 +142,7 @@ export default function CharacterRuntimeSettingsTab() {
         opening_line: profile.opening_line,
         portrait_url: profile.portrait_url,
         tts_provider: profile.tts_provider,
-        tts_voice_id: profile.tts_voice_id,
+        tts_voice_id: characterVoice(voices, profile.character_key, profile.tts_provider as TTSProviderId | null) ?? profile.tts_voice_id,
         prompt_validated: Boolean(auto?.hasPrompt),
         rag_validated: (auto?.ragChunks ?? 0) > 0,
         qualitative_tests_validated: profile.qualitative_tests_validated,
@@ -234,7 +240,7 @@ export default function CharacterRuntimeSettingsTab() {
                 <div className="grid grid-cols-2 gap-2">
                   <Select
                     value={profile.tts_provider ?? ""}
-                    onValueChange={(value) => patchProfile(profile.id, { tts_provider: value || null })}
+                    onValueChange={(value) => patchProfile(profile.id, { tts_provider: value || null, tts_voice_id: characterVoice(voices, profile.character_key, (value || null) as TTSProviderId | null) ?? null })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Provider TTS" />
@@ -245,10 +251,19 @@ export default function CharacterRuntimeSettingsTab() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Input value={profile.tts_voice_id ?? ""} onChange={(event) => patchProfile(profile.id, { tts_voice_id: event.target.value || null })} placeholder="Voice ID du personnage" />
+                  <div aria-label={`Voice ID ${profile.display_name}`} className="flex min-h-9 items-center rounded border px-2 text-xs break-all">
+                    {characterVoice(voices, profile.character_key, profile.tts_provider as TTSProviderId | null)
+                      ?? (profile.tts_provider ? "Aucun Voice ID pour ce fournisseur" : "Choisir un provider")}
+                  </div>
                 </div>
+                {(() => {
+                  const catalogued = characterVoice(voices, profile.character_key, profile.tts_provider as TTSProviderId | null);
+                  if (profile.tts_provider && !catalogued) return <p className="text-xs text-amber-300/90">Ajoutez l’ID de {profile.display_name} pour ce fournisseur dans <a className="underline" href={adminTabPath("voice")}>Technique → Configuration TTS</a>.{profile.tts_voice_id ? ` Le jeu garde pour l’instant ${profile.tts_voice_id}.` : ""}</p>;
+                  if (catalogued && profile.tts_voice_id && catalogued !== profile.tts_voice_id) return <p className="text-xs text-amber-300/90">Le jeu utilise encore {profile.tts_voice_id} ; sauvegarder le profil applique l’ID de la configuration TTS.</p>;
+                  return null;
+                })()}
                  <p className="text-xs text-muted-foreground">
-                  Le provider et le Voice ID sont appliqués à la voix de ce personnage. Les réglages fins Gradium (temp, similarité, vitesse…) se règlent par personnage dans TTS Config.
+                  Le Voice ID est repris de <a className="underline" href={adminTabPath("voice")}>Technique → Configuration TTS</a> selon le provider choisi : aucune copie à la main. Les réglages fins Gradium se règlent aussi dans TTS Config.
                 </p>
 
                 <div className="space-y-1">

@@ -41,7 +41,7 @@ export type WorkshopComparison = z.infer<typeof comparisonSchema> & {
 const providerId = z.enum(['gradium', 'fish', 'inworld', 'elevenlabs', 'cartesia']);
 const cardEvidenceSchema = evidenceSchema.omit({ variant: true });
 const intentCardSchema = z.object({
- provider: providerId, voice: z.string().max(500).nullable(), voiceSource: z.enum(['game', 'workshop', 'provider_default']), model: short.optional(),
+ provider: providerId, voice: z.string().max(500).nullable(), voiceSource: z.enum(['catalogue', 'game', 'workshop', 'provider_default']), model: short.optional(),
  planned: z.record(scalar), ignored: z.array(short).max(12), evidence: cardEvidenceSchema.nullable(),
  rating: z.number().int().min(1).max(5).nullable(), off: z.string().max(500),
 });
@@ -61,7 +61,7 @@ export const intentTrialSchema = z.object({
  }
 });
 export interface IntentTrialCard {
- provider: z.infer<typeof providerId>; voice: string | null; voiceSource: 'game' | 'workshop' | 'provider_default'; model?: string;
+ provider: z.infer<typeof providerId>; voice: string | null; voiceSource: 'catalogue' | 'game' | 'workshop' | 'provider_default'; model?: string;
  planned: Record<string, string | number | boolean | null>; ignored: string[]; evidence: Omit<WorkshopComparison['evidence'][number], 'variant'> | null;
  rating: number | null; off: string;
 }
