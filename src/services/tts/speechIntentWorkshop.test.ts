@@ -31,7 +31,7 @@ describe('AP4 — validated catalogue', () => {
    expect(intent.recipe.speedHint).toBeGreaterThanOrEqual(0.7); expect(intent.recipe.speedHint).toBeLessThanOrEqual(1.2);
    expect(intentPerformance(intent)).toMatchObject({ source: 'manual', emotion: intent.recipe.emotion });
   }
-  expect(recipeWords(WORKSHOP_INTENTS[9].recipe)).toBe('triste, à voix basse, plus lent (×0.9), pauses longues');
+  expect(recipeWords(WORKSHOP_INTENTS[9].recipe)).toBe('triste, à voix basse, plus lent (×0.96), pauses longues');
  });
 });
 

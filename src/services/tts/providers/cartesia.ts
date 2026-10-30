@@ -36,7 +36,7 @@ export const cartesiaProvider: TTSProvider = {
     const startTime = Date.now();
     const tRequest = performance.now();
     const debugId = debugLogger.logFetch("tts", `TTS-CA "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts-cartesia`, body);
-    const timeout = createTimeoutSignal(12000, ctx?.signal);
+    const timeout = createTimeoutSignal((ctx?.timeoutMs ?? 12000), ctx?.signal);
 
     let response: Response;
     try {
@@ -66,7 +66,7 @@ export const cartesiaProvider: TTSProvider = {
       throw error;
     }
 
-    const blob = await withTimeout("tts_cartesia_blob", response.blob(), 12000);
+    const blob = await withTimeout("tts_cartesia_blob", response.blob(), (ctx?.timeoutMs ?? 12000));
     const tEnd = performance.now();
     debugLogger.logResponse(debugId, "tts", `TTS-CA (${(blob.size / 1024).toFixed(0)}KB)`, response.status, startTime);
 

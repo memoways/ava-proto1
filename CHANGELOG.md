@@ -4,6 +4,19 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [AP4-quater — fournisseurs qui échouent, voix lentes (en cours)] — 2026-10-30
+
+- Délai réseau par requête (`timeoutMs`) : l'atelier passe 60 s, le jeu garde 12 s.
+  Cause du « tts_gradium_blob timed out after 12000ms » : 10–12 s mesurés pour un
+  passage de 500 caractères. Inworld (7–9 s) concerné par le même mécanisme,
+  non rejoué : à vérifier à l'écoute.
+- Erreur ElevenLabs : le message du fournisseur est ajouté au code (200 car. max).
+- Intentions de l'atelier : plus de ralentissement 0,88 ; Fish et Inworld ne sont
+  jamais ralentis hors mapping du jeu ; température Fish/Inworld relevée avec
+  l'intensité (+0,12 par niveau), visible dans le plan de carte Fish.
+- Non fait : preuve du déploiement `proxy-tts` et liste des modèles ElevenLabs
+  (pas de clé, pas de logs via le MCP), diagnostic Inworld, A/B à noter.
+
 ## [AP4-ter — ElevenLabs fonctionnel et modèle expressif par défaut] — 2026-10-30
 
 - Bug « ElevenLabs TTS error: 400 (unsupported_model) » : `proxy-tts` envoyait

@@ -32,6 +32,8 @@ export interface TTSGenerateContext {
   onAuditionRequest?: (request: TTSAuditionRequest) => void;
   /** Audition-only model override; runtime model settings remain untouched. */
   auditionModelId?: string;
+  /** Per-request network deadline; the live game keeps the 12 s default, the workshop passes a wider one. */
+  timeoutMs?: number;
   /** Derive after the validated private header, before the first audio segment. */
   resolveSpeechPerformance?: (state: string | null, text: string) => import('./performanceIntent').PerformanceIntent;
   /** Observability context propagated to PostHog/Supabase telemetry. */

@@ -28,7 +28,7 @@ function save(content: string, name: string, type: string) {
 }
 function baseSettings(): ProviderBaseSettings {
  const gradium = resolveGradiumSettings('max'), fish = getFishSettings(), eleven = getTTSSettings(), inworld = getInworldSettings(), cartesia = getCartesiaSettings();
- return { gradium: { temp: gradium.temp, paddingBonus: gradium.paddingBonus, cfgCoef: gradium.cfgCoef }, fish: { speed: fish.speed, emotionTags: fish.emotionTags, defaultEmotion: fish.defaultEmotion, model: fish.model },
+ return { gradium: { temp: gradium.temp, paddingBonus: gradium.paddingBonus, cfgCoef: gradium.cfgCoef }, fish: { speed: fish.speed, emotionTags: fish.emotionTags, defaultEmotion: fish.defaultEmotion, model: fish.model, temperature: fish.temperature },
   elevenlabs: { style: eleven.style, stability: eleven.stability, speed: eleven.speed }, inworld: { deliveryMode: inworld.deliveryMode, speakingRate: inworld.speakingRate, modelId: inworld.modelId }, cartesia: { language: cartesia.language, modelId: cartesia.modelId } };
 }
 function providerDefaultVoice(provider: TTSProviderId): string | null {

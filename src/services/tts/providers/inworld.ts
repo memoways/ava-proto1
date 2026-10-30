@@ -5,7 +5,7 @@
 
 import type { TTSProvider, TTSGenerateContext, TTSGenerateResult } from "@/services/tts/types";
 import { getInworldSettings } from "@/services/tts/providerSettings";
-import { applyInworldPerformance } from "@/services/tts/performanceIntent";
+import { applyInworldPerformance, expressiveTemperature } from "@/services/tts/performanceIntent";
 import { debugLogger } from "@/services/debugLogger";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
 import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
@@ -34,7 +34,7 @@ export const inworldProvider: TTSProvider = {
       deliveryMode: actingPatch.deliveryMode ?? s.deliveryMode,
       language: s.language,
       speakingRate: actingPatch.speakingRate ?? s.speakingRate,
-      temperature: s.temperature,
+      temperature: expressiveTemperature(s.temperature, ctx?.performance),
       stream: false,
       ...(actingPatch.instruction ? { instruction: actingPatch.instruction } : {}),
     };
@@ -43,7 +43,7 @@ export const inworldProvider: TTSProvider = {
     const startTime = Date.now();
     const tRequest = performance.now();
     const debugId = debugLogger.logFetch("tts", `TTS-IW "${preparedText.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts-inworld`, body);
-    const timeout = createTimeoutSignal(12000, ctx?.signal);
+    const timeout = createTimeoutSignal((ctx?.timeoutMs ?? 12000), ctx?.signal);
 
     const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-tts-inworld`, {
       method: "POST",
@@ -61,7 +61,7 @@ export const inworldProvider: TTSProvider = {
       throw error;
     }
 
-    const blob = await withTimeout("tts_inworld_blob", response.blob(), 12000);
+    const blob = await withTimeout("tts_inworld_blob", response.blob(), (ctx?.timeoutMs ?? 12000));
     const tEnd = performance.now();
     debugLogger.logResponse(debugId, "tts", `TTS-IW (${(blob.size / 1024).toFixed(0)}KB)`, response.status, startTime);
 
