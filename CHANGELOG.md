@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [AP3 — bilan humain et réorientation par intention de jeu] — 2026-10-30
+
+- Documentation seule, aucun code modifié. Bilan de la séance AP3 : parcours
+  compris ; réglages bruts Gradium et répliques sans contexte refusés par Ulrich.
+- Plan de l’atelier réorienté : passages de 2–3 phrases longues, liste
+  d’intentions de jeu, recette neutre traduite par fournisseur avec paramètres
+  visibles, comparaison côte à côte entre fournisseurs notée de 1 à 5.
+  Analyse de l’indépendance vis-à-vis du fournisseur (socle `PerformanceIntent`
+  existant, limites Gradium/Cartesia en français, avatars vidéo à auditer).
+- Prompt autonome AP4 ajouté ; anciens AP4–AP6 décalés en AP6–AP8.
+
 ## [AP2 — atelier unique et comparaisons retrouvables] — 2026-10-28
 
 - Toutes les auditions sont réunies dans Expérience → Atelier de parole. TTS
