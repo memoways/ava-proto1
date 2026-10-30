@@ -57,10 +57,18 @@ aucun audio automatique ni activation du jeu. Audio exact uniquement en mémoire
 Livraison GitHub/CI et preview sont vérifiées à la clôture, avec reçu réel dans la
 PR et Notion ; ne pas confondre implémentation et publication.
 
-**Suite AP3 préparée, non lancée : première écoute accompagnée Max.**
-[Prompt autonome AP3](prompt_reprise_atelier_parole_lot_ap3.md) : 10–15 minutes,
-M1/M2, une hypothèse et deux versions. Compréhension et préférence vocales sont
-validées par Ulrich ; aucune acceptation humaine revendiquée par les tests AP2.
+**AP3 mené le 29 octobre : parcours compris, réglages bruts refusés.**
+Ulrich juge la mécanique claire. En revanche, les réglages bruts Gradium sont
+incompréhensibles et les répliques M1/M2 trop courtes, sans contexte. Il demande
+des passages de 2 à 3 phrases longues, une émotion choisie dans une liste, la
+recette traduite pour chaque fournisseur avec ses paramètres visibles, et une
+comparaison côte à côte entre fournisseurs notée de 1 à 5. Aucune écoute ni
+comparaison enregistrée.
+Analyse : le socle neutre `PerformanceIntent` et ses cinq adaptateurs existent
+déjà ; l’atelier exposait la mauvaise couche.
+[Retour, analyse et contrat AP4](plan_lot_b_rendu_vocal.md#retour-dulrich-pendant-ap3--29-octobre-2026) ·
+[Prompt autonome AP4](prompt_reprise_atelier_parole_lot_ap4.md), non lancé. Les
+textes et la liste d’intentions sont validés par Ulrich avant le code.
 F4 reste distincte. Aucune publication production implicite.
 
 ## Livraison AP2 et accès dédié

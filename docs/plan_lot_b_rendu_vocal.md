@@ -9,8 +9,9 @@ séances accompagnées de 10–15 minutes, une hypothèse et deux variantes maxi
 Réglages app et retouches Notion dans des passes séparées. Variantes et avis
 persistants dans le back-office ; audio exact seulement pendant la séance.
 
-**État : AP1 livré techniquement ; utilisabilité rejetée par Ulrich le 28 octobre.
-AP2 doit d’abord simplifier et supprimer le doublon TTS, puis conserver les essais.**
+**État au 30 octobre : AP1 et AP2 livrés techniquement. AP3 a été mené : Ulrich
+comprend le parcours mais refuse ce qu’on lui fait régler. La série est
+réorientée vers des intentions de jeu (voir la section suivante).**
 Cette section est le contrat de la nouvelle série ; les sections datées
 ci-dessous décrivent les livraisons précédentes. A4R confirme les copies E0
 le 26 octobre, mais ni A4R ni F4 ne valent acceptation du naturel vocal.
@@ -19,11 +20,170 @@ La recette F4 reste distincte ; aucun gel de démo ni publication implicite.
 | Lot | Périmètre et résultat observable | Dépendance / sortie | Statut |
 | --- | --- | --- | --- |
 | AP1 | Atelier lisible, réglages expliqués et écoute A/B fidèle au transport actuel ; réemploi du banc | Livraison technique vérifiée ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap1.md) | Implémenté ; vérifications et reçu ci-dessous |
-| AP2 | Atelier unique et parcours simple ; retrait du banc de TTS Config ; variantes/avis nommés et retrouvables | Correction UX prioritaire, puis stockage sandbox strict et relecture | Implémenté ; livraison et recette de clôture ci-dessous |
-| AP3 | Première séance Max, deux répliques initiales, une hypothèse et deux variantes | AP2 livré ; bilan humain, référence et prochain défaut observé | Recette à organiser |
-| AP4 | Conversations courtes guidées, nouvelle session par essai, références et versions réellement utilisées | Bilan AP3 ; états proposés/déclarés/livrés et coupures distingués | Planifié |
-| AP5 | Affiner Max par passes : Notion, GM effectif, LLM ou restitution ; une couche par comparaison | Observations humaines ; sous-lots AP5.1… définis avant leur exécution | Itératif, non lancé |
-| AP6 | Emma avec ses propres états, puis Max ↔ Emma et conversation plus longue | Méthode éprouvée sur Max ; bilan distinct par personnage | Planifié |
+| AP2 | Atelier unique et parcours simple ; retrait du banc de TTS Config ; variantes/avis nommés et retrouvables | Correction UX prioritaire, puis stockage sandbox strict et relecture | Livré #111, main `f855bf3` |
+| AP3 | Première séance Max, deux répliques initiales, une hypothèse et deux variantes | AP2 livré ; bilan humain, référence et prochain défaut observé | Fait le 29 octobre : parcours compris, réglages bruts et répliques trop courtes refusés ; aucune écoute ni comparaison enregistrée |
+| AP4 | Atelier par intention de jeu : passage de 2–3 phrases longues, émotion choisie dans une liste, recette traduite pour chaque fournisseur avec paramètres visibles, comparaison côte à côte entre fournisseurs, note de 1 à 5 par fournisseur | Retour AP3 ; textes et liste d’intentions validés par Ulrich avant le code ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap4.md) | Prêt, non lancé |
+| AP5 | Séance accompagnée : Max, deux passages × trois intentions, comparés sur les fournisseurs disponibles | AP4 livré ; tableau intention × fournisseur noté à l’oreille | Planifié |
+| AP6 | Choisir le fournisseur pour la suite, relier les 5 états de Max à des intentions validées, puis conversations courtes guidées (ancien AP4) | Notes AP5 ; décision humaine sur le fournisseur | Planifié |
+| AP7 | Passes sur le texte : Notion, GM effectif, LLM ; une couche par comparaison (ancien AP5) | Observations humaines ; sous-lots définis avant leur exécution | Itératif, non lancé |
+| AP8 | Emma avec ses propres états, puis Max ↔ Emma (ancien AP6) ; audit séparé de la voix des avatars vidéo | Méthode éprouvée sur Max | Planifié |
+
+### Retour d’Ulrich pendant AP3 — 29 octobre 2026
+
+Source : retour oral d’Ulrich sur la preview `sandbox-ulrich` après avoir
+parcouru l’atelier jusqu’à l’étape 3, sans écoute. Résumé fidèle :
+
+- La mécanique en quatre étapes est claire.
+- Les réglages proposés sont incompréhensibles : « Rythme global
+  (padding_bonus) », « Variabilité (température) », « Fidélité à la voix
+  (cfg_coef) » et une valeur d’essai à 0, sans rien sur leur effet. Il a
+  l’impression de régler à l’aveugle.
+- Les répliques M1/M2 sont trop courtes et sans contexte : « c’est comme juger
+  le jeu d’un acteur sans connaître le contexte ».
+- Ce qu’il demande : un passage plus long avec son contexte ; une liste
+  d’intentions de jeu (très dramatique, moyennement dramatique, détaché,
+  essoufflé, peur, perdu / ne sait plus quoi dire…) ; des réglages faits
+  automatiquement pour cette intention ; l’affichage de la recette appliquée ;
+  puis il écoute et note la crédibilité **par rapport à l’intention** sur une
+  échelle de 1 (pas du tout) à 5 (totalement). Champ texte « ce qui est off »
+  seulement en dessous de 5. Pas de long formulaire.
+- Question de fond : le travail ne doit pas consister à affiner Gradium seul.
+  Il doit fonctionner avec n’importe quel service de génération vocale, et
+  aussi avec le streaming vidéo.
+
+Corrections d’Ulrich du 30 octobre, après lecture du plan :
+
+- Un passage, ce sont des phrases plus longues, pas plus de phrases : 2 à 3
+  phrases, 4 à 5 au maximum, avec le contexte porté par les mots.
+- Il veut définir le texte à jouer, puis l’émotion du personnage, puis voir
+  les réglages techniques que chaque service applique.
+- La comparaison entre fournisseurs est centrale : même phrase, même
+  intention, générée sur Gradium, Fish, ElevenLabs ou tout service disponible,
+  avec une note par service pour savoir lequel fonctionne le mieux.
+
+Conséquences : AP3 est clos avec un résultat humain (défaut observé = altitude
+des réglages et texte trop court), sans référence vocale à conserver. Les
+anciens AP4–AP6 sont décalés. La règle précédente « pas de catalogue d’états
+commun » est remplacée, sur décision d’Ulrich, par un **catalogue d’intentions
+propre à l’atelier**. Il n’est pas un paramètre du jeu ; sa reliure aux états
+des fiches est l’objet d’AP6.
+
+### Analyse — ce qui est déjà indépendant du fournisseur (lecture du code, 30 octobre)
+
+Constat principal : le socle neutre existe déjà dans le jeu. L’atelier AP1/AP2,
+lui, expose la mauvaise couche.
+
+1. **Couche neutre.** `src/services/tts/performanceIntent.ts` définit
+   `PerformanceIntent` : émotion parmi 10 valeurs canoniques (neutral, tense,
+   angry, sad, scared, fragile, warm, accusatory, sarcastic, urgent),
+   intensité 0–2, delivery (measured, whisper, rushed, cutting), débit relatif,
+   pauses (short, normal, long) et une instruction de jeu en langage naturel.
+   Le mapping des états par personnage (`SpeechVoiceMapping`) est lui aussi
+   neutre.
+2. **Adaptateurs.** Cinq fournisseurs traduisent cette intention dans leurs
+   propres réglages : Gradium (padding/température), Fish (marqueurs
+   d’émotion), Inworld (instruction en texte + mode de delivery + débit),
+   ElevenLabs (style/stabilité/débit, balises v3), Cartesia (débit, volume,
+   émotion). Changer de fournisseur ne demande donc pas de refaire le travail
+   d’intention.
+3. **Le défaut de l’atelier.** La comparaison par défaut porte sur les trois
+   réglages bruts de Gradium. C’est pour ça que l’atelier ressemble à un
+   réglage fin de Gradium. Il faut faire porter la comparaison sur
+   l’intention, et laisser l’adaptateur choisir les réglages.
+4. **Limites réelles, constatées dans le code et pas encore à l’oreille.**
+   L’expressivité varie beaucoup selon le fournisseur :
+   - Gradium ne peut jouer que sur le rythme et la variabilité (ses balises
+     d’émotion sont fermées).
+   - Cartesia n’applique l’émotion qu’en anglais ; en français, il ne garde
+     que le débit et le volume.
+   - Inworld, ElevenLabs v3 et Fish disposent de leviers d’émotion explicites.
+
+   Conséquence probable : sur Gradium, plusieurs intentions sonneront pareil.
+   Les notes d’AP5 doivent le mesurer au lieu de le supposer.
+5. **Le texte est le levier commun à tous les services.** Les mots, la
+   ponctuation, les hésitations et la longueur passent par tous les
+   fournisseurs et par l’avatar vidéo. Ils viennent des fiches Notion et du
+   LLM (AP7). L’atelier doit donc juger un passage en contexte, pas une
+   réplique isolée.
+6. **Avatar vidéo.** La sortie TTS locale de l’avatar transmet l’intention
+   (`src/services/streamingAvatar/localTtsOutput.ts`). D’après la recherche
+   dans le code, les sorties HeyGen/LiveAvatar/Tavus ne la reçoivent pas et
+   utilisent leur propre voix. À confirmer dans un audit séparé (AP8). Une
+   intention neutre reste la bonne interface pour les y brancher plus tard.
+
+### Contrat AP4 — atelier par intention de jeu
+
+Parcours cible, une action principale par étape. Corrections d’Ulrich du
+30 octobre intégrées : passages courts en nombre de phrases mais faits de
+phrases longues, et comparaison entre fournisseurs au cœur de l’outil.
+
+1. **Texte à jouer.** Choisir un passage de Max de 2 à 3 phrases longues
+   (au plus 4–5). Le contexte doit tenir dans les phrases elles-mêmes, avec
+   plus de mots, et non dans des phrases plus nombreuses. Une courte ligne de
+   situation reste affichée : qui appelle, ce qui vient d’être dit. Les
+   passages proposés sont rédigés à partir de la fiche Notion active et des
+   faits canoniques (présent de l’appartement, souvenir J−2 distinct), puis
+   validés par Ulrich **avant** le code. Ulrich peut aussi modifier le passage
+   choisi ou écrire le sien. Ces textes servent seulement à l’atelier : rien
+   n’est injecté dans le jeu, et la fiche n’est pas modifiée.
+2. **Émotion du personnage.** Choisir une intention dans une liste fermée,
+   avec un libellé courant et une phrase qui l’explique. Proposition de départ,
+   à valider : posé ; détaché ; moyennement dramatique ; très dramatique ;
+   essoufflé / pressé ; peur ; perdu, ne sait plus quoi dire ; colère contenue ;
+   espoir qui revient ; confidence à voix basse. Chaque intention est une
+   recette neutre (`PerformanceIntent` : émotion, intensité, delivery, débit,
+   pauses, instruction). Ce n’est pas un nouveau réglage par fournisseur.
+3. **Fournisseurs à comparer.** Choisir parmi les fournisseurs disponibles et
+   configurés dans la sandbox : Gradium, Fish, ElevenLabs, Inworld, Cartesia.
+   Les fournisseurs sans clé ou sans voix Max sont affichés indisponibles.
+   Chacun a sa carte, côte à côte, avec :
+   - la recette en mots, identique partout (par exemple « plus lent, pauses
+     longues, voix fragile ») ;
+   - les paramètres techniques que ce fournisseur expose et les valeurs
+     réellement appliquées ;
+   - ce que ce fournisseur ignore. Par exemple, Cartesia n’applique pas
+     l’émotion en français, et Gradium n’a ni émotion ni chuchotement.
+
+   « Mêmes réglages » signifie donc : même texte, même intention, même
+   recette neutre. Les paramètres natifs diffèrent par nature, et la voix aussi,
+   car chaque service a la sienne. L’écran l’indique au lieu de le masquer.
+4. **Générer et écouter.** Un bouton par carte, et une génération par clic :
+   les coûts restent maîtrisés et aucun lancement en série n’est automatique.
+   Un son déjà généré dans la séance est rejoué sans nouvel appel. Les cartes
+   restent côte à côte pour réécouter et comparer.
+5. **Note par fournisseur.** Curseur de 1 à 5 sur chaque carte, « Est-ce que
+   ça correspond à l’intention ? ». Le champ « Qu’est-ce qui est off ? » n’est
+   demandé qu’en dessous de 5. Enregistrer l’essai (texte, intention, cartes,
+   paramètres appliqués, notes), puis vérifier la restitution après
+   rechargement.
+6. **Résultats.** Tableau intention × fournisseur avec la moyenne des notes et
+   le nombre d’essais, visible dans l’atelier et exportable. Il répond à la
+   question « Fish, Gradium, ElevenLabs… : lequel joue le mieux quelle
+   émotion ? » sur des notes humaines, jamais sur un juge LLM.
+
+Persistance : réutiliser `speech_workshop_documents`. Le schéma 1 accepte
+déjà des extensions conservées. Un tableau dédié aux essais d’intention est
+ajouté sans migration, avec CAS et relecture exacte inchangés. Les
+comparaisons AP2 restent lisibles. Réglages bruts, A/B AP2, Emma, transports,
+mapping du jeu et preuves restent dans les options avancées.
+
+Invariants : aucune modification des fiches Notion, du prompt GM, des voix,
+des réglages ou du mapping du jeu, du STT, des interruptions/mains libres, des
+transferts ni du budget. Gami DigiDouble exclu. Aucune publication production.
+Les notes humaines sont des avis ; une note de 5 n’applique rien au jeu et
+ne change pas le fournisseur du jeu (décision humaine distincte, AP6).
+
+Validation : tests de la table intention → recette pour chaque adaptateur (un
+même `PerformanceIntent` produit des réglages distincts et bornés, et les
+leviers ignorés sont déclarés), de la persistance (ajout, CAS, relecture,
+anciens documents) et du parcours (fournisseur indisponible signalé, même
+texte et même intention sur toutes les cartes, un appel par clic, note < 5
+qui exige le champ, note de 5 qui ne l’exige pas, rechargement).
+Parcours clavier et 390 px. Livraison selon le contrat AGENTS. Recette humaine
+distincte : AP5.
+
+Retour arrière : revert du squash AP4. Les documents restent lisibles par
+le code AP2 grâce aux extensions conservées.
 
 ### Retour d’Ulrich après AP1 — correction AP2 obligatoire
 
