@@ -22,7 +22,7 @@ La recette F4 reste distincte ; aucun gel de démo ni publication implicite.
 | AP1 | Atelier lisible, réglages expliqués et écoute A/B fidèle au transport actuel ; réemploi du banc | Livraison technique vérifiée ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap1.md) | Implémenté ; vérifications et reçu ci-dessous |
 | AP2 | Atelier unique et parcours simple ; retrait du banc de TTS Config ; variantes/avis nommés et retrouvables | Correction UX prioritaire, puis stockage sandbox strict et relecture | Livré #111, main `f855bf3` |
 | AP3 | Première séance Max, deux répliques initiales, une hypothèse et deux variantes | AP2 livré ; bilan humain, référence et prochain défaut observé | Fait le 29 octobre : parcours compris, réglages bruts et répliques trop courtes refusés ; aucune écoute ni comparaison enregistrée |
-| AP4 | Atelier par intention de jeu : passage de 2–3 phrases longues, émotion choisie dans une liste, recette traduite pour chaque fournisseur avec paramètres visibles, comparaison côte à côte entre fournisseurs, note de 1 à 5 par fournisseur | Retour AP3 ; textes et liste d’intentions validés par Ulrich avant le code ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap4.md) | Prêt, non lancé |
+| AP4 | Atelier par intention de jeu : passage de 2–3 phrases longues, émotion choisie dans une liste, recette traduite pour chaque fournisseur avec paramètres visibles, comparaison côte à côte entre fournisseurs, note de 1 à 5 par fournisseur | Retour AP3 ; textes et liste d’intentions validés par Ulrich avant le code ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap4.md) | Étape 0 proposée le 30 octobre, [en attente de validation](#ap4-étape-0--textes-et-intentions-à-valider-30-octobre-2026) ; aucun code |
 | AP5 | Séance accompagnée : Max, deux passages × trois intentions, comparés sur les fournisseurs disponibles | AP4 livré ; tableau intention × fournisseur noté à l’oreille | Planifié |
 | AP6 | Choisir le fournisseur pour la suite, relier les 5 états de Max à des intentions validées, puis conversations courtes guidées (ancien AP4) | Notes AP5 ; décision humaine sur le fournisseur | Planifié |
 | AP7 | Passes sur le texte : Notion, GM effectif, LLM ; une couche par comparaison (ancien AP5) | Observations humaines ; sous-lots définis avant leur exécution | Itératif, non lancé |
@@ -184,6 +184,148 @@ distincte : AP5.
 
 Retour arrière : revert du squash AP4. Les documents restent lisibles par
 le code AP2 grâce aux extensions conservées.
+
+### AP4 étape 0 — textes et intentions à valider (30 octobre 2026)
+
+Statut : **proposé, en attente du « validé » d’Ulrich. Aucun code AP4 écrit.**
+Sources : fiche Max active lue dans Gamilab natif (get-self
+`7e1a9a09-09cb-4deb-a306-83a29b831bc2`, page
+`ef4cfaa6-70e3-4e87-9b9e-079815fd0cd9`, dernière modification
+29 octobre 2026 15:27 UTC) ; adaptateurs de
+`src/services/tts/performanceIntent.ts` exécutés sur main `fad96ca`.
+
+#### Trois passages de Max
+
+Règles suivies : 3 phrases longues chacun ; le contexte est dans les mots.
+Présent = appartement de Lausanne ; le souvenir J−2 de l’hôtel est daté
+comme tel. Pas de « euh », pas de points de suspension, pas d’état imposé.
+« Bon » et « j’sais pas » n’apparaissent qu’une fois dans l’ensemble.
+
+**P1 — Le présent, l’appartement.**
+Situation : premier échange. Le bénévole de la cellule vient de se présenter
+et demande comment ça se passe à la maison depuis hier.
+
+> Emma est dans la cuisine depuis ce matin, Léo et Ava sont chacun dans leur
+> chambre, et moi je suis là dans le salon à regarder ce téléphone comme si
+> quelqu’un allait enfin nous dire ce qu’on doit faire maintenant. La police
+> nous a dit hier qu’une cellule allait nous appeler, alors j’attendais sans
+> trop savoir ce que j’attendais, et on reste chacun de son côté dans le même
+> appartement sans arriver à se dire un mot. Bon, c’est vous qui appelez,
+> c’est déjà ça.
+
+**P2 — Le souvenir J−2, l’hôtel.**
+Situation : le bénévole connaît les grandes lignes de la déposition. Il
+demande ce qui s’est passé à l’hôtel, il y a deux jours, avec Anne.
+
+> Il y a deux jours, à l’hôtel, j’avais ce canon contre la tempe et je
+> regardais mon fusil par terre en me demandant si j’aurais le temps, pendant
+> que le type roux expliquait tranquillement à Anne qu’il fallait faire
+> confiance à la nature. Et puis Anne lui a mis un coup de poêle, l’autre a
+> tourné son arme vers elle, je l’ai poussé, j’ai repris le fusil et j’ai tiré
+> en pleine poitrine, et c’est seulement après que j’ai vu que mes mains
+> tremblaient. Derrière une porte il y avait Peter, vivant, attaché, et moi je
+> restais là sans comprendre qui était l’homme que j’avais laissé sous l’abri.
+
+**P3 — Emma, aujourd’hui.**
+Situation : plus tard dans l’appel, la confiance s’est installée. Le
+bénévole demande doucement comment ça va entre Emma et lui.
+
+> Elle est dans la cuisine, je suis dans le salon, il y a dix mètres entre nous
+> et on ne se parle plus depuis qu’on est rentrés, parce que la dernière chose
+> qu’elle a vue de moi là-haut, c’est le fusil pointé sur elle et puis sur Ava.
+> Je dis que ça ne changera rien, que je l’aimerai pareil, je peux même le dire
+> fort, mais quand je la regarde par la porte, avec sa voix, ses gestes, tout ce
+> qui est encore là, j’attends, et j’sais pas ce que j’attends.
+
+Faits vérifiés dans la fiche : `aujourd’hui.01`, `J-2.06` à `J-2.09`,
+`J-1.13`, « Sujets sensibles » (Emma, le fusil). Ces textes servent
+seulement à l’atelier ; rien n’est injecté dans le jeu, la fiche est inchangée.
+
+#### Dix intentions : libellé, explication, recette neutre
+
+La recette est un `PerformanceIntent` (source `manual`). L’instruction de jeu
+est en anglais car seul Inworld la lit, et elle est limitée à 100 caractères.
+
+| # | Libellé | Ce que Max fait | Émotion · intensité · delivery · débit · pauses | Instruction (Inworld) |
+| --- | --- | --- | --- | --- |
+| 1 | Posé | Il parle calmement, en pesant ses mots. | neutral · 1 · measured · 0,95 · normales | calm, measured, steady low voice |
+| 2 | Détaché | Il raconte comme si ça ne le concernait pas. | neutral · 0 · — · 1,00 · normales | detached, flat, emotionally distant |
+| 3 | Moyennement dramatique | L’émotion est là, mais il la tient. | sad · 1 · measured · 0,92 · normales | sad, heavy, holding back emotion |
+| 4 | Très dramatique | La digue cède : la voix se casse. | sad · 2 · measured · 0,88 · longues | very sad, voice breaking, overwhelmed |
+| 5 | Essoufflé / pressé | Il parle vite, sans reprendre son souffle. | urgent · 1 · rushed · 1,12 · courtes | breathless, rushed, urgent |
+| 6 | Peur | La peur accélère et fait trembler la voix. | scared · 2 · rushed · 1,08 · courtes | very frightened, anxious, shaky voice |
+| 7 | Perdu, ne sait plus quoi dire | Il cherche ses mots et s’arrête. | fragile · 1 · measured · 0,88 · longues | lost, hesitant, searching for words |
+| 8 | Colère contenue | Il est en colère, sans crier. | angry · 1 · cutting · 0,98 · normales | contained anger, low clipped voice, not shouting |
+| 9 | Espoir qui revient | Une piste le relance, avec prudence. | warm · 1 · — · 1,04 · normales | hope returning, a little faster, cautious |
+| 10 | Confidence à voix basse | Il dit à voix basse ce qu’il n’a dit à personne. | sad · 1 · whisper · 0,90 · longues | confiding, hushed, close and quiet |
+
+#### Ce que chaque fournisseur applique, d’après le code
+
+Valeurs calculées par les adaptateurs existants, à partir des réglages par
+défaut du code (Gradium temp 0,7 / padding 0 ; Fish vitesse 1, marqueurs
+actifs ; ElevenLabs `eleven_multilingual_v2`, style 0,18, stabilité 0,5 ;
+Inworld BALANCED ; Cartesia `fr`). L’écran AP4 affichera les valeurs
+réellement appliquées avec les réglages de la sandbox.
+
+| Intention | Gradium (temp / padding) | Fish (marqueur · vitesse) | ElevenLabs v2 (style / stabilité / vitesse) · balise v3 | Inworld (mode · débit) | Cartesia FR (vitesse / volume) |
+| --- | --- | --- | --- | --- | --- |
+| Posé | 0,74 / +0,5 | aucun · 0,95 | 0,18 / 0,50 / 0,95 · aucune | BALANCED · 0,95 | 0,95 / 1 |
+| Détaché | 0,70 / 0 | aucun · 1 | 0,18 / 0,50 / 1 · aucune | BALANCED · 1 | 1 / 1 |
+| Moyennement dramatique | 0,74 / +0,5 | (sad) · 0,92 | 0,24 / 0,54 / 0,92 · [sad] | BALANCED · 0,92 | 0,92 / 0,85 |
+| Très dramatique | 0,78 / +0,5 | (sad) · 0,88 | 0,27 / 0,56 / 0,88 · [sad] | CREATIVE · 0,88 | 0,88 / 0,85 |
+| Essoufflé / pressé | 0,77 / −0,6 | (in a hurry tone) · 1,12 | 0,34 / 0,40 / 1,12 · [urgent] | BALANCED · 1,12 | 1,12 / 1,15 |
+| Peur | 0,80 / −0,6 | (scared) (in a hurry tone) · 1,08 | 0,36 / 0,38 / 1,08 · [worried] | CREATIVE · 1,08 | 1,08 / 1 |
+| Perdu | 0,74 / +0,5 | (hesitating) · 0,88 | 0,22 / 0,52 / 0,88 · [hesitant] | BALANCED · 0,88 | 0,88 / 1 |
+| Colère contenue | 0,77 / 0 | (angry) · 0,98 | 0,36 / 0,38 / 0,98 · [angry] | BALANCED · 0,98 | 0,98 / 1,15 |
+| Espoir qui revient | 0,74 / 0 | (empathetic) · 1,04 | 0,23 / 0,50 / 1,04 · [warmly] | BALANCED · 1,04 | 1,04 / 1 |
+| Confidence à voix basse | 0,74 / +0,5 | (sad) (whispering) · 0,90 | 0,24 / 0,54 / 0,90 · [sad][whispers] | BALANCED · 0,90 | 0,90 / 0,85 |
+
+Leviers ignorés, à afficher sur chaque carte :
+
+- **Gradium** : ni émotion nommée, ni chuchotement, ni instruction. Les pauses
+  de la recette ne passent pas (pauses WS réservées au mapping d’état du jeu).
+  Posé, Moyennement dramatique, Perdu et Confidence produisent les mêmes
+  réglages (0,74 / +0,5) : ils ne se distinguent que par le texte.
+- **Fish** : pas d’intensité (Moyennement et Très dramatique ont le même
+  marqueur, seule la vitesse change) ; aucun marqueur pour Posé et Détaché ;
+  « Espoir » devient `(empathetic)` ; pauses ignorées.
+- **ElevenLabs** : avec `eleven_multilingual_v2`, seulement style, stabilité
+  et vitesse ; balises d’émotion et chuchotement uniquement avec `eleven_v3`.
+  Colère contenue et Peur ont les mêmes curseurs. Pauses ignorées.
+- **Inworld** : le plus complet (instruction propre à chaque intention, mode
+  CREATIVE à l’intensité 2, débit). Pauses seulement si l’instruction les
+  évoque.
+- **Cartesia** : en français, ni émotion ni chuchotement ; seulement vitesse
+  et volume. Colère contenue monte le volume (1,15), à l’opposé de
+  « contenue ». Pauses ignorées.
+
+Les adaptateurs servent aussi au jeu. AP4 les affiche sans les modifier.
+
+#### Fournisseurs disponibles dans `sandbox-ulrich` (3 bis)
+
+**Non vérifié dans cette session.** Aucun outil MCP Lovable n’est exposé ;
+le connecteur Supabase générique est exclu par AGENTS. Rien n’a été lu ni
+modifié dans la sandbox.
+
+Constat de code, important pour AP4 : `character_runtime_profiles` porte
+**un seul** fournisseur et une seule voix par personnage et par environnement
+(`SpeechAuditionBench.tsx`, carte `max:<fournisseur>`). Seul le fournisseur
+du jeu a donc une voix Max. Les autres n’ont que la voix par défaut de leurs
+réglages : Gradium `b5ioHAR7JuHVLskk`, Inworld `Alain`, Cartesia
+`0834f3df-…`, Fish sans voix par défaut (`referenceId` vide), sauf réglage
+stocké. Proposition pour AP4, sans migration et sans toucher au jeu :
+une **voix d’atelier par fournisseur** pour Max, saisie dans l’atelier et
+conservée dans `speech_workshop_documents`. Sans voix d’atelier, la carte
+affiche « voix par défaut du fournisseur, pas la voix de Max » ; sans clé,
+« indisponible ». La présence des clés se lit au premier appel du proxy,
+sans essai automatique.
+
+#### Reprise si la validation n’arrive pas
+
+AP4 s’arrête ici. Reprendre en présentant cette section à Ulrich, puis coder
+le contrat AP4 seulement après sa réponse « validé » (avec ses corrections
+reportées ici). Branche locale `claude/ap4-atelier-parole-cfc140` depuis main
+`fad96ca`, non poussée.
 
 ### Retour d’Ulrich après AP1 — correction AP2 obligatoire
 
