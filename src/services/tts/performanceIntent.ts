@@ -9,6 +9,7 @@
 import type { TTSProviderId } from "./types";
 import { getActiveEnvironment } from '../environmentContext';
 import { getSpeechPerformanceSettings, type SpeechPerformanceSettings } from './speechPerformanceSettings';
+import { supportsElevenLabsAudioTags } from "../../../supabase/functions/_shared/elevenLabsModels";
 import type { GradiumPauseSeconds } from './gradiumSpeech';
 
 export type CanonicalEmotion =
@@ -89,7 +90,7 @@ export const PROVIDER_ACTING_SUPPORT: Record<TTSProviderId, ProviderActingSuppor
   elevenlabs: {
     usability: "weak",
     labelFr: "Faible",
-    detailFr: "Sliders style / stabilité / vitesse. Tags [angry] uniquement si le modèle est eleven_v3.",
+    detailFr: "Sliders style / stabilité / vitesse. Balises [angry] seulement avec les modèles v3 / v4.",
   },
   gradium: {
     usability: "speed_only",
@@ -123,7 +124,7 @@ const DELIVERY_NL: Record<PerformanceDelivery, string> = {
   cutting: "clipped, cutting",
 };
 
-const ELEVENLABS_V3_TAGS: Record<CanonicalEmotion, string> = {
+const ELEVENLABS_AUDIO_TAGS: Record<CanonicalEmotion, string> = {
   neutral: "",
   tense: "[tense]",
   angry: "[angry]",
@@ -447,8 +448,8 @@ export function applyElevenLabsPerformance(
   const delta = deltas[intent.emotion];
   const speed = intent.source === 'speech_state' ? clamp(base.speed * (intent.speedHint ?? 1), 0.7, 1.2) : intent.speedHint ?? clamp(base.speed + delta.speed * factor, 0.7, 1.2);
   let spoken = text;
-  if (base.modelId === "eleven_v3") {
-    const tag = ELEVENLABS_V3_TAGS[intent.emotion];
+  if (supportsElevenLabsAudioTags(base.modelId)) {
+    const tag = ELEVENLABS_AUDIO_TAGS[intent.emotion];
     const deliveryTag = intent.delivery === "whisper" ? "[whispers]" : "";
     const prefix = [tag, deliveryTag].filter(Boolean).join("");
     if (prefix && !spoken.startsWith("[")) spoken = `${prefix} ${spoken}`;

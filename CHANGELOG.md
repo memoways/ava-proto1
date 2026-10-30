@@ -4,6 +4,25 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [AP4-ter — ElevenLabs fonctionnel et modèle expressif par défaut] — 2026-10-30
+
+- Bug « ElevenLabs TTS error: 400 (unsupported_model) » : `proxy-tts` envoyait
+  toujours `optimize_streaming_latency` (déprécié, refusé par v3/v4) et le
+  contexte `previous_text` / `next_text`. Une table de capacités par modèle
+  (`supabase/functions/_shared/elevenLabsModels.ts`, partagée avec le client)
+  n’envoie ces paramètres que là où ils sont acceptés et coupe le texte à la
+  limite du modèle. Cause confirmée par la doc ElevenLabs, **pas** par les logs
+  ni par un appel réel (non accessibles à l’agent) : la recette reste humaine.
+- TTS Config : modèles actuels (v4, v4 Turbo, v3, v3 Conversational,
+  Multilingual v2, Flash v2.5) ; Turbo v2 / v2.5 dépréciés lus comme Flash v2.5
+  (réglage stocké, base et serveur) ; presets « Rapide » / « Temps réel » sur
+  Flash, « Expressif » sur v4 ; curseur de latence remplacé par une note pour
+  v3 / v4.
+- Modèle expressif par défaut de l’atelier : `eleven_v4` (choix d’Ulrich). Le
+  modèle du jeu ne change que par un enregistrement explicite de TTS Config.
+- Balises d’émotion appliquées à tous les modèles qui les supportent (v3, v4,
+  v4 Turbo, v3 Conversational), pas seulement `eleven_v3`.
+
 ## [AP4-bis — voix des personnages par fournisseur et atelier compact] — 2026-10-30
 
 - Technique → Configuration TTS : nouveau panneau « Voix des personnages par

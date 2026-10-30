@@ -1824,3 +1824,37 @@ sur cette session. Aucun changement des réglages de sécurité 1Password. Git/g
 isolés, askpass/SSH neutralisés ; suivi CI à une minute. Source : retour direct
 d’Ulrich, tests locaux et traces CI. Plan d’accès mis à jour ; reçu final dans
 PR/Notion après fusion, sans deuxième campagne complète sur main.
+
+## Exécution AP4-ter — 30 octobre 2026
+
+Retour d’Ulrich : la carte ElevenLabs de l’atelier affichait « ElevenLabs TTS
+error: 400 (unsupported_model) ». Il demandait de corriger le bug, de mettre à
+jour les réglages ElevenLabs de TTS Config et d’indiquer le bon modèle
+expressif par défaut.
+
+- **Cause.** L’atelier envoie `eleven_v3`. `proxy-tts` ajoutait toujours
+  `optimize_streaming_latency` (déprécié ; v3/v4 le refusent) et le contexte de
+  phrases voisines. *Non confirmée par les logs ni par un appel réel* : l’agent
+  n’a ni outil de logs Lovable ni clé ElevenLabs. Appuyée par la doc officielle
+  « Models » (lue le 30 octobre) et des retours de développeurs.
+- **Correctif.** `supabase/functions/_shared/elevenLabsModels.ts` : capacités
+  par modèle (latence de streaming, contexte, balises, limite de caractères),
+  conversion des Turbo dépréciés vers Flash v2.5. `proxy-tts` et le client s’en
+  servent. Erreur renvoyée au client inchangée. Le serveur ne fait plus
+  confiance au modèle stocké : un ancien réglage Turbo ne peut plus produire de 400.
+- **Modèles.** v4, v4 Turbo, v3, v3 Conversational, Multilingual v2, Flash
+  v2.5. Défaut du jeu inchangé (Multilingual v2). `language_code` et `seed`
+  restent envoyés partout : acceptés par Multilingual v2 en production, non
+  vérifiés pour v4.
+- **Défaut expressif.** Ulrich a choisi `eleven_v4` pour l’atelier et le
+  preset « Expressif ». Non vérifié sur son compte : si v4 répond 400
+  (modèle non disponible), repasser `ELEVENLABS_EXPRESSIVE_MODEL` à
+  `eleven_v3` (une constante).
+- **Balises.** `[angry]`, `[whispers]`… sur tout modèle à balises.
+- **Validations.** 1161 unitaires, 42 intégration, 71 régression, lint,
+  typecheck et build verts. Pas de test E2E ajouté : le scénario existant
+  désactive la carte ElevenLabs, le modèle de la carte est couvert en unitaire.
+- **Reste humain.** Après déploiement Lovable de `proxy-tts`, générer une carte
+  ElevenLabs dans la preview `sandbox-ulrich` : elle doit jouer (plus de 400).
+  Une CI verte ne le prouve pas. Production non publiée.
+

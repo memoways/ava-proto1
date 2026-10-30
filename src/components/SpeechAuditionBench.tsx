@@ -19,6 +19,7 @@ import { readSavedSpeechPerformance, saveSpeechPerformanceSettings, EMPTY_SPEECH
 import { AUDITION_PROVIDERS, createAuditionCorpus, auditionVoice, createAuditionSnapshot, auditionIntent, auditionKey, SpeechAuditionRunner, type AuditionLine, type AuditionEvidence, type AuditionTransport } from '@/services/tts/speechAudition';
 import { readWorkshop, saveWorkshopComparison, exportWorkshop, workshopEvidence, type WorkshopComparison, type WorkshopDocument } from '@/services/tts/speechWorkshopStore';
 import type { TTSProviderId } from '@/services/tts/types';
+import { ELEVENLABS_WORKSHOP_MODEL } from '@/services/tts/speechIntentWorkshop';
 interface Character { promptId?: string; key: string; name: string; level: number; provider: TTSProviderId; states: Array<{ name: string; description: string }> }
 const NOTE_FIELDS = ['words', 'rhythm', 'timbre', 'artifacts'] as const;
 const NOTE_LABELS = ['Mots / pensée', 'Pauses / rythme', 'Affect / timbre', 'Clics / hoquets'];
@@ -154,7 +155,7 @@ export default function SpeechAuditionBench() {
    const evidence = await runner.current.listen(key, line.text, getProviderById(provider), {
     characterKey: character, voiceId: voice, performance: auditionIntent(snapshot, line.text, line.state, level),
     ...(provider === 'gradium' ? { speechAudition: structuredClone(snapshot), bufferPreset } : {}),
-    ...(provider === 'elevenlabs' ? { auditionModelId: 'eleven_v3' as const } : {}),
+    ...(provider === 'elevenlabs' ? { auditionModelId: ELEVENLABS_WORKSHOP_MODEL } : {}),
    }, requestedTransport);
    if (requestId !== sequence.current || !stillHere()) return;
    setResults(old => [{ key, variant, evidence }, ...old.filter(r => !(r.key === key && r.variant === variant))].slice(0, 32)); setStep(variant === 'A' ? 3 : 4);

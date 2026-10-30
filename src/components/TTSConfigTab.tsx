@@ -52,6 +52,7 @@ import {
 } from "@/services/settingsService";
 import { listCharacterRuntimeProfiles } from "@/services/experienceOrchestration";
 import { PROVIDER_ACTING_SUPPORT } from "@/services/tts/performanceIntent";
+import { elevenLabsCapabilities, normalizeElevenLabsModelId, supportsElevenLabsAudioTags } from "../../supabase/functions/_shared/elevenLabsModels";
 import CharacterVoicesPanel from "@/components/CharacterVoicesPanel";
 const GRADIUM_CHARACTER_ORDER = ["max", "emma"];
 
@@ -325,8 +326,8 @@ export default function TTSConfigTab() {
             <ActingNote
               providerId="elevenlabs"
               detail={
-                elSettings.modelId === "eleven_v3"
-                  ? "Tags [angry] actifs (modèle eleven_v3) + sliders."
+                supportsElevenLabsAudioTags(elSettings.modelId)
+                  ? `Balises [angry] actives (modèle ${elSettings.modelId}) + sliders.`
                   : PROVIDER_ACTING_SUPPORT.elevenlabs.detailFr
               }
             />
@@ -389,10 +390,16 @@ export default function TTSConfigTab() {
         <SliderRow label="Vitesse" value={elSettings.speed} min={0.7} max={1.2} step={0.02}
           onChange={(v) => updateEl({ speed: v })}
           tooltip="Vitesse de lecture globale. 1 = vitesse normale." minLabel="0.7 lent" maxLabel="1.2 rapide" />
-        <SliderRow label="Optimize streaming latency" value={elSettings.optimizeStreamingLatency} min={0} max={4} step={1}
-          onChange={(v) => updateEl({ optimizeStreamingLatency: Math.round(v) })} format={(v) => v.toString()}
-          tooltip="Compromis entre qualité et latence pour le streaming. 0 = qualité maximale ; 4 = latence minimale, utile pour le dialogue temps réel."
-          minLabel="Qualité max" maxLabel="Latence min" />
+        {elevenLabsCapabilities(normalizeElevenLabsModelId(elSettings.modelId)).streamingLatency ? (
+          <SliderRow label="Optimize streaming latency" value={elSettings.optimizeStreamingLatency} min={0} max={4} step={1}
+            onChange={(v) => updateEl({ optimizeStreamingLatency: Math.round(v) })} format={(v) => v.toString()}
+            tooltip="Compromis entre qualité et latence pour le streaming. 0 = qualité maximale ; 4 = latence minimale, utile pour le dialogue temps réel."
+            minLabel="Qualité max" maxLabel="Latence min" />
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Latence de streaming : non applicable à ce modèle (v3 / v4). Ce réglage n'est pas envoyé à ElevenLabs.
+          </p>
+        )}
 
         <div className="flex items-center justify-between py-2">
           <div className="flex items-center gap-1.5">

@@ -1,5 +1,6 @@
 import { HANDS_FREE_DEFAULTS, normalizeHandsFreeSettings, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
 import defaultSettings from "@/config/settings.json";
+import { ELEVENLABS_EXPRESSIVE_MODEL, ELEVENLABS_MODEL_CAPABILITIES, normalizeElevenLabsModelId } from "../../supabase/functions/_shared/elevenLabsModels";
 import {
   deleteEnvironmentSetting,
   loadEnvironmentSetting,
@@ -368,13 +369,13 @@ export interface TTSSettings {
 
 const TTS_STORAGE_KEY = "ava_tts_settings";
 
-export const ELEVENLABS_MODELS = [
-  { id: "eleven_multilingual_v2", label: "Multilingual v2", description: "Meilleure diction et continuité — recommandé pour Max" },
-  { id: "eleven_turbo_v2_5", label: "Turbo v2.5", description: "Basse latence, bonne qualité — recommandé pour le temps réel" },
-  { id: "eleven_v3", label: "Eleven v3", description: "Très expressif — à tester selon disponibilité du compte" },
-  { id: "eleven_turbo_v2", label: "Turbo v2", description: "Rapide, qualité correcte" },
-  { id: "eleven_flash_v2_5", label: "Flash v2.5", description: "Ultra rapide, latence minimale" },
-];
+/** Stored settings may still name a deprecated Turbo model: read it as its replacement. */
+function withCurrentElevenLabsModel(settings: TTSSettings): TTSSettings {
+  const modelId = normalizeElevenLabsModelId(settings.modelId);
+  return modelId === settings.modelId ? settings : { ...settings, modelId };
+}
+
+export const ELEVENLABS_MODELS = ELEVENLABS_MODEL_CAPABILITIES.map(({ id, label, description }) => ({ id, label, description }));
 
 const ttsDefaults: TTSSettings = {
   modelId: "eleven_multilingual_v2",
@@ -415,7 +416,7 @@ export const TTS_PRESETS: Record<string, { label: string; description: string; s
   expressive: {
     label: "Expressif",
     description: "Plus d'émotion et de variation",
-    settings: { stability: 0.38, similarityBoost: 0.80, style: 0.38, speed: 1.0, optimizeStreamingLatency: 0, applyTextNormalization: "on" },
+    settings: { modelId: ELEVENLABS_EXPRESSIVE_MODEL, stability: 0.38, similarityBoost: 0.80, style: 0.38, speed: 1.0, optimizeStreamingLatency: 0, applyTextNormalization: "on" },
   },
   calm_measured: {
     label: "Calme et mesuré",
@@ -430,12 +431,12 @@ export const TTS_PRESETS: Record<string, { label: string; description: string; s
   fast_urgent: {
     label: "Rapide et urgent",
     description: "Sous stress, phrases pressées",
-    settings: { modelId: "eleven_turbo_v2_5", stability: 0.38, similarityBoost: 0.76, style: 0.32, speed: 1.06, optimizeStreamingLatency: 1, applyTextNormalization: "on" },
+    settings: { modelId: "eleven_flash_v2_5", stability: 0.38, similarityBoost: 0.76, style: 0.32, speed: 1.06, optimizeStreamingLatency: 1, applyTextNormalization: "on" },
   },
   realtime_conversation: {
     label: "Conversation temps réel",
     description: "Priorité à la latence faible pour tests voice-to-voice",
-    settings: { modelId: "eleven_turbo_v2_5", stability: 0.46, similarityBoost: 0.78, style: 0.16, speed: 1.02, outputFormat: "mp3_44100_64", optimizeStreamingLatency: 1, applyTextNormalization: "on" },
+    settings: { modelId: "eleven_flash_v2_5", stability: 0.46, similarityBoost: 0.78, style: 0.16, speed: 1.02, outputFormat: "mp3_44100_64", optimizeStreamingLatency: 1, applyTextNormalization: "on" },
   },
 };
 
@@ -443,14 +444,14 @@ export const TTS_PRESETS: Record<string, { label: string; description: string; s
 export function getTTSSettings(): TTSSettings {
   try {
     const stored = readEnvironmentStorage(TTS_STORAGE_KEY);
-    if (stored) return { ...ttsDefaults, ...JSON.parse(stored) };
+    if (stored) return withCurrentElevenLabsModel({ ...ttsDefaults, ...JSON.parse(stored) });
   } catch { /* ignore */ }
   return { ...ttsDefaults };
 }
 
 /** Async load from DB */
 export async function loadTTSSettingsFromDB(): Promise<TTSSettings> {
-  return loadFromDB(TTS_STORAGE_KEY, ttsDefaults);
+  return withCurrentElevenLabsModel(await loadFromDB(TTS_STORAGE_KEY, ttsDefaults));
 }
 
 /** Save to both localStorage and DB */
