@@ -20,7 +20,7 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: {
 import { setActiveEnvironment } from '../environmentContext';
 import { createAuditionSnapshot } from './speechAudition';
 import { EMPTY_SPEECH_PERFORMANCE, proposeSpeechMapping } from './speechPerformanceSettings';
-import { WORKSHOP_KEY, readWorkshop, saveWorkshopComparison, workshopEvidence, exportWorkshop, type WorkshopComparison } from './speechWorkshopStore';
+import { WORKSHOP_KEY, readWorkshop, saveWorkshopComparison, saveIntentTrial, cardEvidence, workshopEvidence, exportWorkshop, type IntentTrial, type WorkshopComparison } from './speechWorkshopStore';
 function comparison(): WorkshopComparison {
  const a = createAuditionSnapshot('max', [{ name: 'Retenu', description: '' }], { ...EMPTY_SPEECH_PERFORMANCE, enabled: true, byCharacter: { max: { Retenu: proposeSpeechMapping('Retenu', '') } } }, false, true);
  const b = structuredClone(a); b.gradium.paddingBonus = a.gradium.paddingBonus === 0 ? 0.2 : 0;
@@ -88,5 +88,52 @@ describe('AP2 — admin-only sandbox documents, explicit CAS and exact readback'
   expect(json).toContain('simulation'); expect(json).toContain('inconnue'); expect(json).toContain('padding_bonus');
   for (const secret of ['full transcript', 'secret-token', 'full prompt', 'hidden']) expect(json).not.toContain(secret);
   expect(exportWorkshop(c, 'text')).toContain('Coût : inconnu'); expect(exportWorkshop(c, 'text')).toContain('Aucune application au jeu');
+ });
+});
+function trial(id = 'trial-1'): IntentTrial {
+ const heard = cardEvidence({ requests: [{ transport: 'rest', body: { voice_id: 'max', text: 'never stored', json_config: { temp: 0.74, padding_bonus: 0.7 } } }], transport: 'rest', cached: false, providerCalls: 1 });
+ return { id, environment: 'sandbox-ulrich', createdAt: 'date', character: 'max',
+  passage: { id: 'P1', situation: 'Premier échange', text: 'Emma est dans la cuisine depuis ce matin.', edited: false },
+  intent: { id: 'peur', label: 'Peur', recipe: { emotion: 'scared', intensity: 2, delivery: 'rushed', speedHint: 1.08, pauses: 'short', actingNl: 'very frightened' } },
+  cards: [
+   { provider: 'gradium', voice: 'max', voiceSource: 'game', planned: { 'Variabilité (temp)': 0.8 }, ignored: ['Chuchotement'], evidence: heard, rating: 3, off: 'trop posé' },
+   { provider: 'fish', voice: 'ref', voiceSource: 'provider_default', planned: { 'Marqueur d’émotion': '(scared)' }, ignored: ['Instruction de jeu'], evidence: heard, rating: 5, off: '' },
+   { provider: 'cartesia', voice: null, voiceSource: 'provider_default', planned: { Vitesse: 1.08 }, ignored: ['Émotion'], evidence: null, rating: null, off: '' },
+  ] };
+}
+describe('AP4 — intent trials in the same document', () => {
+ beforeEach(() => { localStorage.clear(); setActiveEnvironment('sandbox-ulrich'); Object.assign(db, { value: null, member: true, user: true, failRead: false, failWrite: false, conflict: false, duplicate: false, mismatch: false, failReadback: false, writes: 0, filters: [], keys: [], duringWrite: null }); });
+ it('appends a trial with CAS and exact readback, keeping AP2 comparisons and extensions intact', async () => {
+  const ap2 = await saveWorkshopComparison(comparison(), null, 'sandbox-ulrich');
+  db.value = { ...ap2, extension: { keep: true } }; const baseline = await readWorkshop('sandbox-ulrich');
+  const saved = await saveIntentTrial(trial(), baseline, 'sandbox-ulrich');
+  expect(saved.comparisons).toEqual(ap2.comparisons); expect(saved).toMatchObject({ extension: { keep: true }, intentTrials: [{ id: 'trial-1' }] });
+  expect(await readWorkshop('sandbox-ulrich')).toEqual(saved); expect(JSON.stringify(saved)).not.toContain('never stored');
+  const second = await saveIntentTrial(trial('trial-2'), saved, 'sandbox-ulrich');
+  expect(second.intentTrials?.map(t => t.id)).toEqual(['trial-2', 'trial-1']);
+  await expect(saveIntentTrial(trial('trial-2'), second, 'sandbox-ulrich')).rejects.toMatchObject({ code: 'conflict' });
+ });
+ it('reads AP2-only documents and refuses stale baselines, failed readback and foreign trials', async () => {
+  const ap2 = await saveWorkshopComparison(comparison(), null, 'sandbox-ulrich');
+  expect((await readWorkshop('sandbox-ulrich'))?.intentTrials).toBeUndefined();
+  db.value = { ...ap2, version: 'elsewhere' };
+  await expect(saveIntentTrial(trial(), ap2, 'sandbox-ulrich')).rejects.toMatchObject({ code: 'conflict' });
+  db.value = ap2; db.mismatch = true; db.writes = 0;
+  await expect(saveIntentTrial(trial(), ap2, 'sandbox-ulrich')).rejects.toMatchObject({ code: 'readback' });
+  db.value = { ...ap2, intentTrials: [{ ...trial(), environment: 'sandbox-romed' }] }; db.mismatch = false;
+  await expect(readWorkshop('sandbox-ulrich')).rejects.toMatchObject({ code: 'context' });
+ });
+ it('requires a heard card, a reason below 5 and unique providers; a 5 needs no reason', async () => {
+  const noReason = trial(); noReason.cards[0].off = ' ';
+  await expect(saveIntentTrial(noReason, null, 'sandbox-ulrich')).rejects.toMatchObject({ code: 'schema', message: expect.stringContaining('off') });
+  const unheard = trial(); unheard.cards[2].rating = 4; unheard.cards[2].off = 'plat';
+  await expect(saveIntentTrial(unheard, null, 'sandbox-ulrich')).rejects.toMatchObject({ code: 'schema', message: expect.stringContaining('générée') });
+  const none = trial(); for (const card of none.cards) card.rating = null;
+  await expect(saveIntentTrial(none, null, 'sandbox-ulrich')).rejects.toMatchObject({ code: 'schema' });
+  const duplicate = trial(); duplicate.cards[2] = { ...duplicate.cards[1] };
+  await expect(saveIntentTrial(duplicate, null, 'sandbox-ulrich')).rejects.toMatchObject({ code: 'schema' });
+  expect(db.writes).toBe(0);
+  const five = trial(); five.cards = [five.cards[1]];
+  expect((await saveIntentTrial(five, null, 'sandbox-ulrich')).intentTrials?.[0].cards[0]).toMatchObject({ rating: 5, off: '' });
  });
 });

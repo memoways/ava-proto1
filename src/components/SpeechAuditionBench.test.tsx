@@ -127,7 +127,7 @@ describe('AP2 — one guided workshop and saved comparisons', () => {
   listen.mockImplementationOnce(() => new Promise(r => { resolve = r; }));
   fireEvent.click(screen.getByRole('button', { name: 'Réécouter la version actuelle' })); fireEvent.click(screen.getByRole('button', { name: 'Écouter la version actuelle' }));
   fireEvent.change(screen.getByLabelText('Personnage du banc'), { target: { value: 'emma' } });
-  await act(async () => resolve(evidence)); expect(screen.getByLabelText('Étape courante')).toHaveTextContent('Étape 1');
+  await act(async () => resolve(evidence)); expect(screen.getByLabelText('Étape A/B')).toHaveTextContent('Étape 1');
   expect(screen.queryByRole('button', { name: 'Enregistrer la comparaison et mon avis' })).not.toBeInTheDocument();
  });
  it('auditions another provider with an isolated voice and only an emotion change in the trial', async () => {
@@ -169,7 +169,7 @@ describe('AP2 — one guided workshop and saved comparisons', () => {
   await act(async () => finish({ schemaVersion: 1, environment: 'sandbox-ulrich', version: 'late', comparisons: [vi.mocked(saveWorkshopComparison).mock.calls[0][0]] }));
   expect(screen.queryByText(/Comparaison enregistrée et relue/)).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Recharger les variantes' })).toBeEnabled();
-  expect(screen.getByLabelText('Étape courante')).toHaveTextContent('Étape 1');
+  expect(screen.getByLabelText('Étape A/B')).toHaveTextContent('Étape 1');
  });
  it('keeps read failures distinct from an empty library and never saves in that state', async () => {
   vi.mocked(readWorkshop).mockRejectedValue(new Error('Lecture de l’atelier indisponible'));

@@ -13,7 +13,7 @@ import { clearSystemPromptCache } from "@/agents/maxAgent";
 import { hydrateAllSettings } from "@/services/settingsService";
 import LLMConfigTab from "@/components/LLMConfigTab";
 import RAGConfigTab from "@/components/RAGConfigTab";
-import SpeechAuditionBench from '@/components/SpeechAuditionBench';
+import SpeechIntentWorkshop from '@/components/SpeechIntentWorkshop';
 import TTSConfigTab from "@/components/TTSConfigTab";
 import STTConfigTab from "@/components/STTConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
@@ -619,7 +619,7 @@ export default function Admin() {
 
           {/* ==================== EXPÉRIENCE ==================== */}
           <TabsContent value="speech-workshop">
-            {activeTab === "speech-workshop" && <SpeechAuditionBench />}
+            {activeTab === "speech-workshop" && <SpeechIntentWorkshop />}
           </TabsContent>
 
           <TabsContent value="architecture">

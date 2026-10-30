@@ -4,6 +4,29 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [AP4 — atelier de parole par intention de jeu] — 2026-10-30
+
+- Étape 0 validée par Ulrich sans correction : trois passages de Max
+  (présent, souvenir J−2 de l’hôtel, Emma), dix intentions avec explication
+  et recette neutre, tableau de ce que chaque fournisseur applique ou ignore.
+- Expérience → Atelier de parole : texte à jouer → émotion → fournisseurs →
+  cartes côte à côte. Chaque carte montre la recette, les paramètres appliqués
+  par l’adaptateur et les leviers ignorés ; une génération par clic, rejeu sans
+  appel, échec réel affiché, fournisseur sans voix signalé indisponible.
+- Note de 1 à 5 par carte écoutée, « ce qui est off » obligatoire sous 5.
+  Tableau intention × fournisseur (moyenne, nombre d’essais), export CSV/JSON.
+  Aucun juge LLM ; une note n’applique rien au jeu.
+- Voix d’atelier par fournisseur pour Max, enregistrée avec l’essai, sans
+  toucher à la voix ni au fournisseur du jeu.
+- `speech_workshop_documents` : essais `intentTrials` ajoutés au schéma 1,
+  sans migration, même CAS et relecture exacte ; comparaisons AP2 conservées.
+- Banc AP2 (réglages bruts, A/B, Emma, transports, mapping, preuves) replié
+  sous les options avancées et monté seulement à l’ouverture.
+- Tests : table intention → recette par adaptateur, persistance, parcours,
+  E2E clavier/390 px. Aucun son réel généré : recette humaine en AP5.
+  [Plan](docs/plan_lot_b_rendu_vocal.md#exécution-ap4--30-octobre-2026),
+  [prompt AP5](docs/prompt_reprise_atelier_parole_lot_ap5.md), non lancé.
+
 ## [AP3 — bilan humain et réorientation par intention de jeu] — 2026-10-30
 
 - Documentation seule, aucun code modifié. Bilan de la séance AP3 : parcours
