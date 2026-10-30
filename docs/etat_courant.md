@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 28 octobre 2026. Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 30 octobre 2026. Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -66,9 +66,19 @@ comparaison côte à côte entre fournisseurs notée de 1 à 5. Aucune écoute n
 comparaison enregistrée.
 Analyse : le socle neutre `PerformanceIntent` et ses cinq adaptateurs existent
 déjà ; l’atelier exposait la mauvaise couche.
-[Retour, analyse et contrat AP4](plan_lot_b_rendu_vocal.md#retour-dulrich-pendant-ap3--29-octobre-2026) ·
-[Prompt autonome AP4](prompt_reprise_atelier_parole_lot_ap4.md), non lancé. Les
-textes et la liste d’intentions sont validés par Ulrich avant le code.
+[Retour, analyse et contrat AP4](plan_lot_b_rendu_vocal.md#retour-dulrich-pendant-ap3--29-octobre-2026).
+
+**AP4 implémenté le 30 octobre : atelier par intention de jeu.**
+Textes et dix intentions validés par Ulrich. Un texte, une émotion, une carte
+par fournisseur côte à côte : recette, paramètres appliqués, leviers ignorés,
+une génération par clic, note de 1 à 5 (« off » sous 5), tableau intention ×
+fournisseur exportable. Essais dans `speech_workshop_documents` (`intentTrials`),
+sans migration ; banc AP2 replié en options avancées. Seul Gradium a la voix
+de Max dans `sandbox-ulrich` ; les autres demandent une voix d’atelier.
+Aucun son réel généré en développement.
+[Exécution AP4](plan_lot_b_rendu_vocal.md#exécution-ap4--30-octobre-2026) ·
+[Prompt autonome AP5](prompt_reprise_atelier_parole_lot_ap5.md), séance
+accompagnée, non lancée. Reçu PR/CI/fusion dans la PR et Notion.
 F4 reste distincte. Aucune publication production implicite.
 
 ## Livraison AP2 et accès dédié

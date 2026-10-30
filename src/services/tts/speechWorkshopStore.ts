@@ -38,8 +38,41 @@ export const comparisonSchema = z.object({
 export type WorkshopComparison = z.infer<typeof comparisonSchema> & {
  line: AuditionLine; notes: Record<'words' | 'rhythm' | 'timbre' | 'artifacts', string>;
 };
-export interface WorkshopDocument { schemaVersion: 1; environment: string; version: string; comparisons: WorkshopComparison[]; [key: string]: unknown }
-const documentSchema = z.object({ schemaVersion: z.literal(1), environment: short, version: short.min(1), comparisons: z.array(comparisonSchema.passthrough()).max(100) }).passthrough();
+const providerId = z.enum(['gradium', 'fish', 'inworld', 'elevenlabs', 'cartesia']);
+const cardEvidenceSchema = evidenceSchema.omit({ variant: true });
+const intentCardSchema = z.object({
+ provider: providerId, voice: z.string().max(500).nullable(), voiceSource: z.enum(['game', 'workshop', 'provider_default']), model: short.optional(),
+ planned: z.record(scalar), ignored: z.array(short).max(12), evidence: cardEvidenceSchema.nullable(),
+ rating: z.number().int().min(1).max(5).nullable(), off: z.string().max(500),
+});
+/** AP4: one text, one neutral intent, one card per provider; ratings are human opinions only. */
+export const intentTrialSchema = z.object({
+ id: short.min(1), environment: short, createdAt: short, character: short,
+ passage: z.object({ id: z.enum(['P1', 'P2', 'P3', 'libre']), situation: short, text: z.string().trim().min(1).max(1200), edited: z.boolean() }),
+ intent: z.object({ id: short.min(1), label: short.min(1), recipe: z.object({ emotion: short, intensity: z.number().int().min(0).max(2), delivery: short.optional(), speedHint: z.number().min(0.7).max(1.2), pauses: z.enum(['short', 'normal', 'long']), actingNl: z.string().max(100) }) }),
+ cards: z.array(intentCardSchema.passthrough()).min(1).max(5),
+}).superRefine((trial, ctx) => {
+ if (new Set(trial.cards.map(card => card.provider)).size !== trial.cards.length) ctx.addIssue({ code: 'custom', message: 'Un fournisseur ne peut apparaître qu’une fois par essai.' });
+ const rated = trial.cards.filter(card => card.rating !== null);
+ if (!rated.length) ctx.addIssue({ code: 'custom', message: 'Noter au moins une carte écoutée.' });
+ for (const card of rated) {
+  if (!card.evidence || card.evidence.kind !== 'provider_request') ctx.addIssue({ code: 'custom', message: `${card.provider} : seule une carte générée dans cette séance peut être notée.` });
+  if (card.rating! < 5 && !card.off.trim()) ctx.addIssue({ code: 'custom', message: `${card.provider} : préciser ce qui est off sous la note de 5.` });
+ }
+});
+export interface IntentTrialCard {
+ provider: z.infer<typeof providerId>; voice: string | null; voiceSource: 'game' | 'workshop' | 'provider_default'; model?: string;
+ planned: Record<string, string | number | boolean | null>; ignored: string[]; evidence: Omit<WorkshopComparison['evidence'][number], 'variant'> | null;
+ rating: number | null; off: string;
+}
+export interface IntentTrial {
+ id: string; environment: string; createdAt: string; character: string;
+ passage: { id: 'P1' | 'P2' | 'P3' | 'libre'; situation: string; text: string; edited: boolean };
+ intent: { id: string; label: string; recipe: { emotion: string; intensity: number; delivery?: string; speedHint: number; pauses: 'short' | 'normal' | 'long'; actingNl: string } };
+ cards: IntentTrialCard[];
+}
+export interface WorkshopDocument { schemaVersion: 1; environment: string; version: string; comparisons: WorkshopComparison[]; intentTrials?: IntentTrial[]; [key: string]: unknown }
+const documentSchema = z.object({ schemaVersion: z.literal(1), environment: short, version: short.min(1), comparisons: z.array(comparisonSchema.passthrough()).max(100), intentTrials: z.array(intentTrialSchema as unknown as z.ZodType<IntentTrial>).max(500).optional() }).passthrough();
 export type WorkshopFailure = 'context' | 'forbidden' | 'unavailable' | 'schema' | 'conflict' | 'readback';
 export class WorkshopError extends Error { constructor(public code: WorkshopFailure, message: string) { super(message); } }
 function assertEnvironment(environment: EnvironmentId) {
@@ -58,6 +91,7 @@ function validateDocument(value: unknown, environment: EnvironmentId): WorkshopD
  if (!parsed.success) throw new WorkshopError('schema', 'Format d’atelier inconnu ou invalide ; aucune écriture autorisée.');
  if (parsed.data.environment !== environment || parsed.data.comparisons.some(c => c.environment !== environment || c.a.environment !== environment || c.b.environment !== environment))
   throw new WorkshopError('context', 'Document provenant d’un autre environnement.');
+ if (parsed.data.intentTrials?.some(t => t.environment !== environment)) throw new WorkshopError('context', 'Essai provenant d’un autre environnement.');
  // Keep validated extensions byte-for-byte in the CAS baseline and other entries.
  return structuredClone(value) as WorkshopDocument;
 }
@@ -93,14 +127,32 @@ export async function saveWorkshopComparison(value: WorkshopComparison, baseline
   Object.assign(source, { [comparison.control]: target[comparison.control as keyof typeof target] });
  } else { const key = comparison.control as 'temp' | 'cfgCoef' | 'paddingBonus'; expectedB.gradium[key] = comparison.b.gradium[key]; }
  if (auditionKey(comparison.a) === auditionKey(comparison.b) || auditionKey(expectedB) !== auditionKey(comparison.b)) throw new WorkshopError('schema', 'Une seule différence est autorisée entre les deux versions.');
+ return writeDocument(environment, baseline, current => {
+  const previous = current?.comparisons.find(c => c.id === comparison.id);
+  return { ...current, schemaVersion: 1, environment, version: crypto.randomUUID(), comparisons: [
+   { ...(mergeExtensions(previous, comparison) as WorkshopComparison), createdAt: previous?.createdAt ?? comparison.createdAt } as WorkshopComparison,
+   ...(current?.comparisons ?? []).filter(c => c.id !== comparison.id),
+  ] };
+ });
+}
+/** Append one AP4 trial with the same CAS and exact readback; AP2 comparisons and extensions are untouched. */
+export async function saveIntentTrial(value: IntentTrial, baseline: WorkshopDocument | null, environment: EnvironmentId) {
+ await authorize(environment);
+ const parsed = intentTrialSchema.safeParse(value);
+ if (!parsed.success) throw new WorkshopError('schema', parsed.error.issues.map(issue => issue.message).join(' '));
+ if (parsed.data.environment !== environment) throw new WorkshopError('context', 'Essai provenant d’un autre environnement.');
+ const trial = structuredClone(value);
+ return writeDocument(environment, baseline, current => {
+  if (current?.intentTrials?.some(t => t.id === trial.id)) throw new WorkshopError('conflict', 'Cet essai est déjà enregistré. Rechargez avant de réenregistrer.');
+  return { ...current, schemaVersion: 1, environment, version: crypto.randomUUID(), comparisons: current?.comparisons ?? [], intentTrials: [trial, ...(current?.intentTrials ?? [])] };
+ });
+}
+async function writeDocument(environment: EnvironmentId, baseline: WorkshopDocument | null, build: (current: WorkshopDocument | null) => WorkshopDocument) {
  const current = await readDocument(environment);
- if (auditionKey(current) !== auditionKey(baseline)) throw new WorkshopError('conflict', 'Comparaisons modifiées ailleurs. Rechargez les variantes avant de réenregistrer votre brouillon.');
- const previous = current?.comparisons.find(c => c.id === comparison.id);
- const next: WorkshopDocument = { ...current, schemaVersion: 1, environment, version: crypto.randomUUID(), comparisons: [
-  { ...(mergeExtensions(previous, comparison) as WorkshopComparison), createdAt: previous?.createdAt ?? comparison.createdAt } as WorkshopComparison,
-  ...(current?.comparisons ?? []).filter(c => c.id !== comparison.id),
- ] };
- documentSchema.parse(next);
+ if (auditionKey(current) !== auditionKey(baseline)) throw new WorkshopError('conflict', 'Atelier modifié ailleurs. Rechargez avant de réenregistrer votre brouillon.');
+ const next = build(current);
+ const checked = documentSchema.safeParse(next);
+ if (!checked.success) throw new WorkshopError('schema', 'Document d’atelier trop grand ou invalide ; aucune écriture.');
  assertEnvironment(environment);
  const row = { key: WORKSHOP_KEY, environment_id: environment, value: JSON.parse(JSON.stringify(next)), updated_at: new Date().toISOString() };
  const query = supabase.from('admin_settings');
@@ -129,6 +181,10 @@ export function workshopEvidence(evidence: AuditionEvidence, variant: 'A' | 'B',
    ...Object.fromEntries(['json_config', 'jsonConfig'].filter(key => request.body[key] && typeof request.body[key] === 'object').map(key => [key, Object.fromEntries(CONFIG_KEYS.filter(k => scalar.safeParse((request.body[key] as Record<string, unknown>)[k]).success).map(k => [k, (request.body[key] as Record<string, unknown>)[k]]))])),
   },
  })) });
+}
+export function cardEvidence(evidence: AuditionEvidence, simulated = false): IntentTrialCard['evidence'] {
+ const { variant: _variant, ...rest } = workshopEvidence(evidence, 'A', simulated);
+ return rest;
 }
 export function exportWorkshop(comparison: WorkshopComparison, format: 'json' | 'text') {
  const c = comparisonSchema.parse(comparison);

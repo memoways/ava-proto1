@@ -11,7 +11,9 @@ persistants dans le back-office ; audio exact seulement pendant la séance.
 
 **État au 30 octobre : AP1 et AP2 livrés techniquement. AP3 a été mené : Ulrich
 comprend le parcours mais refuse ce qu’on lui fait régler. La série est
-réorientée vers des intentions de jeu (voir la section suivante).**
+réorientée vers des intentions de jeu. AP4 (atelier par intention) est
+implémenté après validation des textes et intentions ; AP5 est la séance
+d’écoute humaine.**
 Cette section est le contrat de la nouvelle série ; les sections datées
 ci-dessous décrivent les livraisons précédentes. A4R confirme les copies E0
 le 26 octobre, mais ni A4R ni F4 ne valent acceptation du naturel vocal.
@@ -22,8 +24,8 @@ La recette F4 reste distincte ; aucun gel de démo ni publication implicite.
 | AP1 | Atelier lisible, réglages expliqués et écoute A/B fidèle au transport actuel ; réemploi du banc | Livraison technique vérifiée ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap1.md) | Implémenté ; vérifications et reçu ci-dessous |
 | AP2 | Atelier unique et parcours simple ; retrait du banc de TTS Config ; variantes/avis nommés et retrouvables | Correction UX prioritaire, puis stockage sandbox strict et relecture | Livré #111, main `f855bf3` |
 | AP3 | Première séance Max, deux répliques initiales, une hypothèse et deux variantes | AP2 livré ; bilan humain, référence et prochain défaut observé | Fait le 29 octobre : parcours compris, réglages bruts et répliques trop courtes refusés ; aucune écoute ni comparaison enregistrée |
-| AP4 | Atelier par intention de jeu : passage de 2–3 phrases longues, émotion choisie dans une liste, recette traduite pour chaque fournisseur avec paramètres visibles, comparaison côte à côte entre fournisseurs, note de 1 à 5 par fournisseur | Retour AP3 ; textes et liste d’intentions validés par Ulrich avant le code ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap4.md) | Étape 0 proposée le 30 octobre, [en attente de validation](#ap4-étape-0--textes-et-intentions-à-valider-30-octobre-2026) ; aucun code |
-| AP5 | Séance accompagnée : Max, deux passages × trois intentions, comparés sur les fournisseurs disponibles | AP4 livré ; tableau intention × fournisseur noté à l’oreille | Planifié |
+| AP4 | Atelier par intention de jeu : passage de 2–3 phrases longues, émotion choisie dans une liste, recette traduite pour chaque fournisseur avec paramètres visibles, comparaison côte à côte entre fournisseurs, note de 1 à 5 par fournisseur | Retour AP3 ; textes et liste d’intentions validés par Ulrich avant le code ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap4.md) | Étape 0 validée le 30 octobre ; [implémenté](#exécution-ap4--30-octobre-2026), livraison dans le bilan |
+| AP5 | Séance accompagnée : Max, deux passages × trois intentions, comparés sur les fournisseurs disponibles | AP4 livré ; tableau intention × fournisseur noté à l’oreille ; [prompt autonome](prompt_reprise_atelier_parole_lot_ap5.md) | Prêt, non lancé |
 | AP6 | Choisir le fournisseur pour la suite, relier les 5 états de Max à des intentions validées, puis conversations courtes guidées (ancien AP4) | Notes AP5 ; décision humaine sur le fournisseur | Planifié |
 | AP7 | Passes sur le texte : Notion, GM effectif, LLM ; une couche par comparaison (ancien AP5) | Observations humaines ; sous-lots définis avant leur exécution | Itératif, non lancé |
 | AP8 | Emma avec ses propres états, puis Max ↔ Emma (ancien AP6) ; audit séparé de la voix des avatars vidéo | Méthode éprouvée sur Max | Planifié |
@@ -187,7 +189,8 @@ le code AP2 grâce aux extensions conservées.
 
 ### AP4 étape 0 — textes et intentions à valider (30 octobre 2026)
 
-Statut : **proposé, en attente du « validé » d’Ulrich. Aucun code AP4 écrit.**
+Statut : **validé par Ulrich le 30 octobre 2026, sans correction** (passages,
+intentions et voix d’atelier par fournisseur). Implémentation : section suivante.
 Sources : fiche Max active lue dans Gamilab natif (get-self
 `7e1a9a09-09cb-4deb-a306-83a29b831bc2`, page
 `ef4cfaa6-70e3-4e87-9b9e-079815fd0cd9`, dernière modification
@@ -303,9 +306,14 @@ Les adaptateurs servent aussi au jeu. AP4 les affiche sans les modifier.
 
 #### Fournisseurs disponibles dans `sandbox-ulrich` (3 bis)
 
-**Non vérifié dans cette session.** Aucun outil MCP Lovable n’est exposé ;
-le connecteur Supabase générique est exclu par AGENTS. Rien n’a été lu ni
-modifié dans la sandbox.
+Lu en lecture seule le 30 octobre, après validation, par le connecteur Lovable
+Ava (projet `1265958d-…`, workspace Memoways, synchronisé sur `fad96ca`) ;
+aucun réglage modifié. `character_runtime_profiles` : Max → Gradium avec voix,
+rugosité 3 ; Emma → Gradium avec voix. `admin_settings` : Gradium (Max
+`paddingBonus` 0,2) et Fish (`referenceId` renseigné, voix de la sandbox dont
+l’identité n’est pas attestée comme celle de Max) ; aucun réglage stocké pour
+Inworld, Cartesia ni ElevenLabs, donc valeurs par défaut du code. La présence
+des clés serveur n’est pas lisible en SQL : elle apparaît au premier essai.
 
 Constat de code, important pour AP4 : `character_runtime_profiles` porte
 **un seul** fournisseur et une seule voix par personnage et par environnement
@@ -322,10 +330,87 @@ sans essai automatique.
 
 #### Reprise si la validation n’arrive pas
 
-AP4 s’arrête ici. Reprendre en présentant cette section à Ulrich, puis coder
-le contrat AP4 seulement après sa réponse « validé » (avec ses corrections
-reportées ici). Branche locale `claude/ap4-atelier-parole-cfc140` depuis main
-`fad96ca`, non poussée.
+Sans objet : « validé » reçu le 30 octobre.
+
+### Exécution AP4 — 30 octobre 2026
+
+Branche `claude/ap4-atelier-parole-cfc140` depuis main `fad96ca`.
+
+**Résultat applicatif.** Expérience → Atelier de parole ouvre désormais
+l’atelier par intention (`SpeechIntentWorkshop`), en quatre étapes :
+
+1. Texte à jouer : P1–P3 avec leur ligne de situation, modifiables, ou texte
+   libre.
+2. Émotion du personnage : les dix intentions validées, chacune avec son
+   explication et sa recette en mots.
+3. Fournisseurs à comparer : les cinq, avec la source de voix (voix de Max du
+   jeu, voix d’atelier, voix par défaut du fournisseur « pas la voix de Max »)
+   ou « Indisponible : aucune voix configurée ». Champ de voix d’atelier par
+   fournisseur.
+4. Écouter et noter : une carte par fournisseur, côte à côte (empilées à
+   390 px). Chaque carte montre la recette, les paramètres appliqués calculés
+   par l’adaptateur, ce que le fournisseur ignore, un bouton qui fait un appel
+   par clic (rejeu sans appel), l’échec réel du fournisseur s’il y en a un,
+   une note de 1 à 5 et « Qu’est-ce qui est off ? » obligatoire sous 5.
+
+Le catalogue et le calcul sont dans `src/services/tts/speechIntentWorkshop.ts`.
+Les adaptateurs du jeu sont inchangés. Toutes les cartes partent en REST :
+on compare la voix, pas la latence. ElevenLabs utilise `eleven_v3` dans
+l’atelier, comme en AP2.
+
+**Résultats.** Tableau intention × fournisseur (moyenne, nombre d’essais),
+export CSV et JSON, liste des essais avec « Reprendre ce texte et cette
+intention » (sans audio). Aucun juge LLM.
+
+**Persistance.** `speech_workshop_documents`, champ `intentTrials` ajouté au
+schéma 1, sans migration. `saveIntentTrial` réutilise le même CAS et la même
+relecture exacte que les comparaisons AP2 (écriture commune `writeDocument`).
+Règles côté stockage : au moins une carte notée, carte notée = générée
+pendant la séance (`provider_request`), raison obligatoire sous 5,
+fournisseurs uniques. Paramètres de requête filtrés : ni texte complet, ni
+jeton. Les documents AP2 sans essais restent lisibles et modifiables.
+
+**Options avancées.** Le banc AP2 (« Comparaison A/B des réglages »),
+avec Emma, transports, mapping du jeu et preuves, est replié et monté
+seulement à l’ouverture.
+
+**Invariants vérifiés dans le diff.** Aucun changement de fiches Notion,
+prompt GM, modèle ou température du jeu, voix ou fournisseur du jeu, mapping
+live, budget, capture/STT, interruptions/mains libres ou transferts. Aucun
+audio durable. Une note de 5 n’active rien.
+
+**Preuves locales.**
+
+- `speechIntentWorkshop.test.ts` (6) : passages de 2 à 5 phrases longues sans
+  tic, dix intentions bornées, paramètres bornés pour chaque adaptateur,
+  leviers ignorés toujours déclarés, intentions distinctes chez Inworld,
+  ElevenLabs v3 et Fish (10/10) et confondues chez Gradium (déclaré), voix
+  et moyennes/exports.
+- `speechWorkshopStore.test.ts` (+3) : ajout, conservation AP2/extensions,
+  doublon, conflit, relecture différente, essai étranger, ancien document,
+  règles de note.
+- `SpeechIntentWorkshop.test.tsx` (5) : ouverture sans audio, fournisseur sans
+  voix signalé, même texte et même intention sur toutes les cartes, un appel
+  par clic, note < 5, rechargement, banc AP2 monté seulement à l’ouverture,
+  production exclue.
+- E2E `speech-workshop.spec.ts` (Chromium local, 7,4 s) : parcours AP4 au
+  clavier, cartes côte à côte puis empilées à 390 px sans défilement
+  horizontal, deux générations simulées, enregistrement relu et tableau
+  après rechargement, puis tout le parcours AP2 sous les options avancées.
+
+**Limites.** Aucun son réel n’a été généré : la crédibilité vocale reste la
+recette humaine d’AP5. Les clés Inworld, Cartesia, ElevenLabs et Fish ne sont
+pas vérifiées. Seul Gradium a la voix de Max : pour les autres, il faut saisir
+une voix d’atelier, sinon on compare des voix différentes (l’écran le dit).
+
+#### Mesure CT2 AP4
+
+Étape 0 commitée à 10:38 UTC, « validé » reçu ensuite. Implémentation, tests
+et passe qualité complète verte avant 10:52 UTC : lint (avertissement
+IndexPRD4 préexistant), typage, **71 régressions, 1 145 unitaires,
+42 intégrations**, build ; `test:delivery` 35/35 ; E2E ciblé Chromium 7,4 s.
+Horodatages push/CI/fusion dans le bilan de livraison et Notion, sans PR
+documentaire supplémentaire.
 
 ### Retour d’Ulrich après AP1 — correction AP2 obligatoire
 

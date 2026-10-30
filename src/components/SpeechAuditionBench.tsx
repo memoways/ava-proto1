@@ -204,15 +204,15 @@ export default function SpeechAuditionBench() {
   stop(); setMappingDraft(old => ({ ...old, byCharacter: { ...old.byCharacter, [character]: { ...old.byCharacter[character], [state]: { ...(old.byCharacter[character]?.[state] ?? proposeSpeechMapping(state, active?.states.find(s => s.name === state)?.description ?? '')), ...patch } } } }));
  }
  if (environment === 'prod') return <section><h3>Atelier de parole</h3><p>Réservé aux environnements sandbox.</p></section>;
- return <section aria-label="Atelier de parole" className="min-w-0 max-w-3xl space-y-4 break-words [&_select]:max-w-full [&_select]:min-w-0 [&_select]:rounded [&_select]:border [&_select]:bg-background [&_select]:p-2 [&_label]:min-w-0">
-  <fieldset disabled={saving} className="min-w-0 space-y-4"><h3 className="text-xl font-semibold">Atelier de parole — {active?.name ?? 'Max'}</h3>
+ return <section aria-label="Comparaison A/B des réglages" className="min-w-0 max-w-3xl space-y-4 break-words [&_select]:max-w-full [&_select]:min-w-0 [&_select]:rounded [&_select]:border [&_select]:bg-background [&_select]:p-2 [&_label]:min-w-0">
+  <fieldset disabled={saving} className="min-w-0 space-y-4"><h3 className="text-xl font-semibold">Comparaison A/B des réglages — {active?.name ?? 'Max'}</h3>
   <p>Une réplique, deux versions, une seule différence. Aucun essai ne modifie le jeu. <span className="text-sm text-muted-foreground">{environment}</span></p>
   {error && <p role="alert" className="text-destructive">{error}</p>}
   {status && <p role="status">{status}</p>}
   {providerParametersChanged && <div role="status"><p>Les paramètres de ce fournisseur ont changé. Le document est conservé ; préparez explicitement une nouvelle comparaison avec les valeurs actuelles avant de régénérer.</p><Button variant="outline" onClick={() => selectCharacter(character)}>Préparer avec les références actuelles</Button></div>}
   {referencesChanged && <p role="status">Les références actuelles diffèrent du document chargé. Le brouillon conserve ses anciennes valeurs ; voir « Références et différences » avant une nouvelle comparaison.</p>}
   {!ready && !error && <p role="status">Chargement des références…</p>}
-  <p aria-label="Étape courante" className="font-medium">Étape {step} sur 4 — {['Choisir la réplique et son état', 'Écouter la version actuelle', 'Écouter un essai', 'Donner son avis et enregistrer'][step - 1]}</p>
+  <p aria-label="Étape A/B" className="font-medium">Étape {step} sur 4 — {['Choisir la réplique et son état', 'Écouter la version actuelle', 'Écouter un essai', 'Donner son avis et enregistrer'][step - 1]}</p>
   {step === 1 && <div className="space-y-3 rounded border p-4">
    <p>Choisissez la réplique et l’état de {active?.name ?? 'Max'}. Au clic sur Continuer, vous préparerez l’écoute ; aucun son ne démarre.</p>
    <label className="block">Réplique <select className="block w-full" aria-label="Réplique du banc" value={lineIndex} onChange={e => { resetPair(); setLineIndex(Number(e.target.value)); }}>{(corpora[character] ?? []).map((l, i) => <option key={l.id} value={i}>{l.id} — {l.text.slice(0, 65)}</option>)}</select></label>
