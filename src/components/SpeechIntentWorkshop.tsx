@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import SpeechAuditionBench from './SpeechAuditionBench';
 import { getActiveEnvironment } from '@/services/environmentContext';
+import { adminTabPath } from '@/services/adminNavigation';
+import { characterVoice, loadCharacterVoicesFromDB, type CharacterVoiceCatalogue } from '@/services/tts/characterVoices';
 import { listCharacterRuntimeProfiles } from '@/services/experienceOrchestration';
 import { getTTSSettings } from '@/services/settingsService';
 import { getProviderById } from '@/services/tts/registry';
@@ -54,7 +55,8 @@ export default function SpeechIntentWorkshop() {
  const [text, setText] = useState(INTENT_PASSAGES[0].text);
  const [intentId, setIntentId] = useState('');
  const [selected, setSelected] = useState<TTSProviderId[]>([]);
- const [workshopVoices, setWorkshopVoices] = useState<Partial<Record<TTSProviderId, string>>>({});
+ const [voices, setVoices] = useState<CharacterVoiceCatalogue>({});
+ const [savedOnce, setSavedOnce] = useState(false);
  const [generated, setGenerated] = useState<Partial<Record<TTSProviderId, Generated>>>({});
  const [failures, setFailures] = useState<Partial<Record<TTSProviderId, string>>>({});
  const [ratings, setRatings] = useState<Partial<Record<TTSProviderId, Rating>>>({});
@@ -72,29 +74,24 @@ export default function SpeechIntentWorkshop() {
   mounted.current = true;
   if (environment === 'prod') return;
   const owner = runner.current, counter = sequence;
-  void readWorkshop(environment).then(value => { if (stillHere()) { setDocument(value); setStoreReady(true); prefillVoices(value); } }).catch(e => { if (stillHere()) setStoreError(e instanceof Error ? e.message : String(e)); });
-  Promise.all([listCharacterRuntimeProfiles(), loadFishSettingsFromDB(), loadInworldSettingsFromDB(), loadCartesiaSettingsFromDB()]).then(([profiles]) => {
+  void readWorkshop(environment).then(value => { if (stillHere()) { setDocument(value); setStoreReady(true); } }).catch(e => { if (stillHere()) setStoreError(e instanceof Error ? e.message : String(e)); });
+  Promise.all([listCharacterRuntimeProfiles(), loadCharacterVoicesFromDB(), loadFishSettingsFromDB(), loadInworldSettingsFromDB(), loadCartesiaSettingsFromDB()]).then(([profiles, catalogue]) => {
    if (!stillHere()) return;
    const max = profiles.find(p => p.character_key === 'max');
-   setGame({ provider: (max?.tts_provider as TTSProviderId | null) ?? null, voice: max?.tts_voice_id ?? null }); setBase(baseSettings()); setReady(true);
+   setVoices(catalogue); setGame({ provider: (max?.tts_provider as TTSProviderId | null) ?? null, voice: max?.tts_voice_id ?? null }); setBase(baseSettings()); setReady(true);
   }).catch(e => { if (stillHere()) setError(e instanceof Error ? e.message : String(e)); });
   return () => { mounted.current = false; counter.current++; owner.clear(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [environment]);
- function prefillVoices(value: WorkshopDocument | null) {
-  const voices: Partial<Record<TTSProviderId, string>> = {};
-  for (const trial of [...(value?.intentTrials ?? [])].reverse()) for (const card of trial.cards) if (card.voiceSource === 'workshop' && card.voice) voices[card.provider] = card.voice;
-  setWorkshopVoices(old => ({ ...voices, ...old }));
- }
  const intent = intentId ? workshopIntent(intentId) : null;
  const passage = INTENT_PASSAGES.find(p => p.id === passageId);
  const situation = passage?.situation ?? 'Texte libre écrit dans l’atelier.';
  const cards = useMemo(() => !intent || !base ? [] : INTENT_PROVIDERS.map(provider => {
-  const voice = resolveCardVoice(provider, game, workshopVoices[provider], providerDefaultVoice(provider));
+  const voice = resolveCardVoice(provider, game, characterVoice(voices, 'max', provider), providerDefaultVoice(provider));
   const plan = providerPlan(provider, intent, base);
   const key = auditionKey({ text: text.trim(), intent: intent.recipe, provider, voice: voice.voice, plan });
   return { provider, voice, plan, key, available: voice.source !== null };
- }), [intent, base, game, workshopVoices, text]);
+ }), [intent, base, game, voices, text]);
  const chosen = cards.filter(card => selected.includes(card.provider));
  const ratedCards = chosen.filter(card => ratings[card.provider]?.key === card.key && ratings[card.provider]?.rating);
  const canSave = storeReady && ratedCards.length > 0 && ratedCards.every(card => ratings[card.provider]!.rating === 5 || ratings[card.provider]!.off.trim()) && !busy && !saving;
@@ -142,15 +139,21 @@ export default function SpeechIntentWorkshop() {
   try {
    const confirmed = await saveIntentTrial(trial, document, environment);
    if (!stillHere()) return;
-   setDocument(confirmed); setTrialId(crypto.randomUUID()); setRatings({});
+   setDocument(confirmed); setTrialId(crypto.randomUUID()); setRatings({}); setSavedOnce(true);
    setStatus('Essai enregistré et relu dans cette sandbox. Les notes sont des avis : aucun réglage du jeu modifié.');
   } catch (e) { if (stillHere()) setStoreError(e instanceof Error ? e.message : String(e)); }
   finally { if (stillHere()) setSaving(false); }
  }
  async function reload() {
   setStoreError(''); setStoreReady(false);
-  try { const value = await readWorkshop(environment); if (stillHere()) { setDocument(value); setStoreReady(true); prefillVoices(value); setStatus('Essais rechargés ; votre brouillon est conservé.'); } }
+  try { const value = await readWorkshop(environment); if (stillHere()) { setDocument(value); setStoreReady(true); setStatus('Essais rechargés ; votre brouillon est conservé.'); } }
   catch (e) { if (stillHere()) setStoreError(e instanceof Error ? e.message : String(e)); }
+ }
+ /** After a saved trial: start another one without leaving the tab; heard audio stays replayable this session. */
+ function newTest(target: 1 | 2) {
+  stop(); setRatings({}); setFailures({}); setTrialId(crypto.randomUUID()); setSavedOnce(false); setStatus('');
+  if (target === 2) setIntentId('');
+  setStep(target);
  }
  function resume(trial: IntentTrial) {
   stop(); setPassageId(trial.passage.id); setText(trial.passage.text); setIntentId(trial.intent.id); setSelected(trial.cards.map(c => c.provider)); setRatings({}); setTrialId(crypto.randomUUID()); setStep(4);
@@ -164,40 +167,40 @@ export default function SpeechIntentWorkshop() {
   {error && <p role="alert" className="text-destructive">{error}</p>}
   {status && <p role="status">{status}</p>}
   {!ready && !error && <p>Chargement des fournisseurs…</p>}
-  <p ref={heading} tabIndex={-1} aria-label="Étape courante" className="font-medium outline-none">Étape {step} sur 4 — {STEPS[step - 1]}</p>
+  <div className="flex flex-wrap items-center justify-between gap-2"><p ref={heading} tabIndex={-1} aria-label="Étape courante" className="font-medium outline-none">Étape {step} sur 4 — {STEPS[step - 1]}</p>
+   {step > 1 && <Button size="sm" variant="outline" disabled={saving} onClick={() => newTest(1)}>Recommencer un test</Button>}</div>
   {step === 1 && <div className="space-y-3 rounded border p-4">
    <label className="block">Passage de Max<select className="block w-full max-w-full rounded border bg-background p-2" aria-label="Passage" value={passageId} onChange={e => choosePassage(e.target.value as PassageId)}>
     {INTENT_PASSAGES.map(p => <option key={p.id} value={p.id}>{p.id} — {p.title}</option>)}<option value="libre">Texte libre</option></select></label>
    <p className="text-sm"><strong>Situation :</strong> {situation}</p>
-   <label className="block">Texte à jouer (modifiable)<Textarea aria-label="Texte à jouer" rows={6} maxLength={1200} value={text} onChange={e => { stop(); setText(e.target.value); }}/></label>
+   <label className="block">Texte à jouer (modifiable)<Textarea aria-label="Texte à jouer" rows={4} maxLength={1200} value={text} onChange={e => { stop(); setText(e.target.value); }}/></label>
    <p className="text-sm text-muted-foreground">Ce texte sert seulement à l’atelier : il n’est pas injecté dans le jeu et la fiche Notion n’est pas modifiée.</p>
    <Button disabled={!text.trim() || !ready} onClick={() => goTo(2)}>Continuer vers l’émotion</Button>
   </div>}
   {step === 2 && <fieldset className="space-y-2 rounded border p-4"><legend className="px-1 font-medium">Quelle émotion Max doit-il jouer ?</legend>
-   {WORKSHOP_INTENTS.map(item => <label key={item.id} className="flex gap-2 rounded border p-2"><input type="radio" name="intent" value={item.id} checked={intentId === item.id} onChange={() => { stop(); setIntentId(item.id); }}/><span><strong>{item.label}</strong> — {item.explanation}<br/><span className="text-sm text-muted-foreground">Recette : {recipeWords(item.recipe)}</span></span></label>)}
+   <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">{WORKSHOP_INTENTS.map(item => <label key={item.id} className="flex gap-2 rounded border p-2 text-sm"><input type="radio" name="intent" value={item.id} checked={intentId === item.id} onChange={() => { stop(); setIntentId(item.id); }}/><span><strong>{item.label}</strong> — {item.explanation}<br/><span className="text-xs text-muted-foreground">Recette : {recipeWords(item.recipe)}</span></span></label>)}</div>
    <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => goTo(1)}>Revenir au texte</Button><Button disabled={!intent} onClick={() => goTo(3)}>Continuer vers les fournisseurs</Button></div>
   </fieldset>}
   {step >= 3 && intent && <div className="space-y-1 rounded border p-3 text-sm"><p><strong>{intent.label}</strong> — recette identique sur toutes les cartes : {recipeWords(intent.recipe)}.</p><blockquote className="border-l-2 pl-2">{text.trim()}</blockquote></div>}
   {step === 3 && <fieldset className="space-y-2 rounded border p-4"><legend className="px-1 font-medium">Fournisseurs à comparer</legend>
    <p className="text-sm">Même texte, même intention, même recette neutre. Les réglages natifs et la voix diffèrent par nature : chaque carte les montre.</p>
-   {cards.map(card => <div key={card.provider} className="rounded border p-2"><label className="flex gap-2"><input type="checkbox" aria-label={`Comparer ${PROVIDER_LABELS[card.provider]}`} checked={selected.includes(card.provider)} disabled={!card.available} onChange={e => toggle(card.provider, e.target.checked)}/><span><strong>{PROVIDER_LABELS[card.provider]}</strong> — {card.voice.label}</span></label>
-    <label className="block text-sm">Voix d’atelier pour Max (identifiant chez {PROVIDER_LABELS[card.provider]}, facultatif)<Input aria-label={`Voix d’atelier ${PROVIDER_LABELS[card.provider]}`} maxLength={500} value={workshopVoices[card.provider] ?? ''} onChange={e => { stop(); setWorkshopVoices(old => ({ ...old, [card.provider]: e.target.value })); }}/></label></div>)}
-   <p className="text-sm text-muted-foreground">Une clé absente ou refusée apparaît sur la carte au premier essai ; aucun son n’est simulé. La voix d’atelier ne modifie pas la voix du jeu.</p>
+   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{cards.map(card => <label key={card.provider} className={`flex gap-2 rounded border p-2 text-sm ${card.available ? '' : 'opacity-70'}`}><input type="checkbox" aria-label={`Comparer ${PROVIDER_LABELS[card.provider]}`} checked={selected.includes(card.provider)} disabled={!card.available} onChange={e => toggle(card.provider, e.target.checked)}/><span><strong>{PROVIDER_LABELS[card.provider]}</strong><br/><span className="text-xs">{card.voice.label}</span></span></label>)}</div>
+   <p className="text-xs text-muted-foreground">Les voix de Max se saisissent une seule fois dans <a className="underline" href={adminTabPath('voice')}>Technique → Configuration TTS</a>. Une clé absente ou refusée apparaît sur la carte au premier essai ; aucun son n’est simulé.</p>
    <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => goTo(2)}>Revenir à l’émotion</Button><Button disabled={!chosen.some(card => card.available)} onClick={() => goTo(4)}>Afficher les cartes côte à côte</Button></div>
   </fieldset>}
   {step === 4 && intent && <div className="space-y-3">
    <p className="text-sm">Un clic = une génération auprès du fournisseur (coût inconnu). Un son déjà généré pendant la séance est rejoué sans nouvel appel. Tous en REST : on compare la voix, pas la latence.</p>
-   <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{chosen.map(card => {
+   <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">{chosen.map(card => {
     const done = generated[card.provider]?.key === card.key ? generated[card.provider] : undefined;
     const rating = ratings[card.provider]?.key === card.key ? ratings[card.provider] : undefined;
     const label = PROVIDER_LABELS[card.provider];
     return <article key={card.provider} aria-label={`Carte ${label}`} className="min-w-0 space-y-2 rounded border p-3">
      <h4 className="font-semibold">{label}{card.plan.model ? ` · ${card.plan.model}` : ''}</h4>
      <p className="text-sm">{card.voice.label}</p>
-     <p className="text-sm"><strong>Recette :</strong> {recipeWords(intent.recipe)}</p>
-     <div className="text-sm"><strong>Paramètres appliqués</strong><ul className="list-disc pl-5">{card.plan.parameters.map(p => <li key={p.label}>{p.label} : {String(p.value)}</li>)}</ul></div>
-     <div className="text-sm"><strong>Ignoré par ce fournisseur</strong><ul className="list-disc pl-5">{card.plan.ignored.map(item => <li key={item}>{item}</li>)}</ul></div>
-     {!card.available ? <p role="note">Indisponible : aucune voix configurée. Ajoutez une voix d’atelier à l’étape 3.</p>
+     {card.plan.note && <p role="note" className="text-xs text-amber-300/90">{card.plan.note}</p>}
+     <div className="text-xs"><strong>Paramètres appliqués</strong><ul className="list-disc pl-5">{card.plan.parameters.map(p => <li key={p.label}>{p.label} : {String(p.value)}</li>)}</ul></div>
+     <div className="text-xs"><strong>Ignoré par ce fournisseur</strong><ul className="list-disc pl-5">{card.plan.ignored.map(item => <li key={item}>{item}</li>)}</ul></div>
+     {!card.available ? <p role="note">Indisponible : aucune voix configurée dans Technique → Configuration TTS.</p>
       : <Button disabled={!!busy || saving || !text.trim()} onClick={() => void generate(card)}>{done ? `Réécouter ${label} (sans nouvel appel)` : `Générer et écouter ${label}`}</Button>}
      {busy === card.provider && <Button variant="outline" onClick={stop}>Arrêter</Button>}
      {failures[card.provider] && <p role="alert" className="text-destructive">{label} indisponible ou en échec : {failures[card.provider]}</p>}
@@ -209,7 +212,9 @@ export default function SpeechIntentWorkshop() {
      </fieldset>
     </article>;
    })}</div>
-   <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => goTo(3)}>Revenir aux fournisseurs</Button><Button disabled={!canSave} onClick={() => void saveTrial()}>Enregistrer l’essai et mes notes</Button></div>
+   {savedOnce ? <div className="flex flex-wrap gap-2 rounded border p-3"><span className="w-full text-sm font-medium">Essai enregistré. Faire un autre test :</span>
+     <Button onClick={() => newTest(2)}>Même texte, autre émotion</Button><Button variant="outline" onClick={() => newTest(1)}>Autre texte</Button></div>
+    : <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => goTo(3)}>Revenir aux fournisseurs</Button><Button disabled={!canSave} onClick={() => void saveTrial()}>Enregistrer l’essai et mes notes</Button></div>}
    <p className="text-sm text-muted-foreground">Seules les cartes écoutées peuvent être notées. Une note de 5 n’active rien et ne change pas le fournisseur du jeu.</p>
   </div>}
   <section aria-label="Résultats par intention" className="space-y-2 rounded border p-4">

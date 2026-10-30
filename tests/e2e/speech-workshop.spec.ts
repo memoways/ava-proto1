@@ -31,6 +31,7 @@ test('AP4 : atelier par intention, puis banc AP2 replié et comparaisons retrouv
  const values: Record<string, unknown> = {
   ava_speech_performance: { enabled: true, version: 'fixture-v1', gradiumTagsEnabled: false, byCharacter: { max: { Retenu: { emotion: 'fragile', delivery: 'measured', speed: 0.9, pauses: 'long', instruction: '' } } } },
   ava_tts_settings_gradium: { streamingEnabled: false, settingsVersion: 2, outputFormat: 'wav', byCharacter: { max: { paddingBonus: 0.2 } } },
+  ava_tts_character_voices: { max: { fish: 'max-fish-fixture' } },
   ava_llm_settings: { LLM_MODEL: 'fixture-model' }, ava_gameplay_settings: { MAX_PROMPT_VARIANT: 'optimized_v3' },
  };
  let audioCalls = 0;
@@ -145,14 +146,22 @@ test('AP4 : atelier par intention, puis banc AP2 replié et comparaisons retrouv
  await expect(page.getByLabel('Étape courante')).toContainText('Étape 2 sur 4');
  await page.getByRole('radio', { name: /Peur — La peur accélère/ }).check();
  await page.getByRole('button', { name: 'Continuer vers les fournisseurs' }).click();
- await expect(page.getByRole('checkbox', { name: 'Comparer Fish Audio' })).toBeDisabled();
+ // AP4-bis: Max's Fish voice comes from Technique → Configuration TTS; providers sit in columns.
+ await expect(page.getByRole('checkbox', { name: 'Comparer Fish Audio' })).toBeEnabled();
+ await expect(page.locator('label').filter({ hasText: 'Fish Audio' })).toContainText('Voix de Max (configuration TTS)');
+ const [gPick, fPick] = [await page.getByRole('checkbox', { name: 'Comparer Gradium' }).boundingBox(), await page.getByRole('checkbox', { name: 'Comparer Fish Audio' }).boundingBox()];
+ expect(Math.abs((gPick?.y ?? 0) - (fPick?.y ?? 1))).toBeLessThan(2);
+ await page.getByRole('checkbox', { name: 'Comparer Fish Audio' }).check();
  for (const name of ['ElevenLabs', 'Cartesia']) await page.getByRole('checkbox', { name: `Comparer ${name}` }).uncheck();
  await expect(page.getByRole('checkbox', { name: 'Comparer Inworld' })).toBeChecked();
  await page.getByRole('button', { name: 'Afficher les cartes côte à côte' }).click();
- await expect(page.getByRole('article')).toHaveCount(2);
+ await expect(page.getByRole('article')).toHaveCount(3);
  const gradiumCard = page.getByRole('article', { name: 'Carte Gradium' }), inworldCard = page.getByRole('article', { name: 'Carte Inworld' });
- const [gBox, iBox] = [await gradiumCard.boundingBox(), await inworldCard.boundingBox()];
+ const fishCard = page.getByRole('article', { name: 'Carte Fish Audio' });
+ await expect(gradiumCard).toContainText('Gradium ne joue pas d’émotion par réglage');
+ const [gBox, iBox, fBox] = [await gradiumCard.boundingBox(), await inworldCard.boundingBox(), await fishCard.boundingBox()];
  expect(Math.abs((gBox?.y ?? 0) - (iBox?.y ?? 1))).toBeLessThan(2);
+ expect(Math.abs((gBox?.y ?? 0) - (fBox?.y ?? 1))).toBeLessThan(2);
  const before = audioCalls;
  await page.getByRole('button', { name: 'Générer et écouter Gradium' }).click();
  await expect(page.getByRole('button', { name: 'Réécouter Gradium (sans nouvel appel)' })).toBeVisible();
@@ -174,15 +183,32 @@ test('AP4 : atelier par intention, puis banc AP2 replié et comparaisons retrouv
  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
  const [gNarrow, iNarrow] = [await gradiumCard.boundingBox(), await inworldCard.boundingBox()];
  expect((iNarrow?.y ?? 0)).toBeGreaterThan((gNarrow?.y ?? 0) + (gNarrow?.height ?? 0) - 1);
+ // AP4-bis: another test from the same screen, without changing tab.
+ await page.setViewportSize({ width: 1280, height: 900 });
+ await page.getByRole('button', { name: 'Même texte, autre émotion' }).click();
+ await expect(page.getByLabel('Étape courante')).toContainText('Étape 2 sur 4');
+ await page.getByRole('radio', { name: /Colère contenue/ }).check();
+ await page.getByRole('button', { name: 'Continuer vers les fournisseurs' }).click();
+ await expect(page.getByRole('checkbox', { name: 'Comparer Inworld' })).toBeChecked();
+ await page.getByRole('button', { name: 'Afficher les cartes côte à côte' }).click();
+ await page.getByRole('button', { name: 'Générer et écouter Gradium' }).click();
+ await expect(page.getByRole('button', { name: 'Réécouter Gradium (sans nouvel appel)' })).toBeVisible();
+ await expect(page.getByRole('button', { name: 'Enregistrer l’essai et mes notes' })).toBeDisabled();
+ await page.getByRole('button', { name: 'Recommencer un test' }).click();
+ await expect(page.getByLabel('Étape courante')).toContainText('Étape 1 sur 4');
+ await page.setViewportSize({ width: 390, height: 844 });
+ expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
  await page.reload();
  const results = page.getByRole('region', { name: 'Résultats par intention' });
  await expect(results.getByRole('row', { name: /Peur/ })).toContainText('2 (1)');
  await expect(results.getByRole('row', { name: /Peur/ })).toContainText('5 (1)');
  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
- expect(audioCalls).toBe(6); expect(errors).toEqual([]);
+ expect(audioCalls).toBe(7); expect(errors).toEqual([]);
  await page.goto('/admin/technique/configuration-tts');
  await expect(page.getByRole('link', { name: /Ouvrir l’atelier de parole/ })).toBeVisible();
  await expect(page.getByRole('button', { name: /Écouter|Tester/ })).toHaveCount(0);
  await expect(page.getByText('A3 — Réglages fidèles et auditions')).toHaveCount(0);
- expect(audioCalls).toBe(6);
+ await expect(page.getByLabel('Voice ID Max Fish Audio')).toHaveValue('max-fish-fixture');
+ await expect(page.getByLabel('Voice ID Max Gradium')).toHaveValue('max-fixture');
+ expect(audioCalls).toBe(7);
 });

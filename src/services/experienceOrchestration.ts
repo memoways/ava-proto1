@@ -263,6 +263,15 @@ export async function updateCharacterRuntimeProfile(
   if (error) throw error;
 }
 
+/** Voice-only sync from Technique → Configuration TTS; other profile fields stay untouched. */
+export async function updateCharacterRuntimeVoice(id: string, ttsVoiceId: string): Promise<void> {
+  const { error } = await supabase
+    .from("character_runtime_profiles" as never)
+    .update({ tts_voice_id: ttsVoiceId, updated_at: new Date().toISOString() } as never)
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function updateCharacterRuntimeActivation(id: string, enabled: boolean): Promise<void> {
   const { error } = await supabase
     .from("character_runtime_profiles" as never)

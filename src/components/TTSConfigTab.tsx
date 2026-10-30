@@ -52,6 +52,7 @@ import {
 } from "@/services/settingsService";
 import { listCharacterRuntimeProfiles } from "@/services/experienceOrchestration";
 import { PROVIDER_ACTING_SUPPORT } from "@/services/tts/performanceIntent";
+import CharacterVoicesPanel from "@/components/CharacterVoicesPanel";
 const GRADIUM_CHARACTER_ORDER = ["max", "emma"];
 
 function ActingNote({
@@ -277,7 +278,7 @@ export default function TTSConfigTab() {
           Configure les fournisseurs, modèles et paramètres utilisés dans le jeu. Les auditions se font dans Expérience → Atelier de parole.
         </p>
         <p className="text-sm text-muted-foreground">
-          Les <strong>Voice ID</strong> se règlent par personnage dans Expérience → Orchestration. Gradium a des réglages fins distincts par personnage dans le panneau ci-dessous.
+          Les <strong>Voice ID</strong> de chaque personnage, pour chaque fournisseur, se saisissent une seule fois ci-dessous. Gradium a des réglages fins distincts par personnage plus bas.
         </p>
       </div>
 
@@ -312,6 +313,8 @@ export default function TTSConfigTab() {
           </p>
         )}
       </section>
+
+      <CharacterVoicesPanel />
 
       {/* ===== ElevenLabs panel ===== */}
       <section className="border rounded-lg p-4 space-y-4">

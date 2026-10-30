@@ -11,10 +11,12 @@ vi.mock('@/services/tts/providerSettings', async original => {
 });
 vi.mock('@/services/tts/speechWorkshopStore', async original => ({ ...await original<typeof import('@/services/tts/speechWorkshopStore')>(), readWorkshop: vi.fn(async () => null), saveIntentTrial: vi.fn() }));
 vi.mock('./SpeechAuditionBench', () => ({ default: () => <p>Banc A/B AP2 monté</p> }));
+vi.mock('@/services/tts/characterVoices', async original => ({ ...await original<typeof import('@/services/tts/characterVoices')>(), loadCharacterVoicesFromDB: vi.fn(async () => ({})) }));
 import { setActiveEnvironment } from '@/services/environmentContext';
 import { SpeechAuditionRunner } from '@/services/tts/speechAudition';
 import { INTENT_PASSAGES } from '@/services/tts/speechIntentWorkshop';
 import { readWorkshop, saveIntentTrial, type WorkshopDocument } from '@/services/tts/speechWorkshopStore';
+import { loadCharacterVoicesFromDB } from '@/services/tts/characterVoices';
 import SpeechIntentWorkshop from './SpeechIntentWorkshop';
 
 const heard = { requests: [{ transport: 'rest' as const, body: { voice_id: 'x' } }], transport: 'rest' as const, cached: false, providerCalls: 1 };
@@ -55,8 +57,17 @@ describe('AP4 — intent workshop', () => {
   expect(screen.getByRole('checkbox', { name: 'Comparer Fish Audio' })).toBeDisabled();
   expect(screen.getByRole('checkbox', { name: 'Comparer Fish Audio' }).closest('div')).toHaveTextContent('Indisponible : aucune voix configurée');
   expect(screen.getByRole('checkbox', { name: 'Comparer Gradium' })).toBeChecked();
-  fireEvent.change(screen.getByLabelText('Voix d’atelier Fish Audio'), { target: { value: 'max-fish' } });
-  expect(screen.getByRole('checkbox', { name: 'Comparer Fish Audio' })).toBeEnabled();
+  expect(screen.getByRole('link', { name: 'Technique → Configuration TTS' })).toBeInTheDocument();
+ });
+ it('uses Max’s voices from the TTS configuration for every provider', async () => {
+  vi.mocked(loadCharacterVoicesFromDB).mockResolvedValueOnce({ max: { fish: 'max-fish', gradium: 'max-gradium-v2' } });
+  const listen = vi.spyOn(SpeechAuditionRunner.prototype, 'listen').mockResolvedValue(heard);
+  await toCards(['Gradium', 'Fish Audio']);
+  expect(screen.getByRole('article', { name: 'Carte Fish Audio' })).toHaveTextContent('Voix de Max (configuration TTS)');
+  expect(screen.getByRole('article', { name: 'Carte Gradium' })).toHaveTextContent('Gradium ne joue pas d’émotion par réglage');
+  fireEvent.click(screen.getByRole('button', { name: 'Générer et écouter Fish Audio' }));
+  await screen.findByRole('button', { name: 'Réécouter Fish Audio (sans nouvel appel)' });
+  expect(listen.mock.calls[0][3]).toMatchObject({ voiceId: 'max-fish' });
  });
  it('sends the same text and intent to every card, one provider call per click, and replays without a new call', async () => {
   const listen = vi.spyOn(SpeechAuditionRunner.prototype, 'listen').mockResolvedValue(heard);
@@ -104,6 +115,13 @@ describe('AP4 — intent workshop', () => {
   const results = screen.getByRole('region', { name: 'Résultats par intention' });
   expect(within(results).getByRole('row', { name: /Peur/ })).toHaveTextContent('3 (1)');
   expect(within(results).getByRole('row', { name: /Peur/ })).toHaveTextContent('5 (1)');
+  fireEvent.click(screen.getByRole('button', { name: 'Même texte, autre émotion' }));
+  expect(screen.getByLabelText('Étape courante')).toHaveTextContent('Étape 2 sur 4');
+  expect(screen.getByRole('button', { name: 'Continuer vers les fournisseurs' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('radio', { name: /Colère contenue/ })); fireEvent.click(screen.getByRole('button', { name: 'Continuer vers les fournisseurs' }));
+  expect(screen.getByRole('checkbox', { name: 'Comparer Inworld' })).toBeChecked();
+  fireEvent.click(screen.getByRole('button', { name: 'Recommencer un test' }));
+  expect(screen.getByLabelText('Étape courante')).toHaveTextContent('Étape 1 sur 4');
  });
  it('mounts the AP2 bench only when advanced options are opened, and stays out of production', async () => {
   const view = render(<MemoryRouter><SpeechIntentWorkshop /></MemoryRouter>);

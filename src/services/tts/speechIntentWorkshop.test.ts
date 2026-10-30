@@ -53,7 +53,11 @@ describe('AP4 — intent → native parameters for each adapter', () => {
   expect(signature('fish').size).toBe(10);
   expect(signature('gradium').size).toBeLessThan(10);
   expect(value('gradium', 'pose', 'Variabilité (temp)')).toBe(value('gradium', 'perdu', 'Variabilité (temp)'));
-  expect(providerPlan('gradium', WORKSHOP_INTENTS[0], base).ignored).toContain('Émotion nommée (balises Gradium fermées)');
+  const gradium = providerPlan('gradium', WORKSHOP_INTENTS[0], base);
+  expect(gradium.ignored).toContain('Émotion (Gradium n’a aucun réglage d’émotion)');
+  expect(gradium.ignored.some(item => item.startsWith('Fidélité à la voix (cfg_coef)'))).toBe(true);
+  expect(gradium.parameters.map(p => p.label)).toEqual(['Variabilité (temp)', 'Rythme global (padding_bonus)']);
+  expect(gradium.note).toMatch(/aucune|ne joue pas d’émotion/);
   expect(value('fish', 'moyen_dramatique', 'Marqueur d’émotion')).toBe(value('fish', 'tres_dramatique', 'Marqueur d’émotion'));
   expect(providerPlan('fish', WORKSHOP_INTENTS[0], base).ignored[0]).toMatch(/aucun marqueur/);
   expect(value('fish', 'confidence', 'Marqueur d’émotion')).toBe('(sad) (whispering)');
@@ -66,11 +70,12 @@ describe('AP4 — intent → native parameters for each adapter', () => {
 });
 
 describe('AP4 — voices and human results', () => {
- it('uses Max’s game voice only on his provider and never hides a default or missing voice', () => {
+ it('prefers the TTS configuration voice, then Max’s game voice, and never hides a default or missing voice', () => {
   const game = { provider: 'gradium' as const, voice: 'max-gradium' };
   expect(resolveCardVoice('gradium', game, undefined, 'default')).toMatchObject({ voice: 'max-gradium', source: 'game' });
+  expect(resolveCardVoice('gradium', game, 'max-gradium-v2', 'default')).toMatchObject({ voice: 'max-gradium-v2', source: 'catalogue' });
   expect(resolveCardVoice('fish', game, undefined, 'fish-ref')).toMatchObject({ source: 'provider_default', label: expect.stringContaining('pas la voix de Max') });
-  expect(resolveCardVoice('fish', game, ' max-fish ', 'fish-ref')).toMatchObject({ voice: 'max-fish', source: 'workshop' });
+  expect(resolveCardVoice('fish', game, ' max-fish ', 'fish-ref')).toMatchObject({ voice: 'max-fish', source: 'catalogue', label: 'Voix de Max (configuration TTS)' });
   expect(resolveCardVoice('cartesia', game, '', '')).toMatchObject({ voice: null, source: null, label: expect.stringMatching(/^Indisponible/) });
   expect(resolveCardVoice('elevenlabs', game, undefined, null)).toMatchObject({ voice: null, source: 'provider_default' });
  });
