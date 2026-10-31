@@ -22,6 +22,8 @@ interface TTSRequest {
   // Request stitching — prosodic context for natural inter-sentence flow
   previousText?: string;
   nextText?: string;
+  /** `list_models`: returns the TTS models this account can use (ids and names only, never the key). */
+  action?: "list_models";
   // Output format / latency tuning (overridable per call)
   outputFormat?: string;
   optimizeStreamingLatency?: number;
@@ -41,7 +43,20 @@ serve(async (req) => {
     }
 
     const body: TTSRequest = await req.json();
-    
+
+    if (body.action === 'list_models') {
+      const listed = await fetch('https://api.elevenlabs.io/v1/models', { headers: { 'xi-api-key': ELEVENLABS_API_KEY } });
+      const raw = await listed.text();
+      if (!listed.ok) {
+        return new Response(JSON.stringify({ error: `ElevenLabs error: ${listed.status}`, details: raw }),
+          { status: listed.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const models = (JSON.parse(raw) as Array<{ model_id: string; name?: string; can_do_text_to_speech?: boolean }>)
+        .filter((m) => m.can_do_text_to_speech)
+        .map((m) => ({ id: m.model_id, name: m.name }));
+      return new Response(JSON.stringify({ models }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     if (!body.text || body.text.trim() === '') {
       throw new Error('Text is required');
     }

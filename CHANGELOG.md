@@ -14,6 +14,8 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Intentions de l'atelier : plus de ralentissement 0,88 ; Fish et Inworld ne sont
   jamais ralentis hors mapping du jeu ; température Fish/Inworld relevée avec
   l'intensité (+0,12 par niveau), visible dans le plan de carte Fish.
+- `proxy-tts` : action admin `list_models` (ids des modèles TTS du compte, sans clé) et
+  `fetchElevenLabsAccountModels()` ; utilisable seulement après déploiement Lovable.
 - Non fait : preuve du déploiement `proxy-tts` et liste des modèles ElevenLabs
   (pas de clé, pas de logs via le MCP), diagnostic Inworld, A/B à noter.
 

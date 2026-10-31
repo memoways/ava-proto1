@@ -125,3 +125,15 @@ export const elevenLabsProvider: TTSProvider = {
     };
   },
 };
+
+/** Admin diagnostic: TTS models the ElevenLabs account can really use (needs the deployed `proxy-tts` list_models action). */
+export async function fetchElevenLabsAccountModels(): Promise<{ id: string; name?: string }[]> {
+  const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-tts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "list_models" }),
+  });
+  const raw = await response.text();
+  if (!response.ok) throw new Error(`ElevenLabs models error: ${response.status}${parseElevenLabsErrorDetails(raw).message ? `: ${parseElevenLabsErrorDetails(raw).message}` : ""}`);
+  return (parseJsonRecord(raw)?.models as { id: string; name?: string }[] | undefined) ?? [];
+}
