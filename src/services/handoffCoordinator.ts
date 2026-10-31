@@ -25,7 +25,17 @@ export function needsHandoffPreparation(text: string): boolean {
     || /\bje\s+(?:vais|peux|pourrais|pourrai)\s+(?:(?:le|la|les)\s+)?(?:appeler|joindre|contacter|chercher)\s*(?:max|emma|pour\s+(?:toi|vous))?\s*$/.test(clause.trim())
     || /\bje\s+(?:vais|peux|pourrais|pourrai)\s+(?:appeler|joindre|contacter|chercher)\s+(?:max|emma)\b/.test(clause)
     || /\bje\s+(?:(?:vais|peux|pourrais)\s+)?(?:te|vous)\s+(?:mets|mettre)\s+(?:en\s+relation|en\s+ligne)\b/.test(clause)
-    || /\b(?:tu\s+peux|vous\s+pouvez)\s+(?:appeler|joindre|contacter)\s+(?:max|emma)\b/.test(clause));
+    || /\b(?:tu\s+peux|vous\s+pouvez)\s+(?:appeler|joindre|contacter)\s+(?:max|emma)\b/.test(clause)
+    // Session e6918bd8 (G1.3): « Je passe Emma » and « je peux lui transmettre l'appel »
+    // were spoken unheld, so the GM-validated consent was dropped as unprepared.
+    || /\bje\s+(?:(?:vais|peux|pourrais|pourrai)\s+)?(?:(?:te|vous)\s+)?(?:re)?pass(?:e|er)\s+(?:max|emma)\b/.test(clause)
+    || /\bje\s+(?:(?:vais|peux|pourrais|pourrai)\s+)?(?:(?:te|vous|lui)\s+)?(?:transmets|transmettre|(?:re)?pass(?:e|er)|transfere(?:r)?)\s+(?:l'appel|la\s+ligne|le\s+telephone|le\s+combine)\b/.test(clause));
+}
+
+/** A withheld candidate loses only its transfer-offer sentences; the rest stays the character's words. */
+export function withoutTransferOffer(text: string): string {
+  const sentences = text.match(/[^.!?…]+(?:[.!?…]+[»”"]*|$)\s*/gu) ?? [];
+  return sentences.filter(sentence => !needsHandoffPreparation(sentence)).join('').trim();
 }
 export { withdrawsHandoff } from './characterConversation';
 

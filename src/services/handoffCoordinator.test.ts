@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ConversationMessage } from '@/types';
-import { HandoffCoordinator, completedCallExchanges, candidateEvidence, withdrawsHandoff, needsHandoffPreparation } from './handoffCoordinator';
+import { HandoffCoordinator, completedCallExchanges, candidateEvidence, withdrawsHandoff, needsHandoffPreparation, withoutTransferOffer } from './handoffCoordinator';
 import { advanceHandoffTurn, assessHandoffTurn, restoreHandoffOffer } from './characterHandoffState';
 import { validInput } from './characterHandoff.fixtures';
 
@@ -23,6 +23,22 @@ describe('F1 request lifetime and delivered exchanges', () => {
     'Je vais aller le chercher dans le salon et lui dire que vous voulez lui parler directement.',
     'Tu peux appeler Emma.', 'Je peux te mettre en relation avec Emma.'])('still holds an actual transfer candidate: %s', text => {
     expect(needsHandoffPreparation(text)).toBe(true);
+  });
+  // Session e6918bd8 (G1.3): these offers were spoken unheld and the GM-validated consent was dropped.
+  it.each(['Je passe Emma.', 'Je passe Emma maintenant.', 'Je vais passer Emma.',
+    'Oui… je peux lui transmettre l’appel. Elle est dans la cuisine.', 'Je lui passe l’appel.',
+    'Je transmets l’appel à Emma.', 'Je te repasse Max.'])('holds a direct transfer phrasing: %s', text => {
+    expect(needsHandoffPreparation(text)).toBe(true);
+  });
+  it.each(['Je passe mes nuits à attendre Emma.', 'Je ne passe pas Emma.', 'Il m’a transmis l’appel hier.',
+    'Je passe devant la chambre d’Emma.'])('does not hold an unrelated passer/transmettre: %s', text => {
+    expect(needsHandoffPreparation(text)).toBe(false);
+  });
+  it('drops only the transfer sentences of a withheld candidate', () => {
+    expect(withoutTransferOffer('Oui… je peux lui transmettre l’appel. Elle est dans la cuisine. Je passe Emma.'))
+      .toBe('Oui… Elle est dans la cuisine.');
+    expect(withoutTransferOffer('Je passe Emma maintenant.')).toBe('');
+    expect(withoutTransferOffer('Elle ne dort pas. Je ne sais pas quoi lui dire')).toBe('Elle ne dort pas. Je ne sais pas quoi lui dire');
   });
   it('uses the same lease for any registry member and rejects a replaced request/call/version', () => {
     const coordinator = new HandoffCoordinator<'one' | 'two' | 'three'>();

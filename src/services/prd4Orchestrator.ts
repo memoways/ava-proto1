@@ -12,7 +12,7 @@ import { observeVoice, observeService, type VoiceObserver, type ServiceObservati
  *  - Post-tour ordinaire asynchrone ; candidat de passage préparé avant sa confirmation vocale.
  */
 import { SimulateMaxResponseError, simulateMaxResponse, type MaxAgentInput, type SimulateMaxDiagnosticContext } from "@/agents/maxAgent";
-import { candidateEvidence, needsHandoffPreparation, HANDOFF_PREPARATION_TIMEOUT_MS } from "./handoffCoordinator";
+import { candidateEvidence, needsHandoffPreparation, withoutTransferOffer, HANDOFF_PREPARATION_TIMEOUT_MS } from "./handoffCoordinator";
 import { evaluatePostTurnPRD4, commitHandoffCandidate, type PRD4PostTurnDetailedResult } from "@/agents/gameMasterPRD4";
 import type { PRD4LabelResult } from "@/agents/gameMasterLabelPRD4";
 import {
@@ -57,7 +57,7 @@ import {
   normalizeSessionDurationSeconds,
 } from "@/config/experienceRuntime";
 import { buildExperienceFrame } from "@/services/experienceFrame";
-import { canRetryCharacterResponse, characterRecoveryLine, characterHandoffPauseLine, latestCallTransfer } from './characterConversationContinuity';
+import { canRetryCharacterResponse, characterRecoveryLine, characterHandoffPauseLine, followsHandoffPause, latestCallTransfer } from './characterConversationContinuity';
 import { validateRecoverySpeech } from './responseIntentStream';
 import type { ConversationMessage, ConversationTurnTraceV1, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 
@@ -559,7 +559,10 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     }
     if (!candidateReleased) {
       handoffPreparationBlocked = true;
-      maxResponse = characterHandoffPauseLine(activeCharacter, input.conversationHistory);
+      // A second pause in a row loops the scene (session e6918bd8): keep the
+      // character's own words, without the transfer it cannot promise yet.
+      const remainder = followsHandoffPause(activeCharacter, input.conversationHistory) ? withoutTransferOffer(maxResponse) : '';
+      maxResponse = remainder || characterHandoffPauseLine(activeCharacter, input.conversationHistory);
       if (input.playedSpeechStateRef) input.playedSpeechStateRef.current = null;
     }
   }

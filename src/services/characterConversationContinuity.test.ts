@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { characterHandoffGreeting, characterHandoffPauseLine, characterRecallGreeting, characterRecoveryLine, characterRegister, latestCallTransfer, createInitialGreetingSelector, initialGreetingLines, greetingDelivery } from './characterConversationContinuity';
+import { characterHandoffGreeting, characterHandoffPauseLine, followsHandoffPause, characterRecallGreeting, characterRecoveryLine, characterRegister, latestCallTransfer, createInitialGreetingSelector, initialGreetingLines, greetingDelivery } from './characterConversationContinuity';
 import { projectDeliveredConversation } from './responseDelivery';
 import { buildExperienceFrame } from './experienceFrame';
 import type { ConversationMessage } from '@/types';
@@ -96,6 +96,15 @@ describe('scripted lines follow the register already used in the call (recette G
       expect(characterRecoveryLine('max', recette)).not.toMatch(/\bvous\b|Reprenez|Attendez/);
     }
     expect(characterHandoffPauseLine('max', recette.slice(0, 1))).toMatch(/vous/);
+  });
+
+  it('recognizes a pause the character just said, in either register', () => {
+    const user: ConversationMessage = { role: 'user', content: 'Tu pourrais me passer Emma', timestamp: 0 };
+    const pause: ConversationMessage = { role: 'max', content: 'De quoi veux-tu lui parler, au juste ?', timestamp: 1 };
+    expect(followsHandoffPause('max', [user, pause])).toBe(true);
+    expect(followsHandoffPause('max', [user, pause, user])).toBe(true);
+    expect(followsHandoffPause('max', [pause, user, { role: 'max', content: 'Je ne sais pas.', timestamp: 2 }, user])).toBe(false);
+    expect(followsHandoffPause('emma', [user, pause])).toBe(false);
   });
 
   it('greets a returning player in the register the target already used', () => {

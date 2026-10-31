@@ -231,6 +231,21 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     expect(commitHandoffCandidate).toHaveBeenCalledWith(expect.anything(), expect.anything(), undefined, false);
   });
 
+  it('G1.3 never repeats a transfer pause: the next withheld reply keeps its own words', async () => {
+    const history: ConversationMessage[] = [
+      { role: 'user', content: 'Tu pourrais me passer Emma', timestamp: 0, spokenWith: 'max' },
+      { role: 'max', content: 'De quoi veux-tu lui parler, au juste ?', timestamp: 1, spokenWith: 'max' },
+    ];
+    vi.mocked(simulateMaxResponse).mockResolvedValueOnce({ systemPrompt: 'system',
+      response: 'Elle est dans la cuisine, elle ne dit rien. Je te la passe.' });
+    const result = await processPRD4Turn({ sessionId: 'session', characterContext: MAX_CONTEXT,
+      conversationHistory: history, userMessage: 'Comment elle va ?', userRole: null,
+      timeElapsedSeconds: 10, handoffRequested: true, prepareHandoff: async () => false });
+    expect(result).toMatchObject({ handoffPreparationBlocked: true,
+      maxResponse: 'Elle est dans la cuisine, elle ne dit rien.' });
+    await result.postTurnPromise;
+  });
+
   it('F1: ordinary continuation with an open request returns before GM, with one existing call', async () => {
     let finish!: (value: PRD4PostTurnEvaluation) => void;
     vi.mocked(evaluatePostTurnPRD4).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
