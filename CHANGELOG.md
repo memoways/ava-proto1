@@ -16,6 +16,12 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   l'intensité (+0,12 par niveau), visible dans le plan de carte Fish.
 - `proxy-tts` : action admin `list_models` (ids des modèles TTS du compte, sans clé) et
   `fetchElevenLabsAccountModels()` ; utilisable seulement après déploiement Lovable.
+- Atelier : texte joué avec ruptures de rythme (`performedText`) — pour les intentions à pauses
+  longues, virgules en « … », premier mot répété (« Je… je »), arrêt en milieu de phrase à
+  l'intensité 2 ; pauses courtes : virgules retirées. Atelier seulement, déterministe.
+- ElevenLabs « 400 unsupported_model » persistant : cause = Edge Function `proxy-tts`
+  déployée obsolète (log `lat=0` d'avant #116, alors que le code omet le paramètre pour v4).
+  Redéployée par Lovable depuis `90cf653` ; à confirmer par une génération (`lat=omitted`).
 - Non fait : preuve du déploiement `proxy-tts` et liste des modèles ElevenLabs
   (pas de clé, pas de logs via le MCP), diagnostic Inworld, A/B à noter.
 

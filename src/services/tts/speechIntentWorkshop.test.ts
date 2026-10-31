@@ -92,3 +92,19 @@ describe('AP4 — voices and human results', () => {
   expect(JSON.parse(exportIntentResults(trials, 'json')).rows[0]).toMatchObject({ intent: 'Peur', fish: { mean: 3, count: 2 }, inworld: null });
  });
 });
+
+import { performedText } from './speechIntentWorkshop';
+describe('AP4-quater — workshop delivery text', () => {
+ const lost = WORKSHOP_INTENTS.find(i => i.id === 'perdu')!;
+ const rushed = WORKSHOP_INTENTS.find(i => i.id === 'essouffle')!;
+ const calm = WORKSHOP_INTENTS.find(i => i.id === 'detache')!;
+ it('breaks the rhythm for long-pause intents, deterministically', () => {
+  const out = performedText(lost, 'Je ne sais pas, je crois que tout est fini. Elle est partie hier soir sans rien dire à personne.');
+  expect(out).toContain('Je… je ne sais pas… je crois');
+  expect(out).toBe(performedText(lost, 'Je ne sais pas, je crois que tout est fini. Elle est partie hier soir sans rien dire à personne.'));
+ });
+ it('removes commas for short pauses and leaves other intents untouched', () => {
+  expect(performedText(rushed, 'Vite, vite, viens.')).toBe('Vite vite viens.');
+  expect(performedText(calm, ' Bonjour, ça va. ')).toBe('Bonjour, ça va.');
+ });
+});
