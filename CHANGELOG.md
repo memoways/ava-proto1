@@ -24,6 +24,10 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   (`local_salvage`) au lieu d'un second appel LLM.
 - Télémétrie : spans client `character_*` (RAG, lectures de contexte, construction du prompt,
   tentative, raison de relance, sauvetage local, garde de gravité, préparation de passage).
+- Correctif L1 (lecture progressive ElevenLabs) : si la lecture se termine avant que la
+  requête échoue (tampon vide), `finished` restait suspendu pour toujours et le tour ne finissait
+  jamais. L'échec rejette désormais toujours la génération. Cause de l'E2E « un accord généré mais
+  non joué » instable sur main (2/8 sous charge) et systématique en CI sur cette branche.
 - Non changés sans accord : `endOfSpeechMs` sandbox (2 000 ms), streaming LLM, modèle de Max.
 
 ## [Recette L1.3 — prompt G1 : gravité, Ava, latence réelle] — 2026-10-31

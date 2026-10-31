@@ -120,3 +120,7 @@ occupe tout l'appel. »
   pas les 0,7–1,1 s entre `context_ready` et `llm_request` ; les spans tranchent à la recette.
 - Validations : `npm run test:quality` vert (lint sans erreur, 1 avertissement préexistant ;
   unitaires, régression, intégration, build). Une simulation ne prouve pas le rendu vocal.
+- Correctif L1 découvert par la CI : `elevenLabsStreamPlayer` — un `ended` précoce réglait la
+  lecture en attendant la génération, puis l'échec de la requête sortait de `failAll` sans
+  rejeter la génération : tour bloqué sur « répond… ». `failAll` rejette maintenant toujours la
+  génération. E2E concerné : 12/12 sous charge (avant : 5 échecs sur 8 ; main : 2 sur 8).

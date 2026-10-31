@@ -102,6 +102,9 @@ export function createElevenLabsStreamingPlayback(
   generationP.catch(() => {});
 
   const failAll = (err: unknown) => {
+    // An early `ended` (empty buffer) settles playback but waits for generation:
+    // a later request failure must still reject it, or `finished` never settles.
+    rejectGeneration(err);
     if (settled) return;
     settled = true;
     rejectStarted(err);
