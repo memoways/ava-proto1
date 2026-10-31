@@ -17,12 +17,13 @@ export interface ElevenLabsModelCapabilities {
   audioTags: boolean;
 }
 
-export const ELEVENLABS_EXPRESSIVE_MODEL = "eleven_v4";
+/** Chosen by ear on 31 Oct 2026 (lot L1): v4 expressiveness, first byte ~0.4 s instead of ~1.1 s. */
+export const ELEVENLABS_EXPRESSIVE_MODEL = "eleven_v4_turbo";
 export const ELEVENLABS_FALLBACK_MODEL = "eleven_multilingual_v2";
 
 export const ELEVENLABS_MODEL_CAPABILITIES: ElevenLabsModelCapabilities[] = [
-  { id: "eleven_v4", label: "Eleven v4", description: "Le plus émotif, balises audio — défaut expressif de l'atelier", maxChars: 10000, streamingLatency: false, stitching: false, audioTags: true },
-  { id: "eleven_v4_turbo", label: "Eleven v4 Turbo", description: "Expressif et rapide (~100 ms), balises audio", maxChars: 10000, streamingLatency: false, stitching: false, audioTags: true },
+  { id: "eleven_v4", label: "Eleven v4", description: "Le plus émotif, balises audio, mais lent (1er octet ~1,1 s)", maxChars: 10000, streamingLatency: false, stitching: false, audioTags: true },
+  { id: "eleven_v4_turbo", label: "Eleven v4 Turbo", description: "Expressif et rapide (1er octet ~0,4 s), balises audio — défaut expressif du jeu et de l'atelier", maxChars: 10000, streamingLatency: false, stitching: false, audioTags: true },
   { id: "eleven_v3", label: "Eleven v3", description: "Jeu dramatique, balises audio", maxChars: 5000, streamingLatency: false, stitching: false, audioTags: true },
   { id: "eleven_v3_conversational", label: "Eleven v3 Conversational", description: "Dialogue temps réel (~165 ms), balises audio", maxChars: 5000, streamingLatency: false, stitching: false, audioTags: true },
   { id: "eleven_multilingual_v2", label: "Multilingual v2", description: "Meilleure diction et continuité — défaut du jeu pour Max", maxChars: 10000, streamingLatency: true, stitching: true, audioTags: false },

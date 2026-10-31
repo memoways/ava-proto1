@@ -38,6 +38,16 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**L1 implémenté le 31 octobre : ElevenLabs lu au fil de l'eau, v4 Turbo retenu.**
+L'écart de ~4 s avec Gradium venait de l'attente du MP3 complet. Lecture progressive
+MediaSource avec repli blob et coupure nette ; défaut expressif `eleven_v4_turbo`.
+Premier son mesuré à 0,66 s après envoi du texte (v4 : 0,98 s, avant 4,5 s). Le réglage
+sandbox enregistré (`eleven_v4`) est à basculer dans TTS Config ; recette L1.3
+d'Ulrich (Max, 5 tours, Gradium inchangé, interruption) à faire. L1.2 non nécessaire
+d'après les mesures.
+[Mesures et exécution L1](plan_latence_elevenlabs_et_relance_2026-10-31.md#mesure-l10--31-octobre-2026) ·
+[Prompt L2 « retard fin LLM → TTS »](prompt_reprise_latence_lot_l2.md), non lancé.
+
 **R1 implémenté le 31 octobre : répliques de deux à trois phrases avec accroche.**
 Retour d'Ulrich sur ElevenLabs : meilleure voix, mais latence et répliques trop courtes.
 Contrat de flux 45 → 70 mots, règle d'accroche partagée par les quatre variantes,
@@ -46,7 +56,7 @@ vérifiée : `optimized_v3`, `responseStyle` non injecté, Notion « une à troi
 Proposition Notion pour Max non appliquée. Ressenti à valider par Ulrich ; latence
 ElevenLabs accrue jusqu'à L1.
 [Exécution R1](plan_latence_elevenlabs_et_relance_2026-10-31.md#exécution-r1--31-octobre-2026) ·
-[Prompt L1 « ElevenLabs réactif »](prompt_reprise_latence_elevenlabs_lot_l1.md), non lancé.
+[Prompt L1 « ElevenLabs réactif »](prompt_reprise_latence_elevenlabs_lot_l1.md), exécuté.
 
 **AP1 livré techniquement ; utilisabilité rejetée par Ulrich.**
 Accès admin sandbox : Expérience → Atelier de parole,

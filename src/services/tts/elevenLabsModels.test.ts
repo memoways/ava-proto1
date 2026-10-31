@@ -51,9 +51,9 @@ describe("ElevenLabs model capabilities (AP4-ter)", () => {
     }
   });
 
-  it("uses v4 as workshop default and applies audio tags on every tag-capable model", () => {
+  it("uses v4 Turbo as workshop default and applies audio tags on every tag-capable model", () => {
     expect(ELEVENLABS_WORKSHOP_MODEL).toBe(ELEVENLABS_EXPRESSIVE_MODEL);
-    expect(ELEVENLABS_EXPRESSIVE_MODEL).toBe("eleven_v4");
+    expect(ELEVENLABS_EXPRESSIVE_MODEL).toBe("eleven_v4_turbo");
     const intent = intentFromManualEmotion("angry", 2);
     for (const modelId of ["eleven_v4", "eleven_v4_turbo", "eleven_v3", "eleven_v3_conversational"]) {
       expect(supportsElevenLabsAudioTags(modelId)).toBe(true);

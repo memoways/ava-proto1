@@ -71,8 +71,9 @@ export interface TTSGenerateResult {
 export interface TTSStreamGenerationStats {
   provider: TTSProviderId;
   model?: string;
-  /** "websocket" when audio streamed live, "rest_fallback" when the blob path took over. */
-  transport: "websocket" | "rest_fallback";
+  /** "websocket" (Gradium) or "http_stream" (ElevenLabs chunked MP3) when audio streamed
+   *  live, "rest_fallback" when the blob path took over. */
+  transport: "websocket" | "http_stream" | "rest_fallback";
   statusCode?: number;
   /** Time to first audio chunk (ms since handle creation). */
   firstByteMs?: number;

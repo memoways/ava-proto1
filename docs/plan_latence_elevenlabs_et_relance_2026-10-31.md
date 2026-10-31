@@ -1,6 +1,6 @@
 # Mini-plan — latence ElevenLabs et relance conversationnelle
 
-Date : 31 octobre 2026. Statut : R1 choisi par Ulrich et implémenté (voir [Exécution R1](#exécution-r1--31-octobre-2026)) ; L1 non lancé.
+Date : 31 octobre 2026. Statut : R1 implémenté (voir [Exécution R1](#exécution-r1--31-octobre-2026)) ; L1.0 mesuré (voir [Mesure L1.0](#mesure-l10--31-octobre-2026)), v4 Turbo retenu à l'oreille, L1.1 implémenté (voir [Exécution L1.1](#exécution-l11--31-octobre-2026)) ; recette L1.3 à faire par Ulrich.
 
 Retour de test d'Ulrich (31 oct.) : ElevenLabs sonne bien mieux, mais
 1. la latence est nettement supérieure à Gradium ;
@@ -166,3 +166,103 @@ Une réplique de ~70 mots au lieu de ~45 est ~50 % plus longue à synthétiser. 
 L1 n'est pas fait, ElevenLabs attend le MP3 complet : **l'attente avant la première syllabe
 augmente d'autant**. Gradium (chemin incrémental) n'est presque pas touché : il commence
 sur la première phrase. L1.1 (lecture progressive du MP3) compense directement.
+
+## Mesure L1.0 — 31 octobre 2026
+
+Sans code. Sources : `voice_turn_events` (télémétrie v2, origine `app_turn_decision`),
+`audio_latencies` (1er octet / total TTS), via Lovable Cloud ; puis 12 appels `proxy-tts`
+depuis la session admin sandbox (même corps que le fournisseur, réglages TTS courants,
+réplique R1 de Max de 277 caractères ≈ 14 s d'audio, 3 tirages par modèle).
+
+### Ce que montrent les tours réels (sandbox-ulrich, hands-free)
+
+| Jalon (médiane, ms depuis la décision de tour) | Gradium (92 tours) | ElevenLabs v4 (15 tours, 31 oct.) |
+|---|---|---|
+| LLM fini (`llm_response`) | 3 579 | 4 256 |
+| Texte envoyé au TTS (`tts_text_sent`) | 3 646 | 4 610 |
+| 1er octet TTS (`audio_latencies`) | — | +925 après envoi |
+| Audio complet (`audio_blob_ready`) | — (flux) | ≈ +3 570 après envoi |
+| **Premier son** | **4 414** | **8 388** |
+
+- L'écart ElevenLabs/Gradium (~4 s) est **entièrement côté TTS** : le jeu attend tout le MP3
+  (3,6–4,8 s pour 250–320 caractères) alors que le 1er octet arrive en ~0,9 s.
+- **En sandbox, `VOICE_INCREMENTAL_OUTPUT` est `false`** (prod : `true`). Les tours Gradium
+  mesurés ici ne passaient donc pas non plus par le chemin incrémental, et `first_token` /
+  `intent_ready` ne sont pas observés : le « 1er token LLM » n'existe pas pour ces tours.
+  Avec le flux activé (150 tours sandbox antérieurs), 1er token p50 3,2 s, LLM fini 4,1 s.
+- La référence « ~1,9 s » de Gradium n'est pas retrouvée avec l'origine `app_turn_decision` :
+  Gradium y fait 4,4 s (dont ~0,77 s entre envoi du texte et premier son). Comparer donc les
+  deux fournisseurs sur le même jalon : **envoi du texte → premier son**.
+- Écart hors fournisseur : dans ~1 tour sur 5 (EL et Gradium), 2–3,6 s séparent `llm_response`
+  de `tts_text_sent`. Non expliqué, hors L1 ; à instruire séparément.
+- Le proxy relaie bien le flux en morceaux (18–49 chunks `audio/mpeg`) : L1.1 n'exige pas
+  de changement Edge.
+
+### Comparaison des modèles (même texte, médiane de 3)
+
+| Modèle | 1er octet | MP3 complet | Balises audio | Premier son projeté après envoi, avec L1.1 |
+|---|---|---|---|---|
+| v4 (actuel) | 1 063 ms | 4 423 ms | oui | ~1,2 s (aujourd'hui 4,4 s) |
+| v4 Turbo | 367 ms | 2 355 ms | oui | ~0,5 s |
+| v3 Conversational | 474 ms (1 tirage froid à 2,9 s) | 2 252 ms | oui | ~0,6 s |
+| Flash v2.5 | 393 ms | 714 ms | non | ~0,5 s (déjà ~0,8 s sans L1.1) |
+
+Projection = 1er octet + ~150 ms de démarrage MediaSource, à vérifier en L1.1. Les quatre
+modèles génèrent 3 à 20 fois plus vite que le temps réel : pas de risque de coupure en
+lecture progressive. Référence Gradium sur le même jalon : ~0,77 s.
+
+Lecture : L1.1 seul ramène v4 à ~0,45 s de Gradium ; L1.1 + v4 Turbo ou v3 Conversational
+le met au niveau de Gradium ou mieux. L1.2 (segments) ne paraît pas nécessaire si l'un des
+deux passe l'écoute. Flash est le plus rapide mais perd les balises audio et l'expressivité
+qui motivaient le passage à ElevenLabs.
+
+## Exécution L1.1 — 31 octobre 2026
+
+Choix d'Ulrich après écoute dans l'atelier : **v4 Turbo**.
+
+- `src/services/tts/elevenLabsStreamPlayer.ts` : poignée `TTSStreamPlaybackHandle` pour
+  ElevenLabs. Le corps chunked de `proxy-tts` alimente une `MediaSource`
+  (`ManagedMediaSource` d'abord, iOS 17.1+) attachée à un `<audio>` ; la lecture commence
+  à `open()`, dès les premiers octets.
+- Replis, avant tout son audible : MediaSource absente, MP3 refusé, lecture bloquée ou
+  muette 15 s → lecture du MP3 déjà reçu (`playAudioBlobRobust`). Requête en échec avant le
+  premier octet → une requête REST (comme la relance bornée existante), sauf erreur client
+  4xx hors 429. Après le premier son : coupure signalée, jamais rejouée.
+- `cancel()` (barge-in, tour obsolète via le signal de la file) annule la requête et
+  coupe l'audio immédiatement.
+- Branché par `elevenLabsProvider.createStreamingPlayback`, donc par `tryCreateStreamingPlayback`
+  et `TTSQueue` sans changement de l'orchestrateur. Restent sur le blob : auditions de
+  l'atelier (capture exacte), phrase d'ouverture en cache, formats non MP3, Firefox
+  (pas de MediaSource MP3).
+- Défaut expressif `ELEVENLABS_EXPRESSIVE_MODEL = eleven_v4_turbo` (préréglage « Expressif »,
+  atelier). Le réglage TTS enregistré en sandbox (`eleven_v4`) n'est pas modifié par le code.
+- Télémétrie : transport `http_stream` ; `first_audio_chunk`, `audio_scheduled` (premier son)
+  et `audio_blob_ready` (flux complet) sont désormais observés pour ElevenLabs.
+
+### Vérification
+
+| Mesure réelle (Chrome, `proxy-tts` sandbox, réplique R1 de 277 car.) | Premier son | Flux complet |
+|---|---|---|
+| v4 Turbo, lecture progressive | **655 ms** | 2 511 ms |
+| v4, lecture progressive | 979 ms | 4 544 ms |
+| v4, ancien chemin (L1.0) | ≈ 4 400 ms | — |
+
+Chaîne du jeu (`LocalTTSOutput` → `TTSQueue` → façade) : lecture complète jusqu'à la fin,
+transport `http_stream`. Interruption en cours de lecture : `AbortError`, requête annulée,
+audio arrêté. Tests unitaires du lecteur (7) ; qualité locale complète verte.
+
+Trouvé par les E2E : `finished` ne se résout qu'une fois tout le flux reçu. Le reçu de livraison
+exige « segments joués = segments générés » ; une fin de lecture annoncée avant la fin du
+téléchargement marquait la réplique « échouée » et bloquait un passage vers Max. Aucun
+`pause()` non plus après une fin naturelle (compté comme interruption).
+
+Non vérifié ici : rendu à l'oreille en jeu, Safari/iOS réels, mains libres avec
+barge-in vocal. C'est la recette L1.3 d'Ulrich.
+
+### L1.2 : non lancé
+
+Avec la lecture progressive, ElevenLabs v4 Turbo est au niveau de Gradium sur le même
+jalon, envoi du texte → premier son (~0,66 s contre ~0,77 s en médiane Gradium). Découper la réplique en segments
+ajouterait le risque de « prosody cliff » (v4 Turbo n'accepte pas le stitching) pour un gain
+d'environ 0,5–0,9 s (1er token LLM vs LLM fini). À rouvrir seulement si la recette le demande,
+et seulement après lecture de la doc officielle `stream-input`.

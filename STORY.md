@@ -3,9 +3,24 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-31 (R1 : répliques de deux à trois phrases avec accroche)
+> **Last Updated**: 2026-10-31 (L1 : ElevenLabs lu au fil de l'eau, v4 Turbo)
 
 ---
+
+## L1 — ElevenLabs parle dès les premiers octets (31 octobre 2026)
+
+ElevenLabs sonnait mieux que Gradium mais répondait quatre secondes plus tard. Les
+mesures des tours réels ont montré où partait le temps : ni dans le LLM ni dans le
+réseau, mais dans une attente. Le premier morceau de son arrivait en moins d'une
+seconde, et le jeu attendait pourtant le fichier entier avant de lire la première
+syllabe. Avec les répliques plus longues de R1, cette attente avait encore grandi.
+
+Le son est maintenant lu à mesure qu'il arrive. Si le navigateur ne sait pas le
+faire, le jeu reprend l'ancien chemin sans que le joueur s'en aperçoive ; une
+interruption coupe la voix tout de suite. Ulrich a écouté les modèles côte à côte et
+retenu v4 Turbo : la même expressivité que v4, avec un premier son vers 0,7 s au lieu
+d'une seconde. La recette d'écoute en jeu reste la sienne.
+[Mesures, comparatif et suite](docs/plan_latence_elevenlabs_et_relance_2026-10-31.md#exécution-l11--31-octobre-2026).
 
 ## R1 — une phrase de plus pour rebondir (31 octobre 2026)
 
