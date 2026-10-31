@@ -147,8 +147,9 @@ describe("maxRichPromptCompiler — rich_v2", () => {
   });
 
   it("expose un contrat conversationnel unique et non contradictoire", () => {
-    expect(RICH_V2_CONVERSATION_CONTRACT).toContain("une à trois phrases");
-    expect(RICH_V2_CONVERSATION_CONTRACT).toContain("quatre phrases courtes");
+    expect(RICH_V2_CONVERSATION_CONTRACT).toContain("deux à trois phrases parlées");
+    expect(RICH_V2_CONVERSATION_CONTRACT).toContain("jusqu'à quatre phrases");
+    expect(RICH_V2_CONVERSATION_CONTRACT).toContain("Ce n'est pas une question");
     expect(RICH_V2_CONVERSATION_CONTRACT).not.toMatch(/45 mots/);
     expect(RICH_V2_CONVERSATION_CONTRACT).toMatch(/évite les relances réflexes et répétitives/);
   });

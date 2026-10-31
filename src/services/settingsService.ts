@@ -203,6 +203,16 @@ export function listLlmConfigModels(): OpenRouterModel[] {
   return OPENROUTER_MODELS;
 }
 
+// Character replies carry the private intent JSON (~70 tokens) plus 2–3 spoken
+// sentences (~70 words) since lot R1. Stored 220 budgets predate R1 and would
+// truncate that target, so the effective floor wins, like the GM floor below.
+export const CHARACTER_MAX_TOKENS_FLOOR = 360;
+export const CHARACTER_MAX_TOKENS_CEILING = 480;
+export function clampCharacterMaxTokens(value: number): number {
+  const tokens = Math.floor(Number(value)) || CHARACTER_MAX_TOKENS_FLOOR;
+  return Math.min(CHARACTER_MAX_TOKENS_CEILING, Math.max(CHARACTER_MAX_TOKENS_FLOOR, tokens));
+}
+
 const llmDefaults: LLMSettings = {
   LLM_MODEL: defaultSettings.LLM_MODEL,
   // Le GM ne fait QUE du JSON structuré déterministe (brief de tour, évaluation post-turn).
@@ -210,7 +220,7 @@ const llmDefaults: LLMSettings = {
   // → réduit drastiquement la latence du GM pre-turn (vue dans le panneau Latence & blocage).
   LLM_MODEL_GM: "google/gemini-2.5-flash",
   LLM_TEMPERATURE: defaultSettings.LLM_TEMPERATURE,
-  LLM_MAX_TOKENS: Math.min(defaultSettings.LLM_MAX_TOKENS, 220),
+  LLM_MAX_TOKENS: clampCharacterMaxTokens(defaultSettings.LLM_MAX_TOKENS),
   LLM_TOP_P: defaultSettings.LLM_TOP_P,
   LLM_TEMPERATURE_GM: 0.3,
   // Le GM produit l'évaluation complète, sa mémoire et ses garde-fous en JSON.
@@ -293,7 +303,7 @@ function normalizeLLMSettings(settings: LLMSettings): LLMSettings {
     ...settings,
     LLM_MODEL: realtimeModel,
     LLM_MODEL_GM: gmModel.modelId,
-    LLM_MAX_TOKENS: Math.min(settings.LLM_MAX_TOKENS || llmDefaults.LLM_MAX_TOKENS, 220),
+    LLM_MAX_TOKENS: clampCharacterMaxTokens(settings.LLM_MAX_TOKENS || llmDefaults.LLM_MAX_TOKENS),
     LLM_TOP_P: Math.min(settings.LLM_TOP_P || llmDefaults.LLM_TOP_P, 0.9),
     LLM_MAX_TOKENS_GM: Math.max(950, Math.floor(Number(settings.LLM_MAX_TOKENS_GM) || llmDefaults.LLM_MAX_TOKENS_GM)),
     LLM_REASONING: settings.LLM_REASONING && typeof settings.LLM_REASONING === "object" ? settings.LLM_REASONING : {},
@@ -656,7 +666,7 @@ const maxPromptControlDefaults: MaxPromptControlSettings = {
   objectives: `Obtenir des informations fiables sur Ava, tester la sincérité de l'interlocuteur, protéger ce que tu ne veux pas encore révéler, et faire progresser la confiance sans casser la tension.`,
   roleContext: `Tu évolues dans une expérience narrative conversationnelle. Tu n'es pas un assistant: tu es un personnage situé, avec une mémoire partielle, des zones d'ombre, des émotions, et des limites de révélation.`,
   longTermMemory: `Historique stable: Ava a disparu. Tu possèdes des souvenirs, des tensions familiales et des fragments de vérité, mais tout n'est pas accessible ni dicible à chaque tour.`,
-  responseStyle: `Réponses brèves, orales, incarnées, 1 à 2 phrases (45 mots maximum). Tu privilégies la retenue et la précision. Tu ne termines PAS chaque réponse par une question : tu ne questionnes que lorsque c'est nécessaire à ton objectif du moment, jamais par réflexe.`,
+  responseStyle: `Réponses orales, incarnées, 2 à 3 phrases (environ 60 à 70 mots). Tu livres d'abord ton contenu, puis tu laisses une accroche : un détail concret, une réaction, un fil ouvert. Tu privilégies la retenue et la précision. Tu ne termines PAS chaque réponse par une question : tu ne questionnes que lorsque c'est nécessaire à ton objectif du moment, jamais par réflexe.`,
   allowedKnowledgePolicy: `Tu peux t'appuyer uniquement sur: 1) ton identité et ton rôle définis ici, 2) les faits du CONTEXTE AUTORISÉ DU TOUR, 3) l'historique récent fourni, 4) le contexte post-vidéo éventuel. Rien d'autre.`,
   forbiddenAssertions: `N'affirme jamais un fait absent du contexte autorisé. N'invente ni événement, ni relation, ni lieu, ni intention, ni souvenir précis. N'explicite jamais une hypothèse comme une certitude.`,
   forbiddenTopics: `Si un sujet n'est pas débloqué, s'il est absent du contexte autorisé, ou s'il doit rester caché, tu esquives avec naturel, tu exprimes un doute, ou tu refuses de l'affirmer.`,

@@ -1,6 +1,7 @@
 import type { CharacterPrompt } from "@/services/characterPromptService";
 import { MAX_MAX_RAG_CONTEXT_CHARS, MAX_MAX_RAG_ITEM_CHARS, MAX_MAX_RAG_ITEMS } from "@/services/ragBudget";
 import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
+import { RESPONSE_HOOK_RULE } from "@/agents/responseHook";
 import { characterEmbodiment, withoutCharacterEmbodiment } from '@/services/characterEmbodiment';
 
 /**
@@ -53,7 +54,8 @@ export const RICH_V2_CORE_HEADER = "# FICHE PERSONNAGE (source éditoriale uniqu
 export const RICH_V2_CONVERSATION_CONTRACT = `## CONTRAT DE CONVERSATION
 - Tu es ce personnage. Tu parles à la première personne, en français, sans narration ni méta-commentaire.
 - Tu réagis à ce qui vient d'être dit selon la relation : répondre, nuancer, retenir, contester ou questionner sont tous possibles.
-- Tu parles le plus souvent en une à trois phrases ou fragments. Un souvenir précis peut aller jusqu'à quatre phrases courtes. Jamais de monologue.
+${RESPONSE_HOOK_RULE}
+- Jamais de monologue.
 - Tu ne rejoues jamais une ouverture déjà passée et tu ne redemandes pas ce qui t'a déjà été donné (prénom, rôle, raison de l'appel).
 - Une question en retour doit servir ton besoin ou obliger l'interlocuteur à se positionner ; évite les relances réflexes et répétitives.
 - Une ambiguïté, un humour maladroit ou une erreur de transcription s'interprètent charitablement : tu réponds au sens le plus plausible.

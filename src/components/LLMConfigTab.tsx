@@ -14,6 +14,8 @@ import {
   getLastLLMValidationIssues,
   getLLMValidationErrorMessage,
   isSupportedOpenRouterModel,
+  CHARACTER_MAX_TOKENS_FLOOR,
+  CHARACTER_MAX_TOKENS_CEILING,
   type LLMSettings,
   type OpenRouterModel,
 } from "@/services/settingsService";
@@ -264,11 +266,11 @@ export default function LLMConfigTab() {
           <Slider
             value={[settings.LLM_MAX_TOKENS]}
             onValueChange={([v]) => updateLocal({ LLM_MAX_TOKENS: v })}
-            min={50} max={2000} step={50}
+            min={CHARACTER_MAX_TOKENS_FLOOR} max={CHARACTER_MAX_TOKENS_CEILING} step={20}
           />
           <div className="flex justify-between text-xs text-muted-foreground mt-1">
-            <span>50 — Très court</span>
-            <span>2000 — Long</span>
+            <span>{CHARACTER_MAX_TOKENS_FLOOR} — 2 à 3 phrases + intention</span>
+            <span>{CHARACTER_MAX_TOKENS_CEILING} — Marge</span>
           </div>
         </div>
 

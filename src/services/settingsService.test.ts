@@ -22,7 +22,12 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import {
+  CHARACTER_MAX_TOKENS_CEILING,
+  CHARACTER_MAX_TOKENS_FLOOR,
+  clampCharacterMaxTokens,
   getAntiHallucinationValidatorSettings,
+  getLLMSettings,
+  getMaxPromptControlSettings,
   getVideoTriggerSettings,
   hydrateAllSettings,
   loadLLMSettingsFromDB,
@@ -58,6 +63,21 @@ describe("settingsService recent additions", () => {
     expect(writes).not.toHaveBeenCalled();
     await loadLLMSettingsFromDB();
     expect(writes).toHaveBeenCalledOnce();
+  });
+
+  it("R1 — raises stored pre-R1 character budgets to the effective floor and caps them", () => {
+    expect(clampCharacterMaxTokens(220)).toBe(CHARACTER_MAX_TOKENS_FLOOR);
+    expect(clampCharacterMaxTokens(400)).toBe(400);
+    expect(clampCharacterMaxTokens(2000)).toBe(CHARACTER_MAX_TOKENS_CEILING);
+    expect(clampCharacterMaxTokens(Number.NaN)).toBe(CHARACTER_MAX_TOKENS_FLOOR);
+    expect(getLLMSettings().LLM_MAX_TOKENS).toBe(360);
+  });
+
+  it("R1 — default response style asks for 2–3 sentences with a hook, not a reflex question", () => {
+    const style = getMaxPromptControlSettings().responseStyle;
+    expect(style).toContain("2 à 3 phrases");
+    expect(style).toContain("accroche");
+    expect(style).toContain("Tu ne termines PAS chaque réponse par une question");
   });
 
   it("hydrates video trigger settings on app start", async () => {

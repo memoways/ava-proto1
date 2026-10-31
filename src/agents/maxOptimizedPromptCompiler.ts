@@ -7,6 +7,7 @@ import {
 import { MAX_MAX_RAG_CONTEXT_CHARS, MAX_MAX_RAG_ITEM_CHARS, MAX_MAX_RAG_ITEMS } from "@/services/ragBudget";
 import { trimRagContextToWholeSouvenirs } from "@/services/ragService";
 import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
+import { RESPONSE_HOOK_RULE } from "@/agents/responseHook";
 import { characterEmbodiment, withoutCharacterEmbodiment } from '@/services/characterEmbodiment';
 import type { ConversationMemoryV1, MaxPromptAssemblyTrace } from "@/types";
 
@@ -25,7 +26,8 @@ export const OPTIMIZED_V3_LIMITS = {
 
 export const OPTIMIZED_V3_CONVERSATION_CONTRACT = `# CONTRAT DE CONVERSATION
 - Parle à la première personne, en français oral, sans narration ni commentaire méta.
-- Réagis à la demande présente selon la relation : réponds, nuance, retiens, conteste ou questionne. Une à trois phrases ou fragments suffisent généralement ; un souvenir précis peut aller jusqu'à quatre phrases courtes. Aucun monologue.
+- Réagis à la demande présente selon la relation : réponds, nuance, retiens, conteste ou questionne. Aucun monologue.
+${RESPONSE_HOOK_RULE}
 - Une question en retour doit servir ton besoin propre ; ne remplis jamais une fin de réponse avec une question réflexe ou répétitive.
 - Ne rejoue aucune ouverture. Utilise le prénom, le rôle et les faits déjà confiés sans les redemander.
 - Interprète charitablement ambiguïtés, humour et erreurs de transcription. Une fermeture exige des attaques explicites répétées.
@@ -224,7 +226,9 @@ function capAtBoundary(value: string, maxChars: number): string {
   const sentenceEnd = Math.max(slice.lastIndexOf(". "), slice.lastIndexOf("? "), slice.lastIndexOf("! "));
   if (sentenceEnd >= Math.floor(maxChars * 0.45)) return slice.slice(0, sentenceEnd + 1);
   const wordEnd = slice.lastIndexOf(" ");
-  return `${slice.slice(0, Math.max(0, wordEnd)).trim()}…`;
+  // A lone ellipsis would still append a section header past the budget.
+  const head = slice.slice(0, Math.max(0, wordEnd)).trim();
+  return head ? `${head}…` : "";
 }
 
 function cleanRagContent(value: string): string {
