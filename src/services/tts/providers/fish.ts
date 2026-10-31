@@ -31,7 +31,7 @@ export const fishProvider: TTSProvider = {
       mp3Bitrate: s.mp3Bitrate,
       latency: s.latency,
       temperature: expressiveTemperature(s.temperature, ctx?.performance),
-      topP: s.topP,
+      topP: expressiveTemperature(s.topP, ctx?.performance),
       speed: shaped.speed,
       volume: s.volume,
       normalize: s.normalize,

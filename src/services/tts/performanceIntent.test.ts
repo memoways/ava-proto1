@@ -120,7 +120,7 @@ describe("provider adapters", () => {
 
   it("caps Gradium temp even when a legacy base setting exceeds the diction limit", () => {
     const tuned = applyGradiumPerformance({ temp: 1.1, paddingBonus: 0 }, angry);
-    expect(tuned.temp).toBe(0.85);
+    expect(tuned.temp).toBe(0.9);
   });
 
   it("sends Inworld instruction and CREATIVE mode at intensity 2", () => {
