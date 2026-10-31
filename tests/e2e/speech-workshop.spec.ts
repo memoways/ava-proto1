@@ -141,7 +141,7 @@ test('AP4 : atelier par intention, puis banc AP2 replié et comparaisons retrouv
  await page.reload();
  const toEmotion = page.getByRole('button', { name: 'Continuer vers l’émotion' });
  await expect(toEmotion).toBeEnabled();
- await expect(page.getByLabel('Texte à jouer')).toHaveValue(/^Emma est dans la cuisine depuis ce matin/);
+ await expect(page.getByLabel('Texte à jouer')).toHaveValue(/^Emma est dans la cuisine, depuis ce matin/);
  await toEmotion.focus(); await page.keyboard.press('Enter');
  await expect(page.getByLabel('Étape courante')).toContainText('Étape 2 sur 4');
  await page.getByRole('radio', { name: /Peur — La peur accélère/ }).check();
