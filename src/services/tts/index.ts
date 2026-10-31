@@ -274,7 +274,7 @@ export function tryCreateStreamingPlayback(text: string, opts?: TTSOptions): TTS
           status_code: statusCode ?? 0,
           error_type: classifyError(statusCode, message),
           error_message: message.slice(0, 500),
-          transport: "websocket",
+          transport: provider.id === "elevenlabs" ? "http_stream" : "websocket",
         },
       });
     },

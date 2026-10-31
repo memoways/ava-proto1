@@ -4,6 +4,27 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [L1 — ElevenLabs réactif : lecture progressive et v4 Turbo] — 2026-10-31
+
+- Mesure L1.0 (télémétrie réelle sandbox) : l'écart ElevenLabs/Gradium (~4 s, premier son
+  8,4 s contre 4,4 s depuis la décision de tour) venait entièrement de l'attente du MP3
+  complet ; le premier octet arrivait en ~0,9 s. Comparatif v4 / v4 Turbo / v3 Conversational /
+  Flash v2.5 dans `docs/plan_latence_elevenlabs_et_relance_2026-10-31.md`.
+- Lecture progressive ElevenLabs (`elevenLabsStreamPlayer.ts`) : le flux MP3 relayé par
+  `proxy-tts` alimente une MediaSource (ManagedMediaSource sur iOS) au fil des octets, via
+  `createStreamingPlayback` et la file TTS. Avant tout son, un échec bascule sur le MP3 reçu
+  (ou une requête REST si rien n'est arrivé, sauf erreur client 4xx) ; après, la coupure est
+  signalée sans rejouer. `cancel()` coupe requête et audio (barge-in). Atelier, phrase
+  d'ouverture en cache et formats non MP3 gardent le chemin blob. Aucun changement Edge.
+- Mesure réelle (même réplique, navigateur, `proxy-tts` sandbox) : premier son v4 Turbo
+  0,66 s (MP3 complet à 2,5 s), v4 0,98 s (au lieu de 4,5 s).
+- Défaut expressif ElevenLabs (préréglage « Expressif » et atelier) : `eleven_v4_turbo`,
+  choisi à l'oreille par Ulrich. Le réglage enregistré en sandbox reste à basculer dans
+  TTS Config.
+- Télémétrie : transport `http_stream` pour le flux ElevenLabs (`audio_latencies`, services).
+- Constats hors lot : `VOICE_INCREMENTAL_OUTPUT` est `false` en sandbox (`true` en prod) ;
+  ~1 tour sur 5 perd 2–3,6 s entre la fin du LLM et l'envoi au TTS, tous fournisseurs.
+
 ## [Gouvernance — base Caractères Notion en lecture seule] — 2026-10-31
 
 - Interdiction formelle d'Ulrich inscrite dans `AGENTS.md` et `CLAUDE.md` : aucune

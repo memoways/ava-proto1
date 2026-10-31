@@ -21,7 +21,7 @@ describe('AP4 — validated catalogue', () => {
   expect(INTENT_PASSAGES[1].text).toMatch(/^Il y a deux jours, à l’hôtel/);
  });
  it('plans the ElevenLabs card on the expressive v4 model (AP4-ter)', () => {
-  expect(providerPlan('elevenlabs', WORKSHOP_INTENTS.find(i => i.id === 'confidence')!, base).model).toBe('eleven_v4');
+  expect(providerPlan('elevenlabs', WORKSHOP_INTENTS.find(i => i.id === 'confidence')!, base).model).toBe('eleven_v4_turbo');
  });
  it('defines ten intents with plain labels, explanations and bounded neutral recipes', () => {
   expect(WORKSHOP_INTENTS.map(i => i.label)).toEqual(['Posé', 'Détaché', 'Moyennement dramatique', 'Très dramatique', 'Essoufflé / pressé', 'Peur', 'Perdu, ne sait plus quoi dire', 'Colère contenue', 'Espoir qui revient', 'Confidence à voix basse']);
