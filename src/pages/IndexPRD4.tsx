@@ -1640,6 +1640,24 @@ const IndexPRD4 = () => {
         const finalizeHandoff = result.postTurnPromise.then(async ev => {
           if (!turnHandoffState || !turnHandoffSnapshot || !handoffLease?.current() || endedRef.current) return handoffSnapshotRef.current!;
           if (turnHandoffState.state === 'available') return handoffSnapshotRef.current!;
+          // A consent the GM validated on the heard receipt, spoken without an output
+          // hold, gets the same readiness/director guards instead of being dropped.
+          if (!preparedState && responseReceipt?.status === 'completed' && responseReceipt.delivered === responseReceipt.generated
+            && finalizeCharacterHandoff(turnHandoffState, ev, userText, responseReceipt, true).validation.authorized) {
+            try {
+              const prepared = await prepareCharacterHandoff({ state: turnHandoffState, evaluation: ev, text: responseReceipt.generated,
+                userText, history: conversationRef.current.filter(message => message.delivery?.turnId !== turnId),
+                handoffCount: handoffCountRef.current, signal: handoffLease.signal, current: handoffLease.current,
+                readiness: getCharacterRuntimeReadiness,
+                persist: async next => {
+                  const saved = await writeHandoffSnapshot(turnHandoffSnapshot!, next, undefined, conversationRef.current, handoffLease!.signal);
+                  turnHandoffSnapshot = saved; handoffSnapshotRef.current = saved;
+                } });
+              preparedState = prepared.state;
+              setHandoffPortraits({ [prepared.target]: prepared.portraitUrl });
+            } catch { /* A guard or readiness refusal keeps the offer revoked below. */ }
+            if (!handoffLease.current()) return handoffSnapshotRef.current!;
+          }
           const assessed = finalizeCharacterHandoff(turnHandoffState, ev, userText, responseReceipt, Boolean(preparedState));
           const next = assessed.state;
           try {

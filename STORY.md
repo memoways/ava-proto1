@@ -3,9 +3,21 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-31 (G1.2 : recette gravité, prompt plus rapide, registre tenu)
+> **Last Updated**: 2026-10-31 (G1.3 : le passage à Emma n'est plus jeté, plus de pause en boucle)
 
 ---
+
+## G1.3 — Max accepte, mais Emma ne vient pas (31 octobre 2026)
+
+Ulrich demande Emma ; Max répond « Je passe Emma », deux fois, et rien ne se passe. Puis Max
+répète « De quoi veux-tu lui parler, au juste ? » comme un disque rayé. Les traces montrent
+que le maître du jeu avait bien accepté le passage les deux fois. C'est le code qui jetait
+l'offre : « Je passe Emma » n'était pas reconnu comme une offre à préparer avant de la dire,
+et une offre non préparée était révoquée, sans bouton. Ces formulations sont maintenant
+reconnues ; un accord validé mais dit sans préparation passe par les mêmes gardes au lieu
+d'être jeté ; et une pause de transfert n'est jamais dite deux fois de suite. Le prompt se
+construit désormais en 25–58 ms. Restent à décider par Ulrich : délai de fin de parole,
+streaming vers ElevenLabs, modèle, RAG, et l'acceptation du passage à la voix.
 
 ## G1.2 — la recette tient, le prompt se construit vite (31 octobre 2026)
 

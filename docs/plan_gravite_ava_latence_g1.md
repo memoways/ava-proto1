@@ -179,3 +179,72 @@ bonne direction » ; demande : plus de réactivité sans régression ni cassure 
 4. RAG 0,8–1,35 s (embedding 0,1–0,7 s, rerank ~0,2 s) : piste suivante, non traitée.
 5. Transfert retenu par le MJ alors que le joueur le demande clairement (tour 6) : coûte un
    tour complet ; règle éditoriale du MJ à revoir avec Ulrich si ce n'est pas voulu.
+
+## G1.3a — Recette d'Ulrich (31 octobre 2026, sans code)
+
+Session `e6918bd8-50e9-499a-8d9d-875b217cc36a` (sandbox-ulrich, 21 h 02, Max, 10 tours, non
+terminée, ElevenLabs v4 Turbo, LLM `openai/gpt-5.6-luna`, MJ `google/gemini-2.5-flash`).
+Retour d'Ulrich : gros blocage sur le passage à Emma, impossible ; Max a répété plusieurs fois
+la même chose.
+
+- **G1.2 tient** : `character_prompt_build` 25–58 ms (avant : 770–960 ms), soit l'écart
+  `context_ready → llm_request`. Un seul `prd4_chat` par tour (10 pour 10), aucune relance ;
+  sauvetage local aux tours 5 et 6. Registre « tu » tenu partout, pauses comprises.
+- **Gravité** : tenue sur les 7 répliques générées ; aucun déclenchement de la garde.
+- **Latence** (origine = transcription finale) : premier son hors passage 3,2–4,7 s
+  (RAG 0,68–1,75 s, LLM 1,5–2,9 s, texte → son 0,37–0,72 s). Tours 8–10 : 4,9–6,6 s, dont
+  1,9–2,9 s de préparation du passage.
+- **`Ahva`** : à confirmer à l'oreille par Ulrich ; aucune mesure ne prouve un rendu vocal.
+
+### Cause du blocage du passage
+
+| Tour | Joueur | Max (dit) | MJ | Résultat |
+|---|---|---|---|---|
+| 6 | « Tu crois que je pourrais parler avec elle » | « Oui… je peux lui transmettre l'appel. […] Je passe Emma. » | handoff, accord validé | offre jetée |
+| 7 | « Volontiers pour parler avec Emma, oui. » | « Je passe Emma maintenant. » | handoff, accord validé | offre jetée |
+| 8 | « Tu pourrais me passer Emma » | pause « De quoi veux-tu lui parler, au juste ? » | preuve refusée (`consent_reference_invalid`) | pause |
+| 9 | « J'aimerais savoir comment elle se sent… » | pause « Attends. Qu'est-ce que tu voudrais lui dire ? » | idem | pause |
+| 10 | « …lui poser des questions… » | pause « De quoi veux-tu lui parler… » (répétée) | `request_unresolved` | pause |
+
+- Tours 6–7 : le MJ a validé l'accord sur le reçu entendu (`handoff_blocked`, raison
+  `consent_validated`, étape `delivery` dans `experience_events`). Mais le détecteur de
+  maintien `needsHandoffPreparation` ne reconnaissait ni « Je passe Emma » ni « transmettre
+  l'appel » : la réplique est partie sans préparation, et `finalizeCharacterHandoff` révoque
+  toute offre non préparée. Aucun bouton de passage n'est apparu.
+- Tours 8–10 : la phrase de Max (non conservée) déclenchait la préparation ; le MJ candidat a
+  rendu une preuve invalide (`assessment_missing`) ; repli sur la phrase de pause scriptée, qui
+  n'a que deux variantes et a tourné en boucle.
+- Le point 5 de G1.2b (« transfert retenu par le MJ ») ne s'applique pas à cette session : le
+  MJ a accepté deux fois, c'est le code qui a jeté l'offre.
+
+## Exécution G1.3 — 31 octobre 2026
+
+- `handoffCoordinator.ts` : `needsHandoffPreparation` maintient aussi « je (te/vous) passe
+  Max/Emma », « je vais passer Emma », « je (lui) transmets / passe l'appel, la ligne, le
+  téléphone » ; « je passe mes nuits… », « je ne passe pas Emma », « il m'a transmis l'appel »
+  restent ordinaires (tests).
+- `IndexPRD4.tsx` : un accord validé par le MJ sur le reçu entendu, sans préparation préalable
+  (formulation que le maintien manquerait encore), passe par la même préparation
+  (`prepareCharacterHandoff` : disponibilité de la cible, garde du directeur, quota, seuil)
+  au lieu d'être révoqué. L'offre devient disponible : bouton de passage, clic du joueur
+  inchangé. Refus de garde ou de disponibilité : offre révoquée comme avant.
+- `prd4Orchestrator.ts` + `characterConversationContinuity.ts` : jamais deux pauses de transfert
+  de suite. Si la réplique précédente du personnage était déjà une pause et que la préparation
+  échoue encore, le personnage dit sa propre réplique sans les phrases de promesse de passage
+  (`withoutTransferOffer`) ; pause scriptée seulement si rien ne reste.
+- Sans changement : MJ et ses preuves, vetos, clic du joueur, Gradium, `endOfSpeechMs`,
+  `VOICE_INCREMENTAL_OUTPUT`, modèle, RAG.
+- Validations : unitaires ciblés (détection, retrait, pause répétée), `npm run test:quality`.
+  Une simulation ne prouve pas le parcours vocal : recette d'Ulrich attendue.
+
+### G1.3b — décisions d'Ulrich (présentées le 31 octobre, aucune prise seul)
+
+1. `endOfSpeechMs` sandbox 2 000 → 900 ms (prod 900) : jusqu'à 1,1 s de silence en moins avant
+   chaque tour ; risque de couper une phrase hésitante. Changement de réglage sandbox seul.
+2. Streaming du LLM vers ElevenLabs : LLM 1,5–2,9 s en batch ; premier son possible après la
+   première phrase (gain estimé 0,8–1,5 s) ; chantier lourd (incrémental Gradium seulement).
+3. Modèle de Max/Emma plus rapide : comparaison sur gravité et langue avant tout choix.
+4. RAG 0,68–1,75 s : mesurer embedding/rerank puis paralléliser avec les lectures ou cacher.
+5. Acceptation vocale du passage : aujourd'hui l'offre attend un clic sur le bouton. En mains
+   libres, un « oui » du joueur après l'offre pourrait la déclencher ; à décider (invariant
+   « clic du joueur »).

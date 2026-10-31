@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [G1.3 — passage à Emma : accord du MJ préservé, pause jamais répétée] — 2026-10-31
+
+- Recette d'Ulrich (session `e6918bd8…`, sandbox, Max, 10 tours) : passage à Emma impossible
+  et Max qui répète. Cause : le MJ a validé l'accord aux tours 6 et 7 (« Je passe Emma »),
+  mais la réplique n'était pas reconnue comme offre à préparer, et une offre non préparée
+  était révoquée (aucun bouton). Puis préparation refusée trois fois → même pause en boucle.
+- `needsHandoffPreparation` reconnaît « je (te) passe Emma/Max », « je vais passer Emma »,
+  « je (lui) transmets / passe l'appel, la ligne, le téléphone ».
+- Un accord validé par le MJ sur le reçu entendu, sans préparation préalable, passe par la
+  même préparation (disponibilité, garde du directeur) au lieu d'être révoqué ; clic du joueur
+  inchangé.
+- Jamais deux pauses de transfert de suite : la réplique suivante garde les mots du
+  personnage, sans la promesse de passage.
+- G1.2 vérifié : construction du prompt 25–58 ms (avant 0,77–0,96 s), un `prd4_chat` par tour,
+  premier son hors passage 3,2–4,7 s. Décisions de latence présentées à Ulrich, non prises.
+
 ## [G1.2 — recette gravité et latence : prompt ~0,8 s plus rapide, registre tenu] — 2026-10-31
 
 - Recette d'Ulrich (session `4671a23a…`, sandbox, Max → Emma, 10 tours) : aucune trivialité ni

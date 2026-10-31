@@ -38,6 +38,15 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**G1.3 implémenté le 31 octobre : le passage à Emma n'est plus jeté, pause jamais répétée.**
+Recette d'Ulrich (session `e6918bd8…`) : le MJ avait validé « Je passe Emma » deux fois, mais
+l'offre non préparée était révoquée (formulation non reconnue), puis la pause tournait en
+boucle. Formulations reconnues, accord validé préparé après coup avec les mêmes gardes, pas de
+seconde pause. G1.2 tient : prompt 25–58 ms, premier son hors passage 3,2–4,7 s. Décisions de
+latence et d'acceptation vocale à prendre par Ulrich.
+[Recette et exécution G1.3](plan_gravite_ava_latence_g1.md#g13a--recette-dulrich-31-octobre-2026-sans-code) ·
+[Prompt G1.4 « recette du passage, décisions d'Ulrich »](prompt_reprise_passage_latence_lot_g1_4.md).
+
 **G1.2 implémenté le 31 octobre : recette lue, prompt ~0,8 s plus rapide, registre tenu.**
 Recette d'Ulrich (session `4671a23a…`) : gravité tenue, aucune relance LLM, premier son
 4,1–4,8 s. La construction du prompt `optimized_v3` coûtait 0,77–0,96 s par tour (déduplication

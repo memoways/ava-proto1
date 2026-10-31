@@ -118,17 +118,26 @@ export function characterRecoveryLine(character: RuntimeCharacter, history: Conv
   return unusedLine(lines[character], character, history);
 }
 
+const handoffPauseLines: Record<RuntimeCharacter, Record<'tu' | 'vous', readonly string[]>> = {
+  max: {
+    tu: ['Attends. Qu’est-ce que tu voudrais lui dire ?', 'De quoi veux-tu lui parler, au juste ?'],
+    vous: ['Attendez. Qu’est-ce que vous voudriez lui dire ?', 'De quoi voulez-vous lui parler, au juste ?'],
+  },
+  emma: {
+    tu: ['Attends… Qu’est-ce que tu veux lui dire ?', 'Qu’est-ce qui te donne envie de lui parler ?'],
+    vous: ['Attendez… Qu’est-ce que vous voulez lui dire ?', 'Qu’est-ce qui vous amène à vouloir lui parler ?'],
+  },
+};
+
 /** A withheld transfer stays in the scene: no technical status, invented consent or audio outage. */
 export function characterHandoffPauseLine(character: RuntimeCharacter, history: ConversationMessage[]): string {
-  const informal = characterRegister(character, history) === 'tu';
-  const lines = character === 'max'
-    ? informal
-      ? ['Attends. Qu’est-ce que tu voudrais lui dire ?', 'De quoi veux-tu lui parler, au juste ?']
-      : ['Attendez. Qu’est-ce que vous voudriez lui dire ?', 'De quoi voulez-vous lui parler, au juste ?']
-    : informal
-      ? ['Attends… Qu’est-ce que tu veux lui dire ?', 'Qu’est-ce qui te donne envie de lui parler ?']
-      : ['Attendez… Qu’est-ce que vous voulez lui dire ?', 'Qu’est-ce qui vous amène à vouloir lui parler ?'];
-  return unusedLine(lines, character, history);
+  return unusedLine(handoffPauseLines[character][characterRegister(character, history)], character, history);
+}
+
+/** True when the character's latest reply in this history was already a transfer pause. */
+export function followsHandoffPause(character: RuntimeCharacter, history: ConversationMessage[]): boolean {
+  const last = [...history].reverse().find(message => message.role !== 'user');
+  return last?.role === character && Object.values(handoffPauseLines[character]).some(lines => lines.includes(last.content));
 }
 
 export function characterHandoffGreeting(target: RuntimeCharacter, from: RuntimeCharacter, history: ConversationMessage[]): string {
