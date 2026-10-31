@@ -22,13 +22,28 @@ describe("derivePerformanceIntent", () => {
     expect(intent.actingNl).toContain("tense");
   });
 
-  it("defaults Emma to warm when the line has no emotional cue", () => {
+  it("defaults Emma to a grave voice when the line has no emotional cue (G1)", () => {
     const intent = derivePerformanceIntent({
       text: "Allô ? Oui, je vous écoute.",
       characterKey: "emma",
     });
-    expect(intent.emotion).toBe("warm");
-    expect(intent.delivery).toBe("measured");
+    expect(intent.emotion).toBe("fragile");
+    expect(intent.actingNl).toMatch(/^grave, weighed down; /);
+  });
+
+  it("never lets Max or Emma default to a light emotion (G1)", () => {
+    for (const characterKey of ["max", "emma"]) {
+      for (const text of ["Merci. Prends ton temps, je t'écoute.", "Bien sûr, évidemment, génial.", "Max vient de me passer la ligne. Bonjour."]) {
+        const intent = derivePerformanceIntent({ text, characterKey });
+        expect(["warm", "sarcastic", "neutral"]).not.toContain(intent.emotion);
+        expect(applyElevenLabsPerformance({ style: 0.38, stability: 0.38, speed: 1, modelId: "eleven_v4_turbo" }, text, intent).text)
+          .not.toMatch(/\[(?:warmly|sarcastic)\]/);
+      }
+    }
+  });
+
+  it("keeps a light emotion for characters outside the grave set", () => {
+    expect(derivePerformanceIntent({ text: "Merci. Prends ton temps, je t'écoute.", characterKey: "guide" }).emotion).toBe("warm");
   });
 
   it("does not silently apply Max's acting baseline when identity is missing", () => {
@@ -77,7 +92,7 @@ describe("derivePerformanceIntent", () => {
   it("lets a strong lexicon match win over GM memory", () => {
     const intent = derivePerformanceIntent({
       text: "Merci. Prends ton temps, je t'écoute.",
-      characterKey: "max",
+      characterKey: "guide",
       previousEmotionalState: "tendu",
     });
     expect(intent.emotion).toBe("warm");

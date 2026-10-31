@@ -1,6 +1,7 @@
 import { guardCharacterResponse, type CharacterExecutionContext } from './characterIdentityGuard';
 import { AVA_CHARACTER_REGISTRY } from './characterRegistry';
 import { RESPONSE_TARGET_WORDS } from '@/agents/responseHook';
+import { enforceGravity } from '@/agents/gravity';
 
 export interface ResponseIntent { goal: string; points: string[]; parole?: string }
 export const SPEECH_BOUNDARY = '\n<speech>\n';
@@ -13,7 +14,7 @@ export function buildResponseStreamContract(maxTokens: number): string {
   const intent = small
     ? 'goal : 4 mots maximum ; points : tableau vide []'
     : 'goal : 8 mots maximum ; points : 0 à 2 points de 4 mots maximum chacun';
-  return `\n# FORMAT DE SORTIE IMPÉRATIF\nDans cette même réponse, écris d'abord une seule ligne JSON {"goal":"objectif privé","points":[],"parole":"état"}. Garde cet en-tête privé compact : ${intent}. Objectif ≤240 caractères, chaque point ≤160 caractères. Ce sont des intentions de communication, pas un raisonnement détaillé. "parole" : le nom exact d'un état de « Tes états de parole » que tu joues dans cette réponse (≤40 caractères) ; omets-le si aucun ne convient. Puis écris le marqueur <speech> seul sur une ligne entre le JSON et ton discours in character, avec de vrais retours à la ligne. Ne ferme jamais <speech> : aucun marqueur de fermeture, même en fin de réponse. Termine directement après les mots prononcés. Limite du discours : ${speechWords} mots maximum, y compris citations et questions.${speechWords >= 50 ? ' Vise deux à trois phrases parlées, autour de 60 mots : une réplique d\'une seule phrase courte laisse l\'interlocuteur sans prise.' : ''} Le budget total de ${budget} tokens inclut le JSON et la parole : ne consomme pas la place de la parole avec l'intention. Choisis l'essentiel si la demande est large ; termine le flux dans cette limite, avec une fin technique normale. Livre d'abord le contenu de ta réplique ; ensuite seulement, la pensée peut rester ouverte selon ta fiche : fragments volontaires, reprises et suspensions sont permis, sans conclusion ajoutée pour la boucler. Termine sur une accroche (détail concret, réaction, fil ouvert), pas sur une question réflexe. Une réponse nette reste possible. Aucun markdown, aucune autre métadonnée, aucun tag dans le discours. L'intention est privée, jamais entendue. Une intention ou une continuation privée n'est jamais une confidence déjà entendue. Respecte les mêmes limites de confidences et le canon.\n`;
+  return `\n# FORMAT DE SORTIE IMPÉRATIF\nDans cette même réponse, écris d'abord une seule ligne JSON {"goal":"objectif privé","points":[],"parole":"état"}. Garde cet en-tête privé compact : ${intent}. Objectif ≤240 caractères, chaque point ≤160 caractères. Ce sont des intentions de communication, pas un raisonnement détaillé. "parole" : le nom exact d'un état de « Tes états de parole » que tu joues dans cette réponse (≤40 caractères) ; omets-le si aucun ne convient. Puis écris le marqueur <speech> seul sur une ligne entre le JSON et ton discours in character, avec de vrais retours à la ligne. Ne ferme jamais <speech> : aucun marqueur de fermeture, même en fin de réponse. Termine directement après les mots prononcés. Limite du discours : ${speechWords} mots maximum, y compris citations et questions.${speechWords >= 50 ? ' Vise deux à trois phrases parlées, autour de 60 mots : une réplique d\'une seule phrase courte laisse l\'interlocuteur sans prise.' : ''} Le budget total de ${budget} tokens inclut le JSON et la parole : ne consomme pas la place de la parole avec l'intention. Choisis l'essentiel si la demande est large ; termine le flux dans cette limite, avec une fin technique normale. Livre d'abord le contenu de ta réplique ; ensuite seulement, la pensée peut rester ouverte selon ta fiche : fragments volontaires, reprises et suspensions sont permis, sans conclusion ajoutée pour la boucler. Termine sur une accroche (un fil de ton drame laissé ouvert, une réaction), jamais sur un détail du décor ni sur une question réflexe. Une réponse nette reste possible. Aucun markdown, aucune autre métadonnée, aucun tag dans le discours. L'intention est privée, jamais entendue. Une intention ou une continuation privée n'est jamais une confidence déjà entendue. Respecte les mêmes limites de confidences et le canon.\n`;
 }
 
 export function normalizeResponseIntent(value: unknown): ResponseIntent | null {
@@ -61,12 +62,19 @@ export function safeSentenceEnd(text: string, eof = false): number {
   return end;
 }
 
+function hasOpenQuote(text: string): boolean {
+  const count = (pattern: RegExp) => (text.match(pattern) ?? []).length;
+  return count(/«/g) !== count(/»/g) || count(/“/g) !== count(/”/g) || count(/"/g) % 2 === 1;
+}
+
 export class ResponseIntentParser {
   private header = '';
   private pending = '';
   private emitted = '';
   private intentValue: ResponseIntent | null = null;
   private terminal = false;
+  /** Sentences dropped by the gravity guard (G1), for diagnostics. */
+  gravityRemoved = 0;
   constructor(private context: CharacterExecutionContext, private onIntent: (i: ResponseIntent) => void,
     private onSegment: (text: string) => void) {}
   get intent() { return this.intentValue; }
@@ -111,16 +119,29 @@ export class ResponseIntentParser {
     if (guardCharacterResponse(prefix, this.context).blocked) throw new Error('Foreign character identity in response stream');
     // Tags/structured payloads in speech fail closed, including a repeated private header.
     if (/[<>[\]{}]/.test(segment)) throw new Error('Structured data in speech');
-    this.emitted = prefix;
     this.pending = this.pending.slice(end);
-    this.onSegment(segment.trim());
+    // Gravity guard: trivial or light sentences are dropped before they can be spoken.
+    const grave = enforceGravity(segment.trim(), !this.emitted);
+    this.gravityRemoved += grave.removed;
+    if (!grave.text.trim()) return;
+    this.emitted = grave.removed ? `${this.emitted}${this.emitted ? ' ' : ''}${grave.text}` : prefix;
+    this.onSegment(grave.text.trim());
   }
   finish(normalCompletion = false) {
     if (!this.intentValue) throw new Error('Missing response intent');
     // Compatibility for known terminal markers only, after upstream stop + DONE
     // (or a batch stop). Never infer transport completion from punctuation.
     // No arbitrary tag/prefix stripping: </spe, attributes and trailing text fail.
+    const beforeResidue = this.pending;
     if (normalCompletion) this.pending = this.pending.replace(/\s*<\/speech>?\s*$/, '');
+    const closingResidue = this.pending !== beforeResidue;
+    // R1 lets a thought stay open. After a normal upstream stop, an unpunctuated
+    // final fragment is that open thought, not a cut stream: speak it as a
+    // suspension instead of relaunching the whole LLM call (G1). Quotes and a
+    // fragment followed by a closing residue stay strict.
+    if (normalCompletion && !closingResidue && this.pending.trim() && !hasOpenQuote(this.pending) && !safeSentenceEnd(this.pending, true)) {
+      this.pending = `${this.pending.trimEnd().replace(/[,;:—–-]+$/, '').trimEnd()}…`;
+    }
     this.emit(true);
     if (this.pending.trim()) throw new Error('Incomplete response sentence or quote');
     if (!this.emitted.trim()) throw new Error('Empty response speech');
@@ -130,8 +151,8 @@ export class ResponseIntentParser {
 }
 
 /** Validate a complete recovery before emitting any of it; same speech guards. */
-export function validateRecoverySpeech(text: string, context: CharacterExecutionContext): string {
+export function validateRecoverySpeech(text: string, context: CharacterExecutionContext, normalCompletion = false): string {
   const parser = new ResponseIntentParser(context, () => {}, () => {});
   parser.push(JSON.stringify({ goal: 'Validation de parole', points: [] }) + SPEECH_BOUNDARY + text);
-  return parser.finish();
+  return parser.finish(normalCompletion);
 }

@@ -12,6 +12,7 @@ import type {
 } from "@/services/tts/types";
 import { getTTSSettings } from "@/services/settingsService";
 import { applyElevenLabsPerformance } from "@/services/tts/performanceIntent";
+import { supportsElevenLabsAudioTags } from "../../../../supabase/functions/_shared/elevenLabsModels";
 import { debugLogger } from "@/services/debugLogger";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
 import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
@@ -53,13 +54,26 @@ export function parseElevenLabsErrorDetails(raw: string): {
   return { type, code, message };
 }
 
+/**
+ * Lot G1: v4 Turbo reads « Ava » the English way (heard « Éva ») although the
+ * request is `language_code: fr`; text and STT both said « Ava ». The expressive
+ * models (audio tags: v3/v4) get a French phonetic spelling; v2/Flash keep the
+ * written name. Spelling chosen by ear in the G1.2 recette.
+ */
+export const ELEVENLABS_AVA_SPELLING = "Ahva";
+
+export function prepareElevenLabsText(text: string, modelId: string): string {
+  const prepared = prepareTextForTTS(text);
+  return supportsElevenLabsAudioTags(modelId) ? prepared.replace(/\bAva\b/g, ELEVENLABS_AVA_SPELLING) : prepared;
+}
+
 /** Request body for `proxy-tts`, shared by the blob and streaming paths. */
 export function buildElevenLabsRequest(text: string, ctx?: TTSGenerateContext) {
   const tts = getTTSSettings();
   const modelId = ctx?.auditionModelId ?? tts.modelId;
   const shaped = applyElevenLabsPerformance(
     { style: tts.style, stability: tts.stability, speed: tts.speed, modelId },
-    prepareTextForTTS(text),
+    prepareElevenLabsText(text, modelId),
     ctx?.performance,
   );
   const body = {
@@ -76,8 +90,8 @@ export function buildElevenLabsRequest(text: string, ctx?: TTSGenerateContext) {
     applyTextNormalization: tts.applyTextNormalization,
     seed: tts.seed,
     ...(ctx?.voiceId ? { voiceId: ctx.voiceId } : {}),
-    ...(ctx?.previousText ? { previousText: prepareTextForTTS(ctx.previousText) } : {}),
-    ...(ctx?.nextText ? { nextText: prepareTextForTTS(ctx.nextText) } : {}),
+    ...(ctx?.previousText ? { previousText: prepareElevenLabsText(ctx.previousText, modelId) } : {}),
+    ...(ctx?.nextText ? { nextText: prepareElevenLabsText(ctx.nextText, modelId) } : {}),
   };
   return { body, modelId, label: `TTS-EL "${shaped.text.slice(0, 60)}…"` };
 }

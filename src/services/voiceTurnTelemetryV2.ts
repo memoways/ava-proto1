@@ -79,7 +79,10 @@ export function observeService(observer: ((value: ServiceObservation) => void) |
 }
 /** Strip all non-technical upstream fields before collection, not only on MCP reads. */
 export function projectServerObservation(input: ServerObservation, clientOrigin?: number): ServerObservation {
-  const names = new Set(["control_quota", "rag_profile", "embedding", "vector_search", "rerank", "upstream_headers", "upstream_body", "gm_generation", "gm_validation_json", "gm_validation_relationship", "gm_persistence", "gm_available"]);
+  const names = new Set(["control_quota", "rag_profile", "embedding", "vector_search", "rerank", "upstream_headers", "upstream_body", "gm_generation", "gm_validation_json", "gm_validation_relationship", "gm_persistence", "gm_available",
+    "character_rag", "character_context_reads", "character_prompt_build", "character_attempt", "character_local_salvage",
+    "character_retry_intent", "character_retry_sentence", "character_retry_empty", "character_retry_timeout", "character_retry_other",
+    "character_gravity_guard", "character_handoff_preparation"]);
   return {
     request_id: String(input.request_id).slice(0, 160),
     ...(input.clock === "client_monotonic" && Number.isFinite(input.client_origin_at) && clientOrigin !== undefined

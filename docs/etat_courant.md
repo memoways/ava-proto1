@@ -38,6 +38,16 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**G1 implémenté le 31 octobre : gravité, « Ava », relance LLM évitée.**
+Cause de « Eva » : voix ElevenLabs v4 (texte et STT disent « Ava ») → graphie `Ahva` pour
+v3/v4. Trivialités : accroche R1 « détail concret » → invariant de gravité non tronquable,
+accroche tournée vers le drame, garde locale de sortie. Décroché léger : base vocale `warm`
+d'Emma → base `fragile`, jamais `warm`/`sarcastic` par défaut pour Max et Emma. Écart fin
+LLM → TTS : relance complète du LLM → pensée ouverte dite en suspension et sauvetage local.
+Spans `character_*` pour la suite. Recette G1.2 d'Ulrich à faire.
+[Constat et exécution](plan_gravite_ava_latence_g1.md) ·
+[Prompt G1.2 « recette gravité et latence »](prompt_reprise_recette_gravite_lot_g1_2.md).
+
 **L1 implémenté le 31 octobre : ElevenLabs lu au fil de l'eau, v4 Turbo retenu.**
 L'écart de ~4 s avec Gradium venait de l'attente du MP3 complet. Lecture progressive
 MediaSource avec repli blob et coupure nette ; défaut expressif `eleven_v4_turbo`.
@@ -48,7 +58,7 @@ son, dû à l'écart fin LLM → TTS (2,6–5,9 s, un tour sur deux), au context
 Recette aussi : Max trivial, Emma légère au décroché, « Eva » au lieu de « Ava ».
 [Mesures et exécution L1](plan_latence_elevenlabs_et_relance_2026-10-31.md#mesure-l10--31-octobre-2026) ·
 [Prompt G1 « gravité, Ava, latence réelle »](prompt_reprise_gravite_ava_latence_lot_g1.md),
-non lancé ; il absorbe [L2](prompt_reprise_latence_lot_l2.md).
+exécuté ; il absorbe [L2](prompt_reprise_latence_lot_l2.md).
 
 **R1 implémenté le 31 octobre : répliques de deux à trois phrases avec accroche.**
 Retour d'Ulrich sur ElevenLabs : meilleure voix, mais latence et répliques trop courtes.

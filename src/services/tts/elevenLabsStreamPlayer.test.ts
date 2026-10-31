@@ -96,6 +96,20 @@ function setup(overrides: Partial<ElevenLabsStreamDeps> = {}, ctx: Parameters<ty
 }
 
 describe("ElevenLabs progressive playback (L1.1)", () => {
+  it("settles `finished` when the request fails after an early end (G1, E2E hang)", async () => {
+    failNextAppend = false;
+    let fail!: (e: unknown) => void;
+    const pending = new Promise<Response>((_res, rej) => { fail = rej; });
+    const { handle, audio } = setup({ request: vi.fn(() => pending) });
+    handle.open();
+    audio.onplaying?.();
+    await handle.started;
+    audio.end();
+    fail(Object.assign(new Error("ElevenLabs TTS error: 422"), { statusCode: 422 }));
+    await expect(handle.finished).rejects.toThrow(/422/);
+    await expect(handle.generationDone).rejects.toThrow(/422/);
+  });
+
   it("feeds every chunk to MediaSource, starts on open and finishes on ended", async () => {
     failNextAppend = false;
     const observe = vi.fn();

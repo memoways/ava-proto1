@@ -265,9 +265,39 @@ function speedFor(
   return clamp(Number(speed.toFixed(2)), 0.7, 1.2);
 }
 
+/** Ava characters crushed by their situation (lot G1): never a light default voice. */
+const GRAVE_CHARACTERS = new Set(["max", "emma"]);
+const GRAVE_REMAP: Partial<Record<CanonicalEmotion, CanonicalEmotion>> = {
+  neutral: "fragile",
+  warm: "fragile",
+  sarcastic: "tense",
+};
+const GRAVE_ACTING_PREFIX = "grave, weighed down; ";
+
+export function isGraveCharacter(characterKey?: string | null): boolean {
+  return GRAVE_CHARACTERS.has(characterKey?.trim().toLowerCase() ?? "");
+}
+
+/** Light emotions never leave the derived (non-workshop) path for Max and Emma. */
+function withGravity(intent: PerformanceIntent, characterKey?: string | null): PerformanceIntent {
+  if (!isGraveCharacter(characterKey)) return intent;
+  const emotion = GRAVE_REMAP[intent.emotion] ?? intent.emotion;
+  const remapped = emotion !== intent.emotion;
+  const delivery = intent.delivery;
+  const acting = intent.source === "speech_state" ? intent.actingNl : buildActingNl(emotion, intent.intensity, delivery);
+  return {
+    ...intent,
+    emotion,
+    delivery,
+    ...(remapped && intent.source !== "speech_state" ? { speedHint: speedFor(emotion, intent.intensity, delivery) } : {}),
+    actingNl: `${GRAVE_ACTING_PREFIX}${acting}`.slice(0, 100),
+  };
+}
+
 function characterBaseline(characterKey?: string | null): { emotion: CanonicalEmotion; delivery?: PerformanceDelivery } {
   const key = characterKey?.trim().toLowerCase();
-  if (key === "emma") return { emotion: "warm", delivery: "measured" };
+  // Emma speaks faster than Max (fiche): grave without the extra "measured" slowdown.
+  if (key === "emma") return { emotion: "fragile" };
   if (key === "max") return { emotion: "tense", delivery: "cutting" };
   return { emotion: "neutral" };
 }
@@ -310,10 +340,10 @@ export function derivePerformanceIntent(input: DerivePerformanceInput): Performa
   if (settings.enabled && mapping && (input.rugosite ?? 0) > 0) {
     const amount = clamp(input.rugosite ?? 0, 0, 3) / 3;
     const speed = Number(mapping.speed);
-    return { emotion: mapping.emotion, intensity: amount < 0.5 ? 0 : amount < 1 ? 1 : 2,
+    return withGravity({ emotion: mapping.emotion, intensity: amount < 0.5 ? 0 : amount < 1 ? 1 : 2,
       delivery: mapping.delivery, speedHint: clamp(1 + ((Number.isFinite(speed) ? speed : 1) - 1) * amount, 0.7, 1.2),
       actingNl: `${mapping.instruction}; ${mapping.pauses} pauses, clear diction`.slice(0, 100),
-      pauses: mapping.pauses, speechState: state, mappingVersion: settings.version, source: 'speech_state' };
+      pauses: mapping.pauses, speechState: state, mappingVersion: settings.version, source: 'speech_state' }, input.characterKey);
   }
   const text = input.text?.trim() || "";
   const folded = foldText(text);
@@ -356,14 +386,14 @@ export function derivePerformanceIntent(input: DerivePerformanceInput): Performa
     intensity = intensity < 2 ? ((intensity + 1) as PerformanceIntensity) : 2;
   }
 
-  return {
+  return withGravity({
     emotion,
     intensity,
     delivery,
     actingNl: buildActingNl(emotion, intensity, delivery),
     speedHint: speedFor(emotion, intensity, delivery),
     source,
-  };
+  }, input.characterKey);
 }
 
 /** Fish Audio emotion markers (S1 vocabulary) for each canonical emotion. */
