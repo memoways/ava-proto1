@@ -12,7 +12,7 @@ import { getCartesiaSettings, getFishSettings, getInworldSettings, loadCartesiaS
 import { auditionKey, SpeechAuditionRunner, type AuditionEvidence } from '@/services/tts/speechAudition';
 import {
  ELEVENLABS_WORKSHOP_MODEL, INTENT_PASSAGES, INTENT_PROVIDERS, PROVIDER_LABELS, WORKSHOP_INTENTS, exportIntentResults, intentPerformance, intentResults,
- providerPlan, recipeWords, resolveCardVoice, workshopIntent, type ProviderBaseSettings,
+ performedText, providerPlan, recipeWords, resolveCardVoice, workshopIntent, type ProviderBaseSettings,
 } from '@/services/tts/speechIntentWorkshop';
 import { cardEvidence, readWorkshop, saveIntentTrial, type IntentTrial, type WorkshopDocument } from '@/services/tts/speechWorkshopStore';
 import type { TTSProviderId } from '@/services/tts/types';
@@ -89,7 +89,7 @@ export default function SpeechIntentWorkshop() {
  const cards = useMemo(() => !intent || !base ? [] : INTENT_PROVIDERS.map(provider => {
   const voice = resolveCardVoice(provider, game, characterVoice(voices, 'max', provider), providerDefaultVoice(provider));
   const plan = providerPlan(provider, intent, base);
-  const key = auditionKey({ text: text.trim(), intent: intent.recipe, provider, voice: voice.voice, plan });
+  const key = auditionKey({ text: performedText(intent, text), intent: intent.recipe, provider, voice: voice.voice, plan });
   return { provider, voice, plan, key, available: voice.source !== null };
  }), [intent, base, game, voices, text]);
  const chosen = cards.filter(card => selected.includes(card.provider));
@@ -107,7 +107,7 @@ export default function SpeechIntentWorkshop() {
   if (!intent || !card.available || !stillHere()) return;
   stop(); const request = ++sequence.current; setBusy(card.provider); setFailures(old => ({ ...old, [card.provider]: '' }));
   try {
-   const evidence = await runner.current.listen(card.key, text.trim(), getProviderById(card.provider), {
+   const evidence = await runner.current.listen(card.key, performedText(intent, text), getProviderById(card.provider), {
     characterKey: 'max', ...(card.voice.voice ? { voiceId: card.voice.voice } : {}), performance: intentPerformance(intent),
     ...(card.provider === 'elevenlabs' ? { auditionModelId: ELEVENLABS_WORKSHOP_MODEL } : {}),
    }, 'rest');

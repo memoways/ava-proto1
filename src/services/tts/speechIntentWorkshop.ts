@@ -47,6 +47,26 @@ export function intentPerformance(intent: WorkshopIntent): PerformanceIntent {
  return { ...structuredClone(intent.recipe), source: 'manual' };
 }
 
+/**
+ * Workshop-only delivery text: the voice is judged "too read", so broken rhythm is written into the text
+ * (ellipses, a stammered first word, a mid-sentence stop). Deterministic; never used by the game, the GM prompt
+ * or Notion files. Intents with short pauses lose their commas so the line runs on.
+ */
+export function performedText(intent: WorkshopIntent, text: string): string {
+ const { pauses, intensity } = intent.recipe;
+ const source = text.trim();
+ if (pauses === 'short') return source.replace(/,\s+/g, ' ');
+ if (pauses !== 'long' || intensity < 1) return source;
+ return source.split(/(?<=[.!?])\s+/).map((sentence, index) => {
+  let out = sentence.replace(/,\s+/g, '… ');
+  const words = out.split(/\s+/);
+  const first = words[0] ?? '';
+  if (index % 2 === 0 && words.length >= 5 && /^[A-Za-zÀ-ÿ]{1,4}$/.test(first)) out = `${first}… ${first.toLowerCase()} ${words.slice(1).join(' ')}`;
+  else if (intensity === 2 && words.length > 8 && !out.includes('…')) out = `${words.slice(0, 4).join(' ')}… ${words.slice(4).join(' ')}`;
+  return out;
+ }).join(' ');
+}
+
 const EMOTION_WORDS: Record<CanonicalEmotion, string> = {
  neutral: 'sans émotion marquée', tense: 'tendu', angry: 'en colère', sad: 'triste', scared: 'effrayé', fragile: 'fragile, hésitant',
  warm: 'chaleureux', accusatory: 'accusateur', sarcastic: 'ironique', urgent: 'pressant',

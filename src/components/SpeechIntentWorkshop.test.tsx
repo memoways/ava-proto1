@@ -14,7 +14,7 @@ vi.mock('./SpeechAuditionBench', () => ({ default: () => <p>Banc A/B AP2 monté<
 vi.mock('@/services/tts/characterVoices', async original => ({ ...await original<typeof import('@/services/tts/characterVoices')>(), loadCharacterVoicesFromDB: vi.fn(async () => ({})) }));
 import { setActiveEnvironment } from '@/services/environmentContext';
 import { SpeechAuditionRunner } from '@/services/tts/speechAudition';
-import { INTENT_PASSAGES } from '@/services/tts/speechIntentWorkshop';
+import { INTENT_PASSAGES, performedText, workshopIntent } from '@/services/tts/speechIntentWorkshop';
 import { readWorkshop, saveIntentTrial, type WorkshopDocument } from '@/services/tts/speechWorkshopStore';
 import { loadCharacterVoicesFromDB } from '@/services/tts/characterVoices';
 import SpeechIntentWorkshop from './SpeechIntentWorkshop';
@@ -84,7 +84,7 @@ describe('AP4 — intent workshop', () => {
   expect(listen).toHaveBeenCalledTimes(3);
   const texts = new Set(listen.mock.calls.map(call => call[1]));
   const intents = new Set(listen.mock.calls.map(call => JSON.stringify(call[3].performance)));
-  expect(texts).toEqual(new Set([INTENT_PASSAGES[0].text])); expect(intents.size).toBe(1);
+  expect(texts).toEqual(new Set([performedText(workshopIntent('peur'), INTENT_PASSAGES[0].text)])); expect(intents.size).toBe(1);
   expect(listen.mock.calls.map(call => call[2].id)).toEqual(['gradium', 'inworld', 'cartesia']);
   expect(listen.mock.calls[0][3]).toMatchObject({ voiceId: 'voice-max', characterKey: 'max', performance: { emotion: 'scared', intensity: 2, source: 'manual' } });
   expect(listen.mock.calls.every(call => call[4] === 'rest')).toBe(true);
