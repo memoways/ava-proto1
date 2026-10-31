@@ -4,6 +4,28 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [G1 — gravité des personnages, « Ava », relance LLM évitée] — 2026-10-31
+
+- Diagnostic G1.0 (session `d00687ba…`, sandbox) : « Eva » est la prononciation ElevenLabs v4
+  Turbo (STT et texte LLM disent « Ava ») ; trivialités dues à l'accroche R1 « détail concret » ;
+  décroché léger d'Emma dû à son ton de base `warm` (`[warmly]` en v4) ; écart fin LLM → TTS
+  = seconde requête LLM complète (relance de récupération) sur 3 tours sur 6.
+- Gravité côté texte : `GRAVITY_INVARIANT` dans le bloc d'identité non tronquable (toutes
+  variantes) ; accroche réécrite vers un fil du drame, jamais un détail du décor ; garde locale
+  `enforceGravity` (sans LLM) qui retire les phrases triviales ou légères, jamais la première.
+- Gravité côté voix : Max et Emma ne partent plus en `warm`, `sarcastic` ni `neutral` par défaut
+  (remap vers `fragile`/`tense`) ; base d'Emma `fragile` ; instruction « grave » préfixée
+  (Inworld) ; balises v4 sans `[warmly]` ni `[sarcastic]`. Ateliers explicites et Gradium inchangés.
+  Décroché d'Emma « Bonjour. » remplacé par « … Je vous écoute. ».
+- « Ava » : graphie phonétique `Ahva` envoyée aux seuls modèles ElevenLabs à balises (v3/v4) ;
+  texte affiché, transcription et autres fournisseurs inchangés. À valider à l'oreille.
+- Relance : une pensée finale non ponctuée après un arrêt normal est dite en suspension ; une
+  réponse batch complète dont seul l'en-tête privé est inutilisable est validée localement
+  (`local_salvage`) au lieu d'un second appel LLM.
+- Télémétrie : spans client `character_*` (RAG, lectures de contexte, construction du prompt,
+  tentative, raison de relance, sauvetage local, garde de gravité, préparation de passage).
+- Non changés sans accord : `endOfSpeechMs` sandbox (2 000 ms), streaming LLM, modèle de Max.
+
 ## [Recette L1.3 — prompt G1 : gravité, Ava, latence réelle] — 2026-10-31
 
 - Recette d'Ulrich : latence ressentie inchangée. Mesure de la session : texte → son

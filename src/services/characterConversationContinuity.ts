@@ -96,7 +96,7 @@ export function characterHandoffGreeting(target: RuntimeCharacter, from: Runtime
       : [`${source} m’a passé l’appel. Je vous écoute.`, `C’est Max. Je reprends l’appel de ${source}. Dites-moi.`, `Allô. ${source} m’a transmis l’appel. Dites-moi.`, `Oui, Max à l’appareil. ${source} vient de me passer la ligne.`]
     : returning
       ? [`${source} m’a repassé l’appel. Je suis là.`, 'Me revoilà… Prenons le temps de reprendre.', 'Oui, c’est de nouveau Emma. Je vous écoute.', 'Je suis là. On peut continuer.']
-      : [`Allô… ${source} m’a passé l’appel. Je vous écoute.`, `C’est Emma. Vous étiez avec ${source}… Je suis là.`, `${source} vient de me passer la ligne. Bonjour.`, `Oui, Emma à l’appareil… ${source} m’a transmis l’appel.`];
+      : [`Allô… ${source} m’a passé l’appel. Je vous écoute.`, `C’est Emma. Vous étiez avec ${source}… Je suis là.`, `${source} vient de me passer la ligne… Je vous écoute.`, `Oui, Emma à l’appareil… ${source} m’a transmis l’appel.`];
   return unusedLine(lines, target, history);
 }
 

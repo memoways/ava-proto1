@@ -86,7 +86,7 @@ describe('lot 3 — terminal closing residue', () => {
   it('R1 — livre le contenu avant de rester ouvert et finit sur une accroche, pas une question réflexe', () => {
     const contract = buildResponseStreamContract(360);
     expect(contract.indexOf("Livre d'abord le contenu")).toBeLessThan(contract.indexOf('pensée peut rester ouverte'));
-    expect(contract).toContain('Termine sur une accroche (détail concret, réaction, fil ouvert), pas sur une question réflexe');
+    expect(contract).toContain('Termine sur une accroche (un fil de ton drame laissé ouvert, une réaction), jamais sur un détail du décor ni sur une question réflexe');
     expect(contract).toContain('Vise deux à trois phrases parlées');
     expect(contract).not.toContain('sans explication ni conclusion ajoutée pour achever la pensée');
   });
@@ -122,5 +122,26 @@ describe('lot 3 — terminal closing residue', () => {
   it('requires a normal upstream completion for a truncated closing marker', () => {
     const { p } = parser(); p.push(header + 'Bonjour.\n</speech');
     expect(() => p.finish(false)).toThrow();
+  });
+});
+
+describe('G1 — open final thought and gravity guard', () => {
+  it('speaks an unpunctuated final fragment as a suspension after a normal stop', () => {
+    const { p, spoken } = parser();
+    p.push(header + 'Il y a autre chose, sur la montagne. Pas maintenant');
+    expect(p.finish(true)).toBe('Il y a autre chose, sur la montagne. Pas maintenant…');
+    expect(spoken.join(' ')).toBe('Il y a autre chose, sur la montagne. Pas maintenant…');
+  });
+  it('still rejects the same fragment without a normal stop, or with an open quote', () => {
+    const cut = parser(); cut.p.push(header + 'Pas maintenant'); expect(() => cut.p.finish(false)).toThrow();
+    const quote = parser(); quote.p.push(header + '« Pas maintenant'); expect(() => quote.p.finish(true)).toThrow();
+  });
+  it('drops a trivial or light sentence before it can be spoken, keeping the answer', () => {
+    const { p, spoken } = parser();
+    p.push(header + 'Non, pas vraiment. Elle est dans sa chambre. ');
+    p.push('Le café refroidit sûrement dans sa tasse.');
+    expect(p.finish(true)).toBe('Non, pas vraiment. Elle est dans sa chambre.');
+    expect(spoken.join(' ')).not.toMatch(/café/);
+    expect(p.gravityRemoved).toBe(1);
   });
 });

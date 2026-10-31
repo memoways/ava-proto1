@@ -1,7 +1,7 @@
 import { ResponseIntentParser, type ResponseIntent } from "./responseIntentStream";
 import { projectDeliveredConversation, type ResponseDeliveryReceipt } from "./responseDelivery";
 import type { OpenHandoffRequest } from './characterHandoffState';
-import { observeVoice, observeService, type VoiceObserver, type ServiceObservation, type ServerObservation } from "./voiceTurnTelemetryV2";
+import { observeVoice, observeService, type VoiceObserver, type ServiceObservation, type ServerObservation, type ProcessSpan } from "./voiceTurnTelemetryV2";
 /**
  * PRD4 — Orchestrateur lean d'un tour de conversation.
  *
@@ -157,11 +157,27 @@ export type PRD4LatencySegmentEvent =
   | { type: "start"; segment: "RAG" | "LLM" | "GM"; service: string }
   | { type: "end"; segment: "RAG" | "LLM" | "GM"; service: string; durationMs: number };
 
+/** Bounded span name carrying why the first character attempt was relaunched. */
+export function characterRetrySpanName(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/response intent/i.test(message)) return "character_retry_intent";
+  if (/Incomplete response/i.test(message)) return "character_retry_sentence";
+  if (/Empty response/i.test(message)) return "character_retry_empty";
+  if (/timeout|timed out/i.test(message)) return "character_retry_timeout";
+  return "character_retry_other";
+}
+
 export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnResult> {
   assertCharacterExecutionContext(input.characterContext);
   input.signal?.throwIfAborted();
   input = { ...input, conversationHistory: projectDeliveredConversation(input.conversationHistory) };
   const t0 = performance.now();
+  // G1: client spans for the character path (context, attempts, recovery reason,
+  // handoff wait), relative to t0. Diagnostic only, emitted once per turn.
+  const characterSpans: ProcessSpan[] = [];
+  const span = (name: string, start: number, end = performance.now(), status: ProcessSpan["status"] = "ok") => {
+    if (characterSpans.length < 32) characterSpans.push({ name, start_ms: Math.max(0, Math.round(start - t0)), end_ms: Math.max(0, Math.round(end - t0)), status });
+  };
   const diagnosticTraceEnabled = input.diagnosticTraceEnabled === true;
   const turnId = input.turnId || crypto.randomUUID();
   const responseDeadlineAt = Math.min(t0 + TURN_RESPONSE_DEADLINE_MS,
@@ -277,6 +293,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   }
 
   const rag_ms = Math.round(performance.now() - ragStart);
+  span("character_rag", ragStart, performance.now(), ragError ? "failed" : "ok");
   input.onLatencySegment?.({ type: "end", segment: "RAG", service: "RAG", durationMs: rag_ms });
   input.signal?.throwIfAborted();
 
@@ -364,6 +381,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     speechStateHistory: recentSpeechStates,
   };
   observeVoice(input.onVoiceObservation, "context_ready");
+  span("character_context_reads", maxStart);
   try { input.onVersionsObserved?.(input.characterContext.promptUpdatedAt, "versionId" in frameRuntime ? frameRuntime.versionId : null); } catch { /* diagnostic only */ }
   let maxResponse = "";
   let max_ms = 0;
@@ -406,10 +424,15 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         attempt.abort('character-attempt-finished');
       }
     };
+    const attemptStart = performance.now();
     try {
       maxResult = await generate(false, Math.min(MAX_LLM_RESPONSE_DEADLINE_MS, remainingMs));
       if (!maxResult.response.trim()) throw new Error('Empty response speech');
+      span("character_attempt", attemptStart);
+      if (maxResult.promptBuildLatencyMs !== undefined) span("character_prompt_build", attemptStart, attemptStart + maxResult.promptBuildLatencyMs);
+      if (maxResult.speechRecovery === 'local_salvage') span("character_local_salvage", performance.now());
     } catch (error) {
+      span("character_attempt", attemptStart, performance.now(), "failed");
       const retryMs = Math.floor(responseDeadlineAt - performance.now());
       if (input.signal?.aborted || input.streamControl?.hasSegments() || retryMs < 250 || !canRetryCharacterResponse(error)) throw error;
       console.warn('[PRD4 orchestrator] Retrying recognized turn before speech:', error);
@@ -417,14 +440,17 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       // Same immutable input, model, character and context. No RAG/GM repetition,
       // no replay once speech was submitted. Recovery drops only the private wire
       // protocol and validates the entire answer before incremental delivery.
+      const retryStart = performance.now();
       maxResult = await generate(true, Math.min(MAX_LLM_RESPONSE_DEADLINE_MS, retryMs));
       if (!maxResult.response.trim()) throw new Error('Empty response speech');
+      span(characterRetrySpanName(error), retryStart);
       if (input.streamControl) {
         maxResult = { ...maxResult, response: validateRecoverySpeech(maxResult.response, input.characterContext) };
         input.streamControl.onRecovered(maxResult.response);
       }
     }
     identityGuard = guardCharacterResponse(maxResult.response, input.characterContext);
+    if (maxResult.gravityRemoved) span("character_gravity_guard", performance.now());
     if (input.playedSpeechStateRef && !input.streamControl) input.playedSpeechStateRef.current = maxResult.responseIntent?.parole ?? null;
     maxResponse = identityGuard.response;
   } catch (err) {
@@ -521,7 +547,9 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         candidateResult = evaluated;
         candidateReleased = await input.prepareHandoff!(candidateResult, maxResponse, signal, preparationStartedAt);
       })(), HANDOFF_PREPARATION_TIMEOUT_MS, () => controller.abort('handoff-deadline'));
+      span("character_handoff_preparation", preparationStartedAt);
     } catch {
+      span("character_handoff_preparation", preparationStartedAt, performance.now(), "failed");
       candidateReleased = false;
       candidateResult = { engagement_delta: 0, confusion_detected: false, role_usage_quality: 'unknown',
         topics_covered: [], transition_recommended: false, cinematic_hint: null, next_turn_guidance: '',
@@ -543,6 +571,9 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     : runPostTurn();
   // En diagnostic, le post-tour (qui prépare la suite et écrit son propre log)
   // ne démarre qu'après la mise en file locale durable de la réponse.
+  if (characterSpans.length) {
+    try { input.onServerObserved?.({ request_id: `${turnId}:character`, clock: "client_monotonic", spans: characterSpans, client_origin_at: t0 }); } catch { /* diagnostic only */ }
+  }
   let rawPostTurnPromise = diagnosticTraceEnabled ? null : finishPostTurn();
 
   const summaryEvery = gameplay?.RAG_SUMMARY_EVERY_N_TURNS ?? 4;

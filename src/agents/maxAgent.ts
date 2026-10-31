@@ -1,5 +1,5 @@
 import { trimRagContextToWholeSouvenirs } from "@/services/ragService";
-import { buildResponseStreamContract, ResponseIntentParser, type ResponseIntent } from "@/services/responseIntentStream";
+import { buildResponseStreamContract, ResponseIntentParser, validateRecoverySpeech, type ResponseIntent } from "@/services/responseIntentStream";
 import { formatPrivateDeliveryContext } from "@/services/responseDelivery";
 import { CHARACTER_CALL_TRANSFER_INSTRUCTIONS } from "@/services/characterConversation";
 import { callLLM, callLLMWithUsage, LLMProxyRequestError, streamLLM, type LLMUsage } from "@/services/openRouterLLM";
@@ -26,6 +26,7 @@ import {
 } from "@/agents/maxPromptCompiler";
 import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
 import { RESPONSE_HOOK_RULE } from "@/agents/responseHook";
+import { GRAVITY_INVARIANT, enforceGravity } from "@/agents/gravity";
 import { rugositySpeechDirective } from "@/services/speechRugosity";
 import { characterEmbodiment, withoutCharacterEmbodiment } from '@/services/characterEmbodiment';
 import {
@@ -220,6 +221,10 @@ export async function callMaxAgent(
 export interface SimulateMaxResult {
   response: string;
   responseIntent?: ResponseIntent | null;
+  /** Batch answer kept without its private header (no second LLM call). */
+  speechRecovery?: 'local_salvage';
+  /** Sentences removed by the gravity guard. */
+  gravityRemoved?: number;
   systemPrompt: string;
   usage?: LLMUsage | null;
   latencyMs?: number;
@@ -358,14 +363,35 @@ export async function simulateMaxResponse(
   if (result.finishReason && result.finishReason !== 'stop') throw new Error(`LLM response incomplete (${result.finishReason})`);
   let response = result.content;
   let responseIntent: ResponseIntent | null = null;
+  let speechRecovery: SimulateMaxResult['speechRecovery'];
+  let gravityRemoved = 0;
   if (privateProtocol && !opts?.onSpeechToken && opts?.characterContext) {
     const parser = new ResponseIntentParser(opts.characterContext, intent => { responseIntent = intent; }, () => {});
-    parser.push(response);
-    response = parser.finish(result.finishReason === 'stop');
+    try {
+      parser.push(response);
+      response = parser.finish(result.finishReason === 'stop');
+      gravityRemoved = parser.gravityRemoved;
+    } catch (error) {
+      // G1: a complete batch answer whose private header alone is missing or
+      // malformed is validated locally with the recovery guards instead of a
+      // second full LLM call (1.5–2.5 s on one turn in two after R1).
+      const salvage = result.finishReason === 'stop' && /response intent/i.test(error instanceof Error ? error.message : '')
+        ? salvageBatchSpeech(response) : null;
+      if (salvage === null) throw error;
+      response = validateRecoverySpeech(salvage, opts.characterContext, true);
+      speechRecovery = 'local_salvage';
+    }
+  }
+  if (!privateProtocol) {
+    const grave = enforceGravity(response);
+    response = grave.text;
+    gravityRemoved = grave.removed;
   }
   return {
     response,
     responseIntent,
+    ...(speechRecovery ? { speechRecovery } : {}),
+    gravityRemoved,
     systemPrompt,
     usage: result.usage,
     latencyMs: result.latencyMs,
@@ -377,6 +403,15 @@ export async function simulateMaxResponse(
     promptBuildLatencyMs,
     requestedSettings,
   };
+}
+
+/** Speech part of a complete batch answer whose private header is unusable. */
+export function salvageBatchSpeech(content: string): string | null {
+  const marker = content.indexOf('<speech>');
+  const speech = marker >= 0 ? content.slice(marker + '<speech>'.length) : content;
+  const clean = speech.replace(/\s*<\/speech>?\s*$/, '').trim();
+  if (!clean || (marker < 0 && /^\s*[{[]/.test(content))) return null;
+  return clean;
 }
 
 function buildValidatorPrompt(input: {
@@ -522,7 +557,7 @@ export async function buildMaxSystemPrompt(
   const characterIdentity = characterContext
     ? buildCharacterIdentityInvariant(characterContext)
     : `# IDENTITÉ ACTIVE — INVARIANT PRIORITAIRE NON TRONQUABLE\n- Tu es ${canonicalName}. Tu ne te présentes jamais comme un autre personnage.`;
-  const identityInvariant = `${characterIdentity}\n\n## PROCÉDURE DE PASSAGE TÉLÉPHONIQUE\n${CHARACTER_CALL_TRANSFER_INSTRUCTIONS}`;
+  const identityInvariant = `${characterIdentity}\n\n${GRAVITY_INVARIANT}\n\n## PROCÉDURE DE PASSAGE TÉLÉPHONIQUE\n${CHARACTER_CALL_TRANSFER_INSTRUCTIONS}`;
 
   if (variant === "legacy") {
     const fieldsSections = buildCharacterPromptSections(withoutCharacterEmbodiment(characterFields));

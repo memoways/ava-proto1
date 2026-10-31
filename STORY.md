@@ -3,9 +3,30 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-31 (L1 : ElevenLabs lu au fil de l'eau, v4 Turbo)
+> **Last Updated**: 2026-10-31 (G1 : gravité, « Ava », relance LLM évitée)
 
 ---
+
+## G1 — des personnages écrasés, « Ava » bien dit, une relance en moins (31 octobre 2026)
+
+À l'écoute, Max parlait de l'odeur du café pendant que sa famille s'effondrait, et
+Emma décrochait d'une voix enjouée. Les fiches n'y étaient pour rien : elles sont
+graves. La règle de relance R1 demandait de finir sur « un détail concret », et Max
+prenait le café ; la voix d'Emma partait par défaut en « chaleureux ». Le jeu porte
+maintenant un invariant de gravité que rien ne peut retirer, une relance tournée vers
+le drame, et une garde qui retire avant de la dire une phrase triviale ou légère. Les
+voix de Max et d'Emma ne partent plus jamais en chaleureux ou sarcastique par défaut.
+
+« Eva » ne venait ni de la transcription ni du texte : les deux disaient « Ava ». C'est
+la voix ElevenLabs v4 qui lisait le prénom à l'anglaise ; elle reçoit désormais une
+graphie phonétique, à valider à l'oreille.
+
+Enfin, un tour sur deux attendait deux à trois secondes de plus parce que le jeu
+relançait tout le LLM quand l'en-tête privé ou la fin de phrase ne lui convenait pas.
+Une pensée laissée ouverte est désormais dite en suspension, et une réponse complète
+au seul en-tête défaillant est gardée, sans second appel. Chaque tour enregistre aussi
+où passe son temps de préparation, pour la suite.
+[Constat et exécution](docs/plan_gravite_ava_latence_g1.md).
 
 ## L1 — ElevenLabs parle dès les premiers octets (31 octobre 2026)
 
