@@ -3,9 +3,20 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-31 (G1 : gravité, « Ava », relance LLM évitée)
+> **Last Updated**: 2026-10-31 (G1.2 : recette gravité, prompt plus rapide, registre tenu)
 
 ---
+
+## G1.2 — la recette tient, le prompt se construit vite (31 octobre 2026)
+
+Ulrich a parlé à Max puis à Emma : « bien, correct, bonne direction ». Rien de trivial ni de
+léger, et plus aucune relance du LLM. Il demandait encore de la réactivité. Les nouveaux spans
+ont montré une attente que personne ne voyait : près d'une seconde à chaque tour pour
+construire le prompt, alors qu'aucun réseau n'était en jeu. La déduplication de la fiche
+réanalysait les mêmes paragraphes à chaque comparaison ; elle les analyse désormais une fois.
+La recette a aussi montré Max repasser au « vous » sur une phrase scriptée alors qu'il tutoyait
+depuis le début : ces phrases suivent maintenant le registre déjà installé. Restent à décider
+par Ulrich : délai de fin de parole en sandbox, streaming vers ElevenLabs, modèle plus rapide.
 
 ## G1 — des personnages écrasés, « Ava » bien dit, une relance en moins (31 octobre 2026)
 

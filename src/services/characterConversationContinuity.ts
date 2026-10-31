@@ -50,6 +50,43 @@ export function createInitialGreetingSelector() {
   };
 }
 
+type Register = 'vous' | 'tu';
+
+const informalAddress = /(?:^|[^\p{L}])(?:(?:tu|te|toi|ton|ta|tes)(?=$|[^\p{L}])|t['’])/giu;
+const formalAddress = /(?:^|[^\p{L}])(?:vous|votre|vos)(?=$|[^\p{L}])/giu;
+
+/**
+ * The register a character already uses with the player in this call. A scripted
+ * line in the middle of a call must not switch back to « vous » once the
+ * character says « tu » (recette G1.2). First contact stays formal.
+ */
+export function characterRegister(character: RuntimeCharacter, history: ConversationMessage[]): Register {
+  const own = sliceConversationForCharacter(history, character).filter(message => message.role === character);
+  for (const message of own.reverse()) {
+    const informal = message.content.match(informalAddress)?.length ?? 0;
+    const formal = message.content.match(formalAddress)?.length ?? 0;
+    if (informal !== formal) return informal > formal ? 'tu' : 'vous';
+  }
+  return 'vous';
+}
+
+const recoveryLinesInformal: Record<RuntimeCharacter, readonly string[]> = {
+  max: [
+    'Un instant. Reprends les derniers mots.',
+    'Je t’ai perdu un moment. Redisons ça simplement.',
+    'Attends. Tu peux reprendre la fin ?',
+    'Ça a coupé. Juste la dernière phrase ?',
+    'Reprends, je t’écoute.',
+  ],
+  emma: [
+    'Pardon… La fin m’a échappé. Tu peux reprendre ?',
+    'Attends, je n’ai pas tout saisi. Encore une fois ?',
+    'Je suis là… Redis-moi juste la fin.',
+    'Excuse-moi, ça a coupé un instant. Tu disais ?',
+    'Je t’écoute. On reprend doucement ?',
+  ],
+};
+
 const recoveryLines: Record<RuntimeCharacter, readonly string[]> = {
   max: [
     'Un instant. Reprenez les derniers mots.',
@@ -77,25 +114,37 @@ function unusedLine(lines: readonly string[], character: RuntimeCharacter, histo
 }
 
 export function characterRecoveryLine(character: RuntimeCharacter, history: ConversationMessage[]): string {
-  return unusedLine(recoveryLines[character], character, history);
+  const lines = characterRegister(character, history) === 'tu' ? recoveryLinesInformal : recoveryLines;
+  return unusedLine(lines[character], character, history);
 }
 
 /** A withheld transfer stays in the scene: no technical status, invented consent or audio outage. */
 export function characterHandoffPauseLine(character: RuntimeCharacter, history: ConversationMessage[]): string {
-  return unusedLine(character === 'max'
-    ? ['Attendez. Qu’est-ce que vous voudriez lui dire ?', 'De quoi voulez-vous lui parler, au juste ?']
-    : ['Attendez… Qu’est-ce que vous voulez lui dire ?', 'Qu’est-ce qui vous amène à vouloir lui parler ?'], character, history);
+  const informal = characterRegister(character, history) === 'tu';
+  const lines = character === 'max'
+    ? informal
+      ? ['Attends. Qu’est-ce que tu voudrais lui dire ?', 'De quoi veux-tu lui parler, au juste ?']
+      : ['Attendez. Qu’est-ce que vous voudriez lui dire ?', 'De quoi voulez-vous lui parler, au juste ?']
+    : informal
+      ? ['Attends… Qu’est-ce que tu veux lui dire ?', 'Qu’est-ce qui te donne envie de lui parler ?']
+      : ['Attendez… Qu’est-ce que vous voulez lui dire ?', 'Qu’est-ce qui vous amène à vouloir lui parler ?'];
+  return unusedLine(lines, character, history);
 }
 
 export function characterHandoffGreeting(target: RuntimeCharacter, from: RuntimeCharacter, history: ConversationMessage[]): string {
   const source = characterDisplayName(from);
   const returning = hasSpokenWithCharacter(history, target);
+  const informal = returning && characterRegister(target, history) === 'tu';
   const lines = target === 'max'
     ? returning
-      ? [`${source} m’a repassé l’appel. On reprend.`, 'Me revoilà. Je vous écoute.', 'Oui, c’est de nouveau Max. Nous en étions où ?', 'Je suis toujours là. Continuons.']
+      ? informal
+        ? [`${source} m’a repassé l’appel. On reprend.`, 'Me revoilà. Je t’écoute.', 'Oui, c’est de nouveau Max. On en était où ?', 'Je suis toujours là. Continuons.']
+        : [`${source} m’a repassé l’appel. On reprend.`, 'Me revoilà. Je vous écoute.', 'Oui, c’est de nouveau Max. Nous en étions où ?', 'Je suis toujours là. Continuons.']
       : [`${source} m’a passé l’appel. Je vous écoute.`, `C’est Max. Je reprends l’appel de ${source}. Dites-moi.`, `Allô. ${source} m’a transmis l’appel. Dites-moi.`, `Oui, Max à l’appareil. ${source} vient de me passer la ligne.`]
     : returning
-      ? [`${source} m’a repassé l’appel. Je suis là.`, 'Me revoilà… Prenons le temps de reprendre.', 'Oui, c’est de nouveau Emma. Je vous écoute.', 'Je suis là. On peut continuer.']
+      ? informal
+        ? [`${source} m’a repassé l’appel. Je suis là.`, 'Me revoilà… Prenons le temps de reprendre.', 'Oui, c’est de nouveau Emma. Je t’écoute.', 'Je suis là. On peut continuer.']
+        : [`${source} m’a repassé l’appel. Je suis là.`, 'Me revoilà… Prenons le temps de reprendre.', 'Oui, c’est de nouveau Emma. Je vous écoute.', 'Je suis là. On peut continuer.']
       : [`Allô… ${source} m’a passé l’appel. Je vous écoute.`, `C’est Emma. Vous étiez avec ${source}… Je suis là.`, `${source} vient de me passer la ligne… Je vous écoute.`, `Oui, Emma à l’appareil… ${source} m’a transmis l’appel.`];
   return unusedLine(lines, target, history);
 }
@@ -117,7 +166,12 @@ export function canRetryCharacterResponse(error: unknown): boolean {
 /** Direct grid calls never invent a transfer by the previous character. */
 export function characterRecallGreeting(character: RuntimeCharacter, history: ConversationMessage[], openingLine: string | null): string {
   if (!hasSpokenWithCharacter(history, character)) return initialGreetingLines(character, openingLine)[0];
+  const informal = characterRegister(character, history) === 'tu';
   return unusedLine(character === 'max'
-    ? ['Oui, c’est de nouveau Max. Je vous écoute.', 'Me revoilà. Nous en étions où ?']
-    : ['Oui… c’est de nouveau Emma. Je vous écoute.', 'Me revoilà… On peut reprendre.'], character, history);
+    ? informal
+      ? ['Oui, c’est de nouveau Max. Je t’écoute.', 'Me revoilà. On en était où ?']
+      : ['Oui, c’est de nouveau Max. Je vous écoute.', 'Me revoilà. Nous en étions où ?']
+    : informal
+      ? ['Oui… c’est de nouveau Emma. Je t’écoute.', 'Me revoilà… On peut reprendre.']
+      : ['Oui… c’est de nouveau Emma. Je vous écoute.', 'Me revoilà… On peut reprendre.'], character, history);
 }
