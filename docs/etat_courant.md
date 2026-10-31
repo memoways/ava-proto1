@@ -42,8 +42,9 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 Recette d'Ulrich (session `e6918bd8…`) : le MJ avait validé « Je passe Emma » deux fois, mais
 l'offre non préparée était révoquée (formulation non reconnue), puis la pause tournait en
 boucle. Formulations reconnues, accord validé préparé après coup avec les mêmes gardes, pas de
-seconde pause. G1.2 tient : prompt 25–58 ms, premier son hors passage 3,2–4,7 s. Décisions de
-latence et d'acceptation vocale à prendre par Ulrich.
+seconde pause. G1.2 tient : prompt 25–58 ms, premier son hors passage 3,2–4,7 s. Fin de parole
+sandbox passée de 2 000 à 900 ms (décision d'Ulrich, réglage seul) ; autres décisions de latence
+et acceptation vocale à prendre par Ulrich.
 [Recette et exécution G1.3](plan_gravite_ava_latence_g1.md#g13a--recette-dulrich-31-octobre-2026-sans-code) ·
 [Prompt G1.4 « recette du passage, décisions d'Ulrich »](prompt_reprise_passage_latence_lot_g1_4.md).
 

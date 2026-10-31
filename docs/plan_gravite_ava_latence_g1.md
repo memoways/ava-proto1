@@ -248,3 +248,17 @@ la même chose.
 5. Acceptation vocale du passage : aujourd'hui l'offre attend un clic sur le bouton. En mains
    libres, un « oui » du joueur après l'offre pourrait la déclencher ; à décider (invariant
    « clic du joueur »).
+
+### G1.3c — décision 1 appliquée (31 octobre 2026)
+
+- Ulrich accepte la fin de parole à 900 ms en sandbox. `admin_settings`, clé
+  `ava_gameplay_settings`, `sandbox-ulrich` : `VOICE_HANDS_FREE.endOfSpeechMs` 2 000 → 900 ms
+  (écrit via le MCP Lovable Ava à 20 h 46 UTC, relu). Rien d'autre changé : attente
+  supplémentaire sur phrase hésitante toujours 700 ms, interruption toujours désactivée en
+  sandbox. Production déjà à 900 ms, non touchée. Aucun code modifié.
+- Pas de surcharge persistante : la page de jeu relit `admin_settings` au démarrage et
+  remplace le cache du navigateur.
+- À mesurer à la prochaine recette : délai entre la fin réelle de la parole et la décision de
+  tour (gain attendu jusqu'à 1,1 s), et toute phrase coupée trop tôt (écoute d'Ulrich).
+  Retour arrière : remettre 2 000 dans la même clé.
+- Décisions 2 à 5 : toujours en attente d'Ulrich.

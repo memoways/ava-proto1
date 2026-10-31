@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [G1.3c — fin de parole à 900 ms en sandbox] — 2026-10-31
+
+- Décision d'Ulrich : `VOICE_HANDS_FREE.endOfSpeechMs` de `sandbox-ulrich` passe de 2 000 à
+  900 ms (valeur de la production). Jusqu'à 1,1 s de silence en moins avant chaque réponse ;
+  phrases hésitantes toujours +700 ms. Réglage seul, aucun code ; production inchangée.
+
 ## [G1.3 — passage à Emma : accord du MJ préservé, pause jamais répétée] — 2026-10-31
 
 - Recette d'Ulrich (session `e6918bd8…`, sandbox, Max, 10 tours) : passage à Emma impossible
