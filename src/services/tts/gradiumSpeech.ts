@@ -10,10 +10,12 @@ export function stripGradiumControlMarkup(text: string): string {
 }
 
 /** Keep the historical anti-click cleanup, including the disabled path. */
-export function prepareTextForGradium(text: string): string {
-  return prepareTextForTTS(stripGradiumControlMarkup(text))
+export function prepareTextForGradium(text: string, options?: { keepEllipses?: boolean }): string {
+  const cleaned = prepareTextForTTS(stripGradiumControlMarkup(text));
+  // Workshop only (AP4-quater): the hesitations written in the text must reach Gradium instead of becoming commas.
+  return (options?.keepEllipses ? cleaned : cleaned
     .replace(/\s*\.{3}\s*(?=[A-Za-zÀ-ÿ0-9])/g, ', ')
-    .replace(/\.{3}/g, '.')
+    .replace(/\.{3}/g, '.'))
     .replace(/\s+[—–-]\s+/g, ', ')
     .replace(/[«»"“”()[\]]/g, '')
     .replace(/([,;:!?.])\s*,/g, '$1')

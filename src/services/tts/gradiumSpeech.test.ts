@@ -36,3 +36,10 @@ describe('A2 Gradium speech controls', () => {
     expect(planGradiumSpeech('… Oui… — … non.', 1).filter(p => p.type === 'pause')).toHaveLength(1);
   });
 });
+
+describe('AP4-quater — workshop hesitations', () => {
+  it('keeps ellipses only when asked, and still cleans them for the game', () => {
+    expect(prepareTextForGradium('Je... je sais pas.', { keepEllipses: true })).toBe('Je... je sais pas.');
+    expect(prepareTextForGradium('Je... je sais pas.')).toBe('Je, je sais pas.');
+  });
+});

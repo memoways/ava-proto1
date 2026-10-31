@@ -12,6 +12,9 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Réglages de l'atelier poussés (intentions « manuel » seulement) : Gradium `temp` +0,07 par niveau
   (plafond 0,9) et pauses longues +0,5 ; ElevenLabs stabilité −0,1 et style +0,08 par niveau ;
   Fish `topP` relevé avec l'intensité comme `temperature`. Le jeu garde ses plafonds.
+- Gradium transformait « … » en virgule (`prepareTextForGradium`) : les hésitations du texte
+  étaient effacées. Option `keepEllipses`, activée seulement pour les intentions de l'atelier ;
+  le jeu garde son nettoyage. Découvert par l'E2E de la PR (texte Gradium ≠ texte Inworld).
 - À valider à l'oreille : retour d'Ulrich du 31 octobre (« mieux, pas encore assez cassé »).
 
 ## [AP4-quater — fournisseurs qui échouent, voix lentes (en cours)] — 2026-10-30

@@ -69,7 +69,7 @@ function resolveRestFormat(format: GradiumSettings["outputFormat"]): GradiumSett
 
 async function generateGradiumSpeech(text: string, ctx: TTSGenerateContext | undefined, s: GradiumSettings): Promise<TTSGenerateResult> {
     if (ctx?.signal?.aborted) throw new DOMException('Annulé', 'AbortError');
-    const preparedText = prepareTextForGradium(text);
+    const preparedText = prepareTextForGradium(text, { keepEllipses: ctx?.performance?.source === 'manual' });
     const pauseSeconds = pauseForContext(ctx);
     const pauseRendering = planGradiumSpeech(text, pauseSeconds).some(part => part.type === 'pause') ? 'rest_unavailable' : 'disabled';
     if (pauseRendering === 'rest_unavailable') debugLogger.log({ service: 'tts', level: 'warn', direction: 'out', label: 'TTS-GR REST: experimental pauses unavailable; cleaned speech preserved' });
