@@ -16,6 +16,8 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   en sandbox et prod sont relevés à la lecture, sans écriture DB. Curseur admin aligné.
 - `optimized_v3` : une section réduite à « … » n'est plus ajoutée avec son titre (dépassement
   du budget de contexte d'environ 30 caractères quand il était presque épuisé).
+- Preuve sandbox (Max, 5 tours isolés, un tirage) : 35 → 50 mots en moyenne, aucune fin par
+  question. Des exemples concrets étaient recopiés (4/5) : remplacés par des gabarits.
 - Constat : `responseStyle` (Max Prompt Control) n'est pas injecté dans le prompt live ;
   défaut réécrit pour rester cohérent. Proposition Notion pour la fiche de Max dans
   `docs/plan_latence_elevenlabs_et_relance_2026-10-31.md`, non appliquée.

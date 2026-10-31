@@ -107,7 +107,7 @@ les fiches. La fiche de Max tire cependant vers le très bref ; proposition ci-d
   plus bref seulement si la relation l'exige ; **accroche** = livrer d'abord le contenu,
   puis un détail concret non expliqué, une réaction ou un fil ouvert, appuyés sur la fiche,
   sans inventer ; « ce n'est pas une question ». Trois exemples de forme, construits sur le
-  présent canonique partagé (police qui ne rappelle pas), marqués « pas des faits ».
+  gabarits à remplir avec la fiche (pas des répliques citables), et « varie l'accroche ».
 - Contrat de flux : limite `min(70, (budget − 70) / 3)` mots ; « Livre d'abord le contenu de
   ta réplique ; ensuite seulement, la pensée peut rester ouverte » ; « Termine sur une
   accroche…, pas sur une question réflexe ». Fragments et suspensions d'A1 conservés.
@@ -119,6 +119,33 @@ les fiches. La fiche de Max tire cependant vers le très bref ; proposition ci-d
 - Correctif trouvé en route : `capAtBoundary` (optimized_v3) pouvait rendre « … » seul quand
   il ne restait presque plus de place ; la section était alors ajoutée avec son titre et le
   prompt dépassait sa limite (~30 caractères). Section désormais omise.
+
+### Preuve sandbox — 5 répliques avant / après
+
+Conditions : `sandbox-ulrich`, Max, `optimized_v3`, `openai/gpt-5.6-luna` à 1,4, flux PRD4
+réel (`streamPRD4Turn`, RAG et contrat de flux compris), session admin d'Ulrich, app locale.
+Chaque question est un tour isolé sans historique, un seul tirage : indicatif, pas statistique.
+`ms` = tour LLM complet côté navigateur, sans TTS.
+
+| Question | Avant (`main`, 220 tokens, 45 mots) | Après (R1, 360 tokens) |
+|---|---|---|
+| Bonjour Max… Comment ça va, ce matin ? | « Bonjour. Je ne sais pas trop quoi répondre. On est rentrés hier, et chacun est dans sa pièce. J'attends votre appel depuis ce matin… J'ai besoin de parler, oui, mais je ne sais pas par où commencer. » (37 mots, 3,1 s) | « Bonjour. Je tiens debout, c'est à peu près tout. On est rentrés hier de la montagne, et depuis chacun reste dans son coin… Emma est dans la cuisine. Je ne sais pas comment lui parler sans faire semblant que tout ça est normal. » (43 mots, 5,5 s) |
+| Qu'est-ce qui s'est passé à la montagne ? | « On est partis pour retrouver Ava. Elle est sortie de la forêt… en disant qu'elle était devenue un garçon. Mona était là, au camp. Peter a été tué. Agotha et Philippe aussi. Et nous sommes rentrés hier, avec Emma contaminée. » (40, 3,1 s) | « Ava est sortie de la forêt en disant qu'elle était devenue un garçon… et qu'on pouvait revoir Mona. Emma l'a prise dans ses bras. Après ça, on a compris qu'elle était contaminée aussi. Peter, Agotha et Philippe sont morts. J'ai ligoté un homme… il est mort dans un abri effondré. Et Léo, c'est lui qui nous a ramenés. » (58, 4,3 s) |
+| Et Emma, comment elle va ? | « Elle est dans la cuisine. Elle essaie de tenir, je crois. Je l'ai vue prendre Ava dans ses bras… et maintenant elle est contaminée aussi. Je ne sais pas combien de temps il reste avant que ça commence. » (38, 2,9 s) | « Elle est dans la cuisine. Elle tient encore debout, elle parle… mais je la regarde et je pense à ce qui va lui arriver. Je ne sais pas comment lui parler sans lui faire croire que je peux arranger ça. J'ai laissé sa tasse près de l'évier, comme si elle allait revenir la chercher. » (54, 7,7 s) |
+| Vous avez des nouvelles de la police ? | « Non. Rien depuis la déposition d'hier. Ils ont dit que les arrestations étaient suspendues… j'attends qu'ils rappellent, mais je ne sais même pas s'ils le feront. » (26, 2,9 s) | « Pas vraiment. Ils ont pris nos dépositions hier, par téléphone, mais les arrestations sont suspendues. Ils doivent rappeler si la cellule de bénévoles trouve quelque chose… ou si quelqu'un sait encore quoi faire. J'attends cet appel dans le salon, pendant qu'Emma est dans la cuisine. » (45, 3,7 s) |
+| Vous arrivez à dormir un peu ? | « Par moments. Hier, je me suis écroulé dans la chambre des enfants, à côté d'Emma. Mais ce n'était pas vraiment dormir… plutôt disparaître quelques heures. Après, je me suis réveillé et j'ai écouté si quelqu'un bougeait. » (36, 3,5 s) | « Un peu. Par morceaux, surtout quand quelqu'un bouge dans l'appartement. Après, je me réveille et je recompte… les voix, les portes. Emma est dans la cuisine depuis tout à l'heure. Je ne sais pas quoi lui dire sans faire semblant que tout ça peut encore rentrer dans une phrase. » (49, 4,2 s) |
+
+Moyenne : 35 → 50 mots ; aucune fin par question, avant comme après.
+
+Ce que la preuve a changé : un premier jet avec des exemples concrets (« le téléphone est resté
+sur la table ») a été **recopié dans 4 réponses sur 5**. Les exemples sont devenus des gabarits
+à remplir et une consigne « varie l'accroche » ; plus aucune reprise dans le second passage.
+
+À surveiller à l'écoute : « Emma est dans la cuisine » revient (ancre canonique de la fiche,
+amplifiée ici par des tours isolés sans historique) ; l'accroche peut inventer un menu détail
+(« sa tasse près de l'évier ») malgré « sans inventer » ; « Léo… nous a ramenés » et, avant,
+« Mona était là, au camp » sont à vérifier contre le canon. Le temps LLM paraît plus long
+(un tirage chacun, non concluant) ; la latence perçue dépend surtout du TTS (voir plus bas).
 
 ### Proposition Notion (non appliquée, édition d'Ulrich)
 
