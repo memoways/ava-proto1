@@ -101,7 +101,7 @@ export class SpeechAuditionRunner {
     Object.assign(evidence, structuredClone(cached.evidence), { cached: true, providerCalls: 0, firstSoundMs: undefined });
     blob = cached.blob;
    } else {
-    const ctx = { ...context, signal, onAuditionRequest: (request: TTSAuditionRequest) => {
+    const ctx = { ...context, signal, timeoutMs: 60000, onAuditionRequest: (request: TTSAuditionRequest) => {
      if (signal.aborted || this.controller !== controller) return;
      evidence.requests.push(structuredClone(request)); evidence.providerCalls++; this.calls++;
     } };

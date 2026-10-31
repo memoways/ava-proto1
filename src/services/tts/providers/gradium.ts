@@ -99,7 +99,7 @@ async function generateGradiumSpeech(text: string, ctx: TTSGenerateContext | und
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       signal: controller.signal,
-    }), 12000, () => controller.abort(new Error('Gradium request deadline')));
+    }), (ctx?.timeoutMs ?? 12000), () => controller.abort(new Error('Gradium request deadline')));
     const tFirstByte = performance.now();
 
     reader = response.body?.getReader();
@@ -120,7 +120,7 @@ async function generateGradiumSpeech(text: string, ctx: TTSGenerateContext | und
       }
       return new Blob(chunks, { type: response.headers.get('Content-Type') || 'audio/wav' });
     };
-    const blob = await withTimeout("tts_gradium_blob", readBlob(), 12000, () => controller.abort(new Error('Gradium body deadline')));
+    const blob = await withTimeout("tts_gradium_blob", readBlob(), (ctx?.timeoutMs ?? 12000), () => controller.abort(new Error('Gradium body deadline')));
     if (!response.ok) {
       const err = await blob.text();
       debugLogger.logResponse(debugId, "tts", "TTS-GR", response.status, startTime, err);

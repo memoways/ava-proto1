@@ -150,3 +150,19 @@ describe("PROVIDER_ACTING_SUPPORT", () => {
     expect(PROVIDER_ACTING_SUPPORT.cartesia.usability).toBe("en_emotion_only");
   });
 });
+
+describe('AP4-quater: no slowdown for slow providers, expressive temperature', () => {
+  const sad = (source: 'manual' | 'speech_state') => ({ emotion: 'sad', intensity: 2, actingNl: 'x', speedHint: 0.88, source } as import('./performanceIntent').PerformanceIntent);
+  it('never slows Fish or Inworld outside the game mapping', async () => {
+    const m = await import('./performanceIntent');
+    expect(m.applyFishPerformance({ speed: 1, emotionTags: false, defaultEmotion: '' }, 'a', sad('manual')).speed).toBe(1);
+    expect(m.applyFishPerformance({ speed: 1, emotionTags: false, defaultEmotion: '' }, 'a', sad('speech_state')).speed).toBe(0.88);
+    expect(m.applyInworldPerformance({ deliveryMode: 'BALANCED', speakingRate: 1 }, sad('manual')).speakingRate).toBe(1);
+  });
+  it('raises temperature with intensity only for workshop intents', async () => {
+    const m = await import('./performanceIntent');
+    expect(m.expressiveTemperature(0.7, sad('manual'))).toBeCloseTo(0.94);
+    expect(m.expressiveTemperature(0.7, sad('speech_state'))).toBe(0.7);
+    expect(m.expressiveTemperature(0.7, null)).toBe(0.7);
+  });
+});

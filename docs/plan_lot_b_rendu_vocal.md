@@ -1858,3 +1858,15 @@ expressif par défaut.
   ElevenLabs dans la preview `sandbox-ulrich` : elle doit jouer (plus de 400).
   Une CI verte ne le prouve pas. Production non publiée.
 
+
+## Exécution AP4-quater — 30 octobre 2026 (en cours)
+
+Notes d'Ulrich sur main `d5dd517` (sandbox-ulrich, tous sur Max, 1 à 5) :
+Gradium 3 / 1 (P2 voix du jeu) / 3, Fish 2 / 2, Inworld 2 / 2, Cartesia 3 / 3,
+ElevenLabs sans note (échec). Constat commun : trop lent, trop linéaire, trop lu.
+
+Fait : délai d'atelier 60 s (`timeoutMs`), message fournisseur ElevenLabs, recettes
+sans ralentissement, Fish/Inworld jamais ralentis hors jeu, température liée à
+l'intensité. Reste : preuve `proxy-tts` déployé et modèles du compte ElevenLabs,
+diagnostic Inworld, texte à hésitations (atelier seulement), essais A/B notés,
+prompt AP5, PR et livraison.

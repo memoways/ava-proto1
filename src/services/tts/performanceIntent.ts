@@ -398,7 +398,9 @@ export function applyFishPerformance(
   intent?: PerformanceIntent | null,
 ): FishVoiceShaping {
   const clean = text.replace(/^\s*(\([^)]{1,40}\)\s*)+/, "");
-  const speed = Math.min(2, Math.max(0.5, base.speed * (intent?.speedHint ?? 1)));
+  // Fish is already slow and "pasty" when slowed further: workshop intents never go below the base speed.
+  const hint = intent?.source === 'speech_state' ? (intent.speedHint ?? 1) : Math.max(1, intent?.speedHint ?? 1);
+  const speed = Math.min(2, Math.max(0.5, base.speed * hint));
   if (!base.emotionTags) return { text: clean, speed, tag: "" };
   const emotionTag = intent && intent.intensity > 0 ? FISH_EMOTION_TAGS[intent.emotion] : "";
   const deliveryTag = intent?.delivery ? FISH_DELIVERY_TAGS[intent.delivery] ?? "" : "";
@@ -506,8 +508,9 @@ export function applyInworldPerformance(
   return {
     instruction: intent.actingNl,
     deliveryMode: intent.intensity >= 2 ? "CREATIVE" : base.deliveryMode,
+    // Inworld already runs ~2x longer than the others (41 s vs 22 s): never slow it down outside the game mapping.
     speakingRate: intent.source === 'speech_state' ? clamp(base.speakingRate * (intent.speedHint ?? 1), 0.5, 2) : intent.speedHint
-      ? clamp(intent.speedHint, 0.5, 2)
+      ? clamp(Math.max(intent.speedHint, 1), 0.5, 2)
       : base.speakingRate,
   };
 }
@@ -542,4 +545,10 @@ export function logPerformanceIntent(intent: PerformanceIntent, extra?: Record<s
     `[TTS-performance] emotion=${intent.emotion} intensity=${intent.intensity} source=${intent.source} acting="${intent.actingNl}"`,
     extra ?? "",
   );
+}
+
+/** Sampling temperature raised with intensity for workshop intents so the delivery actually varies (Fish, Inworld). */
+export function expressiveTemperature(base: number, intent?: PerformanceIntent | null): number {
+  if (!intent || intent.source === 'speech_state') return base;
+  return clamp(base + 0.12 * intent.intensity, 0, 1);
 }

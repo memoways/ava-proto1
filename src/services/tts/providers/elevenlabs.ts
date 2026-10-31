@@ -35,6 +35,7 @@ function parseJsonRecord(value: string): Record<string, unknown> | null {
 export function parseElevenLabsErrorDetails(raw: string): {
   type?: string;
   code?: string;
+  message?: string;
 } {
   const outer = parseJsonRecord(raw);
   const rawDetails = outer?.details;
@@ -45,7 +46,9 @@ export function parseElevenLabsErrorDetails(raw: string): {
   const type = typeof detail?.type === "string" ? detail.type : undefined;
   const codeCandidate = detail?.code ?? detail?.status;
   const code = typeof codeCandidate === "string" ? codeCandidate : undefined;
-  return { type, code };
+  const messageCandidate = detail?.message;
+  const message = typeof messageCandidate === "string" ? messageCandidate.slice(0, 200) : undefined;
+  return { type, code, message };
 }
 
 export const elevenLabsProvider: TTSProvider = {
@@ -84,7 +87,7 @@ export const elevenLabsProvider: TTSProvider = {
     const startTime = Date.now();
     const tRequest = performance.now();
     const debugId = debugLogger.logFetch("tts", `TTS-EL "${shaped.text.slice(0, 60)}…"`, `${SUPABASE_URL}/functions/v1/proxy-tts`, body);
-    const timeout = createTimeoutSignal(12000, ctx?.signal);
+    const timeout = createTimeoutSignal((ctx?.timeoutMs ?? 12000), ctx?.signal);
 
     const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-tts`, {
       method: "POST",
@@ -98,7 +101,7 @@ export const elevenLabsProvider: TTSProvider = {
       const err = await response.text();
       debugLogger.logResponse(debugId, "tts", "TTS-EL", response.status, startTime, err);
       const details = parseElevenLabsErrorDetails(err);
-      const suffix = details.code ? ` (${details.code})` : "";
+      const suffix = `${details.code ? ` (${details.code})` : ""}${details.message ? `: ${details.message}` : ""}`;
       const error = new Error(`ElevenLabs TTS error: ${response.status}${suffix}`) as TTSProviderRequestError;
       error.statusCode = response.status;
       error.providerErrorType = details.type;
@@ -106,7 +109,7 @@ export const elevenLabsProvider: TTSProvider = {
       throw error;
     }
 
-    const blob = await withTimeout("tts_elevenlabs_blob", response.blob(), 12000);
+    const blob = await withTimeout("tts_elevenlabs_blob", response.blob(), (ctx?.timeoutMs ?? 12000));
     const tEnd = performance.now();
     debugLogger.logResponse(debugId, "tts", `TTS-EL (${(blob.size / 1024).toFixed(0)}KB)`, response.status, startTime);
 
@@ -122,3 +125,15 @@ export const elevenLabsProvider: TTSProvider = {
     };
   },
 };
+
+/** Admin diagnostic: TTS models the ElevenLabs account can really use (needs the deployed `proxy-tts` list_models action). */
+export async function fetchElevenLabsAccountModels(): Promise<{ id: string; name?: string }[]> {
+  const response = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-tts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "list_models" }),
+  });
+  const raw = await response.text();
+  if (!response.ok) throw new Error(`ElevenLabs models error: ${response.status}${parseElevenLabsErrorDetails(raw).message ? `: ${parseElevenLabsErrorDetails(raw).message}` : ""}`);
+  return (parseJsonRecord(raw)?.models as { id: string; name?: string }[] | undefined) ?? [];
+}

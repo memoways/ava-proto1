@@ -1,5 +1,5 @@
 import {
- applyCartesiaGenerationConfig, applyElevenLabsPerformance, applyFishPerformance, applyGradiumPerformance, applyInworldPerformance,
+ applyCartesiaGenerationConfig, applyElevenLabsPerformance, applyFishPerformance, applyGradiumPerformance, applyInworldPerformance, expressiveTemperature,
  type CanonicalEmotion, type PerformanceDelivery, type PerformanceIntent,
 } from './performanceIntent';
 import { ELEVENLABS_EXPRESSIVE_MODEL } from '../../../supabase/functions/_shared/elevenLabsModels';
@@ -23,16 +23,16 @@ export const INTENT_PASSAGES: IntentPassage[] = [
 export type IntentRecipe = Omit<PerformanceIntent, 'source' | 'speechState' | 'mappingVersion'> & { speedHint: number; pauses: 'short' | 'normal' | 'long' };
 export interface WorkshopIntent { id: string; label: string; explanation: string; recipe: IntentRecipe }
 export const WORKSHOP_INTENTS: WorkshopIntent[] = [
- { id: 'pose', label: 'Posé', explanation: 'Il parle calmement, en pesant ses mots.', recipe: { emotion: 'neutral', intensity: 1, delivery: 'measured', speedHint: 0.95, pauses: 'normal', actingNl: 'calm, measured, steady low voice' } },
+ { id: 'pose', label: 'Posé', explanation: 'Il parle calmement, en pesant ses mots.', recipe: { emotion: 'neutral', intensity: 1, delivery: 'measured', speedHint: 0.97, pauses: 'normal', actingNl: 'calm, measured, steady low voice' } },
  { id: 'detache', label: 'Détaché', explanation: 'Il raconte comme si ça ne le concernait pas.', recipe: { emotion: 'neutral', intensity: 0, speedHint: 1, pauses: 'normal', actingNl: 'detached, flat, emotionally distant' } },
- { id: 'moyen_dramatique', label: 'Moyennement dramatique', explanation: 'L’émotion est là, mais il la tient.', recipe: { emotion: 'sad', intensity: 1, delivery: 'measured', speedHint: 0.92, pauses: 'normal', actingNl: 'sad, heavy, holding back emotion' } },
- { id: 'tres_dramatique', label: 'Très dramatique', explanation: 'La digue cède : la voix se casse.', recipe: { emotion: 'sad', intensity: 2, delivery: 'measured', speedHint: 0.88, pauses: 'long', actingNl: 'very sad, voice breaking, overwhelmed' } },
+ { id: 'moyen_dramatique', label: 'Moyennement dramatique', explanation: 'L’émotion est là, mais il la tient.', recipe: { emotion: 'sad', intensity: 1, delivery: 'measured', speedHint: 1, pauses: 'normal', actingNl: 'sad, heavy, holding back emotion' } },
+ { id: 'tres_dramatique', label: 'Très dramatique', explanation: 'La digue cède : la voix se casse.', recipe: { emotion: 'sad', intensity: 2, delivery: 'measured', speedHint: 1, pauses: 'long', actingNl: 'very sad, voice breaking, sobbing, halting, sudden rhythm changes, not reading' } },
  { id: 'essouffle', label: 'Essoufflé / pressé', explanation: 'Il parle vite, sans reprendre son souffle.', recipe: { emotion: 'urgent', intensity: 1, delivery: 'rushed', speedHint: 1.12, pauses: 'short', actingNl: 'breathless, rushed, urgent' } },
  { id: 'peur', label: 'Peur', explanation: 'La peur accélère et fait trembler la voix.', recipe: { emotion: 'scared', intensity: 2, delivery: 'rushed', speedHint: 1.08, pauses: 'short', actingNl: 'very frightened, anxious, shaky voice' } },
- { id: 'perdu', label: 'Perdu, ne sait plus quoi dire', explanation: 'Il cherche ses mots et s’arrête.', recipe: { emotion: 'fragile', intensity: 1, delivery: 'measured', speedHint: 0.88, pauses: 'long', actingNl: 'lost, hesitant, searching for words' } },
+ { id: 'perdu', label: 'Perdu, ne sait plus quoi dire', explanation: 'Il cherche ses mots et s’arrête.', recipe: { emotion: 'fragile', intensity: 1, delivery: 'measured', speedHint: 1, pauses: 'long', actingNl: 'lost, hesitant, stammering, searching for words, broken rhythm' } },
  { id: 'colere_contenue', label: 'Colère contenue', explanation: 'Il est en colère, sans crier.', recipe: { emotion: 'angry', intensity: 1, delivery: 'cutting', speedHint: 0.98, pauses: 'normal', actingNl: 'contained anger, low clipped voice, not shouting' } },
  { id: 'espoir', label: 'Espoir qui revient', explanation: 'Une piste le relance, avec prudence.', recipe: { emotion: 'warm', intensity: 1, speedHint: 1.04, pauses: 'normal', actingNl: 'hope returning, a little faster, cautious' } },
- { id: 'confidence', label: 'Confidence à voix basse', explanation: 'Il dit à voix basse ce qu’il n’a dit à personne.', recipe: { emotion: 'sad', intensity: 1, delivery: 'whisper', speedHint: 0.9, pauses: 'long', actingNl: 'confiding, hushed, close and quiet' } },
+ { id: 'confidence', label: 'Confidence à voix basse', explanation: 'Il dit à voix basse ce qu’il n’a dit à personne.', recipe: { emotion: 'sad', intensity: 1, delivery: 'whisper', speedHint: 0.96, pauses: 'long', actingNl: 'confiding, hushed, close and quiet' } },
 ];
 export const INTENT_PROVIDERS: TTSProviderId[] = ['gradium', 'fish', 'elevenlabs', 'inworld', 'cartesia'];
 export const PROVIDER_LABELS: Record<TTSProviderId, string> = { gradium: 'Gradium', fish: 'Fish Audio', elevenlabs: 'ElevenLabs', inworld: 'Inworld', cartesia: 'Cartesia' };
@@ -62,7 +62,7 @@ export function recipeWords(recipe: IntentRecipe): string {
 
 export interface ProviderBaseSettings {
  gradium: { temp: number; paddingBonus: number; cfgCoef: number };
- fish: { speed: number; emotionTags: boolean; defaultEmotion: string; model?: string };
+ fish: { speed: number; emotionTags: boolean; defaultEmotion: string; model?: string; temperature?: number };
  elevenlabs: { style: number; stability: number; speed: number };
  inworld: { deliveryMode: 'STABLE' | 'BALANCED' | 'CREATIVE'; speakingRate: number; modelId?: string };
  cartesia: { language: string; modelId?: string };
@@ -88,7 +88,7 @@ export function providerPlan(provider: TTSProviderId, intent: WorkshopIntent, ba
   if (!base.fish.emotionTags) ignored.unshift('Émotion (marqueurs désactivés dans les réglages Fish)');
   else if (recipe.intensity === 0 || recipe.emotion === 'neutral') ignored.unshift('Émotion (aucun marqueur pour cette recette)');
   if (recipe.delivery === 'measured' || recipe.delivery === 'cutting') ignored.push(`Delivery « ${DELIVERY_WORDS[recipe.delivery]} »`);
-  return { model: base.fish.model, parameters: [{ label: 'Marqueur d’émotion', value: shaped.tag || 'aucun' }, { label: 'Vitesse', value: round(shaped.speed) }], ignored };
+  return { model: base.fish.model, parameters: [{ label: 'Marqueur d’émotion', value: shaped.tag || 'aucun' }, { label: 'Vitesse', value: round(shaped.speed) }, { label: 'Variabilité (temperature)', value: round(expressiveTemperature(base.fish.temperature ?? 0.7, performance)) }], ignored };
  }
  if (provider === 'elevenlabs') {
   const shaped = applyElevenLabsPerformance({ ...base.elevenlabs, modelId: ELEVENLABS_WORKSHOP_MODEL }, '', performance);

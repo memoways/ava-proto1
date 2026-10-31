@@ -6,7 +6,7 @@
 
 import type { TTSProvider, TTSGenerateContext, TTSGenerateResult } from "@/services/tts/types";
 import { getFishSettings } from "@/services/tts/providerSettings";
-import { applyFishPerformance } from "@/services/tts/performanceIntent";
+import { applyFishPerformance, expressiveTemperature } from "@/services/tts/performanceIntent";
 import { debugLogger } from "@/services/debugLogger";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
 import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
@@ -30,7 +30,7 @@ export const fishProvider: TTSProvider = {
       format: s.format,
       mp3Bitrate: s.mp3Bitrate,
       latency: s.latency,
-      temperature: s.temperature,
+      temperature: expressiveTemperature(s.temperature, ctx?.performance),
       topP: s.topP,
       speed: shaped.speed,
       volume: s.volume,
@@ -42,7 +42,7 @@ export const fishProvider: TTSProvider = {
     const startTime = Date.now();
     const tRequest = performance.now();
     const debugId = debugLogger.logFetch("tts", `TTS-Fish "${shaped.text.slice(0, 60)}…"`, ENDPOINT, body);
-    const timeout = createTimeoutSignal(12000, ctx?.signal);
+    const timeout = createTimeoutSignal((ctx?.timeoutMs ?? 12000), ctx?.signal);
 
     const response = await authenticatedFunctionFetch(ENDPOINT, {
       method: "POST",
@@ -60,7 +60,7 @@ export const fishProvider: TTSProvider = {
       throw error;
     }
 
-    const blob = await withTimeout("tts_fish_blob", response.blob(), 12000);
+    const blob = await withTimeout("tts_fish_blob", response.blob(), (ctx?.timeoutMs ?? 12000));
     const tEnd = performance.now();
     debugLogger.logResponse(debugId, "tts", `TTS-Fish (${(blob.size / 1024).toFixed(0)}KB)`, response.status, startTime);
 
