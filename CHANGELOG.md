@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [R1 — relance conversationnelle : deux à trois phrases et une accroche] — 2026-10-31
+
+- Répliques de Max/Emma : deux à trois phrases parlées, ~60–70 mots (au lieu de 45 mots
+  maximum). Règle partagée `RESPONSE_HOOK_RULE` dans les quatre variantes de prompt :
+  livrer d'abord le contenu, puis laisser une accroche (détail concret non expliqué,
+  réaction, fil ouvert), appuyée sur la fiche, sans inventer et sans question réflexe.
+- Contrat de flux : limite `min(70, (budget − 70) / 3)` mots ; la pensée ne reste ouverte
+  qu'après le contenu ; fragments et suspensions (A1) conservés.
+- `LLM_MAX_TOKENS` des personnages borné à [360, 480], défaut 360 : les 220 enregistrés
+  en sandbox et prod sont relevés à la lecture, sans écriture DB. Curseur admin aligné.
+- `optimized_v3` : une section réduite à « … » n'est plus ajoutée avec son titre (dépassement
+  du budget de contexte d'environ 30 caractères quand il était presque épuisé).
+- Constat : `responseStyle` (Max Prompt Control) n'est pas injecté dans le prompt live ;
+  défaut réécrit pour rester cohérent. Proposition Notion pour la fiche de Max dans
+  `docs/plan_latence_elevenlabs_et_relance_2026-10-31.md`, non appliquée.
+- Effet attendu : réplique ~50 % plus longue, donc attente ElevenLabs plus longue tant que
+  le lot L1 (lecture progressive) n'est pas fait.
+
 ## [AP4-quater 3/3 — textes d'essai parlés, variations poussées] — 2026-10-31
 
 - Passages P1/P2/P3 réécrits comme de la parole : phrases brisées, vraies hésitations

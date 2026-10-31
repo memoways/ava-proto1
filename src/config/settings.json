@@ -6,7 +6,7 @@
   "MIN_QUESTIONS_BEFORE_GATE": 10,
   "LLM_MODEL": "google/gemini-2.5-flash",
   "LLM_TEMPERATURE": 0.8,
-  "LLM_MAX_TOKENS": 220,
+  "LLM_MAX_TOKENS": 360,
   "LLM_TOP_P": 0.95,
   "TTS_VOICE_ID": "",
   "RAG_TOP_K": 3,

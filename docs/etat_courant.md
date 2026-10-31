@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 30 octobre 2026. Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 31 octobre 2026. Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -37,6 +37,16 @@ Personnel : Ulrich `377e8583-7838-4c05-9f76-8833a450f304`, sources Ava exclues.
 GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
+
+**R1 implémenté le 31 octobre : répliques de deux à trois phrases avec accroche.**
+Retour d'Ulrich sur ElevenLabs : meilleure voix, mais latence et répliques trop courtes.
+Contrat de flux 45 → 70 mots, règle d'accroche partagée par les quatre variantes,
+budget personnage [360, 480] tokens (220 stockés relevés à la lecture). Valeur effective
+vérifiée : `optimized_v3`, `responseStyle` non injecté, Notion « une à trois phrases ».
+Proposition Notion pour Max non appliquée. Ressenti à valider par Ulrich ; latence
+ElevenLabs accrue jusqu'à L1.
+[Exécution R1](plan_latence_elevenlabs_et_relance_2026-10-31.md#exécution-r1--31-octobre-2026) ·
+[Prompt L1 « ElevenLabs réactif »](prompt_reprise_latence_elevenlabs_lot_l1.md), non lancé.
 
 **AP1 livré techniquement ; utilisabilité rejetée par Ulrich.**
 Accès admin sandbox : Expérience → Atelier de parole,

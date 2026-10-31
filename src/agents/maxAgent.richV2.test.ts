@@ -65,7 +65,7 @@ describe("parole sandbox — fiches Cloud exactes du 25 octobre", () => {
       const secret = sheet.dynamique_conversation.split(/\n\s*\n/).find(block => block.startsWith("Ce que tu veux vraiment"))!;
       expect(trace.finalSystemPrompt).toContain(sheet.maniere_de_parler);
       expect(trace.finalSystemPrompt).toContain(secret);
-      expect(trace.finalSystemPrompt).toContain('phrases ou fragments');
+      expect(trace.finalSystemPrompt).toContain('deux à trois phrases parlées');
       expect(trace.finalSystemPrompt).not.toMatch(/jamais trois fois|Choisis un autre état/);
       expect(trace.budget?.withinBudget).toBe(true);
       expect(trace.budget!.staticChars).toBeLessThanOrEqual(trace.budget!.staticLimitChars);

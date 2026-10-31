@@ -3,9 +3,27 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-28 (développement poursuivi ; présent canonique Max/Emma fusionné, CI main verte)
+> **Last Updated**: 2026-10-31 (R1 : répliques de deux à trois phrases avec accroche)
 
 ---
+
+## R1 — une phrase de plus pour rebondir (31 octobre 2026)
+
+Ulrich a essayé ElevenLabs : la voix est meilleure, mais il « manque une phrase ».
+Max répond, puis s'arrête, et l'interlocuteur n'a plus rien pour enchaîner. Les
+fiches Notion demandaient « une à trois phrases » ; le code, lui, coupait à
+45 mots et disait de laisser la pensée ouverte sans rien ajouter pour la conclure.
+Le plafond de tokens à 220, intention privée comprise, verrouillait le tout.
+
+La réplique vise maintenant deux à trois phrases. Elle dit d'abord ce qu'elle a
+à dire, puis laisse une prise : un détail qu'on n'explique pas, une réaction qui
+échappe, un fil qui reste ouvert. La question en retour reste rare et ne sert
+jamais à finir une phrase. Les fragments et les suspensions d'A1 restent permis.
+
+La longueur se paie en attente : avec ElevenLabs, chaque mot de plus retarde la
+première syllabe tant que le MP3 n'est pas lu en continu (lot L1). Le ressenti des
+nouvelles répliques reste la validation d'Ulrich.
+[Valeurs effectives, changements et proposition Notion](docs/plan_latence_elevenlabs_et_relance_2026-10-31.md#exécution-r1--31-octobre-2026).
 
 ## Présent canonique Max/Emma — 28 octobre 2026
 

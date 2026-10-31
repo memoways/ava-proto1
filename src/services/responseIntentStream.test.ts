@@ -76,12 +76,26 @@ describe('P1 private intent and safe speech', () => {
 
 describe('lot 3 — terminal closing residue', () => {
   it('distingue fin technique et pensée ouverte dans le même budget', () => {
-    const contract = buildResponseStreamContract(220);
+    const contract = buildResponseStreamContract(360);
     expect(contract).not.toContain('achève ta réponse');
     expect(contract).toContain('fin technique normale');
     expect(contract).toContain('pensée peut rester ouverte');
-    expect(contract).toContain('45 mots maximum');
+    expect(contract).toContain('70 mots maximum');
     expect(contract).toContain('goal : 8 mots maximum');
+  });
+  it('R1 — livre le contenu avant de rester ouvert et finit sur une accroche, pas une question réflexe', () => {
+    const contract = buildResponseStreamContract(360);
+    expect(contract.indexOf("Livre d'abord le contenu")).toBeLessThan(contract.indexOf('pensée peut rester ouverte'));
+    expect(contract).toContain('Termine sur une accroche (détail concret, réaction, fil ouvert), pas sur une question réflexe');
+    expect(contract).toContain('Vise deux à trois phrases parlées');
+    expect(contract).not.toContain('sans explication ni conclusion ajoutée pour achever la pensée');
+  });
+  it('R1 — garde la limite de mots sous le budget et ne vise pas trois phrases en petit budget', () => {
+    expect(buildResponseStreamContract(480)).toContain('70 mots maximum');
+    expect(buildResponseStreamContract(220)).toContain('50 mots maximum');
+    const small = buildResponseStreamContract(100);
+    expect(small).toContain('22 mots maximum');
+    expect(small).not.toContain('Vise deux à trois phrases');
   });
   it('forbids model-generated closing markers in the effective contract', () => {
     expect(buildResponseStreamContract(220)).toContain('Ne ferme jamais <speech>');
