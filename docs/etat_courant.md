@@ -42,11 +42,13 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 L'écart de ~4 s avec Gradium venait de l'attente du MP3 complet. Lecture progressive
 MediaSource avec repli blob et coupure nette ; défaut expressif `eleven_v4_turbo`.
 Premier son mesuré à 0,66 s après envoi du texte (v4 : 0,98 s, avant 4,5 s). Le réglage
-sandbox enregistré (`eleven_v4`) est à basculer dans TTS Config ; recette L1.3
-d'Ulrich (Max, 5 tours, Gradium inchangé, interruption) à faire. L1.2 non nécessaire
-d'après les mesures.
+sandbox basculé en v4 Turbo par Ulrich le 31 oct. Recette L1.3 : latence ressentie
+inchangée ; mesure : texte → son 0,43–0,56 s (L1 tient), mais 5,4–10,2 s de fin de tour à
+son, dû à l'écart fin LLM → TTS (2,6–5,9 s, un tour sur deux), au contexte et au LLM.
+Recette aussi : Max trivial, Emma légère au décroché, « Eva » au lieu de « Ava ».
 [Mesures et exécution L1](plan_latence_elevenlabs_et_relance_2026-10-31.md#mesure-l10--31-octobre-2026) ·
-[Prompt L2 « retard fin LLM → TTS »](prompt_reprise_latence_lot_l2.md), non lancé.
+[Prompt G1 « gravité, Ava, latence réelle »](prompt_reprise_gravite_ava_latence_lot_g1.md),
+non lancé ; il absorbe [L2](prompt_reprise_latence_lot_l2.md).
 
 **R1 implémenté le 31 octobre : répliques de deux à trois phrases avec accroche.**
 Retour d'Ulrich sur ElevenLabs : meilleure voix, mais latence et répliques trop courtes.

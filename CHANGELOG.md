@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Recette L1.3 — prompt G1 : gravité, Ava, latence réelle] — 2026-10-31
+
+- Recette d'Ulrich : latence ressentie inchangée. Mesure de la session : texte → son
+  0,43–0,56 s (L1 tient), mais 5,4–10,2 s de fin de tour à son, dû à l'écart fin LLM → TTS
+  (2,6–5,9 s, un tour sur deux), à la préparation du contexte et au LLM de Max.
+- Constats de jeu : Max part dans des trivialités, Emma décroche sur un ton léger, Emma dit
+  « Eva » (absent des sources RAG/storyworld/règles/réglages).
+- `docs/prompt_reprise_gravite_ava_latence_lot_g1.md` ; il remplace le prompt L2.
+
 ## [L1 — ElevenLabs réactif : lecture progressive et v4 Turbo] — 2026-10-31
 
 - Mesure L1.0 (télémétrie réelle sandbox) : l'écart ElevenLabs/Gradium (~4 s, premier son

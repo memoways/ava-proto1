@@ -1,5 +1,7 @@
 # Prompt de reprise — Lot L2 : retard intermittent entre fin du LLM et TTS
 
+> Remplacé par `prompt_reprise_gravite_ava_latence_lot_g1.md` (partie C) le 31 octobre 2026.
+
 Copier dans un nouveau chat sur Ava.
 
 ---
