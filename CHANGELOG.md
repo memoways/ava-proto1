@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Gouvernance — base Caractères Notion en lecture seule] — 2026-10-31
+
+- Interdiction formelle d'Ulrich inscrite dans `AGENTS.md` et `CLAUDE.md` : aucune
+  modification de la base Caractères AVA (champs, contenu RAG, pages personnages) depuis
+  ce dépôt sans demande explicite ; seules les tâches Notion sont mises à jour d'ici.
+
 ## [R1 — relance conversationnelle : deux à trois phrases et une accroche] — 2026-10-31
 
 - Répliques de Max/Emma : deux à trois phrases parlées, ~60–70 mots (au lieu de 45 mots
