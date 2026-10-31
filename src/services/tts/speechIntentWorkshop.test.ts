@@ -11,13 +11,12 @@ const base: ProviderBaseSettings = {
 const value = (provider: (typeof INTENT_PROVIDERS)[number], id: string, label: string) => providerPlan(provider, WORKSHOP_INTENTS.find(i => i.id === id)!, base).parameters.find(p => p.label === label)?.value;
 
 describe('AP4 — validated catalogue', () => {
- it('keeps the three validated passages: 2 to 5 long sentences, no forced tics', () => {
+ it('keeps the three passages (AP4-quater: spoken, broken, with real repetitions and hesitations)', () => {
   expect(INTENT_PASSAGES.map(p => p.id)).toEqual(['P1', 'P2', 'P3']);
   for (const passage of INTENT_PASSAGES) {
    const sentences = passage.text.split(/[.!?](?:\s|$)/).filter(s => s.trim());
-   expect(sentences.length).toBeGreaterThanOrEqual(2); expect(sentences.length).toBeLessThanOrEqual(5);
-   expect(passage.text.split(/\s+/).length / sentences.length).toBeGreaterThan(20);
-   expect(passage.text).not.toMatch(/\beuh\b|…|\.\.\.|je… je/i); expect(passage.situation.length).toBeGreaterThan(20);
+   expect(sentences.length).toBeGreaterThanOrEqual(6); expect(sentences.length).toBeLessThanOrEqual(16);
+   expect(passage.text).toMatch(/…/); expect(passage.situation.length).toBeGreaterThan(20);
   }
   expect(INTENT_PASSAGES[1].text).toMatch(/^Il y a deux jours, à l’hôtel/);
  });

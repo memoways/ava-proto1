@@ -456,9 +456,11 @@ export function applyElevenLabsPerformance(
     const prefix = [tag, deliveryTag].filter(Boolean).join("");
     if (prefix && !spoken.startsWith("[")) spoken = `${prefix} ${spoken}`;
   }
+  // Workshop intents: lower stability and higher style so the delivery breaks and changes pace.
+  const workshop = intent.source === 'manual';
   return {
-    style: clamp(base.style + delta.style * factor, 0, 1),
-    stability: clamp(base.stability + delta.stability * factor, 0, 1),
+    style: clamp(base.style + delta.style * factor + (workshop ? 0.08 * intent.intensity : 0), 0, 1),
+    stability: clamp(base.stability + delta.stability * factor - (workshop ? 0.1 * intent.intensity : 0), 0, 1),
     speed,
     text: spoken,
   };
@@ -481,7 +483,9 @@ export function applyGradiumPerformance(
   }
   // Kept small: high Gradium temperatures produce hiccups, breaths and odd
   // pronunciations. Bump ≤ 0.1 and hard ceiling at 0.85.
-  const tempBump = Math.min(0.1, 0.04 * intent.intensity
+  // Workshop intents (source "manual") go further: Ulrich judged every take "too perfect and too linear".
+  const workshop = intent.source === 'manual';
+  const tempBump = workshop ? 0.07 * intent.intensity : Math.min(0.1, 0.04 * intent.intensity
     + (intent.emotion === "angry" || intent.emotion === "urgent" || intent.emotion === "scared" ? 0.03 : 0));
   let padding = base.paddingBonus;
   if (intent.delivery === "rushed" || intent.emotion === "urgent") padding -= 0.6;
@@ -489,8 +493,8 @@ export function applyGradiumPerformance(
     padding += 0.5;
   }
   return {
-    temp: clamp(base.temp + tempBump, 0, 0.85),
-    paddingBonus: clamp(padding, -4, 4),
+    temp: clamp(base.temp + tempBump, 0, workshop ? 0.9 : 0.85),
+    paddingBonus: clamp(workshop && intent.pauses === 'long' ? padding + 0.5 : padding, -4, 4),
   };
 }
 

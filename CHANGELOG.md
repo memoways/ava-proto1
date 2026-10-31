@@ -4,6 +4,16 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [AP4-quater 3/3 — textes d'essai parlés, variations poussées] — 2026-10-31
+
+- Passages P1/P2/P3 réécrits comme de la parole : phrases brisées, vraies hésitations
+  (« je… je l'ai poussé »), répétitions de mots (« une cellule… une cellule »), moins
+  littéraire. Mêmes faits. `performedText` n'ajoute plus de tics sur une phrase qui en a déjà.
+- Réglages de l'atelier poussés (intentions « manuel » seulement) : Gradium `temp` +0,07 par niveau
+  (plafond 0,9) et pauses longues +0,5 ; ElevenLabs stabilité −0,1 et style +0,08 par niveau ;
+  Fish `topP` relevé avec l'intensité comme `temperature`. Le jeu garde ses plafonds.
+- À valider à l'oreille : retour d'Ulrich du 31 octobre (« mieux, pas encore assez cassé »).
+
 ## [AP4-quater — fournisseurs qui échouent, voix lentes (en cours)] — 2026-10-30
 
 - Délai réseau par requête (`timeoutMs`) : l'atelier passe 60 s, le jeu garde 12 s.

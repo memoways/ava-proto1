@@ -13,11 +13,11 @@ import type { TTSProviderId } from './types';
 export interface IntentPassage { id: 'P1' | 'P2' | 'P3'; title: string; situation: string; text: string }
 export const INTENT_PASSAGES: IntentPassage[] = [
  { id: 'P1', title: 'Le présent, l’appartement', situation: 'Premier échange. Le bénévole de la cellule vient de se présenter et demande comment ça se passe à la maison depuis hier.',
-  text: 'Emma est dans la cuisine depuis ce matin, Léo et Ava sont chacun dans leur chambre, et moi je suis là dans le salon à regarder ce téléphone comme si quelqu’un allait enfin nous dire ce qu’on doit faire maintenant. La police nous a dit hier qu’une cellule allait nous appeler, alors j’attendais sans trop savoir ce que j’attendais, et on reste chacun de son côté dans le même appartement sans arriver à se dire un mot. Bon, c’est vous qui appelez, c’est déjà ça.' },
+  text: 'Emma est dans la cuisine, depuis ce matin. Léo, Ava, chacun dans sa chambre. Et moi, moi je suis là, dans le salon, je regarde ce téléphone… j’sais pas, comme si quelqu’un allait nous dire quoi faire. La police nous a dit hier qu’une cellule… une cellule allait nous appeler. Alors j’attendais. J’attendais, mais… j’sais pas trop quoi. On est tous là, chacun dans son coin, dans le même appartement, et on arrive pas à se parler. Enfin bon. C’est vous qui appelez. C’est déjà ça.' },
  { id: 'P2', title: 'Le souvenir J−2, l’hôtel', situation: 'Le bénévole connaît les grandes lignes de la déposition. Il demande ce qui s’est passé à l’hôtel, il y a deux jours, avec Anne.',
-  text: 'Il y a deux jours, à l’hôtel, j’avais ce canon contre la tempe et je regardais mon fusil par terre en me demandant si j’aurais le temps, pendant que le type roux expliquait tranquillement à Anne qu’il fallait faire confiance à la nature. Et puis Anne lui a mis un coup de poêle, l’autre a tourné son arme vers elle, je l’ai poussé, j’ai repris le fusil et j’ai tiré en pleine poitrine, et c’est seulement après que j’ai vu que mes mains tremblaient. Derrière une porte il y avait Peter, vivant, attaché, et moi je restais là sans comprendre qui était l’homme que j’avais laissé sous l’abri.' },
+  text: 'Il y a deux jours, à l’hôtel… j’avais ce canon, là, contre la tempe. Et je regardais mon fusil, par terre, je me disais… est-ce que j’aurais le temps ? Le type roux, il parlait, tranquille, il expliquait à Anne qu’il fallait… faire confiance à la nature. Et là, Anne, elle lui met un coup de poêle. Un coup de poêle ! L’autre, il tourne son arme vers elle, alors je… je l’ai poussé. J’ai repris le fusil, et j’ai tiré. En pleine poitrine. Et c’est après, seulement après, que j’ai vu mes mains. Elles tremblaient. Derrière une porte, il y avait Peter. Vivant. Attaché. Et moi je restais là, je comprenais pas… qui c’était, l’homme, l’homme que j’avais laissé sous l’abri.' },
  { id: 'P3', title: 'Emma, aujourd’hui', situation: 'Plus tard dans l’appel, la confiance s’est installée. Le bénévole demande doucement comment ça va entre Emma et lui.',
-  text: 'Elle est dans la cuisine, je suis dans le salon, il y a dix mètres entre nous et on ne se parle plus depuis qu’on est rentrés, parce que la dernière chose qu’elle a vue de moi là-haut, c’est le fusil pointé sur elle et puis sur Ava. Je dis que ça ne changera rien, que je l’aimerai pareil, je peux même le dire fort, mais quand je la regarde par la porte, avec sa voix, ses gestes, tout ce qui est encore là, j’attends, et j’sais pas ce que j’attends.' },
+  text: 'Elle est dans la cuisine. Moi, je suis dans le salon. Dix mètres entre nous, dix mètres, et on se parle plus. Plus depuis qu’on est rentrés. Parce que… la dernière chose qu’elle a vue de moi, là-haut, c’est le fusil. Pointé sur elle. Et puis sur Ava. Je lui dis que ça changera rien, que je l’aimerai pareil, je peux même le dire fort, mais… quand je la regarde, par la porte, sa voix, ses gestes, tout ce qui est encore là… j’attends. J’attends, et j’sais pas ce que j’attends.' },
 ];
 
 export type IntentRecipe = Omit<PerformanceIntent, 'source' | 'speechState' | 'mappingVersion'> & { speedHint: number; pauses: 'short' | 'normal' | 'long' };
@@ -61,8 +61,8 @@ export function performedText(intent: WorkshopIntent, text: string): string {
   let out = sentence.replace(/,\s+/g, '… ');
   const words = out.split(/\s+/);
   const first = words[0] ?? '';
-  if (index % 2 === 0 && words.length >= 5 && /^[A-Za-zÀ-ÿ]{1,4}$/.test(first)) out = `${first}… ${first.toLowerCase()} ${words.slice(1).join(' ')}`;
-  else if (intensity === 2 && words.length > 8 && !out.includes('…')) out = `${words.slice(0, 4).join(' ')}… ${words.slice(4).join(' ')}`;
+  if (!sentence.includes('…') && index % 2 === 0 && words.length >= 5 && /^[A-Za-zÀ-ÿ]{1,4}$/.test(first)) out = `${first}… ${first.toLowerCase()} ${words.slice(1).join(' ')}`;
+  else if (intensity === 2 && words.length > 8 && !out.includes('…') && !sentence.includes('…')) out = `${words.slice(0, 4).join(' ')}… ${words.slice(4).join(' ')}`;
   return out;
  }).join(' ');
 }
