@@ -39,6 +39,15 @@ sa mémoire personnelle et ne valide pas l'accès aux sources Ava.
   réalise le rendu. Les propositions de changement des champs Notion restent
   séparées des réglages de l'app. Ulrich confirme leur synchronisation à jour
   au 25 octobre 2026 ; ne pas diagnostiquer un retard depuis un refus d'accès.
+- **Interdiction formelle — base Caractères en lecture seule (Ulrich, 31 octobre 2026).**
+  Aucun agent, aucun script ni aucune commande lancés depuis ce dépôt ne modifie la
+  base Caractères AVA (pages Max, Emma et autres personnages) : ni ses propriétés et
+  champs, ni le contenu des pages qui alimente le RAG, ni ses commentaires, sauf si
+  Ulrich le demande explicitement pour une modification précise. Lecture seule. Une
+  évolution éditoriale se présente comme proposition dans `docs/` ; Ulrich l'applique
+  lui-même. Seules les tâches Notion (avancement, reçus de livraison) sont mises à jour
+  depuis ici. Ne jamais déclencher non plus une Edge Function qui écrit dans Notion
+  (`update-notion-video`, etc.) pour éditer un personnage.
 
 ## Chaîne de développement et de publication (obligatoire)
 

@@ -30,6 +30,9 @@ Ava `1265958d-b74e-40f2-917d-182fe05163fc`, workspace Memoways
 Production distincte et soumise à autorisation. Notion Ava : Gamilab natif,
 get-self `7e1a9a09-09cb-4deb-a306-83a29b831bc2` ; autres IDs dans AGENTS.
 Gami DigiDouble exclu, aucun animal affiché.
+**Base Caractères Notion : lecture seule, interdiction formelle** (aucune
+modification de champ, de contenu RAG ou de page personnage sans demande explicite
+d'Ulrich) ; seules les tâches Notion se mettent à jour d'ici. Détail dans AGENTS.
 
 GitHub : voie directe sans demande, App locale à clé fichier (décision
 « GitHub — accès direct » d’AGENTS). `git` nu fonctionne dans Ava ; `gh` et la
