@@ -38,13 +38,21 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**G1.2 implémenté le 31 octobre : recette lue, prompt ~0,8 s plus rapide, registre tenu.**
+Recette d'Ulrich (session `4671a23a…`) : gravité tenue, aucune relance LLM, premier son
+4,1–4,8 s. La construction du prompt `optimized_v3` coûtait 0,77–0,96 s par tour (déduplication
+quadratique) : profils mis en cache, même prompt. Phrases scriptées en cours d'appel au « tu »
+quand le personnage tutoie. À confirmer par `character_prompt_build` à la prochaine recette.
+[Recette et exécution G1.2](plan_gravite_ava_latence_g1.md#g12a--recette-dulrich-31-octobre-2026-sans-code) ·
+[Prompt G1.3 « latence, décisions d'Ulrich »](prompt_reprise_latence_decisions_lot_g1_3.md).
+
 **G1 implémenté le 31 octobre : gravité, « Ava », relance LLM évitée.**
 Cause de « Eva » : voix ElevenLabs v4 (texte et STT disent « Ava ») → graphie `Ahva` pour
 v3/v4. Trivialités : accroche R1 « détail concret » → invariant de gravité non tronquable,
 accroche tournée vers le drame, garde locale de sortie. Décroché léger : base vocale `warm`
 d'Emma → base `fragile`, jamais `warm`/`sarcastic` par défaut pour Max et Emma. Écart fin
 LLM → TTS : relance complète du LLM → pensée ouverte dite en suspension et sauvetage local.
-Spans `character_*` pour la suite. Recette G1.2 d'Ulrich à faire.
+Spans `character_*` pour la suite. Recette G1.2 faite.
 [Constat et exécution](plan_gravite_ava_latence_g1.md) ·
 [Prompt G1.2 « recette gravité et latence »](prompt_reprise_recette_gravite_lot_g1_2.md).
 

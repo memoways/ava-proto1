@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { characterHandoffGreeting, characterRecoveryLine, latestCallTransfer, createInitialGreetingSelector, initialGreetingLines, greetingDelivery } from './characterConversationContinuity';
+import { characterHandoffGreeting, characterHandoffPauseLine, characterRecallGreeting, characterRecoveryLine, characterRegister, latestCallTransfer, createInitialGreetingSelector, initialGreetingLines, greetingDelivery } from './characterConversationContinuity';
 import { projectDeliveredConversation } from './responseDelivery';
 import { buildExperienceFrame } from './experienceFrame';
 import type { ConversationMessage } from '@/types';
@@ -70,5 +70,39 @@ describe('character call continuity', () => {
       for (let j = 0; j < 8; j++) history.push({ role: 'max', content: 'Échange normal.', timestamp: i });
     }
     expect(characterRecoveryLine('max', history)).toBe(recoveries[0]);
+  });
+});
+
+describe('scripted lines follow the register already used in the call (recette G1.2)', () => {
+  const max = (content: string): ConversationMessage => ({ role: 'max', content, timestamp: 0 });
+  const recette = [
+    max('Allô. Max à l’appareil. Je vous écoute.'),
+    { role: 'user', content: 'Écoute bonjour Max, je t’appelle.', timestamp: 0 } as ConversationMessage,
+    max('Je ne vais pas bien. Je peux te donner les faits.'),
+    max('Oui… tu peux essayer. Dis-lui seulement que tu penses à elle.'),
+  ];
+
+  it('detects tu after a formal greeting, vous otherwise', () => {
+    expect(characterRegister('max', recette)).toBe('tu');
+    expect(characterRegister('max', recette.slice(0, 2))).toBe('vous');
+    expect(characterRegister('max', [])).toBe('vous');
+    expect(characterRegister('max', [max('Reprends, je t’écoute.')])).toBe('tu');
+    expect(characterRegister('max', [max('Je te passe Emma, et vous verrez.'), max('Rien.')])).toBe('vous');
+  });
+
+  it('keeps the withheld-transfer pause and recoveries in « tu » once Max says « tu »', () => {
+    for (let i = 0; i < 6; i += 1) {
+      expect(characterHandoffPauseLine('max', recette)).not.toMatch(/\bvous\b|voulez|voudriez/);
+      expect(characterRecoveryLine('max', recette)).not.toMatch(/\bvous\b|Reprenez|Attendez/);
+    }
+    expect(characterHandoffPauseLine('max', recette.slice(0, 1))).toMatch(/vous/);
+  });
+
+  it('greets a returning player in the register the target already used', () => {
+    const emma: ConversationMessage = { role: 'emma', content: 'Je t’écoute, dis-moi ce que tu sais.', timestamp: 0 };
+    for (let i = 0; i < 6; i += 1) {
+      expect(characterHandoffGreeting('emma', 'max', [emma])).not.toMatch(/\bvous\b/);
+      expect(characterRecallGreeting('emma', [emma], null)).not.toMatch(/\bvous\b/);
+    }
   });
 });

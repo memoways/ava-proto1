@@ -130,24 +130,37 @@ function shingleSet(value: string, width = 5): Set<string> {
   return out;
 }
 
+type ComparisonProfile = { normalized: string; terms: Set<string>; shingles: Set<string> };
+
+// The editorial sheet is identical from one turn to the next: analysing each
+// unit once instead of once per comparison removes the quadratic cost that
+// delayed every live turn by ~0.8 s. Profiles are read-only.
+const comparisonProfiles = new Map<string, ComparisonProfile>();
+const COMPARISON_PROFILE_CACHE_LIMIT = 4_000;
+
+function comparisonProfile(text: string): ComparisonProfile {
+  const cached = comparisonProfiles.get(text);
+  if (cached) return cached;
+  const profile = { normalized: normalizeForComparison(text), terms: keywords(text), shingles: shingleSet(text) };
+  if (comparisonProfiles.size >= COMPARISON_PROFILE_CACHE_LIMIT) comparisonProfiles.clear();
+  comparisonProfiles.set(text, profile);
+  return profile;
+}
+
 function duplicateOf(text: string, selected: CandidateUnit[]): CandidateUnit | null {
-  const normalized = normalizeForComparison(text);
+  const { normalized, shingles, terms: lexicalTerms } = comparisonProfile(text);
   if (normalized.length < 20) return null;
-  const shingles = shingleSet(text);
-  const lexicalTerms = keywords(text);
   for (const candidate of selected) {
-    const other = normalizeForComparison(candidate.text);
+    const { normalized: other, terms: otherTerms, shingles: otherShingles } = comparisonProfile(candidate.text);
     // A separator normalizes to empty and is contained in every passage.
     // Apply the same evidence threshold on both sides of the comparison.
     if (other.length < 20) continue;
     if (other.includes(normalized) || normalized.includes(other)) return candidate;
-    const otherTerms = keywords(candidate.text);
     let sharedTerms = 0;
     lexicalTerms.forEach((value) => { if (otherTerms.has(value)) sharedTerms += 1; });
     const lexicalContainment = sharedTerms / Math.max(1, Math.min(lexicalTerms.size, otherTerms.size));
     if (Math.min(lexicalTerms.size, otherTerms.size) >= 8 && lexicalContainment >= 0.82) return candidate;
     if (!shingles.size) continue;
-    const otherShingles = shingleSet(candidate.text);
     let common = 0;
     shingles.forEach((value) => { if (otherShingles.has(value)) common += 1; });
     const containment = common / Math.max(1, Math.min(shingles.size, otherShingles.size));

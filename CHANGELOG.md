@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [G1.2 — recette gravité et latence : prompt ~0,8 s plus rapide, registre tenu] — 2026-10-31
+
+- Recette d'Ulrich (session `4671a23a…`, sandbox, Max → Emma, 10 tours) : aucune trivialité ni
+  légèreté, aucune relance LLM (sauvetage local sur 5 tours), premier son 4,1–4,8 s hors
+  passage. Attente évitable nommée par les spans : construction du prompt 0,77–0,96 s à chaque
+  tour.
+- Compilateur `optimized_v3` : la déduplication analyse chaque texte une seule fois (cache
+  borné) au lieu de le réanalyser à chaque comparaison. Même prompt ; 175 → 5–11 ms en Node.
+- Phrases scriptées en cours d'appel (pause de transfert retenu, reprises, retour, rappel) :
+  elles suivent le « tu » quand le personnage tutoie déjà le joueur ; premier contact inchangé.
+
 ## [G1 — gravité des personnages, « Ava », relance LLM évitée] — 2026-10-31
 
 - Diagnostic G1.0 (session `d00687ba…`, sandbox) : « Eva » est la prononciation ElevenLabs v4

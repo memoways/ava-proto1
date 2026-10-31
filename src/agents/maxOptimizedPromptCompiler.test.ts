@@ -170,3 +170,15 @@ describe("optimized_v3 prompt compiler", () => {
     expect(result.finalSystemPrompt).not.toContain("# NOYAU DE MAX");
   });
 });
+
+describe('optimized_v3 dedup profile cache (recette G1.2)', () => {
+  it('builds the same prompt on a warm cache as on a cold one', () => {
+    const sheet = makeCanonicalPresentFixture('max');
+    const input = { character: sheet, characterName: sheet.name!, userMessage: 'Il est parti avec Anne ?', historyChars: 1_800,
+      ragCandidates: [{ id: 'hotel', rank: 1, content: "Il y a deux jours, le néon grésillait dans le hall de l'hôtel pendant que Max cherchait Anne." }] };
+    const cold = buildOptimizedPromptAssembly(input);
+    const warm = buildOptimizedPromptAssembly(input);
+    expect(warm.finalSystemPrompt).toBe(cold.finalSystemPrompt);
+    expect(warm.budget).toEqual(cold.budget);
+  });
+});

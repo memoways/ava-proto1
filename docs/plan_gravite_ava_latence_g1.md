@@ -124,3 +124,58 @@ occupe tout l'appel. »
   lecture en attendant la génération, puis l'échec de la requête sortait de `failAll` sans
   rejeter la génération : tour bloqué sur « répond… ». `failAll` rejette maintenant toujours la
   génération. E2E concerné : 12/12 sous charge (avant : 5 échecs sur 8 ; main : 2 sur 8).
+
+## G1.2a — Recette d'Ulrich (31 octobre 2026, sans code)
+
+Session `4671a23a-2fc1-4597-92e7-9ae6d0e6c31a` (sandbox-ulrich, 20 h 19, Max → Emma, un passage,
+10 tours, ElevenLabs v4 Turbo, LLM `openai/gpt-5.6-luna`). Ressenti d'Ulrich : « bien, correct,
+bonne direction » ; demande : plus de réactivité sans régression ni cassure de voix.
+
+- **Gravité** : aucune trivialité ni légèreté dans le texte livré (Max 7 répliques, Emma 3) ;
+  aucun span `character_gravity_guard` : la garde n'a rien eu à retirer. Décroché d'Emma :
+  « Oui, Emma à l'appareil… Max m'a transmis l'appel. »
+- **Relance** : 10 `prd4_chat` pour 10 tours, aucune relance. `character_local_salvage` sur
+  5 tours (2, 3, 4, 5, 10) : l'en-tête privé manquait et a été sauvé sans second appel ; avant
+  G1.1, ces tours auraient coûté +1,4 à 2,6 s.
+- **« Ava »** : non commenté par Ulrich ; `Ahva` reste en place, à confirmer à l'oreille.
+- **Latence** (origine = décision de tour, horloge client) : premier son à 4,1–4,8 s hors
+  passage (6,0 s au tour 10, LLM 3,0 s), 6,8 s et 8,6 s sur les deux tours de passage.
+  Décomposition type : RAG 0,83–1,35 s → **construction du prompt 0,77–0,96 s à chaque tour**
+  (`character_prompt_build` = écart `context_ready → llm_request`) → LLM 1,3–2,4 s (serveur
+  1,34–3,05 s) → texte → premier son 0,47–0,61 s. `character_context_reads` : 2–3 ms.
+- **Cause de la construction lente** : calcul pur, pas de réseau (la fiche est en cache).
+  `duplicateOf` (compilateur `optimized_v3`) recalculait normalisation, mots-clés et shingles
+  de chaque unité déjà retenue pour chaque nouvelle unité comparée : coût quadratique sur des
+  fiches de ~50 000 caractères. Profil Node : 175 ms par construction, dont 85 % dans
+  `shingleSet`/`duplicateOf`/`normalizeForComparison` ; plus lent dans le navigateur.
+- **Passage** : au tour 6 (« si tu peux me la passer »), le MJ a retenu le transfert ; Max a dit
+  la phrase de pause après 2,3 s de préparation, puis le transfert s'est fait au tour 7 après
+  4,0 s de préparation. La pause était vouvoyée (« Attendez. Qu'est-ce que vous voudriez lui
+  dire ? ») alors que Max tutoyait depuis le tour 2 : cassure de continuité.
+
+## Exécution G1.2b — 31 octobre 2026
+
+- `maxOptimizedPromptCompiler.ts` : profil de comparaison (texte normalisé, mots-clés,
+  shingles) calculé une fois par texte et gardé en cache borné (4 000 entrées) ; mêmes seuils,
+  même résultat (test cache froid = cache chaud). Construction mesurée en Node : 175 ms →
+  11 ms au premier tour, 5 ms ensuite. Gain attendu en sandbox : ~0,8 s par tour, à confirmer
+  par `character_prompt_build` à la prochaine recette.
+- `characterConversationContinuity.ts` : `characterRegister` lit le registre que le personnage
+  emploie déjà (dernière réplique avec une adresse) ; pause de transfert retenu, phrases de
+  reprise, retour d'appel et rappel passent au « tu » quand il tutoie. Premier contact
+  inchangé (vouvoiement).
+- Sans changement : `Ahva`, termes de la garde (aucun faux positif ni oubli observé),
+  Gradium, `VOICE_INCREMENTAL_OUTPUT`, préparation des passages (invariant « Transfers alone
+  await preparation »).
+- Validations : `npm run test:quality` vert. Une simulation ne prouve pas le rendu vocal.
+
+### Restant, décisions d'Ulrich
+
+1. `endOfSpeechMs` sandbox 2 000 → 900 ms (prod 900) : jusqu'à 1,1 s de silence en moins avant
+   la décision de tour, hors des jalons mesurés ; risque : couper une phrase hésitante.
+2. Streaming du LLM vers ElevenLabs : LLM 1,3–2,4 s en batch, premier son possible après la
+   première phrase ; chantier plus lourd (le chemin incrémental n'existe que pour Gradium).
+3. Modèle de Max/Emma plus rapide : à comparer sur la gravité et la langue avant tout choix.
+4. RAG 0,8–1,35 s (embedding 0,1–0,7 s, rerank ~0,2 s) : piste suivante, non traitée.
+5. Transfert retenu par le MJ alors que le joueur le demande clairement (tour 6) : coûte un
+   tour complet ; règle éditoriale du MJ à revoir avec Ulrich si ce n'est pas voulu.
