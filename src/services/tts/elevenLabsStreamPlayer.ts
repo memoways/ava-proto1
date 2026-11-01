@@ -89,7 +89,9 @@ export function createElevenLabsStreamingPlayback(
   let streamFailed: unknown = null;
   let statusCode: number | undefined;
   let firstByteMs: number | undefined;
-  const chunks: Uint8Array[] = [];
+  // Network chunks are ArrayBuffer-backed at runtime; the narrow generic keeps
+  // appendBuffer/Blob happy under TS 5.9's ArrayBufferLike widening.
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
 
   let resolveStarted!: () => void, rejectStarted!: (e: unknown) => void;
   let resolveFinished!: (v: { playbackTotalMs: number }) => void, rejectFinished!: (e: unknown) => void;
