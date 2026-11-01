@@ -2,6 +2,9 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import Hls from "hls.js";
 import { resolveNativeVideoSource } from "@/services/videoPlayback";
 
+/** Idle time before the pointer hides again over a playing video. */
+const POINTER_IDLE_HIDE_MS = 1_500;
+
 const canControlNativeMedia = () =>
   typeof window !== "undefined" && !/jsdom/i.test(window.navigator.userAgent);
 
@@ -51,6 +54,10 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   const stoppingRef = useRef(false);
   const playbackRequestedRef = useRef(false);
   const [sourceEpoch, setSourceEpoch] = useState(0);
+  // The pointer is hidden while a video plays; moving the mouse shows it briefly
+  // so « Passer » stays reachable.
+  const [pointerVisible, setPointerVisible] = useState(false);
+  const pointerTimerRef = useRef<number | null>(null);
   const [playbackEngine, setPlaybackEngine] = useState<"pending" | "hls.js" | "native-hls" | "native-file" | "unsupported">("pending");
   const source = useMemo(() => resolveNativeVideoSource(videoUrl), [videoUrl]);
 
@@ -236,6 +243,24 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     pauseVideo(videoRef.current);
   }, [active, pauseVideo, playWithAudio]);
 
+  useEffect(() => {
+    setPointerVisible(false);
+    return () => {
+      if (pointerTimerRef.current) window.clearTimeout(pointerTimerRef.current);
+      pointerTimerRef.current = null;
+    };
+  }, [active]);
+
+  const revealPointer = useCallback(() => {
+    if (!activeRef.current) return;
+    setPointerVisible(true);
+    if (pointerTimerRef.current) window.clearTimeout(pointerTimerRef.current);
+    pointerTimerRef.current = window.setTimeout(() => {
+      pointerTimerRef.current = null;
+      setPointerVisible(false);
+    }, POINTER_IDLE_HIDE_MS);
+  }, []);
+
   const handleSkip = useCallback(() => {
     stopPlayback();
     onSkip();
@@ -243,12 +268,15 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
   return (
     <div
-      className={`fixed inset-0 z-0 bg-background transition-opacity duration-200 ${active ? "opacity-100" : "pointer-events-none opacity-0"}`}
+      className={`fixed inset-0 z-0 bg-background transition-opacity duration-200 ${active ? "opacity-100" : "pointer-events-none opacity-0"} ${active && !pointerVisible ? "cursor-none" : ""}`}
       aria-hidden={!active}
+      data-pointer={active && !pointerVisible ? "hidden" : "visible"}
+      onMouseMove={revealPointer}
     >
+      {/* aria-label, not title: a title shows a "Video player" tooltip under the pointer. */}
       <video
         ref={videoRef}
-        title="Video player"
+        aria-label="Video player"
         data-source={source.url}
         data-playback-engine={playbackEngine}
         className="absolute inset-0 h-full w-full object-cover"

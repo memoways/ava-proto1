@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Sélection vidéos, lot 3b — retouches de recette] — 2026-11-01
+
+- Lecteur vidéo : plus d'infobulle « Video player », pointeur masqué pendant la vidéo
+  (réapparaît 1,5 s au mouvement de la souris pour « Passer »).
+- Annonce « Une vidéo arrive » en capsule sous les personnages, en haut à gauche, jamais
+  par-dessus le texte.
+- Voix : un personnage ne s'emporte jamais sur deux répliques de suite (`urgent`, `angry`,
+  `accusatory`) ; la seconde est rendue retenue. Cause mesurée : Max en rugosité 3, réplique
+  `urgent` par le seul mot « maintenant », puis « La digue cède » en « very ». Rendu seulement :
+  états de parole, GM, Notion et rugosité inchangés.
+
 ## [Sélection vidéos, lot 3b — transition cinématique] — 2026-11-01
 
 - La réplique du personnage n'est jamais coupée par une vidéo, ni le joueur qui parle :

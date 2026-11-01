@@ -41,7 +41,7 @@ import {
   type STTSession,
 } from "@/services/stt";
 import type { TTSProviderId } from "@/services/tts/types";
-import { derivePerformanceIntent, logPerformanceIntent } from "@/services/tts/performanceIntent";
+import { derivePerformanceIntent, isHeatedIntent, logPerformanceIntent, type PerformanceIntent } from "@/services/tts/performanceIntent";
 import { getSpeechPerformanceSettings, loadSpeechPerformanceSettings } from '@/services/tts/speechPerformanceSettings';
 import { unlockAudioPlayback } from "@/services/audioPlayback";
 import {
@@ -374,6 +374,12 @@ const IndexPRD4 = () => {
   const cinematicRef = useRef<CinematicTransitionState<VideoTriggerRow>>(CINEMATIC_IDLE);
   const cinematicMetaRef = useRef<{ turnId: string; turnIndex: number; reason: string | null; confidence: number | null;
     orchestrationVersionId: string | null; previousLastVideoTurn: number } | null>(null);
+  // Recette 1 Nov 2026: a character never flares up on two replies in a row.
+  const heatedReplyRef = useRef(new Map<string, boolean>());
+  const heatedReplyKey = (character: string) => `${sessionIdRef.current ?? "local"}:${character}`;
+  const rememberReplyTemper = (character: string, intent: PerformanceIntent) => {
+    heatedReplyRef.current.set(heatedReplyKey(character), isHeatedIntent(intent));
+  };
   const audioStateRef = useRef<AudioState>(state.audioState);
   audioStateRef.current = state.audioState;
   const dispatchCinematicRef = useRef<(event: CinematicTransitionEvent<VideoTriggerRow>, reason?: string) => void>(() => {});
@@ -671,7 +677,9 @@ const IndexPRD4 = () => {
       speechState: context.speechPerformanceContext?.state,
       rugosite: context.speechPerformanceContext?.rugosite,
       validSpeechStates: context.speechPerformanceContext?.states,
+      previousHeated: heatedReplyRef.current.get(heatedReplyKey(characterKey)) === true,
     });
+    rememberReplyTemper(characterKey, intent);
     logPerformanceIntent(intent, { turnId: context.turnId, characterKey });
     trackEvent("prd4_tts_performance", {
       session_id: sessionIdRef.current,
@@ -683,6 +691,7 @@ const IndexPRD4 = () => {
       source: intent.source,
       speech_state: intent.speechState ?? null,
       mapping_version: intent.mappingVersion ?? null,
+      tempered: intent.tempered ?? null,
     });
     const turnContext = {
       sessionId: sessionIdRef.current ?? undefined,
@@ -1638,16 +1647,19 @@ const IndexPRD4 = () => {
           lastCharacterTextRef.current = '';
           const voiceId = activeVoiceIdRef.current ?? undefined;
           const performanceIntent = derivePerformanceIntent({ text: '', characterKey: turnCharacter,
-            previousEmotionalState: pendingEmotionalStateRef.current, userMessage: userText });
+            previousEmotionalState: pendingEmotionalStateRef.current, userMessage: userText,
+            previousHeated: heatedReplyRef.current.get(heatedReplyKey(turnCharacter)) === true });
           streamedVoice = prepareStreamedVoiceTurn({ characterKey: turnCharacter, voiceId,
             resolveSpeechPerformance: (state, text) => {
               const intent = derivePerformanceIntent({ text, characterKey: turnCharacter,
                 speechState: state, rugosite: speechRuntimeForVoice.rugosite, validSpeechStates: speechRuntimeForVoice.states,
-                speechSettings: speechSettingsForVoice, previousEmotionalState: pendingEmotionalStateRef.current });
+                speechSettings: speechSettingsForVoice, previousEmotionalState: pendingEmotionalStateRef.current,
+                previousHeated: heatedReplyRef.current.get(heatedReplyKey(turnCharacter)) === true });
+              rememberReplyTemper(turnCharacter, intent);
               logPerformanceIntent(intent, { turnId, characterKey: turnCharacter, mappingVersion: intent.mappingVersion });
               trackEvent('prd4_tts_performance', { session_id: owningSessionId, turn_id: turnId, turn_index: turnIndex,
                 character: turnCharacter, emotion: intent.emotion, intensity: intent.intensity, source: intent.source,
-                speech_state: intent.speechState ?? null, mapping_version: intent.mappingVersion ?? null });
+                speech_state: intent.speechState ?? null, mapping_version: intent.mappingVersion ?? null, tempered: intent.tempered ?? null });
               return intent;
             },
             performance: performanceIntent, signal: turnController.signal,
@@ -3382,6 +3394,8 @@ const IndexPRD4 = () => {
 
 
   // ---- Render ---------------------------------------------------------------
+  // Shown from the announcement until the screen fades to black.
+  const cinematicAnnounced = cinematicHoldsInput(cinematic) && (cinematic.phase === "pending" || cinematic.phase === "fading_out");
   let screen: ReactNode = null;
   switch (state.phase) {
     case "welcome":
@@ -3459,6 +3473,8 @@ const IndexPRD4 = () => {
               handoffCalling={handoffCalling}
               handoffInputLocked={handoffInputLocked}
               inputHeld={cinematicHoldsInput(cinematic)}
+              cinematicAnnounced={cinematicAnnounced}
+              onIgnoreCinematic={() => dispatchCinematicRef.current({ type: "skip" })}
               handoffCallingTarget={handoffCallingTarget}
               onAcceptHandoff={() => void handleAcceptHandoff()}
               onRejectHandoff={handleRejectHandoff}
@@ -3491,8 +3507,6 @@ const IndexPRD4 = () => {
 
   const teaserActive = state.phase === "teaser";
   const interludeActive = state.phase === "conversation_max" && Boolean(activeVideo?.video_url);
-  const cinematicAnnounced = state.phase === "conversation_max" && cinematicHoldsInput(cinematic)
-    && (cinematic.phase === "pending" || cinematic.phase === "fading_out");
   const cinematicActive = teaserActive || interludeActive;
   const cinematicVideoUrl = interludeActive && activeVideo?.video_url
     ? activeVideo.video_url
@@ -3527,24 +3541,7 @@ const IndexPRD4 = () => {
           }}
         />
       ) : null}
-      {cinematicAnnounced ? (
-        <div
-          role="status"
-          data-testid="cinematic-announced"
-          className="fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full border border-border/20 bg-black/50 px-4 py-1.5 font-mono text-xs text-muted-foreground/90 backdrop-blur-sm"
-        >
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-foreground/70" aria-hidden="true" />
-          <span>Une séquence arrive…</span>
-          {/* Not « Passer »: that label belongs to the video player itself. */}
-          <button
-            type="button"
-            className="underline-offset-2 hover:text-foreground hover:underline"
-            onClick={() => dispatchCinematicRef.current({ type: "skip" })}
-          >
-            Ignorer
-          </button>
-        </div>
-      ) : null}
+
     </>
   );
 };

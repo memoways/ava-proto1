@@ -38,6 +38,9 @@ interface Props {
   handoffInputLocked?: boolean;
   /** A cinematic is announced: no new turn and no interruption until it is over. */
   inputHeld?: boolean;
+  /** A cinematic is coming: discreet capsule under the characters, with « Ignorer ». */
+  cinematicAnnounced?: boolean;
+  onIgnoreCinematic?: () => void;
   handoffCallingTarget?: "max" | "emma";
   onAcceptHandoff?: () => void;
   onRejectHandoff?: () => void;
@@ -67,6 +70,8 @@ const ConversationScreen = ({
   handoffCalling = false,
   handoffInputLocked = false,
   inputHeld = false,
+  cinematicAnnounced = false,
+  onIgnoreCinematic,
   handoffCallingTarget = "emma",
   onAcceptHandoff,
   onRejectHandoff,
@@ -295,6 +300,20 @@ const ConversationScreen = ({
                 className="min-h-11 rounded-full px-3 text-xs text-foreground/80 underline underline-offset-4 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50">
                 Rester avec {displayName}
               </button>
+          )}
+          {/* In the header column, never over the conversation text. */}
+          {cinematicAnnounced && (
+            <div role="status" data-testid="cinematic-announced"
+              className="flex min-h-9 w-full items-center gap-2 rounded-full border border-border/40 bg-background/60 px-3 py-1.5 text-[11px] text-muted-foreground backdrop-blur-md">
+              <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-foreground/70 motion-reduce:animate-none" />
+              <span className="min-w-0 flex-1 leading-tight">Une vidéo arrive</span>
+              {onIgnoreCinematic && (
+                <button type="button" onClick={onIgnoreCinematic}
+                  className="shrink-0 underline-offset-2 hover:text-foreground hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                  Ignorer
+                </button>
+              )}
+            </div>
           )}
         </div>
         {streamingAvatarActive && streamingAvatarState === "connecting" && (

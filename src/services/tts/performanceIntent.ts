@@ -39,6 +39,8 @@ export interface PerformanceIntent {
   speechState?: string;
   pauses?: 'short' | 'normal' | 'long';
   mappingVersion?: string;
+  /** Set when the temper guard replaced a second flare-up in a row by a held-back delivery. */
+  tempered?: 'calmed';
 }
 
 export interface DerivePerformanceInput {
@@ -50,6 +52,8 @@ export interface DerivePerformanceInput {
   rugosite?: number;
   validSpeechStates?: string[];
   speechSettings?: SpeechPerformanceSettings;
+  /** The character's previous reply was rendered heated (see `isHeatedIntent`). */
+  previousHeated?: boolean;
 }
 
 export const CANONICAL_EMOTIONS: CanonicalEmotion[] = [
@@ -333,7 +337,32 @@ function punctuationSignals(text: string): { intensityBoost: PerformanceIntensit
   return { intensityBoost: 0 };
 }
 
+/**
+ * Emotions heard as the character flaring up. Ulrich's recette (1 Nov 2026):
+ * Max may flare up, but never on two replies in a row. Its strength stays the
+ * rugosité setting's business.
+ */
+const HEATED_EMOTIONS = new Set<CanonicalEmotion>(["angry", "urgent", "accusatory"]);
+
+export function isHeatedIntent(intent: Pick<PerformanceIntent, "emotion"> | null | undefined): boolean {
+  return Boolean(intent && HEATED_EMOTIONS.has(intent.emotion));
+}
+
+/** Rendering only: the speech state, its name and the GM log are unchanged. */
+function withTemper(intent: PerformanceIntent, input: DerivePerformanceInput): PerformanceIntent {
+  if (!isHeatedIntent(intent) || !input.previousHeated) return intent;
+  const baseline = characterBaseline(input.characterKey);
+  const emotion = HEATED_EMOTIONS.has(baseline.emotion) ? "tense" : baseline.emotion;
+  // Second flare-up in a row: held-back delivery instead of the mapping's heat.
+  return withGravity({ ...intent, emotion, intensity: 0, delivery: "measured", pauses: intent.pauses ? "normal" : undefined,
+    actingNl: buildActingNl(emotion, 0, "measured"), speedHint: 1, tempered: "calmed" }, input.characterKey);
+}
+
 export function derivePerformanceIntent(input: DerivePerformanceInput): PerformanceIntent {
+  return withTemper(deriveUntemperedIntent(input), input);
+}
+
+function deriveUntemperedIntent(input: DerivePerformanceInput): PerformanceIntent {
   const settings = input.speechSettings ?? getSpeechPerformanceSettings();
   const state = input.validSpeechStates?.find(name => name.toLocaleLowerCase('fr') === input.speechState?.toLocaleLowerCase('fr'));
   const mapping = state ? settings.byCharacter?.[input.characterKey ?? '']?.[state] : undefined;
