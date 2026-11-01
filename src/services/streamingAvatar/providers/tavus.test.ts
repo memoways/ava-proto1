@@ -17,7 +17,7 @@ class Stream {
 function track(kind: string, id = kind) {
   fake.handlers.get("track-started")?.({ participant: { local: false }, type: kind, track: { id, kind, readyState: "live" } });
 }
-const settings = { replicaId: "face", personaId: "pal", language: "French", maxDurationSeconds: 900, emotion: "sadness" as const };
+const settings = { replicaId: "face", personaId: "pal", language: "French", maxDurationSeconds: 900, emotion: "sadness" as const, listeningEmotion: "neutral" as const };
 describe("Tavus actual receive-only lifecycle", () => {
   beforeEach(() => {
     vi.useFakeTimers(); vi.clearAllMocks(); fake.handlers.clear(); vi.stubGlobal("MediaStream", Stream);
@@ -83,19 +83,20 @@ describe("Tavus actual receive-only lifecycle", () => {
       message_type: "conversation",
       event_type: "conversation.set_emotion",
       conversation_id: "conversation",
-      properties: { emotion: "sadness" },
+      properties: { emotion: "neutral" },
     });
     const video = document.createElement("video"); video.play = vi.fn(async () => {}); output.attachMedia(video);
     const speech = output.renderText("Je n'en peux plus."); await vi.advanceTimersByTimeAsync(0);
     const order = fake.call.sendAppMessage.mock.calls.map(([message]) => message.event_type);
     expect(order.slice(-2)).toEqual(["conversation.set_emotion", "conversation.echo"]);
+    expect(emotionCalls().at(-1)?.properties.emotion).toBe("sadness");
     const echo = fake.call.sendAppMessage.mock.calls.at(-1)?.[0];
     expect(echo.properties.text).toBe('<emotion value="dejected"/> Je n\'en peux plus.');
     const event = (type: string) => fake.handlers.get("app-message")?.({ data: { event_type: type, conversation_id: "conversation", properties: { role: "pal" } } });
     event("conversation.started_speaking"); await vi.advanceTimersByTimeAsync(0); event("conversation.stopped_speaking");
     await speech; await output.dispose();
   });
-  it("re-asserts the emotion after each line and while listening", async () => {
+  it("switches to the listening emotion after each line and keeps it while idle", async () => {
     const output = new TavusStreamingAvatarOutput(settings, {}, 1000, 1000); await ready(output);
     const video = document.createElement("video"); video.play = vi.fn(async () => {}); output.attachMedia(video);
     const speech = output.renderText("Laisse-moi."); await vi.advanceTimersByTimeAsync(0);
@@ -105,6 +106,7 @@ describe("Tavus actual receive-only lifecycle", () => {
     event("conversation.stopped_speaking"); await speech;
     const types = () => fake.call.sendAppMessage.mock.calls.map(([message]) => message.event_type);
     expect(types()).toEqual(["conversation.set_emotion"]);
+    expect(fake.call.sendAppMessage.mock.calls[0][0].properties.emotion).toBe("neutral");
     (fake.call as { getNetworkStats?: () => Promise<unknown> }).getNetworkStats = vi.fn(async () => ({}));
     await vi.advanceTimersByTimeAsync(5000);
     expect(types()).toEqual(["conversation.set_emotion", "conversation.set_emotion"]);

@@ -4,6 +4,16 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatar Tavus — émotion d'écoute distincte] — 2026-11-01
+
+- Recette 3 : moins de sourire, mais « Tristesse » tenue en écoute donne un air de chien battu,
+  qui appelle la pitié. Deux réglages admin : « Émotion en parlant » (défaut Tristesse, balise
+  `dejected`) et « Émotion en écoutant » (défaut Neutre : fermé, impassible).
+- Voix : Tavus prononce le français « à l'anglaise » avec sa voix par défaut. Le PAL accepte
+  `layers.tts` ElevenLabs (`tts_engine`, `external_voice_id`, `api_key`, `tts_model_name`) :
+  réglage côté Tavus, sans code. Envoyer l'audio d'Ava (echo `modality: audio`) reste une option
+  plus lourde.
+
 ## [Avatar Tavus — émotion tenue pendant l'écoute] — 2026-11-01
 
 - Recette 2 : nos consignes atteignent Tavus (le visage change en parlant), mais pendant l'écoute

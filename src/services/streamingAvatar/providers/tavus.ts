@@ -19,6 +19,7 @@ import {
   type ResponseOutputResult,
   type ResponseOutputTurnContext,
   type TavusAvatarSettings,
+  type TavusEmotion,
 } from "../types";
 
 interface TavusMessage {
@@ -112,17 +113,17 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     call.setLocalAudio(false, { forceDiscardTrack: true });
     call.setLocalVideo(false);
     // As early as possible so the face never greets with its default smile.
-    this.applyEmotion();
+    this.applyEmotion(this.settings.listeningEmotion);
     await this.waitUntilReady();
     if (context.signal?.aborted) throw new DOMException("Avatar preparation aborted", "AbortError");
-    this.applyEmotion();
+    this.applyEmotion(this.settings.listeningEmotion);
     this.callbacks.onConnectionStateChange?.("ready");
     this.statsTimer = setInterval(() => {
       void call.getNetworkStats().then(stats => {
         if (!this.disposed) this.reportNetwork(stats);
       }).catch(() => {});
       // While listening the face drifts back to a friendly assistant look; keep it held.
-      if (!this.currentSpeech) this.applyEmotion();
+      if (!this.currentSpeech) this.applyEmotion(this.settings.listeningEmotion);
     }, 5000);
   }
 
@@ -149,8 +150,8 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     let playedSegments = 0;
     let currentStarted = false;
     const chunks = splitAvatarText(text);
-    // Re-assert the face emotion each turn: cheap, and survives a provider reconnect.
-    this.applyEmotion();
+    // Re-assert the speaking emotion each turn: cheap, and survives a provider reconnect.
+    this.applyEmotion(this.settings.emotion);
     try {
       for (const chunk of chunks) {
         if (this.disposed || context?.signal?.aborted) throw new DOMException("Avatar turn aborted", "AbortError");
@@ -209,12 +210,9 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     }
   }
 
-  private applyEmotion(): void {
-    if (!this.call || !this._externalSessionId || !this.settings.emotion) return;
-    this.call.sendAppMessage(
-      buildTavusSetEmotionCommand(this._externalSessionId, this.settings.emotion),
-      "*",
-    );
+  private applyEmotion(emotion: TavusEmotion): void {
+    if (!this.call || !this._externalSessionId || !emotion) return;
+    this.call.sendAppMessage(buildTavusSetEmotionCommand(this._externalSessionId, emotion), "*");
   }
 
   interrupt(): void {
@@ -301,8 +299,8 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
         if (!speech || !speech.started || speech.ended) return;
         speech.ended = true;
         speech.resolveEnded();
-        // The per-line echo tag ends with the line; restore the held emotion for listening.
-        this.applyEmotion();
+        // The per-line echo tag ends with the line; switch to the listening emotion.
+        this.applyEmotion(this.settings.listeningEmotion);
         this.callbacks.onConnectionStateChange?.("ready");
         this.callbacks.onSpeakEnd?.(speech.turnId);
       } else if (

@@ -30,6 +30,7 @@ export const streamingAvatarDefaults: StreamingAvatarSettings = {
     language: "French",
     maxDurationSeconds: 900,
     emotion: "sadness",
+    listeningEmotion: "neutral",
   },
 };
 
@@ -108,14 +109,19 @@ export function normalizeStreamingAvatarSettings(
       ...tavus,
       maxDurationSeconds: clamp(tavus.maxDurationSeconds, 60, 3_600, 900),
       emotion: normalizeTavusEmotion(tavus.emotion),
+      listeningEmotion: normalizeTavusEmotion(
+        tavus.listeningEmotion,
+        streamingAvatarDefaults.tavus.listeningEmotion,
+      ),
     },
   };
 }
 
-function normalizeTavusEmotion(value: unknown): TavusEmotion {
-  return TAVUS_EMOTIONS.includes(value as TavusEmotion)
-    ? (value as TavusEmotion)
-    : streamingAvatarDefaults.tavus.emotion;
+function normalizeTavusEmotion(
+  value: unknown,
+  fallback: TavusEmotion = streamingAvatarDefaults.tavus.emotion,
+): TavusEmotion {
+  return TAVUS_EMOTIONS.includes(value as TavusEmotion) ? (value as TavusEmotion) : fallback;
 }
 
 function clamp(value: unknown, min: number, max: number, fallback: number): number {

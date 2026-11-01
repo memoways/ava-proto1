@@ -39,8 +39,10 @@ export interface TavusAvatarSettings {
   personaId: string;
   language: string;
   maxDurationSeconds: number;
-  /** Held by the face while listening and speaking; Ava's characters are in distress. */
+  /** Face emotion while speaking (set_emotion + Echo tag); Ava's characters are in distress. */
   emotion: TavusEmotion;
+  /** Face emotion held while listening; sadness reads as pitiful, so closed and neutral by default. */
+  listeningEmotion: TavusEmotion;
 }
 
 export interface StreamingAvatarSettings {
