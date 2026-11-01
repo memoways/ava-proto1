@@ -140,4 +140,20 @@ describe("validateDirectorDecision", () => {
     expect(decision.action.type).toBe("handoff");
     if (decision.action.type === "handoff") expect(decision.action.targetCharacter).toBe("emma");
   });
+
+  it("blocks a cinematic outside the eligible list with the ineligible reason", () => {
+    const cinematic = {
+      labels: { themes: [], topics: [], intentions: [] },
+      nextTurnGuidance: null,
+      memoryDelta: null,
+      action: { type: "cinematic" as const, videoId: "video-1", reason: "pertinent", confidence: 0.8 },
+    };
+    const blocked = validateDirectorDecision(cinematic, { ...context, eligibleVideoIds: ["video-2"] });
+    expect(blocked.accepted).toBe(false);
+    expect(blocked.blockedReason).toBe("ineligible");
+    expect(blocked.action).toEqual({ type: "none" });
+    expect(validateDirectorDecision(cinematic, { ...context, eligibleVideoIds: ["video-1"] }).accepted).toBe(true);
+    // Without an eligibility list the historical guard is unchanged.
+    expect(validateDirectorDecision(cinematic, context).accepted).toBe(true);
+  });
 });

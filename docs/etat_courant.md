@@ -38,13 +38,14 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
-**Sélection vidéos, lot 1 livré le 1er novembre : données et synchronisation.**
-Migration additive `video_triggers` (`nature`, `characters`, `ai_description`) et mapping
-Notion dans `sync-notion` (vide → transformée, disponible pour tous). Aucun changement en
-partie. À vérifier après synchronisation Lovable : migration appliquée, puis une synchro
-vidéos renvoyant `video_metadata_synced: true`. Champs Notion à remplir par Ulrich.
+**Sélection vidéos, lot 2 livré le 1er novembre : filtre d'éligibilité déterministe.**
+`selectEligibleVideos` filtre avant le GM : film vu → transformées ; film pas vu → extraits
+d'abord, transformées après `MIN_EXTRACTS_BEFORE_CINEMATIC` (défaut 2) ; personnage en ligne,
+`intro` et déjà jouées exclues. Garde du directeur : motif `ineligible`. Lot 1 vérifié
+appliqué (migration + synchro, champs remplis). Recette humaine à faire par Ulrich : une
+partie film vu, une partie film pas vu. Prompts GM inchangés.
 [Plan](plan_selection_videos_contextuelle.md) ·
-[Prompt lot 2 « filtre d'éligibilité »](prompt_reprise_selection_videos_lot_2.md).
+[Prompt lot 3 « choix au sens »](prompt_reprise_selection_videos_lot_3.md).
 
 **G1.3 implémenté le 31 octobre : le passage à Emma n'est plus jeté, pause jamais répétée.**
 Recette d'Ulrich (session `e6918bd8…`) : le MJ avait validé « Je passe Emma » deux fois, mais

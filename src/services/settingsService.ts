@@ -1,5 +1,6 @@
 import { HANDS_FREE_DEFAULTS, normalizeHandsFreeSettings, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
 import defaultSettings from "@/config/settings.json";
+import { DEFAULT_MIN_EXTRACTS_BEFORE_CINEMATIC } from "@/services/videoEligibility";
 import { ELEVENLABS_EXPRESSIVE_MODEL, ELEVENLABS_MODEL_CAPABILITIES, normalizeElevenLabsModelId } from "../../supabase/functions/_shared/elevenLabsModels";
 import {
   deleteEnvironmentSetting,
@@ -610,6 +611,8 @@ export interface VideoTriggerSettings {
   MAX_PER_SESSION: number;
   /** Réservé : ne déclenche que si au moins N labels ont été extraits ce tour. */
   MIN_LABELS_REQUIRED: number;
+  /** Parcours « film pas vu » : extraits du film à montrer avant une vidéo transformée. */
+  MIN_EXTRACTS_BEFORE_CINEMATIC: number;
 }
 
 const VIDEO_TRIGGER_STORAGE_KEY = "ava_video_trigger_settings";
@@ -620,6 +623,7 @@ export const videoTriggerDefaults: VideoTriggerSettings = {
   MIN_TURNS_BETWEEN: 3,
   MAX_PER_SESSION: 0,
   MIN_LABELS_REQUIRED: 1,
+  MIN_EXTRACTS_BEFORE_CINEMATIC: DEFAULT_MIN_EXTRACTS_BEFORE_CINEMATIC,
 };
 
 export function getVideoTriggerSettings(): VideoTriggerSettings {

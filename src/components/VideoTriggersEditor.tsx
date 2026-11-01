@@ -142,6 +142,17 @@ function VideoTriggerRulesPanel() {
           />
           <p className="text-[10px] text-muted-foreground mt-1">Nombre min. de thèmes/sujets/intentions extraits du tour.</p>
         </div>
+
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Extraits avant une vidéo transformée</label>
+          <Input
+            type="number"
+            min={0}
+            value={settings.MIN_EXTRACTS_BEFORE_CINEMATIC}
+            onChange={(e) => update({ MIN_EXTRACTS_BEFORE_CINEMATIC: Math.max(0, Number(e.target.value) || 0) })}
+          />
+          <p className="text-[10px] text-muted-foreground mt-1">Parcours « film pas vu » : extraits du film montrés avant d'autoriser une vidéo transformée.</p>
+        </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
