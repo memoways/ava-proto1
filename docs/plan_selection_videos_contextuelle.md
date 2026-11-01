@@ -203,6 +203,68 @@ Comportement voulu par Ulrich :
 
 L'item « attendre la fin de la réplique avant de lancer la vidéo » du lot 5 est traité ici.
 
+**Exécution (2026-11-01, livré).**
+
+- Constat de départ, vérifié dans le code : le GM n'évalue un tour qu'**après la livraison
+  réelle** de la réplique (`runPostTurn` attend le reçu de livraison : seul le texte entendu
+  entre dans son journal). La décision cinématique arrive donc toujours après la fin du son,
+  souvent quand le joueur a déjà repris la parole en mains libres. L'ancien code lançait
+  alors la vidéo, et le blocage mains libres (`activeVideo`) abandonnait le tour du joueur
+  (`capture-interlude`) : c'est la gêne relevée. Le moment de l'appel GM n'a pas été changé
+  (invariant du lot : aucun changement du GM).
+- Machine d'état pure `src/services/cinematicTransition.ts` :
+  `idle → pending → fading_out → playing → closing → fading_in → idle`. Événements :
+  `decided` (conversation occupée ? joueur en train de parler ?), `turn_started`,
+  `conversation_idle`, `turn_abandoned`, `fade_out_done`, `video_ended` (completed, skipped,
+  error), `close_done`, `fade_in_done`, `skip`, `cancel`. Durées nommées :
+  `CINEMATIC_FADE_OUT_MS` 700 (personnage → noir), `CINEMATIC_REVEAL_MS` 400 (noir → vidéo),
+  `CINEMATIC_CLOSE_MS` 700 (vidéo → noir), `CINEMATIC_FADE_IN_MS` 800 (noir → personnage),
+  à ajuster en recette.
+- Règles : décision pendant un tour en cours → `pending`, écoute tenue, départ quand la
+  réplique a réellement fini ; décision quand personne ne parle → fondu immédiat ; décision
+  pendant que le joueur parle → `pending` **sans** tenir l'écoute (`deferrals: 1`) : son
+  énoncé devient un tour normal, la séquence est annoncée dès que ce tour démarre, puis jouée
+  à la fin de la réplique suivante. Si le joueur s'arrête sans produire de tour, elle part
+  au retour au calme. L'écoute est tenue de l'annonce jusqu'à la fin du retour en fondu.
+- `IndexPRD4` : la décision cinématique est lue dans un chemin dédié, enregistré avant la
+  lecture de la réplique ; le directeur d'après-tour ne traite plus que guidance, passage et
+  fin. Une seule garde `guardDirector` sert aux deux (mêmes règles : jamais rejouée, délai
+  entre vidéos, éligibilité). La vidéo est réservée dès la décision ; annulée avant d'être
+  vue (hors « Ignorer »), la réservation est rendue. La réplique n'est jamais interrompue :
+  `activeVideo` n'est posé qu'au début de la lecture, quand plus rien ne parle.
+- Écoute tenue (`cinematicHoldsInput`) : `processTurn`, transcriptions mains libres, fin de
+  parole, détecteur acoustique et appui-pour-parler refusent toute entrée ; à l'annonce, le
+  début d'énoncé entendu est oublié et une réplique suspendue par un candidat acoustique
+  reprend ; à la sortie, la transcription repart propre (`stt.resume()`). Le micro mains libres
+  est coupé pendant la vidéo par le blocage existant et réarmé pendant le retour en fondu
+  (`handsFreeNeedsRearm`, `handsFreeRecovery` inchangés). Délais de fin de parole et stratégie
+  d'interruption hors cinématique inchangés.
+- Visuel : voile noir unique (`data-testid="cinematic-veil"`, `data-phase`) au-dessus du
+  personnage et de la vidéo ; signe discret « Une séquence arrive… » avec « Ignorer » pendant
+  l'attente et le fondu. « Passer » reste le bouton du lecteur, seulement pendant la lecture ;
+  il ramène par le même fondu. Bouton parler désactivé et statut « Max répond » (sans
+  « tu peux l'interrompre ») pendant la tenue.
+- Annulations : « Ignorer » (attente) ou « Passer » ; fin de partie, raccrocher, passage à
+  l'autre personnage et réinitialisations (`cleanupAudio`, `cancel`) ; abandon du tour attendu
+  (`turn_abandoned`) ; erreur de lecture native du `<video>` ou format non pris en charge
+  (`onError` du lecteur → retour en fondu). **Limite :** une erreur fatale hls.js reste
+  seulement journalisée, comme avant ; le lecteur garde « Passer ».
+- Mesures, sans nouvelle table : `experience_events` `cinematic_recommended` (décision),
+  `cinematic_played` (début réel, `decisionToStartMs`, `deferrals`), `cinematic_skipped`
+  (`stage`, `outcome`), `cinematic_blocked` `transition_cancelled` (annulation avant lecture,
+  `reason`, `stage`) ; PostHog `prd4_video_announced`, `prd4_video_deferred`,
+  `prd4_video_cancelled`, `prd4_video_triggered` (`decision_to_start_ms`, `deferrals`).
+- Mode appui-pour-parler : appuyer pour parler avant la décision du GM rend son résultat
+  caduc (comportement existant, `new-user-turn`) ; aucune vidéo ne part alors pour ce tour.
+- Tests : `cinematicTransition.test.ts` (15 : transitions, annulations, report, tenue) ;
+  `ConversationScreen` (parler tenu), `GumletVideoPlayer` (`onError`) ; E2E `lot 3b` (décision
+  après la réplique, joueur silencieux ; mains libres, décision pendant que le joueur parle,
+  reportée, annoncée pendant la réplique suivante non coupée, puis jouée, micro réarmé ;
+  « Ignorer ») ; E2E cinématique HLS et endurance inchangés et verts.
+- Recette humaine d'Ulrich (sandbox) : une cinématique décidée pendant qu'il se tait, une
+  pendant qu'il parle déjà, « Passer » et « Ignorer » ; il juge la fluidité des fondus et la
+  justesse du report (question ouverte ci-dessous).
+
 ### Lot 4 — Description IA automatique
 
 - Fonction edge `describe-video` : analyse la vidéo et écrit « Description IA »
@@ -235,3 +297,5 @@ L'item « attendre la fin de la réplique avant de lancer la vidéo » du lot 5 
 - Ava et Léo ne sont pas encore appelables : les vidéos où ils figurent seuls
   devront être tagguées « Tous » pour être jouées.
 - Signification exacte de Type `interlude` face à `mid_conversation`.
+- Lot 3b : le report « à la fin de la réplique suivante » convient-il, ou la vidéo
+  devrait-elle partir dès que le joueur se tait ? Durées de fondu à ajuster en recette.

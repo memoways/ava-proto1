@@ -4,6 +4,26 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Sélection vidéos, lot 3b — transition cinématique] — 2026-11-01
+
+- La réplique du personnage n'est jamais coupée par une vidéo, ni le joueur qui parle :
+  machine d'état pure `cinematicTransition` (`idle → pending → fading_out → playing → closing
+  → fading_in`). Décision quand personne ne parle : fondu au noir, vidéo, fondu au noir,
+  retour en fondu sur le personnage. Décision pendant que le joueur parle (cas de la recette :
+  le GM juge la réplique livrée, donc après le son) : son tour est pris normalement, la vidéo
+  est annoncée pendant la réplique suivante et jouée à sa fin.
+- Écoute tenue de l'annonce au retour (aucun nouveau tour, aucune interruption), signe discret
+  « Une séquence arrive… » avec « Ignorer » ; micro mains libres réarmé après la vidéo.
+- Fondus en constantes nommées (700 / 400 / 700 / 800 ms). « Passer » garde le même retour.
+  Annulation propre : Ignorer, fin de partie, raccrocher, passage de personnage, tour
+  abandonné, erreur de lecture native (`onError` du lecteur ; hls.js fatal seulement journalisé).
+- Mesures sans nouvelle table : `cinematic_recommended`, `cinematic_played`
+  (`decisionToStartMs`, `deferrals`), annulations ; PostHog `prd4_video_announced`,
+  `prd4_video_deferred`, `prd4_video_cancelled`.
+- GM, règle de choix, filtre d'éligibilité et contrat JSON inchangés.
+  Plan : [sélection contextuelle](docs/plan_selection_videos_contextuelle.md) ·
+  [prompt lot 4](docs/prompt_reprise_selection_videos_lot_4.md).
+
 ## [Sélection vidéos, lot 3b préparé — transition cinématique] — 2026-11-01
 
 - Documentation seule. Recette d'Ulrich en sandbox-ulrich (v11) : choix des vidéos validé ;

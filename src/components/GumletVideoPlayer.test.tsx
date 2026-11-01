@@ -136,4 +136,17 @@ describe("GumletVideoPlayer", () => {
     fireEvent.ended(player);
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
+
+  it("reports one playback failure while shown, and none while hidden", () => {
+    const onError = vi.fn();
+    const url = "https://example.test/cinematic.mp4";
+    const { rerender } = render(<GumletVideoPlayer videoUrl={url} onComplete={() => {}} onSkip={() => {}} onError={onError} active={false} />);
+    const player = screen.getByTitle("Video player") as HTMLVideoElement;
+    fireEvent.error(player);
+    expect(onError).not.toHaveBeenCalled();
+    rerender(<GumletVideoPlayer videoUrl={url} onComplete={() => {}} onSkip={() => {}} onError={onError} active />);
+    fireEvent.error(player);
+    fireEvent.error(player);
+    expect(onError).toHaveBeenCalledTimes(1);
+  });
 });

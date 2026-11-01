@@ -105,6 +105,7 @@ async function installNetworkFakes(
     let gradiumIndex = 0;
     type E2ETestWindow = Window & {
       __e2eLongAudio?: boolean;
+      __e2eLongAudioMs?: number;
       __e2eAudioState?: { ended: number; paused: number };
       __e2eNativeVideoState?: { playing: boolean; playCount: number; pauseCount: number };
       __e2eSTTFinals?: number;
@@ -178,7 +179,7 @@ async function installNetworkFakes(
         }
 
         play() {
-          const durationMs = testWindow.__e2eLongAudio ? 1_200 : 10;
+          const durationMs = testWindow.__e2eLongAudioMs ?? (testWindow.__e2eLongAudio ? 1_200 : 10);
           this.onplaying?.();
           this.progressTimer = window.setInterval(() => this.ontimeupdate?.(), 100);
           this.endTimer = window.setTimeout(() => {
@@ -1192,6 +1193,151 @@ test("une cinématique HLS démarre automatiquement puis Passer coupe son média
     }).__e2eNativeVideoState;
     return Boolean(state && !state.playing && state.pauseCount > previousPauseCount);
   }, pauseCountBeforeSkip), { timeout: 5_000 }).toBe(true);
+});
+
+// ---- Lot 3b : transition cinématique -----------------------------------------
+const CINEMATIC_E2E_VIDEO_ID = "44444444-4444-4444-8444-444444444444";
+const audioState = (page: Page) => page.evaluate(() =>
+  (window as Window & { __e2eAudioState?: { ended: number; paused: number } }).__e2eAudioState ?? { ended: 0, paused: 0 });
+const nativeVideoPlaying = (page: Page) => page.evaluate(() =>
+  Boolean((window as Window & { __e2eNativeVideoState?: { playing: boolean } }).__e2eNativeVideoState?.playing));
+const veilPhase = (page: Page) => page.getByTestId("cinematic-veil").getAttribute("data-phase");
+
+test("lot 3b : décision après la réplique, joueur silencieux — fondu au noir, vidéo, Passer puis retour et micro rendu", async ({ page }) => {
+  test.setTimeout(60_000);
+  const transcripts = ["Parle-moi de Max.", "Que sais-tu au sujet d'Ava ?", "Montre-moi le souvenir familial.", "Et après ce souvenir ?"];
+  const fakes = await installNetworkFakes(page, transcripts, { triggerVideoAtLabel: 3, ttsSuccess: true });
+  await startCharacterConversation(page, "Max");
+  let endedBeforeReply = 0;
+  for (let turn = 1; turn <= 3; turn += 1) {
+    await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+    await expect(page.getByText(transcripts[turn - 1], { exact: false })).toBeVisible();
+    if (turn === 3) {
+      endedBeforeReply = (await audioState(page)).ended;
+      await page.evaluate(() => { (window as Window & { __e2eLongAudioMs?: number }).__e2eLongAudioMs = 1_500; });
+    }
+    await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+  }
+
+  // The GM judges the delivered reply: the whole reply plays first, never cut.
+  const skipVideo = page.getByRole("button", { name: /Passer/ });
+  await expect(skipVideo).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => nativeVideoPlaying(page), { timeout: 5_000 }).toBe(true);
+  const audio = await audioState(page);
+  expect(audio.paused).toBe(0);
+  expect(audio.ended).toBeGreaterThan(endedBeforeReply);
+  expect(await veilPhase(page)).toBe("playing");
+  await expect(page.getByTestId("cinematic-announced")).toHaveCount(0);
+
+  // « Passer » fades to black then back to Max; listening reopens only after the fade-in.
+  await page.evaluate(() => { (window as Window & { __e2eLongAudioMs?: number }).__e2eLongAudioMs = 10; });
+  await skipVideo.click();
+  await expect.poll(() => veilPhase(page)).toMatch(/closing|fading_in/);
+  await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeDisabled();
+  await expect.poll(() => veilPhase(page), { timeout: 5_000 }).toBe("idle");
+  await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
+  await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+  await expect(page.getByText(transcripts[3], { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+  await expect.poll(fakes.getTtsText).toContain("Réponse de Max pour le tour 4.");
+
+  const played = fakes.getExperienceEvents().find((event) => event.event_type === "cinematic_played");
+  expect(played?.payload).toMatchObject({ videoId: CINEMATIC_E2E_VIDEO_ID, deferrals: 0 });
+  // Decision → video start includes the named fade to black.
+  expect(Number(played?.payload.decisionToStartMs)).toBeGreaterThanOrEqual(600);
+  expect(fakes.getExperienceEvents().map((event) => event.event_type)).toEqual(expect.arrayContaining(["cinematic_recommended", "cinematic_skipped"]));
+});
+
+/**
+ * Hands-free: Max answers turn 3, then the player keeps speaking while the GM
+ * decides. Returns once the cinematic was recommended during that speech.
+ */
+async function speakWhileGmDecides(page: Page, fakes: Awaited<ReturnType<typeof installNetworkFakes>>) {
+  const recognize = (text: string) => page.evaluate(value =>
+    (window as Window & { __e2eRecognize?: (text: string) => void }).__e2eRecognize?.(value), text);
+  await startCharacterConversation(page, "Max");
+  await page.getByRole("button", { name: "Activer le micro" }).click();
+  await expect.poll(fakes.getGmPostTurnCount, { timeout: 10_000 }).toBe(1);
+  for (const [index, text] of ["Que sais-tu au sujet d'Ava ?", "Montre-moi le souvenir familial."].entries()) {
+    await expect(page.getByRole("status")).toHaveText(/À l'écoute/, { timeout: 10_000 });
+    await recognize(text);
+    await expect.poll(fakes.getGmPostTurnCount, { timeout: 10_000 }).toBe(index + 2);
+  }
+  await expect.poll(fakes.getMaxTurnCount, { timeout: 10_000 }).toBe(3);
+  await expect(page.getByRole("status")).toHaveText(/À l'écoute/, { timeout: 10_000 });
+  const words = ["Je", "continue", "à", "parler", "de", "ce", "souvenir", "pendant", "que", "tu", "réfléchis", "encore", "un", "peu", "plus"];
+  const recommended = () => fakes.getExperienceEvents().some((event) => event.event_type === "cinematic_recommended");
+  let spoken = 0;
+  while (!recommended() && spoken < words.length - 1) {
+    spoken += 1;
+    await recognize(words.slice(0, spoken).join(" "));
+    await page.waitForTimeout(300);
+  }
+  expect(recommended()).toBe(true);
+  // Next reply lasts long enough to observe the announcement while Max speaks.
+  await page.evaluate(() => { (window as Window & { __e2eLongAudioMs?: number }).__e2eLongAudioMs = 3_000; });
+  await recognize(words.slice(0, spoken + 1).join(" "));
+  // Decided while the player speaks: no video, no sign, the player is not cut.
+  await expect(page.getByTestId("cinematic-announced")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Passer/ })).toHaveCount(0);
+  expect(await nativeVideoPlaying(page)).toBe(false);
+  expect(fakes.getMaxTurnCount()).toBe(3);
+  return words.slice(0, 3).join(" ");
+}
+
+test("lot 3b : mains libres, décision pendant que le joueur parle — reportée, annoncée pendant la réplique suivante, puis jouée", async ({ page }) => {
+  test.setTimeout(90_000);
+  const fakes = await installNetworkFakes(page, ["Parle-moi de Max.", ""], { handsFree: true, p2: true, ttsSuccess: true,
+    triggerVideoAtLabel: 3, delayGmMs: 1_500 });
+  const spokenPrefix = await speakWhileGmDecides(page, fakes);
+
+  // The utterance becomes turn 4: the cinematic is announced while Max answers it, uncut.
+  await expect.poll(fakes.getMaxTurnCount, { timeout: 10_000 }).toBe(4);
+  expect(fakes.getCharacterCalls()[3]).toContain(spokenPrefix);
+  const announced = page.getByTestId("cinematic-announced");
+  await expect(announced).toBeVisible({ timeout: 10_000 });
+  expect(await veilPhase(page)).toBe("pending");
+  const endedAtAnnouncement = (await audioState(page)).ended;
+  expect(await nativeVideoPlaying(page)).toBe(false);
+
+  const skipVideo = page.getByRole("button", { name: /Passer/ });
+  await expect(skipVideo).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => nativeVideoPlaying(page), { timeout: 5_000 }).toBe(true);
+  const audio = await audioState(page);
+  expect(audio.paused).toBe(0);
+  expect(audio.ended).toBeGreaterThan(endedAtAnnouncement);
+  const played = fakes.getExperienceEvents().find((event) => event.event_type === "cinematic_played");
+  expect(played?.payload).toMatchObject({ videoId: CINEMATIC_E2E_VIDEO_ID, deferrals: 1 });
+
+  // After the video the microphone is re-armed and listening again.
+  await page.evaluate(() => { (window as Window & { __e2eLongAudioMs?: number }).__e2eLongAudioMs = 10; });
+  await skipVideo.click();
+  await expect.poll(() => veilPhase(page), { timeout: 5_000 }).toBe("idle");
+  await expect(page.getByRole("status")).toHaveText(/À l'écoute/, { timeout: 10_000 });
+  await expect(page.getByRole("button", { name: "Couper le micro" })).toBeVisible();
+});
+
+test("lot 3b : mains libres, Ignorer annule la séquence annoncée sans la jouer ni couper la réplique", async ({ page }) => {
+  test.setTimeout(90_000);
+  const fakes = await installNetworkFakes(page, ["Parle-moi de Max.", ""], { handsFree: true, p2: true, ttsSuccess: true,
+    triggerVideoAtLabel: 3, delayGmMs: 1_500 });
+  await speakWhileGmDecides(page, fakes);
+
+  const announced = page.getByTestId("cinematic-announced");
+  await expect(announced).toBeVisible({ timeout: 10_000 });
+  const endedAtAnnouncement = (await audioState(page)).ended;
+  await announced.getByRole("button", { name: "Ignorer" }).click();
+  await expect(announced).toHaveCount(0);
+  await expect.poll(async () => (await audioState(page)).ended, { timeout: 10_000 }).toBeGreaterThan(endedAtAnnouncement);
+  expect((await audioState(page)).paused).toBe(0);
+  await expect(page.getByRole("status")).toHaveText(/À l'écoute/, { timeout: 10_000 });
+  await expect(page.getByRole("button", { name: /Passer/ })).toHaveCount(0);
+  expect(await nativeVideoPlaying(page)).toBe(false);
+  expect(await veilPhase(page)).toBe("idle");
+  const skipped = fakes.getExperienceEvents().find((event) => event.event_type === "cinematic_skipped");
+  expect(skipped?.payload).toMatchObject({ videoId: CINEMATIC_E2E_VIDEO_ID, skipped: true, stage: "pending" });
+  expect(fakes.getExperienceEvents().some((event) => event.event_type === "cinematic_played")).toBe(false);
 });
 
 test("parcours PRD4 heureux avec trois tours de conversation", async ({ page }) => {

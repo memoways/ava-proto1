@@ -38,6 +38,15 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Sélection vidéos, lot 3b livré le 1er novembre (code) : transition cinématique.**
+La vidéo ne coupe plus ni la réplique ni le joueur : le GM décide après la réplique livrée ;
+personne ne parle → fondu au noir, vidéo, retour en fondu ; le joueur parle → son tour est
+pris, la séquence est annoncée pendant la réplique suivante (écoute tenue, « Ignorer »), puis
+jouée. Machine `cinematicTransition`, fondus 700/400/700/800 ms. Recette humaine à faire par
+Ulrich en sandbox : vidéo décidée en silence, pendant qu'il parle, « Passer » et « Ignorer ».
+Aucune publication. [Plan](plan_selection_videos_contextuelle.md#lot-3b--transition-cinématique-demande-dulrich-2026-11-01) ·
+[Prompt lot 4 « Description IA automatique »](prompt_reprise_selection_videos_lot_4.md).
+
 **Sélection vidéos, lot 3 livré le 1er novembre (code) : choix au sens.**
 Bloc vidéos du GM avec Contexte et Description (ou Description IA), 300 caractères chacun ;
 règle du code : contexte d'abord, un thème seul ne suffit plus. `videoTriggerMatcher.ts`
@@ -47,8 +56,7 @@ nouveau brouillon depuis l'admin de l'aperçu Lovable puis « Publier » —
 [procédure](prompt_gm_publie_regle_videos_lot_3.md). Recette humaine : film vu, film pas
 vu, vidéo pertinente au fil de la conversation.
 Recette d'Ulrich (sandbox-ulrich, v11 publiée) : choix validé ; la cinématique arrive
-pendant qu'il répond → lot 3b « transition cinématique » (réplique jamais coupée, écoute
-suspendue, fondu au noir, vidéo, retour en fondu), à faire avant le lot 4.
+pendant qu'il répond → lot 3b « transition cinématique », livré (voir ci-dessus).
 [Plan](plan_selection_videos_contextuelle.md) ·
 [Prompt lot 3b](prompt_reprise_selection_videos_lot_3b.md) ·
 [Prompt lot 4 « Description IA automatique »](prompt_reprise_selection_videos_lot_4.md).
