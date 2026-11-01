@@ -13,8 +13,10 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   thème commun ne suffit plus, un contexte clair suffit ; null si rien ne correspond. Consigne
   finale du message GM alignée. Contrat JSON inchangé ; filtre d'éligibilité du lot 2 intact.
 - Prompt GM publié (sandbox-ulrich v7, prod v8, sandbox-julien v9, même texte) lu via Lovable :
-  texte de remplacement prêt, **non publié** —
-  [prompt GM publié, lot 3](docs/prompt_gm_publie_regle_videos_lot_3.md).
+  **non publié** ; un « Nouveau brouillon » en admin le régénère depuis le prompt du code —
+  [procédure](docs/prompt_gm_publie_regle_videos_lot_3.md).
+- Correctif : la ligne « Cinématiques » du constructeur de prompt admin ne dit plus
+  « lorsqu'un thème correspond » mais suit le choix au sens.
 - `videoTriggerMatcher.ts` supprimé (code mort, logique par mots-clés contraire au lot).
 - Bloc vidéos mesuré sur le catalogue réel : pire cas 1 633 → 3 076 caractères (film vu, Max).
   Plan : [sélection contextuelle](docs/plan_selection_videos_contextuelle.md) ·

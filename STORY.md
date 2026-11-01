@@ -14,8 +14,8 @@ conversation, et n'importe quelle vidéo marquée « secrets » partait. Il voit
 chaque vidéo autorisée, le Contexte écrit par Ulrich — à quel moment de l'histoire elle prend
 son sens — et ce qu'elle montre. Il choisit d'abord sur ce contexte ; un thème commun ne
 suffit plus, et sans rapprochement clair il ne lance rien. Le prompt GM publié en admin
-garde encore l'ancienne règle : le texte de remplacement est prêt, sa publication revient à
-Ulrich. Description IA, rédigée automatiquement, viendra au lot 4.
+garde encore l'ancienne règle : il suffit d'en créer un nouveau brouillon depuis l'admin, qui reprend
+la règle du code ; sa publication revient à Ulrich. Description IA, rédigée automatiquement, viendra au lot 4.
 
 ## Sélection vidéos, lot 2 — la bonne vidéo pour le bon parcours (1er novembre 2026)
 

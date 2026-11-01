@@ -28,7 +28,7 @@ remote `https://github.com/memoways/ava-proto1`). Réponds en français.
   si elle est remplie, sinon Description IA, plafonnée à 300 caractères. Dès qu'une
   Description IA existe, elle atteint le GM sans autre changement de code.
 - Règle GM « choix au sens » dans le prompt du code. Prompt publié
-  (sandbox-ulrich v7, prod v8, sandbox-julien v9) : remplacement préparé dans
+  (sandbox-ulrich v7, prod v8, sandbox-julien v9) : procédure (nouveau brouillon généré depuis le code) dans
   `docs/prompt_gm_publie_regle_videos_lot_3.md`, publication admin à la main
   d'Ulrich. Vérifie par Lovable (lecture seule) s'il l'a publié ; ne publie rien.
 - Modèle « Gemini 2.5 Flash » : les Edge Functions l'appellent **via OpenRouter**
