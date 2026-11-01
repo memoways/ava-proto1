@@ -38,6 +38,15 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Sélection vidéos, lot 4 livré le 1er novembre (code) : Description IA automatique.**
+Edge Function `describe-video` (admin) : Gemini 2.5 Flash regarde le rendu 360p Gumlet
+(MP4 fragmenté, base64) et écrit **seulement** « Description IA » dans Notion puis
+`ai_description` ; Description humaine jamais lue ni écrite. Admin : « Analyser » par vidéo et
+« Analyser les vidéos sans description ». Aucune analyse réelle lancée : Ulrich analyse une
+vidéo de test, relecture, puis le reste. Prompt GM : sandbox-ulrich v11 porte la règle ; prod
+v8, sandbox-julien v9 inchangés. [Plan](plan_selection_videos_contextuelle.md#lot-4--description-ia-automatique) ·
+[Prompt lot 5 « lecture et mémoire »](prompt_reprise_selection_videos_lot_5.md).
+
 **Sélection vidéos, lot 3b livré le 1er novembre (code) : transition cinématique.**
 La vidéo ne coupe plus ni la réplique ni le joueur : le GM décide après la réplique livrée ;
 personne ne parle → fondu au noir, vidéo, retour en fondu ; le joueur parle → son tour est

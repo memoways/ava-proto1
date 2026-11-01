@@ -1,10 +1,10 @@
 # Plan — sélection contextuelle des vidéos
 
-Date : 2026-11-01. Statut : lots 1 (données), 2 (filtre d'éligibilité) et 3 (choix au sens,
-code) livrés ; règle publiée en sandbox-ulrich (v11) et validée par Ulrich, prod et
-sandbox-julien inchangés ; lot 3b (transition cinématique) à démarrer
-([prompt lot 3b](prompt_reprise_selection_videos_lot_3b.md)), puis lot 4
-([prompt lot 4](prompt_reprise_selection_videos_lot_4.md)).
+Date : 2026-11-01. Statut : lots 1 (données), 2 (filtre d'éligibilité), 3 (choix au sens),
+3b (transition cinématique) et 4 (Description IA, code) livrés ; règle GM publiée en
+sandbox-ulrich (v11), prod (v8) et sandbox-julien (v9) inchangés. Première analyse réelle à
+faire par Ulrich en admin ; lot 5 (lecture et mémoire) préparé
+([prompt lot 5](prompt_reprise_selection_videos_lot_5.md)).
 Source : analyse de la mécanique vidéo (session du 2026-11-01) et décisions d'Ulrich.
 
 ## État actuel (résumé)
@@ -298,6 +298,56 @@ transition « fonctionne bien ». Trois retouches demandées et livrées :
 - Consigne de l'analyse : décrire objectivement ce qu'on voit (personnages,
   lieu, actions, ambiance), sans interprétation narrative.
 
+**Étape 0 — faisabilité (2026-11-01, avant le code).**
+
+- Modèle : `GET https://openrouter.ai/api/v1/models` déclare pour `google/gemini-2.5-flash`
+  les entrées `text, image, file, audio, video` (0,30 $/M jetons en entrée, 2,50 $/M en
+  sortie), seul fournisseur Google AI Studio. Documentation OpenRouter (vidéos) : partie
+  `video_url` de Chat Completions, URL ou donnée base64 ; **Gemini sur AI Studio n'accepte en
+  URL que YouTube**, donc base64 obligatoire ; formats `video/mp4`, `video/mpeg`, `video/mov`,
+  `video/webm`. Limite d'une requête Gemini en ligne : environ 20 Mo. Aucune passerelle Lovable
+  AI dédiée n'est utilisée par le projet (OpenRouter, `OPENROUTER_API_KEY` côté serveur).
+- Gumlet (accès public, sans clé) : `video.gumlet.io/<collection>/<asset>/main.m3u8` répond
+  200 ; `download.mp4`, `main.mp4`, `360p.mp4`… répondent 403/401 (aucun MP4 public) ;
+  `thumbnail-1-0.png` donne une seule vignette (insuffisant). Chaque rendu HLS est **un seul
+  MP4 fragmenté** adressé par plages d'octets (`EXT-X-MAP` + `EXT-X-BYTERANGE`, jeton signé
+  dans la playlist) : téléchargé sans plage, c'est la piste vidéo complète, sans le son
+  (piste audio séparée). Vérifié sur les 17 vidéos : 8 à 65 s, 121 Ko à 3,5 Mo en 360p
+  (4,7 Mo en base64 au pire), tout sous la limite.
+- Coût estimé (non mesuré, aucune clé hors serveur) : environ 258 jetons par seconde de
+  vidéo, soit ≈ 17 000 jetons (≈ 0,5 centime) pour la plus longue (65 s), ≈ 80 000 jetons
+  (≈ 3 centimes) pour tout le catalogue (≈ 330 s). Coût et latence réels : renvoyés par
+  `describe-video` (`usage`, `latency_ms`) à la première analyse.
+- Voie retenue : Edge Function → master → rendu 360p → fichier MP4 → base64 → OpenRouter.
+
+**Exécution (2026-11-01, livré).**
+
+- Module pur `supabase/functions/_shared/videoDescription.ts` : `gumletAssetId`,
+  `pickAnalysisVariant` (plus petit rendu ≥ 360p, sinon le plus grand), `variantMediaFileUrl`
+  (refuse les playlists à segments distincts), `buildDescribeVideoRequest`,
+  `VIDEO_DESCRIPTION_PROMPT`, `normalizeAiDescription` (une ligne, 300 caractères coupés au
+  mot), `buildAiDescriptionNotionPatch` et `assertOnlyAiDescription` (« Description IA »
+  seule ; Description refusée en premier), `parseDescribeVideoBody`, `selectVideosToDescribe`.
+- Edge Function `describe-video` : `requireAdmin` avant toute lecture ; URL Gumlet lue dans
+  `video_triggers` par `notion_id` (colonnes `notion_id, video_url` seulement : Description
+  jamais lue) ; vidéo > 12 Mo refusée (413) ; réponse vide → 502 sans écriture ; PATCH Notion
+  « Description IA » puis miroir `ai_description`. Pas d'entrée `config.toml` : JWT vérifié
+  par défaut, comme `update-notion-video` (non utilisé ni étendu).
+- Consigne : séquence sans le son ; personnages (apparence, attitude), lieu, actions, lumière
+  et ambiance ; français, présent, une ou deux phrases, 300 caractères ; seulement le visible,
+  aucune interprétation narrative ni intention prêtée ni nom propre deviné. Le titre et le
+  Contexte ne sont pas envoyés (ils orienteraient l'analyse).
+- Éditeur admin (`VideoTriggersEditor`) : « Analyser » par vidéo ; « Analyser les vidéos sans
+  description (n) » avec confirmation, séquentiel, progression ; interrupteur « Réanalyser les
+  Descriptions IA existantes » (une vidéo à Description humaine n'est jamais prise en lot, le
+  bouton par vidéo reste possible et n'écrit toujours que Description IA).
+- Tests : `videoDescription.test.ts` (16), `describeVideoEndpoint.test.ts` (7) ; résolution
+  Gumlet du module vérifiée en direct sur les 17 vidéos.
+- **Analyse réelle non lancée** (écriture Notion, appel admin) : Ulrich analyse d'abord une
+  vidéo courte (par exemple « Emma regard feu avec Max », 9 s), on relit le texte dans
+  Notion et l'admin, puis le reste par « Analyser les vidéos sans description ». Les vidéos
+  analysées seront listées dans le compte rendu de cette recette.
+
 ### Lot 5 — Lecture et mémoire
 
 - (Traité au lot 3b : la vidéo attend la fin de la réplique.)
@@ -318,5 +368,7 @@ transition « fonctionne bien ». Trois retouches demandées et livrées :
 - Ava et Léo ne sont pas encore appelables : les vidéos où ils figurent seuls
   devront être tagguées « Tous » pour être jouées.
 - Signification exacte de Type `interlude` face à `mid_conversation`.
+- Lot 4 : la consigne d'analyse produit-elle des descriptions assez parlantes pour le GM ?
+  À juger sur les premières Descriptions IA ; ajuster `VIDEO_DESCRIPTION_PROMPT` si besoin.
 - Lot 3b : le report « à la fin de la réplique suivante » convient-il, ou la vidéo
   devrait-elle partir dès que le joueur se tait ? Durées de fondu à ajuster en recette.

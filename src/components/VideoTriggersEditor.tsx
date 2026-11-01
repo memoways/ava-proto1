@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Pencil, Save, X, RefreshCw, ExternalLink, Settings as SettingsIcon } from "lucide-react";
+import { Pencil, Save, X, RefreshCw, ExternalLink, Settings as SettingsIcon, Sparkles } from "lucide-react";
 import {
   listVideoTriggers,
   updateVideoTriggerOnNotion,
+  describeVideoWithAi,
   type VideoTriggerRow,
   type UpdateVideoTriggerPatch,
 } from "@/services/videoTriggerService";
@@ -28,6 +29,7 @@ import {
   loadVideoSyncHistory,
   type VideoSyncRunSummary,
 } from "@/services/videoSyncHistory";
+import { selectVideosToDescribe } from "../../supabase/functions/_shared/videoDescription";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 
@@ -293,6 +295,9 @@ export default function VideoTriggersEditor() {
   const [draft, setDraft] = useState<Partial<VideoTriggerRow>>({});
   const [newTheme, setNewTheme] = useState("");
   const [history, setHistory] = useState<CinematicEventRow[]>([]);
+  const [describingId, setDescribingId] = useState<string | null>(null);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [reanalyze, setReanalyze] = useState(false);
 
   const fetchTriggers = useCallback(async () => {
     setLoading(true);
@@ -371,6 +376,40 @@ export default function VideoTriggersEditor() {
     }
   }
 
+  async function describeOne(t: VideoTriggerRow): Promise<boolean> {
+    if (!t.notion_id) return false;
+    setDescribingId(t.id);
+    try {
+      const result = await describeVideoWithAi(t.notion_id);
+      setTriggers((rows) => rows.map((row) => (row.id === t.id ? { ...row, ai_description: result.ai_description } : row)));
+      toast.success(`Description IA écrite : ${t.title}`);
+      return true;
+    } catch (err) {
+      toast.error(`Analyse impossible (${t.title}) : ${(err as Error).message}`);
+      return false;
+    } finally {
+      setDescribingId(null);
+    }
+  }
+
+  const toDescribe = selectVideosToDescribe(triggers, { reanalyze });
+
+  async function describeMissing() {
+    if (toDescribe.length === 0) return;
+    const message = `Analyser ${toDescribe.length} vidéo(s) ? Seule « Description IA » sera écrite dans Notion.`;
+    if (!window.confirm(message)) return;
+    setBulkProgress({ done: 0, total: toDescribe.length });
+    let written = 0;
+    for (const [index, video] of toDescribe.entries()) {
+      if (await describeOne(video)) written += 1;
+      setBulkProgress({ done: index + 1, total: toDescribe.length });
+    }
+    setBulkProgress(null);
+    toast.success(`${written}/${toDescribe.length} Description(s) IA écrite(s)`);
+  }
+
+  const busy = describingId !== null || bulkProgress !== null;
+
   if (loading) return <p className="text-sm text-muted-foreground">Chargement des triggers…</p>;
 
   return (
@@ -389,6 +428,26 @@ export default function VideoTriggersEditor() {
         <Button variant="outline" size="sm" onClick={fetchTriggers}>
           <RefreshCw className="h-3 w-3 mr-1" /> Refresh
         </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border rounded p-3 bg-muted/5">
+        <div className="text-xs text-muted-foreground max-w-xl">
+          <strong>Description IA</strong> : Gemini regarde la vidéo (sans le son) et décrit ce qu'on voit.
+          Écrit seulement « Description IA » dans Notion ; la Description humaine n'est jamais lue ni écrasée,
+          et reste prioritaire pour le GM.
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Switch checked={reanalyze} onCheckedChange={setReanalyze} disabled={busy} />
+            Réanalyser les Descriptions IA existantes
+          </label>
+          <Button size="sm" variant="outline" onClick={describeMissing} disabled={busy || toDescribe.length === 0}>
+            <Sparkles className="h-3 w-3 mr-1" />
+            {bulkProgress
+              ? `Analyse ${bulkProgress.done}/${bulkProgress.total}…`
+              : `Analyser les vidéos sans description (${toDescribe.length})`}
+          </Button>
+        </div>
       </div>
 
       {triggers.length === 0 && (
@@ -514,9 +573,20 @@ export default function VideoTriggersEditor() {
                   </a>
                 )}
               </div>
-              <Button variant="ghost" size="sm" onClick={() => startEdit(t)}>
-                <Pencil className="h-3 w-3 mr-1" /> Éditer
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void describeOne(t)}
+                  disabled={busy || !t.notion_id || !t.video_url}
+                >
+                  <Sparkles className={`h-3 w-3 mr-1 ${describingId === t.id ? "animate-pulse" : ""}`} />
+                  {describingId === t.id ? "Analyse…" : "Analyser"}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => startEdit(t)}>
+                  <Pencil className="h-3 w-3 mr-1" /> Éditer
+                </Button>
+              </div>
             </div>
             <div className="flex flex-wrap gap-1 mt-2">
               {(t.themes ?? []).map((tag) => (
@@ -526,6 +596,7 @@ export default function VideoTriggersEditor() {
             </div>
             {t.context && <p className="text-xs text-muted-foreground mt-2"><strong>Contexte :</strong> {t.context}</p>}
             {t.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2"><strong>Description :</strong> {t.description}</p>}
+            {t.ai_description && <p className="text-xs text-muted-foreground mt-1 line-clamp-3"><strong>Description IA :</strong> {t.ai_description}</p>}
             {t.video_url && <p className="text-xs text-muted-foreground mt-1 truncate">🔗 {t.video_url}</p>}
             <p className="mt-1 text-[11px] text-muted-foreground">Synchronisé : {t.updated_at ? new Date(t.updated_at).toLocaleString("fr-FR") : "date inconnue"}</p>
           </div>
