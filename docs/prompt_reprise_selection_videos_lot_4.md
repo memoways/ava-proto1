@@ -15,11 +15,17 @@ remote `https://github.com/memoways/ava-proto1`). Réponds en français.
 3. Lis le plan `docs/plan_selection_videos_contextuelle.md` (sections « Décisions
    d'Ulrich », « Lot 3 — Exécution », « Lot 4 » et « Non-régression »).
 
-## 2. État vérifié à la fin du lot 3 (2026-11-01)
+## 2. État vérifié à la fin du lot 3b (2026-11-01)
 
-À lancer après le lot 3b (transition cinématique, `docs/prompt_reprise_selection_videos_lot_3b.md`) ;
-relis son compte rendu et le plan pour l'état à jour.
-
+- Lots 1, 2, 3 et 3b livrés sur main (PR #128 à #132, puis la PR du lot 3b ; SHA final dans
+  son compte rendu et dans le plan). Lot 3b, transition cinématique : machine d'état pure
+  `src/services/cinematicTransition.ts` pilotée par `src/pages/IndexPRD4.tsx` ; la vidéo ne
+  coupe plus la réplique ni le joueur ; fondus nommés (700/400/700/800 ms) ; écoute tenue de
+  l'annonce au retour ; mesures `cinematic_recommended`, `cinematic_played`
+  (`decisionToStartMs`, `deferrals`) dans `experience_events`. Le GM juge la réplique livrée :
+  sa décision arrive après le son. Recette humaine du lot 3b (fondus, report) à la main
+  d'Ulrich : relis le plan, section « Lot 3b — Exécution », et ses retours éventuels avant
+  de toucher à la lecture. Ce lot 4 ne modifie ni la transition ni le lecteur.
 
 - `video_triggers` : 17 vidéos, `nature` et `characters` remplis ; `context` de 28
   à 600 caractères ; `description` et `ai_description` **vides partout** (chaînes
@@ -86,7 +92,7 @@ plan, et donner à Ulrich une seule décision à prendre.
 2. Mets à jour CHANGELOG, STORY, `docs/etat_courant.md` et le plan (lot 4 livré, ou
    constat de faisabilité si arrêt à l'étape 0).
 3. Écris le prompt du lot 5, `docs/prompt_reprise_selection_videos_lot_5.md`
-   (lecture et mémoire : vidéo qui coupe la voix, contexte post-vidéo au-delà de
+   (lecture et mémoire — la vidéo qui coupait la voix est traitée au lot 3b — : contexte post-vidéo au-delà de
    500 caractères, mémoire des vidéos vues). Il doit être autonome, sur ce modèle,
    et inclure la même obligation de livraison et de prompt suivant. Si aucun lot ne
    suit, le dire explicitement.

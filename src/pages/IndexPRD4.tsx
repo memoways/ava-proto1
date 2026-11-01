@@ -52,6 +52,18 @@ import {
 } from "@/services/settingsService";
 import { withTimeout } from "@/services/asyncUtils";
 import {
+  CINEMATIC_IDLE,
+  cinematicDroppedBeforePlayback,
+  cinematicHoldsInput,
+  cinematicPhaseDurationMs,
+  cinematicShowsVideo,
+  cinematicTransitionStep,
+  cinematicVeilOpacity,
+  cinematicVeilTransitionMs,
+  type CinematicTransitionEvent,
+  type CinematicTransitionState,
+} from "@/services/cinematicTransition";
+import {
   buildVoiceTurnCompletedPayload,
   createVoiceTurnId,
   recordVoiceTurnCompleted,
@@ -144,8 +156,8 @@ import {
   toCharacterExecutionContext,
   type CharacterExecutionContext,
 } from "@/services/characterIdentityGuard";
-import { appendExperienceEvent, applyTopicHandoffFallback, validateDirectorDecision } from "@/services/experienceDirector";
-import type { ExperienceDirectorDecisionV1, RuntimeCharacter } from "@/types";
+import { appendExperienceEvent, applyTopicHandoffFallback, validateDirectorDecision, type GuardedDirectorDecision } from "@/services/experienceDirector";
+import type { ExperienceDirectorDecisionV1, PRD4PostTurnEvaluation, RuntimeCharacter } from "@/types";
 import { createAcousticInterruptionController, recognizedWordsChanged, withoutRejectedPrefix, endOfSpeechDelayMs, normalizeHandsFreeSettings, shouldBargeIn, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
 import { createMicRecoveryPolicy, isMicSilentlyDead, MIC_WATCHDOG_STRIKES } from "@/services/handsFreeRecovery";
 import { characterRecallGreeting, characterHandoffGreeting, characterRecoveryLine, createInitialGreetingSelector, greetingDelivery } from '@/services/characterConversationContinuity';
@@ -356,6 +368,15 @@ const IndexPRD4 = () => {
   const onboardingStartedAtRef = useRef<number | null>(null);
   const firstMaxResponseAtRef = useRef<number | null>(null);
   const cinematicPlayerRef = useRef<GumletVideoPlayerHandle | null>(null);
+  // Lot 3b: a validated cinematic waits for the reply to end, holds player input
+  // from its announcement on, then fades through black (see cinematicTransition).
+  const [cinematic, setCinematic] = useState<CinematicTransitionState<VideoTriggerRow>>(CINEMATIC_IDLE);
+  const cinematicRef = useRef<CinematicTransitionState<VideoTriggerRow>>(CINEMATIC_IDLE);
+  const cinematicMetaRef = useRef<{ turnId: string; turnIndex: number; reason: string | null; confidence: number | null;
+    orchestrationVersionId: string | null; previousLastVideoTurn: number } | null>(null);
+  const audioStateRef = useRef<AudioState>(state.audioState);
+  audioStateRef.current = state.audioState;
+  const dispatchCinematicRef = useRef<(event: CinematicTransitionEvent<VideoTriggerRow>, reason?: string) => void>(() => {});
 
 
 
@@ -427,6 +448,7 @@ const IndexPRD4 = () => {
   const cleanupAudio = useCallback(() => {
     callGenerationRef.current += 1;
     handoffCoordinatorRef.current.invalidate();
+    dispatchCinematicRef.current({ type: "cancel" }, "experience_cleanup");
     cinematicPlayerRef.current?.stop();
     callPreparationRef.current = null;
     if (micRecoveryTimerRef.current) window.clearTimeout(micRecoveryTimerRef.current);
@@ -1026,6 +1048,7 @@ const IndexPRD4 = () => {
     gmTopicsCoveredRef.current = latestGm?.topics_covered ?? [];
     endedRef.current = false;
     isProcessingRef.current = false;
+    dispatchCinematicRef.current({ type: "cancel" }, "reset");
     setActiveVideo(null);
     setSessionDurationSeconds(configuredDurationSeconds);
     timer.reset(remainingSeconds);
@@ -1162,6 +1185,7 @@ const IndexPRD4 = () => {
     pendingEmotionalStateRef.current = null;
     gmTopicsCoveredRef.current = [];
     setSelectedCharacter(startingCharacter);
+    dispatchCinematicRef.current({ type: "cancel" }, "reset");
     setActiveVideo(null);
 
     // Recharge les règles de déclenchement vidéo (admin)
@@ -1295,13 +1319,115 @@ const IndexPRD4 = () => {
   }, []);
   useEffect(() => () => { inputTelemetryRef.current?.finish("cancelled"); }, []);
 
+  // ---- Transition cinématique (lot 3b) ----------------------------------------
+  dispatchCinematicRef.current = (event, reason) => {
+    const previous = cinematicRef.current;
+    const next = cinematicTransitionStep(previous, event);
+    if (next === previous) return;
+    cinematicRef.current = next;
+    setCinematic(next);
+    const meta = cinematicMetaRef.current;
+    const sid = sessionIdRef.current;
+    const video = previous.phase !== "idle" ? previous.video : next.phase !== "idle" ? next.video : null;
+    if (!video) return;
+
+    const heldBefore = cinematicHoldsInput(previous);
+    const heldAfter = cinematicHoldsInput(next);
+    if (!heldBefore && heldAfter && previous.phase === "idle") {
+      // Announcement: drop any half-heard utterance; a paused reply resumes.
+      if (handsFreeTimerRef.current) window.clearTimeout(handsFreeTimerRef.current);
+      handsFreeTimerRef.current = null;
+      acousticRef.current?.reset(); acousticVoiceRef.current = false;
+      lastTranscriptRef.current = ""; discardedPrefixRef.current = "";
+      if (!isProcessingRef.current) finishInputTelemetry("cancelled");
+      setUserSubtitle("");
+    }
+    if (heldBefore && !heldAfter) {
+      // Listening reopens on a clean transcript; nothing said during the hold counts.
+      lastTranscriptRef.current = ""; discardedPrefixRef.current = "";
+      setUserSubtitle("");
+      if (handsFreeListeningRef.current && !handsFreeFinalizingRef.current && !isProcessingRef.current) sttRef.current?.resume();
+    }
+
+    if (previous.phase === "idle") {
+      trackEvent("prd4_video_announced", { session_id: sid, video_id: video.id, phase: next.phase,
+        deferred: next.phase !== "idle" && next.deferrals > 0 });
+      if (next.phase !== "idle" && next.deferrals > 0) {
+        trackEvent("prd4_video_deferred", { session_id: sid, video_id: video.id, reason: "player_speaking" });
+      }
+    }
+    if (next.phase === "playing" && previous.phase !== "playing") {
+      const decisionToStartMs = Math.max(0, Math.round((next.startedAt ?? performance.now()) - next.decidedAt));
+      trackEvent("prd4_video_triggered", { session_id: sid, turn_id: meta?.turnId, video_id: video.id, title: video.title,
+        source: "experience_director", decision_to_start_ms: decisionToStartMs, deferrals: next.deferrals });
+      if (sid && meta) void appendExperienceEvent({
+        sessionId: sid,
+        eventKey: `cinematic-played:${meta.turnId}`,
+        eventType: "cinematic_played",
+        turnId: meta.turnId,
+        turnIndex: meta.turnIndex,
+        character: activeCharacterRef.current,
+        orchestrationVersionId: meta.orchestrationVersionId,
+        payload: { videoId: video.id, reason: meta.reason, confidence: meta.confidence, decisionToStartMs, deferrals: next.deferrals },
+      });
+      setActiveVideo(video);
+    }
+    if (cinematicShowsVideo(previous) && !cinematicShowsVideo(next)) setActiveVideo(null);
+
+    if (cinematicDroppedBeforePlayback(previous, next)) {
+      const skipped = event.type === "skip";
+      const stage = previous.phase;
+      trackEvent("prd4_video_cancelled", { session_id: sid, video_id: video.id, stage, reason: skipped ? "skipped" : reason ?? event.type });
+      if (!skipped) {
+        // Never shown: the director may offer it again later.
+        triggeredVideoIdsRef.current = triggeredVideoIdsRef.current.filter((id) => id !== video.id);
+        if (meta) lastVideoTurnRef.current = meta.previousLastVideoTurn;
+      }
+      if (sid && meta) void appendExperienceEvent({
+        sessionId: sid,
+        eventKey: `cinematic-${skipped ? "skipped" : "cancelled"}:${video.id}:${meta.turnId}`,
+        eventType: skipped ? "cinematic_skipped" : "cinematic_blocked",
+        turnId: meta.turnId,
+        turnIndex: meta.turnIndex,
+        character: activeCharacterRef.current,
+        orchestrationVersionId: meta.orchestrationVersionId,
+        payload: skipped
+          ? { videoId: video.id, skipped: true, stage }
+          : { blockedReason: "transition_cancelled", videoId: video.id, stage, reason: reason ?? event.type },
+      });
+    }
+    if (next.phase === "idle") cinematicMetaRef.current = null;
+  };
+
+  // Timed phases of the transition (fades) advance on their own.
+  useEffect(() => {
+    const duration = cinematicPhaseDurationMs(cinematic.phase);
+    if (duration == null) return;
+    const phase = cinematic.phase;
+    const id = window.setTimeout(() => {
+      if (phase === "fading_out") dispatchCinematicRef.current({ type: "fade_out_done", at: performance.now() });
+      else if (phase === "closing") dispatchCinematicRef.current({ type: "close_done" });
+      else if (phase === "fading_in") dispatchCinematicRef.current({ type: "fade_in_done" });
+    }, duration);
+    return () => window.clearTimeout(id);
+  }, [cinematic]);
+
+  // The reply has really ended (no turn in flight, nobody speaking): a waiting cinematic starts.
+  useEffect(() => {
+    if (cinematic.phase !== "pending" || state.audioState !== "idle") return;
+    if (isProcessingRef.current || handsFreeFinalizingRef.current) return;
+    dispatchCinematicRef.current({ type: "conversation_idle" });
+  }, [cinematic, state.audioState]);
+
   // ---- Conversation : process turn ------------------------------------------
   const processTurn = useCallback(
     async (userText: string) => {
       if (isProcessingRef.current || !userText.trim() || endedRef.current
-        || ['validating', 'calling', 'switching'].includes(handoffPhaseRef.current)) return;
+        || ['validating', 'calling', 'switching'].includes(handoffPhaseRef.current)
+        || cinematicHoldsInput(cinematicRef.current)) return;
       // The request owns its offer; ordinary speech is not a revocation.
       isProcessingRef.current = true;
+      dispatchCinematicRef.current({ type: "turn_started" });
       const inputReadyAt = turnInputReadyAtRef.current ?? performance.now();
       const latencyOrigin = turnInputReadyAtRef.current ? turnLatencyOriginRef.current : "transcript_final";
       turnInputReadyAtRef.current = null;
@@ -1793,6 +1919,106 @@ const IndexPRD4 = () => {
             firstAudioTimeouts: 0,
           });
         };
+        // One guard for every director action; the cinematic path below and the
+        // post-reply director share it so a waiting video obeys the same rules.
+        const guardDirector = (decision: ExperienceDirectorDecisionV1, ev: PRD4PostTurnEvaluation, videos: VideoTriggerRow[],
+          proposalProfile: { enabled?: boolean; ready?: boolean } | null) => {
+          const directorConfig = ev.orchestration_config;
+          const settings = videoTriggerSettingsRef.current;
+          const proposalTarget = decision.action.type === 'handoff' ? decision.action.targetCharacter : null;
+          return validateDirectorDecision(decision, {
+            configPublished: Boolean(ev.orchestration_version_id && directorConfig),
+            currentCharacter: activeCharacterRef.current,
+            userTurn: turnIndex,
+            completedExchanges: completedCallExchanges(conversationRef.current, turnCharacter),
+            handoffCount: handoffCountRef.current,
+            handoffPending: Boolean(handoffOfferRef.current),
+            lastHandoffTurn: lastHandoffUserTurn(conversationRef.current),
+            handoffsEnabled: directorConfig?.editor.allowHandoffs ?? true,
+            minimumHandoffTurn: directorConfig?.minimumHandoffTurn ?? 4,
+            maximumHandoffsPerSession: directorConfig?.maximumHandoffsPerSession ?? 1,
+            minimumTurnsBetweenHandoffs: directorConfig?.minimumTurnsBetweenHandoffs ?? 2,
+            targetReady: proposalProfile?.enabled === true && proposalProfile.ready === true
+              && Boolean(proposalTarget && directorConfig?.activeCharacters.includes(proposalTarget)),
+            playedVideoIds: triggeredVideoIdsRef.current,
+            availableVideoIds: videos.filter((video) => Boolean(video.video_url)).map((video) => video.id),
+            eligibleVideoIds: selectEligibleVideos(videos, {
+              path: experiencePathFromFilmAnswer(hasSeenFilmRef.current),
+              currentCharacter: activeCharacterRef.current,
+              playedVideoIds: triggeredVideoIdsRef.current,
+              extractsShown: countPlayedExtracts(videos, triggeredVideoIdsRef.current),
+              minExtractsBeforeCinematic: settings.MIN_EXTRACTS_BEFORE_CINEMATIC,
+            }).map((video) => video.id),
+            lastVideoTurn: Number.isFinite(lastVideoTurnRef.current) ? lastVideoTurnRef.current : null,
+            minimumVideoTurn: settings.ENABLED ? settings.MIN_TURNS_BEFORE_FIRST : Number.MAX_SAFE_INTEGER,
+            minimumTurnsBetweenVideos: settings.MIN_TURNS_BETWEEN,
+            maximumVideosPerSession: settings.MAX_PER_SESSION,
+            cinematicsEnabled: directorConfig?.editor.allowCinematics ?? true,
+            resultIsCurrent: isCurrentTurn(),
+          });
+        };
+        const logDirectorBlocked = (guarded: GuardedDirectorDecision, ev: PRD4PostTurnEvaluation) => {
+          if (guarded.accepted || guarded.recommendedAction.type === "none") return;
+          const sid = sessionIdRef.current;
+          trackEvent(`prd4_${guarded.recommendedAction.type}_blocked`, { session_id: sid, turn_id: turnId, reason: guarded.blockedReason });
+          if (sid) void appendExperienceEvent({
+            sessionId: sid,
+            eventKey: `director-blocked:${turnId}:${guarded.recommendedAction.type}`,
+            eventType: guarded.recommendedAction.type === "handoff" ? "handoff_blocked" : "cinematic_blocked",
+            turnId,
+            turnIndex,
+            character: activeCharacterRef.current,
+            orchestrationVersionId: ev.orchestration_version_id,
+            payload: { blockedReason: guarded.blockedReason, action: guarded.recommendedAction },
+          });
+        };
+
+        // Lot 3b: the cinematic decision is read as soon as the GM answers, often
+        // while the reply is still playing. The reply is never cut; the video
+        // waits in the transition machine and player input is held meanwhile.
+        void result.postTurnPromise.then(async (ev) => {
+          if (!isCurrentTurn() || ev.execution_status !== "executed" || ev.action?.type !== "cinematic") return;
+          const videos = await withTimeout('director_videos', getVideoTriggersCached(), HANDOFF_DEPENDENCY_TIMEOUT_MS).catch(() => []);
+          if (!isCurrentTurn()) return;
+          const guarded = guardDirector({
+            labels: ev.labels ?? { themes: [], topics: [], intentions: [] },
+            nextTurnGuidance: ev.next_turn_guidance || null,
+            memoryDelta: ev.memory_delta ?? null,
+            action: ev.action,
+          }, ev, videos, null);
+          logDirectorBlocked(guarded, ev);
+          if (guarded.action.type !== "cinematic" || cinematicRef.current.phase !== "idle") return;
+          const cinematic = guarded.action;
+          const video = videos.find((candidate) => candidate.id === cinematic.videoId && candidate.video_url) ?? null;
+          if (!video) return;
+          const sid = sessionIdRef.current;
+          cinematicMetaRef.current = { turnId, turnIndex, reason: cinematic.reason ?? null, confidence: cinematic.confidence ?? null,
+            orchestrationVersionId: ev.orchestration_version_id ?? null, previousLastVideoTurn: lastVideoTurnRef.current };
+          // Reserved at decision time: a waiting video is never offered twice and counts for spacing.
+          triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, video.id];
+          lastVideoTurnRef.current = turnIndex;
+          trackEvent("prd4_video_recommended", { session_id: sid, turn_id: turnId, video_id: video.id, confidence: cinematic.confidence });
+          if (sid) void appendExperienceEvent({
+            sessionId: sid,
+            eventKey: `cinematic-recommended:${turnId}`,
+            eventType: "cinematic_recommended",
+            turnId,
+            turnIndex,
+            character: activeCharacterRef.current,
+            orchestrationVersionId: ev.orchestration_version_id,
+            payload: { videoId: video.id, reason: cinematic.reason, confidence: cinematic.confidence },
+          });
+          const audio = audioStateRef.current;
+          dispatchCinematicRef.current({
+            type: "decided",
+            video,
+            at: performance.now(),
+            conversationBusy: isProcessingRef.current,
+            playerSpeaking: audio === "user_speaking" || audio === "user_finalizing" || handsFreeTimerRef.current !== null
+              || handsFreeFinalizingRef.current || acousticVoiceRef.current,
+          });
+        }).catch((cinematicError) => console.warn("[PRD4] cinematic decision ignored:", cinematicError));
+
         const outputResult = await (streamedVoice ? streamedVoice.finish() : renderResponseText(result.maxResponse, {
           turnId,
           turnIndex,
@@ -1990,10 +2216,8 @@ const IndexPRD4 = () => {
             }
           }
 
-          const videos = ev.action?.type === 'cinematic'
-            ? await withTimeout('director_videos', getVideoTriggersCached(), HANDOFF_DEPENDENCY_TIMEOUT_MS).catch(() => []) : [];
-          if (!isCurrentTurn()) return;
-          const settings = videoTriggerSettingsRef.current;
+          // Cinematics are owned by the transition path registered before playback.
+          if (gmExecuted && ev.action?.type === 'cinematic') return;
           const directorConfig = ev.orchestration_config;
           // Offer creation is owned above. Unconfirmed GM recommendations still guide the next turn.
           const coordinatedHandoff = Boolean(preparedState || turnHandoffState?.state === 'available');
@@ -2010,74 +2234,13 @@ const IndexPRD4 = () => {
             ? await withTimeout('handoff_recommendation', getCharacterRuntimeReadiness(proposalTarget), HANDOFF_DEPENDENCY_TIMEOUT_MS).catch(() => null)
             : null;
           if (!isCurrentTurn()) return;
-          const guarded = validateDirectorDecision(decision, {
-            configPublished: Boolean(ev.orchestration_version_id && directorConfig),
-            currentCharacter: activeCharacterRef.current,
-            userTurn: turnIndex,
-            completedExchanges: completedCallExchanges(conversationRef.current, turnCharacter),
-            handoffCount: handoffCountRef.current,
-            handoffPending: Boolean(handoffOfferRef.current),
-            lastHandoffTurn: lastHandoffUserTurn(conversationRef.current),
-            handoffsEnabled: directorConfig?.editor.allowHandoffs ?? true,
-            minimumHandoffTurn: directorConfig?.minimumHandoffTurn ?? 4,
-            maximumHandoffsPerSession: directorConfig?.maximumHandoffsPerSession ?? 1,
-            minimumTurnsBetweenHandoffs: directorConfig?.minimumTurnsBetweenHandoffs ?? 2,
-            targetReady: proposalProfile?.enabled === true && proposalProfile.ready === true
-              && Boolean(proposalTarget && directorConfig?.activeCharacters.includes(proposalTarget)),
-            playedVideoIds: triggeredVideoIdsRef.current,
-            availableVideoIds: videos.filter((video) => Boolean(video.video_url)).map((video) => video.id),
-            eligibleVideoIds: selectEligibleVideos(videos, {
-              path: experiencePathFromFilmAnswer(hasSeenFilmRef.current),
-              currentCharacter: activeCharacterRef.current,
-              playedVideoIds: triggeredVideoIdsRef.current,
-              extractsShown: countPlayedExtracts(videos, triggeredVideoIdsRef.current),
-              minExtractsBeforeCinematic: settings.MIN_EXTRACTS_BEFORE_CINEMATIC,
-            }).map((video) => video.id),
-            lastVideoTurn: Number.isFinite(lastVideoTurnRef.current) ? lastVideoTurnRef.current : null,
-            minimumVideoTurn: settings.ENABLED ? settings.MIN_TURNS_BEFORE_FIRST : Number.MAX_SAFE_INTEGER,
-            minimumTurnsBetweenVideos: settings.MIN_TURNS_BETWEEN,
-            maximumVideosPerSession: settings.MAX_PER_SESSION,
-            cinematicsEnabled: directorConfig?.editor.allowCinematics ?? true,
-            resultIsCurrent: isCurrentTurn(),
-          });
+          const guarded = guardDirector(decision, ev, [], proposalProfile);
           const sid = sessionIdRef.current;
-          if (!guarded.accepted && guarded.recommendedAction.type !== "none") {
-            trackEvent(`prd4_${guarded.recommendedAction.type}_blocked`, { session_id: sid, turn_id: turnId, reason: guarded.blockedReason });
-            if (sid) void appendExperienceEvent({
-              sessionId: sid,
-              eventKey: `director-blocked:${turnId}:${guarded.recommendedAction.type}`,
-              eventType: guarded.recommendedAction.type === "handoff" ? "handoff_blocked" : "cinematic_blocked",
-              turnId,
-              turnIndex,
-              character: activeCharacterRef.current,
-              orchestrationVersionId: ev.orchestration_version_id,
-              payload: { blockedReason: guarded.blockedReason, action: guarded.recommendedAction },
-            });
-          }
+          logDirectorBlocked(guarded, ev);
 
           if (guarded.action.type === 'handoff') {
             // Guidance is a proposal to the character, never permission or a UI offer.
             pendingGmGuidanceRef.current = guarded.action.proposalGuidance;
-          } else if (guarded.action.type === "cinematic") {
-            const cinematic = guarded.action;
-            const video = videos.find((candidate) => candidate.id === cinematic.videoId && candidate.video_url) ?? null;
-            if (video) {
-              triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, video.id];
-              lastVideoTurnRef.current = turnIndex;
-              trackEvent("prd4_video_recommended", { session_id: sid, turn_id: turnId, video_id: video.id, confidence: cinematic.confidence });
-              trackEvent("prd4_video_triggered", { session_id: sid, turn_id: turnId, video_id: video.id, title: video.title, source: "experience_director" });
-              setActiveVideo(video);
-              if (sid) void appendExperienceEvent({
-                sessionId: sid,
-                eventKey: `cinematic-played:${turnId}`,
-                eventType: "cinematic_played",
-                turnId,
-                turnIndex,
-                character: activeCharacterRef.current,
-                orchestrationVersionId: ev.orchestration_version_id,
-                payload: { videoId: video.id, reason: cinematic.reason, confidence: cinematic.confidence },
-              });
-            }
           } else if (guarded.action.type === "end") {
             const minimumClosureSeconds = getSessionMinimumClosureSeconds(configuredSessionDurationRef.current);
             if (elapsed >= minimumClosureSeconds && !endedRef.current) {
@@ -2145,6 +2308,10 @@ const IndexPRD4 = () => {
           resumeConversationTraceSync(true);
           // Mains libres : l'écho de la réplique entendu pendant la lecture est oublié.
           if (handsFreeListeningRef.current && !handsFreeFinalizingRef.current) sttRef.current?.resume();
+          // The reply has ended: a cinematic waiting for it may start (input is held, nobody speaks).
+          dispatchCinematicRef.current({ type: "conversation_idle" });
+        } else {
+          dispatchCinematicRef.current({ type: "turn_abandoned" }, "turn_abandoned");
         }
       }
     },
@@ -2275,7 +2442,8 @@ const IndexPRD4 = () => {
   }, [endLatencySegment, finishInputTelemetry, incrementPttError, processTurn, setAudioState, teardownSTT]);
 
   const handlePTTPress = useCallback(async () => {
-    if (endedRef.current || ['validating', 'calling', 'switching'].includes(handoffPhaseRef.current)) return;
+    if (endedRef.current || ['validating', 'calling', 'switching'].includes(handoffPhaseRef.current)
+      || cinematicHoldsInput(cinematicRef.current)) return;
     // Filet anti-blocage : si le verrou est resté coincé mais que l'état audio est
     // au repos (signe que le tour précédent a bien fini), on libère le verrou.
     if (isProcessingRef.current && state.audioState === "idle") {
@@ -2430,7 +2598,8 @@ const IndexPRD4 = () => {
   const finalizeHandsFreeUtterance = useCallback(async () => {
     handsFreeTimerRef.current = null;
     const stt = sttRef.current;
-    if (!stt || handsFreeFinalizingRef.current || isProcessingRef.current || handsFreeBlockedRef.current) return;
+    if (!stt || handsFreeFinalizingRef.current || isProcessingRef.current || handsFreeBlockedRef.current
+      || cinematicHoldsInput(cinematicRef.current)) return;
     if (acousticVoiceRef.current) {
       handsFreeTimerRef.current = window.setTimeout(() => void finalizeHandsFreeUtterance(), 100);
       return;
@@ -2471,7 +2640,8 @@ const IndexPRD4 = () => {
 
   handsFreeTranscriptRef.current = (rawText: string, isFinal: boolean) => {
     const settings = handsFreeSettingsRef.current;
-    if (!rawText.trim() || handsFreeBlockedRef.current) return;
+    // A cinematic is announced: nothing the player says starts a turn or interrupts.
+    if (!rawText.trim() || handsFreeBlockedRef.current || cinematicHoldsInput(cinematicRef.current)) return;
     // Le micro livre de la parole : le budget de reprise automatique est rendu.
     micRecoveryRef.current.reset(); micGaveUpRef.current = false;
     let text = rawText;
@@ -2533,7 +2703,8 @@ const IndexPRD4 = () => {
       const stream = stt.getStream?.();
       if (stream && handsFreeSettingsRef.current.interruptionStrategy === "acoustic_confirmed") {
         const detector = await createLocalSpeechDetector(stream, (voiced, at) => {
-          if (sttRef.current !== stt || !handsFreeListeningRef.current || handsFreeBlockedRef.current) return;
+          if (sttRef.current !== stt || !handsFreeListeningRef.current || handsFreeBlockedRef.current
+            || cinematicHoldsInput(cinematicRef.current)) return;
           acousticVoiceRef.current = voiced;
           const output = handsFreeSettingsRef.current.bargeInEnabled && isProcessingRef.current ? streamedVoiceRef.current?.reversibleOutput ?? null : null;
           acousticRef.current?.signal(voiced, at, output, lastTranscriptRef.current);
@@ -2968,6 +3139,7 @@ const IndexPRD4 = () => {
     if (!offer?.gmApproval || offer.targetCharacter === activeCharacterRef.current) return;
     handoffPhaseRef.current = 'validating'; // synchronous lock before the first await
     const sid = sessionIdRef.current;
+    dispatchCinematicRef.current({ type: "cancel" }, "handoff");
     finishInputTelemetry('cancelled');
     const resumeMicrophone = handsFreeListeningRef.current || handsFreeNeedsRearmRef.current;
     cleanupAudio();
@@ -3168,28 +3340,35 @@ const IndexPRD4 = () => {
     activeOutputControllerRef.current?.abort("experience-restart");
     activeOutputControllerRef.current = null;
     activeTurnSequenceRef.current += 1;
+    dispatchCinematicRef.current({ type: "cancel" }, "reset");
     setActiveVideo(null);
     callPreparationRef.current = null;
     expectedAvatarTextRef.current.clear();
     endedRef.current = false;
   }, [cleanupAudio, reset, setCurrentHandoffOffer]);
 
-  const finishActiveVideo = useCallback((skipped: boolean) => {
-    if (!activeVideo || activeVideoRef.current !== activeVideo || endedRef.current || phaseRef.current !== 'conversation_max') return;
-    pendingPostVideoContextRef.current = activeVideo.context || activeVideo.post_video_context || null;
+  const finishActiveVideo = useCallback((outcome: "completed" | "skipped" | "error") => {
+    const transition = cinematicRef.current;
+    if (!activeVideo || activeVideoRef.current !== activeVideo || endedRef.current || phaseRef.current !== 'conversation_max'
+      || transition.phase !== "playing") return;
+    const skipped = outcome !== "completed";
+    if (outcome !== "error") pendingPostVideoContextRef.current = activeVideo.context || activeVideo.post_video_context || null;
     trackEvent("prd4_video_completed", {
       session_id: sessionIdRef.current,
       video_id: activeVideo.id,
       skipped,
+      outcome,
+      played_ms: transition.startedAt == null ? null : Math.round(performance.now() - transition.startedAt),
     });
     if (sessionIdRef.current) void appendExperienceEvent({
       sessionId: sessionIdRef.current,
       eventKey: `cinematic-${skipped ? "skipped" : "completed"}:${activeVideo.id}`,
       eventType: skipped ? "cinematic_skipped" : "cinematic_completed",
       character: activeCharacterRef.current,
-      payload: { videoId: activeVideo.id, skipped },
+      payload: { videoId: activeVideo.id, skipped, outcome },
     });
-    setActiveVideo(null);
+    // Fade to black over the video, then back to the character (activeVideo clears on the way).
+    dispatchCinematicRef.current({ type: "video_ended", outcome });
   }, [activeVideo]);
 
   // Narrative interludes keep the provider session connected but silent.
@@ -3279,6 +3458,7 @@ const IndexPRD4 = () => {
               handoffPortraitUrl={handoffOffer ? handoffPortraits[handoffOffer.targetCharacter] : null}
               handoffCalling={handoffCalling}
               handoffInputLocked={handoffInputLocked}
+              inputHeld={cinematicHoldsInput(cinematic)}
               handoffCallingTarget={handoffCallingTarget}
               onAcceptHandoff={() => void handleAcceptHandoff()}
               onRejectHandoff={handleRejectHandoff}
@@ -3311,6 +3491,8 @@ const IndexPRD4 = () => {
 
   const teaserActive = state.phase === "teaser";
   const interludeActive = state.phase === "conversation_max" && Boolean(activeVideo?.video_url);
+  const cinematicAnnounced = state.phase === "conversation_max" && cinematicHoldsInput(cinematic)
+    && (cinematic.phase === "pending" || cinematic.phase === "fading_out");
   const cinematicActive = teaserActive || interludeActive;
   const cinematicVideoUrl = interludeActive && activeVideo?.video_url
     ? activeVideo.video_url
@@ -3324,13 +3506,45 @@ const IndexPRD4 = () => {
       <GumletVideoPlayer
         ref={cinematicPlayerRef}
         videoUrl={cinematicVideoUrl}
-        onComplete={interludeActive ? () => finishActiveVideo(false) : handleTeaserContinue}
-        onSkip={interludeActive ? () => finishActiveVideo(true) : handleTeaserSkip}
+        onComplete={interludeActive ? () => finishActiveVideo("completed") : handleTeaserContinue}
+        onSkip={interludeActive ? () => finishActiveVideo("skipped") : handleTeaserSkip}
+        onError={interludeActive ? () => finishActiveVideo("error") : undefined}
         onReady={teaserActive || state.phase === "welcome" ? () => setTeaserPlayerReady(true) : undefined}
         active={cinematicActive}
-        showSkip={cinematicActive}
+        showSkip={teaserActive || (interludeActive && cinematic.phase === "playing")}
       />
       {screen}
+      {/* Lot 3b: black veil for the fades between the character and the video. */}
+      {state.phase === "conversation_max" ? (
+        <div
+          data-testid="cinematic-veil"
+          data-phase={cinematic.phase}
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-40 bg-black"
+          style={{
+            opacity: cinematicVeilOpacity(cinematic),
+            transition: `opacity ${cinematicVeilTransitionMs(cinematic.phase)}ms ease-in-out`,
+          }}
+        />
+      ) : null}
+      {cinematicAnnounced ? (
+        <div
+          role="status"
+          data-testid="cinematic-announced"
+          className="fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full border border-border/20 bg-black/50 px-4 py-1.5 font-mono text-xs text-muted-foreground/90 backdrop-blur-sm"
+        >
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-foreground/70" aria-hidden="true" />
+          <span>Une séquence arrive…</span>
+          {/* Not « Passer »: that label belongs to the video player itself. */}
+          <button
+            type="button"
+            className="underline-offset-2 hover:text-foreground hover:underline"
+            onClick={() => dispatchCinematicRef.current({ type: "skip" })}
+          >
+            Ignorer
+          </button>
+        </div>
+      ) : null}
     </>
   );
 };

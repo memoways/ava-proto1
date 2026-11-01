@@ -15,6 +15,8 @@ interface GumletVideoPlayerProps {
   onComplete: () => void;
   onSkip: () => void;
   onReady?: () => void;
+  /** Native media error or unsupported source while active (hls.js fatal errors are only logged). */
+  onError?: () => void;
   /** Keep the single media element mounted/preloaded but visually hidden. */
   active?: boolean;
   /** Show the skip button overlay. */
@@ -33,6 +35,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   onComplete,
   onSkip,
   onReady,
+  onError,
   active = true,
   showSkip = true,
   children,
@@ -41,6 +44,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   const hlsRef = useRef<Hls | null>(null);
   const onCompleteRef = useRef(onComplete);
   const onReadyRef = useRef(onReady);
+  const onErrorRef = useRef(onError);
   const activeRef = useRef(active);
   const sourceGenerationRef = useRef(0);
   const hasCompletedRef = useRef(false);
@@ -52,6 +56,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
   onCompleteRef.current = onComplete;
   onReadyRef.current = onReady;
+  onErrorRef.current = onError;
   activeRef.current = active;
 
   const pauseVideo = useCallback((video: HTMLVideoElement | null) => {
@@ -62,6 +67,13 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     if (hasCompletedRef.current) return;
     hasCompletedRef.current = true;
     onCompleteRef.current();
+  }, []);
+
+  /** Reports one failure per source, only while the player is shown. */
+  const failOnce = useCallback(() => {
+    if (hasCompletedRef.current || stoppingRef.current || !activeRef.current) return;
+    hasCompletedRef.current = true;
+    onErrorRef.current?.();
   }, []);
 
   const stopPlayback = useCallback(() => {
@@ -176,6 +188,8 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal || generation !== sourceGenerationRef.current) return;
+        // Logged only: the player stays on screen with « Passer » (hls.js
+        // fatal errors are not routed to onError, see the lot 3b plan).
         console.error("[Video] Fatal HLS error:", data.type, data.details);
       });
       hls.attachMedia(video);
@@ -207,8 +221,9 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     setPlaybackEngine("unsupported");
     if (canControlNativeMedia()) {
       console.error("[Video] HLS playback is not supported by this browser.");
+      failOnce();
     }
-  }, [pauseVideo, playWithAudio, source.kind, source.url, sourceEpoch]);
+  }, [failOnce, pauseVideo, playWithAudio, source.kind, source.url, sourceEpoch]);
 
   useEffect(() => {
     if (active) {
@@ -273,6 +288,11 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
           }
         }}
         onEnded={completeOnce}
+        onError={() => {
+          // Source removal while stopping or hidden is not a playback failure.
+          if (!videoRef.current?.getAttribute("src") && !hlsRef.current) return;
+          failOnce();
+        }}
       />
 
       {active ? children : null}

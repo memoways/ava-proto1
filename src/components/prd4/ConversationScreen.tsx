@@ -36,6 +36,8 @@ interface Props {
   handoffPortraitUrl?: string | null;
   handoffCalling?: boolean;
   handoffInputLocked?: boolean;
+  /** A cinematic is announced: no new turn and no interruption until it is over. */
+  inputHeld?: boolean;
   handoffCallingTarget?: "max" | "emma";
   onAcceptHandoff?: () => void;
   onRejectHandoff?: () => void;
@@ -64,6 +66,7 @@ const ConversationScreen = ({
   handoffPortraitUrl = null,
   handoffCalling = false,
   handoffInputLocked = false,
+  inputHeld = false,
   handoffCallingTarget = "emma",
   onAcceptHandoff,
   onRejectHandoff,
@@ -73,7 +76,7 @@ const ConversationScreen = ({
   // on n'affiche ni le flux, ni sa dernière image figée : seulement sa photo.
   const streamingAvatarActive = streamingAvatarRequested && activeCharacter === "max";
   const handoffInputBlocked = handoffCalling || handoffInputLocked;
-  const disabled = handoffInputBlocked || audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "max_thinking" || audioState === "max_speaking";
+  const disabled = handoffInputBlocked || inputHeld || audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "max_thinking" || audioState === "max_speaking";
   const recording = audioState === "user_speaking";
 
   const handleToggleTalk = useCallback(() => {
@@ -83,9 +86,9 @@ const ConversationScreen = ({
       return;
     }
     if (handoffInputBlocked) return;
-    if (audioState === "idle") onPTTPress();
+    if (audioState === "idle" && !inputHeld) onPTTPress();
     else if (audioState === "user_speaking") onPTTRelease();
-  }, [audioState, handoffInputBlocked, handsFree, handsFreeListening, onPTTPress, onPTTRelease, onToggleHandsFree]);
+  }, [audioState, handoffInputBlocked, handsFree, handsFreeListening, inputHeld, onPTTPress, onPTTRelease, onToggleHandsFree]);
 
   useEffect(() => {
     const isInteractiveTarget = (target: EventTarget | null) => {
@@ -357,7 +360,7 @@ const ConversationScreen = ({
                 {handsFreeListening && audioState === "user_speaking" && "Je t'écoute…"}
                 {audioState === "user_finalizing" && "…"}
                 {audioState === "max_thinking" && `${displayName} réfléchit…`}
-                {audioState === "max_speaking" && `${displayName} répond — tu peux l'interrompre`}
+                {audioState === "max_speaking" && (inputHeld ? `${displayName} répond` : `${displayName} répond — tu peux l'interrompre`)}
               </p>
               <button
                 onClick={handleToggleTalk}

@@ -3,9 +3,19 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-01 (sélection vidéos, lot 3 : choix au sens)
+> **Last Updated**: 2026-11-01 (sélection vidéos, lot 3b : transition cinématique)
 
 ---
+
+## Sélection vidéos, lot 3b — la vidéo attend son tour (1er novembre 2026)
+
+En recette, Ulrich répondait à Max quand la vidéo est tombée : sa phrase était perdue, et rien
+ne lui disait qu'il ne servait plus à rien de parler. Le maître du jeu ne juge une réplique
+qu'une fois entendue ; sa décision arrive donc après le son, souvent pendant la réponse du
+joueur. Désormais la vidéo attend : si personne ne parle, l'image passe au noir, la vidéo
+joue, puis le personnage revient en fondu ; si le joueur parle, il finit, le personnage lui
+répond — un petit signe annonce alors la séquence et l'écoute se tient — et la vidéo vient
+après. « Ignorer » l'écarte, « Passer » la coupe ; dans tous les cas le micro est rendu.
 
 ## Sélection vidéos, lot 3 — choisir une vidéo pour ce qu'elle raconte (1er novembre 2026)
 

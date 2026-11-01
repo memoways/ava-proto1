@@ -108,6 +108,23 @@ it.each([false, true])('locks microphone and choices during validation without h
 });
 
 
+it('holds push-to-talk while a cinematic is announced, without hiding the reply status', () => {
+  const press = vi.fn();
+  const status = render(<ConversationScreen {...baseProps} activeCharacter="max" conversationLog={[]} inputHeld
+    handsFree handsFreeListening audioState="max_speaking" />);
+  expect(screen.getByText('Max répond')).toBeInTheDocument();
+  expect(screen.queryByText(/tu peux l'interrompre/)).not.toBeInTheDocument();
+  status.unmount();
+  const { rerender } = render(<ConversationScreen {...baseProps} activeCharacter="max" conversationLog={[]} inputHeld onPTTPress={press} />);
+  expect(screen.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeDisabled();
+  fireEvent.keyDown(window, { code: 'Space' });
+  expect(press).not.toHaveBeenCalled();
+  rerender(<ConversationScreen {...baseProps} activeCharacter="max" conversationLog={[]} onPTTPress={press} />);
+  expect(screen.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled();
+  fireEvent.keyDown(window, { code: 'Space' });
+  expect(press).toHaveBeenCalledTimes(1);
+});
+
 it('leaves Space on a focused call button to its native activation without opening the microphone', () => {
   const press = vi.fn();
   render(<ConversationScreen {...baseProps} activeCharacter="emma" conversationLog={[]}

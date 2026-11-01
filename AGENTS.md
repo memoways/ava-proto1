@@ -201,6 +201,8 @@ fusionné décrits ci-dessus, sans seconde campagne complète sur main.
 - Speech-state prosody is an environment-scoped deterministic TTS mapping, configured before incremental setup; auditions use isolated provider voices and Gradium emotional tags remain capability-gated off — why: audible character states without extra LLM calls, production changes or speculative vendor tags.
 - Hands-free turn decisions stay in `src/services/handsFreeVoice.ts`: end-of-speech uses application timing; the approved barge-in target uses local acoustic candidates followed by recognized speech confirmation. STT providers supply signals and text, not turn decisions. Before changing capture or interruptions, follow [the latency plan, section 3](docs/plan_optimisation_latence_voice_to_voice.md#3-écoute-libre-et-interruptions--p2), including reversible candidate handling and the existing text strategy for rollback — why: fast reactions with consistent behaviour across providers.
 
+- Director cinematics go through the pure state machine `src/services/cinematicTransition.ts`: the character's reply and the player's speech are never cut; a video decided while the player speaks waits for the next reply; player input is held from the announcement until the fade back, and the hands-free microphone is re-armed after the video — why: a cinematic is a breath in the conversation, not an interruption.
+
 <!-- LOVABLE:BEGIN -->
 - Admin Markdown exports use a pure report formatter and a separate authorized paginated reader/download helper, with explicit missing-diagnostic warnings and no full prompt traces — why: exports remain testable and private without changing the conversation pipeline or conflating latency sources.
 <!-- LOVABLE:END -->
