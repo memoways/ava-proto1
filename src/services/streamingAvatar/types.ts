@@ -21,11 +21,26 @@ export interface HeyGenAvatarSettings {
   sandbox: boolean;
 }
 
+/** Facial emotions accepted by Tavus `conversation.set_emotion` (Phoenix-4+ faces). */
+export const TAVUS_EMOTIONS = [
+  "sadness",
+  "fear",
+  "anger",
+  "disgust",
+  "contempt",
+  "surprise",
+  "neutral",
+  "happiness",
+] as const;
+export type TavusEmotion = (typeof TAVUS_EMOTIONS)[number];
+
 export interface TavusAvatarSettings {
   replicaId: string;
   personaId: string;
   language: string;
   maxDurationSeconds: number;
+  /** Held by the face while listening and speaking; Ava's characters are in distress. */
+  emotion: TavusEmotion;
 }
 
 export interface StreamingAvatarSettings {

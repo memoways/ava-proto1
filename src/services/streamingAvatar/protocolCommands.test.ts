@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildTavusEchoCommand,
+  buildTavusSetEmotionCommand,
   sendHeyGenSpeakText,
 } from "./protocolCommands";
 
@@ -25,5 +26,14 @@ describe("streaming avatar direct text protocols", () => {
       properties: { modality: "text", text, done: true },
     });
     expect(JSON.stringify(command)).not.toContain("conversation.respond");
+  });
+
+  it("builds the Tavus conversation.set_emotion command with the documented shape", () => {
+    expect(buildTavusSetEmotionCommand("conversation-1", "sadness")).toEqual({
+      message_type: "conversation",
+      event_type: "conversation.set_emotion",
+      conversation_id: "conversation-1",
+      properties: { emotion: "sadness" },
+    });
   });
 });

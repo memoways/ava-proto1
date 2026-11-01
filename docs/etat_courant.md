@@ -38,6 +38,10 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Avatar Tavus abattu (1er novembre, code) :** `conversation.set_emotion` « sadness » par défaut
+à la connexion et à chaque réplique, réglable dans l'onglet admin Tavus. Recette humaine : Face
+Phoenix-4/4.5 Pro, vérifier que Max ne sourit à aucun moment. HeyGen : aucun contrôle d'émotion.
+
 **Sélection vidéos, lot 5 livré le 1er novembre (code) : lecture et mémoire.**
 Contexte post-vidéo entier (coupe au mot) + « ce que la vidéo montrait », plafond 1 000 ;
 mémoire des trois dernières vidéos vues, bloc identique pour le GM et le personnage

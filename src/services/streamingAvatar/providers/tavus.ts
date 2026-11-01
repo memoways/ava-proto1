@@ -5,7 +5,7 @@ import DailyIframe, {
   type DailyNetworkStats,
 } from "@daily-co/daily-js";
 import { endAvatarSession, startAvatarSession } from "../api";
-import { buildTavusEchoCommand } from "../protocolCommands";
+import { buildTavusEchoCommand, buildTavusSetEmotionCommand } from "../protocolCommands";
 import { splitAvatarText } from "../textSegmentation";
 import {
   AvatarRenderError,
@@ -109,6 +109,7 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     call.setLocalVideo(false);
     await this.waitUntilReady();
     if (context.signal?.aborted) throw new DOMException("Avatar preparation aborted", "AbortError");
+    this.applyEmotion();
     this.callbacks.onConnectionStateChange?.("ready");
     this.statsTimer = setInterval(() => {
       void call.getNetworkStats().then(stats => {
@@ -140,6 +141,8 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     let playedSegments = 0;
     let currentStarted = false;
     const chunks = splitAvatarText(text);
+    // Re-assert the face emotion each turn: cheap, and survives a provider reconnect.
+    this.applyEmotion();
     try {
       for (const chunk of chunks) {
         if (this.disposed || context?.signal?.aborted) throw new DOMException("Avatar turn aborted", "AbortError");
@@ -196,6 +199,14 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
       element.srcObject = this.mediaStream;
       this.playMedia();
     }
+  }
+
+  private applyEmotion(): void {
+    if (!this.call || !this._externalSessionId || !this.settings.emotion) return;
+    this.call.sendAppMessage(
+      buildTavusSetEmotionCommand(this._externalSessionId, this.settings.emotion),
+      "*",
+    );
   }
 
   interrupt(): void {
