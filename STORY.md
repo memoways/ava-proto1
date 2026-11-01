@@ -3,9 +3,20 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-01 (sélection vidéos, lot 3b : transition cinématique)
+> **Last Updated**: 2026-11-01 (sélection vidéos, lot 4 : Description IA automatique)
 
 ---
+
+## Sélection vidéos, lot 4 — une IA regarde les vidéos (1er novembre 2026)
+
+Le maître du jeu choisit désormais une vidéo pour ce qu'elle raconte, mais il ne savait pas
+ce qu'elle montre : aucune vidéo n'avait de Description. Plutôt que de les écrire une à une,
+Ulrich peut maintenant demander, depuis l'admin, à Gemini de regarder chaque vidéo et d'en
+décrire objectivement l'image — personnages, lieu, gestes, ambiance — dans un champ à part,
+« Description IA ». Ce qu'Ulrich écrit lui-même dans Description reste prioritaire et n'est
+jamais touché. Avant d'écrire une ligne, il a fallu vérifier que c'était possible : Gumlet ne
+donne pas de fichier vidéo, mais ses flux cachent chacun un MP4 complet et léger, que Gemini
+sait lire. Il reste à Ulrich de lancer l'analyse sur une première vidéo et de relire le texte.
 
 ## Sélection vidéos, lot 3b — la vidéo attend son tour (1er novembre 2026)
 

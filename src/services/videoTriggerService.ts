@@ -91,3 +91,35 @@ export async function updateVideoTriggerOnNotion(
   }
   invalidateVideoTriggerCache();
 }
+
+export interface DescribeVideoResult {
+  notion_id: string;
+  ai_description: string;
+  model: string;
+  video_bytes: number;
+  latency_ms: number;
+  usage: { prompt_tokens?: number; completion_tokens?: number; cost?: number } | null;
+}
+
+/** Admin only: AI analysis of one video, written to Notion "Description IA" alone. */
+export async function describeVideoWithAi(notionId: string): Promise<DescribeVideoResult> {
+  const cachedAuthSession = await getCachedSession();
+  const token = cachedAuthSession?.access_token;
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/describe-video`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ notion_id: notionId }),
+  });
+  const text = await res.text();
+  let parsed: unknown = null;
+  try { parsed = JSON.parse(text); } catch { /* ignore */ }
+  if (!res.ok) {
+    const errMsg = (parsed as { error?: string } | null)?.error || text || `HTTP ${res.status}`;
+    throw new Error(errMsg);
+  }
+  invalidateVideoTriggerCache();
+  return parsed as DescribeVideoResult;
+}

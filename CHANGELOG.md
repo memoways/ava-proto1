@@ -4,6 +4,31 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Sélection vidéos, lot 4 — Description IA automatique] — 2026-11-01
+
+- Faisabilité établie avant le code : `google/gemini-2.5-flash` (OpenRouter, fournisseur Google
+  AI Studio) accepte la vidéo en entrée, en base64 seulement (pas d'URL hors YouTube). Gumlet
+  ne sert aucun MP4 public (403/401) mais chaque rendu HLS est un MP4 fragmenté unique, lisible
+  en entier : les 17 vidéos du catalogue pèsent de 0,12 à 3,5 Mo en 360p (8 à 65 s, image seule).
+- Edge Function `describe-video` (admin seulement, `requireAdmin`) : lit l'URL Gumlet dans le
+  catalogue (jamais celle de l'appelant), télécharge le rendu 360p, demande à Gemini une
+  description objective en français (personnages, lieu, actions, ambiance ; 300 caractères au
+  plus, sans interprétation narrative), écrit **uniquement** « Description IA » dans Notion puis
+  `video_triggers.ai_description`. Description humaine jamais lue ni écrite ; garde
+  `assertOnlyAiDescription` avant chaque écriture ; réponse vide ou vidéo trop lourde (> 12 Mo) :
+  rien n'est écrit. Retour : texte, octets, latence, jetons et coût.
+- Éditeur vidéo admin : bouton « Analyser » par vidéo, « Analyser les vidéos sans description »
+  (Description et Description IA vides ; « Réanalyser » lève seulement la seconde condition),
+  confirmation avant le lot ; Description IA affichée en lecture seule.
+- Module pur `supabase/functions/_shared/videoDescription.ts` ; tests
+  `videoDescription.test.ts` (16) et `describeVideoEndpoint.test.ts` (7 : refus non admin,
+  champ unique, URL du catalogue, rien d'écrit sur réponse vide ou vidéo trop lourde).
+- GM, filtre d'éligibilité, transition cinématique, lecteur, voix et mains libres inchangés ; la
+  Description IA atteint le GM par `formatVideoCandidateLine` (lot 3) dès qu'elle existe.
+  Aucune analyse réelle lancée : première analyse sur une vidéo de test par Ulrich en admin.
+  Plan : [sélection contextuelle](docs/plan_selection_videos_contextuelle.md) ·
+  [prompt lot 5](docs/prompt_reprise_selection_videos_lot_5.md).
+
 ## [Sélection vidéos, lot 3b — retouches de recette] — 2026-11-01
 
 - Lecteur vidéo : plus d'infobulle « Video player », pointeur masqué pendant la vidéo
