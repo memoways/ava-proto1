@@ -95,4 +95,19 @@ describe("Tavus actual receive-only lifecycle", () => {
     event("conversation.started_speaking"); await vi.advanceTimersByTimeAsync(0); event("conversation.stopped_speaking");
     await speech; await output.dispose();
   });
+  it("re-asserts the emotion after each line and while listening", async () => {
+    const output = new TavusStreamingAvatarOutput(settings, {}, 1000, 1000); await ready(output);
+    const video = document.createElement("video"); video.play = vi.fn(async () => {}); output.attachMedia(video);
+    const speech = output.renderText("Laisse-moi."); await vi.advanceTimersByTimeAsync(0);
+    const event = (type: string) => fake.handlers.get("app-message")?.({ data: { event_type: type, conversation_id: "conversation", properties: { role: "pal" } } });
+    event("conversation.started_speaking"); await vi.advanceTimersByTimeAsync(0);
+    fake.call.sendAppMessage.mockClear();
+    event("conversation.stopped_speaking"); await speech;
+    const types = () => fake.call.sendAppMessage.mock.calls.map(([message]) => message.event_type);
+    expect(types()).toEqual(["conversation.set_emotion"]);
+    (fake.call as { getNetworkStats?: () => Promise<unknown> }).getNetworkStats = vi.fn(async () => ({}));
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(types()).toEqual(["conversation.set_emotion", "conversation.set_emotion"]);
+    await output.dispose();
+  });
 });
