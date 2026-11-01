@@ -4,6 +4,7 @@ import { buildOptimizedPromptAssembly, OPTIMIZED_V3_LIMITS } from "./maxOptimize
 import { mergeConversationMemory } from "@/services/conversationMemoryV1";
 import { buildExperienceFrame } from "@/services/experienceFrame";
 import { makeCanonicalPresentFixture } from './__fixtures__/canonicalPresentFixture';
+import { buildPostVideoContext, formatWatchedVideos, watchedVideoFrom, WATCHED_VIDEOS_SECTION_TITLE } from "@/services/watchedVideoMemory";
 
 describe("optimized_v3 prompt compiler", () => {
   const presentCases = (['max', 'emma'] as const).flatMap(character =>
@@ -180,5 +181,53 @@ describe('optimized_v3 dedup profile cache (recette G1.2)', () => {
     const warm = buildOptimizedPromptAssembly(input);
     expect(warm.finalSystemPrompt).toBe(cold.finalSystemPrompt);
     expect(warm.budget).toEqual(cold.budget);
+  });
+});
+
+describe("optimized_v3 — ce que le joueur a vu (sélection vidéos, lot 5)", () => {
+  const context = `${Array.from({ length: 120 }, (_, index) => `mot${index}`).join(" ")}`.slice(0, 599) + "z";
+  const postVideo = buildPostVideoContext({ context, post_video_context: null, description: null,
+    ai_description: "Max et Emma près d'un feu de cheminée, la pièce est sombre." })!;
+  const watched = formatWatchedVideos([
+    watchedVideoFrom({ id: "feu", title: "Emma regard feu avec Max", description: null, ai_description: "Emma fixe les flammes." }, 4, false),
+  ]);
+  const bigRag = Array.from({ length: 6 }, (_, index) => ({ id: `s${index}`, rank: index + 1,
+    content: `Souvenir ${index} : ${"une scène très ancienne au bord du lac gelé ".repeat(9)}` }));
+
+  it("transmet le Contexte entier de 600 caractères et ce que la vidéo montrait", () => {
+    const sheet = makeCanonicalPresentFixture("max");
+    const result = buildOptimizedPromptAssembly({ character: sheet, characterName: sheet.name!, userMessage: "C'était quoi, ce feu ?",
+      historyChars: 0, postVideoContext: postVideo, ragCandidates: bigRag });
+    const section = result.injectedSections.find((item) => item.key === "post_video")!;
+    expect(section.content).toContain(context);
+    expect(section.content).toContain("Ce que la vidéo montrait : Max et Emma près d'un feu de cheminée");
+    expect(result.budget?.withinBudget).toBe(true);
+  });
+
+  it("place le contexte post-vidéo et les vidéos vues avant les souvenirs complémentaires", () => {
+    const sheet = makeCanonicalPresentFixture("emma");
+    const result = buildOptimizedPromptAssembly({ character: sheet, characterName: sheet.name!, userMessage: "La scène du feu…",
+      historyChars: 1_800, postVideoContext: postVideo, watchedVideos: watched, ragCandidates: bigRag });
+    const keys = result.injectedSections.map((item) => item.key);
+    expect(keys.indexOf("post_video")).toBeGreaterThan(-1);
+    expect(keys.indexOf("watched_videos")).toBeGreaterThan(keys.indexOf("post_video"));
+    if (keys.includes("rag_context")) expect(keys.indexOf("rag_context")).toBeGreaterThan(keys.indexOf("watched_videos"));
+    expect(result.budget?.withinBudget).toBe(true);
+  });
+
+  it("garde le bloc des vidéos vues identique à celui du GM, même voisin du contexte post-vidéo", () => {
+    const sheet = makeCanonicalPresentFixture("max");
+    const result = buildOptimizedPromptAssembly({ character: sheet, characterName: sheet.name!, userMessage: "Tu te souviens du feu ?",
+      historyChars: 0, postVideoContext: "Ce que la vidéo montrait : Emma fixe les flammes.", watchedVideos: watched });
+    const section = result.injectedSections.find((item) => item.key === "watched_videos")!;
+    expect(section.title).toBe(WATCHED_VIDEOS_SECTION_TITLE);
+    expect(section.content).toBe(watched);
+  });
+
+  it("n'ajoute aucune section quand aucune vidéo n'a été vue", () => {
+    const sheet = makeCanonicalPresentFixture("max");
+    const result = buildOptimizedPromptAssembly({ character: sheet, characterName: sheet.name!, userMessage: "Bonjour", historyChars: 0 });
+    expect(result.injectedSections.some((item) => item.key === "watched_videos" || item.key === "post_video")).toBe(false);
+    expect(OPTIMIZED_V3_LIMITS.postVideoChars).toBeGreaterThanOrEqual(600 + 300);
   });
 });

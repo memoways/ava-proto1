@@ -10,6 +10,11 @@ import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
 import { RESPONSE_HOOK_RULE } from "@/agents/responseHook";
 import { characterEmbodiment, withoutCharacterEmbodiment } from '@/services/characterEmbodiment';
 import type { ConversationMemoryV1, MaxPromptAssemblyTrace } from "@/types";
+import {
+  POST_VIDEO_SECTION_MAX_CHARS,
+  WATCHED_VIDEOS_SECTION_MAX_CHARS,
+  WATCHED_VIDEOS_SECTION_TITLE,
+} from "@/services/watchedVideoMemory";
 
 export const OPTIMIZED_V3_LIMITS = {
   generatedContextChars: 11_000,
@@ -22,6 +27,8 @@ export const OPTIMIZED_V3_LIMITS = {
   ragItems: MAX_MAX_RAG_ITEMS,
   relationshipChars: 1_400,
   frameChars: 1_400,
+  postVideoChars: POST_VIDEO_SECTION_MAX_CHARS,
+  watchedVideosChars: WATCHED_VIDEOS_SECTION_MAX_CHARS,
 };
 
 export const OPTIMIZED_V3_CONVERSATION_CONTRACT = `# CONTRAT DE CONVERSATION
@@ -82,6 +89,7 @@ export interface OptimizedPromptInput {
   experienceFrame?: string;
   guards?: string;
   postVideoContext?: string;
+  watchedVideos?: string;
   ragCandidates?: OptimizedRagCandidate[];
   identityInvariant?: string;
 }
@@ -435,9 +443,9 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
     const cappedOriginal = source === 'static' ? original : key === "rag_context"
       ? trimRagContextToWholeSouvenirs(original, cap)
       : capAtBoundary(original, cap);
-    // The shared frame must retain the same facts and wording as the GM's
-    // frame; lexical overlap with the character sheet is not redundancy here.
-    const sharedFrame = key === "experience_frame";
+    // The shared frame and watched videos block must retain the same facts and
+    // wording as the GM's; lexical overlap is not redundancy here.
+    const sharedFrame = key === "experience_frame" || key === "watched_videos";
     const novelty = sharedFrame || source === "static" || source === "rag"
       ? { text: cappedOriginal, removedChars: 0, keptBy: undefined }
       : retainNovelContent(cappedOriginal, selectedForDedup);
@@ -550,8 +558,11 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
         : {}),
     });
   }
+  // Lot 5 : ce que le joueur vient de voir passe avant les souvenirs complémentaires,
+  // qui cèdent la place quand le contexte est plein (jamais l'inverse).
+  append("post_video", "CONTEXTE POST-VIDÉO", input.postVideoContext, OPTIMIZED_V3_LIMITS.postVideoChars, "runtime");
+  append("watched_videos", WATCHED_VIDEOS_SECTION_TITLE, input.watchedVideos, OPTIMIZED_V3_LIMITS.watchedVideosChars, "runtime");
   append("rag_context", "SOUVENIRS COMPLÉMENTAIRES", ragBlocks.join("\n\n"), OPTIMIZED_V3_LIMITS.ragChars, "rag");
-  append("post_video", "CONTEXTE POST-VIDÉO", input.postVideoContext, 500, "runtime");
 
   const deliveredCore = injectedSections.find(section => section.key === 'character_core')?.content ?? '';
   if (protectedCharacterSections(input.character).some(section => !deliveredCore.includes(section.content))) {

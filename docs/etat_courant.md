@@ -38,6 +38,15 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Sélection vidéos, lot 5 livré le 1er novembre (code) : lecture et mémoire.**
+Contexte post-vidéo entier (coupe au mot) + « ce que la vidéo montrait », plafond 1 000 ;
+mémoire des trois dernières vidéos vues, bloc identique pour le GM et le personnage
+(« Ignorée » exclue, « Passée » marquée). Passe avant les souvenirs RAG. Aucune migration, aucune
+écriture Notion, prompt GM publié inchangé. Lot 4 : 17/17 Descriptions IA (201–299), Descriptions
+humaines intactes. Recette humaine par Ulrich : une vidéo jouée, puis une allusion à cette scène
+deux ou trois tours plus tard. [Plan](plan_selection_videos_contextuelle.md#lot-5--lecture-et-mémoire) ·
+[Prompt lot 6 « consigne d'analyse »](prompt_reprise_selection_videos_lot_6.md).
+
 **Sélection vidéos, lot 4 livré le 1er novembre (code) : Description IA automatique.**
 Edge Function `describe-video` (admin) : Gemini 2.5 Flash regarde le rendu 360p Gumlet
 (MP4 fragmenté, base64) et écrit **seulement** « Description IA » dans Notion puis

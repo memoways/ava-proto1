@@ -1,3 +1,4 @@
+import { WATCHED_VIDEOS_SECTION_TITLE } from "@/services/watchedVideoMemory";
 import { trimRagContextToWholeSouvenirs } from "@/services/ragService";
 import { buildResponseStreamContract, ResponseIntentParser, validateRecoverySpeech, type ResponseIntent } from "@/services/responseIntentStream";
 import { formatPrivateDeliveryContext } from "@/services/responseDelivery";
@@ -95,6 +96,8 @@ export interface MaxAgentInput {
   userMessage: string;
   ragContext?: string;
   postVideoContext?: string;
+  /** Lot 5 : dernières vidéos vues, bloc identique à celui du GM. */
+  watchedVideos?: string;
   session_id?: string;
   knowledgeContext?: MaxTurnKnowledgeContext;
   /** Compressed bullet-point summary of earlier turns of the same session. */
@@ -639,6 +642,7 @@ export async function buildMaxSystemPrompt(
       ["speech_state", "PAROLE DU TOUR", buildSpeechStateBlock(input)],
       ["rag_context", "CONTEXTE NARRATIF — SOURCE DE VÉRITÉ", input.ragContext],
       ["post_video", "APRÈS LA VIDÉO", input.postVideoContext],
+      ["watched_videos", WATCHED_VIDEOS_SECTION_TITLE, input.watchedVideos],
     ];
     for (const [key, title, rawContent] of legacySections) {
       const content = rawContent?.trim();
@@ -732,6 +736,7 @@ export async function buildMaxSystemPrompt(
       experienceFrame: input.experienceFrame,
       guards: guards || undefined,
       postVideoContext: input.postVideoContext,
+      watchedVideos: input.watchedVideos,
       ragCandidates: input.ragCandidates,
     });
   }
@@ -853,6 +858,7 @@ export async function buildMaxSystemPrompt(
   appendDynamicSection("turn_guards", "GARDE-FOUS DU TOUR", guards || undefined);
   appendDynamicSection("rag_context", "SOUVENIRS PERTINENTS", input.ragContext);
   appendDynamicSection("post_video", "CONTEXTE POST-VIDÉO", input.postVideoContext);
+  appendDynamicSection("watched_videos", WATCHED_VIDEOS_SECTION_TITLE, input.watchedVideos);
 
   const renderedFields = renderCompiledCharacterSections(compiledFields);
   const historyChars = input.conversationHistory.reduce((sum, message) => sum + message.content.length, 0);
@@ -1022,6 +1028,7 @@ async function buildRichMaxSystemPrompt(
   appendDynamicSection("turn_guards", "GARDE-FOUS DU TOUR", guards || undefined);
   appendDynamicSection("rag_context", "SOUVENIRS PERTINENTS", input.ragContext);
   appendDynamicSection("post_video", "CONTEXTE POST-VIDÉO", input.postVideoContext);
+  appendDynamicSection("watched_videos", WATCHED_VIDEOS_SECTION_TITLE, input.watchedVideos);
 
   const renderedFields = renderRichSections(compiled.sections);
   const historyChars = input.conversationHistory.reduce((sum, message) => sum + message.content.length, 0);

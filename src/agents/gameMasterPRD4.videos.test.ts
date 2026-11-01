@@ -8,6 +8,7 @@ vi.mock("@/services/sessionConversationMemory", () => ({ persistPostTurnMemory: 
 import { callLLMWithUsage } from "@/services/openRouterLLM";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import { EXPERIENCE_DIRECTOR_SYSTEM_PROMPT, evaluatePostTurnPRD4 } from "./gameMasterPRD4";
+import { formatWatchedVideos, watchedVideoFrom } from "@/services/watchedVideoMemory";
 import publishedReplacement from "../../docs/prompt_gm_publie_regle_videos_lot_3.md?raw";
 
 const row = (id: string, extra: Partial<VideoTriggerRow>): VideoTriggerRow => ({
@@ -77,6 +78,32 @@ describe("Game Master PRD4 — eligible video candidates", () => {
     expect(prompt).toContain('id=transformed-all | titre="transformed-all" | type=mid_conversation | priorité=? | thèmes=[—] | contexte="Quand le joueur doute de Max." | description="Max seul dans la neige."');
     expect(prompt).toContain("dont le `contexte`");
     expect(prompt).not.toContain("recoupe les `themes` d'une vidéo disponible");
+  });
+});
+
+describe("Game Master PRD4 — videos the player watched (lot 5)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getVideoTriggersCached).mockResolvedValue(catalog);
+  });
+
+  it("receives the watched videos block verbatim, shared with the character", async () => {
+    const watched = formatWatchedVideos([
+      watchedVideoFrom({ id: "feu", title: "Emma regard feu avec Max", description: null, ai_description: "Emma fixe les flammes." }, 4, false),
+      watchedVideoFrom({ id: "neige", title: "Max lampe perdu dans la neige", description: null, ai_description: "Max cherche dans la neige." }, 7, true),
+    ]);
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce(gmReply("transformed-all"));
+    await evaluatePostTurnPRD4({ ...baseInput, experiencePath: "seen", watchedVideos: watched });
+    const prompt = String(vi.mocked(callLLMWithUsage).mock.calls[0][0][1].content);
+    expect(prompt).toContain(`## VIDÉOS DÉJÀ VUES PAR LE JOUEUR (données ; une allusion du joueur à une scène peut viser l'une d'elles)\n${watched}\n`);
+    expect(watched).toContain("(tour 7, passée avant la fin)");
+  });
+
+  it("says none when nothing has been watched", async () => {
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce(gmReply("transformed-all"));
+    await evaluatePostTurnPRD4({ ...baseInput, experiencePath: "seen" });
+    const prompt = String(vi.mocked(callLLMWithUsage).mock.calls[0][0][1].content);
+    expect(prompt).toContain("## VIDÉOS DÉJÀ VUES PAR LE JOUEUR (données ; une allusion du joueur à une scène peut viser l'une d'elles)\n(aucune)");
   });
 });
 

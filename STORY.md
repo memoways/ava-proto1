@@ -3,9 +3,20 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-01 (sélection vidéos, lot 4 : Description IA automatique)
+> **Last Updated**: 2026-11-01 (sélection vidéos, lot 5 : lecture et mémoire)
 
 ---
+
+## Sélection vidéos, lot 5 — les personnages se souviennent de ce qu'on a vu (1er novembre 2026)
+
+Après une vidéo, Max ou Emma ne recevaient que les 500 premiers caractères de son Contexte,
+et l'oubliaient au tour suivant : si le joueur reparlait plus tard de « la scène du feu »,
+personne ne savait de quoi il parlait. Désormais le personnage reçoit le Contexte entier et ce
+que la vidéo montrait ; puis les trois dernières vidéos vues restent, en une ligne chacune,
+sous les yeux du maître du jeu comme du personnage, avec le même texte des deux côtés. Une
+vidéo écartée avant d'être vue n'y entre pas ; une vidéo coupée en route y figure comme vue en
+partie. Les 17 vidéos ont maintenant leur Description IA ; deux textes coupés et deux presque
+jumeaux appellent un réglage de la consigne d'analyse (lot 6).
 
 ## Sélection vidéos, lot 4 — une IA regarde les vidéos (1er novembre 2026)
 

@@ -163,6 +163,8 @@ export interface ConversationTurnTraceV1 {
     userRoleSummary: string | null;
     userPostureRaw: string | null;
     postVideoContext: string | null;
+    /** Lot 5 ; absent des traces archivées. */
+    watchedVideos?: string | null;
     temporalContext: {
       timeElapsedSeconds: number;
       sessionDurationSeconds: number;

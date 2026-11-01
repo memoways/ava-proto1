@@ -1,3 +1,4 @@
+import { POST_VIDEO_SECTION_MAX_CHARS, WATCHED_VIDEOS_SECTION_MAX_CHARS } from "@/services/watchedVideoMemory";
 import type { CharacterPrompt } from "@/services/characterPromptService";
 import { MAX_MAX_RAG_CONTEXT_CHARS, MAX_MAX_RAG_ITEM_CHARS, MAX_MAX_RAG_ITEMS } from "@/services/ragBudget";
 import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
@@ -38,7 +39,8 @@ export const RICH_V2_DYNAMIC_SECTION_CHARS = {
   speech_state: 800,
   turn_guards: 500,
   rag_context: MAX_MAX_RAG_CONTEXT_CHARS,
-  post_video: 500,
+  post_video: POST_VIDEO_SECTION_MAX_CHARS,
+  watched_videos: WATCHED_VIDEOS_SECTION_MAX_CHARS,
 } as const;
 
 /** RAG : 3 souvenirs entiers, plafond partagé avec les autres variantes. */
