@@ -112,6 +112,7 @@ import GumletVideoPlayer, { type GumletVideoPlayerHandle } from "@/components/Gu
 import { savePRD4Questionnaire, syncPRD4QuestionnaireToNotion } from "@/services/prd4Questionnaire";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import { countPlayedExtracts, selectEligibleVideos } from "@/services/videoEligibility";
+import { buildPostVideoContext, formatWatchedVideos, rememberWatchedVideo, watchedVideoFrom, type WatchedVideo } from "@/services/watchedVideoMemory";
 import { experiencePathFromFilmAnswer } from "@/services/experienceFrame";
 import {
   loadVideoTriggerSettingsFromDB,
@@ -321,6 +322,8 @@ const IndexPRD4 = () => {
   const lastVideoTurnRef = useRef<number>(-Infinity);
   const videoTriggerSettingsRef = useRef<VideoTriggerSettings>(videoTriggerDefaults);
   const pendingPostVideoContextRef = useRef<string | null>(null);
+  // Lot 5 : vidéos vues pendant la page de jeu, dans l'ordre (ni GM ni personnage ne les oublient).
+  const watchedVideosRef = useRef<WatchedVideo[]>([]);
   // Boucle GM→Max : guidance produite par le post-tour N, consommée au tour N+1.
   const pendingGmGuidanceRef = useRef<string | null>(null);
   const pendingSpeechStateRef = useRef<string | null>(null);
@@ -1021,6 +1024,8 @@ const IndexPRD4 = () => {
     configuredSessionDurationRef.current = configuredDurationSeconds;
     sessionDurationRef.current = Math.min(configuredDurationSeconds, elapsedSeconds);
     triggeredVideoIdsRef.current = session.triggers_activated;
+    // Ce que montraient les vidéos n'est pas persisté pour le joueur (experience_events : lecture admin).
+    watchedVideosRef.current = [];
     activeCharacterRef.current = session.active_character;
     activeCharacterContextRef.current = characterContext;
     activeVoiceIdRef.current = profile.ttsVoiceId;
@@ -1162,6 +1167,7 @@ const IndexPRD4 = () => {
     turnLatenciesRef.current = [];
     sessionDurationRef.current = 0;
     triggeredVideoIdsRef.current = [];
+    watchedVideosRef.current = [];
     lastVideoTurnRef.current = -Infinity;
     pendingPostVideoContextRef.current = null;
     const startingCharacter = startingCharacterRef.current;
@@ -1734,6 +1740,7 @@ const IndexPRD4 = () => {
           characterContext: turnCharacterContext,
           triggeredVideoIds: triggeredVideoIdsRef.current,
           postVideoContext,
+          watchedVideos: formatWatchedVideos(watchedVideosRef.current) || undefined,
           gmGuidance,
           gmTopicsCovered: gmTopicsCoveredRef.current,
           gmSpeechState,
@@ -3333,6 +3340,7 @@ const IndexPRD4 = () => {
     turnLatenciesRef.current = [];
     sessionDurationRef.current = 0;
     triggeredVideoIdsRef.current = [];
+    watchedVideosRef.current = [];
     pendingPostVideoContextRef.current = null;
     pendingGmGuidanceRef.current = null;
     pendingEmotionalStateRef.current = null;
@@ -3364,7 +3372,12 @@ const IndexPRD4 = () => {
     if (!activeVideo || activeVideoRef.current !== activeVideo || endedRef.current || phaseRef.current !== 'conversation_max'
       || transition.phase !== "playing") return;
     const skipped = outcome !== "completed";
-    if (outcome !== "error") pendingPostVideoContextRef.current = activeVideo.context || activeVideo.post_video_context || null;
+    if (outcome !== "error") {
+      pendingPostVideoContextRef.current = buildPostVideoContext(activeVideo);
+      // Passée en cours de lecture : vue en partie, gardée et marquée comme telle.
+      watchedVideosRef.current = rememberWatchedVideo(watchedVideosRef.current,
+        watchedVideoFrom(activeVideo, cinematicMetaRef.current?.turnIndex ?? null, skipped));
+    }
     trackEvent("prd4_video_completed", {
       session_id: sessionIdRef.current,
       video_id: activeVideo.id,

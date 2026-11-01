@@ -92,6 +92,8 @@ export interface PRD4TurnInput {
   triggeredVideoIds?: string[];
   /** Contexte injecté dans Max suite à la vidéo précédente. */
   postVideoContext?: string;
+  /** Lot 5 : bloc des dernières vidéos vues, identique pour le GM et le personnage. */
+  watchedVideos?: string;
   /** GIFF — posture initiale de l'utilisateur (question/intention exprimée avant l'appel). */
   userPostureRaw?: string | null;
   /** Boucle GM→Max : next_turn_guidance produit par le post-tour du tour précédent. */
@@ -357,6 +359,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     userMessage: input.userMessage,
     ragContext: ragContext || undefined,
     postVideoContext: input.postVideoContext,
+    watchedVideos: input.watchedVideos,
     session_id: input.sessionId ?? undefined,
     knowledgeContext,
     // Résumé lu depuis le cache mémoire scoped au personnage (jamais le log global).
@@ -506,6 +509,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         sessionDurationSeconds,
         minimumClosureSeconds,
         triggeredVideoIds: input.triggeredVideoIds,
+        watchedVideos: input.watchedVideos ?? null,
         experiencePath: experiencePathFromFilmAnswer(input.hasSeenFilm),
         minExtractsBeforeCinematic: input.minExtractsBeforeCinematic,
         signal: candidateSignal ?? input.postTurnSignal ?? input.signal,
@@ -627,6 +631,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         userRoleSummary: resolvedUserRoleSummary ?? null,
         userPostureRaw: input.userPostureRaw ?? null,
         postVideoContext: input.postVideoContext ?? null,
+        watchedVideos: input.watchedVideos ?? null,
         temporalContext: maxInput.temporalContext!,
         gmGuidance: maxInput.gmGuidance?.guidance ?? null,
         gmTopicsCovered: maxInput.gmGuidance?.topicsCovered ?? [],

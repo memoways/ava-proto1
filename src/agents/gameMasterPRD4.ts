@@ -55,6 +55,8 @@ export interface PRD4PostTurnInput {
   minimumClosureSeconds: number;
   /** IDs de triggers vidéo déjà joués (évite de rejouer). */
   triggeredVideoIds?: string[];
+  /** Lot 5 : dernières vidéos vues (bloc partagé avec le personnage). */
+  watchedVideos?: string | null;
   /** Parcours film (seen/unseen) ; absent = inconnu, aucun filtre de nature. */
   experiencePath?: ExperiencePath | null;
   /** Parcours unseen : extraits à montrer avant une vidéo transformée. */
@@ -365,6 +367,9 @@ ${videoLines}
 
 ## already_triggered
 ${triggered.length ? triggered.join(", ") : "(aucune)"}
+
+## VIDÉOS DÉJÀ VUES PAR LE JOUEUR (données ; une allusion du joueur à une scène peut viser l'une d'elles)
+${input.watchedVideos?.trim() || "(aucune)"}
 
 ## HISTORIQUE RÉCENT
 ${recent || "(aucun)"}

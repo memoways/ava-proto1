@@ -1,10 +1,10 @@
 # Plan — sélection contextuelle des vidéos
 
 Date : 2026-11-01. Statut : lots 1 (données), 2 (filtre d'éligibilité), 3 (choix au sens),
-3b (transition cinématique) et 4 (Description IA, code) livrés ; règle GM publiée en
-sandbox-ulrich (v11), prod (v8) et sandbox-julien (v9) inchangés. Première analyse réelle à
-faire par Ulrich en admin ; lot 5 (lecture et mémoire) préparé
-([prompt lot 5](prompt_reprise_selection_videos_lot_5.md)).
+3b (transition cinématique), 4 (Description IA) et 5 (lecture et mémoire) livrés ; règle GM
+publiée en sandbox-ulrich (v11), prod (v8) et sandbox-julien (v9) inchangés. Les 17 vidéos ont
+une Description IA ; lot 6 (consigne d'analyse) préparé
+([prompt lot 6](prompt_reprise_selection_videos_lot_6.md)).
 Source : analyse de la mécanique vidéo (session du 2026-11-01) et décisions d'Ulrich.
 
 ## État actuel (résumé)
@@ -348,12 +348,70 @@ transition « fonctionne bien ». Trois retouches demandées et livrées :
   Notion et l'admin, puis le reste par « Analyser les vidéos sans description ». Les vidéos
   analysées seront listées dans le compte rendu de cette recette.
 
+**Analyse réelle (constat du 2026-11-01, lecture Lovable).** Les 17 vidéos ont une
+Description IA (201 à 299 caractères) ; les Descriptions humaines sont restées vides et
+intactes. Relecture : textes coupés par « … » sur « couteau » et « Ava dans les bras de Emma »
+(Gemini dépasse 300, `normalizeAiDescription` coupe) ; descriptions presque identiques pour
+« Max lampe perdu dans la neige » et « test slowly-turning-on-himself » (même plan, le GM ne
+peut pas les distinguer). Suite : lot 6.
+
 ### Lot 5 — Lecture et mémoire
 
 - (Traité au lot 3b : la vidéo attend la fin de la réplique.)
 - Contexte post-vidéo : relever la limite de 500 caractères.
 - Mémoire : garder dans la session les vidéos vues et ce qu'elles montrent,
   pour le GM et le personnage au-delà d'un tour.
+
+**Étape 0 — mesure (2026-11-01, avant le code).**
+
+- Prompt personnage `optimized_v3` (seule variante des 84 tours tracés sur 30 jours) : noyau
+  statique ≈ 4 400 caractères (max 4 448, plafond 5 500) ; prompt système p50 7 396 (Emma) et
+  9 603 (Max), p95 10 113 et 10 496 ; limite 11 000 moins l'historique (p95 ≈ 1 000). Aucun
+  tour hors budget.
+- Le contexte post-vidéo était la **dernière** section, après les souvenirs RAG (moyenne 349,
+  max 1 750), qui finissent parfois « budget_contexte_epuise » : il pouvait être coupé ou omis.
+- Catalogue : Contexte 28 à 600 caractères (trois au-delà de 300 : 600, 431, 366), Description IA
+  201 à 299, Description vide partout.
+- Plafonds retenus : Contexte 650 (marge sur 600), ce que la vidéo montrait 300, section
+  post-vidéo 1 000 ; vidéos vues : trois lignes (titre 80, description 140), section 750. Les
+  deux sections passent avant les souvenirs complémentaires : la limite globale ne bouge pas, ce
+  sont les souvenirs qui cèdent quand le contexte est plein. Pas de dépassement : aucune décision
+  d'Ulrich requise.
+
+**Exécution (2026-11-01, livré).**
+
+- `src/services/watchedVideoMemory.ts` : `capAtWord` (jamais au milieu d'un mot, « … » marque la
+  coupe), `buildPostVideoContext`, `watchedVideoFrom`, `rememberWatchedVideo` (ordre de
+  visionnage, une vidéo rejouée passe en fin), `formatWatchedVideos` (trois dernières, de la
+  plus ancienne à la plus récente : « - « titre » (tour N[, passée avant la fin]) : ce qu'elle
+  montre »).
+- `IndexPRD4` : `watchedVideosRef` (remis à zéro au démarrage et au redémarrage) alimenté par
+  `finishActiveVideo` ; le bloc part à chaque tour (`watchedVideos`), le contexte post-vidéo une
+  seule fois comme avant.
+- Décisions : vidéo « Ignorée » (annonce écartée) ou jamais montrée (transition annulée,
+  erreur de lecture) hors mémoire ; « Passée » pendant la lecture : gardée, marquée « passée
+  avant la fin » (le joueur en a vu le début, le personnage ne doit pas supposer la fin vue).
+- GM : section « VIDÉOS DÉJÀ VUES PAR LE JOUEUR » du message utilisateur (code, pas le prompt
+  publié) ; personnage : section de même titre, contenu identique (exemptée du dédoublonnage,
+  comme le cadre commun) dans `optimized_v3`, `compact_v1`, `rich_v2` et legacy. Trace :
+  `memory.watchedVideos`.
+- Persistance : aucune table. Les événements `cinematic_played/completed/skipped` restent dans
+  `experience_events`, lisibles par les admins seulement ; `triggers_activated` n'est pas écrit
+  par PRD4. Une reprise de session repart donc sans mémoire vidéo (comme l'exclusion des vidéos
+  jouées aujourd'hui). La restaurer exigerait une politique RLS de lecture propriétaire
+  (migration Lovable, accord d'Ulrich) : non nécessaire à ce stade.
+- Tests : `watchedVideoMemory.test.ts` (10), `maxOptimizedPromptCompiler.test.ts` (+4 : Contexte
+  de 600 entier, ordre avant RAG, bloc identique, rien sans vidéo), `gameMasterPRD4.videos.test.ts`
+  (+2 : bloc reçu tel quel, « (aucune) »).
+- Recette humaine (Ulrich) : une partie où une vidéo est jouée, puis une allusion à cette scène
+  deux ou trois tours plus tard ; vérifier aussi « Passer » en cours de lecture.
+
+### Lot 6 — Consigne d'analyse (préparé)
+
+- Descriptions IA sans coupure : consigne visant 260 caractères au plus, phrases complètes.
+- Distinguer les plans voisins : demander le geste ou l'objet distinctif de la séquence.
+- Réanalyse des vidéos concernées par Ulrich en admin ; aucune écriture Notion par l'agent.
+- [Prompt lot 6](prompt_reprise_selection_videos_lot_6.md).
 
 ## Non-régression
 

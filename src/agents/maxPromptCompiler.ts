@@ -1,3 +1,4 @@
+import { POST_VIDEO_SECTION_MAX_CHARS, WATCHED_VIDEOS_SECTION_MAX_CHARS } from "@/services/watchedVideoMemory";
 import type { CharacterPrompt } from "@/services/characterPromptService";
 import { MAX_MAX_RAG_CONTEXT_CHARS } from "@/services/ragBudget";
 import { characterEmbodiment, withoutCharacterEmbodiment } from '@/services/characterEmbodiment';
@@ -24,7 +25,8 @@ export const MAX_DYNAMIC_SECTION_CHARS = {
   gm_guidance: 350,
   speech_state: 800,
   rag_context: MAX_MAX_RAG_CONTEXT_CHARS,
-  post_video: 500,
+  post_video: POST_VIDEO_SECTION_MAX_CHARS,
+  watched_videos: WATCHED_VIDEOS_SECTION_MAX_CHARS,
   turn_guards: 500,
 } as const;
 

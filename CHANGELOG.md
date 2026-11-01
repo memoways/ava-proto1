@@ -4,6 +4,33 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Sélection vidéos, lot 5 — lecture et mémoire] — 2026-11-01
+
+- Étape 0 mesurée avant le code : 84 tours `optimized_v3` des 30 derniers jours, prompt
+  système p95 10 113 (Emma) et 10 496 (Max) caractères pour une limite de 11 000 moins
+  l'historique ; noyau statique ≈ 4 400. Le contexte post-vidéo était ajouté **après** les
+  souvenirs RAG, qui épuisent parfois le budget (`budget_contexte_epuise`). Catalogue : Contexte
+  jusqu'à 600 caractères (« mauvaise conscience »), Description IA 201 à 299, Description vide.
+- Contexte post-vidéo : Contexte entier (coupe au mot au-delà de 650, jamais au milieu d'un mot)
+  suivi de « Ce que la vidéo montrait : » (Description, sinon Description IA, 300 caractères) ;
+  plafond de section 1 000 (500 avant) dans les quatre variantes du prompt personnage.
+- Mémoire des vidéos vues : liste ordonnée de la page de jeu (id, titre, ce qu'elle montre, tour,
+  vue en partie) ; les trois dernières forment un bloc identique transmis au GM (« VIDÉOS DÉJÀ
+  VUES PAR LE JOUEUR ») et au personnage (750 caractères au plus, exempté de dédoublonnage pour
+  rester identique). Vidéo « Ignorée » ou jamais montrée : hors mémoire ; « Passée » en cours de
+  lecture : gardée, marquée « passée avant la fin ».
+- `optimized_v3` : contexte post-vidéo et vidéos vues passent avant les souvenirs
+  complémentaires, qui cèdent la place quand le contexte est plein ; limite globale inchangée.
+- Persistance : aucune table ni migration ; les événements `cinematic_*` restent dans
+  `experience_events` (lecture admin seulement), la reprise de session repart sans mémoire vidéo.
+- Module `src/services/watchedVideoMemory.ts` ; tests `watchedVideoMemory.test.ts` (10), quatre
+  cas `maxOptimizedPromptCompiler.test.ts`, deux cas `gameMasterPRD4.videos.test.ts`.
+- Constat lot 4 : les 17 vidéos ont une Description IA (201 à 299 caractères), Descriptions
+  humaines vides et intactes. Prompt GM publié, filtre, choix au sens, transition, lecteur, voix
+  et `describe-video` inchangés ; aucune écriture Notion.
+  Plan : [sélection contextuelle](docs/plan_selection_videos_contextuelle.md#lot-5--lecture-et-mémoire) ·
+  [prompt lot 6](docs/prompt_reprise_selection_videos_lot_6.md).
+
 ## [Sélection vidéos, lot 4 — Description IA automatique] — 2026-11-01
 
 - Faisabilité établie avant le code : `google/gemini-2.5-flash` (OpenRouter, fournisseur Google
