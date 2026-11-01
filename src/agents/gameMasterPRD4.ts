@@ -2,6 +2,7 @@ import { withTimeout } from '@/services/asyncUtils';
 import { candidateEvidence, HANDOFF_DEPENDENCY_TIMEOUT_MS } from '@/services/handoffCoordinator';
 import { CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS } from '@/services/gameMasterPromptBuilder';
 import { GM_RUNTIME_OUTPUT_INSTRUCTIONS, REQUIRED_GM_JSON_FIELDS } from '@/services/gameMasterContract';
+import { formatVideoCandidateLine } from '@/services/videoCandidateLine';
 import { selectSpeechState } from '@/services/speechRugosity';
 import type { OpenHandoffRequest } from '@/services/characterHandoffState';
 import type { ResponseDeliveryReceipt } from '@/services/responseDelivery';
@@ -183,13 +184,15 @@ Règles "labels" :
 - N'utilise que des mots simples, minuscules, sans accents superflus, sans phrase.
 - Pour "themes", privilégie les grands thèmes narratifs : famille, patriarcat, trahison, secrets, confiance, deuil, violence, mémoire, identité, amour, mensonge.
 
-Règles "trigger_video_id" — PRIORITÉ HAUTE :
-- Compare \`labels.themes\` aux champs \`themes\` de VIDÉOS DISPONIBLES.
+Règles "trigger_video_id" — choix au sens, PRIORITÉ HAUTE :
+- VIDÉOS DISPONIBLES ne liste que des vidéos déjà autorisées pour ce moment (parcours film, personnage en ligne, vidéos déjà jouées exclues). Choisis uniquement parmi elles.
+- Rapproche chaque vidéo de ce qui se joue maintenant : thèmes, sujets concrets et intention du joueur (labels), et ce que le personnage vient de dire.
+- Appuie-toi d'abord sur \`contexte\` (intention éditoriale : à quel moment de la conversation la vidéo prend son sens), puis sur \`description\` (ce que montre la séquence), puis sur \`thèmes\`.
+- Un thème commun ne suffit pas si le contexte de la vidéo ne correspond pas à l'échange. Un contexte qui correspond clairement suffit, même sans thème identique.
 - Tolère synonymes/fautes : "patricarcat"="patriarcat" ; "famille" ⊃ parents/sœur/père/frère/enfance/fratrie ; "trahison" ⊃ mensonge/cacher/secret ; "secrets" ⊃ cacher/vérité.
-- DÈS QU'UN thème de la vidéo recoupe un label \`themes\` que tu viens d'extraire → renseigne \`trigger_video_id\` avec l'id de la vidéo.
-- Plusieurs matchs : prends la priorité la plus haute (number le plus petit = plus prioritaire).
+- Plusieurs vidéos pertinentes : prends la plus juste au regard du contexte ; à égalité, la priorité la plus haute (number le plus petit = plus prioritaire).
 - Jamais d'id déjà présent dans \`already_triggered\`.
-- Si \`labels.themes\` est vide, retourne null (pas de trigger sans label clair).
+- Si rien ne rejoint clairement l'échange (message vague, salutation, hors-sujet), retourne null : jamais de vidéo par défaut.
 
 Règles "action" :
 - Utilise {"type":"none"} par défaut.
@@ -276,7 +279,7 @@ function buildUserPrompt(input: PRD4PostTurnInput, videos: VideoTriggerRow[]): s
   const triggered = input.triggeredVideoIds ?? [];
   const videoLines = videos.length
     ? videos
-        .map((v) => `- id=${v.id} | titre="${v.title}" | type=${v.type} | priorité=${v.priority ?? "?"} | thèmes=[${(v.themes ?? []).join(", ") || "—"}]${v.description ? ` | description="${v.description.slice(0, 160)}"` : ""}`)
+        .map(formatVideoCandidateLine)
         .join("\n")
     : "(aucune)";
   const memory = input.conversationMemoryBefore;
@@ -384,7 +387,7 @@ ${JSON.stringify({ turnId: input.handoffContext.turnId, turnIndex: input.turnInd
 UTILISATEUR (à labéliser) : ${input.userMessage}
 ${characterAttribution} : ${input.maxResponse}
 
-Retourne l'évaluation JSON. Extrais d'abord \`labels\` à partir du message UTILISATEUR uniquement (max 4 labels, vides si pas évident). Puis renseigne \`trigger_video_id\` si un de tes \`labels.themes\` recoupe les \`themes\` d'une vidéo disponible.`;
+Retourne l'évaluation JSON. Extrais d'abord \`labels\` à partir du message UTILISATEUR uniquement (max 4 labels, vides si pas évident). Puis renseigne \`trigger_video_id\` avec la vidéo disponible dont le \`contexte\` (puis la \`description\` et les \`thèmes\`) rejoint le sens de l'échange ; null si aucune ne correspond clairement.`;
 }
 
 function cleanMemoryDelta(raw: unknown): ConversationMemoryDelta | null {

@@ -38,6 +38,16 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Sélection vidéos, lot 3 livré le 1er novembre (code) : choix au sens.**
+Bloc vidéos du GM avec Contexte et Description (ou Description IA), 300 caractères chacun ;
+règle du code : contexte d'abord, un thème seul ne suffit plus. `videoTriggerMatcher.ts`
+supprimé. **Prompt GM publié non modifié** (sandbox-ulrich v7, prod v8, sandbox-julien v9) :
+publication admin par Ulrich, sandbox d'abord, production sur son accord —
+[texte prêt](prompt_gm_publie_regle_videos_lot_3.md). Recette humaine : film vu, film pas
+vu, vidéo pertinente au fil de la conversation.
+[Plan](plan_selection_videos_contextuelle.md) ·
+[Prompt lot 4 « Description IA automatique »](prompt_reprise_selection_videos_lot_4.md).
+
 **Sélection vidéos, lot 2 livré le 1er novembre : filtre d'éligibilité déterministe.**
 `selectEligibleVideos` filtre avant le GM : film vu → transformées ; film pas vu → extraits
 d'abord, transformées après `MIN_EXTRACTS_BEFORE_CINEMATIC` (défaut 2) ; personnage en ligne,

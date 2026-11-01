@@ -3,9 +3,19 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-01 (sélection vidéos, lot 2 : filtre d'éligibilité déterministe)
+> **Last Updated**: 2026-11-01 (sélection vidéos, lot 3 : choix au sens)
 
 ---
+
+## Sélection vidéos, lot 3 — choisir une vidéo pour ce qu'elle raconte (1er novembre 2026)
+
+Le maître du jeu choisissait une vidéo dès qu'un mot-thème coïncidait : « secrets » dans la
+conversation, et n'importe quelle vidéo marquée « secrets » partait. Il voit maintenant, pour
+chaque vidéo autorisée, le Contexte écrit par Ulrich — à quel moment de l'histoire elle prend
+son sens — et ce qu'elle montre. Il choisit d'abord sur ce contexte ; un thème commun ne
+suffit plus, et sans rapprochement clair il ne lance rien. Le prompt GM publié en admin
+garde encore l'ancienne règle : le texte de remplacement est prêt, sa publication revient à
+Ulrich. Description IA, rédigée automatiquement, viendra au lot 4.
 
 ## Sélection vidéos, lot 2 — la bonne vidéo pour le bon parcours (1er novembre 2026)
 

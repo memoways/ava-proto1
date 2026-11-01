@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Sélection vidéos, lot 3 — choix au sens, pas au mot-clé] — 2026-11-01
+
+- Bloc VIDÉOS DISPONIBLES du GM : chaque candidate porte désormais `contexte` et `description`
+  (Description humaine, sinon Description IA), chacun plafonné à 300 caractères sur une ligne.
+  Fonction pure `formatVideoCandidateLine` (`src/services/videoCandidateLine.ts`).
+- Règle GM du code « choix au sens » : contexte d'abord, puis description, puis thèmes ; un
+  thème commun ne suffit plus, un contexte clair suffit ; null si rien ne correspond. Consigne
+  finale du message GM alignée. Contrat JSON inchangé ; filtre d'éligibilité du lot 2 intact.
+- Prompt GM publié (sandbox-ulrich v7, prod v8, sandbox-julien v9, même texte) lu via Lovable :
+  texte de remplacement prêt, **non publié** —
+  [prompt GM publié, lot 3](docs/prompt_gm_publie_regle_videos_lot_3.md).
+- `videoTriggerMatcher.ts` supprimé (code mort, logique par mots-clés contraire au lot).
+- Bloc vidéos mesuré sur le catalogue réel : pire cas 1 633 → 3 076 caractères (film vu, Max).
+  Plan : [sélection contextuelle](docs/plan_selection_videos_contextuelle.md) ·
+  [prompt lot 4](docs/prompt_reprise_selection_videos_lot_4.md).
+
 ## [Sélection vidéos, lot 2 — filtre d'éligibilité déterministe] — 2026-11-01
 
 - Nouvelle fonction pure `selectEligibleVideos` (`src/services/videoEligibility.ts`) : film vu →
