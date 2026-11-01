@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatar Tavus — visage abattu, jamais souriant] — 2026-11-01
+
+- Tavus : le navigateur envoie `conversation.set_emotion` dès que le flux est prêt, puis avant
+  chaque réplique (robuste à une reconnexion). Le visage garde l'émotion en écoutant et en
+  parlant. Défaut « sadness » pour tous les personnages : Max est au fond du trou, aucun sourire
+  commercial. Réglable dans Admin → Avatar streaming → Tavus (« Émotion du visage »).
+- Les réglages déjà enregistrés sans émotion reçoivent « sadness » à la normalisation ; aucune
+  migration, aucune Edge Function modifiée.
+- Limite : effet seulement sur un Face Phoenix-4 ou 4.5 (Pro). HeyGen LiveAvatar n'expose aucun
+  paramètre d'émotion faciale documenté ; le sourire y dépend du choix de l'avatar.
+
 ## [Sélection vidéos, lot 5 — lecture et mémoire] — 2026-11-01
 
 - Étape 0 mesurée avant le code : 84 tours `optimized_v3` des 30 derniers jours, prompt

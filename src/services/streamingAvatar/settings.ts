@@ -1,8 +1,10 @@
 import { loadEnvironmentSetting, readEnvironmentStorage, saveEnvironmentSetting } from "@/services/environmentContext";
-import type {
-  OutputSettings,
-  StreamingAvatarProviderId,
-  StreamingAvatarSettings,
+import {
+  TAVUS_EMOTIONS,
+  type OutputSettings,
+  type StreamingAvatarProviderId,
+  type StreamingAvatarSettings,
+  type TavusEmotion,
 } from "./types";
 
 export const OUTPUT_SETTINGS_KEY = "ava_output_settings";
@@ -27,6 +29,7 @@ export const streamingAvatarDefaults: StreamingAvatarSettings = {
     personaId: "",
     language: "French",
     maxDurationSeconds: 900,
+    emotion: "sadness",
   },
 };
 
@@ -104,8 +107,15 @@ export function normalizeStreamingAvatarSettings(
     tavus: {
       ...tavus,
       maxDurationSeconds: clamp(tavus.maxDurationSeconds, 60, 3_600, 900),
+      emotion: normalizeTavusEmotion(tavus.emotion),
     },
   };
+}
+
+function normalizeTavusEmotion(value: unknown): TavusEmotion {
+  return TAVUS_EMOTIONS.includes(value as TavusEmotion)
+    ? (value as TavusEmotion)
+    : streamingAvatarDefaults.tavus.emotion;
 }
 
 function clamp(value: unknown, min: number, max: number, fallback: number): number {

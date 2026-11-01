@@ -17,7 +17,7 @@ class Stream {
 function track(kind: string, id = kind) {
   fake.handlers.get("track-started")?.({ participant: { local: false }, type: kind, track: { id, kind, readyState: "live" } });
 }
-const settings = { replicaId: "face", personaId: "pal", language: "French", maxDurationSeconds: 900 };
+const settings = { replicaId: "face", personaId: "pal", language: "French", maxDurationSeconds: 900, emotion: "sadness" as const };
 describe("Tavus actual receive-only lifecycle", () => {
   beforeEach(() => {
     vi.useFakeTimers(); vi.clearAllMocks(); fake.handlers.clear(); vi.stubGlobal("MediaStream", Stream);
@@ -56,7 +56,8 @@ describe("Tavus actual receive-only lifecycle", () => {
     video.play = vi.fn(async () => { throw new DOMException("autoplay blocked", "NotAllowedError"); });
     output.attachMedia(video); await vi.advanceTimersByTimeAsync(0);
     await expect(output.renderText("Bonjour")).rejects.toMatchObject({ started: false });
-    expect(fake.call.sendAppMessage).not.toHaveBeenCalled(); await output.dispose();
+    const sent = fake.call.sendAppMessage.mock.calls.map(([message]) => message.event_type);
+    expect(sent).not.toContain("conversation.echo"); await output.dispose();
   });
   it("accepts PAL speech and ignores wrong conversations and duplicate legacy events", async () => {
     const onSpeakStart = vi.fn(), onSpeakEnd = vi.fn();
@@ -70,5 +71,24 @@ describe("Tavus actual receive-only lifecycle", () => {
     event("conversation.stopped_speaking"); event("conversation.stopped_speaking", "conversation", "replica");
     await expect(speech).resolves.toMatchObject({ status: "played", playedSegments: 1 });
     expect(onSpeakStart).toHaveBeenCalledOnce(); expect(onSpeakEnd).toHaveBeenCalledOnce(); await output.dispose();
+  });
+  it("sets the configured face emotion when ready and again before each spoken turn", async () => {
+    const output = new TavusStreamingAvatarOutput(settings, {}, 1000, 1000); await ready(output);
+    const emotionCalls = () => fake.call.sendAppMessage.mock.calls
+      .map(([message]) => message)
+      .filter((message) => message.event_type === "conversation.set_emotion");
+    expect(emotionCalls()).toEqual([{
+      message_type: "conversation",
+      event_type: "conversation.set_emotion",
+      conversation_id: "conversation",
+      properties: { emotion: "sadness" },
+    }]);
+    const video = document.createElement("video"); video.play = vi.fn(async () => {}); output.attachMedia(video);
+    const speech = output.renderText("Je n'en peux plus."); await vi.advanceTimersByTimeAsync(0);
+    const order = fake.call.sendAppMessage.mock.calls.map(([message]) => message.event_type);
+    expect(order.slice(-2)).toEqual(["conversation.set_emotion", "conversation.echo"]);
+    const event = (type: string) => fake.handlers.get("app-message")?.({ data: { event_type: type, conversation_id: "conversation", properties: { role: "pal" } } });
+    event("conversation.started_speaking"); await vi.advanceTimersByTimeAsync(0); event("conversation.stopped_speaking");
+    await speech; await output.dispose();
   });
 });

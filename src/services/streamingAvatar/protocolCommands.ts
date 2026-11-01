@@ -22,3 +22,16 @@ export function buildTavusEchoCommand(conversationId: string, text: string) {
     },
   } as const;
 }
+
+/**
+ * Tavus holds this facial emotion while listening and speaking, until the next
+ * `conversation.set_emotion`. Without it Phoenix faces default to a friendly smile.
+ */
+export function buildTavusSetEmotionCommand(conversationId: string, emotion: string) {
+  return {
+    message_type: "conversation",
+    event_type: "conversation.set_emotion",
+    conversation_id: conversationId,
+    properties: { emotion },
+  } as const;
+}
