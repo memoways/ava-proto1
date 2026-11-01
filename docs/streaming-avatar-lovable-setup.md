@@ -18,7 +18,7 @@ Le mode avatar est un moteur de rendu. Ava reste l’unique propriétaire du STT
 
 - HeyGen LiveAvatar FULL : le navigateur appelle le wrapper SDK `repeat(text)`, qui émet `avatar.speak_text`. Ne pas utiliser `avatar.speak_response`.
 - Tavus : le navigateur émet `conversation.echo` avec `modality: "text"` et `done: true`. Ne pas utiliser `conversation.respond`.
-- Tavus : à la connexion puis avant chaque réplique, le navigateur émet `conversation.set_emotion` avec l'émotion réglée en admin (défaut `sadness`). Le visage la garde en écoutant et en parlant ; aucun sourire. Exige un Face Phoenix-4/4.5 (Pro).
+- Tavus : à la connexion puis avant chaque réplique, le navigateur émet `conversation.set_emotion` avec l'émotion réglée en admin (défaut `sadness`). Le visage la garde en écoutant et en parlant. Chaque echo texte porte aussi la balise Echo `<emotion value="dejected"/>` (obligatoire en mode Echo, sinon le visage choisit lui-même et sourit). Exige un Face Phoenix-4/4.5.
 - La Persona ID Tavus doit avoir `pipeline_mode: "echo"`. L’Edge Function le vérifie avant chaque création ; ce mode désactive Perception, STT et LLM Tavus ainsi que son entrée micro.
 - Les clés API ne quittent jamais l’Edge Function. Le navigateur reçoit uniquement un jeton de session média éphémère.
 

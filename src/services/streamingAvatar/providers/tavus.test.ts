@@ -72,21 +72,25 @@ describe("Tavus actual receive-only lifecycle", () => {
     await expect(speech).resolves.toMatchObject({ status: "played", playedSegments: 1 });
     expect(onSpeakStart).toHaveBeenCalledOnce(); expect(onSpeakEnd).toHaveBeenCalledOnce(); await output.dispose();
   });
-  it("sets the configured face emotion when ready and again before each spoken turn", async () => {
+  it("sets the face emotion at join, when ready, and tags each spoken line", async () => {
     const output = new TavusStreamingAvatarOutput(settings, {}, 1000, 1000); await ready(output);
     const emotionCalls = () => fake.call.sendAppMessage.mock.calls
       .map(([message]) => message)
       .filter((message) => message.event_type === "conversation.set_emotion");
-    expect(emotionCalls()).toEqual([{
+    // Once right after joining, once when the stream is ready.
+    expect(emotionCalls()).toHaveLength(2);
+    expect(emotionCalls()[0]).toEqual({
       message_type: "conversation",
       event_type: "conversation.set_emotion",
       conversation_id: "conversation",
       properties: { emotion: "sadness" },
-    }]);
+    });
     const video = document.createElement("video"); video.play = vi.fn(async () => {}); output.attachMedia(video);
     const speech = output.renderText("Je n'en peux plus."); await vi.advanceTimersByTimeAsync(0);
     const order = fake.call.sendAppMessage.mock.calls.map(([message]) => message.event_type);
     expect(order.slice(-2)).toEqual(["conversation.set_emotion", "conversation.echo"]);
+    const echo = fake.call.sendAppMessage.mock.calls.at(-1)?.[0];
+    expect(echo.properties.text).toBe('<emotion value="dejected"/> Je n\'en peux plus.');
     const event = (type: string) => fake.handlers.get("app-message")?.({ data: { event_type: type, conversation_id: "conversation", properties: { role: "pal" } } });
     event("conversation.started_speaking"); await vi.advanceTimersByTimeAsync(0); event("conversation.stopped_speaking");
     await speech; await output.dispose();

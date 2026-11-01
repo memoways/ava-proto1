@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildTavusEchoCommand,
   buildTavusSetEmotionCommand,
+  stripTavusEmotionTags,
   sendHeyGenSpeakText,
 } from "./protocolCommands";
 
@@ -35,5 +36,11 @@ describe("streaming avatar direct text protocols", () => {
       conversation_id: "conversation-1",
       properties: { emotion: "sadness" },
     });
+  });
+
+  it("prefixes every Tavus echo with the Echo-mode emotion tag", () => {
+    const command = buildTavusEchoCommand("conversation-1", "Je n'en peux plus.", "sadness");
+    expect(command.properties.text).toBe('<emotion value="dejected"/> Je n\'en peux plus.');
+    expect(stripTavusEmotionTags(command.properties.text)).toBe("Je n'en peux plus.");
   });
 });

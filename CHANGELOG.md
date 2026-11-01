@@ -4,6 +4,16 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatar Tavus — balise d'émotion sur chaque réplique] — 2026-11-01
+
+- Recette : Max accueillait encore en souriant malgré `set_emotion`. La doc Tavus Echo impose une
+  balise dans chaque texte : sans elle, le visage choisit sa propre émotion par réplique.
+- Chaque `conversation.echo` commence désormais par `<emotion value="dejected"/>` (mappé depuis le
+  réglage admin : sadness → dejected, fear → scared, etc.). Les transcriptions renvoyées par
+  Tavus sont nettoyées de la balise avant la comparaison au texte attendu.
+- `set_emotion` part aussi juste après l'entrée dans la salle, avant que le flux soit prêt, pour
+  que l'accueil ne commence pas sur le sourire par défaut.
+
 ## [Avatar Tavus — visage abattu, jamais souriant] — 2026-11-01
 
 - Tavus : le navigateur envoie `conversation.set_emotion` dès que le flux est prêt, puis avant

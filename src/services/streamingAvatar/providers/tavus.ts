@@ -5,7 +5,11 @@ import DailyIframe, {
   type DailyNetworkStats,
 } from "@daily-co/daily-js";
 import { endAvatarSession, startAvatarSession } from "../api";
-import { buildTavusEchoCommand, buildTavusSetEmotionCommand } from "../protocolCommands";
+import {
+  buildTavusEchoCommand,
+  buildTavusSetEmotionCommand,
+  stripTavusEmotionTags,
+} from "../protocolCommands";
 import { splitAvatarText } from "../textSegmentation";
 import {
   AvatarRenderError,
@@ -107,6 +111,8 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     );
     call.setLocalAudio(false, { forceDiscardTrack: true });
     call.setLocalVideo(false);
+    // As early as possible so the face never greets with its default smile.
+    this.applyEmotion();
     await this.waitUntilReady();
     if (context.signal?.aborted) throw new DOMException("Avatar preparation aborted", "AbortError");
     this.applyEmotion();
@@ -149,7 +155,7 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
         const speech = createPendingSpeech(context?.turnId);
         this.currentSpeech = speech;
         this.call.sendAppMessage(
-          buildTavusEchoCommand(this._externalSessionId, chunk),
+          buildTavusEchoCommand(this._externalSessionId, chunk, this.settings.emotion),
           "*",
         );
         const abort = () => this.interrupt();
@@ -299,7 +305,10 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
         message.event_type === "conversation.utterance" &&
         typeof message.properties?.text === "string"
       ) {
-        this.callbacks.onTranscript?.(message.properties.text, this.currentSpeech?.turnId);
+        this.callbacks.onTranscript?.(
+          stripTavusEmotionTags(message.properties.text),
+          this.currentSpeech?.turnId,
+        );
       }
     });
     call.on("left-meeting", () => this.handleDisconnected("left_meeting"));

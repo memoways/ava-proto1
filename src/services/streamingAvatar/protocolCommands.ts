@@ -1,3 +1,5 @@
+import type { TavusEmotion } from "./types";
+
 /**
  * Provider commands are deliberately isolated here so Ava's final text cannot
  * accidentally be routed through a provider-side conversational command.
@@ -10,14 +12,41 @@ export function sendHeyGenSpeakText(
   return session.repeat(text);
 }
 
-export function buildTavusEchoCommand(conversationId: string, text: string) {
+/**
+ * Echo-mode text tags (a different vocabulary from `set_emotion`). Tavus requires
+ * them in Echo mode: an untagged text echo lets the face pick its own emotion,
+ * which overrides `set_emotion` and brings back the smile.
+ */
+export const TAVUS_ECHO_EMOTION_TAGS: Record<TavusEmotion, string> = {
+  sadness: "dejected",
+  fear: "scared",
+  anger: "angry",
+  disgust: "disgusted",
+  contempt: "contempt",
+  surprise: "surprised",
+  neutral: "neutral",
+  happiness: "content",
+};
+
+const EMOTION_TAG_PATTERN = /<emotion\s+value="[a-z]+"\s*\/>\s*/g;
+
+export function stripTavusEmotionTags(text: string): string {
+  return text.replace(EMOTION_TAG_PATTERN, "");
+}
+
+export function buildTavusEchoCommand(
+  conversationId: string,
+  text: string,
+  emotion?: TavusEmotion,
+) {
+  const tag = emotion ? `<emotion value="${TAVUS_ECHO_EMOTION_TAGS[emotion]}"/> ` : "";
   return {
     message_type: "conversation",
     event_type: "conversation.echo",
     conversation_id: conversationId,
     properties: {
       modality: "text",
-      text,
+      text: `${tag}${text}`,
       done: true,
     },
   } as const;
@@ -25,7 +54,7 @@ export function buildTavusEchoCommand(conversationId: string, text: string) {
 
 /**
  * Tavus holds this facial emotion while listening and speaking, until the next
- * `conversation.set_emotion`. Without it Phoenix faces default to a friendly smile.
+ * `conversation.set_emotion`. Echo text tags still decide each spoken line.
  */
 export function buildTavusSetEmotionCommand(conversationId: string, emotion: string) {
   return {
