@@ -484,6 +484,14 @@ export default function VideoTriggersEditor() {
                 <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{t.type}</span>
                 {t.priority != null && <span className="text-xs text-muted-foreground">P{t.priority}</span>}
                 <Badge variant={t.video_url ? "default" : "destructive"}>{t.video_url ? "média disponible" : "média absent"}</Badge>
+                {t.nature && (
+                  <Badge variant="outline">{t.nature === "extract" ? "Extrait du film" : "Vidéo transformée"}</Badge>
+                )}
+                {t.characters && t.characters.length > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {t.characters.includes("all") ? "Tous" : t.characters.join(", ")}
+                  </span>
+                )}
                 {t.notion_id && (
                   <a
                     href={`https://www.notion.so/${t.notion_id.replace(/-/g, "")}`}

@@ -3,9 +3,20 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-10-31 (G1.3 : le passage à Emma n'est plus jeté, plus de pause en boucle)
+> **Last Updated**: 2026-11-01 (sélection vidéos, lot 1 : Nature, Personnages et Description IA synchronisés)
 
 ---
+
+## Sélection vidéos, lot 1 — dire à l'app ce qu'est chaque vidéo (1er novembre 2026)
+
+Le maître du jeu choisissait les vidéos sur les seuls thèmes, sans savoir si une séquence
+est un extrait du film ou une vidéo transformée, ni qui y apparaît. Ulrich veut des règles
+claires : film vu, uniquement des vidéos transformées ; film pas vu, d'abord des extraits ;
+et une vidéo seulement quand on parle à l'un de ses personnages. Ce premier lot ne change
+rien en partie : il fait passer Nature, Personnages et Description IA de Notion à l'app,
+avec des valeurs par défaut qui gardent le comportement actuel (vide = vidéo transformée,
+disponible pour tous). La synchronisation reste sûre même si la base n'a pas encore reçu
+les nouvelles colonnes. Le filtre d'éligibilité viendra au lot 2.
 
 ## G1.3 — Max accepte, mais Emma ne vient pas (31 octobre 2026)
 

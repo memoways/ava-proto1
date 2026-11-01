@@ -20,9 +20,15 @@ export interface VideoTriggerRow {
   transition_style: string | null;
   post_video_context: string | null;
   updated_at: string | null;
+  /** Selection metadata (lot 1): absent until the additive migration is applied. */
+  nature?: "extract" | "transformed" | null;
+  characters?: string[] | null;
+  ai_description?: string | null;
 }
 
-const SELECT = "id, notion_id, title, type, themes, video_url, context, description, priority, transition_style, post_video_context, updated_at";
+// "*" keeps the read working before and after the additive metadata migration:
+// naming the new columns would fail (and empty the video list) until it lands.
+const SELECT = "*";
 
 export async function listVideoTriggers(): Promise<VideoTriggerRow[]> {
   const { data, error } = await supabase

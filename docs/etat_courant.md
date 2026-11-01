@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 31 octobre 2026. Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 1er novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -37,6 +37,14 @@ Personnel : Ulrich `377e8583-7838-4c05-9f76-8833a450f304`, sources Ava exclues.
 GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
+
+**Sélection vidéos, lot 1 livré le 1er novembre : données et synchronisation.**
+Migration additive `video_triggers` (`nature`, `characters`, `ai_description`) et mapping
+Notion dans `sync-notion` (vide → transformée, disponible pour tous). Aucun changement en
+partie. À vérifier après synchronisation Lovable : migration appliquée, puis une synchro
+vidéos renvoyant `video_metadata_synced: true`. Champs Notion à remplir par Ulrich.
+[Plan](plan_selection_videos_contextuelle.md) ·
+[Prompt lot 2 « filtre d'éligibilité »](prompt_reprise_selection_videos_lot_2.md).
 
 **G1.3 implémenté le 31 octobre : le passage à Emma n'est plus jeté, pause jamais répétée.**
 Recette d'Ulrich (session `e6918bd8…`) : le MJ avait validé « Je passe Emma » deux fois, mais
