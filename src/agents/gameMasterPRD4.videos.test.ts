@@ -7,7 +7,8 @@ vi.mock("@/services/sessionConversationMemory", () => ({ persistPostTurnMemory: 
 
 import { callLLMWithUsage } from "@/services/openRouterLLM";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
-import { evaluatePostTurnPRD4 } from "./gameMasterPRD4";
+import { EXPERIENCE_DIRECTOR_SYSTEM_PROMPT, evaluatePostTurnPRD4 } from "./gameMasterPRD4";
+import publishedReplacement from "../../docs/prompt_gm_publie_regle_videos_lot_3.md?raw";
 
 const row = (id: string, extra: Partial<VideoTriggerRow>): VideoTriggerRow => ({
   id, notion_id: null, title: id, type: "mid_conversation", themes: [], video_url: "https://video", context: null,
@@ -64,5 +65,34 @@ describe("Game Master PRD4 — eligible video candidates", () => {
     expect(prompt).toContain("id=extract-max");
     expect(prompt).not.toContain("id=transformed-all");
     expect(result.trigger_video_id).toBe("extract-max");
+  });
+
+  it("sends each candidate's context and factual description to the GM", async () => {
+    vi.mocked(getVideoTriggersCached).mockResolvedValue([
+      row("transformed-all", { nature: "transformed", characters: ["all"], context: "Quand le joueur doute de Max.", ai_description: "Max seul dans la neige." }),
+    ]);
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce(gmReply("transformed-all"));
+    await evaluatePostTurnPRD4({ ...baseInput, experiencePath: "seen" });
+    const prompt = String(vi.mocked(callLLMWithUsage).mock.calls[0][0][1].content);
+    expect(prompt).toContain('id=transformed-all | titre="transformed-all" | type=mid_conversation | priorité=? | thèmes=[—] | contexte="Quand le joueur doute de Max." | description="Max seul dans la neige."');
+    expect(prompt).toContain("dont le `contexte`");
+    expect(prompt).not.toContain("recoupe les `themes` d'une vidéo disponible");
+  });
+});
+
+describe("Game Master PRD4 — built-in video rule", () => {
+  it("chooses by meaning, context first, themes no longer the only criterion", () => {
+    expect(EXPERIENCE_DIRECTOR_SYSTEM_PROMPT).toContain("choix au sens");
+    expect(EXPERIENCE_DIRECTOR_SYSTEM_PROMPT).toContain("Appuie-toi d'abord sur `contexte`");
+    expect(EXPERIENCE_DIRECTOR_SYSTEM_PROMPT).toContain("Un thème commun ne suffit pas");
+    expect(EXPERIENCE_DIRECTOR_SYSTEM_PROMPT).not.toContain("Si `labels.themes` est vide, retourne null");
+    expect(EXPERIENCE_DIRECTOR_SYSTEM_PROMPT).toContain('"trigger_video_id": string | null');
+  });
+
+  it("keeps the prepared published replacement identical to the built-in rule", () => {
+    const start = EXPERIENCE_DIRECTOR_SYSTEM_PROMPT.indexOf('Règles "trigger_video_id"');
+    const rule = EXPERIENCE_DIRECTOR_SYSTEM_PROMPT.slice(start, EXPERIENCE_DIRECTOR_SYSTEM_PROMPT.indexOf('\n\nRègles "action"', start));
+    expect(rule.length).toBeGreaterThan(500);
+    expect(publishedReplacement).toContain(rule);
   });
 });

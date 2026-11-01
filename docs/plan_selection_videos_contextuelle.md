@@ -1,7 +1,9 @@
 # Plan — sélection contextuelle des vidéos
 
-Date : 2026-11-01. Statut : lots 1 (données) et 2 (filtre d'éligibilité) livrés, lot 3 à
-démarrer ([prompt lot 3](prompt_reprise_selection_videos_lot_3.md)).
+Date : 2026-11-01. Statut : lots 1 (données), 2 (filtre d'éligibilité) et 3 (choix au sens,
+code) livrés ; prompt GM publié prêt, publication admin à faire par Ulrich
+([texte](prompt_gm_publie_regle_videos_lot_3.md)) ; lot 4 à démarrer
+([prompt lot 4](prompt_reprise_selection_videos_lot_4.md)).
 Source : analyse de la mécanique vidéo (session du 2026-11-01) et décisions d'Ulrich.
 
 ## État actuel (résumé)
@@ -15,7 +17,7 @@ Source : analyse de la mécanique vidéo (session du 2026-11-01) et décisions d
   Description vide partout. Aucun filtre par personnage ni par parcours film.
 - Garde-fous existants (`experienceDirector.ts`) : activé, URL présente, jamais
   rejouée, délai avant la première vidéo et entre deux vidéos, maximum par session.
-- `videoTriggerMatcher.ts` n'est appelé nulle part (code mort).
+- `videoTriggerMatcher.ts` n'était appelé nulle part (code mort) : supprimé au lot 3.
 - Le prompt GM publié (`systemPromptOverride`, fixture `gm-published-sandbox-v7`)
   remplace le prompt du code : toute règle vidéo doit aussi passer dans la
   version publiée, sinon elle reste sans effet.
@@ -132,6 +134,40 @@ Personnages remplis sur les 15 vidéos (extraits et transformées, Max/Emma/Léo
   Contrat JSON inchangé.
 - Mettre à jour le prompt du code **et** la version publiée en admin.
 - Décider du sort de `videoTriggerMatcher.ts` : filet de sécurité ou suppression.
+
+**Exécution (2026-11-01).**
+
+- Ligne vidéo : fonction pure `formatVideoCandidateLine` (`src/services/videoCandidateLine.ts`).
+  Format historique conservé (id, titre, type, priorité, thèmes), puis `contexte="…"` et
+  `description="…"`. Description humaine prioritaire ; Description IA seulement si
+  Description est vide ou blanche. Chaque texte : une ligne, guillemets doubles remplacés,
+  plafond 300 caractères coupé au mot avec « … » ; champ vide omis. Titre plafonné à 120.
+- Règle GM du code (`EXPERIENCE_DIRECTOR_SYSTEM_PROMPT`, bloc « trigger_video_id — choix au
+  sens ») : candidates déjà autorisées ; rapprocher de ce qui se joue (labels, réplique du
+  personnage) ; contexte d'abord, puis description, puis thèmes ; un thème commun ne suffit
+  pas si le contexte ne correspond pas, un contexte clair suffit sans thème ; null si rien ne
+  rejoint clairement l'échange. La consigne finale du message GM (code, toujours envoyée)
+  suit la même règle. Contrat JSON inchangé.
+- Prompt publié : version active lue via Lovable (lecture seule). `sandbox-ulrich` v7,
+  `prod` v8 et `sandbox-julien` v9 portent le même texte que la fixture
+  `gm-published-sandbox-v7` (md5 `82f57f2c…`). Texte de remplacement (un seul bloc changé)
+  et procédure admin : [prompt GM publié, lot 3](prompt_gm_publie_regle_videos_lot_3.md).
+  **Non publié** : publication admin par Ulrich, sandbox d'abord ; la production exige son
+  accord. Un test garde ce texte identique à la règle du code. Jusque-là, en sandbox-ulrich,
+  prod et sandbox-julien, le bloc et la consigne finale (code) s'appliquent mais le prompt
+  système publié impose encore le thème.
+- `videoTriggerMatcher.ts` **supprimé** : jamais appelé, et un filet par mots-clés
+  déclencherait une vidéo sur un seul thème commun, à l'opposé du choix au sens. Le filtre
+  d'éligibilité (lot 2) et la garde du directeur restent les seules barrières.
+- Taille mesurée sur le catalogue réel (17 vidéos, Description et Description IA vides,
+  Contexte de 28 à 600 caractères), bloc VIDÉOS DISPONIBLES avant → après :
+  film vu Max 11 vidéos 1 633 → 3 076 car. ; film vu Emma 8 vidéos 1 213 → 2 220 ;
+  film pas vu Max 3 extraits 376 → 1 312 ; film pas vu Emma 2 extraits 254 → 878.
+  Pire cas +1 443 caractères (≈ +400 jetons) pour un prompt système de ≈ 12 300 caractères
+  (publié 10 415 + contrat technique 1 849) ; plafond théorique 300 + 300 par vidéo.
+- Tests : `videoCandidateLine.test.ts` (priorité Description, repli IA, plafonds, champs
+  vides) ; `gameMasterPRD4.videos.test.ts` (contexte et description envoyés, règle du code,
+  texte publié préparé identique) ; suites GM, directeur et synchronisation vertes.
 
 ### Lot 4 — Description IA automatique
 
