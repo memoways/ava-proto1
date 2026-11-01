@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { resolveNativeVideoSource } from "@/services/videoPlayback";
 import GumletVideoPlayer from "./GumletVideoPlayer";
@@ -10,7 +10,7 @@ describe("GumletVideoPlayer", () => {
     expect(resolveNativeVideoSource(watchUrl)).toEqual({ url: hlsUrl, kind: "hls" });
     expect(resolveNativeVideoSource(hlsUrl)).toEqual({ url: hlsUrl, kind: "hls" });
     render(<GumletVideoPlayer videoUrl={hlsUrl} onComplete={() => {}} onSkip={() => {}} />);
-    const player = screen.getByTitle("Video player") as HTMLVideoElement;
+    const player = screen.getByLabelText("Video player") as HTMLVideoElement;
     expect(player.autoplay).toBe(true);
     expect(player.muted).toBe(false);
     expect(player.defaultMuted).toBe(false);
@@ -45,7 +45,7 @@ describe("GumletVideoPlayer", () => {
       />,
     );
 
-    const player = screen.getByTitle("Video player") as HTMLVideoElement;
+    const player = screen.getByLabelText("Video player") as HTMLVideoElement;
     expect(player.tagName).toBe("VIDEO");
     expect(document.querySelector("iframe")).not.toBeInTheDocument();
     expect(player).toHaveAttribute(
@@ -63,7 +63,7 @@ describe("GumletVideoPlayer", () => {
       />,
     );
 
-    const player = screen.getByTitle("Video player") as HTMLVideoElement;
+    const player = screen.getByLabelText("Video player") as HTMLVideoElement;
     expect(player.autoplay).toBe(true);
     expect(player.controls).toBe(false);
     expect(player.volume).toBe(1);
@@ -80,7 +80,7 @@ describe("GumletVideoPlayer", () => {
       />,
     );
 
-    const firstPlayer = screen.getByTitle("Video player");
+    const firstPlayer = screen.getByLabelText("Video player");
     rerender(
       <GumletVideoPlayer
         videoUrl="https://gumlet.tv/watch/67a281cac82041cdc3714c0c"
@@ -89,7 +89,7 @@ describe("GumletVideoPlayer", () => {
       />,
     );
 
-    expect(screen.getByTitle("Video player")).toBe(firstPlayer);
+    expect(screen.getByLabelText("Video player")).toBe(firstPlayer);
     expect(firstPlayer).toHaveAttribute(
       "data-source",
       "https://video.gumlet.io/673f29f4a5e1bf70aa645cb7/67a281cac82041cdc3714c0c/main.m3u8",
@@ -104,7 +104,7 @@ describe("GumletVideoPlayer", () => {
         videoUrl="https://gumlet.tv/watch/6a188e39fdee17a44c1ea049"
         onComplete={() => {}}
         onSkip={() => {
-          const player = screen.getByTitle("Video player") as HTMLVideoElement;
+          const player = screen.getByLabelText("Video player") as HTMLVideoElement;
           stateObservedByParent = {
             muted: player.muted,
             currentTime: player.currentTime,
@@ -114,7 +114,7 @@ describe("GumletVideoPlayer", () => {
       />,
     );
 
-    const player = screen.getByTitle("Video player") as HTMLVideoElement;
+    const player = screen.getByLabelText("Video player") as HTMLVideoElement;
     player.currentTime = 12;
     fireEvent.click(screen.getByRole("button", { name: /passer/i }));
 
@@ -131,7 +131,7 @@ describe("GumletVideoPlayer", () => {
       />,
     );
 
-    const player = screen.getByTitle("Video player");
+    const player = screen.getByLabelText("Video player");
     fireEvent.ended(player);
     fireEvent.ended(player);
     expect(onComplete).toHaveBeenCalledTimes(1);
@@ -141,12 +141,28 @@ describe("GumletVideoPlayer", () => {
     const onError = vi.fn();
     const url = "https://example.test/cinematic.mp4";
     const { rerender } = render(<GumletVideoPlayer videoUrl={url} onComplete={() => {}} onSkip={() => {}} onError={onError} active={false} />);
-    const player = screen.getByTitle("Video player") as HTMLVideoElement;
+    const player = screen.getByLabelText("Video player") as HTMLVideoElement;
     fireEvent.error(player);
     expect(onError).not.toHaveBeenCalled();
     rerender(<GumletVideoPlayer videoUrl={url} onComplete={() => {}} onSkip={() => {}} onError={onError} active />);
     fireEvent.error(player);
     fireEvent.error(player);
     expect(onError).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the pointer and the native tooltip while a video plays; a mouse move shows it briefly", () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(<GumletVideoPlayer videoUrl="https://example.test/cinematic.mp4" onComplete={() => {}} onSkip={() => {}} active />);
+      const shell = container.firstElementChild as HTMLElement;
+      expect(screen.getByLabelText("Video player")).not.toHaveAttribute("title");
+      expect(shell).toHaveClass("cursor-none");
+      fireEvent.mouseMove(shell);
+      expect(shell).not.toHaveClass("cursor-none");
+      act(() => { vi.advanceTimersByTime(1_600); });
+      expect(shell).toHaveClass("cursor-none");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

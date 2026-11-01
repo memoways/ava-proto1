@@ -125,6 +125,19 @@ it('holds push-to-talk while a cinematic is announced, without hiding the reply 
   expect(press).toHaveBeenCalledTimes(1);
 });
 
+it('announces a coming video in the header column, under the characters, with Ignorer', () => {
+  const ignore = vi.fn();
+  render(<ConversationScreen {...baseProps} activeCharacter="max" conversationLog={[]} inputHeld cinematicAnnounced onIgnoreCinematic={ignore} />);
+  const capsule = screen.getByTestId('cinematic-announced');
+  expect(capsule).toHaveTextContent('Une vidéo arrive');
+  expect(capsule.closest('header')).not.toBeNull();
+  const characters = capsule.parentElement!;
+  expect(characters.querySelector('[data-character-capsule="current"]')).not.toBeNull();
+  expect(capsule.className).not.toMatch(/\b(fixed|absolute)\b/);
+  fireEvent.click(within(capsule).getByRole('button', { name: 'Ignorer' }));
+  expect(ignore).toHaveBeenCalledTimes(1);
+});
+
 it('leaves Space on a focused call button to its native activation without opening the microphone', () => {
   const press = vi.fn();
   render(<ConversationScreen {...baseProps} activeCharacter="emma" conversationLog={[]}

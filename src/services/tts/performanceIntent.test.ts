@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isHeatedIntent,
   applyCartesiaGenerationConfig,
   applyElevenLabsPerformance,
   applyGradiumPerformance,
@@ -179,5 +180,41 @@ describe('AP4-quater: no slowdown for slow providers, expressive temperature', (
     expect(m.expressiveTemperature(0.7, sad('manual'))).toBeCloseTo(0.94);
     expect(m.expressiveTemperature(0.7, sad('speech_state'))).toBe(0.7);
     expect(m.expressiveTemperature(0.7, null)).toBe(0.7);
+  });
+});
+
+describe("temper guard (recette d'Ulrich, 1er novembre 2026)", () => {
+  const map = {
+    "La digue cède": { delivery: "rushed", emotion: "urgent", instruction: "Fast, overflowing remorse; stop abruptly, clear diction", pauses: "short", speed: 1.12 },
+    "Bloqué": { delivery: "measured", emotion: "fragile", instruction: "Broken, hesitant speech", pauses: "long", speed: 0.9 },
+  };
+  const speechSettings = { enabled: true, version: "v", gradiumTagsEnabled: false, byCharacter: { max: map } } as never;
+  const states = Object.keys(map);
+  // Session 89e1868f (sandbox-ulrich, Max rugosité 3): replies 2 and 3 both rendered "urgent".
+  const reply2 = "Emma a été contaminée quand elle a pris Ava dans ses bras. Je ne sais pas quand, ni jusqu’où. J’aurais dû empêcher ça, et maintenant je ne sais même plus comment lui parler.";
+  const reply3 = "J’aimerais lui dire que je l’aimerai, quoi qu’il lui arrive. Je voudrais lui parler sans lui demander de me pardonner.";
+
+  it("keeps a single flare-up as the speech state and rugosité render it", () => {
+    const intent = derivePerformanceIntent({ text: reply3, characterKey: "max", speechState: "La digue cède",
+      validSpeechStates: states, rugosite: 3, speechSettings });
+    expect(intent).toMatchObject({ emotion: "urgent", intensity: 2, speedHint: 1.12, source: "speech_state" });
+    expect(intent.tempered).toBeUndefined();
+  });
+
+  it("calms the second flare-up in a row, keeping the played speech state name", () => {
+    const first = derivePerformanceIntent({ text: reply2, characterKey: "max", speechSettings, validSpeechStates: states, rugosite: 3 });
+    expect(isHeatedIntent(first)).toBe(true);
+    const second = derivePerformanceIntent({ text: reply3, characterKey: "max", speechState: "La digue cède",
+      validSpeechStates: states, rugosite: 3, speechSettings, previousHeated: isHeatedIntent(first) });
+    expect(isHeatedIntent(second)).toBe(false);
+    expect(second).toMatchObject({ emotion: "tense", intensity: 0, delivery: "measured", speedHint: 1, speechState: "La digue cède", tempered: "calmed" });
+    expect(second.actingNl).not.toMatch(/overflowing|rushed|urgent/i);
+  });
+
+  it("leaves calm replies untouched after a flare-up", () => {
+    const calm = derivePerformanceIntent({ text: reply3, characterKey: "max", speechState: "Bloqué",
+      validSpeechStates: states, rugosite: 3, speechSettings, previousHeated: true });
+    expect(calm).toMatchObject({ emotion: "fragile", speechState: "Bloqué" });
+    expect(calm.tempered).toBeUndefined();
   });
 });

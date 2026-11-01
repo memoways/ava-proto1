@@ -23,9 +23,12 @@ remote `https://github.com/memoways/ava-proto1`). Réponds en français.
   coupe plus la réplique ni le joueur ; fondus nommés (700/400/700/800 ms) ; écoute tenue de
   l'annonce au retour ; mesures `cinematic_recommended`, `cinematic_played`
   (`decisionToStartMs`, `deferrals`) dans `experience_events`. Le GM juge la réplique livrée :
-  sa décision arrive après le son. Recette humaine du lot 3b (fondus, report) à la main
-  d'Ulrich : relis le plan, section « Lot 3b — Exécution », et ses retours éventuels avant
-  de toucher à la lecture. Ce lot 4 ne modifie ni la transition ni le lecteur.
+  sa décision arrive après le son. Recette d'Ulrich faite (« ça fonctionne bien ») et
+  retouches livrées dans une seconde PR : pas d'infobulle ni de pointeur sur la vidéo,
+  capsule « Une vidéo arrive » sous les personnages, et garde de voix `withTemper`
+  (`performanceIntent.ts`) : jamais deux répliques emportées de suite. Détail dans le plan,
+  « Lot 3b — Exécution » et « Recette d'Ulrich et retouches ». Ce lot 4 ne modifie ni la
+  transition, ni le lecteur, ni la voix.
 
 - `video_triggers` : 17 vidéos, `nature` et `characters` remplis ; `context` de 28
   à 600 caractères ; `description` et `ai_description` **vides partout** (chaînes

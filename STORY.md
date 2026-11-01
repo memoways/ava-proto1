@@ -17,6 +17,10 @@ joue, puis le personnage revient en fondu ; si le joueur parle, il finit, le per
 répond — un petit signe annonce alors la séquence et l'écoute se tient — et la vidéo vient
 après. « Ignorer » l'écarte, « Passer » la coupe ; dans tous les cas le micro est rendu.
 
+En recette, la transition a convaincu. Trois retouches ont suivi : plus de « Video player » ni
+de flèche sur l'image, l'annonce rangée sous les personnages, et Max qui ne s'emporte plus deux
+fois de suite — sa voix montait sur un simple « maintenant », puis sur « la digue cède ».
+
 ## Sélection vidéos, lot 3 — choisir une vidéo pour ce qu'elle raconte (1er novembre 2026)
 
 Le maître du jeu choisissait une vidéo dès qu'un mot-thème coïncidait : « secrets » dans la

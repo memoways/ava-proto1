@@ -1092,7 +1092,7 @@ test("le teaser démarre automatiquement avec le son puis Passer coupe tout", as
   await installNetworkFakes(page);
 
   await page.goto("/");
-  const playerBeforeStart = await page.locator("video[title='Video player']").elementHandle();
+  const playerBeforeStart = await page.locator("video[aria-label='Video player']").elementHandle();
   expect(playerBeforeStart).not.toBeNull();
   await expect(page.locator("iframe[title='Video player']")).toHaveCount(0);
   await page.getByRole("button", { name: "Commencer" }).click();
@@ -1101,7 +1101,7 @@ test("le teaser démarre automatiquement avec le son puis Passer coupe tout", as
     const state = (window as Window & {
       __e2eNativeVideoState?: { playing: boolean; playCount: number };
     }).__e2eNativeVideoState;
-    const video = document.querySelector("video[title='Video player']") as HTMLVideoElement | null;
+    const video = document.querySelector("video[aria-label='Video player']") as HTMLVideoElement | null;
     return Boolean(
       state?.playing &&
       state.playCount > 0 &&
@@ -1112,7 +1112,7 @@ test("le teaser démarre automatiquement avec le son puis Passer coupe tout", as
     );
   }), { timeout: 5_000 }).toBe(true);
 
-  const playbackPath = await page.locator("video[title='Video player']").evaluate((video) => ({
+  const playbackPath = await page.locator("video[aria-label='Video player']").evaluate((video) => ({
     currentSrc: (video as HTMLVideoElement).currentSrc,
     engine: (video as HTMLVideoElement).dataset.playbackEngine,
   }));
@@ -1133,7 +1133,7 @@ test("le teaser démarre automatiquement avec le son puis Passer coupe tout", as
     const state = (window as Window & {
       __e2eNativeVideoState?: { playing: boolean; pauseCount: number };
     }).__e2eNativeVideoState;
-    const video = document.querySelector("video[title='Video player']") as HTMLVideoElement | null;
+    const video = document.querySelector("video[aria-label='Video player']") as HTMLVideoElement | null;
     return Boolean(state && !state.playing && state.pauseCount > previousPauseCount && video?.muted);
   }, pauseCountBeforeSkip), { timeout: 5_000 }).toBe(true);
 });
@@ -1150,7 +1150,7 @@ test("une cinématique HLS démarre automatiquement puis Passer coupe son média
   const fakes = await installNetworkFakes(page, transcripts, { triggerVideoAtLabel: 3 });
 
   await page.goto("/");
-  const persistentPlayer = await page.locator("video[title='Video player']").elementHandle();
+  const persistentPlayer = await page.locator("video[aria-label='Video player']").elementHandle();
   expect(persistentPlayer).not.toBeNull();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
@@ -1171,7 +1171,7 @@ test("une cinématique HLS démarre automatiquement puis Passer coupe son média
 
   const skipVideo = page.getByRole("button", { name: /Passer/ });
   await expect(skipVideo).toBeVisible({ timeout: 10_000 });
-  expect(await page.locator("video[title='Video player']").evaluate((video, initialPlayer) =>
+  expect(await page.locator("video[aria-label='Video player']").evaluate((video, initialPlayer) =>
     video === initialPlayer,
   persistentPlayer)).toBe(true);
   await expect(page.locator("iframe[title='Video player']")).toHaveCount(0);
@@ -1227,6 +1227,8 @@ test("lot 3b : décision après la réplique, joueur silencieux — fondu au noi
   const audio = await audioState(page);
   expect(audio.paused).toBe(0);
   expect(audio.ended).toBeGreaterThan(endedBeforeReply);
+  // No native tooltip and no pointer over the playing video.
+  await expect(page.locator("video[aria-label='Video player']")).not.toHaveAttribute("title", /.*/);
   expect(await veilPhase(page)).toBe("playing");
   await expect(page.getByTestId("cinematic-announced")).toHaveCount(0);
 
@@ -1297,6 +1299,9 @@ test("lot 3b : mains libres, décision pendant que le joueur parle — reportée
   expect(fakes.getCharacterCalls()[3]).toContain(spokenPrefix);
   const announced = page.getByTestId("cinematic-announced");
   await expect(announced).toBeVisible({ timeout: 10_000 });
+  await expect(announced).toContainText("Une vidéo arrive");
+  // Under the character capsules, never over the conversation.
+  await expect(page.locator("header").getByTestId("cinematic-announced")).toBeVisible();
   expect(await veilPhase(page)).toBe("pending");
   const endedAtAnnouncement = (await audioState(page)).ended;
   expect(await nativeVideoPlaying(page)).toBe(false);

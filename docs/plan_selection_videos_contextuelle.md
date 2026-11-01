@@ -265,6 +265,27 @@ L'item « attendre la fin de la réplique avant de lancer la vidéo » du lot 5 
   pendant qu'il parle déjà, « Passer » et « Ignorer » ; il juge la fluidité des fondus et la
   justesse du report (question ouverte ci-dessous).
 
+**Recette d'Ulrich et retouches (2026-11-01, session `89e1868f…`, sandbox-ulrich).** La
+transition « fonctionne bien ». Trois retouches demandées et livrées :
+
+- Lecteur : plus d'infobulle « Video player » (attribut `title` remplacé par `aria-label`) ;
+  le pointeur est masqué pendant la vidéo et réapparaît 1,5 s quand la souris bouge, pour
+  garder « Passer » atteignable (`POINTER_IDLE_HIDE_MS`).
+- Annonce : capsule « Une vidéo arrive » (avec « Ignorer ») dans la colonne des personnages,
+  en haut à gauche, sous les capsules, dans le flux : plus de bulle flottante au-dessus du
+  texte.
+- Max « trop en colère, deux fois » : cause mesurée sur la session. Rugosité de Max = 3 en
+  sandbox-ulrich. Réplique 2 sans état de parole joué → heuristique lexicale : le seul mot
+  « maintenant » la classe `urgent`. Réplique 3 : état « La digue cède » (GM l'a proposé trois
+  tours de suite, le contrat l'autorise) → `urgent`, intensité « very », vitesse 1,12. Deux
+  répliques emportées consécutives. Correctif de rendu seulement (`performanceIntent.ts`,
+  `withTemper`) : une émotion « emportée » (`angry`, `urgent`, `accusatory`) n'est jamais rendue
+  sur deux répliques de suite du même personnage ; la seconde passe en voix retenue (Max :
+  `tense`, mesurée, intensité 0, vitesse 1), marquée `tempered: "calmed"` dans
+  `prd4_tts_performance`. L'état de parole, son nom, le GM, Notion et l'échelle de rugosité
+  (lot B) restent inchangés : une emportée isolée garde sa force. Levier de force restant :
+  la rugosité de Max en admin (3 → 2), décision d'Ulrich.
+
 ### Lot 4 — Description IA automatique
 
 - Fonction edge `describe-video` : analyse la vidéo et écrit « Description IA »

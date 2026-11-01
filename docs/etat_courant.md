@@ -44,7 +44,9 @@ personne ne parle → fondu au noir, vidéo, retour en fondu ; le joueur parle �
 pris, la séquence est annoncée pendant la réplique suivante (écoute tenue, « Ignorer »), puis
 jouée. Machine `cinematicTransition`, fondus 700/400/700/800 ms. Recette humaine à faire par
 Ulrich en sandbox : vidéo décidée en silence, pendant qu'il parle, « Passer » et « Ignorer ».
-Aucune publication. [Plan](plan_selection_videos_contextuelle.md#lot-3b--transition-cinématique-demande-dulrich-2026-11-01) ·
+Recette faite : « ça fonctionne bien » ; retouches livrées (pas d'infobulle ni de pointeur sur
+la vidéo, capsule « Une vidéo arrive » sous les personnages, Max jamais emporté deux répliques
+de suite). Levier restant : rugosité de Max (3 en sandbox-ulrich). Aucune publication. [Plan](plan_selection_videos_contextuelle.md#lot-3b--transition-cinématique-demande-dulrich-2026-11-01) ·
 [Prompt lot 4 « Description IA automatique »](prompt_reprise_selection_videos_lot_4.md).
 
 **Sélection vidéos, lot 3 livré le 1er novembre (code) : choix au sens.**
