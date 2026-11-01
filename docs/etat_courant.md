@@ -46,7 +46,11 @@ publication admin par Ulrich, sandbox d'abord, production sur son accord :
 nouveau brouillon depuis l'admin de l'aperçu Lovable puis « Publier » —
 [procédure](prompt_gm_publie_regle_videos_lot_3.md). Recette humaine : film vu, film pas
 vu, vidéo pertinente au fil de la conversation.
+Recette d'Ulrich (sandbox-ulrich, v11 publiée) : choix validé ; la cinématique arrive
+pendant qu'il répond → lot 3b « transition cinématique » (réplique jamais coupée, écoute
+suspendue, fondu au noir, vidéo, retour en fondu), à faire avant le lot 4.
 [Plan](plan_selection_videos_contextuelle.md) ·
+[Prompt lot 3b](prompt_reprise_selection_videos_lot_3b.md) ·
 [Prompt lot 4 « Description IA automatique »](prompt_reprise_selection_videos_lot_4.md).
 
 **Sélection vidéos, lot 2 livré le 1er novembre : filtre d'éligibilité déterministe.**

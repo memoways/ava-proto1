@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Sélection vidéos, lot 3b préparé — transition cinématique] — 2026-11-01
+
+- Documentation seule. Recette d'Ulrich en sandbox-ulrich (v11) : choix des vidéos validé ;
+  la cinématique arrivait pendant sa réponse. Lot 3b ajouté au plan (réplique jamais coupée,
+  écoute suspendue, fondus au noir) et prompt de reprise
+  [lot 3b](docs/prompt_reprise_selection_videos_lot_3b.md).
+
 ## [Sélection vidéos, lot 3 — choix au sens, pas au mot-clé] — 2026-11-01
 
 - Bloc VIDÉOS DISPONIBLES du GM : chaque candidate porte désormais `contexte` et `description`
