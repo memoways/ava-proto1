@@ -317,7 +317,7 @@ export function createElevenLabsStreamingPlayback(
           firstByteMs = Math.round(performance.now() - t0);
           observeVoice(ctx?.onVoiceObservation, "first_audio_chunk");
         }
-        chunks.push(value);
+        chunks.push(value as Uint8Array<ArrayBuffer>);
         pump();
       }
     } catch (err) {
