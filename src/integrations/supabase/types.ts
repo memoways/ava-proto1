@@ -1553,12 +1553,15 @@ export type Database = {
       }
       video_triggers: {
         Row: {
+          ai_description: string | null
+          characters: string[] | null
           context: string | null
           created_at: string | null
           description: string | null
           duration_seconds: number | null
           gameplay_step_id: string | null
           id: string
+          nature: string | null
           notion_id: string | null
           placeholder_text: string | null
           post_video_context: string | null
@@ -1571,12 +1574,15 @@ export type Database = {
           video_url: string | null
         }
         Insert: {
+          ai_description?: string | null
+          characters?: string[] | null
           context?: string | null
           created_at?: string | null
           description?: string | null
           duration_seconds?: number | null
           gameplay_step_id?: string | null
           id?: string
+          nature?: string | null
           notion_id?: string | null
           placeholder_text?: string | null
           post_video_context?: string | null
@@ -1589,12 +1595,15 @@ export type Database = {
           video_url?: string | null
         }
         Update: {
+          ai_description?: string | null
+          characters?: string[] | null
           context?: string | null
           created_at?: string | null
           description?: string | null
           duration_seconds?: number | null
           gameplay_step_id?: string | null
           id?: string
+          nature?: string | null
           notion_id?: string | null
           placeholder_text?: string | null
           post_video_context?: string | null
