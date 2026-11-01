@@ -1,7 +1,7 @@
 # Plan — sélection contextuelle des vidéos
 
-Date : 2026-11-01. Statut : lot 1 livré (données et synchronisation), lot 2 à démarrer
-([prompt lot 2](prompt_reprise_selection_videos_lot_2.md)).
+Date : 2026-11-01. Statut : lots 1 (données) et 2 (filtre d'éligibilité) livrés, lot 3 à
+démarrer ([prompt lot 3](prompt_reprise_selection_videos_lot_3.md)).
 Source : analyse de la mécanique vidéo (session du 2026-11-01) et décisions d'Ulrich.
 
 ## État actuel (résumé)
@@ -103,6 +103,25 @@ Nouvelle fonction pure (par exemple `selectEligibleVideos`) appelée avant le GM
 Le GM ne reçoit que les candidates éligibles. `validateDirectorDecision` refait
 le même contrôle (nouveau motif de blocage `ineligible`) au cas où le GM
 citerait un id hors liste. Tests unitaires sur toutes les combinaisons.
+
+**Exécution (2026-11-01).** Lot 1 vérifié via Lovable : colonnes présentes, Nature et
+Personnages remplis sur les 15 vidéos (extraits et transformées, Max/Emma/Léo).
+
+- `src/services/videoEligibility.ts` : `selectEligibleVideos`, `countPlayedExtracts`,
+  `videoAvailableForCharacter`. Nature absente → transformée ; Personnages absent, vide ou
+  `all` → tous. « Aucun extrait éligible » s'entend après filtres personnage, intro et déjà
+  jouées : extraits tous joués ou réservés à un autre personnage → transformées autorisées.
+- GM (`evaluatePostTurnPRD4`) : filtre la liste avant `buildUserPrompt` et `validIds`.
+  Entrées `experiencePath` (depuis `experiencePathFromFilmAnswer`) et
+  `minExtractsBeforeCinematic` transmises par l'orchestrateur ; absentes (tests admin) →
+  parcours inconnu, seuil 2.
+- Directeur : `DirectorGuardContext.eligibleVideoIds` et motif `ineligible`, contrôlé après
+  `cinematic_already_played`. `IndexPRD4` calcule la même liste au moment de la décision.
+  Aucun libellé admin des motifs n'existait : rien à ajouter.
+- Réglage `MIN_EXTRACTS_BEFORE_CINEMATIC` (défaut 2) dans `VideoTriggerSettings` et
+  l'éditeur vidéo admin ; fusion avec les défauts pour les réglages déjà enregistrés.
+- Tests : `videoEligibility.test.ts`, `gameMasterPRD4.videos.test.ts`, motif `ineligible`
+  dans `experienceDirector.test.ts`.
 
 ### Lot 3 — Choix au sens, pas au mot-clé
 

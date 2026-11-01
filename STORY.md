@@ -3,9 +3,19 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-01 (sélection vidéos, lot 1 : Nature, Personnages et Description IA synchronisés)
+> **Last Updated**: 2026-11-01 (sélection vidéos, lot 2 : filtre d'éligibilité déterministe)
 
 ---
+
+## Sélection vidéos, lot 2 — la bonne vidéo pour le bon parcours (1er novembre 2026)
+
+Avec les métadonnées du lot 1, l'app peut enfin appliquer les règles d'Ulrich avant même que
+le maître du jeu choisisse : qui a vu le film ne reçoit que des vidéos transformées ; qui ne
+l'a pas vu découvre d'abord des extraits, puis, après deux extraits (réglage admin), les
+vidéos transformées. Une vidéo n'est proposée que si le personnage en ligne y figure ; les
+vidéos d'introduction ne reviennent plus en conversation. Le maître du jeu ne voit plus que
+ces candidates, et le directeur bloque toute vidéo hors liste (« ineligible »). Le choix au
+sens, par la Description et le Contexte, viendra au lot 3.
 
 ## Sélection vidéos, lot 1 — dire à l'app ce qu'est chaque vidéo (1er novembre 2026)
 

@@ -56,7 +56,7 @@ import {
   getSessionMinimumClosureSeconds,
   normalizeSessionDurationSeconds,
 } from "@/config/experienceRuntime";
-import { buildExperienceFrame } from "@/services/experienceFrame";
+import { buildExperienceFrame, experiencePathFromFilmAnswer } from "@/services/experienceFrame";
 import { canRetryCharacterResponse, characterRecoveryLine, characterHandoffPauseLine, followsHandoffPause, latestCallTransfer } from './characterConversationContinuity';
 import { validateRecoverySpeech } from './responseIntentStream';
 import type { ConversationMessage, ConversationTurnTraceV1, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
@@ -83,6 +83,8 @@ export interface PRD4TurnInput {
   userRole: UserRoleProfile | null;
   /** Réponse du joueur à « avez-vous vu le film ? » — choisit le parcours d'exposition. */
   hasSeenFilm?: string | null;
+  /** Parcours « film pas vu » : extraits à montrer avant une vidéo transformée. */
+  minExtractsBeforeCinematic?: number;
   timeElapsedSeconds: number;
   /** Attribution immuable du personnage, résolue avant le tour. */
   characterContext: CharacterExecutionContext;
@@ -504,6 +506,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         sessionDurationSeconds,
         minimumClosureSeconds,
         triggeredVideoIds: input.triggeredVideoIds,
+        experiencePath: experiencePathFromFilmAnswer(input.hasSeenFilm),
+        minExtractsBeforeCinematic: input.minExtractsBeforeCinematic,
         signal: candidateSignal ?? input.postTurnSignal ?? input.signal,
         persist: candidate ? false : undefined,
         diagnosticTrace: diagnosticTraceEnabled,

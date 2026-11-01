@@ -18,6 +18,8 @@ import type { ServiceObservation, ServerObservation } from "@/services/voiceTurn
 import { callLLMWithUsage, LLMProxyRequestError } from "@/services/openRouterLLM";
 import { getLLMSettings } from "@/services/settingsService";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
+import { countPlayedExtracts, DEFAULT_MIN_EXTRACTS_BEFORE_CINEMATIC, selectEligibleVideos } from "@/services/videoEligibility";
+import type { ExperiencePath } from "@/services/experienceFrame";
 import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
 import { normalizeMemoryText } from "@/services/conversationMemoryV1";
 import { asRuntimeCharacter } from "@/services/characterConversation";
@@ -52,6 +54,10 @@ export interface PRD4PostTurnInput {
   minimumClosureSeconds: number;
   /** IDs de triggers vidéo déjà joués (évite de rejouer). */
   triggeredVideoIds?: string[];
+  /** Parcours film (seen/unseen) ; absent = inconnu, aucun filtre de nature. */
+  experiencePath?: ExperiencePath | null;
+  /** Parcours unseen : extraits à montrer avant une vidéo transformée. */
+  minExtractsBeforeCinematic?: number;
   signal?: AbortSignal;
   diagnosticTrace?: boolean;
   systemPromptOverride?: string | null;
@@ -523,8 +529,16 @@ export async function evaluatePostTurnPRD4(
   let result: PRD4PostTurnEvaluation;
   let model = "";
   let effectiveMaxTokens = 950;
-  const videos = input.handoffContext?.candidateText !== undefined ? []
+  const allVideos = input.handoffContext?.candidateText !== undefined ? []
     : await withTimeout('gm_videos', getVideoTriggersCached(), HANDOFF_DEPENDENCY_TIMEOUT_MS).catch(() => []);
+  // Only eligible candidates reach the prompt and the accepted ids.
+  const videos = selectEligibleVideos(allVideos, {
+    path: input.experiencePath,
+    currentCharacter: input.currentCharacter,
+    playedVideoIds: input.triggeredVideoIds ?? [],
+    extractsShown: countPlayedExtracts(allVideos, input.triggeredVideoIds ?? []),
+    minExtractsBeforeCinematic: input.minExtractsBeforeCinematic ?? DEFAULT_MIN_EXTRACTS_BEFORE_CINEMATIC,
+  });
   const validIds = new Set(videos.map((v) => v.id));
   const triggered = new Set(input.triggeredVideoIds ?? []);
   const promptOverride = input.systemPromptOverride?.trim();

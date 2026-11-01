@@ -99,6 +99,8 @@ import ThanksScreen from "@/components/ThanksScreen";
 import GumletVideoPlayer, { type GumletVideoPlayerHandle } from "@/components/GumletVideoPlayer";
 import { savePRD4Questionnaire, syncPRD4QuestionnaireToNotion } from "@/services/prd4Questionnaire";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
+import { countPlayedExtracts, selectEligibleVideos } from "@/services/videoEligibility";
+import { experiencePathFromFilmAnswer } from "@/services/experienceFrame";
 import {
   loadVideoTriggerSettingsFromDB,
   videoTriggerDefaults,
@@ -1588,6 +1590,7 @@ const IndexPRD4 = () => {
           userMessage: userText,
           userRole: userRoleRef.current,
           hasSeenFilm: hasSeenFilmRef.current,
+          minExtractsBeforeCinematic: videoTriggerSettingsRef.current.MIN_EXTRACTS_BEFORE_CINEMATIC,
           userPostureRaw: userPostureRef.current?.raw ?? null,
           timeElapsedSeconds: elapsed,
           characterContext: turnCharacterContext,
@@ -2023,6 +2026,13 @@ const IndexPRD4 = () => {
               && Boolean(proposalTarget && directorConfig?.activeCharacters.includes(proposalTarget)),
             playedVideoIds: triggeredVideoIdsRef.current,
             availableVideoIds: videos.filter((video) => Boolean(video.video_url)).map((video) => video.id),
+            eligibleVideoIds: selectEligibleVideos(videos, {
+              path: experiencePathFromFilmAnswer(hasSeenFilmRef.current),
+              currentCharacter: activeCharacterRef.current,
+              playedVideoIds: triggeredVideoIdsRef.current,
+              extractsShown: countPlayedExtracts(videos, triggeredVideoIdsRef.current),
+              minExtractsBeforeCinematic: settings.MIN_EXTRACTS_BEFORE_CINEMATIC,
+            }).map((video) => video.id),
             lastVideoTurn: Number.isFinite(lastVideoTurnRef.current) ? lastVideoTurnRef.current : null,
             minimumVideoTurn: settings.ENABLED ? settings.MIN_TURNS_BEFORE_FIRST : Number.MAX_SAFE_INTEGER,
             minimumTurnsBetweenVideos: settings.MIN_TURNS_BETWEEN,

@@ -22,7 +22,8 @@ export type DirectorBlockReason =
   | "cinematic_unavailable"
   | "cinematic_already_played"
   | "cinematic_cooldown"
-  | "cinematic_limit_reached";
+  | "cinematic_limit_reached"
+  | "ineligible";
 
 export interface DirectorGuardContext {
   configPublished: boolean;
@@ -39,6 +40,8 @@ export interface DirectorGuardContext {
   targetReady: boolean;
   playedVideoIds: string[];
   availableVideoIds: string[];
+  /** Eligible ids from `selectEligibleVideos`; absent = no eligibility check. */
+  eligibleVideoIds?: string[];
   lastVideoTurn: number | null;
   minimumVideoTurn: number;
   minimumTurnsBetweenVideos: number;
@@ -127,6 +130,7 @@ export function validateDirectorDecision(
     if (!context.cinematicsEnabled) return blocked("cinematic_disabled");
     if (!context.availableVideoIds.includes(decision.action.videoId)) return blocked("cinematic_unavailable");
     if (context.playedVideoIds.includes(decision.action.videoId)) return blocked("cinematic_already_played");
+    if (context.eligibleVideoIds && !context.eligibleVideoIds.includes(decision.action.videoId)) return blocked("ineligible");
     if (context.userTurn < context.minimumVideoTurn) return blocked("cinematic_cooldown");
     if (
       context.lastVideoTurn != null

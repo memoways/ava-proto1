@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Sélection vidéos, lot 2 — filtre d'éligibilité déterministe] — 2026-11-01
+
+- Nouvelle fonction pure `selectEligibleVideos` (`src/services/videoEligibility.ts`) : film vu →
+  vidéos transformées seulement ; film pas vu → extraits d'abord, vidéos transformées après
+  `MIN_EXTRACTS_BEFORE_CINEMATIC` extraits montrés (ou s'il ne reste aucun extrait éligible) ;
+  parcours inconnu → aucun filtre de nature. Personnage en ligne listé, ou `all`/vide/absent.
+  Type `intro` et vidéos déjà jouées exclus ; ordre du catalogue conservé.
+- Le GM ne reçoit que les candidates éligibles (bloc vidéos et ids acceptés). Le directeur
+  refait le contrôle : nouveau motif de blocage `ineligible` via `eligibleVideoIds`.
+- Nouveau réglage vidéo `MIN_EXTRACTS_BEFORE_CINEMATIC` (défaut 2), éditable dans l'éditeur
+  vidéo admin. Extraits montrés comptés depuis les vidéos réellement jouées de la session.
+- Aucun prompt GM, contrat JSON ni Description modifié (lot 3). Migration du lot 1 vérifiée
+  appliquée via Lovable ; Nature et Personnages déjà renseignés sur les 15 vidéos.
+  Plan : [sélection contextuelle](docs/plan_selection_videos_contextuelle.md) ·
+  [prompt lot 3](docs/prompt_reprise_selection_videos_lot_3.md).
+
 ## [Sélection vidéos, lot 1 — Nature, Personnages et Description IA synchronisés] — 2026-11-01
 
 - Migration additive `video_triggers` : `nature`, `characters` (text[]), `ai_description`,
