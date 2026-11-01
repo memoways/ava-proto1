@@ -16,6 +16,11 @@ import {
   loadPaginatedNotionChildren,
   type NotionContentBlock,
 } from "../_shared/notionPageContent.ts";
+import {
+  isMissingVideoMetadataColumnError,
+  mapVideoCharacters,
+  mapVideoNature,
+} from "../_shared/videoMetadata.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -55,6 +60,8 @@ interface VideoSyncResult {
   themes: string[];
   priority: number;
   type: string;
+  nature: string;
+  characters: string[];
   has_url: boolean;
 }
 
@@ -324,6 +331,7 @@ serve(async (req) => {
     let videosSynced = 0;
     let videosSkipped = 0;
     const perVideo: VideoSyncResult[] = [];
+    let videoMetadataColumnsAvailable = true;
     const videoSyncErrors: Array<{ title: string; error: string }> = [];
     const videoSkippedDetails: Array<{ title: string; reason: string }> = [];
     if (videosDbId) {
@@ -361,6 +369,9 @@ serve(async (req) => {
         const type = extractSelect(props['Type']) || 'interlude';
         const transition = extractSelect(props['Style de transition']) || 'fade_black';
         const videoUrl = extractUrl(props['URL Gumlet']) || extractUrl(props['URL']);
+        const nature = mapVideoNature(extractSelect(props['Nature']));
+        const characters = mapVideoCharacters(extractMultiSelect(props['Personnages']));
+        const aiDescription = extractRichText(props['Description IA']);
 
         const record = {
           notion_id: page.id,
@@ -375,9 +386,22 @@ serve(async (req) => {
           post_video_context: context, // back-compat for legacy code path
           updated_at: new Date().toISOString(),
         };
-        const { error: vErr } = await supabase
-          .from('video_triggers')
-          .upsert(record, { onConflict: 'notion_id' });
+        const metadata = { nature, characters, ai_description: aiDescription };
+        let { error: vErr } = videoMetadataColumnsAvailable
+          ? await supabase
+            .from('video_triggers')
+            .upsert({ ...record, ...metadata }, { onConflict: 'notion_id' })
+          : { error: null };
+        if (!videoMetadataColumnsAvailable || isMissingVideoMetadataColumnError(vErr)) {
+          // Additive migration not applied yet: keep syncing the legacy columns.
+          if (videoMetadataColumnsAvailable) {
+            console.warn('[sync-notion] video metadata columns missing, syncing without them:', vErr?.message);
+            videoMetadataColumnsAvailable = false;
+          }
+          ({ error: vErr } = await supabase
+            .from('video_triggers')
+            .upsert(record, { onConflict: 'notion_id' }));
+        }
         if (vErr) {
           console.error(`[sync-notion] video upsert error for ${title}:`, vErr);
           videoSyncErrors.push({ title, error: vErr.message });
@@ -385,7 +409,7 @@ serve(async (req) => {
         }
         seenNotionIds.push(page.id);
         videosSynced++;
-        perVideo.push({ title, themes, priority, type, has_url: !!videoUrl });
+        perVideo.push({ title, themes, priority, type, nature, characters, has_url: !!videoUrl });
       }
 
       // Prune rows whose Notion page disappeared or is no longer "En ligne"
@@ -786,6 +810,7 @@ Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
       video_skipped_details: videoSkippedDetails,
 
       per_video: perVideo,
+      video_metadata_synced: Boolean(videosDbId) && videoMetadataColumnsAvailable,
       wiped_all: wipedAll,
       in_place_profile_refresh: inPlaceProfileRefresh,
       total_embeddings_in_db: totalEmb || 0,

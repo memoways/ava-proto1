@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Sélection vidéos, lot 1 — Nature, Personnages et Description IA synchronisés] — 2026-11-01
+
+- Migration additive `video_triggers` : `nature`, `characters` (text[]), `ai_description`,
+  nullables, sans réécriture de données.
+- `sync-notion` mappe les champs Notion « 🎬 Vidéos AVA » : Nature (Extrait du film → `extract`,
+  vide ou inconnu → `transformed`), Personnages (Léo → `leo`, « Tous » ou vide → `['all']`),
+  Description IA → `ai_description`. Si la migration n'est pas encore appliquée, la
+  synchronisation continue sur les colonnes historiques (`video_metadata_synced: false`).
+- `VideoTriggerRow` et types Supabase étendus ; lecture tolérante avant/après migration.
+  Éditeur admin : Nature et Personnages en lecture seule.
+- Aucun changement de sélection ni de comportement en partie : le GM lit les mêmes champs.
+  Plan : [sélection contextuelle des vidéos](docs/plan_selection_videos_contextuelle.md) ·
+  [prompt lot 2](docs/prompt_reprise_selection_videos_lot_2.md).
+
 ## [G1.3c — fin de parole à 900 ms en sandbox] — 2026-10-31
 
 - Décision d'Ulrich : `VOICE_HANDS_FREE.endOfSpeechMs` de `sandbox-ulrich` passe de 2 000 à
