@@ -17,6 +17,10 @@ remote `https://github.com/memoways/ava-proto1`). Réponds en français.
 
 ## 2. État vérifié à la fin du lot 3 (2026-11-01)
 
+À lancer après le lot 3b (transition cinématique, `docs/prompt_reprise_selection_videos_lot_3b.md`) ;
+relis son compte rendu et le plan pour l'état à jour.
+
+
 - `video_triggers` : 17 vidéos, `nature` et `characters` remplis ; `context` de 28
   à 600 caractères ; `description` et `ai_description` **vides partout** (chaînes
   vides, pas null). Lecture via le MCP Lovable Ava `1265958d-b74e-40f2-917d-182fe05163fc`.

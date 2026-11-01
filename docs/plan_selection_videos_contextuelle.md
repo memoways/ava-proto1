@@ -1,8 +1,9 @@
 # Plan — sélection contextuelle des vidéos
 
 Date : 2026-11-01. Statut : lots 1 (données), 2 (filtre d'éligibilité) et 3 (choix au sens,
-code) livrés ; prompt GM publié prêt, publication admin à faire par Ulrich
-([texte](prompt_gm_publie_regle_videos_lot_3.md)) ; lot 4 à démarrer
+code) livrés ; règle publiée en sandbox-ulrich (v11) et validée par Ulrich, prod et
+sandbox-julien inchangés ; lot 3b (transition cinématique) à démarrer
+([prompt lot 3b](prompt_reprise_selection_videos_lot_3b.md)), puis lot 4
 ([prompt lot 4](prompt_reprise_selection_videos_lot_4.md)).
 Source : analyse de la mécanique vidéo (session du 2026-11-01) et décisions d'Ulrich.
 
@@ -174,6 +175,34 @@ Personnages remplis sur les 15 vidéos (extraits et transformées, Max/Emma/Léo
   vides) ; `gameMasterPRD4.videos.test.ts` (contexte et description envoyés, règle du code,
   texte publié préparé identique) ; suites GM, directeur et synchronisation vertes.
 
+**Recette d'Ulrich (2026-11-01, sandbox-ulrich, v11 « Test prov — brouillon » publiée à
+13:56 UTC).** Le choix des vidéos convient. Gêne relevée : la cinématique arrive alors que
+le joueur a commencé à répondre à la réplique du personnage ; rien ne signale qu'il ne sert
+plus à rien de parler.
+
+### Lot 3b — Transition cinématique (demande d'Ulrich, 2026-11-01)
+
+Constat dans le code (main `83baa4e`) : `IndexPRD4` appelle `setActiveVideo` dès que la
+décision du directeur est validée (`guarded.action.type === "cinematic"`), sans attendre la
+fin de la réplique ; un effet interrompt alors la sortie vocale en cours
+(`responseOutputRef.current?.interrupt()`). L'écoute mains libres n'est pas suspendue à
+l'annonce. Le lecteur (`GumletVideoPlayer`) n'a qu'un fondu d'opacité de 200 ms.
+
+Comportement voulu par Ulrich :
+
+1. La décision cinématique est connue pendant la réplique (le GM tourne en parallèle de la
+   voix) : la vidéo est **en attente**, la réplique n'est jamais coupée.
+2. Dès l'annonce, l'écoute du joueur est suspendue (aucun nouveau tour), avec un signe
+   visuel discret qu'une séquence arrive.
+3. Fin de la réplique → fondu au noir du personnage → vidéo → fondu au noir → retour en
+   fondu sur le personnage → écoute rouverte : une respiration, pas une invitation à parler.
+4. Décision arrivée après la fin de la réplique alors que le joueur parle déjà : ne pas lui
+   couper la parole ; reporter la vidéo à la fin de la réplique suivante (à confirmer en
+   recette) — sinon, si personne ne parle, enchaîner tout de suite.
+5. Bouton « passer » conservé ; le même retour en fondu s'applique.
+
+L'item « attendre la fin de la réplique avant de lancer la vidéo » du lot 5 est traité ici.
+
 ### Lot 4 — Description IA automatique
 
 - Fonction edge `describe-video` : analyse la vidéo et écrit « Description IA »
@@ -188,8 +217,7 @@ Personnages remplis sur les 15 vidéos (extraits et transformées, Max/Emma/Léo
 
 ### Lot 5 — Lecture et mémoire
 
-- Vérifier sur une trace de session si la vidéo coupe la voix ; si oui,
-  attendre la fin de la réplique avant de lancer la vidéo.
+- (Traité au lot 3b : la vidéo attend la fin de la réplique.)
 - Contexte post-vidéo : relever la limite de 500 caractères.
 - Mémoire : garder dans la session les vidéos vues et ce qu'elles montrent,
   pour le GM et le personnage au-delà d'un tour.
