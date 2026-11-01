@@ -42,8 +42,9 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 Bloc vidéos du GM avec Contexte et Description (ou Description IA), 300 caractères chacun ;
 règle du code : contexte d'abord, un thème seul ne suffit plus. `videoTriggerMatcher.ts`
 supprimé. **Prompt GM publié non modifié** (sandbox-ulrich v7, prod v8, sandbox-julien v9) :
-publication admin par Ulrich, sandbox d'abord, production sur son accord —
-[texte prêt](prompt_gm_publie_regle_videos_lot_3.md). Recette humaine : film vu, film pas
+publication admin par Ulrich, sandbox d'abord, production sur son accord :
+nouveau brouillon depuis l'admin de l'aperçu Lovable puis « Publier » —
+[procédure](prompt_gm_publie_regle_videos_lot_3.md). Recette humaine : film vu, film pas
 vu, vidéo pertinente au fil de la conversation.
 [Plan](plan_selection_videos_contextuelle.md) ·
 [Prompt lot 4 « Description IA automatique »](prompt_reprise_selection_videos_lot_4.md).

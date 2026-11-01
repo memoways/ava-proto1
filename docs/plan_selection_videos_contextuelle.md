@@ -150,12 +150,17 @@ Personnages remplis sur les 15 vidéos (extraits et transformées, Max/Emma/Léo
   suit la même règle. Contrat JSON inchangé.
 - Prompt publié : version active lue via Lovable (lecture seule). `sandbox-ulrich` v7,
   `prod` v8 et `sandbox-julien` v9 portent le même texte que la fixture
-  `gm-published-sandbox-v7` (md5 `82f57f2c…`). Texte de remplacement (un seul bloc changé)
-  et procédure admin : [prompt GM publié, lot 3](prompt_gm_publie_regle_videos_lot_3.md).
-  **Non publié** : publication admin par Ulrich, sandbox d'abord ; la production exige son
-  accord. Un test garde ce texte identique à la règle du code. Jusque-là, en sandbox-ulrich,
-  prod et sandbox-julien, le bloc et la consigne finale (code) s'appliquent mais le prompt
-  système publié impose encore le thème.
+  `gm-published-sandbox-v7` (md5 `82f57f2c…`). L'aperçu du prompt en admin est en lecture
+  seule : « Nouveau brouillon » génère le prompt depuis le prompt du code et les réglages de
+  la version source. Publication = nouveau brouillon depuis l'admin de l'aperçu Lovable,
+  puis « Publier » ; procédure et écarts avec la v7 (règles hors-monde et
+  `next_speech_state` jamais publiées) : [prompt GM publié, lot 3](prompt_gm_publie_regle_videos_lot_3.md).
+  **Non publié** : action d'Ulrich, sandbox d'abord ; la production exige son accord.
+  Correctif : la ligne de réglage « Cinématiques » du constructeur
+  (`gameMasterPromptBuilder.ts`) disait « lorsqu'un thème correspond » ; elle suit désormais
+  le choix au sens. Un test garde le document identique à la règle du code. Jusqu'à la
+  publication, en sandbox-ulrich, prod et sandbox-julien, le bloc et la consigne finale
+  (code) s'appliquent mais le prompt système publié impose encore le thème.
 - `videoTriggerMatcher.ts` **supprimé** : jamais appelé, et un filet par mots-clés
   déclencherait une vidéo sur un seul thème commun, à l'opposé du choix au sens. Le filtre
   d'éligibilité (lot 2) et la garde du directeur restent les seules barrières.

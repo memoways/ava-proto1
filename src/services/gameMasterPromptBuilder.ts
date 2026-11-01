@@ -88,7 +88,7 @@ ${priorities}
 Actions autorisées :
 - Handoff entre Max et Emma : ${config.editor.allowHandoffs && config.maximumHandoffsPerSession > 0 ? `autorisé à partir du tour ${config.minimumHandoffTurn} (suggestions GM seulement), au maximum ${config.maximumHandoffsPerSession} fois, avec ${config.minimumTurnsBetweenHandoffs} tour(s) de pause entre deux propositions. Bidirectionnel. Ne force jamais le joueur.` : "désactivé — retourne action.type=none à la place"}.
 ${config.editor.handoffRules.length ? `- Règles thématiques : ${config.editor.handoffRules.map((rule) => `${rule.targetCharacter} si thèmes/topics [${[...rule.themes, ...rule.topics].join(", ")}]`).join(" ; ")}.` : "- Aucune règle thématique supplémentaire."}
-- Cinématiques : ${config.editor.allowCinematics ? "autorisées lorsqu'un thème correspond et que les garde-fous valident l'action" : "désactivées — retourne trigger_video_id=null et aucune action cinematic"}.
+- Cinématiques : ${config.editor.allowCinematics ? "autorisées lorsqu'une vidéo disponible rejoint le sens de l'échange (contexte d'abord, voir Règles \"trigger_video_id\") et que les garde-fous valident l'action" : "désactivées — retourne trigger_video_id=null et aucune action cinematic"}.
 
 ${config.editor.guardrails ? buildGuardrailsBlock(config.editor.guardrails) : ""}
 
