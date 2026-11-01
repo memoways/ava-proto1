@@ -121,6 +121,8 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
       void call.getNetworkStats().then(stats => {
         if (!this.disposed) this.reportNetwork(stats);
       }).catch(() => {});
+      // While listening the face drifts back to a friendly assistant look; keep it held.
+      if (!this.currentSpeech) this.applyEmotion();
     }, 5000);
   }
 
@@ -299,6 +301,8 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
         if (!speech || !speech.started || speech.ended) return;
         speech.ended = true;
         speech.resolveEnded();
+        // The per-line echo tag ends with the line; restore the held emotion for listening.
+        this.applyEmotion();
         this.callbacks.onConnectionStateChange?.("ready");
         this.callbacks.onSpeakEnd?.(speech.turnId);
       } else if (

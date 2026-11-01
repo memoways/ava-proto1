@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatar Tavus — émotion tenue pendant l'écoute] — 2026-11-01
+
+- Recette 2 : nos consignes atteignent Tavus (le visage change en parlant), mais pendant l'écoute
+  il revient à une attitude d'assistant aimable. `set_emotion` est maintenant renvoyé à la fin de
+  chaque réplique (la balise Echo ne vaut que pour la ligne) et toutes les 5 s tant qu'il écoute.
+- Limite connue : l'attitude d'écoute vient surtout du Face ; un Face créé depuis une photo
+  invente une écoute « assistant ». Levier fort : Face entraîné sur une vidéo dont les 30 s
+  d'écoute sont jouées abattues.
+
 ## [Avatar Tavus — balise d'émotion sur chaque réplique] — 2026-11-01
 
 - Recette : Max accueillait encore en souriant malgré `set_emotion`. La doc Tavus Echo impose une
