@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatars streaming — Anam : accueil synchronisé et jeu posé] — 2026-11-02
+
+- Retour d'Ulrich (Max sur Anam) : accueil désynchronisé ; premier mot ou première phrase
+  « hurlés » puis voix plus calme, avec `[distressed]` comme avec `[sad]`, expressivité 0,2.
+- Accueil : `stream()` du SDK se résout dès l'arrivée des pistes WebRTC, avant `SESSION_READY` et
+  avant la première image décodée ; l'accueil partait donc sur un flux pas encore calé. La
+  première réplique attend désormais `SESSION_READY` et la première image affichée
+  (`requestVideoFrameCallback`, sinon `loadeddata`), au plus 5 s, puis 1 s de stabilisation.
+  Une seule fois par session ; diagnostic `warm_up` (durée, borne atteinte ou non).
+- Jeu : la balise de jeu n'est plus écrite en tête du texte. Une voix expressive la jouait
+  aussi, très fort au début de la réplique. Elle part en Director Note cue par le canal de données
+  (`sendDirectorNoteCue(tag, { atSeconds: 0 })`), lue par le visage seul pour toute la réplique ;
+  la voix garde son débit. Échec d'envoi : réplique dite sans balise. Aides admin mises à jour.
+- Tests Anam : texte nu + cue, cue en échec, attente de l'accueil (une fois), borne atteinte.
+  À valider en recette par Ulrich (synchro de l'accueil, absence de cassure dans la réplique).
+
 ## [Avatars streaming AV3 — LemonSlice en mode audio] — 2026-11-02
 
 - LemonSlice devient sélectionnable (`heygen | tavus | anam | lemonslice`). D1 (Ulrich) : salle

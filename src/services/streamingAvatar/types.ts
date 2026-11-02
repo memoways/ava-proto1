@@ -147,7 +147,7 @@ export interface VideoLatencyObservation {
 
 /** Technical-only fields; never include room URLs, tokens or spoken text. */
 export interface AvatarMediaDiagnostics {
-  event: "tracks" | "playback" | "network" | "cpu";
+  event: "tracks" | "playback" | "network" | "cpu" | "warm_up";
   audioTracks?: number;
   videoTracks?: number;
   playback?: "playing" | "blocked" | "failed";
@@ -161,6 +161,9 @@ export interface AvatarMediaDiagnostics {
   videoJitter?: number | null;
   roundTripTime?: number | null;
   cpuState?: "low" | "high";
+  /** Wait before the opening line; `warmUpComplete` false when the bound was reached. */
+  warmUpMs?: number;
+  warmUpComplete?: boolean;
   cpuReason?: string;
 }
 

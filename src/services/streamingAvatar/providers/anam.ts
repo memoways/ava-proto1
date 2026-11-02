@@ -3,15 +3,13 @@ import {
   createClient,
   MessageRole,
   type AnamClient,
+  type DirectorNoteCueTag,
   type MessageDeliveryFailure,
   type MessageStreamEvent,
 } from "@anam-ai/js-sdk";
 import { endAvatarSession, startAvatarSession } from "../api";
 import { splitAvatarText } from "../textSegmentation";
-import {
-  stripAnamCueTags,
-  withAnamCue,
-} from "../../../../supabase/functions/_shared/streamingAvatarRequest";
+import { stripAnamCueTags } from "../../../../supabase/functions/_shared/streamingAvatarRequest";
 import {
   AvatarRenderError,
   type AnamAvatarSettings,
@@ -36,10 +34,21 @@ interface PendingSpeech {
   endedPromise: Promise<void>;
 }
 
+export interface AnamWarmUpTiming {
+  /** Longest wait for SESSION_READY and the first rendered frame; past it Ava speaks anyway. */
+  maxWaitMs: number;
+  /** Pause after the first frame so WebRTC can align audio and video before the opening line. */
+  settleMs: number;
+}
+
+const DEFAULT_WARM_UP: AnamWarmUpTiming = { maxWaitMs: 5_000, settleMs: 1_000 };
+
 /**
  * Anam in text mode: the persona says Ava's text through a talk stream (Anam LLM off,
  * `CUSTOMER_CLIENT_V1`). The SDK never opens the microphone (`disableInputAudio`), so no sound
  * reaches Anam. Persona transcript events mark the start and the end of each spoken line.
+ * The speaking cue goes over the data channel (face only): an inline `[sad]` tag would also
+ * drive an expressive voice, which shouts the first words then calms down.
  */
 export class AnamStreamingAvatarOutput implements ResponseOutput {
   readonly mode = "streaming_avatar" as const;
@@ -58,13 +67,19 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
   private ready = false;
   private currentSpeech: PendingSpeech | null = null;
   private mediaPlayback: Promise<void> | null = null;
+  private readonly warmUpTiming: AnamWarmUpTiming;
+  private resolveSessionReady!: () => void;
+  private readonly sessionReady = new Promise<void>((resolve) => { this.resolveSessionReady = resolve; });
+  private warmUp: Promise<void> | null = null;
 
   constructor(
     settings: AnamAvatarSettings,
     callbacks: ResponseOutputCallbacks,
     connectionTimeoutMs: number,
     speechStartTimeoutMs: number,
+    warmUpTiming: AnamWarmUpTiming = DEFAULT_WARM_UP,
   ) {
+    this.warmUpTiming = warmUpTiming;
     this.settings = settings;
     this.callbacks = callbacks;
     this.connectionTimeoutMs = connectionTimeoutMs;
@@ -138,6 +153,10 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     } catch (cause) {
       throw new AvatarRenderError("Anam audio/video playback failed", false, { cause });
     }
+    // The opening line waits for a warmed-up stream: sent on the first tracks, it came out of sync.
+    this.warmUp ??= this.waitForWarmUp(this.mediaElement);
+    await this.warmUp;
+    if (this.disposed || context?.signal?.aborted) throw new DOMException("Avatar turn aborted", "AbortError");
     const startedAt = performance.now();
     let firstStartedAt = 0;
     const chunks = splitAvatarText(text);
@@ -147,11 +166,11 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     const abort = () => this.interrupt();
     context?.signal?.addEventListener("abort", abort, { once: true });
     try {
-      // One talk stream per line; the cue tag leads the line and Anam strips it from transcripts.
+      this.sendSpeakingCue();
+      // One talk stream per line, plain text: the voice keeps its own steady delivery.
       for (let index = 0; index < chunks.length; index++) {
         if (this.disposed || context?.signal?.aborted) throw new DOMException("Avatar turn aborted", "AbortError");
-        const chunk = index === 0 ? withAnamCue(chunks[index], this.settings.speakingCue) : chunks[index];
-        await talk.streamMessageChunk(chunk, index === chunks.length - 1);
+        await talk.streamMessageChunk(chunks[index], index === chunks.length - 1);
       }
       await withDeadline(speech.startedPromise, this.speechStartTimeoutMs, "Anam did not start speaking");
       firstStartedAt = performance.now();
@@ -221,7 +240,33 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     this.callbacks.onConnectionStateChange?.("inactive");
   }
 
+  /** Face-only cue for the whole next persona turn; it holds until the turn ends. */
+  private sendSpeakingCue(): void {
+    const cue = this.settings.speakingCue;
+    if (cue === "none" || !this.client) return;
+    try {
+      this.client.sendDirectorNoteCue(cue as DirectorNoteCueTag, { atSeconds: 0 });
+    } catch (error) {
+      console.warn("[Anam] speaking cue not sent", error);
+    }
+  }
+
+  private async waitForWarmUp(element: HTMLMediaElement): Promise<void> {
+    const startedAt = performance.now();
+    const ready = await Promise.race([
+      Promise.all([this.sessionReady, waitForFirstFrame(element)]).then(() => true),
+      delay(this.warmUpTiming.maxWaitMs).then(() => false),
+    ]);
+    this.callbacks.onMediaDiagnostics?.({
+      event: "warm_up",
+      warmUpMs: Math.round(performance.now() - startedAt),
+      warmUpComplete: ready,
+    });
+    await delay(this.warmUpTiming.settleMs);
+  }
+
   private bindEvents(client: AnamClient): void {
+    client.addListener(AnamEvent.SESSION_READY, () => this.resolveSessionReady());
     client.addListener(AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED, (event: MessageStreamEvent) => {
       const speech = this.currentSpeech;
       if (this.disposed || !speech || event.role !== MessageRole.PERSONA) return;
@@ -324,6 +369,22 @@ function createPendingSpeech(correlationId: string, turnId?: string): PendingSpe
     startedPromise,
     endedPromise,
   };
+}
+
+function delay(ms: number): Promise<void> {
+  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+}
+
+/** Resolves once the element shows a decoded frame, so speech never starts on a black stream. */
+function waitForFirstFrame(element: HTMLMediaElement): Promise<void> {
+  const video = element as HTMLVideoElement;
+  if (typeof video.requestVideoFrameCallback === "function") {
+    return new Promise((resolve) => { video.requestVideoFrameCallback(() => resolve()); });
+  }
+  if (element.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) return Promise.resolve();
+  return new Promise((resolve) => {
+    element.addEventListener("loadeddata", () => resolve(), { once: true });
+  });
 }
 
 async function withDeadline<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
