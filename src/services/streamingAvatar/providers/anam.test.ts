@@ -55,7 +55,7 @@ const settings = {
   avatarId: "30fa96d0-26c4-4e55-94a0-517025942e18",
   voiceId: "6bfbe25a-979d-40f3-a92b-5394170af54b",
 };
-const warmUp = { maxWaitMs: 50, settleMs: 0, pollMs: 1, steadySamples: 2 };
+const warmUp = { maxWaitMs: 50, settleMs: 0, pollMs: 1, steadySamples: 2, rehearsalMaxMs: 0 };
 /** Fake peer connection: video decodes `fps` frames per second, audio flows unless `audio` is false. */
 const peerConnection = ({ fps = 25, audio = true, freezes = (): number => 0 } = {}) => {
   const startedAt = performance.now();
@@ -237,6 +237,49 @@ describe("Anam text-mode lifecycle", () => {
       persona("Bonjour.", { endOfSpeech: true });
       await opening; await output.dispose();
     }
+  });
+
+  it("rehearses muted and hidden before the opening line, once, without reporting it", async () => {
+    const onSpeakStart = vi.fn(), onTranscript = vi.fn(), onConnectionStateChange = vi.fn(), onMediaDiagnostics = vi.fn();
+    const output = anam({}, { onSpeakStart, onTranscript, onConnectionStateChange, onMediaDiagnostics }, { ...warmUp, rehearsalMaxMs: 1_000 });
+    await output.prepare({ sessionId: "ava" }); sessionReady();
+    const video = videoWithFrame(); output.attachMedia(video);
+    const opening = output.renderText("Bonjour.", { turnId: "opening" });
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(1));
+    expect(fake.talks[0].chunks).toEqual([["Bonjour. Je suis là, je t'écoute.", true]]);
+    expect(video.muted).toBe(true);
+    expect(onConnectionStateChange).toHaveBeenLastCalledWith("warming");
+    persona("Bonjour. Je suis là,");
+    persona(" je t'écoute.", { endOfSpeech: true });
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(2));
+    expect(video.muted).toBe(false);
+    expect(fake.talks[1].chunks).toEqual([["Bonjour.", true]]);
+    expect(onSpeakStart).not.toHaveBeenCalled();
+    expect(onTranscript).not.toHaveBeenCalled();
+    expect(onConnectionStateChange).toHaveBeenLastCalledWith("ready");
+    expect(onMediaDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ event: "warm_up", rehearsed: true, warmUpComplete: true }));
+    persona("Bonjour.", { endOfSpeech: true });
+    await opening;
+    expect(onSpeakStart).toHaveBeenCalledWith("opening");
+    expect(onTranscript).toHaveBeenCalledWith("Bonjour.", "opening");
+    const next = output.renderText("Encore.");
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(3));
+    persona("Encore.", { endOfSpeech: true });
+    await next; await output.dispose();
+  });
+
+  it("skips a rehearsal that never ends and still speaks the opening line unmuted", async () => {
+    const onMediaDiagnostics = vi.fn();
+    const output = anam({}, { onMediaDiagnostics }, { ...warmUp, rehearsalMaxMs: 30 });
+    await output.prepare({ sessionId: "ava" }); sessionReady();
+    const video = videoWithFrame(); output.attachMedia(video);
+    const opening = output.renderText("Bonjour.");
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(2));
+    expect(fake.client.interruptPersona).toHaveBeenCalledOnce();
+    expect(video.muted).toBe(false);
+    expect(onMediaDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ event: "warm_up", rehearsed: false, warmUpComplete: false }));
+    persona("Bonjour.", { endOfSpeech: true });
+    await opening; await output.dispose();
   });
 
   it("interrupts mid-line through interruptPersona and reports a started render", async () => {
