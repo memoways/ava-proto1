@@ -30,6 +30,7 @@ import {
   type VideoSyncRunSummary,
 } from "@/services/videoSyncHistory";
 import { selectVideosToDescribe } from "../../supabase/functions/_shared/videoDescription";
+import CinematicPreview from "@/components/CinematicPreview";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 
@@ -292,6 +293,7 @@ export default function VideoTriggersEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Partial<VideoTriggerRow>>({});
   const [newTheme, setNewTheme] = useState("");
   const [history, setHistory] = useState<CinematicEventRow[]>([]);
@@ -547,58 +549,69 @@ export default function VideoTriggersEditor() {
         }
 
         return (
-          <div key={t.id} className="border rounded-lg p-3 bg-muted/10 group">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-sm font-semibold">{t.title}</span>
-                <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{t.type}</span>
-                {t.priority != null && <span className="text-xs text-muted-foreground">P{t.priority}</span>}
-                <Badge variant={t.video_url ? "default" : "destructive"}>{t.video_url ? "média disponible" : "média absent"}</Badge>
-                {t.nature && (
-                  <Badge variant="outline">{t.nature === "extract" ? "Extrait du film" : "Vidéo transformée"}</Badge>
-                )}
-                {t.characters && t.characters.length > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    {t.characters.includes("all") ? "Tous" : t.characters.join(", ")}
-                  </span>
-                )}
-                {t.notion_id && (
-                  <a
-                    href={`https://www.notion.so/${t.notion_id.replace(/-/g, "")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-muted-foreground/70 hover:text-primary inline-flex items-center gap-0.5"
+          <div key={t.id} className="border rounded-lg p-3 bg-muted/10 group flex flex-col gap-3 sm:flex-row">
+            <div className="w-full shrink-0 sm:w-44">
+              <CinematicPreview
+                videoUrl={t.video_url}
+                title={t.title}
+                playing={playingId === t.id}
+                onPlay={() => setPlayingId(t.id)}
+                onClose={() => setPlayingId(null)}
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-sm font-semibold">{t.title}</span>
+                  <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{t.type}</span>
+                  {t.priority != null && <span className="text-xs text-muted-foreground">P{t.priority}</span>}
+                  <Badge variant={t.video_url ? "default" : "destructive"}>{t.video_url ? "média disponible" : "média absent"}</Badge>
+                  {t.nature && (
+                    <Badge variant="outline">{t.nature === "extract" ? "Extrait du film" : "Vidéo transformée"}</Badge>
+                  )}
+                  {t.characters && t.characters.length > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      {t.characters.includes("all") ? "Tous" : t.characters.join(", ")}
+                    </span>
+                  )}
+                  {t.notion_id && (
+                    <a
+                      href={`https://www.notion.so/${t.notion_id.replace(/-/g, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-muted-foreground/70 hover:text-primary inline-flex items-center gap-0.5"
+                    >
+                      Notion <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void describeOne(t)}
+                    disabled={busy || !t.notion_id || !t.video_url}
                   >
-                    Notion <ExternalLink className="h-3 w-3" />
-                  </a>
-                )}
+                    <Sparkles className={`h-3 w-3 mr-1 ${describingId === t.id ? "animate-pulse" : ""}`} />
+                    {describingId === t.id ? "Analyse…" : "Analyser"}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => startEdit(t)}>
+                    <Pencil className="h-3 w-3 mr-1" /> Éditer
+                  </Button>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void describeOne(t)}
-                  disabled={busy || !t.notion_id || !t.video_url}
-                >
-                  <Sparkles className={`h-3 w-3 mr-1 ${describingId === t.id ? "animate-pulse" : ""}`} />
-                  {describingId === t.id ? "Analyse…" : "Analyser"}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => startEdit(t)}>
-                  <Pencil className="h-3 w-3 mr-1" /> Éditer
-                </Button>
+              <div className="flex flex-wrap gap-1 mt-2">
+                {(t.themes ?? []).map((tag) => (
+                  <span key={tag} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">{tag}</span>
+                ))}
+                {(!t.themes || t.themes.length === 0) && <span className="text-xs text-muted-foreground/50 italic">Aucun thème</span>}
               </div>
+              {t.context && <p className="text-xs text-muted-foreground mt-2"><strong>Contexte :</strong> {t.context}</p>}
+              {t.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2"><strong>Description :</strong> {t.description}</p>}
+              {t.ai_description && <p className="text-xs text-muted-foreground mt-1 line-clamp-3"><strong>Description IA :</strong> {t.ai_description}</p>}
+              {t.video_url && <p className="text-xs text-muted-foreground mt-1 truncate">🔗 {t.video_url}</p>}
+              <p className="mt-1 text-[11px] text-muted-foreground">Synchronisé : {t.updated_at ? new Date(t.updated_at).toLocaleString("fr-FR") : "date inconnue"}</p>
             </div>
-            <div className="flex flex-wrap gap-1 mt-2">
-              {(t.themes ?? []).map((tag) => (
-                <span key={tag} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">{tag}</span>
-              ))}
-              {(!t.themes || t.themes.length === 0) && <span className="text-xs text-muted-foreground/50 italic">Aucun thème</span>}
-            </div>
-            {t.context && <p className="text-xs text-muted-foreground mt-2"><strong>Contexte :</strong> {t.context}</p>}
-            {t.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2"><strong>Description :</strong> {t.description}</p>}
-            {t.ai_description && <p className="text-xs text-muted-foreground mt-1 line-clamp-3"><strong>Description IA :</strong> {t.ai_description}</p>}
-            {t.video_url && <p className="text-xs text-muted-foreground mt-1 truncate">🔗 {t.video_url}</p>}
-            <p className="mt-1 text-[11px] text-muted-foreground">Synchronisé : {t.updated_at ? new Date(t.updated_at).toLocaleString("fr-FR") : "date inconnue"}</p>
           </div>
         );
       })}
