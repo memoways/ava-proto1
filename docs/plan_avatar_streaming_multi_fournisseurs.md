@@ -254,11 +254,11 @@ Suite : [prompt AV3 « LemonSlice en mode audio »](prompt_reprise_avatar_stream
 Branche `feat/avatar-streaming-av3`, depuis main `9aa1034` (PR #142). **D1 : option (a)**, salle
 Daily privée créée par l'Edge Function (choix d'Ulrich le 2 novembre). D2 inchangée (a).
 
-- **Écart constaté au démarrage.** La migration AV2 `20261102120000_streaming_avatar_provider_anam.sql`
-  n'est pas appliquée : `pg_constraint` (lecture par le MCP Lovable Ava) limite encore
-  `sessions.streaming_avatar_provider` à `heygen | tavus`. Tant qu'elle n'est pas appliquée par
-  Lovable, ni Anam ni LemonSlice ne peuvent lier leur session (la création échoue proprement,
-  repli TTS) ; la recette AV2 n'a donc pas pu avoir lieu. Aucune nouvelle migration en AV3.
+- **Contrainte AV2.** Au démarrage, `pg_constraint` (lecture par le MCP Lovable Ava) limitait
+  encore `sessions.streaming_avatar_provider` à `heygen | tavus`. Pendant le lot, Lovable a
+  appliqué la contrainte (main `4970ba5`, `drizzle/migrations/0014_streaming_avatar_provider_anam.sql`) :
+  relue ensuite, elle accepte `heygen | tavus | anam | lemonslice`. Aucune nouvelle migration en AV3.
+  Recette AV2 (Anam) non encore faite à cette date.
 - **Doc lue avant le code** (lemonslice.com/docs : WebSocket, Control session, CWM-1, modèles
   Lite/Cartoon/Flash ; exemple officiel `10-websocket-app`) : `POST /api/liveai/sessions` avec
   `X-API-Key`, réponse `session_id` + `websocket_address` ; client → serveur `audio`
@@ -317,7 +317,7 @@ Daily privée créée par l'Edge Function (choix d'Ulrich le 2 novembre). D2 inc
   Points à confirmer à la recette : délai entre le premier morceau envoyé et la bouche qui bouge,
   qualité du rééchantillonnage linéaire, `idle_prompt` lu.
 - **À faire (une action à la fois).** Secrets `LEMONSLICE_API_KEY` puis `DAILY_API_KEY` (Ulrich),
-  application de la migration AV2 et déploiement de l'Edge Function par Lovable, puis recette
+  déploiement de l'Edge Function par Lovable, puis recette
   d'Ulrich : une session LemonSlice avec la voix de Max, synchro labiale, aucun sourire,
   interruption en cours de réplique, repli TTS si LemonSlice échoue.
 

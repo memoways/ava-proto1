@@ -41,10 +41,9 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 **Avatars streaming AV3 (2 novembre, code) : LemonSlice en mode audio.** D1a : salle Daily privée
 créée par l'Edge Function, navigateur en réception seule. La voix du personnage d'Ava (TTS actuel)
 part en PCM16 sur le WebSocket LemonSlice, `audio_end` par réplique, fin sur `playback_finished`,
-interruption, repli TTS. **Bloquant constaté :** migration AV2 non appliquée en base (contrainte
-`streaming_avatar_provider` encore `heygen | tavus`) ; Anam et LemonSlice en dépendent. À faire, une
-action à la fois : secrets `LEMONSLICE_API_KEY` puis `DAILY_API_KEY`, migration AV2 et Edge Function
-par Lovable, recette d'Ulrich (voix de Max, synchro, aucun sourire, interruption, repli). Aucun lot
+interruption, repli TTS. Contrainte `streaming_avatar_provider` appliquée par Lovable (main
+`4970ba5`, relue : `anam` et `lemonslice` acceptés). À faire, une action à la fois : secrets
+`LEMONSLICE_API_KEY` puis `DAILY_API_KEY`, Edge Function déployée par Lovable, recette d'Ulrich (voix de Max, synchro, aucun sourire, interruption, repli). Aucun lot
 de code ne suit, sauf AV4 « Anam passthrough » si Ulrich choisit D2b.
 [Plan](plan_avatar_streaming_multi_fournisseurs.md#exécution-av3--2-novembre-2026).
 

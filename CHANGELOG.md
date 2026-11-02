@@ -23,8 +23,8 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Réglages (même JSON, anciens réglages relus sans perte) : agent ou image, modèle, attitudes en
   parlant (abattue) et au repos (fermée), délais, fréquence, format, recadrage, hochement CWM-1,
   durée de salle. Admin : carte LemonSlice « Essentiel » + « Avancé ».
-- **Constat :** la migration AV2 (contrainte `streaming_avatar_provider`) n'est pas appliquée en
-  base ; Anam et LemonSlice en dépendent. Aucune nouvelle migration en AV3.
+- Contrainte `streaming_avatar_provider` : appliquée par Lovable pendant le lot (main `4970ba5`),
+  relue en base (`anam` et `lemonslice` acceptés). Aucune nouvelle migration en AV3.
 - Tests : corps de session, contrôle et salle Daily (10), réglages (2), pont audio (8), cycle de vie
   avec salle, WebSocket et TTS simulés (10), registre.
 
