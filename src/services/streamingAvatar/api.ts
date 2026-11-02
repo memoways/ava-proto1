@@ -60,6 +60,32 @@ export async function endAvatarSession(input: {
   }
 }
 
+export interface TavusConfigurationCheck {
+  ok: boolean;
+  conversationStatus: string;
+  properties: Record<string, unknown>;
+  policy: string | null;
+  /** PAL `layers.tts`, read only (D3: Ava never writes the PAL). */
+  palVoice: Record<string, unknown>;
+}
+
+/** Admin only: Tavus `test_mode` conversation (no room, the PAL never joins). */
+export async function checkTavusConfiguration(
+  tavus: TavusAvatarSettings,
+): Promise<TavusConfigurationCheck> {
+  const response = await authenticatedFunctionFetch(ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "check",
+      provider: "tavus",
+      config: tavus,
+    }),
+  });
+  if (!response.ok) throw new Error(await readAvatarError(response));
+  return response.json() as Promise<TavusConfigurationCheck>;
+}
+
 export async function getAvatarProviderStatus(): Promise<Record<StreamingAvatarProviderId, boolean>> {
   const response = await authenticatedFunctionFetch(ENDPOINT, {
     method: "GET",

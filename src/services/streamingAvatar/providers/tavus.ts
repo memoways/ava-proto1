@@ -7,6 +7,7 @@ import DailyIframe, {
 import { endAvatarSession, startAvatarSession } from "../api";
 import {
   buildTavusEchoCommand,
+  buildTavusInterruptCommand,
   buildTavusSetEmotionCommand,
   stripTavusEmotionTags,
 } from "../protocolCommands";
@@ -217,14 +218,7 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
 
   interrupt(): void {
     if (this.call && this._externalSessionId) {
-      this.call.sendAppMessage(
-        {
-          message_type: "conversation",
-          event_type: "conversation.interrupt",
-          conversation_id: this._externalSessionId,
-        },
-        "*",
-      );
+      this.call.sendAppMessage(buildTavusInterruptCommand(this._externalSessionId), "*");
     }
     const error = new Error("Tavus speech interrupted");
     this.currentSpeech?.rejectStarted(error);

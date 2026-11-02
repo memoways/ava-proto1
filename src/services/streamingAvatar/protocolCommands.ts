@@ -64,3 +64,23 @@ export function buildTavusSetEmotionCommand(conversationId: string, emotion: str
     properties: { emotion },
   } as const;
 }
+
+/** Stops the current Tavus line at once; the next echo starts clean. */
+export function buildTavusInterruptCommand(conversationId: string) {
+  return {
+    message_type: "conversation",
+    event_type: "conversation.interrupt",
+    conversation_id: conversationId,
+  } as const;
+}
+
+/**
+ * LiveAvatar `avatar.start_listening` / `avatar.stop_listening` (SDK 0.0.19): posture only.
+ * The SDK voice chat stays muted, so no microphone audio ever reaches LiveAvatar.
+ */
+export function sendHeyGenListening(
+  session: { startListening: () => string; stopListening: () => string },
+  listening: boolean,
+): string {
+  return listening ? session.startListening() : session.stopListening();
+}

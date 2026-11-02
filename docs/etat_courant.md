@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 1er novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 2 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -37,6 +37,16 @@ Personnel : Ulrich `377e8583-7838-4c05-9f76-8833a450f304`, sources Ava exclues.
 GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
+
+**Avatars streaming AV1 (2 novembre, code) : socle multi-fournisseurs et réglages complets.**
+Module partagé Edge/client à liste blanche et bornes ; Anam et LemonSlice connus, non
+sélectionnables. HeyGen : très haute qualité, encodage, durée max, voix par moteur, posture
+d'écoute. Tavus : `languages`, délais, sous-titres, fond vert, politique UE, vérification
+`test_mode` avec voix du PAL en lecture seule. Admin « Essentiel »/« Avancé ». Aucune migration
+ni secret. À faire : déploiement Lovable de l'Edge Function, puis recette d'Ulrich (HeyGen et
+Tavus sandbox, réglage avancé changé, interruption en cours de réplique).
+[Plan](plan_avatar_streaming_multi_fournisseurs.md#exécution-av1--2-novembre-2026) ·
+[Prompt AV2 « Anam en mode texte »](prompt_reprise_avatar_streaming_lot_av2.md).
 
 **Avatar Tavus abattu (1er novembre, code) :** `conversation.set_emotion` « sadness » par défaut
 à l'entrée, quand le flux est prêt et à chaque réplique, plus la balise Echo `dejected` dans chaque texte (recette 1 : sourire encore présent sans balise), renvoi en fin de réplique et toutes les 5 s pendant l'écoute (recette 2 : retour à l'assistant aimable). Réglable dans l'onglet admin Tavus. Recette 3 : écoute séparée (défaut Neutre, Tristesse faisait chien battu). Voix : passer le PAL Tavus sur ElevenLabs (voix de Max) côté Tavus. Recette humaine : Face

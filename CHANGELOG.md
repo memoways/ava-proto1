@@ -14,6 +14,31 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   réglage côté Tavus, sans code. Envoyer l'audio d'Ava (echo `modality: audio`) reste une option
   plus lourde.
 
+## [Avatars streaming AV1 — socle multi-fournisseurs, réglages HeyGen et Tavus] — 2026-11-02
+
+- Socle : module pur partagé `supabase/functions/_shared/streamingAvatarRequest.ts` (Edge Function
+  et client) ; fournisseurs connus `heygen | tavus | anam | lemonslice`, seuls HeyGen et Tavus
+  sélectionnables. Liste blanche et bornes par champ : aucune valeur client n'est transmise telle
+  quelle. Même JSON `ava_streaming_avatar_settings`, normalisation tolérante (Tavus
+  `language: "French"` relu en `languages: ["fr"]`, valeur inconnue ou hors bornes → défaut).
+  Aucune migration, aucun secret.
+- HeyGen : qualité « très haute », encodage H264/VP8, durée maximale de session, réglages de voix
+  par moteur (ElevenLabs, Fish, Cartesia ; seuls les champs lus par le modèle partent ; v3,
+  v3 conversationnel et v4 Turbo ne reçoivent que la stabilité). Posture d'écoute
+  (`avatar.start_listening`/`stop_listening`) pendant que le joueur parle ; le micro n'est jamais
+  publié. `avatar.interrupt` inchangé.
+- Tavus : `properties.languages` remplace `language` (déprécié), délais de fermeture réglables,
+  sous-titres, fond vert et politique UE optionnels, `conversation.interrupt` isolé dans
+  `protocolCommands`. Bouton admin « Vérifier » : conversation `test_mode` (aucune salle, le PAL ne
+  rejoint pas), voix du PAL affichée en lecture seule (D3 non tranchée).
+- Admin : blocs « Essentiel » et « Avancé » repliable par fournisseur, bornes et aide d'une ligne,
+  champs non lus par le modèle désactivés.
+- Tests : `streamingAvatarRequest.test.ts` (17), `settings.test.ts` (5), commandes interrupt et
+  écoute. Deno absent du poste : Edge Function non vérifiée par `deno check`. Déploiement Lovable
+  et recette humaine (HeyGen + Tavus sandbox, réglage avancé, interruption) à faire.
+- Plan : `docs/plan_avatar_streaming_multi_fournisseurs.md` (« Exécution AV1 ») ; suite :
+  `docs/prompt_reprise_avatar_streaming_lot_av2.md` (Anam en mode texte).
+
 ## [Avatar Tavus — émotion tenue pendant l'écoute] — 2026-11-01
 
 - Recette 2 : nos consignes atteignent Tavus (le visage change en parlant), mais pendant l'écoute
