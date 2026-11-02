@@ -32,6 +32,15 @@ import {
   HEYGEN_ELEVENLABS_MODELS,
   HEYGEN_ELEVENLABS_STABILITY_ONLY,
   HEYGEN_FISH_MODELS,
+  LEMONSLICE_BOUNDS,
+  LEMONSLICE_PROMPT_MAX,
+  lemonSliceActionsAllowed,
+  lemonSliceAspectRatioSent,
+  lemonSliceEditImageRead,
+  type LemonSliceAspectRatio,
+  type LemonSliceEditImageMode,
+  type LemonSliceEditImageVariant,
+  type LemonSliceModel,
   normalizeTavusLanguages,
   STREAMING_AVATAR_BOUNDS,
   type NumberBounds,
@@ -45,6 +54,7 @@ import {
   type HeyGenAvatarSettings,
   type HeyGenElevenLabsVoice,
   type HeyGenVoiceSettings,
+  type LemonSliceAvatarSettings,
   type StreamingAvatarProviderId,
   type StreamingAvatarSettings,
   type TavusEmotion,
@@ -64,6 +74,10 @@ const providerCopy: Record<StreamingAvatarProviderId, { title: string; descripti
   anam: {
     title: "Anam",
     description: "Le texte Ava est envoyé par talk stream (LLM Anam coupé) ; le micro n'est jamais ouvert côté Anam.",
+  },
+  lemonslice: {
+    title: "LemonSlice",
+    description: "La voix du personnage d'Ava (TTS actuel) anime le visage ; vidéo et son reviennent par une salle Daily privée.",
   },
 };
 
@@ -123,8 +137,8 @@ export default function StreamingAvatarConfigTab() {
         </p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        {(["heygen", "tavus", "anam"] as const).map((provider) => {
+      <div className="grid gap-3 md:grid-cols-2">
+        {(["heygen", "tavus", "anam", "lemonslice"] as const).map((provider) => {
           const active = settings.activeProvider === provider;
           return (
             <button
@@ -180,10 +194,15 @@ export default function StreamingAvatarConfigTab() {
           value={settings.tavus}
           onChange={(tavus) => update({ tavus })}
         />
-      ) : (
+      ) : settings.activeProvider === "anam" ? (
         <AnamFields
           value={settings.anam}
           onChange={(anam) => update({ anam })}
+        />
+      ) : (
+        <LemonSliceFields
+          value={settings.lemonslice}
+          onChange={(lemonslice) => update({ lemonslice })}
         />
       )}
 
@@ -638,15 +657,100 @@ const ANAM_VOICE_ENGINE_LABELS: Record<AnamVoiceEngine, string> = {
   fish: "Fish Audio",
 };
 
-function PromptField({ label, value, disabled, onChange }: { label: string; value: string; disabled?: boolean; onChange: (value: string) => void }) {
+function PromptField({ label, value, disabled, max = ANAM_STYLE_PROMPT_MAX, onChange }: { label: string; value: string; disabled?: boolean; max?: number; onChange: (value: string) => void }) {
   return (
     <div className="space-y-2">
       <Label className={disabled ? "text-muted-foreground" : undefined}>{label}</Label>
-      <Textarea rows={4} maxLength={ANAM_STYLE_PROMPT_MAX} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
-      <Hint text={disabled ? "Non lu par ce modèle : non envoyé." : `${value.length} / ${ANAM_STYLE_PROMPT_MAX} caractères ; en anglais de préférence.`} />
+      <Textarea rows={4} maxLength={max} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
+      <Hint text={disabled ? "Non lu par ce modèle : non envoyé." : `${value.length} / ${max} caractères ; en anglais de préférence.`} />
     </div>
   );
 }
+
+function LemonSliceFields({
+  value,
+  onChange,
+}: {
+  value: LemonSliceAvatarSettings;
+  onChange: (value: LemonSliceAvatarSettings) => void;
+}) {
+  const patch = (next: Partial<LemonSliceAvatarSettings>) => onChange({ ...value, ...next });
+  const b = LEMONSLICE_BOUNDS;
+  const ratioSent = lemonSliceAspectRatioSent(value);
+  const editRead = lemonSliceEditImageRead(value);
+  const actions = lemonSliceActionsAllowed(value);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">LemonSlice</CardTitle>
+        <CardDescription>Ava garde micro, STT, LLM et la voix de ses personnages : chaque réplique est synthétisée par le TTS actuel, convertie en PCM16 et envoyée au visage (<code>audio</code> puis <code>audio_end</code>) ; <code>playback_finished</code> marque la fin. Salle Daily privée créée par Ava, navigateur en réception seule. Secrets <code>LEMONSLICE_API_KEY</code> et <code>DAILY_API_KEY</code>.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <SectionTitle>Essentiel</SectionTitle>
+        <div className="grid gap-4 md:grid-cols-2">
+          <TextField label="Agent ID" hint="Avatar créé sur lemonslice.com ; prioritaire sur l'image." value={value.agentId} onChange={(agentId) => patch({ agentId })} />
+          <TextField label="Image de l'avatar (URL https)" hint={value.agentId.trim() ? "Ignorée : l'Agent ID est utilisé." : "Image publique, 368×560 conseillé."} value={value.agentImageUrl} onChange={(agentImageUrl) => patch({ agentImageUrl })} />
+          <EnumField label="Modèle" hint="Flash et CWM-1 : offres Ultra/Entreprise." value={value.model} options={LEMONSLICE_MODEL_LABELS} onChange={(model) => patch({ model })} />
+          <EnumField
+            label="Fréquence audio"
+            hint="Le TTS d'Ava est rééchantillonné à cette fréquence ; 16 kHz évite un rééchantillonnage chez LemonSlice."
+            value={String(value.audioSampleRate) as "16000" | "24000"}
+            options={{ "16000": "16 kHz (défaut)", "24000": "24 kHz" }}
+            onChange={(rate) => patch({ audioSampleRate: rate === "24000" ? 24_000 : 16_000 })}
+          />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <PromptField label="Attitude en parlant (agent_prompt)" max={LEMONSLICE_PROMPT_MAX} value={value.agentPrompt} onChange={(agentPrompt) => patch({ agentPrompt })} />
+          <PromptField label="Attitude au repos (agent_idle_prompt)" max={LEMONSLICE_PROMPT_MAX} value={value.agentIdlePrompt} onChange={(agentIdlePrompt) => patch({ agentIdlePrompt })} />
+        </div>
+        <Advanced>
+          <div className="grid gap-4 md:grid-cols-2">
+            <NumberField label="Délai d'inactivité (s)" hint="30 à 900 ; défaut 300. Remis à zéro quand le joueur parle." bounds={b.idleTimeoutSeconds} value={value.idleTimeoutSeconds} onChange={(idleTimeoutSeconds) => patch({ idleTimeoutSeconds })} />
+            <NumberField label="Fin de réponse sans audio (s)" hint="0 = délai LemonSlice (non envoyé) ; jusqu'à 10." bounds={b.responseDoneTimeoutSeconds} value={value.responseDoneTimeoutSeconds} onChange={(responseDoneTimeoutSeconds) => patch({ responseDoneTimeoutSeconds })} />
+            <NumberField label="Durée maximale de la salle (s)" hint="300 à 3 600 ; défaut 1 800. Salle et jetons Daily expirent ensuite." bounds={b.roomMaxSeconds} value={value.roomMaxSeconds} onChange={(roomMaxSeconds) => patch({ roomMaxSeconds })} />
+            <EnumField label="Format" hint={ratioSent ? "2x3 conseillé." : "Ce modèle n'accepte que 2x3 : non envoyé."} value={value.aspectRatio} options={LEMONSLICE_ASPECT_LABELS} onChange={(aspectRatio) => patch({ aspectRatio })} />
+            <EnumField label="Recadrer l'image (edit_image)" hint={editRead ? "Défaut : réglage du compte." : "Lu seulement avec une image et le format 2x3 : non envoyé."} value={value.editImage} options={LEMONSLICE_EDIT_LABELS} onChange={(editImage) => patch({ editImage })} />
+            <EnumField label="Cadrage" hint={editRead && value.editImage === "on" ? "Envoyé avec le recadrage." : "Non envoyé sans recadrage activé."} value={value.editImageVariant} options={LEMONSLICE_VARIANT_LABELS} onChange={(editImageVariant) => patch({ editImageVariant })} />
+          </div>
+          <SwitchField
+            label="Hochement pendant que le joueur parle"
+            hint={actions ? "Action CWM-1 « listen », au plus toutes les 4 s ; le micro reste chez Ava." : "Modèle CWM-1 seulement : non envoyé."}
+            checked={value.listenAction}
+            onChange={(listenAction) => patch({ listenAction })}
+          />
+        </Advanced>
+      </CardContent>
+    </Card>
+  );
+}
+
+const LEMONSLICE_MODEL_LABELS: Record<LemonSliceModel, string> = {
+  default: "Modèle phare (défaut)",
+  flash: "Flash",
+  pro: "Pro",
+  "cwm-1": "CWM-1 (actions)",
+  "cwm-1-lite": "CWM-1 Lite",
+  cartoon: "Cartoon",
+};
+
+const LEMONSLICE_ASPECT_LABELS: Record<LemonSliceAspectRatio, string> = {
+  "2x3": "2x3 (défaut)",
+  "9x16": "9x16",
+  "1x1": "1x1",
+};
+
+const LEMONSLICE_EDIT_LABELS: Record<LemonSliceEditImageMode, string> = {
+  default: "Réglage du compte (défaut)",
+  on: "Recadrer",
+  off: "Ne pas recadrer",
+};
+
+const LEMONSLICE_VARIANT_LABELS: Record<LemonSliceEditImageVariant, string> = {
+  bust: "Buste (défaut)",
+  portrait: "Portrait",
+  standing: "Debout",
+  sitting: "Assis",
+};
 
 const HEYGEN_QUALITY_LABELS: Record<HeyGenAvatarSettings["quality"], string> = {
   very_high: "Très haute",

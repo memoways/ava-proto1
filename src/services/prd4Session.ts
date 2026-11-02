@@ -104,7 +104,7 @@ export async function updatePRD4Conversation(
 
 export interface PRD4StreamingAvatarPayload {
   output_mode?: "tts" | "streaming_avatar";
-  streaming_avatar_provider?: "heygen" | "tavus" | "anam" | null;
+  streaming_avatar_provider?: "heygen" | "tavus" | "anam" | "lemonslice" | null;
   streaming_avatar_session_id?: string | null;
   streaming_avatar_connect_ms?: number | null;
   streaming_avatar_first_frame_ms?: number | null;

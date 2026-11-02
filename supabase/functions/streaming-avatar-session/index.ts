@@ -4,8 +4,16 @@ import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 import { requireAdmin } from "../_shared/adminAuth.ts";
 import {
   buildAnamSessionTokenRequest,
+  buildDailyMeetingTokenRequest,
+  buildDailyRoomRequest,
   buildHeyGenSessionRequest,
+  buildLemonSliceControlRequest,
+  buildLemonSliceSessionRequest,
   buildTavusConversationRequest,
+  lemonSliceRoomName,
+  normalizeLemonSliceSettings,
+  safeDailyRoomUrl,
+  safeLemonSliceWebSocketAddress,
   safeProviderId,
   SELECTABLE_STREAMING_AVATAR_PROVIDERS,
   type KnownStreamingAvatarProvider,
@@ -19,16 +27,21 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// LemonSlice is known (AV3) but refused until it has a factory and a secret.
 type Provider = SelectableStreamingAvatarProvider;
 
+const LEMONSLICE_API = "https://lemonslice.com/api/liveai/sessions";
+const DAILY_API = "https://api.daily.co/v1";
+
 interface AvatarRequest {
-  action?: "start" | "end" | "check";
+  action?: "start" | "end" | "check" | "control";
   provider?: KnownStreamingAvatarProvider;
   sessionId?: string;
   externalSessionId?: string;
   sessionToken?: string;
   config?: Record<string, unknown>;
+  /** LemonSlice `/control` event and its value (prompt or action name). */
+  event?: string;
+  value?: unknown;
 }
 
 serve(async (req) => {
@@ -104,6 +117,16 @@ serve(async (req) => {
           "Authorization",
           bearer(Deno.env.get("ANAM_API_KEY")),
         ),
+        lemonslice: await probeProvider(
+          LEMONSLICE_API,
+          "X-API-Key",
+          Deno.env.get("LEMONSLICE_API_KEY"),
+        ),
+        daily: await probeProvider(
+          `${DAILY_API}/rooms?limit=1`,
+          "Authorization",
+          bearer(Deno.env.get("DAILY_API_KEY")),
+        ),
       });
     }
     const denied = await enforceGameRequest(
@@ -119,6 +142,8 @@ serve(async (req) => {
         heygen: Boolean(Deno.env.get("LIVEAVATAR_API_KEY")),
         tavus: Boolean(Deno.env.get("TAVUS_API_KEY")),
         anam: Boolean(Deno.env.get("ANAM_API_KEY")),
+        // LemonSlice publishes its video in a private Daily room created here.
+        lemonslice: Boolean(Deno.env.get("LEMONSLICE_API_KEY") && Deno.env.get("DAILY_API_KEY")),
       },
     });
   }
@@ -126,7 +151,11 @@ serve(async (req) => {
 
   if (req.method !== "POST") return jsonError("Method not allowed", 405);
   const body = (await req.json().catch(() => null)) as AvatarRequest | null;
-  if (!body || (body.action !== "start" && body.action !== "end" && body.action !== "check")) {
+  if (
+    !body ||
+    (body.action !== "start" && body.action !== "end" && body.action !== "check" &&
+      body.action !== "control")
+  ) {
     return jsonError("Invalid action", 400);
   }
   if (!SELECTABLE_STREAMING_AVATAR_PROVIDERS.includes(body.provider as Provider)) {
@@ -136,7 +165,9 @@ serve(async (req) => {
     // Admin configuration check: Tavus test_mode conversation or Anam token, no session, no binding.
     const auth = await requireAdmin(req, corsHeaders);
     if (!auth.ok) return auth.response!;
-    if (body.provider === "heygen") return jsonError("HeyGen has no configuration check", 400);
+    if (body.provider === "heygen" || body.provider === "lemonslice") {
+      return jsonError(`${body.provider} has no configuration check`, 400);
+    }
     try {
       return body.provider === "anam"
         ? await checkAnam(body.config ?? {})
@@ -147,9 +178,17 @@ serve(async (req) => {
   }
   if (!isUuid(body.sessionId)) return jsonError("Valid Ava sessionId required", 400);
 
+  if (body.action === "control" && body.provider !== "lemonslice") {
+    return jsonError("Only LemonSlice accepts control events", 400);
+  }
   const denied = await enforceGameRequest(
     req,
-    body.action === "start" ? "streaming-avatar-start" : "streaming-avatar-end",
+    body.action === "start"
+      ? "streaming-avatar-start"
+      : body.action === "end"
+      ? "streaming-avatar-end"
+      // No dedicated bucket without a migration: control events share the status quota (30/min).
+      : "streaming-avatar-status",
     corsHeaders,
     body.sessionId!,
     true,
@@ -165,6 +204,8 @@ serve(async (req) => {
         ? await startHeyGen(body.config ?? {})
         : body.provider === "anam"
         ? await startAnam(body.config ?? {})
+        : body.provider === "lemonslice"
+        ? await startLemonSlice(body.config ?? {}, body.sessionId!)
         : await startTavus(body.config ?? {}, body.sessionId!);
       if (!response.ok) return response;
       const started = await response.clone().json() as {
@@ -184,6 +225,8 @@ serve(async (req) => {
           await endHeyGen(started.externalSessionId, started.sessionToken).catch(() => {});
         } else if (body.provider === "tavus") {
           await endTavus(started.externalSessionId).catch(() => {});
+        } else if (body.provider === "lemonslice") {
+          await endLemonSlice(started.externalSessionId, body.sessionId!).catch(() => {});
         }
         // Anam: the single-use token is simply never handed to the client.
         throw error;
@@ -191,6 +234,17 @@ serve(async (req) => {
       return response;
     }
     const externalSessionId = safeId(body.externalSessionId);
+    if (body.action === "control") {
+      if (!externalSessionId || !await ownsExternalSession(
+        req,
+        body.sessionId!,
+        body.provider,
+        externalSessionId,
+      )) {
+        return jsonError("External session ownership mismatch", 403);
+      }
+      return await controlLemonSlice(externalSessionId, body.config ?? {}, body.event, body.value);
+    }
     if (externalSessionId && !await ownsExternalSession(
       req,
       body.sessionId!,
@@ -202,6 +256,10 @@ serve(async (req) => {
     if (body.provider === "anam") {
       // The client closes the Anam stream (stopStreaming); the token cannot start another session.
       return json({ ok: true });
+    }
+    if (body.provider === "lemonslice") {
+      // The room name is derived from the Ava session, never read from the client.
+      return await endLemonSlice(externalSessionId, body.sessionId!);
     }
     return body.provider === "heygen"
       ? await endHeyGen(body.externalSessionId, body.sessionToken)
@@ -372,6 +430,164 @@ async function checkAnam(config: Record<string, unknown>): Promise<Response> {
   });
 }
 
+async function dailyFetch(
+  apiKey: string,
+  path: string,
+  init: { method: string; body?: Record<string, unknown> },
+): Promise<Response> {
+  return fetch(`${DAILY_API}${path}`, {
+    method: init.method,
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: init.body ? JSON.stringify(init.body) : undefined,
+  });
+}
+
+async function deleteDailyRoom(apiKey: string, roomName: string): Promise<void> {
+  const upstream = await dailyFetch(apiKey, `/rooms/${encodeURIComponent(roomName)}`, {
+    method: "DELETE",
+  });
+  if (upstream.ok || upstream.status === 404) {
+    await upstream.body?.cancel();
+    return;
+  }
+  await readUpstream(upstream, "Daily room cleanup failed", false);
+}
+
+async function createDailyMeetingToken(
+  apiKey: string,
+  roomName: string,
+  role: "avatar" | "viewer",
+  config: Record<string, unknown>,
+  nowSeconds: number,
+): Promise<string> {
+  const upstream = await dailyFetch(apiKey, "/meeting-tokens", {
+    method: "POST",
+    body: buildDailyMeetingTokenRequest(roomName, role, config, nowSeconds),
+  });
+  const payload = await readUpstream(upstream, "Daily meeting token creation failed", false);
+  const token = safeString(payload.token);
+  if (!token) throw new Error("Daily returned no meeting token");
+  return token;
+}
+
+/**
+ * Private Daily room (D1a) + LemonSlice session. LemonSlice joins with the publishing token;
+ * the browser only receives (`canSend: false`). Room URL, tokens and the WebSocket address
+ * are capabilities: none of them is ever logged.
+ */
+async function startLemonSlice(
+  config: Record<string, unknown>,
+  avaSessionId: string,
+): Promise<Response> {
+  const apiKey = Deno.env.get("LEMONSLICE_API_KEY");
+  const dailyKey = Deno.env.get("DAILY_API_KEY");
+  if (!apiKey || !dailyKey) return jsonError("LemonSlice is not configured", 503);
+  const settings = normalizeLemonSliceSettings(config);
+  const precheck = buildLemonSliceSessionRequest(settings, {
+    dailyUrl: "https://ava.daily.co/precheck",
+    dailyToken: "precheck",
+  });
+  if ("error" in precheck) return jsonError(precheck.error, 400);
+
+  const roomName = lemonSliceRoomName(avaSessionId);
+  const nowSeconds = Date.now() / 1000;
+  // A previous failed start may have left the room behind.
+  await deleteDailyRoom(dailyKey, roomName);
+  const roomResponse = await dailyFetch(dailyKey, "/rooms", {
+    method: "POST",
+    body: buildDailyRoomRequest(roomName, settings, nowSeconds),
+  });
+  const room = await readUpstream(roomResponse, "Daily room creation failed", false);
+  const roomUrl = safeDailyRoomUrl(room.url);
+  if (!roomUrl) throw new Error("Daily returned an unexpected room");
+
+  try {
+    const avatarToken = await createDailyMeetingToken(dailyKey, roomName, "avatar", settings, nowSeconds);
+    const viewerToken = await createDailyMeetingToken(dailyKey, roomName, "viewer", settings, nowSeconds);
+    const request = buildLemonSliceSessionRequest(settings, {
+      dailyUrl: roomUrl,
+      dailyToken: avatarToken,
+    });
+    if ("error" in request) throw new Error(request.error);
+    const upstream = await fetch(LEMONSLICE_API, {
+      method: "POST",
+      headers: { "X-API-Key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify(request.body),
+    });
+    const payload = await readUpstream(upstream, "LemonSlice session creation failed", false);
+    const externalSessionId = safeId(payload.session_id);
+    const websocketAddress = safeLemonSliceWebSocketAddress(payload.websocket_address);
+    if (!externalSessionId || !websocketAddress) {
+      if (externalSessionId) await terminateLemonSlice(apiKey, externalSessionId).catch(() => {});
+      throw new Error("LemonSlice returned an incomplete session");
+    }
+    return json({
+      provider: "lemonslice",
+      externalSessionId,
+      roomUrl,
+      meetingToken: viewerToken,
+      websocketAddress,
+      audioSampleRate: settings.audioSampleRate,
+    });
+  } catch (error) {
+    await deleteDailyRoom(dailyKey, roomName).catch(() => {});
+    throw error;
+  }
+}
+
+async function terminateLemonSlice(apiKey: string, externalSessionId: string): Promise<void> {
+  const upstream = await fetch(
+    `${LEMONSLICE_API}/${encodeURIComponent(externalSessionId)}/control`,
+    {
+      method: "POST",
+      headers: { "X-API-Key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "terminate" }),
+    },
+  );
+  if (upstream.ok || upstream.status === 404) {
+    await upstream.body?.cancel();
+    return;
+  }
+  await readUpstream(upstream, "LemonSlice session cleanup failed", false);
+}
+
+async function endLemonSlice(externalSessionId: string, avaSessionId: string): Promise<Response> {
+  const apiKey = Deno.env.get("LEMONSLICE_API_KEY");
+  const dailyKey = Deno.env.get("DAILY_API_KEY");
+  const errors: unknown[] = [];
+  if (apiKey && externalSessionId) {
+    await terminateLemonSlice(apiKey, externalSessionId).catch((error) => errors.push(error));
+  }
+  if (dailyKey) {
+    await deleteDailyRoom(dailyKey, lemonSliceRoomName(avaSessionId))
+      .catch((error) => errors.push(error));
+  }
+  if (errors.length) throw errors[0];
+  return json({ ok: true });
+}
+
+async function controlLemonSlice(
+  externalSessionId: string,
+  config: Record<string, unknown>,
+  event: unknown,
+  value: unknown,
+): Promise<Response> {
+  const apiKey = Deno.env.get("LEMONSLICE_API_KEY");
+  if (!apiKey) return jsonError("LemonSlice is not configured", 503);
+  const request = buildLemonSliceControlRequest(config, event, value);
+  if ("error" in request) return jsonError(request.error, 400);
+  const upstream = await fetch(
+    `${LEMONSLICE_API}/${encodeURIComponent(externalSessionId)}/control`,
+    {
+      method: "POST",
+      headers: { "X-API-Key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify(request.body),
+    },
+  );
+  await readUpstream(upstream, "LemonSlice control event failed", false);
+  return json({ ok: true });
+}
+
 interface TavusPalTarget {
   palId: string;
   faceId: string;
@@ -466,7 +682,12 @@ async function endTavus(externalSessionId: unknown): Promise<Response> {
   return json({ ok: true });
 }
 
-async function readUpstream(response: Response, fallback: string): Promise<Record<string, unknown>> {
+async function readUpstream(
+  response: Response,
+  fallback: string,
+  /** LemonSlice and Daily errors may echo room URLs or tokens: only the status is logged. */
+  logBody = true,
+): Promise<Record<string, unknown>> {
   const text = await response.text();
   let body: Record<string, unknown> = {};
   try {
@@ -476,7 +697,8 @@ async function readUpstream(response: Response, fallback: string): Promise<Recor
   }
   if (!response.ok) {
     console.error(
-      `[streaming-avatar-session] upstream ${response.status} ${fallback}: ${text.slice(0, 500)}`,
+      `[streaming-avatar-session] upstream ${response.status} ${fallback}` +
+        (logBody ? `: ${text.slice(0, 500)}` : ""),
     );
     const message =
       safeString(body.message) ||

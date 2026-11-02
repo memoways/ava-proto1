@@ -2,12 +2,13 @@
 // client (settings normalization, admin bounds, tests). Pure TypeScript, no Deno or browser import.
 // Every provider field is whitelisted and bounded here: no client value reaches a provider as is.
 // Sources read on 2 November 2026: LiveAvatar "Create session token" (FULL mode), Tavus
-// "Create conversation" + "Language support", Anam "Create session token" + "Director Notes".
+// "Create conversation" + "Language support", Anam "Create session token" + "Director Notes",
+// LemonSlice "WebSocket" + "Control session" (see the LemonSlice section).
 
 export const STREAMING_AVATAR_PROVIDERS = ["heygen", "tavus", "anam", "lemonslice"] as const;
 export type KnownStreamingAvatarProvider = (typeof STREAMING_AVATAR_PROVIDERS)[number];
-/** Providers with a client factory and a configured secret; LemonSlice comes in AV3. */
-export const SELECTABLE_STREAMING_AVATAR_PROVIDERS = ["heygen", "tavus", "anam"] as const;
+/** Providers with a client factory and a configured secret. */
+export const SELECTABLE_STREAMING_AVATAR_PROVIDERS = ["heygen", "tavus", "anam", "lemonslice"] as const;
 export type SelectableStreamingAvatarProvider =
   (typeof SELECTABLE_STREAMING_AVATAR_PROVIDERS)[number];
 
@@ -672,4 +673,270 @@ const ANAM_CUE_PATTERN = new RegExp(
 
 export function stripAnamCueTags(text: string): string {
   return text.replace(ANAM_CUE_PATTERN, "");
+}
+
+// ---------------------------------------------------------------------------
+// LemonSlice — POST /api/liveai/sessions (audio → avatar, transport websocket-daily)
+// Sources read on 2 November 2026: LemonSlice "WebSocket", "Control session", "CWM-1",
+// "Lite model", "Cartoon model", "Flash model"; Daily REST "rooms" and "meeting-tokens".
+// ---------------------------------------------------------------------------
+
+/** "default" sends no `model`: LemonSlice uses its flagship model. */
+export const LEMONSLICE_MODELS = ["default", "flash", "pro", "cwm-1", "cwm-1-lite", "cartoon"] as const;
+/** Models that only support the 2x3 aspect ratio: `aspect_ratio` is not sent for them. */
+export const LEMONSLICE_2X3_ONLY_MODELS: readonly string[] = ["cwm-1-lite", "cartoon"];
+/** CWM-1 whole-body actions (`/control` event `action`), Ultra/Enterprise offers only. */
+export const LEMONSLICE_ACTION_MODELS: readonly string[] = ["cwm-1"];
+export const LEMONSLICE_SAMPLE_RATES = [16_000, 24_000] as const;
+export const LEMONSLICE_ASPECT_RATIOS = ["2x3", "9x16", "1x1"] as const;
+/** "default" sends no `edit_image`: the account default applies. */
+export const LEMONSLICE_EDIT_IMAGE_MODES = ["default", "on", "off"] as const;
+export const LEMONSLICE_EDIT_IMAGE_VARIANTS = ["standing", "bust", "sitting", "portrait"] as const;
+export const LEMONSLICE_PROMPT_MAX = 1_000;
+/** Only the nod is allowed from the game: it plays while the player speaks. */
+export const LEMONSLICE_ALLOWED_ACTIONS = ["listen"] as const;
+export const LEMONSLICE_CONTROL_EVENTS = [
+  "update-agent-prompt",
+  "update-idle-prompt",
+  "action",
+  "reset-idle-timeout",
+] as const;
+
+export const LEMONSLICE_DEFAULT_AGENT_PROMPT =
+  "a grieving adult in deep distress talking slowly, heavy eyes, slight frown, never smiling";
+export const LEMONSLICE_DEFAULT_IDLE_PROMPT =
+  "a guarded person listening in silence, still neutral face, lips together, never smiling";
+
+export const LEMONSLICE_BOUNDS = {
+  idleTimeoutSeconds: { min: 30, max: 900, step: 10, fallback: 300 },
+  /** 0 = not sent: LemonSlice applies its own delay. */
+  responseDoneTimeoutSeconds: { min: 0, max: 10, step: 0.25, fallback: 0 },
+  /** Lifetime of the private Daily room and of both meeting tokens. */
+  roomMaxSeconds: { min: 300, max: 3_600, step: 60, fallback: 1_800 },
+} satisfies Record<string, NumberBounds>;
+
+export type LemonSliceModel = (typeof LEMONSLICE_MODELS)[number];
+export type LemonSliceSampleRate = (typeof LEMONSLICE_SAMPLE_RATES)[number];
+export type LemonSliceAspectRatio = (typeof LEMONSLICE_ASPECT_RATIOS)[number];
+export type LemonSliceEditImageMode = (typeof LEMONSLICE_EDIT_IMAGE_MODES)[number];
+export type LemonSliceEditImageVariant = (typeof LEMONSLICE_EDIT_IMAGE_VARIANTS)[number];
+export type LemonSliceControlEvent = (typeof LEMONSLICE_CONTROL_EVENTS)[number];
+
+export interface LemonSliceAvatarSettings {
+  /** Avatar created on lemonslice.com; takes precedence over the image URL. */
+  agentId: string;
+  /** Public https image (368×560 recommended) when no agent id is set. */
+  agentImageUrl: string;
+  model: LemonSliceModel;
+  /** Attitude while speaking: Ava's characters are in distress, never smiling. */
+  agentPrompt: string;
+  /** Attitude at rest, while the player speaks. */
+  agentIdlePrompt: string;
+  idleTimeoutSeconds: number;
+  responseDoneTimeoutSeconds: number;
+  audioSampleRate: LemonSliceSampleRate;
+  aspectRatio: LemonSliceAspectRatio;
+  editImage: LemonSliceEditImageMode;
+  editImageVariant: LemonSliceEditImageVariant;
+  /** CWM-1 only: nod (`listen`) when the player starts speaking. */
+  listenAction: boolean;
+  roomMaxSeconds: number;
+}
+
+export function normalizeLemonSliceSettings(value: unknown): LemonSliceAvatarSettings {
+  const raw = asRecord(value);
+  const b = LEMONSLICE_BOUNDS;
+  return {
+    agentId: typeof raw.agentId === "string" ? raw.agentId : "",
+    agentImageUrl: typeof raw.agentImageUrl === "string" ? raw.agentImageUrl : "",
+    model: pickEnum(raw.model, LEMONSLICE_MODELS, "default"),
+    agentPrompt: boundedText(raw.agentPrompt, LEMONSLICE_DEFAULT_AGENT_PROMPT, LEMONSLICE_PROMPT_MAX),
+    agentIdlePrompt: boundedText(
+      raw.agentIdlePrompt,
+      LEMONSLICE_DEFAULT_IDLE_PROMPT,
+      LEMONSLICE_PROMPT_MAX,
+    ),
+    idleTimeoutSeconds: boundedInteger(raw.idleTimeoutSeconds, b.idleTimeoutSeconds),
+    responseDoneTimeoutSeconds: boundedNumber(
+      raw.responseDoneTimeoutSeconds,
+      b.responseDoneTimeoutSeconds,
+    ),
+    audioSampleRate: LEMONSLICE_SAMPLE_RATES.includes(raw.audioSampleRate as LemonSliceSampleRate)
+      ? (raw.audioSampleRate as LemonSliceSampleRate)
+      : 16_000,
+    aspectRatio: pickEnum(raw.aspectRatio, LEMONSLICE_ASPECT_RATIOS, "2x3"),
+    editImage: pickEnum(raw.editImage, LEMONSLICE_EDIT_IMAGE_MODES, "default"),
+    editImageVariant: pickEnum(raw.editImageVariant, LEMONSLICE_EDIT_IMAGE_VARIANTS, "bust"),
+    listenAction: raw.listenAction === true,
+    roomMaxSeconds: boundedInteger(raw.roomMaxSeconds, b.roomMaxSeconds),
+  };
+}
+
+export function safeHttpsImageUrl(value: unknown): string {
+  if (typeof value !== "string" || value.length > 2_000) return "";
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" && !url.username && !url.password ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+/** Daily room URL issued by the Edge Function (`https://<domain>.daily.co/<room>`). */
+export function safeDailyRoomUrl(value: unknown): string {
+  const url = safeHttpsImageUrl(value);
+  if (!url) return "";
+  return /^https:\/\/[a-z0-9-]+\.daily\.co\/[A-Za-z0-9_-]{1,128}$/.test(url) ? url : "";
+}
+
+export function lemonSliceAspectRatioSent(settings: LemonSliceAvatarSettings): boolean {
+  return !LEMONSLICE_2X3_ONLY_MODELS.includes(settings.model);
+}
+
+/** `edit_image` reframes the uploaded image: read only with an image URL and the 2x3 ratio. */
+export function lemonSliceEditImageRead(settings: LemonSliceAvatarSettings): boolean {
+  const ratio = lemonSliceAspectRatioSent(settings) ? settings.aspectRatio : "2x3";
+  return !safeProviderId(settings.agentId, true) && ratio === "2x3";
+}
+
+export function lemonSliceActionsAllowed(settings: LemonSliceAvatarSettings): boolean {
+  return LEMONSLICE_ACTION_MODELS.includes(settings.model);
+}
+
+export interface LemonSliceDailyTarget {
+  dailyUrl: string;
+  /** Meeting token allowed to publish: handed to LemonSlice only, never to the browser. */
+  dailyToken: string;
+}
+
+export function buildLemonSliceSessionRequest(
+  config: unknown,
+  target: LemonSliceDailyTarget,
+): BuildResult {
+  const settings = normalizeLemonSliceSettings(config);
+  const agentId = safeProviderId(settings.agentId, true);
+  const agentImageUrl = agentId ? "" : safeHttpsImageUrl(settings.agentImageUrl);
+  if (!agentId && !agentImageUrl) {
+    return { ok: false, error: "LemonSlice agentId or an https agentImageUrl is required" };
+  }
+  const dailyUrl = safeDailyRoomUrl(target.dailyUrl);
+  if (!dailyUrl || !target.dailyToken) return { ok: false, error: "Daily room is missing" };
+
+  const body: Record<string, unknown> = {
+    // Ava sends the audio of its own TTS through the WebSocket; the video goes to the Daily room.
+    transport_type: "websocket-daily",
+    daily_properties: { daily_url: dailyUrl, daily_token: target.dailyToken },
+    audio_sample_rate: settings.audioSampleRate,
+    idle_timeout: settings.idleTimeoutSeconds,
+  };
+  if (agentId) body.agent_id = agentId;
+  else body.agent_image_url = agentImageUrl;
+  if (settings.model !== "default") body.model = settings.model;
+  const agentPrompt = settings.agentPrompt.trim();
+  const idlePrompt = settings.agentIdlePrompt.trim();
+  if (agentPrompt) body.agent_prompt = agentPrompt;
+  if (idlePrompt) body.agent_idle_prompt = idlePrompt;
+  if (settings.responseDoneTimeoutSeconds > 0) {
+    body.response_done_timeout = settings.responseDoneTimeoutSeconds;
+  }
+  if (lemonSliceAspectRatioSent(settings)) body.aspect_ratio = settings.aspectRatio;
+  if (lemonSliceEditImageRead(settings) && settings.editImage !== "default") {
+    body.edit_image = settings.editImage === "on";
+    if (settings.editImage === "on") body.edit_image_variant = settings.editImageVariant;
+  }
+  return { ok: true, body };
+}
+
+/** In-session `/control` body; only whitelisted events and bounded values leave Ava. */
+export function buildLemonSliceControlRequest(
+  config: unknown,
+  event: unknown,
+  value?: unknown,
+): BuildResult {
+  const settings = normalizeLemonSliceSettings(config);
+  if (!LEMONSLICE_CONTROL_EVENTS.includes(event as LemonSliceControlEvent)) {
+    return { ok: false, error: "Invalid LemonSlice control event" };
+  }
+  if (event === "reset-idle-timeout") return { ok: true, body: { event } };
+  if (event === "action") {
+    if (!lemonSliceActionsAllowed(settings)) {
+      return { ok: false, error: "LemonSlice actions need the CWM-1 model" };
+    }
+    const action = pickEnum(value, LEMONSLICE_ALLOWED_ACTIONS, "listen");
+    if (action !== value) return { ok: false, error: "Invalid LemonSlice action" };
+    return { ok: true, body: { event, action } };
+  }
+  const prompt = typeof value === "string" ? value.trim() : "";
+  if (!prompt || prompt.length > LEMONSLICE_PROMPT_MAX) {
+    return { ok: false, error: "Invalid LemonSlice prompt" };
+  }
+  return event === "update-agent-prompt"
+    ? { ok: true, body: { event, agent_prompt: prompt } }
+    : { ok: true, body: { event, idle_prompt: prompt } };
+}
+
+/** One private room per Ava session: the name is derived, never read from the client. */
+export function lemonSliceRoomName(avaSessionId: string): string {
+  return `ava-ls-${avaSessionId.replace(/[^A-Za-z0-9-]/g, "").slice(0, 64)}`;
+}
+
+export function buildDailyRoomRequest(
+  roomName: string,
+  config: unknown,
+  nowSeconds: number,
+): Record<string, unknown> {
+  const settings = normalizeLemonSliceSettings(config);
+  return {
+    name: roomName,
+    privacy: "private",
+    properties: {
+      exp: Math.floor(nowSeconds) + settings.roomMaxSeconds,
+      eject_at_room_exp: true,
+      max_participants: 2,
+      enable_chat: false,
+      enable_prejoin_ui: false,
+      start_audio_off: true,
+      start_video_off: true,
+    },
+  };
+}
+
+/**
+ * Two tokens: LemonSlice publishes audio and video; the browser only receives
+ * (`canSend: false`), so the player's microphone can never reach the room.
+ */
+export function buildDailyMeetingTokenRequest(
+  roomName: string,
+  role: "avatar" | "viewer",
+  config: unknown,
+  nowSeconds: number,
+): Record<string, unknown> {
+  const settings = normalizeLemonSliceSettings(config);
+  const properties: Record<string, unknown> = {
+    room_name: roomName,
+    exp: Math.floor(nowSeconds) + settings.roomMaxSeconds,
+    eject_at_token_exp: true,
+    is_owner: false,
+  };
+  if (role === "avatar") {
+    properties.user_name = "LemonSlice";
+    properties.permissions = { canSend: ["video", "audio"] };
+  } else {
+    properties.user_name = "Ava";
+    properties.start_audio_off = true;
+    properties.start_video_off = true;
+    properties.permissions = { canSend: false };
+  }
+  return { properties };
+}
+
+/** WebSocket address issued by LemonSlice; it carries the capability and is never logged. */
+export function safeLemonSliceWebSocketAddress(value: unknown): string {
+  if (typeof value !== "string" || value.length > 2_000) return "";
+  try {
+    const url = new URL(value);
+    return url.protocol === "wss:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
 }

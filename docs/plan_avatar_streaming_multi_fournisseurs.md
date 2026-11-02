@@ -248,3 +248,78 @@ avec une voix choisie chez Anam (recommandation, aucune décision contraire d'Ul
   synchro labiale, aucun sourire, interruption en cours de réplique, repli TTS si Anam échoue.
 
 Suite : [prompt AV3 « LemonSlice en mode audio »](prompt_reprise_avatar_streaming_lot_av3.md).
+
+## Exécution AV3 — 2 novembre 2026
+
+Branche `feat/avatar-streaming-av3`, depuis main `9aa1034` (PR #142). **D1 : option (a)**, salle
+Daily privée créée par l'Edge Function (choix d'Ulrich le 2 novembre). D2 inchangée (a).
+
+- **Écart constaté au démarrage.** La migration AV2 `20261102120000_streaming_avatar_provider_anam.sql`
+  n'est pas appliquée : `pg_constraint` (lecture par le MCP Lovable Ava) limite encore
+  `sessions.streaming_avatar_provider` à `heygen | tavus`. Tant qu'elle n'est pas appliquée par
+  Lovable, ni Anam ni LemonSlice ne peuvent lier leur session (la création échoue proprement,
+  repli TTS) ; la recette AV2 n'a donc pas pu avoir lieu. Aucune nouvelle migration en AV3.
+- **Doc lue avant le code** (lemonslice.com/docs : WebSocket, Control session, CWM-1, modèles
+  Lite/Cartoon/Flash ; exemple officiel `10-websocket-app`) : `POST /api/liveai/sessions` avec
+  `X-API-Key`, réponse `session_id` + `websocket_address` ; client → serveur `audio`
+  (`sampleRate` obligatoire, `encoding: "PCM16"`), `audio_end`, `interrupt`, `heartbeat`,
+  `terminate` ; serveur → client `playback_finished` (`playback_position`, `interrupted`) et
+  `heartbeat_ack`. `/control` : `terminate`, `update-agent-prompt` (`agent_prompt`),
+  `update-idle-prompt` (**`idle_prompt`**), `action` (CWM-1), `reset-idle-timeout`.
+- **Socle.** `lemonslice` sélectionnable ; fabrique `providers/lemonslice.ts` ; réglages
+  `lemonslice` dans le même JSON, normalisés par `normalizeLemonSliceSettings` (module partagé),
+  anciens réglages relus sans perte (bloc absent → défauts).
+- **Edge Function.** `startLemonSlice` : supprime une salle restée d'un essai raté, crée la salle
+  Daily privée `ava-ls-<session Ava>` (nom dérivé, jamais lu du client ; expiration
+  `roomMaxSeconds`, 2 participants), deux jetons (LemonSlice : `canSend` vidéo + audio ;
+  navigateur : `canSend: false`, entrée audio/vidéo coupée), puis la session LemonSlice dont le
+  corps vient de `buildLemonSliceSessionRequest` (liste blanche ; `transport_type` forcé à
+  `websocket-daily`). Liaison `sessions.streaming_avatar_provider = "lemonslice"` ; en cas
+  d'échec, terminate + salle supprimée. Fin : `/control terminate` puis `DELETE` de la salle.
+  Action `control` (propriété vérifiée) relayée par `buildLemonSliceControlRequest` ; faute de
+  quota dédié sans migration, elle consomme le quota `streaming-avatar-status` (30/min).
+  `configured.lemonslice` exige `LEMONSLICE_API_KEY` **et** `DAILY_API_KEY` ; sonde admin
+  `lemonslice` + `daily`. Adresse WebSocket, URL de salle et jetons : jamais journalisés (les
+  erreurs LemonSlice/Daily ne journalisent que le statut).
+- **Pont audio.** Chaque réplique est découpée comme le TTS local (`chunkTextForTTS`), synthétisée
+  par `generateSpeech` avec la voix et le moteur du personnage (ElevenLabs, Gradium… mêmes
+  réglages, réessai, télémétrie), un segment d'avance. Conteneurs (mp3, opus, wav) décodés par
+  `OfflineAudioContext` à la fréquence de session ; formats bruts `pcm_*` lus directement. Mono,
+  rééchantillonnage linéaire vers 16 000 ou 24 000 Hz, PCM16 little-endian, morceaux de 100 ms en
+  base64, envoyés sans cadence ; `audio_end` à la fin de la réplique ; `heartbeat` toutes les
+  10 s. Fin de réplique = `playback_finished` reçu **après** `audio_end` (un
+  `playback_finished` intermédiaire, pause entre segments, est ignoré). Début de parole = premier
+  morceau envoyé (approximation : LemonSlice n'émet pas d'événement de début). Interruption :
+  `interrupt`, la synthèse en cours est abandonnée sans l'attendre. Le son sort uniquement par la
+  piste audio de la salle Daily : rien n'est joué par le lecteur TTS local.
+- **Repli TTS.** Échec avant le premier morceau (TTS en erreur, lecture bloquée, pont fermé) →
+  `AvatarRenderError(started: false)` : la page rejoue la réplique en TTS local, comme les autres
+  fournisseurs.
+- **Écoute.** `setListening(true)` (joueur qui parle) : `reset-idle-timeout` au plus toutes les
+  20 s (sinon LemonSlice coupe après `idle_timeout` sans audio) et, si activé et modèle CWM-1
+  seulement, l'action `listen` (hochement) au plus toutes les 4 s. Le micro reste chez Ava.
+- **Réglages.** `agentId` ou `agentImageUrl` (https), `model` (phare par défaut, `flash`, `pro`,
+  `cwm-1`, `cwm-1-lite`, `cartoon`), `agentPrompt` abattu et `agentIdlePrompt` fermé (« never
+  smiling »), `idleTimeoutSeconds` 30–900 (défaut 300), `responseDoneTimeoutSeconds` 0–10
+  (0 = non envoyé), `audioSampleRate`, `aspectRatio` (non envoyé pour Lite et Cartoon, 2x3
+  seulement), `editImage` (compte / oui / non ; lu seulement avec une image et le 2x3) +
+  `editImageVariant` (envoyé seulement avec le recadrage), `listenAction`, `roomMaxSeconds`.
+- **Admin.** Carte LemonSlice, « Essentiel » + « Avancé » ; champs non lus signalés « non
+  envoyé ». Pas de bouton « Vérifier » (LemonSlice n'a pas de mode test) ; panneau de test inchangé.
+- **Tests.** Corps de session, contrôle et salle Daily (10), réglages (2), pont audio (8), cycle
+  de vie avec salle, WebSocket et TTS simulés (10 : réception seule, aucun `getUserMedia`, audio +
+  `audio_end`, fin sur `playback_finished`, fin prématurée ignorée, interruption pendant la
+  parole et pendant la synthèse, repli TTS, lecture bloquée, écoute, fin de session, pont fermé).
+  Qualité locale : 74 régressions, 1 388 unitaires, 42 intégrations, lint, typage, build ;
+  35 tests de livraison.
+- **Non vérifié localement.** Deno absent : Edge Function non passée à `deno check` ; aucun appel
+  réel à LemonSlice ni à Daily ; décodage `OfflineAudioContext` non exécuté en test (jsdom).
+  Points à confirmer à la recette : délai entre le premier morceau envoyé et la bouche qui bouge,
+  qualité du rééchantillonnage linéaire, `idle_prompt` lu.
+- **À faire (une action à la fois).** Secrets `LEMONSLICE_API_KEY` puis `DAILY_API_KEY` (Ulrich),
+  application de la migration AV2 et déploiement de l'Edge Function par Lovable, puis recette
+  d'Ulrich : une session LemonSlice avec la voix de Max, synchro labiale, aucun sourire,
+  interruption en cours de réplique, repli TTS si LemonSlice échoue.
+
+Suite : **aucun lot de code ne suit par défaut.** AV4 « Anam passthrough » ne s'ouvre que si
+Ulrich choisit D2b (voix du personnage d'Ava pour Anam, sur ce pont audio).
