@@ -35,13 +35,31 @@ interface PendingSpeech {
 }
 
 export interface AnamWarmUpTiming {
-  /** Longest wait for SESSION_READY and the first rendered frame; past it Ava speaks anyway. */
+  /** Longest wait for a ready session and a steady stream; past it Ava speaks anyway. */
   maxWaitMs: number;
-  /** Pause after the first frame so WebRTC can align audio and video before the opening line. */
+  /** Pause once the stream is steady, before the opening line. */
   settleMs: number;
+  /** Interval between two WebRTC stats samples. */
+  pollMs: number;
+  /** Consecutive steady samples required: video at full rate, no freeze, audio flowing. */
+  steadySamples: number;
 }
 
-const DEFAULT_WARM_UP: AnamWarmUpTiming = { maxWaitMs: 5_000, settleMs: 1_000 };
+const DEFAULT_WARM_UP: AnamWarmUpTiming = { maxWaitMs: 10_000, settleMs: 500, pollMs: 250, steadySamples: 6 };
+/** Below this decoded rate the stream is still ramping up (bandwidth estimation, keyframes). */
+const STEADY_MIN_FPS = 20;
+/**
+ * Same playout buffer for audio and video from the first frame: without it the jitter buffers
+ * start minimal, underrun, and grow over the first lines (choppy, out-of-sync opening).
+ */
+const PLAYOUT_BUFFER_MS = 400;
+
+interface InboundSample {
+  at: number;
+  framesDecoded: number;
+  freezeCount: number;
+  audioPackets: number;
+}
 
 /**
  * Anam in text mode: the persona says Ava's text through a talk stream (Anam LLM off,
@@ -120,6 +138,7 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       for (const track of stream.getTracks()) mediaStream.addTrack(track);
     }
     this.mediaStream = mediaStream;
+    this.applyPlayoutBuffer();
     this.reportTracks();
     if (!mediaStream.getVideoTracks().length || !mediaStream.getAudioTracks().length) {
       throw new Error(
@@ -253,16 +272,70 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
 
   private async waitForWarmUp(element: HTMLMediaElement): Promise<void> {
     const startedAt = performance.now();
+    const deadline = startedAt + this.warmUpTiming.maxWaitMs;
     const ready = await Promise.race([
       Promise.all([this.sessionReady, waitForFirstFrame(element)]).then(() => true),
       delay(this.warmUpTiming.maxWaitMs).then(() => false),
     ]);
+    const steady = ready ? await this.waitForSteadyStream(deadline) : { steady: false, videoFps: null };
     this.callbacks.onMediaDiagnostics?.({
       event: "warm_up",
       warmUpMs: Math.round(performance.now() - startedAt),
-      warmUpComplete: ready,
+      warmUpComplete: ready && steady.steady !== false,
+      steadyStream: steady.steady,
+      videoFps: steady.videoFps,
     });
     await delay(this.warmUpTiming.settleMs);
+  }
+
+  /**
+   * Polls the receiving stats until video decodes at full rate without freezing while audio
+   * flows. `steady: null` when the SDK hides its peer connection (fixed settle only).
+   */
+  private async waitForSteadyStream(deadline: number): Promise<{ steady: boolean | null; videoFps: number | null }> {
+    const pc = this.peerConnection();
+    if (!pc) return { steady: null, videoFps: null };
+    let previous: InboundSample | null = null;
+    let streak = 0;
+    let videoFps: number | null = null;
+    while (!this.disposed && performance.now() < deadline) {
+      const sample = await readInbound(pc).catch(() => null);
+      if (sample && previous && sample.at > previous.at) {
+        videoFps = Math.round(((sample.framesDecoded - previous.framesDecoded) * 1000) / (sample.at - previous.at));
+        const steady = videoFps >= STEADY_MIN_FPS
+          && sample.freezeCount === previous.freezeCount
+          && sample.audioPackets > previous.audioPackets;
+        streak = steady ? streak + 1 : 0;
+        if (streak >= this.warmUpTiming.steadySamples) return { steady: true, videoFps };
+      }
+      if (sample) previous = sample;
+      await delay(this.warmUpTiming.pollMs);
+    }
+    return { steady: false, videoFps };
+  }
+
+  private applyPlayoutBuffer(): void {
+    for (const receiver of this.peerConnection()?.getReceivers() ?? []) {
+      const tunable = receiver as RTCRtpReceiver & { jitterBufferTarget?: number | null };
+      if (!("jitterBufferTarget" in tunable)) continue; // Not supported by this browser.
+      try {
+        tunable.jitterBufferTarget = PLAYOUT_BUFFER_MS;
+      } catch (error) {
+        console.warn("[Anam] playout buffer not applied", error);
+      }
+    }
+  }
+
+  /** The SDK keeps its peer connection private; read it defensively, absent on other versions. */
+  private peerConnection(): RTCPeerConnection | null {
+    const internals = this.client as unknown as {
+      streamingClient?: { getPeerConnection?: () => RTCPeerConnection | null };
+    } | null;
+    try {
+      return internals?.streamingClient?.getPeerConnection?.() ?? null;
+    } catch {
+      return null;
+    }
   }
 
   private bindEvents(client: AnamClient): void {
@@ -385,6 +458,20 @@ function waitForFirstFrame(element: HTMLMediaElement): Promise<void> {
   return new Promise((resolve) => {
     element.addEventListener("loadeddata", () => resolve(), { once: true });
   });
+}
+
+async function readInbound(pc: RTCPeerConnection): Promise<InboundSample> {
+  const sample: InboundSample = { at: performance.now(), framesDecoded: 0, freezeCount: 0, audioPackets: 0 };
+  (await pc.getStats()).forEach((report: Record<string, unknown>) => {
+    if (report.type !== "inbound-rtp") return;
+    if (report.kind === "video") {
+      sample.framesDecoded += Number(report.framesDecoded ?? 0);
+      sample.freezeCount += Number(report.freezeCount ?? 0);
+    } else if (report.kind === "audio") {
+      sample.audioPackets += Number(report.packetsReceived ?? 0);
+    }
+  });
+  return sample;
 }
 
 async function withDeadline<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {

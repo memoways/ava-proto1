@@ -164,6 +164,9 @@ export interface AvatarMediaDiagnostics {
   /** Wait before the opening line; `warmUpComplete` false when the bound was reached. */
   warmUpMs?: number;
   warmUpComplete?: boolean;
+  /** Stats-based check before the opening line; null when the peer connection is not reachable. */
+  steadyStream?: boolean | null;
+  videoFps?: number | null;
   cpuReason?: string;
 }
 

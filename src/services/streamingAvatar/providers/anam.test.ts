@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const fake = vi.hoisted(() => {
   const handlers = new Map<string, (...args: unknown[]) => void>();
   const talks: { chunks: [string, boolean][]; correlationId: string }[] = [];
+  const peer = { current: null as null | { getReceivers: () => unknown[]; getStats: () => Promise<Map<string, unknown>> } };
   const client = {
+    streamingClient: { getPeerConnection: () => peer.current },
     addListener: vi.fn((name: string, cb: (...args: unknown[]) => void) => { handlers.set(name, cb); }),
     stream: vi.fn(async (..._args: unknown[]) => [] as unknown[]),
     isStreaming: vi.fn(() => true),
@@ -18,7 +20,7 @@ const fake = vi.hoisted(() => {
       };
     }),
   };
-  return { handlers, talks, client, createClient: vi.fn((_token: string, _options?: unknown) => client) };
+  return { handlers, talks, client, peer, createClient: vi.fn((_token: string, _options?: unknown) => client) };
 });
 vi.mock("@anam-ai/js-sdk", () => ({
   createClient: fake.createClient,
@@ -53,9 +55,27 @@ const settings = {
   avatarId: "30fa96d0-26c4-4e55-94a0-517025942e18",
   voiceId: "6bfbe25a-979d-40f3-a92b-5394170af54b",
 };
-const warmUp = { maxWaitMs: 50, settleMs: 0 };
-const anam = (overrides = {}, callbacks = {}) =>
-  new AnamStreamingAvatarOutput({ ...settings, ...overrides }, callbacks, 1000, 1000, warmUp);
+const warmUp = { maxWaitMs: 50, settleMs: 0, pollMs: 1, steadySamples: 2 };
+/** Fake peer connection: video decodes `fps` frames per second, audio flows unless `audio` is false. */
+const peerConnection = ({ fps = 25, audio = true, freezes = (): number => 0 } = {}) => {
+  const startedAt = performance.now();
+  const receivers = [{ jitterBufferTarget: null }, { jitterBufferTarget: null }];
+  let calls = 0;
+  return {
+    receivers,
+    getReceivers: () => receivers,
+    getStats: async () => {
+      calls++;
+      const elapsed = performance.now() - startedAt;
+      return new Map<string, unknown>([
+        ["v", { type: "inbound-rtp", kind: "video", framesDecoded: Math.floor((elapsed * fps) / 1000), freezeCount: freezes() }],
+        ["a", { type: "inbound-rtp", kind: "audio", packetsReceived: audio ? calls : 1 }],
+      ]);
+    },
+  };
+};
+const anam = (overrides = {}, callbacks = {}, timing = warmUp) =>
+  new AnamStreamingAvatarOutput({ ...settings, ...overrides }, callbacks, 1000, 1000, timing);
 const sessionReady = () => fake.handlers.get("SESSION_READY")?.("anam-session");
 /** jsdom never decodes a frame: report one as soon as playback is asked for. */
 const videoWithFrame = () => {
@@ -69,7 +89,7 @@ const persona = (content: string, extra: Record<string, unknown> = {}) =>
 
 describe("Anam text-mode lifecycle", () => {
   beforeEach(() => {
-    vi.clearAllMocks(); fake.handlers.clear(); fake.talks.length = 0;
+    vi.clearAllMocks(); fake.handlers.clear(); fake.talks.length = 0; fake.peer.current = null;
     vi.stubGlobal("MediaStream", Stream);
     fake.client.stream.mockImplementation(async () => [new Stream([track("video")]), new Stream([track("audio")])]);
   });
@@ -169,6 +189,54 @@ describe("Anam text-mode lifecycle", () => {
     expect(onMediaDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ event: "warm_up", warmUpComplete: false }));
     persona("Bonjour.", { endOfSpeech: true });
     await opening; await output.dispose();
+  });
+
+  it("sets one playout buffer on every receiver", async () => {
+    const pc = peerConnection(); fake.peer.current = pc;
+    const output = await ready();
+    expect(pc.receivers.map(r => r.jitterBufferTarget)).toEqual([400, 400]);
+    await output.dispose();
+  });
+
+  it("speaks first once the stream decodes at full rate with audio flowing", async () => {
+    fake.peer.current = peerConnection({ fps: 25 });
+    const onMediaDiagnostics = vi.fn();
+    const output = anam({}, { onMediaDiagnostics }, { ...warmUp, maxWaitMs: 2_000, pollMs: 40 });
+    await output.prepare({ sessionId: "ava" }); sessionReady(); output.attachMedia(videoWithFrame());
+    const opening = output.renderText("Bonjour.");
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(1));
+    expect(onMediaDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ event: "warm_up", warmUpComplete: true, steadyStream: true }));
+    persona("Bonjour.", { endOfSpeech: true });
+    await opening; await output.dispose();
+  });
+
+  it("keeps waiting while video stutters, then speaks at the bound", async () => {
+    fake.peer.current = peerConnection({ fps: 8 });
+    const onMediaDiagnostics = vi.fn();
+    const output = anam({}, { onMediaDiagnostics }, { ...warmUp, maxWaitMs: 300, pollMs: 40 });
+    await output.prepare({ sessionId: "ava" }); sessionReady(); output.attachMedia(videoWithFrame());
+    const opening = output.renderText("Bonjour.");
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(fake.talks).toHaveLength(0);
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(1));
+    expect(onMediaDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ event: "warm_up", warmUpComplete: false, steadyStream: false }));
+    persona("Bonjour.", { endOfSpeech: true });
+    await opening; await output.dispose();
+  });
+
+  it("is not steady while video freezes or audio is silent", async () => {
+    let freezes = 0;
+    for (const pc of [peerConnection({ freezes: () => freezes++ }), peerConnection({ audio: false })]) {
+      fake.peer.current = pc; fake.talks.length = 0;
+      const onMediaDiagnostics = vi.fn();
+      const output = anam({}, { onMediaDiagnostics }, { ...warmUp, maxWaitMs: 300, pollMs: 40 });
+      await output.prepare({ sessionId: "ava" }); sessionReady(); output.attachMedia(videoWithFrame());
+      const opening = output.renderText("Bonjour.");
+      await vi.waitFor(() => expect(fake.talks).toHaveLength(1));
+      expect(onMediaDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ event: "warm_up", steadyStream: false }));
+      persona("Bonjour.", { endOfSpeech: true });
+      await opening; await output.dispose();
+    }
   });
 
   it("interrupts mid-line through interruptPersona and reports a started render", async () => {

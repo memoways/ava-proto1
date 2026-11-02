@@ -20,6 +20,21 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Tests Anam : texte nu + cue, cue en échec, attente de l'accueil (une fois), borne atteinte.
   À valider en recette par Ulrich (synchro de l'accueil, absence de cassure dans la réplique).
 
+## [Avatars streaming — Anam : flux stable avant l'accueil] — 2026-11-02
+
+- Recette d'Ulrich après #145 : plus de déraillement de jeu, mais la première réplique de Max
+  reste désynchronisée, et les deux ou trois suivantes sont saccadées le temps que la vidéo se
+  stabilise.
+- Tampon de lecture : `jitterBufferTarget` de 400 ms sur chaque récepteur WebRTC (audio et
+  vidéo) dès la connexion. Sans lui, les tampons partent au minimum, se vident, puis grossissent
+  pendant les premières répliques. Navigateur sans cette propriété : rien ne change.
+- Accueil : après `SESSION_READY` et la première image, Ava lit les statistiques WebRTC toutes
+  les 250 ms. Elle attend 6 mesures stables de suite (≥ 20 images/s décodées, aucun gel, audio
+  reçu), au plus 10 s au total, puis 0,5 s. Le SDK garde sa connexion privée : elle est lue
+  défensivement (`streamingClient.getPeerConnection`) ; si elle est absente, l'attente fixe
+  s'applique. Le diagnostic `warm_up` donne aussi `steadyStream` et `videoFps`.
+- À valider en recette par Ulrich : synchro de la première réplique, fluidité des suivantes.
+
 ## [Avatars streaming — cadrage LemonSlice] — 2026-11-02
 
 - Recette AV3 : la vidéo LemonSlice apparaissait très zoomée (front et yeux seulement). L'API ne
