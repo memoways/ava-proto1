@@ -99,6 +99,13 @@
       "when": 1793531081279,
       "tag": "0013_add_video_triggers_nature_characters_ai_description",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793619151257,
+      "tag": "0014_streaming_avatar_provider_anam",
+      "breakpoints": true
     }
   ]
 }
