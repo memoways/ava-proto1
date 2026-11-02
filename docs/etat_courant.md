@@ -40,8 +40,7 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 **Anam, jeu et synchro (2 novembre).** #145 fusionnée (`ae0cf92`) : balise de jeu au visage seul,
 recette d'Ulrich : plus de déraillement. Suite (PR en cours) : tampon de lecture de 400 ms et accueil
-retenu jusqu'à un flux WebRTC stable (≤ 10 s), fusionné (`fd721af`). Encore 1 à 2 s d'avance de
-l'image sur la première réplique : répétition muette et masquée avant l'accueil (PR en cours).
+retenu jusqu'à un flux WebRTC stable (≤ 10 s). Recette d'Ulrich à refaire sur la première réplique.
 
 **Avatars streaming AV3 (2 novembre, code) : LemonSlice en mode audio.** D1a : salle Daily privée
 créée par l'Edge Function, navigateur en réception seule. La voix du personnage d'Ava (TTS actuel)

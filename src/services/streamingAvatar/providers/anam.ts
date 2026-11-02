@@ -22,8 +22,6 @@ import {
 
 interface PendingSpeech {
   turnId?: string;
-  /** Rehearsal line: muted, hidden, never reported to Ava. */
-  silent: boolean;
   correlationId: string;
   started: boolean;
   ended: boolean;
@@ -45,23 +43,9 @@ export interface AnamWarmUpTiming {
   pollMs: number;
   /** Consecutive steady samples required: video at full rate, no freeze, audio flowing. */
   steadySamples: number;
-  /** Longest wait for the muted rehearsal line to be spoken; 0 skips the rehearsal. */
-  rehearsalMaxMs: number;
 }
 
-const DEFAULT_WARM_UP: AnamWarmUpTiming = {
-  maxWaitMs: 10_000,
-  settleMs: 500,
-  pollMs: 250,
-  steadySamples: 6,
-  rehearsalMaxMs: 12_000,
-};
-/**
- * Said once, muted and hidden, before the opening line. The first spoken line of a session
- * comes out with the image up to two seconds ahead of the sound while WebRTC aligns them;
- * the rehearsal absorbs that, so the opening line starts in sync.
- */
-const REHEARSAL_TEXT = "Bonjour. Je suis là, je t'écoute.";
+const DEFAULT_WARM_UP: AnamWarmUpTiming = { maxWaitMs: 10_000, settleMs: 500, pollMs: 250, steadySamples: 6 };
 /** Below this decoded rate the stream is still ramping up (bandwidth estimation, keyframes). */
 const STEADY_MIN_FPS = 20;
 /**
@@ -105,7 +89,6 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
   private resolveSessionReady!: () => void;
   private readonly sessionReady = new Promise<void>((resolve) => { this.resolveSessionReady = resolve; });
   private warmUp: Promise<void> | null = null;
-  private rehearsing = false;
 
   constructor(
     settings: AnamAvatarSettings,
@@ -288,8 +271,6 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
   }
 
   private async waitForWarmUp(element: HTMLMediaElement): Promise<void> {
-    // The UI keeps the portrait until the warm-up ends: no silent lip movement is ever shown.
-    this.callbacks.onConnectionStateChange?.("warming");
     const startedAt = performance.now();
     const deadline = startedAt + this.warmUpTiming.maxWaitMs;
     const ready = await Promise.race([
@@ -297,45 +278,14 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       delay(this.warmUpTiming.maxWaitMs).then(() => false),
     ]);
     const steady = ready ? await this.waitForSteadyStream(deadline) : { steady: false, videoFps: null };
-    const rehearsed = ready ? await this.rehearse() : false;
-    // null: rehearsal turned off by the timing, not a failure.
     this.callbacks.onMediaDiagnostics?.({
       event: "warm_up",
       warmUpMs: Math.round(performance.now() - startedAt),
-      warmUpComplete: ready && steady.steady !== false && rehearsed !== false,
+      warmUpComplete: ready && steady.steady !== false,
       steadyStream: steady.steady,
       videoFps: steady.videoFps,
-      rehearsed,
     });
     await delay(this.warmUpTiming.settleMs);
-    if (!this.disposed && this.ready) this.callbacks.onConnectionStateChange?.("ready");
-  }
-
-  /** Muted line spoken before the opening one; a failure only skips it. */
-  private async rehearse(): Promise<boolean | null> {
-    if (this.warmUpTiming.rehearsalMaxMs <= 0) return null;
-    if (!this.client || this.disposed) return false;
-    const talk = this.client.createTalkMessageStream();
-    const speech = createPendingSpeech(talk.getCorrelationId(), undefined, true);
-    this.currentSpeech = speech;
-    this.setRehearsing(true);
-    try {
-      await talk.streamMessageChunk(REHEARSAL_TEXT, true);
-      await withDeadline(speech.endedPromise, this.warmUpTiming.rehearsalMaxMs, "Anam rehearsal did not finish");
-      return true;
-    } catch (error) {
-      console.warn("[Anam] rehearsal skipped", error);
-      if (!speech.ended) this.interrupt();
-      return false;
-    } finally {
-      if (this.currentSpeech === speech) this.currentSpeech = null;
-      this.setRehearsing(false);
-    }
-  }
-
-  private setRehearsing(value: boolean): void {
-    this.rehearsing = value;
-    if (this.mediaElement) this.mediaElement.muted = value;
   }
 
   /**
@@ -393,14 +343,6 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     client.addListener(AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED, (event: MessageStreamEvent) => {
       const speech = this.currentSpeech;
       if (this.disposed || !speech || event.role !== MessageRole.PERSONA) return;
-      if (speech.silent) {
-        if (event.interrupted) this.failCurrentSpeech(new Error("Anam rehearsal interrupted"));
-        else if (event.endOfSpeech && !speech.ended) {
-          speech.ended = true;
-          speech.resolveEnded();
-        }
-        return;
-      }
       if (!speech.started) {
         speech.started = true;
         speech.resolveStarted();
@@ -446,7 +388,7 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
   private playMedia(): void {
     const element = this.mediaElement;
     if (!element) return;
-    element.muted = this.rehearsing;
+    element.muted = false;
     element.volume = 1;
     const playback = Promise.resolve().then(() => element.play()).then(() => {
       if (!this.disposed && this.mediaElement === element) this.callbacks.onMediaDiagnostics?.({ event: "playback", playback: "playing" });
@@ -472,7 +414,7 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
   }
 }
 
-function createPendingSpeech(correlationId: string, turnId?: string, silent = false): PendingSpeech {
+function createPendingSpeech(correlationId: string, turnId?: string): PendingSpeech {
   let resolveStarted!: () => void;
   let rejectStarted!: (error: Error) => void;
   let resolveEnded!: () => void;
@@ -489,7 +431,6 @@ function createPendingSpeech(correlationId: string, turnId?: string, silent = fa
   void endedPromise.catch(() => {});
   return {
     turnId,
-    silent,
     correlationId,
     started: false,
     ended: false,

@@ -30,8 +30,6 @@ export type KnownStreamingAvatarProviderId = KnownStreamingAvatarProvider;
 export type StreamingAvatarConnectionState =
   | "inactive"
   | "connecting"
-  /** Connected, warming up before the first line: the UI keeps the portrait. */
-  | "warming"
   | "ready"
   | "speaking"
   | "disconnected"
@@ -168,8 +166,6 @@ export interface AvatarMediaDiagnostics {
   warmUpComplete?: boolean;
   /** Stats-based check before the opening line; null when the peer connection is not reachable. */
   steadyStream?: boolean | null;
-  /** Muted rehearsal line spoken before the opening one. */
-  rehearsed?: boolean | null;
   videoFps?: number | null;
   cpuReason?: string;
 }

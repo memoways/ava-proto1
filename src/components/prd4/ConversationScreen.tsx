@@ -182,9 +182,8 @@ const ConversationScreen = ({
     return () => cancelAnimationFrame(raf);
   }, [streamingAvatarActive]);
 
-  // Warm-up: Max rehearses muted before his first line, the portrait stays on screen.
-  const videoVisible = streamingAvatarActive && videoLive && !streamLost && streamingAvatarState !== "warming";
-  const frozenVisible = streamingAvatarActive && hasFrozenFrame && !videoVisible && streamingAvatarState !== "warming";
+  const videoVisible = streamingAvatarActive && videoLive && !streamLost;
+  const frozenVisible = streamingAvatarActive && hasFrozenFrame && !videoVisible;
   const photoVisible = !videoVisible && !frozenVisible;
   const displayName = displayNameForCharacter(activeCharacter);
   const portrait = portraitUrl ?? (activeCharacter === "emma" ? emmaAvatar : maxAvatar);
@@ -322,7 +321,7 @@ const ConversationScreen = ({
             </div>
           )}
         </div>
-        {streamingAvatarActive && (streamingAvatarState === "connecting" || streamingAvatarState === "warming") && (
+        {streamingAvatarActive && streamingAvatarState === "connecting" && (
           <div className="flex items-center gap-2 rounded-full border border-border/40 bg-background/60 px-3 py-2 text-xs text-muted-foreground backdrop-blur-md">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             Connexion vidéo…
