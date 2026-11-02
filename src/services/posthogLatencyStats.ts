@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { toLatencySample, type LatencySample } from "@/services/latencyAnalytics";
 
 export type PosthogPeriod = "24h" | "7d" | "30d" | "custom";
 
@@ -90,6 +91,10 @@ export interface InternalLatencyComparison {
   onlyInternal: number;
   costPerSessionUsd: number | null;
   providers: PosthogLatencyStats["providers"];
+  /** Filtered V1 turns for the charts; absent on older callers and mocks. */
+  samples?: LatencySample[];
+  /** True when the period holds more rows than the page cap read here. */
+  samplesCapped?: boolean;
 }
 
 interface TurnLatencyRow {
@@ -100,6 +105,8 @@ interface TurnLatencyRow {
 }
 
 export interface VoiceEventRow {
+  created_at?: string | null;
+  event_name?: string | null;
   session_id: string | null;
   turn_id: string | null;
   context_type: string | null;
@@ -123,6 +130,28 @@ interface TraceRow { turn_id: string | null }
 
 interface UsageRow { session_id: string | null; cost_usd: number | string | null }
 interface AudioRow { session_id: string | null; tts_text_len: number | null; metadata_json: { provider?: string } | null }
+
+// PostgREST returns at most 1000 rows per request: read the period by pages.
+const VOICE_PAGE_SIZE = 1000;
+const VOICE_MAX_PAGES = 20;
+
+async function readVoiceRows(from: string, to: string): Promise<{ rows: VoiceEventRow[]; capped: boolean }> {
+  const rows: VoiceEventRow[] = [];
+  for (let page = 0; page < VOICE_MAX_PAGES; page += 1) {
+    const { data, error } = await supabase
+      .from("voice_turn_events" as never)
+      .select("created_at, event_name, session_id, turn_id, context_type, severity, metadata_json")
+      .gte("created_at", from)
+      .lt("created_at", to)
+      .order("created_at", { ascending: true })
+      .range(page * VOICE_PAGE_SIZE, (page + 1) * VOICE_PAGE_SIZE - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as unknown as VoiceEventRow[];
+    rows.push(...batch);
+    if (batch.length < VOICE_PAGE_SIZE) return { rows, capped: false };
+  }
+  return { rows, capped: true };
+}
 
 const VOICE_COST_PER_1K: Record<string, number> = {
   elevenlabs: 0.30,
@@ -167,7 +196,7 @@ export async function loadInternalLatencyComparison(
   options: { filters?: Record<string, string>; includeSandbox?: boolean } = {},
 ): Promise<InternalLatencyComparison> {
   const [voiceResult, legacyTurnResult, usageResult, audioResult, traceResult] = await Promise.all([
-    supabase.from("voice_turn_events" as never).select("session_id, turn_id, context_type, severity, metadata_json").gte("created_at", posthog.period.from).lt("created_at", posthog.period.to),
+    readVoiceRows(posthog.period.from, posthog.period.to).then((value) => ({ ...value, error: null }), (error) => ({ rows: [] as VoiceEventRow[], capped: false, error })),
     supabase.from("turn_latencies" as never).select("session_id, metadata_json").gte("created_at", posthog.period.from).lt("created_at", posthog.period.to),
     supabase.from("llm_usage" as never).select("session_id, cost_usd").gte("created_at", posthog.period.from).lt("created_at", posthog.period.to),
     supabase.from("audio_latencies" as never).select("session_id, tts_text_len, metadata_json").eq("direction", "out").gte("created_at", posthog.period.from).lt("created_at", posthog.period.to),
@@ -177,7 +206,7 @@ export async function loadInternalLatencyComparison(
   // coûts et traces enrichissent la comparaison mais ne doivent pas rendre la
   // mesure interne indisponible si l'une d'elles manque ou échoue.
   if (voiceResult.error) throw voiceResult.error;
-  const allVoice = (voiceResult.data ?? []) as unknown as VoiceEventRow[];
+  const allVoice = voiceResult.rows;
   const legacyTurns = (legacyTurnResult.error ? [] : legacyTurnResult.data ?? []) as unknown as TurnLatencyRow[];
   const usage = (usageResult.error ? [] : usageResult.data ?? []) as unknown as UsageRow[];
   const audio = (audioResult.error ? [] : audioResult.data ?? []) as unknown as AudioRow[];
@@ -256,6 +285,8 @@ export async function loadInternalLatencyComparison(
     onlyInternal,
     costPerSessionUsd: costSessions.size ? (scopedLlmCost + scopedVoiceCost) / costSessions.size : null,
     providers,
+    samples: voice.map((row) => toLatencySample(row as Parameters<typeof toLatencySample>[0])).filter((sample): sample is LatencySample => sample !== null),
+    samplesCapped: voiceResult.capped,
   };
 }
 

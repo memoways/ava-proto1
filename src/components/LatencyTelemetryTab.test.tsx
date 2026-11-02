@@ -16,7 +16,8 @@ vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: PropsWithChildren) => <div>{children}</div>,
   BarChart: ({ children, data }: PropsWithChildren<{ data: unknown }>) => { mocks.chart(data); return <div>{children}</div>; },
   AreaChart: ({ children }: PropsWithChildren) => <div>{children}</div>,
-  Area: () => null, Bar: () => null, CartesianGrid: () => null, Cell: () => null, Legend: () => null,
+  LineChart: ({ children }: PropsWithChildren) => <div>{children}</div>,
+  Line: () => null, Area: () => null, Bar: () => null, CartesianGrid: () => null, Cell: () => null, Legend: () => null,
   Tooltip: () => null, XAxis: () => null, YAxis: () => null,
 }));
 import LatencyTelemetryTab from "./LatencyTelemetryTab";
