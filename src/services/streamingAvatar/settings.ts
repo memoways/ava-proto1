@@ -1,5 +1,17 @@
 import { loadEnvironmentSetting, readEnvironmentStorage, saveEnvironmentSetting } from "@/services/environmentContext";
 import {
+  boundedInteger,
+  HEYGEN_ENCODINGS,
+  HEYGEN_QUALITIES,
+  normalizeHeyGenVoiceSettings,
+  normalizeTavusLanguages,
+  pickEnum,
+  safeLanguageCode,
+  SELECTABLE_STREAMING_AVATAR_PROVIDERS,
+  STREAMING_AVATAR_BOUNDS,
+  TAVUS_DEFAULT_LANGUAGES,
+} from "../../../supabase/functions/_shared/streamingAvatarRequest";
+import {
   TAVUS_EMOTIONS,
   type OutputSettings,
   type StreamingAvatarProviderId,
@@ -22,13 +34,21 @@ export const streamingAvatarDefaults: StreamingAvatarSettings = {
     contextId: "",
     language: "fr",
     quality: "high",
+    encoding: "H264",
+    maxSessionDurationSeconds: 0,
+    voiceSettings: normalizeHeyGenVoiceSettings(undefined),
     sandbox: true,
   },
   tavus: {
     replicaId: "",
     personaId: "",
-    language: "French",
+    languages: [...TAVUS_DEFAULT_LANGUAGES],
     maxDurationSeconds: 900,
+    participantAbsentTimeoutSeconds: 120,
+    participantLeftTimeoutSeconds: 30,
+    enableClosedCaptions: false,
+    applyGreenscreen: false,
+    euPolicy: false,
     emotion: "sadness",
     listeningEmotion: "neutral",
   },
@@ -53,7 +73,8 @@ async function saveSetting<T>(key: string, value: T): Promise<void> {
 }
 
 function normalizeProvider(value: unknown): StreamingAvatarProviderId {
-  return value === "tavus" ? "tavus" : "heygen";
+  // Known but not yet selectable providers (Anam, LemonSlice) fall back to HeyGen.
+  return pickEnum(value, SELECTABLE_STREAMING_AVATAR_PROVIDERS, "heygen");
 }
 
 export function getOutputSettings(): OutputSettings {
@@ -90,31 +111,70 @@ export async function saveStreamingAvatarSettingsToDB(
   await saveSetting(STREAMING_AVATAR_SETTINGS_KEY, normalizeStreamingAvatarSettings(value));
 }
 
+/**
+ * Tolerant normalization: older JSON (Tavus `language: "French"`, HeyGen without voice settings)
+ * is read without loss; unknown or out of bounds values return to their default.
+ */
 export function normalizeStreamingAvatarSettings(
   value: Partial<StreamingAvatarSettings>,
 ): StreamingAvatarSettings {
-  const heygen = { ...streamingAvatarDefaults.heygen, ...(value.heygen ?? {}) };
-  const tavus = { ...streamingAvatarDefaults.tavus, ...(value.tavus ?? {}) };
+  const raw = (value ?? {}) as Record<string, unknown>;
+  const heygen = asRecord(raw.heygen);
+  const tavus = asRecord(raw.tavus);
+  const b = STREAMING_AVATAR_BOUNDS;
+  const heygenDefaults = streamingAvatarDefaults.heygen;
+  const tavusDefaults = streamingAvatarDefaults.tavus;
   return {
-    activeProvider: normalizeProvider(value.activeProvider),
-    connectionTimeoutMs: clamp(value.connectionTimeoutMs, 3_000, 30_000, 12_000),
-    fallbackTimeoutMs: clamp(value.fallbackTimeoutMs, 1_000, 15_000, 5_000),
+    activeProvider: normalizeProvider(raw.activeProvider),
+    connectionTimeoutMs: clamp(raw.connectionTimeoutMs, 3_000, 30_000, 12_000),
+    fallbackTimeoutMs: clamp(raw.fallbackTimeoutMs, 1_000, 15_000, 5_000),
     heygen: {
-      ...heygen,
-      quality:
-        heygen.quality === "low" || heygen.quality === "medium" ? heygen.quality : "high",
+      avatarId: text(heygen.avatarId, heygenDefaults.avatarId),
+      voiceId: text(heygen.voiceId, heygenDefaults.voiceId),
+      contextId: text(heygen.contextId, heygenDefaults.contextId),
+      language: safeLanguageCode(heygen.language, heygenDefaults.language),
+      quality: pickEnum(heygen.quality, HEYGEN_QUALITIES, heygenDefaults.quality),
+      encoding: pickEnum(heygen.encoding, HEYGEN_ENCODINGS, heygenDefaults.encoding),
+      maxSessionDurationSeconds: boundedInteger(
+        heygen.maxSessionDurationSeconds,
+        b.heygenMaxSessionSeconds,
+      ),
+      voiceSettings: normalizeHeyGenVoiceSettings(heygen.voiceSettings),
       sandbox: heygen.sandbox !== false,
     },
     tavus: {
-      ...tavus,
-      maxDurationSeconds: clamp(tavus.maxDurationSeconds, 60, 3_600, 900),
+      replicaId: text(tavus.replicaId, tavusDefaults.replicaId),
+      personaId: text(tavus.personaId, tavusDefaults.personaId),
+      languages: normalizeTavusLanguages(tavus.languages, tavus.language),
+      maxDurationSeconds: boundedInteger(tavus.maxDurationSeconds, b.tavusMaxCallSeconds),
+      participantAbsentTimeoutSeconds: boundedInteger(
+        tavus.participantAbsentTimeoutSeconds,
+        b.tavusAbsentTimeoutSeconds,
+      ),
+      participantLeftTimeoutSeconds: boundedInteger(
+        tavus.participantLeftTimeoutSeconds,
+        b.tavusLeftTimeoutSeconds,
+      ),
+      enableClosedCaptions: tavus.enableClosedCaptions === true,
+      applyGreenscreen: tavus.applyGreenscreen === true,
+      euPolicy: tavus.euPolicy === true,
       emotion: normalizeTavusEmotion(tavus.emotion),
       listeningEmotion: normalizeTavusEmotion(
         tavus.listeningEmotion,
-        streamingAvatarDefaults.tavus.listeningEmotion,
+        tavusDefaults.listeningEmotion,
       ),
     },
   };
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function text(value: unknown, fallback: string): string {
+  return typeof value === "string" ? value : fallback;
 }
 
 function normalizeTavusEmotion(

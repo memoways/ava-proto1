@@ -6,6 +6,7 @@ const fake = vi.hoisted(() => ({ call: {
 vi.mock("@daily-co/daily-js", () => ({ default: { createCallObject: () => fake.call } }));
 vi.mock("../api", () => ({ startAvatarSession: vi.fn(async () => ({ provider: "tavus", externalSessionId: "conversation", conversationUrl: "https://room.invalid", meetingToken: "ephemeral" })), endAvatarSession: vi.fn(async () => {}) }));
 import { TavusStreamingAvatarOutput } from "./tavus";
+import { streamingAvatarDefaults } from "../settings";
 class Stream {
   tracks: MediaStreamTrack[] = [];
   getTracks() { return this.tracks; }
@@ -17,7 +18,7 @@ class Stream {
 function track(kind: string, id = kind) {
   fake.handlers.get("track-started")?.({ participant: { local: false }, type: kind, track: { id, kind, readyState: "live" } });
 }
-const settings = { replicaId: "face", personaId: "pal", language: "French", maxDurationSeconds: 900, emotion: "sadness" as const, listeningEmotion: "neutral" as const };
+const settings = { ...streamingAvatarDefaults.tavus, replicaId: "face", personaId: "pal" };
 describe("Tavus actual receive-only lifecycle", () => {
   beforeEach(() => {
     vi.useFakeTimers(); vi.clearAllMocks(); fake.handlers.clear(); vi.stubGlobal("MediaStream", Stream);
@@ -110,6 +111,20 @@ describe("Tavus actual receive-only lifecycle", () => {
     (fake.call as { getNetworkStats?: () => Promise<unknown> }).getNetworkStats = vi.fn(async () => ({}));
     await vi.advanceTimersByTimeAsync(5000);
     expect(types()).toEqual(["conversation.set_emotion", "conversation.set_emotion"]);
+    await output.dispose();
+  });
+  it("sends conversation.interrupt and rejects the current line when interrupted", async () => {
+    const output = new TavusStreamingAvatarOutput(settings, {}, 1000, 1000); await ready(output);
+    const video = document.createElement("video"); video.play = vi.fn(async () => {}); output.attachMedia(video);
+    const speech = output.renderText("Attends."); await vi.advanceTimersByTimeAsync(0);
+    fake.call.sendAppMessage.mockClear();
+    output.interrupt();
+    await expect(speech).rejects.toThrow("Tavus speech interrupted");
+    expect(fake.call.sendAppMessage.mock.calls[0][0]).toEqual({
+      message_type: "conversation",
+      event_type: "conversation.interrupt",
+      conversation_id: "conversation",
+    });
     await output.dispose();
   });
 });

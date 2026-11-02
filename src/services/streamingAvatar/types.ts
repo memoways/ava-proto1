@@ -1,5 +1,24 @@
+import type {
+  HeyGenEncoding,
+  HeyGenQuality,
+  HeyGenVoiceSettings,
+  KnownStreamingAvatarProvider,
+  SelectableStreamingAvatarProvider,
+} from "../../../supabase/functions/_shared/streamingAvatarRequest";
+
+export type {
+  HeyGenCartesiaVoice,
+  HeyGenElevenLabsVoice,
+  HeyGenFishVoice,
+  HeyGenVoiceEngine,
+  HeyGenVoiceSettings,
+} from "../../../supabase/functions/_shared/streamingAvatarRequest";
+
 export type OutputMode = "tts" | "streaming_avatar";
-export type StreamingAvatarProviderId = "heygen" | "tavus";
+/** Providers that can be selected and started today (factory + secret). */
+export type StreamingAvatarProviderId = SelectableStreamingAvatarProvider;
+/** Every provider Ava knows, including those prepared for later lots (Anam, LemonSlice). */
+export type KnownStreamingAvatarProviderId = KnownStreamingAvatarProvider;
 export type StreamingAvatarConnectionState =
   | "inactive"
   | "connecting"
@@ -17,7 +36,11 @@ export interface HeyGenAvatarSettings {
   voiceId: string;
   contextId: string;
   language: string;
-  quality: "low" | "medium" | "high";
+  quality: HeyGenQuality;
+  encoding: HeyGenEncoding;
+  /** 0 = not sent, LiveAvatar applies the subscription limit. */
+  maxSessionDurationSeconds: number;
+  voiceSettings: HeyGenVoiceSettings;
   sandbox: boolean;
 }
 
@@ -37,8 +60,16 @@ export type TavusEmotion = (typeof TAVUS_EMOTIONS)[number];
 export interface TavusAvatarSettings {
   replicaId: string;
   personaId: string;
-  language: string;
+  /** `properties.languages` codes; the first one opens the conversation. */
+  languages: string[];
   maxDurationSeconds: number;
+  participantAbsentTimeoutSeconds: number;
+  participantLeftTimeoutSeconds: number;
+  enableClosedCaptions: boolean;
+  /** Ignored by Phoenix-4.5 faces. */
+  applyGreenscreen: boolean;
+  /** Tavus `policy: "eu"` (AI Act resolution of `auto` settings). */
+  euPolicy: boolean;
   /** Face emotion while speaking (set_emotion + Echo tag); Ava's characters are in distress. */
   emotion: TavusEmotion;
   /** Face emotion held while listening; sadness reads as pitiful, so closed and neutral by default. */
@@ -143,6 +174,8 @@ export interface ResponseOutput {
   renderText(text: string, context?: ResponseOutputTurnContext): Promise<ResponseOutputResult>;
   attachMedia(element: HTMLMediaElement): void;
   interrupt(): void;
+  /** Listening posture while the player speaks (HeyGen); providers without it ignore the call. */
+  setListening?(listening: boolean): void;
   dispose(): Promise<void>;
 }
 

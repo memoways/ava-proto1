@@ -385,6 +385,11 @@ const IndexPRD4 = () => {
   };
   const audioStateRef = useRef<AudioState>(state.audioState);
   audioStateRef.current = state.audioState;
+  // Avatar listening posture while the microphone is open; Ava keeps the audio (never published).
+  const playerSpeaking = state.audioState === "user_speaking" || state.audioState === "user_finalizing";
+  useEffect(() => {
+    try { responseOutputRef.current?.setListening?.(playerSpeaking); } catch { /* cosmetic */ }
+  }, [playerSpeaking]);
   const dispatchCinematicRef = useRef<(event: CinematicTransitionEvent<VideoTriggerRow>, reason?: string) => void>(() => {});
 
 

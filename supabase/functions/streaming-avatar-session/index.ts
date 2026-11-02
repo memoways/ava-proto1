@@ -2,6 +2,15 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 import { requireAdmin } from "../_shared/adminAuth.ts";
+import {
+  buildHeyGenSessionRequest,
+  buildTavusConversationRequest,
+  safeProviderId,
+  SELECTABLE_STREAMING_AVATAR_PROVIDERS,
+  type KnownStreamingAvatarProvider,
+  type SelectableStreamingAvatarProvider,
+  summarizeTavusPalVoice,
+} from "../_shared/streamingAvatarRequest.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,11 +18,12 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-type Provider = "heygen" | "tavus";
+// Anam and LemonSlice are known (AV2/AV3) but refused until they have a factory and a secret.
+type Provider = SelectableStreamingAvatarProvider;
 
 interface AvatarRequest {
-  action?: "start" | "end";
-  provider?: Provider;
+  action?: "start" | "end" | "check";
+  provider?: KnownStreamingAvatarProvider;
   sessionId?: string;
   externalSessionId?: string;
   sessionToken?: string;
@@ -109,11 +119,22 @@ serve(async (req) => {
 
   if (req.method !== "POST") return jsonError("Method not allowed", 405);
   const body = (await req.json().catch(() => null)) as AvatarRequest | null;
-  if (!body || (body.action !== "start" && body.action !== "end")) {
+  if (!body || (body.action !== "start" && body.action !== "end" && body.action !== "check")) {
     return jsonError("Invalid action", 400);
   }
-  if (body.provider !== "heygen" && body.provider !== "tavus") {
+  if (!SELECTABLE_STREAMING_AVATAR_PROVIDERS.includes(body.provider as Provider)) {
     return jsonError("Invalid provider", 400);
+  }
+  if (body.action === "check") {
+    // Admin configuration check: Tavus test_mode conversation, no room, no binding.
+    const auth = await requireAdmin(req, corsHeaders);
+    if (!auth.ok) return auth.response!;
+    if (body.provider !== "tavus") return jsonError("Only Tavus supports a configuration check", 400);
+    try {
+      return await checkTavus(body.config ?? {});
+    } catch (error) {
+      return jsonError(error instanceof Error ? error.message : "Tavus check failed", 502);
+    }
   }
   if (!isUuid(body.sessionId)) return jsonError("Valid Ava sessionId required", 400);
 
@@ -241,31 +262,12 @@ async function hasExternalSession(req: Request, sessionId: string): Promise<bool
 async function startHeyGen(config: Record<string, unknown>): Promise<Response> {
   const apiKey = Deno.env.get("LIVEAVATAR_API_KEY");
   if (!apiKey) return jsonError("HeyGen LiveAvatar is not configured", 503);
-  const avatarId = safeId(config.avatarId);
-  const voiceId = safeId(config.voiceId);
-  const contextId = safeId(config.contextId, true);
-  if (!avatarId || !voiceId) return jsonError("HeyGen avatarId and voiceId are required", 400);
-
-  const avatarPersona: Record<string, string> = {
-    voice_id: voiceId,
-    language: safeLanguage(config.language, "fr"),
-  };
-  if (contextId) avatarPersona.context_id = contextId;
+  const request = buildHeyGenSessionRequest(config);
+  if ("error" in request) return jsonError(request.error, 400);
   const upstream = await fetch("https://api.liveavatar.com/v1/sessions/token", {
     method: "POST",
     headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      mode: "FULL",
-      avatar_id: avatarId,
-      avatar_persona: avatarPersona,
-      video_settings: {
-        quality: ["low", "medium", "high"].includes(String(config.quality))
-          ? config.quality
-          : "high",
-      },
-      is_sandbox: config.sandbox !== false,
-      interactivity_type: "PUSH_TO_TALK",
-    }),
+    body: JSON.stringify(request.body),
   });
   const payload = await readUpstream(upstream, "HeyGen session creation failed");
   const data = asRecord(payload.data);
@@ -283,49 +285,14 @@ async function startTavus(
 ): Promise<Response> {
   const apiKey = Deno.env.get("TAVUS_API_KEY");
   if (!apiKey) return jsonError("Tavus is not configured", 503);
-  // Tavus renamed `replica` -> `face` and `persona` -> `pal` in the v2 API.
-  const faceId = safeId(config.replicaId);
-  const palId = safeId(config.personaId);
-  if (!palId) return jsonError("A Tavus Echo PAL id (persona id) is required", 400);
-  const maxCallDuration = safeInteger(config.maxDurationSeconds, 60, 3_600, 900);
-
-  // Current API path first, legacy personas path as a fallback for older accounts.
-  let palResponse = await fetch(
-    `https://tavusapi.com/v2/pals/${encodeURIComponent(palId)}`,
-    { headers: { "x-api-key": apiKey } },
-  );
-  let legacyPersona = false;
-  if (palResponse.status === 404) {
-    palResponse = await fetch(
-      `https://tavusapi.com/v2/personas/${encodeURIComponent(palId)}`,
-      { headers: { "x-api-key": apiKey } },
-    );
-    legacyPersona = palResponse.ok;
-  }
-  const pal = await readUpstream(palResponse, "Tavus PAL validation failed");
-  if (safeString(pal.pipeline_mode).toLowerCase() !== "echo") {
-    return jsonError("The Tavus PAL (persona) must use pipeline_mode=echo", 400);
-  }
-
-  const requestBody: Record<string, unknown> = {
-    audio_only: false,
-    require_auth: true,
-    max_participants: 2,
-    conversation_name: `Ava ${avaSessionId.slice(0, 8)}`,
-    properties: {
-      language: safeLanguage(config.language, "French"),
-      max_call_duration: maxCallDuration,
-      participant_absent_timeout: 120,
-      participant_left_timeout: 30,
-    },
-  };
-  if (legacyPersona) {
-    requestBody.persona_id = palId;
-    if (faceId) requestBody.replica_id = faceId;
-  } else {
-    requestBody.pal_id = palId;
-    if (faceId) requestBody.face_id = faceId;
-  }
+  const target = await loadTavusPal(apiKey, config);
+  if (target instanceof Response) return target;
+  const requestBody = buildTavusConversationRequest(config, {
+    avaSessionId,
+    palId: target.palId,
+    faceId: target.faceId,
+    legacyPersona: target.legacyPersona,
+  });
 
   const upstream = await fetch("https://tavusapi.com/v2/conversations", {
     method: "POST",
@@ -345,6 +312,71 @@ async function startTavus(
     externalSessionId,
     conversationUrl,
     meetingToken,
+  });
+}
+
+interface TavusPalTarget {
+  palId: string;
+  faceId: string;
+  legacyPersona: boolean;
+  pal: Record<string, unknown>;
+}
+
+async function loadTavusPal(
+  apiKey: string,
+  config: Record<string, unknown>,
+): Promise<TavusPalTarget | Response> {
+  // Tavus renamed `replica` -> `face` and `persona` -> `pal` in the v2 API.
+  const faceId = safeId(config.replicaId);
+  const palId = safeId(config.personaId);
+  if (!palId) return jsonError("A Tavus Echo PAL id (persona id) is required", 400);
+
+  // Current API path first, legacy personas path as a fallback for older accounts.
+  let palResponse = await fetch(
+    `https://tavusapi.com/v2/pals/${encodeURIComponent(palId)}`,
+    { headers: { "x-api-key": apiKey } },
+  );
+  let legacyPersona = false;
+  if (palResponse.status === 404) {
+    palResponse = await fetch(
+      `https://tavusapi.com/v2/personas/${encodeURIComponent(palId)}`,
+      { headers: { "x-api-key": apiKey } },
+    );
+    legacyPersona = palResponse.ok;
+  }
+  const pal = await readUpstream(palResponse, "Tavus PAL validation failed");
+  if (safeString(pal.pipeline_mode).toLowerCase() !== "echo") {
+    return jsonError("The Tavus PAL (persona) must use pipeline_mode=echo", 400);
+  }
+  return { palId, faceId, legacyPersona, pal };
+}
+
+/** test_mode conversation: validates the settings without a room; PAL voice read-only (D3). */
+async function checkTavus(config: Record<string, unknown>): Promise<Response> {
+  const apiKey = Deno.env.get("TAVUS_API_KEY");
+  if (!apiKey) return jsonError("Tavus is not configured", 503);
+  const target = await loadTavusPal(apiKey, config);
+  if (target instanceof Response) return target;
+  const requestBody = buildTavusConversationRequest(config, {
+    avaSessionId: "check000",
+    palId: target.palId,
+    faceId: target.faceId,
+    legacyPersona: target.legacyPersona,
+    testMode: true,
+  });
+  const upstream = await fetch("https://tavusapi.com/v2/conversations", {
+    method: "POST",
+    headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody),
+  });
+  const payload = await readUpstream(upstream, "Tavus test conversation failed");
+  return json({
+    provider: "tavus",
+    ok: true,
+    conversationStatus: safeString(payload.status).slice(0, 40),
+    properties: requestBody.properties,
+    policy: requestBody.policy ?? null,
+    palVoice: summarizeTavusPalVoice(target.pal),
   });
 }
 
@@ -403,29 +435,9 @@ async function probeHeyGenStart(
 ): Promise<Record<string, unknown>> {
   const apiKey = Deno.env.get("LIVEAVATAR_API_KEY");
   if (!apiKey) return { ok: false, error: "missing secret" };
-  const avatarId = safeId(config.avatarId);
-  const voiceId = safeId(config.voiceId);
-  const contextId = safeId(config.contextId, true);
-  if (!avatarId || !voiceId) {
-    return { ok: false, error: "avatarId/voiceId missing or invalid", avatarId, voiceId };
-  }
-  const avatarPersona: Record<string, string> = {
-    voice_id: voiceId,
-    language: safeLanguage(config.language, "fr"),
-  };
-  if (contextId) avatarPersona.context_id = contextId;
-  const requestBody = {
-    mode: "FULL",
-    avatar_id: avatarId,
-    avatar_persona: avatarPersona,
-    video_settings: {
-      quality: ["low", "medium", "high"].includes(String(config.quality))
-        ? config.quality
-        : "high",
-    },
-    is_sandbox: config.sandbox !== false,
-    interactivity_type: "PUSH_TO_TALK",
-  };
+  const request = buildHeyGenSessionRequest(config);
+  if ("error" in request) return { ok: false, error: request.error };
+  const requestBody = request.body;
   try {
     const upstream = await fetch("https://api.liveavatar.com/v1/sessions/token", {
       method: "POST",
@@ -443,24 +455,7 @@ async function probeHeyGenStart(
   }
 }
 
-function safeId(value: unknown, optional = false): string {
-  if (typeof value !== "string") return "";
-  const trimmed = value.trim();
-  if (!trimmed && optional) return "";
-  return /^[A-Za-z0-9_-]{1,200}$/.test(trimmed) ? trimmed : "";
-}
-
-function safeLanguage(value: unknown, fallback: string): string {
-  if (typeof value !== "string") return fallback;
-  const trimmed = value.trim();
-  return /^[A-Za-z-]{2,30}$/.test(trimmed) ? trimmed : fallback;
-}
-
-function safeInteger(value: unknown, min: number, max: number, fallback: number): number {
-  return typeof value === "number" && Number.isFinite(value)
-    ? Math.min(max, Math.max(min, Math.round(value)))
-    : fallback;
-}
+const safeId = safeProviderId;
 
 function safeString(value: unknown): string {
   return typeof value === "string" ? value : "";

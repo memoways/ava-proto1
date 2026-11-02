@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildTavusEchoCommand,
+  buildTavusInterruptCommand,
   buildTavusSetEmotionCommand,
+  sendHeyGenListening,
   stripTavusEmotionTags,
   sendHeyGenSpeakText,
 } from "./protocolCommands";
@@ -42,5 +44,21 @@ describe("streaming avatar direct text protocols", () => {
     const command = buildTavusEchoCommand("conversation-1", "Je n'en peux plus.", "sadness");
     expect(command.properties.text).toBe('<emotion value="dejected"/> Je n\'en peux plus.');
     expect(stripTavusEmotionTags(command.properties.text)).toBe("Je n'en peux plus.");
+  });
+
+  it("interrupts Tavus with conversation.interrupt on the bound conversation", () => {
+    expect(buildTavusInterruptCommand("conversation-1")).toEqual({
+      message_type: "conversation",
+      event_type: "conversation.interrupt",
+      conversation_id: "conversation-1",
+    });
+  });
+
+  it("maps the HeyGen listening posture to start/stop_listening", () => {
+    const session = { startListening: vi.fn(() => "start"), stopListening: vi.fn(() => "stop") };
+    expect(sendHeyGenListening(session, true)).toBe("start");
+    expect(sendHeyGenListening(session, false)).toBe("stop");
+    expect(session.startListening).toHaveBeenCalledOnce();
+    expect(session.stopListening).toHaveBeenCalledOnce();
   });
 });

@@ -6,7 +6,7 @@ import {
   type AgentEvent,
 } from "@heygen/liveavatar-web-sdk";
 import { endAvatarSession, startAvatarSession } from "../api";
-import { sendHeyGenSpeakText } from "../protocolCommands";
+import { sendHeyGenListening, sendHeyGenSpeakText } from "../protocolCommands";
 import { splitAvatarText } from "../textSegmentation";
 import {
   AvatarRenderError,
@@ -49,6 +49,7 @@ export class HeyGenStreamingAvatarOutput implements ResponseOutput {
   private readyNotified = false;
   private disposed = false;
   private currentSpeech: PendingSpeech | null = null;
+  private listening = false;
 
   constructor(
     settings: HeyGenAvatarSettings,
@@ -113,6 +114,7 @@ export class HeyGenStreamingAvatarOutput implements ResponseOutput {
     try {
       for (const chunk of chunks) {
         if (context?.signal?.aborted) throw new DOMException("Avatar turn aborted", "AbortError");
+        this.setListening(false);
         const speech = this.createSpeech(
           sendHeyGenSpeakText(this.session, chunk),
           chunk,
@@ -176,6 +178,17 @@ export class HeyGenStreamingAvatarOutput implements ResponseOutput {
     this.currentSpeech = null;
   }
 
+  setListening(listening: boolean): void {
+    if (this.listening === listening) return;
+    try {
+      if (this.session?.state !== SessionState.CONNECTED || !this.streamReady) return;
+      sendHeyGenListening(this.session, listening);
+      this.listening = listening;
+    } catch {
+      // Posture is cosmetic; a refused command never blocks the conversation.
+    }
+  }
+
   async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
@@ -220,6 +233,7 @@ export class HeyGenStreamingAvatarOutput implements ResponseOutput {
     session.on(SessionEvent.SESSION_DISCONNECTED, (reason) => {
       if (this.disposed) return;
       this.streamReady = false;
+      this.listening = false;
       this.callbacks.onConnectionStateChange?.("disconnected");
       this.callbacks.onDisconnected?.(String(reason));
       const error = new Error(`HeyGen disconnected: ${String(reason)}`);
