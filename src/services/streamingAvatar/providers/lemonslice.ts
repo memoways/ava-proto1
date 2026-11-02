@@ -52,6 +52,8 @@ const LISTEN_ACTION_INTERVAL_MS = 4_000;
 export class LemonSliceStreamingAvatarOutput implements ResponseOutput {
   readonly mode = "streaming_avatar" as const;
   readonly provider = "lemonslice";
+  // LemonSlice has no landscape output (2x3, 9x16, 1x1): cropping it to a wide screen zooms on the eyes.
+  readonly videoFit = "contain" as const;
   get model() { return this.settings.model; }
   private readonly settings: LemonSliceAvatarSettings;
   private readonly callbacks: ResponseOutputCallbacks;

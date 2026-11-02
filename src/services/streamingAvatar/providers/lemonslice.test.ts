@@ -87,6 +87,8 @@ describe("LemonSlice audio-bridge lifecycle", () => {
     expect(socket().address).toBe("wss://bridge.invalid/s");
     expect(onStreamReady).toHaveBeenCalledOnce();
     expect(getUserMedia).not.toHaveBeenCalled();
+    // Portrait frames only: the conversation screen must not crop them to a wide screen.
+    expect(output.videoFit).toBe("contain");
     await output.dispose();
   });
 
