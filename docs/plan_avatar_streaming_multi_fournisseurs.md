@@ -203,3 +203,48 @@ séparée, fusionnée avant le lot avec l'accord d'Ulrich : elle touchait les m�
   cours de réplique.
 
 Suite : [prompt AV2 « Anam en mode texte »](prompt_reprise_avatar_streaming_lot_av2.md).
+
+## Exécution AV2 — 2 novembre 2026
+
+Branche `feat/avatar-streaming-av2`, depuis main `a939b35` (PR #141). D2 : option (a), `talk`
+avec une voix choisie chez Anam (recommandation, aucune décision contraire d'Ulrich).
+
+- **Écart découvert et tranché.** La base Lovable (lecture `pg_constraint` par le MCP Ava)
+  limitait `sessions.streaming_avatar_provider` à `heygen | tavus` : une session Anam ne pouvait
+  être ni créée ni liée. Ulrich a choisi la migration minimale
+  `20261102120000_streaming_avatar_provider_anam.sql` (contrainte élargie à `anam` et
+  `lemonslice`, aucune donnée touchée). Elle doit être appliquée par Lovable avant de
+  sélectionner Anam.
+- **SDK.** `@anam-ai/js-sdk` 4.29.1, dernière version publiée depuis au moins deux semaines
+  (19 octobre 2026), noms vérifiés dans le paquet installé et la doc : `createClient(token,
+  { disableInputAudio })`, `stream()`, `createTalkMessageStream()` / `streamMessageChunk`,
+  `interruptPersona()`, événements `MESSAGE_STREAM_EVENT_RECEIVED` (`role`, `endOfSpeech`,
+  `interrupted`), `TALK_STREAM_INTERRUPTED`, `MESSAGE_DELIVERY_FAILED`, `CONNECTION_CLOSED`.
+  Télémétrie client Anam coupée (`disableClientMetrics`).
+- **Parole.** Une talk stream par réplique ; découpage `splitAvatarText` inchangé, balise de jeu
+  sur le premier morceau. Début de parole = première transcription du persona, fin = `endOfSpeech`
+  (Anam diffuse ces transcriptions au rythme de la parole ; à confirmer à la recette). Pas de
+  posture d'écoute à piloter : l'attitude au repos vient des Director Notes.
+- **Émotion.** Défaut pour Max et Emma, comme Tavus (#137–#140) : style personnalisé abattu en
+  parlant, attitude fermée au repos (`customIdlingStylePrompt`), expressivité 0,4, balise `[sad]`
+  par réplique. Anam interdit de combiner `presetStyle` et prompt personnalisé : en mode préréglé,
+  aucune attitude au repos n'est envoyée. Cara 3 ne reçoit aucune Director Note.
+- **Voix.** `voiceGenerationOptions` selon le moteur déclaré dans l'admin : ElevenLabs v2
+  (tous les champs), v3 (stabilité), v4 (stabilité, similarité) ; Cartesia (volume, vitesse,
+  émotion, défaut `sad`) ; Fish (volume, vitesse). « Réglages de la voix dans Anam » n'envoie rien.
+- **Session.** `videoQuality`, `region` + `regionPolicy` (politique envoyée seulement avec une
+  région), `dataRetention` enregistrement et transcriptions désactivés par défaut.
+- **Edge Function.** `startAnam`, liaison et fin comme HeyGen/Tavus (fin : aucun appel Anam, le
+  client ferme le flux et le jeton est à usage unique), `configured.anam`, sonde `probe=1`,
+  action admin `check`. Le jeton n'apparaît dans aucun journal.
+- **Tests.** Corps de session (forçages, liste blanche, UUID, Director Notes, voix par modèle,
+  région), réglages anciens relus sans perte, cycle de vie avec SDK simulé (micro jamais ouvert,
+  pistes audio + vidéo, balise, fin de parole, interruption, échec de remise, déconnexion, lecture
+  bloquée). Qualité locale : 74 régressions, 1 357 unitaires, 42 intégrations, lint, typage,
+  build ; 35 tests de livraison.
+- **Non vérifié localement.** Deno absent : Edge Function non passée à `deno check` ; aucun appel
+  réel à Anam. À faire : secret `ANAM_API_KEY` (Ulrich), application de la migration et
+  déploiement de l'Edge Function par Lovable, puis recette d'Ulrich : session Anam en français,
+  synchro labiale, aucun sourire, interruption en cours de réplique, repli TTS si Anam échoue.
+
+Suite : [prompt AV3 « LemonSlice en mode audio »](prompt_reprise_avatar_streaming_lot_av3.md).

@@ -1,5 +1,6 @@
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import type {
+  AnamAvatarSettings,
   HeyGenAvatarSettings,
   StreamingAvatarProviderId,
   TavusAvatarSettings,
@@ -19,6 +20,12 @@ export type AvatarSessionStartResponse =
       externalSessionId: string;
       conversationUrl: string;
       meetingToken: string;
+    }
+  | {
+      provider: "anam";
+      /** Ava-side binding id: Anam returns no session id with the token. */
+      externalSessionId: string;
+      sessionToken: string;
     };
 
 export async function startAvatarSession(input: {
@@ -26,6 +33,7 @@ export async function startAvatarSession(input: {
   sessionId: string;
   heygen?: HeyGenAvatarSettings;
   tavus?: TavusAvatarSettings;
+  anam?: AnamAvatarSettings;
   signal?: AbortSignal;
 }): Promise<AvatarSessionStartResponse> {
   const response = await authenticatedFunctionFetch(ENDPOINT, {
@@ -35,7 +43,7 @@ export async function startAvatarSession(input: {
       action: "start",
       provider: input.provider,
       sessionId: input.sessionId,
-      config: input.provider === "heygen" ? input.heygen : input.tavus,
+      config: input[input.provider],
     }),
     signal: input.signal,
   });
@@ -86,6 +94,26 @@ export async function checkTavusConfiguration(
   return response.json() as Promise<TavusConfigurationCheck>;
 }
 
+export interface AnamConfigurationCheck {
+  ok: boolean;
+  /** Whitelisted personaConfig and sessionOptions actually accepted by Anam (no token). */
+  personaConfig: Record<string, unknown>;
+  sessionOptions: Record<string, unknown>;
+}
+
+/** Admin only: Anam issues a session token for these settings; the token is discarded. */
+export async function checkAnamConfiguration(
+  anam: AnamAvatarSettings,
+): Promise<AnamConfigurationCheck> {
+  const response = await authenticatedFunctionFetch(ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "check", provider: "anam", config: anam }),
+  });
+  if (!response.ok) throw new Error(await readAvatarError(response));
+  return response.json() as Promise<AnamConfigurationCheck>;
+}
+
 export async function getAvatarProviderStatus(): Promise<Record<StreamingAvatarProviderId, boolean>> {
   const response = await authenticatedFunctionFetch(ENDPOINT, {
     method: "GET",
@@ -98,6 +126,7 @@ export async function getAvatarProviderStatus(): Promise<Record<StreamingAvatarP
   return {
     heygen: body.configured?.heygen === true,
     tavus: body.configured?.tavus === true,
+    anam: body.configured?.anam === true,
   };
 }
 

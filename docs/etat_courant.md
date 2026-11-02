@@ -38,6 +38,14 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Avatars streaming AV2 (2 novembre, code) : Anam en mode texte.** SDK 4.29.1, micro jamais
+ouvert, LLM Anam coupé, une talk stream par réplique avec balise `[sad]`, Director Notes abattues
+en parlant et fermées au repos, voix Anam (D2a), interruption `interruptPersona`. Migration
+minimale décidée par Ulrich : contrainte `streaming_avatar_provider` élargie (`anam`,
+`lemonslice`). À faire : secret `ANAM_API_KEY`, migration et Edge Function appliquées par Lovable,
+puis recette d'Ulrich. [Plan](plan_avatar_streaming_multi_fournisseurs.md#exécution-av2--2-novembre-2026) ·
+[Prompt AV3 « LemonSlice en mode audio »](prompt_reprise_avatar_streaming_lot_av3.md).
+
 **Avatars streaming AV1 (2 novembre, code) : socle multi-fournisseurs et réglages complets.**
 Module partagé Edge/client à liste blanche et bornes ; Anam et LemonSlice connus, non
 sélectionnables. HeyGen : très haute qualité, encodage, durée max, voix par moteur, posture

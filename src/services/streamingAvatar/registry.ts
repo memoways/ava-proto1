@@ -37,6 +37,15 @@ const avatarProviders: Record<StreamingAvatarProviderId, AvatarOutputFactory> = 
       settings.fallbackTimeoutMs,
     );
   },
+  anam: async (settings, callbacks) => {
+    const { AnamStreamingAvatarOutput } = await import("./providers/anam");
+    return new AnamStreamingAvatarOutput(
+      settings.anam,
+      callbacks,
+      settings.connectionTimeoutMs,
+      settings.fallbackTimeoutMs,
+    );
+  },
 };
 
 export async function createResponseOutput(

@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 import { requireAdmin } from "../_shared/adminAuth.ts";
 import {
+  buildAnamSessionTokenRequest,
   buildHeyGenSessionRequest,
   buildTavusConversationRequest,
   safeProviderId,
@@ -18,7 +19,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Anam and LemonSlice are known (AV2/AV3) but refused until they have a factory and a secret.
+// LemonSlice is known (AV3) but refused until it has a factory and a secret.
 type Provider = SelectableStreamingAvatarProvider;
 
 interface AvatarRequest {
@@ -98,6 +99,11 @@ serve(async (req) => {
           "x-api-key",
           Deno.env.get("TAVUS_API_KEY"),
         ),
+        anam: await probeProvider(
+          "https://api.anam.ai/v1/avatars?perPage=1",
+          "Authorization",
+          bearer(Deno.env.get("ANAM_API_KEY")),
+        ),
       });
     }
     const denied = await enforceGameRequest(
@@ -112,6 +118,7 @@ serve(async (req) => {
       configured: {
         heygen: Boolean(Deno.env.get("LIVEAVATAR_API_KEY")),
         tavus: Boolean(Deno.env.get("TAVUS_API_KEY")),
+        anam: Boolean(Deno.env.get("ANAM_API_KEY")),
       },
     });
   }
@@ -126,14 +133,16 @@ serve(async (req) => {
     return jsonError("Invalid provider", 400);
   }
   if (body.action === "check") {
-    // Admin configuration check: Tavus test_mode conversation, no room, no binding.
+    // Admin configuration check: Tavus test_mode conversation or Anam token, no session, no binding.
     const auth = await requireAdmin(req, corsHeaders);
     if (!auth.ok) return auth.response!;
-    if (body.provider !== "tavus") return jsonError("Only Tavus supports a configuration check", 400);
+    if (body.provider === "heygen") return jsonError("HeyGen has no configuration check", 400);
     try {
-      return await checkTavus(body.config ?? {});
+      return body.provider === "anam"
+        ? await checkAnam(body.config ?? {})
+        : await checkTavus(body.config ?? {});
     } catch (error) {
-      return jsonError(error instanceof Error ? error.message : "Tavus check failed", 502);
+      return jsonError(error instanceof Error ? error.message : "Configuration check failed", 502);
     }
   }
   if (!isUuid(body.sessionId)) return jsonError("Valid Ava sessionId required", 400);
@@ -154,6 +163,8 @@ serve(async (req) => {
       }
       const response = body.provider === "heygen"
         ? await startHeyGen(body.config ?? {})
+        : body.provider === "anam"
+        ? await startAnam(body.config ?? {})
         : await startTavus(body.config ?? {}, body.sessionId!);
       if (!response.ok) return response;
       const started = await response.clone().json() as {
@@ -171,9 +182,10 @@ serve(async (req) => {
       } catch (error) {
         if (body.provider === "heygen") {
           await endHeyGen(started.externalSessionId, started.sessionToken).catch(() => {});
-        } else {
+        } else if (body.provider === "tavus") {
           await endTavus(started.externalSessionId).catch(() => {});
         }
+        // Anam: the single-use token is simply never handed to the client.
         throw error;
       }
       return response;
@@ -186,6 +198,10 @@ serve(async (req) => {
       externalSessionId,
     )) {
       return jsonError("External session ownership mismatch", 403);
+    }
+    if (body.provider === "anam") {
+      // The client closes the Anam stream (stopStreaming); the token cannot start another session.
+      return json({ ok: true });
     }
     return body.provider === "heygen"
       ? await endHeyGen(body.externalSessionId, body.sessionToken)
@@ -312,6 +328,47 @@ async function startTavus(
     externalSessionId,
     conversationUrl,
     meetingToken,
+  });
+}
+
+async function requestAnamToken(
+  config: Record<string, unknown>,
+): Promise<{ sessionToken: string; body: Record<string, unknown> } | Response> {
+  const apiKey = Deno.env.get("ANAM_API_KEY");
+  if (!apiKey) return jsonError("Anam is not configured", 503);
+  const request = buildAnamSessionTokenRequest(config);
+  if ("error" in request) return jsonError(request.error, 400);
+  const upstream = await fetch("https://api.anam.ai/v1/auth/session-token", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(request.body),
+  });
+  const payload = await readUpstream(upstream, "Anam session token creation failed");
+  const sessionToken = safeString(payload.sessionToken);
+  if (!sessionToken) throw new Error("Anam returned no session token");
+  return { sessionToken, body: request.body };
+}
+
+async function startAnam(config: Record<string, unknown>): Promise<Response> {
+  const token = await requestAnamToken(config);
+  if (token instanceof Response) return token;
+  // Anam returns no session id with the token: Ava binds its own id for ownership checks.
+  return json({
+    provider: "anam",
+    externalSessionId: crypto.randomUUID(),
+    sessionToken: token.sessionToken,
+  });
+}
+
+/** A token is issued for these settings and dropped: validates ids and options, starts nothing. */
+async function checkAnam(config: Record<string, unknown>): Promise<Response> {
+  const token = await requestAnamToken(config);
+  if (token instanceof Response) return token;
+  return json({
+    provider: "anam",
+    ok: true,
+    personaConfig: token.body.personaConfig,
+    sessionOptions: token.body.sessionOptions,
   });
 }
 
@@ -456,6 +513,10 @@ async function probeHeyGenStart(
 }
 
 const safeId = safeProviderId;
+
+function bearer(apiKey: string | undefined): string | undefined {
+  return apiKey ? `Bearer ${apiKey}` : undefined;
+}
 
 function safeString(value: unknown): string {
   return typeof value === "string" ? value : "";

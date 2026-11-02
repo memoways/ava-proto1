@@ -1,4 +1,5 @@
 import type {
+  AnamAvatarSettings,
   HeyGenEncoding,
   HeyGenQuality,
   HeyGenVoiceSettings,
@@ -7,6 +8,11 @@ import type {
 } from "../../../supabase/functions/_shared/streamingAvatarRequest";
 
 export type {
+  AnamAvatarSettings,
+  AnamCueTag,
+  AnamDirectorNotes,
+  AnamSessionOptions,
+  AnamVoiceGenerationOptions,
   HeyGenCartesiaVoice,
   HeyGenElevenLabsVoice,
   HeyGenFishVoice,
@@ -17,7 +23,7 @@ export type {
 export type OutputMode = "tts" | "streaming_avatar";
 /** Providers that can be selected and started today (factory + secret). */
 export type StreamingAvatarProviderId = SelectableStreamingAvatarProvider;
-/** Every provider Ava knows, including those prepared for later lots (Anam, LemonSlice). */
+/** Every provider Ava knows, including LemonSlice prepared for AV3. */
 export type KnownStreamingAvatarProviderId = KnownStreamingAvatarProvider;
 export type StreamingAvatarConnectionState =
   | "inactive"
@@ -82,6 +88,7 @@ export interface StreamingAvatarSettings {
   fallbackTimeoutMs: number;
   heygen: HeyGenAvatarSettings;
   tavus: TavusAvatarSettings;
+  anam: AnamAvatarSettings;
 }
 
 export interface ResponseOutputPrepareContext {

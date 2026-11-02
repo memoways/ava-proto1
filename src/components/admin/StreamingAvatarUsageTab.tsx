@@ -1,5 +1,5 @@
 /**
- * Consommation Streaming Avatar — monitoring multi-providers (HeyGen, Tavus, …).
+ * Consommation Streaming Avatar — monitoring multi-providers (HeyGen, Tavus, Anam, …).
  *
  * Lit la table `sessions` (colonnes `streaming_avatar_*`, `output_mode`,
  * `duration_seconds`) et agrège par fournisseur : volumétrie, latences de
@@ -27,6 +27,7 @@ const DEFAULT_COST_PER_MINUTE_USD = 0.15;
 const PROVIDER_LABELS: Record<string, string> = {
   heygen: "HeyGen LiveAvatar",
   tavus: "Tavus",
+  anam: "Anam",
 };
 
 interface SessionRow {
@@ -173,7 +174,7 @@ export default function StreamingAvatarUsageTab() {
         <div>
           <h2 className="text-lg font-semibold">Consommation Streaming Avatar</h2>
           <p className="text-sm text-muted-foreground">
-            Métriques des services vidéo temps réel (HeyGen, Tavus, et futurs fournisseurs) : connexion,
+            Métriques des services vidéo temps réel (HeyGen, Tavus, Anam et futurs fournisseurs) : connexion,
             première image, première parole, replis TTS et coût estimé.
           </p>
         </div>

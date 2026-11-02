@@ -110,7 +110,7 @@ export default function StreamingAvatarTestPanel({
         avatarSettings: effective,
         callbacks: {
           onConnectionStateChange: (state) => push(`État connexion : ${state}`),
-          onStreamReady: () => push("Flux média prêt (Tavus : audio + vidéo)", "ok"),
+          onStreamReady: () => push("Flux média prêt (audio + vidéo)", "ok"),
           onMediaDiagnostics: diagnostics => {
             if (diagnostics.event === "tracks") push(`Pistes reçues : audio=${diagnostics.audioTracks}, vidéo=${diagnostics.videoTracks}`);
             if (diagnostics.event === "playback") push(`Lecture navigateur : ${diagnostics.playback}${diagnostics.errorName ? ` (${diagnostics.errorName})` : ""}`, diagnostics.playback === "playing" ? "ok" : "error");
