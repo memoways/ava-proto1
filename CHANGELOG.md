@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Admin — Cinématiques : capsules rangées par fonction] — 2026-11-02
+
+- Retour d'Ulrich sur #148 : miniatures trop petites, boutons et labels mélangés.
+- Miniature agrandie (320 px, 384 px sur grand écran). Liens Gumlet et Notion et date de
+  synchronisation regroupés sous la vidéo.
+- À droite, par fonction : titre et actions (Analyser, Éditer) ; champs étiquetés Type,
+  Priorité, Nature, Personnages, Média ; Thèmes (déclencheurs) ; Contexte, Description et
+  Description IA en liste à deux colonnes. « Média disponible » n'est plus un badge rouge
+  (point vert) ; seul « Absent » reste en alerte. Mode édition inchangé.
+- Vérifié en local sur les vraies cinématiques (lecture seule).
+
 ## [Admin — Cinématiques : miniature et lecteur intégré] — 2026-11-02
 
 - Demande d'Ulrich : voir chaque cinématique directement dans l'onglet Cinématiques.
