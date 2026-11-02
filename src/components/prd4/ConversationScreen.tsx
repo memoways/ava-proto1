@@ -129,6 +129,9 @@ const ConversationScreen = ({
   // Si le flux hoquette (waiting/stalled) ou se coupe, on fige cette image au lieu
   // d'afficher un écran noir ou de rebasculer brutalement sur la photo.
   const [videoLive, setVideoLive] = useState(false);
+  // Once the live video is on screen it stays there until the stream is lost: a short stall
+  // freezes the last frame instead of flashing the portrait.
+  const [videoShown, setVideoShown] = useState(false);
   const [hasFrozenFrame, setHasFrozenFrame] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -148,7 +151,10 @@ const ConversationScreen = ({
     streamingAvatarState === "inactive";
 
   useEffect(() => {
-    if (streamLost) setVideoLive(false);
+    if (streamLost) {
+      setVideoLive(false);
+      setVideoShown(false);
+    }
   }, [streamLost]);
 
   useEffect(() => {
@@ -182,9 +188,12 @@ const ConversationScreen = ({
     return () => cancelAnimationFrame(raf);
   }, [streamingAvatarActive]);
 
-  // Warm-up: Max rehearses muted before his first line, the portrait stays on screen.
-  const videoVisible = streamingAvatarActive && videoLive && !streamLost && streamingAvatarState !== "warming";
-  const frozenVisible = streamingAvatarActive && hasFrozenFrame && !videoVisible && streamingAvatarState !== "warming";
+  const warming = streamingAvatarState === "warming";
+  const videoVisible = streamingAvatarActive && !streamLost && !warming && (videoLive || videoShown);
+  const frozenVisible = streamingAvatarActive && hasFrozenFrame && !videoVisible && !warming;
+  useEffect(() => {
+    if (videoVisible) setVideoShown(true);
+  }, [videoVisible]);
   const photoVisible = !videoVisible && !frozenVisible;
   const displayName = displayNameForCharacter(activeCharacter);
   const portrait = portraitUrl ?? (activeCharacter === "emma" ? emmaAvatar : maxAvatar);
@@ -322,7 +331,7 @@ const ConversationScreen = ({
             </div>
           )}
         </div>
-        {streamingAvatarActive && (streamingAvatarState === "connecting" || streamingAvatarState === "warming") && (
+        {streamingAvatarActive && (streamingAvatarState === "connecting" || warming) && (
           <div className="flex items-center gap-2 rounded-full border border-border/40 bg-background/60 px-3 py-2 text-xs text-muted-foreground backdrop-blur-md">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             Connexion vidéo…

@@ -72,6 +72,28 @@ describe("ConversationScreen streaming avatar", () => {
     expect(attachAvatarMedia).toHaveBeenCalledTimes(1);
   });
 
+  it("stays on the connection screen while warming, then shows the video once", () => {
+    const props = { ...baseProps, streamingAvatarActive: true, attachAvatarMedia: vi.fn() };
+    const { rerender } = render(<ConversationScreen {...props} streamingAvatarState="warming" />);
+    const video = screen.getByLabelText("Flux vidéo en direct de Max");
+    fireEvent.loadedData(video);
+    expect(video).toHaveClass("opacity-0");
+    expect(screen.getByText("Connexion vidéo…")).toBeInTheDocument();
+
+    rerender(<ConversationScreen {...props} streamingAvatarState="ready" />);
+    expect(video).toHaveClass("opacity-100");
+    expect(screen.queryByText("Connexion vidéo…")).not.toBeInTheDocument();
+
+    // A short stall keeps the live video on screen instead of flashing the portrait.
+    fireEvent.waiting(video);
+    expect(video).toHaveClass("opacity-100");
+    rerender(<ConversationScreen {...props} streamingAvatarState="speaking" />);
+    expect(video).toHaveClass("opacity-100");
+
+    rerender(<ConversationScreen {...props} streamingAvatarState="disconnected" />);
+    expect(video).toHaveClass("opacity-0");
+  });
+
   it("keeps the Max poster visible and announces the TTS fallback", () => {
     render(
       <ConversationScreen
