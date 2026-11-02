@@ -177,12 +177,19 @@ export interface ResponseOutputCallbacks {
   onTranscript?: (text: string, turnId?: string) => void;
 }
 
+export type AvatarVideoFit = "cover" | "contain";
+
 export interface ResponseOutput {
   readonly mode: OutputMode;
   readonly provider: string;
   /** Technical avatar/model identifier actually selected by this instance. */
   readonly model?: string;
   readonly externalSessionId: string | null;
+  /**
+   * How the live video fills the conversation screen. Absent means "cover" (HeyGen, Tavus,
+   * Anam); LemonSlice only renders portrait/square frames, so it asks for the whole frame.
+   */
+  readonly videoFit?: AvatarVideoFit;
   prepare(context: ResponseOutputPrepareContext): Promise<void>;
   renderText(text: string, context?: ResponseOutputTurnContext): Promise<ResponseOutputResult>;
   attachMedia(element: HTMLMediaElement): void;

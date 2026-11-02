@@ -20,6 +20,15 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Tests Anam : texte nu + cue, cue en échec, attente de l'accueil (une fois), borne atteinte.
   À valider en recette par Ulrich (synchro de l'accueil, absence de cassure dans la réplique).
 
+## [Avatars streaming — cadrage LemonSlice] — 2026-11-02
+
+- Recette AV3 : la vidéo LemonSlice apparaissait très zoomée (front et yeux seulement). L'API ne
+  produit que `2x3`, `9x16` ou `1x1` ; l'écran de conversation la recadrait en `object-cover` sur un
+  écran large. Le fournisseur LemonSlice déclare désormais `videoFit: "contain"` : vidéo et image
+  figée affichées en entier. HeyGen, Tavus et Anam ne déclarent rien et restent en `cover`.
+- Déploiement AV3 : Lovable a redéployé `streaming-avatar-session` et corrigé quatre erreurs de type
+  Deno sans effet à l'exécution (main `f8e08d4`).
+
 ## [Avatars streaming AV3 — LemonSlice en mode audio] — 2026-11-02
 
 - LemonSlice devient sélectionnable (`heygen | tavus | anam | lemonslice`). D1 (Ulrich) : salle
