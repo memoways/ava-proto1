@@ -7,6 +7,7 @@ const fake = vi.hoisted(() => {
     stream: vi.fn(async (..._args: unknown[]) => [] as unknown[]),
     isStreaming: vi.fn(() => true),
     interruptPersona: vi.fn(),
+    sendDirectorNoteCue: vi.fn(),
     stopStreaming: vi.fn(async () => {}),
     createTalkMessageStream: vi.fn(() => {
       const talk = { chunks: [] as [string, boolean][], correlationId: `corr-${talks.length + 1}` };
@@ -26,6 +27,7 @@ vi.mock("@anam-ai/js-sdk", () => ({
     TALK_STREAM_INTERRUPTED: "TALK_STREAM_INTERRUPTED",
     MESSAGE_DELIVERY_FAILED: "MESSAGE_DELIVERY_FAILED",
     CONNECTION_CLOSED: "CONNECTION_CLOSED",
+    SESSION_READY: "SESSION_READY",
   },
   MessageRole: { USER: "user", PERSONA: "persona" },
 }));
@@ -51,6 +53,17 @@ const settings = {
   avatarId: "30fa96d0-26c4-4e55-94a0-517025942e18",
   voiceId: "6bfbe25a-979d-40f3-a92b-5394170af54b",
 };
+const warmUp = { maxWaitMs: 50, settleMs: 0 };
+const anam = (overrides = {}, callbacks = {}) =>
+  new AnamStreamingAvatarOutput({ ...settings, ...overrides }, callbacks, 1000, 1000, warmUp);
+const sessionReady = () => fake.handlers.get("SESSION_READY")?.("anam-session");
+/** jsdom never decodes a frame: report one as soon as playback is asked for. */
+const videoWithFrame = () => {
+  const video = document.createElement("video") as HTMLVideoElement;
+  video.play = vi.fn(async () => {});
+  video.requestVideoFrameCallback = vi.fn((cb: VideoFrameRequestCallback) => { queueMicrotask(() => cb(0, {} as VideoFrameCallbackMetadata)); return 1; });
+  return video;
+};
 const persona = (content: string, extra: Record<string, unknown> = {}) =>
   fake.handlers.get("MESSAGE_STREAM_EVENT_RECEIVED")?.({ id: "m", content, role: "persona", endOfSpeech: false, interrupted: false, ...extra });
 
@@ -63,10 +76,10 @@ describe("Anam text-mode lifecycle", () => {
   afterEach(() => { vi.unstubAllGlobals(); });
 
   async function ready(callbacks = {}) {
-    const output = new AnamStreamingAvatarOutput(settings, callbacks, 1000, 1000);
+    const output = anam({}, callbacks);
     await output.prepare({ sessionId: "ava" });
-    const video = document.createElement("video"); video.play = vi.fn(async () => {});
-    output.attachMedia(video);
+    sessionReady();
+    output.attachMedia(videoWithFrame());
     return output;
   }
 
@@ -87,11 +100,12 @@ describe("Anam text-mode lifecycle", () => {
     await output.dispose();
   });
 
-  it("speaks the line with its cue tag and ends on the persona end of speech", async () => {
+  it("speaks plain text with a face-only cue and ends on the persona end of speech", async () => {
     const onSpeakStart = vi.fn(), onSpeakEnd = vi.fn(), onTranscript = vi.fn(), onPlaybackStart = vi.fn();
     const output = await ready({ onSpeakStart, onSpeakEnd, onTranscript });
     const speech = output.renderText("Je ne sais pas.", { turnId: "turn", onPlaybackStart });
-    await vi.waitFor(() => expect(fake.talks[0]?.chunks).toEqual([["[sad] Je ne sais pas.", true]]));
+    await vi.waitFor(() => expect(fake.talks[0]?.chunks).toEqual([["Je ne sais pas.", true]]));
+    expect(fake.client.sendDirectorNoteCue).toHaveBeenCalledWith("sad", { atSeconds: 0 });
     fake.handlers.get("MESSAGE_STREAM_EVENT_RECEIVED")?.({ id: "u", content: "hors tour", role: "user", endOfSpeech: true, interrupted: false });
     expect(onSpeakStart).not.toHaveBeenCalled();
     persona("Je ne sais ");
@@ -104,13 +118,57 @@ describe("Anam text-mode lifecycle", () => {
   });
 
   it("sends no tag when the cue is off", async () => {
-    const output = new AnamStreamingAvatarOutput({ ...settings, speakingCue: "none" }, {}, 1000, 1000);
+    const output = anam({ speakingCue: "none" });
     await output.prepare({ sessionId: "ava" });
-    const video = document.createElement("video"); video.play = vi.fn(async () => {}); output.attachMedia(video);
+    sessionReady(); output.attachMedia(videoWithFrame());
+    const speech = output.renderText("Bonjour.");
+    await vi.waitFor(() => expect(fake.talks[0]?.chunks).toEqual([["Bonjour.", true]]));
+    expect(fake.client.sendDirectorNoteCue).not.toHaveBeenCalled();
+    persona("Bonjour.", { endOfSpeech: true });
+    await speech; await output.dispose();
+  });
+
+  it("still speaks when the cue cannot be sent", async () => {
+    fake.client.sendDirectorNoteCue.mockImplementationOnce(() => { throw new Error("data channel closed"); });
+    const output = await ready();
     const speech = output.renderText("Bonjour.");
     await vi.waitFor(() => expect(fake.talks[0]?.chunks).toEqual([["Bonjour.", true]]));
     persona("Bonjour.", { endOfSpeech: true });
-    await speech; await output.dispose();
+    await expect(speech).resolves.toMatchObject({ status: "played" });
+    await output.dispose();
+  });
+
+  it("holds the opening line until the session is ready and a frame is shown, once", async () => {
+    const onMediaDiagnostics = vi.fn();
+    const output = anam({}, { onMediaDiagnostics });
+    await output.prepare({ sessionId: "ava" });
+    output.attachMedia(videoWithFrame());
+    const opening = output.renderText("Bonjour.");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(fake.talks).toHaveLength(0);
+    sessionReady();
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(1));
+    expect(onMediaDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ event: "warm_up", warmUpComplete: true }));
+    persona("Bonjour.", { endOfSpeech: true });
+    await opening;
+    const next = output.renderText("Encore.");
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(2));
+    persona("Encore.", { endOfSpeech: true });
+    await next;
+    expect(onMediaDiagnostics.mock.calls.filter(([d]) => d.event === "warm_up")).toHaveLength(1);
+    await output.dispose();
+  });
+
+  it("speaks after the warm-up bound when Anam never reports ready", async () => {
+    const onMediaDiagnostics = vi.fn();
+    const output = anam({}, { onMediaDiagnostics });
+    await output.prepare({ sessionId: "ava" });
+    output.attachMedia(videoWithFrame());
+    const opening = output.renderText("Bonjour.");
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(1));
+    expect(onMediaDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ event: "warm_up", warmUpComplete: false }));
+    persona("Bonjour.", { endOfSpeech: true });
+    await opening; await output.dispose();
   });
 
   it("interrupts mid-line through interruptPersona and reports a started render", async () => {
@@ -149,7 +207,7 @@ describe("Anam text-mode lifecycle", () => {
   });
 
   it("refuses to speak while browser playback is blocked", async () => {
-    const output = new AnamStreamingAvatarOutput(settings, {}, 1000, 1000);
+    const output = anam();
     await output.prepare({ sessionId: "ava" });
     const video = document.createElement("video");
     video.play = vi.fn(async () => { throw new DOMException("autoplay blocked", "NotAllowedError"); });

@@ -476,7 +476,7 @@ function AnamFields({
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Anam</CardTitle>
-        <CardDescription>Persona éphémère : Ava force <code>llmId: CUSTOMER_CLIENT_V1</code> (LLM Anam coupé) et <code>skipGreeting</code>. Chaque réplique part en talk stream, précédée de la balise de jeu ; interruption par <code>interruptPersona</code>. Avatar et voix se choisissent dans le Lab Anam (identifiants UUID).</CardDescription>
+        <CardDescription>Persona éphémère : Ava force <code>llmId: CUSTOMER_CLIENT_V1</code> (LLM Anam coupé) et <code>skipGreeting</code>. Chaque réplique part en talk stream, texte nu, la balise de jeu passant par le canal de données ; l'accueil attend que la vidéo soit prête ; interruption par <code>interruptPersona</code>. Avatar et voix se choisissent dans le Lab Anam (identifiants UUID).</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <SectionTitle>Essentiel</SectionTitle>
@@ -493,7 +493,7 @@ function AnamFields({
           <TextField label="Langue" hint="Code ISO 639, ex. fr." value={value.languageCode} onChange={(languageCode) => patch({ languageCode })} />
           <EnumField
             label="Balise de jeu en parlant"
-            hint="Placée en tête de chaque réplique ([sad]…), jamais prononcée ni transcrite."
+            hint="Envoyée au visage seul (Director Note cue) pour toute la réplique ; la voix garde son débit posé."
             value={value.speakingCue}
             options={ANAM_CUE_LABELS}
             onChange={(speakingCue) => patch({ speakingCue })}

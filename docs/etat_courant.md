@@ -38,6 +38,10 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Anam, correctif de jeu (2 novembre, code, non livré).** Accueil retenu jusqu'à `SESSION_READY`
+et la première image (≤ 5 s, puis 1 s) ; balise de jeu envoyée au visage seul (Director Note cue),
+plus dans le texte, pour éviter la voix qui crie en début de réplique. Recette d'Ulrich à refaire.
+
 **Avatars streaming AV3 (2 novembre, code) : LemonSlice en mode audio.** D1a : salle Daily privée
 créée par l'Edge Function, navigateur en réception seule. La voix du personnage d'Ava (TTS actuel)
 part en PCM16 sur le WebSocket LemonSlice, `audio_end` par réplique, fin sur `playback_finished`,
