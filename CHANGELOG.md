@@ -32,17 +32,20 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Tests Anam : texte nu + cue, cue en échec, attente de l'accueil (une fois), borne atteinte.
   À valider en recette par Ulrich (synchro de l'accueil, absence de cassure dans la réplique).
 
-## [Avatars streaming — Anam : répétition muette avant l'accueil] — 2026-11-02
+## [Avatars streaming — Anam : retrait de la répétition, vidéo affichée une seule fois] — 2026-11-02
 
-- Recette d'Ulrich après #146 : mieux, mais sur la première réplique l'image part 1 à 2 s avant
-  le son, puis le recalage WebRTC rattrape l'écart. Aucune mesure exploitable (les événements
-  avatar n'arrivent pas dans PostHog).
-- Avant la première réplique de la session, Max dit une phrase courte (« Bonjour. Je suis là, je
-  t'écoute. »), son coupé, vidéo masquée. L'écran garde le portrait et affiche « Connexion
-  vidéo… » (nouvel état `warming`). Le circuit voix, lèvres et recalage est rodé ; la vraie réplique
-  part ensuite, son rétabli. Cette répétition n'est jamais rapportée à Ava (ni début de parole, ni
-  transcription). Si elle échoue ou dépasse 12 s, elle est interrompue et l'accueil part quand même.
-- Diagnostic `warm_up` : `rehearsed`. Coût : 3 à 5 s de plus avant l'accueil.
+- Recette d'Ulrich après #147 (répétition muette avant l'accueil) : régression. Allers-retours
+  entre portrait et vidéo, Max dit deux phrases différentes (la répétition était audible),
+  désynchro inchangée. #147 est annulée (`git revert`) : retour au comportement de #146.
+- Cause probable : la fin de parole d'Anam arrive avant que le son ait fini de jouer, et le son
+  était rétabli trop tôt. L'enchaînement « prêt → préparation → prêt » faisait alterner photo et
+  vidéo.
+- Nouveau : état `warming` émis par Anam dès la connexion, à la place de `ready`. L'écran reste
+  sur le portrait avec « Connexion vidéo… » jusqu'à la fin de l'attente d'avant l'accueil, puis
+  passe à `ready` une seule fois, juste avant la première réplique. Une fois affichée, la vidéo
+  n'est plus masquée par un court blocage (`waiting`/`stalled`) ; elle ne l'est que si le flux
+  est perdu.
+- Désynchro de la première réplique (image 1 à 2 s en avance) : non résolue, comme après #146.
 
 ## [Avatars streaming — Anam : flux stable avant l'accueil] — 2026-11-02
 
