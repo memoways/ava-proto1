@@ -28,6 +28,8 @@ interface Props {
   streamingAvatarActive?: boolean;
   streamingAvatarState?: StreamingAvatarConnectionState;
   attachAvatarMedia?: (element: HTMLMediaElement | null) => void;
+  /** "contain" shows the whole provider frame (LemonSlice); default crops to fill the screen. */
+  avatarVideoFit?: "cover" | "contain";
   activeCharacter: "max" | "emma";
   portraitUrl?: string | null;
   handoffIssue?: { phase: 'preparing' | 'error'; reason: string; reload?: boolean } | null;
@@ -62,6 +64,7 @@ const ConversationScreen = ({
   streamingAvatarActive: streamingAvatarRequested = false,
   streamingAvatarState = "inactive",
   attachAvatarMedia,
+  avatarVideoFit = "cover",
   activeCharacter,
   portraitUrl = null,
   handoffIssue = null,
@@ -221,7 +224,8 @@ const ConversationScreen = ({
         <canvas
           ref={canvasRef}
           className={cn(
-            "absolute inset-0 h-full w-full object-cover transition-opacity duration-300",
+            "absolute inset-0 h-full w-full transition-opacity duration-300",
+            avatarVideoFit === "contain" ? "object-contain" : "object-cover",
             frozenVisible ? "opacity-100" : "opacity-0",
           )}
           aria-hidden
@@ -240,7 +244,8 @@ const ConversationScreen = ({
           onStalled={handleVideoStall}
           onEmptied={handleVideoStall}
           className={cn(
-            "absolute inset-0 h-full w-full object-cover transition-opacity duration-300",
+            "absolute inset-0 h-full w-full transition-opacity duration-300",
+            avatarVideoFit === "contain" ? "object-contain" : "object-cover",
             videoVisible ? "opacity-100" : "opacity-0",
           )}
           aria-label={`Flux vidéo en direct de ${displayName}`}

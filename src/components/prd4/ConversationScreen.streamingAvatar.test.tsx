@@ -44,6 +44,23 @@ describe("ConversationScreen streaming avatar", () => {
     expect(screen.getByRole("button", { name: /Terminer/i })).toBeInTheDocument();
   });
 
+  it("shows the whole LemonSlice frame instead of cropping it to the screen", () => {
+    render(
+      <ConversationScreen
+        {...baseProps}
+        streamingAvatarActive
+        streamingAvatarState="ready"
+        attachAvatarMedia={vi.fn()}
+        avatarVideoFit="contain"
+      />,
+    );
+
+    const video = screen.getByLabelText("Flux vidéo en direct de Max");
+    fireEvent.loadedData(video);
+    expect(video).toHaveClass("object-contain", "opacity-100");
+    expect(video).not.toHaveClass("object-cover");
+  });
+
   it("does not reattach the video while live user transcription changes", () => {
     const attachAvatarMedia = vi.fn();
     const props = { ...baseProps, streamingAvatarActive: true, attachAvatarMedia,

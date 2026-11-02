@@ -1,7 +1,7 @@
 import { HandoffCoordinator, prepareCharacterHandoff, finalizeCharacterHandoff, completedCallExchanges, needsHandoffPreparation, HANDOFF_DEPENDENCY_TIMEOUT_MS } from '@/services/handoffCoordinator';
 import { createVoiceTurnV2, handleVoiceInputError, type ServiceObservation, type VoiceObserver } from "@/services/voiceTurnTelemetryV2";
 import { renderWithVideoLatency, splitOutputLatency } from "@/services/streamingAvatar/latency";
-import type { VideoLatencyObservation } from "@/services/streamingAvatar/types";
+import type { AvatarVideoFit, VideoLatencyObservation } from "@/services/streamingAvatar/types";
 import { getRuntimeContext } from "@/services/environmentContext";
 /**
  * IndexPRD4 — Nouveau parcours (mai 2026).
@@ -286,6 +286,7 @@ const IndexPRD4 = () => {
   const [streamingAvatarActive, setStreamingAvatarActive] = useState(false);
   const [streamingAvatarState, setStreamingAvatarState] =
     useState<StreamingAvatarConnectionState>("inactive");
+  const [avatarVideoFit, setAvatarVideoFit] = useState<AvatarVideoFit>("cover");
   const sttLatencySegmentRef = useRef<string | null>(null);
   const pttFinalizingRef = useRef(false);
   const turnInputReadyAtRef = useRef<number | null>(null);
@@ -506,6 +507,7 @@ const IndexPRD4 = () => {
     if (output) void output.dispose();
     setStreamingAvatarActive(false);
     setStreamingAvatarState("inactive");
+    setAvatarVideoFit("cover");
   }, []);
 
   const finalizeAndEnd = useCallback(
@@ -908,6 +910,7 @@ const IndexPRD4 = () => {
     if (!current()) { await output.dispose(); return; }
     responseOutputRef.current = output;
     setStreamingAvatarActive(output.mode === "streaming_avatar");
+    setAvatarVideoFit(output.videoFit ?? "cover");
     if (output.mode === "streaming_avatar") avatarConnectStartedAtRef.current = performance.now();
     try {
       await output.prepare({ sessionId: sid });
@@ -3481,6 +3484,7 @@ const IndexPRD4 = () => {
               streamingAvatarActive={streamingAvatarActive}
               streamingAvatarState={streamingAvatarState}
               attachAvatarMedia={attachAvatarMedia}
+              avatarVideoFit={avatarVideoFit}
               activeCharacter={state.selectedCharacter}
               portraitUrl={activePortraitUrl}
               handoffIssue={handoffIssue}
