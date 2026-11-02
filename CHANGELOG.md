@@ -4,6 +4,18 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Admin — Cinématiques : miniature et lecteur intégré] — 2026-11-02
+
+- Demande d'Ulrich : voir chaque cinématique directement dans l'onglet Cinématiques.
+- Chaque capsule (toujours horizontale) affiche à gauche la miniature Gumlet 16:9, dérivée
+  de l'URL déjà stockée (`resolveGumletThumbnailUrl` → `thumbnail-1-0.png`, publique, sans clé
+  ni Edge Function). Un clic lance un petit lecteur avec contrôles (hls.js, HLS natif en
+  repli) ; une seule vidéo joue à la fois, la croix rend la miniature. Sans média : vignette vide.
+- Composant admin séparé (`CinematicPreview`), `GumletVideoPlayer` côté joueur inchangé.
+- Vérifié en local : miniatures et lecture de deux vraies cinématiques, passage d'une vidéo à
+  l'autre. Limite : miniature par défaut de Gumlet ; vidéos d'une autre collection Gumlet sans
+  miniature (vignette vide).
+
 ## [Avatars streaming — Anam : accueil synchronisé et jeu posé] — 2026-11-02
 
 - Retour d'Ulrich (Max sur Anam) : accueil désynchronisé ; premier mot ou première phrase

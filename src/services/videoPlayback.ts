@@ -25,3 +25,9 @@ export const resolveNativeVideoSource = (url: string): NativeVideoSource => {
     kind: /\.m3u8(?:$|\?)/i.test(url) ? "hls" : "file",
   };
 };
+
+/** Gumlet's default poster frame for a watch/embed URL, or null for other sources. */
+export const resolveGumletThumbnailUrl = (url: string | null | undefined): string | null => {
+  const assetId = url ? getGumletAssetId(url) : null;
+  return assetId ? `https://video.gumlet.io/${GUMLET_COLLECTION_ID}/${assetId}/thumbnail-1-0.png` : null;
+};
