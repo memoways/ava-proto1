@@ -217,8 +217,8 @@ function TavusFields({
         <TextField label="PAL ID (ex-Persona ID)" value={value.personaId} onChange={(personaId) => patch({ personaId })} />
         <TextField label="Langue" value={value.language} onChange={(language) => patch({ language })} />
         <NumberField label="Durée maximale (s)" value={value.maxDurationSeconds} min={60} max={3600} onChange={(maxDurationSeconds) => patch({ maxDurationSeconds })} />
-        <div className="space-y-2 md:col-span-2">
-          <Label>Émotion du visage</Label>
+        <div className="space-y-2">
+          <Label>Émotion en parlant</Label>
           <Select value={value.emotion} onValueChange={(emotion: TavusEmotion) => patch({ emotion })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -227,10 +227,21 @@ function TavusFields({
               ))}
             </SelectContent>
           </Select>
-          <p className="text-xs text-muted-foreground">
-            Envoyée par <code>conversation.set_emotion</code> dès la connexion puis à chaque réplique : le visage la garde en écoutant et en parlant. Par défaut « Tristesse » : les personnages sont abattus et ne sourient jamais. Exige un Face Phoenix-4 ou 4.5 (Pro) ; sans effet sur un Face Phoenix-3.
-          </p>
         </div>
+        <div className="space-y-2">
+          <Label>Émotion en écoutant</Label>
+          <Select value={value.listeningEmotion} onValueChange={(listeningEmotion: TavusEmotion) => patch({ listeningEmotion })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {TAVUS_EMOTIONS.map((emotion) => (
+                <SelectItem key={emotion} value={emotion}>{TAVUS_EMOTION_LABELS[emotion]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <p className="text-xs text-muted-foreground md:col-span-2">
+          En parlant : <code>conversation.set_emotion</code> et balise Echo sur chaque réplique. En écoutant : <code>set_emotion</code> à la connexion, à la fin de chaque réplique et toutes les 5 s. « Tristesse » en écoute donne un air de chien battu ; « Neutre » (défaut) reste fermé sans apitoyer. Exige un Face Phoenix-4 ou 4.5.
+        </p>
       </CardContent>
     </Card>
   );
@@ -243,7 +254,7 @@ const TAVUS_EMOTION_LABELS: Record<TavusEmotion, string> = {
   disgust: "Dégoût",
   contempt: "Mépris",
   surprise: "Surprise",
-  neutral: "Neutre",
+  neutral: "Neutre — fermé, impassible",
   happiness: "Joie — sourit (déconseillé)",
 };
 
