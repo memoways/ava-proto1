@@ -239,6 +239,23 @@ describe("Anam text-mode lifecycle", () => {
     }
   });
 
+  it("reports warming until the warm-up before the first line ends, then ready once", async () => {
+    const onConnectionStateChange = vi.fn();
+    const output = await ready({ onConnectionStateChange });
+    expect(onConnectionStateChange.mock.calls.map(([state]) => state)).toEqual(["connecting", "warming"]);
+    const opening = output.renderText("Bonjour.");
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(1));
+    expect(onConnectionStateChange).toHaveBeenLastCalledWith("ready");
+    persona("Bonjour.", { endOfSpeech: true });
+    await opening;
+    const next = output.renderText("Encore.");
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(2));
+    persona("Encore.", { endOfSpeech: true });
+    await next;
+    expect(onConnectionStateChange.mock.calls.map(([state]) => state)).toEqual(["connecting", "warming", "ready", "speaking", "ready", "speaking", "ready"]);
+    await output.dispose();
+  });
+
   it("interrupts mid-line through interruptPersona and reports a started render", async () => {
     const output = await ready();
     const speech = output.renderText("Une longue réplique.");

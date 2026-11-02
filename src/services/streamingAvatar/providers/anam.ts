@@ -152,7 +152,8 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     }
     this.ready = true;
     this.callbacks.onStreamReady?.();
-    this.callbacks.onConnectionStateChange?.("ready");
+    // The UI stays on the connection screen until the warm-up before the first line ends.
+    this.callbacks.onConnectionStateChange?.("warming");
   }
 
   async renderText(
@@ -286,6 +287,8 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       videoFps: steady.videoFps,
     });
     await delay(this.warmUpTiming.settleMs);
+    // Shown once, right before the first line: no back and forth with the portrait.
+    if (!this.disposed && this.ready) this.callbacks.onConnectionStateChange?.("ready");
   }
 
   /**

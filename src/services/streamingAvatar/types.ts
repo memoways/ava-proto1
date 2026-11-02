@@ -30,6 +30,8 @@ export type KnownStreamingAvatarProviderId = KnownStreamingAvatarProvider;
 export type StreamingAvatarConnectionState =
   | "inactive"
   | "connecting"
+  /** Connected, warming up before the first line: the UI stays on the connection screen. */
+  | "warming"
   | "ready"
   | "speaking"
   | "disconnected"
