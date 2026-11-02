@@ -217,7 +217,7 @@ serve(async (req) => {
         await bindExternalSession(
           req,
           body.sessionId!,
-          body.provider,
+          body.provider as Provider,
           started.externalSessionId,
         );
       } catch (error) {
@@ -238,7 +238,7 @@ serve(async (req) => {
       if (!externalSessionId || !await ownsExternalSession(
         req,
         body.sessionId!,
-        body.provider,
+        body.provider as Provider,
         externalSessionId,
       )) {
         return jsonError("External session ownership mismatch", 403);
@@ -248,7 +248,7 @@ serve(async (req) => {
     if (externalSessionId && !await ownsExternalSession(
       req,
       body.sessionId!,
-      body.provider,
+      body.provider as Provider,
       externalSessionId,
     )) {
       return jsonError("External session ownership mismatch", 403);
@@ -457,7 +457,7 @@ async function createDailyMeetingToken(
   apiKey: string,
   roomName: string,
   role: "avatar" | "viewer",
-  config: Record<string, unknown>,
+  config: unknown,
   nowSeconds: number,
 ): Promise<string> {
   const upstream = await dailyFetch(apiKey, "/meeting-tokens", {
