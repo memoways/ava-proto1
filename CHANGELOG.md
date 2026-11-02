@@ -20,6 +20,18 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Tests Anam : texte nu + cue, cue en échec, attente de l'accueil (une fois), borne atteinte.
   À valider en recette par Ulrich (synchro de l'accueil, absence de cassure dans la réplique).
 
+## [Avatars streaming — Anam : répétition muette avant l'accueil] — 2026-11-02
+
+- Recette d'Ulrich après #146 : mieux, mais sur la première réplique l'image part 1 à 2 s avant
+  le son, puis le recalage WebRTC rattrape l'écart. Aucune mesure exploitable (les événements
+  avatar n'arrivent pas dans PostHog).
+- Avant la première réplique de la session, Max dit une phrase courte (« Bonjour. Je suis là, je
+  t'écoute. »), son coupé, vidéo masquée. L'écran garde le portrait et affiche « Connexion
+  vidéo… » (nouvel état `warming`). Le circuit voix, lèvres et recalage est rodé ; la vraie réplique
+  part ensuite, son rétabli. Cette répétition n'est jamais rapportée à Ava (ni début de parole, ni
+  transcription). Si elle échoue ou dépasse 12 s, elle est interrompue et l'accueil part quand même.
+- Diagnostic `warm_up` : `rehearsed`. Coût : 3 à 5 s de plus avant l'accueil.
+
 ## [Avatars streaming — Anam : flux stable avant l'accueil] — 2026-11-02
 
 - Recette d'Ulrich après #145 : plus de déraillement de jeu, mais la première réplique de Max
