@@ -45,6 +45,25 @@ interface CinematicEventRow {
 }
 
 
+function MetaField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-sm">{children}</dd>
+    </div>
+  );
+}
+
+function TextField({ label, clamp, children }: { label: string; clamp?: string; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-1 sm:grid-cols-[8rem_1fr] sm:gap-3">
+      <dt className="font-medium text-foreground/80">{label}</dt>
+      <dd className={`text-muted-foreground ${clamp ?? ""}`}>{children}</dd>
+    </div>
+  );
+}
+
+
 function VideoTriggerRulesPanel() {
   const [settings, setSettings] = useState<VideoTriggerSettings>(videoTriggerDefaults);
   const [loading, setLoading] = useState(true);
@@ -549,8 +568,9 @@ export default function VideoTriggersEditor() {
         }
 
         return (
-          <div key={t.id} className="border rounded-lg p-3 bg-muted/10 group flex flex-col gap-3 sm:flex-row">
-            <div className="w-full shrink-0 sm:w-44">
+          <div key={t.id} className="border rounded-lg p-4 bg-muted/10 group flex flex-col gap-5 md:flex-row">
+            {/* Media: preview plus its sources, kept together under the video. */}
+            <div className="w-full shrink-0 space-y-2 md:w-80 xl:w-96">
               <CinematicPreview
                 videoUrl={t.video_url}
                 title={t.title}
@@ -558,36 +578,33 @@ export default function VideoTriggersEditor() {
                 onPlay={() => setPlayingId(t.id)}
                 onClose={() => setPlayingId(null)}
               />
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                {t.video_url && (
+                  <a href={t.video_url} target="_blank" rel="noopener noreferrer" title={t.video_url} className="inline-flex items-center gap-1 hover:text-primary">
+                    Gumlet <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+                {t.notion_id && (
+                  <a
+                    href={`https://www.notion.so/${t.notion_id.replace(/-/g, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 hover:text-primary"
+                  >
+                    Notion <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+                <span className="ml-auto text-[11px]">Synchronisé : {t.updated_at ? new Date(t.updated_at).toLocaleString("fr-FR") : "date inconnue"}</span>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-sm font-semibold">{t.title}</span>
-                  <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{t.type}</span>
-                  {t.priority != null && <span className="text-xs text-muted-foreground">P{t.priority}</span>}
-                  <Badge variant={t.video_url ? "default" : "destructive"}>{t.video_url ? "média disponible" : "média absent"}</Badge>
-                  {t.nature && (
-                    <Badge variant="outline">{t.nature === "extract" ? "Extrait du film" : "Vidéo transformée"}</Badge>
-                  )}
-                  {t.characters && t.characters.length > 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      {t.characters.includes("all") ? "Tous" : t.characters.join(", ")}
-                    </span>
-                  )}
-                  {t.notion_id && (
-                    <a
-                      href={`https://www.notion.so/${t.notion_id.replace(/-/g, "")}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-muted-foreground/70 hover:text-primary inline-flex items-center gap-0.5"
-                    >
-                      Notion <ExternalLink className="h-3 w-3" />
-                    </a>
-                  )}
-                </div>
-                <div className="flex items-center gap-1">
+
+            <div className="min-w-0 flex-1 space-y-4">
+              {/* Identity and actions. */}
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <h4 className="font-mono text-base font-semibold leading-tight">{t.title}</h4>
+                <div className="flex shrink-0 items-center gap-2">
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={() => void describeOne(t)}
                     disabled={busy || !t.notion_id || !t.video_url}
@@ -595,22 +612,48 @@ export default function VideoTriggersEditor() {
                     <Sparkles className={`h-3 w-3 mr-1 ${describingId === t.id ? "animate-pulse" : ""}`} />
                     {describingId === t.id ? "Analyse…" : "Analyser"}
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => startEdit(t)}>
+                  <Button variant="outline" size="sm" onClick={() => startEdit(t)}>
                     <Pencil className="h-3 w-3 mr-1" /> Éditer
                   </Button>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-1 mt-2">
-                {(t.themes ?? []).map((tag) => (
-                  <span key={tag} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">{tag}</span>
-                ))}
-                {(!t.themes || t.themes.length === 0) && <span className="text-xs text-muted-foreground/50 italic">Aucun thème</span>}
-              </div>
-              {t.context && <p className="text-xs text-muted-foreground mt-2"><strong>Contexte :</strong> {t.context}</p>}
-              {t.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2"><strong>Description :</strong> {t.description}</p>}
-              {t.ai_description && <p className="text-xs text-muted-foreground mt-1 line-clamp-3"><strong>Description IA :</strong> {t.ai_description}</p>}
-              {t.video_url && <p className="text-xs text-muted-foreground mt-1 truncate">🔗 {t.video_url}</p>}
-              <p className="mt-1 text-[11px] text-muted-foreground">Synchronisé : {t.updated_at ? new Date(t.updated_at).toLocaleString("fr-FR") : "date inconnue"}</p>
+
+              {/* Classification: one labelled field per kind of information. */}
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 xl:grid-cols-5">
+                <MetaField label="Type"><span className="font-mono">{t.type}</span></MetaField>
+                <MetaField label="Priorité">{t.priority != null ? `P${t.priority}` : "—"}</MetaField>
+                <MetaField label="Nature">{t.nature ? (t.nature === "extract" ? "Extrait du film" : "Vidéo transformée") : "—"}</MetaField>
+                <MetaField label="Personnages">
+                  {t.characters && t.characters.length > 0 ? (t.characters.includes("all") ? "Tous" : t.characters.join(", ")) : "—"}
+                </MetaField>
+                <MetaField label="Média">
+                  {t.video_url ? (
+                    <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" />Disponible</span>
+                  ) : (
+                    <Badge variant="destructive">Absent</Badge>
+                  )}
+                </MetaField>
+              </dl>
+
+              <dl>
+                <MetaField label="Thèmes (déclencheurs)">
+                  <div className="flex flex-wrap gap-1">
+                    {(t.themes ?? []).map((tag) => (
+                      <span key={tag} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">{tag}</span>
+                    ))}
+                    {(!t.themes || t.themes.length === 0) && <span className="text-xs text-muted-foreground/50 italic">Aucun thème</span>}
+                  </div>
+                </MetaField>
+              </dl>
+
+              {/* Editorial texts read by the Game Master. */}
+              {(t.context || t.description || t.ai_description) && (
+                <dl className="space-y-2 border-t pt-3 text-xs">
+                  {t.context && <TextField label="Contexte">{t.context}</TextField>}
+                  {t.description && <TextField label="Description" clamp="line-clamp-2">{t.description}</TextField>}
+                  {t.ai_description && <TextField label="Description IA" clamp="line-clamp-3">{t.ai_description}</TextField>}
+                </dl>
+              )}
             </div>
           </div>
         );
