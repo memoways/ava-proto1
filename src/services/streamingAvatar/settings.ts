@@ -3,6 +3,7 @@ import {
   boundedInteger,
   HEYGEN_ENCODINGS,
   HEYGEN_QUALITIES,
+  normalizeAnamSettings,
   normalizeHeyGenVoiceSettings,
   normalizeTavusLanguages,
   pickEnum,
@@ -52,6 +53,8 @@ export const streamingAvatarDefaults: StreamingAvatarSettings = {
     emotion: "sadness",
     listeningEmotion: "neutral",
   },
+  // Sad speaking style and closed idling attitude, like the Tavus emotions; IDs set in the admin.
+  anam: normalizeAnamSettings(undefined),
 };
 
 function readLocal<T>(key: string, defaults: T): T {
@@ -73,7 +76,7 @@ async function saveSetting<T>(key: string, value: T): Promise<void> {
 }
 
 function normalizeProvider(value: unknown): StreamingAvatarProviderId {
-  // Known but not yet selectable providers (Anam, LemonSlice) fall back to HeyGen.
+  // Known but not yet selectable providers (LemonSlice) fall back to HeyGen.
   return pickEnum(value, SELECTABLE_STREAMING_AVATAR_PROVIDERS, "heygen");
 }
 
@@ -112,8 +115,8 @@ export async function saveStreamingAvatarSettingsToDB(
 }
 
 /**
- * Tolerant normalization: older JSON (Tavus `language: "French"`, HeyGen without voice settings)
- * is read without loss; unknown or out of bounds values return to their default.
+ * Tolerant normalization: older JSON (Tavus `language: "French"`, HeyGen without voice settings,
+ * no `anam` block) is read without loss; unknown or out of bounds values return to their default.
  */
 export function normalizeStreamingAvatarSettings(
   value: Partial<StreamingAvatarSettings>,
@@ -164,6 +167,7 @@ export function normalizeStreamingAvatarSettings(
         tavusDefaults.listeningEmotion,
       ),
     },
+    anam: normalizeAnamSettings(raw.anam),
   };
 }
 

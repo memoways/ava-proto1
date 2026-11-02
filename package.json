@@ -23,6 +23,7 @@
     "test:e2e:install": "playwright install chromium firefox webkit"
   },
   "dependencies": {
+    "@anam-ai/js-sdk": "4.29.1",
     "@daily-co/daily-js": "^0.91.0",
     "@grainql/analytics-web": "^3.4.0",
     "@hcaptcha/react-hcaptcha": "^2.0.2",

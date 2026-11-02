@@ -6,14 +6,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import {
+  checkAnamConfiguration,
   checkTavusConfiguration,
   getAvatarProviderStatus,
+  type AnamConfigurationCheck,
   type TavusConfigurationCheck,
 } from "@/services/streamingAvatar/api";
 import {
+  ANAM_AVATAR_MODELS,
+  ANAM_CARTESIA_EMOTIONS,
+  ANAM_DIRECTOR_NOTES_MODELS,
+  ANAM_ELEVENLABS_MODELS,
+  ANAM_ELEVENLABS_STABILITY_ONLY,
+  ANAM_ELEVENLABS_V4,
+  ANAM_STYLE_PROMPT_MAX,
+  type AnamCueTag,
+  type AnamPresetStyle,
+  type AnamStyleMode,
+  type AnamVoiceEngine,
   HEYGEN_CARTESIA_MODELS,
   HEYGEN_ELEVENLABS_MODELS,
   HEYGEN_ELEVENLABS_STABILITY_ONLY,
@@ -27,6 +41,7 @@ import {
   loadStreamingAvatarSettingsFromDB,
   saveStreamingAvatarSettingsToDB,
   TAVUS_EMOTIONS,
+  type AnamAvatarSettings,
   type HeyGenAvatarSettings,
   type HeyGenElevenLabsVoice,
   type HeyGenVoiceSettings,
@@ -45,6 +60,10 @@ const providerCopy: Record<StreamingAvatarProviderId, { title: string; descripti
   tavus: {
     title: "Tavus",
     description: "Une persona Echo reçoit conversation.echo : Perception, STT et LLM Tavus restent désactivés.",
+  },
+  anam: {
+    title: "Anam",
+    description: "Le texte Ava est envoyé par talk stream (LLM Anam coupé) ; le micro n'est jamais ouvert côté Anam.",
   },
 };
 
@@ -104,8 +123,8 @@ export default function StreamingAvatarConfigTab() {
         </p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        {(["heygen", "tavus"] as const).map((provider) => {
+      <div className="grid gap-3 md:grid-cols-3">
+        {(["heygen", "tavus", "anam"] as const).map((provider) => {
           const active = settings.activeProvider === provider;
           return (
             <button
@@ -156,10 +175,15 @@ export default function StreamingAvatarConfigTab() {
           value={settings.heygen}
           onChange={(heygen) => update({ heygen })}
         />
-      ) : (
+      ) : settings.activeProvider === "tavus" ? (
         <TavusFields
           value={settings.tavus}
           onChange={(tavus) => update({ tavus })}
+        />
+      ) : (
+        <AnamFields
+          value={settings.anam}
+          onChange={(anam) => update({ anam })}
         />
       )}
 
@@ -389,6 +413,238 @@ function TavusFields({
         </Advanced>
       </CardContent>
     </Card>
+  );
+}
+
+function AnamFields({
+  value,
+  onChange,
+}: {
+  value: AnamAvatarSettings;
+  onChange: (value: AnamAvatarSettings) => void;
+}) {
+  const patch = (next: Partial<AnamAvatarSettings>) => onChange({ ...value, ...next });
+  const notes = value.directorNotes;
+  const patchNotes = (next: Partial<typeof notes>) => patch({ directorNotes: { ...notes, ...next } });
+  const voice = value.voiceGenerationOptions;
+  const patchVoice = (next: Partial<typeof voice>) => patch({ voiceGenerationOptions: { ...voice, ...next } });
+  const eleven = voice.elevenLabs;
+  const patchEleven = (next: Partial<typeof eleven>) => patchVoice({ elevenLabs: { ...eleven, ...next } });
+  const cartesia = voice.cartesia;
+  const fish = voice.fish;
+  const session = value.sessionOptions;
+  const patchSession = (next: Partial<typeof session>) => patch({ sessionOptions: { ...session, ...next } });
+  const notesRead = ANAM_DIRECTOR_NOTES_MODELS.includes(value.avatarModel);
+  const stabilityOnly = ANAM_ELEVENLABS_STABILITY_ONLY.includes(eleven.model);
+  const v4 = ANAM_ELEVENLABS_V4.includes(eleven.model);
+  const b = STREAMING_AVATAR_BOUNDS;
+  const [checking, setChecking] = useState(false);
+  const [check, setCheck] = useState<AnamConfigurationCheck | null>(null);
+  const [checkError, setCheckError] = useState<string | null>(null);
+  const runCheck = async () => {
+    setChecking(true);
+    setCheck(null);
+    setCheckError(null);
+    try {
+      setCheck(await checkAnamConfiguration(value));
+    } catch (error) {
+      setCheckError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setChecking(false);
+    }
+  };
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Anam</CardTitle>
+        <CardDescription>Persona éphémère : Ava force <code>llmId: CUSTOMER_CLIENT_V1</code> (LLM Anam coupé) et <code>skipGreeting</code>. Chaque réplique part en talk stream, précédée de la balise de jeu ; interruption par <code>interruptPersona</code>. Avatar et voix se choisissent dans le Lab Anam (identifiants UUID).</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <SectionTitle>Essentiel</SectionTitle>
+        <div className="grid gap-4 md:grid-cols-2">
+          <TextField label="Avatar ID" value={value.avatarId} onChange={(avatarId) => patch({ avatarId })} />
+          <TextField label="Voice ID" hint="Voix choisie chez Anam (D2a) ; la voix d'Ava n'est pas utilisée." value={value.voiceId} onChange={(voiceId) => patch({ voiceId })} />
+          <EnumField
+            label="Modèle d'avatar"
+            hint="Les notes de jeu ne sont lues que par Cara 4."
+            value={value.avatarModel}
+            options={sameLabels(ANAM_AVATAR_MODELS)}
+            onChange={(avatarModel) => patch({ avatarModel })}
+          />
+          <TextField label="Langue" hint="Code ISO 639, ex. fr." value={value.languageCode} onChange={(languageCode) => patch({ languageCode })} />
+          <EnumField
+            label="Balise de jeu en parlant"
+            hint="Placée en tête de chaque réplique ([sad]…), jamais prononcée ni transcrite."
+            value={value.speakingCue}
+            options={ANAM_CUE_LABELS}
+            onChange={(speakingCue) => patch({ speakingCue })}
+          />
+          <EnumField
+            label="Style de jeu (Director Notes)"
+            hint={notesRead ? "Personnalisé : attitude en parlant et au repos ; préréglé : un style, sans attitude au repos." : "Non lu par ce modèle : non envoyé."}
+            value={notes.mode}
+            options={ANAM_STYLE_MODE_LABELS}
+            onChange={(mode) => patchNotes({ mode })}
+          />
+          {notes.mode === "preset" && (
+            <EnumField
+              label="Style préréglé"
+              value={notes.presetStyle}
+              options={ANAM_PRESET_LABELS}
+              onChange={(presetStyle) => patchNotes({ presetStyle })}
+            />
+          )}
+          {notes.mode !== "default" && (
+            <NumberField label="Expressivité" hint="0 à 1 ; bas = plus posé." bounds={b.anamExpressivity} value={notes.expressivity} disabled={!notesRead} onChange={(expressivity) => patchNotes({ expressivity })} />
+          )}
+        </div>
+        {notes.mode === "custom" && (
+          <div className="grid gap-4 md:grid-cols-2">
+            <PromptField label="Attitude en parlant" value={notes.customStylePrompt} disabled={!notesRead} onChange={(customStylePrompt) => patchNotes({ customStylePrompt })} />
+            <PromptField label="Attitude au repos (écoute)" value={notes.customIdlingStylePrompt} disabled={!notesRead} onChange={(customIdlingStylePrompt) => patchNotes({ customIdlingStylePrompt })} />
+          </div>
+        )}
+        <Advanced>
+          <div className="grid gap-4 md:grid-cols-2">
+            <NumberField label="Durée maximale de session (s)" hint="60 à 3 600 ; défaut 900." bounds={b.anamMaxSessionSeconds} value={value.maxSessionLengthSeconds} onChange={(maxSessionLengthSeconds) => patch({ maxSessionLengthSeconds })} />
+            <EnumField
+              label="Qualité vidéo"
+              value={session.videoQuality}
+              options={{ high: "Haute (défaut)", auto: "Automatique" }}
+              onChange={(videoQuality) => patchSession({ videoQuality })}
+            />
+            <EnumField
+              label="Région"
+              hint="Automatique : Anam choisit la plus proche."
+              value={session.region}
+              options={{ auto: "Automatique (défaut)", eu: "Europe", us: "États-Unis" }}
+              onChange={(region) => patchSession({ region })}
+            />
+            <EnumField
+              label="Politique de région"
+              hint={session.region === "auto" ? "Sans région : non envoyée." : "Stricte : échoue plutôt que changer de région."}
+              value={session.regionPolicy}
+              options={{ preferred: "Préférée (défaut)", strict: "Stricte" }}
+              onChange={(regionPolicy) => patchSession({ regionPolicy })}
+            />
+            <SwitchField label="Enregistrement chez Anam" hint="dataRetention.recording ; désactivé par défaut." checked={session.keepRecording} onChange={(keepRecording) => patchSession({ keepRecording })} />
+            <SwitchField label="Transcriptions chez Anam" hint="dataRetention.transcripts ; désactivé par défaut." checked={session.keepTranscripts} onChange={(keepTranscripts) => patchSession({ keepTranscripts })} />
+            <EnumField
+              label="Réglages de voix"
+              hint="Choisir le moteur de la voix Anam ; seuls les champs qu'il lit sont envoyés."
+              value={voice.engine}
+              options={ANAM_VOICE_ENGINE_LABELS}
+              onChange={(engine) => patchVoice({ engine })}
+            />
+          </div>
+          {voice.engine === "elevenLabs" && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <EnumField
+                label="Modèle ElevenLabs"
+                hint="v3 : stabilité seule ; v4 : stabilité et similarité."
+                value={eleven.model}
+                options={sameLabels(ANAM_ELEVENLABS_MODELS)}
+                onChange={(model) => patchEleven({ model })}
+              />
+              <NumberField label="Stabilité" hint="0 à 1." bounds={b.elevenLabsStability} value={eleven.stability} onChange={(stability) => patchEleven({ stability })} />
+              <NumberField label="Similarité" hint="0 à 1." bounds={b.elevenLabsSimilarity} value={eleven.similarityBoost} disabled={stabilityOnly} onChange={(similarityBoost) => patchEleven({ similarityBoost })} />
+              <NumberField label="Style" hint="0 à 1." bounds={b.elevenLabsStyle} value={eleven.style} disabled={stabilityOnly || v4} onChange={(style) => patchEleven({ style })} />
+              <NumberField label="Vitesse" hint="0,7 à 1,2." bounds={b.anamElevenLabsSpeed} value={eleven.speed} disabled={stabilityOnly || v4} onChange={(speed) => patchEleven({ speed })} />
+              <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                <div><Label>Speaker boost</Label><Hint text={stabilityOnly || v4 ? "Non lu par ce modèle : non envoyé." : undefined} /></div>
+                <Switch checked={eleven.useSpeakerBoost} disabled={stabilityOnly || v4} onCheckedChange={(useSpeakerBoost) => patchEleven({ useSpeakerBoost })} />
+              </div>
+            </div>
+          )}
+          {voice.engine === "cartesia" && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <NumberField label="Volume" hint="0,5 à 2." bounds={b.anamCartesiaVolume} value={cartesia.volume} onChange={(volume) => patchVoice({ cartesia: { ...cartesia, volume } })} />
+              <NumberField label="Vitesse" hint="0,6 à 1,5." bounds={b.anamCartesiaSpeed} value={cartesia.speed} onChange={(speed) => patchVoice({ cartesia: { ...cartesia, speed } })} />
+              <EnumField
+                label="Émotion de la voix"
+                value={cartesia.emotion}
+                options={sameLabels(ANAM_CARTESIA_EMOTIONS)}
+                onChange={(emotion) => patchVoice({ cartesia: { ...cartesia, emotion } })}
+              />
+            </div>
+          )}
+          {voice.engine === "fish" && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <NumberField label="Volume" hint="0,5 à 2." bounds={b.anamFishVolume} value={fish.volume} onChange={(volume) => patchVoice({ fish: { ...fish, volume } })} />
+              <NumberField label="Vitesse" hint="0,5 à 2." bounds={b.anamFishSpeed} value={fish.speed} onChange={(speed) => patchVoice({ fish: { ...fish, speed } })} />
+            </div>
+          )}
+          <div className="space-y-2 rounded-md border p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label>Vérifier la configuration</Label>
+                <p className="text-xs text-muted-foreground">Anam émet un jeton pour ces réglages, aussitôt abandonné : aucune session ne démarre.</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={runCheck} disabled={checking || !value.avatarId || !value.voiceId}>
+                {checking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Vérifier
+              </Button>
+            </div>
+            {checkError && <p className="text-xs text-destructive">{checkError}</p>}
+            {check && (
+              <div className="space-y-1 text-xs">
+                <p className="text-emerald-600">Accepté par Anam.</p>
+                <pre className="overflow-x-auto rounded bg-muted p-2">{JSON.stringify({ personaConfig: check.personaConfig, sessionOptions: check.sessionOptions }, null, 2)}</pre>
+              </div>
+            )}
+          </div>
+        </Advanced>
+      </CardContent>
+    </Card>
+  );
+}
+
+const ANAM_CUE_LABELS: Record<AnamCueTag, string> = {
+  none: "Aucune balise",
+  sad: "[sad] — triste (défaut)",
+  distressed: "[distressed] — détresse",
+  concerned: "[concerned] — inquiet",
+  angry: "[angry] — colère",
+  surprised: "[surprised] — surpris",
+  curious: "[curious] — curieux",
+  supportive: "[supportive] — bienveillant",
+  warm: "[warm] — chaleureux (déconseillé)",
+  playful: "[playful] — joueur (déconseillé)",
+  happy: "[happy] — joyeux (déconseillé)",
+  laughter: "[laughter] — rire (déconseillé)",
+};
+
+const ANAM_STYLE_MODE_LABELS: Record<AnamStyleMode, string> = {
+  custom: "Personnalisé — parler et repos (défaut)",
+  preset: "Préréglé",
+  default: "Aucun — style de l'avatar",
+};
+
+const ANAM_PRESET_LABELS: Record<AnamPresetStyle, string> = {
+  sad: "Triste (sad)",
+  distressed: "Détresse (distressed)",
+  neutral: "Neutre",
+  supportive: "Bienveillant",
+  warm: "Chaleureux (déconseillé)",
+  playful: "Joueur (déconseillé)",
+  happy: "Joyeux (déconseillé)",
+  angry: "Colère",
+};
+
+const ANAM_VOICE_ENGINE_LABELS: Record<AnamVoiceEngine, string> = {
+  default: "Réglages de la voix dans Anam (défaut)",
+  elevenLabs: "ElevenLabs",
+  cartesia: "Cartesia Sonic-3",
+  fish: "Fish Audio",
+};
+
+function PromptField({ label, value, disabled, onChange }: { label: string; value: string; disabled?: boolean; onChange: (value: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <Label className={disabled ? "text-muted-foreground" : undefined}>{label}</Label>
+      <Textarea rows={4} maxLength={ANAM_STYLE_PROMPT_MAX} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
+      <Hint text={disabled ? "Non lu par ce modèle : non envoyé." : `${value.length} / ${ANAM_STYLE_PROMPT_MAX} caractères ; en anglais de préférence.`} />
+    </div>
   );
 }
 

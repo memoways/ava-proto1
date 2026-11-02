@@ -14,6 +14,13 @@ vi.mock("./providers/tavus", () => ({
   },
 }));
 
+vi.mock("./providers/anam", () => ({
+  AnamStreamingAvatarOutput: class {
+    mode = "streaming_avatar";
+    provider = "anam";
+  },
+}));
+
 import { createResponseOutput, listStreamingAvatarProviders } from "./registry";
 import { streamingAvatarDefaults } from "./settings";
 
@@ -28,7 +35,7 @@ describe("ResponseOutput registry", () => {
     expect(output.provider).toBe("tts");
   });
 
-  it.each(["heygen", "tavus"] as const)("selects the %s provider", async (provider) => {
+  it.each(["heygen", "tavus", "anam"] as const)("selects the %s provider", async (provider) => {
     const output = await createResponseOutput({
       mode: "streaming_avatar",
       avatarSettings: {
@@ -42,6 +49,6 @@ describe("ResponseOutput registry", () => {
   });
 
   it("exposes providers through the extensible registry", () => {
-    expect(listStreamingAvatarProviders()).toEqual(["heygen", "tavus"]);
+    expect(listStreamingAvatarProviders()).toEqual(["heygen", "tavus", "anam"]);
   });
 });

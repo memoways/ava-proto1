@@ -43,7 +43,7 @@ describe("streaming avatar settings normalization", () => {
   });
 
   it("keeps known but not yet selectable providers off", () => {
-    expect(normalize({ activeProvider: "anam" }).activeProvider).toBe("heygen");
+    expect(normalize({ activeProvider: "anam" }).activeProvider).toBe("anam");
     expect(normalize({ activeProvider: "lemonslice" }).activeProvider).toBe("heygen");
     expect(normalize({ activeProvider: "tavus" }).activeProvider).toBe("tavus");
   });
@@ -78,5 +78,48 @@ describe("streaming avatar settings normalization", () => {
     });
     expect(value.heygen.voiceSettings.fish).toMatchObject({ model: "s1", speed: 1.1 });
     expect(value.heygen.voiceSettings.cartesia.speed).toBe(0.7);
+  });
+
+  it("adds Anam defaults to settings saved before AV2 without touching HeyGen and Tavus", () => {
+    const stored = {
+      activeProvider: "tavus",
+      heygen: { avatarId: "avatar", voiceId: "voice" },
+      tavus: { replicaId: "face", personaId: "pal", languages: ["fr"], emotion: "sadness", listeningEmotion: "neutral" },
+    };
+    const value = normalize(stored);
+    expect(value.heygen).toMatchObject({ avatarId: "avatar", voiceId: "voice" });
+    expect(value.tavus).toMatchObject({ replicaId: "face", personaId: "pal", emotion: "sadness" });
+    expect(value.anam).toEqual(streamingAvatarDefaults.anam);
+    expect(value.anam).toMatchObject({
+      avatarModel: "cara-4-latest",
+      languageCode: "fr",
+      speakingCue: "sad",
+      directorNotes: { mode: "custom" },
+      sessionOptions: { keepRecording: false, keepTranscripts: false },
+    });
+    expect(value.anam.directorNotes.customIdlingStylePrompt).toMatch(/Never smile/);
+  });
+
+  it("keeps saved Anam values and returns unknown or out of bounds ones to their default", () => {
+    const value = normalize({
+      anam: {
+        avatarId: "a",
+        avatarModel: "cara-9",
+        speakingCue: "[sad]",
+        maxSessionLengthSeconds: 99_999,
+        directorNotes: { mode: "preset", presetStyle: "distressed", expressivity: 3, customStylePrompt: "x".repeat(2_001) },
+        voiceGenerationOptions: { engine: "fish", fish: { speed: 1.5, volume: 9 }, cartesia: { emotion: "scared" } },
+        sessionOptions: { region: "eu", regionPolicy: "strict", videoQuality: "4k" },
+      },
+    });
+    expect(value.anam.avatarId).toBe("a");
+    expect(value.anam.avatarModel).toBe("cara-4-latest");
+    expect(value.anam.speakingCue).toBe("sad");
+    expect(value.anam.maxSessionLengthSeconds).toBe(900);
+    expect(value.anam.directorNotes).toMatchObject({ mode: "preset", presetStyle: "distressed", expressivity: 0.4 });
+    expect(value.anam.directorNotes.customStylePrompt).toBe(streamingAvatarDefaults.anam.directorNotes.customStylePrompt);
+    expect(value.anam.voiceGenerationOptions.fish).toEqual({ speed: 1.5, volume: 1 });
+    expect(value.anam.voiceGenerationOptions.cartesia.emotion).toBe("scared");
+    expect(value.anam.sessionOptions).toMatchObject({ region: "eu", regionPolicy: "strict", videoQuality: "high" });
   });
 });

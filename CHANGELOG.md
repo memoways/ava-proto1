@@ -4,6 +4,32 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatars streaming AV2 — Anam en mode texte] — 2026-11-02
+
+- Anam devient sélectionnable (`heygen | tavus | anam` ; LemonSlice reste connu, refusé). SDK
+  `@anam-ai/js-sdk` 4.29.1 (publié le 19 octobre 2026), version exacte. Fournisseur
+  `providers/anam.ts` : jeton de session de l'Edge Function, `createClient` avec
+  `disableInputAudio` (aucun micro demandé ni publié), une `createTalkMessageStream` par réplique,
+  début et fin de parole lus sur les transcriptions du persona (`endOfSpeech`), interruption par
+  `interruptPersona()`, échec de remise (`MESSAGE_DELIVERY_FAILED`) et fermeture de connexion
+  rejetées avant la parole pour garder le repli TTS.
+- Edge Function : `POST /v1/auth/session-token` avec `ANAM_API_KEY`, corps construit par
+  `buildAnamSessionTokenRequest` (liste blanche, UUID, bornes) ; forcés : `llmId:
+  "CUSTOMER_CLIENT_V1"`, `skipGreeting: true`, `maxSessions: 1`, jeton 300 s. Anam ne renvoie pas
+  d'identifiant de session : Ava lie un identifiant aléatoire pour le contrôle de propriété.
+  Statut `configured.anam`, sonde admin, action `check` (jeton émis puis abandonné).
+- Réglages (même JSON, normalisation tolérante, anciens réglages relus sans perte) : avatar,
+  modèle Cara, voix Anam (D2a), langue, durée ; Director Notes personnalisées par défaut (attitude
+  abattue en parlant, fermée au repos, « Never smile »), expressivité 0,4 ; balise `[sad]` en tête
+  de chaque réplique, retirée des transcriptions ; `voiceGenerationOptions` par moteur (champs lus
+  seulement) ; qualité vidéo, région, rétention Anam désactivée par défaut.
+- Admin : carte Anam, « Essentiel » + « Avancé », bouton « Vérifier ».
+- **Migration (décision d'Ulrich, 2 novembre) :** `20261102120000_streaming_avatar_provider_anam.sql`
+  élargit seulement la contrainte `sessions.streaming_avatar_provider` à `anam` et `lemonslice`.
+  Sans elle, une session Anam ne peut pas être créée : ne pas sélectionner Anam avant son
+  application par Lovable.
+- Tests : corps de session Anam (7), réglages (2), cycle de vie avec SDK simulé (8), registre.
+
 ## [Avatar Tavus — émotion d'écoute distincte] — 2026-11-01
 
 - Recette 3 : moins de sourire, mais « Tristesse » tenue en écoute donne un air de chien battu,

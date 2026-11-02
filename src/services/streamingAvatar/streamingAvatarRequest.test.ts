@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  ANAM_DEFAULT_IDLE_STYLE_PROMPT,
+  ANAM_DEFAULT_STYLE_PROMPT,
+  buildAnamSessionTokenRequest,
   buildHeyGenSessionRequest,
   buildHeyGenVoiceSettings,
   buildTavusConversationRequest,
   normalizeTavusLanguages,
+  stripAnamCueTags,
   summarizeTavusPalVoice,
+  withAnamCue,
 } from "../../../supabase/functions/_shared/streamingAvatarRequest";
 
 const heygenBase = { avatarId: "avatar-1", voiceId: "voice-1", language: "fr" };
@@ -216,5 +221,105 @@ describe("Tavus conversation request", () => {
       external_voice_id: "voice",
       voice_settings: { speed: 1, stability: 0.5 },
     });
+  });
+});
+
+const anamBase = {
+  avatarId: "30FA96D0-26c4-4e55-94a0-517025942e18",
+  voiceId: "6bfbe25a-979d-40f3-a92b-5394170af54b",
+};
+
+function anamBody(config: Record<string, unknown>) {
+  const result = buildAnamSessionTokenRequest(config);
+  if ("error" in result) throw new Error(result.error);
+  return result.body as Record<string, Record<string, unknown>>;
+}
+
+describe("Anam session token request", () => {
+  it("forces the client LLM, no greeting and a single short-lived session", () => {
+    const body = anamBody(anamBase);
+    expect(body.maxSessions).toBe(1);
+    expect(body.expiresInSeconds).toBe(300);
+    expect(body.personaConfig).toMatchObject({
+      avatarId: "30fa96d0-26c4-4e55-94a0-517025942e18",
+      voiceId: anamBase.voiceId,
+      avatarModel: "cara-4-latest",
+      llmId: "CUSTOMER_CLIENT_V1",
+      skipGreeting: true,
+      languageCode: "fr",
+      maxSessionLengthSeconds: 900,
+    });
+    expect(body.personaConfig.systemPrompt).toBeUndefined();
+    expect(body.personaConfig.voiceGenerationOptions).toBeUndefined();
+    expect(body.sessionOptions).toEqual({
+      videoQuality: "high",
+      dataRetention: { recording: false, transcripts: false },
+    });
+  });
+
+  it("sends the sad speaking style and the closed idling attitude by default", () => {
+    const notes = anamBody(anamBase).personaConfig.directorNotes as Record<string, unknown>;
+    expect(notes.customStylePrompt).toBe(ANAM_DEFAULT_STYLE_PROMPT);
+    expect(notes.customIdlingStylePrompt).toBe(ANAM_DEFAULT_IDLE_STYLE_PROMPT);
+    expect(notes.expressivity).toBe(0.4);
+    expect(notes.presetStyle).toBeUndefined();
+  });
+
+  it("never combines a preset style with a custom prompt, and skips notes on cara-3", () => {
+    const preset = anamBody({
+      ...anamBase,
+      directorNotes: { mode: "preset", presetStyle: "distressed", customIdlingStylePrompt: "closed" },
+    }).personaConfig.directorNotes;
+    expect(preset).toEqual({ presetStyle: "distressed", expressivity: 0.4 });
+    expect(anamBody({ ...anamBase, avatarModel: "cara-3" }).personaConfig.directorNotes).toBeUndefined();
+    expect(anamBody({ ...anamBase, directorNotes: { mode: "default" } }).personaConfig.directorNotes).toBeUndefined();
+  });
+
+  it("sends only the voice fields read by the engine and model", () => {
+    const voice = (options: Record<string, unknown>) =>
+      anamBody({ ...anamBase, voiceGenerationOptions: options }).personaConfig.voiceGenerationOptions;
+    expect(voice({ engine: "elevenLabs", elevenLabs: { model: "eleven_v3", stability: 0.3, speed: 0.8 } }))
+      .toEqual({ model: "eleven_v3", stability: 0.3 });
+    expect(voice({ engine: "elevenLabs", elevenLabs: { model: "eleven_v4_turbo", stability: 0.3, similarityBoost: 0.6, style: 1 } }))
+      .toEqual({ model: "eleven_v4_turbo", stability: 0.3, similarityBoost: 0.6 });
+    expect(voice({ engine: "elevenLabs", elevenLabs: { model: "eleven_multilingual_v2", speed: 1.3 } }))
+      .toEqual({ model: "eleven_multilingual_v2", stability: 0.75, similarityBoost: 0.75, style: 0, useSpeakerBoost: true, speed: 1 });
+    expect(voice({ engine: "cartesia", cartesia: { volume: 1.5, speed: 0.7 } }))
+      .toEqual({ volume: 1.5, speed: 0.7, emotion: "sad" });
+    expect(voice({ engine: "fish", fish: { volume: 0.4, speed: 2 } })).toEqual({ volume: 1, speed: 2 });
+  });
+
+  it("sends a region policy only with an explicit region", () => {
+    expect(anamBody({ ...anamBase, sessionOptions: { regionPolicy: "strict" } }).sessionOptions)
+      .not.toHaveProperty("regionPolicy");
+    expect(anamBody({ ...anamBase, sessionOptions: { region: "eu", regionPolicy: "strict", keepTranscripts: true } }).sessionOptions)
+      .toEqual({ videoQuality: "high", region: "eu", regionPolicy: "strict", dataRetention: { recording: false, transcripts: true } });
+  });
+
+  it("refuses non UUID ids and ignores fields outside the whitelist", () => {
+    expect(buildAnamSessionTokenRequest({ ...anamBase, avatarId: "../avatars" })).toMatchObject({ ok: false });
+    expect(buildAnamSessionTokenRequest({ avatarId: anamBase.avatarId })).toMatchObject({ ok: false });
+    const body = anamBody({
+      ...anamBase,
+      llmId: "ANAM_GPT_4O_MINI_V1",
+      systemPrompt: "Say hello",
+      skipGreeting: false,
+      tools: [{ name: "x" }],
+      enableAudioPassthrough: true,
+      environment: { type: "livekit" },
+    });
+    expect(body.personaConfig.llmId).toBe("CUSTOMER_CLIENT_V1");
+    expect(body.personaConfig.skipGreeting).toBe(true);
+    for (const key of ["systemPrompt", "tools", "enableAudioPassthrough"]) {
+      expect(body.personaConfig).not.toHaveProperty(key);
+    }
+    expect(body).not.toHaveProperty("environment");
+  });
+
+  it("puts the cue tag in front of a line and strips it from transcripts", () => {
+    expect(withAnamCue("Je ne sais pas.", "sad")).toBe("[sad] Je ne sais pas.");
+    expect(withAnamCue("Je ne sais pas.", "none")).toBe("Je ne sais pas.");
+    expect(stripAnamCueTags("[sad] Je ne sais pas. [distressed] Aide-moi.")).toBe("Je ne sais pas. Aide-moi.");
+    expect(stripAnamCueTags("[note] reste")).toBe("[note] reste");
   });
 });

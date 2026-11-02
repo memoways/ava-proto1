@@ -1,13 +1,13 @@
 // Streaming avatar request builders, shared by the streaming-avatar-session Edge Function and the
 // client (settings normalization, admin bounds, tests). Pure TypeScript, no Deno or browser import.
 // Every provider field is whitelisted and bounded here: no client value reaches a provider as is.
-// Sources read on 2 November 2026: LiveAvatar "Create session token" (FULL mode) and Tavus
-// "Create conversation" + "Language support".
+// Sources read on 2 November 2026: LiveAvatar "Create session token" (FULL mode), Tavus
+// "Create conversation" + "Language support", Anam "Create session token" + "Director Notes".
 
 export const STREAMING_AVATAR_PROVIDERS = ["heygen", "tavus", "anam", "lemonslice"] as const;
 export type KnownStreamingAvatarProvider = (typeof STREAMING_AVATAR_PROVIDERS)[number];
-/** Providers with a client factory and a configured secret; Anam and LemonSlice come in AV2/AV3. */
-export const SELECTABLE_STREAMING_AVATAR_PROVIDERS = ["heygen", "tavus"] as const;
+/** Providers with a client factory and a configured secret; LemonSlice comes in AV3. */
+export const SELECTABLE_STREAMING_AVATAR_PROVIDERS = ["heygen", "tavus", "anam"] as const;
 export type SelectableStreamingAvatarProvider =
   (typeof SELECTABLE_STREAMING_AVATAR_PROVIDERS)[number];
 
@@ -61,6 +61,13 @@ export const STREAMING_AVATAR_BOUNDS = {
   tavusMaxCallSeconds: { min: 60, max: 3_600, step: 60, fallback: 900 },
   tavusAbsentTimeoutSeconds: { min: 10, max: 3_600, step: 10, fallback: 120 },
   tavusLeftTimeoutSeconds: { min: 0, max: 3_600, step: 10, fallback: 30 },
+  anamMaxSessionSeconds: { min: 60, max: 3_600, step: 60, fallback: 900 },
+  anamExpressivity: { min: 0, max: 1, step: 0.05, fallback: 0.4 },
+  anamElevenLabsSpeed: { min: 0.7, max: 1.2, step: 0.05, fallback: 1 },
+  anamCartesiaVolume: { min: 0.5, max: 2, step: 0.05, fallback: 1 },
+  anamCartesiaSpeed: { min: 0.6, max: 1.5, step: 0.05, fallback: 1 },
+  anamFishVolume: { min: 0.5, max: 2, step: 0.05, fallback: 1 },
+  anamFishSpeed: { min: 0.5, max: 2, step: 0.05, fallback: 1 },
 } satisfies Record<string, NumberBounds>;
 
 export const TAVUS_MAX_LANGUAGES = 42;
@@ -335,4 +342,334 @@ export function summarizeTavusPalVoice(pal: unknown): Record<string, unknown> {
   }
   if (Object.keys(settings).length) summary.voice_settings = settings;
   return summary;
+}
+
+// ---------------------------------------------------------------------------
+// Anam — POST /v1/auth/session-token (ephemeral persona, client-driven speech)
+// ---------------------------------------------------------------------------
+
+export const ANAM_AVATAR_MODELS = ["cara-4-latest", "cara-4", "cara-4.1-express", "cara-3"] as const;
+/** Director Notes are read by Cara 4 models only; they are not sent for cara-3. */
+export const ANAM_DIRECTOR_NOTES_MODELS: readonly string[] = [
+  "cara-4-latest",
+  "cara-4",
+  "cara-4.1-express",
+];
+export const ANAM_PRESET_STYLES = [
+  "neutral",
+  "sad",
+  "distressed",
+  "supportive",
+  "warm",
+  "playful",
+  "happy",
+  "angry",
+] as const;
+export const ANAM_STYLE_MODES = ["default", "preset", "custom"] as const;
+/** Inline cue tags read by Anam in the spoken text (`[sad] …`); "none" sends no tag. */
+export const ANAM_CUE_TAGS = [
+  "none",
+  "sad",
+  "distressed",
+  "concerned",
+  "angry",
+  "surprised",
+  "curious",
+  "supportive",
+  "warm",
+  "playful",
+  "happy",
+  "laughter",
+] as const;
+/** "default" sends no voiceGenerationOptions: the voice keeps its Anam settings. */
+export const ANAM_VOICE_ENGINES = ["default", "elevenLabs", "cartesia", "fish"] as const;
+export const ANAM_ELEVENLABS_MODELS = [
+  "eleven_flash_v2_5",
+  "eleven_multilingual_v2",
+  "eleven_turbo_v2_5",
+  "eleven_flash_v2",
+  "eleven_v3",
+  "eleven_v3_conversational",
+  "eleven_v4_turbo",
+  "eleven_v4",
+] as const;
+/** Anam: v3 models read `stability` only; v4 models `stability` and `similarityBoost`. */
+export const ANAM_ELEVENLABS_STABILITY_ONLY: readonly string[] = ["eleven_v3", "eleven_v3_conversational"];
+export const ANAM_ELEVENLABS_V4: readonly string[] = ["eleven_v4_turbo", "eleven_v4"];
+export const ANAM_CARTESIA_EMOTIONS = ["sad", "neutral", "calm", "scared", "angry", "content"] as const;
+export const ANAM_VIDEO_QUALITIES = ["high", "auto"] as const;
+/** "auto" sends no region: Anam picks the closest one. */
+export const ANAM_REGIONS = ["auto", "eu", "us"] as const;
+export const ANAM_REGION_POLICIES = ["preferred", "strict"] as const;
+export const ANAM_STYLE_PROMPT_MAX = 2_000;
+/** Forced by Ava: Anam's LLM is off, the persona only says the text Ava sends. */
+export const ANAM_CLIENT_LLM_ID = "CUSTOMER_CLIENT_V1";
+/** The token starts one session, shortly after it is issued. */
+export const ANAM_TOKEN_TTL_SECONDS = 300;
+
+export const ANAM_DEFAULT_STYLE_PROMPT =
+  "A grieving adult in deep distress. Low energy, heavy eyes, a slight frown, slow and " +
+  "restrained movements. Never smile, never look cheerful, friendly or reassuring.";
+export const ANAM_DEFAULT_IDLE_STYLE_PROMPT =
+  "Listening in silence, closed and guarded. Still, neutral face, lips together, steady gaze. " +
+  "Never smile, never nod encouragingly.";
+
+export type AnamAvatarModel = (typeof ANAM_AVATAR_MODELS)[number];
+export type AnamPresetStyle = (typeof ANAM_PRESET_STYLES)[number];
+export type AnamStyleMode = (typeof ANAM_STYLE_MODES)[number];
+export type AnamCueTag = (typeof ANAM_CUE_TAGS)[number];
+export type AnamVoiceEngine = (typeof ANAM_VOICE_ENGINES)[number];
+
+export interface AnamDirectorNotes {
+  /** default: nothing sent; preset: `presetStyle`; custom: speaking and idling prompts. */
+  mode: AnamStyleMode;
+  presetStyle: AnamPresetStyle;
+  customStylePrompt: string;
+  /** Attitude while the player speaks; Anam accepts it only with a custom prompt. */
+  customIdlingStylePrompt: string;
+  expressivity: number;
+}
+
+export interface AnamElevenLabsVoice {
+  model: (typeof ANAM_ELEVENLABS_MODELS)[number];
+  stability: number;
+  similarityBoost: number;
+  style: number;
+  useSpeakerBoost: boolean;
+  speed: number;
+}
+
+export interface AnamCartesiaVoice {
+  volume: number;
+  speed: number;
+  emotion: (typeof ANAM_CARTESIA_EMOTIONS)[number];
+}
+
+export interface AnamFishVoice {
+  volume: number;
+  speed: number;
+}
+
+/** All three engines are kept so switching engine in the admin loses nothing. */
+export interface AnamVoiceGenerationOptions {
+  /** Must match the engine of the chosen Anam voice; only the fields it reads are sent. */
+  engine: AnamVoiceEngine;
+  elevenLabs: AnamElevenLabsVoice;
+  cartesia: AnamCartesiaVoice;
+  fish: AnamFishVoice;
+}
+
+export interface AnamSessionOptions {
+  videoQuality: (typeof ANAM_VIDEO_QUALITIES)[number];
+  region: (typeof ANAM_REGIONS)[number];
+  regionPolicy: (typeof ANAM_REGION_POLICIES)[number];
+  /** Anam keeps a recording and the transcripts of the session when enabled. */
+  keepRecording: boolean;
+  keepTranscripts: boolean;
+}
+
+export interface AnamAvatarSettings {
+  avatarId: string;
+  avatarModel: AnamAvatarModel;
+  voiceId: string;
+  languageCode: string;
+  maxSessionLengthSeconds: number;
+  directorNotes: AnamDirectorNotes;
+  /** Inline cue tag put in front of every spoken line; recognized tags are not spoken. */
+  speakingCue: AnamCueTag;
+  voiceGenerationOptions: AnamVoiceGenerationOptions;
+  sessionOptions: AnamSessionOptions;
+}
+
+function boundedText(value: unknown, fallback: string, max: number): string {
+  if (typeof value !== "string") return fallback;
+  return value.length <= max ? value : fallback;
+}
+
+export function normalizeAnamSettings(value: unknown): AnamAvatarSettings {
+  const raw = asRecord(value);
+  const notes = asRecord(raw.directorNotes);
+  const voice = asRecord(raw.voiceGenerationOptions);
+  const eleven = asRecord(voice.elevenLabs);
+  const cartesia = asRecord(voice.cartesia);
+  const fish = asRecord(voice.fish);
+  const session = asRecord(raw.sessionOptions);
+  const b = STREAMING_AVATAR_BOUNDS;
+  return {
+    avatarId: typeof raw.avatarId === "string" ? raw.avatarId : "",
+    avatarModel: pickEnum(raw.avatarModel, ANAM_AVATAR_MODELS, "cara-4-latest"),
+    voiceId: typeof raw.voiceId === "string" ? raw.voiceId : "",
+    languageCode: safeLanguageCode(raw.languageCode, "fr"),
+    maxSessionLengthSeconds: boundedInteger(raw.maxSessionLengthSeconds, b.anamMaxSessionSeconds),
+    directorNotes: {
+      mode: pickEnum(notes.mode, ANAM_STYLE_MODES, "custom"),
+      presetStyle: pickEnum(notes.presetStyle, ANAM_PRESET_STYLES, "sad"),
+      customStylePrompt: boundedText(
+        notes.customStylePrompt,
+        ANAM_DEFAULT_STYLE_PROMPT,
+        ANAM_STYLE_PROMPT_MAX,
+      ),
+      customIdlingStylePrompt: boundedText(
+        notes.customIdlingStylePrompt,
+        ANAM_DEFAULT_IDLE_STYLE_PROMPT,
+        ANAM_STYLE_PROMPT_MAX,
+      ),
+      expressivity: boundedNumber(notes.expressivity, b.anamExpressivity),
+    },
+    speakingCue: pickEnum(raw.speakingCue, ANAM_CUE_TAGS, "sad"),
+    voiceGenerationOptions: {
+      engine: pickEnum(voice.engine, ANAM_VOICE_ENGINES, "default"),
+      elevenLabs: {
+        model: pickEnum(eleven.model, ANAM_ELEVENLABS_MODELS, "eleven_flash_v2_5"),
+        stability: boundedNumber(eleven.stability, b.elevenLabsStability),
+        similarityBoost: boundedNumber(eleven.similarityBoost, b.elevenLabsSimilarity),
+        style: boundedNumber(eleven.style, b.elevenLabsStyle),
+        useSpeakerBoost: eleven.useSpeakerBoost !== false,
+        speed: boundedNumber(eleven.speed, b.anamElevenLabsSpeed),
+      },
+      cartesia: {
+        volume: boundedNumber(cartesia.volume, b.anamCartesiaVolume),
+        speed: boundedNumber(cartesia.speed, b.anamCartesiaSpeed),
+        emotion: pickEnum(cartesia.emotion, ANAM_CARTESIA_EMOTIONS, "sad"),
+      },
+      fish: {
+        volume: boundedNumber(fish.volume, b.anamFishVolume),
+        speed: boundedNumber(fish.speed, b.anamFishSpeed),
+      },
+    },
+    sessionOptions: {
+      videoQuality: pickEnum(session.videoQuality, ANAM_VIDEO_QUALITIES, "high"),
+      region: pickEnum(session.region, ANAM_REGIONS, "auto"),
+      regionPolicy: pickEnum(session.regionPolicy, ANAM_REGION_POLICIES, "preferred"),
+      keepRecording: session.keepRecording === true,
+      keepTranscripts: session.keepTranscripts === true,
+    },
+  };
+}
+
+export function buildAnamDirectorNotes(
+  settings: AnamAvatarSettings,
+): Record<string, string | number> | null {
+  if (!ANAM_DIRECTOR_NOTES_MODELS.includes(settings.avatarModel)) return null;
+  const notes = settings.directorNotes;
+  if (notes.mode === "preset") {
+    return { presetStyle: notes.presetStyle, expressivity: notes.expressivity };
+  }
+  if (notes.mode === "custom") {
+    const style = notes.customStylePrompt.trim();
+    const idle = notes.customIdlingStylePrompt.trim();
+    // presetStyle cannot be combined with a custom prompt; an empty prompt keeps the default style.
+    if (!style) return { expressivity: notes.expressivity };
+    const body: Record<string, string | number> = {
+      customStylePrompt: style,
+      expressivity: notes.expressivity,
+    };
+    if (idle) body.customIdlingStylePrompt = idle;
+    return body;
+  }
+  return null;
+}
+
+/** Provider payload for the voice engine only, with only the fields its model reads. */
+export function buildAnamVoiceGenerationOptions(
+  settings: AnamAvatarSettings,
+): Record<string, string | number | boolean> | null {
+  const voice = settings.voiceGenerationOptions;
+  if (voice.engine === "elevenLabs") {
+    const eleven = voice.elevenLabs;
+    if (ANAM_ELEVENLABS_STABILITY_ONLY.includes(eleven.model)) {
+      return { model: eleven.model, stability: eleven.stability };
+    }
+    if (ANAM_ELEVENLABS_V4.includes(eleven.model)) {
+      return {
+        model: eleven.model,
+        stability: eleven.stability,
+        similarityBoost: eleven.similarityBoost,
+      };
+    }
+    return {
+      model: eleven.model,
+      stability: eleven.stability,
+      similarityBoost: eleven.similarityBoost,
+      style: eleven.style,
+      useSpeakerBoost: eleven.useSpeakerBoost,
+      speed: eleven.speed,
+    };
+  }
+  if (voice.engine === "cartesia") {
+    return {
+      volume: voice.cartesia.volume,
+      speed: voice.cartesia.speed,
+      emotion: voice.cartesia.emotion,
+    };
+  }
+  if (voice.engine === "fish") return { volume: voice.fish.volume, speed: voice.fish.speed };
+  return null;
+}
+
+/** Anam ids are UUIDs; anything else is refused before reaching the provider. */
+export function safeAnamId(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim().toLowerCase();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(trimmed)
+    ? trimmed
+    : "";
+}
+
+export function buildAnamSessionTokenRequest(config: unknown): BuildResult {
+  const settings = normalizeAnamSettings(config);
+  const avatarId = safeAnamId(settings.avatarId);
+  const voiceId = safeAnamId(settings.voiceId);
+  if (!avatarId || !voiceId) return { ok: false, error: "Anam avatarId and voiceId are required" };
+
+  const personaConfig: Record<string, unknown> = {
+    name: "Ava",
+    avatarId,
+    avatarModel: settings.avatarModel,
+    voiceId,
+    // Ava owns the microphone, STT and LLM: the persona only says the text it receives.
+    llmId: ANAM_CLIENT_LLM_ID,
+    skipGreeting: true,
+    languageCode: settings.languageCode,
+    maxSessionLengthSeconds: settings.maxSessionLengthSeconds,
+  };
+  const directorNotes = buildAnamDirectorNotes(settings);
+  if (directorNotes) personaConfig.directorNotes = directorNotes;
+  const voiceOptions = buildAnamVoiceGenerationOptions(settings);
+  if (voiceOptions) personaConfig.voiceGenerationOptions = voiceOptions;
+
+  const session = settings.sessionOptions;
+  const sessionOptions: Record<string, unknown> = {
+    videoQuality: session.videoQuality,
+    dataRetention: { recording: session.keepRecording, transcripts: session.keepTranscripts },
+  };
+  if (session.region !== "auto") {
+    sessionOptions.region = session.region;
+    sessionOptions.regionPolicy = session.regionPolicy;
+  }
+
+  return {
+    ok: true,
+    body: {
+      clientLabel: "ava",
+      maxSessions: 1,
+      expiresInSeconds: ANAM_TOKEN_TTL_SECONDS,
+      personaConfig,
+      sessionOptions,
+    },
+  };
+}
+
+/** Inline cue in front of a spoken line; Anam strips recognized tags from its transcripts. */
+export function withAnamCue(text: string, cue: AnamCueTag): string {
+  return cue === "none" ? text : `[${cue}] ${text}`;
+}
+
+const ANAM_CUE_PATTERN = new RegExp(
+  `\\[(?:${ANAM_CUE_TAGS.filter((tag) => tag !== "none").join("|")})\\]\\s*`,
+  "g",
+);
+
+export function stripAnamCueTags(text: string): string {
+  return text.replace(ANAM_CUE_PATTERN, "");
 }
