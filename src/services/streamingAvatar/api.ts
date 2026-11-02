@@ -2,6 +2,7 @@ import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import type {
   AnamAvatarSettings,
   HeyGenAvatarSettings,
+  LemonSliceAvatarSettings,
   StreamingAvatarProviderId,
   TavusAvatarSettings,
 } from "./types";
@@ -26,6 +27,16 @@ export type AvatarSessionStartResponse =
       /** Ava-side binding id: Anam returns no session id with the token. */
       externalSessionId: string;
       sessionToken: string;
+    }
+  | {
+      provider: "lemonslice";
+      externalSessionId: string;
+      /** Private Daily room; the meeting token is receive-only (`canSend: false`). */
+      roomUrl: string;
+      meetingToken: string;
+      /** Capability URL for the audio bridge: never logged, never in diagnostics. */
+      websocketAddress: string;
+      audioSampleRate: number;
     };
 
 export async function startAvatarSession(input: {
@@ -34,6 +45,7 @@ export async function startAvatarSession(input: {
   heygen?: HeyGenAvatarSettings;
   tavus?: TavusAvatarSettings;
   anam?: AnamAvatarSettings;
+  lemonslice?: LemonSliceAvatarSettings;
   signal?: AbortSignal;
 }): Promise<AvatarSessionStartResponse> {
   const response = await authenticatedFunctionFetch(ENDPOINT, {
@@ -66,6 +78,34 @@ export async function endAvatarSession(input: {
   if (!response.ok && response.status !== 404 && response.status !== 409) {
     throw new Error(await readAvatarError(response));
   }
+}
+
+export type LemonSliceControlInput =
+  | { event: "action"; value: "listen" }
+  | { event: "reset-idle-timeout" }
+  | { event: "update-agent-prompt" | "update-idle-prompt"; value: string };
+
+/** In-session LemonSlice `/control` event, relayed by the Edge Function (API key server side). */
+export async function controlLemonSliceSession(input: {
+  sessionId: string;
+  externalSessionId: string;
+  lemonslice: LemonSliceAvatarSettings;
+  control: LemonSliceControlInput;
+}): Promise<void> {
+  const response = await authenticatedFunctionFetch(ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "control",
+      provider: "lemonslice",
+      sessionId: input.sessionId,
+      externalSessionId: input.externalSessionId,
+      config: input.lemonslice,
+      event: input.control.event,
+      value: "value" in input.control ? input.control.value : undefined,
+    }),
+  });
+  if (!response.ok) throw new Error(await readAvatarError(response));
 }
 
 export interface TavusConfigurationCheck {
@@ -127,6 +167,7 @@ export async function getAvatarProviderStatus(): Promise<Record<StreamingAvatarP
     heygen: body.configured?.heygen === true,
     tavus: body.configured?.tavus === true,
     anam: body.configured?.anam === true,
+    lemonslice: body.configured?.lemonslice === true,
   };
 }
 

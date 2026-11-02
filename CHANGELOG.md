@@ -4,6 +4,30 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatars streaming AV3 — LemonSlice en mode audio] — 2026-11-02
+
+- LemonSlice devient sélectionnable (`heygen | tavus | anam | lemonslice`). D1 (Ulrich) : salle
+  Daily privée créée par l'Edge Function. Ava garde micro, STT, LLM et la voix de ses
+  personnages : chaque réplique est synthétisée par le TTS actuel (`generateSpeech`, voix du
+  personnage), décodée, convertie en PCM16 mono 16 ou 24 kHz, envoyée en morceaux de 100 ms sur le
+  WebSocket LemonSlice (`audio`, `audio_end`, `interrupt`, `heartbeat`, `terminate`) ; fin de
+  réplique sur `playback_finished` reçu après `audio_end`. Vidéo et son reviennent par la salle
+  Daily, rejointe en réception seule : rien n'est joué deux fois, aucun micro publié.
+- Edge Function : salle `ava-ls-<session>` privée, jetons Daily (LemonSlice publie, navigateur
+  `canSend: false`), `POST /api/liveai/sessions` avec `LEMONSLICE_API_KEY`, corps construit par
+  `buildLemonSliceSessionRequest` (liste blanche, `websocket-daily` forcé, champs non lus par le
+  modèle non envoyés). Fin : `terminate` + suppression de la salle. Action `control` (propriété
+  vérifiée, quota `streaming-avatar-status`) : `reset-idle-timeout` pendant que le joueur parle,
+  `listen` sur CWM-1. Statut `configured.lemonslice` (deux secrets), sonde admin LemonSlice et
+  Daily. Adresse WebSocket, URL de salle et jetons jamais journalisés.
+- Réglages (même JSON, anciens réglages relus sans perte) : agent ou image, modèle, attitudes en
+  parlant (abattue) et au repos (fermée), délais, fréquence, format, recadrage, hochement CWM-1,
+  durée de salle. Admin : carte LemonSlice « Essentiel » + « Avancé ».
+- Contrainte `streaming_avatar_provider` : appliquée par Lovable pendant le lot (main `4970ba5`),
+  relue en base (`anam` et `lemonslice` acceptés). Aucune nouvelle migration en AV3.
+- Tests : corps de session, contrôle et salle Daily (10), réglages (2), pont audio (8), cycle de vie
+  avec salle, WebSocket et TTS simulés (10), registre.
+
 ## [Avatars streaming AV2 — Anam en mode texte] — 2026-11-02
 
 - Anam devient sélectionnable (`heygen | tavus | anam` ; LemonSlice reste connu, refusé). SDK

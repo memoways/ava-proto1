@@ -42,9 +42,10 @@ describe("streaming avatar settings normalization", () => {
     expect(normalize({ heygen: "x", tavus: [1, 2] })).toEqual(streamingAvatarDefaults);
   });
 
-  it("keeps known but not yet selectable providers off", () => {
+  it("selects every known provider and returns unknown ones to HeyGen", () => {
     expect(normalize({ activeProvider: "anam" }).activeProvider).toBe("anam");
-    expect(normalize({ activeProvider: "lemonslice" }).activeProvider).toBe("heygen");
+    expect(normalize({ activeProvider: "lemonslice" }).activeProvider).toBe("lemonslice");
+    expect(normalize({ activeProvider: "d-id" }).activeProvider).toBe("heygen");
     expect(normalize({ activeProvider: "tavus" }).activeProvider).toBe("tavus");
   });
 
@@ -121,5 +122,35 @@ describe("streaming avatar settings normalization", () => {
     expect(value.anam.voiceGenerationOptions.fish).toEqual({ speed: 1.5, volume: 1 });
     expect(value.anam.voiceGenerationOptions.cartesia.emotion).toBe("scared");
     expect(value.anam.sessionOptions).toMatchObject({ region: "eu", regionPolicy: "strict", videoQuality: "high" });
+  });
+});
+
+describe("LemonSlice settings normalization", () => {
+  it("reads AV2 settings (no lemonslice block) with the dejected defaults", () => {
+    const value = normalize({ activeProvider: "anam", anam: { avatarId: "a" } });
+    expect(value.lemonslice).toEqual(streamingAvatarDefaults.lemonslice);
+    expect(value.lemonslice.agentPrompt).toMatch(/never smiling/);
+    expect(value.lemonslice.agentIdlePrompt).toMatch(/never smiling/);
+    expect(value.lemonslice).toMatchObject({ model: "default", audioSampleRate: 16_000, aspectRatio: "2x3", idleTimeoutSeconds: 300 });
+  });
+
+  it("keeps saved LemonSlice values and returns unknown ones to their default", () => {
+    const value = normalize({
+      lemonslice: {
+        agentId: "agent_1", model: "cwm-1", audioSampleRate: 24_000, idleTimeoutSeconds: 120,
+        aspectRatio: "9x16", editImage: "on", editImageVariant: "portrait", listenAction: true,
+        agentPrompt: "a tired man",
+      },
+    });
+    expect(value.lemonslice).toMatchObject({
+      agentId: "agent_1", model: "cwm-1", audioSampleRate: 24_000, idleTimeoutSeconds: 120,
+      aspectRatio: "9x16", editImage: "on", editImageVariant: "portrait", listenAction: true,
+      agentPrompt: "a tired man",
+    });
+    const broken = normalize({
+      lemonslice: { model: "ultra", audioSampleRate: 44_100, idleTimeoutSeconds: -1, aspectRatio: "16x9", agentPrompt: "x".repeat(1_001) },
+    });
+    expect(broken.lemonslice).toMatchObject({ model: "default", audioSampleRate: 16_000, idleTimeoutSeconds: 300, aspectRatio: "2x3" });
+    expect(broken.lemonslice.agentPrompt).toBe(streamingAvatarDefaults.lemonslice.agentPrompt);
   });
 });

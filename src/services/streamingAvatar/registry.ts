@@ -46,6 +46,15 @@ const avatarProviders: Record<StreamingAvatarProviderId, AvatarOutputFactory> = 
       settings.fallbackTimeoutMs,
     );
   },
+  lemonslice: async (settings, callbacks) => {
+    const { LemonSliceStreamingAvatarOutput } = await import("./providers/lemonslice");
+    return new LemonSliceStreamingAvatarOutput(
+      settings.lemonslice,
+      callbacks,
+      settings.connectionTimeoutMs,
+      settings.fallbackTimeoutMs,
+    );
+  },
 };
 
 export async function createResponseOutput(

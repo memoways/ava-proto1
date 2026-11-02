@@ -4,6 +4,7 @@ import type {
   HeyGenQuality,
   HeyGenVoiceSettings,
   KnownStreamingAvatarProvider,
+  LemonSliceAvatarSettings,
   SelectableStreamingAvatarProvider,
 } from "../../../supabase/functions/_shared/streamingAvatarRequest";
 
@@ -18,12 +19,13 @@ export type {
   HeyGenFishVoice,
   HeyGenVoiceEngine,
   HeyGenVoiceSettings,
+  LemonSliceAvatarSettings,
 } from "../../../supabase/functions/_shared/streamingAvatarRequest";
 
 export type OutputMode = "tts" | "streaming_avatar";
 /** Providers that can be selected and started today (factory + secret). */
 export type StreamingAvatarProviderId = SelectableStreamingAvatarProvider;
-/** Every provider Ava knows, including LemonSlice prepared for AV3. */
+/** Every provider Ava knows; today all of them are selectable. */
 export type KnownStreamingAvatarProviderId = KnownStreamingAvatarProvider;
 export type StreamingAvatarConnectionState =
   | "inactive"
@@ -89,6 +91,7 @@ export interface StreamingAvatarSettings {
   heygen: HeyGenAvatarSettings;
   tavus: TavusAvatarSettings;
   anam: AnamAvatarSettings;
+  lemonslice: LemonSliceAvatarSettings;
 }
 
 export interface ResponseOutputPrepareContext {
@@ -181,7 +184,7 @@ export interface ResponseOutput {
   renderText(text: string, context?: ResponseOutputTurnContext): Promise<ResponseOutputResult>;
   attachMedia(element: HTMLMediaElement): void;
   interrupt(): void;
-  /** Listening posture while the player speaks (HeyGen); providers without it ignore the call. */
+  /** Listening posture while the player speaks (HeyGen, LemonSlice); others ignore the call. */
   setListening?(listening: boolean): void;
   dispose(): Promise<void>;
 }
