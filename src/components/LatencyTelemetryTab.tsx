@@ -1,4 +1,5 @@
 import { VoiceTurnDiagnostics } from "./VoiceTurnDiagnostics";
+import { LatencyDashboard } from "./latency/LatencyDashboard";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity,
@@ -196,14 +197,21 @@ function ChartShell({ title, description, action, children }: { title: string; d
   );
 }
 
-export default function LatencyTelemetryTab({ initialStats }: { initialStats?: PosthogLatencyStats }) {
+export default function LatencyTelemetryTab({
+  initialStats,
+  initialInternal,
+}: {
+  initialStats?: PosthogLatencyStats;
+  /** Dev preview only: skips the internal read. */
+  initialInternal?: InternalLatencyComparison;
+}) {
   const [period, setPeriod] = useState<PosthogPeriod>("24h");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [filterOptions, setFilterOptions] = useState<FilterOptions>(EMPTY_FILTER_OPTIONS);
   const [stats, setStats] = useState<PosthogLatencyStats | null>(() => initialStats ?? null);
-  const [internal, setInternal] = useState<InternalLatencyComparison | null>(null);
+  const [internal, setInternal] = useState<InternalLatencyComparison | null>(() => initialInternal ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [costBudget, setCostBudget] = useState("");
@@ -242,7 +250,9 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
       : fallbackPeriod
         ? { period: fallbackPeriod, turnIds: [] }
         : null;
-    if (internalScope) {
+    if (initialInternal) {
+      setFilterOptions((current) => mergeFilterOptions(current, initialInternal.providers));
+    } else if (internalScope) {
       try {
         const internalResult = await loadInternalLatencyComparison(internalScope, {
           filters: requestedDimensions,
@@ -258,16 +268,14 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
       setInternal(null);
     }
     setLoading(false);
-  }, [filters, from, includeSandbox, initialStats, period, to]);
+  }, [filters, from, includeSandbox, initialInternal, initialStats, period, to]);
 
   useEffect(() => {
-    if (initialStats) {
-      setFilterOptions((current) => mergeFilterOptions(current, initialStats.providers));
-      void load();
-      return;
-    }
+    if (initialStats) setFilterOptions((current) => mergeFilterOptions(current, initialStats.providers));
+    // A preset period reloads at once; a custom range waits for "Appliquer".
+    if (period === "custom") return;
     void load();
-  }, [includeSandbox]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [includeSandbox, period]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canary = useMemo(() => (stats || internal) ? evaluateCanaryReadiness({
     sessionCount: internal ? internal.sessionCount : stats?.totals.sessions ?? 0,
@@ -331,7 +339,6 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
     ?? { from: new Date(Date.now() - 86400000).toISOString(), to: new Date().toISOString() }, [stats?.period, period, from, to]);
   return (
     <div className="space-y-5">
-      <VoiceTurnDiagnostics from={v2Period.from} to={v2Period.to} />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2"><h2 className="text-lg font-semibold">Latences AVA interne &amp; PostHog</h2><Badge>Deux sources</Badge></div>
@@ -380,6 +387,16 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
         </div>
       </section>
 
+      <section className="space-y-3" aria-label="Statistiques de latence">
+        <div>
+          <h3 className="text-base font-semibold">Statistiques de latence — évolution par étape et par service</h3>
+          <p className="text-xs text-muted-foreground">Mesures AVA internes par tour (STT, RAG, LLM, TTS, vidéo), filtrées par la période et les filtres ci-dessus. Les tendances PostHog suivent plus bas.</p>
+        </div>
+        {internal?.samples
+          ? <LatencyDashboard samples={internal.samples} period={stats?.period ?? v2Period} capped={internal.samplesCapped} />
+          : <p className="rounded-xl border p-6 text-center text-sm text-muted-foreground">{loading ? "Chargement des mesures internes…" : "Mesures AVA internes indisponibles pour cette période (droits admin ou table voice_turn_events)."}</p>}
+      </section>
+
       {error && (
         <section className="rounded-xl border border-red-700/50 bg-red-950/20 p-4">
           <h3 className="flex items-center gap-2 font-semibold text-red-300"><AlertTriangle className="h-4 w-4" />PostHog indisponible</h3>
@@ -388,25 +405,6 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
         </section>
       )}
 
-      {internal && (
-        <section className="space-y-3 rounded-xl border border-primary/35 bg-card p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div><h3 className="font-semibold">AVA interne — source principale</h3><p className="text-xs text-muted-foreground">Mesures persistées par session et par tour, conservées même si PostHog est absent.</p></div>
-            <Badge>AVA interne</Badge>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <SummaryCard label="Sessions / tours" value={`${internal.sessionCount} / ${internal.turnCount}`} detail="périmètre interne filtré" icon={Activity} />
-            <SummaryCard label="Premier son p50 / p95" value={`${fmtMs(internal.p50FirstSoundMs)} / ${fmtMs(internal.p95FirstSoundMs)}`} detail="cibles ≤ 2 s / ≤ 4 s" icon={Timer} tone={(internal.p95FirstSoundMs ?? 0) > 4000 ? "danger" : "neutral"} />
-            <SummaryCard label="Couverture premier son" value={fmtRate(internal.firstSoundCoverageRate)} detail={`${internal.measuredFirstSound} mesuré(s) · ${internal.unmeasuredFirstSound} non mesuré(s)`} icon={GitBranch} tone={internal.unmeasuredFirstSound ? "warning" : "neutral"} />
-            <SummaryCard label="Erreurs internes" value={fmtRate(internal.errorRate)} detail={`${internal.errorCount} tour(s) en échec`} icon={AlertTriangle} tone={internal.errorCount ? "danger" : "neutral"} />
-          </div>
-          <div className="flex flex-wrap items-end justify-between gap-3 border-t pt-3">
-            <div><h4 className="text-sm font-semibold">Canary interne — décision de publication</h4><p className="text-xs text-muted-foreground">Premier son, erreurs et persistance viennent d’AVA ; PostHog complète la tendance.</p></div>
-            <div className="w-56"><label className="text-xs text-muted-foreground">Budget maximum / session (USD)</label><Input type="number" min="0" step="0.001" value={costBudget} onChange={(event) => setCostBudget(event.target.value)} placeholder="à approuver" /></div>
-          </div>
-          {canary && <><Badge variant="outline">{canary.decision === "promote" ? "PROMOUVOIR" : canary.decision === "rollback" ? "REVENIR EN ARRIÈRE" : "DONNÉES MANQUANTES / ATTENTE"}</Badge><div className="grid gap-2 md:grid-cols-2">{canary.checks.map((check) => <div key={check.key} className={`rounded border p-2 text-xs ${statusClass(check.status)}`}>{check.detail}<span className="ml-1 opacity-70">({check.key === "costPerSessionUsd" ? "coûts internes" : "AVA interne"})</span></div>)}</div></>}
-        </section>
-      )}
 
       {stats && (
         <>
@@ -601,7 +599,29 @@ export default function LatencyTelemetryTab({ initialStats }: { initialStats?: P
         </>
       )}
 
+      {internal && (
+        <section className="space-y-3 rounded-xl border border-primary/35 bg-card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div><h3 className="font-semibold">Canary interne — couverture et publication</h3><p className="text-xs text-muted-foreground">Mesures persistées par session et par tour, conservées même si PostHog est absent.</p></div>
+            <Badge>AVA interne</Badge>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryCard label="Sessions / tours" value={`${internal.sessionCount} / ${internal.turnCount}`} detail="périmètre interne filtré" icon={Activity} />
+            <SummaryCard label="Premier son p50 / p95" value={`${fmtMs(internal.p50FirstSoundMs)} / ${fmtMs(internal.p95FirstSoundMs)}`} detail="cibles ≤ 2 s / ≤ 4 s" icon={Timer} tone={(internal.p95FirstSoundMs ?? 0) > 4000 ? "danger" : "neutral"} />
+            <SummaryCard label="Couverture premier son" value={fmtRate(internal.firstSoundCoverageRate)} detail={`${internal.measuredFirstSound} mesuré(s) · ${internal.unmeasuredFirstSound} non mesuré(s)`} icon={GitBranch} tone={internal.unmeasuredFirstSound ? "warning" : "neutral"} />
+            <SummaryCard label="Erreurs internes" value={fmtRate(internal.errorRate)} detail={`${internal.errorCount} tour(s) en échec`} icon={AlertTriangle} tone={internal.errorCount ? "danger" : "neutral"} />
+          </div>
+          <div className="flex flex-wrap items-end justify-between gap-3 border-t pt-3">
+            <div><h4 className="text-sm font-semibold">Canary interne — décision de publication</h4><p className="text-xs text-muted-foreground">Premier son, erreurs et persistance viennent d’AVA ; PostHog complète la tendance.</p></div>
+            <div className="w-56"><label className="text-xs text-muted-foreground">Budget maximum / session (USD)</label><Input type="number" min="0" step="0.001" value={costBudget} onChange={(event) => setCostBudget(event.target.value)} placeholder="à approuver" /></div>
+          </div>
+          {canary && <><Badge variant="outline">{canary.decision === "promote" ? "PROMOUVOIR" : canary.decision === "rollback" ? "REVENIR EN ARRIÈRE" : "DONNÉES MANQUANTES / ATTENTE"}</Badge><div className="grid gap-2 md:grid-cols-2">{canary.checks.map((check) => <div key={check.key} className={`rounded border p-2 text-xs ${statusClass(check.status)}`}>{check.detail}<span className="ml-1 opacity-70">({check.key === "costPerSessionUsd" ? "coûts internes" : "AVA interne"})</span></div>)}</div></>}
+        </section>
+      )}
+
       {!loading && !error && !stats && <p className="rounded-xl border p-6 text-center text-sm text-muted-foreground">Aucune donnée PostHog pour cette période. Cela ne signifie pas zéro.</p>}
+
+      <VoiceTurnDiagnostics from={v2Period.from} to={v2Period.to} />
     </div>
   );
 }

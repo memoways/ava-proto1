@@ -4,6 +4,27 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Admin — Latences : statistiques et évolutions en tête de page] — 2026-11-02
+
+- Demande d'Ulrich : page Latences AVA interne & PostHog illisible ; voir d'abord les
+  statistiques, leur évolution dans le temps, par étape (STT, RAG, LLM, TTS, vidéo) et par
+  service, avec des filtres de période.
+- Nouveau bloc en tête, juste sous la période et les filtres : une tuile par étape (médiane,
+  p95, nombre de mesures, couverture, tendance moitié récente / moitié ancienne, mini-courbe),
+  courbes d'évolution par étape (p50 ou p95, étapes activables), barres empilées « où passe le
+  temps d'attente », comparaison des services (étape × service STT/TTS/vidéo, modèle LLM,
+  personnage ou navigateur, avec tableau) et évolution par service (cinq plus utilisés + « Autres »).
+  Points par heure, 6 h, jour ou semaine selon la période.
+- Lecture seule : calcul côté navigateur (`latencyAnalytics`) sur les tours `voice_turn_completed`
+  déjà stockés dans `voice_turn_events`. Aucune collecte, table, Edge Function ni appel PostHog
+  modifié. La lecture des tours se fait par pages de 1 000 (au plus 20 000, signalé au-delà) au
+  lieu d'une seule requête plafonnée à 1 000 lignes.
+- Les périodes 24 h / 7 j / 30 j se rechargent dès le clic ; la période personnalisée attend
+  « Appliquer ». Tendances PostHog, canary, tours lents et chronologie V2 sont conservés, placés
+  en dessous.
+- Vérifié : tests unitaires des calculs, tests de l'onglet, rendu de la prévisualisation locale
+  (desktop et mobile). Non vérifié sur données réelles Lovable.
+
 ## [Admin — Cinématiques : capsules rangées par fonction] — 2026-11-02
 
 - Retour d'Ulrich sur #148 : miniatures trop petites, boutons et labels mélangés.

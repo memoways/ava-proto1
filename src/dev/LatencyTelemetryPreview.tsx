@@ -1,5 +1,6 @@
 import LatencyTelemetryTab from "@/components/LatencyTelemetryTab";
-import type { PosthogLatencyStats } from "@/services/posthogLatencyStats";
+import type { InternalLatencyComparison, PosthogLatencyStats } from "@/services/posthogLatencyStats";
+import type { LatencySample } from "@/services/latencyAnalytics";
 
 const timeline = [
   ["2026-08-08T09:00:00.000Z", 7, 3120, 4980, 4720, 7290, 17400, 23800],
@@ -66,11 +67,43 @@ const MOCK_STATS: PosthogLatencyStats = {
   turnIds: Array.from({ length: 37 }, (_, index) => `turn-preview-${index + 1}`),
 };
 
+// Deterministic pseudo-random turns spread over the preview period.
+function previewSamples(): LatencySample[] {
+  let seed = 7;
+  const random = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const from = Date.parse(MOCK_STATS.period.from);
+  return Array.from({ length: 180 }, (_, index) => {
+    const createdAt = new Date(from + (index / 180) * 86_400_000 + random() * 300_000).toISOString();
+    const model = random() < 0.65 ? "openai/gpt-5.6-luna" : "google/gemini-2.5-flash";
+    const tts = random() < 0.7 ? "Gradium" : "ElevenLabs";
+    const video = random() < 0.25 ? "LemonSlice" : null;
+    const drift = 1 + index / 360;
+    const stt = 380 + random() * 700;
+    const rag = (700 + random() * 1400) * drift;
+    const llm = (model.startsWith("google") ? 1500 : 2400) + random() * 2600;
+    const ttsMs = video ? undefined : (tts === "Gradium" ? 900 : 1400) + random() * 900;
+    const videoMs = video ? 1800 + random() * 2200 : undefined;
+    const responseReady = stt + rag + llm;
+    const firstSound = responseReady + (ttsMs ?? videoMs ?? 0);
+    return {
+      createdAt, model, tts: video ? null : tts, video, stt: "Deepgram", character: random() < 0.8 ? "max" : "luna", browser: random() < 0.7 ? "Chromium" : "WebKit",
+      values: { stt, rag, llm, tts: ttsMs, video: videoMs, responseReady, firstSound, endToEnd: firstSound + 6000 + random() * 8000, playback: 6000 + random() * 8000 },
+    };
+  });
+}
+
+const MOCK_INTERNAL: InternalLatencyComparison = {
+  source: "AVA interne", turnCount: 180, sessionCount: 21, measuredFirstSound: 172, unmeasuredFirstSound: 8,
+  firstSoundCoverageRate: 172 / 180, errorCount: 2, errorRate: 2 / 180, p50FirstSoundMs: 5480, p95FirstSoundMs: 8360,
+  p50ResponseReadyMs: 3890, p95ResponseReadyMs: 6690, persistenceRate: 0.97, missingInInternal: 1, onlyInternal: 0,
+  costPerSessionUsd: null, providers: MOCK_STATS.providers, samples: previewSamples(), samplesCapped: false,
+};
+
 export default function LatencyTelemetryPreview() {
   return (
     <main className="min-h-screen bg-background p-6 text-foreground lg:p-10">
       <div className="mx-auto max-w-[1680px]">
-        <LatencyTelemetryTab initialStats={MOCK_STATS} />
+        <LatencyTelemetryTab initialStats={MOCK_STATS} initialInternal={MOCK_INTERNAL} />
       </div>
     </main>
   );
