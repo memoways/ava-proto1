@@ -92,6 +92,14 @@ intervention. Aucun recouvrement de fichiers avec une PR ouverte. La PR historiq
 
 ## Livraison — CI complète sur PR une fois
 
+**Aller au bout sans demander (Ulrich, 3 novembre 2026).** Lot fini et vérifié en
+local : commit, push, PR, attente de la CI, mise à jour sur main si elle a bougé,
+fusion squash par la garde, nettoyage de notre branche. Autorisation permanente :
+aucune question, aucun bouton « commit / push / fusionner ? », aucune proposition
+d'Auto-fix (la garde attend déjà la CI ; lancer la garde en arrière-plan). Seuls un
+échec diagnostiqué non corrigeable, la production ou un conflit sur du travail
+étranger justifient de s'arrêter et de le dire.
+
 Décision approuvée par Ulrich le 28 octobre 2026 ; justification et limites :
 [ADR CT1](docs/adr_ci_complete_sur_pr.md). Cette règle remplace explicitement
 l'obligation précédente de rejouer les E2E sur main après chaque fusion.
@@ -100,7 +108,8 @@ l'obligation précédente de rejouer les E2E sur main après chaque fusion.
    `npm run test:quality` et `npm run test:delivery` verts avant push. Tout le lot
    (code, tests, plan, prompts, CHANGELOG) est commité avant le premier push.
 2. La CI `Core experience quality` teste le HEAD exact de la PR, contenant main
-   à jour. Attendre run **et** job `regression-gates` verts, jamais queued,
+   à jour, en jobs parallèles (qualité + E2E en 4 shards, ~8 min ; 25 min avant le
+   3 novembre). Attendre run **et** job `regression-gates` verts, jamais queued,
    in_progress, skipped ou rouge. Une relance bornée est permise après diagnostic ;
    si le code ou la base change, obtenir la CI du nouveau HEAD.
 3. Fusion squash autorisée sans redemander, uniquement via la garde versionnée :

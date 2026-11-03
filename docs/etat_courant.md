@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 2 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 3 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -21,6 +21,11 @@ passage complet sur main. Le SHA réel et le run se lisent sur GitHub et dans le
 compte rendu de livraison, sans créer une PR documentaire supplémentaire.
 Contexte personnel/skills et branchement git-ship sont des changements locaux
 du poste, décrits dans [la livraison CT1](livraison_contexte_travail_ct1.md).
+
+## Livraison (3 novembre)
+
+CI en jobs parallèles (qualité + E2E en 4 shards, ~8 min au lieu de 25). Livrer de bout
+en bout sans demander : PR, CI, mise à jour sur main, garde, nettoyage. [ADR](adr_ci_complete_sur_pr.md#amendement-du-3-novembre-2026--même-campagne-en-parallèle).
 
 ## Démarrer
 

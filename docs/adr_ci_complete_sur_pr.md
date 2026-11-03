@@ -54,3 +54,22 @@ Les tests simulés ne remplacent pas la recette vocale F4 ni une publication.
 - [GitHub : contexte PR et checkout du HEAD](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request) : le checkout PR par défaut teste un commit de merge synthétique ; le ref HEAD explicite rend le contrat non ambigu.
 - [GitHub : fusion conditionnée au SHA](https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request) : le paramètre sha refuse un HEAD différent.
 - [Contrat](../AGENTS.md), [plan](plan_audit_contexte_travail.md).
+
+## Amendement du 3 novembre 2026 — même campagne, en parallèle
+
+Demande d'Ulrich : la livraison perd 30 à 45 min par lot. Mesure sur 60 runs
+(27 octobre–3 novembre) : chaque campagne dure 22 à 27 min, dont 21 min d'E2E
+(113 tests sur un seul worker, un fichier de 19 min), y compris les échecs qui
+n'apparaissent qu'en fin de run. Avec plusieurs sessions en parallèle, chaque
+fusion déplace main : la garde refusait alors les autres PR avec un message
+opaque (`Command failed: git merge-base…`), d'où un second run de 25 min.
+
+Décision : contrôles inchangés (mêmes commandes, trois navigateurs, retry CI
+inchangé), répartis en jobs parallèles : `quality` (vérification de base,
+test:delivery, test:quality) et `e2e` en 4 shards par test (`fullyParallel` en CI,
+toujours un worker par machine, donc sans concurrence CPU sur les tests audio).
+Le job `regression-gates` agrège les deux et reste l'unique verdict lu par la
+garde. Écart assumé à la règle « une seule installation par passage » : dépôt
+public, minutes gratuites, priorité au délai. La garde donne désormais la
+commande exacte quand la branche est en retard sur main. Les agents livrent de
+bout en bout sans demander (AGENTS, section Livraison).

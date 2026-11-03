@@ -11,10 +11,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Same controls as before, split across parallel runners: the E2E suite alone
+# took 21 min on one worker. Each shard keeps one worker (no CPU contention for
+# timing-sensitive audio tests). `regression-gates` stays the single verdict the
+# delivery guard reads.
 jobs:
-  regression-gates:
+  quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,6 +38,26 @@ jobs:
       - run: npm ci
       - run: npm run test:delivery
       - run: npm run test:quality
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-node22-v1
+      - run: npm ci
       - name: Install all Playwright browsers and dependencies
         run: |
           # Same signed Ubuntu packages; avoid the stalled Azure mirror.
@@ -41,12 +65,26 @@ jobs:
             sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
           fi
           npx playwright install --with-deps chromium firefox webkit
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
       - name: Upload Playwright failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-failure-${{ github.run_id }}
+          name: playwright-failure-${{ github.run_id }}-shard-${{ matrix.shard }}
           path: output/playwright/
           if-no-files-found: ignore
           retention-days: 7
+
+  regression-gates:
+    needs: [quality, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every quality and E2E job to succeed
+        env:
+          QUALITY: ${{ needs.quality.result }}
+          E2E: ${{ needs.e2e.result }}
+        run: |
+          echo "quality=$QUALITY e2e=$E2E"
+          test "$QUALITY" = success && test "$E2E" = success

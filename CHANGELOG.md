@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [CI — campagne parallèle et livraison sans friction] — 2026-11-03
+
+- Demande d'Ulrich : chaque lot perdait 30 à 45 min entre la fin du travail et main, avec
+  des questions de validation inutiles.
+- Mesure (60 runs, 27 oct.–3 nov.) : 22 à 27 min par campagne, dont 21 min d'E2E Playwright
+  (113 tests, un seul worker). Les échecs n'apparaissaient qu'après 25 min. Avec des sessions
+  parallèles, chaque fusion déplaçait main et la garde refusait les autres PR avec un message
+  opaque, d'où un second run complet.
+- CI : mêmes contrôles, en jobs parallèles — `quality` et `e2e` en 4 shards (un worker par
+  machine) ; `regression-gates` agrège et reste le verdict de la garde. Cible ~8 min.
+- Garde `ship-pr.mjs` : message explicite et commande exacte quand la branche est en retard sur main.
+- Contrat (AGENTS, CLAUDE) : livraison de bout en bout sans demander, sans bouton de validation
+  ni offre d'Auto-fix. ADR CI amendé.
+
 ## [Admin — Latences : statistiques et évolutions en tête de page] — 2026-11-02
 
 - Demande d'Ulrich : page Latences AVA interne & PostHog illisible ; voir d'abord les

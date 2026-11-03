@@ -22,7 +22,9 @@ const isCI = Boolean(process.env.CI);
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  fullyParallel: false,
+  // CI shards by test (not by file): the main spec file alone holds ~19 min of tests.
+  // Each CI shard still runs one worker, so tests never compete for CPU.
+  fullyParallel: isCI,
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,
   workers: isCI ? 1 : undefined,
