@@ -73,6 +73,11 @@ for (const [name, change] of [
   assert.equal(state.calls.length, 0);
 });
 
+test('an outdated branch gets an actionable message', async () => {
+  const { state, io } = fixture(); state.behind = true;
+  await assert.rejects(ship(options, io), /behind main bbbbbbb\. Run: git merge --no-edit origin\/main/);
+});
+
 test('pure Markdown/docs lot uses the documented exception', async () => {
   const { state, io } = fixture(); state.paths = 'AGENTS.md\ndocs/etat_courant.md'; state.runs = false;
   const result = await ship(options, io); assert.equal(result.docsOnly, true); assert.equal(result.run, null);
