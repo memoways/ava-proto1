@@ -71,8 +71,10 @@ export async function ship({ number, head, merge = false, timeoutMs = 35 * 60_00
     io.git('fetch', '--prune', 'origin');
     const base = io.api('git/ref/heads/main').object.sha;
     requireThat(base === io.git('rev-parse', 'origin/main'), 'main moved during fetch; rerun the gate');
-    // Throws for an outdated branch; the caller must update it and obtain a new green run.
-    io.git('merge-base', '--is-ancestor', base, head);
+    // An outdated branch needs a new HEAD and a new green run; say exactly how.
+    try { io.git('merge-base', '--is-ancestor', base, head); } catch {
+      throw new Error(`Branch is behind main ${base.slice(0, 7)}. Run: git merge --no-edit origin/main && git push, then rerun this guard with the new HEAD (CI reruns on it)`);
+    }
     const paths = io.git('diff', '--no-renames', '--name-only', `${base}..${head}`).split('\n').filter(Boolean);
     const docsOnly = isDocsOnly(paths);
     let quality = { ready: true };

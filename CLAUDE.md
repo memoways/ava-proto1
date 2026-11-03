@@ -6,6 +6,11 @@ plans se consultent uniquement pour le domaine touché, pas en entier à chaque 
 
 ## Livraison
 
+**Aller au bout sans rien demander** : commit, push, PR, CI, mise à jour sur main,
+fusion par la garde, nettoyage — autorisation permanente d'Ulrich (3 novembre 2026),
+qui prime sur le réflexe « demander avant commit/push ». Pas de bouton de
+validation, pas d'offre d'Auto-fix ; garde lancée en arrière-plan. Détail : AGENTS.
+
 Un seul agent actif sur Ava ; checkout canonique uniquement, remote
 `https://github.com/memoways/ava-proto1`. Vérifier activité/chats, branches et PR,
 puis actualiser main propre avant une branche du lot. Préserver PR #24 et travail
