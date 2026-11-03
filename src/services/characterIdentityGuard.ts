@@ -1,5 +1,6 @@
 import type { RuntimeCharacter } from "@/types";
 import { AVA_CHARACTER_REGISTRY, displayNameForCharacter } from "@/services/characterRegistry";
+import { normalizeCharacterNames } from "@/services/characterNames";
 
 export interface CharacterExecutionContext {
   characterKey: RuntimeCharacter;
@@ -111,7 +112,7 @@ export function guardCharacterResponse(
   assertCharacterExecutionContext(context);
   const activeFirstName = context.displayName.trim().split(/\s+/)[0] || displayNameForCharacter(context.characterKey);
   if (!responseClaimsForeignIdentity(response, context.characterKey)) {
-    return { blocked: false, response, reason: null };
+    return { blocked: false, response: normalizeCharacterNames(response), reason: null };
   }
   return {
     blocked: true,

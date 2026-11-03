@@ -59,3 +59,28 @@ describe("ResponseOutput registry", () => {
     expect(listStreamingAvatarProviders()).toEqual(["heygen", "tavus", "anam", "lemonslice"]);
   });
 });
+
+describe("withCanonicalCharacterNames", () => {
+  it("never hands 'Eva' to a provider, whatever its type", async () => {
+    const { withCanonicalCharacterNames } = await import("./registry");
+    const seen: string[] = [];
+    const inner = {
+      mode: "streaming_avatar" as const,
+      provider: "fake",
+      externalSessionId: "s1",
+      async prepare() {},
+      async renderText(text: string) {
+        seen.push(text);
+        return { status: "played" as const, provider: "fake", firstPlaybackStartMs: 0, playbackTotalMs: 0, generatedSegments: 1, playedSegments: 1, failedSegments: 0, started: true };
+      },
+      attachMedia() {},
+      interrupt() {},
+      async dispose() {},
+    };
+    const wrapped = withCanonicalCharacterNames(inner);
+    await wrapped.renderText("Eva, c'est Éva qui t'appelle.");
+    expect(seen).toEqual(["Ava, c'est Ava qui t'appelle."]);
+    expect(wrapped.provider).toBe("fake");
+    expect(wrapped.externalSessionId).toBe("s1");
+  });
+});

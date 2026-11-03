@@ -54,6 +54,14 @@ describe("character identity guard", () => {
     expect(invariant).toContain(emma.promptUpdatedAt);
   });
 
+  it("réécrit une dérive d'Ava dans la réponse", () => {
+    expect(guardCharacterResponse("Tu as vu Eva hier ?", emma)).toEqual({
+      blocked: false,
+      response: "Tu as vu Ava hier ?",
+      reason: null,
+    });
+  });
+
   it("refuse des identifiants ou versions de fiche invalides", () => {
     expect(() => guardCharacterResponse("Bonjour.", { ...emma, notionPageId: "not-a-page" })).toThrow(/Notion page/i);
     expect(() => guardCharacterResponse("Bonjour.", { ...emma, promptUpdatedAt: "not-a-date" })).toThrow(/prompt version/i);

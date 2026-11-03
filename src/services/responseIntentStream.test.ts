@@ -4,6 +4,17 @@ const context = { characterKey: 'max' as const, displayName: 'Max Lorenzo', char
 const header = JSON.stringify({ goal: 'Rassurer sans divulguer', points: ['Écouter'] }) + SPEECH_BOUNDARY;
 function parser() { const spoken: string[] = []; const intents: unknown[] = []; return { spoken, intents, p: new ResponseIntentParser(context, i => intents.push(i), s => spoken.push(s)) }; }
 describe('P1 private intent and safe speech', () => {
+  it('puts the exact-name rule in the output contract', () => {
+    expect(buildResponseStreamContract(360)).toContain('jamais Eva');
+  });
+  it('rewrites a drifted Ava spelling before it is spoken, even split across fragments', () => {
+    const wire = header + 'Eva m\'a laissé un mot. Éva ne répond plus. ';
+    for (let i = 0; i <= wire.length; i++) {
+      const { p, spoken } = parser(); p.push(wire.slice(0, i)); p.push(wire.slice(i));
+      expect(p.finish()).toBe('Ava m\'a laissé un mot. Ava ne répond plus.');
+      expect(spoken.join(' ')).not.toMatch(/\b[EÉ]va\b/);
+    }
+  });
   it('accepts all header fragment boundaries without leaking a private character', () => {
     for (let i = 0; i <= header.length; i++) {
       const {p, spoken, intents} = parser(); p.push(header.slice(0,i)); expect(spoken).toEqual([]);
