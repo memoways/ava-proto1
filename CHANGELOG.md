@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Voix — « Ava » jamais prononcé « Eva »] — 2026-11-03
+
+- Demande d'Ulrich : Max et parfois Emma disaient « Eva » au lieu de « Ava », en TTS comme
+  en avatar vidéo. Les noms Ava, Max, Emma, Léo ne doivent jamais dériver.
+- Nouveau `characterNames.ts` : réécrit Eva / Éva / Evah (et Ema, Emah) en Ava / Emma, casse
+  préservée, mots voisins (évacuation, Evan, Emmanuel) intacts.
+- Appliqué à chaque chemin : flux de réponse (avant tout segment parlé ou affiché), garde
+  d'identité (ouvertures, rappels), `prepareTextForTTS` (tous les fournisseurs TTS) et
+  enveloppe de `createResponseOutput` (HeyGen, Tavus, Anam, LemonSlice et TTS local).
+- Contrat de sortie du prompt : règle explicite « Ava (A-V-A, jamais Eva), Max, Emma, Léo ».
+  Hors budget statique du prompt compact (déjà plein) et en fin de prompt.
+- Correction au passage : « A.V.A. » était lu lettre par lettre (le point final bloquait la
+  règle de réécriture en « Ava »).
+- Limite : le texte envoyé est désormais toujours « Ava ». Si un moteur le lit encore « Éva »
+  à l'oreille, il faudra un dictionnaire de prononciation (champ Pronunciation ID Gradium) ou
+  une graphie phonétique, à régler à l'écoute : non vérifiable sans recette vocale.
+
 ## [CI — campagne parallèle et livraison sans friction] — 2026-11-03
 
 - Demande d'Ulrich : chaque lot perdait 30 à 45 min entre la fin du travail et main, avec

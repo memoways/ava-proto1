@@ -1,8 +1,10 @@
+import { normalizeCharacterNames } from "@/services/characterNames";
 import { LocalTTSOutput } from "./localTtsOutput";
 import type {
   OutputMode,
   ResponseOutput,
   ResponseOutputCallbacks,
+  ResponseOutputTurnContext,
   StreamingAvatarProviderId,
   StreamingAvatarSettings,
 } from "./types";
@@ -57,12 +59,29 @@ const avatarProviders: Record<StreamingAvatarProviderId, AvatarOutputFactory> = 
   },
 };
 
+/**
+ * Last line of defence for character names: whatever the provider (local TTS or a
+ * video avatar that voices the text itself), it only ever receives "Ava", never "Eva".
+ */
+export function withCanonicalCharacterNames(output: ResponseOutput): ResponseOutput {
+  return new Proxy(output, {
+    get(target, prop) {
+      if (prop === "renderText") {
+        return (text: string, turn?: ResponseOutputTurnContext) =>
+          target.renderText(normalizeCharacterNames(text), turn);
+      }
+      const value = Reflect.get(target, prop, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
 export async function createResponseOutput(
   context: ResponseOutputFactoryContext,
 ): Promise<ResponseOutput> {
-  if (context.mode === "tts") return new LocalTTSOutput();
+  if (context.mode === "tts") return withCanonicalCharacterNames(new LocalTTSOutput());
   const factory = avatarProviders[context.avatarSettings.activeProvider];
-  return factory(context.avatarSettings, context.callbacks ?? {});
+  return withCanonicalCharacterNames(await factory(context.avatarSettings, context.callbacks ?? {}));
 }
 
 export function listStreamingAvatarProviders(): StreamingAvatarProviderId[] {
