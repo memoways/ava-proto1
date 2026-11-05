@@ -120,6 +120,8 @@ export interface ResponseOutputTurnContext {
   characterKey?: string;
   /** Per-turn acting intent forwarded to the TTS queue. */
   performance?: import("@/services/tts/performanceIntent").PerformanceIntent;
+  /** Face cue chosen for this line (Anam), recorded in the turn telemetry. */
+  onAvatarCue?: (value: import("../voiceTurnTelemetryV2").AvatarCueObservation) => void;
 }
 
 export interface ResponseOutputResult {
@@ -149,7 +151,7 @@ export interface VideoLatencyObservation {
 
 /** Technical-only fields; never include room URLs, tokens or spoken text. */
 export interface AvatarMediaDiagnostics {
-  event: "tracks" | "playback" | "network" | "cpu" | "warm_up";
+  event: "tracks" | "playback" | "network" | "cpu" | "warm_up" | "speaking_cue";
   audioTracks?: number;
   videoTracks?: number;
   playback?: "playing" | "blocked" | "failed";
@@ -179,6 +181,15 @@ export interface AvatarMediaDiagnostics {
   /** Region set in the admin ("auto" lets the provider choose). */
   requestedRegion?: string;
   cpuReason?: string;
+  /** Per line (Anam AN2): cue chosen and its acting intent; labels only, never spoken text. */
+  cue?: string;
+  cueSent?: boolean;
+  cueOrigin?: "intent" | "fixed" | "fallback";
+  emotion?: string | null;
+  intensity?: number | null;
+  performanceSource?: string | null;
+  speechState?: string | null;
+  tempered?: boolean;
 }
 
 export interface ResponseOutputCallbacks {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { AvatarCueObservation } from "@/services/voiceTurnTelemetryV2";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -109,6 +110,39 @@ function HandoffAuditTimeline({ sessionId }: { sessionId: string }) {
       {e.payload.gmRecommends === true ? ' · GM recommande' : ''}
       {e.payload.stage ? ` · ${e.payload.stage}` : ''}{e.payload.blockedReason ? ` · ${e.payload.blockedReason}` : ''}
     </p>)}
+  </details>;
+}
+
+/** Face cue per line of a streaming avatar session (Anam AN2), from the turn telemetry. */
+function AvatarCueTrajectory({ sessionId }: { sessionId: string }) {
+  const [rows, setRows] = useState<Array<{ turn_index: number | null; character: string | null; cue: AvatarCueObservation | null }>>([]);
+  useEffect(() => {
+    let active = true;
+    setRows([]);
+    void supabase.from('voice_turn_events' as never)
+      .select('turn_index,character:metadata_json->>character,cue:metadata_json->avatar_cue')
+      .eq('session_id', sessionId).eq('event_name', 'voice_turn_finished')
+      .order('created_at', { ascending: true }).limit(500)
+      .then(({ data }) => { if (active) setRows((data ?? []) as unknown as typeof rows); });
+    return () => { active = false; };
+  }, [sessionId]);
+  const cues = rows.filter((row) => row.cue && typeof row.cue.cue === 'string');
+  if (!cues.length) return null;
+  const distinct = new Set(cues.map((row) => row.cue!.cue)).size;
+  return <details className="mb-3 rounded border p-3 text-xs">
+    <summary>Émotion du visage (Anam) : {cues.length} répliques, {distinct} balise{distinct > 1 ? 's' : ''}</summary>
+    <p className="my-2 text-muted-foreground">Balise envoyée au visage par réplique et intention de jeu d'origine (état de parole du Game Master, mémoire ou réplique).</p>
+    {cues.map((row, index) => {
+      const cue = row.cue!;
+      return <p key={index} className="my-1 font-mono">
+        {row.turn_index != null ? `T${row.turn_index} · ` : ''}{row.character ? `${row.character} · ` : ''}
+        [{cue.cue}]{cue.sent ? '' : cue.cue === 'none' ? ' (style de base)' : ' (non envoyée)'}
+        {cue.origin !== 'intent' ? ` · ${cue.origin === 'fixed' ? 'fixe' : 'repli'}` : ''}
+        {cue.emotion ? ` · ${cue.emotion}${cue.intensity != null ? ` ${cue.intensity}` : ''}` : ''}
+        {cue.source ? ` · ${cue.source}` : ''}{cue.speech_state ? ` · « ${cue.speech_state} »` : ''}
+        {cue.tempered ? ' · tempéré' : ''}
+      </p>;
+    })}
   </details>;
 }
 
@@ -766,6 +800,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
             )}
 
             <HandoffAuditTimeline sessionId={selected.id} />
+            <AvatarCueTrajectory sessionId={selected.id} />
 
             {/* PRD4 — Timeline GM post-turn */}
             {Array.isArray(selected.gm_post_turn_log) && selected.gm_post_turn_log.length > 0 && (

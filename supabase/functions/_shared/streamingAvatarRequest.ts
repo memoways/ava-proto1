@@ -387,6 +387,44 @@ export const ANAM_CUE_TAGS = [
   "happy",
   "laughter",
 ] as const;
+/** Cues that make the face smile: never a default (Max and Emma never smile). */
+export const ANAM_SMILING_CUE_TAGS: readonly string[] = ["playful", "happy", "laughter"];
+/**
+ * "evolving": the cue follows the per-turn acting intent (Game Master speech state, GM memory
+ * or the line itself); "fixed": `speakingCue` on every line, as before AN2.
+ */
+export const ANAM_EMOTION_CUE_MODES = ["evolving", "fixed"] as const;
+/** Canonical acting emotions, kept identical to `CANONICAL_EMOTIONS` in performanceIntent.ts. */
+export const ANAM_PERFORMANCE_EMOTIONS = [
+  "neutral",
+  "tense",
+  "angry",
+  "sad",
+  "scared",
+  "fragile",
+  "warm",
+  "accusatory",
+  "sarcastic",
+  "urgent",
+] as const;
+/** Characters whose cue table is always shown in the admin; others keep a saved table. */
+export const ANAM_EMOTION_CUE_CHARACTERS = ["max", "emma"] as const;
+/**
+ * Default emotion → cue table, without any smile. `neutral` and `sarcastic` send no cue: the
+ * Director Notes base style carries the line; `warm` stays `concerned` (warm would smile).
+ */
+export const ANAM_DEFAULT_EMOTION_CUES: Readonly<Record<AnamPerformanceEmotion, AnamCueTag>> = {
+  neutral: "none",
+  tense: "concerned",
+  angry: "angry",
+  accusatory: "angry",
+  sad: "sad",
+  fragile: "sad",
+  scared: "distressed",
+  urgent: "distressed",
+  warm: "concerned",
+  sarcastic: "none",
+};
 /** "default" sends no voiceGenerationOptions: the voice keeps its Anam settings. */
 export const ANAM_VOICE_ENGINES = ["default", "elevenLabs", "cartesia", "fish"] as const;
 export const ANAM_ELEVENLABS_MODELS = [
@@ -425,6 +463,9 @@ export type AnamPresetStyle = (typeof ANAM_PRESET_STYLES)[number];
 export type AnamStyleMode = (typeof ANAM_STYLE_MODES)[number];
 export type AnamCueTag = (typeof ANAM_CUE_TAGS)[number];
 export type AnamVoiceEngine = (typeof ANAM_VOICE_ENGINES)[number];
+export type AnamEmotionCueMode = (typeof ANAM_EMOTION_CUE_MODES)[number];
+export type AnamPerformanceEmotion = (typeof ANAM_PERFORMANCE_EMOTIONS)[number];
+export type AnamEmotionCueMap = Record<AnamPerformanceEmotion, AnamCueTag>;
 
 export interface AnamDirectorNotes {
   /** default: nothing sent; preset: `presetStyle`; custom: speaking and idling prompts. */
@@ -481,8 +522,14 @@ export interface AnamAvatarSettings {
   languageCode: string;
   maxSessionLengthSeconds: number;
   directorNotes: AnamDirectorNotes;
-  /** Inline cue tag put in front of every spoken line; recognized tags are not spoken. */
+  /**
+   * Face-only cue sent over the data channel before each line: always in "fixed" mode, and in
+   * "evolving" mode when the turn carries no acting intent.
+   */
   speakingCue: AnamCueTag;
+  emotionCueMode: AnamEmotionCueMode;
+  /** Per character key; every table is complete (missing emotions take the default). */
+  emotionCues: Record<string, AnamEmotionCueMap>;
   voiceGenerationOptions: AnamVoiceGenerationOptions;
   sessionOptions: AnamSessionOptions;
 }
@@ -523,6 +570,8 @@ export function normalizeAnamSettings(value: unknown): AnamAvatarSettings {
       expressivity: boundedNumber(notes.expressivity, b.anamExpressivity),
     },
     speakingCue: pickEnum(raw.speakingCue, ANAM_CUE_TAGS, "sad"),
+    emotionCueMode: pickEnum(raw.emotionCueMode, ANAM_EMOTION_CUE_MODES, "evolving"),
+    emotionCues: normalizeAnamEmotionCues(raw.emotionCues),
     voiceGenerationOptions: {
       engine: pickEnum(voice.engine, ANAM_VOICE_ENGINES, "default"),
       elevenLabs: {
@@ -678,6 +727,63 @@ const ANAM_CUE_PATTERN = new RegExp(
 
 export function stripAnamCueTags(text: string): string {
   return text.replace(ANAM_CUE_PATTERN, "");
+}
+
+const ANAM_CHARACTER_KEY_PATTERN = /^[a-z0-9_-]{1,40}$/;
+const ANAM_MAX_CUE_TABLES = 12;
+
+/** One complete table; unknown emotions or cues are dropped, missing ones take the default. */
+export function normalizeAnamEmotionCueMap(value: unknown): AnamEmotionCueMap {
+  const raw = asRecord(value);
+  const map = { ...ANAM_DEFAULT_EMOTION_CUES };
+  for (const emotion of ANAM_PERFORMANCE_EMOTIONS) {
+    map[emotion] = pickEnum(raw[emotion], ANAM_CUE_TAGS, ANAM_DEFAULT_EMOTION_CUES[emotion]);
+  }
+  return map;
+}
+
+/** Max and Emma always get a table; another saved character key keeps its own. */
+export function normalizeAnamEmotionCues(value: unknown): Record<string, AnamEmotionCueMap> {
+  const raw = asRecord(value);
+  const cues: Record<string, AnamEmotionCueMap> = {};
+  for (const key of ANAM_EMOTION_CUE_CHARACTERS) cues[key] = normalizeAnamEmotionCueMap(raw[key]);
+  for (const key of Object.keys(raw)) {
+    if (Object.keys(cues).length >= ANAM_MAX_CUE_TABLES) break;
+    if (!(key in cues) && ANAM_CHARACTER_KEY_PATTERN.test(key)) cues[key] = normalizeAnamEmotionCueMap(raw[key]);
+  }
+  return cues;
+}
+
+/**
+ * Pure mapping of a per-turn acting intent to an Anam cue. `null` without a usable intent
+ * (the caller falls back to the fixed cue); "none" means the base style carries the line.
+ */
+export function anamCueForPerformance(
+  intent: { emotion?: string } | null | undefined,
+  mapping: Partial<AnamEmotionCueMap> | null | undefined,
+): AnamCueTag | null {
+  const emotion = intent?.emotion;
+  if (!emotion || !(ANAM_PERFORMANCE_EMOTIONS as readonly string[]).includes(emotion)) return null;
+  const key = emotion as AnamPerformanceEmotion;
+  return pickEnum(mapping?.[key], ANAM_CUE_TAGS, ANAM_DEFAULT_EMOTION_CUES[key]);
+}
+
+export interface AnamSpeakingCueChoice {
+  cue: AnamCueTag;
+  /** "intent": from the acting intent; "fixed": fixed mode; "fallback": evolving without intent. */
+  origin: "intent" | "fixed" | "fallback";
+}
+
+/** Cue for the next line, from the settings, the active character and its acting intent. */
+export function resolveAnamSpeakingCue(
+  settings: Pick<AnamAvatarSettings, "speakingCue" | "emotionCueMode" | "emotionCues">,
+  intent: { emotion?: string } | null | undefined,
+  characterKey?: string | null,
+): AnamSpeakingCueChoice {
+  if (settings.emotionCueMode === "fixed") return { cue: settings.speakingCue, origin: "fixed" };
+  const mapping = (characterKey && settings.emotionCues?.[characterKey]) || ANAM_DEFAULT_EMOTION_CUES;
+  const cue = anamCueForPerformance(intent, mapping);
+  return cue === null ? { cue: settings.speakingCue, origin: "fallback" } : { cue, origin: "intent" };
 }
 
 // ---------------------------------------------------------------------------

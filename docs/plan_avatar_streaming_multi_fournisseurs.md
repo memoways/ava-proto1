@@ -427,3 +427,54 @@ Branche `feat/anam-an1-foundations`.
 Appris pour AN2 : le diagnostic `warm_up` sert de modèle pour un diagnostic par tour (champs
 plats, listes blanches, aucun texte) ; `trackEvent("prd4_streaming_avatar_media")` étale les
 champs du diagnostic tels quels, donc tout nouveau champ doit rester non sensible.
+
+### Exécution AN2 — 5 novembre 2026
+
+Branche `feat/anam-an2-evolving-emotion`.
+
+- **Diagnostic avant code (lecture SQL par le MCP Lovable Ava, 5 novembre).** sandbox-ulrich,
+  12 derniers jours : Max a 283 tours évalués par le Game Master sur 49 sessions (TTS et avatar) ;
+  `next_speech_state` non nul dans 94 tours, 5 états distincts (« La digue cède », « Bloqué »,
+  « Tu tournes autour », « L'espoir revient », « Éclair ») ; un état joué dans 197 tours ;
+  rugosité 3 (prod et sandbox-ulrich) ; jeu vocal actif avec une correspondance pour chaque état
+  (Bloqué → `fragile`, Éclair et Tu tournes autour → `tense`, La digue cède et L'espoir revient →
+  `urgent`) ; mémoire du Game Master : 17 émotions différentes. Conclusion : l'émotion de Max
+  évolue déjà côté voix ; le Game Master n'est pas modifié. Réglage enregistré pour Anam
+  (sandbox-ulrich) : `cara-4.1-express`, balise fixe `distressed`, expressivité 0,2. La source des
+  intentions (`prd4_tts_performance`) n'est que dans PostHog : non lue ici.
+- **Correspondance pure.** Module partagé (`streamingAvatarRequest.ts`) :
+  `anamCueForPerformance(intent, mapping)` → balise Anam, ou `null` sans intention utilisable ;
+  `resolveAnamSpeakingCue(settings, intent, characterKey)` → `{ cue, origin }` (`intent`, `fixed`,
+  `fallback`). Défauts sans sourire (`ANAM_DEFAULT_EMOTION_CUES`) : `neutral` et `sarcastic` →
+  aucune balise (style de base), `tense` et `warm` → `concerned`, `angry` et `accusatory` →
+  `angry`, `sad` et `fragile` → `sad`, `scared` et `urgent` → `distressed`. `playful`, `happy`,
+  `laughter` jamais par défaut ; l'admin signale une balise souriante choisie à la main.
+- **Réglages.** `emotionCueMode` (`evolving` par défaut, `fixed` = comportement d'AN1) et
+  `emotionCues` (une table complète par personnage, Max et Emma toujours présents, autre clé
+  enregistrée conservée, entrées inconnues écartées). Anciens réglages relus sans perte : la
+  balise enregistrée (`speakingCue`) devient la balise de repli. Rien de cela n'est envoyé dans
+  le jeton Anam.
+- **Fournisseur.** `renderText` choisit la balise depuis `context.performance` et le personnage
+  actif ; envoi inchangé (canal de données, `atSeconds: 0`, visage seul, jamais dans le texte).
+  « Aucune balise » n'envoie rien ; un envoi refusé laisse la réplique dite sans balise.
+- **Diagnostic par tour.** `onMediaDiagnostics({ event: "speaking_cue", cue, cueSent, cueOrigin,
+  emotion, intensity, performanceSource, speechState, tempered })` (PostHog
+  `prd4_streaming_avatar_media`) et `avatar_cue` dans l'enregistrement `voice_turn_finished` de
+  `voice_turn_events` (étiquettes seules, aucun texte prononcé). Admin → Sessions : bloc
+  « Émotion du visage (Anam) », balise par réplique avec émotion, intensité, source et état de
+  parole. L'accueil (sans télémétrie de tour) n'apparaît que dans PostHog.
+- **Admin.** Carte Anam : « Émotion du visage » (évolutive / fixe), « Balise de repli » en mode
+  évolutif, et tables émotion → balise par personnage (bouton « Défauts »).
+- **Tests.** Correspondance (tous les cas, défauts sans sourire, table éditée, liste identique à
+  `CANONICAL_EMOTIONS`), mode fixe, repli sans intention, table par personnage, échec d'envoi,
+  évolution sur une session simulée (concerned → sad → distressed → angry → style de base),
+  diagnostic sans texte, anciens réglages, jeton sans table. Accueil, synchro, tampon, HeyGen,
+  Tavus et LemonSlice inchangés (suites existantes vertes).
+- **Edge Function.** Le module partagé a changé : `streaming-avatar-session` à redéployer par
+  Lovable (aucun changement du corps envoyé à Anam).
+- **Recette d'Ulrich.** Session Anam d'une dizaine d'échanges avec Max (aveu, provocation,
+  promesse de guérison, retour au calme) : le visage change de registre, sans sourire ; la voix
+  ne crie pas en début de réplique ; trajectoire lisible dans Admin → Sessions.
+
+**Aucun lot ne suit AN2.** La même traduction pour Tavus ne s'ouvre que sur demande d'Ulrich ;
+la désynchronisation de la première réplique reste hors périmètre.

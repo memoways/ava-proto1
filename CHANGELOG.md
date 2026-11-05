@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatars streaming — Anam AN2 : émotion du visage par réplique] — 2026-11-05
+
+- Demande d'Ulrich : Max évolue dans son jeu au fil de la session, piloté par le Game Master.
+- Diagnostic SQL (sandbox-ulrich, 12 jours) : le Game Master propose déjà des états de parole
+  variés pour Max (5 états, 94 tours sur 283), rugosité 3, jeu vocal actif : l'émotion évolue
+  côté voix. Game Master inchangé.
+- Anam suit maintenant l'intention de jeu de chaque réplique : balise du visage tirée de
+  l'émotion (`anamCueForPerformance`, module partagé), défauts sans sourire (`neutral` → style de
+  base, `tense`/`warm` → `concerned`, `fragile`/`sad` → `sad`, `urgent`/`scared` → `distressed`,
+  `angry`/`accusatory` → `angry`). Envoi inchangé : canal de données, visage seul, jamais dans le
+  texte ; un envoi refusé laisse la réplique sans balise.
+- Admin Anam : mode « Émotion du visage » évolutif (défaut) ou fixe, balise de repli, table
+  émotion → balise par personnage. Anciens réglages relus sans perte.
+- Diagnostic par réplique (`speaking_cue`, `avatar_cue` dans `voice_turn_events`), étiquettes
+  seules ; trajectoire visible dans Admin → Sessions.
+- Module partagé modifié : Edge Function `streaming-avatar-session` à redéployer par Lovable.
+  Aucun lot ne suit AN2.
+
 ## [Avatars streaming — Anam AN1 : modèle, métriques, chemin réseau, aides voix] — 2026-11-05
 
 - Modèle d'avatar Anam par défaut : `cara-4.1-express` (recommandé par Anam). Une valeur déjà

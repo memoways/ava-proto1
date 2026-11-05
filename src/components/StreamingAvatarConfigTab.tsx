@@ -18,13 +18,19 @@ import {
 } from "@/services/streamingAvatar/api";
 import {
   ANAM_CARTESIA_EMOTIONS,
+  ANAM_DEFAULT_EMOTION_CUES,
   ANAM_DIRECTOR_NOTES_MODELS,
   ANAM_ELEVENLABS_MODELS,
   ANAM_ELEVENLABS_STABILITY_ONLY,
   ANAM_ELEVENLABS_V4,
+  ANAM_PERFORMANCE_EMOTIONS,
+  ANAM_SMILING_CUE_TAGS,
   ANAM_STYLE_PROMPT_MAX,
   type AnamAvatarModel,
   type AnamCueTag,
+  type AnamEmotionCueMap,
+  type AnamEmotionCueMode,
+  type AnamPerformanceEmotion,
   type AnamPresetStyle,
   type AnamStyleMode,
   type AnamVoiceEngine,
@@ -492,8 +498,17 @@ function AnamFields({
           />
           <TextField label="Langue" hint="Code ISO 639, ex. fr." value={value.languageCode} onChange={(languageCode) => patch({ languageCode })} />
           <EnumField
-            label="Balise de jeu en parlant"
-            hint="Envoyée au visage seul (Director Note cue) pour toute la réplique ; la voix garde son débit posé."
+            label="Émotion du visage"
+            hint="Évolutive : la balise suit l'intention de jeu de chaque réplique (état de parole proposé par le Game Master, sa mémoire, ou la réplique). Fixe : la même balise toute la session."
+            value={value.emotionCueMode}
+            options={ANAM_EMOTION_CUE_MODE_LABELS}
+            onChange={(emotionCueMode) => patch({ emotionCueMode })}
+          />
+          <EnumField
+            label={value.emotionCueMode === "fixed" ? "Balise de jeu en parlant" : "Balise de repli"}
+            hint={value.emotionCueMode === "fixed"
+              ? "Envoyée au visage seul (Director Note cue) pour toute la réplique ; la voix garde son débit posé."
+              : "Utilisée seulement pour une réplique sans intention de jeu."}
             value={value.speakingCue}
             options={ANAM_CUE_LABELS}
             onChange={(speakingCue) => patch({ speakingCue })}
@@ -517,6 +532,9 @@ function AnamFields({
             <NumberField label="Expressivité" hint="0 à 1 ; bas = plus posé." bounds={b.anamExpressivity} value={notes.expressivity} disabled={!notesRead} onChange={(expressivity) => patchNotes({ expressivity })} />
           )}
         </div>
+        {value.emotionCueMode === "evolving" && (
+          <AnamEmotionCueTables value={value.emotionCues} onChange={(emotionCues) => patch({ emotionCues })} />
+        )}
         {notes.mode === "custom" && (
           <div className="grid gap-4 md:grid-cols-2">
             <PromptField label="Attitude en parlant" value={notes.customStylePrompt} disabled={!notesRead} onChange={(customStylePrompt) => patchNotes({ customStylePrompt })} />
@@ -628,7 +646,7 @@ const ANAM_AVATAR_MODEL_LABELS: Record<AnamAvatarModel, string> = {
 
 const ANAM_CUE_LABELS: Record<AnamCueTag, string> = {
   none: "Aucune balise",
-  sad: "[sad] — triste (défaut)",
+  sad: "[sad] — triste",
   distressed: "[distressed] — détresse",
   concerned: "[concerned] — inquiet",
   angry: "[angry] — colère",
@@ -640,6 +658,70 @@ const ANAM_CUE_LABELS: Record<AnamCueTag, string> = {
   happy: "[happy] — joyeux (déconseillé)",
   laughter: "[laughter] — rire (déconseillé)",
 };
+
+const ANAM_EMOTION_CUE_MODE_LABELS: Record<AnamEmotionCueMode, string> = {
+  evolving: "Évolutive — suit l'intention de jeu (défaut)",
+  fixed: "Fixe — une balise toute la session",
+};
+
+const ANAM_EMOTION_LABELS: Record<AnamPerformanceEmotion, string> = {
+  neutral: "Neutre",
+  tense: "Tendu",
+  angry: "En colère",
+  accusatory: "Accusateur",
+  sad: "Triste",
+  fragile: "Fragile",
+  scared: "Apeuré",
+  urgent: "Pressant",
+  warm: "Chaleureux",
+  sarcastic: "Sarcastique",
+};
+
+const ANAM_CHARACTER_LABELS: Record<string, string> = { max: "Max", emma: "Emma" };
+
+/** Emotion → cue per character; defaults never smile, a smiling choice is flagged. */
+function AnamEmotionCueTables({ value, onChange }: {
+  value: Record<string, AnamEmotionCueMap>;
+  onChange: (value: Record<string, AnamEmotionCueMap>) => void;
+}) {
+  return (
+    <Collapsible className="rounded-md border p-3">
+      <CollapsibleTrigger className="flex w-full items-center gap-2 text-sm font-medium">
+        <ChevronRight className="h-4 w-4" />Correspondance émotion → balise, par personnage
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-3 space-y-4">
+        <Hint text="Émotion de l'intention de jeu à gauche, balise envoyée au visage à droite. « Aucune balise » laisse le style de base (Director Notes). Défauts sans sourire." />
+        {Object.entries(value).map(([character, table]) => {
+          const smiling = ANAM_PERFORMANCE_EMOTIONS.filter((emotion) => ANAM_SMILING_CUE_TAGS.includes(table[emotion]));
+          return (
+            <div key={character} className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <SectionTitle>{ANAM_CHARACTER_LABELS[character] ?? character}</SectionTitle>
+                <Button type="button" variant="ghost" size="sm" onClick={() => onChange({ ...value, [character]: { ...ANAM_DEFAULT_EMOTION_CUES } })}>
+                  Défauts
+                </Button>
+              </div>
+              {smiling.length > 0 && (
+                <p className="text-xs text-destructive">Balise souriante pour : {smiling.map((emotion) => ANAM_EMOTION_LABELS[emotion]).join(", ")}.</p>
+              )}
+              <div className="grid gap-3 md:grid-cols-2">
+                {ANAM_PERFORMANCE_EMOTIONS.map((emotion) => (
+                  <EnumField
+                    key={emotion}
+                    label={ANAM_EMOTION_LABELS[emotion]}
+                    value={table[emotion]}
+                    options={ANAM_CUE_LABELS}
+                    onChange={(cue) => onChange({ ...value, [character]: { ...table, [emotion]: cue } })}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
 
 const ANAM_STYLE_MODE_LABELS: Record<AnamStyleMode, string> = {
   custom: "Personnalisé — parler et repos (défaut)",

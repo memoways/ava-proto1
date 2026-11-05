@@ -343,3 +343,115 @@ describe("Anam text-mode lifecycle", () => {
     await opening; await output.dispose();
   });
 });
+
+describe("Anam evolving face cue (AN2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks(); fake.handlers.clear(); fake.talks.length = 0; fake.peer.current = null;
+    fake.client.sendDirectorNoteCue.mockReset();
+    vi.stubGlobal("MediaStream", Stream);
+    fake.client.stream.mockImplementation(async () => [new Stream([track("video")]), new Stream([track("audio")])]);
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  async function ready(overrides = {}, callbacks = {}) {
+    const output = anam(overrides, callbacks);
+    await output.prepare({ sessionId: "ava" });
+    sessionReady();
+    output.attachMedia(videoWithFrame());
+    return output;
+  }
+  const intent = (emotion: string, extra: Record<string, unknown> = {}) =>
+    ({ emotion, intensity: 1, actingNl: "", source: "speech_state", ...extra }) as never;
+  /** Says one line and returns the cues sent over the data channel for it. */
+  async function say(output: AnamStreamingAvatarOutput, text: string, context: Record<string, unknown>) {
+    const before = fake.client.sendDirectorNoteCue.mock.calls.length;
+    const talks = fake.talks.length;
+    const speech = output.renderText(text, context);
+    await vi.waitFor(() => expect(fake.talks[talks]?.chunks.at(-1)?.[1]).toBe(true));
+    persona(text, { endOfSpeech: true });
+    await expect(speech).resolves.toMatchObject({ status: "played" });
+    return fake.client.sendDirectorNoteCue.mock.calls.slice(before).map(([cue]) => cue);
+  }
+
+  it("changes the face register over a session as the acting intent evolves", async () => {
+    const onMediaDiagnostics = vi.fn();
+    const onAvatarCue = vi.fn();
+    const output = await ready({ speakingCue: "distressed" }, { onMediaDiagnostics });
+    const turns = [
+      intent("tense", { speechState: "Tu tournes autour" }),
+      intent("fragile", { speechState: "Bloqué" }),
+      intent("urgent", { speechState: "La digue cède", intensity: 2 }),
+      intent("angry", { source: "lexicon", tempered: "calmed" }),
+      intent("neutral", { source: "gm_memory" }),
+    ];
+    const sent: string[][] = [];
+    for (const [index, performance] of turns.entries()) {
+      sent.push(await say(output, `Réplique ${index}.`, { turnId: `t${index}`, characterKey: "max", performance, onAvatarCue }));
+    }
+    expect(sent).toEqual([["concerned"], ["sad"], ["distressed"], ["angry"], []]);
+    expect(new Set(sent.flat()).size).toBeGreaterThanOrEqual(2);
+    // Plain text only: the cue never enters the spoken text.
+    expect(fake.talks.map((talk) => talk.chunks.map(([chunk]) => chunk).join(""))).toEqual(turns.map((_, i) => `Réplique ${i}.`));
+    for (const call of fake.client.sendDirectorNoteCue.mock.calls) expect(call[1]).toEqual({ atSeconds: 0 });
+    expect(onAvatarCue.mock.calls.map(([value]) => value)).toEqual([
+      { provider: "anam", cue: "concerned", sent: true, origin: "intent", emotion: "tense", intensity: 1, source: "speech_state", speech_state: "Tu tournes autour", tempered: false },
+      { provider: "anam", cue: "sad", sent: true, origin: "intent", emotion: "fragile", intensity: 1, source: "speech_state", speech_state: "Bloqué", tempered: false },
+      { provider: "anam", cue: "distressed", sent: true, origin: "intent", emotion: "urgent", intensity: 2, source: "speech_state", speech_state: "La digue cède", tempered: false },
+      { provider: "anam", cue: "angry", sent: true, origin: "intent", emotion: "angry", intensity: 1, source: "lexicon", speech_state: null, tempered: true },
+      { provider: "anam", cue: "none", sent: false, origin: "intent", emotion: "neutral", intensity: 1, source: "gm_memory", speech_state: null, tempered: false },
+    ]);
+    const cues = onMediaDiagnostics.mock.calls.map(([d]) => d).filter((d) => d.event === "speaking_cue");
+    expect(cues.map((d) => d.cue)).toEqual(["concerned", "sad", "distressed", "angry", "none"]);
+    expect(cues[2]).toEqual({
+      event: "speaking_cue", cue: "distressed", cueSent: true, cueOrigin: "intent", emotion: "urgent",
+      intensity: 2, performanceSource: "speech_state", speechState: "La digue cède", tempered: false,
+    });
+    // Labels only: no spoken text in the per-line diagnostic.
+    expect(JSON.stringify(cues)).not.toContain("Réplique");
+    await output.dispose();
+  });
+
+  it("keeps the fixed cue in fixed mode, whatever the intent", async () => {
+    const onAvatarCue = vi.fn();
+    const output = await ready({ emotionCueMode: "fixed", speakingCue: "sad" });
+    expect(await say(output, "Non.", { characterKey: "max", performance: intent("angry"), onAvatarCue })).toEqual(["sad"]);
+    expect(await say(output, "Non.", { characterKey: "max", performance: intent("tense"), onAvatarCue })).toEqual(["sad"]);
+    expect(onAvatarCue.mock.calls.map(([value]) => value.origin)).toEqual(["fixed", "fixed"]);
+    await output.dispose();
+  });
+
+  it("falls back to the fixed cue when a line carries no intent", async () => {
+    const onAvatarCue = vi.fn();
+    const output = await ready({ speakingCue: "distressed" });
+    expect(await say(output, "Bonjour.", { characterKey: "max", onAvatarCue })).toEqual(["distressed"]);
+    expect(onAvatarCue).toHaveBeenCalledWith(expect.objectContaining({ cue: "distressed", origin: "fallback", emotion: null, sent: true }));
+    await output.dispose();
+  });
+
+  it("uses the active character's table", async () => {
+    const output = await ready({ emotionCues: { ...settings.emotionCues, emma: { ...settings.emotionCues.emma, tense: "distressed" } } });
+    expect(await say(output, "Léo ?", { characterKey: "emma", performance: intent("tense") })).toEqual(["distressed"]);
+    expect(await say(output, "Quoi ?", { characterKey: "max", performance: intent("tense") })).toEqual(["concerned"]);
+    await output.dispose();
+  });
+
+  it("says the line without a cue when the send fails, and reports it", async () => {
+    fake.client.sendDirectorNoteCue.mockImplementationOnce(() => { throw new Error("data channel closed"); });
+    const onAvatarCue = vi.fn();
+    const output = await ready();
+    const speech = output.renderText("Je suis là.", { characterKey: "max", performance: intent("sad"), onAvatarCue });
+    await vi.waitFor(() => expect(fake.talks[0]?.chunks).toEqual([["Je suis là.", true]]));
+    persona("Je suis là.", { endOfSpeech: true });
+    await expect(speech).resolves.toMatchObject({ status: "played" });
+    expect(onAvatarCue).toHaveBeenCalledWith(expect.objectContaining({ cue: "sad", sent: false, origin: "intent" }));
+    await output.dispose();
+  });
+
+  it("still speaks when the cue observer throws", async () => {
+    const output = await ready({}, { onMediaDiagnostics: (d: { event: string }) => {
+      if (d.event === "speaking_cue") throw new Error("analytics down");
+    } });
+    expect(await say(output, "Oui.", { characterKey: "max", performance: intent("sad") })).toEqual(["sad"]);
+    await output.dispose();
+  });
+});

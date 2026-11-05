@@ -10,7 +10,11 @@ import {
 import { endAvatarSession, startAvatarSession } from "../api";
 import { readNetworkPath, type AvatarNetworkPath } from "../networkPath";
 import { splitAvatarText } from "../textSegmentation";
-import { stripAnamCueTags } from "../../../../supabase/functions/_shared/streamingAvatarRequest";
+import {
+  resolveAnamSpeakingCue,
+  stripAnamCueTags,
+} from "../../../../supabase/functions/_shared/streamingAvatarRequest";
+import type { AvatarCueObservation } from "../../voiceTurnTelemetryV2";
 import {
   AvatarRenderError,
   type AnamAvatarSettings,
@@ -67,7 +71,8 @@ interface InboundSample {
  * `CUSTOMER_CLIENT_V1`). The SDK never opens the microphone (`disableInputAudio`), so no sound
  * reaches Anam. Persona transcript events mark the start and the end of each spoken line.
  * The speaking cue goes over the data channel (face only): an inline `[sad]` tag would also
- * drive an expressive voice, which shouts the first words then calms down.
+ * drive an expressive voice, which shouts the first words then calms down. In "evolving" mode
+ * the cue follows the turn's acting intent, so the face changes register with the session.
  */
 export class AnamStreamingAvatarOutput implements ResponseOutput {
   readonly mode = "streaming_avatar" as const;
@@ -188,7 +193,7 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     const abort = () => this.interrupt();
     context?.signal?.addEventListener("abort", abort, { once: true });
     try {
-      this.sendSpeakingCue();
+      this.sendSpeakingCue(context);
       // One talk stream per line, plain text: the voice keeps its own steady delivery.
       for (let index = 0; index < chunks.length; index++) {
         if (this.disposed || context?.signal?.aborted) throw new DOMException("Avatar turn aborted", "AbortError");
@@ -262,14 +267,48 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     this.callbacks.onConnectionStateChange?.("inactive");
   }
 
-  /** Face-only cue for the whole next persona turn; it holds until the turn ends. */
-  private sendSpeakingCue(): void {
-    const cue = this.settings.speakingCue;
-    if (cue === "none" || !this.client) return;
+  /**
+   * Face-only cue for the whole next persona turn; it holds until the turn ends. A refused
+   * send leaves the line spoken without a cue. Reported per line, labels only.
+   */
+  private sendSpeakingCue(context?: ResponseOutputTurnContext): void {
+    const intent = context?.performance;
+    const { cue, origin } = resolveAnamSpeakingCue(this.settings, intent, context?.characterKey);
+    let sent = false;
+    if (cue !== "none" && this.client) {
+      try {
+        this.client.sendDirectorNoteCue(cue as DirectorNoteCueTag, { atSeconds: 0 });
+        sent = true;
+      } catch (error) {
+        console.warn("[Anam] speaking cue not sent", error);
+      }
+    }
+    const observation: AvatarCueObservation = {
+      provider: "anam",
+      cue,
+      sent,
+      origin,
+      emotion: intent?.emotion ?? null,
+      intensity: intent?.intensity ?? null,
+      source: intent?.source ?? null,
+      speech_state: intent?.speechState ? intent.speechState.slice(0, 60) : null,
+      tempered: intent?.tempered === "calmed",
+    };
     try {
-      this.client.sendDirectorNoteCue(cue as DirectorNoteCueTag, { atSeconds: 0 });
-    } catch (error) {
-      console.warn("[Anam] speaking cue not sent", error);
+      context?.onAvatarCue?.(observation);
+      this.callbacks.onMediaDiagnostics?.({
+        event: "speaking_cue",
+        cue,
+        cueSent: sent,
+        cueOrigin: origin,
+        emotion: observation.emotion,
+        intensity: observation.intensity,
+        performanceSource: observation.source,
+        speechState: observation.speech_state,
+        tempered: observation.tempered,
+      });
+    } catch {
+      // Diagnostics never block a line.
     }
   }
 

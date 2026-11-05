@@ -1,5 +1,5 @@
 import { HandoffCoordinator, prepareCharacterHandoff, finalizeCharacterHandoff, completedCallExchanges, needsHandoffPreparation, HANDOFF_DEPENDENCY_TIMEOUT_MS } from '@/services/handoffCoordinator';
-import { createVoiceTurnV2, handleVoiceInputError, type ServiceObservation, type VoiceObserver } from "@/services/voiceTurnTelemetryV2";
+import { createVoiceTurnV2, handleVoiceInputError, type AvatarCueObservation, type ServiceObservation, type VoiceObserver } from "@/services/voiceTurnTelemetryV2";
 import { renderWithVideoLatency, splitOutputLatency } from "@/services/streamingAvatar/latency";
 import type { AvatarVideoFit, VideoLatencyObservation } from "@/services/streamingAvatar/types";
 import { getRuntimeContext } from "@/services/environmentContext";
@@ -664,6 +664,7 @@ const IndexPRD4 = () => {
       attemptId?: string;
       onVoiceObservation?: VoiceObserver;
       onServiceObserved?: (value: ServiceObservation) => void;
+      onAvatarCue?: (value: AvatarCueObservation) => void;
     } = {},
   ): Promise<ResponseOutputResult> => {
     context.signal?.throwIfAborted();
@@ -710,6 +711,7 @@ const IndexPRD4 = () => {
       attemptId: context.attemptId,
       onVoiceObservation: context.onVoiceObservation,
       onServiceObserved: context.onServiceObserved,
+      onAvatarCue: context.onAvatarCue,
       signal: context.signal,
       cacheOpening: context.cacheOpening,
       onPlaybackStart: context.onPlaybackStart,
@@ -2052,6 +2054,7 @@ const IndexPRD4 = () => {
           attemptId: telemetry.attemptId,
           onVoiceObservation: telemetry.observe,
           onServiceObserved: telemetry.service,
+          onAvatarCue: telemetry.avatarCue,
           signal: outputController.signal,
           onPlaybackStart,
           voiceId: activeVoiceIdRef.current ?? undefined,

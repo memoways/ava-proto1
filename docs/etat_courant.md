@@ -43,6 +43,13 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Anam AN2 (5 novembre, code) : émotion du visage par réplique.** La balise Anam suit
+l'intention de jeu (états de parole du Game Master, sa mémoire, la réplique) ; défauts sans
+sourire, mode fixe en repli, table par personnage dans l'admin, trajectoire dans Admin →
+Sessions. Diagnostic : le Game Master fait déjà évoluer Max (5 états, rugosité 3). Edge Function
+à redéployer par Lovable, puis recette d'Ulrich (une dizaine d'échanges avec Max). Aucun lot ne
+suit. [Exécution](plan_avatar_streaming_multi_fournisseurs.md#exécution-an2--5-novembre-2026).
+
 **Anam AN1 (5 novembre, code) : fondations.** Cara 4.1 Express par défaut (valeurs enregistrées
 gardées), métriques client Anam réactivées (télémétrie de connexion seule), chemin réseau (type de
 candidat, protocole, RTT ; aucune adresse) dans `warm_up`, visible dans « Tester l'avatar », aides
