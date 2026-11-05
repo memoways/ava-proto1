@@ -12,6 +12,10 @@ explicite d'Ulrich après la boîte de confirmation de l'interface. Une action h
 - Bucket et 4 politiques vérifiés présents (MCP Lovable Ava `1265958d-b74e-40f2-917d-182fe05163fc`). Edge Function
   `streaming-avatar-session` : déploiement des actions `train-face` / `face-status` non éprouvé par appel ; se confirme au
   premier « Rafraîchir » (liste) puis au suivi du Face.
+- Incident à la première recette (5 novembre) : l'upload TUS a été refusé (`AccessDenied`, RLS) alors que bucket, politiques
+  et rôles admin existent. Lot 3 bis : message détaillé (réponse du stockage, compte, hôte) + repli sur l'envoi standard.
+  Lire ce message en premier ; il dira si le blocage vient du TUS, du compte ou de l'environnement Lovable (Test/Live :
+  vérifier que le site testé est celui où la migration est appliquée, publier si besoin avec l'accord d'Ulrich).
 - Point ouvert : la taille d'objet maximale de Lovable Cloud peut être inférieure à 750 Mo → message dédié et champ « ou URL publique ».
 
 ## Séquence de recette (Ulrich, une action à la fois ; l'agent guide, vérifie et note)

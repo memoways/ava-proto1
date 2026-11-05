@@ -3,6 +3,10 @@ import { parseTavusTrainingStoragePath } from "../../../supabase/functions/_shar
 
 const getCachedSession = vi.hoisted(() => vi.fn());
 vi.mock("@/services/gameAuth", () => ({ getCachedSession }));
+const directUpload = vi.hoisted(() => vi.fn());
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: { storage: { from: () => ({ upload: directUpload }) } },
+}));
 
 interface FakeOptions {
   endpoint: string;
@@ -47,6 +51,7 @@ import {
   checkTavusTrainingFile,
   defaultTavusFaceName,
   describeTavusUploadError,
+  tavusUploadIdentity,
   uploadTavusTrainingVideo,
 } from "./tavusFaceUpload";
 
@@ -117,11 +122,47 @@ describe("describeTavusUploadError", () => {
     expect(describeTavusUploadError(failure(404, "Bucket not found"))).toMatch(/migration du lot 2/);
   });
 
+  it("recognises a policy refusal reported as HTTP 400 and names the account used", () => {
+    const body = '{"statusCode":"403","code":"AccessDenied","error":"Unauthorized","message":"new row violates row-level security policy"}';
+    const error = Object.assign(failure(400, body, "tus: unexpected response"), {
+      identity: { email: "ulrich@example.com", anonymous: false, host: "proto1.example.com" },
+    });
+    const message = describeTavusUploadError(error);
+    expect(message).toMatch(/refuse l'écriture/);
+    expect(message).toContain("row-level security policy");
+    expect(message).toContain("ulrich@example.com (proto1.example.com)");
+    expect(describeTavusUploadError(failure(400, body))).not.toMatch(/Compte utilisé/);
+  });
+
+  it("flags an anonymous session", () => {
+    const error = Object.assign(failure(403), { identity: { email: null, anonymous: true, host: "h" } });
+    expect(describeTavusUploadError(error)).toContain("session anonyme");
+  });
+
+  it("adds the storage message to a generic failure", () => {
+    const message = describeTavusUploadError(failure(500, '{"message":"Internal error"}', "tus: failed"));
+    expect(message).toContain("Réponse du stockage : Internal error");
+  });
+
   it("keeps a generic message free of links", () => {
     const message = describeTavusUploadError(failure(500, "", "failed at https://x.supabase.co/storage?token=abc"));
     expect(message).toContain("[lien]");
     expect(message).not.toContain("token=abc");
     expect(message).toMatch(/reprend/);
+  });
+});
+
+describe("tavusUploadIdentity", () => {
+  const jwt = (claims: object) => `h.${btoa(JSON.stringify(claims)).replace(/=+$/, "")}.s`;
+
+  it("reads the email and the anonymous flag, never the token", () => {
+    expect(tavusUploadIdentity({ access_token: jwt({}), user: { email: "a@b.c", is_anonymous: false } }, "host")).toEqual({
+      email: "a@b.c",
+      anonymous: false,
+      host: "host",
+    });
+    expect(tavusUploadIdentity({ access_token: jwt({ is_anonymous: true }), user: {} }, "host").anonymous).toBe(true);
+    expect(tavusUploadIdentity(null, "host")).toEqual({ email: null, anonymous: false, host: "host" });
   });
 });
 
@@ -186,6 +227,51 @@ describe("uploadTavusTrainingVideo", () => {
     expect(instances).toHaveLength(0);
   });
 
+  const refusal = () =>
+    Object.assign(new Error("tus: unexpected response"), {
+      originalResponse: {
+        getStatus: () => 400,
+        getBody: () => '{"statusCode":"403","code":"AccessDenied","message":"new row violates row-level security policy"}',
+      },
+    });
+
+  it("falls back on the standard upload when the resumable endpoint refuses the policy", async () => {
+    getCachedSession.mockResolvedValue({ access_token: "jwt" });
+    directUpload.mockReset().mockResolvedValue({ data: {}, error: null });
+    const onFallback = vi.fn();
+    const handle = uploadTavusTrainingVideo(file(), "max/x.mp4", { onFallback });
+    await flush();
+    last().options.onError(refusal());
+    await expect(handle.done).resolves.toBe("max/x.mp4");
+    expect(onFallback).toHaveBeenCalled();
+    expect(directUpload).toHaveBeenCalledWith("max/x.mp4", expect.any(File), {
+      contentType: "video/mp4",
+      upsert: false,
+    });
+  });
+
+  it("reports both refusals and the account when the standard upload is refused too", async () => {
+    getCachedSession.mockResolvedValue({ access_token: "jwt", user: { email: "a@b.c" } });
+    directUpload.mockReset().mockResolvedValue({ data: null, error: { message: "new row violates row-level security policy" } });
+    const handle = uploadTavusTrainingVideo(file(), "max/x.mp4");
+    await flush();
+    last().options.onError(refusal());
+    const error = await handle.done.catch((e: unknown) => e);
+    const message = describeTavusUploadError(error);
+    expect(message).toMatch(/L'envoi direct a aussi été refusé/);
+    expect(message).toContain("a@b.c");
+  });
+
+  it("does not fall back on a size refusal or another failure", async () => {
+    getCachedSession.mockResolvedValue({ access_token: "jwt" });
+    directUpload.mockReset();
+    const handle = uploadTavusTrainingVideo(file(), "max/x.mp4");
+    await flush();
+    last().options.onError(Object.assign(new Error("x"), { originalResponse: { getStatus: () => 413, getBody: () => "" } }));
+    await expect(handle.done).rejects.toBeDefined();
+    expect(directUpload).not.toHaveBeenCalled();
+  });
+
   it("propagates a transfer error and can abort", async () => {
     getCachedSession.mockResolvedValue({ access_token: "jwt" });
     const handle = uploadTavusTrainingVideo(file(), "max/x.mp4");
@@ -193,6 +279,7 @@ describe("uploadTavusTrainingVideo", () => {
     const failure = new Error("boom");
     last().options.onError(failure);
     await expect(handle.done).rejects.toBe(failure);
+    expect((failure as Error & { identity?: unknown }).identity).toMatchObject({ anonymous: false });
     handle.abort();
     expect(last().aborted).toBe(true);
   });
