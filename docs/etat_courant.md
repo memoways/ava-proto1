@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 3 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 5 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -42,6 +42,14 @@ Personnel : Ulrich `377e8583-7838-4c05-9f76-8833a450f304`, sources Ava exclues.
 GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
+
+**Anam, expressivité et émotion évolutive (5 novembre, plan).** Recommandations du support Anam
+relues contre le code : Director Notes et `videoQuality: "high"` déjà en place. Deux lots :
+[AN1](prompt_reprise_anam_lot_an1.md) (Cara 4.1 Express par défaut, métriques client, chemin
+réseau dans `warm_up`, aides voix) puis [AN2](prompt_reprise_anam_lot_an2.md) (balise d'émotion
+par réplique tirée de l'intention de jeu que le Game Master fait évoluer ; Max ne sourit pas).
+Chaque lot va au bout : garde, Lovable synchronisé, prompt suivant.
+[Plan](plan_avatar_streaming_multi_fournisseurs.md#suite-anam--expressivité-émotion-évolutive-et-synchro-5-novembre-2026).
 
 **Anam, jeu et synchro (2 novembre).** #145 fusionnée (`ae0cf92`) : balise de jeu au visage seul,
 recette d'Ulrich : plus de déraillement. Suite (PR en cours) : tampon de lecture de 400 ms et accueil
