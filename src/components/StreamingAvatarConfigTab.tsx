@@ -69,7 +69,9 @@ import {
   type TavusEchoEmotion,
   type TavusEmotion,
 } from "@/services/streamingAvatar";
+import { assignTavusFace } from "@/services/streamingAvatar/tavusFaceAdmin";
 import StreamingAvatarTestPanel from "@/components/StreamingAvatarTestPanel";
+import TavusFaceTrainer from "@/components/TavusFaceTrainer";
 
 
 const providerCopy: Record<StreamingAvatarProviderId, { title: string; description: string }> = {
@@ -426,6 +428,11 @@ function TavusFields({
           </p>
         </div>
         <TavusCharacterOverrides value={value} onChange={(characters) => patch({ characters })} />
+        <TavusFaceTrainer
+          characters={value.characters}
+          characterLabels={TAVUS_CHARACTER_LABELS}
+          onAssign={(characterKey, faceId) => patch({ characters: assignTavusFace(value.characters, characterKey, faceId) })}
+        />
         <Advanced>
           <div className="grid gap-4 md:grid-cols-2">
             <NumberField label="Fermeture si personne ne rejoint (s)" hint="10 à 3 600 ; défaut 120." bounds={b.tavusAbsentTimeoutSeconds} value={value.participantAbsentTimeoutSeconds} onChange={(participantAbsentTimeoutSeconds) => patch({ participantAbsentTimeoutSeconds })} />
