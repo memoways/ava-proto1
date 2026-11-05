@@ -396,11 +396,24 @@ async function requestAnamToken(
   if (!apiKey) return jsonError("Anam is not configured", 503);
   const request = buildAnamSessionTokenRequest(config);
   if ("error" in request) return jsonError(request.error, 400);
-  const upstream = await fetch("https://api.anam.ai/v1/auth/session-token", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(request.body),
-  });
+  const post = (body: Record<string, unknown>) =>
+    fetch("https://api.anam.ai/v1/auth/session-token", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  let upstream = await post(request.body);
+  const sessionOptions = request.body.sessionOptions as Record<string, unknown> | undefined;
+  if (upstream.status === 403 && sessionOptions && "region" in sessionOptions) {
+    const text = await upstream.clone().text();
+    if (text.includes("session_region_not_available")) {
+      // The Anam plan does not allow region selection: fall back to Anam's automatic region.
+      console.warn("[streaming-avatar-session] anam region not allowed, retrying with auto region");
+      const { region: _r, regionPolicy: _p, ...rest } = sessionOptions;
+      request.body.sessionOptions = rest;
+      upstream = await post(request.body);
+    }
+  }
   const payload = await readUpstream(upstream, "Anam session token creation failed");
   const sessionToken = safeString(payload.sessionToken);
   if (!sessionToken) throw new Error("Anam returned no session token");
