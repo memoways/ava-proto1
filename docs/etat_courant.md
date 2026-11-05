@@ -43,6 +43,12 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Tavus lot 2 (5 novembre, code) : backend d'entraînement d'un Face.** Bucket privé + actions admin
+`train-face` / `face-status` + client typé, sans interface ni entraînement réel. Actions d'Ulrich :
+appliquer la migration dans le chat Lovable, vérifier le redéploiement de l'Edge Function. Suite :
+[lot 3 « admin »](prompt_reprise_tavus_face_emotion_lot_3.md).
+[Plan](plan_tavus_entrainement_face_emotion.md#exécution-lot-2--5-novembre-2026).
+
 **Tavus lot 1 (5 novembre, code) : balise Echo et expressivité par personnage.** Balise Echo
 choisie directement parmi les 11 valeurs (défaut `dejected`), découplée de `set_emotion` ;
 surcharges Max/Emma (Face ID, balise, émotions ; vide = global), Face recréé seulement s'il

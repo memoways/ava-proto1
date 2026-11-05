@@ -142,6 +142,32 @@ lot 3 (admin d'upload), lot 4 (recette réelle). Réglage à faire par Ulrich en
 souhaite : renseigner le Face de Max dans le bloc « Par personnage » une fois entraîné.
 [Prompt lot 2](prompt_reprise_tavus_face_emotion_lot_2.md).
 
+## Exécution lot 2 — 5 novembre 2026
+
+Doc Tavus relue le 5 novembre 2026 (« Video to Face », Create Face, Get Face, Phoenix‑4.5
+Preview and Status, Video Requirements) : champs et limites inchangés (`face_name`,
+`model_name`, `train_video_url` ; `consent_video_url` déprécié ; `status` started/completed/error,
+`training_progress`, `finetune_status`, `error_message` ; mp4/webm ≥ 1080p, ≥ 25 ips, ≤ 750 Mo).
+
+Livré (code et tests seulement ; aucun entraînement réel, aucun appel d'écriture vers Tavus) :
+- Migration `20261105120000_tavus_training_videos.sql` : bucket privé `tavus-training-videos`
+  (750 Mo, `video/mp4`, `video/webm`) + 4 politiques admin-only. **À appliquer par Ulrich dans le
+  chat Lovable** (le SQL est le fichier tel quel), puis vérification par lecture via le MCP Lovable Ava.
+- `_shared/streamingAvatarRequest.ts` : `buildTavusFaceTrainingRequest` (3 champs seulement, https
+  public obligatoire, nom nettoyé ≤ 80), `parseTavusTrainingStoragePath`, `checkTavusTrainingObject`,
+  `normalizeTavusFace` (statut, progression %, affinage, étape `training/preview/ready/tuning_failed/error`,
+  erreur sans lien), `normalizeTavusFaceList`, `redactTavusText`.
+- Edge `streaming-avatar-session` : actions admin `train-face` (`storagePath` → vérification de
+  l'objet puis lien signé 48 h au service role, ou `videoUrl` ; une seule des deux) et `face-status` ;
+  réponse `{ provider, face }` (camelCase, pas de lien ni de clé) ; erreurs Tavus sans lien, corps jamais
+  journalisé. Sonde `tavus-catalog` : `faceStatuses` normalisés ajoutés.
+- Client `api.ts` : `trainTavusFace`, `getTavusFaceStatus`. Tests : `streamingAvatarRequest.test.ts`,
+  `api.test.ts` (aucun réseau).
+- Limite connue : la taille maximale d'objet de Lovable Cloud peut être inférieure à 750 Mo (lot 3 :
+  message clair + repli URL).
+
+Reste : lot 3 (admin), lot 4 (recette). [Prompt lot 3](prompt_reprise_tavus_face_emotion_lot_3.md).
+
 ## Vérification
 - Unitaires ciblés : `npx vitest run src/services/streamingAvatar supabase/functions/_shared`.
 - Qualité complète : `npm run test:quality`, `npm run test:delivery`.

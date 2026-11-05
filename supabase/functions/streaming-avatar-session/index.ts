@@ -10,8 +10,14 @@ import {
   buildLemonSliceControlRequest,
   buildLemonSliceSessionRequest,
   buildTavusConversationRequest,
+  buildTavusFaceTrainingRequest,
+  checkTavusTrainingObject,
   lemonSliceRoomName,
   normalizeLemonSliceSettings,
+  normalizeTavusFace,
+  normalizeTavusFaceList,
+  parseTavusTrainingStoragePath,
+  redactTavusText,
   safeDailyRoomUrl,
   safeLemonSliceWebSocketAddress,
   safeProviderId,
@@ -19,6 +25,8 @@ import {
   type KnownStreamingAvatarProvider,
   type SelectableStreamingAvatarProvider,
   summarizeTavusPalVoice,
+  TAVUS_TRAINING_BUCKET,
+  TAVUS_TRAINING_URL_TTL_SECONDS,
 } from "../_shared/streamingAvatarRequest.ts";
 
 const corsHeaders = {
@@ -33,7 +41,7 @@ const LEMONSLICE_API = "https://lemonslice.com/api/liveai/sessions";
 const DAILY_API = "https://api.daily.co/v1";
 
 interface AvatarRequest {
-  action?: "start" | "end" | "check" | "control";
+  action?: "start" | "end" | "check" | "control" | "train-face" | "face-status";
   provider?: KnownStreamingAvatarProvider;
   sessionId?: string;
   externalSessionId?: string;
@@ -42,6 +50,12 @@ interface AvatarRequest {
   /** LemonSlice `/control` event and its value (prompt or action name). */
   event?: string;
   value?: unknown;
+  /** Tavus Face training (admin): name, then a stored video or a public https link. */
+  faceName?: string;
+  storagePath?: string;
+  videoUrl?: string;
+  /** Tavus `face-status`: the Face to read. */
+  faceId?: string;
 }
 
 serve(async (req) => {
@@ -64,16 +78,26 @@ serve(async (req) => {
             headers: { "x-api-key": key },
           });
           const text = await res.text();
-          return { status: res.status, body: text.slice(0, 4000) };
+          return { status: res.status, body: text.slice(0, 4000), text };
         } catch (error) {
-          return { status: 0, body: String(error) };
+          return { status: 0, body: String(error), text: "" };
         }
       };
+      const withoutText = ({ status, body }: { status: number; body: string }) => ({ status, body });
+      const faces = await fetchList("faces?limit=25");
+      let faceStatuses: ReturnType<typeof normalizeTavusFaceList> = [];
+      try {
+        faceStatuses = normalizeTavusFaceList(JSON.parse(faces.text));
+      } catch {
+        // Not JSON (error page): the raw body above is enough.
+      }
       return json({
-        pals: await fetchList("pals?limit=25"),
-        personas: await fetchList("personas?limit=25"),
-        faces: await fetchList("faces?limit=25"),
-        replicas: await fetchList("replicas?limit=25"),
+        pals: withoutText(await fetchList("pals?limit=25")),
+        personas: withoutText(await fetchList("personas?limit=25")),
+        faces: withoutText(faces),
+        // Normalized status and training progress of each Face (lot 2).
+        faceStatuses,
+        replicas: withoutText(await fetchList("replicas?limit=25")),
       });
     }
     if (url.searchParams.get("probe") === "session") {
@@ -154,12 +178,19 @@ serve(async (req) => {
   if (
     !body ||
     (body.action !== "start" && body.action !== "end" && body.action !== "check" &&
-      body.action !== "control")
+      body.action !== "control" && body.action !== "train-face" && body.action !== "face-status")
   ) {
     return jsonError("Invalid action", 400);
   }
   if (!SELECTABLE_STREAMING_AVATAR_PROVIDERS.includes(body.provider as Provider)) {
     return jsonError("Invalid provider", 400);
+  }
+  if (body.action === "train-face" || body.action === "face-status") {
+    // Admin only, Tavus only: Face training is paid and quota-limited, never open to a player.
+    const auth = await requireAdmin(req, corsHeaders);
+    if (!auth.ok) return auth.response!;
+    if (body.provider !== "tavus") return jsonError("Face training is only available for Tavus", 400);
+    return body.action === "train-face" ? await trainTavusFace(body) : await getTavusFace(body);
   }
   if (body.action === "check") {
     // Admin configuration check: Tavus test_mode conversation or Anam token, no session, no binding.
@@ -664,6 +695,100 @@ async function checkTavus(config: Record<string, unknown>): Promise<Response> {
     policy: requestBody.policy ?? null,
     palVoice: summarizeTavusPalVoice(target.pal),
   });
+}
+
+/** Training video in the private bucket: checked, then a 48 h link signed with the service role. */
+async function signTavusTrainingVideo(storagePath: string): Promise<string | Response> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) return jsonError("Lovable Cloud storage is not configured", 503);
+  const storage = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  }).storage.from(TAVUS_TRAINING_BUCKET);
+
+  const slash = storagePath.lastIndexOf("/");
+  const folder = slash >= 0 ? storagePath.slice(0, slash) : "";
+  const name = storagePath.slice(slash + 1);
+  const { data: files, error: listError } = await storage.list(folder, { limit: 20, search: name });
+  if (listError) throw new Error("Unable to read the training video storage");
+  const file = (files ?? []).find((entry) => entry.name === name);
+  if (!file) return jsonError("Training video not found in storage", 404);
+  const problem = checkTavusTrainingObject(
+    (file.metadata ?? null) as { size?: unknown; mimetype?: unknown } | null,
+  );
+  if (problem) return jsonError(problem, 400);
+
+  const { data, error } = await storage.createSignedUrl(storagePath, TAVUS_TRAINING_URL_TTL_SECONDS);
+  if (error || !data?.signedUrl) throw new Error("Unable to sign the training video link");
+  return data.signedUrl;
+}
+
+/**
+ * Admin: `POST /v2/faces` (video to face, Phoenix-4.5). The signed link and the API key are
+ * capabilities: neither is logged or returned, and Tavus error text is stripped of links.
+ */
+async function trainTavusFace(body: AvatarRequest): Promise<Response> {
+  const apiKey = Deno.env.get("TAVUS_API_KEY");
+  if (!apiKey) return jsonError("Tavus is not configured", 503);
+  const hasPath = typeof body.storagePath === "string" && body.storagePath.trim() !== "";
+  const hasUrl = typeof body.videoUrl === "string" && body.videoUrl.trim() !== "";
+  if (hasPath === hasUrl) {
+    return jsonError("Send either storagePath or videoUrl, not both and not neither", 400);
+  }
+  try {
+    let videoUrl: unknown = body.videoUrl;
+    if (hasPath) {
+      const storagePath = parseTavusTrainingStoragePath(body.storagePath);
+      if (!storagePath) return jsonError("Invalid training video path", 400);
+      const signed = await signTavusTrainingVideo(storagePath);
+      if (signed instanceof Response) return signed;
+      videoUrl = signed;
+    }
+    const request = buildTavusFaceTrainingRequest({ faceName: body.faceName, videoUrl });
+    if ("error" in request) return jsonError(request.error, 400);
+    const upstream = await fetch("https://tavusapi.com/v2/faces", {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify(request.body),
+    });
+    // logBody=false: a Tavus error may echo the (signed) training link.
+    const payload = await readUpstream(upstream, "Tavus Face training failed", false);
+    const face = normalizeTavusFace({
+      ...payload,
+      face_name: request.body.face_name,
+      model_name: request.body.model_name,
+    });
+    if (!face.faceId) throw new Error("Tavus returned no Face id");
+    console.log(`[streaming-avatar-session] tavus face training started ${face.faceId} ${face.status}`);
+    return json({ provider: "tavus", face });
+  } catch (error) {
+    const message = redactTavusText(error instanceof Error ? error.message : "", 300);
+    console.error(`[streaming-avatar-session] tavus/train-face failed: ${message}`);
+    return jsonError(message || "Tavus Face training failed", 502);
+  }
+}
+
+/** Admin: `GET /v2/faces/{face_id}`, normalized (status, progress, tuning, error). */
+async function getTavusFace(body: AvatarRequest): Promise<Response> {
+  const apiKey = Deno.env.get("TAVUS_API_KEY");
+  if (!apiKey) return jsonError("Tavus is not configured", 503);
+  const faceId = safeId(body.faceId);
+  if (!faceId) return jsonError("A valid Tavus Face id is required", 400);
+  try {
+    const upstream = await fetch(`https://tavusapi.com/v2/faces/${encodeURIComponent(faceId)}`, {
+      headers: { "x-api-key": apiKey },
+    });
+    if (upstream.status === 404) {
+      await upstream.body?.cancel();
+      return jsonError("Tavus Face not found", 404);
+    }
+    const payload = await readUpstream(upstream, "Tavus Face status failed", false);
+    return json({ provider: "tavus", face: normalizeTavusFace({ face_id: faceId, ...payload }) });
+  } catch (error) {
+    const message = redactTavusText(error instanceof Error ? error.message : "", 300);
+    console.error(`[streaming-avatar-session] tavus/face-status failed: ${message}`);
+    return jsonError(message || "Tavus Face status failed", 502);
+  }
 }
 
 async function endHeyGen(
