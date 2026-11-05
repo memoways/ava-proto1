@@ -55,6 +55,8 @@ import {
   getStreamingAvatarSettings,
   loadStreamingAvatarSettingsFromDB,
   saveStreamingAvatarSettingsToDB,
+  TAVUS_AVATAR_CHARACTERS,
+  TAVUS_ECHO_EMOTIONS,
   TAVUS_EMOTIONS,
   type AnamAvatarSettings,
   type HeyGenAvatarSettings,
@@ -63,6 +65,8 @@ import {
   type LemonSliceAvatarSettings,
   type StreamingAvatarProviderId,
   type StreamingAvatarSettings,
+  type TavusCharacterOverride,
+  type TavusEchoEmotion,
   type TavusEmotion,
 } from "@/services/streamingAvatar";
 import StreamingAvatarTestPanel from "@/components/StreamingAvatarTestPanel";
@@ -403,10 +407,25 @@ function TavusFields({
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-2">
+            <Label>Balise Echo en parlant</Label>
+            <Select value={value.echoEmotion} onValueChange={(echoEmotion: TavusEchoEmotion) => patch({ echoEmotion })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {TAVUS_ECHO_EMOTIONS.map((emotion) => (
+                  <SelectItem key={emotion} value={emotion}>{TAVUS_ECHO_EMOTION_LABELS[emotion]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              <code>{`<emotion value="…"/>`}</code> en tête de chaque réplique. « dejected » retire le mieux le sourire, peut paraître un peu triste ; à tester.
+            </p>
+          </div>
           <p className="text-xs text-muted-foreground md:col-span-2">
-            En parlant : <code>conversation.set_emotion</code> et balise Echo sur chaque réplique. En écoutant : <code>set_emotion</code> à la connexion, à la fin de chaque réplique et toutes les 5 s. « Tristesse » en écoute donne un air de chien battu ; « Neutre » (défaut) reste fermé sans apitoyer. Exige un Face Phoenix-4 ou 4.5.
+            En parlant : <code>conversation.set_emotion</code> (émotion en parlant) et balise Echo (réglée à part, 11 valeurs) sur chaque réplique. En écoutant : <code>set_emotion</code> à la connexion, à la fin de chaque réplique et toutes les 5 s. « Tristesse » en écoute donne un air de chien battu ; « Neutre » (défaut) reste fermé sans apitoyer. Exige un Face Phoenix-4 ou 4.5.
           </p>
         </div>
+        <TavusCharacterOverrides value={value} onChange={(characters) => patch({ characters })} />
         <Advanced>
           <div className="grid gap-4 md:grid-cols-2">
             <NumberField label="Fermeture si personne ne rejoint (s)" hint="10 à 3 600 ; défaut 120." bounds={b.tavusAbsentTimeoutSeconds} value={value.participantAbsentTimeoutSeconds} onChange={(participantAbsentTimeoutSeconds) => patch({ participantAbsentTimeoutSeconds })} />
@@ -438,6 +457,95 @@ function TavusFields({
         </Advanced>
       </CardContent>
     </Card>
+  );
+}
+
+const TAVUS_GLOBAL_VALUE = "__global__";
+const TAVUS_CHARACTER_LABELS: Record<string, string> = { max: "Max", emma: "Emma" };
+
+/** Per-character Face and emotions; an empty field keeps the global value above. */
+function TavusCharacterOverrides({
+  value,
+  onChange,
+}: {
+  value: StreamingAvatarSettings["tavus"];
+  onChange: (characters: StreamingAvatarSettings["tavus"]["characters"]) => void;
+}) {
+  const patchCharacter = (key: string, next: Partial<TavusCharacterOverride>) => {
+    const merged: TavusCharacterOverride = { ...(value.characters[key] ?? {}), ...next };
+    // An emptied field is removed so the character follows the global value again.
+    for (const field of Object.keys(merged) as (keyof TavusCharacterOverride)[]) {
+      if (merged[field] === undefined || merged[field] === "") delete merged[field];
+    }
+    onChange({ ...value.characters, [key]: merged });
+  };
+  const fromSelect = <T extends string>(selected: string) =>
+    selected === TAVUS_GLOBAL_VALUE ? undefined : (selected as T);
+  return (
+    <div className="space-y-3">
+      <SectionTitle>Par personnage</SectionTitle>
+      <p className="text-xs text-muted-foreground">
+        Vide = réglage global. Le Face est fixé à l'ouverture de la conversation Tavus : un personnage avec un autre Face ouvre une nouvelle conversation à son entrée ; même Face, seules les émotions changent.
+      </p>
+      {TAVUS_AVATAR_CHARACTERS.map((key) => {
+        const override = value.characters[key] ?? {};
+        return (
+          <div key={key} className="grid gap-4 rounded-md border p-3 md:grid-cols-2">
+            <p className="text-sm font-medium md:col-span-2">{TAVUS_CHARACTER_LABELS[key] ?? key}</p>
+            <TextField
+              label="Face ID"
+              value={override.faceId ?? ""}
+              onChange={(faceId) => patchCharacter(key, { faceId: faceId.trim() || undefined })}
+            />
+            <div className="space-y-2">
+              <Label>Balise Echo en parlant</Label>
+              <Select
+                value={override.echoEmotion ?? TAVUS_GLOBAL_VALUE}
+                onValueChange={(selected) => patchCharacter(key, { echoEmotion: fromSelect<TavusEchoEmotion>(selected) })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TAVUS_GLOBAL_VALUE}>Global ({value.echoEmotion})</SelectItem>
+                  {TAVUS_ECHO_EMOTIONS.map((emotion) => (
+                    <SelectItem key={emotion} value={emotion}>{TAVUS_ECHO_EMOTION_LABELS[emotion]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Émotion en parlant</Label>
+              <Select
+                value={override.emotion ?? TAVUS_GLOBAL_VALUE}
+                onValueChange={(selected) => patchCharacter(key, { emotion: fromSelect<TavusEmotion>(selected) })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TAVUS_GLOBAL_VALUE}>Global ({TAVUS_EMOTION_LABELS[value.emotion]})</SelectItem>
+                  {TAVUS_EMOTIONS.map((emotion) => (
+                    <SelectItem key={emotion} value={emotion}>{TAVUS_EMOTION_LABELS[emotion]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Émotion en écoutant</Label>
+              <Select
+                value={override.listeningEmotion ?? TAVUS_GLOBAL_VALUE}
+                onValueChange={(selected) => patchCharacter(key, { listeningEmotion: fromSelect<TavusEmotion>(selected) })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TAVUS_GLOBAL_VALUE}>Global ({TAVUS_EMOTION_LABELS[value.listeningEmotion]})</SelectItem>
+                  {TAVUS_EMOTIONS.map((emotion) => (
+                    <SelectItem key={emotion} value={emotion}>{TAVUS_EMOTION_LABELS[emotion]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -865,6 +973,20 @@ const TAVUS_EMOTION_LABELS: Record<TavusEmotion, string> = {
   surprise: "Surprise",
   neutral: "Neutre — fermé, impassible",
   happiness: "Joie — sourit (déconseillé)",
+};
+
+const TAVUS_ECHO_EMOTION_LABELS: Record<TavusEchoEmotion, string> = {
+  neutral: "neutral — neutre",
+  angry: "angry — en colère",
+  excited: "excited — excité (sourit)",
+  elated: "elated — exalté (sourit)",
+  content: "content — satisfait (sourit)",
+  sad: "sad — triste",
+  dejected: "dejected — abattu (défaut)",
+  scared: "scared — effrayé",
+  contempt: "contempt — mépris",
+  disgusted: "disgusted — dégoûté",
+  surprised: "surprised — surpris",
 };
 
 function sameLabels<T extends string>(values: readonly T[]): Record<T, string> {

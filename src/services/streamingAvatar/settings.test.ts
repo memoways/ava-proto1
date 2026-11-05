@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeStreamingAvatarSettings, streamingAvatarDefaults } from "./settings";
+import { normalizeStreamingAvatarSettings, resolveTavusCharacterSettings, streamingAvatarDefaults } from "./settings";
 import type { StreamingAvatarSettings } from "./types";
 
 const normalize = (value: unknown) =>
@@ -152,5 +152,70 @@ describe("LemonSlice settings normalization", () => {
     });
     expect(broken.lemonslice).toMatchObject({ model: "default", audioSampleRate: 16_000, idleTimeoutSeconds: 300, aspectRatio: "2x3" });
     expect(broken.lemonslice.agentPrompt).toBe(streamingAvatarDefaults.lemonslice.agentPrompt);
+  });
+});
+
+describe("Tavus Echo tag and per-character settings (lot 1)", () => {
+  it("defaults to dejected with empty Max and Emma overrides", () => {
+    expect(streamingAvatarDefaults.tavus.echoEmotion).toBe("dejected");
+    expect(normalize({}).tavus.characters).toEqual({ max: {}, emma: {} });
+  });
+
+  it("derives the Echo tag from the speaking emotion for settings saved before lot 1", () => {
+    expect(normalize({ tavus: { emotion: "sadness" } }).tavus.echoEmotion).toBe("dejected");
+    expect(normalize({ tavus: { emotion: "neutral" } }).tavus.echoEmotion).toBe("neutral");
+    expect(normalize({ tavus: { emotion: "happiness" } }).tavus.echoEmotion).toBe("content");
+    expect(normalize({ tavus: { emotion: "joy" } }).tavus.echoEmotion).toBe("dejected");
+  });
+
+  it("keeps a chosen Echo value independent from set_emotion and resets unknown ones", () => {
+    const chosen = normalize({ tavus: { emotion: "neutral", echoEmotion: "sad" } }).tavus;
+    expect(chosen).toMatchObject({ emotion: "neutral", echoEmotion: "sad" });
+    expect(normalize({ tavus: { emotion: "neutral", echoEmotion: "sadness" } }).tavus.echoEmotion).toBe("dejected");
+    expect(normalize({ tavus: { echoEmotion: "joyful" } }).tavus.echoEmotion).toBe("dejected");
+  });
+
+  it("normalizes overrides: valid fields kept, invalid or empty ones dropped", () => {
+    const value = normalize({
+      tavus: {
+        characters: {
+          max: { faceId: "  r-max  ", echoEmotion: "neutral", emotion: "anger", listeningEmotion: "joy" },
+          emma: { faceId: "", echoEmotion: "happy" },
+          "Bad Key": { faceId: "x" },
+          leo: { faceId: "r-leo" },
+          broken: "x",
+        },
+      },
+    }).tavus.characters;
+    expect(value.max).toEqual({ faceId: "r-max", echoEmotion: "neutral", emotion: "anger" });
+    expect(value.emma).toEqual({});
+    expect(value.leo).toEqual({ faceId: "r-leo" });
+    expect(value.broken).toEqual({});
+    expect(value).not.toHaveProperty("Bad Key");
+    expect(normalize({ tavus: { characters: [1] } }).tavus.characters).toEqual({ max: {}, emma: {} });
+  });
+
+  it("resolves a character: each set override wins, the rest stays global", () => {
+    const tavus = normalize({
+      tavus: {
+        replicaId: "r-global", emotion: "sadness", listeningEmotion: "neutral", echoEmotion: "dejected",
+        characters: { max: { faceId: "r-max", listeningEmotion: "contempt" }, emma: { echoEmotion: "sad" } },
+      },
+    }).tavus;
+    expect(resolveTavusCharacterSettings(tavus, "max")).toEqual({
+      faceId: "r-max", echoEmotion: "dejected", emotion: "sadness", listeningEmotion: "contempt",
+    });
+    expect(resolveTavusCharacterSettings(tavus, "emma")).toEqual({
+      faceId: "r-global", echoEmotion: "sad", emotion: "sadness", listeningEmotion: "neutral",
+    });
+    const global = { faceId: "r-global", echoEmotion: "dejected", emotion: "sadness", listeningEmotion: "neutral" };
+    expect(resolveTavusCharacterSettings(tavus)).toEqual(global);
+    expect(resolveTavusCharacterSettings(tavus, "leo")).toEqual(global);
+  });
+
+  it("resolves global values for a settings object without the characters table", () => {
+    const legacy = { ...streamingAvatarDefaults.tavus, replicaId: "r" } as Partial<typeof streamingAvatarDefaults.tavus>;
+    delete legacy.characters;
+    expect(resolveTavusCharacterSettings(legacy as typeof streamingAvatarDefaults.tavus, "max").faceId).toBe("r");
   });
 });

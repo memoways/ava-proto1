@@ -11,6 +11,7 @@ import {
   buildTavusSetEmotionCommand,
   stripTavusEmotionTags,
 } from "../protocolCommands";
+import { resolveTavusCharacterSettings } from "../settings";
 import { splitAvatarText } from "../textSegmentation";
 import {
   AvatarRenderError,
@@ -19,6 +20,7 @@ import {
   type ResponseOutputPrepareContext,
   type ResponseOutputResult,
   type ResponseOutputTurnContext,
+  type ResolvedTavusCharacterSettings,
   type TavusAvatarSettings,
   type TavusEmotion,
 } from "../types";
@@ -44,8 +46,11 @@ interface PendingSpeech {
 export class TavusStreamingAvatarOutput implements ResponseOutput {
   readonly mode = "streaming_avatar" as const;
   readonly provider = "tavus";
-  get model() { return this.settings.replicaId; }
+  get model() { return this.active.faceId; }
   private readonly settings: TavusAvatarSettings;
+  /** Character whose Face and emotions are in use (undefined = global settings). */
+  private characterKey: string | undefined;
+  private active: ResolvedTavusCharacterSettings;
   private readonly callbacks: ResponseOutputCallbacks;
   private readonly connectionTimeoutMs: number;
   private readonly speechStartTimeoutMs: number;
@@ -67,6 +72,7 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     speechStartTimeoutMs: number,
   ) {
     this.settings = settings;
+    this.active = resolveTavusCharacterSettings(settings);
     this.callbacks = callbacks;
     this.connectionTimeoutMs = connectionTimeoutMs;
     this.speechStartTimeoutMs = speechStartTimeoutMs;
@@ -79,14 +85,32 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
   async prepare(context: ResponseOutputPrepareContext): Promise<void> {
     if (this.call) return;
     this.avaSessionId = context.sessionId;
+    this.characterKey = context.characterKey;
+    this.active = resolveTavusCharacterSettings(this.settings, context.characterKey);
+    await this.connect(context.signal);
+  }
+
+  /**
+   * Opens a Tavus conversation with the active character's Face. The Face is fixed when the
+   * conversation is created, so a character with another Face needs a new conversation.
+   */
+  private async connect(signal?: AbortSignal): Promise<void> {
     this.callbacks.onConnectionStateChange?.("connecting");
     const started = await startAvatarSession({
       provider: "tavus",
-      sessionId: context.sessionId,
-      tavus: this.settings,
-      signal: context.signal,
+      sessionId: this.avaSessionId,
+      tavus: conversationSettings(this.settings, this.active),
+      signal,
     });
     if (started.provider !== "tavus") throw new Error("Unexpected avatar provider response");
+    if (this.disposed) {
+      await endAvatarSession({
+        provider: "tavus",
+        sessionId: this.avaSessionId,
+        externalSessionId: started.externalSessionId,
+      }).catch(() => {});
+      throw new Error("Tavus session was disposed during connection");
+    }
     this._externalSessionId = started.externalSessionId;
     const call = DailyIframe.createCallObject({
       startAudioOff: true,
@@ -114,18 +138,68 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     call.setLocalAudio(false, { forceDiscardTrack: true });
     call.setLocalVideo(false);
     // As early as possible so the face never greets with its default smile.
-    this.applyEmotion(this.settings.listeningEmotion);
+    this.applyEmotion(this.active.listeningEmotion);
     await this.waitUntilReady();
-    if (context.signal?.aborted) throw new DOMException("Avatar preparation aborted", "AbortError");
-    this.applyEmotion(this.settings.listeningEmotion);
+    if (signal?.aborted) throw new DOMException("Avatar preparation aborted", "AbortError");
+    this.applyEmotion(this.active.listeningEmotion);
     this.callbacks.onConnectionStateChange?.("ready");
+    if (this.statsTimer) clearInterval(this.statsTimer);
     this.statsTimer = setInterval(() => {
+      if (this.call !== call) return;
       void call.getNetworkStats().then(stats => {
-        if (!this.disposed) this.reportNetwork(stats);
+        if (!this.disposed && this.call === call) this.reportNetwork(stats);
       }).catch(() => {});
       // While listening the face drifts back to a friendly assistant look; keep it held.
-      if (!this.currentSpeech) this.applyEmotion(this.settings.listeningEmotion);
+      if (!this.currentSpeech) this.applyEmotion(this.active.listeningEmotion);
     }, 5000);
+  }
+
+  /**
+   * Applies a character change before its line: same Face keeps the conversation and only
+   * switches emotions; another Face closes the conversation and opens a new one.
+   */
+  private async switchCharacter(characterKey: string, signal?: AbortSignal): Promise<void> {
+    const next = resolveTavusCharacterSettings(this.settings, characterKey);
+    const sameFace = next.faceId === this.active.faceId;
+    this.characterKey = characterKey;
+    this.active = next;
+    if (sameFace) {
+      this.applyEmotion(next.listeningEmotion);
+      return;
+    }
+    await this.closeConversation();
+    try {
+      await this.connect(signal);
+    } catch (cause) {
+      throw new AvatarRenderError("Tavus could not open the character's Face", false, { cause });
+    }
+  }
+
+  /** Leaves the room and ends the Tavus conversation; the output stays usable. */
+  private async closeConversation(): Promise<void> {
+    if (this.statsTimer) clearInterval(this.statsTimer);
+    this.statsTimer = null;
+    this.interrupt();
+    const call = this.call;
+    const externalSessionId = this._externalSessionId;
+    // Cleared first: events of the old room are ignored, not read as a disconnection.
+    this.call = null;
+    this._externalSessionId = null;
+    this.ready = false;
+    this.mediaPlayback = null;
+    try {
+      await call?.leave();
+    } catch {
+      // Continue to destroy/end even if the room already disconnected.
+    }
+    await call?.destroy().catch(() => {});
+    if (externalSessionId && this.avaSessionId) {
+      await endAvatarSession({
+        provider: "tavus",
+        sessionId: this.avaSessionId,
+        externalSessionId,
+      }).catch((error) => console.warn("[Tavus] server cleanup failed", error));
+    }
   }
 
   async renderText(
@@ -136,6 +210,12 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
       throw new AvatarRenderError("Tavus video stream is not ready", false);
     }
     if (context?.signal?.aborted) throw new DOMException("Avatar turn aborted", "AbortError");
+    if (context?.characterKey && context.characterKey !== this.characterKey) {
+      await this.switchCharacter(context.characterKey, context?.signal);
+      if (!this.call || !this.ready || !this._externalSessionId) {
+        throw new AvatarRenderError("Tavus video stream is not ready", false);
+      }
+    }
     // Do not send speech until the browser accepts audible media playback.
     // Provider speaking events alone are not proof of local audio output.
     if (!this.mediaElement || !this.mediaPlayback) {
@@ -152,14 +232,17 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     let currentStarted = false;
     const chunks = splitAvatarText(text);
     // Re-assert the speaking emotion each turn: cheap, and survives a provider reconnect.
-    this.applyEmotion(this.settings.emotion);
+    this.applyEmotion(this.active.emotion);
     try {
       for (const chunk of chunks) {
         if (this.disposed || context?.signal?.aborted) throw new DOMException("Avatar turn aborted", "AbortError");
         const speech = createPendingSpeech(context?.turnId);
         this.currentSpeech = speech;
-        this.call.sendAppMessage(
-          buildTavusEchoCommand(this._externalSessionId, chunk, this.settings.emotion),
+        const call = this.call;
+        const conversationId = this._externalSessionId;
+        if (!call || !conversationId) throw new Error("Tavus conversation closed");
+        call.sendAppMessage(
+          buildTavusEchoCommand(conversationId, chunk, this.active.echoEmotion),
           "*",
         );
         const abort = () => this.interrupt();
@@ -183,7 +266,7 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
       return {
         status: "played",
         provider: "Tavus",
-        model: this.settings.replicaId,
+        model: this.active.faceId,
         firstPlaybackStartMs: Math.round((firstStartedAt || performance.now()) - startedAt),
         playbackTotalMs: Math.round(performance.now() - (firstStartedAt || startedAt)),
         generatedSegments: chunks.length,
@@ -229,24 +312,7 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
   async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
-    if (this.statsTimer) clearInterval(this.statsTimer);
-    this.statsTimer = null;
-    this.interrupt();
-    const call = this.call;
-    this.call = null;
-    try {
-      await call?.leave();
-    } catch {
-      // Continue to destroy/end even if the room already disconnected.
-    }
-    await call?.destroy().catch(() => {});
-    if (this._externalSessionId && this.avaSessionId) {
-      await endAvatarSession({
-        provider: "tavus",
-        sessionId: this.avaSessionId,
-        externalSessionId: this._externalSessionId,
-      }).catch((error) => console.warn("[Tavus] server cleanup failed", error));
-    }
+    await this.closeConversation();
     this.mediaStream = null;
     if (this.mediaElement) this.mediaElement.srcObject = null;
     this.mediaElement = null;
@@ -256,6 +322,7 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
 
   private bindEvents(call: DailyCall): void {
     call.on("track-started", (event: DailyEventObjectTrack | undefined) => {
+      if (this.call !== call) return;
       if (this.disposed || !event?.participant || event.participant.local || !this.mediaStream) return;
       if (event.type !== "video" && event.type !== "audio") return;
       if (!this.mediaStream.getTracks().some((track) => track.id === event.track.id)) {
@@ -277,7 +344,7 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     });
     call.on("app-message", (event: DailyEventObjectAppMessage<TavusMessage> | undefined) => {
       const message = event?.data;
-      if (this.disposed || !message) return;
+      if (this.call !== call || this.disposed || !message) return;
       if (message.conversation_id && message.conversation_id !== this._externalSessionId) return;
       const role = message.properties?.role;
       if (role && role !== "pal" && role !== "replica") return;
@@ -294,7 +361,7 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
         speech.ended = true;
         speech.resolveEnded();
         // The per-line echo tag ends with the line; switch to the listening emotion.
-        this.applyEmotion(this.settings.listeningEmotion);
+        this.applyEmotion(this.active.listeningEmotion);
         this.callbacks.onConnectionStateChange?.("ready");
         this.callbacks.onSpeakEnd?.(speech.turnId);
       } else if (
@@ -307,13 +374,14 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
         );
       }
     });
-    call.on("left-meeting", () => this.handleDisconnected("left_meeting"));
-    call.on("error", () => this.handleDisconnected("daily_error"));
-    call.on("network-quality-change", event => { if (event) this.reportNetwork(event); });
+    call.on("left-meeting", () => { if (this.call === call) this.handleDisconnected("left_meeting"); });
+    call.on("error", () => { if (this.call === call) this.handleDisconnected("daily_error"); });
+    call.on("network-quality-change", event => { if (event && this.call === call) this.reportNetwork(event); });
     call.on("cpu-load-change", event => {
-      if (event) this.callbacks.onMediaDiagnostics?.({ event: "cpu", cpuState: event.cpuLoadState, cpuReason: event.cpuLoadStateReason });
+      if (event && this.call === call) this.callbacks.onMediaDiagnostics?.({ event: "cpu", cpuState: event.cpuLoadState, cpuReason: event.cpuLoadStateReason });
     });
     call.on("track-stopped", event => {
+      if (this.call !== call) return;
       if (!event || event.participant?.local || !this.mediaStream) return;
       const track = this.mediaStream.getTracks().find(track => track.id === event.track.id);
       // Transient network interruptions keep the persistent track attached.
@@ -386,6 +454,14 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
       check();
     });
   }
+}
+
+/** Settings sent to the Edge Function: the resolved Face, without the per-character table. */
+function conversationSettings(
+  settings: TavusAvatarSettings,
+  active: ResolvedTavusCharacterSettings,
+): TavusAvatarSettings {
+  return { ...settings, replicaId: active.faceId, characters: {} };
 }
 
 function createPendingSpeech(turnId?: string): PendingSpeech {

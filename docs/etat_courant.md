@@ -43,6 +43,14 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Tavus lot 1 (5 novembre, code) : balise Echo et expressivité par personnage.** Balise Echo
+choisie directement parmi les 11 valeurs (défaut `dejected`), découplée de `set_emotion` ;
+surcharges Max/Emma (Face ID, balise, émotions ; vide = global), Face recréé seulement s'il
+change ; balise jamais lue ni sous-titrée. Front seul, rien à déployer côté Edge. Suite :
+[lot 2 « backend d'entraînement »](prompt_reprise_tavus_face_emotion_lot_2.md) (migration via
+le chat Lovable). Recette visuelle au lot 4.
+[Plan](plan_tavus_entrainement_face_emotion.md#exécution-lot-1--5-novembre-2026).
+
 **Anam AN2 (5 novembre, code) : émotion du visage par réplique.** La balise Anam suit
 l'intention de jeu (états de parole du Game Master, sa mémoire, la réplique) ; défauts sans
 sourire, mode fixe en repli, table par personnage dans l'admin, trajectoire dans Admin →
