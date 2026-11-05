@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatars streaming — Tavus lot 2 : backend d'entraînement d'un Face] — 2026-11-05
+
+- Bucket privé `tavus-training-videos` (750 Mo, mp4/webm, politiques admin-only) : migration à
+  appliquer par Ulrich dans le chat Lovable (une fusion ne l'applique pas).
+- Edge Function `streaming-avatar-session` : actions admin `train-face` (vidéo stockée → lien signé
+  48 h, ou URL https publique ; Phoenix‑4.5) et `face-status` (statut, progression, affinage,
+  erreur) ; sonde `tavus-catalog` enrichie du statut des Faces. Clé et liens jamais journalisés ni
+  renvoyés ; corps limité à `face_name`, `model_name`, `train_video_url`.
+- Client `trainTavusFace` / `getTavusFaceStatus`. Aucun appel Tavus réel (tests purs), aucune interface
+  (lot 3), aucun prompt modifié. Module partagé modifié : Edge Function à redéployer par Lovable.
+
 ## [Avatars streaming — Tavus lot 1 : balise Echo et expressivité par personnage] — 2026-11-05
 
 - Constat : le PAL Tavus est en mode Echo, Ava écrit chaque réplique ; la balise

@@ -6,7 +6,15 @@ import {
   buildHeyGenSessionRequest,
   buildHeyGenVoiceSettings,
   buildTavusConversationRequest,
+  buildTavusFaceTrainingRequest,
+  checkTavusTrainingObject,
+  normalizeTavusFace,
+  normalizeTavusFaceList,
   normalizeTavusLanguages,
+  parseTavusTrainingStoragePath,
+  redactTavusText,
+  safeTavusFaceName,
+  safeTavusTrainingVideoUrl,
   stripAnamCueTags,
   summarizeTavusPalVoice,
   withAnamCue,
@@ -328,5 +336,193 @@ describe("Anam session token request", () => {
     expect(withAnamCue("Je ne sais pas.", "none")).toBe("Je ne sais pas.");
     expect(stripAnamCueTags("[sad] Je ne sais pas. [distressed] Aide-moi.")).toBe("Je ne sais pas. Aide-moi.");
     expect(stripAnamCueTags("[note] reste")).toBe("[note] reste");
+  });
+});
+
+describe("Tavus Face training request", () => {
+  const url = "https://abc.supabase.co/storage/v1/object/sign/tavus-training-videos/a/b.mp4?token=eyJ.x.y";
+
+  function trainingBody(input: { faceName: unknown; videoUrl: unknown }) {
+    const result = buildTavusFaceTrainingRequest(input);
+    if ("error" in result) throw new Error(result.error);
+    return result.body;
+  }
+
+  it("sends exactly face_name, model_name and train_video_url", () => {
+    expect(trainingBody({ faceName: "Max - 5 nov", videoUrl: url })).toEqual({
+      face_name: "Max - 5 nov",
+      model_name: "phoenix-4.5",
+      train_video_url: url,
+    });
+  });
+
+  it("never forwards callback_url, voice, consent video or any extra client field", () => {
+    const body = trainingBody({
+      faceName: "Max",
+      videoUrl: url,
+      callback_url: "https://evil.example/hook",
+      consent_video_url: "https://evil.example/c.mp4",
+      default_voice_id: "v1",
+      voice_name: "anna",
+      model_name: "phoenix-3",
+      train_image_url: "https://evil.example/i.png",
+      properties: { background_green_screen: true },
+    } as never);
+    expect(Object.keys(body).sort()).toEqual(["face_name", "model_name", "train_video_url"]);
+    expect(body.model_name).toBe("phoenix-4.5");
+  });
+
+  it("refuses a link that is not public https", () => {
+    for (const bad of [
+      "http://example.com/v.mp4",
+      "ftp://example.com/v.mp4",
+      "https://user:pass@example.com/v.mp4",
+      "https://localhost/v.mp4",
+      "https://intranet/v.mp4",
+      "https://192.168.1.10/v.mp4",
+      "https://[::1]/v.mp4",
+      "javascript:alert(1)",
+      "not a url",
+      "",
+      undefined,
+      42,
+      `https://example.com/${"a".repeat(4_100)}`,
+    ]) {
+      expect(buildTavusFaceTrainingRequest({ faceName: "Max", videoUrl: bad })).toEqual({
+        ok: false,
+        error: "The training video link must be a public https URL",
+      });
+    }
+  });
+
+  it("requires a usable name, cleans it and bounds it", () => {
+    expect(buildTavusFaceTrainingRequest({ faceName: "  ", videoUrl: url }).ok).toBe(false);
+    expect(buildTavusFaceTrainingRequest({ faceName: 12, videoUrl: url }).ok).toBe(false);
+    expect(safeTavusFaceName("  Max \n\t — 5   nov\u0000 ")).toBe("Max — 5 nov");
+    expect(safeTavusFaceName("x".repeat(500))).toHaveLength(80);
+    expect(trainingBody({ faceName: "y".repeat(200), videoUrl: url }).face_name).toHaveLength(80);
+  });
+
+  it("accepts a public https link from the backup field", () => {
+    expect(safeTavusTrainingVideoUrl("https://cdn.example.com/train.mp4?x=1")).toBe(
+      "https://cdn.example.com/train.mp4?x=1",
+    );
+  });
+});
+
+describe("Tavus training storage path", () => {
+  it("accepts a path inside the bucket, with or without the bucket prefix", () => {
+    expect(parseTavusTrainingStoragePath("max/2026-11-05.mp4")).toBe("max/2026-11-05.mp4");
+    expect(parseTavusTrainingStoragePath("tavus-training-videos/max/take_1.webm")).toBe("max/take_1.webm");
+    expect(parseTavusTrainingStoragePath("clip.MP4")).toBe("clip.MP4");
+  });
+
+  it("refuses traversal, absolute paths, odd characters and other extensions", () => {
+    for (const bad of [
+      "../secret.mp4",
+      "a/../b.mp4",
+      "/abs/video.mp4",
+      "a//b.mp4",
+      "a\\b.mp4",
+      "a/b c.mp4",
+      "a/b.mov",
+      "a/b.mp4.exe",
+      "a/b/c/d/e.mp4",
+      "other-bucket/../../x.mp4",
+      ".hidden.mp4",
+      "",
+      null,
+      7,
+      `${"a".repeat(260)}.mp4`,
+    ]) {
+      expect(parseTavusTrainingStoragePath(bad)).toBe("");
+    }
+  });
+
+  it("checks size and type against the Tavus limits", () => {
+    expect(checkTavusTrainingObject({ size: 100_000_000, mimetype: "video/mp4" })).toBeNull();
+    expect(checkTavusTrainingObject({ size: 750 * 1024 * 1024, mimetype: "video/webm" })).toBeNull();
+    expect(checkTavusTrainingObject({})).toBeNull();
+    expect(checkTavusTrainingObject({ size: 750 * 1024 * 1024 + 1 })).toMatch(/750 MB/);
+    expect(checkTavusTrainingObject({ size: 0 })).toMatch(/empty/);
+    expect(checkTavusTrainingObject({ size: 10, mimetype: "video/quicktime" })).toMatch(/mp4 or video\/webm/);
+    expect(checkTavusTrainingObject(null)).toBeNull();
+  });
+});
+
+describe("Tavus Face response", () => {
+  it("reads a Face being trained", () => {
+    expect(normalizeTavusFace({ face_id: "f123", face_name: "Max", status: "started", training_progress: "12/100" }))
+      .toEqual({
+        faceId: "f123",
+        name: "Max",
+        status: "started",
+        trainingProgress: "12/100",
+        progressPercent: 12,
+        finetuneStatus: null,
+        stage: "training",
+        errorMessage: null,
+        modelName: null,
+        createdAt: null,
+        updatedAt: null,
+      });
+  });
+
+  it("tells the Phoenix-4.5 preview, tuned and tuning-failed stages apart", () => {
+    const base = { face_id: "f1", status: "completed", training_progress: "100/100" };
+    expect(normalizeTavusFace({ ...base, finetune_status: "training" })).toMatchObject({
+      stage: "preview",
+      finetuneStatus: "training",
+      progressPercent: 100,
+    });
+    expect(normalizeTavusFace({ ...base, finetune_status: "completed" }).stage).toBe("ready");
+    expect(normalizeTavusFace({ ...base, finetune_status: "error" }).stage).toBe("tuning_failed");
+    expect(normalizeTavusFace({ ...base, finetune_status: null }).stage).toBe("ready");
+  });
+
+  it("reports an error with a short message stripped of links", () => {
+    const face = normalizeTavusFace({
+      face_id: "f2",
+      status: "error",
+      error_message: `Could not download https://bucket.example/v.mp4?token=SECRET because it timed out ${"z".repeat(500)}`,
+    });
+    expect(face.stage).toBe("error");
+    expect(face.errorMessage).not.toContain("SECRET");
+    expect(face.errorMessage).not.toContain("https://");
+    expect(face.errorMessage).toContain("[link]");
+    expect(face.errorMessage!.length).toBeLessThanOrEqual(300);
+  });
+
+  it("is tolerant to missing or odd fields and keeps the model name", () => {
+    expect(normalizeTavusFace(null)).toMatchObject({ faceId: "", status: "unknown", stage: "training", progressPercent: null });
+    expect(normalizeTavusFace({ face_id: "bad id!", status: "weird", finetune_status: "nope" })).toMatchObject({
+      faceId: "",
+      status: "unknown",
+      finetuneStatus: null,
+    });
+    expect(normalizeTavusFace({ face_id: "f3", model_name: "phoenix-4.5" }).modelName).toBe("phoenix-4.5");
+    expect(normalizeTavusFace({ face_id: "f3", training_progress: "45%" }).progressPercent).toBe(45);
+    expect(normalizeTavusFace({ face_id: "f3", training_progress: 30 }).progressPercent).toBe(30);
+    expect(normalizeTavusFace({ face_id: "f3", training_progress: "0/0" }).progressPercent).toBeNull();
+    expect(normalizeTavusFace({ face_id: "f3", training_progress: "300/100" }).progressPercent).toBe(100);
+  });
+
+  it("normalizes a Faces list from the catalog probe", () => {
+    const list = normalizeTavusFaceList({
+      data: [
+        { face_id: "a1", status: "completed", finetune_status: "training", training_progress: "100/100" },
+        { face_id: "a2", status: "started", training_progress: "3/100" },
+        { status: "completed" },
+      ],
+    });
+    expect(list.map((face) => [face.faceId, face.stage])).toEqual([["a1", "preview"], ["a2", "training"]]);
+    expect(normalizeTavusFaceList([{ face_id: "b1" }]).map((face) => face.faceId)).toEqual(["b1"]);
+    expect(normalizeTavusFaceList("nope")).toEqual([]);
+    expect(normalizeTavusFaceList({ data: Array.from({ length: 40 }, (_, i) => ({ face_id: `f${i}` })) })).toHaveLength(25);
+  });
+
+  it("removes links from any relayed Tavus text", () => {
+    expect(redactTavusText("bad url http://x.io/a?token=1 end")).toBe("bad url [link] end");
+    expect(redactTavusText(42)).toBe("");
   });
 });

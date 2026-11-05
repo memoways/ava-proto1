@@ -1,4 +1,5 @@
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
+import type { NormalizedTavusFace } from "../../../supabase/functions/_shared/streamingAvatarRequest";
 import type {
   AnamAvatarSettings,
   HeyGenAvatarSettings,
@@ -132,6 +133,54 @@ export async function checkTavusConfiguration(
   });
   if (!response.ok) throw new Error(await readAvatarError(response));
   return response.json() as Promise<TavusConfigurationCheck>;
+}
+
+/** Tavus Face as the admin reads it (status, training progress, Phoenix-4.5 tuning). */
+export type TavusFace = NormalizedTavusFace;
+
+export type TavusFaceTrainingSource =
+  /** Video uploaded to the private `tavus-training-videos` bucket (path with or without the bucket prefix). */
+  | { storagePath: string; videoUrl?: undefined }
+  /** Backup: a public https link Tavus can download for at least 24 hours. */
+  | { videoUrl: string; storagePath?: undefined };
+
+/**
+ * Admin only: starts the training of a Phoenix-4.5 Face from a video (`POST /v2/faces`).
+ * Real cost and quota on the Tavus account: only call it on an explicit admin action.
+ */
+export async function trainTavusFace(
+  input: { faceName: string } & TavusFaceTrainingSource,
+): Promise<TavusFace> {
+  const response = await authenticatedFunctionFetch(ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "train-face",
+      provider: "tavus",
+      faceName: input.faceName,
+      storagePath: input.storagePath,
+      videoUrl: input.videoUrl,
+    }),
+  });
+  if (!response.ok) throw new Error(await readAvatarError(response));
+  return readTavusFace(response);
+}
+
+/** Admin only: current status of a Face (`GET /v2/faces/{face_id}`), read-only. */
+export async function getTavusFaceStatus(faceId: string): Promise<TavusFace> {
+  const response = await authenticatedFunctionFetch(ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "face-status", provider: "tavus", faceId }),
+  });
+  if (!response.ok) throw new Error(await readAvatarError(response));
+  return readTavusFace(response);
+}
+
+async function readTavusFace(response: Response): Promise<TavusFace> {
+  const body = (await response.json().catch(() => null)) as { face?: TavusFace } | null;
+  if (!body?.face?.faceId) throw new Error("Tavus returned no Face");
+  return body.face;
 }
 
 export interface AnamConfigurationCheck {

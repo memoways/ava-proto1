@@ -346,6 +346,205 @@ export function summarizeTavusPalVoice(pal: unknown): Record<string, unknown> {
 }
 
 // ---------------------------------------------------------------------------
+// Tavus — Face training: POST /v2/faces (video to face) and GET /v2/faces/{face_id}
+// Sources read on 5 November 2026: Tavus "Video to Face", "Create Face", "Get Face",
+// "Phoenix-4.5 Preview and Status", "Phoenix-4.5 Video Requirements".
+// ---------------------------------------------------------------------------
+
+/** Phoenix-4.5: zero-shot preview in minutes, background tuning for a few hours. */
+export const TAVUS_FACE_MODEL = "phoenix-4.5";
+export const TAVUS_FACE_NAME_MAX = 80;
+/** Private Supabase Storage bucket holding the training videos (admin-only policies). */
+export const TAVUS_TRAINING_BUCKET = "tavus-training-videos";
+/** Tavus: mp4/webm, at most 750 MB (the bucket enforces the same limit). */
+export const TAVUS_TRAINING_VIDEO_MAX_BYTES = 750 * 1024 * 1024;
+export const TAVUS_TRAINING_VIDEO_TYPES = ["video/mp4", "video/webm"] as const;
+/** Tavus needs the link valid for at least 24 h after submission; 48 h leaves a margin. */
+export const TAVUS_TRAINING_URL_TTL_SECONDS = 48 * 60 * 60;
+const TAVUS_TRAINING_URL_MAX = 4_000;
+const TAVUS_TRAINING_PATH_MAX = 240;
+
+/** Control characters out, whitespace collapsed, bounded. "" when nothing usable remains. */
+export function safeTavusFaceName(value: unknown): string {
+  if (typeof value !== "string") return "";
+  // eslint-disable-next-line no-control-regex
+  const cleaned = value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+  return cleaned.slice(0, TAVUS_FACE_NAME_MAX).trim();
+}
+
+/**
+ * Public https link Tavus can download. No credentials, no local or literal-IP host: Tavus
+ * fetches it from its own servers, so such a link could never work.
+ */
+export function safeTavusTrainingVideoUrl(value: unknown): string {
+  if (typeof value !== "string" || value.length > TAVUS_TRAINING_URL_MAX) return "";
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:" || url.username || url.password) return "";
+    const host = url.hostname.toLowerCase();
+    if (!host.includes(".") || host === "localhost" || host.endsWith(".localhost")) return "";
+    if (host.endsWith(".local") || host.endsWith(".internal")) return "";
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.startsWith("[")) return "";
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Path of a training video inside the bucket. The bucket prefix is accepted and removed; any
+ * other shape (absolute, traversal, odd characters, wrong extension) is refused.
+ */
+export function parseTavusTrainingStoragePath(value: unknown): string {
+  if (typeof value !== "string" || value.length > TAVUS_TRAINING_PATH_MAX + 40) return "";
+  let path = value.trim();
+  if (path.startsWith(`${TAVUS_TRAINING_BUCKET}/`)) path = path.slice(TAVUS_TRAINING_BUCKET.length + 1);
+  if (!path || path.length > TAVUS_TRAINING_PATH_MAX) return "";
+  const segments = path.split("/");
+  if (segments.length > 4) return "";
+  for (const segment of segments) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(segment) || segment.includes("..")) return "";
+  }
+  return /\.(mp4|webm)$/i.test(segments[segments.length - 1]) ? path : "";
+}
+
+/** Stored object metadata against the Tavus limits; the error message, or null when fine. */
+export function checkTavusTrainingObject(
+  meta: { size?: unknown; mimetype?: unknown } | null | undefined,
+): string | null {
+  const size = meta?.size;
+  if (typeof size === "number" && Number.isFinite(size)) {
+    if (size <= 0) return "The training video is empty";
+    if (size > TAVUS_TRAINING_VIDEO_MAX_BYTES) return "The training video exceeds 750 MB";
+  }
+  const mimetype = typeof meta?.mimetype === "string" ? meta.mimetype.toLowerCase() : "";
+  if (mimetype && !(TAVUS_TRAINING_VIDEO_TYPES as readonly string[]).includes(mimetype)) {
+    return "The training video must be video/mp4 or video/webm";
+  }
+  return null;
+}
+
+/**
+ * `POST /v2/faces` body for a video-to-face training. Strict whitelist: three fields, never
+ * `callback_url`, a voice, `consent_video_url` or any other client value.
+ */
+export function buildTavusFaceTrainingRequest(input: {
+  faceName: unknown;
+  videoUrl: unknown;
+}): BuildResult {
+  const faceName = safeTavusFaceName(input?.faceName);
+  if (!faceName) return { ok: false, error: "A Face name is required" };
+  const videoUrl = safeTavusTrainingVideoUrl(input?.videoUrl);
+  if (!videoUrl) {
+    return { ok: false, error: "The training video link must be a public https URL" };
+  }
+  return {
+    ok: true,
+    body: { face_name: faceName, model_name: TAVUS_FACE_MODEL, train_video_url: videoUrl },
+  };
+}
+
+export const TAVUS_FACE_STATUSES = ["started", "completed", "error", "unknown"] as const;
+export const TAVUS_FACE_FINETUNE_STATUSES = ["training", "completed", "error"] as const;
+/**
+ * Where the Face stands for the admin: "training" (not usable), "preview" (usable, watermark,
+ * tuning running), "ready" (usable, no preview watermark), "tuning_failed" (usable, "tuning
+ * failed" watermark), "error" (not usable).
+ */
+export const TAVUS_FACE_STAGES = ["training", "preview", "ready", "tuning_failed", "error"] as const;
+
+export type TavusFaceStatus = (typeof TAVUS_FACE_STATUSES)[number];
+export type TavusFaceFinetuneStatus = (typeof TAVUS_FACE_FINETUNE_STATUSES)[number];
+export type TavusFaceStage = (typeof TAVUS_FACE_STAGES)[number];
+
+export interface NormalizedTavusFace {
+  faceId: string;
+  name: string;
+  status: TavusFaceStatus;
+  /** Raw Tavus string (for example "100/100"), bounded. */
+  trainingProgress: string;
+  /** 0-100 when the progress can be read, otherwise null. */
+  progressPercent: number | null;
+  /** Phoenix-4.5 background tuning; null on other models or before it starts. */
+  finetuneStatus: TavusFaceFinetuneStatus | null;
+  stage: TavusFaceStage;
+  /** Training failure details (bounded, links removed); null when there is none. */
+  errorMessage: string | null;
+  modelName: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+function boundedLabel(value: unknown, max: number): string {
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+function progressPercent(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw) && raw >= 0 && raw <= 100) {
+    return Math.round(raw);
+  }
+  if (typeof raw !== "string") return null;
+  const fraction = raw.trim().match(/^(\d{1,6})\s*\/\s*(\d{1,6})$/);
+  if (fraction && Number(fraction[2]) > 0) {
+    return Math.max(0, Math.min(100, Math.round((Number(fraction[1]) / Number(fraction[2])) * 100)));
+  }
+  const percent = raw.trim().match(/^(\d{1,3}(?:\.\d+)?)\s*%$/);
+  return percent && Number(percent[1]) <= 100 ? Math.round(Number(percent[1])) : null;
+}
+
+/** Links (signed or not) and the text around them are never relayed from a Tavus message. */
+export function redactTavusText(text: unknown, max = 300): string {
+  if (typeof text !== "string") return "";
+  return text.replace(/https?:\/\/\S+/gi, "[link]").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+/** Tavus Face (Create or Get response) to the fields the admin needs. Never throws. */
+export function normalizeTavusFace(value: unknown): NormalizedTavusFace {
+  const raw = asRecord(value);
+  const status = pickEnum(raw.status, TAVUS_FACE_STATUSES, "unknown");
+  const finetune = (TAVUS_FACE_FINETUNE_STATUSES as readonly unknown[]).includes(raw.finetune_status)
+    ? (raw.finetune_status as TavusFaceFinetuneStatus)
+    : null;
+  let stage: TavusFaceStage;
+  if (status === "completed") {
+    stage = finetune === "training" ? "preview" : finetune === "error" ? "tuning_failed" : "ready";
+  } else {
+    stage = status === "error" ? "error" : "training";
+  }
+  const progress = boundedLabel(raw.training_progress, 20);
+  const message = redactTavusText(raw.error_message);
+  return {
+    faceId: safeProviderId(raw.face_id),
+    name: boundedLabel(raw.face_name, 200),
+    status,
+    trainingProgress: progress,
+    progressPercent: progressPercent(raw.training_progress),
+    finetuneStatus: finetune,
+    stage,
+    errorMessage: message || null,
+    modelName: boundedLabel(raw.model_name, 40) || null,
+    createdAt: boundedLabel(raw.created_at, 40) || null,
+    updatedAt: boundedLabel(raw.updated_at, 40) || null,
+  };
+}
+
+/** `GET /v2/faces` response (`data` array, or a bare array) to normalized Faces. */
+export function normalizeTavusFaceList(value: unknown, limit = 25): NormalizedTavusFace[] {
+  const raw = asRecord(value);
+  const list = Array.isArray(value)
+    ? value
+    : Array.isArray(raw.data)
+    ? raw.data
+    : Array.isArray(raw.faces)
+    ? raw.faces
+    : [];
+  return list
+    .slice(0, limit)
+    .map((entry) => normalizeTavusFace(entry))
+    .filter((face) => face.faceId);
+}
+
+// ---------------------------------------------------------------------------
 // Anam — POST /v1/auth/session-token (ephemeral persona, client-driven speech)
 // ---------------------------------------------------------------------------
 
