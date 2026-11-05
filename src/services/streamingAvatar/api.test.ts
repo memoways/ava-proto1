@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const authenticatedFunctionFetch = vi.hoisted(() => vi.fn());
 vi.mock("@/services/gameAuth", () => ({ authenticatedFunctionFetch }));
 
-import { getTavusFaceStatus, trainTavusFace } from "./api";
+import { getTavusFaceStatus, listTavusFaces, trainTavusFace } from "./api";
 
 const face = {
   faceId: "f123",
@@ -76,6 +76,24 @@ describe("Tavus Face training client", () => {
     authenticatedFunctionFetch.mockResolvedValue(ok({ provider: "tavus", face: preview }));
     await expect(getTavusFaceStatus("f123")).resolves.toEqual(preview);
     expect(sentBody()).toEqual({ action: "face-status", provider: "tavus", faceId: "f123" });
+  });
+
+  it("lists the account Faces from the read-only catalog probe", async () => {
+    authenticatedFunctionFetch.mockResolvedValue(
+      ok({ pals: {}, faces: {}, faceStatuses: [face, { faceId: "" }] }),
+    );
+    await expect(listTavusFaces()).resolves.toEqual([face]);
+    const [url, init] = authenticatedFunctionFetch.mock.calls[0];
+    expect(String(url)).toMatch(/\/streaming-avatar-session\?probe=tavus-catalog$/);
+    expect(init.method).toBe("GET");
+    expect(init.body).toBeUndefined();
+  });
+
+  it("returns an empty list when the probe has no Faces and fails on an error body", async () => {
+    authenticatedFunctionFetch.mockResolvedValueOnce(ok({ pals: {} }));
+    await expect(listTavusFaces()).resolves.toEqual([]);
+    authenticatedFunctionFetch.mockResolvedValueOnce(ok({ error: "missing TAVUS_API_KEY" }));
+    await expect(listTavusFaces()).rejects.toThrow("missing TAVUS_API_KEY");
   });
 
   it("surfaces a status error", async () => {

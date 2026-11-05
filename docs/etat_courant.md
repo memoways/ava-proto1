@@ -43,6 +43,13 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Tavus lot 3 (5 novembre, code) : admin d'entraînement d'un Face.** Bloc « Entraîner un Face (vidéo) »
+dans l'onglet Tavus : upload TUS vers le bucket privé, entraînement lancé seulement après confirmation,
+liste des Faces avec suivi (30 s tant que `started`), « Attribuer à Max » (puis Sauvegarder). Bucket et
+4 politiques vérifiés présents dans Lovable Cloud ; aucun entraînement réel lancé. Suite : recette
+humaine, [lot 4](prompt_reprise_tavus_face_emotion_lot_4.md).
+[Plan](plan_tavus_entrainement_face_emotion.md#exécution-lot-3--5-novembre-2026).
+
 **Tavus lot 2 (5 novembre, code) : backend d'entraînement d'un Face.** Bucket privé + actions admin
 `train-face` / `face-status` + client typé, sans interface ni entraînement réel. Actions d'Ulrich :
 appliquer la migration dans le chat Lovable, vérifier le redéploiement de l'Edge Function. Suite :

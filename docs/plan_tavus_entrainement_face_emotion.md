@@ -168,6 +168,37 @@ Livré (code et tests seulement ; aucun entraînement réel, aucun appel d'écri
 
 Reste : lot 3 (admin), lot 4 (recette). [Prompt lot 3](prompt_reprise_tavus_face_emotion_lot_3.md).
 
+## Exécution lot 3 — 5 novembre 2026
+
+Vérifié avant le code (MCP Lovable Ava, lecture seule) : le bucket `tavus-training-videos` existe, privé,
+limite 786 432 000 octets, et les 4 politiques admin-only sont en place (commit Lovable « Créé bucket et appliqué
+polices », migration `0015`). Le code de l'Edge Function avec `train-face` / `face-status` est dans le dépôt
+Lovable ; son déploiement n'a pas été éprouvé par un appel (aucun appel réel autorisé) : il se confirme au
+premier « Rafraîchir » ou « Vérifier » de la recette (lot 4).
+
+Livré (front seul, aucune migration, Edge Function inchangée, aucun appel d'écriture Tavus) :
+- `src/components/TavusFaceTrainer.tsx`, inséré dans `TavusFields` sous « Par personnage » : bloc repliable ;
+  exigences vidéo ; nom (défaut « Max — date », suit le personnage cible tant qu'on ne l'a pas modifié) ;
+  personnage cible ; étape 1 « Téléverser » (input fichier caché derrière un bouton, progression, annulation,
+  reprise) ; champ « ou URL publique » (https obligatoire, une seule source) ; étape 2 « Lancer l'entraînement »
+  avec boîte de confirmation (coût/quota Tavus) ; liste des Faces, « Rafraîchir », suivi 30 s tant que `started`
+  et bloc ouvert ; « Attribuer à Max/Emma » (actif seulement si `completed`), badge « Attribué à … ».
+- `tavusFaceUpload.ts` : `checkTavusTrainingFile` (mp4/webm, > 0, ≤ 750 Mo), `buildTavusTrainingObjectPath`
+  (`<personnage>/<horodatage>-<nom>.mp4`, accepté par `parseTavusTrainingStoragePath`),
+  `describeTavusUploadError` (413 / « maximum allowed size » → message vers l'URL publique ; 401/403 ; bucket
+  absent), `uploadTavusTrainingVideo` (tus-js-client, endpoint `/storage/v1/upload/resumable`, 6 Mo, jeton admin
+  rafraîchi à chaque requête, `x-upsert: false`).
+- `tavusFaceAdmin.ts` : libellés d'étape, règles d'attribution, fusion de liste, `assignTavusFace`.
+- `api.ts` : `listTavusFaces` (sonde `tavus-catalog` existante : une lecture GET, `faceStatuses`).
+- Dépendance `tus-js-client` 4.3.1 (justification au CHANGELOG) ; `package-lock.json` mis à jour.
+- Tests : voir CHANGELOG ; aucune requête réseau, aucun entraînement.
+
+Limites connues : la liste vient de `GET /v2/faces?limit=25` (limite 25 Faces, ordre rendu par Tavus ; la sonde fait aussi les lectures
+PAL/personas/replicas, lecture seule) ; la taille d'objet maximale de Lovable Cloud reste à éprouver en recette
+(repli URL prêt) ; `bun.lock` / `bun.lockb` non régénérés.
+
+Reste : lot 4 (recette réelle, Ulrich). [Prompt lot 4](prompt_reprise_tavus_face_emotion_lot_4.md).
+
 ## Vérification
 - Unitaires ciblés : `npx vitest run src/services/streamingAvatar supabase/functions/_shared`.
 - Qualité complète : `npm run test:quality`, `npm run test:delivery`.

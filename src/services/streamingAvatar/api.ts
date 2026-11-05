@@ -177,6 +177,24 @@ export async function getTavusFaceStatus(faceId: string): Promise<TavusFace> {
   return readTavusFace(response);
 }
 
+/**
+ * Admin only: the Faces of the Tavus account with their status, read-only. Uses the existing
+ * `tavus-catalog` probe (one GET, no write), so no Edge change is needed.
+ */
+export async function listTavusFaces(): Promise<TavusFace[]> {
+  const response = await authenticatedFunctionFetch(`${ENDPOINT}?probe=tavus-catalog`, {
+    method: "GET",
+  });
+  if (!response.ok) throw new Error(await readAvatarError(response));
+  const body = (await response.json().catch(() => null)) as
+    | { faceStatuses?: unknown; error?: unknown }
+    | null;
+  if (typeof body?.error === "string") throw new Error(body.error);
+  return Array.isArray(body?.faceStatuses)
+    ? (body.faceStatuses as TavusFace[]).filter((face) => Boolean(face?.faceId))
+    : [];
+}
+
 async function readTavusFace(response: Response): Promise<TavusFace> {
   const body = (await response.json().catch(() => null)) as { face?: TavusFace } | null;
   if (!body?.face?.faceId) throw new Error("Tavus returned no Face");

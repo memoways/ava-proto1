@@ -4,6 +4,30 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatars streaming — Tavus lot 3 : admin, téléverser, suivre, attribuer un Face] — 2026-11-05
+
+- Onglet admin Avatar streaming → Tavus : bloc repliable « Entraîner un Face (vidéo) » (`TavusFaceTrainer`) :
+  exigences vidéo, nom par défaut « Max — date », personnage cible (Max/Emma), contrôle type
+  (mp4/webm) et taille (≤ 750 Mo) avant tout envoi, upload derrière un bouton avec barre de
+  progression (reprise du même objet après échec), champ « ou URL publique » https. Deux
+  étapes distinctes : téléverser (stockage privé seulement), puis « Lancer l'entraînement » **après une
+  confirmation explicite** (coût et quota Tavus) ; jamais d'entraînement automatique.
+- Upload résumable TUS vers le bucket privé `tavus-training-videos` avec le jeton de l'admin
+  (politiques admin-only du lot 2), morceaux de 6 Mo, jeton rafraîchi à chaque requête. Si Lovable
+  Cloud refuse la taille (413 / « maximum allowed size »), message clair renvoyant au champ URL.
+- Liste des Faces du compte (statut, progression, aperçu filigrané / affinage / échec d'affinage),
+  rafraîchissement manuel et suivi automatique toutes les 30 s seulement tant qu'un Face est `started`
+  et le bloc ouvert ; lecture par la sonde `tavus-catalog` existante (aucun changement d'Edge Function).
+  « Attribuer à Max » (ou Emma) écrit `tavus.characters.<personnage>.faceId` ; « Sauvegarder » reste
+  le geste d'enregistrement. Pas de suppression de Face.
+- Nouvelle dépendance **`tus-js-client` 4.3.1** (client TUS de référence de Supabase Storage pour les
+  fichiers > 6 Mo : reprise après coupure, morceaux, nouvelles tentatives ; un upload standard ne
+  convient pas à ~750 Mo). `package-lock.json` mis à jour (CI : `npm ci`) ; `bun.lock` / `bun.lockb`
+  ne sont pas régénérés (bun absent du poste), Lovable les réécrit à la prochaine installation.
+- Tests : `tavusFaceUpload.test.ts`, `tavusFaceAdmin.test.ts`, `api.test.ts` (liste),
+  `TavusFaceTrainer.test.tsx` (confirmation avant entraînement, https, format, repli taille, attribution,
+  polling). Aucun appel Tavus réel, aucun entraînement, aucun prompt modifié, base Caractères Notion intacte.
+
 ## [Avatars streaming — Tavus lot 2 : backend d'entraînement d'un Face] — 2026-11-05
 
 - Bucket privé `tavus-training-videos` (750 Mo, mp4/webm, politiques admin-only) : migration à
