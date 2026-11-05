@@ -67,6 +67,44 @@ export const TAVUS_EMOTIONS = [
 ] as const;
 export type TavusEmotion = (typeof TAVUS_EMOTIONS)[number];
 
+/**
+ * Echo-mode text tags (`<emotion value="…"/>`), a different vocabulary from `set_emotion`.
+ * Tavus documents these eleven values for Phoenix-4+ faces.
+ */
+export const TAVUS_ECHO_EMOTIONS = [
+  "neutral",
+  "angry",
+  "excited",
+  "elated",
+  "content",
+  "sad",
+  "dejected",
+  "scared",
+  "contempt",
+  "disgusted",
+  "surprised",
+] as const;
+export type TavusEchoEmotion = (typeof TAVUS_ECHO_EMOTIONS)[number];
+
+/** Characters that get a per-character Tavus block in the admin. */
+export const TAVUS_AVATAR_CHARACTERS = ["max", "emma"] as const;
+
+/** Per-character overrides; an absent or empty field falls back to the global value. */
+export interface TavusCharacterOverride {
+  faceId?: string;
+  echoEmotion?: TavusEchoEmotion;
+  emotion?: TavusEmotion;
+  listeningEmotion?: TavusEmotion;
+}
+
+/** Effective Tavus face and emotions for one character (see `resolveTavusCharacterSettings`). */
+export interface ResolvedTavusCharacterSettings {
+  faceId: string;
+  echoEmotion: TavusEchoEmotion;
+  emotion: TavusEmotion;
+  listeningEmotion: TavusEmotion;
+}
+
 export interface TavusAvatarSettings {
   replicaId: string;
   personaId: string;
@@ -80,10 +118,14 @@ export interface TavusAvatarSettings {
   applyGreenscreen: boolean;
   /** Tavus `policy: "eu"` (AI Act resolution of `auto` settings). */
   euPolicy: boolean;
-  /** Face emotion while speaking (set_emotion + Echo tag); Ava's characters are in distress. */
+  /** Face emotion while speaking (`set_emotion`); Ava's characters are in distress. */
   emotion: TavusEmotion;
   /** Face emotion held while listening; sadness reads as pitiful, so closed and neutral by default. */
   listeningEmotion: TavusEmotion;
+  /** Echo tag prefixed to each spoken line, chosen directly among the 11 Echo values. */
+  echoEmotion: TavusEchoEmotion;
+  /** Per-character overrides keyed by character (`max`, `emma`); empty means global. */
+  characters: Record<string, TavusCharacterOverride>;
 }
 
 export interface StreamingAvatarSettings {
@@ -99,6 +141,8 @@ export interface StreamingAvatarSettings {
 export interface ResponseOutputPrepareContext {
   sessionId: string;
   signal?: AbortSignal;
+  /** Character on screen when the output connects (Tavus picks its Face from it). */
+  characterKey?: string;
 }
 
 export interface ResponseOutputTurnContext {

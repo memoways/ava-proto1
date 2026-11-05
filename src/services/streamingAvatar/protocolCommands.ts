@@ -1,4 +1,4 @@
-import type { TavusEmotion } from "./types";
+import { TAVUS_ECHO_EMOTIONS, type TavusEchoEmotion, type TavusEmotion } from "./types";
 
 /**
  * Provider commands are deliberately isolated here so Ava's final text cannot
@@ -15,9 +15,10 @@ export function sendHeyGenSpeakText(
 /**
  * Echo-mode text tags (a different vocabulary from `set_emotion`). Tavus requires
  * them in Echo mode: an untagged text echo lets the face pick its own emotion,
- * which overrides `set_emotion` and brings back the smile.
+ * which overrides `set_emotion` and brings back the smile. Since lot 1 the Echo tag
+ * is its own setting; this table only derives it for settings saved before.
  */
-export const TAVUS_ECHO_EMOTION_TAGS: Record<TavusEmotion, string> = {
+export const TAVUS_ECHO_EMOTION_TAGS: Record<TavusEmotion, TavusEchoEmotion> = {
   sadness: "dejected",
   fear: "scared",
   anger: "angry",
@@ -28,18 +29,24 @@ export const TAVUS_ECHO_EMOTION_TAGS: Record<TavusEmotion, string> = {
   happiness: "content",
 };
 
-const EMOTION_TAG_PATTERN = /<emotion\s+value="[a-z]+"\s*\/>\s*/g;
+/** Any `<emotion value="…"/>` tag (quotes, case and closing slash tolerated) and its trailing space. */
+const EMOTION_TAG_PATTERN = /<emotion\s+value\s*=\s*["'][a-z_-]*["']\s*\/?>\s*/gi;
 
 export function stripTavusEmotionTags(text: string): string {
   return text.replace(EMOTION_TAG_PATTERN, "");
 }
 
+export function isTavusEchoEmotion(value: unknown): value is TavusEchoEmotion {
+  return TAVUS_ECHO_EMOTIONS.includes(value as TavusEchoEmotion);
+}
+
+/** Echo text command; the tag is only written for one of the 11 documented Echo values. */
 export function buildTavusEchoCommand(
   conversationId: string,
   text: string,
-  emotion?: TavusEmotion,
+  echoEmotion?: TavusEchoEmotion,
 ) {
-  const tag = emotion ? `<emotion value="${TAVUS_ECHO_EMOTION_TAGS[emotion]}"/> ` : "";
+  const tag = isTavusEchoEmotion(echoEmotion) ? `<emotion value="${echoEmotion}"/> ` : "";
   return {
     message_type: "conversation",
     event_type: "conversation.echo",

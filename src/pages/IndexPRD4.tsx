@@ -915,7 +915,7 @@ const IndexPRD4 = () => {
     setAvatarVideoFit(output.videoFit ?? "cover");
     if (output.mode === "streaming_avatar") avatarConnectStartedAtRef.current = performance.now();
     try {
-      await output.prepare({ sessionId: sid });
+      await output.prepare({ sessionId: sid, characterKey: startingCharacter });
       // A timeout/disconnect may have installed the TTS fallback while the
       // provider was still finishing its connection in the background.
       if (responseOutputRef.current !== output) {

@@ -13,11 +13,17 @@ import {
   STREAMING_AVATAR_BOUNDS,
   TAVUS_DEFAULT_LANGUAGES,
 } from "../../../supabase/functions/_shared/streamingAvatarRequest";
+import { isTavusEchoEmotion, TAVUS_ECHO_EMOTION_TAGS } from "./protocolCommands";
 import {
+  TAVUS_AVATAR_CHARACTERS,
   TAVUS_EMOTIONS,
   type OutputSettings,
+  type ResolvedTavusCharacterSettings,
   type StreamingAvatarProviderId,
   type StreamingAvatarSettings,
+  type TavusAvatarSettings,
+  type TavusCharacterOverride,
+  type TavusEchoEmotion,
   type TavusEmotion,
 } from "./types";
 
@@ -53,6 +59,9 @@ export const streamingAvatarDefaults: StreamingAvatarSettings = {
     euPolicy: false,
     emotion: "sadness",
     listeningEmotion: "neutral",
+    // Removes the smile best; can read a little sad (to check in the lot 4 recipe).
+    echoEmotion: "dejected",
+    characters: { max: {}, emma: {} },
   },
   // Sad speaking style and closed idling attitude, like the Tavus emotions; IDs set in the admin.
   anam: normalizeAnamSettings(undefined),
@@ -169,6 +178,8 @@ export function normalizeStreamingAvatarSettings(
         tavus.listeningEmotion,
         tavusDefaults.listeningEmotion,
       ),
+      echoEmotion: normalizeTavusEchoEmotion(tavus.echoEmotion, tavus.emotion),
+      characters: normalizeTavusCharacters(tavus.characters),
     },
     anam: normalizeAnamSettings(raw.anam),
     lemonslice: normalizeLemonSliceSettings(raw.lemonslice),
@@ -190,6 +201,61 @@ function normalizeTavusEmotion(
   fallback: TavusEmotion = streamingAvatarDefaults.tavus.emotion,
 ): TavusEmotion {
   return TAVUS_EMOTIONS.includes(value as TavusEmotion) ? (value as TavusEmotion) : fallback;
+}
+
+/**
+ * Settings saved before the Echo tag had its own field derive it from the speaking
+ * `set_emotion` value (old behaviour); an unknown value falls back to the default.
+ */
+function normalizeTavusEchoEmotion(value: unknown, legacyEmotion: unknown): TavusEchoEmotion {
+  if (isTavusEchoEmotion(value)) return value;
+  if (value === undefined || value === null) {
+    return TAVUS_ECHO_EMOTION_TAGS[normalizeTavusEmotion(legacyEmotion)];
+  }
+  return streamingAvatarDefaults.tavus.echoEmotion;
+}
+
+const CHARACTER_KEY_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
+const FACE_ID_MAX_LENGTH = 128;
+
+/** Keeps only valid overrides; `max` and `emma` are always present (empty = global). */
+function normalizeTavusCharacters(value: unknown): Record<string, TavusCharacterOverride> {
+  const characters: Record<string, TavusCharacterOverride> = {};
+  for (const key of TAVUS_AVATAR_CHARACTERS) characters[key] = {};
+  for (const [key, raw] of Object.entries(asRecord(value))) {
+    if (!CHARACTER_KEY_PATTERN.test(key)) continue;
+    const entry = asRecord(raw);
+    const override: TavusCharacterOverride = {};
+    const faceId = typeof entry.faceId === "string" ? entry.faceId.trim() : "";
+    if (faceId && faceId.length <= FACE_ID_MAX_LENGTH) override.faceId = faceId;
+    if (isTavusEchoEmotion(entry.echoEmotion)) override.echoEmotion = entry.echoEmotion;
+    if (TAVUS_EMOTIONS.includes(entry.emotion as TavusEmotion)) {
+      override.emotion = entry.emotion as TavusEmotion;
+    }
+    if (TAVUS_EMOTIONS.includes(entry.listeningEmotion as TavusEmotion)) {
+      override.listeningEmotion = entry.listeningEmotion as TavusEmotion;
+    }
+    characters[key] = override;
+  }
+  return characters;
+}
+
+/**
+ * Effective Face and emotions for a character: each override field wins when set,
+ * otherwise the global value applies. No character (or an unknown one) means global.
+ */
+export function resolveTavusCharacterSettings(
+  settings: TavusAvatarSettings,
+  characterKey?: string | null,
+): ResolvedTavusCharacterSettings {
+  const override: TavusCharacterOverride =
+    (characterKey && settings.characters?.[characterKey]) || {};
+  return {
+    faceId: override.faceId?.trim() || settings.replicaId,
+    echoEmotion: override.echoEmotion ?? settings.echoEmotion,
+    emotion: override.emotion ?? settings.emotion,
+    listeningEmotion: override.listeningEmotion ?? settings.listeningEmotion,
+  };
 }
 
 function clamp(value: unknown, min: number, max: number, fallback: number): number {

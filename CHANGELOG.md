@@ -4,6 +4,30 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatars streaming — Tavus lot 1 : balise Echo et expressivité par personnage] — 2026-11-05
+
+- Constat : le PAL Tavus est en mode Echo, Ava écrit chaque réplique ; la balise
+  `<emotion value="…"/>` était déjà préfixée par le code, mais dérivée du réglage
+  `set_emotion` (8 valeurs) et commune à tous les personnages. Aucun prompt modifié.
+- Balise Echo réglable directement parmi les 11 valeurs Tavus (`neutral`, `angry`, `excited`,
+  `elated`, `content`, `sad`, `dejected`, `scared`, `contempt`, `disgusted`, `surprised`),
+  défaut `dejected`, découplée de `set_emotion`. Réglages enregistrés avant : balise dérivée de
+  l'émotion en parlant comme avant (`sadness` → `dejected`) ; valeur inconnue → `dejected`.
+  Une valeur hors liste n'écrit jamais de balise.
+- Surcharges par personnage (`tavus.characters.max`, `.emma`) : Face ID, balise Echo, émotion
+  en parlant, émotion en écoutant ; vide = réglage global. Helper pur
+  `resolveTavusCharacterSettings`. Le Face est choisi à l'ouverture selon le personnage de
+  départ ; à un changement de personnage, même Face → seules les émotions changent, autre Face
+  → la conversation Tavus est fermée puis rouverte avec ce Face (l'ancienne salle n'est pas lue
+  comme une déconnexion). L'Edge Function reçoit le Face résolu, sans la table.
+- Défense : `prepareTextForTTS` et les sous-titres retirent toute balise `<emotion …/>`
+  (auparavant seul `>` était retiré, laissant `<emotion value=…/` lisible) ; motif tolérant
+  aux guillemets, à la casse et aux espaces.
+- Admin Tavus : sélecteur « Balise Echo en parlant » avec aide, bloc « Par personnage »
+  (Max, Emma) où « Global » reprend la valeur commune.
+- Front seul : aucune migration, aucun secret, Edge Function inchangée, aucun appel d'écriture
+  vers Tavus. Recette visuelle réelle au lot 4 ; lot 2 (backend d'entraînement) préparé.
+
 ## [Avatars streaming — Anam AN2 : émotion du visage par réplique] — 2026-11-05
 
 - Demande d'Ulrich : Max évolue dans son jeu au fil de la session, piloté par le Game Master.

@@ -1,4 +1,5 @@
 import { normalizeCharacterNames } from "@/services/characterNames";
+import { stripTavusEmotionTags } from "@/services/streamingAvatar/protocolCommands";
 
 /**
  * Provider-agnostic text preparation for TTS.
@@ -6,7 +7,8 @@ import { normalizeCharacterNames } from "@/services/characterNames";
  * provider receives clean French prose.
  */
 export function prepareTextForTTS(text: string): string {
-  return normalizeCharacterNames(text)
+  // A Tavus Echo tag is face-only: never read aloud (removing `>` alone left `<emotion value=…/`).
+  return normalizeCharacterNames(stripTavusEmotionTags(text))
     .replace(/\r\n/g, "\n")
     .replace(/\*\*([^*]+)\*\*/g, "$1")
     .replace(/\*([^*]+)\*/g, "$1")
