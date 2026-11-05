@@ -169,6 +169,15 @@ export interface AvatarMediaDiagnostics {
   /** Stats-based check before the opening line; null when the peer connection is not reachable. */
   steadyStream?: boolean | null;
   videoFps?: number | null;
+  /** Selected ICE pair at warm-up (see `networkPath.ts`): types and protocols, never addresses. */
+  localCandidateType?: string | null;
+  remoteCandidateType?: string | null;
+  transportProtocol?: string | null;
+  relayProtocol?: string | null;
+  roundTripTimeMs?: number | null;
+  incomingBitrateKbps?: number | null;
+  /** Region set in the admin ("auto" lets the provider choose). */
+  requestedRegion?: string;
   cpuReason?: string;
 }
 

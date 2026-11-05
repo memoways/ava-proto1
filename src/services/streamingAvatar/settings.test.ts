@@ -92,7 +92,7 @@ describe("streaming avatar settings normalization", () => {
     expect(value.tavus).toMatchObject({ replicaId: "face", personaId: "pal", emotion: "sadness" });
     expect(value.anam).toEqual(streamingAvatarDefaults.anam);
     expect(value.anam).toMatchObject({
-      avatarModel: "cara-4-latest",
+      avatarModel: "cara-4.1-express",
       languageCode: "fr",
       speakingCue: "sad",
       directorNotes: { mode: "custom" },
@@ -114,7 +114,7 @@ describe("streaming avatar settings normalization", () => {
       },
     });
     expect(value.anam.avatarId).toBe("a");
-    expect(value.anam.avatarModel).toBe("cara-4-latest");
+    expect(value.anam.avatarModel).toBe("cara-4.1-express");
     expect(value.anam.speakingCue).toBe("sad");
     expect(value.anam.maxSessionLengthSeconds).toBe(900);
     expect(value.anam.directorNotes).toMatchObject({ mode: "preset", presetStyle: "distressed", expressivity: 0.4 });

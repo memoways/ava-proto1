@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatars streaming — Anam AN1 : modèle, métriques, chemin réseau, aides voix] — 2026-11-05
+
+- Modèle d'avatar Anam par défaut : `cara-4.1-express` (recommandé par Anam). Une valeur déjà
+  enregistrée est conservée ; dans l'admin, `cara-4-latest` est signalé « instable, déconseillé
+  en production ».
+- Métriques client Anam réactivées (`disableClientMetrics` retiré) : télémétrie de connexion du
+  SDK 4.29.1 (jalons, redémarrages ICE, heartbeat, erreurs), sans texte ni son, pour la page
+  Sessions de Lab. Rétention toujours désactivée.
+- Diagnostic `warm_up` enrichi du chemin réseau retenu (`networkPath.ts`) : candidat local et
+  distant (`host` / `srflx` / `prflx` / `relay`), protocole, protocole du relais, RTT, débit
+  entrant estimé, région demandée. Jamais d'adresse, de port ni d'URL de relais. Affiché dans le
+  panneau « Tester l'avatar ».
+- Aides de l'admin sur les voix expressives (Cartesia Sonic 3.6, ElevenLabs v3 conversational /
+  v4) et le passage des voix ElevenLabs intégrées en `eleven_v4_turbo` le 3 novembre. Champs
+  envoyés par moteur vérifiés contre la documentation Anam : inchangés.
+- Module partagé modifié : Edge Function `streaming-avatar-session` à redéployer par Lovable.
+  Prompt AN2 actualisé.
+
 ## [Avatars streaming — Anam : plan d'expressivité et d'émotion évolutive] — 2026-11-05
 
 - Recommandations du support Anam (Director Notes, Cara 4.1 Express, `videoQuality`, réseau)

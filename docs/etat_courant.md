@@ -43,6 +43,12 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Anam AN1 (5 novembre, code) : fondations.** Cara 4.1 Express par défaut (valeurs enregistrées
+gardées), métriques client Anam réactivées (télémétrie de connexion seule), chemin réseau (type de
+candidat, protocole, RTT ; aucune adresse) dans `warm_up`, visible dans « Tester l'avatar », aides
+voix. Edge Function à redéployer par Lovable. Recette d'Ulrich, puis
+[AN2](prompt_reprise_anam_lot_an2.md). [Exécution](plan_avatar_streaming_multi_fournisseurs.md#exécution-an1--5-novembre-2026).
+
 **Anam, expressivité et émotion évolutive (5 novembre, plan).** Recommandations du support Anam
 relues contre le code : Director Notes et `videoQuality: "high"` déjà en place. Deux lots :
 [AN1](prompt_reprise_anam_lot_an1.md) (Cara 4.1 Express par défaut, métriques client, chemin

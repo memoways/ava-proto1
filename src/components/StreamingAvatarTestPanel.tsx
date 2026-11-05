@@ -9,6 +9,7 @@ import {
   type ResponseOutput,
   type StreamingAvatarSettings,
 } from "@/services/streamingAvatar";
+import { describeWarmUp } from "@/services/streamingAvatar/networkPath";
 import { createPRD4Session } from "@/services/prd4Session";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -115,6 +116,7 @@ export default function StreamingAvatarTestPanel({
             if (diagnostics.event === "tracks") push(`Pistes reçues : audio=${diagnostics.audioTracks}, vidéo=${diagnostics.videoTracks}`);
             if (diagnostics.event === "playback") push(`Lecture navigateur : ${diagnostics.playback}${diagnostics.errorName ? ` (${diagnostics.errorName})` : ""}`, diagnostics.playback === "playing" ? "ok" : "error");
             if (diagnostics.event === "cpu") push(`Charge locale Daily : ${diagnostics.cpuState} (${diagnostics.cpuReason})`, diagnostics.cpuState === "high" ? "error" : "info");
+            if (diagnostics.event === "warm_up") push(describeWarmUp(diagnostics), diagnostics.warmUpComplete === false ? "error" : "info");
             if (diagnostics.event === "network") push(`Réseau : ${diagnostics.networkState}, audio ${diagnostics.audioBitrate ?? "—"} bit/s, vidéo ${diagnostics.videoBitrate ?? "—"} bit/s, pertes audio ${diagnostics.audioPacketLoss ?? "—"}, vidéo ${diagnostics.videoPacketLoss ?? "—"}, jitter audio ${diagnostics.audioJitter ?? "—"}, vidéo ${diagnostics.videoJitter ?? "—"}, RTT ${diagnostics.roundTripTime ?? "—"}`);
           },
           onDisconnected: (reason) => push(`Déconnexion : ${reason ?? "inconnue"}`, "error"),

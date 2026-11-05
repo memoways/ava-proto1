@@ -243,7 +243,7 @@ describe("Anam session token request", () => {
     expect(body.personaConfig).toMatchObject({
       avatarId: "30fa96d0-26c4-4e55-94a0-517025942e18",
       voiceId: anamBase.voiceId,
-      avatarModel: "cara-4-latest",
+      avatarModel: "cara-4.1-express",
       llmId: "CUSTOMER_CLIENT_V1",
       skipGreeting: true,
       languageCode: "fr",
@@ -255,6 +255,13 @@ describe("Anam session token request", () => {
       videoQuality: "high",
       dataRetention: { recording: false, transcripts: false },
     });
+  });
+
+  it("keeps a saved avatar model, including the unstable cara-4-latest", () => {
+    for (const avatarModel of ["cara-4-latest", "cara-4", "cara-3"]) {
+      expect(anamBody({ ...anamBase, avatarModel }).personaConfig.avatarModel).toBe(avatarModel);
+    }
+    expect(anamBody({ ...anamBase, avatarModel: "cara-9" }).personaConfig.avatarModel).toBe("cara-4.1-express");
   });
 
   it("sends the sad speaking style and the closed idling attitude by default", () => {

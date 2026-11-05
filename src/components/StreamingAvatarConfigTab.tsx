@@ -17,13 +17,13 @@ import {
   type TavusConfigurationCheck,
 } from "@/services/streamingAvatar/api";
 import {
-  ANAM_AVATAR_MODELS,
   ANAM_CARTESIA_EMOTIONS,
   ANAM_DIRECTOR_NOTES_MODELS,
   ANAM_ELEVENLABS_MODELS,
   ANAM_ELEVENLABS_STABILITY_ONLY,
   ANAM_ELEVENLABS_V4,
   ANAM_STYLE_PROMPT_MAX,
+  type AnamAvatarModel,
   type AnamCueTag,
   type AnamPresetStyle,
   type AnamStyleMode,
@@ -482,12 +482,12 @@ function AnamFields({
         <SectionTitle>Essentiel</SectionTitle>
         <div className="grid gap-4 md:grid-cols-2">
           <TextField label="Avatar ID" value={value.avatarId} onChange={(avatarId) => patch({ avatarId })} />
-          <TextField label="Voice ID" hint="Voix choisie chez Anam (D2a) ; la voix d'Ava n'est pas utilisée." value={value.voiceId} onChange={(voiceId) => patch({ voiceId })} />
+          <TextField label="Voice ID" hint="Voix choisie chez Anam (D2a) ; la voix d'Ava n'est pas utilisée. Voix expressives recommandées par Anam : une voix Cartesia Sonic 3.6 (choisie par son Voice ID), ou ElevenLabs v3 conversational / v4." value={value.voiceId} onChange={(voiceId) => patch({ voiceId })} />
           <EnumField
             label="Modèle d'avatar"
-            hint="Les notes de jeu ne sont lues que par Cara 4."
+            hint="Cara 4.1 Express recommandé par Anam. Les notes de jeu ne sont lues que par Cara 4."
             value={value.avatarModel}
-            options={sameLabels(ANAM_AVATAR_MODELS)}
+            options={ANAM_AVATAR_MODEL_LABELS}
             onChange={(avatarModel) => patch({ avatarModel })}
           />
           <TextField label="Langue" hint="Code ISO 639, ex. fr." value={value.languageCode} onChange={(languageCode) => patch({ languageCode })} />
@@ -550,7 +550,7 @@ function AnamFields({
             <SwitchField label="Transcriptions chez Anam" hint="dataRetention.transcripts ; désactivé par défaut." checked={session.keepTranscripts} onChange={(keepTranscripts) => patchSession({ keepTranscripts })} />
             <EnumField
               label="Réglages de voix"
-              hint="Choisir le moteur de la voix Anam ; seuls les champs qu'il lit sont envoyés."
+              hint="Choisir le moteur de la voix Anam ; seuls les champs qu'il lit sont envoyés. Sans réglages, les voix ElevenLabs intégrées passent en eleven_v4_turbo depuis le 3 novembre 2026."
               value={voice.engine}
               options={ANAM_VOICE_ENGINE_LABELS}
               onChange={(engine) => patchVoice({ engine })}
@@ -560,7 +560,7 @@ function AnamFields({
             <div className="grid gap-4 md:grid-cols-2">
               <EnumField
                 label="Modèle ElevenLabs"
-                hint="v3 : stabilité seule ; v4 : stabilité et similarité."
+                hint="Expressifs : eleven_v3_conversational (stabilité seule) ou eleven_v4 / eleven_v4_turbo (stabilité et similarité). Choisir v3 conversational pour garder une voix intégrée en v3 après le 3 novembre."
                 value={eleven.model}
                 options={sameLabels(ANAM_ELEVENLABS_MODELS)}
                 onChange={(model) => patchEleven({ model })}
@@ -579,6 +579,7 @@ function AnamFields({
             <div className="grid gap-4 md:grid-cols-2">
               <NumberField label="Volume" hint="0,5 à 2." bounds={b.anamCartesiaVolume} value={cartesia.volume} onChange={(volume) => patchVoice({ cartesia: { ...cartesia, volume } })} />
               <NumberField label="Vitesse" hint="0,6 à 1,5." bounds={b.anamCartesiaSpeed} value={cartesia.speed} onChange={(speed) => patchVoice({ cartesia: { ...cartesia, speed } })} />
+              <p className="text-xs text-muted-foreground md:col-span-2">Sonic 3 et Sonic 3.6 : volume, vitesse, émotion. Sonic 3.6, le plus expressif, se choisit par la voix (Voice ID) dans le Lab Anam.</p>
               <EnumField
                 label="Émotion de la voix"
                 value={cartesia.emotion}
@@ -617,6 +618,13 @@ function AnamFields({
     </Card>
   );
 }
+
+const ANAM_AVATAR_MODEL_LABELS: Record<AnamAvatarModel, string> = {
+  "cara-4.1-express": "Cara 4.1 Express — recommandé (défaut)",
+  "cara-4": "Cara 4",
+  "cara-4-latest": "Cara 4 latest — instable, déconseillé en production",
+  "cara-3": "Cara 3 — sans notes de jeu",
+};
 
 const ANAM_CUE_LABELS: Record<AnamCueTag, string> = {
   none: "Aucune balise",
