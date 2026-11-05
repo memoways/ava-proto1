@@ -107,6 +107,9 @@ describe("Anam text-mode lifecycle", () => {
     const output = await ready();
     expect(startAvatarSession).toHaveBeenCalledWith(expect.objectContaining({ provider: "anam", anam: settings }));
     expect(fake.createClient).toHaveBeenCalledWith("ephemeral", expect.objectContaining({ disableInputAudio: true }));
+    // Client metrics stay on so Anam (and its Lab Sessions page) gets the connection telemetry.
+    const options = fake.createClient.mock.calls[0][1] as { metrics?: { disableClientMetrics?: boolean } };
+    expect(options.metrics?.disableClientMetrics).toBeUndefined();
     expect(fake.client.stream).toHaveBeenCalledWith();
     await output.dispose();
   });
@@ -300,5 +303,43 @@ describe("Anam text-mode lifecycle", () => {
     await expect(output.renderText("Bonjour")).rejects.toMatchObject({ started: false });
     expect(fake.talks).toHaveLength(0);
     await output.dispose();
+  });
+  it("adds the selected network path to the warm-up diagnostic, never an address", async () => {
+    const pc = peerConnection({ fps: 25 });
+    const stats = pc.getStats;
+    pc.getStats = async () => new Map<string, unknown>([
+      ...(await stats()),
+      ["T", { type: "transport", selectedCandidatePairId: "P" }],
+      ["P", { id: "P", type: "candidate-pair", localCandidateId: "L", remoteCandidateId: "R", currentRoundTripTime: 0.084, availableIncomingBitrate: 2_400_000 }],
+      ["L", { id: "L", type: "local-candidate", candidateType: "relay", protocol: "udp", relayProtocol: "tls", address: "192.0.2.10", port: 50_000, url: "turns:relay.example:443" }],
+      ["R", { id: "R", type: "remote-candidate", candidateType: "host", protocol: "udp", address: "198.51.100.7", port: 3478 }],
+    ]);
+    fake.peer.current = pc;
+    const onMediaDiagnostics = vi.fn();
+    const output = anam({ sessionOptions: { ...settings.sessionOptions, region: "eu" } }, { onMediaDiagnostics }, { ...warmUp, maxWaitMs: 2_000, pollMs: 40 });
+    await output.prepare({ sessionId: "ava" }); sessionReady(); output.attachMedia(videoWithFrame());
+    const opening = output.renderText("Bonjour.");
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(1));
+    const warm = onMediaDiagnostics.mock.calls.map(([d]) => d).find((d) => d.event === "warm_up");
+    expect(warm).toMatchObject({
+      localCandidateType: "relay", remoteCandidateType: "host", transportProtocol: "udp", relayProtocol: "tls",
+      roundTripTimeMs: 84, incomingBitrateKbps: 2400, requestedRegion: "eu",
+    });
+    expect(JSON.stringify(warm)).not.toMatch(/192\.0\.2|198\.51\.100|50000|3478|turns:|relay\.example/);
+    expect(Object.keys(warm).filter((key) => ["address", "port", "url"].includes(key))).toEqual([]);
+    persona("Bonjour.", { endOfSpeech: true });
+    await opening; await output.dispose();
+  });
+
+  it("warms up without a network path when the connection is private", async () => {
+    const onMediaDiagnostics = vi.fn();
+    const output = await ready({ onMediaDiagnostics });
+    const opening = output.renderText("Bonjour.");
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(1));
+    const warm = onMediaDiagnostics.mock.calls.map(([d]) => d).find((d) => d.event === "warm_up");
+    expect(warm).toMatchObject({ requestedRegion: "auto" });
+    expect(warm).not.toHaveProperty("localCandidateType");
+    persona("Bonjour.", { endOfSpeech: true });
+    await opening; await output.dispose();
   });
 });

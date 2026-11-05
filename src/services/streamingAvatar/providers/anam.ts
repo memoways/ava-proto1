@@ -8,6 +8,7 @@ import {
   type MessageStreamEvent,
 } from "@anam-ai/js-sdk";
 import { endAvatarSession, startAvatarSession } from "../api";
+import { readNetworkPath, type AvatarNetworkPath } from "../networkPath";
 import { splitAvatarText } from "../textSegmentation";
 import { stripAnamCueTags } from "../../../../supabase/functions/_shared/streamingAvatarRequest";
 import {
@@ -122,8 +123,9 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     this._externalSessionId = started.externalSessionId;
     const client = createClient(started.sessionToken, {
       // Ava keeps its microphone and STT: the SDK never asks for nor publishes input audio.
+      // Client metrics stay on: connection telemetry only (milestones, ICE restarts, errors),
+      // which feeds Anam's session performance page in Lab; no text and no audio.
       disableInputAudio: true,
-      metrics: { disableClientMetrics: true },
     });
     this.client = client;
     this.bindEvents(client);
@@ -279,12 +281,15 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       delay(this.warmUpTiming.maxWaitMs).then(() => false),
     ]);
     const steady = ready ? await this.waitForSteadyStream(deadline) : { steady: false, videoFps: null };
+    const path = await this.selectedNetworkPath();
     this.callbacks.onMediaDiagnostics?.({
       event: "warm_up",
       warmUpMs: Math.round(performance.now() - startedAt),
       warmUpComplete: ready && steady.steady !== false,
       steadyStream: steady.steady,
       videoFps: steady.videoFps,
+      ...path,
+      requestedRegion: this.settings.sessionOptions.region,
     });
     await delay(this.warmUpTiming.settleMs);
     // Shown once, right before the first line: no back and forth with the portrait.
@@ -315,6 +320,17 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       await delay(this.warmUpTiming.pollMs);
     }
     return { steady: false, videoFps };
+  }
+
+  /** Route taken by the stream (direct or TURN fallback); null when the connection is private. */
+  private async selectedNetworkPath(): Promise<AvatarNetworkPath | null> {
+    const pc = this.peerConnection();
+    if (!pc) return null;
+    try {
+      return await readNetworkPath(pc);
+    } catch {
+      return null;
+    }
   }
 
   private applyPlayoutBuffer(): void {

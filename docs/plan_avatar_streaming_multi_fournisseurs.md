@@ -387,3 +387,43 @@ balise fixe. AN2 la traduit en balise Anam : aucun nouvel appel LLM.
 
 Aucun lot ne suit AN2 par défaut. La même traduction pour Tavus (émotion tenue aujourd'hui) ne
 s'ouvre que sur demande d'Ulrich.
+
+### Exécution AN1 — 5 novembre 2026
+
+Branche `feat/anam-an1-foundations`.
+
+- **Modèle.** `normalizeAnamSettings` (même module pour le client et l'Edge Function) prend
+  `cara-4.1-express` par défaut (`ANAM_DEFAULT_AVATAR_MODEL`). Une valeur enregistrée connue
+  (`cara-4-latest`, `cara-4`, `cara-3`) est conservée ; une valeur inconnue revient au défaut.
+  Admin : « Cara 4.1 Express — recommandé (défaut) », « Cara 4 latest — instable, déconseillé en
+  production ».
+- **Métriques client.** `disableClientMetrics` retiré. Lu dans le SDK 4.29.1
+  (`lib/ClientMetrics.js`, `ConnectionMilestones.js`, `HeartbeatStats.js`, `ClientError.js`) :
+  tentative et succès de session, connexion établie/fermée, jalons de connexion, redémarrage
+  ICE, allers-retours de heartbeat (échantillon de 5 %), codes d'erreur ; étiquettes : version du
+  SDK, identifiants de session, d'organisation et de tentative. Aucun texte, aucun son (le micro
+  reste fermé). La rétention (enregistrement, transcriptions) reste désactivée.
+- **Chemin réseau.** `src/services/streamingAvatar/networkPath.ts` lit la paire ICE retenue
+  (`transport.selectedCandidatePairId`, sinon paire `selected`, sinon nommée et réussie) : type
+  de candidat local et distant, protocole, protocole du relais si le candidat local est un
+  relais, RTT courant (ms), débit entrant estimé (kbit/s). Valeurs hors liste blanche écartées ;
+  adresses, ports et URL de relais jamais lus. Ajouté au diagnostic `warm_up` avec la région
+  demandée ; rien si le SDK cache sa connexion. Lecture : candidat local `relay` = repli TURN
+  (Cloudflare, TLS/TCP 443 ou UDP/TCP 3478) ; sinon chemin direct, le candidat distant pouvant
+  être un relais Anam (UDP 3478).
+- **Admin.** Le panneau « Tester l'avatar » affiche désormais la ligne `warm_up` (préchauffage,
+  stabilité du flux, chemin réseau, RTT, région). Aides de voix : Cartesia Sonic 3.6 choisie
+  par son Voice ID ; ElevenLabs `eleven_v3_conversational` (stabilité seule) ou
+  `eleven_v4` / `eleven_v4_turbo` (stabilité et similarité) ; voix ElevenLabs intégrées passées
+  en `eleven_v4_turbo` le 3 novembre 2026 si aucun modèle n'est fixé. Champs envoyés par moteur
+  confrontés à `anam.ai/docs/personas/voices/configuration.md` le 5 novembre : conformes, aucun
+  changement d'envoi ni de voix par défaut. Fish n'y est pas documenté (inchangé).
+- **Tests.** Corps de jeton (défaut 4.1 Express, anciennes valeurs conservées), `createClient`
+  sans `disableClientMetrics`, chemin réseau (relais TLS, direct, sans paire, valeurs inattendues,
+  connexion privée, aucun champ d'adresse dans le diagnostic).
+- **Edge Function.** Le module partagé a changé (défaut du modèle) : `streaming-avatar-session`
+  doit être redéployée par Lovable.
+
+Appris pour AN2 : le diagnostic `warm_up` sert de modèle pour un diagnostic par tour (champs
+plats, listes blanches, aucun texte) ; `trackEvent("prd4_streaming_avatar_media")` étale les
+champs du diagnostic tels quels, donc tout nouveau champ doit rester non sensible.

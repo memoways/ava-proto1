@@ -349,7 +349,12 @@ export function summarizeTavusPalVoice(pal: unknown): Record<string, unknown> {
 // Anam — POST /v1/auth/session-token (ephemeral persona, client-driven speech)
 // ---------------------------------------------------------------------------
 
-export const ANAM_AVATAR_MODELS = ["cara-4-latest", "cara-4", "cara-4.1-express", "cara-3"] as const;
+export const ANAM_AVATAR_MODELS = ["cara-4.1-express", "cara-4", "cara-4-latest", "cara-3"] as const;
+/**
+ * Recommended by Anam (docs, 5 November 2026). `cara-4-latest` may change from one session to
+ * the next and is not advised in production; a saved value is kept as is.
+ */
+export const ANAM_DEFAULT_AVATAR_MODEL: AnamAvatarModel = "cara-4.1-express";
 /** Director Notes are read by Cara 4 models only; they are not sent for cara-3. */
 export const ANAM_DIRECTOR_NOTES_MODELS: readonly string[] = [
   "cara-4-latest",
@@ -498,7 +503,7 @@ export function normalizeAnamSettings(value: unknown): AnamAvatarSettings {
   const b = STREAMING_AVATAR_BOUNDS;
   return {
     avatarId: typeof raw.avatarId === "string" ? raw.avatarId : "",
-    avatarModel: pickEnum(raw.avatarModel, ANAM_AVATAR_MODELS, "cara-4-latest"),
+    avatarModel: pickEnum(raw.avatarModel, ANAM_AVATAR_MODELS, ANAM_DEFAULT_AVATAR_MODEL),
     voiceId: typeof raw.voiceId === "string" ? raw.voiceId : "",
     languageCode: safeLanguageCode(raw.languageCode, "fr"),
     maxSessionLengthSeconds: boundedInteger(raw.maxSessionLengthSeconds, b.anamMaxSessionSeconds),

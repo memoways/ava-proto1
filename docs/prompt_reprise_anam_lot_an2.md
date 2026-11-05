@@ -3,8 +3,7 @@
 Tu travailles sur Ava (`~/CodeProjects/memoways/ava-proto1`, checkout canonique, remote
 `https://github.com/memoways/ava-proto1`). Réponds en français.
 
-> AN1 doit être fusionné avant AN2. Le lot AN1 actualise ce prompt avant son push : si une
-> section « Apports d'AN1 » manque ci-dessous, lis la section « Exécution AN1 » du plan.
+> AN1 doit être fusionné avant AN2 (vérifier sur main la section « Exécution AN1 » du plan).
 
 ## 1. Démarrage
 
@@ -19,6 +18,25 @@ Tu travailles sur Ava (`~/CodeProjects/memoways/ava-proto1`, checkout canonique,
    Actualise main propre (`git pull --ff-only`), puis crée `feat/anam-an2-evolving-emotion`.
 3. Lis dans `docs/plan_avatar_streaming_multi_fournisseurs.md` la section « Suite Anam —
    expressivité, émotion évolutive et synchro » et « Exécution AN1 ».
+
+## Apports d'AN1 (5 novembre 2026)
+
+- Défaut `cara-4.1-express` ; une valeur enregistrée est conservée. Vérifier dans l'admin le
+  modèle réellement enregistré pour Max avant la recette AN2 (Director Notes lues par Cara 4 seul).
+- Métriques client Anam actives : la page Sessions de Lab (`lab.anam.ai/sessions`) sert de
+  contrôle de performance pendant la recette.
+- Diagnostic `warm_up` (une fois par session) : préchauffage, flux stable, chemin réseau
+  (`localCandidateType`, `remoteCandidateType`, `transportProtocol`, `relayProtocol`,
+  `roundTripTimeMs`, `incomingBitrateKbps`, `requestedRegion`), affiché dans « Tester l'avatar »
+  (`describeWarmUp` dans `src/services/streamingAvatar/networkPath.ts`). Modèle à suivre pour le
+  diagnostic par tour d'AN2 : champs plats, listes blanches, aucun texte. Attention :
+  `IndexPRD4.tsx` étale tout le diagnostic dans `trackEvent("prd4_streaming_avatar_media")`.
+- Voix : champs envoyés par moteur conformes à la documentation Anam ; depuis le 3 novembre, une
+  voix ElevenLabs intégrée sans modèle fixé parle en `eleven_v4_turbo`. Balises en ligne
+  toujours exclues du texte.
+- Désynchronisation de la première réplique (image en avance de 1 à 2 s) : pas corrigée par
+  AN1 ; le chemin réseau relevé en recette (direct ou repli TURN) oriente la suite. Hors
+  périmètre d'AN2 sauf demande d'Ulrich.
 
 ## 2. Demande d'Ulrich (5 novembre 2026)
 
