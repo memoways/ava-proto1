@@ -323,3 +323,67 @@ Daily privée créée par l'Edge Function (choix d'Ulrich le 2 novembre). D2 inc
 
 Suite : **aucun lot de code ne suit par défaut.** AV4 « Anam passthrough » ne s'ouvre que si
 Ulrich choisit D2b (voix du personnage d'Ava pour Anam, sur ce pont audio).
+
+## Suite Anam — expressivité, émotion évolutive et synchro (5 novembre 2026)
+
+Source : recommandations du support Anam transmises par Ulrich le 5 novembre 2026, confrontées
+au code et à la documentation officielle lue le même jour (`anam.ai/docs` : Director Notes,
+modèles, vidéo, voix, réseau, performance des sessions, bonnes pratiques d'avatar).
+
+### Constat
+
+| Recommandation | Déjà en place | Écart |
+|---|---|---|
+| Director Notes : style de base + expressivité | Style personnalisé (parole et repos), expressivité 0,4 | — |
+| Balises d'émotion | Une balise par réplique, par le canal de données (visage seul, #145) | **Toujours la même** (`sad`) : aucune évolution dans la session |
+| Voix expressive (Cartesia Sonic 3.6, ElevenLabs v3/v4) | Moteurs et modèles sélectionnables | Défaut « voix Anam » ; ElevenLabs proposé en `eleven_flash_v2_5`. Depuis le 3 novembre, les voix ElevenLabs standard en v3 conversational passent en `eleven_v4_turbo` |
+| Image source neutre | — | À vérifier dans Lab pour Max (Anam ne corrige pas un visage déjà marqué) |
+| Modèle Cara 4.1 Express | Sélectionnable | Défaut `cara-4-latest`, déconseillé en production par Anam (peut changer d'une session à l'autre) |
+| `videoQuality: "high"` | Défaut, envoyé au jeton | — |
+| Synchro son/image (réseau) | Tampon 400 ms, accueil sur flux stable | `disableClientMetrics: true` prive Anam (et Lab) de nos mesures ; chemin réseau inconnu (UDP 3478 direct ou relais TURN TCP/TLS 443) ; région `auto` |
+
+Les balises en ligne dans le texte restent écartées : la voix expressive les jouait aussi
+(premiers mots criés). Le canal de données sert le visage seul ; en mode texte, le moment exact
+de chaque mot n'est pas connu d'avance, donc une balise par réplique, pas en cours de phrase.
+
+### Décision d'Ulrich (5 novembre 2026)
+
+Max doit évoluer dans son jeu au fil de la session, pas tenir une seule émotion. C'est le Game
+Master qui indique, pour le tour suivant, si l'émotion évolue ; la conduite des émotions se met
+à jour pendant la conversation. Chaque lot va au bout : PR, CI, fusion squash par la garde,
+Lovable synchronisé, prompt du lot suivant.
+
+### La chaîne existante à brancher
+
+Le Game Master renvoie déjà `next_speech_state` (un état de parole de la fiche du personnage,
+pour le tour suivant) et `memory_after.relationship.emotionalState`. `derivePerformanceIntent`
+(`src/services/tts/performanceIntent.ts`) en tire, à chaque réplique, une intention de jeu :
+émotion canonique (`neutral`, `tense`, `angry`, `sad`, `scared`, `fragile`, `warm`,
+`accusatory`, `sarcastic`, `urgent`), intensité 0–2, source (`speech_state`, `gm_memory`,
+`lexicon`), garde de tempérament (`tempered`). L'état de parole ne pilote l'émotion que si les
+réglages de jeu vocal sont actifs, qu'une correspondance existe pour cet état et ce personnage,
+et que la rugosité est supérieure à 0 ; sinon l'émotion vient de la mémoire du Game Master
+(`emotionalState`) ou du lexique de la réplique. Cette intention arrive déjà dans
+`ResponseOutputTurnContext.performance` pour les avatars streaming ; Anam l'ignore et envoie sa
+balise fixe. AN2 la traduit en balise Anam : aucun nouvel appel LLM.
+
+### Lots
+
+- **AN1 — fondations Anam.** `cara-4.1-express` par défaut (valeurs enregistrées inchangées,
+  `cara-4-latest` signalé instable dans l'admin) ; métriques client réactivées ; diagnostic
+  `warm_up` enrichi du chemin réseau (type de candidat local/distant, protocole, RTT, débit
+  entrant estimé ; aucune adresse IP) ; aides de l'admin sur les voix expressives et le
+  changement ElevenLabs du 3 novembre. Recette : Cara 4.1 Express choisi pour Max, page Sessions
+  de Lab, comparaison région `auto`/`eu` et réseau mobile.
+  [Prompt AN1](prompt_reprise_anam_lot_an1.md).
+- **AN2 — émotion par réplique pilotée par le Game Master.** Correspondance pure et testée
+  intention de jeu → balise Anam, éditable par personnage dans l'admin, défauts sans sourire pour
+  Max (`warm` → `concerned`, jamais `happy`, `playful`, `laughter`) ; mode « évolutive » par
+  défaut, balise fixe en repli ; `neutral` = style de base (aucune balise) ; diagnostic par
+  tour (balise, émotion, intensité, source, état de parole ; aucun texte) et trajectoire visible
+  dans l'admin. Vérification sur sessions réelles que Max a des états de parole et que le Game
+  Master les fait évoluer ; sinon décision d'Ulrich avant d'ajouter un champ au Game Master.
+  [Prompt AN2](prompt_reprise_anam_lot_an2.md).
+
+Aucun lot ne suit AN2 par défaut. La même traduction pour Tavus (émotion tenue aujourd'hui) ne
+s'ouvre que sur demande d'Ulrich.

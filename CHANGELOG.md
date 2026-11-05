@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatars streaming — Anam : plan d'expressivité et d'émotion évolutive] — 2026-11-05
+
+- Recommandations du support Anam (Director Notes, Cara 4.1 Express, `videoQuality`, réseau)
+  confrontées au code et à la documentation officielle du jour. Déjà en place : Director Notes
+  (style de parole et de repos, expressivité), balise de jeu par le canal de données,
+  `videoQuality: "high"`. Écarts : balise fixe toute la session, défaut `cara-4-latest`
+  (déconseillé en production), métriques client coupées, chemin réseau inconnu.
+- Décision d'Ulrich : Max évolue dans son jeu au fil de la session, piloté par le Game Master.
+- Plan mis à jour (section « Suite Anam ») ; prompts de reprise AN1 (fondations) et AN2 (émotion
+  par réplique). Documentation seule, aucun code modifié.
+
 ## [Voix — « Ava » jamais prononcé « Eva »] — 2026-11-03
 
 - Demande d'Ulrich : Max et parfois Emma disaient « Eva » au lieu de « Ava », en TTS comme
