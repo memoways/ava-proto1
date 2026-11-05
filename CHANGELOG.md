@@ -4,6 +4,16 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatars streaming — Tavus lot 3 bis : upload refusé par le stockage (403), diagnostic et repli] — 2026-11-05
+
+- Constat (recette) : le téléversement TUS échoue à la création avec `AccessDenied` (HTTP 400, `statusCode` 403,
+  politique RLS) alors que le bucket et ses 4 politiques admin-only existent dans Lovable Cloud (identiques à
+  celles de `character-portraits`) et que les 5 comptes admin ont le rôle `admin`. Cause non établie depuis le dépôt.
+- Message d'erreur explicite : réponse du stockage, compte utilisé (e-mail ou « session anonyme ») et hôte du site,
+  jamais le jeton. Repli : si l'envoi reprenable est refusé par la politique, essai de l'envoi standard du client
+  Supabase (chemin des portraits, non reprenable) ; si celui-ci est aussi refusé, le message le dit, ce qui désigne le
+  compte ou l'environnement (Test/Live) plutôt que le TUS. Aucun changement de politique ni d'Edge Function.
+
 ## [Avatars streaming — Tavus lot 3 : admin, téléverser, suivre, attribuer un Face] — 2026-11-05
 
 - Onglet admin Avatar streaming → Tavus : bloc repliable « Entraîner un Face (vidéo) » (`TavusFaceTrainer`) :

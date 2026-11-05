@@ -73,6 +73,7 @@ export default function TavusFaceTrainer({ characters, characterLabels, onAssign
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [uploadedPath, setUploadedPath] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -153,8 +154,12 @@ export default function TavusFaceTrainer({ characters, characterLabels, onAssign
     pendingPathRef.current ??= buildTavusTrainingObjectPath(targetKey, file);
     setUploading(true);
     setUploadError(null);
+    setNotice(null);
     setProgress(0);
-    const handle = uploadTavusTrainingVideo(file, pendingPathRef.current, { onProgress: setProgress });
+    const handle = uploadTavusTrainingVideo(file, pendingPathRef.current, {
+      onProgress: setProgress,
+      onFallback: () => setNotice("Envoi direct en cours (non reprenable) : le stockage a refusé l'envoi reprenable."),
+    });
     uploadRef.current = handle;
     try {
       setUploadedPath(await handle.done);
@@ -280,6 +285,7 @@ export default function TavusFaceTrainer({ characters, characterLabels, onAssign
               </p>
             </div>
           )}
+          {notice && uploading && <p className="text-xs text-muted-foreground">{notice}</p>}
           {fileError && <p className="text-xs text-destructive">{fileError}</p>}
           {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
         </div>
