@@ -26,6 +26,15 @@ describe("V2 observations without changing voice decisions", () => {
     expect(value.coverage.state).toBe("partial");
     expect(value.critical_wait).toBe("coverage_incomplete");
   });
+  it("keeps the avatar face cue of the line in the finished record, ignored once finished", () => {
+    const { turn, events } = attempt();
+    const cue = { provider: "anam" as const, cue: "concerned", sent: true, origin: "intent" as const, emotion: "tense", intensity: 1, source: "speech_state", speech_state: "Tu tournes autour", tempered: false };
+    turn.avatarCue(cue);
+    turn.finish("completed");
+    turn.avatarCue({ ...cue, cue: "angry" });
+    expect(events[0].value.avatar_cue).toBeUndefined();
+    expect(events[1].value.avatar_cue).toEqual(cue);
+  });
   it("finalizes cancellation once and ignores delayed playback and provider callbacks", () => {
     const { turn, events } = attempt();
     turn.finish("interrupted");

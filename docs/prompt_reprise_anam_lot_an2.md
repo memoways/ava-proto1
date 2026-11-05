@@ -4,6 +4,7 @@ Tu travailles sur Ava (`~/CodeProjects/memoways/ava-proto1`, checkout canonique,
 `https://github.com/memoways/ava-proto1`). Réponds en français.
 
 > AN1 doit être fusionné avant AN2 (vérifier sur main la section « Exécution AN1 » du plan).
+> **Exécuté le 5 novembre 2026** : voir « Exécution AN2 » dans le plan. Aucun lot ne suit.
 
 ## 1. Démarrage
 

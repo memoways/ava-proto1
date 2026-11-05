@@ -21,6 +21,20 @@ export interface ServiceObservation {
   fallback?: boolean;
   retry_count?: number;
 }
+/** Face cue of a streaming avatar line (Anam AN2); acting labels only, never spoken text. */
+export interface AvatarCueObservation {
+  provider: "anam";
+  /** Cue chosen for the line; "none" keeps the Director Notes base style. */
+  cue: string;
+  /** Actually sent over the data channel (false for "none" or a refused send). */
+  sent: boolean;
+  origin: "intent" | "fixed" | "fallback";
+  emotion: string | null;
+  intensity: number | null;
+  source: string | null;
+  speech_state: string | null;
+  tempered: boolean;
+}
 export interface ProcessSpan {
   name: string;
   start_ms: number;
@@ -69,6 +83,7 @@ export interface VoiceTurnV2 {
   interruptions?: { interruption_id: string; event: import("./handsFreeVoice").InterruptionEvent; offset_ms: number }[];
   interruptions_capped?: boolean;
   capture_dsp?: { echoCancellation: boolean; noiseSuppression: boolean | null; autoGainControl: boolean | null; trackSampleRate: number | null; contextSampleRate: number };
+  avatar_cue?: AvatarCueObservation;
 }
 export type VoiceObserver = (name: VoiceMilestone, at?: number) => void;
 export function observeVoice(observer: VoiceObserver | undefined, name: VoiceMilestone, at = performance.now()): void {
@@ -130,6 +145,7 @@ export function createVoiceTurnV2(
       if (event.event !== "interruption_recovery") observe(event.event, event.at);
     },
     captureDsp(dsp: NonNullable<VoiceTurnV2["capture_dsp"]>) { if (!finished) value.capture_dsp = { ...dsp }; },
+    avatarCue(cue: AvatarCueObservation) { if (!finished) value.avatar_cue = { ...cue }; },
     setOrigin(at: number, origin: VoiceTurnV2["latency_origin"]) {
       if (finished || !Number.isFinite(at)) return;
       const shift = Math.round(originAt - at);

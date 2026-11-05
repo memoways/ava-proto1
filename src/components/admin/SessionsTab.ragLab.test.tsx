@@ -3,6 +3,11 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const insertPinnedQuestion = vi.fn(async () => ({ error: null }));
+const avatarCueRows = [
+  { turn_index: 1, character: "max", cue: { provider: "anam", cue: "concerned", sent: true, origin: "intent", emotion: "tense", intensity: 1, source: "speech_state", speech_state: "Tu tournes autour", tempered: false } },
+  { turn_index: 2, character: "max", cue: { provider: "anam", cue: "none", sent: false, origin: "intent", emotion: "neutral", intensity: 1, source: "gm_memory", speech_state: null, tempered: false } },
+  { turn_index: 3, character: "max", cue: null },
+];
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -10,6 +15,11 @@ vi.mock("@/integrations/supabase/client", () => ({
       if (table === 'experience_events') {
         const query = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
           limit: vi.fn(async () => ({ data: [], error: null })) };
+        return query;
+      }
+      if (table === 'voice_turn_events') {
+        const query = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
+          limit: vi.fn(async () => ({ data: avatarCueRows, error: null })) };
         return query;
       }
       if (table === "rag_lab_pinned_questions") {
@@ -78,5 +88,17 @@ describe("SessionsTab — envoi vers le laboratoire RAG", () => {
       question: "Où habites-tu ?",
       character_name: "Max",
     }));
+  });
+
+  it("montre la trajectoire de l'émotion du visage Anam, réplique par réplique", async () => {
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <SessionsTab sessions={[session]} selectedSessionId={null} onSelectSession={vi.fn()} onRefresh={vi.fn()} />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByText("Session test"));
+    expect(await screen.findByText("Émotion du visage (Anam) : 2 répliques, 2 balises")).toBeInTheDocument();
+    expect(screen.getByText(/T1 · max · \[concerned\] · tense 1 · speech_state · « Tu tournes autour »/)).toBeInTheDocument();
+    expect(screen.getByText(/T2 · max · \[none\] \(style de base\) · neutral 1 · gm_memory/)).toBeInTheDocument();
   });
 });
