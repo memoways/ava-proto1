@@ -2,7 +2,9 @@ import type { ConversationMessage, RuntimeCharacter, PRD4PostTurnEvaluation } fr
 import type { ResponseDeliveryReceipt } from './responseDelivery';
 import { assessHandoffTurn, revokeHandoff, type HandoffState } from './characterHandoffState';
 import { validateDirectorDecision } from './experienceDirector';
-import { lastHandoffUserTurn, inferSpokenWith } from './characterConversation';
+import { lastHandoffUserTurn, inferSpokenWith, otherCharacter, hasCharacterHandoffConsent } from './characterConversation';
+import { cleanHandoffAssessment, handoffSpeechEvidence, validateCharacterHandoff,
+  type CharacterHandoffAssessment, type CharacterHandoffValidationInput } from './characterHandoff';
 import { withTimeout } from './asyncUtils';
 
 export const HANDOFF_PREPARATION_TIMEOUT_MS = 16_000;
@@ -31,6 +33,57 @@ export function needsHandoffPreparation(text: string): boolean {
     || /\bje\s+(?:(?:vais|peux|pourrais|pourrai)\s+)?(?:(?:te|vous)\s+)?(?:re)?pass(?:e|er)\s+(?:max|emma)\b/.test(clause)
     || /\bje\s+(?:(?:vais|peux|pourrais|pourrai)\s+)?(?:(?:te|vous|lui)\s+)?(?:transmets|transmettre|(?:re)?pass(?:e|er)|transfere(?:r)?)\s+(?:l'appel|la\s+ligne|le\s+telephone|le\s+combine)\b/.test(clause));
 }
+
+type RecoveryContext = Pick<CharacterHandoffValidationInput, 'currentCharacter' | 'turnId' | 'turnIndex'
+  | 'orchestrationVersionId' | 'userText' | 'delivery' | 'openRequest'>;
+
+/**
+ * Recette Max → Emma (sessions du 1er au 4 novembre 2026) : le personnage accepte
+ * (« Je te la passe »), le GM le note, mais sa preuve référencée est rejetée
+ * (cible absente d'un fragment STT, consentRef mal formé, preuve omise). La
+ * réplique était alors remplacée par une question figée et le joueur tournait en
+ * boucle. Cette preuve déterministe n'existe que si le joueur a lui-même demandé
+ * la cible (tour courant ou demande ouverte) ET si une phrase délivrée du
+ * personnage est une annonce explicite de transfert. Le GM garde son veto
+ * (object/defer/refusal), la validation complète repasse avec ses vetos sur la
+ * réplique entière, puis les gardes du directeur et le clic du joueur.
+ */
+export function recoverHandoffAssessment(context: RecoveryContext,
+  gm: { stance?: unknown; refusal?: unknown } | null): CharacterHandoffAssessment | null {
+  if (gm?.stance === 'object' || gm?.stance === 'defer' || gm?.refusal === true) return null;
+  const { delivery, orchestrationVersionId: version } = context;
+  if (!version || !delivery || delivery.turnId !== context.turnId || delivery.turnIndex !== context.turnIndex
+    || delivery.character !== context.currentCharacter || !delivery.delivered.trim()
+    || delivery.status === 'unknown' || !delivery.generated.startsWith(delivery.delivered)) return null;
+  const target = otherCharacter(context.currentCharacter);
+  const name = new RegExp(`\\b${target}\\b`, 'i');
+  const open = context.openRequest?.targetCharacter === target && context.openRequest.sourceCharacter === context.currentCharacter
+    && context.openRequest.orchestrationVersionId === version && context.openRequest.turnIndex < context.turnIndex
+    && context.openRequest.expiresAfterTurnIndex >= context.turnIndex ? context.openRequest : null;
+  const current = context.userText.match(name);
+  const requested = current ?? open?.userText.match(name);
+  if (!requested) return null;
+  const consent = handoffSpeechEvidence(delivery).find(item => item.delivered
+    && (needsHandoffPreparation(item.text) || hasCharacterHandoffConsent(item.text, target)));
+  if (!consent) return null;
+  const assessment = cleanHandoffAssessment({
+    schemaVersion: 1, sourceCharacter: context.currentCharacter, targetCharacter: target,
+    turnId: context.turnId, turnIndex: context.turnIndex, orchestrationVersionId: version,
+    origin: { type: 'player_request', turnId: current ? context.turnId : open!.turnId,
+      turnIndex: current ? context.turnIndex : open!.turnIndex, evidence: current ? context.userText : open!.userText },
+    targetEvidence: { speaker: 'user', quote: requested[0] },
+    consent: { stance: 'accept', evidence: consent.text, refusalEvidence: null },
+  });
+  if (!assessment) return null;
+  const verdict = validateCharacterHandoff({ ...context, evaluation: {
+    execution_status: 'executed', character_key: context.currentCharacter, turn_index: context.turnIndex,
+    orchestration_version_id: version, handoff_assessment: assessment,
+    action: { type: 'handoff', targetCharacter: target, reason: RECOVERED_HANDOFF_REASON, proposalGuidance: RECOVERED_HANDOFF_GUIDANCE } } });
+  return verdict.authorized ? assessment : null;
+}
+
+export const RECOVERED_HANDOFF_REASON = 'Accord de transfert délivré par le personnage.';
+export const RECOVERED_HANDOFF_GUIDANCE = 'Passe l’appel sans redemander la raison.';
 
 /** A withheld candidate loses only its transfer-offer sentences; the rest stays the character's words. */
 export function withoutTransferOffer(text: string): string {

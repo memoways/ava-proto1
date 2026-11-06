@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Passage Max → Emma fluide — fin des boucles « De quoi veux-tu lui parler ? »] — 2026-11-06
+
+- Constat sur les sessions du 31 octobre au 4 novembre (lecture seule Lovable Cloud) : 31 blocages de passage dans
+  13 sessions. Max accepte (« Je te la passe »), mais la preuve du Game Master est rejetée (demande coupée en
+  fragments STT sans le nom d'Emma, référence de consentement mal formée) ; sa réplique était alors **remplacée par
+  une question figée du code** (« De quoi veux-tu lui parler, au juste ? »), posée même après explication, d'où la
+  boucle. [Plan et diagnostic](docs/plan_fluidite_passage_max_emma.md).
+- La preuve lit toute la demande du joueur (fragments depuis la dernière réplique), du GM à la restauration après
+  rechargement ; détection élargie (« me passer Emma », « échanger avec Emma »…).
+- Preuve déterministe quand le joueur a demandé la cible et que le personnage annonce explicitement le transfert ;
+  veto du GM (refus, report), vetos de la réplique entière, gardes du directeur et clic du joueur conservés.
+  Trace `handoff_proof_recovered`. `GM_CODE_VERSION` `gm-2026-11-06-handoff-recovery`.
+- La question de motif n'est posée qu'une fois par appel et seulement sans raison donnée ; sinon le personnage garde
+  ses mots sans la promesse, ou une courte attente. Consigne de passage : accepter, c'est passer tout de suite, sans
+  aller demander l'accord de l'autre ni redemander la raison.
+- Aucune fiche Notion, réglage Cloud, migration ou Edge Function modifiés. Tests : `handoffFluidity.test.ts`,
+  `gameMasterPRD4.handoffRecovery.test.ts`. Recette humaine d'Ulrich à faire ; aucune publication production.
+
 ## [Avatars streaming — Tavus parle avec la voix d'Ava (audio Echo)] — 2026-11-06
 
 - Constat : en Echo texte, le PAL générique `pipecat0` lit les répliques avec la voix par défaut de Tavus (diction

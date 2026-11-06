@@ -166,6 +166,7 @@ import {
   buildSwitchRequestGuidance,
   characterDisplayName,
   detectPlayerSwitchRequest,
+  playerUtteranceSinceLastReply,
   hasSpokenWithCharacter,
   inferSpokenWith,
   lastHandoffUserTurn,
@@ -1501,6 +1502,8 @@ const IndexPRD4 = () => {
       const turnIndex = conversationRef.current.filter((m) => m.role === "user").length;
       const turnId = createVoiceTurnId(sessionIdRef.current, turnIndex);
       const turnCharacter = activeCharacterRef.current;
+      // STT splits one request into fragments; handoff proofs read the whole utterance.
+      const handoffUserText = playerUtteranceSinceLastReply(conversationRef.current);
       const inputMode = handsFreeListeningRef.current ? "hands_free" : "push_to_talk";
       const runtime = getRuntimeContext();
       const telemetry = inputTelemetryRef.current ?? createVoiceTurnV2({
@@ -1603,7 +1606,7 @@ const IndexPRD4 = () => {
           if (!isCurrentTurn()) return;
           if (expected.active_character !== turnCharacter || !expected.orchestration_version_id) throw new HandoffConflictError();
           turnHandoffState = advanceHandoffTurn(expected.pending_handoff, { sessionId: sid,
-            sourceCharacter: turnCharacter, orchestrationVersionId: expected.orchestration_version_id, turnId, turnIndex }, userText);
+            sourceCharacter: turnCharacter, orchestrationVersionId: expected.orchestration_version_id, turnId, turnIndex }, handoffUserText);
           turnHandoffState.sourceCallId ??= sourceCallId(expected);
           handoffLease = handoffCoordinatorRef.current.bind(sid, turnHandoffState.sourceCallId, turnCharacter,
             expected.orchestration_version_id, turnHandoffState.requestId ?? turnHandoffState.revision);
@@ -1638,7 +1641,7 @@ const IndexPRD4 = () => {
         const postVideoContext = pendingPostVideoContextRef.current ?? undefined;
         pendingPostVideoContextRef.current = null;
         // Consommation one-shot : une guidance périmée ne doit pas survivre à son tour.
-        const requestedSwitch = detectPlayerSwitchRequest(userText, activeCharacterRef.current);
+        const requestedSwitch = detectPlayerSwitchRequest(handoffUserText, activeCharacterRef.current);
         const switchGuidance = requestedSwitch
           ? buildSwitchRequestGuidance(activeCharacterRef.current, requestedSwitch)
           : null;
@@ -1706,7 +1709,7 @@ const IndexPRD4 = () => {
             && ev.handoff_assessment) return true;
           setHandoffIssue({ phase: 'preparing', reason: 'Préparation du passage…', retryText: userText });
           try {
-            const prepared = await prepareCharacterHandoff({ state: turnHandoffState, evaluation: ev, text, userText,
+            const prepared = await prepareCharacterHandoff({ state: turnHandoffState, evaluation: ev, text, userText: handoffUserText,
               history: conversationRef.current, handoffCount: handoffCountRef.current, signal: preparationSignal,
               current: handoffLease.current, readiness: getCharacterRuntimeReadiness,
               persist: async next => {
@@ -1740,6 +1743,7 @@ const IndexPRD4 = () => {
           postTurnSignal: handoffLease?.signal,
           prepareHandoff,
           handoffOpenRequest: turnHandoffState?.openRequest ?? null,
+          handoffUserText,
           conversationHistory: priorConversation,
           userMessage: userText,
           userRole: userRoleRef.current,
@@ -1801,10 +1805,10 @@ const IndexPRD4 = () => {
           // A consent the GM validated on the heard receipt, spoken without an output
           // hold, gets the same readiness/director guards instead of being dropped.
           if (!preparedState && responseReceipt?.status === 'completed' && responseReceipt.delivered === responseReceipt.generated
-            && finalizeCharacterHandoff(turnHandoffState, ev, userText, responseReceipt, true).validation.authorized) {
+            && finalizeCharacterHandoff(turnHandoffState, ev, handoffUserText, responseReceipt, true).validation.authorized) {
             try {
               const prepared = await prepareCharacterHandoff({ state: turnHandoffState, evaluation: ev, text: responseReceipt.generated,
-                userText, history: conversationRef.current.filter(message => message.delivery?.turnId !== turnId),
+                userText: handoffUserText, history: conversationRef.current.filter(message => message.delivery?.turnId !== turnId),
                 handoffCount: handoffCountRef.current, signal: handoffLease.signal, current: handoffLease.current,
                 readiness: getCharacterRuntimeReadiness,
                 persist: async next => {
@@ -1816,7 +1820,7 @@ const IndexPRD4 = () => {
             } catch { /* A guard or readiness refusal keeps the offer revoked below. */ }
             if (!handoffLease.current()) return handoffSnapshotRef.current!;
           }
-          const assessed = finalizeCharacterHandoff(turnHandoffState, ev, userText, responseReceipt, Boolean(preparedState));
+          const assessed = finalizeCharacterHandoff(turnHandoffState, ev, handoffUserText, responseReceipt, Boolean(preparedState));
           const next = assessed.state;
           try {
             const saved = await writeHandoffSnapshot(turnHandoffSnapshot, next, undefined, conversationRef.current);

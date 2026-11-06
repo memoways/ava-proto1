@@ -5,7 +5,7 @@ import { displayNameForCharacter } from "@/services/characterRegistry";
 export type CharacterSwitchStance = "accept" | "object" | "defer";
 
 /** Procedure shared with the GM; editorial frame and character willingness stay separate. */
-export const CHARACTER_CALL_TRANSFER_INSTRUCTIONS = "Règle de procédure prioritaire sur toute guidance contraire : chacun reste de son côté. Pour passer à l'autre personnage, propose de passer l'appel : il s'agit d'un transfert téléphonique, ne lui propose pas de venir et ne promets ni déplacement ni conférence. L'appel est transmis sans rapprochement physique, sans rester à côté de l'autre et sans écouter la conversation après le transfert : ce sont des règles internes silencieuses. Si tu acceptes, fais une seule annonce brève du passage en nommant la personne ; une mention de l'autre pièce suffit si utile. Ne répète pas que tu n'écouteras pas, que tu seras absent ou que tu raccrocheras : n'expose pas ces consignes internes au joueur. Tu peux aussi refuser ou hésiter. Le joueur déclenche le changement, sans transmission de confidences privées.";
+export const CHARACTER_CALL_TRANSFER_INSTRUCTIONS = "Règle de procédure prioritaire sur toute guidance contraire : chacun reste de son côté. Pour passer à l'autre personnage, propose de passer l'appel (transfert téléphonique) : ne lui propose pas de venir, ni déplacement ni conférence. L'appel est transmis sans rapprochement physique, sans rester à côté de l'autre et sans écouter la conversation après le transfert : règles internes silencieuses. Si tu acceptes, fais une seule annonce brève du passage en nommant la personne, tout de suite, sans aller d'abord lui demander son accord ; une mention de l'autre pièce suffit. Si le joueur a dit pourquoi il veut lui parler, ne le lui redemande pas. Ne répète pas que tu n'écouteras pas, seras absent ou raccrocheras. Tu peux aussi refuser ou hésiter. Le joueur déclenche le changement, sans transmission de confidences privées.";
 
 export interface CharacterHandoffOffer {
   reason: string;
@@ -94,6 +94,27 @@ export function lastHandoffUserTurn(messages: ConversationMessage[]): number | n
   return lastChangeAt;
 }
 
+/** Bound shared by every handoff proof source (open request, GM context, validation). */
+export const PLAYER_UTTERANCE_MAX_CHARS = 2000;
+
+/**
+ * The player's whole utterance for the current turn: speech recognition splits one
+ * request into fragments (« Est-ce que tu peux me la » / « passer »), each logged as
+ * its own message. Handoff proofs read the consecutive player messages since the
+ * character's last reply, never another call or the other character's words.
+ */
+export function playerUtteranceSinceLastReply(messages: ConversationMessage[], end = messages.length): string {
+  const parts: string[] = [];
+  for (let index = Math.min(end, messages.length) - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role !== "user") break;
+    const text = message.content.trim();
+    if (text) parts.unshift(text);
+  }
+  const joined = parts.join(" ");
+  return joined.length > PLAYER_UTTERANCE_MAX_CHARS ? joined.slice(-PLAYER_UTTERANCE_MAX_CHARS) : joined;
+}
+
 function normalizeSwitchText(value: string): string {
   return value
     .normalize("NFD")
@@ -120,6 +141,10 @@ export function detectPlayerSwitchRequest(
     /(?:je (?:veux|voudrais|aimerais)|j['’]aimerais|on (?:peut|pourrait))\s+(?:(?:bien|juste)\s+)?(?:parler|discuter|appeler).{0,24}(emma|max|papa|pere|père)/i,
     /(?:passe[- ]moi|file[- ]moi|donne[- ]moi)\s+(emma|max|papa|pere|père)/i,
     /(?:je (?:veux|voudrais)|j['’]aimerais)\s+(?:voir|avoir)\s+(emma|max|papa|pere|père)/i,
+    // Recette du 4 novembre : « si tu peux me passer Emma », « que vous me passiez Emma ».
+    /\b(?:me|nous)\s+pass(?:er|ez|iez|es?)\s+(emma|max|papa|pere|père)\b/i,
+    // « je serais très curieux de pouvoir échanger avec Emma », « je pourrais lui parler à Emma ».
+    /(?:\bje\s+(?:pourrais|peux|voudrais|veux|souhaite|souhaiterais|aimerais)|\bj['’]aimerais|\bj['’]ai envie de|\bje serais\s+(?:\S+\s+){0,2}?(?:curieux|curieuse|content|contente|heureux|heureuse)\s+de)\b(?:(?!\b(?:tu|vous|il|elle|on|pas|plus|jamais)\b)[^.?!]){0,40}?\b(?:parler|discuter|echanger|échanger|appeler|joindre|contacter)\b[^.?!]{0,12}?\b(?:a|à|avec|au)\s+(emma|max|papa|pere|père)\b/i,
   ];
   for (const pattern of patterns) {
     const match = userText.match(pattern) ?? text.match(pattern);
