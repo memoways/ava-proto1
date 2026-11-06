@@ -19,7 +19,8 @@ class Stream {
 function track(kind: string, id = kind) {
   fake.handlers.get("track-started")?.({ participant: { local: false }, type: kind, track: { id, kind, readyState: "live" } });
 }
-const settings = { ...streamingAvatarDefaults.tavus, replicaId: "face", personaId: "pal" };
+// The PAL-voice path (Echo text); the Ava-audio path has its own suite below.
+const settings = { ...streamingAvatarDefaults.tavus, replicaId: "face", personaId: "pal", voiceSource: "tavus" as const };
 describe("Tavus actual receive-only lifecycle", () => {
   beforeEach(() => {
     vi.useFakeTimers(); vi.clearAllMocks(); fake.handlers.clear(); vi.stubGlobal("MediaStream", Stream);

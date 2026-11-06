@@ -113,7 +113,7 @@ function HandoffAuditTimeline({ sessionId }: { sessionId: string }) {
   </details>;
 }
 
-/** Face cue per line of a streaming avatar session (Anam AN2), from the turn telemetry. */
+/** Face cue per line of a streaming avatar session (Anam AN2, Tavus Ava audio), from the turn telemetry. */
 function AvatarCueTrajectory({ sessionId }: { sessionId: string }) {
   const [rows, setRows] = useState<Array<{ turn_index: number | null; character: string | null; cue: AvatarCueObservation | null }>>([]);
   useEffect(() => {
@@ -130,7 +130,7 @@ function AvatarCueTrajectory({ sessionId }: { sessionId: string }) {
   if (!cues.length) return null;
   const distinct = new Set(cues.map((row) => row.cue!.cue)).size;
   return <details className="mb-3 rounded border p-3 text-xs">
-    <summary>Émotion du visage (Anam) : {cues.length} répliques, {distinct} balise{distinct > 1 ? 's' : ''}</summary>
+    <summary>Émotion du visage ({providerLabel(cues)}) : {cues.length} répliques, {distinct} balise{distinct > 1 ? 's' : ''}</summary>
     <p className="my-2 text-muted-foreground">Balise envoyée au visage par réplique et intention de jeu d'origine (état de parole du Game Master, mémoire ou réplique).</p>
     {cues.map((row, index) => {
       const cue = row.cue!;
@@ -144,6 +144,12 @@ function AvatarCueTrajectory({ sessionId }: { sessionId: string }) {
       </p>;
     })}
   </details>;
+}
+
+/** Older rows (Anam AN2) carry no other provider; an unknown value stays Anam. */
+function providerLabel(rows: Array<{ cue: AvatarCueObservation | null }>): string {
+  const providers = new Set(rows.map((row) => (row.cue?.provider === 'tavus' ? 'Tavus' : 'Anam')));
+  return [...providers].join(', ');
 }
 
 const fmt = (d: string | null) => d ? new Date(d).toLocaleString("fr-CH") : "—";

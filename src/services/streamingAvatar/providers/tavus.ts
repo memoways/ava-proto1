@@ -6,12 +6,23 @@ import DailyIframe, {
 } from "@daily-co/daily-js";
 import { endAvatarSession, startAvatarSession } from "../api";
 import {
+  createAvatarAudioProgress,
+  streamAvatarSpeech,
+  withDeadline,
+  type AvatarAudioProgress,
+} from "../avatarAudioBridge";
+import { pcm16ToBase64 } from "../lemonSliceAudio";
+import {
+  buildTavusEchoAudioCommand,
   buildTavusEchoCommand,
   buildTavusInterruptCommand,
   buildTavusSetEmotionCommand,
   stripTavusEmotionTags,
+  TAVUS_ECHO_AUDIO_CHUNK_MS,
+  TAVUS_ECHO_AUDIO_SAMPLE_RATE,
 } from "../protocolCommands";
 import { resolveTavusCharacterSettings } from "../settings";
+import { resolveTavusSpeakingEmotion, tavusCueObservation } from "../tavusEmotionCues";
 import { splitAvatarText } from "../textSegmentation";
 import {
   AvatarRenderError,
@@ -28,13 +39,35 @@ import {
 interface TavusMessage {
   event_type?: string;
   conversation_id?: string;
-  properties?: { role?: string; text?: string };
+  properties?: { role?: string; text?: string; interrupted?: boolean };
 }
+
+/**
+ * Ava-audio line state. Tavus reports `stopped_speaking` whenever its audio queue runs dry,
+ * `done` or not (verified 6 November 2026), so only a stop after the last chunk and after
+ * enough audio has played ends the line; earlier stops are pauses between segments.
+ */
+interface AudioLineState {
+  committed: boolean;
+  startedAt: number;
+  pausedAt: number;
+  pausedMs: number;
+  expectedAudioMs: number;
+  softEndTimer: ReturnType<typeof setTimeout> | null;
+}
+
+/** A late stop of a pause may arrive after the last chunk; real ends come near the audio end. */
+const AUDIO_END_TOLERANCE_MS = 400;
+/** No stop at all after the audio should have played: end the line anyway. */
+const AUDIO_SOFT_END_GRACE_MS = 4_000;
 
 interface PendingSpeech {
   turnId?: string;
   started: boolean;
   ended: boolean;
+  audio?: AudioLineState;
+  /** Ava-audio lines: the turn's playback-start hook, fired on Tavus' first `started_speaking`. */
+  onPlaybackStart?: () => void;
   resolveStarted: () => void;
   rejectStarted: (error: Error) => void;
   resolveEnded: () => void;
@@ -64,6 +97,8 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
   private currentSpeech: PendingSpeech | null = null;
   private mediaPlayback: Promise<void> | null = null;
   private statsTimer: ReturnType<typeof setInterval> | null = null;
+  private turnAbort: AbortController | null = null;
+  private audioLineSeq = 0;
 
   constructor(
     settings: TavusAvatarSettings,
@@ -226,6 +261,16 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     } catch (cause) {
       throw new AvatarRenderError("Tavus audio/video playback failed", false, { cause });
     }
+    return this.active.voiceSource === "ava"
+      ? this.renderAvaAudio(text, context)
+      : this.renderEchoText(text, context);
+  }
+
+  /** PAL voice: Echo text, one message per segment, each closed by `stopped_speaking`. */
+  private async renderEchoText(
+    text: string,
+    context?: ResponseOutputTurnContext,
+  ): Promise<ResponseOutputResult> {
     const startedAt = performance.now();
     let firstStartedAt = 0;
     let playedSegments = 0;
@@ -283,6 +328,184 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     }
   }
 
+  /**
+   * Ava's voice: each line is synthesized by Ava's TTS (character voice, active engine and
+   * settings) and sent as Echo audio; Tavus only animates the face and the lips from it. The
+   * acting intent that shapes the voice also picks the face emotion of the line.
+   */
+  private async renderAvaAudio(
+    text: string,
+    context?: ResponseOutputTurnContext,
+  ): Promise<ResponseOutputResult> {
+    const turnAbort = new AbortController();
+    this.turnAbort = turnAbort;
+    const abort = () => this.interrupt();
+    context?.signal?.addEventListener("abort", abort, { once: true });
+    const startedAt = performance.now();
+    this.applySpeakingEmotion(context);
+    const speech = createPendingSpeech(context?.turnId);
+    const audio: AudioLineState = {
+      committed: false, startedAt: 0, pausedAt: 0, pausedMs: 0, expectedAudioMs: 0, softEndTimer: null,
+    };
+    speech.audio = audio;
+    speech.onPlaybackStart = context?.onPlaybackStart;
+    this.currentSpeech = speech;
+    const inferenceId = `ava-${context?.turnId ?? "line"}-${++this.audioLineSeq}`;
+    const progress = createAvatarAudioProgress();
+    let startWatch: Promise<void> | null = null;
+    let startFailure: Error | null = null;
+    try {
+      await streamAvatarSpeech({
+        text,
+        context,
+        sampleRate: TAVUS_ECHO_AUDIO_SAMPLE_RATE,
+        chunkMs: TAVUS_ECHO_AUDIO_CHUNK_MS,
+        signal: turnAbort.signal,
+        speechStartTimeoutMs: this.speechStartTimeoutMs,
+        label: "Tavus",
+        progress,
+        isAlive: () => !this.disposed && this.currentSpeech === speech,
+        sendChunk: (pcm, final) => this.sendEchoAudio(pcm, inferenceId, final),
+        onFirstChunk: () => {
+          // Tavus must confirm the speech; otherwise the turn falls back to local TTS.
+          startWatch = withDeadline(speech.startedPromise, this.speechStartTimeoutMs, "Tavus did not start speaking");
+          startWatch.catch((error: unknown) => {
+            startFailure = error instanceof Error ? error : new Error(String(error));
+            turnAbort.abort();
+          });
+        },
+      });
+      if (progress.sentChunks === 0 || !startWatch) throw new Error("Ava TTS produced no audio for Tavus");
+      await startWatch;
+      audio.committed = true;
+      audio.expectedAudioMs = progress.sentAudioMs;
+      this.scheduleSoftEnd(speech);
+      await withDeadline(speech.endedPromise, progress.sentAudioMs + 60_000, "Tavus speech did not finish");
+      return {
+        status: "played",
+        provider: "Tavus",
+        model: this.active.faceId,
+        firstPlaybackStartMs: Math.round((audio.startedAt || performance.now()) - startedAt),
+        playbackTotalMs: Math.round(performance.now() - (audio.startedAt || startedAt)),
+        generatedSegments: progress.lines,
+        playedSegments: progress.lines,
+        failedSegments: 0,
+        started: true,
+      };
+    } catch (cause) {
+      // Audio already queued at Tavus must not play over the local fallback or the next line.
+      if (progress.sentChunks > 0 && this.currentSpeech === speech) this.sendInterrupt();
+      const error = startFailure ?? cause;
+      throw new AvatarRenderError(
+        error instanceof Error ? error.message : String(error),
+        speech.started,
+        { cause: error },
+      );
+    } finally {
+      context?.signal?.removeEventListener("abort", abort);
+      if (audio.softEndTimer) clearTimeout(audio.softEndTimer);
+      audio.softEndTimer = null;
+      if (this.currentSpeech === speech) this.currentSpeech = null;
+      if (this.turnAbort === turnAbort) this.turnAbort = null;
+    }
+  }
+
+  private sendEchoAudio(pcm: Int16Array, inferenceId: string, final: boolean): boolean {
+    const call = this.call;
+    const conversationId = this._externalSessionId;
+    if (!call || !conversationId || !this.ready) return false;
+    call.sendAppMessage(
+      buildTavusEchoAudioCommand(
+        conversationId,
+        pcm16ToBase64(pcm),
+        TAVUS_ECHO_AUDIO_SAMPLE_RATE,
+        inferenceId,
+        final,
+      ),
+      "*",
+    );
+    return true;
+  }
+
+  /** Face emotion of the line from the acting intent, else the character's speaking emotion. */
+  private applySpeakingEmotion(context?: ResponseOutputTurnContext): void {
+    const intent = context?.performance;
+    const choice = resolveTavusSpeakingEmotion(intent, this.active.emotion);
+    const sent = Boolean(this.call && this._externalSessionId);
+    this.applyEmotion(choice.emotion);
+    const observation = tavusCueObservation(choice, sent, intent);
+    try {
+      context?.onAvatarCue?.(observation);
+      this.callbacks.onMediaDiagnostics?.({
+        event: "speaking_cue",
+        cue: observation.cue,
+        cueSent: sent,
+        cueOrigin: observation.origin,
+        emotion: observation.emotion,
+        intensity: observation.intensity,
+        performanceSource: observation.source,
+        speechState: observation.speech_state,
+        tempered: observation.tempered,
+      });
+    } catch {
+      // Diagnostics never block a line.
+    }
+  }
+
+  /** Ends the line if no stop arrives once the audio should have played. */
+  private scheduleSoftEnd(speech: PendingSpeech): void {
+    const audio = speech.audio;
+    if (!audio?.committed || !speech.started || audio.pausedAt) return;
+    if (audio.softEndTimer) clearTimeout(audio.softEndTimer);
+    const due = audio.startedAt + audio.pausedMs + audio.expectedAudioMs + AUDIO_SOFT_END_GRACE_MS;
+    audio.softEndTimer = setTimeout(() => {
+      audio.softEndTimer = null;
+      if (this.currentSpeech === speech) this.finishSpeech(speech);
+    }, Math.max(0, due - performance.now()));
+  }
+
+  private onAudioStarted(speech: PendingSpeech): void {
+    const audio = speech.audio!;
+    const now = performance.now();
+    if (audio.pausedAt) {
+      // Resumed after a pause between segments.
+      audio.pausedMs += now - audio.pausedAt;
+      audio.pausedAt = 0;
+      this.scheduleSoftEnd(speech);
+    }
+    if (speech.started) return;
+    speech.started = true;
+    audio.startedAt = now;
+    speech.resolveStarted();
+    speech.onPlaybackStart?.();
+    this.callbacks.onConnectionStateChange?.("speaking");
+    this.callbacks.onSpeakStart?.(speech.turnId);
+  }
+
+  private onAudioStopped(speech: PendingSpeech): void {
+    const audio = speech.audio!;
+    if (!speech.started || speech.ended) return;
+    const now = performance.now();
+    const played = now - audio.startedAt - audio.pausedMs;
+    if (!audio.committed || played < audio.expectedAudioMs - AUDIO_END_TOLERANCE_MS) {
+      // Queue ran dry before the rest of the line arrived: a pause, not the end.
+      if (!audio.pausedAt) audio.pausedAt = now;
+      return;
+    }
+    this.finishSpeech(speech);
+  }
+
+  private finishSpeech(speech: PendingSpeech): void {
+    if (speech.ended) return;
+    speech.ended = true;
+    if (speech.audio?.softEndTimer) clearTimeout(speech.audio.softEndTimer);
+    speech.resolveEnded();
+    // The line's emotion ends with the line; switch to the listening emotion.
+    this.applyEmotion(this.active.listeningEmotion);
+    this.callbacks.onConnectionStateChange?.("ready");
+    this.callbacks.onSpeakEnd?.(speech.turnId);
+  }
+
   attachMedia(element: HTMLMediaElement): void {
     if (this.disposed) return;
     if (this.mediaElement === element && element.srcObject === this.mediaStream) return;
@@ -300,13 +523,18 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
   }
 
   interrupt(): void {
-    if (this.call && this._externalSessionId) {
-      this.call.sendAppMessage(buildTavusInterruptCommand(this._externalSessionId), "*");
-    }
+    this.turnAbort?.abort();
+    this.sendInterrupt();
     const error = new Error("Tavus speech interrupted");
     this.currentSpeech?.rejectStarted(error);
     this.currentSpeech?.rejectEnded(error);
     this.currentSpeech = null;
+  }
+
+  private sendInterrupt(): void {
+    if (this.call && this._externalSessionId) {
+      this.call.sendAppMessage(buildTavusInterruptCommand(this._externalSessionId), "*");
+    }
   }
 
   async dispose(): Promise<void> {
@@ -350,6 +578,10 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
       if (role && role !== "pal" && role !== "replica") return;
       if (message.event_type === "conversation.started_speaking") {
         const speech = this.currentSpeech;
+        if (speech?.audio) {
+          this.onAudioStarted(speech);
+          return;
+        }
         if (!speech || speech.started) return;
         speech.started = true;
         speech.resolveStarted();
@@ -357,6 +589,11 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
         this.callbacks.onSpeakStart?.(speech.turnId);
       } else if (message.event_type === "conversation.stopped_speaking") {
         const speech = this.currentSpeech;
+        if (speech?.audio) {
+          // A late stop of an interrupted line must not end or pause the next one.
+          if (message.properties?.interrupted !== true) this.onAudioStopped(speech);
+          return;
+        }
         if (!speech || !speech.started || speech.ended) return;
         speech.ended = true;
         speech.resolveEnded();
@@ -428,6 +665,7 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     this.callbacks.onConnectionStateChange?.("disconnected");
     this.callbacks.onDisconnected?.(reason);
     const error = new Error(`Tavus disconnected: ${reason}`);
+    this.turnAbort?.abort();
     this.currentSpeech?.rejectStarted(error);
     this.currentSpeech?.rejectEnded(error);
   }
@@ -489,16 +727,4 @@ function createPendingSpeech(turnId?: string): PendingSpeech {
     startedPromise,
     endedPromise,
   };
-}
-
-async function withDeadline<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
-  });
-  try {
-    return await Promise.race([promise, timeout]);
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
 }

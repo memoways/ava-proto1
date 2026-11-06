@@ -3,19 +3,17 @@ import DailyIframe, {
   type DailyEventObjectTrack,
   type DailyNetworkStats,
 } from "@daily-co/daily-js";
-import { getTTSSettings } from "@/services/settingsService";
-import { generateSpeech } from "@/services/tts";
-import { getActiveProviderId, resolveGradiumSettings } from "@/services/tts/providerSettings";
-import { chunkTextForTTS } from "@/services/tts/textChunking";
-import type { TTSProviderId } from "@/services/tts/types";
 import { controlLemonSliceSession, endAvatarSession, startAvatarSession } from "../api";
 import {
+  createAvatarAudioProgress,
+  streamAvatarSpeech,
+  withDeadline,
+} from "../avatarAudioBridge";
+import {
   buildLemonSliceAudioCommand,
+  LEMONSLICE_CHUNK_MS,
   LEMONSLICE_HEARTBEAT_MS,
   parseLemonSliceServerMessage,
-  pcm16BytesToFloat,
-  rawPcmRate,
-  speechToLemonSliceChunks,
   type LemonSliceClientCommand,
 } from "../lemonSliceAudio";
 import { lemonSliceActionsAllowed } from "../../../../supabase/functions/_shared/streamingAvatarRequest";
@@ -174,37 +172,29 @@ export class LemonSliceStreamingAvatarOutput implements ResponseOutput {
     const abort = () => this.interrupt();
     context?.signal?.addEventListener("abort", abort, { once: true });
     const startedAt = performance.now();
-    let firstSentAt = 0;
-    let sentChunks = 0;
-    const providerId = context?.providerId ?? getActiveProviderId();
-    const lines = chunkTextForTTS(text, providerId === "gradium" ? { maxSingleChars: 320, targetChars: 320 } : undefined);
+    const progress = createAvatarAudioProgress();
     const playback = createPendingPlayback(context?.turnId);
     this.playback = playback;
     try {
-      // One line ahead: the next segment is synthesized while the current one is streamed.
-      let next = this.prefetch(lines, 0, providerId, context, turnAbort.signal);
-      for (let index = 0; index < lines.length; index++) {
-        const pcmChunks = await withDeadline(
-          abortable(next, turnAbort.signal),
-          this.ttsDeadline(index),
-          "Ava TTS did not answer for LemonSlice",
-        );
-        if (index + 1 < lines.length) next = this.prefetch(lines, index + 1, providerId, context, turnAbort.signal);
-        this.assertTurnAlive(turnAbort.signal);
-        for (const pcm of pcmChunks) {
-          if (!this.send(buildLemonSliceAudioCommand(pcm, this.sampleRate))) {
-            throw new Error("LemonSlice audio bridge is closed");
-          }
-          sentChunks++;
-          if (sentChunks === 1) {
-            firstSentAt = performance.now();
-            context?.onPlaybackStart?.();
-            this.callbacks.onConnectionStateChange?.("speaking");
-            this.callbacks.onSpeakStart?.(context?.turnId);
-          }
-        }
-      }
-      if (sentChunks === 0) throw new Error("Ava TTS produced no audio for LemonSlice");
+      await streamAvatarSpeech({
+        text,
+        context,
+        sampleRate: this.sampleRate,
+        chunkMs: LEMONSLICE_CHUNK_MS,
+        signal: turnAbort.signal,
+        speechStartTimeoutMs: this.speechStartTimeoutMs,
+        label: "LemonSlice",
+        progress,
+        isAlive: () => !this.disposed,
+        // `audio_end` closes the turn below; an empty closing chunk has nothing to send.
+        sendChunk: (pcm) => pcm.length === 0 || this.send(buildLemonSliceAudioCommand(pcm, this.sampleRate)),
+        onFirstChunk: () => {
+          context?.onPlaybackStart?.();
+          this.callbacks.onConnectionStateChange?.("speaking");
+          this.callbacks.onSpeakStart?.(context?.turnId);
+        },
+      });
+      if (progress.sentChunks === 0) throw new Error("Ava TTS produced no audio for LemonSlice");
       // Commits the turn: without it the trailing audio may drop and the face may freeze.
       this.send({ command: "audio_end" });
       playback.committed = true;
@@ -215,18 +205,18 @@ export class LemonSliceStreamingAvatarOutput implements ResponseOutput {
         status: interrupted ? "cancelled" : "played",
         provider: "LemonSlice",
         model: this.settings.model,
-        firstPlaybackStartMs: Math.round((firstSentAt || performance.now()) - startedAt),
-        playbackTotalMs: Math.round(performance.now() - (firstSentAt || startedAt)),
-        generatedSegments: lines.length,
-        playedSegments: interrupted ? 0 : lines.length,
+        firstPlaybackStartMs: Math.round((progress.firstSentAt || performance.now()) - startedAt),
+        playbackTotalMs: Math.round(performance.now() - (progress.firstSentAt || startedAt)),
+        generatedSegments: progress.lines,
+        playedSegments: interrupted ? 0 : progress.lines,
         failedSegments: 0,
         started: true,
       };
     } catch (cause) {
-      if (sentChunks > 0 && this.playback === playback) this.send({ command: "interrupt" });
+      if (progress.sentChunks > 0 && this.playback === playback) this.send({ command: "interrupt" });
       throw new AvatarRenderError(
         cause instanceof Error ? cause.message : String(cause),
-        sentChunks > 0,
+        progress.sentChunks > 0,
         { cause },
       );
     } finally {
@@ -314,54 +304,6 @@ export class LemonSliceStreamingAvatarOutput implements ResponseOutput {
     this.mediaElement = null;
     this.mediaPlayback = null;
     this.callbacks.onConnectionStateChange?.("inactive");
-  }
-
-  private ttsDeadline(index: number): number {
-    // The first line gates the speech start (fallback deadline); later lines were prefetched.
-    return index === 0 ? Math.max(this.speechStartTimeoutMs, 8_000) : 30_000;
-  }
-
-  private assertTurnAlive(signal: AbortSignal): void {
-    if (this.disposed || signal.aborted) throw new DOMException("Avatar turn aborted", "AbortError");
-  }
-
-  private prefetch(
-    lines: string[],
-    index: number,
-    providerId: TTSProviderId,
-    context: ResponseOutputTurnContext | undefined,
-    signal: AbortSignal,
-  ): Promise<Int16Array[]> {
-    const pending = this.synthesize(lines, index, providerId, context, signal);
-    void pending.catch(() => {}); // Observed by the loop, or dropped after an interruption.
-    return pending;
-  }
-
-  private async synthesize(
-    lines: string[],
-    index: number,
-    providerId: TTSProviderId,
-    context: ResponseOutputTurnContext | undefined,
-    signal: AbortSignal,
-  ): Promise<Int16Array[]> {
-    const blob = await generateSpeech(lines[index], {
-      previousText: lines[index - 1],
-      nextText: lines[index + 1],
-      session_id: context?.sessionId,
-      turn_id: context?.turnId,
-      turn_index: context?.turnIndex,
-      attempt_id: context?.attemptId,
-      voiceId: context?.voiceId,
-      providerId,
-      characterOverride: context?.providerId != null,
-      characterKey: context?.characterKey,
-      performance: context?.performance,
-      cacheOpening: context?.cacheOpening,
-      onVoiceObservation: context?.onVoiceObservation,
-      onServiceObserved: context?.onServiceObserved,
-      signal,
-    });
-    return decodeSpeech(blob, speechFormat(providerId, context?.characterKey), this.sampleRate);
   }
 
   private control(control: Parameters<typeof controlLemonSliceSession>[0]["control"]): void {
@@ -507,43 +449,6 @@ export class LemonSliceStreamingAvatarOutput implements ResponseOutput {
   }
 }
 
-/** Raw `pcm_*` output of the active TTS settings, if any (containers are decoded instead). */
-function speechFormat(providerId: TTSProviderId, characterKey?: string): string | null {
-  try {
-    if (providerId === "elevenlabs") return getTTSSettings().outputFormat;
-    if (providerId === "gradium") return resolveGradiumSettings(characterKey).outputFormat;
-  } catch {
-    // Settings unavailable: let the browser decode the container.
-  }
-  return null;
-}
-
-async function decodeSpeech(blob: Blob, format: string | null, targetRate: number): Promise<Int16Array[]> {
-  const bytes = await blob.arrayBuffer();
-  const pcmRate = rawPcmRate(format);
-  if (pcmRate) return speechToLemonSliceChunks([pcm16BytesToFloat(bytes)], pcmRate, targetRate);
-  let context: OfflineAudioContext;
-  try {
-    // Decoding into a context at the session rate lets the browser resample.
-    context = new OfflineAudioContext(1, 1, targetRate);
-  } catch {
-    context = new OfflineAudioContext(1, 1, 48_000);
-  }
-  const buffer = await context.decodeAudioData(bytes);
-  const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i));
-  return speechToLemonSliceChunks(channels, buffer.sampleRate, targetRate);
-}
-
-/** An interruption must not wait for the TTS request in flight. */
-function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) return Promise.reject(new DOMException("Avatar turn aborted", "AbortError"));
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => reject(new DOMException("Avatar turn aborted", "AbortError"));
-    signal.addEventListener("abort", onAbort, { once: true });
-    promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
-  });
-}
-
 function createPendingPlayback(turnId?: string): PendingPlayback {
   let resolve!: (interrupted: boolean) => void;
   let reject!: (error: Error) => void;
@@ -553,16 +458,4 @@ function createPendingPlayback(turnId?: string): PendingPlayback {
   });
   void promise.catch(() => {});
   return { turnId, committed: false, resolve, reject, promise };
-}
-
-async function withDeadline<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
-  });
-  try {
-    return await Promise.race([promise, timeout]);
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
 }

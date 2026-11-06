@@ -5,7 +5,9 @@ Lovable / Lovable Cloud est l'unique chaîne de livraison. Ce lot est une **rece
 documente et corrige un défaut éventuel ; il ne lance **aucun entraînement de Face** (coût et quota Tavus) sans le « fait »
 explicite d'Ulrich après la boîte de confirmation de l'interface. Une action humaine à la fois.
 
-## État vérifié (5 novembre 2026)
+## État vérifié (5 novembre 2026, voix mise à jour le 6 novembre)
+- 6 novembre : Tavus parle avec la voix d'Ava (audio Echo, réglage « Source de la voix », défaut Ava) —
+  [plan](plan_tavus_voix_ava_audio.md). Cette recette couvre aussi ce changement.
 - Lots 1, 2, 3 livrés (CHANGELOG « Tavus lot 1/2/3 », plan sections « Exécution lot 1/2/3 »). Admin : onglet Avatar streaming →
   Tavus → bloc « Entraîner un Face (vidéo) » : upload TUS vers `tavus-training-videos`, entraînement après confirmation, liste des
   Faces (suivi 30 s tant que `started`), « Attribuer à Max » (écrit `tavus.characters.max.faceId`, puis « Sauvegarder »).
@@ -24,10 +26,13 @@ explicite d'Ulrich après la boîte de confirmation de l'interface. Une action h
 2. Admin → Tavus → ouvrir le bloc : « Rafraîchir » (confirme le déploiement Edge), téléverser, vérifier le message si la taille
    est refusée (alors héberger la vidéo en lien public https ≥ 24 h), puis « Lancer l'entraînement » → confirmer.
 3. Attendre `completed` (aperçu filigrané en minutes, affinage en quelques heures), « Attribuer à Max », « Sauvegarder ».
-4. Panneau test (`StreamingAvatarTestPanel.tsx`) puis session réelle : pas de sourire en parlant ni en écoute ; comparer balise
-   Echo `dejected` et `neutral`, émotion d'écoute `neutral` vs `sadness`.
-5. Voix : bouton « Vérifier » (voix du PAL en lecture seule) + écoute — la voix doit rester celle du PAL (ElevenLabs de Max) et non
-   le `default_voice_id` créé depuis l'audio de la vidéo.
+4. Panneau test (`StreamingAvatarTestPanel.tsx`) puis session réelle : pas de sourire en parlant ni en écoute ; émotion
+   d'écoute `neutral` vs `sadness`. Depuis le 6 novembre (voix Ava en audio Echo, défaut), l'émotion en parlant suit
+   l'intention de jeu de chaque réplique ; la balise Echo (`dejected`/`neutral`) ne compte qu'en « Source de la voix : Tavus (PAL) ».
+5. Voix : recette du [plan voix Ava](plan_tavus_voix_ava_audio.md#recette-humaine-ulrich) — voix ElevenLabs de Max, synchro
+   labiale, émotion qui suit la réplique, interruption, latence comparée à la voie texte (Tavus PAL sur Max). Un Face entraîné
+   sur une vidéo ne change pas la voix en mode Ava (audio) ; en mode Tavus (PAL), vérifier par « Vérifier » qu'elle reste celle
+   du PAL et non le `default_voice_id` créé depuis l'audio de la vidéo.
 6. Consigner le résultat (Face ID, réglages retenus, défauts) dans le plan « Exécution lot 4 », CHANGELOG et `docs/etat_courant.md`.
 
 ## Invariants
