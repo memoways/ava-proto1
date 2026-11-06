@@ -31,3 +31,21 @@ export const resolveGumletThumbnailUrl = (url: string | null | undefined): strin
   const assetId = url ? getGumletAssetId(url) : null;
   return assetId ? `https://video.gumlet.io/${GUMLET_COLLECTION_ID}/${assetId}/thumbnail-1-0.png` : null;
 };
+
+/**
+ * Media buffered ahead before a cinematic starts. Started on its first fragment, the video
+ * stalled within seconds (sound cut, stutter), the bandwidth being shared with the live avatar.
+ */
+export const START_BUFFER_S = 4;
+/** Longest wait for that buffer: past it the video starts anyway. */
+export const START_BUFFER_MAX_WAIT_MS = 4_000;
+
+/** Seconds of media buffered after the playhead (0 when the playhead is outside every range). */
+export function bufferedAheadSeconds(video: Pick<HTMLMediaElement, "buffered" | "currentTime">): number {
+  const ranges = video.buffered;
+  const at = video.currentTime;
+  for (let index = 0; index < ranges.length; index++) {
+    if (ranges.start(index) <= at + 0.1 && ranges.end(index) > at) return ranges.end(index) - at;
+  }
+  return 0;
+}

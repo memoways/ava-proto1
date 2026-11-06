@@ -1,9 +1,10 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
-import { resolveNativeVideoSource } from "@/services/videoPlayback";
+import { START_BUFFER_MAX_WAIT_MS, START_BUFFER_S, bufferedAheadSeconds, resolveNativeVideoSource } from "@/services/videoPlayback";
 
 /** Idle time before the pointer hides again over a playing video. */
 const POINTER_IDLE_HIDE_MS = 1_500;
+const START_BUFFER_POLL_MS = 150;
 
 const canControlNativeMedia = () =>
   typeof window !== "undefined" && !/jsdom/i.test(window.navigator.userAgent);
@@ -53,6 +54,9 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   const hasCompletedRef = useRef(false);
   const stoppingRef = useRef(false);
   const playbackRequestedRef = useRef(false);
+  /** The first play (user gesture) blesses the element; only later cinematics wait for a buffer. */
+  const hasPlayedRef = useRef(false);
+  const startWaitRef = useRef<{ generation: number; since: number; timer: number | null } | null>(null);
   const [sourceEpoch, setSourceEpoch] = useState(0);
   // The pointer is hidden while a video plays; moving the mouse shows it briefly
   // so « Passer » stays reachable.
@@ -83,6 +87,12 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     onErrorRef.current?.();
   }, []);
 
+  const clearStartWait = () => {
+    const wait = startWaitRef.current;
+    if (wait?.timer) window.clearTimeout(wait.timer);
+    startWaitRef.current = null;
+  };
+
   const stopPlayback = useCallback(() => {
     sourceGenerationRef.current += 1;
     stoppingRef.current = true;
@@ -106,6 +116,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       try { hls.destroy(); } catch { /* already destroyed */ }
     }
 
+    clearStartWait();
     video.removeAttribute("src");
     if (canControlNativeMedia()) video.load();
     // Recreate the native pipeline while hidden. This keeps the same <video>
@@ -126,6 +137,27 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
     if (!canControlNativeMedia()) return;
     const generation = sourceGenerationRef.current;
+    if (hasPlayedRef.current && hlsRef.current && !video.ended && bufferedAheadSeconds(video) < START_BUFFER_S) {
+      let wait = startWaitRef.current;
+      if (!wait || wait.generation !== generation) {
+        clearStartWait();
+        wait = { generation, since: performance.now(), timer: null };
+        startWaitRef.current = wait;
+      }
+      if (performance.now() - wait.since < START_BUFFER_MAX_WAIT_MS) {
+        if (!wait.timer) {
+          const pending = wait;
+          pending.timer = window.setTimeout(() => {
+            pending.timer = null;
+            if (startWaitRef.current !== pending || !playbackRequestedRef.current) return;
+            if (pending.generation !== sourceGenerationRef.current) return;
+            playWithAudioRef.current();
+          }, START_BUFFER_POLL_MS);
+        }
+        return;
+      }
+    }
+    clearStartWait();
     try {
       const attempt = video.play();
       if (attempt && typeof attempt.catch === "function") {
@@ -140,6 +172,9 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       }
     }
   }, []);
+
+  const playWithAudioRef = useRef(playWithAudio);
+  playWithAudioRef.current = playWithAudio;
 
   useImperativeHandle(ref, () => ({
     playWithAudio,
@@ -240,6 +275,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       return;
     }
     playbackRequestedRef.current = false;
+    clearStartWait();
     pauseVideo(videoRef.current);
   }, [active, pauseVideo, playWithAudio]);
 
@@ -292,6 +328,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
         onLoadedData={() => {
           if (activeRef.current || playbackRequestedRef.current) playWithAudio();
         }}
+        onPlaying={() => { if (activeRef.current) hasPlayedRef.current = true; }}
         onPlay={() => {
           const video = videoRef.current;
           if (!video || stoppingRef.current) return;

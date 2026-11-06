@@ -94,7 +94,10 @@ const sessionReady = () => fake.handlers.get("SESSION_READY")?.("anam-session");
 /** jsdom never decodes a frame: report one as soon as playback is asked for. */
 const videoWithFrame = () => {
   const video = document.createElement("video") as HTMLVideoElement;
-  video.play = vi.fn(async () => {});
+  let paused = true;
+  Object.defineProperty(video, "paused", { get: () => paused });
+  video.play = vi.fn(async () => { paused = false; });
+  document.body.append(video);
   video.requestVideoFrameCallback = vi.fn((cb: VideoFrameRequestCallback) => { queueMicrotask(() => cb(0, {} as VideoFrameCallbackMetadata)); return 1; });
   return video;
 };
@@ -235,10 +238,49 @@ describe("Anam text-mode lifecycle", () => {
     await opening; await output.dispose();
   });
 
+  it("measures each line, holds a correction found mid-line until the line has drained", async () => {
+    const pc = peerConnection({ fps: 25 }); fake.peer.current = pc;
+    const onAvatarCue = vi.fn();
+    const output = new AnamStreamingAvatarOutput(settings, {}, 1000, 1000, warmUp, { ...avSync, pollMs: 5, cooldownMs: 30, baseMs: 20 });
+    await output.prepare({ sessionId: "ava" }); sessionReady(); output.attachMedia(videoWithFrame());
+    const line = output.renderText("Bonjour.", { onAvatarCue });
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(1));
+    persona("Bonjour.");
+    // The image drifts 500 ms ahead while Max speaks.
+    const stats = pc.getStats;
+    pc.getStats = async () => new Map([...(await stats())].map(([key, report]) => {
+      const r = report as Record<string, unknown>;
+      return [key, r.kind === "video" ? { ...r, estimatedPlayoutTimestamp: 1_000_500 - Number(pc.receivers[1].jitterBufferTarget ?? 0) }
+        : { ...r, estimatedPlayoutTimestamp: 1_000_000 - Number(pc.receivers[0].jitterBufferTarget ?? 0) }];
+    }));
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    expect(pc.receivers.map(r => r.jitterBufferTarget)).toEqual([20, 20]);
+    persona("", { endOfSpeech: true });
+    await line;
+    const end = onAvatarCue.mock.calls.map(([value]) => value).find((value) => "av_samples" in value);
+    expect(end.av_samples).toBeGreaterThan(2);
+    expect(end.av_offset_median_ms).toBe(500);
+    // Still untouched right after the end: the playout buffer drains first.
+    expect(pc.receivers[1].jitterBufferTarget).toBe(20);
+    await vi.waitFor(() => expect(Number(pc.receivers[1].jitterBufferTarget)).toBeGreaterThan(300), { timeout: 2_000 });
+    expect(pc.receivers[0].jitterBufferTarget).toBe(20);
+    await output.dispose();
+  });
+
+  it("takes no sample while the avatar element is detached (cinematic)", async () => {
+    const pc = peerConnection({ fps: 25, offset: 800 }); fake.peer.current = pc;
+    const output = new AnamStreamingAvatarOutput(settings, {}, 1000, 1000, warmUp, { ...avSync, pollMs: 5, cooldownMs: 30 });
+    await output.prepare({ sessionId: "ava" });
+    const video = videoWithFrame(); output.attachMedia(video); video.remove();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(pc.receivers.map(r => r.jitterBufferTarget)).toEqual([400, 400]);
+    await output.dispose();
+  });
+
   it("delays the voice when it runs ahead of the image", async () => {
     const pc = peerConnection({ fps: 25, offset: -300 }); fake.peer.current = pc;
     const output = new AnamStreamingAvatarOutput(settings, {}, 1000, 1000, warmUp, { ...avSync, pollMs: 5, cooldownMs: 30 });
-    await output.prepare({ sessionId: "ava" });
+    await output.prepare({ sessionId: "ava" }); output.attachMedia(videoWithFrame());
     await vi.waitFor(() => {
       const [audioTarget, videoTarget] = pc.receivers.map(r => Number(r.jitterBufferTarget));
       expect(videoTarget).toBe(400);
@@ -439,7 +481,11 @@ describe("Anam evolving face cue (AN2)", () => {
     // Plain text only: the cue never enters the spoken text.
     expect(fake.talks.map((talk) => talk.chunks.map(([chunk]) => chunk).join(""))).toEqual(turns.map((_, i) => `Réplique ${i}.`));
     for (const call of fake.client.sendDirectorNoteCue.mock.calls) expect(call[1]).toEqual({ atSeconds: 0 });
-    expect(onAvatarCue.mock.calls.map(([value]) => value)).toEqual([
+    // One report at the start of each line (cue), one at its end with the lip sync measured.
+    const ends = onAvatarCue.mock.calls.map(([value]) => value).filter((value) => "av_samples" in value);
+    expect(ends).toHaveLength(sent.length);
+    expect(ends[0]).toMatchObject({ av_samples: 0, av_offset_median_ms: null, audio_playout_target_ms: 400, video_playout_target_ms: 400 });
+    expect(onAvatarCue.mock.calls.map(([value]) => value).filter((value) => !("av_samples" in value))).toEqual([
       { provider: "anam", cue: "concerned", sent: true, origin: "intent", emotion: "tense", intensity: 1, source: "speech_state", speech_state: "Tu tournes autour", tempered: false },
       { provider: "anam", cue: "sad", sent: true, origin: "intent", emotion: "fragile", intensity: 1, source: "speech_state", speech_state: "Bloqué", tempered: false },
       { provider: "anam", cue: "distressed", sent: true, origin: "intent", emotion: "urgent", intensity: 2, source: "speech_state", speech_state: "La digue cède", tempered: false },
@@ -462,7 +508,7 @@ describe("Anam evolving face cue (AN2)", () => {
     const output = await ready({ emotionCueMode: "fixed", speakingCue: "sad" });
     expect(await say(output, "Non.", { characterKey: "max", performance: intent("angry"), onAvatarCue })).toEqual(["sad"]);
     expect(await say(output, "Non.", { characterKey: "max", performance: intent("tense"), onAvatarCue })).toEqual(["sad"]);
-    expect(onAvatarCue.mock.calls.map(([value]) => value.origin)).toEqual(["fixed", "fixed"]);
+    expect(onAvatarCue.mock.calls.map(([value]) => value).filter((value) => !("av_samples" in value)).map((value) => value.origin)).toEqual(["fixed", "fixed"]);
     await output.dispose();
   });
 
