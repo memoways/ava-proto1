@@ -123,6 +123,13 @@ describe("streaming avatar settings normalization", () => {
     expect(value.anam.voiceGenerationOptions.cartesia.emotion).toBe("scared");
     expect(value.anam.sessionOptions).toMatchObject({ region: "eu", regionPolicy: "strict", videoQuality: "high" });
   });
+
+  it("reads the Anam lip sync mode: auto by default, bounded manual shift", () => {
+    expect(normalize({ anam: {} }).anam.lipSync).toEqual({ mode: "auto", manualShiftMs: 0 });
+    expect(normalize({ anam: { lipSync: { mode: "manual", manualShiftMs: 640.4 } } }).anam.lipSync).toEqual({ mode: "manual", manualShiftMs: 640 });
+    expect(normalize({ anam: { lipSync: { mode: "browser", manualShiftMs: -1_200 } } }).anam.lipSync).toEqual({ mode: "browser", manualShiftMs: -1_200 });
+    expect(normalize({ anam: { lipSync: { mode: "magic", manualShiftMs: 9_999 } } }).anam.lipSync).toEqual({ mode: "auto", manualShiftMs: 0 });
+  });
 });
 
 describe("LemonSlice settings normalization", () => {

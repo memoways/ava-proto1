@@ -174,7 +174,7 @@ function AvatarSyncByLine({ sessionId }: { sessionId: string }) {
     <p className="my-2 text-muted-foreground">Écart pendant que la voix est audible : + image en avance, − voix en avance. Étendue = flottement à l'intérieur de la réplique. Tampons audio/vidéo en fin de réplique.</p>
     {rows.map((row, index) => <p key={index} className="my-1 font-mono">
       R{row.line_index} · {row.voiced_samples ? `médiane ${signed(row.offset_median_ms)} · de ${signed(row.offset_min_ms)} à ${signed(row.offset_max_ms)} (étendue ${row.offset_spread_ms} ms)` : 'non mesurée'}
-      {' '}· tampons A {row.audio_target_end_ms} / V {row.video_target_end_ms} ms{row.corrections ? ` · ${row.corrections} correction${row.corrections > 1 ? 's' : ''}` : ''}{row.sync_stopped ? ' · correction arrêtée' : ''}
+      {' '}· {row.lip_sync_mode === 'browser' ? 'navigateur seul' : `tampons A ${row.audio_target_end_ms} / V ${row.video_target_end_ms} ms`}{row.lip_sync_mode === 'manual' ? ` (manuel ${row.manual_shift_ms} ms)` : ''}{row.corrections ? ` · ${row.corrections} correction${row.corrections > 1 ? 's' : ''}` : ''}{row.sync_stopped ? ' · correction arrêtée' : ''}
     </p>)}
   </details>;
 }
