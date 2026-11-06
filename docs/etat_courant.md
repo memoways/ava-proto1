@@ -43,6 +43,12 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Passage Max → Emma fluide (6 novembre, code).** Les boucles « De quoi veux-tu lui parler ? » venaient d'une
+question figée du code substituée à l'accord de Max quand la preuve du GM échouait (fragments STT, référence mal
+formée). Preuve sur toute la demande, preuve déterministe si Max annonce le transfert demandé, question de motif une
+seule fois et seulement sans raison. Suite : recette d'Ulrich (demander Emma en expliquant, en plusieurs phrases).
+Aucun lot de code ne suit. [Plan](plan_fluidite_passage_max_emma.md).
+
 **Tavus voix d'Ava (6 novembre, code) : audio Echo.** Tavus ne parle plus avec sa voix (diction française
 faible) : Ava synthétise chaque réplique avec la voix du personnage et l'envoie en audio Echo, Tavus anime le visage
 et les lèvres ; l'intention de jeu choisit l'émotion du visage. Format vérifié sur conversation réelle. Réglage

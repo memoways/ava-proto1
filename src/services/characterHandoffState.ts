@@ -1,6 +1,6 @@
 import type { ConversationMessage, RuntimeCharacter } from '@/types';
 import type { CharacterHandoffOffer } from './characterConversation';
-import { detectPlayerSwitchRequest, withdrawsHandoff } from './characterConversation';
+import { detectPlayerSwitchRequest, playerUtteranceSinceLastReply, withdrawsHandoff } from './characterConversation';
 import { cleanHandoffAssessment, validateCharacterHandoff, type CharacterHandoffValidationInput } from './characterHandoff';
 
 export interface HandoffContext {
@@ -120,11 +120,13 @@ export function restoreHandoffOffer(raw: unknown, context: HandoffContext, histo
     || offer.targetCharacter !== offer.assessment.targetCharacter) return null;
   const reply = history.find(m => m.delivery?.turnId === state.turnId && m.delivery.character === state.sourceCharacter);
   if (state.requestId && (reply?.delivery?.status !== 'completed' || reply.delivery.generated !== reply.delivery.delivered)) return null;
-  const users = history.filter(m => m.role === 'user');
-  const user = users[state.turnIndex - 1];
+  const userIndexes = history.flatMap((m, index) => m.role === 'user' ? [index] : []);
+  const userIndex = userIndexes[state.turnIndex - 1];
+  const user = userIndex === undefined ? undefined : history[userIndex];
   if (!user || user.spokenWith !== state.sourceCharacter) return null;
   const validation = validateCharacterHandoff({ currentCharacter: state.sourceCharacter, turnId: state.turnId,
-    turnIndex: state.turnIndex, orchestrationVersionId: state.orchestrationVersionId, userText: user.content,
+    turnIndex: state.turnIndex, orchestrationVersionId: state.orchestrationVersionId,
+    userText: playerUtteranceSinceLastReply(history, userIndex + 1),
     delivery: reply?.delivery ?? null, openRequest: state.openRequest,
     evaluation: { execution_status: 'executed', character_key: state.sourceCharacter, turn_index: state.turnIndex,
       orchestration_version_id: state.orchestrationVersionId, handoff_assessment: offer.assessment,

@@ -2,6 +2,7 @@ import type { ConversationMessage, RuntimeCharacter } from '@/types';
 import { characterDisplayName, hasSpokenWithCharacter, sliceConversationForCharacter } from './characterConversation';
 import type { ResponseDeliveryReceipt } from './responseDelivery';
 import type { ResponseOutputResult } from './streamingAvatar/types';
+import { withoutTransferOffer } from './handoffCoordinator';
 
 /** Scripted audio has no word alignment: partial playback stays uncertain. */
 export function greetingDelivery(turnId: string, turnIndex: number, character: RuntimeCharacter, text: string,
@@ -132,6 +133,42 @@ const handoffPauseLines: Record<RuntimeCharacter, Record<'tu' | 'vous', readonly
 /** A withheld transfer stays in the scene: no technical status, invented consent or audio outage. */
 export function characterHandoffPauseLine(character: RuntimeCharacter, history: ConversationMessage[]): string {
   return unusedLine(handoffPauseLines[character][characterRegister(character, history)], character, history);
+}
+
+const handoffHoldLines: Record<RuntimeCharacter, Record<'tu' | 'vous', readonly string[]>> = {
+  max: { tu: ['Attends. Une seconde.', 'Laisse-moi un instant.'], vous: ['Attendez. Une seconde.', 'Laissez-moi un instant.'] },
+  emma: { tu: ['Attends… une seconde.', 'Laisse-moi juste un instant.'], vous: ['Attendez… une seconde.', 'Laissez-moi juste un instant.'] },
+};
+
+/** Messages of the current call only: a previous call's pause never counts against this one. */
+function currentCall(history: ConversationMessage[]): ConversationMessage[] {
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    if (history[index].callStart || history[index].callTransfer) return history.slice(index);
+  }
+  return history;
+}
+
+/** The player already said why (« juste savoir comment elle va », « l'écouter »…). */
+export function playerGaveHandoffReason(utterance: string): boolean {
+  const text = utterance.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/’/g, "'").toLowerCase();
+  return /\b(?:pour|parce que|parce qu'|car|savoir|comment (?:elle|il|ca)|ecouter|l'ecouter|l'entendre|comprendre|nouvelles|aider|echanger|juste|simplement|lui demander|lui poser|lui dire|voir si|voir comment)\b/.test(text);
+}
+
+/**
+ * What the character says when a transfer it offered cannot be prepared yet.
+ * Friction is allowed once, and only if the player has not said why: the scripted
+ * « De quoi veux-tu lui parler ? » is asked at most once per call. Afterwards the
+ * character keeps its own words without the transfer promise, or a short hold —
+ * never the same question again (recette Max → Emma, 1er-4 novembre 2026).
+ */
+export function withheldHandoffReply(character: RuntimeCharacter, history: ConversationMessage[],
+  reply: string, playerUtterance: string): string {
+  const call = currentCall(history);
+  const pauses = Object.values(handoffPauseLines[character]).flat();
+  const askedInCall = call.some(message => message.role === character && pauses.includes(message.content));
+  if (!askedInCall && !playerGaveHandoffReason(playerUtterance)) return characterHandoffPauseLine(character, history);
+  return withoutTransferOffer(reply)
+    || unusedLine(handoffHoldLines[character][characterRegister(character, history)], character, call);
 }
 
 /** True when the character's latest reply in this history was already a transfer pause. */

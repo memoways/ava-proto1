@@ -12,7 +12,7 @@ import { observeVoice, observeService, type VoiceObserver, type ServiceObservati
  *  - Post-tour ordinaire asynchrone ; candidat de passage préparé avant sa confirmation vocale.
  */
 import { SimulateMaxResponseError, simulateMaxResponse, type MaxAgentInput, type SimulateMaxDiagnosticContext } from "@/agents/maxAgent";
-import { candidateEvidence, needsHandoffPreparation, withoutTransferOffer, HANDOFF_PREPARATION_TIMEOUT_MS } from "./handoffCoordinator";
+import { candidateEvidence, needsHandoffPreparation, HANDOFF_PREPARATION_TIMEOUT_MS } from "./handoffCoordinator";
 import { evaluatePostTurnPRD4, commitHandoffCandidate, type PRD4PostTurnDetailedResult } from "@/agents/gameMasterPRD4";
 import type { PRD4LabelResult } from "@/agents/gameMasterLabelPRD4";
 import {
@@ -57,7 +57,7 @@ import {
   normalizeSessionDurationSeconds,
 } from "@/config/experienceRuntime";
 import { buildExperienceFrame, experiencePathFromFilmAnswer } from "@/services/experienceFrame";
-import { canRetryCharacterResponse, characterRecoveryLine, characterHandoffPauseLine, followsHandoffPause, latestCallTransfer } from './characterConversationContinuity';
+import { canRetryCharacterResponse, characterRecoveryLine, withheldHandoffReply, latestCallTransfer } from './characterConversationContinuity';
 import { validateRecoverySpeech } from './responseIntentStream';
 import type { ConversationMessage, ConversationTurnTraceV1, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 
@@ -71,6 +71,8 @@ export interface PRD4TurnInput {
   prepareHandoff?: (evaluation: PRD4PostTurnEvaluation, text: string, signal: AbortSignal, startedAt: number) => Promise<boolean>;
   handoffDelivery?: Promise<ResponseDeliveryReceipt | undefined>;
   handoffOpenRequest?: OpenHandoffRequest | null;
+  /** Whole player utterance for handoff proofs (STT fragments since the last reply). */
+  handoffUserText?: string;
   onVoiceObservation?: VoiceObserver;
   onServiceObserved?: (value: ServiceObservation) => void;
   onServerObserved?: (value: ServerObservation) => void;
@@ -495,6 +497,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       return await evaluatePostTurnPRD4({
         handoffContext: input.handoffDelivery && input.turnId ? { turnId: input.turnId,
           openRequest: input.handoffOpenRequest ?? null, delivery: candidate ? null : handoffDelivery ?? null,
+          userText: input.handoffUserText ?? input.userMessage,
           ...(candidate ? { candidateText } : {}) } : undefined,
         onGmObserved: input.onGmObserved,
         sessionId: input.sessionId,
@@ -569,15 +572,15 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       handoffPreparationBlocked = true;
       // A second pause in a row loops the scene (session e6918bd8): keep the
       // character's own words, without the transfer it cannot promise yet.
-      const remainder = followsHandoffPause(activeCharacter, input.conversationHistory) ? withoutTransferOffer(maxResponse) : '';
-      maxResponse = remainder || characterHandoffPauseLine(activeCharacter, input.conversationHistory);
+      maxResponse = withheldHandoffReply(activeCharacter, input.conversationHistory, maxResponse,
+        input.handoffUserText ?? input.userMessage);
       if (input.playedSpeechStateRef) input.playedSpeechStateRef.current = null;
     }
   }
   const finishPostTurn = () => candidateResult
     ? (input.handoffDelivery ?? Promise.resolve(undefined)).then(receipt => commitHandoffCandidate({
       sessionId: input.sessionId, signal: input.postTurnSignal ?? input.signal,
-      userText: input.userMessage, openRequest: input.handoffOpenRequest ?? null,
+      userText: input.handoffUserText ?? input.userMessage, openRequest: input.handoffOpenRequest ?? null,
       speechStatePlayed: candidateReleased ? selectSpeechState(input.playedSpeechStateRef?.current ?? maxResult?.responseIntent?.parole, speechStates) : null }, candidateResult!, receipt, candidateReleased))
     : runPostTurn();
   // En diagnostic, le post-tour (qui prépare la suite et écrit son propre log)

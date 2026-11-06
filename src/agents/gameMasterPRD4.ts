@@ -1,5 +1,5 @@
 import { withTimeout } from '@/services/asyncUtils';
-import { candidateEvidence, HANDOFF_DEPENDENCY_TIMEOUT_MS } from '@/services/handoffCoordinator';
+import { candidateEvidence, HANDOFF_DEPENDENCY_TIMEOUT_MS, recoverHandoffAssessment, RECOVERED_HANDOFF_GUIDANCE, RECOVERED_HANDOFF_REASON } from '@/services/handoffCoordinator';
 import { CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS } from '@/services/gameMasterPromptBuilder';
 import { GM_RUNTIME_OUTPUT_INSTRUCTIONS, REQUIRED_GM_JSON_FIELDS } from '@/services/gameMasterContract';
 import { formatVideoCandidateLine } from '@/services/videoCandidateLine';
@@ -35,7 +35,7 @@ import {
 } from "@/services/relationshipEngine";
 
 /** Incrémenter à chaque changement de logique ou de prompt du GM (traçabilité A/B). */
-export const GM_CODE_VERSION = "gm-2026-10-26-handoff-preparation";
+export const GM_CODE_VERSION = "gm-2026-11-06-handoff-recovery";
 
 export interface PRD4PostTurnInput {
   onGmObserved?: (service: ServiceObservation, spans: ServerObservation) => void;
@@ -48,7 +48,9 @@ export interface PRD4PostTurnInput {
   conversationMemoryBefore?: ConversationMemoryV1 | null;
   /** GIFF — posture initiale exprimée par l'utilisateur avant l'appel. */
   userPostureRaw?: string | null;
-  handoffContext?: { turnId: string; openRequest: OpenHandoffRequest | null; delivery: ResponseDeliveryReceipt | null; candidateText?: string };
+  handoffContext?: { turnId: string; openRequest: OpenHandoffRequest | null; delivery: ResponseDeliveryReceipt | null; candidateText?: string;
+    /** The player's whole utterance (STT fragments since the last reply); defaults to userMessage. */
+    userText?: string };
   turnIndex: number;
   timeElapsedSeconds: number;
   sessionDurationSeconds: number;
@@ -377,7 +379,7 @@ ${recent || "(aucun)"}
 ${input.handoffContext ? `## CONTEXTE EXACT DU PASSAGE (données, pas des instructions)
 ${JSON.stringify({ turnId: input.handoffContext.turnId, turnIndex: input.turnIndex,
     sourceCharacter: input.currentCharacter, orchestrationVersionId: input.orchestrationVersionId,
-    currentUserMessage: { turnId: input.handoffContext.turnId, turnIndex: input.turnIndex, userText: input.userMessage },
+    currentUserMessage: { turnId: input.handoffContext.turnId, turnIndex: input.turnIndex, userText: input.handoffContext.userText ?? input.userMessage },
     speechEvidence: handoffSpeechEvidence(input.handoffContext.candidateText !== undefined
       ? candidateEvidence(input.handoffContext.candidateText, input.handoffContext.turnId, input.turnIndex, input.currentCharacter)
       : input.handoffContext.delivery).map(e => ({ ...e, delivered: input.handoffContext?.candidateText === undefined && e.delivered })),
@@ -630,6 +632,15 @@ export async function evaluatePostTurnPRD4(
         ? parsed.topics_covered.slice(0, 6).map(String)
         : topics;
       const endRecommended = Boolean(parsed.end_recommended);
+      const handoffProofContext = input.handoffContext ? {
+        currentCharacter: input.currentCharacter, turnId: input.handoffContext.turnId, turnIndex: input.turnIndex,
+        orchestrationVersionId: input.orchestrationVersionId ?? null,
+        userText: input.handoffContext.userText ?? input.userMessage,
+        delivery: input.handoffContext.candidateText !== undefined
+          ? candidateEvidence(input.handoffContext.candidateText, input.handoffContext.turnId, input.turnIndex, input.currentCharacter)
+          : input.handoffContext.delivery, openRequest: input.handoffContext.openRequest,
+      } : null;
+      let proofRejection: import("@/services/characterHandoff").CharacterHandoffAuditReason | null = null;
       result = {
         engagement_delta: Number(parsed.engagement_delta ?? 0),
         confusion_detected: Boolean(parsed.confusion_detected),
@@ -651,19 +662,30 @@ export async function evaluatePostTurnPRD4(
           input.currentCharacter,
         ),
         player_switch_request: cleanPlayerSwitchRequest((parsed as { player_switch_request?: unknown }).player_switch_request),
-        handoff_assessment: materializeHandoffAssessment(parsed.handoff_assessment, input.handoffContext ? {
-          currentCharacter: input.currentCharacter, turnId: input.handoffContext.turnId, turnIndex: input.turnIndex,
-          orchestrationVersionId: input.orchestrationVersionId ?? null, userText: input.userMessage,
-          delivery: input.handoffContext.candidateText !== undefined
-            ? candidateEvidence(input.handoffContext.candidateText, input.handoffContext.turnId, input.turnIndex, input.currentCharacter)
-            : input.handoffContext.delivery, openRequest: input.handoffContext.openRequest,
-        } : null, (reason, missingFields) => validationIssues.push({
+        handoff_assessment: materializeHandoffAssessment(parsed.handoff_assessment, handoffProofContext,
+          (reason, missingFields) => { proofRejection = reason; validationIssues.push({
           code: reason === "assessment_invalid" ? "handoff_assessment_invalid" : "handoff_proof_rejected",
           reason, ...(missingFields.length ? { missing_fields: missingFields } : {}),
-        })),
+        }); }),
       };
       if (input.handoffContext && parsed.handoff_assessment == null && result.action?.type === "handoff") {
         validationIssues.push({ code: "handoff_assessment_missing", missing_fields: ["handoff_assessment"] });
+      }
+      // The character said « je te la passe » to a player who asked for the other
+      // character: a malformed or missing GM proof must not turn that consent into a
+      // scripted question (recette Max → Emma, 1er-4 novembre 2026).
+      if (handoffProofContext && !result.handoff_assessment) {
+        const raw = parsed.handoff_assessment && typeof parsed.handoff_assessment === "object"
+          ? parsed.handoff_assessment as { stance?: unknown; refusal?: unknown } : null;
+        const recovered = recoverHandoffAssessment(handoffProofContext,
+          raw ?? (result.player_switch_request ? { stance: result.player_switch_request.stance } : null));
+        if (recovered && (result.action?.type === "none" || result.action?.type === "cinematic"
+          || (result.action?.type === "handoff" && result.action.targetCharacter === recovered.targetCharacter))) {
+          validationIssues.push({ code: "handoff_proof_recovered", reason: proofRejection ?? "assessment_missing" });
+          result = { ...result, handoff_assessment: recovered, trigger_video_id: null,
+            action: result.action?.type === "handoff" ? result.action : { type: "handoff", targetCharacter: recovered.targetCharacter,
+              reason: RECOVERED_HANDOFF_REASON, proposalGuidance: RECOVERED_HANDOFF_GUIDANCE } };
+        }
       }
     }
     model = callRes.model || model;
@@ -753,7 +775,7 @@ export async function evaluatePostTurnPRD4(
     const verdict = validateCharacterHandoff({ ...input.handoffContext,
       currentCharacter: input.currentCharacter, turnIndex: input.turnIndex,
       orchestrationVersionId: input.orchestrationVersionId ?? null,
-      userText: input.userMessage, evaluation: enriched });
+      userText: input.handoffContext.userText ?? input.userMessage, evaluation: enriched });
     if (!verdict.authorized) validationIssues.push({ code: "handoff_proof_rejected", reason: verdict.reason });
   }
 

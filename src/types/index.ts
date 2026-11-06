@@ -401,7 +401,8 @@ export interface PRD4PostTurnEvaluation {
   /** Bounded technical metadata only: no raw response, quotes or transcript. */
   validation_issues?: Array<{
     code: "json_unreadable" | "schema_incomplete" | "unknown_speech_state"
-      | "handoff_assessment_missing" | "handoff_assessment_invalid" | "handoff_proof_rejected";
+      | "handoff_assessment_missing" | "handoff_assessment_invalid" | "handoff_proof_rejected"
+      | "handoff_proof_recovered";
     missing_fields?: string[];
     reason?: import("@/services/characterHandoff").CharacterHandoffAuditReason;
   }>;
