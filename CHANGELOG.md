@@ -22,6 +22,13 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Aucune fiche Notion, réglage Cloud, migration ou Edge Function modifiés. Tests : `handoffFluidity.test.ts`,
   `gameMasterPRD4.handoffRecovery.test.ts`. Recette humaine d'Ulrich à faire ; aucune publication production.
 
+## [Avatars streaming — Tavus, écoute pilotée par le jeu : prompt du lot 1] — 2026-11-06
+
+- Diagnostic : l'émotion d'écoute Tavus est fixe (`listeningEmotion`), appliquée en fin de réplique, au changement de
+  personnage et toutes les 5 s ; l'intention de jeu de la réplique disparaît pendant l'écoute.
+- Prompt de reprise [lot 1](docs/prompt_reprise_tavus_ecoute_jeu_lot_1.md) : table d'écoute atténuée tirée de la
+  dernière réplique, réglage « Écoute : fixe / suit le jeu », télémétrie, tests et recette. Aucun code modifié.
+
 ## [Avatars streaming — Tavus parle avec la voix d'Ava (audio Echo)] — 2026-11-06
 
 - Constat : en Echo texte, le PAL générique `pipecat0` lit les répliques avec la voix par défaut de Tavus (diction

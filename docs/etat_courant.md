@@ -49,6 +49,11 @@ formée). Preuve sur toute la demande, preuve déterministe si Max annonce le tr
 seule fois et seulement sans raison. Suite : recette d'Ulrich (demander Emma en expliquant, en plusieurs phrases).
 Aucun lot de code ne suit. [Plan](plan_fluidite_passage_max_emma.md).
 
+**Tavus, écoute pilotée par le jeu (6 novembre, prompt).** En voix Ava, le visage suit l'intention de jeu en
+parlant mais repasse à une émotion d'écoute fixe dès la fin de la réplique (et toutes les 5 s). Lot 1 : l'écoute
+prolonge, atténué, l'état de jeu de la dernière réplique ; réglage « Écoute : fixe / suit le jeu », front seul.
+[Prompt lot 1](prompt_reprise_tavus_ecoute_jeu_lot_1.md).
+
 **Tavus voix d'Ava (6 novembre, code) : audio Echo.** Tavus ne parle plus avec sa voix (diction française
 faible) : Ava synthétise chaque réplique avec la voix du personnage et l'envoie en audio Echo, Tavus anime le visage
 et les lèvres ; l'intention de jeu choisit l'émotion du visage. Format vérifié sur conversation réelle. Réglage
