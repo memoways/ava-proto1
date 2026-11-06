@@ -10,6 +10,10 @@
  * track is playing right now; their difference is the offset the viewer sees. The controller
  * delays whichever track is ahead through `jitterBufferTarget`, a little at a time, and stops
  * itself when its corrections have no effect (browser sync fighting back), so it never runs away.
+ *
+ * The caller only feeds samples while the media really plays with audio flowing (never during a
+ * cinematic, with the element detached), and applies new targets between two lines: a target
+ * moved mid-line stretches the voice and freezes the face, which reads as a floating delivery.
  */
 
 export interface PlayoutTargets {
@@ -20,7 +24,7 @@ export interface PlayoutTargets {
 export interface AvSyncOptions {
   /** Playout floor on both tracks: absorbs network jitter from the first frame. */
   baseMs: number;
-  /** Offset left alone (one video frame is 40 ms at 25 fps). */
+  /** Offset left alone (lip sync is hard to notice below ~60 ms, 1.5 frames at 25 fps). */
   toleranceMs: number;
   /** Share of the measured offset corrected per step, below 1 to avoid overshoot. */
   gain: number;
@@ -38,7 +42,7 @@ export interface AvSyncOptions {
 
 export const DEFAULT_AV_SYNC: AvSyncOptions = {
   baseMs: 400,
-  toleranceMs: 45,
+  toleranceMs: 60,
   gain: 0.7,
   maxShiftMs: 2_500,
   window: 3,
@@ -50,22 +54,50 @@ export const DEFAULT_AV_SYNC: AvSyncOptions = {
 /** Upper bound accepted by `RTCRtpReceiver.jitterBufferTarget`. */
 const MAX_TARGET_MS = 4_000;
 
-/**
- * Video playout instant minus audio playout instant, in ms: positive when the image is ahead of
- * the voice. Null when the browser does not expose both timestamps (no sender report yet).
- */
-export async function readPlayoutOffset(pc: RTCPeerConnection): Promise<number | null> {
+export interface AvSample {
+  /**
+   * Video playout instant minus audio playout instant, in ms: positive when the image is ahead of
+   * the voice. Null when the browser does not expose both timestamps (no sender report yet).
+   */
+  offsetMs: number | null;
+  /** Audio packets received so far: a sample only counts when it grew since the previous one. */
+  audioPackets: number;
+}
+
+export async function readAvSample(pc: RTCPeerConnection): Promise<AvSample> {
   let audio: number | null = null;
   let video: number | null = null;
+  let audioPackets = 0;
   (await pc.getStats()).forEach((report: Record<string, unknown>) => {
     if (report.type !== "inbound-rtp") return;
+    if (report.kind === "audio") audioPackets += Number(report.packetsReceived ?? 0);
     const value = Number(report.estimatedPlayoutTimestamp);
     if (!Number.isFinite(value) || value <= 0) return;
     if (report.kind === "audio") audio = value;
     else if (report.kind === "video") video = value;
   });
-  if (audio === null || video === null) return null;
-  return Math.round((video as number) - (audio as number));
+  const offsetMs = audio === null || video === null ? null : Math.round((video as number) - (audio as number));
+  return { offsetMs, audioPackets };
+}
+
+export async function readPlayoutOffset(pc: RTCPeerConnection): Promise<number | null> {
+  return (await readAvSample(pc)).offsetMs;
+}
+
+/** Per-line summary for the turn telemetry: what the viewer saw while the line was spoken. */
+export interface AvLineStats {
+  samples: number;
+  medianMs: number | null;
+  maxAbsMs: number | null;
+}
+
+export function summarizeLine(offsets: number[]): AvLineStats {
+  if (!offsets.length) return { samples: 0, medianMs: null, maxAbsMs: null };
+  return {
+    samples: offsets.length,
+    medianMs: Math.round(median(offsets)),
+    maxAbsMs: Math.round(Math.max(...offsets.map(Math.abs))),
+  };
 }
 
 export class AvSyncController {
@@ -98,6 +130,17 @@ export class AvSyncController {
   /** True once corrections stopped working: targets stay where they are. */
   get stopped(): boolean {
     return this._stopped;
+  }
+
+  /** Targets applied later than computed (end of line): measure again only after they settle. */
+  restartCooldown(now: number): void {
+    this.samples = [];
+    this.coolUntil = now + this.options.cooldownMs;
+  }
+
+  /** Drops the samples gathered so far: the media paused, or audio stopped flowing. */
+  discard(): void {
+    this.samples = [];
   }
 
   /** In sync: last measure within tolerance, or not measurable (nothing to wait for). */

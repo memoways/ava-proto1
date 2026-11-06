@@ -34,6 +34,15 @@ export interface AvatarCueObservation {
   source: string | null;
   speech_state: string | null;
   tempered: boolean;
+  /**
+   * Anam lip sync while the line played (video minus audio playout, ms; positive = image ahead).
+   * Null when not measurable (no sender report, media paused); targets are the playout buffers.
+   */
+  av_samples?: number;
+  av_offset_median_ms?: number | null;
+  av_offset_max_abs_ms?: number | null;
+  audio_playout_target_ms?: number;
+  video_playout_target_ms?: number;
 }
 export interface ProcessSpan {
   name: string;

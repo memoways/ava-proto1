@@ -3537,9 +3537,14 @@ const IndexPRD4 = () => {
   const teaserActive = state.phase === "teaser";
   const interludeActive = state.phase === "conversation_max" && Boolean(activeVideo?.video_url);
   const cinematicActive = teaserActive || interludeActive;
+  // Preload a decided cinematic while it is announced and the screen fades: started on an empty
+  // buffer, it stalled in its first seconds (sound cut). The hidden player stays muted.
+  const preloadCinematicUrl = state.phase === "conversation_max" && (cinematic.phase === "pending" || cinematic.phase === "fading_out")
+    ? cinematic.video.video_url || null
+    : null;
   const cinematicVideoUrl = interludeActive && activeVideo?.video_url
     ? activeVideo.video_url
-    : TEASER_VIDEO_URL;
+    : preloadCinematicUrl ?? TEASER_VIDEO_URL;
 
   return (
     <>

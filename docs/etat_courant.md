@@ -43,6 +43,11 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Anam, synchro tenue par réplique + cinématiques préchargées (6 novembre, code).** Corrections de synchro
+appliquées entre deux répliques (plus en pleine phrase), aucune mesure pendant une cinématique ; écart mesuré
+par réplique visible dans l'admin (Sessions). Cinématique préchargée pendant l'annonce, départ sur 4 s de
+tampon. Suite : recette d'Ulrich ; si une réplique désynchronisée montre « synchro ~0 ms », la cause est côté Anam.
+
 **Anam, synchro labiale active (6 novembre, code).** Son et image désynchronisés puis en dérive : Ava mesure
 l'écart audio/vidéo dans les stats WebRTC et retarde la piste en avance (tampon par piste), avant l'accueil et
 pendant toute la session ; arrêt automatique si sans effet. Diagnostic `av_sync`. Suite : recette d'Ulrich

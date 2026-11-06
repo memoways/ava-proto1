@@ -4,6 +4,26 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Anam : synchro tenue réplique par réplique ; cinématiques sans décrochage au démarrage] — 2026-11-06
+
+- Recette d'Ulrich (session `73871dcc`, 13 tours, Max → Emma) après #164 : accueil synchrone, puis synchro
+  variable selon les répliques (« ça flotte »), et son qui décroche au démarrage des cinématiques. Les
+  diagnostics média n'étant pas stockés, aucune mesure de cette session n'existait : elle est ajoutée.
+- Cause probable du flottement, introduite par #164 : la correction déplaçait les tampons **en pleine
+  réplique** (voix étirée ou accélérée, visage figé un instant) et mesurait aussi pendant les cinématiques,
+  avatar détaché de l'écran (mesures fausses, corrections à contretemps au retour).
+- Synchro : mesures seulement quand la vidéo est réellement lue à l'écran, avec du son qui arrive ; une
+  correction trouvée pendant une réplique est **appliquée après**, une fois le tampon de lecture vidé
+  (+ 300 ms) ; tolérance 60 ms. L'accueil reste corrigé avant la première réplique.
+- Mesure par réplique, stockée avec la télémétrie du tour (`voice_turn_events`, `avatar_cue`) : écart médian
+  et maximal pendant la réplique, nombre de mesures, tampons audio/vidéo. Visible dans l'admin, onglet
+  Sessions, « Émotion du visage » (« synchro +X ms »). Elle dira si l'écart vu reste mesurable côté navigateur.
+- Cinématiques : la session montre deux cinématiques lancées après ~21 s d'annonce, mais chargées seulement au
+  moment de jouer, sur un tampon vide, la bande passante partagée avec le flux Anam. La vidéo décidée se
+  précharge désormais (muette, cachée) pendant l'annonce et le fondu ; au lancement, le lecteur attend 4 s
+  de vidéo en mémoire (4 s au plus) avant de jouer. La toute première vidéo (geste « Commencer ») n'attend pas.
+- À valider en recette par Ulrich : synchro sur une session longue, démarrage des cinématiques.
+
 ## [Avatars streaming — Anam : synchro labiale active audio/vidéo] — 2026-11-06
 
 - Retour d'Ulrich : avec Anam, son et image très désynchronisés, dès l'accueil puis en dérive pendant la session

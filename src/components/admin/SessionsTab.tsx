@@ -141,9 +141,17 @@ function AvatarCueTrajectory({ sessionId }: { sessionId: string }) {
         {cue.emotion ? ` · ${cue.emotion}${cue.intensity != null ? ` ${cue.intensity}` : ''}` : ''}
         {cue.source ? ` · ${cue.source}` : ''}{cue.speech_state ? ` · « ${cue.speech_state} »` : ''}
         {cue.tempered ? ' · tempéré' : ''}
+        {cue.av_samples != null ? ` · synchro ${describeLineSync(cue)}` : ''}
       </p>;
     })}
   </details>;
+}
+
+/** Lip sync measured on the line: median offset (+ image ahead, − voice ahead), worst, buffers. */
+function describeLineSync(cue: AvatarCueObservation): string {
+  if (!cue.av_samples || cue.av_offset_median_ms == null) return 'non mesurée';
+  const signed = (ms: number) => `${ms > 0 ? '+' : ''}${ms} ms`;
+  return `${signed(cue.av_offset_median_ms)} (max ${cue.av_offset_max_abs_ms ?? '—'} ms, tampons A ${cue.audio_playout_target_ms ?? '—'} / V ${cue.video_playout_target_ms ?? '—'} ms)`;
 }
 
 /** Older rows (Anam AN2) carry no other provider; an unknown value stays Anam. */
