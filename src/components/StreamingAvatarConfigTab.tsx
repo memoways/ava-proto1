@@ -30,6 +30,7 @@ import {
   type AnamCueTag,
   type AnamEmotionCueMap,
   type AnamEmotionCueMode,
+  type AnamLipSyncMode,
   type AnamPerformanceEmotion,
   type AnamPresetStyle,
   type AnamStyleMode,
@@ -691,6 +692,22 @@ function AnamFields({
           <div className="grid gap-4 md:grid-cols-2">
             <NumberField label="Durée maximale de session (s)" hint="60 à 3 600 ; défaut 900." bounds={b.anamMaxSessionSeconds} value={value.maxSessionLengthSeconds} onChange={(maxSessionLengthSeconds) => patch({ maxSessionLengthSeconds })} />
             <EnumField
+              label="Synchro labiale"
+              hint="Réglée dans le navigateur, jamais envoyée à Anam. Chaque réplique enregistre l'écart mesuré (admin, Sessions, « Synchro audio/vidéo ») pour comparer les modes."
+              value={value.lipSync.mode}
+              options={ANAM_LIP_SYNC_LABELS}
+              onChange={(mode) => patch({ lipSync: { ...value.lipSync, mode } })}
+            />
+            {value.lipSync.mode === "manual" && (
+              <NumberField
+                label="Décalage manuel (ms)"
+                hint="Positif : retarde l'image (image en avance sur la voix). Négatif : retarde la voix. −1 500 à 2 500, pas de 20."
+                bounds={b.anamLipSyncShiftMs}
+                value={value.lipSync.manualShiftMs}
+                onChange={(manualShiftMs) => patch({ lipSync: { ...value.lipSync, manualShiftMs } })}
+              />
+            )}
+            <EnumField
               label="Qualité vidéo"
               value={session.videoQuality}
               options={{ high: "Haute (défaut)", auto: "Automatique" }}
@@ -803,6 +820,12 @@ const ANAM_CUE_LABELS: Record<AnamCueTag, string> = {
   playful: "[playful] — joueur (déconseillé)",
   happy: "[happy] — joyeux (déconseillé)",
   laughter: "[laughter] — rire (déconseillé)",
+};
+
+const ANAM_LIP_SYNC_LABELS: Record<AnamLipSyncMode, string> = {
+  auto: "Automatique — Ava mesure et corrige entre les répliques (défaut)",
+  browser: "Navigateur seul — aucun tampon ni correction d'Ava",
+  manual: "Manuel — décalage fixe réglé ci-dessous",
 };
 
 const ANAM_EMOTION_CUE_MODE_LABELS: Record<AnamEmotionCueMode, string> = {

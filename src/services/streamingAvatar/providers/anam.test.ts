@@ -273,6 +273,37 @@ describe("Anam text-mode lifecycle", () => {
     await output.dispose();
   });
 
+  it("leaves the buffers to the browser in browser mode, and still records the line", async () => {
+    const pc = peerConnection({ fps: 25, offset: 800 }); fake.peer.current = pc;
+    const output = new AnamStreamingAvatarOutput({ ...settings, lipSync: { mode: "browser", manualShiftMs: 0 } }, {}, 1000, 1000, warmUp, { ...avSync, pollMs: 5, cooldownMs: 30 });
+    await output.prepare({ sessionId: "ava" }); sessionReady(); output.attachMedia(videoWithFrame());
+    const line = output.renderText("Bonjour.", { turnId: "turn-1" });
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(1));
+    persona("Bonjour.");
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    persona("", { endOfSpeech: true });
+    await line;
+    expect(pc.receivers.map(r => r.jitterBufferTarget)).toEqual([null, null]);
+    await output.dispose();
+    expect(fake.recordAvatarAvSync).toHaveBeenCalledWith(expect.objectContaining({
+      lip_sync_mode: "browser", offset_median_ms: 800, audio_target_end_ms: null, video_target_end_ms: null,
+    }));
+  });
+
+  it("applies the manual shift to the track ahead and never corrects it", async () => {
+    const pc = peerConnection({ fps: 25, offset: 300 }); fake.peer.current = pc;
+    const manual = (shift: number) => new AnamStreamingAvatarOutput({ ...settings, lipSync: { mode: "manual", manualShiftMs: shift } }, {}, 1000, 1000, warmUp, { ...avSync, pollMs: 5, cooldownMs: 30 });
+    const imageAhead = manual(640);
+    await imageAhead.prepare({ sessionId: "ava" }); imageAhead.attachMedia(videoWithFrame());
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(pc.receivers.map(r => r.jitterBufferTarget)).toEqual([400, 1_040]);
+    await imageAhead.dispose();
+    const voiceAhead = manual(-200);
+    await voiceAhead.prepare({ sessionId: "ava" });
+    expect(pc.receivers.map(r => r.jitterBufferTarget)).toEqual([600, 400]);
+    await voiceAhead.dispose();
+  });
+
   it("takes no sample while the avatar element is detached (cinematic)", async () => {
     const pc = peerConnection({ fps: 25, offset: 800 }); fake.peer.current = pc;
     const output = new AnamStreamingAvatarOutput(settings, {}, 1000, 1000, warmUp, { ...avSync, pollMs: 5, cooldownMs: 30 });

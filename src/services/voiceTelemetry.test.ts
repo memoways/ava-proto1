@@ -15,9 +15,14 @@ vi.mock("@/services/posthogService", () => ({
   trackEvent: mocks.trackEventMock,
 }));
 
+vi.mock("@/services/environmentContext", () => ({
+  getRuntimeContext: () => ({ environmentId: "env-1", contextType: "user_test" }),
+}));
+
 import {
   buildVoiceTurnCompletedPayload,
   pickVoiceTurnBlocker,
+  recordAvatarAvSync,
   recordVoiceError,
   recordVoiceTurnCompleted,
   recordVoiceTurnV2,
@@ -209,5 +214,21 @@ describe("video telemetry", () => {
     }));
     expect(mocks.trackEventMock.mock.calls.some(([event, value]) => event === "ava_latency_segment" && value.segment_key === "tts_ms")).toBe(false);
     expect(mocks.insertMock).toHaveBeenCalledWith(expect.objectContaining({ metadata_json: expect.objectContaining({ video_provider: "future-video", t_video_wait_ms: 2000 }) }));
+  });
+
+  it("records an avatar lip sync line with the session environment the insert policy requires", async () => {
+    mocks.insertMock.mockReturnValue(Promise.resolve({ error: null }));
+    recordAvatarAvSync({
+      provider: "anam", lip_sync_mode: "auto", manual_shift_ms: null, session_id: "s-1", turn_id: null, line_index: 2,
+      model: "cara-4.1-express", voiced_samples: 6, offset_median_ms: 120, offset_min_ms: 80, offset_max_ms: 160,
+      offset_spread_ms: 80, corrections: 1, audio_target_start_ms: 400, video_target_start_ms: 400,
+      audio_target_end_ms: 400, video_target_end_ms: 484, sync_stopped: false, series: [[0, 120, 1]],
+    });
+    await vi.waitFor(() => expect(mocks.insertMock).toHaveBeenCalled());
+    expect(mocks.fromMock).toHaveBeenCalledWith("voice_turn_events");
+    expect(mocks.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+      session_id: "s-1", turn_id: "avatar-line-2", event_name: "avatar_av_sync",
+      environment_id: "env-1", context_type: "user_test",
+    }));
   });
 });

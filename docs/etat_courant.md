@@ -43,6 +43,10 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Anam, réglage « Synchro labiale » (6 novembre, code).** Cinématiques sans coupure (recette OK). Synchro encore
+flottante : mesures par réplique désormais enregistrées (insert corrigé), réglage admin auto / navigateur seul /
+décalage manuel pour comparer, avec modèle et qualité vidéo. Suite : essais d'Ulrich puis lecture des écarts.
+
 **Anam, synchro par voix audible + micro tenu pendant les cinématiques (6 novembre, code).** La correction
 suit l'écart mesuré pendant la parole (pas au repos), dans les silences ; une ligne `avatar_av_sync` par
 réplique (admin Sessions). Micro gardé ouvert pendant les cinématiques (coupure ~2 s due au casque

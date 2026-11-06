@@ -4,6 +4,21 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Anam : réglage « Synchro labiale » (auto, navigateur, manuel) ; mesures par réplique enregistrées] — 2026-11-06
+
+- Recette d'Ulrich (session `e3db42a7`) après #166 : plus de coupure au démarrage des cinématiques (micro
+  tenu ouvert : corrigé). Synchro toujours flottante, parfois juste, parfois très décalée.
+- Aucune ligne `avatar_av_sync` enregistrée : la politique d'insertion de `voice_turn_events` exige
+  l'environnement et le type de contexte de la session, absents de l'insert. Ils sont ajoutés (comme les
+  autres événements de tour) ; un refus est désormais signalé dans la console.
+- Nouveau réglage admin Anam (Avancé) **Synchro labiale**, lu par le navigateur seul (jamais envoyé à
+  Anam ni à l'Edge) : *Automatique* (défaut, comportement actuel), *Navigateur seul* (aucun tampon ni
+  correction d'Ava, comme avant #146), *Manuel* (décalage fixe : + retarde l'image, − retarde la voix,
+  −1 500 à 2 500 ms). Chaque réplique enregistre le mode, le décalage et l'écart mesuré, pour comparer.
+- Liste admin « Synchro audio/vidéo » : mode et tampons par réplique.
+- À tester par Ulrich : modes de synchro, puis modèle `cara-4` au lieu de `cara-4.1-express` et qualité
+  vidéo « Automatique » ; les écarts par réplique départagent les essais.
+
 ## [Anam : synchro pilotée par la voix audible ; micro gardé ouvert pendant les cinématiques] — 2026-11-06
 
 - Recette d'Ulrich (session `5e830c45`) après #165 : synchro toujours flottante, coupure d'environ 2 s

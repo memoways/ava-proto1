@@ -64,6 +64,8 @@ export const STREAMING_AVATAR_BOUNDS = {
   tavusLeftTimeoutSeconds: { min: 0, max: 3_600, step: 10, fallback: 30 },
   anamMaxSessionSeconds: { min: 60, max: 3_600, step: 60, fallback: 900 },
   anamExpressivity: { min: 0, max: 1, step: 0.05, fallback: 0.4 },
+  /** Manual lip sync: + delays the image (image ahead), − delays the voice. */
+  anamLipSyncShiftMs: { min: -1_500, max: 2_500, step: 20, fallback: 0 },
   anamElevenLabsSpeed: { min: 0.7, max: 1.2, step: 0.05, fallback: 1 },
   anamCartesiaVolume: { min: 0.5, max: 2, step: 0.05, fallback: 1 },
   anamCartesiaSpeed: { min: 0.6, max: 1.5, step: 0.05, fallback: 1 },
@@ -593,6 +595,12 @@ export const ANAM_SMILING_CUE_TAGS: readonly string[] = ["playful", "happy", "la
  * or the line itself); "fixed": `speakingCue` on every line, as before AN2.
  */
 export const ANAM_EMOTION_CUE_MODES = ["evolving", "fixed"] as const;
+/**
+ * Client lip sync for Anam (browser only, never sent to Anam). auto: Ava measures and corrects
+ * between lines; browser: no playout buffer and no correction; manual: a fixed shift.
+ */
+export const ANAM_LIP_SYNC_MODES = ["auto", "browser", "manual"] as const;
+export type AnamLipSyncMode = (typeof ANAM_LIP_SYNC_MODES)[number];
 /** Canonical acting emotions, kept identical to `CANONICAL_EMOTIONS` in performanceIntent.ts. */
 export const ANAM_PERFORMANCE_EMOTIONS = [
   "neutral",
@@ -731,6 +739,7 @@ export interface AnamAvatarSettings {
   emotionCues: Record<string, AnamEmotionCueMap>;
   voiceGenerationOptions: AnamVoiceGenerationOptions;
   sessionOptions: AnamSessionOptions;
+  lipSync: { mode: AnamLipSyncMode; manualShiftMs: number };
 }
 
 function boundedText(value: unknown, fallback: string, max: number): string {
@@ -797,6 +806,10 @@ export function normalizeAnamSettings(value: unknown): AnamAvatarSettings {
       regionPolicy: pickEnum(session.regionPolicy, ANAM_REGION_POLICIES, "preferred"),
       keepRecording: session.keepRecording === true,
       keepTranscripts: session.keepTranscripts === true,
+    },
+    lipSync: {
+      mode: pickEnum(asRecord(raw.lipSync).mode, ANAM_LIP_SYNC_MODES, "auto"),
+      manualShiftMs: boundedInteger(asRecord(raw.lipSync).manualShiftMs, b.anamLipSyncShiftMs),
     },
   };
 }

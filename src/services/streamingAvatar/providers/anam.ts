@@ -72,8 +72,8 @@ interface AvLine {
   series: [number, number | null, number][];
   voicedOffsets: number[];
   corrections: number;
-  startAudioMs: number;
-  startVideoMs: number;
+  startAudioMs: number | null;
+  startVideoMs: number | null;
 }
 
 interface InboundSample {
@@ -178,7 +178,8 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       for (const track of stream.getTracks()) mediaStream.addTrack(track);
     }
     this.mediaStream = mediaStream;
-    this.applyPlayoutTargets(this.avSync.targets);
+    const initial = this.initialTargets();
+    if (initial) this.applyPlayoutTargets(initial);
     this.startAvSync();
     this.reportTracks();
     if (!mediaStream.getVideoTracks().length || !mediaStream.getAudioTracks().length) {
@@ -392,7 +393,7 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
         const steady = videoFps >= STEADY_MIN_FPS
           && sample.freezeCount === previous.freezeCount
           && sample.audioPackets > previous.audioPackets
-          && this.avSync.isSettled(performance.now());
+          && (this.lipSyncMode !== "auto" || this.avSync.isSettled(performance.now()));
         streak = steady ? streak + 1 : 0;
         if (streak >= this.warmUpTiming.steadySamples) return { steady: true, videoFps };
       }
@@ -471,6 +472,8 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       }
       // Before the first line the face idles: its offset sets the opening. Afterwards the idle
       // offset differs from the speaking one, so only audible speech drives the correction.
+      // Browser and manual modes only measure (line records), they never move a buffer.
+      if (this.lipSyncMode !== "auto") return;
       const drives = this.linesStarted === 0 || voiced;
       if (drives && !this.pendingTargets) {
         const targets = this.avSync.observe(offset, now);
@@ -496,13 +499,38 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     }
   }
 
+  private get lipSyncMode() {
+    return this.settings.lipSync?.mode ?? "auto";
+  }
+
+  /**
+   * Playout targets set at connection. auto: same floor, then measured corrections; manual: the
+   * floor plus the admin shift on the track ahead; browser: none, the browser keeps its defaults.
+   */
+  private initialTargets(): PlayoutTargets | null {
+    const base = DEFAULT_AV_SYNC.baseMs;
+    if (this.lipSyncMode === "browser") return null;
+    if (this.lipSyncMode === "manual") {
+      const shift = this.settings.lipSync?.manualShiftMs ?? 0;
+      return { audioMs: base + Math.max(0, -shift), videoMs: base + Math.max(0, shift) };
+    }
+    return this.avSync.targets;
+  }
+
+  /** Buffers really applied, for the line records (null: the browser's own). */
+  private appliedTargets(): PlayoutTargets | null {
+    return this.lipSyncMode === "auto" ? this.avSync.targets : this.initialTargets();
+  }
+
   /** One record per line, from the text sent until the voice has been silent for a while. */
   private openLine(turnId?: string): void {
     this.closeLine();
     // Idle samples from the warm-up or the last silence never mix with this line's voice.
     this.avSync.discard();
     this.linesStarted++;
-    const { audioMs, videoMs } = this.avSync.targets;
+    const applied = this.appliedTargets();
+    const audioMs = applied?.audioMs ?? null;
+    const videoMs = applied?.videoMs ?? null;
     this.line = {
       index: this.linesStarted, turnId: turnId ?? null, openedAt: performance.now(), heardAt: null,
       series: [], voicedOffsets: [], corrections: 0, startAudioMs: audioMs, startVideoMs: videoMs,
@@ -528,9 +556,11 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     if (!line) return;
     this.line = null;
     const stats = summarizeLine(line.voicedOffsets);
-    const { audioMs, videoMs } = this.avSync.targets;
+    const applied = this.appliedTargets();
     const record: AvatarAvSyncRecord = {
       provider: "anam",
+      lip_sync_mode: this.lipSyncMode,
+      manual_shift_ms: this.lipSyncMode === "manual" ? this.settings.lipSync?.manualShiftMs ?? 0 : null,
       session_id: this.avaSessionId || null,
       turn_id: line.turnId,
       line_index: line.index,
@@ -543,8 +573,8 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       corrections: line.corrections,
       audio_target_start_ms: line.startAudioMs,
       video_target_start_ms: line.startVideoMs,
-      audio_target_end_ms: audioMs,
-      video_target_end_ms: videoMs,
+      audio_target_end_ms: applied?.audioMs ?? null,
+      video_target_end_ms: applied?.videoMs ?? null,
       sync_stopped: this.avSync.stopped,
       series: line.series,
     };
