@@ -58,6 +58,7 @@ import {
   TAVUS_AVATAR_CHARACTERS,
   TAVUS_ECHO_EMOTIONS,
   TAVUS_EMOTIONS,
+  TAVUS_VOICE_SOURCES,
   type AnamAvatarSettings,
   type HeyGenAvatarSettings,
   type HeyGenElevenLabsVoice,
@@ -68,6 +69,7 @@ import {
   type TavusCharacterOverride,
   type TavusEchoEmotion,
   type TavusEmotion,
+  type TavusVoiceSource,
 } from "@/services/streamingAvatar";
 import { assignTavusFace } from "@/services/streamingAvatar/tavusFaceAdmin";
 import StreamingAvatarTestPanel from "@/components/StreamingAvatarTestPanel";
@@ -81,7 +83,7 @@ const providerCopy: Record<StreamingAvatarProviderId, { title: string; descripti
   },
   tavus: {
     title: "Tavus",
-    description: "Une persona Echo reçoit conversation.echo : Perception, STT et LLM Tavus restent désactivés.",
+    description: "Un PAL Echo reçoit conversation.echo : par défaut l'audio de la voix Ava du personnage (Tavus anime seulement le visage), ou le texte lu par la voix du PAL. Perception, STT et LLM Tavus restent désactivés.",
   },
   anam: {
     title: "Anam",
@@ -378,11 +380,25 @@ function TavusFields({
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Tavus</CardTitle>
-        <CardDescription>API v2 actuelle : « Replica » s'appelle désormais <strong>Face ID</strong> (GET /v2/faces) et « Persona » s'appelle <strong>PAL ID</strong> (GET /v2/pals, préfixe <code>p…</code>). Le PAL doit être en pipeline_mode « echo » : il porte la voix, Ava fournit exclusivement le texte. Interruption par <code>conversation.interrupt</code>.</CardDescription>
+        <CardDescription>API v2 actuelle : « Replica » s'appelle désormais <strong>Face ID</strong> (GET /v2/faces) et « Persona » s'appelle <strong>PAL ID</strong> (GET /v2/pals, préfixe <code>p…</code>). Le PAL doit être en pipeline_mode « echo ». Source de la voix « Ava » : Ava synthétise chaque réplique avec la voix du personnage et ses réglages TTS, puis l'envoie en audio ; Tavus n'anime que le visage et les lèvres. « Tavus » : Ava envoie le texte, lu par la voix du PAL. Interruption par <code>conversation.interrupt</code>.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <SectionTitle>Essentiel</SectionTitle>
         <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2 md:col-span-2">
+            <Label>Source de la voix</Label>
+            <Select value={value.voiceSource} onValueChange={(voiceSource: TavusVoiceSource) => patch({ voiceSource })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {TAVUS_VOICE_SOURCES.map((source) => (
+                  <SelectItem key={source} value={source}>{TAVUS_VOICE_SOURCE_LABELS[source]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Ava (audio) : voix, moteur et réglages TTS actifs d'Ava (onglet voix), émotion du visage choisie par l'intention de jeu de chaque réplique (repli : émotion en parlant) ; la balise Echo ne s'applique pas. Tavus (PAL) : voix réglée dans Tavus, diction française faible.
+            </p>
+          </div>
           <TextField label="Face ID (ex-Replica ID)" value={value.replicaId} onChange={(replicaId) => patch({ replicaId })} />
           <TextField label="PAL ID (ex-Persona ID)" value={value.personaId} onChange={(personaId) => patch({ personaId })} />
           <LanguagesField value={value.languages} onChange={(languages) => patch({ languages })} />
@@ -504,6 +520,21 @@ function TavusCharacterOverrides({
               value={override.faceId ?? ""}
               onChange={(faceId) => patchCharacter(key, { faceId: faceId.trim() || undefined })}
             />
+            <div className="space-y-2">
+              <Label>Source de la voix</Label>
+              <Select
+                value={override.voiceSource ?? TAVUS_GLOBAL_VALUE}
+                onValueChange={(selected) => patchCharacter(key, { voiceSource: fromSelect<TavusVoiceSource>(selected) })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TAVUS_GLOBAL_VALUE}>Global ({TAVUS_VOICE_SOURCE_LABELS[value.voiceSource]})</SelectItem>
+                  {TAVUS_VOICE_SOURCES.map((source) => (
+                    <SelectItem key={source} value={source}>{TAVUS_VOICE_SOURCE_LABELS[source]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>Balise Echo en parlant</Label>
               <Select
@@ -969,6 +1000,11 @@ const HEYGEN_VOICE_ENGINE_LABELS: Record<HeyGenVoiceSettings["engine"], string> 
   elevenLabs: "ElevenLabs",
   fish: "Fish",
   cartesia: "Cartesia",
+};
+
+const TAVUS_VOICE_SOURCE_LABELS: Record<TavusVoiceSource, string> = {
+  ava: "Ava (audio) — voix du personnage (défaut)",
+  tavus: "Tavus (PAL) — texte lu par la voix du PAL",
 };
 
 const TAVUS_EMOTION_LABELS: Record<TavusEmotion, string> = {

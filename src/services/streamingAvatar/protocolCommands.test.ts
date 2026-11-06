@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  buildTavusEchoAudioCommand,
   buildTavusEchoCommand,
   buildTavusInterruptCommand,
   buildTavusSetEmotionCommand,
   sendHeyGenListening,
   stripTavusEmotionTags,
   sendHeyGenSpeakText,
+  TAVUS_ECHO_AUDIO_CHUNK_MS,
+  TAVUS_ECHO_AUDIO_SAMPLE_RATE,
   TAVUS_ECHO_EMOTION_TAGS,
 } from "./protocolCommands";
 import { TAVUS_ECHO_EMOTIONS, type TavusEchoEmotion } from "./types";
@@ -87,5 +90,17 @@ describe("streaming avatar direct text protocols", () => {
     expect(sendHeyGenListening(session, false)).toBe("stop");
     expect(session.startListening).toHaveBeenCalledOnce();
     expect(session.stopListening).toHaveBeenCalledOnce();
+  });
+});
+
+describe("Tavus Echo audio command", () => {
+  it("matches the format verified on a real conversation", () => {
+    expect(buildTavusEchoAudioCommand("c1", "AAA=", TAVUS_ECHO_AUDIO_SAMPLE_RATE, "ava-t1-1", true)).toEqual({
+      message_type: "conversation",
+      event_type: "conversation.echo",
+      conversation_id: "c1",
+      properties: { modality: "audio", audio: "AAA=", sample_rate: 24_000, inference_id: "ava-t1-1", done: true },
+    });
+    expect(TAVUS_ECHO_AUDIO_CHUNK_MS).toBe(250);
   });
 });

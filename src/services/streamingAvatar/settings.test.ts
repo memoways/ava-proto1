@@ -203,12 +203,12 @@ describe("Tavus Echo tag and per-character settings (lot 1)", () => {
       },
     }).tavus;
     expect(resolveTavusCharacterSettings(tavus, "max")).toEqual({
-      faceId: "r-max", echoEmotion: "dejected", emotion: "sadness", listeningEmotion: "contempt",
+      faceId: "r-max", echoEmotion: "dejected", emotion: "sadness", listeningEmotion: "contempt", voiceSource: "ava",
     });
     expect(resolveTavusCharacterSettings(tavus, "emma")).toEqual({
-      faceId: "r-global", echoEmotion: "sad", emotion: "sadness", listeningEmotion: "neutral",
+      faceId: "r-global", echoEmotion: "sad", emotion: "sadness", listeningEmotion: "neutral", voiceSource: "ava",
     });
-    const global = { faceId: "r-global", echoEmotion: "dejected", emotion: "sadness", listeningEmotion: "neutral" };
+    const global = { faceId: "r-global", echoEmotion: "dejected", emotion: "sadness", listeningEmotion: "neutral", voiceSource: "ava" };
     expect(resolveTavusCharacterSettings(tavus)).toEqual(global);
     expect(resolveTavusCharacterSettings(tavus, "leo")).toEqual(global);
   });
@@ -217,5 +217,33 @@ describe("Tavus Echo tag and per-character settings (lot 1)", () => {
     const legacy = { ...streamingAvatarDefaults.tavus, replicaId: "r" } as Partial<typeof streamingAvatarDefaults.tavus>;
     delete legacy.characters;
     expect(resolveTavusCharacterSettings(legacy as typeof streamingAvatarDefaults.tavus, "max").faceId).toBe("r");
+  });
+});
+
+describe("Tavus voice source (Ava audio or PAL voice)", () => {
+  it("defaults to Ava's audio, including for JSON saved before the field existed", () => {
+    expect(streamingAvatarDefaults.tavus.voiceSource).toBe("ava");
+    const legacy = normalize({
+      tavus: { replicaId: "r", personaId: "pipecat0", emotion: "sadness", echoEmotion: "dejected", characters: { max: {}, emma: {} } },
+    }).tavus;
+    expect(legacy.voiceSource).toBe("ava");
+    expect(legacy).toMatchObject({ replicaId: "r", personaId: "pipecat0", echoEmotion: "dejected" });
+    expect(legacy.characters).toEqual({ max: {}, emma: {} });
+  });
+
+  it("keeps a saved global source and per-character overrides, drops unknown values", () => {
+    const tavus = normalize({
+      tavus: {
+        voiceSource: "tavus",
+        characters: { max: { voiceSource: "ava" }, emma: { voiceSource: "robot" } },
+      },
+    }).tavus;
+    expect(tavus.voiceSource).toBe("tavus");
+    expect(tavus.characters.max).toEqual({ voiceSource: "ava" });
+    expect(tavus.characters.emma).toEqual({});
+    expect(resolveTavusCharacterSettings(tavus, "max").voiceSource).toBe("ava");
+    expect(resolveTavusCharacterSettings(tavus, "emma").voiceSource).toBe("tavus");
+    expect(resolveTavusCharacterSettings(tavus).voiceSource).toBe("tavus");
+    expect(normalize({ tavus: { voiceSource: 42 } }).tavus.voiceSource).toBe("ava");
   });
 });

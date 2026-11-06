@@ -17,6 +17,7 @@ import { isTavusEchoEmotion, TAVUS_ECHO_EMOTION_TAGS } from "./protocolCommands"
 import {
   TAVUS_AVATAR_CHARACTERS,
   TAVUS_EMOTIONS,
+  TAVUS_VOICE_SOURCES,
   type OutputSettings,
   type ResolvedTavusCharacterSettings,
   type StreamingAvatarProviderId,
@@ -25,6 +26,7 @@ import {
   type TavusCharacterOverride,
   type TavusEchoEmotion,
   type TavusEmotion,
+  type TavusVoiceSource,
 } from "./types";
 
 export const OUTPUT_SETTINGS_KEY = "ava_output_settings";
@@ -61,6 +63,8 @@ export const streamingAvatarDefaults: StreamingAvatarSettings = {
     listeningEmotion: "neutral",
     // Removes the smile best; can read a little sad (to check in the lot 4 recipe).
     echoEmotion: "dejected",
+    // Ava's own voice by default: the PAL voice reads French badly (6 November 2026).
+    voiceSource: "ava",
     characters: { max: {}, emma: {} },
   },
   // Sad speaking style and closed idling attitude, like the Tavus emotions; IDs set in the admin.
@@ -179,6 +183,9 @@ export function normalizeStreamingAvatarSettings(
         tavusDefaults.listeningEmotion,
       ),
       echoEmotion: normalizeTavusEchoEmotion(tavus.echoEmotion, tavus.emotion),
+      voiceSource: isTavusVoiceSource(tavus.voiceSource)
+        ? tavus.voiceSource
+        : tavusDefaults.voiceSource,
       characters: normalizeTavusCharacters(tavus.characters),
     },
     anam: normalizeAnamSettings(raw.anam),
@@ -235,6 +242,7 @@ function normalizeTavusCharacters(value: unknown): Record<string, TavusCharacter
     if (TAVUS_EMOTIONS.includes(entry.listeningEmotion as TavusEmotion)) {
       override.listeningEmotion = entry.listeningEmotion as TavusEmotion;
     }
+    if (isTavusVoiceSource(entry.voiceSource)) override.voiceSource = entry.voiceSource;
     characters[key] = override;
   }
   return characters;
@@ -255,7 +263,12 @@ export function resolveTavusCharacterSettings(
     echoEmotion: override.echoEmotion ?? settings.echoEmotion,
     emotion: override.emotion ?? settings.emotion,
     listeningEmotion: override.listeningEmotion ?? settings.listeningEmotion,
+    voiceSource: override.voiceSource ?? settings.voiceSource ?? "ava",
   };
+}
+
+export function isTavusVoiceSource(value: unknown): value is TavusVoiceSource {
+  return TAVUS_VOICE_SOURCES.includes(value as TavusVoiceSource);
 }
 
 function clamp(value: unknown, min: number, max: number, fallback: number): number {

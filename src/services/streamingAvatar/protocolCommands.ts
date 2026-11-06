@@ -60,6 +60,37 @@ export function buildTavusEchoCommand(
 }
 
 /**
+ * Tavus Echo audio, as verified on a real conversation (6 November 2026, PAL `pipecat0`):
+ * `modality: "audio"`, mono PCM16 little-endian in base64, `sample_rate` 24000 (16000 also
+ * accepted). Chunks of one line share an `inference_id`; `done` marks the last chunk of the
+ * line. Tavus ends a line (`stopped_speaking`) whenever its audio queue runs dry, `done` or not.
+ */
+export const TAVUS_ECHO_AUDIO_SAMPLE_RATE = 24_000;
+/** 250 ms per message: first sound ~0.6 s after sending, against ~1.2 s for one large message. */
+export const TAVUS_ECHO_AUDIO_CHUNK_MS = 250;
+
+export function buildTavusEchoAudioCommand(
+  conversationId: string,
+  audioBase64: string,
+  sampleRate: number,
+  inferenceId: string,
+  done: boolean,
+) {
+  return {
+    message_type: "conversation",
+    event_type: "conversation.echo",
+    conversation_id: conversationId,
+    properties: {
+      modality: "audio",
+      audio: audioBase64,
+      sample_rate: sampleRate,
+      inference_id: inferenceId,
+      done,
+    },
+  } as const;
+}
+
+/**
  * Tavus holds this facial emotion while listening and speaking, until the next
  * `conversation.set_emotion`. Echo text tags still decide each spoken line.
  */

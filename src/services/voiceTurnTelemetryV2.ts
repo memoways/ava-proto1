@@ -23,8 +23,8 @@ export interface ServiceObservation {
 }
 /** Face cue of a streaming avatar line (Anam AN2); acting labels only, never spoken text. */
 export interface AvatarCueObservation {
-  provider: "anam";
-  /** Cue chosen for the line; "none" keeps the Director Notes base style. */
+  provider: "anam" | "tavus";
+  /** Cue chosen for the line: Anam tag ("none" keeps the base style) or Tavus `set_emotion` value. */
   cue: string;
   /** Actually sent over the data channel (false for "none" or a refused send). */
   sent: boolean;

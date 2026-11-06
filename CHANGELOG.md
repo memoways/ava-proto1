@@ -4,6 +4,32 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatars streaming — Tavus parle avec la voix d'Ava (audio Echo)] — 2026-11-06
+
+- Constat : en Echo texte, le PAL générique `pipecat0` lit les répliques avec la voix par défaut de Tavus (diction
+  française très mauvaise). Solution B validée par Ulrich : Ava synthétise chaque réplique avec son propre TTS (voix
+  du personnage, moteur et réglages actifs, ElevenLabs aujourd'hui) et l'envoie en `conversation.echo` audio ; Tavus
+  n'anime plus que le visage et les lèvres. [Plan](docs/plan_tavus_voix_ava_audio.md).
+- Format établi par un essai réel (3 conversations courtes, toutes fermées) : `modality: "audio"`, PCM16 LE mono en
+  base64, 24 kHz, morceaux de 250 ms sous un même `inference_id`, `done` sur le dernier ; premier son ≈ 0,6 s après
+  l'envoi ; `started/stopped_speaking` émis, mais un stop arrive dès que la file audio est vide (même sans `done`) ;
+  `conversation.interrupt` coupe en ≈ 0,45 s ; aucune transcription Tavus pour l'audio.
+- Pont audio commun `avatarAudioBridge.ts` extrait de LemonSlice (TTS d'Ava, décodage/rééchantillonnage PCM16,
+  morceaux, un segment d'avance) ; LemonSlice l'utilise sans changement de comportement.
+- Tavus, voie « Ava » : début au premier `started_speaking`, fin seulement après le dernier morceau et la durée
+  audio jouée (pauses entre segments et stop d'une réplique interrompue ignorés, fin de secours si aucun stop),
+  repli TTS local si le TTS échoue avant le premier morceau ou si Tavus ne démarre pas, interruption joueur
+  (TTS en vol abandonné + `conversation.interrupt`), télémétrie de latence (premier son, durée).
+- Émotion du visage cohérente avec la voix : l'intention de jeu de la réplique (`performanceIntent`) choisit
+  `set_emotion` par une table canonique (`tavusEmotionCues.ts`, jamais `happiness`), repli sur l'émotion réglée du
+  personnage ; tracée par réplique dans Admin → Sessions (« Émotion du visage (Tavus) »). La balise Echo texte ne
+  s'applique pas à l'audio.
+- Réglage « Source de la voix : Ava (audio) / Tavus (PAL) », global et par personnage (Max, Emma), défaut Ava ; les
+  anciens JSON sont relus sans perte (sans le champ → Ava). La voie texte reste disponible.
+- Rien à déployer côté Edge Function ni base. Tests : `tavusAudio.test.ts`, `tavusEmotionCues.test.ts`, réglages,
+  commandes. Recette humaine (voix de Max, synchro labiale, émotion, interruption, latence vs voie texte) dans le plan
+  et le [prompt du lot 4 Tavus](docs/prompt_reprise_tavus_face_emotion_lot_4.md). Aucune publication production.
+
 ## [Avatars streaming — Tavus lot 3 bis : upload refusé par le stockage (403), diagnostic et repli] — 2026-11-05
 
 - Constat (recette) : le téléversement TUS échoue à la création avec `AccessDenied` (HTTP 400, `statusCode` 403,

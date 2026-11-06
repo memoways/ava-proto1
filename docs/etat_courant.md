@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 5 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 6 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -42,6 +42,12 @@ Personnel : Ulrich `377e8583-7838-4c05-9f76-8833a450f304`, sources Ava exclues.
 GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
+
+**Tavus voix d'Ava (6 novembre, code) : audio Echo.** Tavus ne parle plus avec sa voix (diction française
+faible) : Ava synthétise chaque réplique avec la voix du personnage et l'envoie en audio Echo, Tavus anime le visage
+et les lèvres ; l'intention de jeu choisit l'émotion du visage. Format vérifié sur conversation réelle. Réglage
+« Source de la voix » (défaut Ava, par personnage), voie texte conservée. Rien à déployer côté Edge. Suite : recette
+d'Ulrich, intégrée au [lot 4](prompt_reprise_tavus_face_emotion_lot_4.md). [Plan](plan_tavus_voix_ava_audio.md).
 
 **Tavus lot 3 (5 novembre, code) : admin d'entraînement d'un Face.** Bloc « Entraîner un Face (vidéo) »
 dans l'onglet Tavus : upload TUS vers le bucket privé, entraînement lancé seulement après confirmation,

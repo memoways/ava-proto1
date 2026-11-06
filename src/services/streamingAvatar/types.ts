@@ -86,6 +86,14 @@ export const TAVUS_ECHO_EMOTIONS = [
 ] as const;
 export type TavusEchoEmotion = (typeof TAVUS_ECHO_EMOTIONS)[number];
 
+/**
+ * Who voices a Tavus line. `ava` (default): Ava's own TTS (character voice, active engine and
+ * settings) is sent as Echo audio and Tavus only animates the face and the lips. `tavus`: Echo
+ * text, read by the PAL's own voice.
+ */
+export const TAVUS_VOICE_SOURCES = ["ava", "tavus"] as const;
+export type TavusVoiceSource = (typeof TAVUS_VOICE_SOURCES)[number];
+
 /** Characters that get a per-character Tavus block in the admin. */
 export const TAVUS_AVATAR_CHARACTERS = ["max", "emma"] as const;
 
@@ -95,6 +103,7 @@ export interface TavusCharacterOverride {
   echoEmotion?: TavusEchoEmotion;
   emotion?: TavusEmotion;
   listeningEmotion?: TavusEmotion;
+  voiceSource?: TavusVoiceSource;
 }
 
 /** Effective Tavus face and emotions for one character (see `resolveTavusCharacterSettings`). */
@@ -103,6 +112,7 @@ export interface ResolvedTavusCharacterSettings {
   echoEmotion: TavusEchoEmotion;
   emotion: TavusEmotion;
   listeningEmotion: TavusEmotion;
+  voiceSource: TavusVoiceSource;
 }
 
 export interface TavusAvatarSettings {
@@ -124,6 +134,8 @@ export interface TavusAvatarSettings {
   listeningEmotion: TavusEmotion;
   /** Echo tag prefixed to each spoken line, chosen directly among the 11 Echo values. */
   echoEmotion: TavusEchoEmotion;
+  /** Voice of the lines; absent in older JSON means Ava's audio. */
+  voiceSource: TavusVoiceSource;
   /** Per-character overrides keyed by character (`max`, `emma`); empty means global. */
   characters: Record<string, TavusCharacterOverride>;
 }
