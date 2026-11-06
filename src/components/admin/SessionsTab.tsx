@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { AvatarCueObservation } from "@/services/voiceTurnTelemetryV2";
+import type { AvatarAvSyncRecord } from "@/services/voiceTelemetry";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -141,17 +142,41 @@ function AvatarCueTrajectory({ sessionId }: { sessionId: string }) {
         {cue.emotion ? ` · ${cue.emotion}${cue.intensity != null ? ` ${cue.intensity}` : ''}` : ''}
         {cue.source ? ` · ${cue.source}` : ''}{cue.speech_state ? ` · « ${cue.speech_state} »` : ''}
         {cue.tempered ? ' · tempéré' : ''}
-        {cue.av_samples != null ? ` · synchro ${describeLineSync(cue)}` : ''}
       </p>;
     })}
   </details>;
 }
 
-/** Lip sync measured on the line: median offset (+ image ahead, − voice ahead), worst, buffers. */
-function describeLineSync(cue: AvatarCueObservation): string {
-  if (!cue.av_samples || cue.av_offset_median_ms == null) return 'non mesurée';
-  const signed = (ms: number) => `${ms > 0 ? '+' : ''}${ms} ms`;
-  return `${signed(cue.av_offset_median_ms)} (max ${cue.av_offset_max_abs_ms ?? '—'} ms, tampons A ${cue.audio_playout_target_ms ?? '—'} / V ${cue.video_playout_target_ms ?? '—'} ms)`;
+/**
+ * Anam lip sync per line (`avatar_av_sync` rows): offset while the voice was audible, + when the
+ * image is ahead, − when the voice is ahead; spread = floating inside the line itself.
+ */
+function AvatarSyncByLine({ sessionId }: { sessionId: string }) {
+  const [rows, setRows] = useState<AvatarAvSyncRecord[]>([]);
+  useEffect(() => {
+    let active = true;
+    setRows([]);
+    void supabase.from('voice_turn_events' as never)
+      .select('metadata_json')
+      .eq('session_id', sessionId).eq('event_name', 'avatar_av_sync')
+      .order('created_at', { ascending: true }).limit(300)
+      .then(({ data }) => {
+        if (!active) return;
+        const records = ((data ?? []) as unknown as Array<{ metadata_json?: AvatarAvSyncRecord | null }>).map((row) => row.metadata_json);
+        setRows(records.filter((row): row is AvatarAvSyncRecord => typeof row?.line_index === 'number'));
+      });
+    return () => { active = false; };
+  }, [sessionId]);
+  if (!rows.length) return null;
+  const signed = (ms: number | null) => (ms == null ? '—' : `${ms > 0 ? '+' : ''}${ms} ms`);
+  return <details className="mb-3 rounded border p-3 text-xs">
+    <summary>Synchro audio/vidéo (Anam) : {rows.length} répliques mesurées</summary>
+    <p className="my-2 text-muted-foreground">Écart pendant que la voix est audible : + image en avance, − voix en avance. Étendue = flottement à l'intérieur de la réplique. Tampons audio/vidéo en fin de réplique.</p>
+    {rows.map((row, index) => <p key={index} className="my-1 font-mono">
+      R{row.line_index} · {row.voiced_samples ? `médiane ${signed(row.offset_median_ms)} · de ${signed(row.offset_min_ms)} à ${signed(row.offset_max_ms)} (étendue ${row.offset_spread_ms} ms)` : 'non mesurée'}
+      {' '}· tampons A {row.audio_target_end_ms} / V {row.video_target_end_ms} ms{row.corrections ? ` · ${row.corrections} correction${row.corrections > 1 ? 's' : ''}` : ''}{row.sync_stopped ? ' · correction arrêtée' : ''}
+    </p>)}
+  </details>;
 }
 
 /** Older rows (Anam AN2) carry no other provider; an unknown value stays Anam. */
@@ -814,6 +839,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
             )}
 
             <HandoffAuditTimeline sessionId={selected.id} />
+            <AvatarSyncByLine sessionId={selected.id} />
             <AvatarCueTrajectory sessionId={selected.id} />
 
             {/* PRD4 — Timeline GM post-turn */}

@@ -20,7 +20,7 @@ const fake = vi.hoisted(() => {
       };
     }),
   };
-  return { handlers, talks, client, peer, createClient: vi.fn((_token: string, _options?: unknown) => client) };
+  return { handlers, talks, client, peer, recordAvatarAvSync: vi.fn(), createClient: vi.fn((_token: string, _options?: unknown) => client) };
 });
 vi.mock("@anam-ai/js-sdk", () => ({
   createClient: fake.createClient,
@@ -33,6 +33,7 @@ vi.mock("@anam-ai/js-sdk", () => ({
   },
   MessageRole: { USER: "user", PERSONA: "persona" },
 }));
+vi.mock("../../voiceTelemetry", () => ({ recordAvatarAvSync: fake.recordAvatarAvSync }));
 vi.mock("../api", () => ({
   startAvatarSession: vi.fn(async () => ({ provider: "anam", externalSessionId: "binding", sessionToken: "ephemeral" })),
   endAvatarSession: vi.fn(async () => {}),
@@ -62,7 +63,7 @@ const warmUp = { maxWaitMs: 50, settleMs: 0, pollMs: 1, steadySamples: 2 };
  * `offset` (video minus audio playout, ms) reads the receivers' targets: delaying the video by
  * N ms brings the image N ms back, as the browser does.
  */
-const peerConnection = ({ fps = 25, audio = true, freezes = (): number => 0, offset = null as null | number } = {}) => {
+const peerConnection = ({ fps = 25, audio = true, freezes = (): number => 0, offset = null as null | number, level = null as null | (() => number) } = {}) => {
   const startedAt = performance.now();
   const receivers = [
     { track: { kind: "audio" }, jitterBufferTarget: null as number | null },
@@ -81,7 +82,7 @@ const peerConnection = ({ fps = 25, audio = true, freezes = (): number => 0, off
           ...(offset === null ? {} : { estimatedPlayoutTimestamp: 1_000_000 + offset - Number(receivers[1].jitterBufferTarget ?? 0) }),
         }],
         ["a", {
-          type: "inbound-rtp", kind: "audio", packetsReceived: audio ? calls : 1,
+          type: "inbound-rtp", kind: "audio", packetsReceived: audio ? calls : 1, ...(level ? { audioLevel: level() } : {}),
           ...(offset === null ? {} : { estimatedPlayoutTimestamp: 1_000_000 - Number(receivers[0].jitterBufferTarget ?? 0) }),
         }],
       ]);
@@ -238,32 +239,37 @@ describe("Anam text-mode lifecycle", () => {
     await opening; await output.dispose();
   });
 
-  it("measures each line, holds a correction found mid-line until the line has drained", async () => {
-    const pc = peerConnection({ fps: 25 }); fake.peer.current = pc;
-    const onAvatarCue = vi.fn();
-    const output = new AnamStreamingAvatarOutput(settings, {}, 1000, 1000, warmUp, { ...avSync, pollMs: 5, cooldownMs: 30, baseMs: 20 });
-    await output.prepare({ sessionId: "ava" }); sessionReady(); output.attachMedia(videoWithFrame());
-    const line = output.renderText("Bonjour.", { onAvatarCue });
-    await vi.waitFor(() => expect(fake.talks).toHaveLength(1));
-    persona("Bonjour.");
-    // The image drifts 500 ms ahead while Max speaks.
+  it("drives the sync with the audible voice only, corrects in the silence, records each line", async () => {
+    let voice = 0;
+    let speakingOffset = 0;
+    const pc = peerConnection({ fps: 25, level: () => voice }); fake.peer.current = pc;
     const stats = pc.getStats;
+    // Idle face: in sync. Speaking: the image runs `speakingOffset` ms ahead.
     pc.getStats = async () => new Map([...(await stats())].map(([key, report]) => {
       const r = report as Record<string, unknown>;
-      return [key, r.kind === "video" ? { ...r, estimatedPlayoutTimestamp: 1_000_500 - Number(pc.receivers[1].jitterBufferTarget ?? 0) }
+      const ahead = voice > 0 ? speakingOffset : 0;
+      return [key, r.kind === "video" ? { ...r, estimatedPlayoutTimestamp: 1_000_000 + ahead - Number(pc.receivers[1].jitterBufferTarget ?? 0) }
         : { ...r, estimatedPlayoutTimestamp: 1_000_000 - Number(pc.receivers[0].jitterBufferTarget ?? 0) }];
     }));
-    await new Promise((resolve) => setTimeout(resolve, 120));
-    expect(pc.receivers.map(r => r.jitterBufferTarget)).toEqual([20, 20]);
-    persona("", { endOfSpeech: true });
+    const output = new AnamStreamingAvatarOutput(settings, {}, 1000, 1000, warmUp, { ...avSync, pollMs: 5, cooldownMs: 30, baseMs: 20 });
+    await output.prepare({ sessionId: "ava" }); sessionReady(); output.attachMedia(videoWithFrame());
+    const line = output.renderText("Bonjour.", { turnId: "turn-1" });
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(1));
+    persona("Bonjour.", { endOfSpeech: true });
     await line;
-    const end = onAvatarCue.mock.calls.map(([value]) => value).find((value) => "av_samples" in value);
-    expect(end.av_samples).toBeGreaterThan(2);
-    expect(end.av_offset_median_ms).toBe(500);
-    // Still untouched right after the end: the playout buffer drains first.
-    expect(pc.receivers[1].jitterBufferTarget).toBe(20);
-    await vi.waitFor(() => expect(Number(pc.receivers[1].jitterBufferTarget)).toBeGreaterThan(300), { timeout: 2_000 });
+    // Anam ended its speech early; the voice is audible now, image 500 ms ahead.
+    speakingOffset = 500; voice = 0.3;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(pc.receivers.map(r => r.jitterBufferTarget)).toEqual([20, 20]); // Never mid-voice.
+    voice = 0;
+    await vi.waitFor(() => expect(Number(pc.receivers[1].jitterBufferTarget)).toBeGreaterThan(300), { timeout: 3_000 });
     expect(pc.receivers[0].jitterBufferTarget).toBe(20);
+    await vi.waitFor(() => expect(fake.recordAvatarAvSync).toHaveBeenCalled(), { timeout: 3_000 });
+    const record = fake.recordAvatarAvSync.mock.calls[0][0];
+    expect(record).toMatchObject({ provider: "anam", session_id: "ava", turn_id: "turn-1", line_index: 1, offset_median_ms: 500, offset_spread_ms: 0 });
+    expect(record.voiced_samples).toBeGreaterThan(3);
+    expect(record.series.some(([, , voiced]: [number, number | null, number]) => voiced === 1)).toBe(true);
+    expect(JSON.stringify(record)).not.toMatch(/Bonjour/);
     await output.dispose();
   });
 
@@ -481,11 +487,7 @@ describe("Anam evolving face cue (AN2)", () => {
     // Plain text only: the cue never enters the spoken text.
     expect(fake.talks.map((talk) => talk.chunks.map(([chunk]) => chunk).join(""))).toEqual(turns.map((_, i) => `Réplique ${i}.`));
     for (const call of fake.client.sendDirectorNoteCue.mock.calls) expect(call[1]).toEqual({ atSeconds: 0 });
-    // One report at the start of each line (cue), one at its end with the lip sync measured.
-    const ends = onAvatarCue.mock.calls.map(([value]) => value).filter((value) => "av_samples" in value);
-    expect(ends).toHaveLength(sent.length);
-    expect(ends[0]).toMatchObject({ av_samples: 0, av_offset_median_ms: null, audio_playout_target_ms: 400, video_playout_target_ms: 400 });
-    expect(onAvatarCue.mock.calls.map(([value]) => value).filter((value) => !("av_samples" in value))).toEqual([
+    expect(onAvatarCue.mock.calls.map(([value]) => value)).toEqual([
       { provider: "anam", cue: "concerned", sent: true, origin: "intent", emotion: "tense", intensity: 1, source: "speech_state", speech_state: "Tu tournes autour", tempered: false },
       { provider: "anam", cue: "sad", sent: true, origin: "intent", emotion: "fragile", intensity: 1, source: "speech_state", speech_state: "Bloqué", tempered: false },
       { provider: "anam", cue: "distressed", sent: true, origin: "intent", emotion: "urgent", intensity: 2, source: "speech_state", speech_state: "La digue cède", tempered: false },
@@ -508,7 +510,7 @@ describe("Anam evolving face cue (AN2)", () => {
     const output = await ready({ emotionCueMode: "fixed", speakingCue: "sad" });
     expect(await say(output, "Non.", { characterKey: "max", performance: intent("angry"), onAvatarCue })).toEqual(["sad"]);
     expect(await say(output, "Non.", { characterKey: "max", performance: intent("tense"), onAvatarCue })).toEqual(["sad"]);
-    expect(onAvatarCue.mock.calls.map(([value]) => value).filter((value) => !("av_samples" in value)).map((value) => value.origin)).toEqual(["fixed", "fixed"]);
+    expect(onAvatarCue.mock.calls.map(([value]) => value.origin)).toEqual(["fixed", "fixed"]);
     await output.dispose();
   });
 

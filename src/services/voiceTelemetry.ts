@@ -504,3 +504,42 @@ export function recordVoiceTurnV2(event: string, payload: import("./voiceTurnTel
     });
   });
 }
+
+/** Lip sync of one streaming avatar line (technical values only, never spoken text). */
+export interface AvatarAvSyncRecord {
+  provider: "anam";
+  session_id: string | null;
+  turn_id: string | null;
+  line_index: number;
+  model: string;
+  voiced_samples: number;
+  offset_median_ms: number | null;
+  offset_min_ms: number | null;
+  offset_max_ms: number | null;
+  offset_spread_ms: number | null;
+  corrections: number;
+  audio_target_start_ms: number;
+  video_target_start_ms: number;
+  audio_target_end_ms: number;
+  video_target_end_ms: number;
+  sync_stopped: boolean;
+  /** [ms since the text was sent, video minus audio playout ms or null, 1 voiced / 0 silent / -1 hidden]. */
+  series: [number, number | null, number][];
+}
+
+/** One row per avatar line in `voice_turn_events` (`avatar_av_sync`), fire and forget. */
+export function recordAvatarAvSync(record: AvatarAvSyncRecord): void {
+  safe(() => {
+    if (voiceTurnEventsUnavailable || !record.session_id) return;
+    void Promise.resolve().then(() => supabase.from("voice_turn_events" as never).insert({
+      session_id: record.session_id,
+      turn_id: record.turn_id ?? `avatar-line-${record.line_index}`,
+      event_name: "avatar_av_sync",
+      severity: "ok",
+      blocker_step: "unknown",
+      metadata_json: record,
+    } as never)).then(({ error }) => {
+      if (error && isMissingTelemetryTable(error.message)) voiceTurnEventsUnavailable = true;
+    }).catch(() => undefined);
+  });
+}
