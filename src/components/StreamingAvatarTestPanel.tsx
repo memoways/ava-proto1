@@ -117,6 +117,7 @@ export default function StreamingAvatarTestPanel({
             if (diagnostics.event === "playback") push(`Lecture navigateur : ${diagnostics.playback}${diagnostics.errorName ? ` (${diagnostics.errorName})` : ""}`, diagnostics.playback === "playing" ? "ok" : "error");
             if (diagnostics.event === "cpu") push(`Charge locale Daily : ${diagnostics.cpuState} (${diagnostics.cpuReason})`, diagnostics.cpuState === "high" ? "error" : "info");
             if (diagnostics.event === "warm_up") push(describeWarmUp(diagnostics), diagnostics.warmUpComplete === false ? "error" : "info");
+            if (diagnostics.event === "av_sync") push(`Synchro audio/vidéo : écart ${diagnostics.avOffsetMs ?? "—"} ms (image ${Number(diagnostics.avOffsetMs) > 0 ? "en avance" : "en retard"}), tampons audio ${diagnostics.audioPlayoutTargetMs} ms / vidéo ${diagnostics.videoPlayoutTargetMs} ms${diagnostics.avSyncState === "ineffective" ? " — correction sans effet, arrêtée" : ""}`, diagnostics.avSyncState === "ineffective" ? "error" : "info");
             if (diagnostics.event === "network") push(`Réseau : ${diagnostics.networkState}, audio ${diagnostics.audioBitrate ?? "—"} bit/s, vidéo ${diagnostics.videoBitrate ?? "—"} bit/s, pertes audio ${diagnostics.audioPacketLoss ?? "—"}, vidéo ${diagnostics.videoPacketLoss ?? "—"}, jitter audio ${diagnostics.audioJitter ?? "—"}, vidéo ${diagnostics.videoJitter ?? "—"}, RTT ${diagnostics.roundTripTime ?? "—"}`);
           },
           onDisconnected: (reason) => push(`Déconnexion : ${reason ?? "inconnue"}`, "error"),

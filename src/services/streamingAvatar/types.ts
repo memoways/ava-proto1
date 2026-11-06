@@ -207,7 +207,7 @@ export interface VideoLatencyObservation {
 
 /** Technical-only fields; never include room URLs, tokens or spoken text. */
 export interface AvatarMediaDiagnostics {
-  event: "tracks" | "playback" | "network" | "cpu" | "warm_up" | "speaking_cue";
+  event: "tracks" | "playback" | "network" | "cpu" | "warm_up" | "speaking_cue" | "av_sync";
   audioTracks?: number;
   videoTracks?: number;
   playback?: "playing" | "blocked" | "failed";
@@ -246,6 +246,12 @@ export interface AvatarMediaDiagnostics {
   performanceSource?: string | null;
   speechState?: string | null;
   tempered?: boolean;
+  /** Anam lip sync: video minus audio playout instant (ms, positive = image ahead of voice). */
+  avOffsetMs?: number | null;
+  /** `corrected`: playout targets moved; `ineffective`: corrections undone by the browser, stopped. */
+  avSyncState?: "corrected" | "ineffective";
+  audioPlayoutTargetMs?: number;
+  videoPlayoutTargetMs?: number;
 }
 
 export interface ResponseOutputCallbacks {

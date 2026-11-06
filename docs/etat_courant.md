@@ -43,6 +43,11 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Anam, synchro labiale active (6 novembre, code).** Son et image désynchronisés puis en dérive : Ava mesure
+l'écart audio/vidéo dans les stats WebRTC et retarde la piste en avance (tampon par piste), avant l'accueil et
+pendant toute la session ; arrêt automatique si sans effet. Diagnostic `av_sync`. Suite : recette d'Ulrich
+(accueil, session longue) ; si la désynchro reste visible avec un écart mesuré ~0, elle vient des horodatages Anam.
+
 **Passage Max → Emma fluide (6 novembre, code).** Les boucles « De quoi veux-tu lui parler ? » venaient d'une
 question figée du code substituée à l'accord de Max quand la preuve du GM échouait (fragments STT, référence mal
 formée). Preuve sur toute la demande, preuve déterministe si Max annonce le transfert demandé, question de motif une

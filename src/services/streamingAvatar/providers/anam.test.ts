@@ -40,6 +40,7 @@ vi.mock("../api", () => ({
 import { AnamStreamingAvatarOutput } from "./anam";
 import { endAvatarSession, startAvatarSession } from "../api";
 import { streamingAvatarDefaults } from "../settings";
+import { DEFAULT_AV_SYNC as avSync } from "../avSync";
 
 class Stream {
   tracks: MediaStreamTrack[] = [];
@@ -56,10 +57,17 @@ const settings = {
   voiceId: "6bfbe25a-979d-40f3-a92b-5394170af54b",
 };
 const warmUp = { maxWaitMs: 50, settleMs: 0, pollMs: 1, steadySamples: 2 };
-/** Fake peer connection: video decodes `fps` frames per second, audio flows unless `audio` is false. */
-const peerConnection = ({ fps = 25, audio = true, freezes = (): number => 0 } = {}) => {
+/**
+ * Fake peer connection: video decodes `fps` frames per second, audio flows unless `audio` is false.
+ * `offset` (video minus audio playout, ms) reads the receivers' targets: delaying the video by
+ * N ms brings the image N ms back, as the browser does.
+ */
+const peerConnection = ({ fps = 25, audio = true, freezes = (): number => 0, offset = null as null | number } = {}) => {
   const startedAt = performance.now();
-  const receivers = [{ jitterBufferTarget: null }, { jitterBufferTarget: null }];
+  const receivers = [
+    { track: { kind: "audio" }, jitterBufferTarget: null as number | null },
+    { track: { kind: "video" }, jitterBufferTarget: null as number | null },
+  ];
   let calls = 0;
   return {
     receivers,
@@ -68,8 +76,14 @@ const peerConnection = ({ fps = 25, audio = true, freezes = (): number => 0 } = 
       calls++;
       const elapsed = performance.now() - startedAt;
       return new Map<string, unknown>([
-        ["v", { type: "inbound-rtp", kind: "video", framesDecoded: Math.floor((elapsed * fps) / 1000), freezeCount: freezes() }],
-        ["a", { type: "inbound-rtp", kind: "audio", packetsReceived: audio ? calls : 1 }],
+        ["v", {
+          type: "inbound-rtp", kind: "video", framesDecoded: Math.floor((elapsed * fps) / 1000), freezeCount: freezes(),
+          ...(offset === null ? {} : { estimatedPlayoutTimestamp: 1_000_000 + offset - Number(receivers[1].jitterBufferTarget ?? 0) }),
+        }],
+        ["a", {
+          type: "inbound-rtp", kind: "audio", packetsReceived: audio ? calls : 1,
+          ...(offset === null ? {} : { estimatedPlayoutTimestamp: 1_000_000 - Number(receivers[0].jitterBufferTarget ?? 0) }),
+        }],
       ]);
     },
   };
@@ -198,6 +212,38 @@ describe("Anam text-mode lifecycle", () => {
     const pc = peerConnection(); fake.peer.current = pc;
     const output = await ready();
     expect(pc.receivers.map(r => r.jitterBufferTarget)).toEqual([400, 400]);
+    await output.dispose();
+  });
+
+  it("delays the video when the image runs ahead of the voice, before the opening line", async () => {
+    const pc = peerConnection({ fps: 25, offset: 800 }); fake.peer.current = pc;
+    const onMediaDiagnostics = vi.fn();
+    const output = new AnamStreamingAvatarOutput(settings, { onMediaDiagnostics }, 1000, 1000,
+      { maxWaitMs: 3_000, settleMs: 0, pollMs: 50, steadySamples: 2 },
+      { ...avSync, pollMs: 5, cooldownMs: 30 });
+    await output.prepare({ sessionId: "ava" }); sessionReady(); output.attachMedia(videoWithFrame());
+    const opening = output.renderText("Bonjour.");
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(1), { timeout: 3_000 });
+    const [audioTarget, videoTarget] = pc.receivers.map(r => Number(r.jitterBufferTarget));
+    expect(audioTarget).toBe(400);
+    expect(Math.abs(videoTarget - audioTarget - 800)).toBeLessThanOrEqual(avSync.toleranceMs);
+    expect(onMediaDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ event: "av_sync", avSyncState: "corrected", avOffsetMs: 800 }));
+    const warm = onMediaDiagnostics.mock.calls.map(([d]) => d).find((d) => d.event === "warm_up");
+    expect(warm).toMatchObject({ warmUpComplete: true, audioPlayoutTargetMs: 400 });
+    expect(Math.abs(warm.avOffsetMs)).toBeLessThanOrEqual(avSync.toleranceMs);
+    persona("Bonjour.", { endOfSpeech: true });
+    await opening; await output.dispose();
+  });
+
+  it("delays the voice when it runs ahead of the image", async () => {
+    const pc = peerConnection({ fps: 25, offset: -300 }); fake.peer.current = pc;
+    const output = new AnamStreamingAvatarOutput(settings, {}, 1000, 1000, warmUp, { ...avSync, pollMs: 5, cooldownMs: 30 });
+    await output.prepare({ sessionId: "ava" });
+    await vi.waitFor(() => {
+      const [audioTarget, videoTarget] = pc.receivers.map(r => Number(r.jitterBufferTarget));
+      expect(videoTarget).toBe(400);
+      expect(Math.abs(audioTarget - videoTarget - 300)).toBeLessThanOrEqual(avSync.toleranceMs);
+    }, { timeout: 2_000 });
     await output.dispose();
   });
 
