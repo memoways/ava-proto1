@@ -63,6 +63,7 @@ import {
   type CinematicTransitionEvent,
   type CinematicTransitionState,
 } from "@/services/cinematicTransition";
+import { holdMicrophone, type MicHold } from "@/services/micHold";
 import {
   buildVoiceTurnCompletedPayload,
   createVoiceTurnId,
@@ -177,6 +178,8 @@ import {
 
 
 const TEASER_VIDEO_URL = "https://video.gumlet.io/673f29f4a5e1bf70aa645cb7/6acc8341689a80cf2e4a427d/main.m3u8";
+/** Microphone kept open this long after a cinematic, while hands-free capture reopens it. */
+const MIC_HOLD_RELEASE_DELAY_MS = 6_000;
 
 function asTTSProviderId(value: string | null | undefined): TTSProviderId | null {
   return value === "elevenlabs" || value === "inworld" || value === "fish" || value === "gradium" || value === "cartesia" ? value : null;
@@ -3410,6 +3413,26 @@ const IndexPRD4 = () => {
     // Fade to black over the video, then back to the character (activeVideo clears on the way).
     dispatchCinematicRef.current({ type: "video_ended", outcome });
   }, [activeVideo]);
+
+  // Hands-free capture stops for a cinematic and restarts after it; a held capture keeps the
+  // microphone open meanwhile, so a Bluetooth headset never switches profile (sound cut ~2 s).
+  const micHoldRef = useRef<MicHold | null>(null);
+  const cinematicRunning = state.phase === "conversation_max" && cinematic.phase !== "idle";
+  useEffect(() => {
+    if (cinematicRunning && handsFreeEnabled) {
+      micHoldRef.current ??= holdMicrophone();
+      return;
+    }
+    const hold = micHoldRef.current;
+    if (!hold) return;
+    // Released once the hands-free capture had time to reopen the device.
+    const timer = window.setTimeout(() => {
+      if (micHoldRef.current === hold) micHoldRef.current = null;
+      hold.release();
+    }, MIC_HOLD_RELEASE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [cinematicRunning, handsFreeEnabled]);
+  useEffect(() => () => { micHoldRef.current?.release(); micHoldRef.current = null; }, []);
 
   // Narrative interludes keep the provider session connected but silent.
   useEffect(() => {

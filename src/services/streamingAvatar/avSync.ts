@@ -45,10 +45,10 @@ export const DEFAULT_AV_SYNC: AvSyncOptions = {
   toleranceMs: 60,
   gain: 0.7,
   maxShiftMs: 2_500,
-  window: 3,
+  window: 4,
   cooldownMs: 2_500,
   maxIneffective: 3,
-  pollMs: 500,
+  pollMs: 250,
 };
 
 /** Upper bound accepted by `RTCRtpReceiver.jitterBufferTarget`. */
@@ -62,41 +62,58 @@ export interface AvSample {
   offsetMs: number | null;
   /** Audio packets received so far: a sample only counts when it grew since the previous one. */
   audioPackets: number;
+  /** Playout level of the voice (0..1), null when the browser does not report it. */
+  audioLevel: number | null;
 }
 
 export async function readAvSample(pc: RTCPeerConnection): Promise<AvSample> {
   let audio: number | null = null;
   let video: number | null = null;
   let audioPackets = 0;
+  let audioLevel: number | null = null;
   (await pc.getStats()).forEach((report: Record<string, unknown>) => {
     if (report.type !== "inbound-rtp") return;
-    if (report.kind === "audio") audioPackets += Number(report.packetsReceived ?? 0);
+    if (report.kind === "audio") {
+      audioPackets += Number(report.packetsReceived ?? 0);
+      const level = Number(report.audioLevel);
+      if (Number.isFinite(level)) audioLevel = Math.max(audioLevel ?? 0, level);
+    }
     const value = Number(report.estimatedPlayoutTimestamp);
     if (!Number.isFinite(value) || value <= 0) return;
     if (report.kind === "audio") audio = value;
     else if (report.kind === "video") video = value;
   });
   const offsetMs = audio === null || video === null ? null : Math.round((video as number) - (audio as number));
-  return { offsetMs, audioPackets };
+  return { offsetMs, audioPackets, audioLevel };
 }
 
 export async function readPlayoutOffset(pc: RTCPeerConnection): Promise<number | null> {
   return (await readAvSample(pc)).offsetMs;
 }
 
-/** Per-line summary for the turn telemetry: what the viewer saw while the line was spoken. */
+/** Voice level above which the avatar is considered speaking (silence and breath stay below). */
+export const VOICED_LEVEL = 0.02;
+
+/** Per-line summary: what the viewer saw while the voice was audible. */
 export interface AvLineStats {
   samples: number;
   medianMs: number | null;
-  maxAbsMs: number | null;
+  minMs: number | null;
+  maxMs: number | null;
+  /** Spread inside the line (max - min): high when the offset floats during the line itself. */
+  spreadMs: number | null;
 }
 
 export function summarizeLine(offsets: number[]): AvLineStats {
-  if (!offsets.length) return { samples: 0, medianMs: null, maxAbsMs: null };
+  if (!offsets.length) return { samples: 0, medianMs: null, minMs: null, maxMs: null, spreadMs: null };
+  const min = Math.min(...offsets);
+  const max = Math.max(...offsets);
   return {
     samples: offsets.length,
     medianMs: Math.round(median(offsets)),
-    maxAbsMs: Math.round(Math.max(...offsets.map(Math.abs))),
+    minMs: Math.round(min),
+    maxMs: Math.round(max),
+    spreadMs: Math.round(max - min),
   };
 }
 

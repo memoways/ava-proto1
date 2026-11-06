@@ -4,6 +4,27 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Anam : synchro pilotée par la voix audible ; micro gardé ouvert pendant les cinématiques] — 2026-11-06
+
+- Recette d'Ulrich (session `5e830c45`) après #165 : synchro toujours flottante, coupure d'environ 2 s
+  2-3 s après le début de chaque cinématique.
+- Mesures de la session : à l'accueil, image ~1,7 s en avance au repos, vidéo retardée à 1 587 ms ; à la
+  réplique 3, voix ~170 ms en avance ; ensuite 0 mesure par réplique. Anam signale la fin de parole presque
+  aussitôt : la fenêtre « pendant la réplique » ne durait que quelques millisecondes, la synchro n'était donc
+  corrigée qu'à l'accueil, sur un visage au repos dont l'écart diffère de celui de la parole.
+- Synchro : après l'accueil, seuls les écarts mesurés **pendant que la voix est audible** (niveau de lecture
+  WebRTC `audioLevel`) pilotent la correction, appliquée après 600 ms de silence ; fenêtre remise à zéro à
+  chaque réplique ; mesure toutes les 250 ms.
+- Preuve : une ligne `avatar_av_sync` par réplique dans `voice_turn_events` (écart médian, min, max,
+  étendue, corrections, tampons, série compacte temps/écart/voix), visible dans l'admin (Sessions,
+  « Synchro audio/vidéo »). Les champs synchro ajoutés à `avatar_cue` par #165 sont retirés.
+- Cinématiques : le mode mains libres ferme le micro à chaque cinématique et le rouvre après. Avec un casque
+  Bluetooth, chaque ouverture/fermeture du micro fait changer le casque de profil et coupe tout le son 1 à
+  2 s (cause probable, non vérifiable à distance). Une capture micro muette est maintenue de la décision de
+  la cinématique jusqu'à 6 s après son retour : le micro ne se ferme plus, pas de changement de profil.
+- À valider en recette par Ulrich : coupure des cinématiques (préciser le casque utilisé) et synchro ;
+  l'admin donne l'écart par réplique.
+
 ## [Anam : synchro tenue réplique par réplique ; cinématiques sans décrochage au démarrage] — 2026-11-06
 
 - Recette d'Ulrich (session `73871dcc`, 13 tours, Max → Emma) après #164 : accueil synchrone, puis synchro

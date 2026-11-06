@@ -8,7 +8,8 @@ import {
   type MessageStreamEvent,
 } from "@anam-ai/js-sdk";
 import { endAvatarSession, startAvatarSession } from "../api";
-import { AvSyncController, DEFAULT_AV_SYNC, readAvSample, summarizeLine, type AvSyncOptions, type PlayoutTargets } from "../avSync";
+import { AvSyncController, DEFAULT_AV_SYNC, VOICED_LEVEL, readAvSample, summarizeLine, type AvSyncOptions, type PlayoutTargets } from "../avSync";
+import { recordAvatarAvSync, type AvatarAvSyncRecord } from "../../voiceTelemetry";
 import { readNetworkPath, type AvatarNetworkPath } from "../networkPath";
 import { splitAvatarText } from "../textSegmentation";
 import {
@@ -32,8 +33,6 @@ interface PendingSpeech {
   started: boolean;
   ended: boolean;
   transcript: string;
-  /** A/V offsets measured while this line played. */
-  avOffsets: number[];
   resolveStarted: () => void;
   rejectStarted: (error: Error) => void;
   resolveEnded: () => void;
@@ -56,8 +55,26 @@ export interface AnamWarmUpTiming {
 const DEFAULT_WARM_UP: AnamWarmUpTiming = { maxWaitMs: 10_000, settleMs: 500, pollMs: 250, steadySamples: 6 };
 /** Below this decoded rate the stream is still ramping up (bandwidth estimation, keyframes). */
 const STEADY_MIN_FPS = 20;
-/** Silence kept after the playout buffer drained before a held A/V correction applies. */
-const FLUSH_MARGIN_MS = 300;
+/** Silence required before a playout buffer moves (the voice is never stretched mid-phrase). */
+const SILENCE_BEFORE_CORRECTION_MS = 600;
+/** Silence that ends a line record once its voice was heard. */
+const LINE_END_SILENCE_MS = 1_200;
+const MAX_LINE_MS = 90_000;
+/** Samples kept per line record (250 ms apart: about 50 s). */
+const MAX_LINE_SAMPLES = 200;
+
+interface AvLine {
+  index: number;
+  turnId: string | null;
+  openedAt: number;
+  heardAt: number | null;
+  /** [ms since the text was sent, offset or null, 1 voice audible / 0 silent / -1 not shown]. */
+  series: [number, number | null, number][];
+  voicedOffsets: number[];
+  corrections: number;
+  startAudioMs: number;
+  startVideoMs: number;
+}
 
 interface InboundSample {
   at: number;
@@ -100,10 +117,14 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
   private avSyncTimer: ReturnType<typeof setInterval> | null = null;
   private avSyncBusy = false;
   private avSyncStopReported = false;
-  /** Correction computed during a line, applied once it ends. */
+  /** Correction computed while the voice was audible, applied in the next silence. */
   private pendingTargets: PlayoutTargets | null = null;
   private lastAudioPackets = -1;
-  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Last time the voice was audible (playout level). */
+  private voicedAt = 0;
+  /** Once a line was sent, only offsets measured while the voice is audible drive the sync. */
+  private linesStarted = 0;
+  private line: AvLine | null = null;
 
   constructor(
     settings: AnamAvatarSettings,
@@ -205,9 +226,9 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     this.currentSpeech = speech;
     const abort = () => this.interrupt();
     context?.signal?.addEventListener("abort", abort, { once: true });
-    let cueObservation: AvatarCueObservation | null = null;
+    this.openLine(context?.turnId);
     try {
-      cueObservation = this.sendSpeakingCue(context);
+      this.sendSpeakingCue(context);
       // One talk stream per line, plain text: the voice keeps its own steady delivery.
       for (let index = 0; index < chunks.length; index++) {
         if (this.disposed || context?.signal?.aborted) throw new DOMException("Avatar turn aborted", "AbortError");
@@ -217,7 +238,6 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       firstStartedAt = performance.now();
       context?.onPlaybackStart?.();
       await withDeadline(speech.endedPromise, 90_000, "Anam speech did not finish");
-      this.reportLineSync(speech, cueObservation, context);
       return {
         status: "played",
         provider: "Anam",
@@ -238,7 +258,6 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     } finally {
       context?.signal?.removeEventListener("abort", abort);
       if (this.currentSpeech === speech) this.currentSpeech = null;
-      this.scheduleFlush();
     }
   }
 
@@ -328,25 +347,6 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       // Diagnostics never block a line.
     }
     return observation;
-  }
-
-  /** Lip sync of the line just spoken, added to its turn telemetry (stored per turn). */
-  private reportLineSync(speech: PendingSpeech, observation: AvatarCueObservation | null, context?: ResponseOutputTurnContext): void {
-    if (!observation) return;
-    const stats = summarizeLine(speech.avOffsets);
-    const { audioMs, videoMs } = this.avSync.targets;
-    try {
-      context?.onAvatarCue?.({
-        ...observation,
-        av_samples: stats.samples,
-        av_offset_median_ms: stats.medianMs,
-        av_offset_max_abs_ms: stats.maxAbsMs,
-        audio_playout_target_ms: audioMs,
-        video_playout_target_ms: videoMs,
-      });
-    } catch {
-      // Diagnostics never block a line.
-    }
   }
 
   private async waitForWarmUp(element: HTMLMediaElement): Promise<void> {
@@ -439,8 +439,7 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
   private stopAvSync(): void {
     if (this.avSyncTimer) clearInterval(this.avSyncTimer);
     this.avSyncTimer = null;
-    if (this.flushTimer) clearTimeout(this.flushTimer);
-    this.flushTimer = null;
+    this.closeLine();
   }
 
   private async avSyncTick(): Promise<void> {
@@ -451,28 +450,44 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     try {
       const sample = await readAvSample(pc).catch(() => null);
       if (!sample || this.disposed) return;
+      const now = performance.now();
       const flowing = sample.audioPackets > this.lastAudioPackets;
       this.lastAudioPackets = sample.audioPackets;
       const element = this.mediaElement;
       // Only what the viewer sees counts: no sample while the element is detached or paused
       // (cinematic, screen change) or while audio stalls; the window restarts afterwards.
       const playing = Boolean(element && element.isConnected && !element.paused);
+      // Without a playout level, Anam's own speech window stands in for the audible voice.
+      const speech = this.currentSpeech;
+      const voiced = playing && flowing && (sample.audioLevel === null
+        ? Boolean(speech?.started && !speech.ended)
+        : sample.audioLevel > VOICED_LEVEL);
+      if (voiced) this.voicedAt = now;
       const offset = sample.offsetMs;
+      this.recordLineSample(now, offset, voiced, playing);
       if (offset === null || !flowing || !playing) {
         this.avSync.discard();
         return;
       }
-      const speech = this.currentSpeech;
-      if (speech?.started && !speech.ended) speech.avOffsets.push(offset);
-      if (this.pendingTargets) return; // Waiting for the line to end.
-      const targets = this.avSync.observe(offset, performance.now());
-      if (targets) {
-        if (this.currentSpeech) this.pendingTargets = targets; // Never move a buffer mid-line.
-        else this.commitTargets(targets, offset);
-      } else if (this.avSync.stopped && !this.avSyncStopReported) {
-        this.avSyncStopReported = true;
-        this.callbacks.onMediaDiagnostics?.({ event: "av_sync", avOffsetMs: offset, avSyncState: "ineffective", ...this.playoutDiagnostics() });
-        this.stopAvSync();
+      // Before the first line the face idles: its offset sets the opening. Afterwards the idle
+      // offset differs from the speaking one, so only audible speech drives the correction.
+      const drives = this.linesStarted === 0 || voiced;
+      if (drives && !this.pendingTargets) {
+        const targets = this.avSync.observe(offset, now);
+        if (targets) this.pendingTargets = targets;
+        else if (this.avSync.stopped && !this.avSyncStopReported) {
+          this.avSyncStopReported = true;
+          this.callbacks.onMediaDiagnostics?.({ event: "av_sync", avOffsetMs: offset, avSyncState: "ineffective", ...this.playoutDiagnostics() });
+        }
+      }
+      // A buffer moved while the voice plays stretches it: corrections wait for a silence.
+      if (this.pendingTargets && now - this.voicedAt >= SILENCE_BEFORE_CORRECTION_MS) {
+        const targets = this.pendingTargets;
+        this.pendingTargets = null;
+        this.applyPlayoutTargets(targets);
+        this.avSync.restartCooldown(now);
+        if (this.line) this.line.corrections++;
+        this.callbacks.onMediaDiagnostics?.({ event: "av_sync", avOffsetMs: offset, avSyncState: "corrected", ...this.playoutDiagnostics() });
       }
     } catch {
       // Diagnostics and sync never break a session.
@@ -481,30 +496,63 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     }
   }
 
-  private commitTargets(targets: PlayoutTargets, offset: number | null): void {
-    this.applyPlayoutTargets(targets);
-    this.callbacks.onMediaDiagnostics?.({ event: "av_sync", avOffsetMs: offset, avSyncState: "corrected", ...this.playoutDiagnostics() });
+  /** One record per line, from the text sent until the voice has been silent for a while. */
+  private openLine(turnId?: string): void {
+    this.closeLine();
+    // Idle samples from the warm-up or the last silence never mix with this line's voice.
+    this.avSync.discard();
+    this.linesStarted++;
+    const { audioMs, videoMs } = this.avSync.targets;
+    this.line = {
+      index: this.linesStarted, turnId: turnId ?? null, openedAt: performance.now(), heardAt: null,
+      series: [], voicedOffsets: [], corrections: 0, startAudioMs: audioMs, startVideoMs: videoMs,
+    };
   }
 
-  /**
-   * Anam reports the end of speech before the last words leave the playout buffer: the held
-   * correction waits for that buffer to drain, so the tail of the line is never stretched.
-   */
-  private scheduleFlush(): void {
-    if (!this.pendingTargets || this.flushTimer) return;
-    this.flushTimer = setTimeout(() => {
-      this.flushTimer = null;
-      this.flushPendingTargets();
-    }, this.avSync.targets.audioMs + FLUSH_MARGIN_MS);
+  private recordLineSample(now: number, offset: number | null, voiced: boolean, playing: boolean): void {
+    const line = this.line;
+    if (!line) return;
+    if (line.series.length < MAX_LINE_SAMPLES) {
+      line.series.push([Math.round(now - line.openedAt), offset, voiced ? 1 : playing ? 0 : -1]);
+    }
+    if (voiced) {
+      line.heardAt ??= now;
+      if (offset !== null) line.voicedOffsets.push(offset);
+    }
+    const quietSinceVoice = line.heardAt !== null && now - this.voicedAt >= LINE_END_SILENCE_MS;
+    if (quietSinceVoice || now - line.openedAt >= MAX_LINE_MS) this.closeLine();
   }
 
-  /** Applies a correction held during the line, in the silence that follows it. */
-  private flushPendingTargets(): void {
-    const targets = this.pendingTargets;
-    if (!targets || this.disposed || this.currentSpeech) return; // A new line: wait for its end.
-    this.pendingTargets = null;
-    this.commitTargets(targets, this.avSync.lastOffsetMs);
-    this.avSync.restartCooldown(performance.now());
+  private closeLine(): void {
+    const line = this.line;
+    if (!line) return;
+    this.line = null;
+    const stats = summarizeLine(line.voicedOffsets);
+    const { audioMs, videoMs } = this.avSync.targets;
+    const record: AvatarAvSyncRecord = {
+      provider: "anam",
+      session_id: this.avaSessionId || null,
+      turn_id: line.turnId,
+      line_index: line.index,
+      model: this.settings.avatarModel,
+      voiced_samples: stats.samples,
+      offset_median_ms: stats.medianMs,
+      offset_min_ms: stats.minMs,
+      offset_max_ms: stats.maxMs,
+      offset_spread_ms: stats.spreadMs,
+      corrections: line.corrections,
+      audio_target_start_ms: line.startAudioMs,
+      video_target_start_ms: line.startVideoMs,
+      audio_target_end_ms: audioMs,
+      video_target_end_ms: videoMs,
+      sync_stopped: this.avSync.stopped,
+      series: line.series,
+    };
+    try {
+      recordAvatarAvSync(record);
+    } catch {
+      // Diagnostics never block a line.
+    }
   }
 
   private playoutDiagnostics(): { audioPlayoutTargetMs: number; videoPlayoutTargetMs: number } {
@@ -622,7 +670,6 @@ function createPendingSpeech(correlationId: string, turnId?: string): PendingSpe
     started: false,
     ended: false,
     transcript: "",
-    avOffsets: [],
     resolveStarted,
     rejectStarted,
     resolveEnded,

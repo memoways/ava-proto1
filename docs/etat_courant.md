@@ -43,6 +43,11 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Anam, synchro par voix audible + micro tenu pendant les cinématiques (6 novembre, code).** La correction
+suit l'écart mesuré pendant la parole (pas au repos), dans les silences ; une ligne `avatar_av_sync` par
+réplique (admin Sessions). Micro gardé ouvert pendant les cinématiques (coupure ~2 s due au casque
+Bluetooth probable). Suite : recette d'Ulrich, puis lecture des écarts par réplique.
+
 **Anam, synchro tenue par réplique + cinématiques préchargées (6 novembre, code).** Corrections de synchro
 appliquées entre deux répliques (plus en pleine phrase), aucune mesure pendant une cinématique ; écart mesuré
 par réplique visible dans l'admin (Sessions). Cinématique préchargée pendant l'annonce, départ sur 4 s de
