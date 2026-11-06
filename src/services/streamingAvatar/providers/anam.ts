@@ -8,6 +8,7 @@ import {
   type MessageStreamEvent,
 } from "@anam-ai/js-sdk";
 import { endAvatarSession, startAvatarSession } from "../api";
+import { AvSyncController, DEFAULT_AV_SYNC, readPlayoutOffset, type AvSyncOptions, type PlayoutTargets } from "../avSync";
 import { readNetworkPath, type AvatarNetworkPath } from "../networkPath";
 import { splitAvatarText } from "../textSegmentation";
 import {
@@ -53,11 +54,6 @@ export interface AnamWarmUpTiming {
 const DEFAULT_WARM_UP: AnamWarmUpTiming = { maxWaitMs: 10_000, settleMs: 500, pollMs: 250, steadySamples: 6 };
 /** Below this decoded rate the stream is still ramping up (bandwidth estimation, keyframes). */
 const STEADY_MIN_FPS = 20;
-/**
- * Same playout buffer for audio and video from the first frame: without it the jitter buffers
- * start minimal, underrun, and grow over the first lines (choppy, out-of-sync opening).
- */
-const PLAYOUT_BUFFER_MS = 400;
 
 interface InboundSample {
   at: number;
@@ -95,6 +91,11 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
   private resolveSessionReady!: () => void;
   private readonly sessionReady = new Promise<void>((resolve) => { this.resolveSessionReady = resolve; });
   private warmUp: Promise<void> | null = null;
+  private readonly avSync: AvSyncController;
+  private readonly avSyncPollMs: number;
+  private avSyncTimer: ReturnType<typeof setInterval> | null = null;
+  private avSyncBusy = false;
+  private avSyncStopReported = false;
 
   constructor(
     settings: AnamAvatarSettings,
@@ -102,7 +103,10 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     connectionTimeoutMs: number,
     speechStartTimeoutMs: number,
     warmUpTiming: AnamWarmUpTiming = DEFAULT_WARM_UP,
+    avSyncOptions: AvSyncOptions = DEFAULT_AV_SYNC,
   ) {
+    this.avSync = new AvSyncController(avSyncOptions);
+    this.avSyncPollMs = avSyncOptions.pollMs;
     this.warmUpTiming = warmUpTiming;
     this.settings = settings;
     this.callbacks = callbacks;
@@ -145,7 +149,8 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       for (const track of stream.getTracks()) mediaStream.addTrack(track);
     }
     this.mediaStream = mediaStream;
-    this.applyPlayoutBuffer();
+    this.applyPlayoutTargets(this.avSync.targets);
+    this.startAvSync();
     this.reportTracks();
     if (!mediaStream.getVideoTracks().length || !mediaStream.getAudioTracks().length) {
       throw new Error(
@@ -250,6 +255,7 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     if (this.disposed) return;
     this.disposed = true;
     this.interrupt();
+    this.stopAvSync();
     const client = this.client;
     this.client = null;
     await client?.stopStreaming().catch(() => {});
@@ -327,6 +333,8 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       warmUpComplete: ready && steady.steady !== false,
       steadyStream: steady.steady,
       videoFps: steady.videoFps,
+      avOffsetMs: this.avSync.lastOffsetMs,
+      ...this.playoutDiagnostics(),
       ...path,
       requestedRegion: this.settings.sessionOptions.region,
     });
@@ -349,9 +357,11 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       const sample = await readInbound(pc).catch(() => null);
       if (sample && previous && sample.at > previous.at) {
         videoFps = Math.round(((sample.framesDecoded - previous.framesDecoded) * 1000) / (sample.at - previous.at));
+        // Steady also means lips in sync: the opening line waits for the A/V correction.
         const steady = videoFps >= STEADY_MIN_FPS
           && sample.freezeCount === previous.freezeCount
-          && sample.audioPackets > previous.audioPackets;
+          && sample.audioPackets > previous.audioPackets
+          && this.avSync.isSettled(performance.now());
         streak = steady ? streak + 1 : 0;
         if (streak >= this.warmUpTiming.steadySamples) return { steady: true, videoFps };
       }
@@ -372,16 +382,61 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     }
   }
 
-  private applyPlayoutBuffer(): void {
+  /**
+   * Playout target per track. Both start on the same floor (without it the jitter buffers start
+   * minimal, underrun and grow over the first lines); the A/V sync then delays the track ahead.
+   */
+  private applyPlayoutTargets(targets: PlayoutTargets): void {
     for (const receiver of this.peerConnection()?.getReceivers() ?? []) {
       const tunable = receiver as RTCRtpReceiver & { jitterBufferTarget?: number | null };
       if (!("jitterBufferTarget" in tunable)) continue; // Not supported by this browser.
+      const kind = receiver.track?.kind;
       try {
-        tunable.jitterBufferTarget = PLAYOUT_BUFFER_MS;
+        tunable.jitterBufferTarget = kind === "video" ? targets.videoMs : kind === "audio" ? targets.audioMs : DEFAULT_AV_SYNC.baseMs;
       } catch (error) {
         console.warn("[Anam] playout buffer not applied", error);
       }
     }
+  }
+
+  /** Measures the audio/video offset for the whole session and corrects it as it drifts. */
+  private startAvSync(): void {
+    if (this.avSyncTimer || !this.peerConnection()) return;
+    this.avSyncTimer = setInterval(() => { void this.avSyncTick(); }, this.avSyncPollMs);
+  }
+
+  private stopAvSync(): void {
+    if (this.avSyncTimer) clearInterval(this.avSyncTimer);
+    this.avSyncTimer = null;
+  }
+
+  private async avSyncTick(): Promise<void> {
+    const pc = this.peerConnection();
+    if (this.disposed || !pc) return this.stopAvSync();
+    if (this.avSyncBusy) return;
+    this.avSyncBusy = true;
+    try {
+      const offset = await readPlayoutOffset(pc).catch(() => null);
+      if (offset === null || this.disposed) return;
+      const targets = this.avSync.observe(offset, performance.now());
+      if (targets) {
+        this.applyPlayoutTargets(targets);
+        this.callbacks.onMediaDiagnostics?.({ event: "av_sync", avOffsetMs: offset, avSyncState: "corrected", ...this.playoutDiagnostics() });
+      } else if (this.avSync.stopped && !this.avSyncStopReported) {
+        this.avSyncStopReported = true;
+        this.callbacks.onMediaDiagnostics?.({ event: "av_sync", avOffsetMs: offset, avSyncState: "ineffective", ...this.playoutDiagnostics() });
+        this.stopAvSync();
+      }
+    } catch {
+      // Diagnostics and sync never break a session.
+    } finally {
+      this.avSyncBusy = false;
+    }
+  }
+
+  private playoutDiagnostics(): { audioPlayoutTargetMs: number; videoPlayoutTargetMs: number } {
+    const { audioMs, videoMs } = this.avSync.targets;
+    return { audioPlayoutTargetMs: audioMs, videoPlayoutTargetMs: videoMs };
   }
 
   /** The SDK keeps its peer connection private; read it defensively, absent on other versions. */
@@ -466,6 +521,7 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
   private handleDisconnected(reason: string): void {
     if (this.disposed) return;
     this.ready = false;
+    this.stopAvSync();
     this.callbacks.onConnectionStateChange?.("disconnected");
     this.callbacks.onDisconnected?.(reason);
     this.failCurrentSpeech(new Error(`Anam disconnected: ${reason}`));

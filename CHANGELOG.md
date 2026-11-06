@@ -4,6 +4,26 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Avatars streaming — Anam : synchro labiale active audio/vidéo] — 2026-11-06
+
+- Retour d'Ulrich : avec Anam, son et image très désynchronisés, dès l'accueil puis en dérive pendant la session
+  (« ça flotte »), qualité vidéo bonne.
+- Cause : le SDK livre bien audio et vidéo dans un même flux, mais Ava imposait un tampon de lecture fixe de 400 ms
+  à chaque piste séparément (#146) sans jamais mesurer l'écart réel. La vidéo ajoute son propre délai de décodage, et
+  quand la synchro du navigateur ne s'engage pas, rien ne rattrapait l'écart ni sa dérive.
+- Synchro active (`streamingAvatar/avSync.ts`) : toutes les 500 ms, Ava lit dans les statistiques WebRTC l'instant
+  joué par chaque piste (`estimatedPlayoutTimestamp`, horloge de l'émetteur) ; la différence est l'écart vu à
+  l'écran. Au-delà de 45 ms (médiane de 3 mesures), la piste en avance est retardée de 70 % de l'écart via
+  `jitterBufferTarget`, puis 2,5 s d'attente que les tampons suivent. Plancher 400 ms conservé, décalage max 2,5 s.
+  Si trois corrections de suite restent sans effet (le navigateur les annule), la boucle s'arrête d'elle-même.
+- Accueil : la stabilité exigée avant la première réplique inclut désormais un écart dans la tolérance (borne de
+  10 s inchangée).
+- Diagnostics : événement `av_sync` (écart mesuré, tampons audio/vidéo, `corrected` ou `ineffective`) ; `warm_up`
+  donne aussi l'écart et les tampons. Panneau de test admin : ligne « Synchro audio/vidéo ».
+- Limite : si Anam envoie déjà l'audio et l'image décalés dans ses horodatages, l'écart mesuré reste à 0 et
+  la correction ne peut rien voir ; les diagnostics le montreront (désynchro visible, `avOffsetMs` proche de 0).
+- À valider en recette par Ulrich : synchro de l'accueil et tenue sur une session longue.
+
 ## [Passage Max → Emma fluide — fin des boucles « De quoi veux-tu lui parler ? »] — 2026-11-06
 
 - Constat sur les sessions du 31 octobre au 4 novembre (lecture seule Lovable Cloud) : 31 blocages de passage dans
