@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Adaptation aux écrans, lot 2 : smartphone en appel vocal sans avatar] — 2026-11-07
+
+- Smartphone (classe du lot 1, forçable par `?ecran=telephone`) : la conversation devient un appel vocal —
+  vignette ronde du personnage, nom, état (en ligne / parle / écoute), minuterie, micro et Terminer ; capsules
+  de passage Max ↔ Emma et « Une vidéo arrive / Ignorer » inchangées. Aucun flux avatar, aucun badge
+  « Connexion vidéo… ».
+- Aiguillage unique `src/services/callOutputMode.ts` appelé par `prepareCall` : smartphone → voix (`tts`), même
+  si le réglage demande l'avatar ; raison `output_mode_reason` (`device_smartphone`, `character_voice_only`,
+  `settings`) dans l'événement PostHog `prd4_session_started` (pas de colonne, pas de migration).
+- `src/components/prd4/ConversationScreen.tsx` : prop `layout` (`video` par défaut, `call` sur smartphone) ;
+  capsules et micro partagés entre les deux rendus, rendu vidéo identique sur tablette et desktop.
+- `viewport-fit=cover` volontairement non ajouté (encoche sur les autres écrans) ; lecteur de cinématiques
+  vérifié (`playsInline`, déverrouillage au geste « Commencer »), inchangé.
+- Tests : unitaires de l'aiguillage et de la variante appel ; E2E téléphone 390×844 de bout en bout (Max, passage
+  Emma, retour grille) sans aucune requête `streaming-avatar-session`. Tests existants inchangés.
+
 ## [Adaptation aux écrans, lot 1 : classe d'appareil et métriques par appareil] — 2026-11-07
 
 - Nouveau `src/services/deviceClass.ts`, seule source de la classe d'appareil : tactile et petit côté de l'écran

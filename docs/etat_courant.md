@@ -43,11 +43,12 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
-**Adaptation aux écrans, lot 1 livré en code (7 novembre).** Classe d'appareil (`src/services/deviceClass.ts`)
-sur la session (`sessions.device_class`, migration via chat Lovable), chaque tour, les latences et PostHog ; filtre
-« Appareil » dans l'admin Sessions et dimension « Appareil » des latences (Edge Function `posthog-latency-stats` à
-redéployer). Aucun changement visible. Suite : [prompt lot 2](prompt_reprise_adaptation_ecrans_lot_2.md)
-(smartphone en appel vocal sans avatar).
+**Adaptation aux écrans, lot 2 livré en code (7 novembre).** Sur smartphone (`?ecran=telephone` pour forcer), la
+conversation est un appel vocal sans avatar : vignette ronde, nom, état, minuterie, micro, Terminer, capsules
+inchangées ; aiguillage unique `src/services/callOutputMode.ts` (raison `output_mode_reason` dans PostHog). Tablette
+et desktop inchangés (avatar vidéo). Lot 1 (#170) : classe d'appareil sur la session, les tours, les latences et
+PostHog. Recette iPhone puis suite : [prompt lot 3](prompt_reprise_adaptation_ecrans_lot_3.md) (tablette optimisée,
+recette multi-appareils).
 
 **Anam, mode « Calage initial » (7 novembre, code).** Mesures du mode navigateur : synchro stable (~−30 ms) dès la
 réplique 4, mais +1,6 s puis −0,6 s sur les deux premières (recalage lent, seulement pendant la parole). Nouveau mode

@@ -106,6 +106,8 @@ import TransitionScreen from "@/components/prd4/TransitionScreen";
 import CharacterSelectScreen from "@/components/prd4/CharacterSelectScreen";
 import CallingMaxScreen from "@/components/prd4/CallingMaxScreen";
 import ConversationScreen from "@/components/prd4/ConversationScreen";
+import { conversationLayoutFor, resolveCallOutputMode } from "@/services/callOutputMode";
+import { getDeviceClass } from "@/services/deviceClass";
 import EndSessionScreen from "@/components/prd4/EndSessionScreen";
 import QuestionnaireScreenPRD4 from "@/components/prd4/QuestionnaireScreenPRD4";
 import ThanksScreen from "@/components/ThanksScreen";
@@ -244,6 +246,8 @@ const IndexPRD4 = () => {
   const confirmedTextRef = useRef("");
   const activeVoiceTelemetryRef = useRef<ReturnType<typeof createVoiceTurnV2> | null>(null);
   const [voiceOnly, setVoiceOnly] = useState(false);
+  // Computed once from the frozen device class: smartphones get the voice call screen.
+  const [conversationLayout] = useState(() => conversationLayoutFor(getDeviceClass()));
   const rescueRef = useRef(new Map<RuntimeCharacter, { text: string; blob: Blob }>());
   const lastRescueRef = useRef(new Map<RuntimeCharacter, string>());
   const rescuePendingRef = useRef(new Set<RuntimeCharacter>());
@@ -815,8 +819,13 @@ const IndexPRD4 = () => {
 
     const startingCharacter = startingCharacterRef.current;
     // Le flux vidéo en direct est celui de Max : un autre personnage (Emma) démarre
-    // en voix seule, avec sa photo, pour ne jamais afficher le flux de Max.
-    const outputMode = startingCharacter === "max" ? outputSettings.mode : "tts";
+    // en voix seule, avec sa photo, pour ne jamais afficher le flux de Max. Un
+    // smartphone reste en voix seule (appel vocal), sans connexion avatar.
+    const { mode: outputMode, reason: outputModeReason } = resolveCallOutputMode({
+      startingCharacter,
+      configuredMode: outputSettings.mode,
+      deviceClass: getDeviceClass(),
+    });
     rescueLifetimeRef.current = new AbortController();
     const pinnedGameplay = getGameplaySettings();
     incrementalOutputEnabledRef.current = pinnedGameplay.VOICE_INCREMENTAL_OUTPUT === true;
@@ -845,6 +854,7 @@ const IndexPRD4 = () => {
       character: startingCharacter,
       diagnostic_trace_enabled: diagnosticTraceEnabled,
       output_mode: outputMode,
+      output_mode_reason: outputModeReason,
       streaming_avatar_provider:
         outputMode === "streaming_avatar" ? avatarSettings.activeProvider : null,
     });
@@ -3506,6 +3516,7 @@ const IndexPRD4 = () => {
               sessionTimeRemaining={timer.formatted}
               onPTTPress={handlePTTPress}
               onPTTRelease={handlePTTRelease}
+              layout={conversationLayout}
               handsFree={handsFreeEnabled}
               voiceOnly={voiceOnly}
               handsFreeListening={handsFreeListening}
