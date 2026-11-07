@@ -20,6 +20,16 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - À valider en recette par Ulrich : synchro des trois premières répliques ; les mesures par réplique montrent si
   la réplique 2 dépasse encore après le passage au navigateur.
 
+## [Adaptation aux écrans : plan et prompt du lot 1] — 2026-11-07
+
+- Plan [docs/plan_adaptation_ecrans.md](docs/plan_adaptation_ecrans.md) pour la tâche Notion « Adapter AVA aux
+  écrans », avec les décisions d'Ulrich : smartphone = écran tactile dont le petit côté fait moins de 600 px, classé au
+  démarrage ; sur smartphone seul l'avatar vidéo en streaming disparaît (interface d'appel vocal), teaser,
+  cinématiques, grille et questionnaire gardés ; forçage `?ecran=` ; classe d'appareil sur la session (migration),
+  chaque tour et PostHog.
+- Trois lots : 1 classe d'appareil et métriques (aucun changement visible), 2 smartphone en appel vocal, 3 tablette et
+  recette multi-appareils. [Prompt lot 1](docs/prompt_reprise_adaptation_ecrans_lot_1.md). Aucun code modifié.
+
 ## [Anam : réglage « Synchro labiale » (auto, navigateur, manuel) ; mesures par réplique enregistrées] — 2026-11-06
 
 - Recette d'Ulrich (session `e3db42a7`) après #166 : plus de coupure au démarrage des cinématiques (micro

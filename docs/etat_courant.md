@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 6 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 7 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -47,6 +47,12 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 réplique 4, mais +1,6 s puis −0,6 s sur les deux premières (recalage lent, seulement pendant la parole). Nouveau mode
 par défaut : l'écart mesuré à la connexion est corrigé d'un coup avant l'accueil, puis le navigateur prend le relais.
 Suite : Ulrich choisit « Calage initial » dans l'admin et teste ; lecture des répliques 1 à 3.
+
+**Adaptation aux écrans (7 novembre, plan).** Smartphone (tactile, petit côté < 600 px) : appel vocal sans avatar
+vidéo, nom et vignette ronde du personnage ; teaser, cinématiques, grille et questionnaire gardés. Tablette et desktop
+inchangés (vidéo), tablette optimisée au lot 3. Classe d'appareil enregistrée sur la session, chaque tour et PostHog,
+filtre « Appareil » dans l'admin. Forçage `?ecran=telephone|tablette|desktop`. [Plan](plan_adaptation_ecrans.md),
+[prompt lot 1](prompt_reprise_adaptation_ecrans_lot_1.md) (métriques, migration via chat Lovable).
 
 **Anam, réglage « Synchro labiale » (6 novembre, code).** Cinématiques sans coupure (recette OK). Synchro encore
 flottante : mesures par réplique désormais enregistrées (insert corrigé), réglage admin auto / navigateur seul /
