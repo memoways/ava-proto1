@@ -596,10 +596,12 @@ export const ANAM_SMILING_CUE_TAGS: readonly string[] = ["playful", "happy", "la
  */
 export const ANAM_EMOTION_CUE_MODES = ["evolving", "fixed"] as const;
 /**
- * Client lip sync for Anam (browser only, never sent to Anam). auto: Ava measures and corrects
- * between lines; browser: no playout buffer and no correction; manual: a fixed shift.
+ * Client lip sync for Anam (browser only, never sent to Anam). initial: Ava measures the offset
+ * before the opening line, corrects it fully once, then leaves the rest to the browser; auto: Ava
+ * measures and corrects between lines; browser: no playout buffer and no correction; manual: a
+ * fixed shift.
  */
-export const ANAM_LIP_SYNC_MODES = ["auto", "browser", "manual"] as const;
+export const ANAM_LIP_SYNC_MODES = ["initial", "auto", "browser", "manual"] as const;
 export type AnamLipSyncMode = (typeof ANAM_LIP_SYNC_MODES)[number];
 /** Canonical acting emotions, kept identical to `CANONICAL_EMOTIONS` in performanceIntent.ts. */
 export const ANAM_PERFORMANCE_EMOTIONS = [
@@ -808,7 +810,7 @@ export function normalizeAnamSettings(value: unknown): AnamAvatarSettings {
       keepTranscripts: session.keepTranscripts === true,
     },
     lipSync: {
-      mode: pickEnum(asRecord(raw.lipSync).mode, ANAM_LIP_SYNC_MODES, "auto"),
+      mode: pickEnum(asRecord(raw.lipSync).mode, ANAM_LIP_SYNC_MODES, "initial"),
       manualShiftMs: boundedInteger(asRecord(raw.lipSync).manualShiftMs, b.anamLipSyncShiftMs),
     },
   };

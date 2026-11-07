@@ -43,6 +43,11 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Anam, mode « Calage initial » (7 novembre, code).** Mesures du mode navigateur : synchro stable (~−30 ms) dès la
+réplique 4, mais +1,6 s puis −0,6 s sur les deux premières (recalage lent, seulement pendant la parole). Nouveau mode
+par défaut : l'écart mesuré à la connexion est corrigé d'un coup avant l'accueil, puis le navigateur prend le relais.
+Suite : Ulrich choisit « Calage initial » dans l'admin et teste ; lecture des répliques 1 à 3.
+
 **Adaptation aux écrans (7 novembre, plan).** Smartphone (tactile, petit côté < 600 px) : appel vocal sans avatar
 vidéo, nom et vignette ronde du personnage ; teaser, cinématiques, grille et questionnaire gardés. Tablette et desktop
 inchangés (vidéo), tablette optimisée au lot 3. Classe d'appareil enregistrée sur la session, chaque tour et PostHog,

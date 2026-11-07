@@ -55,6 +55,10 @@ export interface AnamWarmUpTiming {
 const DEFAULT_WARM_UP: AnamWarmUpTiming = { maxWaitMs: 10_000, settleMs: 500, pollMs: 250, steadySamples: 6 };
 /** Below this decoded rate the stream is still ramping up (bandwidth estimation, keyframes). */
 const STEADY_MIN_FPS = 20;
+/** Largest opening correction: 3.6 s of buffer, within the 4 s jitterBufferTarget limit. */
+const INITIAL_MAX_SHIFT_MS = 3_200;
+/** Warm-up bound in initial mode: the browser grows a video buffer gradually. */
+const INITIAL_WARM_UP_MAX_MS = 15_000;
 /** Silence required before a playout buffer moves (the voice is never stretched mid-phrase). */
 const SILENCE_BEFORE_CORRECTION_MS = 600;
 /** Silence that ends a line record once its voice was heard. */
@@ -125,6 +129,8 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
   /** Once a line was sent, only offsets measured while the voice is audible drive the sync. */
   private linesStarted = 0;
   private line: AvLine | null = null;
+  /** Initial mode: buffers handed back to the browser after the opening line. */
+  private calibrationReleased = false;
 
   constructor(
     settings: AnamAvatarSettings,
@@ -134,7 +140,11 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     warmUpTiming: AnamWarmUpTiming = DEFAULT_WARM_UP,
     avSyncOptions: AvSyncOptions = DEFAULT_AV_SYNC,
   ) {
-    this.avSync = new AvSyncController(avSyncOptions);
+    // Opening calibration: the whole measured offset at once (the browser converges far slower,
+    // about 0.3 s per second of speech, and only while audio flows), up to the buffer limit.
+    this.avSync = new AvSyncController(settings.lipSync?.mode === "initial" || !settings.lipSync
+      ? { ...avSyncOptions, gain: 1, maxShiftMs: Math.max(avSyncOptions.maxShiftMs, INITIAL_MAX_SHIFT_MS) }
+      : avSyncOptions);
     this.avSyncPollMs = avSyncOptions.pollMs;
     this.warmUpTiming = warmUpTiming;
     this.settings = settings;
@@ -352,10 +362,14 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
 
   private async waitForWarmUp(element: HTMLMediaElement): Promise<void> {
     const startedAt = performance.now();
-    const deadline = startedAt + this.warmUpTiming.maxWaitMs;
+    // The opening calibration needs the video buffer to grow to its target: a longer bound.
+    const maxWaitMs = this.lipSyncMode === "initial"
+      ? Math.max(this.warmUpTiming.maxWaitMs, INITIAL_WARM_UP_MAX_MS)
+      : this.warmUpTiming.maxWaitMs;
+    const deadline = startedAt + maxWaitMs;
     const ready = await Promise.race([
       Promise.all([this.sessionReady, waitForFirstFrame(element)]).then(() => true),
-      delay(this.warmUpTiming.maxWaitMs).then(() => false),
+      delay(maxWaitMs).then(() => false),
     ]);
     const steady = ready ? await this.waitForSteadyStream(deadline) : { steady: false, videoFps: null };
     const path = await this.selectedNetworkPath();
@@ -393,7 +407,7 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
         const steady = videoFps >= STEADY_MIN_FPS
           && sample.freezeCount === previous.freezeCount
           && sample.audioPackets > previous.audioPackets
-          && (this.lipSyncMode !== "auto" || this.avSync.isSettled(performance.now()));
+          && (!this.correctsBeforeOpening() || this.avSync.isSettled(performance.now()));
         streak = steady ? streak + 1 : 0;
         if (streak >= this.warmUpTiming.steadySamples) return { steady: true, videoFps };
       }
@@ -473,7 +487,9 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       // Before the first line the face idles: its offset sets the opening. Afterwards the idle
       // offset differs from the speaking one, so only audible speech drives the correction.
       // Browser and manual modes only measure (line records), they never move a buffer.
-      if (this.lipSyncMode !== "auto") return;
+      // Initial mode stops correcting once the opening line is sent: the browser keeps the sync.
+      if (this.lipSyncMode === "initial" && this.linesStarted > 0) return;
+      if (!this.correctsBeforeOpening()) return;
       const drives = this.linesStarted === 0 || voiced;
       if (drives && !this.pendingTargets) {
         const targets = this.avSync.observe(offset, now);
@@ -500,7 +516,12 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
   }
 
   private get lipSyncMode() {
-    return this.settings.lipSync?.mode ?? "auto";
+    return this.settings.lipSync?.mode ?? "initial";
+  }
+
+  /** Modes in which Ava measures and corrects (auto: all session; initial: before the opening). */
+  private correctsBeforeOpening(): boolean {
+    return this.lipSyncMode === "auto" || this.lipSyncMode === "initial";
   }
 
   /**
@@ -519,7 +540,8 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
 
   /** Buffers really applied, for the line records (null: the browser's own). */
   private appliedTargets(): PlayoutTargets | null {
-    return this.lipSyncMode === "auto" ? this.avSync.targets : this.initialTargets();
+    if (this.calibrationReleased) return null;
+    return this.correctsBeforeOpening() ? this.avSync.targets : this.initialTargets();
   }
 
   /** One record per line, from the text sent until the voice has been silent for a while. */
@@ -582,6 +604,25 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       recordAvatarAvSync(record);
     } catch {
       // Diagnostics never block a line.
+    }
+    // Initial mode: the opening line was played on Ava's calibration; the browser has heard
+    // speech by now and keeps the sync alone (a fixed floor would block its own corrections).
+    if (this.lipSyncMode === "initial" && line.index === 1 && !this.calibrationReleased) {
+      this.calibrationReleased = true;
+      this.releasePlayoutTargets();
+    }
+  }
+
+  /** Hands the playout buffers back to the browser's own defaults. */
+  private releasePlayoutTargets(): void {
+    for (const receiver of this.peerConnection()?.getReceivers() ?? []) {
+      const tunable = receiver as RTCRtpReceiver & { jitterBufferTarget?: number | null };
+      if (!("jitterBufferTarget" in tunable)) continue;
+      try {
+        tunable.jitterBufferTarget = null;
+      } catch {
+        // Kept as is when the browser refuses.
+      }
     }
   }
 

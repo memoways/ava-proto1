@@ -823,7 +823,8 @@ const ANAM_CUE_LABELS: Record<AnamCueTag, string> = {
 };
 
 const ANAM_LIP_SYNC_LABELS: Record<AnamLipSyncMode, string> = {
-  auto: "Automatique — Ava mesure et corrige entre les répliques (défaut)",
+  initial: "Calage initial — Ava corrige avant la première réplique, puis le navigateur (défaut)",
+  auto: "Automatique — Ava mesure et corrige entre les répliques",
   browser: "Navigateur seul — aucun tampon ni correction d'Ava",
   manual: "Manuel — décalage fixe réglé ci-dessous",
 };
