@@ -103,6 +103,39 @@ Personnages : Max et Emma actifs ; Ava et Léo restent grisés (aucune promesse 
    (parcours : commencer → teaser → film → grille → appel Max → échange → passage Emma → raccrocher →
    grille) avec assertion « aucun avatar streaming demandé » ; E2E desktop inchangés.
 
+### Exécution lot 2 (7 novembre 2026)
+
+- Départ vérifié : PR #170 (lot 1) fusionnée (`820816c`), colonnes `sessions.device_class` / `device_info`
+  présentes (Lovable `query_database`). Aucune colonne `output_mode_reason` : raison envoyée à PostHog
+  seulement, aucune migration.
+- Aiguillage unique `src/services/callOutputMode.ts` : `resolveCallOutputMode` (pur) rend `{ mode, reason }`
+  — smartphone → `tts` / `device_smartphone` (prioritaire, même pour Max et même si le réglage demande
+  l'avatar), autre personnage que Max → `tts` / `character_voice_only` (règle existante), sinon le réglage /
+  `settings`. `prepareCall` l'appelle ; `output_mode_reason` part dans `prd4_session_started`.
+  `createResponseOutput` n'est appelé que dans `prepareCall` : le passage Max ↔ Emma et les appels depuis la
+  grille passent par `activateTTSFallback` (déjà en `tts` → aucun changement), aucun chemin ne réactive l'avatar.
+- `src/components/prd4/ConversationScreen.tsx` (l'écran réellement monté par `IndexPRD4`, pas l'ancien
+  `src/components/ConversationScreen.tsx`) : prop `layout` (`"video"` par défaut, `"call"` sur smartphone),
+  calculée une fois dans `IndexPRD4` par `conversationLayoutFor(getDeviceClass())`. Les capsules (passage,
+  « Rester avec », « Une vidéo arrive / Ignorer ») et les commandes micro sont extraites en blocs JSX partagés :
+  le rendu vidéo garde exactement le même DOM. Variante appel : vignette ronde 144 px (portrait signé → repli
+  local), nom, état « en ligne / parle… / écoute… / réfléchit… », minuterie, **Terminer** (44 px), même micro ;
+  aucun `<video>` ni canvas, même si l'avatar était demandé. `100svh` et `env(safe-area-inset-*)`.
+- `viewport-fit=cover` **non ajouté** : sans effet desktop, mais il ferait passer sous l'encoche iPhone tous
+  les autres écrans (accueil, grille, questionnaire) qui n'ont pas de marges de sécurité. Les `env()` valent 0
+  sans lui ; à reprendre au lot 3 avec une marge globale si besoin.
+- Lecteur de cinématiques (Gumlet commun) vérifié sans changement : `playsInline`, plein cadre
+  (`absolute inset-0`), déverrouillage audio et lecture au geste « Commencer » sur le même élément `<video>`.
+- Tests : `callOutputMode.test.ts` (smartphone → `tts` quel que soit le réglage ; tablette/desktop → réglage ;
+  Emma → voix), `ConversationScreen.callLayout.test.tsx` (vignette, nom, état, micro PTT et mains libres,
+  Terminer, capsules, aucun élément vidéo ; rendu vidéo par défaut inchangé) ; E2E « écran téléphone » 390×844,
+  `?ecran=telephone`, réglage serveur forcé sur l'avatar : commencer → teaser → film → grille → appel Max →
+  quatre échanges → Appeler Emma → Terminer → grille ; insert `output_mode = "tts"`,
+  `streaming_avatar_provider = null`, `device_class = "smartphone"`, aucune requête
+  `streaming-avatar-session`. Contrôle de mutation : sans l'aiguillage, ce test échoue. Tests existants
+  inchangés (le faux réseau gagne seulement l'option `outputMode`).
+- Recette : [prompt lot 3](prompt_reprise_adaptation_ecrans_lot_3.md) reprend la recette iPhone du lot 2.
+
 ## Lot 3 — Tablette optimisée et recette multi-appareils
 
 1. Revue de `ConversationScreen`, grille, accueil et lecteur sur 768×1024, 820×1180, 1024×1366

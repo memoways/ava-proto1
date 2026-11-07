@@ -53,6 +53,8 @@ interface NetworkFakeOptions {
   handsFree?: boolean;
   skipQuestionnaire?: boolean;
   delayFirstSTTFinalMs?: number;
+  /** Server output setting; "streaming_avatar" makes the avatar the configured mode. */
+  outputMode?: "streaming_avatar";
 }
 
 function json(route: Route, body: unknown, status = 200) {
@@ -473,6 +475,9 @@ async function installNetworkFakes(
       }] : []);
     }
     if (table === "admin_settings") {
+      if (options.outputMode && url.searchParams.get("key") === "eq.ava_output_settings") {
+        return json(route, [{ environment_id: "prod", value: { mode: options.outputMode } }]);
+      }
       if (url.searchParams.get("key") === "eq.ava_gameplay_settings") {
         return json(route, [{ environment_id: "prod", value: { TIMEOUT_SECONDS: 930,
           ...(options.incrementalOutput ? { VOICE_INCREMENTAL_OUTPUT: true } : {}),
@@ -2618,4 +2623,34 @@ test('F2 : après transfert F1, grille puis rappel du même personnage se fermen
   expect(fakes.getSessionRow()).toMatchObject({ active_character: 'max', handoff_count: 1, ended_at: null });
   expect(fakes.getSessionInsertCount()).toBe(1);
   await expect(page.getByText(/fermeture n’est pas sauvegardée|session a changé/)).toHaveCount(0);
+});
+
+test('écran téléphone : appel vocal sans avatar, passage Emma puis raccrocher vers la grille', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const avatarRequests: string[] = [];
+  page.on('request', request => {
+    if (request.url().includes('/functions/v1/streaming-avatar-session')) avatarRequests.push(request.url());
+  });
+  const turns = [...HANDOFF_TURNS, "J'aimerais parler à Emma, s'il te plaît."];
+  // The server setting asks for the avatar: the phone must still stay voice-only.
+  const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true, characterPortraits: true,
+    gmTarget: 'emma', gmStance: 'accept', gmHandoffAt: 4, maxResponse: "D'accord, je te la passe.", outputMode: 'streaming_avatar' });
+  await startCharacterConversation(page, 'Max', '/?ecran=telephone');
+  await expect(page.locator('[data-layout="call"]')).toBeVisible();
+  await expect(page.getByTestId('call-portrait')).toHaveAttribute('src', 'https://portraits.example/max-runtime.jpg');
+  await expect(page.getByRole('heading', { name: 'Max', exact: true })).toBeVisible();
+  await expect(page.locator('video[aria-label^="Flux vidéo"]')).toHaveCount(0);
+  for (const text of turns) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+  await page.getByRole('button', { name: 'Appeler Emma', exact: true }).click();
+  await expect(page.getByRole('img', { name: 'Portrait d’Emma' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('[data-layout="call"]')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Emma', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Appeler Max', exact: true })).toBeVisible();
+  expect(fakes.getSessionRow()).toMatchObject({ output_mode: 'tts', streaming_avatar_provider: null, device_class: 'smartphone' });
+  expect(fakes.getSessionInsertCount()).toBe(1);
+  expect(avatarRequests).toEqual([]);
+  await expect(page.locator('video[aria-label^="Flux vidéo"]')).toHaveCount(0);
+  await expect(page.getByText('Connexion vidéo…')).toHaveCount(0);
 });
