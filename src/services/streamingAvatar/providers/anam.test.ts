@@ -54,6 +54,8 @@ class Stream {
 const track = (kind: string) => ({ id: kind, kind, readyState: "live" }) as unknown as MediaStreamTrack;
 const settings = {
   ...streamingAvatarDefaults.anam,
+  // Most tests describe the continuous correction; the opening calibration has its own tests.
+  lipSync: { mode: "auto" as const, manualShiftMs: 0 },
   avatarId: "30fa96d0-26c4-4e55-94a0-517025942e18",
   voiceId: "6bfbe25a-979d-40f3-a92b-5394170af54b",
 };
@@ -270,6 +272,31 @@ describe("Anam text-mode lifecycle", () => {
     expect(record.voiced_samples).toBeGreaterThan(3);
     expect(record.series.some(([, , voiced]: [number, number | null, number]) => voiced === 1)).toBe(true);
     expect(JSON.stringify(record)).not.toMatch(/Bonjour/);
+    await output.dispose();
+  });
+
+  it("calibrates the whole opening offset before the first line, then hands the sync to the browser", async () => {
+    let voice = 0;
+    const pc = peerConnection({ fps: 25, offset: 2_100, level: () => voice }); fake.peer.current = pc;
+    const onMediaDiagnostics = vi.fn();
+    const output = new AnamStreamingAvatarOutput({ ...settings, lipSync: { mode: "initial", manualShiftMs: 0 } }, { onMediaDiagnostics }, 1000, 1000,
+      { maxWaitMs: 3_000, settleMs: 0, pollMs: 50, steadySamples: 2 }, { ...avSync, pollMs: 5, cooldownMs: 30 });
+    await output.prepare({ sessionId: "ava" }); sessionReady(); output.attachMedia(videoWithFrame());
+    const line = output.renderText("Bonjour.", { turnId: "turn-1" });
+    await vi.waitFor(() => expect(fake.talks).toHaveLength(1), { timeout: 5_000 });
+    // One full step (gain 1), not 70 %: the image starts in sync with the voice.
+    expect(pc.receivers.map(r => r.jitterBufferTarget)).toEqual([400, 2_500]);
+    expect(onMediaDiagnostics.mock.calls.map(([d]) => d).find((d) => d.event === "warm_up")).toMatchObject({ warmUpComplete: true });
+    persona("Bonjour.", { endOfSpeech: true });
+    await line;
+    voice = 0.3;
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    voice = 0;
+    // Once the opening line has played, the buffers go back to the browser's own defaults.
+    await vi.waitFor(() => expect(pc.receivers.map(r => r.jitterBufferTarget)).toEqual([null, null]), { timeout: 3_000 });
+    expect(fake.recordAvatarAvSync).toHaveBeenCalledWith(expect.objectContaining({
+      lip_sync_mode: "initial", line_index: 1, video_target_start_ms: 2_500, video_target_end_ms: 2_500,
+    }));
     await output.dispose();
   });
 

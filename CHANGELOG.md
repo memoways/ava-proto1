@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Anam : mode « Calage initial » — synchro dès la première réplique] — 2026-11-07
+
+- Recette d'Ulrich (session `67796194`, mode « Navigateur seul », 11 répliques mesurées) : trois premières
+  répliques désynchronisées, puis synchro stable. Mesures : réplique 1 image +1,6 s en avance (de +2,2 s à
+  +1,0 s), réplique 2 voix −0,6 s en avance (dépassement), réplique 3 −77 ms, puis −23 à −32 ms jusqu'à la fin.
+- Lecture des séries : au repos, Anam n'envoie pas de son et l'écart ne bouge pas ; le navigateur ne recale
+  que pendant la parole, environ 0,3 s par seconde de voix, et dépasse la cible au passage. L'écart mesuré
+  avant la première réplique (+2,2 s) est celui du début de la réplique 1 : il peut être corrigé d'avance.
+- Nouveau mode **Calage initial** (défaut pour un réglage non choisi) : pendant la connexion, Ava mesure
+  l'écart et le corrige **entièrement en une fois** (jusqu'à 3,2 s), attend que le tampon l'ait atteint (au plus
+  15 s au lieu de 10), garde ce calage pour la première réplique puis rend les tampons au navigateur, qui tient
+  ensuite la synchro seul comme en mode « Navigateur seul ». Un réglage déjà enregistré (« Navigateur seul »)
+  reste tel quel : choisir « Calage initial » dans l'admin.
+- À valider en recette par Ulrich : synchro des trois premières répliques ; les mesures par réplique montrent si
+  la réplique 2 dépasse encore après le passage au navigateur.
+
 ## [Anam : réglage « Synchro labiale » (auto, navigateur, manuel) ; mesures par réplique enregistrées] — 2026-11-06
 
 - Recette d'Ulrich (session `e3db42a7`) après #166 : plus de coupure au démarrage des cinématiques (micro

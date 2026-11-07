@@ -43,6 +43,11 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Anam, mode « Calage initial » (7 novembre, code).** Mesures du mode navigateur : synchro stable (~−30 ms) dès la
+réplique 4, mais +1,6 s puis −0,6 s sur les deux premières (recalage lent, seulement pendant la parole). Nouveau mode
+par défaut : l'écart mesuré à la connexion est corrigé d'un coup avant l'accueil, puis le navigateur prend le relais.
+Suite : Ulrich choisit « Calage initial » dans l'admin et teste ; lecture des répliques 1 à 3.
+
 **Anam, réglage « Synchro labiale » (6 novembre, code).** Cinématiques sans coupure (recette OK). Synchro encore
 flottante : mesures par réplique désormais enregistrées (insert corrigé), réglage admin auto / navigateur seul /
 décalage manuel pour comparer, avec modèle et qualité vidéo. Suite : essais d'Ulrich puis lecture des écarts.
