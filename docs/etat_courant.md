@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 6 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 7 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -42,6 +42,12 @@ Personnel : Ulrich `377e8583-7838-4c05-9f76-8833a450f304`, sources Ava exclues.
 GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
+
+**Adaptation aux écrans (7 novembre, plan).** Smartphone (tactile, petit côté < 600 px) : appel vocal sans avatar
+vidéo, nom et vignette ronde du personnage ; teaser, cinématiques, grille et questionnaire gardés. Tablette et desktop
+inchangés (vidéo), tablette optimisée au lot 3. Classe d'appareil enregistrée sur la session, chaque tour et PostHog,
+filtre « Appareil » dans l'admin. Forçage `?ecran=telephone|tablette|desktop`. [Plan](plan_adaptation_ecrans.md),
+[prompt lot 1](prompt_reprise_adaptation_ecrans_lot_1.md) (métriques, migration via chat Lovable).
 
 **Anam, réglage « Synchro labiale » (6 novembre, code).** Cinématiques sans coupure (recette OK). Synchro encore
 flottante : mesures par réplique désormais enregistrées (insert corrigé), réglage admin auto / navigateur seul /
