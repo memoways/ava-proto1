@@ -13,7 +13,7 @@ export type LatencyStageKey =
   | "firstSound"
   | "endToEnd";
 
-export type LatencyDimensionKey = "stt" | "model" | "tts" | "video" | "character" | "browser";
+export type LatencyDimensionKey = "stt" | "model" | "tts" | "video" | "character" | "browser" | "device";
 
 export interface LatencySample {
   createdAt: string;
@@ -23,6 +23,8 @@ export interface LatencySample {
   video: string | null;
   character: string | null;
   browser: string | null;
+  /** Device class (smartphone, tablet, desktop); absent on turns recorded before lot 1. */
+  device?: string | null;
   values: Partial<Record<LatencyStageKey, number>>;
 }
 
@@ -59,6 +61,7 @@ export const LATENCY_DIMENSIONS: Array<{ key: LatencyDimensionKey; label: string
   { key: "video", label: "Service vidéo" },
   { key: "character", label: "Personnage" },
   { key: "browser", label: "Navigateur" },
+  { key: "device", label: "Appareil" },
 ];
 
 interface RawVoiceRow {
@@ -100,6 +103,7 @@ export function toLatencySample(row: RawVoiceRow): LatencySample | null {
     video: label(metadata.video_provider),
     character: label(metadata.character),
     browser: label(metadata.browser_family),
+    device: label(metadata.device_class),
     values,
   };
 }

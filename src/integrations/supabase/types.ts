@@ -1227,6 +1227,8 @@ export type Database = {
           context_type: string
           conversation_log: Json | null
           conversation_memory: Json
+          device_class: string | null
+          device_info: Json | null
           diagnostic_trace_enabled: boolean
           duration_seconds: number | null
           ended_at: string | null
@@ -1280,6 +1282,8 @@ export type Database = {
           context_type?: string
           conversation_log?: Json | null
           conversation_memory?: Json
+          device_class?: string | null
+          device_info?: Json | null
           diagnostic_trace_enabled?: boolean
           duration_seconds?: number | null
           ended_at?: string | null
@@ -1333,6 +1337,8 @@ export type Database = {
           context_type?: string
           conversation_log?: Json | null
           conversation_memory?: Json
+          device_class?: string | null
+          device_info?: Json | null
           diagnostic_trace_enabled?: boolean
           duration_seconds?: number | null
           ended_at?: string | null

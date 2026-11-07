@@ -43,7 +43,7 @@ describe("latencyTelemetry", () => {
       session_id: "session-1",
       turn_index: 2,
       t_max_llm_ms: 810,
-      metadata_json: { provider: "OpenRouter" },
+      metadata_json: { provider: "OpenRouter", device_class: expect.stringMatching(/^(smartphone|tablet|desktop)$/) },
     }));
   });
 
@@ -64,7 +64,7 @@ describe("latencyTelemetry", () => {
     expect(mocks.insertMock).toHaveBeenCalledWith(expect.objectContaining({
       direction: "out",
       t_tts_total_ms: 460,
-      metadata_json: { provider: "elevenlabs", retry_count: 0 },
+      metadata_json: { provider: "elevenlabs", retry_count: 0, device_class: expect.stringMatching(/^(smartphone|tablet|desktop)$/) },
     }));
   });
 });

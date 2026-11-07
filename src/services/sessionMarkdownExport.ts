@@ -31,6 +31,7 @@ export function buildSessionMarkdown({ session, telemetry, warnings }: SessionEx
     `- Fin : ${text(session.ended_at)}`, `- Compte : ${text(session.account_display_name)}`,
     `- Testeur : ${text(session.tester_label)}`, `- Environnement : ${text(session.environment_id)}`,
     `- Type de contexte : ${text(session.context_type)}`, `- Campagne : ${text(session.campaign_id)}`,
+    `- Appareil : ${session.device_class == null ? "inconnu" : text(session.device_class)}`,
     `- Durée : ${text(session.duration_seconds)} s`, `- Fin de session : ${text(session.game_over_reason)}`,
     `- Messages utilisateur : ${messages.filter(m => m.role === "user").length}`,
     `- Réponses personnages : ${messages.filter(m => messageCharacter(m as { role?: string; spokenWith?: string })).length}`,

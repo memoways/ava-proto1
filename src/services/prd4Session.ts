@@ -11,6 +11,7 @@ import type { Database, Json } from "@/integrations/supabase/types";
 import { ensureGameAuth } from "@/services/gameAuth";
 import { trackEvent } from "@/services/posthogService";
 import { getRuntimeContext } from "@/services/environmentContext";
+import { getDeviceSnapshot } from "@/services/deviceClass";
 
 type SessionInsert = Database["public"]["Tables"]["sessions"]["Insert"];
 
@@ -20,6 +21,12 @@ function trackPersistence(operation: string, success: boolean, sessionId?: strin
     success,
     ...(sessionId ? { session_id: sessionId } : {}),
   });
+}
+
+/** Device class frozen for the page and its technical snapshot (no identifying field). */
+function deviceColumns(): Pick<SessionInsert, "device_class" | "device_info"> {
+  const { device_class, ...device_info } = getDeviceSnapshot();
+  return { device_class, device_info: device_info as unknown as Json };
 }
 
 export async function createPRD4Session(
@@ -44,6 +51,7 @@ export async function createPRD4Session(
     tester_label: runtime.testerLabel,
     test_invitation_id: runtime.testInvitationId,
     started_by_user_id: runtime.startedByUserId,
+    ...deviceColumns(),
   };
   const { data, error } = await supabase
     .from("sessions")

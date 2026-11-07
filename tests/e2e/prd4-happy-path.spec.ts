@@ -1009,6 +1009,21 @@ test("appel GM : un PATCH refusé conserve Emma, son offre autorisée et le comp
   expect(fakes.getSessionInsertCount()).toBe(1);
 });
 
+test("écran : ?ecran=telephone enregistre device_class smartphone sans changer l'écran", async ({ page }) => {
+  await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true });
+  const inserts: Array<Record<string, unknown>> = [];
+  await page.route(`${SUPABASE_ORIGIN}/rest/v1/sessions**`, async route => {
+    if (route.request().method() === "POST") inserts.push(route.request().postDataJSON() as Record<string, unknown>);
+    return route.fallback();
+  });
+  await startCharacterConversation(page, "Max", "/?ecran=telephone");
+  // Lot 1 records the class only: the avatar portrait and the recording control stay as on desktop.
+  await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
+  expect(inserts).toHaveLength(1);
+  expect(inserts[0]).toMatchObject({ device_class: "smartphone", device_info: { source: "url" } });
+  expect(JSON.stringify(inserts[0].device_info)).not.toMatch(/Mozilla|user_?agent/i);
+});
+
 test("capture remplacée : un démarrage rejeté après recommencement laisse le nouveau micro actif", async ({ page }) => {
   test.setTimeout(45_000);
   await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true, skipQuestionnaire: true });

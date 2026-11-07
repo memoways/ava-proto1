@@ -43,6 +43,12 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Adaptation aux écrans, lot 1 livré en code (7 novembre).** Classe d'appareil (`src/services/deviceClass.ts`)
+sur la session (`sessions.device_class`, migration via chat Lovable), chaque tour, les latences et PostHog ; filtre
+« Appareil » dans l'admin Sessions et dimension « Appareil » des latences (Edge Function `posthog-latency-stats` à
+redéployer). Aucun changement visible. Suite : [prompt lot 2](prompt_reprise_adaptation_ecrans_lot_2.md)
+(smartphone en appel vocal sans avatar).
+
 **Anam, mode « Calage initial » (7 novembre, code).** Mesures du mode navigateur : synchro stable (~−30 ms) dès la
 réplique 4, mais +1,6 s puis −0,6 s sur les deux premières (recalage lent, seulement pendant la parole). Nouveau mode
 par défaut : l'écart mesuré à la connexion est corrigé d'un coup avant l'accueil, puis le navigateur prend le relais.
