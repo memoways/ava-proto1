@@ -62,6 +62,27 @@ Personnages : Max et Emma actifs ; Ava et Léo restent grisés (aucune promesse 
    iPad « Macintosh », desktop fenêtre étroite, override) ; test d'insert de session ; E2E existants
    verts.
 
+### Exécution lot 1 (7 novembre 2026)
+
+- `src/services/deviceClass.ts` : `classifyDevice` (pur), `parseDeviceOverride`, `readDeviceOverride` (URL puis
+  sessionStorage de l'onglet, clé `ava_device_class_override`, pour survivre aux changements de phase et au
+  rechargement), `getDeviceSnapshot` / `getDeviceClass` figés au premier appel, libellés admin. Un point de
+  toucher unique (`maxTouchPoints = 1`) sans pointeur grossier reste desktop.
+- Migration `supabase/migrations/20261107211500_session_device_class.sql` : colonnes nullables, check sur les
+  trois valeurs. Vérifié en lecture (Lovable `query_database`, 7 novembre) : colonnes absentes avant migration ;
+  politique d'insert `Participant insert own session` (`auth.uid() = user_id`) suffisante ;
+  `protect_game_session_identity` et `protect_ava_session_context_update` n'inspectent pas ces colonnes.
+  Ordre : migration appliquée et vérifiée **avant** la fusion du code qui écrit les colonnes.
+- `device_class` dans `voice_turn_completed`, `voice_error`, V2, `avatar_av_sync`, `turn_latencies`,
+  `audio_latencies` et tous les événements PostHog (`trackEvent`). Colonne de requête HogQL ajoutée en fin de
+  liste (position 26) pour ne déplacer aucun index existant.
+- Admin : filtre Sessions (Smartphone / Tablette / Desktop / Inconnu), mention dans la liste et le détail ; dimension
+  « Appareil » (latences internes, filtres PostHog, répartition « Appareils ») ; ligne « Appareil » de l'export.
+- Tests : `deviceClass.test.ts`, `prd4Session.test.ts`, `deviceClassMetrics.test.ts`, ajouts dans
+  `voiceTelemetry`, `posthogService`, `posthogLatencyEndpoint` ; E2E `?ecran=telephone` → insert
+  `device_class = "smartphone"` sans changement d'écran. Deux attentes exactes de `latencyTelemetry.test.ts`
+  incluent désormais `device_class` (ajout demandé, pas une régression).
+
 ## Lot 2 — Smartphone : appel vocal sans avatar
 
 1. `prepareCall` : si classe `smartphone`, `outputMode = "tts"` et `output_mode`/provider de session

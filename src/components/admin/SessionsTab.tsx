@@ -19,6 +19,7 @@ import { isQuestionLike } from "@/services/ragQuestionCorpus";
 import { adminTabPath } from "@/services/adminNavigation";
 import type { QuestionnaireData } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DEVICE_CLASSES, DEVICE_CLASS_LABELS, UNKNOWN_DEVICE, sessionDeviceKey, sessionDeviceLabel } from "@/services/deviceClass";
 
 /** Onglet admin où corriger la cause racine selon le type de fallback GM. */
 const FALLBACK_TARGET_TAB: Record<string, { tab: string; label: string }> = {
@@ -52,6 +53,8 @@ export interface SessionRow {
   tester_label: string | null;
   test_invitation_id: string | null;
   started_by_user_id: string | null;
+  /** Absent or null on sessions recorded before the device class existed. */
+  device_class?: string | null;
   account_display_name?: string;
 }
 
@@ -370,6 +373,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
   const [contextFilter, setContextFilter] = useState("all");
   const [campaignFilter, setCampaignFilter] = useState("all");
   const [characterFilter, setCharacterFilter] = useState("all");
+  const [deviceFilter, setDeviceFilter] = useState("all");
   const characterOptions = useMemo(() => sessionCharacterOptions(sessions), [sessions]);
   const campaigns = useMemo(
     () => [...new Set(sessions.map((session) => session.campaign_id).filter((value): value is string => Boolean(value)))],
@@ -380,7 +384,8 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
     && (contextFilter === "all" || session.context_type === contextFilter)
     && (campaignFilter === "all" || session.campaign_id === campaignFilter)
     && (characterFilter === "all" || sessionCharacterMetadata(session).character_keys.includes(characterFilter))
-  )), [campaignFilter, characterFilter, contextFilter, environmentFilter, sessions]);
+    && (deviceFilter === "all" || sessionDeviceKey(session) === deviceFilter)
+  )), [campaignFilter, characterFilter, contextFilter, deviceFilter, environmentFilter, sessions]);
 
   useEffect(() => {
     if (!selectedSessionId) {
@@ -593,6 +598,14 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
               {characterOptions.map(({ key, label }) => <SelectItem key={key} value={key}>{label}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Select value={deviceFilter} onValueChange={setDeviceFilter}>
+            <SelectTrigger aria-label="Filtrer par appareil"><SelectValue placeholder="Appareil" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les appareils</SelectItem>
+              {DEVICE_CLASSES.map((device) => <SelectItem key={device} value={device}>{DEVICE_CLASS_LABELS[device]}</SelectItem>)}
+              <SelectItem value={UNKNOWN_DEVICE}>Inconnu</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <p className="mb-2 text-xs text-muted-foreground">{visibleSessions.length} sessions affichées sur {sessions.length} chargées.</p>
         <div className="mb-2 flex flex-wrap items-center gap-3 text-sm">
@@ -645,7 +658,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                   <p className="text-[10px] font-mono text-muted-foreground">{s.id.slice(0, 8)} · {fmt(s.started_at)}</p>
                   <p className="mt-1 text-xs"><span className="text-muted-foreground">Compte :</span> {s.account_display_name ?? "public"}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {s.environment_id} · {s.test_invitation_id ? "test externe" : s.context_type}
+                    {s.environment_id} · {s.test_invitation_id ? "test externe" : s.context_type} · {sessionDeviceLabel(s)}
                     {s.campaign_id ? ` · ${s.campaign_id}` : ""}
                     {s.tester_label ? ` · ${s.tester_label}` : ""}
                   </p>
@@ -793,6 +806,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
               <Stat label="Compte" value={selected.account_display_name ?? "public"} />
               <Stat label="Environnement" value={selected.environment_id} />
               <Stat label="Contexte" value={selected.context_type} />
+              <Stat label="Appareil" value={sessionDeviceLabel(selected)} />
               <Stat label="Campagne" value={selected.campaign_id || "—"} />
               <Stat label="Testeur" value={selected.tester_label || "—"} />
               <Stat label="Invitation" value={selected.test_invitation_id?.slice(0, 8) || "—"} />

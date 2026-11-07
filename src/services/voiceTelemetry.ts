@@ -3,6 +3,7 @@ import { trackEvent } from "@/services/posthogService";
 import type { BrowserDiagnostics } from "@/services/browserCapabilities";
 import type { OnboardingVariant, VoiceModality } from "@/types";
 import { getRuntimeContext } from "@/services/environmentContext";
+import { getDeviceClass, type DeviceClass } from "@/services/deviceClass";
 
 export type VoiceBlockerStep =
   | "stt"
@@ -85,6 +86,8 @@ export type VoiceTurnCompletedPayload = VoiceTurnCompletedInput &
   VoiceTurnTimings & {
     browser_family: string;
     browser_name: string;
+    /** Device class frozen for the page (smartphone, tablet, desktop). */
+    device_class: DeviceClass;
     media_recorder_mime: string;
     tts_provider?: string;
     tts_model?: string;
@@ -253,6 +256,7 @@ export function buildVoiceTurnCompletedPayload(input: VoiceTurnCompletedInput): 
     t_turn_end_to_end_ms: endToEnd,
     browser_family: browser.browser_family,
     browser_name: browser.browser_name,
+    device_class: getDeviceClass(),
     media_recorder_mime: input.browser?.selectedMimeType || "",
     tts_provider: input.tts?.provider,
     tts_model: input.tts?.model,
@@ -440,6 +444,7 @@ export function recordVoiceError(record: VoiceErrorRecord): void {
     ...record,
     browser_family: browser.browser_family,
     browser_name: browser.browser_name,
+    device_class: getDeviceClass(),
     media_recorder_mime: record.browser?.selectedMimeType || "",
     error_message: record.error_message?.slice(0, 500),
   };
@@ -495,7 +500,7 @@ export function recordVoiceTurnV2(event: string, payload: import("./voiceTurnTel
       blocker_step: "unknown",
       environment_id: payload.environment_id,
       context_type: payload.context_type,
-      metadata_json: payload,
+      metadata_json: { ...payload, device_class: getDeviceClass() },
     } as never).abortSignal(controller.signal)).then(({ error }) => {
       if (error && isMissingTelemetryTable(error.message)) voiceTurnEventsUnavailable = true;
     }).catch(() => undefined).finally(() => {
@@ -547,7 +552,7 @@ export function recordAvatarAvSync(record: AvatarAvSyncRecord): void {
       event_name: "avatar_av_sync",
       severity: "ok",
       blocker_step: "unknown",
-      metadata_json: record,
+      metadata_json: { ...record, device_class: getDeviceClass() },
     } as never)).then(({ error }) => {
       if (error && isMissingTelemetryTable(error.message)) voiceTurnEventsUnavailable = true;
       else if (error) console.warn("[voiceTelemetry] insert avatar_av_sync", error.message);

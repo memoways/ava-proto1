@@ -33,6 +33,7 @@ export interface PosthogSlowTurn {
   videoModel?: string | null;
   videoStatus?: string | null;
   browser: string | null;
+  device?: string | null;
   responseReadyMs: number | null;
   firstSoundMs: number | null;
   endToEndMs: number | null;
@@ -63,7 +64,7 @@ export interface PosthogLatencyStats {
   /** Video fields are optional during a rolling Lovable Cloud update. */
   latency: Record<"responseReady" | "firstSound" | "endToEnd" | "stt" | "rag" | "max" | "tts" | "gmPost", PercentileMetric> & { video?: PercentileMetric };
   blockers: Array<{ key: string; count: number }>;
-  providers: Record<"models" | "stt" | "tts" | "browsers" | "characters", Array<{ key: string; count: number }>> & { video?: Array<{ key: string; count: number }> };
+  providers: Record<"models" | "stt" | "tts" | "browsers" | "characters", Array<{ key: string; count: number }>> & { video?: Array<{ key: string; count: number }>; devices?: Array<{ key: string; count: number }> };
   actions: {
     cinematics: { recommended: number; played: number; skipped: number };
     handoffs: { proposed: number; accepted: number; refused: number; executed: number; blocked: number };
@@ -118,6 +119,7 @@ export interface VoiceEventRow {
     tts_provider?: string;
     video_provider?: string;
     browser_family?: string;
+    device_class?: string;
     first_sound_status?: "measured" | "failed" | "not_measured";
     had_error?: boolean;
     t_turn_voice_ready_ms?: number;
@@ -219,6 +221,7 @@ export async function loadInternalLatencyComparison(
     tts: countDimension(voiceInEnvironment.map((row) => row.metadata_json?.tts_provider)),
     video: countDimension(voiceInEnvironment.map((row) => row.metadata_json?.video_provider)),
     browsers: countDimension(voiceInEnvironment.map((row) => row.metadata_json?.browser_family)),
+    devices: countDimension(voiceInEnvironment.map((row) => row.metadata_json?.device_class)),
   };
   const voice = voiceInEnvironment.filter((row) => {
     const metadata = row.metadata_json ?? {};
@@ -229,6 +232,7 @@ export async function loadInternalLatencyComparison(
       tts: metadata.tts_provider,
       video: metadata.video_provider,
       browser: metadata.browser_family,
+      device: metadata.device_class,
     };
     return Object.entries(options.filters ?? {}).every(([key, expected]) => !expected || dimensions[key] === expected);
   });

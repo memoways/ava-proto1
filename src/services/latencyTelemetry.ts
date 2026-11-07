@@ -12,6 +12,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/services/posthogService";
 import { getRuntimeContext } from "@/services/environmentContext";
+import { getDeviceClass } from "@/services/deviceClass";
 
 let enabled = true;
 
@@ -96,7 +97,7 @@ export function createTurnTimer(initial?: Partial<TurnLatencyRecord>) {
           ...rest,
           environment_id: runtime.environmentId,
           context_type: runtime.contextType,
-          metadata_json: metadata ?? {},
+          metadata_json: { ...(metadata ?? {}), device_class: getDeviceClass() },
         };
         void supabase.from("turn_latencies" as never).insert(row as never).then(({ error }) => {
           if (error) console.warn("[latencyTelemetry] insert turn_latencies", error.message);
@@ -120,7 +121,7 @@ export function recordAudioLatency(record: AudioLatencyRecord) {
       ...rest,
       environment_id: runtime.environmentId,
       context_type: runtime.contextType,
-      metadata_json: metadata ?? {},
+      metadata_json: { ...(metadata ?? {}), device_class: getDeviceClass() },
     };
     void supabase.from("audio_latencies" as never).insert(row as never).then(({ error }) => {
       if (error) console.warn("[latencyTelemetry] insert audio_latencies", error.message);

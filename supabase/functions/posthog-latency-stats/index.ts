@@ -10,7 +10,7 @@ const corsHeaders = {
 const CACHE_TTL_MS = 60_000;
 const cache = new Map<string, { expiresAt: number; value: unknown }>();
 const ALLOWED_PERIODS = new Set(["24h", "7d", "30d", "custom"]);
-const ALLOWED_FILTERS = new Set(["character", "model", "stt", "tts", "video", "browser"]);
+const ALLOWED_FILTERS = new Set(["character", "model", "stt", "tts", "video", "browser", "device"]);
 const EVENTS = [
   "voice_turn_completed",
   "prd4_gm_post_turn",
@@ -47,6 +47,7 @@ interface EventRow {
   videoStatus: string | null;
   videoMs: number | null;
   browser: string | null;
+  device: string | null;
   responseReadyMs: number | null;
   firstSoundMs: number | null;
   firstSoundStatus: string | null;
@@ -188,6 +189,7 @@ function slowestTurns(turns: EventRow[]) {
       videoStatus: row.videoStatus,
       videoMs: row.videoMs,
       browser: row.browser,
+      device: row.device,
       responseReadyMs: row.responseReadyMs,
       firstSoundMs: row.firstSoundMs,
       endToEndMs: row.endToEndMs,
@@ -242,6 +244,7 @@ function aggregate(rows: EventRow[], range: { period: string; from: Date; to: Da
       tts: counts(turns.map((row) => row.tts)),
       video: counts(turns.map((row) => row.video)),
       browsers: counts(turns.map((row) => row.browser)),
+      devices: counts(turns.map((row) => row.device)),
       characters: counts(turns.map((row) => row.character)),
     },
     actions: actionCounts(rows),
@@ -295,6 +298,7 @@ serve(async (req) => {
     tts: "tts_provider",
     video: "video_provider",
     browser: "browser_family",
+    device: "device_class",
   };
   for (const [key, value] of Object.entries(filters)) {
     conditions.push(`toString(properties.${filterProperties[key]}) = ${sqlString(value)}`);
@@ -312,7 +316,8 @@ serve(async (req) => {
       properties.t_tts_total_ms, coalesce(properties.t_gm_post_ms, properties.latency_ms),
       properties.blocker_step, properties.severity,
       coalesce(properties.had_fallback, properties.skipped, false),
-      properties.video_provider, properties.video_model, properties.video_status, properties.t_video_wait_ms
+      properties.video_provider, properties.video_model, properties.video_status, properties.t_video_wait_ms,
+      properties.device_class
     FROM events
     WHERE ${conditions.join(" AND ")}
     ORDER BY timestamp DESC
@@ -349,6 +354,7 @@ serve(async (req) => {
       videoModel: row[23] == null ? null : String(row[23]),
       videoStatus: row[24] == null ? null : String(row[24]), videoMs: numberOrNull(row[25]),
       severity: row[20] == null ? null : String(row[20]), fallback: row[21] === true || row[21] === 1,
+      device: row[26] == null ? null : String(row[26]),
     }));
     const result = aggregate(rows, range, projectId, host);
     cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, value: result });

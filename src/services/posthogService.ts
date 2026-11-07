@@ -1,4 +1,5 @@
 import { getRuntimeContext } from "@/services/environmentContext";
+import { getDeviceClass } from "@/services/deviceClass";
 
 const POSTHOG_KEY = "phc_x9m2HnIiFcKH9kFDH5qujx10qEG2ENylEicki7sPyZr";
 const POSTHOG_HOST = "https://eu.i.posthog.com";
@@ -141,6 +142,7 @@ export function trackEvent(event: string, properties?: Record<string, unknown>) 
     test_invitation_id: runtime.testInvitationId,
     tester_label: runtime.testerLabel,
     started_by: runtime.startedBy,
+    device_class: getDeviceClass(),
   });
   if (!initialized || !analyticsEnabled || !posthog) {
     enqueue({ kind: "capture", event, properties: sanitized });

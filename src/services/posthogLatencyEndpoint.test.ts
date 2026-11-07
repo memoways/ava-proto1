@@ -44,6 +44,18 @@ describe("Lovable Cloud PostHog latency endpoint", () => {
     const query = JSON.parse(String(fetch.mock.calls[0][1]?.body)).query.query;
     expect(query).toContain("toString(properties.video_provider) = 'provider\\'s-video'");
   });
+  it("filters and counts by device class, appended after the existing columns", async () => {
+    const withDevice = [...row("future-video", 1200), "smartphone"];
+    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => Response.json({ results: [withDevice, row()] }));
+    vi.stubGlobal("fetch", fetch);
+    const data = await (await mocks.handler!(request({ device: "smartphone" }))).json();
+    const query = JSON.parse(String(fetch.mock.calls[0][1]?.body)).query.query;
+    expect(query).toContain("toString(properties.device_class) = 'smartphone'");
+    expect(query).toContain("properties.device_class");
+    expect(data.providers.devices).toEqual([{ key: "smartphone", count: 1 }]);
+    expect(data.slowestTurns.find(t => t.video === "future-video")).toMatchObject({ device: "smartphone", videoMs: 1200 });
+    expect(data.slowestTurns.find(t => !t.video).device).toBeNull();
+  });
   it("keeps admin authorization before analytics requests", async () => {
     const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
     mocks.auth.mockResolvedValue({ ok: false, response: new Response("Forbidden", { status: 403 }) });

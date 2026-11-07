@@ -61,6 +61,7 @@ const FILTER_CONFIG = [
   { key: "tts", label: "TTS", providerKey: "tts" },
   { key: "video", label: "Service vidéo", providerKey: "video" },
   { key: "browser", label: "Navigateur", providerKey: "browsers" },
+  { key: "device", label: "Appareil", providerKey: "devices" },
 ] as const;
 
 type FilterKey = (typeof FILTER_CONFIG)[number]["key"];
@@ -69,8 +70,8 @@ type FilterState = Record<FilterKey, string>;
 type FilterOptions = Record<FilterKey, string[]>;
 type TimelineMetric = "responseReady" | "firstSound" | "endToEnd";
 
-const EMPTY_FILTERS: FilterState = { character: "", model: "", stt: "", tts: "", video: "", browser: "" };
-const EMPTY_FILTER_OPTIONS: FilterOptions = { character: [], model: [], stt: [], tts: [], video: [], browser: [] };
+const EMPTY_FILTERS: FilterState = { character: "", model: "", stt: "", tts: "", video: "", browser: "", device: "" };
+const EMPTY_FILTER_OPTIONS: FilterOptions = { character: [], model: [], stt: [], tts: [], video: [], browser: [], device: [] };
 
 const LATENCY_STAGES = [
   { key: "responseReady", label: "Texte prêt" },
@@ -98,6 +99,7 @@ const PROVIDER_LABELS: Record<ProviderKey, string> = {
   tts: "Providers TTS",
   video: "Services vidéo",
   browsers: "Navigateurs",
+  devices: "Appareils",
   characters: "Personnages",
 };
 
@@ -570,7 +572,7 @@ export default function LatencyTelemetryTab({
                 </div>
                 {selectedSlowTurn && <div className="border-t bg-muted/20 p-4">
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <div><p className="text-sm font-semibold">Détail du tour #{selectedSlowTurn.turnIndex ?? "?"}</p><p className="text-xs text-muted-foreground">{selectedSlowTurn.character ?? "personnage inconnu"} · {selectedSlowTurn.browser ?? "navigateur inconnu"} · id {shortId(selectedSlowTurn.turnId)}</p></div>
+                    <div><p className="text-sm font-semibold">Détail du tour #{selectedSlowTurn.turnIndex ?? "?"}</p><p className="text-xs text-muted-foreground">{selectedSlowTurn.character ?? "personnage inconnu"} · {selectedSlowTurn.browser ?? "navigateur inconnu"} · {selectedSlowTurn.device ?? "appareil inconnu"} · id {shortId(selectedSlowTurn.turnId)}</p></div>
                     <Badge variant="outline">{selectedSlowTurn.stt ?? "STT ?"} → {selectedSlowTurn.video ?? selectedSlowTurn.tts ?? "Sortie ?"}</Badge>
                   </div>
                   {selectedSlowTurn.video && <p className="mb-3 text-xs text-muted-foreground">Vidéo : {selectedSlowTurn.video} · {selectedSlowTurn.videoModel || "modèle/avatar non renseigné"} · {selectedSlowTurn.videoStatus || "état non renseigné"}</p>}

@@ -19,6 +19,8 @@ vi.mock("@/services/environmentContext", () => ({
   getRuntimeContext: () => ({ environmentId: "env-1", contextType: "user_test" }),
 }));
 
+vi.mock("@/services/deviceClass", () => ({ getDeviceClass: () => "tablet" }));
+
 import {
   buildVoiceTurnCompletedPayload,
   pickVoiceTurnBlocker,
@@ -229,6 +231,56 @@ describe("video telemetry", () => {
     expect(mocks.insertMock).toHaveBeenCalledWith(expect.objectContaining({
       session_id: "s-1", turn_id: "avatar-line-2", event_name: "avatar_av_sync",
       environment_id: "env-1", context_type: "user_test",
+    }));
+  });
+});
+
+describe("device class telemetry", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("adds device_class next to browser_family in the turn payload", () => {
+    mocks.insertMock.mockReturnValue({ then: vi.fn() });
+    const payload = buildVoiceTurnCompletedPayload({ turn_id: "d:1", turn_index: 1, character: "max", timings: {},
+      browser: { userAgent: "Mozilla/5.0 Safari/605" } });
+    expect(payload).toMatchObject({ browser_family: "WebKit", device_class: "tablet" });
+    recordVoiceTurnCompleted(payload);
+    expect(mocks.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+      metadata_json: expect.objectContaining({ device_class: "tablet", browser_family: "WebKit" }),
+    }));
+  });
+
+  it("adds device_class to voice errors", () => {
+    mocks.insertMock.mockReturnValue({ then: vi.fn() });
+    recordVoiceError({ component: "stt", error_type: "network" });
+    expect(mocks.trackEventMock).toHaveBeenCalledWith("voice_error", expect.objectContaining({ device_class: "tablet" }));
+    expect(mocks.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+      metadata_json: expect.objectContaining({ device_class: "tablet" }),
+    }));
+  });
+
+  it("adds device_class to V2 and avatar lip sync records", async () => {
+    const abortSignal = vi.fn(() => Promise.resolve({ error: null }));
+    mocks.insertMock.mockReturnValue({ abortSignal });
+    const turn = createVoiceTurnV2({ session_id: "s2", turn_id: "s2:1", turn_index: 1, character: "max", environment_id: "prod", context_type: "public", input_mode: "push_to_talk", latency_origin: "ptt_release" }, performance.now(), recordVoiceTurnV2);
+    turn.finish("completed");
+    await vi.waitFor(() => expect(mocks.insertMock).toHaveBeenCalled());
+    expect(mocks.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+      metadata_json: expect.objectContaining({ device_class: "tablet", schema_version: 2 }),
+    }));
+
+    mocks.insertMock.mockClear();
+    mocks.insertMock.mockReturnValue(Promise.resolve({ error: null }));
+    recordAvatarAvSync({
+      provider: "anam", lip_sync_mode: "auto", manual_shift_ms: null, session_id: "s-2", turn_id: null, line_index: 0,
+      model: "m", voiced_samples: 0, offset_median_ms: null, offset_min_ms: null, offset_max_ms: null,
+      offset_spread_ms: null, corrections: 0, audio_target_start_ms: null, video_target_start_ms: null,
+      audio_target_end_ms: null, video_target_end_ms: null, sync_stopped: false, series: [],
+    });
+    await vi.waitFor(() => expect(mocks.insertMock).toHaveBeenCalled());
+    expect(mocks.insertMock).toHaveBeenCalledWith(expect.objectContaining({
+      metadata_json: expect.objectContaining({ device_class: "tablet", line_index: 0 }),
     }));
   });
 });

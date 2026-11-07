@@ -12,6 +12,8 @@ vi.mock("posthog-js", () => ({
   default: mocks,
 }));
 
+vi.mock("@/services/deviceClass", () => ({ getDeviceClass: () => "smartphone" }));
+
 vi.mock("@/services/environmentContext", () => ({
   getRuntimeContext: () => ({
     environmentId: "prod",
@@ -123,5 +125,19 @@ describe("posthogService", () => {
 
     expect(mocks.opt_out_capturing).toHaveBeenCalledOnce();
     expect(mocks.capture).not.toHaveBeenCalled();
+  });
+
+  it("adds the device class to every event like the environment context", async () => {
+    const { enablePostHog, trackEvent } = await import("./posthogService");
+
+    enablePostHog();
+    await vi.waitFor(() => expect(mocks.opt_in_capturing).toHaveBeenCalled());
+    trackEvent("prd4_phase_changed", { phase: "chat" });
+
+    expect(mocks.capture).toHaveBeenCalledWith("prd4_phase_changed", expect.objectContaining({
+      phase: "chat",
+      environment: "prod",
+      device_class: "smartphone",
+    }));
   });
 });

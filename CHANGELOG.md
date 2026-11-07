@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Adaptation aux écrans, lot 1 : classe d'appareil et métriques par appareil] — 2026-11-07
+
+- Nouveau `src/services/deviceClass.ts`, seule source de la classe d'appareil : tactile et petit côté de l'écran
+  < 600 px → smartphone, autre tactile (dont iPad « Macintosh ») → tablette, sinon desktop ; une fenêtre desktop
+  étroite reste desktop. Forçage `?ecran=telephone|tablette|desktop`, gardé dans l'onglet (sessionStorage) pour les
+  changements de phase et le rechargement. Classe figée au premier appel : une rotation ne la change pas.
+- Session : migration additive `20261107211500_session_device_class.sql` (`sessions.device_class` avec check sur
+  les trois valeurs, `sessions.device_info` jsonb technique : viewport, côtés de l'écran, densité, orientation,
+  pointeur, tactile ; ni user agent ni adresse). `createPRD4Session` les écrit. Politiques et déclencheurs inchangés.
+- `device_class` à côté de `browser_family` dans les tours (V1, V2), les erreurs voix, la synchro avatar, les
+  `metadata_json` de `turn_latencies` / `audio_latencies` et chaque événement PostHog.
+- Admin : filtre et mention « Appareil » dans Sessions (anciennes sessions « inconnu »), dimension « Appareil » dans
+  les latences internes et PostHog (Edge Function `posthog-latency-stats` à redéployer par Lovable), ligne
+  « Appareil » dans l'export Markdown.
+- Aucun changement visible pour le joueur ; `VOICE_ONLY_UI` inchangé. Deux tests de `latencyTelemetry` comparaient
+  `metadata_json` à l'identique : ils incluent désormais `device_class`, l'ajout demandé.
+
 ## [Anam : mode « Calage initial » — synchro dès la première réplique] — 2026-11-07
 
 - Recette d'Ulrich (session `67796194`, mode « Navigateur seul », 11 répliques mesurées) : trois premières
