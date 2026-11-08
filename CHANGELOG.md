@@ -4,6 +4,26 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Questionnaire conversationnel, lot 1 : modèle, contexte de session et stockage] — 2026-11-08
+
+- Types `QuestionnaireConversationalData`, `DimensionAnswer`, `ConversationalSessionContext` (`src/types/index.ts`) :
+  note `1..5 | null`, `null` = non évalué, jamais de valeur par défaut.
+- `src/services/conversationalQuestionnaire.ts` (pur) : `buildSessionContext()` reprend film, teaser, personnages
+  réellement entendus et passages Max ↔ Emma (depuis le journal de conversation, `role` des répliques non vides),
+  cinématiques vues, durée, tours, latences, erreurs micro, mains libres, raison de fin, appareil, mode d'appel et repli
+  avatar ; `normalizeScore` (0, 6, 2,5… → `null`), `validateConversationalQuestionnaire`, `radarScores` (non évalués à
+  part), `baseDimensionQuestions` (questions du plan ; seuls les noms des personnages appelés y entrent).
+- `IndexPRD4` mémorise le mode d'appel résolu au décrochage et un éventuel repli avatar → voix (`callModeRef`), lu par
+  le lot 2 ; aucun écran ni parcours modifié.
+- `saveConversationalQuestionnaire` écrit `conversational-v1` dans `sessions.questionnaire_responses` seulement si la
+  session n'a pas encore de questionnaire (PRD4 et legacy jamais écrasés) ; sans migration SQL (jsonb).
+- `sync-questionnaire` : mapping déplacé tel quel dans `supabase/functions/_shared/questionnaireNotionProps.ts`
+  (testable) ; nouvelle branche `conversational-v1` : contexte vers les colonnes PRD4 techniques existantes, notes,
+  verbatims (réponse + relance + commentaire de note), synthèse, version, appareil, mode d'appel, personnages appelés
+  et nombre de passages vers 16 nouvelles colonnes « Conv » ajoutées à la base Notion (ajout seul, schéma relu).
+  Une note `null` laisse la cellule vide.
+- Tests : non évalué ≠ 0 du modèle à Notion, sauvegarde gardée, contexte sans questions, PRD4 et legacy identiques.
+
 ## [Adaptation aux écrans : voix de Max sur iPhone en mains libres et coins de l'écran d'appel] — 2026-11-08
 
 - Recette iPhone d'Ulrich (session `feb8eb9b`, Safari, mains libres) : Max muet, `NotAllowedError` sur chaque tour avec
