@@ -1,8 +1,8 @@
 /**
  * Effective settings recorded with each session (per-device settings plan, lot 1).
  *
- * Written once, at session creation, under `sessions.device_info.effective_settings`
- * (existing JSON column, written only at insert): what really ran for this call
+ * Pinned when the call starts and written under `sessions.device_info.effective_settings`
+ * (existing JSON column) once the character profiles are known, without delaying the call: what really ran for this call
  * (Max and game master models, speech engine and model, voice and its source,
  * output, avatar) and which settings version it used. Read by admin Sessions.
  */

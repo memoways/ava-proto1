@@ -91,8 +91,9 @@ Prompt du lot 2 : [prompt_reprise_reglages_par_appareil_lot_2.md](prompt_reprise
   (`src/components/admin/EffectiveVoiceSummary.tsx`) dans Services par appareil (valeur éditée), Réglages personnages
   (profil édité, trois appareils), Streaming Avatar (réglages affichés, voix du fournisseur et par appareil) et
   TTS Config (réglages sauvegardés).
-- **Réglages effectifs par session** — `src/services/sessionEffectiveSettings.ts`, écrits à l'insertion dans
-  `sessions.device_info.effective_settings` (colonne JSON existante, jamais réécrite ; aucune migration). Détail de
+- **Réglages effectifs par session** — `src/services/sessionEffectiveSettings.ts`, figés au début de l'appel et écrits dans
+  `sessions.device_info.effective_settings` (colonne JSON existante ; aucune migration) dès que les fiches personnage
+  sont connues (`recordPRD4EffectiveSettings`), sans retarder l'appel. Détail de
   session admin : modèles Max et MJ, sortie, moteur et modèle TTS, voix, source et date des réglages, résumé Max et
   Emma.
 - **Validations** — unitaires (navigateur vierge → LLM et ElevenLabs de la base ; repli ; délai ; accord avec les

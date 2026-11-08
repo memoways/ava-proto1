@@ -29,6 +29,7 @@ import { processPRD4Turn, streamPRD4Turn } from "@/services/prd4Orchestrator";
 import {
   createPRD4Session,
   endPRD4Session,
+  recordPRD4EffectiveSettings,
   updatePRD4Onboarding,
   updatePRD4ExperienceState,
   updatePRD4StreamingAvatar,
@@ -836,8 +837,9 @@ const IndexPRD4 = () => {
     const startingCharacter = startingCharacterRef.current;
     // Bounded wait for the database settings; past it the call goes on with the local copy
     // or the code defaults, and the fallback is reported (never silent).
-    const [settingsState, maxProfile, emmaProfile] = await Promise.all([
-      ensureExperienceSettings({ sessionContext: "prepare_call" }),
+    const settingsState = await ensureExperienceSettings({ sessionContext: "prepare_call" });
+    // Character profiles for the session record: requested now, never awaited before the call.
+    const recordProfiles = Promise.all([
       getCharacterRuntimeProfile("max").catch(() => null),
       getCharacterRuntimeProfile("emma").catch(() => null),
     ]);
@@ -881,16 +883,12 @@ const IndexPRD4 = () => {
     setHandsFreeEnabled(handsFreeSettingsRef.current.enabled);
     setVoiceOnly(pinnedGameplay.VOICE_ONLY_UI === true);
     const technicalExpiry = Date.now() + TECHNICAL_RESUME_SECONDS * 1000;
-    const effectiveSettings = buildSessionEffectiveSettings({
-      settings: settingsState,
-      llm: getLLMSettings(),
-      startingCharacter,
-      outputMode,
-      outputModeReason,
-      voices: {
-        max: describeCurrentEffectiveVoice(deviceClass, "max", maxProfile, { deviceServices: deviceSettings }),
-        emma: describeCurrentEffectiveVoice(deviceClass, "emma", emmaProfile, { deviceServices: deviceSettings }),
-      },
+    // Settings pinned at call start; the voices are described once the profiles arrive.
+    const recordStartedAt = new Date();
+    const recordLlm = getLLMSettings();
+    const describeVoices = ([maxProfile, emmaProfile]: Awaited<typeof recordProfiles>) => ({
+      max: describeCurrentEffectiveVoice(deviceClass, "max", maxProfile, { deviceServices: deviceSettings, configuredOutput: outputSettings.mode, avatar: avatarSettings }),
+      emma: describeCurrentEffectiveVoice(deviceClass, "emma", emmaProfile, { deviceServices: deviceSettings, configuredOutput: outputSettings.mode, avatar: avatarSettings }),
     });
     const sid = await createPRD4Session(
       state.userRoleProfile,
@@ -903,8 +901,19 @@ const IndexPRD4 = () => {
         resume_expires_at: new Date(technicalExpiry).toISOString(),
         active_character: startingCharacter,
       } as never,
-      { effectiveSettings },
     );
+    void withTimeout("session_effective_settings_profiles", recordProfiles, 10_000)
+      .catch(() => [null, null] as Awaited<typeof recordProfiles>)
+      .then((profiles) => recordPRD4EffectiveSettings(sid, buildSessionEffectiveSettings({
+        settings: settingsState,
+        llm: recordLlm,
+        startingCharacter,
+        outputMode,
+        outputModeReason,
+        voices: describeVoices(profiles),
+        now: recordStartedAt,
+      })))
+      .catch((error) => console.warn("[PRD4] effective settings not recorded", error));
     if (!current()) { void endPRD4Session(sid, 'abandoned_before_answer', [], 0); return; }
     sessionIdRef.current = sid;
     setTechnicalExpiresAt(technicalExpiry);

@@ -35,7 +35,6 @@ export async function createPRD4Session(
   userRole: UserRoleProfile | null,
   character: RuntimeCharacter,
   extra?: SessionInsert,
-  options: { effectiveSettings?: SessionEffectiveSettings } = {},
 ): Promise<string> {
   await ensureGameAuth();
   const runtime = getRuntimeContext();
@@ -54,7 +53,7 @@ export async function createPRD4Session(
     tester_label: runtime.testerLabel,
     test_invitation_id: runtime.testInvitationId,
     started_by_user_id: runtime.startedByUserId,
-    ...deviceColumns(options.effectiveSettings),
+    ...deviceColumns(),
   };
   const { data, error } = await supabase
     .from("sessions")
@@ -157,6 +156,19 @@ export async function updatePRD4ExperienceState(
     .update(update as never)
     .eq("id", sessionId);
   trackPersistence("update_experience_state", !error, sessionId);
+  if (error) throw error;
+}
+
+/**
+ * Effective settings of the call (per-device settings lot 1), written into the
+ * device snapshot column once the character profiles are known. Never blocks the call.
+ */
+export async function recordPRD4EffectiveSettings(sessionId: string, effectiveSettings: SessionEffectiveSettings): Promise<void> {
+  const { error } = await supabase
+    .from("sessions")
+    .update({ device_info: deviceColumns(effectiveSettings).device_info })
+    .eq("id", sessionId);
+  trackPersistence("record_effective_settings", !error, sessionId);
   if (error) throw error;
 }
 

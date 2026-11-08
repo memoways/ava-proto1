@@ -865,8 +865,9 @@ test('réglages par appareil lot 1 : un navigateur vierge joue le LLM et ElevenL
   expect(new Set(fakes.getCharacterModels())).toEqual(new Set(["openai/gpt-5.6-luna"]));
   expect(fakes.getTtsModels().length).toBeGreaterThan(0);
   expect(new Set(fakes.getTtsModels())).toEqual(new Set(["eleven_v4_turbo"]));
-  const effective = (fakes.getSessionRow().device_info as { effective_settings?: Record<string, unknown> })?.effective_settings;
-  expect(effective).toMatchObject({
+  const effective = () => (fakes.getSessionRow().device_info as { effective_settings?: Record<string, unknown> })?.effective_settings;
+  await expect.poll(effective).toBeTruthy();
+  expect(effective()).toMatchObject({
     settings_source: "database",
     settings_updated_at: "2026-11-08T15:00:00Z",
     max_model: "openai/gpt-5.6-luna",

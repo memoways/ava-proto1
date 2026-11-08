@@ -20,7 +20,8 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   (Anam, HeyGen et son moteur, source Tavus ; Tavus « voix Ava » et LemonSlice rejouent la voix d'Ava). Ligne
   « Joué : … » dans Services par appareil, Réglages personnages, Streaming Avatar et TTS Config.
 - Chaque session enregistre ses réglages effectifs dans `sessions.device_info.effective_settings` (colonne existante,
-  écrite à l'insertion, pas de migration) : `max_model`, `gm_model`, moteur et modèle TTS, voix et source, sortie,
+  pas de migration ; réglages figés au début de l'appel, écrits dès que les fiches personnage sont connues, sans
+  retarder l'appel) : `max_model`, `gm_model`, moteur et modèle TTS, voix et source, sortie,
   avatar, source et date des réglages. Affichés dans le détail de session admin.
 - Tests : `experienceSettings.test.ts` (navigateur vierge → LLM et ElevenLabs de la base, repli, délai borné),
   `effectiveVoice.test.ts` (dont accord avec `resolveDeviceVoice` / `resolveCallOutputMode`),

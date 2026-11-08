@@ -198,7 +198,7 @@ const SETTINGS_SOURCE_LABELS: Record<string, string> = {
   fallback: "repli : copie locale ou défauts du code",
 };
 
-/** What really ran for this call, recorded at session creation (per-device settings lot 1). */
+/** What really ran for this call, pinned at call start (per-device settings lot 1). */
 function EffectiveSettingsSummary({ deviceInfo }: { deviceInfo: unknown }) {
   const record = readSessionEffectiveSettings(deviceInfo);
   if (!record) {
