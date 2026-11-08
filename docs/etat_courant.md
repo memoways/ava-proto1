@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 8 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 8 novembre 2026 (soir). Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -43,11 +43,12 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
-**Réglages par appareil (8 novembre, diagnostic).** L'expérience joueur ne charge pas LLM ni TTS depuis la base :
-un appareil sans admin ouvert (iPhone, testeurs) joue les défauts du code (`gemini-2.5-flash`,
-`eleven_multilingual_v2`) au lieu de sandbox-ulrich (`gpt-5.6-luna`, `eleven_v4_turbo`). [Plan](plan_reglages_par_appareil.md),
-[prompt lot 1](prompt_reprise_reglages_par_appareil_lot_1.md) (chargement complet, résumé effectif) ; lot 2 : onglet
-Expérience › Appareils.
+**Réglages par appareil (8 novembre, lot 1 livré en code).** Le joueur charge désormais tous les réglages d'appel
+depuis la base (`hydrateExperienceSettings`, délai borné 2,5 s, repli signalé `prd4_settings_fallback`) ; résumé
+« Joué : … » (`describeEffectiveVoice`) à côté de chaque choix de moteur ; réglages effectifs de chaque session dans
+`device_info.effective_settings` et dans le détail admin. Vérifier après livraison une nouvelle session smartphone
+(`max_model`, `tts_model`). Suite : [prompt lot 2](prompt_reprise_reglages_par_appareil_lot_2.md) (onglet
+Expérience › Appareils) ; [plan](plan_reglages_par_appareil.md). Recette iPhone (voix de Max) : humaine, à faire.
 
 **Smartphone : film et voix (8 novembre, code).** Film d'introduction en image entière (portrait) avec « Plein
 écran ⤢ » (paysage) ; Admin › Streaming Avatar › « Services par appareil » choisit sortie, avatar, moteur et voix par

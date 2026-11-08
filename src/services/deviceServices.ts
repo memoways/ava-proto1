@@ -113,6 +113,14 @@ export function deviceServicesReady(): Promise<DeviceServicesSettings> {
   return pending;
 }
 
+/** Adopt the local copy just refreshed from the database (experience settings load). */
+export function primeDeviceServicesFromLocal(): DeviceServicesSettings {
+  cached = null;
+  pending = null;
+  cached = getDeviceServices();
+  return cached;
+}
+
 /** Test helper. */
 export function resetDeviceServicesCacheForTests(): void {
   cached = null;

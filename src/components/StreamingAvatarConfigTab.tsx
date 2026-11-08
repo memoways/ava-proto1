@@ -9,6 +9,9 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
+import { EffectiveVoiceBlock, EffectiveVoiceLine, useVoiceProfiles } from "@/components/admin/EffectiveVoiceSummary";
+import { DEVICE_CLASSES } from "@/services/deviceClass";
+import { getDeviceServices } from "@/services/deviceServices";
 import {
   checkAnamConfiguration,
   checkTavusConfiguration,
@@ -105,6 +108,7 @@ export default function StreamingAvatarConfigTab() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<Record<StreamingAvatarProviderId, boolean> | null>(null);
+  const { profiles } = useVoiceProfiles();
 
   useEffect(() => {
     void loadStreamingAvatarSettingsFromDB()
@@ -223,6 +227,35 @@ export default function StreamingAvatarConfigTab() {
           onChange={(lemonslice) => update({ lemonslice })}
         />
       )}
+
+      <Card data-testid="streaming-avatar-effective-voice">
+        <CardHeader>
+          <CardTitle className="text-base">Voix réellement jouée</CardTitle>
+          <CardDescription>
+            Calculée comme dans l'expérience, avec les réglages affichés ici (même non sauvegardés). Emma démarre toujours
+            en voix seule.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <EffectiveVoiceLine
+            device="desktop"
+            character="max"
+            profile={profiles.max}
+            overrides={{
+              avatar: settings,
+              configuredOutput: "streaming_avatar",
+              deviceServices: { ...getDeviceServices().desktop, output: "avatar", avatarProvider: null },
+            }}
+          />
+          <EffectiveVoiceBlock
+            title="Par appareil, avec l'interrupteur et les services par appareil actuels"
+            devices={DEVICE_CLASSES}
+            characters={["max"]}
+            profiles={profiles}
+            overrides={() => ({ avatar: settings })}
+          />
+        </CardContent>
+      </Card>
 
       <div className="flex justify-end">
         <Button onClick={save} disabled={!dirty || saving}>

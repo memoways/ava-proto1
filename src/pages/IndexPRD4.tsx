@@ -29,6 +29,7 @@ import { processPRD4Turn, streamPRD4Turn } from "@/services/prd4Orchestrator";
 import {
   createPRD4Session,
   endPRD4Session,
+  recordPRD4EffectiveSettings,
   updatePRD4Onboarding,
   updatePRD4ExperienceState,
   updatePRD4StreamingAvatar,
@@ -36,7 +37,6 @@ import {
 import {
   createConfiguredSTT,
   getSTTProvider,
-  loadSTTSettingsFromDB,
   prefetchGamilabSDK,
   type STTSession,
 } from "@/services/stt";
@@ -91,8 +91,6 @@ import {
   createResponseOutput,
   getOutputSettings,
   getStreamingAvatarSettings,
-  loadOutputSettingsFromDB,
-  loadStreamingAvatarSettingsFromDB,
   LocalTTSOutput,
   type OutputSettings,
   type ResponseOutput,
@@ -110,6 +108,9 @@ import ConversationScreen from "@/components/prd4/ConversationScreen";
 import { conversationLayoutFor, resolveCallOutputMode, touchFirstFor } from "@/services/callOutputMode";
 import { getDeviceClass } from "@/services/deviceClass";
 import { deviceServicesReady, resolveDeviceVoice } from "@/services/deviceServices";
+import { ensureExperienceSettings, startExperienceSettingsLoad } from "@/services/experienceSettings";
+import { describeCurrentEffectiveVoice } from "@/services/effectiveVoiceCurrent";
+import { buildSessionEffectiveSettings } from "@/services/sessionEffectiveSettings";
 import { cn } from "@/lib/utils";
 import EndSessionScreen from "@/components/prd4/EndSessionScreen";
 import QuestionnaireScreenPRD4 from "@/components/prd4/QuestionnaireScreenPRD4";
@@ -450,19 +451,18 @@ const IndexPRD4 = () => {
   useEffect(() => installAudioGestureUnlock(), []);
 
   useEffect(() => {
-    void loadSTTSettingsFromDB();
-    void loadSpeechPerformanceSettings();
-    void deviceServicesReady();
-    const outputPromise = Promise.all([
-      loadOutputSettingsFromDB(),
-      loadStreamingAvatarSettingsFromDB(),
-    ]);
+    // Every setting that drives a call, read once from admin_settings (read-only) for the
+    // active environment; the getters then read that copy. The first call waits for it.
+    const settingsLoad = startExperienceSettingsLoad().catch(() => null);
+    const outputPromise = settingsLoad.then(
+      () => [getOutputSettings(), getStreamingAvatarSettings()] as [OutputSettings, StreamingAvatarSettings],
+    );
     outputSettingsLoadRef.current = outputPromise;
     void outputPromise.then(([output, avatar]) => {
       outputSettingsRef.current = output;
       avatarSettingsRef.current = avatar;
     });
-    const settingsPromise = loadGameplaySettingsFromDB();
+    const settingsPromise = settingsLoad.then(() => getGameplaySettings());
     gameplaySettingsLoadRef.current = settingsPromise;
     void settingsPromise.then((settings) => {
       const duration = normalizeSessionDurationSeconds(settings.TIMEOUT_SECONDS);
@@ -829,15 +829,23 @@ const IndexPRD4 = () => {
   const prepareCall = useCallback(async () => {
     const generation = callGenerationRef.current;
     const current = () => callGenerationRef.current === generation && !endedRef.current;
+    // Speech states may be edited between two calls of the same page.
     void loadSpeechPerformanceSettings();
     avatarConnectStartedAtRef.current = null;
     avatarFirstFrameAtRef.current = null;
     avatarFirstSpeechAtRef.current = null;
-    const [[outputSettings, configuredAvatarSettings], deviceServices] = await Promise.all([
-      outputSettingsLoadRef.current ??
-        Promise.all([loadOutputSettingsFromDB(), loadStreamingAvatarSettingsFromDB()]),
-      deviceServicesReady(),
+    const startingCharacter = startingCharacterRef.current;
+    // Bounded wait for the database settings; past it the call goes on with the local copy
+    // or the code defaults, and the fallback is reported (never silent).
+    const settingsState = await ensureExperienceSettings({ sessionContext: "prepare_call" });
+    // Character profiles for the session record: requested now, never awaited before the call.
+    const recordProfiles = Promise.all([
+      getCharacterRuntimeProfile("max").catch(() => null),
+      getCharacterRuntimeProfile("emma").catch(() => null),
     ]);
+    const outputSettings = getOutputSettings();
+    const configuredAvatarSettings = getStreamingAvatarSettings();
+    const deviceServices = await deviceServicesReady();
     const deviceClass = getDeviceClass();
     const deviceSettings = deviceServices[deviceClass];
     // "Services par appareil" may pick another avatar provider for this screen.
@@ -857,7 +865,6 @@ const IndexPRD4 = () => {
     }
     diagnosticTraceEnabledRef.current = diagnosticTraceEnabled;
 
-    const startingCharacter = startingCharacterRef.current;
     // Le flux vidéo en direct est celui de Max : un autre personnage (Emma) démarre
     // en voix seule, avec sa photo, pour ne jamais afficher le flux de Max. Un
     // smartphone reste en voix seule (appel vocal), sans connexion avatar.
@@ -876,6 +883,13 @@ const IndexPRD4 = () => {
     setHandsFreeEnabled(handsFreeSettingsRef.current.enabled);
     setVoiceOnly(pinnedGameplay.VOICE_ONLY_UI === true);
     const technicalExpiry = Date.now() + TECHNICAL_RESUME_SECONDS * 1000;
+    // Settings pinned at call start; the voices are described once the profiles arrive.
+    const recordStartedAt = new Date();
+    const recordLlm = getLLMSettings();
+    const describeVoices = ([maxProfile, emmaProfile]: Awaited<typeof recordProfiles>) => ({
+      max: describeCurrentEffectiveVoice(deviceClass, "max", maxProfile, { deviceServices: deviceSettings, configuredOutput: outputSettings.mode, avatar: avatarSettings }),
+      emma: describeCurrentEffectiveVoice(deviceClass, "emma", emmaProfile, { deviceServices: deviceSettings, configuredOutput: outputSettings.mode, avatar: avatarSettings }),
+    });
     const sid = await createPRD4Session(
       state.userRoleProfile,
       startingCharacter,
@@ -888,6 +902,18 @@ const IndexPRD4 = () => {
         active_character: startingCharacter,
       } as never,
     );
+    void withTimeout("session_effective_settings_profiles", recordProfiles, 10_000)
+      .catch(() => [null, null] as Awaited<typeof recordProfiles>)
+      .then((profiles) => recordPRD4EffectiveSettings(sid, buildSessionEffectiveSettings({
+        settings: settingsState,
+        llm: recordLlm,
+        startingCharacter,
+        outputMode,
+        outputModeReason,
+        voices: describeVoices(profiles),
+        now: recordStartedAt,
+      })))
+      .catch((error) => console.warn("[PRD4] effective settings not recorded", error));
     if (!current()) { void endPRD4Session(sid, 'abandoned_before_answer', [], 0); return; }
     sessionIdRef.current = sid;
     setTechnicalExpiresAt(technicalExpiry);
@@ -1062,6 +1088,8 @@ const IndexPRD4 = () => {
       return;
     }
     const { configuredDurationSeconds, elapsedSeconds, remainingSeconds } = timerWindow;
+    // A resumed call (often after a reload) must also play the database settings.
+    await ensureExperienceSettings({ sessionContext: "resume" });
     const profile = await getCharacterRuntimeProfile(session.active_character).catch(() => null);
     const characterContext = toCharacterExecutionContext(profile);
     if (!profile?.ready || !characterContext) {

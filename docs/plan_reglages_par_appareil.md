@@ -70,3 +70,33 @@ Note : le 8 novembre à 16 h 42, `ava_device_services` sandbox-ulrich a été sa
   moteur par personnage et par appareil, voix du catalogue, migration de `ava_device_services` sans perte.
 
 Prompt du lot 1 : [prompt_reprise_reglages_par_appareil_lot_1.md](prompt_reprise_reglages_par_appareil_lot_1.md).
+Prompt du lot 2 : [prompt_reprise_reglages_par_appareil_lot_2.md](prompt_reprise_reglages_par_appareil_lot_2.md).
+
+## Exécution lot 1 (8 novembre 2026)
+
+- **Chargement joueur** — `src/services/experienceSettings.ts` : `hydrateExperienceSettings()` lit en une requête
+  (lecture seule) les 20 clés `EXPERIENCE_SETTING_KEYS` pour l'environnement actif et la production, choisit la ligne
+  de l'environnement sinon celle de la production (même règle que `resolveSettingRows`), écrit la copie locale, efface
+  la copie locale d'une clé sans ligne (défauts du code) et rafraîchit les caches mémoire (STT, fournisseurs STT,
+  dictionnaire, services par appareil). `startExperienceSettingsLoad()` au montage d'`IndexPRD4` (remplace les
+  chargements séparés STT/sortie/avatar/gameplay) ; `ensureExperienceSettings()` dans `prepareCall` et la reprise de
+  session : attente bornée à 2,5 s, puis repli explicite (console + `prd4_settings_fallback`). Un changement
+  d'environnement relance la lecture. Les autres parcours (passage à Emma, grille, questionnaire conversationnel,
+  `proxy-llm`) lisent les getters déjà remplis ; `proxy-llm` reçoit le modèle du client. RLS vérifiée : les clés
+  `ava_*` sont lisibles par le joueur anonyme (prod) et par le testeur invité (son environnement).
+- **Résumé effectif** — `src/services/effectiveVoice.ts` (pur) et `effectiveVoiceCurrent.ts` (lecture des réglages
+  courants). Mêmes règles que l'expérience : sortie par `resolveCallOutputMode`, moteur et voix comme
+  `resolveDeviceVoice` puis repli moteur actif / voix du moteur. Anam et HeyGen parlent avec leur voix (HeyGen
+  précise son moteur et modèle ElevenLabs) ; Tavus « voix Ava » et LemonSlice rejouent la chaîne TTS d'Ava. Affichage
+  (`src/components/admin/EffectiveVoiceSummary.tsx`) dans Services par appareil (valeur éditée), Réglages personnages
+  (profil édité, trois appareils), Streaming Avatar (réglages affichés, voix du fournisseur et par appareil) et
+  TTS Config (réglages sauvegardés).
+- **Réglages effectifs par session** — `src/services/sessionEffectiveSettings.ts`, figés au début de l'appel et écrits dans
+  `sessions.device_info.effective_settings` (colonne JSON existante ; aucune migration) dès que les fiches personnage
+  sont connues (`recordPRD4EffectiveSettings`), sans retarder l'appel. Détail de
+  session admin : modèles Max et MJ, sortie, moteur et modèle TTS, voix, source et date des réglages, résumé Max et
+  Emma.
+- **Validations** — unitaires (navigateur vierge → LLM et ElevenLabs de la base ; repli ; délai ; accord avec les
+  règles de l'expérience), E2E « navigateur vierge » (modèles réellement envoyés à `proxy-llm` / `proxy-tts`, ligne
+  de session), `@iphone` / `@ipad`. Après livraison : lecture base d'une nouvelle session smartphone. Recette iPhone
+  (voix de Max) : humaine, distincte, non faite.

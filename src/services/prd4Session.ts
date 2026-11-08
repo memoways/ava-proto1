@@ -12,6 +12,7 @@ import { ensureGameAuth } from "@/services/gameAuth";
 import { trackEvent } from "@/services/posthogService";
 import { getRuntimeContext } from "@/services/environmentContext";
 import { getDeviceSnapshot } from "@/services/deviceClass";
+import type { SessionEffectiveSettings } from "@/services/sessionEffectiveSettings";
 
 type SessionInsert = Database["public"]["Tables"]["sessions"]["Insert"];
 
@@ -24,9 +25,10 @@ function trackPersistence(operation: string, success: boolean, sessionId?: strin
 }
 
 /** Device class frozen for the page and its technical snapshot (no identifying field). */
-function deviceColumns(): Pick<SessionInsert, "device_class" | "device_info"> {
+function deviceColumns(effectiveSettings?: SessionEffectiveSettings): Pick<SessionInsert, "device_class" | "device_info"> {
   const { device_class, ...device_info } = getDeviceSnapshot();
-  return { device_class, device_info: device_info as unknown as Json };
+  const info = effectiveSettings ? { ...device_info, effective_settings: effectiveSettings } : device_info;
+  return { device_class, device_info: JSON.parse(JSON.stringify(info)) as Json };
 }
 
 export async function createPRD4Session(
@@ -154,6 +156,19 @@ export async function updatePRD4ExperienceState(
     .update(update as never)
     .eq("id", sessionId);
   trackPersistence("update_experience_state", !error, sessionId);
+  if (error) throw error;
+}
+
+/**
+ * Effective settings of the call (per-device settings lot 1), written into the
+ * device snapshot column once the character profiles are known. Never blocks the call.
+ */
+export async function recordPRD4EffectiveSettings(sessionId: string, effectiveSettings: SessionEffectiveSettings): Promise<void> {
+  const { error } = await supabase
+    .from("sessions")
+    .update({ device_info: deviceColumns(effectiveSettings).device_info })
+    .eq("id", sessionId);
+  trackPersistence("record_effective_settings", !error, sessionId);
   if (error) throw error;
 }
 

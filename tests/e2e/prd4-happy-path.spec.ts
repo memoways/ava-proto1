@@ -57,6 +57,10 @@ interface NetworkFakeOptions {
   delayFirstSTTFinalMs?: number;
   /** Server output setting; "streaming_avatar" makes the avatar the configured mode. */
   outputMode?: "streaming_avatar";
+  /** `admin_settings.ava_llm_settings` (LLM models) served by the fake database. */
+  llmSettings?: Record<string, unknown>;
+  /** `admin_settings.ava_tts_settings` (ElevenLabs) served by the fake database. */
+  elevenLabsSettings?: Record<string, unknown>;
 }
 
 function json(route: Route, body: unknown, status = 200) {
@@ -89,6 +93,9 @@ async function installNetworkFakes(
   let triggeredVideoLoads = 0;
   let ttsCallCount = 0;
   const ttsTexts: string[] = [];
+  const ttsModels: string[] = [];
+  const characterModels: string[] = [];
+  const llmModels: string[] = [];
   let posthogRequestCount = 0;
   let traceUploadStarted = 0;
   let traceUploadCompleted = 0;
@@ -481,19 +488,25 @@ async function installNetworkFakes(
       }] : []);
     }
     if (table === "admin_settings") {
-      if (options.outputMode && url.searchParams.get("key") === "eq.ava_output_settings") {
-        return json(route, [{ environment_id: "prod", value: { mode: options.outputMode } }]);
-      }
-      if (url.searchParams.get("key") === "eq.ava_gameplay_settings") {
-        return json(route, [{ environment_id: "prod", value: { TIMEOUT_SECONDS: 930,
+      const settings: Record<string, unknown> = {
+        ava_gameplay_settings: { TIMEOUT_SECONDS: 930,
           ...(options.incrementalOutput ? { VOICE_INCREMENTAL_OUTPUT: true } : {}),
           ...(options.handsFree ? { VOICE_HANDS_FREE: { enabled: true, ...(options.p2 ? { interruptionStrategy: "acoustic_confirmed" } : {}) } } : {}),
           ...(options.p2 ? { VOICE_ONLY_UI: true } : {}),
           ...(options.skipQuestionnaire ? { SHOW_QUESTIONNAIRE: false } : {}),
           ...(options.conversationalQuestionnaire ? { QUESTIONNAIRE_MODE: "conversational" } : {}),
-        } }]);
-      }
-      return json(route, []);
+        },
+        ...(options.outputMode ? { ava_output_settings: { mode: options.outputMode } } : {}),
+        ...(options.llmSettings ? { ava_llm_settings: options.llmSettings } : {}),
+        ...(options.elevenLabsSettings ? { ava_tts_settings: options.elevenLabsSettings } : {}),
+      };
+      // Single-key loads (`key=eq.X`) and the experience settings load (`key=in.(X,Y)`).
+      const filter = url.searchParams.get("key") ?? "";
+      const keys = filter.startsWith("eq.") ? [filter.slice(3)]
+        : filter.startsWith("in.(") ? filter.slice(4, -1).split(",").map(key => key.replace(/^"|"$/g, "")) : [];
+      return json(route, keys.filter(key => key in settings).map(key => ({
+        key, environment_id: "prod", value: settings[key], updated_at: "2026-11-08T15:00:00Z",
+      })));
     }
     if (table === "character_prompts") {
       const emma = url.searchParams.get("character_id") === `eq.${EMMA_CHARACTER_ID}`;
@@ -586,6 +599,7 @@ async function installNetworkFakes(
     }
     if (functionName === "proxy-tts") {
       ttsTexts.push((request.postDataJSON() as { text: string }).text);
+      ttsModels.push(String((request.postDataJSON() as { modelId?: string }).modelId ?? ""));
       ttsCallCount += 1;
       if (options.ttsBusyOnce && ttsCallCount === 1) {
         return json(route, {
@@ -603,7 +617,8 @@ async function installNetworkFakes(
       return route.fulfill({ status: 422, contentType: "application/json", body: JSON.stringify({ error: "TTS disabled in E2E" }) });
     }
     if (functionName === "proxy-llm") {
-      const payload = request.postDataJSON() as { stream?: boolean; messages?: Array<{ role: string; content: string }> };
+      const payload = request.postDataJSON() as { stream?: boolean; model?: string; messages?: Array<{ role: string; content: string }> };
+      llmModels.push(String(payload.model ?? ""));
       const system = payload.messages?.[0]?.content ?? "";
       let content: string;
       if (system.includes("court retour d'expérience")) {
@@ -687,6 +702,7 @@ async function installNetworkFakes(
         });
       } else {
         characterCalls.push(JSON.stringify(payload.messages));
+        characterModels.push(String(payload.model ?? ""));
         maxTurnCount += 1;
         maxMessageCounts.push(payload.messages?.length ?? 0);
         if (options.delayCharacterResponseMs) {
@@ -754,6 +770,9 @@ async function installNetworkFakes(
     getFollowUpCallCount: () => followUpCallCount,
     getSyncQuestionnaireBodies: () => syncQuestionnaireBodies,
     getTtsText: () => ttsTexts.join(" "),
+    getTtsModels: () => ttsModels,
+    getLlmModels: () => llmModels,
+    getCharacterModels: () => characterModels,
     getTtsSubmittedText: async () => options.incrementalOutput
       ? page.evaluate(() => (window as Window & { __e2eGradiumTexts?: string[] }).__e2eGradiumTexts?.join(' ') ?? '')
       : ttsTexts.join(' '),
@@ -824,6 +843,40 @@ for (const character of ['Max', 'Emma'] as const) {
     expect(fakes.getTtsCallCount()).toBe(1);
   });
 }
+
+test('réglages par appareil lot 1 : un navigateur vierge joue le LLM et ElevenLabs de la base', async ({ page }) => {
+  const fakes = await installNetworkFakes(page, HANDOFF_TURNS, {
+    ttsSuccess: true,
+    characterOpenings: true,
+    llmSettings: { LLM_MODEL: "openai/gpt-5.6-luna" },
+    elevenLabsSettings: { modelId: "eleven_v4_turbo", stability: 0.38, style: 0.38 },
+  });
+  // Blank browser: nothing in localStorage before the app runs (no earlier admin visit).
+  await page.addInitScript(() => {
+    const w = window as Window & { __e2eInitialSettings?: string[] };
+    if (w.__e2eInitialSettings === undefined) {
+      w.__e2eInitialSettings = Object.keys(localStorage).filter(key => /ava_(llm|tts)_settings/.test(key));
+    }
+  });
+  await startCharacterConversation(page, 'Max');
+  expect(await page.evaluate(() => (window as Window & { __e2eInitialSettings?: string[] }).__e2eInitialSettings)).toEqual([]);
+  await sendHandoffTurn(page, HANDOFF_TURNS[0]);
+  await expect.poll(() => fakes.getCharacterModels().length).toBeGreaterThan(0);
+  expect(new Set(fakes.getCharacterModels())).toEqual(new Set(["openai/gpt-5.6-luna"]));
+  expect(fakes.getTtsModels().length).toBeGreaterThan(0);
+  expect(new Set(fakes.getTtsModels())).toEqual(new Set(["eleven_v4_turbo"]));
+  const effective = () => (fakes.getSessionRow().device_info as { effective_settings?: Record<string, unknown> })?.effective_settings;
+  await expect.poll(effective).toBeTruthy();
+  expect(effective()).toMatchObject({
+    settings_source: "database",
+    settings_updated_at: "2026-11-08T15:00:00Z",
+    max_model: "openai/gpt-5.6-luna",
+    tts_provider: "elevenlabs",
+    tts_model: "eleven_v4_turbo",
+    voice_id: "e2e-max-voice",
+    output_mode: "tts",
+  });
+});
 
 test('A4 : une fiche initiale arrivée après raccrochage ne prononce aucun accueil', async ({ page }) => {
   const fakes = await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true });
