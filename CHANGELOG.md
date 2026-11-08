@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Questionnaire conversationnel de fin d'expérience : plan] — 2026-11-08
+
+- Plan `docs/plan_questionnaire_conversationnel.md` : réponses à la voix (questions affichées, sans voix de sortie),
+  5 dimensions de Notion notées 1–5 avec « non évalué » distinct, une relance contextuelle maximum, validation finale
+  de la synthèse, radar participant et admin, transcription seule conservée (pas d'audio). Aucune question sur ce que
+  la session connaît déjà (film, personnages, durée, latences, appareil). Quatre lots ; prompt du lot 1 prêt.
+
 ## [Adaptation aux écrans, lot 3 : tablette tactile et recette multi-appareils] — 2026-11-08
 
 - Tablette (classe du lot 1, forçable par `?ecran=tablette`) : écran vidéo et avatar gardés ; prop `touchFirst`
